@@ -1,0 +1,13 @@
+server:
+  host: 0.0.0.0
+  port: 9090
+  models_max: 1
+  binary: LlamaCPP/bin/current/llama-server
+  preset: LlamaCPP/generated/models.ini
+
+models:
+  gemma-4-E4B-it-q4km:
+    path: ~/Models/gemma-4-E4B-it-q4km.gguf
+    ctx-size: 65536
+    n-gpu-layers: 999
+    flash-attn: true

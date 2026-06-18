@@ -1,4 +1,4 @@
-.PHONY: llama-render llama-command llama-run llama-install-user llama-start llama-stop llama-restart llama-status llama-logs llama-models
+.PHONY: llama-render llama-command llama-run llama-install-user llama-install-commands llama-start llama-stop llama-restart llama-status llama-logs llama-models
 
 llama-render:
 	python scripts/llamacpp.py render
@@ -12,20 +12,23 @@ llama-run:
 llama-install-user:
 	python scripts/llamacpp.py install-user-service
 
+llama-install-commands:
+	python scripts/llamacpp.py install-console-commands
+
 llama-start:
-	systemctl --user start llamacpp-router.service
+	python scripts/llamacpp.py service-start
 
 llama-stop:
-	systemctl --user stop llamacpp-router.service
+	python scripts/llamacpp.py service-stop
 
 llama-restart:
-	systemctl --user restart llamacpp-router.service
+	python scripts/llamacpp.py service-restart
 
 llama-status:
-	systemctl --user status llamacpp-router.service --no-pager
+	python scripts/llamacpp.py service-status
 
 llama-logs:
-	journalctl --user -u llamacpp-router.service -f
+	python scripts/llamacpp.py service-logs
 
 llama-models:
-	curl -s http://localhost:9090/v1/models
+	python scripts/llamacpp.py list-models

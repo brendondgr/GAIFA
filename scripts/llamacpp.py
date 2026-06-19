@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -32,6 +33,7 @@ CONSOLE_COMMANDS = {
     "llamacpp-models": "list-models",
 }
 MODEL_METADATA_KEYS = {"path", "model", "params", "nicknames"}
+GGUF_SPLIT_RE = re.compile(r"^(?P<prefix>.*-)(?P<index>\d+)-of-(?P<total>\d+)(?P<suffix>\.gguf)$")
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -99,6 +101,44 @@ def format_command(argv: list[str], env: dict[str, str] | None = None) -> str:
     return f"{prefix} {' '.join(argv)}"
 
 
+def validate_model_file(model_id: str, model_path: Path) -> None:
+    if not model_path.exists():
+        raise SystemExit(f"model file does not exist for {model_id}: {model_path}")
+
+    match = GGUF_SPLIT_RE.match(model_path.name)
+    if not match:
+        return
+
+    split_index = int(match.group("index"))
+    split_total = int(match.group("total"))
+    if split_index != 1 or split_total <= 1:
+        return
+
+    width = len(match.group("index"))
+    missing: list[Path] = []
+    hints: list[str] = []
+    for index in range(1, split_total + 1):
+        name = (
+            f"{match.group('prefix')}{index:0{width}d}-of-"
+            f"{match.group('total')}{match.group('suffix')}"
+        )
+        split_path = model_path.with_name(name)
+        if split_path.exists():
+            continue
+        missing.append(split_path)
+        double_suffix = split_path.with_name(f"{split_path.name}.gguf")
+        if double_suffix.exists():
+            hints.append(f"found {double_suffix.name}; rename it to {split_path.name}")
+
+    if missing:
+        details = "\n".join(f"  - {path}" for path in missing)
+        hint_text = "\n" + "\n".join(f"  - {hint}" for hint in hints) if hints else ""
+        raise SystemExit(
+            f"model {model_id!r} is a split GGUF, but required split files are missing:\n"
+            f"{details}{hint_text}"
+        )
+
+
 def render_models_ini(config_path: Path) -> Path:
     config = load_config(config_path)
     server = config.get("server") or {}
@@ -122,8 +162,7 @@ def render_models_ini(config_path: Path) -> Path:
         if not model_path_raw:
             raise SystemExit(f"model {model_id!r} needs a path")
         model_path = resolve_path(model_path_raw)
-        if not model_path.exists():
-            raise SystemExit(f"model file does not exist: {model_path}")
+        validate_model_file(str(model_id), model_path)
 
         params = dict(model_defaults)
         raw_params = raw_model.get("params") or {}
@@ -325,7 +364,8 @@ def warm_model(config_path: Path, model_id: str) -> None:
         details = exc.read().decode("utf-8", errors="replace")
         raise SystemExit(f"failed to load {model_id}: {details}") from exc
     content = payload.get("choices", [{}])[0].get("message", {}).get("content", "")
-    print(f"loaded {model_id}: {content.strip()}")
+    suffix = f": {content.strip()}" if content.strip() else ""
+    print(f"loaded {model_id}{suffix}")
 
 
 def service_file_exists() -> bool:

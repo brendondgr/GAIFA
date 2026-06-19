@@ -4,7 +4,11 @@ server:
   models_max: 1
   binary: LlamaCPP/bin/current/llama-server
   preset: LlamaCPP/generated/models.ini
-  params: {}
+  params:
+    jinja: true
+    reasoning: auto
+    reasoning-format: deepseek
+    reasoning-budget: -1
   environment:
     AMD_VULKAN_ICD: RADV
     GPU_MAX_HW_QUEUES: "8"
@@ -15,15 +19,14 @@ model_defaults:
   cache-type-v: q8_0
   n-gpu-layers: 999
   flash-attn: true
-  no-mmap: true
+  no-mmap: false
   batch-size: 2048
   ubatch-size: 512
 
 models:
-  gemma-4-E4B-it-q4km:
-    nicknames: [gemma4-E4B]
-    path: ~/Models/gemma-4-E4B-it-q4km.gguf
-
   gemma-4-26B-it-q4km:
     nicknames: [gemma4-26B]
-    path: ~/Models/gemma-4-26B-q4km.gguf
+    path: ~/Models/gemma4-26B-Q6K.gguf
+  nemotron-3-super:
+    nicknames: [nemotron3-super]
+    path: ~/Models/Nemotron3Super/Nemotron3-120B-Q4KM-00001-of-00003.gguf

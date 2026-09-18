@@ -10,7 +10,7 @@ def test_load_merges_defaults(home):
     s = settings.load(home)
     assert s["daemon"]["port"] == 7700
     assert s["llama"]["server_params"]["jinja"] is True
-    assert s["relay"]["url"] == "http://127.0.0.1:4000"
+    assert s["relay"]["url"] == "http://127.0.0.1:17999"
     assert s["scan_dirs"] == ["models", "extra"]
 
 

@@ -21,7 +21,7 @@ SETTINGS = {
         "server_params": {"jinja": True, "reasoning": "auto", "reasoning-budget": -1},
     },
     "ports": {"start": 17071, "end": 17099},
-    "relay": {"url": "http://127.0.0.1:4000", "dashboard_url": "http://127.0.0.1:4000/",
+    "relay": {"url": "http://127.0.0.1:17999", "dashboard_url": "http://127.0.0.1:17999/",
               "auto_register": False},
     "scan_dirs": ["models", "extra"],
 }

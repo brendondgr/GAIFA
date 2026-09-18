@@ -16,6 +16,7 @@ lcpp = "lcpp.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=8",
+    "pytest-timeout>=2",
 ]
 
 [build-system]
@@ -27,3 +28,5 @@ packages = ["src/lcpp"]
 
 [tool.pytest.ini_options]
 testpaths = ["src/tests"]
+# A hung lifecycle test should fail fast, not stall the suite.
+timeout = 60

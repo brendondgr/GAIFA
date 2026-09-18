@@ -56,7 +56,7 @@ def test_preflight_defaults(fake_home):
 def test_preflight_errors(fake_home):
     sup = make_supervisor(fake_home)
     codes = lambda spec: {e["code"] for e in sup.preflight(spec)["errors"]}  # noqa: E731
-    assert codes({"model_id": "gemma4-19B", "port": 4000}) == {"port_reserved"}
+    assert codes({"model_id": "gemma4-19B", "port": 17999}) == {"port_reserved"}
     assert codes({"model_id": "gemma4-19B", "port": 7700}) == {"port_reserved"}
     with socket.socket() as s:
         s.bind(("127.0.0.1", 17090))

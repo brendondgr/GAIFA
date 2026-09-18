@@ -68,3 +68,33 @@ def home(tmp_path: Path) -> Paths:
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(b"\0" * size)
     return Paths(root=root, state=tmp_path / "state")
+
+
+FAKE_SERVER = Path(__file__).parent / "fakes" / "fake_llama_server.py"
+
+
+@pytest.fixture
+def fake_home(home: Paths) -> Paths:
+    """``home`` whose llama binary is the fake server (an executable wrapper)."""
+    import sys
+
+    binary = home.root / "runtime/llama.cpp/bin/current/llama-server"
+    binary.parent.mkdir(parents=True, exist_ok=True)
+    binary.write_text(f"#!{sys.executable}\nimport runpy\nrunpy.run_path({str(FAKE_SERVER)!r}, run_name='__main__')\n")
+    binary.chmod(0o755)
+    (home.root / "models/Broken").mkdir(parents=True, exist_ok=True)
+    (home.root / "models/Broken/willfail.gguf").write_bytes(b"\0" * 50)
+    raw = json.loads(home.models_file.read_text())
+    raw["models"]["broken"] = {"nicknames": ["brk"], "path": "models/Broken/willfail.gguf"}
+    home.models_file.write_text(json.dumps(raw))
+    return home
+
+
+def make_supervisor(paths: Paths, backend=None):
+    from lcpp import settings
+    from lcpp.backends.subprocess import SubprocessBackend
+    from lcpp.catalog import Catalog
+    from lcpp.supervisor import Supervisor
+
+    return Supervisor(paths, backend or SubprocessBackend(paths.state / "logs"),
+                      settings.load(paths), Catalog.load(paths))

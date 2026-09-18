@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end check against the real services: lcppd (:7700), the relay
+# End-to-end check against the real services: lcppd (:7710), the relay
 # (:4000) and real llama-server processes. Touches only its own instances
 # (ports 7181/7182), so a router or anything else you have running is left alone.
 #
@@ -21,7 +21,7 @@ chat() {  # chat <model-name-on-relay> -> prints the model that answered
 }
 
 echo "== daemon"
-curl -sf http://127.0.0.1:7700/api/health >/dev/null && pass "lcppd answers on :7700" || fail "lcppd is not running (lcpp service start)"
+curl -sf http://127.0.0.1:7710/api/health >/dev/null && pass "lcppd answers on :7710" || fail "lcppd is not running (lcpp service start)"
 systemctl --user is-enabled lcpp.service >/dev/null && pass "lcpp.service enabled at boot" || fail "lcpp.service not enabled"
 curl -sf "$RELAY/health" >/dev/null && pass "relay answers on $RELAY" || fail "relay is not running"
 
@@ -37,7 +37,7 @@ echo "== routing through the relay"
 
 echo "== daemon restart keeps instances and registrations"
 systemctl --user restart lcpp.service
-until curl -sf http://127.0.0.1:7700/api/health >/dev/null; do sleep 0.1; done
+until curl -sf http://127.0.0.1:7710/api/health >/dev/null; do sleep 0.1; done
 lcpp status | grep -q "e2e-mini .*ready\|e2e-mini  *$A" && pass "instances survived the restart" || fail "instances lost: $(lcpp status)"
 case " $(regs) " in *" lcpp:$A "*) pass "registration lcpp:$A intact" ;; *) fail "lcpp:$A missing after restart" ;; esac
 [ "$(chat MiniCPM5-2B)" = "MiniCPM5-2B" ] && pass "still routes after restart" || fail "routing broke after restart"

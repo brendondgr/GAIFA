@@ -18,7 +18,7 @@ HOST = "127.0.0.1"
 RELAY_OWNER = "lcpp"
 
 DEFAULTS: dict[str, Any] = {
-    "daemon": {"port": 7700},
+    "daemon": {"port": 7710},
     "llama": {
         "binary": "runtime/llama.cpp/bin/current/llama-server",
         "environment": {},

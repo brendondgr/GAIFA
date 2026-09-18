@@ -11,7 +11,7 @@ Everything is bound to `127.0.0.1`. It is meant for this machine only.
 
 ```text
  lcpp CLI ─┐                                                 ┌─ DashLLM relay :4000
- browser  ─┴─▶ lcppd 127.0.0.1:7700 ── PUT/DELETE lcpp:<port> ─▶ /admin/registrations
+ browser  ─┴─▶ lcppd 127.0.0.1:7710 ── PUT/DELETE lcpp:<port> ─▶ /admin/registrations
                │                                             └─ /v1 ──▶ ┐
                └─ systemd-run ─▶ lcpp-<name>.service ─▶ llama-server :<port>
 ```
@@ -45,10 +45,10 @@ lcpp restart 7072
 lcpp stop 7072 | lcpp stop all
 lcpp service status|restart|logs          # the daemon itself
 lcpp doctor                               # check binary, models, service, relay
-lcpp ui                                   # open http://127.0.0.1:7700
+lcpp ui                                   # open http://127.0.0.1:7710
 ```
 
-The web UI (`http://127.0.0.1:7700`) does the same things. It has five views:
+The web UI (`http://127.0.0.1:7710`) does the same things. It has five views:
 
 - **Instances:** launch with a live port check and memory estimate; stop, restart and view logs.
 - **Models:** edit the catalog and add discovered GGUFs.

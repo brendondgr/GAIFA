@@ -14,7 +14,7 @@ import pytest
 from lcpp.paths import Paths
 
 SETTINGS = {
-    "daemon": {"port": 7700},
+    "daemon": {"port": 7710},
     "llama": {
         "binary": "runtime/llama.cpp/bin/current/llama-server",
         "environment": {"AMD_VULKAN_ICD": "RADV"},

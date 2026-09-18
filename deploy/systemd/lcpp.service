@@ -2,7 +2,7 @@
 # `lcpp service install` (scripts/install.sh calls it). Do not hardcode a path
 # here: a value baked into the installed unit is overwritten on reinstall.
 [Unit]
-Description=lcpp - llama.cpp model launcher (lcppd on 127.0.0.1:7700)
+Description=lcpp - llama.cpp model launcher (lcppd on 127.0.0.1:7710)
 Documentation=file://@REPO_ROOT@/README.md
 
 [Service]

@@ -61,7 +61,7 @@ def test_register_on_ready_and_remove_on_stop(fake_home, relay):
         assert reg["alias"] == "MiniCPM5-2B"
         assert reg["available_models"] == ["minicpm-5-2B", "MiniCPM5-2B"]
         assert reg["base_url"] == "http://127.0.0.1:17071/v1" and reg["owner"] == "lcpp"
-        assert reg["meta"]["manager_url"] == "http://127.0.0.1:7700/" and reg["meta"]["instance"] == name
+        assert reg["meta"]["manager_url"] == "http://127.0.0.1:7710/" and reg["meta"]["instance"] == name
         ov = c.get("/api/relay").json()
         assert ov["status"]["reachable"] and [o["key"] for o in ov["owned"]] == ["lcpp:17071"]
         assert ov["owned"][0]["instance"] == name and not ov["owned"][0]["orphan"]

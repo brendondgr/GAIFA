@@ -39,7 +39,7 @@ def test_health_overview_and_static(client):
     ov = client.get("/api/overview").json()
     assert ov["instances"] == []
     assert ov["system"]["memory"]["total_bytes"] > 0
-    assert ov["system"]["daemon"]["port"] == 7700
+    assert ov["system"]["daemon"]["port"] == 7710
     assert ov["system"]["llama"]["binary_ok"] is True
     assert ov["relay"]["reachable"] is False and ov["relay"]["error"]
     assert "lcpp" in client.get("/").text

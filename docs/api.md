@@ -1,8 +1,8 @@
 # lcpp API
 
-lcppd listens on `http://127.0.0.1:7700` (this machine only; `daemon.port` in
+lcppd listens on `http://127.0.0.1:7710` (this machine only; `daemon.port` in
 `data/lcpp.json`). The web UI and the `lcpp` CLI are both clients of this API.
-Interactive schema: `http://127.0.0.1:7700/api/docs`.
+Interactive schema: `http://127.0.0.1:7710/api/docs`.
 
 **Errors** are always `{"detail": string, "code": string}` with an HTTP status.
 Codes: `port_in_use`, `port_reserved`, `name_taken`, `invalid_name`,

@@ -31,14 +31,14 @@ export function createMockApi() {
     FS.set('~/Models/Nemotron3Super/Nemotron3-120B-Q4KM-00001-of-00003.gguf', 7872576); FS.set('~/Models/Nemotron3Super/Nemotron3-120B-Q4KM-00002-of-00003.gguf', 49932117344); FS.set('~/Models/Nemotron3Super/Nemotron3-120B-Q4KM-00003-of-00003.gguf', 32601178560);
     FS.set('~/Models/Qwen3.6-27B-Q4KM.gguf', 17106773120); FS.set('~/Models/Serenity-12B-Q4_K_M.gguf', 7381382208); FS.set('~/Models/Serenity-26B-A4B-Q4_K_M.gguf', 16796016576);
   };
-  const OTHER_PORTS = { 4000: 'Relay', 4096: 'opencode (pid 2231)', 5432: 'postgres (pid 1180)', 6379: 'redis (pid 1204)', 7700: 'lcpp daemon' };
-  const RESERVED = { 4000: 'reserved (Relay)', 7700: 'reserved (lcpp daemon)' };
+  const OTHER_PORTS = { 4000: 'Relay', 4096: 'opencode (pid 2231)', 5432: 'postgres (pid 1180)', 6379: 'redis (pid 1204)', 7710: 'lcpp daemon' };
+  const RESERVED = { 4000: 'reserved (Relay)', 7710: 'reserved (lcpp daemon)' };
   const S = {};
   function baseState() {
     fsSeed();
     S.defaults = { 'ctx-size': 262144, 'cache-type-k': 'q8_0', 'cache-type-v': 'q8_0', 'n-gpu-layers': 999, 'flash-attn': true, 'no-mmap': false, 'batch-size': 2048, 'ubatch-size': 512 };
     S.catalog = catalogSeed();
-    S.settings = { daemon: { port: 7700 }, llama: { binary: 'LlamaCPP/bin/current/llama-server', environment: { AMD_VULKAN_ICD: 'RADV', GPU_MAX_HW_QUEUES: '8' }, server_params: { jinja: true, reasoning: 'auto', 'reasoning-format': 'deepseek', 'reasoning-budget': -1 } }, ports: { start: 7071, end: 7199 }, relay: { url: 'http://127.0.0.1:4000', dashboard_url: 'http://127.0.0.1:4000/', auto_register: true }, scan_dirs: ['models/', '~/Models'] };
+    S.settings = { daemon: { port: 7710 }, llama: { binary: 'LlamaCPP/bin/current/llama-server', environment: { AMD_VULKAN_ICD: 'RADV', GPU_MAX_HW_QUEUES: '8' }, server_params: { jinja: true, reasoning: 'auto', 'reasoning-format': 'deepseek', 'reasoning-budget': -1 } }, ports: { start: 7071, end: 7199 }, relay: { url: 'http://127.0.0.1:4000', dashboard_url: 'http://127.0.0.1:4000/', auto_register: true }, scan_dirs: ['models/', '~/Models'] };
     S.relayReachable = true;
     S.instances = []; S.registrations = []; S.logs = new Map(); S.listeners = new Map(); S.recent = [];
     S.others = [

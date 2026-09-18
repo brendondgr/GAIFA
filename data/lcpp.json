@@ -1,6 +1,6 @@
 {
   "daemon": {
-    "port": 7700
+    "port": 7710
   },
   "llama": {
     "binary": "runtime/llama.cpp/bin/current/llama-server",

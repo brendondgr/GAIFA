@@ -1,8 +1,8 @@
 # UI smoke checklist
 
-Against the live daemon at http://127.0.0.1:7700 (badge in the sidebar footer
+Against the live daemon at http://127.0.0.1:7710 (badge in the sidebar footer
 reads LIVE). The same page over a plain static server (`lcpp-ui` preview on
-:7710) runs against the mock; `Shift+D` opens its scenario panel.
+:7711) runs against the mock; `Shift+D` opens its scenario panel.
 
 1. **Launch**: `+ Launch`, pick MiniCPM5-2B, port shows ✓ free, preflight
    estimate ≈ 5.8 GB, command preview matches `lcpp start minicpm --dry-run`.

@@ -470,7 +470,7 @@ let bannerTick = null;
 function drawBanner() {
   const s = store.state; const b = $('#banner'); clearInterval(bannerTick);
   if (!s.daemonDown) { b.replaceChildren(); return; }
-  const port = (s.settings && s.settings.daemon.port) || (s.overview && s.overview.system.daemon.port) || 7700; const count = h('span', { class: 'mono' });
+  const port = (s.settings && s.settings.daemon.port) || (s.overview && s.overview.system.daemon.port) || 7710; const count = h('span', { class: 'mono' });
   const tick = () => { const left = Math.max(0, Math.ceil((3000 - (Date.now() - (s.downTick || Date.now()))) / 1000)); count.textContent = left + 's'; };
   s.downTick = Date.now(); tick(); bannerTick = setInterval(() => { tick(); }, 250);
   b.replaceChildren(h('div', { style: { padding: '12px 24px 0' } }, L.Banner({ html: `<b>lcpp daemon not responding at 127.0.0.1:${port}.</b> Retrying in <span id="retry-in"></span> · start it with <code class="mono">lcpp service start</code>`, actions: [L.Button({ label: 'Retry now', size: 'sm', onClick: () => refreshOverview() })] })));

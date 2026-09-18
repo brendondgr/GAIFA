@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Measure lcppd's idle cost: time to first /api/health, RSS, and CPU over a window.
 #
-#   utils/measure_idle.sh              # against the running daemon on :7700
+#   utils/measure_idle.sh              # against the running daemon on :7710
 #   utils/measure_idle.sh --spawn      # start a throwaway daemon on :7790 first
 #
 # Budget: first answer < 1.5 s, RSS < 60 MB, ~0% CPU while idle.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PORT=7700
+PORT=7710
 WINDOW="${WINDOW:-30}"
 SPAWNED=""
 

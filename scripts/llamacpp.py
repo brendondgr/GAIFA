@@ -17,7 +17,8 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG = ROOT / "llamacpp.json"
+DEFAULT_CONFIG = ROOT / "data" / "lcpp.json"
+MODELS_CONFIG = ROOT / "data" / "models.json"
 SERVICE_NAME = "llamacpp-router.service"
 CONSOLE_COMMANDS = {
     "llamacpp-start": "service-start",
@@ -35,11 +36,35 @@ GGUF_SPLIT_RE = re.compile(r"^(?P<prefix>.*-)(?P<index>\d+)-of-(?P<total>\d+)(?P
 
 
 def load_config(path: Path) -> dict[str, Any]:
-    with path.open("r", encoding="utf-8") as fh:
-        data = json.load(fh) or {}
-    if not isinstance(data, dict):
-        raise SystemExit(f"{path} must contain a JSON object")
-    return data
+    """Assemble the legacy single-file shape from data/lcpp.json + data/models.json.
+
+    Transitional: this script is replaced by the lcpp package.
+    """
+    settings = json.loads(path.read_text(encoding="utf-8"))
+    catalog = json.loads(MODELS_CONFIG.read_text(encoding="utf-8"))
+    llama = settings.get("llama") or {}
+    models: dict[str, Any] = {}
+    for model_id, spec in (catalog.get("models") or {}).items():
+        params = dict(spec.get("params") or {})
+        if spec.get("mmproj"):
+            params["mmproj"] = spec["mmproj"]
+        if spec.get("draft"):
+            params["model-draft"] = spec["draft"]
+            params["spec-type"] = spec.get("spec_type") or "draft"
+        models[model_id] = {"nicknames": spec.get("nicknames") or [], "path": spec["path"], "params": params}
+    return {
+        "server": {
+            "host": "127.0.0.1",
+            "port": 7070,
+            "models_max": 1,
+            "binary": llama.get("binary", "runtime/llama.cpp/bin/current/llama-server"),
+            "preset": "data/generated/models.ini",
+            "params": llama.get("server_params") or {},
+            "environment": llama.get("environment") or {},
+        },
+        "model_defaults": catalog.get("defaults") or {},
+        "models": models,
+    }
 
 
 def resolve_path(value: str | os.PathLike[str]) -> Path:
@@ -149,7 +174,7 @@ def render_models_ini(config_path: Path) -> Path:
     if not isinstance(models, dict) or not models:
         raise SystemExit("models must be a non-empty mapping")
 
-    preset_path = resolve_path(server.get("preset", "LlamaCPP/generated/models.ini"))
+    preset_path = resolve_path(server.get("preset", "data/generated/models.ini"))
     preset_path.parent.mkdir(parents=True, exist_ok=True)
 
     lines = ["version = 1", ""]
@@ -189,7 +214,7 @@ def server_args(config_path: Path) -> list[str]:
     if not isinstance(server, dict):
         raise SystemExit("server must be a mapping")
 
-    binary = resolve_path(server.get("binary", "LlamaCPP/bin/current/llama-server"))
+    binary = resolve_path(server.get("binary", "runtime/llama.cpp/bin/current/llama-server"))
     if not binary.exists():
         raise SystemExit(f"llama-server not found: {binary}")
 

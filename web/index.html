@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>lcpp</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='1' y='1' width='22' height='22' rx='6' fill='%23ffb224'/%3E%3Cpath d='M7 7.5l5 4.5-5 4.5' fill='none' stroke='%231a1200' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M13 17h4' fill='none' stroke='%231a1200' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+/* Theme before first paint: saved choice, else the OS. Storage may be unavailable; render regardless. */
+(function(){var t='system';try{t=localStorage.getItem('lcpp.theme')||'system'}catch(e){}
+var dark=t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+document.documentElement.setAttribute('data-theme',dark?'dark':'light');})();
+</script>
+<link rel="stylesheet" href="assets/tokens.css">
+<link rel="stylesheet" href="assets/components.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div class="app lcpp" id="app">
+  <div class="scrim" id="scrim"></div>
+  <aside class="sidebar" id="sidebar" aria-label="Navigation">
+    <div class="brand"><span id="logo"></span><span>lcpp</span><span class="ver" id="ver"></span></div>
+    <nav id="nav" aria-label="Views"></nav>
+    <div class="sidebar-foot">
+      <div class="daemon" id="daemon-status"></div>
+      <a id="relay-link" href="#" target="_blank" rel="noopener">Open Relay dashboard ↗</a>
+      <div class="row" id="foot-badges"></div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <button class="btn btn-ghost btn-icon" id="menu-btn" aria-label="Menu" aria-expanded="false"></button>
+      <div class="brand"><span id="logo2"></span><span>lcpp</span></div>
+    </div>
+    <header class="header" id="header"></header>
+    <div id="banner"></div>
+    <main id="view" aria-live="polite"></main>
+  </div>
+</div>
+<aside class="drawer" id="drawer" aria-label="Logs" hidden></aside>
+<div id="toasts" aria-live="polite"></div>
+<div id="dev"></div>
+<!-- Served by lcppd, config.js switches the UI to the live API; any other
+     static server 404s it and the UI runs against its built-in mock. -->
+<script src="config.js"></script>
+<!-- components/* — lcpp design system (window.Lcpp), a classic script -->
+<script src="assets/components.js"></script>
+<!-- api (http) · api (mock) · state/store · router · views/* -->
+<script type="module" src="assets/app.js"></script>
+</body>
+</html>

@@ -5,13 +5,17 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
 
 # Virtual environments
 .venv
-LlamaCPP/bin/
-LlamaCPP/generated/
-LlamaCPP/vendor/
-LlamaCPP/logs/
 
-# Model weights live alongside the tooling in this dir; never track them.
+# llama.cpp binaries and downloads (see runtime/README.md)
+runtime/
+
+# Generated and machine-local configuration
+data/generated/
+data/*.local.json
+
+# Model weights live in models/; never track them.
 *.gguf

@@ -1,34 +1,17 @@
-.PHONY: llama-render llama-command llama-run llama-install-user llama-install-commands llama-start llama-stop llama-restart llama-status llama-logs llama-models
+# Developer shortcuts. Day-to-day use is the `lcpp` command (see README.md).
+.PHONY: install test dev idle-check smoke
 
-llama-render:
-	python scripts/llamacpp.py render
+install:          ## venv, lcpp command, at-boot service; retires the legacy setup
+	scripts/install.sh
 
-llama-command:
-	python scripts/llamacpp.py print-command
+test:             ## unit + API + CLI tests (fake llama-server; no GPU, no systemd)
+	uv run pytest -q
 
-llama-run:
-	python scripts/llamacpp.py run
+dev:              ## foreground daemon on :7790 running instances as child processes
+	LCPP_STATE_DIR=$$(mktemp -d) uv run python -m lcpp.daemon --port 7790 --dev
 
-llama-install-user:
-	python scripts/llamacpp.py install-user-service
+idle-check:       ## startup time, RSS and idle CPU of a throwaway daemon
+	utils/measure_idle.sh --spawn
 
-llama-install-commands:
-	python scripts/llamacpp.py install-console-commands
-
-llama-start:
-	python scripts/llamacpp.py service-start
-
-llama-stop:
-	python scripts/llamacpp.py service-stop
-
-llama-restart:
-	python scripts/llamacpp.py service-restart
-
-llama-status:
-	python scripts/llamacpp.py service-status
-
-llama-logs:
-	python scripts/llamacpp.py service-logs
-
-llama-models:
-	python scripts/llamacpp.py list-models
+smoke:            ## real llama-server under systemd: MiniCPM on :7071, then stop
+	uv run python utils/smoke_supervisor.py minicpm 7071

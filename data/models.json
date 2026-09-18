@@ -1,0 +1,71 @@
+{
+  "defaults": {
+    "ctx-size": 262144,
+    "cache-type-k": "q8_0",
+    "cache-type-v": "q8_0",
+    "n-gpu-layers": 999,
+    "flash-attn": true,
+    "no-mmap": false,
+    "batch-size": 2048,
+    "ubatch-size": 512
+  },
+  "models": {
+    "gemma-4-26B-it": {
+      "nicknames": [
+        "gemma4-26B"
+      ],
+      "path": "models/Gemma4-26B/Gemma4-26B-A4B-Q4KM.gguf",
+      "mmproj": "models/Gemma4-26B/mmproj-Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-BF16.gguf",
+      "draft": "models/Gemma4-26B/mtp-gemma-4-26B-A4B-it.gguf",
+      "spec_type": "draft-mtp",
+      "params": {
+        "gpu-layers-draft": 999
+      }
+    },
+    "gemma-4-19B-it": {
+      "nicknames": [
+        "gemma4-19B"
+      ],
+      "path": "models/Gemma4-19B/gemma-4-19B-A4B-it-The-DECKARD-Heretic-Uncensored-Thinking.i1-Q4_K_M.gguf"
+    },
+    "gemma-4-E4B-it": {
+      "nicknames": [
+        "gemma4-E4B"
+      ],
+      "path": "models/Gemma4-E4B/Gemma4-E4B.gguf"
+    },
+    "nemotron-3-super": {
+      "nicknames": [
+        "nemotron3-super"
+      ],
+      "path": "~/Models/Nemotron3Super/Nemotron3-120B-Q4KM-00001-of-00003.gguf"
+    },
+    "ornith1-35B": {
+      "nicknames": [
+        "ornith1-35B"
+      ],
+      "path": "models/Ornith1-35B/ornith-1.0-35b-uncensored-Q4_K_M.gguf"
+    },
+    "minicpm-5-2B": {
+      "nicknames": [
+        "MiniCPM5-2B"
+      ],
+      "path": "models/MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf",
+      "params": {
+        "ctx-size": 131072
+      }
+    },
+    "serenity-12B": {
+      "nicknames": [
+        "Serenity-12B"
+      ],
+      "path": "models/Serenity-12B/Serenity-12B-Q4_K_M.gguf"
+    },
+    "serenity-26B-A4B": {
+      "nicknames": [
+        "Serenity-26B"
+      ],
+      "path": "models/Serenity-26B-A4B/Serenity-26B-A4B-Q4_K_M.gguf"
+    }
+  }
+}

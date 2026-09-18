@@ -15,14 +15,9 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-try:
-    import yaml
-except ImportError as exc:  # pragma: no cover - environment guard
-    raise SystemExit("PyYAML is required. Install it with: python -m pip install PyYAML") from exc
-
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONFIG = ROOT / "llamacpp.yaml"
+DEFAULT_CONFIG = ROOT / "llamacpp.json"
 SERVICE_NAME = "llamacpp-router.service"
 CONSOLE_COMMANDS = {
     "llamacpp-start": "service-start",
@@ -33,14 +28,17 @@ CONSOLE_COMMANDS = {
     "llamacpp-models": "list-models",
 }
 MODEL_METADATA_KEYS = {"path", "model", "params", "nicknames"}
+# Params whose values are filesystem paths and must be resolved to absolute
+# paths (relative to ROOT) before being written into the models.ini preset.
+PATH_PARAM_KEYS = {"mmproj", "model-draft"}
 GGUF_SPLIT_RE = re.compile(r"^(?P<prefix>.*-)(?P<index>\d+)-of-(?P<total>\d+)(?P<suffix>\.gguf)$")
 
 
 def load_config(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as fh:
-        data = yaml.safe_load(fh) or {}
+        data = json.load(fh) or {}
     if not isinstance(data, dict):
-        raise SystemExit(f"{path} must contain a YAML mapping")
+        raise SystemExit(f"{path} must contain a JSON object")
     return data
 
 
@@ -80,7 +78,7 @@ def params_to_args(params: dict[str, Any]) -> list[str]:
 def server_environment(server: dict[str, Any]) -> dict[str, str]:
     raw = server.get("environment") or server.get("env") or {}
     if not isinstance(raw, dict):
-        raise SystemExit("server.environment must be a YAML mapping")
+        raise SystemExit("server.environment must be a JSON object")
     return {str(key): str(value) for key, value in raw.items()}
 
 
@@ -176,6 +174,8 @@ def render_models_ini(config_path: Path) -> Path:
         lines.append(f"[{model_id}]")
         lines.append(f"model = {model_path}")
         for key, value in params.items():
+            if value and str(key).replace("_", "-") in PATH_PARAM_KEYS:
+                value = resolve_path(value)
             lines.append(f"{key} = {ini_value(value)}")
         lines.append("")
 
@@ -200,9 +200,9 @@ def server_args(config_path: Path) -> list[str]:
     params = server.get("params") or {}
     extra_args = server.get("extra_args") or []
     if not isinstance(params, dict):
-        raise SystemExit("server.params must be a YAML mapping")
+        raise SystemExit("server.params must be a JSON object")
     if not isinstance(extra_args, list):
-        raise SystemExit("server.extra_args must be a YAML list")
+        raise SystemExit("server.extra_args must be a JSON array")
 
     return [
         str(binary),
@@ -409,10 +409,10 @@ def console_argv() -> list[str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="YAML-driven llama.cpp router helper")
+    parser = argparse.ArgumentParser(description="JSON-driven llama.cpp router helper")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("render", help="render llama.cpp models.ini from YAML")
+    subparsers.add_parser("render", help="render llama.cpp models.ini from JSON config")
     subparsers.add_parser("print-command", help="print the llama-server command")
     subparsers.add_parser("run", help="render config and exec llama-server")
     subparsers.add_parser("install-user-service", help="install and enable the user systemd service")

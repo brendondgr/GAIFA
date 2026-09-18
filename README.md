@@ -1,23 +1,33 @@
 # LLMs
 
-Repo-local helpers for running a YAML-configured llama.cpp router server.
+Repo-local helpers for running a JSON-configured llama.cpp router server. This
+tooling lives in `~/Models/LLMs` alongside the GGUF weights it serves (e.g.
+`Gemma4-26B/`).
 
 ## LlamaCPP
 
-Edit `llamacpp.yaml` to add or remove GGUF models. The current config uses the
-available models in `~/Models` and forces the server to listen on port `7070`.
+Edit `llamacpp.json` to add or remove GGUF models. Model `path` values may be
+relative to this directory (`Gemma4-26B/...`) or absolute (`~/Models/...`), and
+the server listens on port `7070`.
 
 Server-level llama.cpp flags go under `server.params`. Shared per-model runtime
-flags go under `model_defaults`, and per-model overrides can go under each
-model's `params` mapping.
+flags go under `model_defaults`, and per-model overrides go under each model's
+`params` object.
+
+Multimodal and speculative-decoding files are per-model `params`:
+
+- `mmproj` — path to the multimodal projector (resolved like `path`).
+- `model-draft` + `spec-type` — a draft model for speculative decoding; use
+  `"spec-type": "draft-mtp"` for an MTP head.
 
 Example server params:
 
-```yaml
-server:
-  params:
-    threads-http: 16
-    cont-batching: true
+```json
+{
+  "server": {
+    "params": { "threads-http": 16, "cont-batching": true }
+  }
+}
 ```
 
 Common commands from the repo root:

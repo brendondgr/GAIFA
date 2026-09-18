@@ -12,3 +12,6 @@ LlamaCPP/bin/
 LlamaCPP/generated/
 LlamaCPP/vendor/
 LlamaCPP/logs/
+
+# Model weights live alongside the tooling in this dir; never track them.
+*.gguf

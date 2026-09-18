@@ -70,8 +70,9 @@ def out_json(data: Any) -> None:
 
 
 def instance_line(i: dict[str, Any]) -> list[str]:
-    model = i["model_id"] or ("router: " + ", ".join(
-        m["id"] + ("*" if m["loaded"] else "") for m in i["models"]))
+    loaded = [m["id"] for m in i["models"] if m["loaded"]]
+    model = i["model_id"] or (f"router ({len(i['models'])} models; loaded: "
+                              f"{', '.join(loaded) if loaded else 'none'})")
     up = fmt_dur(time.time() - (i["ready_ts"] or i["started_ts"])) if i["state"] == "ready" else i["state"]
     relay = i["relay"]
     rel = "—" if relay["state"] == "off" else f"{relay['state']} ({relay['alias']})"

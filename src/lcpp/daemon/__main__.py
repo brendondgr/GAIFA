@@ -7,6 +7,7 @@ process should be doing nothing at all.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import logging
 import os
 
@@ -14,6 +15,20 @@ import uvicorn
 
 from lcpp import settings
 from lcpp.paths import Paths
+
+
+class QuietServer(uvicorn.Server):
+    """uvicorn wakes ten times a second to refresh its Date header and check
+    for shutdown. Once a second is plenty here (the header only has second
+    resolution anyway) and keeps an idle daemon from waking the CPU."""
+
+    async def main_loop(self) -> None:
+        counter = 0
+        should_exit = await self.on_tick(counter)
+        while not should_exit:
+            counter = (counter + 10) % 864000
+            await asyncio.sleep(1.0)
+            should_exit = await self.on_tick(counter)
 
 
 def main() -> None:
@@ -30,8 +45,9 @@ def main() -> None:
 
     from lcpp.daemon.app import create_app
 
-    uvicorn.run(create_app(paths), host=settings.HOST, port=port, log_level="warning",
-                access_log=False, lifespan="on", server_header=False)
+    config = uvicorn.Config(create_app(paths), host=settings.HOST, port=port, log_level="warning",
+                            access_log=False, lifespan="on", server_header=False)
+    QuietServer(config).run()
 
 
 if __name__ == "__main__":

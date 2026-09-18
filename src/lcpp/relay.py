@@ -373,7 +373,8 @@ class RelayRegistrar:
                        "health": e.get("health") or "unknown", "base_url": e["base_url"]}
                       for e in eps if e.get("owner") != OWNER]
             models = (await self.http.get(f"{self.url}/v1/models")).json()
-            routable = [m["id"] for m in models.get("data", []) if m.get("id") != "auto"]
+            # An alias can equal a model id (MiniCPM5-2B is both); list each name once.
+            routable = list(dict.fromkeys(m["id"] for m in models.get("data", []) if m.get("id") != "auto"))
         except (httpx.HTTPError, ValueError, KeyError):
             pass
         return {"status": status, "owned": owned, "others": others, "routable_models": routable}

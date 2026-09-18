@@ -44,6 +44,9 @@ document.documentElement.setAttribute('data-theme',dark?'dark':'light');})();
 <aside class="drawer" id="drawer" aria-label="Logs" hidden></aside>
 <div id="toasts" aria-live="polite"></div>
 <div id="dev"></div>
+<!-- Served by lcppd, config.js switches the UI to the live API; any other
+     static server 404s it and the UI runs against its built-in mock. -->
+<script src="config.js"></script>
 <!-- components/* — lcpp design system (window.Lcpp), a classic script -->
 <script src="assets/components.js"></script>
 <!-- api (http) · api (mock) · state/store · router · views/* -->

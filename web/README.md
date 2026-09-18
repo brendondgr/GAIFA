@@ -17,7 +17,7 @@ web/
     └── app.js            store, poller, hash router, dialogs, and the five views
 ```
 
-Mode: mock by default. Live mode when `window.LCPP_API_BASE` is set before load, or with `?live` in the URL.
+Mode: served by lcppd (`http://127.0.0.1:7700/`) the UI talks to the live daemon, because the daemon's `/config.js` sets `window.LCPP_API_BASE`. Served by any other static server it runs against the built-in mock (`?live` forces live mode).
 In mock mode press `Shift+D` for the scenario panel (Relay reachable, daemon down, seed/empty/busy, speed).
 
 Because `app.js` is an ES module, open the page over http(s), not `file://`.

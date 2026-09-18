@@ -2,7 +2,6 @@
    Data access goes only through `api` (assets/api.js, assets/mock.js). */
 import * as U from './utils.js';
 import { ApiError, createHttpApi } from './api.js';
-import { createMockApi } from './mock.js';
 const { GB, MB, fmtGB, fmtBytes, fmtDur, ago, nowS, debounce, esc, shq, argvToCmd, clone, deepEq, NAME_RE, CTX_PRESETS, ctxLabel, modelNick, loadPref, savePref, download } = U;
 const L = window.Lcpp;
 const h = L.el, Icon = L.Icon;
@@ -11,11 +10,13 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 async function copyText(text, label) { try { await navigator.clipboard.writeText(text); toast(label || 'Copied to clipboard'); } catch { toast('Clipboard unavailable in this browser', 'error'); } }
 
 /* ============================================================
-   api selection — mock by default; live via window.LCPP_API_BASE or ?live
+   api selection — live when served by lcppd (its /config.js defines
+   window.LCPP_API_BASE, '' = same origin) or with ?live; otherwise the
+   built-in mock, which is only loaded when it is actually used.
    ============================================================ */
-const LIVE = !!window.LCPP_API_BASE || new URLSearchParams(location.search).has('live');
+const LIVE = typeof window.LCPP_API_BASE === 'string' || new URLSearchParams(location.search).has('live');
 const BASE = window.LCPP_API_BASE || '';
-const api = LIVE ? createHttpApi(BASE) : createMockApi();
+const api = LIVE ? createHttpApi(BASE) : (await import('./mock.js')).createMockApi();
 
 /* ============================================================
    state / store
@@ -415,7 +416,7 @@ function renderSettings(root) {
     const daemon = L.Card({ title: 'Daemon', body: h('div', { class: 'stack' }, [h('div', { class: 'form-grid' }, [(() => { const f = num('port', () => form.daemon.port, v => form.daemon.port = v, { min: 1024, max: 65535 }); f.querySelector('.label').append(restart); return f; })()]), h('p', { class: 'help', text: 'Bound to 127.0.0.1 — this machine only.' })]) });
     const envEd = kvEditor({ rows: Object.entries(form.llama.environment).map(([key, value]) => ({ key, value })), keyPlaceholder: 'VAR', valuePlaceholder: 'value', onChange: rows => { form.llama.environment = Object.fromEntries(rows.map(r => [r.key, r.value])); dirty(); } });
     const spEd = kvEditor({ rows: paramsToRows(form.llama.server_params), keyPlaceholder: 'param', onChange: rows => { form.llama.server_params = rowsToParams(rows); dirty(); } });
-    const llama = L.Card({ title: 'llama.cpp', body: h('div', { class: 'stack', style: { gap: '14px' } }, [h('div', { class: 'form-grid' }, [(() => { const f = txt('binary path', () => form.llama.binary, v => form.llama.binary = v, { disabled: true }); f.setHelp(sys && sys.llama.binary_ok ? 'ok' : '', sys ? (sys.llama.binary_ok ? 'found' : 'not found') : ''); return f; })(), L.Field({ label: 'build', mono: true, value: sys ? sys.llama.build : '', disabled: true })]), h('div', { class: 'stack', style: { gap: '6px' } }, [h('div', { class: 'row' }, [sectionLabel('Environment variables'), restart.cloneNode(true)]), envEd]), h('div', { class: 'stack', style: { gap: '6px' } }, [sectionLabel('Server params applied to every instance'), h('p', { class: 'help', text: 'New instances pick these up; running ones keep theirs until restarted.' }), spEd])]) });
+    const llama = L.Card({ title: 'llama.cpp', body: h('div', { class: 'stack', style: { gap: '14px' } }, [h('div', { class: 'form-grid' }, [(() => { const f = txt('binary path', () => form.llama.binary, v => form.llama.binary = v, { disabled: true }); f.setHelp(sys && sys.llama.binary_ok ? 'ok' : '', sys ? (sys.llama.binary_ok ? 'found' : 'not found') : ''); return f; })(), L.Field({ label: 'build', mono: true, value: sys ? sys.llama.build : '', disabled: true })]), h('div', { class: 'stack', style: { gap: '6px' } }, [h('div', { class: 'row' }, [sectionLabel('Environment variables'), h('span', { class: 'badge', text: 'new instances', title: 'Applied to instances launched after saving; running ones keep theirs until restarted' })]), envEd]), h('div', { class: 'stack', style: { gap: '6px' } }, [sectionLabel('Server params applied to every instance'), h('p', { class: 'help', text: 'New instances pick these up; running ones keep theirs until restarted.' }), spEd])]) });
     const ports = L.Card({ title: 'Ports', body: h('div', { class: 'form-grid' }, [num('range start', () => form.ports.start, v => form.ports.start = v, { min: 1024, max: 65535 }), num('range end', () => form.ports.end, v => form.ports.end = v, { min: 1024, max: 65535 })]) });
     const testBtn = L.Button({ label: 'Test', icon: 'bolt', size: 'sm', onClick: async () => { testBtn.classList.add('is-loading'); try { const st = await api.testRelay(); toast(st.reachable ? `Relay reachable in ${st.latency_ms} ms` : st.error, st.reachable ? 'success' : 'error'); } catch (e) { toast(e.detail, 'error'); } finally { testBtn.classList.remove('is-loading'); } } });
     const relay = L.Card({ title: 'Relay', actions: [testBtn], body: h('div', { class: 'stack' }, [h('div', { class: 'form-grid' }, [txt('URL', () => form.relay.url, v => form.relay.url = v), txt('dashboard URL', () => form.relay.dashboard_url, v => form.relay.dashboard_url = v)]), L.Toggle({ label: 'Auto-publish new instances to Relay', checked: form.relay.auto_register, tone: 'cyan', onChange: v => { form.relay.auto_register = v; dirty(); } })]) });

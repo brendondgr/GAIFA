@@ -57,6 +57,16 @@ FILES = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _reap_fake_servers(tmp_path: Path):
+    """Fake servers are started in their own session and outlive a test that
+    fails before stopping them; kill anything launched from this test's home."""
+    yield
+    import subprocess
+
+    subprocess.run(["pkill", "-f", str(tmp_path)], check=False)
+
+
 @pytest.fixture
 def home(tmp_path: Path) -> Paths:
     root = tmp_path / "lcpp"

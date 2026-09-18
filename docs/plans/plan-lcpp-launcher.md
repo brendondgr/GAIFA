@@ -274,3 +274,30 @@ The approach has three parts. First, this repo is restructured (`models/`, `data
 | DashLLM tests | Registration API behaviors incl. adoption and conflicts | `~/Tools/DashLLM/tests/backend/test_registrations.py` |
 | Live utilities | Supervisor smoke, idle budget, full end-to-end, UI checklist | `utils/smoke_supervisor.py`, `utils/measure_idle.sh`, `utils/e2e_live.sh`, `utils/ui_smoke.md` |
 | Documentation | README, agent notes, relay integration docs | `README.md`, `CLAUDE.md`, `~/Tools/DashLLM/docs/*.md` |
+
+---
+
+## 5. Implementation notes (as built)
+
+Where the build differs from the plan above, and why:
+
+- **Step 6, `KillMode`**: the unit uses the default (`control-group`), not
+  `KillMode=process`. Instances are separate transient units outside
+  lcpp.service's cgroup, so the setting cannot affect them. Keeping the default
+  means the daemon's own helpers (journal followers) are cleaned up with it.
+- **Step 6, idle CPU**: uvicorn wakes every 100 ms by default. `QuietServer`
+  ticks once a second, which brought idle CPU from 0.2% to 0%.
+- **Step 8, "guarded delete"**: the relay dashboard has no endpoint delete
+  action, so none was added. Managed endpoints instead get a badge, a link to
+  lcpp, and a notice in their edit form.
+- **Step 9, model-name precedence**: relay model names are unique across
+  endpoints. A published router therefore yields a model's name to a
+  dedicated instance of that model, and gets it back when the instance stops.
+- **Step 9, adoption**: the adopted `llama.cpp · local` endpoint kept its id,
+  alias (`local`) and history. lcpp reports the relay's alias back rather
+  than overriding it.
+- **Additions from the UI brief**: preflight with a GGUF-based KV estimate,
+  the streaming chat proxy, router load/unload, settings, recents and
+  presets. `lcpp chat` and `lcpp doctor` were added to the CLI.
+- **Serenity 12B / 26B-A4B** were moved from `~/Models` into `models/`, with
+  symlinks left at the old paths.

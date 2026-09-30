@@ -2,5 +2,6 @@
 // A plain static graph: a top-level `await import()` inside app.js would deadlock on the cycle.
 import { boot } from "./app.js";
 import "./composer.js";
+import "./cards.js";
 
 boot();

@@ -69,7 +69,7 @@ export async function openChat(id, { push = true } = {}) {
 export async function ensureChat(titleHint) {
   if (S.chat) return S.chat;
   const chat = await api("/v1/chats", { method: "POST", body: { title: (titleHint || "New chat").slice(0, 60) } });
-  S.chats.unshift(chat);
+  if (!S.chats.some((c) => c.id === chat.id)) S.chats.unshift(chat);  // the SSE "chat" event may have added it already
   S.chat = chat.id;
   history.replaceState(null, "", `#${chat.id}`);
   $("chat-title").textContent = chat.title;

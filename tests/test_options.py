@@ -39,6 +39,6 @@ def test_catalogue_has_bounds_and_defaults():
 
 def test_lowpoly_preset_sets_face_budgets():
     r = parse_request({"prompt": "x", "preset": "lowpoly", "stages": ["shape", "parts"], "parts": {"parts": ["a"]}})
-    assert r.shape.target_faces == 1000 and r.parts.target_faces == 1000
+    assert r.shape.target_faces == 1000 and r.parts.target_faces == 1000 and r.rig.target_faces == 1000
     assert r.shape.resolution_base == 7.0 and r.parts.resolution_base == 7.0
     assert parse_request({"prompt": "x"}).shape.target_faces is None  # full detail by default

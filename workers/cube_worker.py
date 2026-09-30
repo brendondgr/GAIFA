@@ -247,7 +247,7 @@ class Worker:
                 cm = m.copy()
                 cm.visual.face_colors = pal[i] + [255]
                 scene.add_geometry(cm, geom_name=f"part_{i:02d}_{safe}", node_name=f"part_{i:02d}_{safe}")
-                out.append({"index": i, "name": name, "file": fn, "faces": int(len(f)), "color": pal[i]})
+                out.append({"index": i, "name": name, "file": fn, "faces": int(len(m.faces)), "color": pal[i]})
             if scene.geometry:
                 scene.export(jdir / "parts.glb")
             (pdir / "manifest.json").write_text(json.dumps(
@@ -261,7 +261,7 @@ class Worker:
         r = req["rig"]
         with Sub("rig"):
             info = rigmod.rig(Path(inputs["parts_dir"]), jdir / "rigged", height=r.get("height_m"),
-                              faces_per_part=int(r["faces_per_part"]))
+                              faces_per_part=int(r["faces_per_part"]), target_faces=r.get("target_faces"))
             (jdir / "rigged.rig.json").replace(jdir / "rig.json")
         return {"glb": "rigged.glb", "rig": "rig.json", "joints": info["joints"], "missing": info["missing"],
                 "faces": info.get("faces")}

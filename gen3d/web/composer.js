@@ -109,12 +109,14 @@ function applyPreset(name) {
   if (!p) return;
   Object.assign(C.shape, p.shape || {});
   Object.assign(C.partsOpts, p.parts || {});
+  Object.assign(C.rig, p.rig || {});
 }
 
 function presetMatches() {
   for (const [k, v] of Object.entries(S.options?.presets || {})) {
     const ok = Object.entries(v.shape || {}).every(([f, x]) => C.shape[f] === x)
-      && Object.entries(v.parts || {}).every(([f, x]) => C.partsOpts[f] === x);
+      && Object.entries(v.parts || {}).every(([f, x]) => C.partsOpts[f] === x)
+      && Object.entries(v.rig || {}).every(([f, x]) => C.rig[f] === x);
     if (ok) return k;
   }
   return "custom";

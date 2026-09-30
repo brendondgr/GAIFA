@@ -59,8 +59,10 @@ def decimate(m: trimesh.Trimesh, target: int) -> trimesh.Trimesh:
 
         ms = pymeshlab.MeshSet()
         ms.add_mesh(pymeshlab.Mesh(m.vertices, m.faces))
+        small = target < 2000  # low-poly budgets are only reachable if topology may change
         ms.meshing_decimation_quadric_edge_collapse(targetfacenum=target, preservenormal=True,
-                                                    preservetopology=True, qualitythr=0.5)
+                                                    preservetopology=not small, qualitythr=0.3 if small else 0.5,
+                                                    planarquadric=small, optimalplacement=True)
         o = ms.current_mesh()
         return trimesh.Trimesh(o.vertex_matrix(), o.face_matrix())
     except Exception as e:
@@ -95,8 +97,10 @@ def frame(z, y):
     return np.stack([x, y, z], 1)
 
 
-def rig(parts_dir: Path, out: Path, height: float | None = None, faces_per_part: int = 15000) -> dict:
-    """Write <out>.glb and <out>.rig.json; return {"joints": [...], "missing": [...]}."""
+def rig(parts_dir: Path, out: Path, height: float | None = None, faces_per_part: int = 15000,
+        target_faces: int | None = None) -> dict:
+    """Write <out>.glb and <out>.rig.json; return {"joints": [...], "missing": [...], "faces": n}.
+    target_faces caps the whole rigged asset (the limb split and rails add faces to the parts)."""
     by_role = load_parts(Path(parts_dir))
     if not by_role:
         raise ValueError("no non-empty parts to rig")
@@ -144,12 +148,29 @@ def rig(parts_dir: Path, out: Path, height: float | None = None, faces_per_part:
     root = "asset_root"
     scene.graph.update(frame_from=scene.graph.base_frame, frame_to=root, matrix=np.eye(4))
 
+    pending = []  # meshes are added after the face budget is known
+
     def add_mesh(role, mesh, parent, T_parent_world, color):
         m = decimate(mesh, faces_per_part)
         m.apply_transform(np.linalg.inv(T_parent_world))
         m.visual.face_colors = color + [255]
-        scene.add_geometry(m, geom_name=f"{role}_geo_{len(scene.geometry)}", node_name=f"{role}_geo_{len(scene.geometry)}",
-                           parent_node_name=parent)
+        pending.append((role, m, parent, color))
+
+    def flush():
+        total = sum(len(m.faces) for _, m, _, _ in pending)
+        if target_faces and total > target_faces:
+            areas = np.array([max(m.area, 1e-9) for _, m, _, _ in pending])
+            floor = 12
+            spare = max(0, target_faces - floor * len(pending))
+            for i, (role, m, parent, color) in enumerate(pending):
+                cap = int(floor + spare * areas[i] / areas.sum())
+                if len(m.faces) > cap:
+                    d = decimate(m, cap)
+                    d.visual.face_colors = color + [255]
+                    pending[i] = (role, d, parent, color)
+        for role, m, parent, _ in pending:
+            n = len(scene.geometry)
+            scene.add_geometry(m, geom_name=f"{role}_geo_{n}", node_name=f"{role}_geo_{n}", parent_node_name=parent)
 
     def add_node(name, parent, T_world, T_parent_world):
         scene.graph.update(frame_from=parent, frame_to=name, matrix=np.linalg.inv(T_parent_world) @ T_world)
@@ -227,6 +248,7 @@ def rig(parts_dir: Path, out: Path, height: float | None = None, faces_per_part:
             limits=dict(swing_deg=[-90, 90], lift_deg=[-45, 80], extend=[0.0, round(0.3 * length, 4)]),
         )
 
+    flush()
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     scene.export(str(out) + ".glb")

@@ -29,7 +29,7 @@ A chat: describe an object, get a model back. Everything the API does is in it.
   first job does. If the service itself stops answering, a red banner says so and the page
   reconnects when it is back.
 - **Composer**: the prompt, then **stage toggles** (Shape · Parts · Rig · Preview), the **Parts**
-  editor (up to 8 names, with templates: Chair, Character, Vehicle, Weapon, Creature), a **preset** (Fast · Balanced · Quality · Custom), the paperclip to **upload a mesh**
+  editor (up to 8 names, with templates: Chair, Character, Vehicle, Weapon, Creature), a **preset** (Low-poly · Fast · Balanced · Quality · Custom), the paperclip to **upload a mesh**
   (or drop one on the composer) and the sliders button, which holds **every setting**: Cube3D
   resolution, top-p / deterministic, seed, guidance, bounding box (with Cube / Tall / Wide /
   Chair / Flat aspects), graph engine; CubePart steps, resolution, guidance, seed, scheduler,
@@ -101,18 +101,21 @@ Every job is a pipeline of optional stages that run in order:
 |---|---|---|
 | `prompt` | `""` | what to make; required with the `shape` stage |
 | `stages` | `["shape", "preview"]` | any of `shape`, `parts`, `rig`, `preview` |
-| `preset` | none | `fast` / `balanced` / `quality`, applied under explicit values |
-| `shape.resolution_base` | 8.0 | 6–9.5; mesh decode grid 2^n. 7 ≈ 3 s, 8 ≈ 25 s, 9 ≈ 200 s of decoding |
+| `preset` | none | `lowpoly` / `fast` / `balanced` / `quality`, applied under explicit values |
+| `shape.resolution_base` | 8.0 | 5–9.5; mesh decode grid 2^n. 5–7 ≈ 1–3 s, 8 ≈ 25 s, 9 ≈ 200 s of decoding |
+| `shape.target_faces` | none | decimate the mesh to about this many faces (e.g. 1000); none = full detail |
 | `shape.top_p` | 0.9 | nucleus sampling; `null` = deterministic (the seed then does nothing) |
 | `shape.seed`, `shape.guidance_scale` | 0, 3.0 | |
 | `shape.bbox` | none | aspect `[W, H, D]`, Y up, e.g. `[1, 2, 1]` for something tall |
 | `shape.fast_engine` | false | HIP-graph engine: same mesh, 2× memory, not faster on gfx1151 |
 | `parts.parts` | `[]` | 1–8 names; left/right is the object's own (it faces +Z) |
 | `parts.steps` | 50 | diffusion steps, ~2.45 s each (the same for 1 or 8 parts) |
-| `parts.resolution_base` | 8.5 | part mesh resolution (8.0 ≈ 55 s, 8.5 ≈ 72 s, 9.0 ≈ 94 s for 8 parts) |
+| `parts.resolution_base` | 8.5 | 6–9.5; part mesh resolution (8.0 ≈ 55 s, 8.5 ≈ 72 s, 9.0 ≈ 94 s for 8 parts). 6 breaks thin-walled objects up; 7 is a safe low end |
+| `parts.target_faces` | none | one budget for all parts together, split by surface area (every part keeps ≥ 24) |
 | `parts.guidance_scale`, `parts.seed`, `parts.scheduler`, `parts.timeshift`, `parts.num_samples` | 7.5, 0, `dpm_solver`, 4.0, 128000 | |
 | `rig.height_m` | 1.8 | scale the rigged model to this height; `null` keeps the mesh's units |
-| `rig.faces_per_part` | 12000 | decimation target |
+| `rig.faces_per_part` | 12000 | decimation cap per part |
+| `rig.target_faces` | none | budget for the whole rigged asset (the limb split and rails add a few hundred faces) |
 | `chat_id` | none | add to a chat; `"new"` starts one titled from the prompt |
 | `parent_id` | none | continue from that job's mesh / parts |
 
@@ -202,6 +205,19 @@ Set `joint.rotation = rest * rotZ(swing) * rotX(lift)` and `slide.position.y = e
 and limits are in each node's glTF `extras` and in `rig.json`. Limbs are found by part name
 (`left arm …`, `right leg …`, `head …`, `strap …`, `base …`); a strap follows the limb it sits
 on. The rig is built for limbed objects (chairs, characters, creatures); other parts ride on the body.
+
+### Low-poly assets
+
+Generated meshes are dense (Cube3D ~10–35k faces, CubePart hundreds of thousands per part set)
+because they are carved from a 256–512³ grid. For game-ready low-poly assets, set a **face budget**:
+the mesh is carved as usual, then collapsed (quadric edge collapse) to the budget while keeping its
+silhouette. The **Low-poly** preset does it for the whole pipeline: resolution 7, 25 CubePart
+steps, 1,000-face budgets for shape, parts and the rigged model.
+
+Measured: a rigged 6-part character at 999 (shape) / 996 (parts) / 956 (rigged) faces in 3m 40s;
+decimation itself takes 0.2–6 s. About 500 faces still reads well; around 250 shapes fall apart.
+Lowering `resolution_base` is not a substitute (it is a power of two: 1–2 would be a 2–4³ grid),
+but low values make decoding much faster: Cube3D at 5 still looks clean.
 
 ## How it works
 

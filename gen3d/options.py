@@ -64,6 +64,8 @@ class PartsOptions(BaseModel):
 class RigOptions(BaseModel):
     height_m: float | None = Field(1.8, gt=0, le=50, description="scale the rigged asset to this height; null = keep units")
     faces_per_part: int = Field(12_000, ge=20, le=200_000, description="decimation cap per part (parts already under it are kept)")
+    target_faces: int | None = Field(None, ge=100, le=2_000_000,
+                                     description="face budget for the whole rigged asset (the limb split adds faces); null = no cap")
 
 
 class JobRequest(BaseModel):
@@ -95,14 +97,18 @@ class JobRequest(BaseModel):
 
 PRESETS: dict[str, dict] = {
     "fast": {"label": "Fast", "help": "coarser meshes, 25 CubePart steps (~1 min shape, ~1.8 min parts)",
-             "shape": {"resolution_base": 7.5}, "parts": {"steps": 25, "resolution_base": 8.0}},
+             "shape": {"resolution_base": 7.5, "target_faces": None},
+             "parts": {"steps": 25, "resolution_base": 8.0, "target_faces": None}, "rig": {"target_faces": None}},
     "balanced": {"label": "Balanced", "help": "the upstream defaults (~1.5 min shape, ~3.2 min parts)",
-                 "shape": {"resolution_base": 8.0}, "parts": {"steps": 50, "resolution_base": 8.5}},
+                 "shape": {"resolution_base": 8.0, "target_faces": None},
+                 "parts": {"steps": 50, "resolution_base": 8.5, "target_faces": None}, "rig": {"target_faces": None}},
     "lowpoly": {"label": "Low-poly", "help": "about 1,000 faces for the whole asset: coarse decode, then decimation",
                 "shape": {"resolution_base": 7.0, "target_faces": 1000},
-                "parts": {"steps": 25, "resolution_base": 7.0, "target_faces": 1000}},
+                "parts": {"steps": 25, "resolution_base": 7.0, "target_faces": 1000},
+                "rig": {"target_faces": 1000}},
     "quality": {"label": "Quality", "help": "finer meshes (~2.5 min shape, ~3.7 min parts, 52 GB peak)",
-                "shape": {"resolution_base": 8.5}, "parts": {"steps": 50, "resolution_base": 9.0}},
+                "shape": {"resolution_base": 8.5, "target_faces": None},
+                "parts": {"steps": 50, "resolution_base": 9.0, "target_faces": None}, "rig": {"target_faces": None}},
 }
 
 PART_TEMPLATES: dict[str, list[str]] = {
@@ -120,7 +126,7 @@ def apply_preset(raw: dict) -> dict:
     if not name or name not in PRESETS:
         return raw
     out = dict(raw)
-    for group in ("shape", "parts"):
+    for group in ("shape", "parts", "rig"):
         merged = dict(PRESETS[name].get(group, {}))
         merged.update(raw.get(group) or {})
         out[group] = merged
@@ -177,6 +183,8 @@ def catalogue() -> dict:
             _field("rig", "height_m", RigOptions, "Height (m)", "number", step=0.1, nullable=True,
                    null_label="keep units"),
             _field("rig", "faces_per_part", RigOptions, "Faces per part", "integer", step=1000),
+            _field("rig", "target_faces", RigOptions, "Face budget (rigged)", "integer", step=100, nullable=True,
+                   null_label="no cap"),
         ],
         "presets": PRESETS,
         "part_templates": PART_TEMPLATES,

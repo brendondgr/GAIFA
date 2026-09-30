@@ -66,7 +66,7 @@ GET    /docs                         OpenAPI
 - [x] 1.4 Verify: `gen3d serve` answers `/health` → **commit: "Service skeleton, CLI and systemd unit"**
 
 ### Phase 2 — jobs, queue, ETA (fake worker)
-- [ ] 2.1 `gen3d/options.py`: request schema (pydantic), option catalogue, presets, validation (≤ 8 parts, ranges)
+- [x] 2.1 `gen3d/options.py`: request schema (pydantic), option catalogue, presets, validation (≤ 8 parts, ranges)
 - [ ] 2.2 `gen3d/store.py`: SQLite jobs + chats + timings, job folders
 - [ ] 2.3 `gen3d/eta.py`: per-stage estimator (seeded from CubeArt timings, learns from finished jobs, live rate)
 - [ ] 2.4 `gen3d/queue.py` + `gen3d/events.py`: FIFO runner task, cancel, SSE broadcast

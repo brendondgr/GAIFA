@@ -164,7 +164,7 @@ function renderQueueDialog() {
     const e = j.eta || {};
     const left = e.done_at ? e.done_at - Date.now() / 1000 : null;
     return `<div class="q-row">
-      <span class="pos">${j.status === "running" ? "▶" : "#" + (e.queue_position ?? "?")}</span>
+      <span class="pos">${j.status === "running" ? "▶" : e.queue_position ? "#" + e.queue_position : "next"}</span>
       <span class="t">${esc(j.title)}<small class="muted">${j.id} · ${j.stages ? Object.keys(j.stages).join(" → ") : ""}</small></span>
       <span class="when">${j.status === "running" ? "running" : "starts in " + fmtDur(e.starts_in_s)}<br>done ${fmtDur(left)} · ${e.done_at ? fmtClock(e.done_at) : "–"}</span>
       <span>${j.chat_id ? `<button class="icon-btn" data-action="open-chat" data-id="${j.chat_id}" title="Open chat">${ICON.continue}</button>` : ""}

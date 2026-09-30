@@ -165,12 +165,13 @@ async def unload(request: Request, force: bool = Query(False, description="also 
 
 # ---- jobs --------------------------------------------------------------------------------------
 
-def _title(req) -> str:
+def _title(req, parent: dict | None = None) -> str:
     if req.title:
         return req.title
     if req.prompt.strip():
         return req.prompt.strip()[:80]
-    return " + ".join(req.stages)
+    base = " + ".join(req.stages)
+    return f"{base} · {parent['title']}"[:80] if parent and parent.get("title") else base
 
 
 def _resolve_chat(store: Store, chat_id: str | None, title: str) -> str | None:
@@ -184,11 +185,13 @@ def _resolve_chat(store: Store, chat_id: str | None, title: str) -> str | None:
 def _queue(request: Request, raw: dict, jid: str | None = None, input_mesh: str | None = None) -> dict:
     store, runner = _store(request), _runner(request)
     req = parse_request(raw)
-    if req.parent_id and not store.get_job(req.parent_id):
+    parent = store.get_job(req.parent_id) if req.parent_id else None
+    if req.parent_id and not parent:
         raise HTTPException(404, f"no parent job {req.parent_id!r}")
-    chat_id = _resolve_chat(store, req.chat_id, _title(req))
+    title = _title(req, parent)
+    chat_id = _resolve_chat(store, req.chat_id, title)
     req.chat_id = chat_id
-    job = store.create_job(req.model_dump(), chat_id=chat_id, parent_id=req.parent_id, title=_title(req),
+    job = store.create_job(req.model_dump(), chat_id=chat_id, parent_id=req.parent_id, title=title,
                            stages=req.stages, jid=jid)
     if input_mesh:
         job = store.update_job(job["id"], input_mesh=input_mesh)

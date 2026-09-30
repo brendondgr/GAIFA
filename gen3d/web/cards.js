@@ -95,7 +95,7 @@ function etaLine(job) {
   if (!e) return "";
   const left = e.done_at - now();
   if (job.status === "queued") {
-    return `<div class="eta-line"><span>Queued <b>#${e.queue_position}</b> · starts in <span data-countdown="${now() + e.starts_in_s}">${fmtDur(e.starts_in_s)}</span></span>
+    return `<div class="eta-line"><span>Queued <b>${e.queue_position ? "#" + e.queue_position : "next"}</b> · starts in <span data-countdown="${now() + e.starts_in_s}">${fmtDur(e.starts_in_s)}</span></span>
       <span>done in <span class="big" data-countdown="${e.done_at}">${fmtDur(left)}</span></span><span class="at">~${fmtClock(e.done_at)}</span></div>`;
   }
   const started = job.started || now();

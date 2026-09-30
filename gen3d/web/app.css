@@ -498,7 +498,8 @@ a { color: var(--cyan); }
   .stage { grid-template-columns: 18px 64px minmax(0, 1fr) 54px; gap: 8px; }
   .viewer { height: 320px; }
   .parts-menu, .menu.options { position: fixed; left: 16px; right: 16px; bottom: 120px; width: auto; }
-  .stage-toggles button span { display: none; }
+  .toolbar { flex-wrap: wrap; row-gap: 6px; }
+  .stage-toggles button { padding: 0 7px; font-size: 11px; }
   .eta-hint { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -506,7 +507,7 @@ a { color: var(--cyan); }
 }
 .menu .row.bbox-row { justify-content: flex-start; gap: 12px; padding-top: 0; }
 .menu .row.bbox-row input[type=number] { width: 64px; }
-.toolbar { flex-wrap: nowrap; }
+@media (min-width: 821px) { .toolbar { flex-wrap: nowrap; } }
 .stage-toggles, .select-tool, .tool { flex: none; }
 .eta-hint { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -2px -2px 4px 0; }

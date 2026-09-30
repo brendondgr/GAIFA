@@ -1,1 +1,162 @@
-<!doctype html><meta charset="utf-8"><title>3DGenerate</title><p>UI coming in phase 4.</p>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>3DGenerate</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ============ sidebar ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="side-head">
+      <div class="brand"><img src="icon.svg" alt="" width="26" height="26">
+        <div class="brand-text"><b>3dgenerate</b><span>Cube3D · CubePart</span></div></div>
+      <button class="icon-btn only-mobile" data-action="close-sidebar" title="Close menu" aria-label="Close menu">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <button class="new-chat" data-action="new-chat">
+      <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New chat
+    </button>
+    <nav class="chat-list" id="chat-list" aria-label="Chats"></nav>
+    <div class="side-foot">
+      <button class="side-link" data-action="open-queue">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Queue<span class="count" id="queue-count"></span>
+      </button>
+      <button class="side-link" data-action="open-settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings
+      </button>
+      <button class="backend-pill" data-action="open-settings" title="GPU worker">
+        <span class="dot" id="worker-dot"></span><span id="worker-label">Connecting…</span>
+      </button>
+    </div>
+  </aside>
+  <div class="scrim" data-action="close-sidebar"></div>
+
+  <!-- ============ main ============ -->
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn only-mobile" data-action="open-sidebar" title="Menu" aria-label="Menu">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <h1 class="chat-title" id="chat-title" title="Click to rename">New chat</h1>
+      <div class="chips" id="top-chips"></div>
+    </header>
+
+    <section class="thread" id="thread" aria-live="polite">
+      <div class="empty" id="empty">
+        <img src="icon.svg" alt="" width="44" height="44">
+        <h2>What should I build?</h2>
+        <p>Describe an object and get a mesh back. Turn on <b>Parts</b> to split it into named pieces and
+          <b>Rig</b> to get a game-ready model with a motor per limb. <span class="muted">Jobs queue up and run one at a time on the GPU; each card shows its progress and when it will be done.</span></p>
+        <div class="suggestions" id="suggestions"></div>
+      </div>
+      <div class="turns" id="turns"></div>
+    </section>
+
+    <!-- ============ composer ============ -->
+    <form class="composer" id="composer" autocomplete="off">
+      <div class="context-row" id="context-row" hidden></div>
+      <div class="box" id="drop-box">
+        <textarea id="prompt" rows="1" placeholder="Describe a 3D object…" aria-label="Prompt"></textarea>
+        <div class="toolbar">
+          <div class="stage-toggles" id="stage-toggles" role="group" aria-label="Stages"></div>
+          <div class="menu-wrap">
+            <button type="button" class="tool" data-action="toggle-parts" id="btn-parts" title="Part names for CubePart">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span id="parts-label">Parts</span>
+            </button>
+            <div class="menu parts-menu" id="parts-menu" hidden></div>
+          </div>
+          <label class="select-tool" title="Preset">
+            <svg viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg>
+            <select id="preset" aria-label="Preset"></select>
+          </label>
+          <button type="button" class="icon-btn" data-action="attach" title="Upload a mesh to split / rig (.glb .obj .ply .stl)" aria-label="Upload a mesh">
+            <svg viewBox="0 0 24 24"><path d="M21.4 11.1 12.2 20.3a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5"/></svg>
+          </button>
+          <input type="file" id="mesh-file" accept=".glb,.gltf,.obj,.ply,.stl,.off" hidden>
+          <div class="spacer"></div>
+          <span class="eta-hint" id="eta-hint" title="Estimated time if queued now"></span>
+          <div class="menu-wrap">
+            <button type="button" class="icon-btn" data-action="toggle-options" id="btn-options" title="All settings" aria-label="All settings">
+              <svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+            </button>
+            <div class="menu options" id="options-menu" hidden></div>
+          </div>
+          <button type="submit" class="send" id="btn-send" title="Generate (Enter)" aria-label="Generate">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="foot muted" id="foot">Enter to generate · Shift+Enter for a new line · drop a mesh here to split it</p>
+    </form>
+  </main>
+</div>
+
+<!-- ============ queue dialog ============ -->
+<dialog class="dialog" id="queue-dialog">
+  <div class="dlg-head">
+    <h3>Queue</h3>
+    <span class="muted small" id="queue-summary"></span>
+    <button class="icon-btn" data-action="close-dialog" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="dlg-body"><div class="queue-list" id="queue-list"></div></div>
+</dialog>
+
+<!-- ============ settings dialog ============ -->
+<dialog class="dialog narrow" id="settings-dialog">
+  <div class="dlg-head">
+    <h3>Settings</h3>
+    <button class="icon-btn" data-action="close-dialog" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="dlg-body stack">
+    <section class="stack">
+      <h4>GPU worker <small class="muted" id="idle-note"></small></h4>
+      <div class="engine-row"><span class="dot" id="worker-dot2"></span><span class="grow" id="worker-detail"></span></div>
+      <div class="inline">
+        <button type="button" class="btn" data-action="load-worker">Load models</button>
+        <button type="button" class="btn" data-action="unload-worker">Unload (free GPU)</button>
+      </div>
+      <p class="status small" id="worker-status"></p>
+    </section>
+    <section class="stack">
+      <h4>Notifications</h4>
+      <label class="check"><input type="checkbox" id="opt-notify"> Desktop notification when a job finishes</label>
+      <label class="check"><input type="checkbox" id="opt-autoview" checked> Open the 3D viewer on the newest result</label>
+    </section>
+    <section class="stack">
+      <h4>API</h4>
+      <p class="muted small">Everything in this page goes through the HTTP API, so scripts can do the same.
+        Reference: <a href="/docs" target="_blank" rel="noopener">/docs</a>.</p>
+      <pre id="api-example"></pre>
+    </section>
+    <section class="stack">
+      <h4>History</h4>
+      <p class="muted small">Chats, jobs and their files live on the server (<code id="data-dir"></code>).</p>
+      <div><button type="button" class="btn danger" data-action="clear-history">Delete all chats and files</button></div>
+      <p class="status small" id="history-status"></p>
+    </section>
+  </div>
+</dialog>
+
+<!-- ============ image lightbox ============ -->
+<dialog class="dialog lightbox" id="lightbox">
+  <div class="dlg-head"><h3 id="lightbox-title">Preview</h3>
+    <button class="icon-btn" data-action="close-dialog" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="dlg-body"><img id="lightbox-img" alt=""></div>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

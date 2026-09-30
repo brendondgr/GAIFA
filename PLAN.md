@@ -80,7 +80,7 @@ GET    /docs                         OpenAPI
 - [x] 3.4 Verify one real shape job and one parts job through the API → **commit: "GPU worker for Cube3D, CubePart and rigging"**
 
 ### Phase 4 — web UI
-- [ ] 4.1 Layout: sidebar (chats), thread, composer, top bar with worker state + queue
+- [x] 4.1 Layout: sidebar (chats), thread, composer, top bar with worker state + queue
 - [ ] 4.2 Settings menu: stage toggles, presets, every Cube3D / CubePart / rig option, parts chip editor, bounding box, mesh upload
 - [ ] 4.3 Job cards: queue position, per-stage progress, ETA + "done at", cancel/retry/continue, notifications
 - [ ] 4.4 Inline 3D viewer (three.js, vendored) with part colours and rig motor sliders; downloads

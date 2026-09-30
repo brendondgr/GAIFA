@@ -93,5 +93,5 @@ GET    /docs                         OpenAPI
 - [x] 5.3 Fix what breaks → **commit: "End-to-end fixes"**
 
 ### Phase 6 — docs and install
-- [ ] 6.1 README: UI tour, API reference with curl + Python, CLI, config, performance, troubleshooting
+- [x] 6.1 README: UI tour, API reference with curl + Python, CLI, config, performance, troubleshooting
 - [ ] 6.2 Run `install.sh` (venv, `gen3d` command, service), final check → **commit: "Docs and installer"**, push

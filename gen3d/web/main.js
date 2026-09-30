@@ -3,5 +3,6 @@
 import { boot } from "./app.js";
 import "./composer.js";
 import "./cards.js";
+import "./settings.js";
 
 boot();

@@ -75,7 +75,7 @@ GET    /docs                         OpenAPI
 
 ### Phase 3 — real GPU worker
 - [x] 3.1 `workers/cube_worker.py`: JSON protocol, lazy Cube3D/CubePart load, tqdm progress hooks, shape/parts/rig stages
-- [ ] 3.2 `workers/rig.py` (vendored) ; `gen3d/worker.py`: podman launch, ready handshake, idle unload, cancel = restart
+- [x] 3.2 `workers/rig.py` (vendored) ; `gen3d/worker.py`: podman launch, ready handshake, idle unload, cancel = restart
 - [ ] 3.3 `gen3d/preview.py`: Blender 4-view render on the host (skipped if Blender is missing)
 - [ ] 3.4 Verify one real shape job and one parts job through the API → **commit: "GPU worker for Cube3D, CubePart and rigging"**
 

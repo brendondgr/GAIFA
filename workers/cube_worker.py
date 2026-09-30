@@ -169,7 +169,8 @@ class Worker:
                 trimesh.Trimesh(v, f).export(obj)
             m = trimesh.load(obj, force="mesh")
             m.export(jdir / "mesh.glb")
-            obj.unlink(missing_ok=True)
+            for leftover in (obj, jdir / "mesh.obj.mtl", jdir / "material.mtl"):
+                leftover.unlink(missing_ok=True)
         return {"mesh": "mesh.glb", "faces": int(len(m.faces)), "raw_faces": int(f.shape[0]),
                 "bounds": m.bounds.round(4).tolist()}
 

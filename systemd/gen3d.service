@@ -10,6 +10,8 @@ WorkingDirectory=@ROOT@
 # Optional overrides (port, idle timeout, CubeArt location...); see gen3d.env.example.
 EnvironmentFile=-%h/.config/gen3d/gen3d.env
 Environment=PYTHONUNBUFFERED=1
+# podman, and Blender for previews (often in ~/.local/bin); the env file can override
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=@ROOT@/.venv/bin/python -m gen3d
 Restart=on-failure
 RestartSec=3

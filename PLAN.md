@@ -94,6 +94,6 @@ GET    /docs                         OpenAPI
 
 ### Phase 6 — docs and install
 - [x] 6.1 README: UI tour, API reference with curl + Python, CLI, config, performance, troubleshooting
-- [ ] 6.2 (requested) Generator control: top-bar start/stop with clear off / starting / ready / generating
+- [x] 6.2 (requested) Generator control: top-bar start/stop with clear off / starting / ready / generating
       states, an offline banner, and a "3DGenerate" desktop launcher (`gen3d open`: start the service, open the UI)
-- [ ] 6.3 Run `install.sh` (venv, `gen3d` command, service, launcher), final check → **commit: "Docs and installer"**, push
+- [x] 6.3 Run `install.sh` (venv, `gen3d` command, service, launcher), final check → **commit: "Docs and installer"**, push

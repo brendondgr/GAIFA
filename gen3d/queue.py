@@ -52,13 +52,14 @@ class Runner:
         self._wake.set()
 
     async def stop(self) -> None:
+        interrupted = self.current is not None  # that job goes back to the queue at next start
         if self._task:
             self._task.cancel()
             try:
                 await self._task
             except (asyncio.CancelledError, Exception):
                 pass
-        await self.worker.stop(reason="server shutting down")
+        await self.worker.stop(reason="server shutting down", graceful=not interrupted)
 
     def kick(self) -> None:
         self._wake.set()

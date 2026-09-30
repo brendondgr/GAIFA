@@ -88,8 +88,8 @@ GET    /docs                         OpenAPI
 - [x] 4.6 Verify in the browser against the fake worker → **commit: "Web UI"**
 
 ### Phase 5 — end-to-end on the GPU
-- [ ] 5.1 Full chat run: prompt → shape → parts → rig → preview; compare ETA with the actual times, tune
-- [ ] 5.2 Follow-up (split / rig an existing result), cancel mid-run, restart server mid-queue
+- [x] 5.1 Full chat run: prompt → shape → parts → rig → preview; compare ETA with the actual times, tune
+- [x] 5.2 Follow-up (split / rig an existing result), cancel mid-run, restart server mid-queue
 - [ ] 5.3 Fix what breaks → **commit: "End-to-end fixes"**
 
 ### Phase 6 — docs and install

@@ -37,6 +37,16 @@ def _sockets() -> list[socket.socket]:
     return socks
 
 
+class Server(uvicorn.Server):
+    def handle_exit(self, sig, frame) -> None:
+        # close the SSE streams first so the graceful shutdown does not wait on them
+        from .server import app
+        events = getattr(app.state, "events", None)
+        if events is not None:
+            events.close()
+        super().handle_exit(sig, frame)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     config = uvicorn.Config(
@@ -47,7 +57,7 @@ def main() -> None:
         # SSE streams never end on their own; do not let them hold a restart hostage.
         timeout_graceful_shutdown=10,
     )
-    server = uvicorn.Server(config)
+    server = Server(config)
     socks = _sockets()
     log.info("listening on %s", ", ".join(
         f"[{s.getsockname()[0]}]:{s.getsockname()[1]}" if s.family == socket.AF_INET6

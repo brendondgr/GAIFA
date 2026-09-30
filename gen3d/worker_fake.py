@@ -56,7 +56,7 @@ class FakeWorker:
         await self.start()
         self.loaded |= set(models)
 
-    async def stop(self, reason: str = "") -> bool:
+    async def stop(self, reason: str = "", graceful: bool = True) -> bool:
         was = self.up
         self.up, self.state, self.loaded = False, "stopped", set()
         return was

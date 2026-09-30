@@ -182,13 +182,14 @@ class CubeWorker:
                 pass
         self.state, self.loaded = "stopped", set()
 
-    async def stop(self, reason: str = "") -> bool:
+    async def stop(self, reason: str = "", graceful: bool = True) -> bool:
+        """graceful=False kills at once: a worker in the middle of a GPU call cannot read "quit"."""
         if not self.proc or self.proc.returncode is not None:
             self.state, self.loaded = "stopped", set()
             return False
         log.info("stopping worker (%s)", reason)
         try:
-            if self.state != "busy":
+            if graceful and self.state != "busy":
                 await self._send({"cmd": "quit"})
                 await asyncio.wait_for(self.proc.wait(), 20)
         except Exception:

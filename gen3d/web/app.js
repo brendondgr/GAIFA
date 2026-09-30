@@ -1,5 +1,6 @@
 // 3DGenerate web UI: state, chats, live updates (SSE) and worker status. No build step.
-// Modules: composer.js (prompt + settings menu), cards.js (job cards), viewer.js (three.js).
+// Modules: composer.js (prompt + settings menu), cards.js (job cards), viewer.js (three.js);
+// main.js imports them all (they register hooks) and then calls boot().
 
 import { $, api, esc, fmtDur, fmtClock, toast, store, ICON } from "./util.js";
 
@@ -245,7 +246,7 @@ window.addEventListener("hashchange", () => { const id = location.hash.slice(1) 
 
 // ---- boot -------------------------------------------------------------------------------------
 
-async function boot() {
+export async function boot() {
   try {
     S.options = await api("/v1/options");
   } catch (e) { toast(e.message, 8000); }
@@ -256,8 +257,3 @@ async function boot() {
   setInterval(refreshHealth, 5000);
   setInterval(renderQueueBadge, 5000);
 }
-
-// modules register their hooks on import, then we boot
-await import("./composer.js").catch((e) => console.warn("composer not loaded", e));
-await import("./cards.js").catch((e) => console.warn("cards not loaded", e));
-boot();

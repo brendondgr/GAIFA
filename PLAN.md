@@ -81,7 +81,7 @@ GET    /docs                         OpenAPI
 
 ### Phase 4 — web UI
 - [x] 4.1 Layout: sidebar (chats), thread, composer, top bar with worker state + queue
-- [ ] 4.2 Settings menu: stage toggles, presets, every Cube3D / CubePart / rig option, parts chip editor, bounding box, mesh upload
+- [x] 4.2 Settings menu: stage toggles, presets, every Cube3D / CubePart / rig option, parts chip editor, bounding box, mesh upload
 - [ ] 4.3 Job cards: queue position, per-stage progress, ETA + "done at", cancel/retry/continue, notifications
 - [ ] 4.4 Inline 3D viewer (three.js, vendored) with part colours and rig motor sliders; downloads
 - [ ] 4.5 Settings dialog: worker load/unload, idle note, notifications, delete history

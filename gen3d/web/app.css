@@ -104,7 +104,7 @@ small { font-size: 11px; color: var(--text-mut); font-weight: 400; }
 
 /* ---------- thread ---------- */
 .thread { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
-.turns, .empty { max-width: 780px; margin: 0 auto; padding: 24px 20px 12px; }
+.turns, .empty { max-width: 860px; margin: 0 auto; padding: 24px 20px 12px; }
 .empty { text-align: center; padding-top: 11vh; }
 .empty h2 { font: 600 22px var(--sans); letter-spacing: -.01em; margin: 14px 0 6px; }
 .empty p { color: var(--text-mut); margin: 0 auto 22px; max-width: 520px; }
@@ -154,7 +154,7 @@ audio { width: 100%; height: 38px; display: block; }
 .error-card span { flex: 1; overflow-wrap: anywhere; }
 
 /* ---------- composer ---------- */
-.composer { max-width: 780px; width: 100%; margin: 0 auto; padding: 8px 20px 12px; }
+.composer { max-width: 860px; width: 100%; margin: 0 auto; padding: 8px 20px 12px; }
 .box { border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-card); box-shadow: var(--shadow);
   padding: 10px 10px 8px 12px; transition: border-color .15s; }
 .box:focus-within { border-color: var(--border-hover); }
@@ -504,3 +504,8 @@ a { color: var(--cyan); }
 @media (prefers-reduced-motion: reduce) {
   .dot.ok, .dot.busy, .badge-live, .stage.running .ico, .bar.indet i { animation: none; }
 }
+.menu .row.bbox-row { justify-content: flex-start; gap: 12px; padding-top: 0; }
+.menu .row.bbox-row input[type=number] { width: 64px; }
+.toolbar { flex-wrap: nowrap; }
+.stage-toggles, .select-tool, .tool { flex: none; }
+.eta-hint { overflow: hidden; text-overflow: ellipsis; min-width: 0; }

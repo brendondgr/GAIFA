@@ -127,14 +127,22 @@ class Estimator:
         running = next((s for s in todo if stages[s].get("state") == "running"), None)
         plan = self.plan(req, todo, loaded, worker_up or running is not None)
         cur = stages.get(running, {}) if running else {}
-        seen_current = False
+        cur_sub = cur.get("sub")
+        planned_subs = {i["sub"] for i in plan if i["stage"] == running}
+        # A current substage outside the plan (the worker starting, an extra model load) comes first:
+        # count its own remainder, then every planned substage of the stage as still to do.
+        seen_current = not cur_sub or cur_sub not in planned_subs
+        if running and cur_sub and cur_sub not in planned_subs:
+            extra = {"worker.start": WORKER_START_S}.get(cur_sub, 0.0) * self.scale
+            elapsed = now - (cur.get("sub_started") or now)
+            by_stage[running] = max(0.0, extra - elapsed)
         for item in plan:
             secs = item["seconds"]
             if running and item["stage"] == running:
-                if item["sub"] == cur.get("sub"):
+                if item["sub"] == cur_sub:
                     seen_current = True
                     secs = self._live(item, cur, now)
-                elif not seen_current and cur.get("sub"):
+                elif not seen_current:
                     continue  # substages of the running stage that already finished
             by_stage[item["stage"]] = by_stage.get(item["stage"], 0.0) + secs
         total = sum(by_stage.values())

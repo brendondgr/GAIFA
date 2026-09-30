@@ -43,3 +43,12 @@ def test_live_rate_drives_running_substage(tmp_path):
     rem = e.remaining(job, req, {"shape"}, True)
     # 10 s for half the tokens -> ~10 s left, plus decode + post
     assert 30 < rem["eta_s"] < 45
+
+
+def test_worker_start_counts_the_whole_running_stage(tmp_path):
+    e = _est(tmp_path)
+    req = parse_request({"prompt": "x", "stages": ["shape", "preview"]})
+    job = {"stages": {"shape": {"state": "running", "sub": "worker.start", "sub_started": time.time()},
+                      "preview": {"state": "pending"}}}
+    rem = e.remaining(job, req, set(), False)
+    assert rem["by_stage"]["shape"] > 90  # load + gpt + decode + post, not just the preview

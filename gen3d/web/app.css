@@ -365,7 +365,7 @@ a { color: var(--cyan); }
   background: var(--bg-row); border: 1px solid var(--border-strong); }
 .part-chip i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .part-chip button { border: 0; background: none; color: var(--text-dim); padding: 0 2px; line-height: 1; }
-.part-chip button:hover { color: var(--red); }
+.part-chip button:hover { color: var(--text); }
 .part-chips input { flex: 1; min-width: 110px; border: 0; outline: 0; background: transparent; font: 400 12px var(--mono); padding: 2px; }
 .parts-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: var(--text-mut); }
 .templates { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
@@ -509,3 +509,6 @@ a { color: var(--cyan); }
 .toolbar { flex-wrap: nowrap; }
 .stage-toggles, .select-tool, .tool { flex: none; }
 .eta-hint { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -2px -2px 4px 0; }
+.menu-head h5 { margin: 4px 6px; }
+.menu-head h5 small { text-transform: none; letter-spacing: 0; font-weight: 400; }

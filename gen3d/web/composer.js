@@ -141,7 +141,7 @@ function renderPartsMenu() {
   const t = S.options?.part_templates || {};
   const max = S.options?.max_parts || 8;
   $("parts-menu").innerHTML = `
-    <h5>Part names <small>CubePart makes one mesh per name</small></h5>
+    ${menuHead("Part names", "CubePart makes one mesh per name")}
     <div class="part-chips" id="part-chips">
       ${C.parts.map((p, i) => `<span class="part-chip"><i style="background:${rgb(PALETTE[i % 8])}"></i>${esc(p)}
         <button type="button" data-action="remove-part" data-i="${i}" aria-label="Remove ${esc(p)}">×</button></span>`).join("")}
@@ -209,7 +209,7 @@ function fieldRow(f) {
 function renderOptions() {
   const fields = (S.options?.fields || []).filter((f) => f.type !== "parts");
   const groups = [["shape", "Shape · Cube3D"], ["parts", "Parts · CubePart"], ["rig", "Rig"]];
-  $("options-menu").innerHTML = groups.map(([g, title]) => {
+  $("options-menu").innerHTML = menuHead("All settings", "saved in this browser") + groups.map(([g, title]) => {
     const on = C.stages[g] && allowed(g);
     return `<div class="opt-group${on ? "" : " disabled"}"><h5>${title}${on ? "" : `<span class="off">stage off</span>`}</h5>
       ${fields.filter((f) => f.group === g).map(fieldRow).join("")}</div>`;
@@ -324,9 +324,15 @@ function openMenu(id) {
   el.hidden = !el.hidden;
   if (!el.hidden) { id === "parts-menu" ? renderPartsMenu() : renderOptions(); if (id === "parts-menu") $("part-input")?.focus(); }
 }
-document.addEventListener("click", (e) => {
-  if (!e.target.closest(".menu-wrap")) { $("parts-menu").hidden = true; $("options-menu").hidden = true; }
+// Menus stay open until closed on purpose (their button, the × in the header, or Esc): clicking
+// elsewhere, or on an item inside (which re-renders the menu), never closes them.
+function closeMenus() { $("parts-menu").hidden = true; $("options-menu").hidden = true; }
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && (!$("parts-menu").hidden || !$("options-menu").hidden)) { e.preventDefault(); closeMenus(); }
 });
+action("close-menus", closeMenus);
+const menuHead = (title, sub) => `<div class="menu-head"><h5>${title}${sub ? ` <small>${sub}</small>` : ""}</h5>
+  <button type="button" class="icon-btn small" data-action="close-menus" title="Close (Esc)" aria-label="Close">${ICON.x}</button></div>`;
 
 action("toggle-stage", (el) => { const k = el.dataset.stage; C.stages[k] = !C.stages[k]; if (k === "parts" && C.stages.parts && !C.parts.length) openMenu("parts-menu"); changed(); });
 action("toggle-parts", () => openMenu("parts-menu"));

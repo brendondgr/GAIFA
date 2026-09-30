@@ -12,7 +12,8 @@ the queue and **when it will be done**, and keeps its files on the server. It ru
 background as a systemd user service, and keeps nothing on the GPU while unused: the worker
 stops after **10 minutes** without a job and starts again on the next one.
 
-**Web UI: http://127.0.0.1:5050** (`gen3d ui` opens it) · API docs: http://127.0.0.1:5050/docs
+**Web UI: http://127.0.0.1:5050**: open it from the **3DGenerate** app launcher (it starts the service if
+needed) or `gen3d open` · API docs: http://127.0.0.1:5050/docs
 
 Built for an AMD Strix Halo (Radeon 8060S, gfx1151, ROCm) with the models set up in
 `~/Models/3D/CubeArt` (see [Models](#models)).
@@ -21,6 +22,12 @@ Built for an AMD Strix Halo (Radeon 8060S, gfx1151, ROCm) with the models set up
 
 A chat: describe an object, get a model back. Everything the API does is in it.
 
+- **Generator control** (top right): always says whether the generator (the GPU worker holding
+  Cube3D and CubePart) is **off**, **starting** (with a timer), **ready** (models loaded, and when it
+  will stop on its own) or **generating**. **Start generator** loads the models now so the next job
+  begins at once (~40 s the first time); **Stop** frees the GPU. You do not have to start it: the
+  first job does. If the service itself stops answering, a red banner says so and the page
+  reconnects when it is back.
 - **Composer**: the prompt, then **stage toggles** (Shape · Parts · Rig · Preview), the **Parts**
   editor (up to 8 names, with templates: Surgeon chair, Chair, Character, Vehicle, Weapon,
   Creature), a **preset** (Fast · Balanced · Quality · Custom), the paperclip to **upload a mesh**
@@ -60,8 +67,13 @@ gen3d load | unload              # start the worker and load both models now / f
 gen3d make "prompt" [opts]       # queue a job from the terminal (below)
 gen3d jobs [N]                   # recent jobs with status and ETA
 gen3d cancel ID                  # cancel a queued or running job
+gen3d open [--load]              # start the service if needed and open the UI (--load: start the generator too)
+gen3d launcher                   # (re)install the "3DGenerate" app-menu launcher (install.sh does this)
 gen3d ui | url                   # open the web UI / print the base URL
 ```
+
+The **3DGenerate** launcher in the app menu runs `gen3d open`; right-click it for *Start generator
+(load models)*, *Stop generator (free the GPU)* and *Stop 3DGenerate*.
 
 ```bash
 gen3d make "sci-fi loot crate with a hinged lid" --parts "lid, box, handles" --preset fast --wait
@@ -252,7 +264,7 @@ copies of CubeArt's scripts.
 
 ```bash
 git clone git@github.com:brendondgr/3DGenerate.git ~/Projects/3DGenerate && cd ~/Projects/3DGenerate
-./install.sh                # server venv + `gen3d` command + boot service, then starts it
+./install.sh                # server venv + `gen3d` command + app launcher + boot service, then starts it
 ./install.sh --no-service   # no boot service (`gen3d start` runs it in the background)
 ```
 

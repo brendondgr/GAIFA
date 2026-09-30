@@ -60,7 +60,7 @@ GET    /docs                         OpenAPI
 - [x] 0.2 Create the private GitHub repo and push → **commit: "Plan and scaffold"**
 
 ### Phase 1 — service skeleton (mirrors LocalTTS)
-- [ ] 1.1 `gen3d/config.py` (env settings), `gen3d/__main__.py` (uvicorn on 127.0.0.1 + ::1, long keep-alive)
+- [x] 1.1 `gen3d/config.py` (env settings), `gen3d/__main__.py` (uvicorn on 127.0.0.1 + ::1, long keep-alive)
 - [ ] 1.2 `gen3d/server.py` with `/`, `/v1`, `/health`, static `/ui`, CORS for loopback origins
 - [ ] 1.3 `bin/gen3d` (start/stop/restart/status/logs/enable/disable/ui/url/serve), `systemd/gen3d.service`, `install.sh`
 - [ ] 1.4 Verify: `gen3d serve` answers `/health` → **commit: "Service skeleton, CLI and systemd unit"**

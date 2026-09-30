@@ -250,7 +250,8 @@ def rig(parts_dir: Path, out: Path, height: float | None = None, faces_per_part:
     except Exception as e:
         print("extras not written:", e)
     print("wrote", str(out) + ".glb", "joints:", list(spec["joints"]))
-    return {"joints": list(spec["joints"]), "missing": missing}
+    return {"joints": list(spec["joints"]), "missing": missing,
+            "faces": int(sum(len(g.faces) for g in scene.geometry.values()))}
 
 
 def main():

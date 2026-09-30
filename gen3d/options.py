@@ -25,7 +25,9 @@ class ShapeOptions(BaseModel):
     top_p: float | None = Field(0.9, gt=0, le=1, description="nucleus sampling; null = deterministic argmax")
     guidance_scale: float = Field(3.0, ge=0, le=10, description="text guidance strength")
     bbox: tuple[float, float, float] | None = Field(None, description="aspect ratio W H D (Y up); null = model decides")
-    resolution_base: float = Field(8.0, ge=6.0, le=9.5, description="mesh decode resolution (2^n grid)")
+    resolution_base: float = Field(8.0, ge=5.0, le=9.5, description="mesh decode resolution (2^n grid)")
+    target_faces: int | None = Field(None, ge=100, le=1_000_000,
+                                     description="decimate the mesh to about this many faces; null = full detail")
     fast_engine: bool = Field(False, description="CUDA/HIP-graph engine: same output, 2x memory, not faster on gfx1151")
 
     @field_validator("bbox")
@@ -40,7 +42,9 @@ class PartsOptions(BaseModel):
     parts: list[str] = Field(default_factory=list, description=f"1-{MAX_PARTS} part names")
     steps: int = Field(50, ge=5, le=150, description="diffusion steps (~2.45 s each)")
     guidance_scale: float = Field(7.5, ge=0, le=20)
-    resolution_base: float = Field(8.5, ge=7.0, le=9.5, description="part mesh decode resolution")
+    resolution_base: float = Field(8.5, ge=6.0, le=9.5, description="part mesh decode resolution (min 6: CubePart samples a fixed 64³ coarse grid)")
+    target_faces: int | None = Field(None, ge=100, le=2_000_000,
+                                     description="one face budget for all parts together, split by surface area; null = full detail")
     scheduler: Literal["dpm_solver", "euler", "heun"] = "dpm_solver"
     timeshift: float = Field(4.0, ge=0.5, le=10)
     seed: int = Field(0, ge=0, le=2**31 - 1)
@@ -59,13 +63,13 @@ class PartsOptions(BaseModel):
 
 class RigOptions(BaseModel):
     height_m: float | None = Field(1.8, gt=0, le=50, description="scale the rigged asset to this height; null = keep units")
-    faces_per_part: int = Field(12_000, ge=1_000, le=200_000, description="decimation target per part")
+    faces_per_part: int = Field(12_000, ge=20, le=200_000, description="decimation cap per part (parts already under it are kept)")
 
 
 class JobRequest(BaseModel):
     prompt: str = Field("", max_length=1000, description="what to make (needed for the shape stage)")
     stages: list[Stage] = Field(default_factory=lambda: ["shape", "preview"])
-    preset: Literal["fast", "balanced", "quality"] | None = Field(None, description="applied under explicit options")
+    preset: Literal["lowpoly", "fast", "balanced", "quality"] | None = Field(None, description="applied under explicit options")
     shape: ShapeOptions = Field(default_factory=ShapeOptions)
     parts: PartsOptions = Field(default_factory=PartsOptions)
     rig: RigOptions = Field(default_factory=RigOptions)
@@ -94,6 +98,9 @@ PRESETS: dict[str, dict] = {
              "shape": {"resolution_base": 7.5}, "parts": {"steps": 25, "resolution_base": 8.0}},
     "balanced": {"label": "Balanced", "help": "the upstream defaults (~1.5 min shape, ~3.2 min parts)",
                  "shape": {"resolution_base": 8.0}, "parts": {"steps": 50, "resolution_base": 8.5}},
+    "lowpoly": {"label": "Low-poly", "help": "about 1,000 faces for the whole asset: coarse decode, then decimation",
+                "shape": {"resolution_base": 7.0, "target_faces": 1000},
+                "parts": {"steps": 25, "resolution_base": 7.0, "target_faces": 1000}},
     "quality": {"label": "Quality", "help": "finer meshes (~2.5 min shape, ~3.7 min parts, 52 GB peak)",
                 "shape": {"resolution_base": 8.5}, "parts": {"steps": 50, "resolution_base": 9.0}},
 }
@@ -147,7 +154,9 @@ def catalogue() -> dict:
         ],
         "fields": [
             _field("shape", "resolution_base", ShapeOptions, "Mesh resolution", "number", step=0.5,
-                   choices=[7.0, 7.5, 8.0, 8.5, 9.0]),
+                   choices=[5.0, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0]),
+            _field("shape", "target_faces", ShapeOptions, "Face budget", "integer", step=100, nullable=True,
+                   null_label="full detail"),
             _field("shape", "top_p", ShapeOptions, "Top-p", "number", step=0.05, nullable=True,
                    null_label="deterministic"),
             _field("shape", "seed", ShapeOptions, "Seed", "integer"),
@@ -157,7 +166,9 @@ def catalogue() -> dict:
             _field("parts", "parts", PartsOptions, "Parts", "parts", max_items=MAX_PARTS),
             _field("parts", "steps", PartsOptions, "Steps", "integer"),
             _field("parts", "resolution_base", PartsOptions, "Part resolution", "number", step=0.5,
-                   choices=[7.5, 8.0, 8.5, 9.0]),
+                   choices=[6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0]),
+            _field("parts", "target_faces", PartsOptions, "Face budget (all parts)", "integer", step=100, nullable=True,
+                   null_label="full detail"),
             _field("parts", "guidance_scale", PartsOptions, "Guidance", "number", step=0.5),
             _field("parts", "seed", PartsOptions, "Seed", "integer"),
             _field("parts", "scheduler", PartsOptions, "Scheduler", "choice", choices=["dpm_solver", "euler", "heun"]),

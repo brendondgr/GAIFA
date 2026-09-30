@@ -59,7 +59,7 @@ def substages(req: JobRequest, stage: str, loaded: set[str]) -> list[tuple[str, 
         out += [
             ("shape.gpt", {"fast": s.fast_engine}, GPT_FAST_S if s.fast_engine else GPT_S, GPT_TOKENS),
             ("shape.decode", {"res": s.resolution_base}, _interp_log(SHAPE_DECODE, s.resolution_base), None),
-            ("shape.post", {"res": s.resolution_base}, _interp_log(SHAPE_POST, s.resolution_base), None),
+            ("shape.post", {"res": s.resolution_base, "target": s.target_faces}, _interp_log(SHAPE_POST, s.resolution_base), None),
         ]
         return out
     if stage == "parts":
@@ -71,7 +71,8 @@ def substages(req: JobRequest, stage: str, loaded: set[str]) -> list[tuple[str, 
         out += [
             ("parts.encode", {}, PARTS_ENCODE_S, None),
             ("parts.diffusion", {"steps": p.steps}, PART_STEP_S * p.steps, p.steps),
-            ("parts.decode", {"res": p.resolution_base, "n": n}, decode8 * (10 + 7.75 * n) / 72.0, None),
+            ("parts.decode", {"res": p.resolution_base, "n": n, "target": p.target_faces},
+             decode8 * (10 + 7.75 * n) / 72.0 + (6.0 if p.target_faces else 0.0), None),
         ]
         return out
     if stage == "rig":

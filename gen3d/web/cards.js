@@ -83,9 +83,9 @@ function stageSummary(job, k) {
   if (k === "shape") return `${fmtNum(r.faces)} faces${r.peak_gpu_gb ? ` · ${r.peak_gpu_gb} GB peak` : ""}`;
   if (k === "parts") {
     const n = (r.parts || []).filter((p) => p.file).length;
-    return `${n} part mesh${n === 1 ? "" : "es"}${r.empty?.length ? ` · ${r.empty.length} empty` : ""}${r.peak_gpu_gb ? ` · ${r.peak_gpu_gb} GB peak` : ""}`;
+    return `${n} part mesh${n === 1 ? "" : "es"}${r.faces != null ? ` · ${fmtNum(r.faces)} faces` : ""}${r.empty?.length ? ` · ${r.empty.length} empty` : ""}${r.peak_gpu_gb ? ` · ${r.peak_gpu_gb} GB peak` : ""}`;
   }
-  if (k === "rig") return `${(r.joints || []).length} joints${r.missing?.length ? ` · no ${r.missing.join(", ")}` : ""}`;
+  if (k === "rig") return `${(r.joints || []).length} joints${r.faces != null ? ` · ${fmtNum(r.faces)} faces` : ""}${r.missing?.length ? ` · no ${r.missing.join(", ")}` : ""}`;
   if (k === "preview") return r.skipped || "4-view render";
   return "";
 }

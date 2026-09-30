@@ -83,6 +83,34 @@ class ProgressTqdm:
         pass
 
 
+def decimate(v, f, target: int):
+    """Quadric edge collapse to ~target faces, keeping the silhouette (coarse pass first when far off)."""
+    import pymeshlab
+    import trimesh
+    ms = pymeshlab.MeshSet()
+    ms.add_mesh(pymeshlab.Mesh(v, f))
+    ms.meshing_merge_close_vertices()
+    ms.meshing_remove_duplicate_faces()
+    ms.meshing_remove_null_faces()
+    goals = ([max(target * 8, 20000)] if len(f) > target * 16 else []) + [target]
+    for goal in goals:
+        if ms.current_mesh().face_number() <= goal:
+            continue
+        ms.meshing_decimation_quadric_edge_collapse(targetfacenum=int(goal), qualitythr=0.3, preserveboundary=True,
+                                                    preservenormal=True, optimalplacement=True, planarquadric=True,
+                                                    autoclean=True)
+    o = ms.current_mesh()
+    return trimesh.Trimesh(o.vertex_matrix(), o.face_matrix(), process=True)
+
+
+def budgets(meshes, total: int, floor: int = 24) -> list[int]:
+    """Split one face budget across parts by surface area; every part keeps at least `floor`."""
+    import numpy as np
+    areas = np.array([m.area for m in meshes], dtype=float)
+    spare = max(0, total - floor * len(meshes))
+    return [int(floor + spare * a / areas.sum()) if areas.sum() > 0 else total // len(meshes) for a in areas]
+
+
 def palette(n: int):
     return [[int(c * 255) for c in colorsys.hsv_to_rgb(i / max(n, 1), 0.55, 0.95)] for i in range(n)]
 
@@ -161,7 +189,9 @@ class Worker:
                     v, f = engine.run_shape_decode(ids, float(s["resolution_base"]))[0]
         with Sub("shape.post"):
             obj = jdir / "mesh.obj"
-            if PYMESHLAB_AVAILABLE:
+            if s.get("target_faces"):
+                decimate(v, f, int(s["target_faces"])).export(obj)
+            elif PYMESHLAB_AVAILABLE:
                 ms = create_pymeshset(v, f)
                 postprocess_mesh(ms, max(10000, int(f.shape[0] * 0.1)), str(obj))
                 save_mesh(ms, str(obj))
@@ -201,14 +231,18 @@ class Worker:
             pal = palette(len(names))
             scene = trimesh.Scene()
             out = []
-            for i, (v, f) in enumerate(meshes):
+            full = [trimesh.Trimesh(v, f) if v is not None and len(f) else None for v, f in meshes]
+            if p.get("target_faces"):
+                real = [m for m in full if m is not None]
+                caps = iter(budgets(real, int(p["target_faces"])) if real else [])
+                full = [decimate(m.vertices, m.faces, next(caps)) if m is not None else None for m in full]
+            for i, m in enumerate(full):
                 name = names[i]
-                if v is None or len(f) == 0:
+                if m is None:
                     out.append({"index": i, "name": name, "file": None, "faces": 0, "color": pal[i]})
                     continue
                 safe = "".join(ch if ch.isalnum() else "_" for ch in name)
                 fn = f"part_{i:02d}_{safe}.glb"
-                m = trimesh.Trimesh(v, f)
                 m.export(pdir / fn)
                 cm = m.copy()
                 cm.visual.face_colors = pal[i] + [255]
@@ -219,7 +253,7 @@ class Worker:
             (pdir / "manifest.json").write_text(json.dumps(
                 {"source_mesh": inputs["mesh"], "parts": out, "center": center.tolist(), "scale": float(scale)}, indent=2))
         empty = [o["name"] for o in out if not o["file"]]
-        return {"dir": "parts", "scene": "parts.glb", "parts": out,
+        return {"dir": "parts", "scene": "parts.glb", "parts": out, "faces": sum(o["faces"] for o in out),
                 **({"empty": empty} if empty else {})}
 
     def rig(self, req: dict, jdir: Path, inputs: dict) -> dict:
@@ -229,7 +263,8 @@ class Worker:
             info = rigmod.rig(Path(inputs["parts_dir"]), jdir / "rigged", height=r.get("height_m"),
                               faces_per_part=int(r["faces_per_part"]))
             (jdir / "rigged.rig.json").replace(jdir / "rig.json")
-        return {"glb": "rigged.glb", "rig": "rig.json", "joints": info["joints"], "missing": info["missing"]}
+        return {"glb": "rigged.glb", "rig": "rig.json", "joints": info["joints"], "missing": info["missing"],
+                "faces": info.get("faces")}
 
     def run(self, task: dict) -> dict:
         jdir = Path(task["job_dir"])

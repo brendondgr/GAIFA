@@ -34,4 +34,11 @@ def test_catalogue_has_bounds_and_defaults():
     f = {(x["group"], x["key"]): x for x in c["fields"]}
     assert f[("parts", "steps")]["min"] == 5 and f[("parts", "steps")]["default"] == 50
     assert c["defaults"]["stages"] == ["shape", "preview"]
-    assert set(c["presets"]) == {"fast", "balanced", "quality"}
+    assert set(c["presets"]) == {"lowpoly", "fast", "balanced", "quality"}
+
+
+def test_lowpoly_preset_sets_face_budgets():
+    r = parse_request({"prompt": "x", "preset": "lowpoly", "stages": ["shape", "parts"], "parts": {"parts": ["a"]}})
+    assert r.shape.target_faces == 1000 and r.parts.target_faces == 1000
+    assert r.shape.resolution_base == 7.0 and r.parts.resolution_base == 7.0
+    assert parse_request({"prompt": "x"}).shape.target_faces is None  # full detail by default

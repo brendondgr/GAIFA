@@ -29,8 +29,7 @@ A chat: describe an object, get a model back. Everything the API does is in it.
   first job does. If the service itself stops answering, a red banner says so and the page
   reconnects when it is back.
 - **Composer**: the prompt, then **stage toggles** (Shape · Parts · Rig · Preview), the **Parts**
-  editor (up to 8 names, with templates: Surgeon chair, Chair, Character, Vehicle, Weapon,
-  Creature), a **preset** (Fast · Balanced · Quality · Custom), the paperclip to **upload a mesh**
+  editor (up to 8 names, with templates: Chair, Character, Vehicle, Weapon, Creature), a **preset** (Fast · Balanced · Quality · Custom), the paperclip to **upload a mesh**
   (or drop one on the composer) and the sliders button, which holds **every setting**: Cube3D
   resolution, top-p / deterministic, seed, guidance, bounding box (with Cube / Tall / Wide /
   Chair / Flat aspects), graph engine; CubePart steps, resolution, guidance, seed, scheduler,
@@ -106,7 +105,7 @@ Every job is a pipeline of optional stages that run in order:
 | `shape.resolution_base` | 8.0 | 6–9.5; mesh decode grid 2^n. 7 ≈ 3 s, 8 ≈ 25 s, 9 ≈ 200 s of decoding |
 | `shape.top_p` | 0.9 | nucleus sampling; `null` = deterministic (the seed then does nothing) |
 | `shape.seed`, `shape.guidance_scale` | 0, 3.0 | |
-| `shape.bbox` | none | aspect `[W, H, D]`, Y up, e.g. `[1.6, 1.7, 0.8]` for a chair |
+| `shape.bbox` | none | aspect `[W, H, D]`, Y up, e.g. `[1, 2, 1]` for something tall |
 | `shape.fast_engine` | false | HIP-graph engine: same mesh, 2× memory, not faster on gfx1151 |
 | `parts.parts` | `[]` | 1–8 names; left/right is the object's own (it faces +Z) |
 | `parts.steps` | 50 | diffusion steps, ~2.45 s each (the same for 1 or 8 parts) |
@@ -190,7 +189,7 @@ open("lantern_parts.glb", "wb").write(requests.get(f"{B}/v1/jobs/{job['id']}/fil
 `rigged.glb` has a node chain per limb, so an engine script can drive each motor on its own:
 
 ```
-chair_root
+asset_root
   base
   recline_joint                       rotate local X
     back                              torso / body (and anything that is not a limb or the head)
@@ -241,7 +240,7 @@ browser / curl ──HTTP──> gen3d (FastAPI, .venv)  ──stdin/stdout JSON
 | parts, 50 steps, 8 parts, resolution 8.5 | ~3.2–3.7 min (diffusion ~2 min, decoding ~70 s) | 37–46 GB (52 GB at 9.0) |
 | parts, 25–30 steps, resolution 8.0–8.5 | ~2.2–2.8 min | ~37 GB |
 | rig / preview | ~5–9 s / ~1–3 s | CPU |
-| full chair (shape + 8 parts + rig + preview, cold worker) | **5m 40s** | |
+| full pipeline (shape + 8 parts + rig + preview, cold worker) | **5m 40s** | |
 
 Decoding runs marching cubes on the CPU (NVIDIA Warp has no ROCm backend), which is why higher
 resolutions cost so much more. Fewer parts do not make CubePart's diffusion faster; it always

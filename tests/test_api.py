@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from gen3d.glb import boxes_glb
 from gen3d.server import app
 
-PARTS = ["base", "torso cushion", "head cushion", "left arm board"]
+PARTS = ["seat", "legs", "rungs", "footrest"]
 
 
 @pytest.fixture(scope="module")
@@ -33,7 +33,7 @@ def test_health_and_options(c):
 
 
 def test_full_pipeline_in_new_chat(c):
-    r = c.post("/v1/jobs", json={"prompt": "surgeon chair", "chat_id": "new",
+    r = c.post("/v1/jobs", json={"prompt": "wooden bar stool", "chat_id": "new",
                                  "stages": ["shape", "parts", "rig", "preview"], "parts": {"parts": PARTS}})
     assert r.status_code == 201, r.text
     job = r.json()
@@ -47,7 +47,7 @@ def test_full_pipeline_in_new_chat(c):
     z = c.get(f"/v1/jobs/{job['id']}/download")
     assert z.status_code == 200 and z.content[:2] == b"PK"
     chat = c.get(f"/v1/chats/{job['chat_id']}").json()
-    assert chat["title"] == "surgeon chair" and chat["jobs"][0]["id"] == job["id"]
+    assert chat["title"] == "wooden bar stool" and chat["jobs"][0]["id"] == job["id"]
 
 
 def test_continue_from_parent_splits_its_mesh(c):

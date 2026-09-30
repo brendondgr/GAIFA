@@ -1,8 +1,9 @@
 """A stand-in for the GPU worker: same interface and events, simulated timings, sample outputs.
 
 GEN3D_FAKE_WORKER=1 selects it. Stages take their real duration divided by GEN3D_FAKE_SPEED (20).
-Outputs are the CubeArt sample results when they exist (so the UI shows real meshes, parts and a
-working rig), otherwise coloured placeholder boxes (GEN3D_FAKE_SAMPLES=0 forces boxes, as tests do).
+Outputs are CubePart's own example (the jellyfish car: its mesh, parts and preview from CubeArt) when
+they exist, so the UI shows real meshes and parts; otherwise coloured placeholder boxes
+(GEN3D_FAKE_SAMPLES=0 forces boxes, as tests do). The fake rig has no joints.
 """
 
 from __future__ import annotations
@@ -30,9 +31,8 @@ def _samples() -> dict[str, Path] | None:
     if os.environ.get("GEN3D_FAKE_SAMPLES", "1") == "0":
         return None
     o = settings.cubeart / "outputs"
-    s = {"mesh": o / "t2s/explore/xframe_s1.glb", "parts": o / "parts/ai_xframe/s1",
-         "rig": o / "rigged/ai_xframe.glb", "rigjson": o / "rigged/ai_xframe.rig.json",
-         "preview": o / "renders/parts_ai_xframe_s1.png"}
+    s = {"mesh": settings.cubeart / "cube/cubepart/examples/inputs/jellyfish_car.glb",
+         "parts": o / "parts/example_jellyfish_car/s0", "preview": o / "renders/parts_example_jellyfish.png"}
     return s if all(p.exists() for p in s.values()) else None
 
 
@@ -137,12 +137,8 @@ class FakeWorker:
             (pdir / "manifest.json").write_text(json.dumps({"parts": parts, "center": [0, 0, 0], "scale": 1.0}))
             return {"dir": "parts", "scene": "parts.glb", "parts": parts, "fake": True}
         if stage == "rig":
-            if sm:
-                shutil.copy(sm["rig"], jdir / "rigged.glb")
-                shutil.copy(sm["rigjson"], jdir / "rig.json")
-            else:
-                shutil.copy(Path(inputs["parts_dir"]).parent / "parts.glb", jdir / "rigged.glb")
-                (jdir / "rig.json").write_text(json.dumps({"units": "m", "joints": {}}))
+            shutil.copy(Path(inputs["parts_dir"]).parent / "parts.glb", jdir / "rigged.glb")
+            (jdir / "rig.json").write_text(json.dumps({"units": "m", "joints": {}}))
             return {"glb": "rigged.glb", "rig": "rig.json", "joints": list(json.loads((jdir / "rig.json").read_text())["joints"]),
                     "fake": True}
         raise ValueError(f"unknown stage {stage}")

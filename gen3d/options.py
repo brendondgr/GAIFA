@@ -99,8 +99,6 @@ PRESETS: dict[str, dict] = {
 }
 
 PART_TEMPLATES: dict[str, list[str]] = {
-    "Surgeon chair": ["base frame", "torso cushion", "head cushion", "left arm board", "right arm board",
-                      "left leg board", "right leg board", "straps"],
     "Chair": ["seat", "backrest", "legs", "armrests"],
     "Character": ["head", "torso", "left arm", "right arm", "left leg", "right leg"],
     "Vehicle": ["body", "front left wheel", "front right wheel", "rear left wheel", "rear right wheel", "windows"],
@@ -171,7 +169,7 @@ def catalogue() -> dict:
         ],
         "presets": PRESETS,
         "part_templates": PART_TEMPLATES,
-        "bbox_presets": {"Cube": [1, 1, 1], "Tall": [1, 2, 1], "Wide": [2, 1, 1], "Chair": [1.6, 1.7, 0.8],
+        "bbox_presets": {"Cube": [1, 1, 1], "Tall": [1, 2, 1], "Wide": [2, 1, 1], "Chair": [1, 1.4, 1],
                          "Flat": [2, 0.5, 2]},
         "max_parts": MAX_PARTS,
         "defaults": JobRequest(prompt="x").model_dump(exclude={"prompt", "chat_id", "parent_id", "title", "preset"}),

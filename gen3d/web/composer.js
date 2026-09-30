@@ -37,7 +37,7 @@ function save() {
 function restore() {
   defaults();
   const s = store("compose");
-  if (!s) { C.parts = [...(S.options?.part_templates?.["Surgeon chair"] || [])]; return; }
+  if (!s) return;
   Object.assign(C.stages, s.stages || {});
   C.preset = s.preset ?? "balanced";
   C.parts = s.parts || [];
@@ -295,7 +295,6 @@ export function continueFrom(job, stages) {
   C.parent = job;
   C.upload = null;
   C.stages = { shape: false, parts: stages.includes("parts"), rig: stages.includes("rig"), preview: true };
-  if (stages.includes("parts") && !C.parts.length) C.parts = [...(S.options?.part_templates?.["Surgeon chair"] || [])];
   changed();
   if (stages.includes("parts")) openMenu("parts-menu");
   $("prompt").focus();
@@ -406,11 +405,12 @@ $("composer").addEventListener("submit", (e) => { e.preventDefault(); submit(); 
 // ---- empty-state suggestions ----------------------------------------------------------------
 
 const SUGGESTIONS = [
-  { title: "Surgeon chair, rigged", prompt: "sci-fi interrogation chair shaped like a giant letter X, padded torso board and head cushion, four straight limb boards spread in an X, straps, motors at each joint",
-    parts: ["base frame", "torso cushion", "head cushion", "left arm board", "right arm board", "left leg board", "right leg board", "straps"], rig: true, bbox: [1.6, 1.7, 0.8] },
-  { title: "Robot surgery chair", prompt: "robotic medical chair with four mechanical arms for the patient's arms and legs, spread in an X shape, padded seat back and headrest, straps" },
+  { title: "Knight, rigged for games", prompt: "stylized low-poly knight in armor standing in a T-pose",
+    parts: ["head", "torso", "left arm", "right arm", "left leg", "right leg"], rig: true, bbox: [1.6, 1.8, 0.6] },
+  { title: "Hover bike, split", prompt: "futuristic hover motorcycle with twin jet thrusters and a long padded seat",
+    parts: ["main body", "front thruster", "rear thruster", "seat", "handlebars"], bbox: [0.8, 0.9, 2.0] },
   { title: "Loot crate, split", prompt: "sci-fi loot crate with a hinged lid, glowing panels and side handles", parts: ["lid", "box body", "handles", "glowing panels"] },
-  { title: "Game character", prompt: "stylized low-poly knight in armor standing in a T-pose", parts: ["head", "torso", "left arm", "right arm", "left leg", "right leg"] },
+  { title: "Brass lantern", prompt: "ornate brass hanging lantern with glass panels and a ring on top", bbox: [1, 1.8, 1] },
 ];
 
 function renderSuggestions() {

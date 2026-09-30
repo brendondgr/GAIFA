@@ -5,7 +5,7 @@ Vendored from ~/Models/3D/CubeArt/scripts/rig.py (CubeArt-only --gt mode removed
 Hierarchy (every joint node sits at its pivot; local axes: Z = swing axis, Y = extend direction,
 X = lift axis — so engine scripts rotate about local Z/X and translate along local Y):
 
-  chair_root
+  asset_root
     base                         (pedestal)
     recline_joint                (tilts the whole back assembly, local X)
       back                       (torso / body, plus anything that is not a limb or the head)
@@ -141,7 +141,7 @@ def rig(parts_dir: Path, out: Path, height: float | None = None, faces_per_part:
     spec = {"units": "m" if height else "source mesh units", "frame": "+Y up, +Z forward",
            "joints": {}}
     scene = trimesh.Scene()
-    root = "chair_root"
+    root = "asset_root"
     scene.graph.update(frame_from=scene.graph.base_frame, frame_to=root, matrix=np.eye(4))
 
     def add_mesh(role, mesh, parent, T_parent_world, color):

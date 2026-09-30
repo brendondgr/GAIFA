@@ -205,18 +205,61 @@ export async function refreshHealth() {
   } catch { setWorker(null); }
 }
 
-function setWorker(h) {
-  const dot = $("worker-dot"), lab = $("worker-label"), dot2 = $("worker-dot2");
-  if (!h) { dot.className = "dot err"; lab.textContent = "Offline"; dot2.className = "dot err"; $("worker-detail").textContent = "API not reachable"; return; }
-  const w = h.worker;
-  const cls = w.state === "busy" || w.state === "starting" ? "busy" : w.state === "ready" ? "ok" : "";
-  dot.className = dot2.className = `dot ${cls}`;
+// The generator = the GPU worker holding Cube3D + CubePart. Its state is shown in the top bar with a
+// start / stop button, and in the sidebar pill.
+let genLoading = null;  // epoch seconds when "Start generator" was clicked, until the load returns
+
+function genState(h) {
+  if (!h) return { key: "offline", label: "Service offline", sub: "run gen3d start" };
+  const w = h.worker, q = h.queue || {};
   const models = w.loaded?.length ? w.loaded.map((m) => (m === "shape" ? "Cube3D" : "CubePart")).join(" + ") : "";
-  lab.textContent = { stopped: "GPU idle", starting: "Worker starting", ready: models ? `Loaded: ${models}` : "Worker ready", busy: "Generating…" }[w.state] || w.state;
-  if (h.fake_worker) lab.textContent += " (fake)";
-  $("worker-detail").textContent = `${w.state}${models ? " · " + models : ""}${w.device ? " · " + w.device : ""}${w.unloads_in_s != null ? ` · unloads in ${fmtDur(w.unloads_in_s)}` : ""}`;
-  $("idle-note").textContent = `unloads after ${fmtDur(h.idle_unload_s)} idle`;
+  if (q.running) return { key: "busy", label: "Generating", sub: q.queued ? `${q.queued} more queued` : models };
+  if (genLoading || w.state === "starting" || w.state === "busy")
+    return { key: "starting", label: "Starting generator", sub: models ? `loaded ${models}` : "loading models onto the GPU" };
+  if (w.state === "ready")
+    return { key: "ready", label: "Generator ready", sub: `${models || "no models yet"}${w.unloads_in_s != null ? ` · stops in ${fmtDur(w.unloads_in_s)}` : ""}` };
+  return { key: "off", label: "Generator off", sub: "starts by itself with the first job" };
+}
+
+function setWorker(h) {
+  const g = genState(h);
+  const cls = { offline: "err", off: "", starting: "busy", busy: "busy", ready: "ok" }[g.key];
+  $("offline").hidden = g.key !== "offline";
+  const since = genLoading || null;
+  const btn = {
+    off: `<button class="gen-btn primary" data-action="gen-start" title="Load Cube3D + CubePart now so the next job starts at once (~40 s the first time)">Start generator</button>`,
+    starting: `<button class="gen-btn" disabled>Starting…</button>`,
+    ready: `<button class="gen-btn" data-action="gen-stop" title="Unload the models and free the GPU">Stop</button>`,
+    busy: "", offline: "",
+  }[g.key];
+  $("gen-ctl").className = `gen-ctl ${g.key}`;
+  $("gen-ctl").innerHTML = `<span class="dot ${cls}"></span><span class="gen-text"><b>${g.label}</b>
+      <small>${since ? `<span data-elapsed="${since}">${fmtDur(Date.now() / 1000 - since)}</span> · ` : ""}${esc(g.sub)}</small></span>${btn}`;
+  $("worker-dot").className = $("worker-dot2").className = `dot ${cls}`;
+  $("worker-label").textContent = g.label + (h?.fake_worker ? " (fake)" : "");
+  if (!h) { $("worker-detail").textContent = "API not reachable"; return; }
+  const w = h.worker;
+  $("worker-detail").textContent = `${g.label} · ${g.sub}${w.device ? " · " + w.device : ""}`;
+  $("idle-note").textContent = `stops after ${fmtDur(h.idle_unload_s)} idle`;
   $("data-dir").textContent = h.data;
+}
+
+async function genStart() {
+  genLoading = Date.now() / 1000;
+  setWorker(S.health);
+  const poll = setInterval(refreshHealth, 2000);
+  try {
+    await api("/v1/load?models=shape,parts", { method: "POST" });
+    toast(`Generator ready in ${fmtDur(Date.now() / 1000 - genLoading)}`);
+  } catch (e) { toast(`Could not start the generator: ${e.message}`, 8000); }
+  finally { clearInterval(poll); genLoading = null; refreshHealth(); }
+}
+
+async function genStop(el) {
+  if (S.health?.queue?.running) { toast("A job is running: cancel it first, or use Settings → Unload"); return; }
+  el.disabled = true;
+  try { await api("/v1/unload", { method: "POST" }); toast("Generator stopped; GPU memory freed"); }
+  catch (e) { toast(e.message); } finally { refreshHealth(); }
 }
 
 // ---- global UI --------------------------------------------------------------------------------
@@ -230,6 +273,8 @@ const ACTIONS = {
   "open-queue": () => { renderQueueDialog(); $("queue-dialog").showModal(); },
   "open-settings": () => { refreshHealth(); $("settings-dialog").showModal(); },
   "close-dialog": (el) => el.closest("dialog").close(),
+  "gen-start": () => genStart(),
+  "gen-stop": (el) => genStop(el),
   "cancel-job": async (el) => { await api(`/v1/jobs/${el.dataset.id}/cancel`, { method: "POST" }); toast("Canceled"); },
 };
 export function action(name, fn) { ACTIONS[name] = fn; }

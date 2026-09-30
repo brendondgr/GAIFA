@@ -51,8 +51,13 @@
       </button>
       <h1 class="chat-title" id="chat-title" title="Click to rename">New chat</h1>
       <div class="chips" id="top-chips"></div>
+      <div class="gen-ctl" id="gen-ctl" aria-live="polite"></div>
     </header>
 
+    <div class="offline" id="offline" hidden>
+      <b>The 3DGenerate service isn't answering.</b> Start it with the <i>3DGenerate</i> app launcher or
+      <code>gen3d start</code> in a terminal; this page reconnects by itself.
+    </div>
     <section class="thread" id="thread" aria-live="polite">
       <div class="empty" id="empty">
         <img src="icon.svg" alt="" width="44" height="44">

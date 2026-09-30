@@ -30,12 +30,12 @@ class Canceled(Exception):
 
 
 class Runner:
-    def __init__(self, store: Store, worker, previewer, events: Broadcaster):
+    def __init__(self, store: Store, worker, previewer, events: Broadcaster, eta_scale: float = 1.0):
         self.store = store
         self.worker = worker
         self.previewer = previewer          # async (job_dir, glb, png) -> None
         self.events = events
-        self.eta = Estimator(store)
+        self.eta = Estimator(store, scale=eta_scale)
         self.current: str | None = None
         self._wake = asyncio.Event()
         self._cancel: set[str] = set()

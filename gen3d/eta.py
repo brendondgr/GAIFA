@@ -82,8 +82,9 @@ def substages(req: JobRequest, stage: str, loaded: set[str]) -> list[tuple[str, 
 
 
 class Estimator:
-    def __init__(self, store):
+    def __init__(self, store, scale: float = 1.0):
         self.store = store
+        self.scale = scale  # < 1 for the fake worker, which runs faster than the real thing
         self._cache: dict[str, list[dict]] = {}
 
     # learned durations ------------------------------------------------------------------------
@@ -99,7 +100,7 @@ class Estimator:
 
     def duration(self, sub: str, features: dict, default: float) -> float:
         got = self.learned(sub, features)
-        return got if got is not None else default
+        return got if got is not None else default * self.scale
 
     # plans --------------------------------------------------------------------------------------
     def plan(self, req: JobRequest, stages: list[str], loaded: set[str], worker_up: bool) -> list[dict]:
@@ -108,7 +109,7 @@ class Estimator:
         loaded = set(loaded)
         out = []
         if not worker_up and any(st in ("shape", "parts", "rig") for st in stages):
-            out.append({"stage": stages[0], "sub": "worker.start", "seconds": WORKER_START_S})
+            out.append({"stage": stages[0], "sub": "worker.start", "seconds": WORKER_START_S * self.scale})
         for st in stages:
             for sub, feat, default, _ in substages(req, st, loaded):
                 out.append({"stage": st, "sub": sub, "seconds": round(self.duration(sub, feat, default), 1)})

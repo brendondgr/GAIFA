@@ -70,7 +70,7 @@ GET    /docs                         OpenAPI
 - [x] 2.2 `gen3d/store.py`: SQLite jobs + chats + timings, job folders
 - [x] 2.3 `gen3d/eta.py`: per-stage estimator (seeded from CubeArt timings, learns from finished jobs, live rate)
 - [x] 2.4 `gen3d/queue.py` + `gen3d/events.py`: FIFO runner task, cancel, SSE broadcast
-- [ ] 2.5 `gen3d/worker_fake.py` + all job/chat/estimate/file endpoints
+- [x] 2.5 `gen3d/worker_fake.py` + all job/chat/estimate/file endpoints
 - [ ] 2.6 `tests/` for options, ETA, store and the API → **commit: "Job queue, ETA estimator, API and tests"**
 
 ### Phase 3 — real GPU worker

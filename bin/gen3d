@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# gen3d - control the 3DGenerate background service, and submit/track jobs from the terminal.
+#
+# How it runs in the background depends on the machine:
+#   systemd   Linux: a user unit `gen3d` (starts at boot with linger)
+#   process   anything else, or GEN3D_NO_SYSTEMD=1: a background process with a pid file
+set -euo pipefail
+
+UNIT=gen3d
+ENV_FILE="$HOME/.config/gen3d/gen3d.env"
+
+# Inside a toolbox/distrobox the user's service manager (and podman) live on the host: hop out.
+if [[ -z "${GEN3D_NO_HOST:-}" ]] && [[ -f /run/.containerenv || -f /run/.toolboxenv ]]; then
+  if command -v flatpak-spawn >/dev/null 2>&1; then exec flatpak-spawn --host "$(readlink -f "$0")" "$@"
+  elif command -v distrobox-host-exec >/dev/null 2>&1; then exec distrobox-host-exec "$(readlink -f "$0")" "$@"; fi
+fi
+
+ROOT="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+PY="$ROOT/.venv/bin/python"
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/gen3d"
+PIDFILE="$STATE/gen3d.pid" LOGFILE="$STATE/gen3d.log"
+PORT=5050 HOST=127.0.0.1
+if [[ -f "$ENV_FILE" ]]; then
+  PORT="$(sed -nE 's/^[[:space:]]*GEN3D_PORT=([0-9]+).*/\1/p' "$ENV_FILE" | tail -1)"; PORT="${PORT:-5050}"
+fi
+URL="http://$HOST:$PORT"
+
+if [[ -n "${GEN3D_NO_SYSTEMD:-}" ]]; then MODE=process
+elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then MODE=systemd
+else MODE=process; fi
+
+usage() {
+  cat <<EOF
+usage: gen3d <command>          (service manager here: $MODE)
+
+  start | stop | restart     manage the background service ($URL)
+  status                     service, GPU worker and queue
+  logs [-f] [N]              last N log lines (default 100); -f to follow
+  enable | disable           start automatically at boot
+  load | unload              start / stop the GPU worker now (unload frees the GPU)
+  make "prompt" [opts]       queue a job; opts: --parts "a, b" --rig --preset fast|balanced|quality --wait
+  jobs [N]                   recent jobs with status and ETA
+  cancel ID                  cancel a queued or running job
+  ui                         open the web UI
+  url                        print the base URL (API docs at \$URL/docs)
+  serve                      run in the foreground (what the service runs)
+EOF
+}
+
+api() { curl -fsS -m "${TIMEOUT:-10}" -X "$1" "$URL$2" "${@:3}" 2>/dev/null; }
+wait_up() {
+  for _ in $(seq 1 80); do api GET /health >/dev/null && return 0; sleep 0.25; done
+  echo "gen3d: started but the API is not answering yet; see 'gen3d logs'" >&2; return 1
+}
+need_up() { api GET /health >/dev/null || { echo "gen3d: API not reachable at $URL (try 'gen3d start')" >&2; exit 1; }; }
+pid_alive() { [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
+
+svc_enable() {
+  case "$MODE" in
+    systemd)
+      mkdir -p "$HOME/.config/systemd/user"
+      sed "s|@ROOT@|$ROOT|g" "$ROOT/systemd/gen3d.service" > "$HOME/.config/systemd/user/gen3d.service"
+      systemctl --user daemon-reload
+      systemctl --user enable "$UNIT" >/dev/null
+      if [[ "$(loginctl show-user "$USER" -p Linger --value 2>/dev/null)" != yes ]]; then
+        loginctl enable-linger "$USER" 2>/dev/null || echo "  (no linger: it will start at login instead of boot)"
+      fi
+      echo "gen3d: will start at boot (systemd user unit)" ;;
+    process) echo "gen3d: no service manager here; start it with 'gen3d start'" ;;
+  esac
+}
+svc_disable() {
+  case "$MODE" in
+    systemd) systemctl --user disable "$UNIT"; echo "gen3d: will not start at boot" ;;
+    process) echo "gen3d: nothing to disable" ;;
+  esac
+}
+svc_start() {
+  case "$MODE" in
+    systemd)
+      [[ -f "$HOME/.config/systemd/user/gen3d.service" ]] || svc_enable
+      systemctl --user start "$UNIT" ;;
+    process)
+      pid_alive && return 0
+      mkdir -p "$STATE"
+      nohup "$ROOT/bin/gen3d" serve >>"$LOGFILE" 2>&1 < /dev/null &
+      echo $! > "$PIDFILE" ;;
+  esac
+}
+svc_stop() {
+  case "$MODE" in
+    systemd) systemctl --user stop "$UNIT" ;;
+    process)
+      if pid_alive; then
+        kill "$(cat "$PIDFILE")"
+        for _ in $(seq 1 80); do pid_alive || break; sleep 0.25; done
+      fi
+      rm -f "$PIDFILE" ;;
+  esac
+}
+svc_state() {
+  case "$MODE" in
+    systemd) echo "$(systemctl --user is-active "$UNIT" 2>/dev/null || true) (autostart: $(systemctl --user is-enabled "$UNIT" 2>/dev/null || true))" ;;
+    process) pid_alive && echo "running (pid $(cat "$PIDFILE"))" || echo "stopped" ;;
+  esac
+}
+
+cmd="${1:-status}"; shift || true
+case "$cmd" in
+  serve)
+    cd "$ROOT"
+    if [[ -f "$ENV_FILE" ]]; then set -a; . "$ENV_FILE"; set +a; fi
+    PYTHONUNBUFFERED=1 exec "$PY" -m gen3d ;;
+  start) svc_start; wait_up && echo "gen3d: running at $URL" ;;
+  stop) svc_stop; echo "gen3d: stopped" ;;
+  restart)
+    if [[ "$MODE" == systemd ]]; then
+      [[ -f "$HOME/.config/systemd/user/gen3d.service" ]] || svc_enable
+      systemctl --user restart "$UNIT"
+    else svc_stop; svc_start; fi
+    wait_up && echo "gen3d: restarted at $URL" ;;
+  status)
+    echo "service: $(svc_state)  $URL  [$MODE]"
+    if health="$(api GET /health)"; then
+      "$PY" - "$health" <<'EOF'
+import json, sys
+h = json.loads(sys.argv[1])
+w = h.get("worker", {})
+line = f"worker: {w.get('state', '?')}"
+if w.get("loaded"):
+    line += "  models: " + ", ".join(w["loaded"])
+if w.get("unloads_in_s") is not None:
+    line += f"  idle {w['idle_s']:.0f}s, unloads in {w['unloads_in_s']:.0f}s"
+print(line)
+q = h.get("queue", {})
+if q:
+    print(f"queue:  {q.get('running', 0)} running, {q.get('queued', 0)} queued"
+          + (f", all done in ~{q['eta_s'] / 60:.1f} min" if q.get("eta_s") else ""))
+print(f"data:   {h['data']}")
+EOF
+    fi ;;
+  logs)
+    follow=(); n=100
+    for a in "$@"; do [[ "$a" == -f ]] && follow=(-f) || n="$a"; done
+    if [[ "$MODE" == systemd ]]; then journalctl --user -u "$UNIT" -n "$n" --no-hostname -o short-iso "${follow[@]}"
+    else tail -n "$n" "${follow[@]}" "$LOGFILE"; fi ;;
+  enable) svc_enable ;;
+  disable) svc_disable ;;
+  load) need_up; echo "starting the GPU worker..."; TIMEOUT=600 api POST /v1/load | "$PY" -m json.tool ;;
+  unload) need_up; api POST /v1/unload | "$PY" -m json.tool ;;
+  make)
+    need_up; exec "$PY" -m gen3d.cli make --url "$URL" "$@" ;;
+  jobs)
+    need_up; exec "$PY" -m gen3d.cli jobs --url "$URL" "${1:-15}" ;;
+  cancel)
+    need_up; api POST "/v1/jobs/${1:?job id}/cancel" | "$PY" -m json.tool ;;
+  ui)
+    need_up; echo "$URL"
+    if command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 & disown; fi ;;
+  url) echo "$URL" ;;
+  -h|--help|help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

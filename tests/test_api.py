@@ -89,8 +89,7 @@ def test_cancel_queued_and_running(c):
         if c.get(f"/v1/jobs/{a['id']}").json()["status"] == "running":
             break
         time.sleep(0.01)
-    c.post(f"/v1/jobs/{a['id']}/cancel")
-    assert wait(c, a["id"])["status"] == "canceled"
+    assert c.post(f"/v1/jobs/{a['id']}/cancel").json()["status"] == "canceled"
 
 
 def test_retry_bumps_seed(c):

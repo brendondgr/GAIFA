@@ -238,7 +238,12 @@ class Runner:
             return self.store.get_job(jid)
         self._cancel.add(jid)
         await self.worker.cancel()  # stops the worker process: the only way to interrupt a GPU call
-        return self.store.get_job(jid)
+        for _ in range(100):  # the runner notices within a moment; answer with the final state
+            job = self.store.get_job(jid)
+            if job["status"] in TERMINAL:
+                break
+            await asyncio.sleep(0.1)
+        return job
 
     def schedule(self) -> dict[str, dict]:
         """ETA for every active job: the running one from live progress, queued ones after it."""

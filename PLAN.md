@@ -90,7 +90,7 @@ GET    /docs                         OpenAPI
 ### Phase 5 — end-to-end on the GPU
 - [x] 5.1 Full chat run: prompt → shape → parts → rig → preview; compare ETA with the actual times, tune
 - [x] 5.2 Follow-up (split / rig an existing result), cancel mid-run, restart server mid-queue
-- [ ] 5.3 Fix what breaks → **commit: "End-to-end fixes"**
+- [x] 5.3 Fix what breaks → **commit: "End-to-end fixes"**
 
 ### Phase 6 — docs and install
 - [ ] 6.1 README: UI tour, API reference with curl + Python, CLI, config, performance, troubleshooting

@@ -42,5 +42,8 @@ mkdir -p "$HOME/.local/bin"
 ln -sf "$ROOT/bin/gen3d" "$HOME/.local/bin/gen3d"
 echo "  $HOME/.local/bin/gen3d"
 
+echo "== desktop launcher"
+"$ROOT/bin/gen3d" launcher
+
 [[ "$SERVICE" == 1 ]] && "$ROOT/bin/gen3d" enable
 "$ROOT/bin/gen3d" restart

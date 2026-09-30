@@ -41,6 +41,8 @@ usage: gen3d <command>          (service manager here: $MODE)
   make "prompt" [opts]       queue a job; opts: --parts "a, b" --rig --preset fast|balanced|quality --wait
   jobs [N]                   recent jobs with status and ETA
   cancel ID                  cancel a queued or running job
+  open [--load]              start the service if needed, then open the web UI (--load: start the generator too)
+  launcher                   (re)install the "3DGenerate" desktop launcher and icon
   ui                         open the web UI
   url                        print the base URL (API docs at \$URL/docs)
   serve                      run in the foreground (what the service runs)
@@ -154,6 +156,25 @@ EOF
     need_up; exec "$PY" -m gen3d.cli jobs --url "$URL" "${1:-15}" ;;
   cancel)
     need_up; api POST "/v1/jobs/${1:?job id}/cancel" | "$PY" -m json.tool ;;
+  open)
+    if ! api GET /health >/dev/null; then
+      command -v notify-send >/dev/null && notify-send -i 3dgenerate "3DGenerate" "Starting the service…" 2>/dev/null || true
+      svc_start; wait_up || exit 1
+    fi
+    if [[ "${1:-}" == --load ]]; then
+      (TIMEOUT=600 api POST "/v1/load?models=shape,parts" >/dev/null &)   # the UI shows it starting
+    fi
+    echo "$URL"
+    if command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 & disown; fi ;;
+  launcher)
+    apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    icons="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
+    mkdir -p "$apps" "$icons"
+    sed "s|@ROOT@|$ROOT|g" "$ROOT/desktop/3dgenerate.desktop" > "$apps/3dgenerate.desktop"
+    cp "$ROOT/gen3d/web/icon.svg" "$icons/3dgenerate.svg"
+    command -v update-desktop-database >/dev/null && update-desktop-database -q "$apps" 2>/dev/null || true
+    command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t "${icons%/scalable/apps}" 2>/dev/null || true
+    echo "gen3d: launcher installed ($apps/3dgenerate.desktop): look for \"3DGenerate\" in the app menu" ;;
   ui)
     need_up; echo "$URL"
     if command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 & disown; fi ;;

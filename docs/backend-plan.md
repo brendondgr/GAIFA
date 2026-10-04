@@ -260,6 +260,30 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **If dynamic names don't work:** the shell keeps a static list of built-in `Mod_<id>` imports, and third-party mods use `page.js`.
   - Move the Example **Hello** tab out of `Hub.dc.html` into `services/_template/ui/page.js`, and record it in `PATCHES.md`.
   *Done when:* `aihub new hello` gives a mod whose custom tab renders inside the shell.
+- [ ] **2.10 `aihub check <id>`: a mod self-test.**
+  - **Route:** `GET /api/services/{id}/check` returns `{ok, checks: [{name, ok, detail}]}`. The CLI prints it and exits 1 on any failure.
+  - **Checks, in order:**
+    - the manifest parses (each `manifest_errors` entry is one failure)
+    - the command's executable exists and `cwd` is a folder
+    - the port is free or held by this mod
+    - health answers 2xx while the mod is ready
+    - the OpenAPI document loads and converts (2.6)
+    - the `status` route matches architecture §4.6 (≤ 4 stats, numeric or string values, jobs shaped like `Job`)
+    - each `[[ui.widgets]]` source answers with `WidgetData`
+    - `ui/page.js` or `ui/Page.dc.html` exists when declared, and `page.js` has a default export with `tabs` and `mount`
+    - `[memory]` and `[tools]` operations name operations that exist in the OpenAPI
+  - **Why:** gives a person or an agent writing a mod a fast write → check → fix loop without opening the UI.
+  *Done when:* tests run it against `fake-ok` (all pass), a mod with a bad manifest, a mod whose health fails, and a status route with the wrong shape; `aihub check hello` passes on a fresh `aihub new hello`.
+- [ ] **2.11 The mod-authoring guide.**
+  - **`docs/mods.md`:** the whole mod contract on one page, as a how-to:
+    - the three requirements and the `service.toml` reference (linking architecture §4)
+    - the four UI levels: nothing (generic page), `status` stats (auto-charted), `[[ui.widgets]]`, and a custom `ui/page.js` with its `ctx`
+    - outputs, memory, models and tools
+    - turning an existing app into a mod (`kind = "external"` or a wrapped command)
+    - the `aihub new` → edit → `aihub check` → `aihub restart` loop, and the common errors with their fixes
+  - **Skill `.claude/skills/aihub-mod/SKILL.md`:** for agents asked to build or port a mod; points at `docs/mods.md` and the template, and requires `aihub check` to pass.
+  - Link both from `CLAUDE.md`, the `aihub` skill and `services/_template/README.md`.
+  *Done when:* following `docs/mods.md` from a clean checkout gives a mod that passes `aihub check` and shows its custom tab and a widget.
 
 **Wire — Phase 2:** `services`, `logs`, `operations`, `proxy` and `events` go live:
 - the sidebar service list with status dots
@@ -279,7 +303,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - Settings save with restart-required
 - [ ] On a hub restart, running mods stay up and are adopted, and the UI reconnects by itself.
 - [ ] `aihub new demo`, then restart: the mod appears in the sidebar, its tile and its API tab, **with no hub code changed**.
-- [ ] Delivered: `manifest.py`, `backends/`, `services.py`, `proxy.py`, `operations.py`, the service routes, `_template`, `aihub new`, and `ModPage`.
+- [ ] Delivered: `manifest.py`, `backends/`, `services.py`, `proxy.py`, `operations.py`, the service routes, `_template`, `aihub new`, `ModPage`, `aihub check` and `docs/mods.md`.
 
 ## Phase 3 — Models registry
 

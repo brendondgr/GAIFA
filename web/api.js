@@ -78,7 +78,8 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     try {
       return await fetchFn(url(path), init);
     } catch (e) {
-      if (e?.name === 'AbortError') throw e;
+      // Stopped before any answer: its own code, never status 0 (which means "AIHub is down").
+      if (e?.name === 'AbortError' || signal?.aborted) throw new ApiError(499, 'Request stopped', 'aborted');
       throw down(base);
     }
   }
@@ -104,7 +105,13 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     let buf = '';
     for (;;) {
       if (signal?.aborted) { reader.cancel().catch(() => {}); break; }
-      const { value, done } = await reader.read();
+      let chunk;
+      try { chunk = await reader.read(); } catch (e) {
+        // Stop pressed mid-stream: resolve with what arrived, like the mock (brief §6.4 ServiceResponse).
+        if (signal?.aborted || e?.name === 'AbortError') break;
+        throw down(base);
+      }
+      const { value, done } = chunk;
       if (done) break;
       buf += dec.decode(value, { stream: true });
       let i;

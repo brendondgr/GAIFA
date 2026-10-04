@@ -168,7 +168,11 @@ class WebFiles(StaticFiles):
     async def get_response(self, path: str, scope: Any) -> Any:
         if not os.path.isdir(self.directory):
             raise StarletteHTTPException(404)
-        return await super().get_response(path, scope)
+        resp = await super().get_response(path, scope)
+        # Revalidate every time (a cheap 304 via the ETag): without this, browsers keep running
+        # an old api.js / mock.js after the hub is upgraded.
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
 
 
 def _envelope(status: int, code: str, detail: str, data: Any = None) -> JSONResponse:

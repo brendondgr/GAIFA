@@ -81,3 +81,12 @@ async def test_components_get_local_fonts_but_no_scripts(web_client):
 async def test_index_without_web_is_404(client):
     r = await client.get("/")
     assert r.status_code == 404 and r.json()["code"] == "not_found"
+
+
+async def test_web_files_are_revalidated(web_client):
+    for path in ("/api.js", "/mock.js", "/mod-ui.js", "/support.js", "/vendor/fonts.css"):
+        r = await web_client.get(path)
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-cache", path
+        assert "etag" in r.headers
+        again = await web_client.get(path, headers={"if-none-match": r.headers["etag"]})
+        assert again.status_code == 304, path

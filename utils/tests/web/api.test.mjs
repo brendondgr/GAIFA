@@ -172,3 +172,32 @@ test('getOverview is assembled from live areas until /api/overview exists', asyn
   const down = createApi({ base: '', liveAreas: ['system'], mock: fakeMock(), fetch: async () => { throw new TypeError('x'); } });
   await assert.rejects(down.getOverview(), e => e.status === 0);
 });
+
+
+test('callService: Stop mid-stream resolves with the lines so far (like the mock)', async () => {
+  const ctl = new AbortController();
+  const enc = new TextEncoder();
+  let pull = 0;
+  const body = new ReadableStream({
+    async pull(c) {
+      pull++;
+      if (pull === 1) { c.enqueue(enc.encode('data: {"n":0}\n\ndata: {"n":1}\n\n')); return; }
+      await new Promise((resolve, reject) => ctl.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+    },
+  });
+  const fetch = async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  const api = createApi({ base: '', liveAreas: ['proxy'], mock: fakeMock(), fetch });
+  const seen = [];
+  const p = api.callService('m', 'GET', '/v1/events', { stream: true, signal: ctl.signal, onEvent: l => { seen.push(l); if (seen.length === 2) ctl.abort(); } });
+  const res = await p;
+  assert.equal(res.status, 200);
+  assert.equal(res.text, '{"n":0}\n{"n":1}');
+  assert.deepEqual(seen, ['{"n":0}', '{"n":1}']);
+});
+
+test('callService: Stop before any answer is `aborted`, not "hub down"', async () => {
+  const ctl = new AbortController(); ctl.abort();
+  const fetch = async () => { throw new DOMException('aborted', 'AbortError'); };
+  const api = createApi({ base: '', liveAreas: ['proxy'], mock: fakeMock(), fetch });
+  await assert.rejects(api.callService('m', 'GET', '/x', { signal: ctl.signal }), e => e.status === 499 && e.code === 'aborted');
+});

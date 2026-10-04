@@ -217,10 +217,12 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - Every change publishes a `service` event and an activity item.
   - *As built:* start and stop return at once (`wait=True` blocks until settled); a generation number per service makes stale health and restart tasks give up. A mod that never gets healthy is stopped before it is marked failed, as is one that misses 5 health checks. Failures set an alert (`svc-<id>`, cleared on ready or stop) and an activity item linking to Logs. Adoption only takes units whose working directory is inside this hub's root; a running unit whose folder was deleted is stopped, again only if it ran from this root. A unit that failed while the hub was down shows as `failed` "… while AIHub was down". Starting a disabled mod is `409 service_disabled`; start/stop on an external mod is `409 external_service`. Summaries are built in `utils/service_views.py`; `utils/proc.py` has `port_owner()`. `app.py` uses the systemd backend, or child processes with `--dev` (and where no systemd user manager answers).
   *Done when:* tests cover ready, slow-start timeout, crash → restart → failed, adoption, disabled mods never starting, and a port conflict.
-- [ ] **2.4 Status polling.** For mods with `[run] status`:
+- [x] **2.4 Status polling.** For mods with `[run] status`:
   - Poll every 2 s while loading, busy or running jobs, otherwise every 10 s, and only while ready.
   - Map to `load`, `idle_s`, `busy`, `stats` and `jobs`; publish `service` / `job` events only on change.
   - **Without a status route:** `load = "n/a"`, unless the mod has `[memory]`. Then the load state follows the hub's own load/unload calls, confirmed by memory.
+  - *As built:* `utils/status.py`. `validate()` keeps the valid parts of a status body and lists the problems (2.10 reports them). Changes to load, busy, stats, the estimate or jobs publish a `service` event; `idle_s` alone doesn't. A hub-started `loading`/`unloading` holds until the mod confirms. A job that disappears while active is published as `done`; jobs still active when the mod stops become `cancelled` (`failed` when it crashed). The fake mod gained `POST /v1/jobs` and `FAKE_BAD_STATUS=1`.
+  *Done when:* tests cover the stats, load and jobs mapping, events only on change, and a malformed status body.
 - [ ] **2.5 `utils/proxy.py`: `ANY /api/s/{id}/{path:path}`.**
   - **Streaming both ways:** the request body streams to httpx, and the response is `StreamingResponse(resp.aiter_raw())` with `resp.aclose` as a background task.
   - **Headers:** drop hop-by-hop headers; add `X-Forwarded-Prefix: /api/s/<id>`.

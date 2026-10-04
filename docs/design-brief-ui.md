@@ -403,6 +403,7 @@ interface ServiceSummary {
   state_since: number;           // unix seconds
   load: LoadState;
   idle_s: number | null;
+  busy: boolean;                 // from the mod's status route; false without one
   memory: { used_bytes: number; estimate_bytes: number | null; peak_bytes: number | null };
   stats: Stat[];                 // ≤ 4
   has_page: boolean;

@@ -251,6 +251,8 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 
 - **`loaded`**: models are in memory; omit or set `null` if the mod has none.
 - **`memory_estimate_gb`**: optional; overrides the manifest estimate, for example per workflow.
+- **Polling:** every 2 s while loading, busy or running jobs, otherwise every 10 s, only while the mod is ready. Invalid parts of the body are ignored (`aihub check` lists them).
+- **`jobs`**: each `{id, label, progress (0–1 or null), state, route?}`, with `state` one of queued, running, done, failed, cancelled. Report finished jobs with their final state; a job that just disappears is shown as `done`.
 - **`stats`**: at most 4 entries. **Numeric `value`s are recorded** each time status is polled, as the series `svc.<id>.stat.<slug(label)>`. That powers tile sparklines and the mod's charts with no extra work. Counters that reset ("… today") should say so with `"reset": "daily"`, so charts don't show the reset as a drop.
 
 ### 4.7 Output conventions

@@ -3,10 +3,13 @@ mod could be: the hub sees nothing but HTTP.
 
     python3 _fakemod.py ok|slow|crash|mem      (port from FAKE_PORT, outputs from FAKE_OUTPUTS)
 
-ok     health, status, openapi, echo, audio, SSE and a route that writes an output
+ok     health, status, openapi, echo, audio, SSE, jobs and a route that writes an output
 slow   like ok, but /health answers 503 for the first FAKE_SLOW_S (3) seconds
 crash  like ok, but the process exits with status 1 after FAKE_CRASH_S (1) seconds
 mem    like ok, plus /v1/load allocates FAKE_MEM_MB (64) MB and /v1/unload frees it
+
+POST /v1/jobs {"label", "seconds"} starts a job that /v1/status reports with progress
+(busy while it runs). FAKE_BAD_STATUS=1 makes /v1/status return a malformed body.
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ PORT = int(os.environ.get("FAKE_PORT", "5190"))
 OUTPUTS = Path(os.environ.get("FAKE_OUTPUTS") or os.environ.get("AIHUB_OUTPUTS") or "outputs")
 STARTED = time.time()
 STATE = {"last_used": time.time(), "requests": 0, "outputs": 0, "memory": None}
+JOBS: dict[str, dict] = {}
 MB = 1024 * 1024
 
 
@@ -49,6 +53,7 @@ def openapi() -> dict:
         "/v1/speech": {"post": op("A short sine tone as WAV", text, "audio/wav")},
         "/v1/events": {"get": op("Three server-sent events", response="text/event-stream")},
         "/v1/outputs": {"post": op("Write a text output", text)},
+        "/v1/jobs": {"post": op("Start a job that runs for `seconds`", {"type": "object", "properties": {"label": {"type": "string"}, "seconds": {"type": "number"}}})},
     }
     if MODE == "mem":
         paths["/v1/load"] = {"post": op("Allocate memory")}
@@ -134,6 +139,11 @@ class Handler(BaseHTTPRequestHandler):
             path = write_output(self.body().get("text") or "hello")
             STATE["outputs"] += 1
             return self.send(201, {"path": str(path)})
+        if url.path == "/v1/jobs":
+            b = self.body()
+            jid = f"j_{len(JOBS) + 1}"
+            JOBS[jid] = {"id": jid, "label": b.get("label") or jid, "start": time.time(), "seconds": float(b.get("seconds") or 1)}
+            return self.send(202, {"id": jid})
         if MODE == "mem" and url.path == "/v1/load":
             mb = int(self.body().get("mb") or os.environ.get("FAKE_MEM_MB", "64"))
             block = bytearray(mb * MB)
@@ -159,16 +169,27 @@ class Handler(BaseHTTPRequestHandler):
         self.close_connection = True
 
 
+def jobs() -> list[dict]:
+    out = []
+    for j in JOBS.values():
+        p = min(1.0, (time.time() - j["start"]) / j["seconds"])
+        out.append({"id": j["id"], "label": j["label"], "progress": round(p, 3), "state": "done" if p >= 1 else "running"})
+    return out
+
+
 def status() -> dict:
+    if os.environ.get("FAKE_BAD_STATUS"):
+        return {"loaded": "yes", "stats": [{"value": 1}, 3, {"label": "x", "value": [1]}], "jobs": {"id": 1}}
+    js = jobs()
     s: dict = {
         "loaded": STATE["memory"] is not None if MODE == "mem" else None,
-        "busy": False,
+        "busy": any(j["state"] == "running" for j in js),
         "idle_s": round(time.time() - STATE["last_used"], 1),
         "stats": [
             {"label": "Requests", "value": STATE["requests"]},
             {"label": "Outputs today", "value": STATE["outputs"], "reset": "daily"},
         ],
-        "jobs": [],
+        "jobs": js,
     }
     if MODE == "mem":
         s["memory_estimate_gb"] = round(int(os.environ.get("FAKE_MEM_MB", "64")) / 1024, 3)

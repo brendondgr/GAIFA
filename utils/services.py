@@ -28,6 +28,7 @@ from typing import Any, Literal
 import httpx
 
 from utils import manifest as mf
+from utils import status
 from utils.backends.base import Backend, BackendError, LogLine, UnitState
 from utils.config import Config
 from utils.events import ActivityLog, Alerts, EventBus
@@ -83,6 +84,7 @@ class Service:
     command: list[str] = field(default_factory=list)
     health: dict[str, Any] | None = None
     status: dict[str, Any] | None = None
+    status_ts: float | None = None
     last_error: str | None = None
     in_flight: int = 0
     last_request_ts: float | None = None
@@ -438,6 +440,8 @@ class ServiceManager:
                 for hook in self.on_ready:
                     self._spawn(svc, hook(svc))
                 self._spawn(svc, self._monitor(svc, gen))
+                if svc.m.run.status:
+                    self._spawn(svc, status.poll(self, svc, gen))
                 return
             if time.monotonic() > deadline:
                 await self._quiet_stop(svc)
@@ -481,7 +485,7 @@ class ServiceManager:
         if gen != svc.gen:
             return
         svc.pid = None
-        self._clear_runtime(svc)
+        self._clear_runtime(svc, jobs_end="failed")
         self._set(svc, "failed", error=why + tail)
         self.alerts.set(
             f"svc-{svc.id}", "error", f"{svc.mod.name} failed: {why}", service=svc.id,
@@ -531,6 +535,9 @@ class ServiceManager:
                     self._set(svc, "ready")
                     for hook in self.on_ready:
                         self._spawn(svc, hook(svc))
+                    if svc.m and svc.m.run.status and not any(getattr(t, "status_poll", False) for t in svc.tasks):
+                        t = self._spawn(svc, status.poll(self, svc, gen))
+                        t.status_poll = True  # type: ignore[attr-defined]
             else:
                 svc.misses += 1
                 if not seen:
@@ -586,8 +593,13 @@ class ServiceManager:
     def _idle_load(self, svc: Service) -> LoadState:
         return "unloaded" if svc.has_memory else "n/a"
 
-    def _clear_runtime(self, svc: Service) -> None:
-        svc.health = svc.status = None
+    def _clear_runtime(self, svc: Service, jobs_end: str = "cancelled") -> None:
+        for job in svc.jobs:  # jobs can't outlive their process
+            if job["state"] in status.ACTIVE_JOBS:
+                self.bus.publish({"type": "job", "job": {**job, "state": jobs_end}})
+        svc.health = svc.status = svc.status_ts = None
+        svc.stats = []
+        svc.memory_estimate_gb = None
         svc.busy, svc.idle_s, svc.jobs = False, None, []
         svc.load = self._idle_load(svc)
         svc.misses = 0

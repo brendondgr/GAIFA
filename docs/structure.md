@@ -50,6 +50,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `manifest.py` | ✅ | `service.toml` schema (pydantic), `discover()` with collected errors, `effective()` config overrides, `launch_spec()` (placeholders + env), `start_order()` |
 | `backends/` | ✅ | `base.py` (`Backend` protocol, `UnitState`, `LogLine`), `systemd.py` (`aihub-<id>.service` via `systemd-run`, journal logs), `subprocess.py` (child processes + log ring; tests and `--dev`) |
 | `services.py` | ✅ | `ServiceManager`: discovery, adoption, autostart in `after` order, start/stop/restart, health monitor, restart-on-failure |
+| `status.py` | ✅ | Status polling (2 s busy / 10 s idle), `validate()` for the §4.6 shape, job events |
 | `service_views.py` | ✅ | `summary()` / `detail()`: a service as the brief's `ServiceSummary` / `ServiceDetail` |
 | `proxy.py` | ⏳ 2.5 | `/api/s/<id>/*` passthrough |
 | `operations.py` | ⏳ 2.6 | Mod OpenAPI → `Operation[]` |

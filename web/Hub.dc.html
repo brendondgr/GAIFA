@@ -337,33 +337,12 @@ button:disabled{cursor:not-allowed;opacity:.5}
             <sc-for list="{{ sv.tabs }}" as="t" hint-placeholder-count="4"><a href="{{ t.href }}" aria-current="{{ t.cur }}" style="{{ t.st }}" style-hover="color:var(--tx,#E6EAF2);text-decoration:none">{{ t.label }}</a></sc-for>
           </nav>
 
-          <sc-if value="{{ sv.t.hello }}" hint-placeholder-val="{{ false }}">
-            <sc-if value="{{ sv.hello.down }}" hint-placeholder-val="{{ false }}">
-              <div style="padding:44px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;border:1px dashed var(--bds,#2A3547);border-radius:12px">
-                <h2 style="margin:0;font-size:16px">Example is not running</h2>
-                <p style="margin:0;color:var(--mut,#8A94A6);max-width:420px">This page talks to the service's own API, so it needs the service to be up.</p>
-                <button onClick="{{ sv.hello.start }}" style="{{ sv.hello.startSt }}">Start Example</button>
-              </div>
-            </sc-if>
-            <sc-if value="{{ sv.hello.up }}" hint-placeholder-val="{{ true }}">
-              <div style="max-width:640px;background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:14px">
-                <div><h2 style="margin:0 0 4px;font-size:15px">Say hello</h2><p style="margin:0;color:var(--mut,#8A94A6);font-size:12.5px">This tab is rendered by the mod's own page module (<code style="font-family:'JetBrains Mono',ui-monospace,monospace">services/_template/ui/page.js</code>). It calls <code style="font-family:'JetBrains Mono',ui-monospace,monospace">GET /v1/hello</code> through <code style="font-family:'JetBrains Mono',ui-monospace,monospace">ctx.call</code>.</p></div>
-                <form onSubmit="{{ sv.hello.onSubmit }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-                  <label for="hello-name" style="display:flex;flex-direction:column;gap:5px;flex:1 1 220px"><span style="font-size:12px;font-weight:500">Name</span>
-                    <input id="hello-name" value="{{ sv.hello.name }}" onChange="{{ sv.hello.onName }}" placeholder="world" autocomplete="off" style="height:32px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--sb,#0D1119);font-size:13px">
-                  </label>
-                  <button type="submit" disabled="{{ sv.hello.loading }}" style="{{ sv.hello.btnSt }}">{{ sv.hello.btnLabel }}</button>
-                </form>
-                <sc-if value="{{ sv.hello.hasResult }}" hint-placeholder-val="{{ false }}">
-                  <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">{{ sv.hello.meta }}</span>
-                  <dc-import name="JsonView" lines="{{ sv.hello.json.lines }}" on-copy="{{ sv.hello.json.copy }}" hint-size="100%,80px"></dc-import></div>
-                </sc-if>
-              </div>
-            </sc-if>
+          <sc-if value="{{ sv.t.mod }}" hint-placeholder-val="{{ false }}">
+            <dc-import name="ModPage" mod="{{ sv.mod }}" hint-size="100%,200px"></dc-import>
           </sc-if>
 
           <sc-if value="{{ sv.t.page }}" hint-placeholder-val="{{ false }}">
-            <div style="padding:40px 20px;text-align:center;border:1px dashed var(--bds,#2A3547);border-radius:12px;color:var(--mut,#8A94A6)">This mod declares a custom page, but its <code style="font-family:'JetBrains Mono',ui-monospace,monospace">ui/page.js</code> could not be loaded. The API, Logs and Settings tabs still work.</div>
+            <div style="padding:40px 20px;text-align:center;border:1px dashed var(--bds,#2A3547);border-radius:12px;color:var(--mut,#8A94A6)">{{ sv.pageMsg }}</div>
           </sc-if>
 
           <sc-if value="{{ sv.t.overview }}" hint-placeholder-val="{{ false }}">
@@ -1109,7 +1088,7 @@ const MSTAT = { ok: ['green', 'ok'], missing: ['red', 'missing'], partial: ['acc
 const KINDS = [['llm', 'LLM'], ['tts', 'TTS'], ['stt', 'STT'], ['voice', 'Voice'], ['3d', '3D'], ['image', 'Image'], ['video', 'Video'], ['text-encoder', 'Text encoder'], ['vae', 'VAE'], ['lora', 'LoRA'], ['vision', 'Vision'], ['upscale', 'Upscale'], ['other', 'Other']];
 const OKINDS = [['audio', 'Audio'], ['image', 'Image'], ['video', 'Video'], ['model3d', '3D'], ['text', 'Text'], ['other', 'Other']];
 const METHOD = { GET: 'cyan', POST: 'green', PUT: 'accent', PATCH: 'accent', DELETE: 'red' };
-const CUSTOM_TABS = { example: [{ id: 'hello', label: 'Hello' }] };
+const BUILTIN_TABS = new Set(['overview', 'outputs', 'api', 'logs', 'settings']);  // a page module's tabs can't reuse these ids (PATCHES #6)
 const LIGHT = { '--bg': '#F5F6F8', '--sb': '#EEF0F3', '--card': '#FFFFFF', '--inset': '#F1F3F6', '--hov': '#E9ECF1', '--row': '#F4F6F9', '--bd': '#E0E4EA', '--bds': '#C9D0DA', '--bdh': '#A6B0BF',
   '--tx': '#0E1420', '--mut': '#4A5568', '--dim': '#687385', '--acc': '#FFB224', '--acct': '#8F5300', '--cy': '#0A6E88', '--gr': '#1A7F37', '--rd': '#CF222E', '--pu': '#7A45D6',
   '--tacc': 'rgba(255,178,36,.18)', '--tcy': 'rgba(10,110,136,.10)', '--tgr': 'rgba(26,127,55,.10)', '--trd': 'rgba(207,34,46,.09)', '--tpu': 'rgba(122,69,214,.10)',
@@ -1168,7 +1147,9 @@ class Component extends DCLogic {
     this.mq = window.matchMedia('(prefers-color-scheme: light)'); this.mq.addEventListener?.('change', () => this.applyTheme());
     this.applyTheme();
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
-    const [mod, hub] = await Promise.all([import(new URL('mock.js', location.href).href), import(new URL('api.js', location.href).href)]);
+    this.pages = {}; this.modListeners = new Set();
+    const [mod, hub, modUi] = await Promise.all([import(new URL('mock.js', location.href).href), import(new URL('api.js', location.href).href), import(new URL('mod-ui.js', location.href).href)]);
+    this.modUi = modUi.createUi();
     const forceMock = new URLSearchParams(location.search).has('mock');
     this.api = hub.createApi({ base: window.AIHUB_API_BASE ?? null, liveAreas: forceMock ? [] : (window.AIHUB_LIVE_AREAS || []), mock: mod.createMockApi() });
     if (!location.hash) history.replaceState(null, '', '#/overview');
@@ -1250,7 +1231,13 @@ class Component extends DCLogic {
   }
   onEvent = ev => {
     const s = this.state;
+    for (const l of this.modListeners || []) { try { l(ev); } catch (e) { console.error('[ModPage] event handler:', e); } }
     switch (ev.type) {
+      case 'resync': {  // events were dropped or mods were added/removed: refetch (PATCHES #6)
+        this.api.getOverview().then(ov => this.applyOverview(ov)).catch(() => {});
+        if (s.route.page === 'service') this.enterRoute(this.parse(), true);  // the open mod may be gone
+        break;
+      }
       case 'service': {
         this.setState(st => { const list = [...st.services], i = list.findIndex(x => x.id === ev.service.id); if (i < 0) list.push(ev.service); else list[i] = ev.service; return { services: list }; });
         if (s.svc?.id === ev.service.id) this.refreshDetail();
@@ -1351,17 +1338,18 @@ class Component extends DCLogic {
   // ---------- services ----------
   tabsFor(d) {
     const t = [];
-    if (d.has_page) t.push(...(CUSTOM_TABS[d.id] || [{ id: 'page', label: 'Page' }])); else t.push({ id: 'overview', label: 'Overview' });
+    if (d.has_page) t.push(...(this.pages?.[d.id]?.tabs || [{ id: 'page', label: 'Page' }])); else t.push({ id: 'overview', label: 'Overview' });
     if (d.has_outputs) t.push({ id: 'outputs', label: 'Outputs' });
     t.push({ id: 'api', label: 'API' }, { id: 'logs', label: 'Logs' }, { id: 'settings', label: 'Settings' });
     return t;
   }
   async loadSvcPage(id) {
     this.closeLogs(); this.files = {};
-    this.setState({ svc: { id, detail: null, ops: null, err: null, filter: '', opId: null, form: {}, chip: {}, ferr: {}, resp: null, sending: false, stream: null, logs: [], logFilter: '', follow: true, wrap: true, newCount: 0, lines: 200, cfg: null, cfgErr: null, cfgRestart: false, saving: false, hello: { name: '', result: null, loading: false }, outs: null } });
+    this.setState({ svc: { id, detail: null, ops: null, err: null, filter: '', opId: null, form: {}, chip: {}, ferr: {}, resp: null, sending: false, stream: null, logs: [], logFilter: '', follow: true, wrap: true, newCount: 0, lines: 200, cfg: null, cfgErr: null, cfgRestart: false, saving: false, outs: null } });
     try {
       const d = await this.api.getService(id);
       this.updSvc({ detail: d, cfg: this.cfgDraft(d.config) });
+      if (d.has_page) this.loadPage(d);
       this.api.listOperations(id).then(ops => this.updSvc({ ops })).catch(() => {});
       return d;
     } catch (e) { this.updSvc({ err: e }); if (e.status === 0) this.goDown(); return null; }
@@ -1501,16 +1489,34 @@ class Component extends DCLogic {
     } catch (e) { this.updSvc({ saving: false, cfgErr: e }); if (e.status === 0) this.goDown(); }
   }
 
-  // ---------- example page ("Hello" tab, mirrors services/_template/ui/page.js) ----------
-  async sayHello(e) {
-    e?.preventDefault?.();
-    const sv = this.state.svc, name = sv.hello.name.trim() || 'world';
-    this.updSvc(s => ({ hello: { ...s.hello, loading: true } }));
-    try {
-      const res = await this.api.callService(sv.id, 'GET', '/v1/hello', { query: { name } });
-      this.updSvc(s => ({ hello: { ...s.hello, loading: false, result: res } }));
-    } catch (err) { this.updSvc(s => ({ hello: { ...s.hello, loading: false } })); this.toast(err.detail || 'Request failed', 'error'); }
+  // ---------- mod pages (PATCHES #6): services/<id>/ui/page.js in the ModPage host ----------
+  pageUrl(d) {
+    if (d.page_url) return d.page_url;
+    // Mock mode: every mock mod with a page shows the template's page module.
+    return this.api.isLive('services') ? `/ui/services/${encodeURIComponent(d.id)}/page.js` : '/ui/services/_template/page.js';
   }
+  async loadPage(d) {
+    const cur = this.pages[d.id], ver = d.started_ts || 0;
+    if (cur && (cur.loading || (cur.ver === ver && !cur.err))) return;
+    this.pages[d.id] = { loading: true, ver, tabs: cur?.tabs };
+    try {
+      const url = new URL(this.pageUrl(d), location.href); url.searchParams.set('v', String(ver));
+      const page = (await import(url.href)).default;
+      if (!page || typeof page.mount !== 'function') throw new Error('page.js must `export default { tabs, mount(el, ctx) }`');
+      const tabs = (Array.isArray(page.tabs) && page.tabs.length ? page.tabs : [{ id: 'page', label: 'Page' }])
+        .filter(t => t && t.id && !BUILTIN_TABS.has(String(t.id))).map(t => ({ id: String(t.id), label: String(t.label || t.id) }));
+      this.pages[d.id] = { page, ver, tabs: tabs.length ? tabs : [{ id: 'page', label: 'Page' }] };
+    } catch (e) {
+      console.error('[ModPage] ' + d.id + ': ' + (e?.message || e));
+      this.pages[d.id] = { err: e?.message || String(e), ver, tabs: [{ id: 'page', label: 'Page' }] };
+    }
+    if (this.state.svc?.id === d.id) this.enterRoute(this.parse()); else this.forceUpdate();
+  }
+  modOn = (type, fn) => {
+    const l = ev => { if (type === '*' || ev.type === type) fn(ev); };
+    this.modListeners.add(l);
+    return () => this.modListeners.delete(l);
+  };
 
   // ---------- models ----------
   async loadModels() {
@@ -1816,7 +1822,7 @@ class Component extends DCLogic {
         ...(d.native_ui ? [{ label: 'Open native UI ↗', d: ICON.ext, href: d.native_ui, isLink: true, isBtn: false }] : []),
         { label: 'Show manifest', d: ICON.file, on: () => this.setState({ svcMenu: false, dialog: { kind: 'manifest', svc: d } }), isLink: false, isBtn: true }],
       tabs: tabs.map(t => ({ label: t.label, href: `#/s/${d.id}/${t.id}`, st: tabSt(t.id === tab), cur: t.id === tab ? 'page' : undefined })),
-      t: { hello: tab === 'hello', page: tab === 'page', overview: tab === 'overview', api: tab === 'api', logs: tab === 'logs', settings: tab === 'settings' },
+      t: { mod: false, page: tab === 'page', overview: tab === 'overview', api: tab === 'api', logs: tab === 'logs', settings: tab === 'settings' },
     };
     // banner
     const B = (tone, title, body, acts) => ({ st: { display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', padding: '12px 14px', borderRadius: 10, background: TONE[tone][1], border: '1px solid ' + TONE[tone][0] }, ist: { color: TONE[tone][0], display: 'flex', flex: 'none', paddingTop: 1 }, title, body, acts });
@@ -1829,10 +1835,14 @@ class Component extends DCLogic {
     v.hasBanner = !!v.banner;
     const running = d.state === 'ready';
 
-    if (v.t.hello) {
-      const h = sv.hello;
-      v.hello = { down: !running, up: running, name: h.name, onName: e => this.updSvc(x => ({ hello: { ...x.hello, name: e.target.value } })), onSubmit: e => this.sayHello(e), loading: h.loading, btnLabel: h.loading ? 'Calling…' : 'Say hello', btnSt: btn('pri', { dis: h.loading }),
-        hasResult: !!h.result, meta: h.result ? `${h.result.status} · ${h.result.ms} ms` : '', json: h.result ? this.jl(h.result.json, 'hello') : null, start: () => this.start(d.id), startSt: btn('pri') };
+    if (d.has_page) {
+      const pg = this.pages?.[d.id] || {};
+      if (pg.page && pg.tabs.some(x => x.id === tab)) {
+        v.t.mod = true; v.t.page = false;
+        v.mod = { page: pg.page, service: d, tab, params: r.params, api: this.api, ui: this.modUi, up: d.state === 'ready' || d.state === 'degraded',
+          toast: (m, l) => this.toast(m, l), confirm: o => this.confirm(o), navigate: h => this.go(h), on: this.modOn };
+      }
+      v.pageMsg = pg.err ? `This mod's page module could not be loaded (${pg.err}). The API, Logs and Settings tabs still work.` : 'Loading this mod\'s page…';
     }
     if (v.t.overview) {
       const hl = d.health;

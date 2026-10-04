@@ -299,6 +299,8 @@ export default {
 
 Rules: a page module never calls `fetch` directly, never styles with raw colors, and handles "service not running" by showing an `EmptyState` with a Start button.
 
+**As built (plan 2.9).** In the `.dc.html` shell, `web/ModPage.dc.html` hosts every page module: it `import()`s `ServiceSummary.page_url` and calls `mount(el, ctx)` on its own element, remounting when the mod, the tab, the hash params or the running state change. `ctx.ui` is `web/mod-ui.js`, plain DOM helpers that use the theme variables, because the export has no importable `components.js`: `h(tag, attrs, ...children)`, `text`, `row`, `stack`, `card`, `button(label, onClick, {kind})`, `input`, `textarea`, `select`, `field(label, control, hint)`, `json(value)`, `badge(label, tone)`, `empty(title, body, action)` and `table(rows)`. `ctx.on('*', fn)` receives every event. Tab ids can't reuse the generic ones (`overview`, `outputs`, `api`, `logs`, `settings`). If `mount` throws, ModPage shows the error and the other tabs keep working.
+
 **In the `.dc.html` shell (from revision 2 on), a mod's page can come in either of two formats.** Either way, it lives in the mod's own folder.
 
 | Format | Who uses it | How it loads |
@@ -407,6 +409,7 @@ interface ServiceSummary {
   memory: { used_bytes: number; estimate_bytes: number | null; peak_bytes: number | null };
   stats: Stat[];                 // ≤ 4
   has_page: boolean;
+  page_url: string | null;       // where the shell loads the page: /ui/services/<id>/page.js or /Mod_<id>.dc.html
   has_outputs: boolean;
   native_ui: string | null;      // URL of the service's own UI, if any
   enabled: boolean;

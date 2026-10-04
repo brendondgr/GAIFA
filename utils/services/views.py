@@ -37,6 +37,7 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         },
         "stats": svc.stats,
         "has_page": has_page(svc),
+        "page_url": page_url(svc),
         "has_outputs": bool(m and m.outputs),
         "native_ui": native,
         "enabled": svc.eff.enabled,
@@ -65,6 +66,16 @@ def detail(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         }
     )
     return out
+
+
+def page_url(svc: Service) -> str | None:
+    """Where the shell loads the page: a page module, or a `Page.dc.html` under `/Mod_<id>.dc.html`."""
+    if not has_page(svc):
+        return None
+    page = svc.m.ui.page  # type: ignore[union-attr]
+    if page.endswith(".dc.html"):
+        return f"/Mod_{svc.id}.dc.html"
+    return f"/ui/services/{svc.id}/{page.removeprefix('ui/')}"
 
 
 def has_page(svc: Service) -> bool:

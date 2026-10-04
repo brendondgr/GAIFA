@@ -261,13 +261,14 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **`aihub new <id> [--name] [--port]`:** copy the template, fill in the id, name and first free port in 5100–5199, run `install.sh`, and print the next steps.
   - *As built:* no hub restart is needed: `aihub new` calls the new `POST /api/services/rescan` (also `aihub rescan`), which adds, removes and updates mods and autostarts new ones; a running hub reports the new mod's state. The template also has `GET /v1/widgets/calls` + a `[[ui.widgets]]` entry, a `[tools]` entry, and `install.sh` uses uv-managed Python (`--python-preference only-managed`) so the venv works on the host and in a toolbox. `aihub install <id>` reruns a mod's install script. The mod commands live in `utils/cli_mods.py`. Found while testing: `[run].command` paths must not follow symlinks (a venv's `bin/python` is one), and tests now get an isolated `AIHUB_ROOT`/`AIHUB_URL` by default.
   *Done when:* `aihub new hello && aihub restart` gives a working mod at `/api/s/hello/v1/hello`, with operations listed.
-- [ ] **2.9 Mod pages in the shell.**
+- [x] **2.9 Mod pages in the shell.**
   - Check whether the dc runtime's `<dc-import>` accepts a bound (dynamic) `name`.
   - **Either way:**
     - Serve `GET /Mod_<id>.dc.html` from `services/<id>/ui/Page.dc.html`.
     - Add a `ModPage.dc.html` host that loads `/ui/services/<id>/page.js` and calls `mount(el, ctx)` on a ref, with cleanup on unmount. Build the `ctx` from brief §5 out of the hybrid `api`.
   - **If dynamic names don't work:** the shell keeps a static list of built-in `Mod_<id>` imports, and third-party mods use `page.js`.
   - Move the Example **Hello** tab out of `Hub.dc.html` into `services/_template/ui/page.js`, and record it in `PATCHES.md`.
+  - *As built:* the dc runtime reads `<dc-import name>` once, as a literal (`walkComponent`), and refuses a bound `<x-import from>`, so dynamic names don't work. Every `page.js` therefore goes through one static host, `web/ModPage.dc.html`, which `import()`s the module and mounts it on a callback ref; it remounts when the mod, tab, params or running state change, and otherwise just refreshes `ctx.service`. `ctx.ui` is `web/mod-ui.js` (themed DOM helpers: `h`, `card`, `button`, `input`, `field`, `json`, `empty`, `badge`, `table`, …). Summaries gained `page_url` (`/ui/services/<id>/<file>` or `/Mod_<id>.dc.html`). `Page.dc.html` pages (Part B) are served at `/Mod_<id>.dc.html`; the shell gets a literal `<dc-import name="Mod_<id>">` per built-in page when its phase lands. The shell now also handles `resync`. Checked in the browser: `aihub new hello` against a running hub shows its Hello tab, which calls the mod through the proxy; stopping it remounts the page's Start state; `?mock` shows the template's page for Example. Shell patch: `web/PATCHES.md` #6.
   *Done when:* `aihub new hello` gives a mod whose custom tab renders inside the shell.
 - [ ] **2.10 `aihub check <id>`: a mod self-test.**
   - **Route:** `GET /api/services/{id}/check` returns `{ok, checks: [{name, ok, detail}]}`. The CLI prints it and exits 1 on any failure.

@@ -24,7 +24,7 @@ export default {
       e.preventDefault();
       send.disabled = true;
       try {
-        // ctx.call(method, path, opts) goes through AIHub's proxy: /api/s/__ID__/v1/hello
+        // ctx.call(method, path, opts) goes through AIHub's proxy: /api/s/<id>/v1/hello
         const res = await ctx.call('GET', '/v1/hello', { query: { name: name.value.trim() || 'world' } });
         result.replaceChildren(ui.text(`${res.status} · ${res.ms} ms`, { muted: true, mono: true }), ui.json(res.json));
       } catch (err) {
@@ -36,7 +36,7 @@ export default {
 
     el.append(ui.card(
       ui.h('h2', { style: 'margin:0;font-size:15px' }, 'Say hello'),
-      ui.text('This tab comes from services/__ID__/ui/page.js. It calls GET /v1/hello through ctx.call.', { muted: true }),
+      ui.text(`This tab comes from services/${svc.id}/ui/page.js. It calls GET /v1/hello through ctx.call.`, { muted: true }),
       ui.h('form', { onsubmit: sayHello, style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end' },
         ui.field('Name', name), send),
       result,

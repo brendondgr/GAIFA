@@ -55,6 +55,7 @@ class ServiceSummary(_Model):
     memory: Memory
     stats: list[Stat]
     has_page: bool
+    page_url: str | None
     has_outputs: bool
     native_ui: str | None
     enabled: bool

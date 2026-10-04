@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+  <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
+    <div role="alert" style="padding:14px 16px;border-radius:10px;border:1px solid var(--rd,#F85149);background:var(--trd,rgba(248,81,73,.13));font-size:12.5px;word-break:break-word"><strong>This page crashed.</strong> {{ error }} — the API, Logs and Settings tabs still work.</div>
+  </sc-if>
+  <div ref="{{ mountRef }}" data-mod-page="{{ modId }}" style="min-width:0"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+// Hosts a mod's page module (design brief §5): `mod` = { page, service, tab, params, api, ui, toast,
+// confirm, navigate, on, up }. Written by us, not Claude Design (web/PATCHES.md #6).
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.el = null;
+    this.key = null;
+    this.cleanup = null;
+    this.offs = [];
+    this.ctx = null;
+    this.state = { error: null };
+    this.mountRef = el => { if (el === this.el) return; this.teardown(); this.el = el; this.sync(); };
+  }
+  componentDidMount() { this.sync(); }
+  componentDidUpdate() { this.sync(); }
+  componentWillUnmount() { this.teardown(); this.el = null; }
+
+  keyOf(m) { return [m.service.id, m.tab, m.up ? 'up' : 'down', JSON.stringify(m.params || {})].join('|'); }
+
+  sync() {
+    const m = this.props.mod;
+    if (!this.el || !m || !m.page) return;
+    const k = this.keyOf(m);
+    if (k === this.key) { if (this.ctx) this.ctx.service = m.service; return; }  // fresh data, same page: no remount
+    this.teardown();
+    this.key = k;
+    const offs = this.offs;
+    const ctx = this.ctx = {
+      service: m.service, tab: m.tab, params: m.params || {}, api: m.api, ui: m.ui,
+      call: (method, path, opts) => m.api.callService(m.service.id, method, path, opts),
+      toast: (msg, level) => m.toast(msg, level), confirm: o => m.confirm(o), navigate: route => m.navigate(route),
+      on: (type, fn) => { const off = m.on(type, fn); offs.push(off); return off; },
+    };
+    try {
+      const r = m.page.mount(this.el, ctx);
+      if (typeof r === 'function') this.cleanup = r;
+      else if (r && typeof r.then === 'function') r.then(f => { if (this.ctx === ctx && typeof f === 'function') this.cleanup = f; }, e => this.fail(e));
+      if (this.state.error) this.setState({ error: null });
+    } catch (e) { this.fail(e); }
+  }
+
+  fail(e) {
+    console.error('[ModPage] ' + (this.props.mod?.service?.id || '?') + ':', e);
+    this.setState({ error: e && e.message ? e.message : String(e) });
+  }
+
+  teardown() {
+    try { this.cleanup?.(); } catch (e) { console.error(e); }
+    for (const off of this.offs.splice(0)) { try { off(); } catch {} }
+    this.cleanup = null; this.ctx = null; this.key = null;
+    if (this.el) this.el.replaceChildren();
+  }
+
+  renderVals() {
+    return { mountRef: this.mountRef, hasError: !!this.state.error, error: this.state.error || '', modId: this.props.mod?.service?.id || '' };
+  }
+}
+</script>
+</body>
+</html>

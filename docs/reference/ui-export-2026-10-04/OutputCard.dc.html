@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div role="button" tabIndex="0" onClick="{{ c.onOpen }}" onKeyDown="{{ c.onKey }}" aria-label="{{ c.aria }}" style="{{ c.cardSt }}" style-hover="border-color:var(--bdh,#3A4A63)">
+  <div style="position:relative;aspect-ratio:4/3;background:var(--inset,#131926);overflow:hidden">
+    <sc-if value="{{ c.hasPreview }}" hint-placeholder-val="{{ true }}">
+      <img src="{{ c.preview }}" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block">
+    </sc-if>
+    <sc-if value="{{ c.isAudio }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;display:flex;align-items:center;gap:10px;padding:14px">
+        <button onClick="{{ c.onPlay }}" aria-label="{{ c.playAria }}" style="width:36px;height:36px;flex:none;border-radius:99px;border:0;background:var(--acc,#FFB224);color:#1A1200;display:grid;place-items:center;cursor:pointer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="{{ c.playD }}"></path></svg>
+        </button>
+        <div aria-hidden="true" style="flex:1;min-width:0;height:44px;display:flex;align-items:center;gap:2px">
+          <sc-for list="{{ c.bars }}" as="b" hint-placeholder-count="24"><span style="{{ b.st }}"></span></sc-for>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ c.isText }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;padding:12px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;line-height:1.5;color:var(--mut,#8A94A6);overflow:hidden;white-space:pre-wrap">{{ c.textPreview }}</div>
+    </sc-if>
+    <sc-if value="{{ c.is3d }}" hint-placeholder-val="{{ false }}">
+      <span style="position:absolute;top:8px;left:8px;height:20px;padding:0 7px;display:inline-flex;align-items:center;border-radius:4px;font-size:10.5px;font-weight:600;letter-spacing:.05em;background:rgba(11,14,20,.78);color:#BC8CFF">3D</span>
+    </sc-if>
+    <sc-if value="{{ c.isVideo }}" hint-placeholder-val="{{ false }}">
+      <span style="position:absolute;top:8px;left:8px;height:20px;padding:0 7px;display:inline-flex;align-items:center;gap:4px;border-radius:4px;font-size:10.5px;font-weight:600;background:rgba(11,14,20,.78);color:#E6EAF2">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"></path></svg>VIDEO
+      </span>
+    </sc-if>
+    <sc-if value="{{ c.hasBadge }}" hint-placeholder-val="{{ false }}">
+      <span style="position:absolute;right:8px;bottom:8px;height:20px;padding:0 6px;display:inline-flex;align-items:center;border-radius:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;background:rgba(11,14,20,.78);color:#E6EAF2">{{ c.badge }}</span>
+    </sc-if>
+  </div>
+  <div style="padding:9px 11px 10px;display:flex;flex-direction:column;gap:2px;min-width:0">
+    <div style="font-size:12.5px;font-weight:500;color:var(--tx,#E6EAF2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.title }}</div>
+    <div style="display:flex;gap:6px;font-size:11.5px;color:var(--mut,#8A94A6);min-width:0">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">{{ c.sub }}</span>
+      <span style="margin-left:auto;flex:none;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px">{{ c.size }}</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:220,&quot;height&quot;:240},&quot;c&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object&quot;}}"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+[project]
+name = "aihub"
+version = "0.1.0"
+description = "One local app that controls every AI service on this machine"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",
+    "pydantic>=2",
+    "tomlkit",
+    "watchfiles",
+    "pillow",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]

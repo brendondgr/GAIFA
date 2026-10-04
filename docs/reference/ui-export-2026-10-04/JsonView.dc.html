@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="position:relative;background:var(--inset,#131926);border:1px solid var(--bd,#1D2430);border-radius:8px;padding:10px 12px;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:12px;line-height:1.65;overflow:auto;max-height:420px;min-width:0">
+  <button onClick="{{ onCopy }}" aria-label="Copy JSON" style="position:sticky;float:right;top:0;height:24px;padding:0 8px;border-radius:5px;border:1px solid var(--bds,#2A3547);background:var(--card,#11151D);color:var(--mut,#8A94A6);font-size:11px;cursor:pointer;font-family:'IBM Plex Sans',system-ui,sans-serif" style-hover="color:var(--tx,#E6EAF2)">Copy</button>
+  <sc-for list="{{ lines }}" as="l" hint-placeholder-count="4">
+    <div style="{{ l.st }}"><button onClick="{{ l.toggle }}" disabled="{{ l.noToggle }}" aria-label="{{ l.aria }}" aria-expanded="{{ l.exp }}" style="display:inline-block;width:14px;padding:0;border:0;background:none;color:var(--mut,#8A94A6);cursor:pointer;font:inherit">{{ l.caret }}</button><span style="color:var(--mut,#8A94A6)">{{ l.key }}</span><span style="{{ l.vst }}">{{ l.val }}</span></div>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:420,&quot;height&quot;:200},&quot;lines&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;object[]&quot;},&quot;onCopy&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}"></script>
+</body>
+</html>

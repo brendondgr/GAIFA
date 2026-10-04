@@ -1,0 +1,19 @@
+# TEMPLATE. @ROOT@ is replaced with this clone's absolute path by `aihub install`.
+# Don't edit the installed copy: a reinstall overwrites it.
+[Unit]
+Description=AIHub - local AI hub (http://127.0.0.1:7000)
+Documentation=file://@ROOT@/docs/architecture.md
+
+[Service]
+# Mods run as their own transient units (aihub-<id>.service), outside this
+# unit's cgroup, so stopping or restarting the hub never stops a mod.
+Type=exec
+WorkingDirectory=@ROOT@
+# The venv's python directly, not `uv run`: no resolver or sync on every boot.
+ExecStart=@ROOT@/.venv/bin/python @ROOT@/app.py
+Restart=on-failure
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

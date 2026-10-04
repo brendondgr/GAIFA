@@ -2,7 +2,7 @@
 
 One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/`, run as its own process. Design: [docs/architecture.md](docs/architecture.md). Build plan: [docs/backend-plan.md](docs/backend-plan.md). UI brief: [docs/design-brief-ui.md](docs/design-brief-ui.md).
 
-**Status:** Phase 1 in progress: 1.2–1.5 done (`utils/` paths, config, db, events, server; `app.py`). Next: 1.6. What exists today: [docs/structure.md](docs/structure.md).
+**Status:** Phase 1 in progress: 1.2–1.6 done (`utils/` paths, config, db, events, server, cli; `app.py`; `bin/aihub`, installed as `aihub.service`). Next: 1.7. What exists today: [docs/structure.md](docs/structure.md).
 
 **Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans.
 
@@ -15,7 +15,7 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 - `uv sync`: install hub dependencies into `.venv/`
 - `uv run pytest`: the test suite (`utils/tests/`)
 - `uv run python app.py`: run the hub in the foreground on 127.0.0.1:7000 (`/api/docs` for the API)
-- (planned, 1.6) `bin/aihub`
+- `aihub status | start | stop | restart | logs [-f] | doctor | open`: the hub as a systemd user service (`aihub install` writes `~/.config/systemd/user/aihub.service` and links `~/.local/bin/aihub`). After changing hub code, `aihub restart`.
 
 ## Mod contract
 1. `services/<id>/service.toml`, with `id` matching `[a-z][a-z0-9-]{1,31}` and the folder name.

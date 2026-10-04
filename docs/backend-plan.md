@@ -129,7 +129,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **`app.py`:** argparse `--port`, `--dev` (subprocess backend), `--no-autostart`, `--demo-mods` (also load the fake mods from `utils/tests/fixtures/mods/`, for UI work before the real apps move in). It binds **both `127.0.0.1` and `[::1]`**; reuse gen3d's `__main__` socket code, which fixes browsers resolving `localhost` to IPv6.
   - *As built:* `--dev` and `--demo-mods` are accepted and stored on `Options`; they take effect when the backends (2.2) and fake mods (1.7) exist. Ctrl+C exits 0; a `SIGINT`/`SIGTERM` first closes open SSE streams so shutdown doesn't wait on them.
   *Done when:* `python app.py` serves `/api/system` and `/api/docs`.
-- [ ] **1.6 `bin/aihub` + `utils/cli.py` + `bin/aihub.service.in`.**
+- [x] **1.6 `bin/aihub` + `utils/cli.py` + `bin/aihub.service.in`.**
   - **The bash wrapper** runs `utils/cli.py` (standard library only, `urllib`, like lcpp's CLI) with the hub venv.
   - **Commands:**
     - `serve` (foreground = `python app.py`)
@@ -141,6 +141,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - `models scan|list|verify <id>` (Phase 3)
     - `doctor` (grows over time; Phase 12.4)
   - **When the hub is down**, it says so and suggests `aihub start`.
+  - *As built:* `logs` reads the journal (`aihub.service`, or `aihub-<id>.service` for a mod), so it works with the hub down. `new` and `models` exit 2 naming the phase that builds them. Mod commands get the hub's `not_found` until Phase 2. Installed 2026-10-04; linger was already on.
   *Done when:* `aihub install && aihub status` works and survives a logout/login (linger).
 - [ ] **1.7 Test harness.**
   - `utils/tests/conftest.py`: a temporary project root, the app built with `SubprocessBackend`, and an `httpx.AsyncClient` over ASGI.

@@ -16,7 +16,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `uv.lock` | ✅ | Locked hub dependencies; `uv sync` builds `.venv/` (ignored) from it |
 | `app.py` | ✅ | `python app.py [--port N] [--dev] [--no-autostart] [--demo-mods]` starts the hub on 127.0.0.1 and [::1] |
 | `config.toml` | ✅ | User settings (architecture §9); a missing file means defaults |
-| `bin/` | 🧱 | `aihub` command (1.6) and `aihub.service.in` systemd template (1.6) |
+| `bin/` | ✅ | `aihub` (bash wrapper → `utils/cli.py` with the hub venv) and `aihub.service.in` (unit template; `aihub install` fills in `@ROOT@`) |
 | `docs/` | ✅ | Design, plan, UI brief, this file, `reference/` UI exports |
 | `utils/` | ✅ | The hub's Python package (below) |
 | `services/` | 🧱 | One folder per mod; `_template/` is filled in 2.8 |
@@ -46,7 +46,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version`, one writer thread, async helpers |
 | `events.py` | ✅ | `EventBus` (per-subscriber queue, overflow → resync), `ActivityLog`, `Alerts`, `sse_stream()` |
 | `server.py` | ✅ | `create_app()`, `Hub` (app state, live-area registry), lifespan, `HubError` + error envelope, static `web/` |
-| `cli.py` | ⏳ 1.6 | Standard-library CLI behind `bin/aihub` |
+| `cli.py` | ✅ | Standard-library CLI behind `bin/aihub`: serve, install, start/stop/restart, status, logs, load/unload, open, url, doctor |
 | `manifest.py` | ⏳ 2.1 | `service.toml` schema, discovery, placeholders |
 | `backends/` | ✅ pkg · ⏳ 2.2 | `base.py`, `systemd.py`, `subprocess.py` |
 | `services.py` | ⏳ 2.3 | Mod state machine, health and status polling |
@@ -70,7 +70,7 @@ utils/tests/
 ├── fixtures/
 │   ├── mods/                   🧱     fake_ok, fake_slow, fake_crash, fake_mem (1.7)
 │   └── openapi/                🧱     real OpenAPI captures from Phase 0.5
-├── core/test_<behavior>.py     ✅     paths, config, db, events, server
+├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli
 ├── services/test_<behavior>.py        manifest, backends, state machine, proxy, operations
 └── <area>/test_<behavior>.py          registry, outputs, memory, metrics, …
 ```

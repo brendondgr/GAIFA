@@ -43,7 +43,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `__init__.py` | ✅ | Package marker; nothing runs at import time |
 | `paths.py` | ✅ | `Paths` (root, configurable dirs kept inside the root), `write_atomic()` |
 | `config.py` | ✅ | `Config` (pydantic, §9), `load()`, `save()` via tomlkit, `service_override()`, loopback check |
-| `db.py` | ⏳ 1.3 | `hub.db`, migrations |
+| `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version`, one writer thread, async helpers |
 | `events.py` | ⏳ 1.4 | Event bus, SSE, activity log, alerts |
 | `server.py` | ⏳ 1.5 | `create_app()`, lifespan, static `web/`, error envelope |
 | `cli.py` | ⏳ 1.6 | Standard-library CLI behind `bin/aihub` |
@@ -70,7 +70,7 @@ utils/tests/
 ├── fixtures/
 │   ├── mods/                   🧱     fake_ok, fake_slow, fake_crash, fake_mem (1.7)
 │   └── openapi/                🧱     real OpenAPI captures from Phase 0.5
-├── core/test_<behavior>.py     ✅     paths, config (db, events, server follow)
+├── core/test_<behavior>.py     ✅     paths, config, db (events, server follow)
 ├── services/test_<behavior>.py        manifest, backends, state machine, proxy, operations
 └── <area>/test_<behavior>.py          registry, outputs, memory, metrics, …
 ```

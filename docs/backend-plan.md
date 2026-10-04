@@ -106,7 +106,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **`save()`** goes through `tomlkit`: it changes only the keys given, and keeps comments and order.
   - **`service_override(id)`** merges `[services.<id>]` over the manifest.
   *Done when:* tests cover defaults, invalid values (clear error naming the key), a round trip that keeps comments, and the non-loopback refusal.
-- [ ] **1.3 `utils/db.py`.**
+- [x] **1.3 `utils/db.py`.**
   - `data/databases/hub.db` in WAL mode, with migrations by `PRAGMA user_version`.
   - Migration 001: `activity(id, ts, service, level, text, route)`, `service_peaks(service PK, peak_bytes, updated_ts)`, `kv(key PK, value)`.
   - One writer thread, a reader connection per thread, and `async` helpers (`execute`, `fetchone`, `fetchall`) built on `asyncio.to_thread`.

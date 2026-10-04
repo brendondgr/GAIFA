@@ -1,0 +1,177 @@
+"""`hub.db`: SQLite in WAL mode, migrations by `PRAGMA user_version`.
+
+One writer thread owns the only write connection; every write is queued to
+it. Reads use one connection per thread. The async helpers run on
+`asyncio.to_thread` (reads) or the writer thread (writes), so the event loop
+never blocks on SQLite.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import queue
+import sqlite3
+import threading
+from collections.abc import Callable, Iterable
+from concurrent.futures import Future
+from pathlib import Path
+from typing import Any, TypeVar
+
+T = TypeVar("T")
+
+# Each entry is one migration; its index + 1 is the user_version it sets.
+MIGRATIONS: list[str] = [
+    # 001
+    """
+    CREATE TABLE activity (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts      REAL NOT NULL,
+        service TEXT,
+        level   TEXT NOT NULL CHECK (level IN ('info', 'warn', 'error')),
+        text    TEXT NOT NULL,
+        route   TEXT
+    );
+    CREATE INDEX activity_ts ON activity (ts);
+    CREATE TABLE service_peaks (
+        service    TEXT PRIMARY KEY,
+        peak_bytes INTEGER NOT NULL,
+        updated_ts REAL NOT NULL
+    );
+    CREATE TABLE kv (
+        key   TEXT PRIMARY KEY,
+        value TEXT
+    );
+    """,
+]
+
+_STOP = object()
+
+
+def _connect(path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(path, timeout=10, check_same_thread=False, isolation_level=None)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 10000")
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def migrate(conn: sqlite3.Connection, migrations: list[str] = MIGRATIONS) -> int:
+    """Apply the migrations past the current user_version. Returns the new version."""
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    for n, sql in enumerate(migrations[version:], start=version + 1):
+        try:
+            conn.executescript(f"BEGIN;\n{sql}\nPRAGMA user_version = {n};\nCOMMIT;")
+        except sqlite3.Error:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+            raise
+    return conn.execute("PRAGMA user_version").fetchone()[0]
+
+
+class Database:
+    def __init__(self, path: Path, migrations: list[str] = MIGRATIONS) -> None:
+        self.path = path
+        self._migrations = migrations
+        self._writer: sqlite3.Connection | None = None
+        self._queue: queue.SimpleQueue[Any] = queue.SimpleQueue()
+        self._thread: threading.Thread | None = None
+        self._local = threading.local()
+        self._readers: list[sqlite3.Connection] = []
+        self._readers_lock = threading.Lock()
+
+    # lifecycle ------------------------------------------------------------
+
+    def open(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._writer = _connect(self.path)
+        self._writer.execute("PRAGMA journal_mode = WAL")
+        self._writer.execute("PRAGMA synchronous = NORMAL")
+        migrate(self._writer, self._migrations)
+        self._thread = threading.Thread(target=self._write_loop, name="aihub-db-writer", daemon=True)
+        self._thread.start()
+
+    def close(self) -> None:
+        if self._thread:
+            self._queue.put(_STOP)
+            self._thread.join()
+            self._thread = None
+        if self._writer:
+            self._writer.close()
+            self._writer = None
+        with self._readers_lock:
+            for c in self._readers:
+                c.close()
+            self._readers.clear()
+        self._local = threading.local()
+
+    @property
+    def version(self) -> int:
+        return self._reader().execute("PRAGMA user_version").fetchone()[0]
+
+    # writes ---------------------------------------------------------------
+
+    def _write_loop(self) -> None:
+        while (item := self._queue.get()) is not _STOP:
+            fn, fut = item
+            if not fut.set_running_or_notify_cancel():
+                continue
+            try:
+                self._writer.execute("BEGIN IMMEDIATE")
+                try:
+                    result = fn(self._writer)
+                except BaseException:
+                    self._writer.execute("ROLLBACK")
+                    raise
+                self._writer.execute("COMMIT")
+                fut.set_result(result)
+            except BaseException as e:  # noqa: BLE001 - handed to the caller
+                fut.set_exception(e)
+
+    def submit(self, fn: Callable[[sqlite3.Connection], T]) -> Future[T]:
+        """Queue `fn(conn)` on the writer thread, in its own transaction."""
+        if self._thread is None:
+            raise RuntimeError("database is not open")
+        fut: Future[T] = Future()
+        self._queue.put((fn, fut))
+        return fut
+
+    async def write(self, fn: Callable[[sqlite3.Connection], T]) -> T:
+        return await asyncio.wrap_future(self.submit(fn))
+
+    async def execute(self, sql: str, params: Iterable[Any] = ()) -> int:
+        """Run one write statement. Returns lastrowid (inserts) or rowcount."""
+
+        def run(c: sqlite3.Connection) -> int:
+            cur = c.execute(sql, tuple(params))
+            return cur.lastrowid if sql.lstrip().upper().startswith("INSERT") else cur.rowcount
+
+        return await self.write(run)
+
+    async def executemany(self, sql: str, rows: Iterable[Iterable[Any]]) -> int:
+        rows = [tuple(r) for r in rows]
+        return await self.write(lambda c: c.executemany(sql, rows).rowcount)
+
+    # reads ----------------------------------------------------------------
+
+    def _reader(self) -> sqlite3.Connection:
+        conn = getattr(self._local, "conn", None)
+        if conn is None:
+            conn = _connect(self.path)
+            conn.execute("PRAGMA query_only = ON")
+            self._local.conn = conn
+            with self._readers_lock:
+                self._readers.append(conn)
+        return conn
+
+    def fetchall_sync(self, sql: str, params: Iterable[Any] = ()) -> list[dict[str, Any]]:
+        return [dict(r) for r in self._reader().execute(sql, tuple(params)).fetchall()]
+
+    def fetchone_sync(self, sql: str, params: Iterable[Any] = ()) -> dict[str, Any] | None:
+        row = self._reader().execute(sql, tuple(params)).fetchone()
+        return dict(row) if row else None
+
+    async def fetchall(self, sql: str, params: Iterable[Any] = ()) -> list[dict[str, Any]]:
+        return await asyncio.to_thread(self.fetchall_sync, sql, tuple(params))
+
+    async def fetchone(self, sql: str, params: Iterable[Any] = ()) -> dict[str, Any] | None:
+        return await asyncio.to_thread(self.fetchone_sync, sql, tuple(params))

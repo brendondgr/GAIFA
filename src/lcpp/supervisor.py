@@ -35,6 +35,7 @@ log = logging.getLogger("lcpp.supervisor")
 
 READY_TIMEOUT_S = 900
 HEALTH_INTERVAL_S = 0.5
+PID_POLL_S = 1.0  # only without pidfd (see _exit_future)
 ERROR_LINE_RE = re.compile(r"error|failed|fatal|abort|out of memory|exception", re.IGNORECASE)
 # Follow-on lines llama.cpp prints after the real cause; only used as a fallback.
 GENERIC_ERROR_RE = re.compile(r"failed to load model|error loading model$|exiting due to", re.IGNORECASE)
@@ -66,6 +67,10 @@ def _exit_future(pid: int | None) -> asyncio.Future[None]:
     if not pid:
         fut.set_result(None)
         return fut
+    if not hasattr(os, "pidfd_open"):  # some Python builds (e.g. uv's standalone CPython) lack it
+        task = loop.create_task(_poll_exit(pid, fut))
+        fut.add_done_callback(lambda _: task.cancel())
+        return fut
     try:
         fd = os.pidfd_open(pid)
     except (ProcessLookupError, OSError):
@@ -88,6 +93,29 @@ def _exit_future(pid: int | None) -> asyncio.Future[None]:
     loop.add_reader(fd, on_exit)
     fut.add_done_callback(lambda _: close())
     return fut
+
+
+def _pid_gone(pid: int) -> bool:
+    """True once ``pid`` has exited (a zombie counts as exited, as it does for a pidfd)."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    try:
+        with open(f"/proc/{pid}/stat") as f:
+            return f.read().rsplit(")", 1)[1].split()[0] == "Z"
+    except (OSError, IndexError):
+        return True
+
+
+async def _poll_exit(pid: int, fut: asyncio.Future[None]) -> None:
+    """Fallback for ``_exit_future`` without pidfd: checks once a second, only while awaited."""
+    while not _pid_gone(pid):
+        await asyncio.sleep(PID_POLL_S)
+    if not fut.done():
+        fut.set_result(None)
 
 
 def normalize_spec(raw: Any, auto_register: bool) -> dict[str, Any]:

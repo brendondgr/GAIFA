@@ -27,13 +27,13 @@ curl -sf "$RELAY/health" >/dev/null && pass "relay answers on $RELAY" || fail "r
 
 echo "== launch two instances on chosen ports"
 lcpp start minicpm --port "$A" --name e2e-mini >/dev/null && pass "minicpm on :$A"
-lcpp start gemma4-E4B --port "$B" --name e2e-e4b --alias e2e-e4b >/dev/null && pass "gemma4-E4B on :$B"
-lcpp status | grep -q "e2e-mini .*registered" && lcpp status | grep -q "e2e-e4b .*registered" \
+lcpp start gemma4-26B --port "$B" --name e2e-g26 --alias e2e-g26 >/dev/null && pass "gemma4-26B on :$B"
+lcpp status | grep -q "e2e-mini .*registered" && lcpp status | grep -q "e2e-g26 .*registered" \
   && pass "both registered with the relay" || fail "not registered: $(lcpp status)"
 
 echo "== routing through the relay"
 [ "$(chat MiniCPM5-2B)" = "MiniCPM5-2B" ] && pass "model name MiniCPM5-2B -> :$A" || fail "MiniCPM5-2B misrouted"
-[ -n "$(chat e2e-e4b)" ] && pass "alias e2e-e4b -> :$B" || fail "alias e2e-e4b did not route"
+[ -n "$(chat e2e-g26)" ] && pass "alias e2e-g26 -> :$B" || fail "alias e2e-g26 did not route"
 
 echo "== daemon restart keeps instances and registrations"
 systemctl --user restart lcpp.service
@@ -46,7 +46,7 @@ echo "== stop"
 lcpp stop "$A" --wait >/dev/null && lcpp stop "$B" --wait >/dev/null && pass "both stopped"
 case " $(regs) " in *" lcpp:$A "*|*" lcpp:$B "*) fail "stale registrations: $(regs)" ;; *) pass "relay has no stale registrations" ;; esac
 for p in $A $B; do
-  systemctl --user show -p LoadState --value "lcpp-e2e-$([ "$p" = "$A" ] && echo mini || echo e4b).service" | grep -q not-found \
+  systemctl --user show -p LoadState --value "lcpp-e2e-$([ "$p" = "$A" ] && echo mini || echo g26).service" | grep -q not-found \
     && pass "unit for :$p is gone" || fail "unit for :$p still loaded"
 done
 echo "all checks passed"

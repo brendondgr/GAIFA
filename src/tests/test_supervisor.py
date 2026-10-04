@@ -134,6 +134,22 @@ def test_crash_after_ready_detected_by_pidfd(fake_home):
     run(scenario())
 
 
+def test_crash_after_ready_detected_without_pidfd(fake_home, monkeypatch):
+    """Python builds without os.pidfd_open fall back to polling the pid."""
+    monkeypatch.delattr(os, "pidfd_open", raising=False)
+    monkeypatch.setattr("lcpp.supervisor.PID_POLL_S", 0.05)
+
+    async def scenario():
+        sup = make_supervisor(fake_home)
+        await sup.start()
+        inst, _ = await sup.launch({"model_id": "gemma4-19B", "port": 17083})
+        await until(lambda: inst.state == "ready")
+        os.killpg(inst.pid, signal.SIGKILL)
+        await until(lambda: inst.state == "failed")
+        await sup.close()
+    run(scenario())
+
+
 def test_restart_gets_new_process(fake_home):
     async def scenario():
         sup = make_supervisor(fake_home)

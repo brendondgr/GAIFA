@@ -17,4 +17,4 @@ export const ctxLabel = n => n >= 1024 ? (n / 1024) + 'k' : String(n);
 export const modelNick = m => (m && m.nicknames && m.nicknames[0]) || (m && m.id) || '';
 export function loadPref(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } }
 export function savePref(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable: fine */ } }
-export function download(name, text) { const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/plain' })), download: name }); document.body.append(a); a.click(); a.remove(); }
+export function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }

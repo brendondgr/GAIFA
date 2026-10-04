@@ -45,6 +45,8 @@ def main() -> None:
         # default of 5 s closes them first, and a request sent on a socket the server is closing
         # dies with a network error (browsers do not retry POSTs). Outlive the browser instead.
         timeout_keep_alive=settings.keep_alive_s,
+        # On stop/restart, let in-flight generations finish (systemd allows 180 s).
+        timeout_graceful_shutdown=150,
     )
     server = uvicorn.Server(config)
     socks = _sockets()

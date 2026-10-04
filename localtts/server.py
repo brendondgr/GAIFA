@@ -292,6 +292,10 @@ class SpeechRequest(BaseModel):
                                                    "are under the default outputs folder (~/Music/TTS)")
     timings: bool = Field(False, description="return JSON {audio (base64), timings: {duration, words}} instead "
                                              "of audio; Kokoro gives native word times, Breeze is aligned with Whisper")
+    request_id: str | None = Field(None, max_length=64,
+                                   description="client-chosen id (not for stream): sending the same id again, e.g. "
+                                               "after a dropped connection, returns that request's result instead "
+                                               "of generating again")
 
 
 def _resolve(req: SpeechRequest) -> tuple[str, str, dict]:
@@ -424,9 +428,25 @@ async def _speak(req: SpeechRequest):
     return Response(data, media_type=audio.MEDIA_TYPES[req.format], headers=headers)
 
 
+# request_id -> (started, task). A task runs to completion even if its client goes away, so a
+# resend (the browser dropped the connection, e.g. on a network change) picks up the result.
+_by_request_id: dict[str, tuple[float, asyncio.Task]] = {}
+RESULT_KEEP_S = 300
+
+
 @app.post("/v1/speech")
 async def speech(req: SpeechRequest):
-    return await _speak(req)
+    if not req.request_id or (req.stream and not req.timings):
+        return await _speak(req)
+    now = time.monotonic()
+    for key, (started, task) in list(_by_request_id.items()):
+        if task.done() and now - started > RESULT_KEEP_S:
+            del _by_request_id[key]
+    if req.request_id in _by_request_id:
+        log.info("speech: request %s sent again; answering it with the first one's result", req.request_id)
+    else:
+        _by_request_id[req.request_id] = (now, asyncio.create_task(_speak(req)))
+    return await asyncio.shield(_by_request_id[req.request_id][1])
 
 
 class OpenAISpeech(BaseModel):

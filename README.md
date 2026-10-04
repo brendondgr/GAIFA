@@ -4,7 +4,7 @@ An always-on local text-to-speech API on **http://127.0.0.1:5040**, backed by
 **Breeze TTS 2** (voice cloning, voice design, voice direction) and **Kokoro-82M**
 (fast built-in voices). It runs in the background (a systemd user service on Linux, a
 LaunchAgent on macOS, or a plain background process), starts at boot, and keeps nothing on
-the GPU while unused: each engine is unloaded after **10 minutes** without a request, and
+the GPU while unused: each engine is unloaded after **3 minutes** without a request, and
 loads again on the next one. The installer looks at the machine first and sets the engines up
 for its GPU: NVIDIA (CUDA), AMD (ROCm), or CPU.
 
@@ -219,7 +219,8 @@ client ──HTTP──> localtts (FastAPI, .venv)  ──stdin/stdout──> br
   (`~/.config/tts-engines/engines.json`, written by `engines/setup.sh`); env vars override.
   Audio comes back over a pipe (JSON header + PCM bytes), so `no_save` really touches no disk.
 - **Unload = stop the worker process**, which returns every byte of GPU memory. A reaper
-  checks every 15 s and stops any engine idle for `LOCALTTS_IDLE_UNLOAD_S` (600).
+  checks every 15 s and stops any engine idle for `LOCALTTS_IDLE_UNLOAD_S` (180). A loaded
+  engine keeps the GPU busy even when idle (see Troubleshooting), so it does not linger.
 - Breeze runs with the fast stages the installer chose: `depth_decoder` + `backbone_decode`
   on NVIDIA and on AMD gfx1151 (tested), eager elsewhere or on the CPU. The torch.compile cache
   lives in `~/.cache/localtts/inductor` so it survives reboots.
@@ -274,7 +275,7 @@ Edit `~/.config/localtts/localtts.env`, then `localtts restart`. Common ones:
 | `LOCALTTS_PORT` | 5040 | |
 | `LOCALTTS_HOST` | 127.0.0.1 | `0.0.0.0` exposes it to the network; there is **no auth** |
 | `LOCALTTS_KEEP_ALIVE_S` | 330 | idle keep-alive; keep it above the browser's (see Troubleshooting) |
-| `LOCALTTS_IDLE_UNLOAD_S` | 600 | idle seconds before an engine leaves the GPU |
+| `LOCALTTS_IDLE_UNLOAD_S` | 180 | idle seconds before an engine leaves the GPU |
 | `LOCALTTS_OUTPUTS_DIR` | `~/Music/TTS` | where generated audio is saved (unless `no_save`) |
 | `LOCALTTS_PRELOAD` | empty | e.g. `breeze` to load at service start |
 | `LOCALTTS_DEFAULT_ENGINE` | kokoro | engine for requests with no voice and no instruction |
@@ -297,6 +298,23 @@ The full list is in `localtts.env.example`.
   the browser always closes first. Long texts (over 1,500 characters) are streamed by the UI,
   which also keeps them clear of Firefox's 300 s wait-for-response limit.
 - `localhost` resolves to `::1` here, so the server listens on both `127.0.0.1` and `[::1]`.
+- **The same error when a network interface appears** (a Docker container starting, a VPN).
+  Firefox treats that as a network change and, 5 s later, closes every connection that has
+  received nothing, which is any Breeze generation still running. A container stuck in a
+  restart loop does this every minute (`docker ps -a` shows it as `Restarting`). The UI sends
+  each generation with a `request_id` and resends it when the connection drops; the server
+  answers a resend with the original request's result, so nothing is generated twice.
+- **A restart used to fail the request in progress.** The unit stops with `KillMode=mixed`
+  (re-run `localtts enable` to update an older unit): the server finishes in-flight requests,
+  up to 150 s, before it unloads the engines.
+- **An idle engine kept a CPU core at 100%** (ROCm nightly). The nightly PyTorch loads
+  rocprofiler-sdk, which attaches to every process and polls its GPU queues. Workers are
+  started with `ROCPROFILER_REGISTER_ENABLED=0`, which turns that off.
+- **The GPU shows 100% busy while an engine is loaded, even idle** (gfx1151). Any process with
+  a ROCm queue does this, system ROCm 7.1 included: the compute command processor keeps
+  polling the queue (~45 W instead of ~17 W). It is the driver or firmware, not LocalTTS, and it
+  stops when the engine unloads, hence the short `LOCALTTS_IDLE_UNLOAD_S`. `localtts unload`
+  frees the GPU at once.
 
 - `localtts logs` shows the server and both workers (worker lines start with `[worker]`).
 - A failed engine load reports `worker exited (code N)`; the traceback is in the log.

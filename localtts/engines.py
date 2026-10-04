@@ -22,6 +22,12 @@ log = logging.getLogger("localtts.engines")
 WORKERS = ROOT / "workers"
 DRAIN_TIMEOUT_S = 30.0  # longest we wait for an abandoned request before restarting the worker
 
+# Base environment for every worker; the service's own environment overrides it.
+# ROCm nightly torch loads rocprofiler-sdk, which attaches to every process and wraps its GPU
+# queues. Its handlers are polled, so an idle worker pins a CPU core and keeps the GPU at 100%
+# busy until it unloads. Nothing here uses the profiler; set ROCPROFILER_REGISTER_ENABLED=1 to profile.
+WORKER_ENV = {"ROCPROFILER_REGISTER_ENABLED": "0"}
+
 
 class EngineError(RuntimeError):
     pass
@@ -56,7 +62,7 @@ class Engine:
                 raise EngineError(f"{self.name} is not installed (no Python at {self.python}); set it up with: bash engines/setup.sh --plan")
             self.state = "loading"
             log.info("%s: starting worker", self.name)
-            env = {**os.environ, "PYTHONUNBUFFERED": "1", **self.env}
+            env = {**WORKER_ENV, **os.environ, "PYTHONUNBUFFERED": "1", **self.env}
             self.proc = await asyncio.create_subprocess_exec(
                 str(self.python), str(self.script),
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
@@ -182,7 +188,7 @@ async def _oneshot(script: str, args: list[str], what: str, timeout: float = 600
     proc = await asyncio.create_subprocess_exec(
         str(settings.breeze_python), str(WORKERS / script), *args,
         stdout=asyncio.subprocess.PIPE, stderr=None, cwd=str(WORKERS),
-        env={**os.environ, "HF_HUB_OFFLINE": "1", **breeze_env()},
+        env={**WORKER_ENV, **os.environ, "HF_HUB_OFFLINE": "1", **breeze_env()},
     )
     out, _ = await asyncio.wait_for(proc.communicate(), timeout)
     for line in out.decode().splitlines():

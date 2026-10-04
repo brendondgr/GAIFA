@@ -50,7 +50,7 @@ async function errorText(resp) {
   return `${resp.status} ${resp.statusText}`;
 }
 
-async function http(path, { base = backendBase(), json, form, method, signal, raw, retry = true } = {}) {
+async function http(path, { base = backendBase(), json, form, method, signal, raw, retry = true, resend = 0 } = {}) {
   const opts = { method: method || (json || form ? "POST" : "GET"), signal };
   if (json) { opts.headers = { "content-type": "application/json" }; opts.body = JSON.stringify(json); }
   if (form) opts.body = form;
@@ -59,6 +59,13 @@ async function http(path, { base = backendBase(), json, form, method, signal, ra
   try { resp = await fetch(base + path, opts); }
   catch (e) {
     if (e.name === "AbortError") throw e;
+    // Firefox drops a request that has received nothing yet 5 s after any network change (a
+    // container starting is enough), and a restart of the service drops it too. Requests the
+    // server can match up again (speech with a request_id) are resent, a little later each time.
+    if (resend > 0) {
+      await new Promise(r => setTimeout(r, 1000 * (4 - Math.min(resend, 3))));
+      return http(path, { base, json, form, method, signal, raw, retry, resend: resend - 1 });
+    }
     // A pooled keep-alive connection that closed under us fails instantly, before the server
     // saw anything; one retry covers it. A slow failure is a real outage: report it.
     if (retry && performance.now() - t0 < 1500) {
@@ -665,7 +672,11 @@ function wavBlob(chunks, sampleRate) {  // PCM s16le mono chunks -> WAV
 async function speak(t, signal) {  // -> {blob, meta}
   const stream = t.text.length > STREAM_CHARS;
   const t0 = performance.now();
-  const resp = await http("/v1/speech", { base: t.backend, json: stream ? { ...t.params, stream: true } : t.params, signal, raw: true });
+  // One id per generation, shared by its resends: the server answers a resend with the result
+  // of the original instead of generating again.
+  const id = crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const json = stream ? { ...t.params, stream: true } : { ...t.params, request_id: id };
+  const resp = await http("/v1/speech", { base: t.backend, json, signal, raw: true, resend: stream ? 0 : 3 });
   const h = k => resp.headers.get(k);
   const meta = {
     saved: h("X-LocalTTS-Saved") || "no", path: h("X-LocalTTS-Path") ? decodeURIComponent(h("X-LocalTTS-Path")) : "",

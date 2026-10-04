@@ -48,7 +48,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 
 ## Phase 0 — Prep in the existing repos
 
-- [ ] **0.1 Commit LocalTTS's uncommitted work.** 8 files are live in the running service but not committed: the 180 s idle default, the ROCm profiler fix, `KillMode=mixed`, and request de-duplication. Also fix the README, which still says engines unload after "10 minutes".
+- [x] **0.1 Commit LocalTTS's uncommitted work.** 8 files are live in the running service but not committed: the 180 s idle default, the ROCm profiler fix, `KillMode=mixed`, and request de-duplication. Also fix the README, which still says engines unload after "10 minutes".
   *Done when:* `git status` is clean and `localtts status` is healthy.
 - [ ] **0.2 Commit lcpp's uncommitted work and fix its known bugs.**
   - Commit the Hugging Face downloads feature (`downloads.py`, its routes and tests; 10 modified and 3 untracked files).

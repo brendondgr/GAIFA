@@ -49,7 +49,8 @@ The docs are the source of truth. Read the section you need before acting; don't
 1. Find the first unticked step in `docs/backend-plan.md`. Check its phase's earlier steps are ticked.
 2. Read the architecture and brief sections the step cites.
 3. Build it, with tests in `utils/tests/<area>/test_<behavior>.py` (fake mods in `utils/tests/fixtures/mods/`).
-4. `uv run pytest` must be green.
+4. `uv run pytest` must be green. It includes the Node tests for `web/api.js` (`utils/tests/web/`); inside the toolbox they use the host's Node via `flatpak-spawn --host node`.
+   To check against the installed hub, run `aihub restart` and reload the page (changing only the `#/…` hash doesn't reload it).
 5. In the same commit: tick the step in the plan, update `docs/structure.md` for new files, and update architecture / brief §6 / §11.7 if behavior differs from what they say.
 6. Commit as `AIHub (<phase>.<step>): <what was done>`. Push when the user asks or at the end of a phase.
 7. At the end of a phase, run its **Wire** and **Checks & deliverables** lists before starting the next phase.

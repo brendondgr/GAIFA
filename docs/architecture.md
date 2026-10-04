@@ -288,9 +288,9 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 - **Previews:** the hub makes them itself (a video poster frame via ffmpeg) and stores them as hidden `.<name>.preview.jpg` files next to the output.
 
 ### 4.8 Adding a mod
-1. Run `aihub new <id>`. It copies `services/_template/`, fills in the id, name and a free port, and runs its `install.sh`.
-2. Edit `services/<id>/server.py` and `service.toml`.
-3. Run `aihub restart`. The mod appears in the sidebar, with an Overview tile and a working API tab.
+1. Run `aihub new <id>`. It copies `services/_template/`, fills in the id, name and a free port, runs its `install.sh`, and asks the running hub to pick it up (`POST /api/services/rescan`). The mod appears in the sidebar, with an Overview tile, a working API tab and its Hello tab, and starts.
+2. Edit `services/<id>/server.py` and `service.toml`, then `aihub restart <id>` (a code change) or `aihub rescan` (a manifest change, applied at the mod's next start).
+3. A mod copied in by hand, or a folder deleted, is picked up the same way with `aihub rescan` (or a hub restart).
 
 ## 5. Runtime
 
@@ -351,6 +351,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/outputs/{id}/file` | an output's main file (supports Range, for audio/video seeking) |
 | `GET /api/outputs/{id}/files/{path}` | a file inside a folder output |
 | `GET /api/outputs/{id}/preview` | thumbnail or poster |
+| `POST /api/services/rescan` | pick up added, removed and edited mod folders without restarting the hub: `{added, removed, changed}`; new mods autostart |
 | `POST /api/memory/acquire` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[]}` or `409 needs_room {plan}` |
 | `GET /api/tools`, `POST /api/tools/{name}/call`, `POST /api/approvals/{id}` | later: agent tools and approval decisions |
 

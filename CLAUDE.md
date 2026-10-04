@@ -15,6 +15,7 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 - `uv sync`: install hub dependencies into `.venv/`
 - `uv run pytest`: the test suite (`utils/tests/`)
 - `uv run python app.py`: run the hub in the foreground on 127.0.0.1:7000 (`/api/docs` for the API)
+- `aihub new <id>`: a new mod from `services/_template/`, installed and loaded; `aihub rescan` after adding or removing mod folders by hand.
 - `aihub status | start | stop | restart | logs [-f] | doctor | open`: the hub as a systemd user service (`aihub install` writes `~/.config/systemd/user/aihub.service` and links `~/.local/bin/aihub`). After changing hub code, `aihub restart`.
 
 ## Mod contract

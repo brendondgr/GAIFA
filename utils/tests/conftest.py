@@ -55,6 +55,16 @@ def wait_for(url: str, timeout: float = 10, ok: Callable[[httpx.Response], bool]
         time.sleep(0.05)
 
 
+@pytest.fixture(autouse=True)
+def _isolated(tmp_path_factory, monkeypatch):
+    """Every test gets a throwaway AIHUB_ROOT and a closed AIHUB_URL, so nothing (a CLI
+    subprocess included) can touch the real repo's services/ or the installed hub."""
+    scratch = tmp_path_factory.mktemp("isolated-root")
+    (scratch / "services").mkdir()
+    monkeypatch.setenv("AIHUB_ROOT", str(scratch))
+    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:1")
+
+
 @pytest.fixture
 def root(tmp_path, monkeypatch) -> Path:
     (tmp_path / "services").mkdir()

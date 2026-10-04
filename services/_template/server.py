@@ -18,7 +18,7 @@ from datetime import datetime
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel, Field
 
 PORT = int(os.environ.get("AIHUB_PORT", "__PORT__"))
@@ -102,7 +102,7 @@ def note(body: Note) -> dict:
 
 
 @app.get("/v1/widgets/calls", summary="Calls per hour (dashboard widget)")
-def calls_widget(range: str = "24h") -> dict:
+def calls_widget(span: str = Query("24h", alias="range", description="1h, 6h, 24h, 7d or 30d")) -> dict:
     """WidgetData (design brief §11.7) for the [[ui.widgets]] entry in service.toml."""
     now = int(time.time() // 3600 * 3600)
     hours = [now - 3600 * i for i in range(23, -1, -1)]

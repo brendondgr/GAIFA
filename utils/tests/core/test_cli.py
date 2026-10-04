@@ -44,15 +44,14 @@ def test_hub_down_says_so(tmp_path):
     assert r.returncode == 1 and "aihub start" in r.stderr
 
 
-def test_url_uses_config_port(tmp_path):
+def test_url_uses_config_port(tmp_path, monkeypatch):
+    monkeypatch.delenv("AIHUB_URL")  # without it, the CLI reads the port from config.toml
     (tmp_path / "config.toml").write_text("[hub]\nport = 7444\n")
     r = run("url", "settings", env={"AIHUB_ROOT": str(tmp_path)})
     assert r.stdout.strip() == "http://127.0.0.1:7444/settings"
 
 
 def test_later_commands_name_their_phase():
-    r = run("new", "foo")
-    assert r.returncode == 2 and "Phase 2.8" in r.stderr
     r = run("models", "scan")
     assert "Phase 3" in r.stderr
 

@@ -13,6 +13,7 @@ Nothing here starts processes or touches the network.
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import tomllib
@@ -503,7 +504,9 @@ def resolve_arg(arg: str, base: Path, first: bool) -> str:
     if arg.startswith("/"):
         return arg
     if (first and "/" in arg) or arg.startswith(("./", "../")):
-        return str((base / arg).resolve())
+        # normpath, not resolve(): a venv's bin/python is a symlink, and Python only finds
+        # its venv when started through that link.
+        return os.path.normpath(base / arg)
     return arg
 
 

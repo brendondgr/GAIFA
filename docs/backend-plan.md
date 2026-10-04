@@ -251,7 +251,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **`PUT config`:** validate, then save through `config.save()`. Port, env and command changes return `restart_required: true`. Enabled and autostart apply immediately.
   - *As built:* response models in `utils/api_models.py`; load/unload in `utils/services/loading.py` (in the background: 202 with `loading`, then a `service` event; on failure the load state goes back and an error activity item says why; `make_room` is accepted and ignored until Phase 5). start/stop/restart take `?wait=1`, which the CLI uses to print the final state (and `last_error` on failure). `PUT config` validates port clashes first and leaves the file untouched on any error (`422 invalid_config`); `env` replaces the whole table; `idle_unload_s: null` removes the key; disabling a running mod stops it. Log streams end when the hub shuts down (`EventBus.closing`). `services`, `logs`, `operations`, `proxy` and `events` are live in `/config.js`.
   *Done when:* the route tests pass, and pydantic response models match the brief's §6.4 types.
-- [ ] **2.8 `services/_template/` + `aihub new`.**
+- [x] **2.8 `services/_template/` + `aihub new`.**
   - **The template:**
     - `service.toml`
     - `server.py`: FastAPI with `/health`, `/v1/status`, `GET /v1/hello?name=`, `POST /v1/echo`, and `POST /v1/note`, which writes a text output to `{outputs}` following the conventions
@@ -259,6 +259,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - `README.md`: the mod contract on one page
     - `ui/page.js`: the Example mod's Hello tab, moved out of the export in 2.9
   - **`aihub new <id> [--name] [--port]`:** copy the template, fill in the id, name and first free port in 5100–5199, run `install.sh`, and print the next steps.
+  - *As built:* no hub restart is needed: `aihub new` calls the new `POST /api/services/rescan` (also `aihub rescan`), which adds, removes and updates mods and autostarts new ones; a running hub reports the new mod's state. The template also has `GET /v1/widgets/calls` + a `[[ui.widgets]]` entry, a `[tools]` entry, and `install.sh` uses uv-managed Python (`--python-preference only-managed`) so the venv works on the host and in a toolbox. `aihub install <id>` reruns a mod's install script. The mod commands live in `utils/cli_mods.py`. Found while testing: `[run].command` paths must not follow symlinks (a venv's `bin/python` is one), and tests now get an isolated `AIHUB_ROOT`/`AIHUB_URL` by default.
   *Done when:* `aihub new hello && aihub restart` gives a working mod at `/api/s/hello/v1/hello`, with operations listed.
 - [ ] **2.9 Mod pages in the shell.**
   - Check whether the dc runtime's `<dc-import>` accepts a bound (dynamic) `name`.

@@ -19,7 +19,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `bin/` | ✅ | `aihub` (bash wrapper → `utils/cli.py` with the hub venv) and `aihub.service.in` (unit template; `aihub install` fills in `@ROOT@`) |
 | `docs/` | ✅ | Design, plan, UI brief, this file, `reference/` UI exports |
 | `utils/` | ✅ | The hub's Python package (below) |
-| `services/` | 🧱 | One folder per mod; `_template/` is filled in 2.8 |
+| `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js` |
 | `data/` | ✅ | Models, databases (below); `logs/` and `state/` arrive in Stage D |
 | `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…`, ignored by git |
 | `web/` | ✅ | The UI (below) |
@@ -47,6 +47,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `events.py` | ✅ | `EventBus` (per-subscriber queue, overflow → resync), `ActivityLog`, `Alerts`, `sse_stream()` |
 | `server.py` | ✅ | `create_app()`, `Hub` (app state, live-area registry), lifespan, `HubError` + error envelope, static `web/` |
 | `cli.py` | ✅ | Standard-library CLI behind `bin/aihub`: serve, install, start/stop/restart, status, logs, load/unload, open, url, doctor |
+| `cli_mods.py` | ✅ | `aihub new`, `aihub install <id>`, `aihub rescan` (standard library only, loaded on demand by `cli.py`) |
 | `manifest.py` | ✅ | `service.toml` schema (pydantic), `discover()` with collected errors, `effective()` config overrides, `launch_spec()` (placeholders + env), `start_order()` |
 | `backends/` | ✅ | `base.py` (`Backend` protocol, `UnitState`, `LogLine`), `systemd.py` (`aihub-<id>.service` via `systemd-run`, journal logs), `subprocess.py` (child processes + log ring; tests and `--dev`) |
 | `services/` | ✅ pkg | Running mods. `manager.py` (`ServiceManager`: start/stop/restart, logs), `discovery.py` (boot, adoption, autostart in `after` order, rescan), `health.py` (readiness, monitor, restart on failure, external mods), `status.py` (status polling, `validate()` for the §4.6 shape, job events), `loading.py` (load/unload via `[memory]`; Phase 5 adds make-room), `views.py` (`ServiceSummary` / `ServiceDetail` JSON), `model.py` (`Service`, `Timing`, `ServiceError`) |

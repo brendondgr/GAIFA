@@ -365,6 +365,14 @@ def test_command_path_resolution(tmp_path):
     assert r("-m", base, False) == "-m"
 
 
+def test_venv_python_symlink_is_not_followed(tmp_path):
+    # Following .venv/bin/python to the base interpreter would start the mod outside its venv.
+    base = tmp_path / "mod"
+    (base / ".venv" / "bin").mkdir(parents=True)
+    (base / ".venv" / "bin" / "python").symlink_to("/usr/bin/python3")
+    assert manifest.resolve_arg(".venv/bin/python", base, True) == str(base / ".venv" / "bin" / "python")
+
+
 def test_launch_spec_refuses_a_broken_mod(svc, cfg_paths):
     write(svc, "bad", 'id = "bad"\n[run]\nport = 5100\n')
     cfg, paths = cfg_paths()

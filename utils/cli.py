@@ -27,7 +27,7 @@ UNIT = "aihub.service"
 TEMPLATE = CODE / "bin" / "aihub.service.in"
 UNIT_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
 LINK = Path.home() / ".local" / "bin" / "aihub"
-LATER = {"new": "2.8", "models": "3"}
+LATER = {"models": "3"}
 WAIT_S = 600  # start/stop/restart wait for the mod to settle (start_timeout_s can be minutes)
 
 
@@ -142,7 +142,27 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0  # not reached
 
 
+def _mods() -> Any:
+    """utils/cli_mods.py (new, install <id>, rescan), loaded only when one of them runs."""
+    try:
+        from utils import cli_mods  # imported as a package (tests)
+    except ImportError:
+        import cli_mods  # type: ignore[no-redef]  # run as a script: utils/ is on sys.path
+    cli_mods.cli = sys.modules[__name__]
+    return cli_mods
+
+
+def cmd_new(args: argparse.Namespace) -> int:
+    return _mods().cmd_new(args)
+
+
+def cmd_rescan(args: argparse.Namespace) -> int:
+    return _mods().cmd_rescan(args)
+
+
 def cmd_install(args: argparse.Namespace) -> int:
+    if args.id:
+        return _mods().cmd_install_mod(args.id)
     UNIT_DIR.mkdir(parents=True, exist_ok=True)
     (UNIT_DIR / UNIT).write_text(render_unit())
     print(f"wrote {UNIT_DIR / UNIT}")
@@ -357,7 +377,9 @@ def parser() -> argparse.ArgumentParser:
     p = sub.add_parser("serve", help="run the hub in the foreground (python app.py)")
     p.add_argument("rest", nargs=argparse.REMAINDER, help="passed to app.py (--port, --dev, ...)")
     p.set_defaults(fn=cmd_serve)
-    sub.add_parser("install", help="install and start the aihub systemd user service").set_defaults(fn=cmd_install)
+    p = sub.add_parser("install", help="install and start the aihub systemd user service, or (with an id) run a mod's install.sh")
+    p.add_argument("id", nargs="?")
+    p.set_defaults(fn=cmd_install)
     sub.add_parser("uninstall", help="stop and remove the aihub service").set_defaults(fn=cmd_uninstall)
     for name, fn, what in (("start", cmd_start, "start"), ("stop", cmd_stop, "stop"), ("restart", cmd_restart, "restart")):
         p = sub.add_parser(name, help=f"{what} the hub (no id), a mod, or everything (all)")
@@ -378,9 +400,13 @@ def parser() -> argparse.ArgumentParser:
         p.add_argument("route", nargs="?")
         p.set_defaults(fn=fn)
     sub.add_parser("doctor", help="check the install").set_defaults(fn=cmd_doctor)
-    p = sub.add_parser("new", help=f"create a mod from the template (Phase {LATER['new']})")
-    p.add_argument("id")
-    p.set_defaults(fn=cmd_later)
+    p = sub.add_parser("new", help="create a mod from services/_template, install it and load it")
+    p.add_argument("id", help="lowercase letters, digits and -, e.g. my-mod")
+    p.add_argument("--name", help="display name (default: from the id)")
+    p.add_argument("--port", type=int, help="port (default: the first free one in config.toml [ports] new_mods)")
+    p.add_argument("--no-install", action="store_true", help="don't run install.sh")
+    p.set_defaults(fn=cmd_new)
+    sub.add_parser("rescan", help="make the hub pick up added, removed or edited mod folders").set_defaults(fn=cmd_rescan)
     p = sub.add_parser("models", help=f"scan | list | verify <id> (Phase {LATER['models']})")
     p.add_argument("action", choices=["scan", "list", "verify"])
     p.add_argument("id", nargs="?")

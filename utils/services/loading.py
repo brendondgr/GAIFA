@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from utils.services import Service, ServiceError
+from utils.services.model import Service, ServiceError
 
 if TYPE_CHECKING:
     from utils.services import ServiceManager

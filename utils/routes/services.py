@@ -15,11 +15,12 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
 from utils import config as config_mod
-from utils import loading, operations
+from utils import operations
+from utils.services import loading
 from utils.api_models import Logs, Operation, SavedConfig, ServiceConfigPatch, ServiceDetail, ServiceSummary
 from utils.events import SSE_RETRY_MS
 from utils.manifest import check_effective_ports, effective
-from utils.service_views import detail, summary
+from utils.services.views import detail, summary
 from utils.services import ServiceError, ServiceManager
 
 router = APIRouter(tags=["services"])
@@ -35,6 +36,11 @@ def _mgr(request: Request) -> ServiceManager:
 async def list_services(request: Request) -> list[dict[str, Any]]:
     mgr = _mgr(request)
     return [summary(mgr, s) for s in mgr.list()]
+
+
+@router.post("/api/services/rescan", summary="Pick up added, removed and edited mod folders (no hub restart)")
+async def rescan_services(request: Request) -> dict[str, list[str]]:
+    return await _mgr(request).rescan(autostart=request.app.state.hub.options.autostart)
 
 
 @router.get("/api/services/{service_id}", summary="One mod in detail", response_model=ServiceDetail, response_model_exclude_unset=True)

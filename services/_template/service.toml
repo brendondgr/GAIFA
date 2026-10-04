@@ -1,0 +1,37 @@
+# __NAME__: made from services/_template with `aihub new __ID__`.
+# Every field is explained in docs/mods.md and architecture §4.3. Only id, [run].port
+# and [run].command are required; delete what you don't use.
+id = "__ID__"                      # = the folder name; becomes /api/s/__ID__/ and #/s/__ID__
+name = "__NAME__"
+description = "A new AIHub mod"
+icon = "puzzle"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]   # relative to this folder; install.sh makes .venv
+port = __PORT__                    # config.toml [services.__ID__] port = … overrides it
+health = "/health"                 # 2xx = ready
+status = "/v1/status"              # optional: load, busy, stats (charted), jobs (architecture §4.6)
+openapi = "/openapi.json"          # the API tab and agent tools are built from it
+env = { NOTE_PREFIX = "note" }     # placeholders: {port} {outputs} {models} {databases} {root} {hub_url} …
+start_timeout_s = 30
+stop_timeout_s = 10
+restart = "on-failure"
+install = "install.sh"
+
+[outputs]                          # present = this mod writes to {outputs} ($AIHUB_OUTPUTS)
+kinds = ["text"]
+
+[ui]
+page = "ui/page.js"                # its own tab(s) inside the AIHub page
+
+[[ui.widgets]]                     # charts on the Overview dashboard (Phase 6 draws them)
+id = "calls"
+title = "Hello calls per hour"
+kind = "bar"                       # line | area | bar | donut | number | table
+source = "GET /v1/widgets/calls"   # returns WidgetData; gets ?range=
+ranges = ["24h"]
+span = 4
+
+[tools]                            # operations the agent may call (Phase 13)
+hello = { op = "GET /v1/hello", description = "Say hello to someone" }

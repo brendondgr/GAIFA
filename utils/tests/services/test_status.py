@@ -6,7 +6,7 @@ import asyncio
 
 import httpx
 
-from utils import status
+from utils.services import status
 from utils.tests.services.conftest import until
 
 

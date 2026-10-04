@@ -356,7 +356,8 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - If no checksum is recorded it records one; otherwise it compares and flags `checksum_mismatch`.
   - Cancelled cleanly on shutdown.
   - *As built:* `utils/registry/verify.py` (`Verifier`). While queued or hashing, a Model has status `verifying` and `progress` (0–1). `?reset=1` forgets the recorded checksums and records new ones (how a re-downloaded file is accepted). A model with no files on disk is `409 model_files_missing`. Deleting a model cancels its verification; shutdown stops the hashing thread within one 8 MB read and records nothing half-done. A file that changes size while being read is reported, not recorded. Results go to the activity feed (a mismatch at `error` level). `aihub models list | show | scan [--add] | verify <id>… | --all [--reset]` is in `utils/cli_models.py`. Hashing ran at ~1.6 GB/s on a real 2.7 GB GGUF.
-- [ ] **3.4 "Used by".** A model's `services` are the explicit list plus every mod whose `[models] dirs` contains the model's top folder. `ServiceDetail.models` is filled from this.
+- [x] **3.4 "Used by".** A model's `services` are the explicit list plus every mod whose `[models] dirs` contains the model's top folder. `ServiceDetail.models` is filled from this.
+  - *As built:* a `[models] dirs` entry matches the model's path by folder prefix, so it can be a top folder (`comfyui`) or a deeper one (`comfyui/loras`); `comfyui/loras` doesn't match `comfyui/loras-extra`. The explicit list comes first, then matching mods in sidebar order. The same list drives the `?service=` filter and the in-use rule for deletes. `ServiceDetail.models` is `Registry.used_by(id)`.
 - [ ] **3.5 Registry alerts.** Keep alerts current for missing, partial and checksum-mismatch counts.
 
 **Wire — Phase 3:** `models` goes live:

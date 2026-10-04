@@ -56,7 +56,7 @@ def detail(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
             "command": svc.command or mgr._command(svc),
             "folder": mgr.paths.rel(svc.mod.dir) if _inside(mgr, svc) else str(svc.mod.dir),
             "outputs_dir": mgr.paths.rel(mgr.paths.outputs / svc.id) if svc.m and svc.m.outputs else None,
-            "models": [],  # registry ids, Phase 3
+            "models": mgr.registry.used_by(svc.id) if mgr.registry else [],  # registry ids (plan 3.4)
             "health": svc.health,
             "manifest": svc.mod.raw,
             "config": svc.eff.as_dict(),

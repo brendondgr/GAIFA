@@ -115,7 +115,7 @@ def _svc(id, state="ready", load="n/a", busy=False):
     ],
 )
 async def test_in_use_blocks_file_deletes(seeded, app, client, svc, blocked):
-    app.state.hub.registry.services = SimpleNamespace(services={svc.id: svc})
+    app.state.hub.registry.services = SimpleNamespace(services={svc.id: svc}, list=lambda: [])
     r = await client.delete("/api/models/g?files=1")
     if blocked:
         assert r.status_code == 409 and r.json()["code"] == "model_in_use"

@@ -128,7 +128,7 @@ AIHub/
 | Memory management | `[memory]` with `load` / `unload` operations and `estimate_gb` | appears in the memory panel; the hub can unload it to make room |
 | Status | `status` route returning the shape in §4.6 | load state, busy/idle, KPIs on its Overview tile, jobs in the header |
 | Outputs | write into `{outputs}` (§4.7) | shows on the Outputs page automatically |
-| Models | `[models] dirs` | registry entries in those folders are listed as "used by" this mod |
+| Models | `[models] dirs` | registry entries in those folders (or deeper, e.g. `comfyui/loras`) are listed as "used by" this mod, and their files can't be deleted while it holds them |
 | Custom page | `ui/page.js` or `ui/Page.dc.html` (UI brief §5) | own tabs inside the AIHub shell |
 | Dashboard widgets | `[[ui.widgets]]` pointing at a route that returns `WidgetData` (UI brief §11.7) | its charts on the Overview dashboard |
 | Charts for free | numeric values in `stats` (§4.6) | each one is recorded as a series `svc.<id>.stat.<slug>` and drawn as sparklines and charts |

@@ -139,6 +139,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             stack.push_async_callback(hub.services.close)
             await hub.services.boot(autostart=hub.options.autostart)
             hub.registry.services = hub.services
+            hub.services.registry = hub.registry
             # 6–8 (outputs, memory, metrics) arrive in Phases 4–6.
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield

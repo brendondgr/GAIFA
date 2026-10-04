@@ -56,6 +56,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         self.dirs = [paths.services, *(extra_dirs or [])]
         self.t = timing or Timing()
         self.services: dict[str, Service] = {}
+        self.registry: Any = None  # utils.registry.Registry, set by the lifespan: ServiceDetail.models
         self.client = httpx.AsyncClient(trust_env=False, timeout=self.t.health_timeout_s)
         from utils.proxy import make_client
 

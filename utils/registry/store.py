@@ -258,8 +258,22 @@ class Registry:
     # ---- used by, in use -------------------------------------------------------
 
     def users(self, e: Entry) -> list[str]:
-        """The mods that use this model: its explicit `services` list."""
-        return list(e.services)
+        """The mods that use this model: its explicit `services` list, then every mod whose
+        `[models] dirs` holds the model's path (in sidebar order)."""
+        out = list(e.services)
+        mgr = self.services
+        for svc in mgr.list() if mgr else []:
+            m = svc.m
+            if svc.id in out or m is None:
+                continue
+            if any(_under(e.path, d.strip("/")) for d in m.models.dirs if d.strip("/")):
+                out.append(svc.id)
+        return out
+
+    def used_by(self, service_id: str) -> list[str]:
+        """The ids of the models a mod uses (`ServiceDetail.models`)."""
+        self.refresh()
+        return [mid for mid, e in sorted(self.entries.items()) if service_id in self.users(e)]
 
     def blocking(self, e: Entry) -> list[Service]:
         """Mods using the model that may have its files open: loading, loaded, unloading or busy
@@ -360,6 +374,10 @@ class Registry:
         for d in parents:
             _prune_up(d, root)
         return failed
+
+
+def _under(path: str, folder: str) -> bool:
+    return path == folder or path.startswith(folder + "/")
 
 
 def _dirs_bottom_up(top: Path) -> Iterator[Path]:

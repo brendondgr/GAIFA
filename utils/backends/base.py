@@ -59,6 +59,10 @@ class Backend(Protocol):
         """Ids of the mods this backend has running (for adoption on hub start)."""
         ...
 
+    async def workdir(self, service_id: str) -> str | None:
+        """The running mod's working directory, so the hub only touches mods from its own root."""
+        ...
+
     async def logs(self, service_id: str, n: int) -> list[LogLine]:
         """The last `n` lines, oldest first."""
         ...

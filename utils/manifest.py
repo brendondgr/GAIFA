@@ -375,7 +375,8 @@ def describe(err: ValidationError) -> list[str]:
             msg = "unknown key (check the spelling against architecture §4.3)"
         elif e["type"] == "missing":
             msg = "required"
-        out.append(f"{MANIFEST}: {where}: {msg}")
+        # Messages that name their own location ("[run].command is required") don't repeat it.
+        out.append(f"{MANIFEST}: {msg}" if msg.startswith("[") else f"{MANIFEST}: {where}: {msg}")
     return out
 
 

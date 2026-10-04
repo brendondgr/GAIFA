@@ -204,7 +204,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **subprocess:** an asyncio subprocess in its own process group, with a log ring buffer. Used by tests and `--dev`.
   - *As built:* the protocol is async (`start`, `stop`, `state` → `UnitState(active, pid, started_ts, result, exit_status)`, `list_ours`, `logs`, `follow`, `close`). `SystemdBackend(prefix=)` lets tests use their own unit names; logs use `journalctl --user -u`, so systemd's own lines (exit status) are included. `SubprocessBackend` stops like `KillMode=mixed` (SIGTERM to the main process, then SIGKILL to the group) and stops every child on `close()`. Starting a mod that is already running is a `BackendError` in both.
   *Done when:* both backends pass the same contract tests (systemd ones are marked and skipped where systemd isn't available).
-- [ ] **2.3 `utils/services.py`: the state machine.** `ServiceManager` holds one `Service` per manifest: state, load, timestamps, pid, health and status caches, stats, `last_error`, `in_flight`, `last_request_ts`.
+- [x] **2.3 `utils/services.py`: the state machine.** `ServiceManager` holds one `Service` per manifest: state, load, timestamps, pid, health and status caches, stats, `last_error`, `in_flight`, `last_request_ts`.
   - **start:**
     - If the port is taken by something that isn't our unit → `failed` / `port_in_use`, naming the process holding it (`proc.port_owner`).
     - Otherwise launch, then poll health every 0.5 s up to `start_timeout_s` → `ready`. On failure → `failed`, with the last 20 log lines in `last_error`.
@@ -215,6 +215,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **On hub boot:** adopt running `aihub-*` units (→ health check → `ready`), then autostart the enabled mods in `after` order, then config order.
   - **`kind = "external"`:** health only; start/stop return `not_unloadable`-style errors.
   - Every change publishes a `service` event and an activity item.
+  - *As built:* start and stop return at once (`wait=True` blocks until settled); a generation number per service makes stale health and restart tasks give up. A mod that never gets healthy is stopped before it is marked failed, as is one that misses 5 health checks. Failures set an alert (`svc-<id>`, cleared on ready or stop) and an activity item linking to Logs. Adoption only takes units whose working directory is inside this hub's root; a running unit whose folder was deleted is stopped, again only if it ran from this root. A unit that failed while the hub was down shows as `failed` "… while AIHub was down". Starting a disabled mod is `409 service_disabled`; start/stop on an external mod is `409 external_service`. Summaries are built in `utils/service_views.py`; `utils/proc.py` has `port_owner()`. `app.py` uses the systemd backend, or child processes with `--dev` (and where no systemd user manager answers).
   *Done when:* tests cover ready, slow-start timeout, crash → restart → failed, adoption, disabled mods never starting, and a port conflict.
 - [ ] **2.4 Status polling.** For mods with `[run] status`:
   - Poll every 2 s while loading, busy or running jobs, otherwise every 10 s, and only while ready.

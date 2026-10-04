@@ -2,7 +2,7 @@
 
 Unlike systemd units, children stop with the hub (`close`). Each runs in its
 own process group, and stop follows systemd's `KillMode=mixed`: SIGTERM to
-the main process, then SIGKILL to the whole group. stdout and stderr go into
+the main process (plus SIGCONT, so a suspended one can act on it), then SIGKILL to the whole group. stdout and stderr go into
 a ring buffer per mod, which `logs` and `follow` read.
 """
 
@@ -23,9 +23,10 @@ CHUNK = 65536
 
 
 class _Child:
-    def __init__(self, proc: asyncio.subprocess.Process, started_ts: float) -> None:
+    def __init__(self, proc: asyncio.subprocess.Process, started_ts: float, cwd: str) -> None:
         self.proc = proc
         self.started_ts = started_ts
+        self.cwd = cwd
         self.readers: list[asyncio.Task[None]] = []
 
 
@@ -81,7 +82,7 @@ class SubprocessBackend:
         except (FileNotFoundError, PermissionError, NotADirectoryError) as e:
             self._emit(spec.id, f"can't run {spec.argv[0]}: {e.strerror}", "stderr")
             raise BackendError(f"can't run {spec.argv[0]}: {e.strerror}") from None
-        child = _Child(proc, time.time())
+        child = _Child(proc, time.time(), str(spec.cwd))
         assert proc.stdout and proc.stderr
         child.readers = [
             asyncio.create_task(self._read(spec.id, proc.stdout, "stdout")),
@@ -111,6 +112,7 @@ class SubprocessBackend:
         if proc.returncode is None:
             try:
                 os.kill(proc.pid, signal.SIGTERM)
+                os.kill(proc.pid, signal.SIGCONT)  # like systemd: a suspended process must run to see SIGTERM
             except ProcessLookupError:
                 pass
             try:
@@ -128,6 +130,10 @@ class SubprocessBackend:
                 t.cancel()
         # Stopped cleanly = inactive, like systemd after `stop` + `reset-failed`.
         del self._children[service_id]
+
+    async def workdir(self, service_id: str) -> str | None:
+        child = self._children.get(service_id)
+        return child.cwd if child else None
 
     async def list_ours(self) -> list[str]:
         return sorted(i for i, c in self._children.items() if c.proc.returncode is None)

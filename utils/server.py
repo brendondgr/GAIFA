@@ -26,6 +26,9 @@ from utils.config import Config
 from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
 from utils.paths import DEFAULT_ROOT, Paths
+from utils.services import ServiceManager
+
+DEMO_MODS = DEFAULT_ROOT / "utils" / "tests" / "fixtures" / "mods"
 
 log = logging.getLogger("aihub")
 
@@ -45,7 +48,7 @@ class Options:
     """What `app.py` was started with."""
 
     port: int | None = None  # None = config hub.port
-    dev: bool = False  # subprocess backend instead of systemd (Phase 2.2)
+    dev: bool = False  # subprocess backend instead of systemd
     autostart: bool = True
     demo_mods: bool = False  # also load utils/tests/fixtures/mods/
 
@@ -64,6 +67,7 @@ class Hub:
     db: Database | None = None
     activity: ActivityLog | None = None
     alerts: Alerts | None = None
+    services: ServiceManager | None = None
     live_areas: list[str] = field(default_factory=list)
     sse_ping_s: float = SSE_PING_S
 
@@ -83,10 +87,24 @@ def hub_version() -> str:
         return "0.0.0"
 
 
+def default_backend(options: Options) -> Any:
+    """systemd units normally; child processes with `--dev` or where there is no systemd user manager."""
+    from utils.backends import systemd
+    from utils.backends.subprocess import SubprocessBackend
+
+    if options.dev:
+        return SubprocessBackend()
+    if systemd.available():
+        return systemd.SystemdBackend()
+    log.warning("no systemd user manager: running mods as child processes (they stop with the hub)")
+    return SubprocessBackend()
+
+
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils.routes import events, system, web
 
-    hub = Hub(paths=paths, config=config, backend=backend, options=options or Options(), version=hub_version())
+    options = options or Options()
+    hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -102,7 +120,15 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.activity = ActivityLog(hub.db, hub.bus)
             await hub.activity.load()
             hub.alerts = Alerts(hub.bus)
-            # 4–8 (registry, services, outputs, memory, metrics) arrive in Phases 2–6.
+            # 4. models registry: Phase 3.
+            # 5. services: find manifests, adopt running units, autostart in the background.
+            hub.services = ServiceManager(
+                paths, hub.config, hub.backend, hub.bus, hub.activity, hub.alerts, hub.port,
+                extra_dirs=[DEMO_MODS] if hub.options.demo_mods else [],
+            )
+            stack.push_async_callback(hub.services.close)
+            await hub.services.boot(autostart=hub.options.autostart)
+            # 6–8 (outputs, memory, metrics) arrive in Phases 4–6.
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 

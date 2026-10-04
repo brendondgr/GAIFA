@@ -131,6 +131,10 @@ class SystemdBackend:
             return UnitState("failed", result=result, exit_status=status)
         return UnitState("inactive", result=result, exit_status=status)
 
+    async def workdir(self, service_id: str) -> str | None:
+        rc, out, _ = await _run("systemctl", "--user", "show", self.unit(service_id), "-p", "WorkingDirectory", "--value")
+        return out.strip() or None if rc == 0 else None
+
     async def stop(self, service_id: str, timeout: float) -> None:
         unit = self.unit(service_id)
         # TimeoutStopSec was set at start; `stop` blocks until the unit is down.

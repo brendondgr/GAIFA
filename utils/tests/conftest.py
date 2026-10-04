@@ -6,8 +6,8 @@
 - `fake_mod`: starts a fake mod from `fixtures/mods/` on a free port.
 - `hub_process`: `python app.py` as a real process on a free port.
 
-The app is built with no backend until Phase 2.2 adds `SubprocessBackend`;
-then `make_app` passes it here, so tests never touch systemd.
+`make_app` passes a `SubprocessBackend`, so tests never touch systemd (the
+systemd backend has its own marked tests).
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ import httpx
 import pytest
 
 from utils import config
+from utils.backends.subprocess import SubprocessBackend
 from utils.server import Options, create_app
 
 REPO = Path(__file__).resolve().parents[2]
@@ -63,9 +64,9 @@ def root(tmp_path, monkeypatch) -> Path:
 
 @pytest.fixture
 def make_app(root):
-    def make(cfg: config.Config | None = None, **opts):
+    def make(cfg: config.Config | None = None, backend=None, **opts):
         cfg = cfg or config.load(root / "config.toml")
-        return create_app(config.build_paths(cfg, root), cfg, backend=None, options=Options(**opts))
+        return create_app(config.build_paths(cfg, root), cfg, backend=backend or SubprocessBackend(), options=Options(**opts))
 
     return make
 
@@ -123,10 +124,10 @@ def fake_mod(tmp_path):
 
 @pytest.fixture
 def hub_process(root):
-    """Run `python app.py --port <free>` on the temp root; yields its base URL."""
+    """Run `python app.py --port <free> --dev` on the temp root; yields its base URL."""
     port = free_port()
     proc = subprocess.Popen(
-        [sys.executable, str(REPO / "app.py"), "--port", str(port)],
+        [sys.executable, str(REPO / "app.py"), "--port", str(port), "--dev"],  # --dev: never touch real systemd units
         env={**os.environ, "AIHUB_ROOT": str(root)},
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
     )

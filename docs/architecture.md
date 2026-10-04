@@ -328,6 +328,14 @@ aihub-comfy.service                  comfy adapter            :5070  (+ ComfyUI 
 
 `Ctrl+C` on `python app.py` stops only the hub; mods keep running. `aihub stop all` stops everything.
 
+**Service states** (`utils/services.py`): `stopped → starting → ready ⇄ degraded`, with `failed` and `stopping`.
+- **starting:** health is polled every 0.5 s up to `start_timeout_s`. A mod that exits, or never gets healthy (it is then stopped), goes to `failed` with the last 20 log lines in `last_error`.
+- **ready:** health every 5 s. 2 misses → `degraded`; 5 misses → stopped and `failed`; the process exiting → `failed`.
+- **failed:** `restart = "on-failure"` retries after 2 / 4 / 8 s, at most 3 times in 5 minutes, then gives up. A failure raises an alert and an activity item.
+- **On boot:** running `aihub-*` units started from this root are adopted (`starting` until healthy); one whose folder is gone is stopped. Then enabled mods with autostart start in the background, each after the mods in its `after` list.
+- **External mods** (`kind = "external"`): health only. Never reachable = `stopped`; reachable = `ready`; lost = `degraded`, then `failed`. Start and stop are refused (`external_service`).
+- `python app.py --dev` runs mods as child processes instead of units; they stop with the hub.
+
 ## 6. Hub API
 
 The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md)**. These routes are backend-only additions:

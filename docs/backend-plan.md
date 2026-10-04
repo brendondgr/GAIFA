@@ -57,8 +57,8 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - Clean stale data: `data/generated/*.ini` (removed models), `serenity-26B-A4B` in `data/recent.local.json`, and the model in `utils/e2e_live.sh`.
   - **Ask the user** whether the catalog entries `gemma-4-E4B-it` and `ornith1-35B` (files missing) should be removed or kept for a re-download.
   *Done when:* 81/81 tests pass on the system Python, and "Download .log" works.
-- [ ] **0.3 Check the other two repos.** Commit anything pending in 3DGenerate and DashLLM. Remove the dead `RELAY_ADMIN_TOKEN`, `RELAY_API_KEY` and `RELAY_REQUIRE_CLIENT_KEY` from DashLLM's `.env.example`.
-- [ ] **0.4 Back up what will move** (small; the models are not copied, because moving them is a reversible rename). Copy these into `~/Backups/aihub-premigration-<date>/`:
+- [x] **0.3 Check the other two repos.** Commit anything pending in 3DGenerate and DashLLM. Remove the dead `RELAY_ADMIN_TOKEN`, `RELAY_API_KEY` and `RELAY_REQUIRE_CLIENT_KEY` from DashLLM's `.env` (`.env.example` was already clean).
+- [x] **0.4 Back up what will move** (small; the models are not copied, because moving them is a reversible rename). Copy these into `~/Backups/aihub-premigration-<date>/`:
   - `relay.db` and `gen3d.db`, using SQLite's online backup, not `cp`
   - LocalTTS `data/voices/`
   - lcpp `data/*.json`
@@ -66,7 +66,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - `~/.config/systemd/user/{relay,opencode,lcpp,localtts,gen3d}.service`
   - `~/.local/bin/{comfyui,localtts,gen3d,lcpp,relay}`
   - the four repos' `.env` / `*.env` files
-- [ ] **0.5 Capture each app's OpenAPI** while they're running. Save `:5040/openapi.json`, `:5050/openapi.json`, `:7710/api/openapi.json` and `:4000/openapi.json` into the backup folder from 0.4. Step 1.7 copies them into `utils/tests/fixtures/openapi/`, and Phase 2.6 tests the operation converter on these real files.
+- [x] **0.5 Capture each app's OpenAPI** while they're running. Save `:5040/openapi.json`, `:5050/openapi.json`, `:7710/api/openapi.json` and `:4000/openapi.json` into the backup folder from 0.4. Step 1.7 copies them into `utils/tests/fixtures/openapi/`, and Phase 2.6 tests the operation converter on these real files.
 
 ## Phase 1 — Repo, skeleton and UI baseline
 

@@ -1,0 +1,178 @@
+# Writing an AIHub mod
+
+A **mod** is a program with an HTTP server on `127.0.0.1`, plus a `service.toml` describing it, in a folder under `services/`. AIHub starts it, watches its health, shows its logs, proxies its API at `/api/s/<id>/…` and builds UI for it. AIHub never imports a mod's code, so a mod can be in any language, and adding one never needs a hub change.
+
+This page is the how-to. The reference is [architecture §4](architecture.md#4-the-mod-contract) (manifest, placeholders, ports, status, outputs).
+
+## 1. The contract
+
+**Required:**
+1. A folder `services/<id>/` with a `service.toml`. `<id>` is 2–32 lowercase letters, digits and `-`, starts with a letter, and equals the `id` field. It becomes the URL (`/api/s/<id>/`, `#/s/<id>`), so choose it once.
+2. A server on `127.0.0.1:$AIHUB_PORT`. Read the port from the environment; don't hard-code it.
+3. A health route that answers 2xx once the mod is ready (`health = "/health"`), or `health = "tcp"` for programs with no HTTP health route.
+
+Deleting the folder removes the mod; run `aihub rescan` (or restart the hub) afterwards.
+
+## 2. The loop
+
+```bash
+aihub new my-mod            # copy services/_template, pick a port, install, load it
+$EDITOR services/my-mod/server.py services/my-mod/service.toml
+aihub restart my-mod        # after code changes
+aihub rescan                # after service.toml changes or adding/removing folders
+aihub check my-mod          # what's wrong, exactly (add --start if it's stopped)
+aihub logs my-mod -f
+```
+
+`aihub new` options: `--name "My Mod"`, `--port 5123` (default: the first free port in `config.toml [ports] new_mods`, 5100–5199), `--no-install`. The template's `install.sh` makes `.venv/` with uv (uv-managed Python, so it works on the host and in a toolbox); rerun it with `aihub install my-mod`.
+
+**Done means `aihub check my-mod` prints "all checks passed".** It checks the manifest, the command, the port, health, the OpenAPI, every operation the manifest names, the status shape, each widget's data and the page module.
+
+## 3. `service.toml` in practice
+
+```toml
+id = "my-mod"
+name = "My Mod"
+description = "One line for the tile"
+icon = "puzzle"                     # a key from the UI's icon set
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]   # or a string: "bin/server --fast"
+port = 5123
+health = "/health"                  # or "tcp"
+status = "/v1/status"               # optional, §5 below
+openapi = "/openapi.json"           # the API tab; set to "" (or remove) if you have none
+env = { MY_MOD_OUT = "{outputs}", MY_MOD_PORT = "{port}" }
+env_file = ".env"                   # optional secrets, gitignored; not placeholder-expanded
+start_timeout_s = 60                # how long health may take after launch
+stop_timeout_s = 30                 # SIGTERM → wait → SIGKILL
+restart = "on-failure"              # retries after 2/4/8 s, at most 3 per 5 min; or "no"
+after = ["relay"]                   # start after these (ordering only)
+```
+
+- **Paths in `command`:** an executable containing `/` resolves against the mod folder (`.venv/bin/python`); a bare name (`python3`, `node`) comes from `PATH`. Arguments starting with `./` or `../` resolve against the mod folder; others are passed as written and are relative to `cwd`, which is the mod folder by default.
+- **Unknown keys are errors**, so a typo like `helth` is reported rather than ignored.
+- **Placeholders** in `command`, `cwd` and `env` are `{root}`, `{service_dir}`, `{port}`, `{models}`, `{outputs}`, `{databases}`, `{hf_home}` and `{hub_url}`. An unknown `{name}` is an error.
+- **Every mod gets** `AIHUB_PORT`, `AIHUB_OUTPUTS`, `AIHUB_MODELS`, `AIHUB_DATABASES`, `AIHUB_ROOT`, `AIHUB_URL`, `AIHUB_SERVICE_ID`, `HF_HOME` and `PYTHONUNBUFFERED=1`. Later layers win: hub vars → `env_file` → `[run].env` → `config.toml [services.<id>].env`.
+- **Users override** `port`, `env`, `enabled`, `autostart`, `idle_unload_s`, `auto_unload` and `priority` in `config.toml` or the mod's Settings tab, without touching your manifest.
+
+## 4. How it runs
+
+- **Where it runs:** each mod is a systemd user unit, `aihub-<id>.service`, so it outlives hub restarts and the hub adopts it again. Logs go to the journal (`aihub logs <id>`). With `python app.py --dev`, mods are child processes instead and stop with the hub.
+- **States:** stopped → starting (health polled every 0.5 s) → ready. Health is then checked every 5 s: 2 misses mean degraded, 5 mean failed. Exiting means failed, and `last_error` holds the last 20 log lines. A failed mod raises an alert and an activity item.
+- **Stopping:** SIGTERM goes to the main process. Handle it and exit; after `stop_timeout_s`, everything in the unit gets SIGKILL, child processes included.
+- **The port must be free.** If something else holds it, the start fails with `port_in_use` and names the process.
+- **External services** (`kind = "external"`, no `command`): something already running elsewhere, such as a container or another machine's tunnel. AIHub only health-checks and proxies it.
+
+## 5. UI: four levels, each optional
+
+**Level 0: nothing.** Every mod gets a page with Overview (health, memory, models, outputs), **API** (built from your OpenAPI: forms for parameters and bodies, the right viewer for audio/image/video/3D/files/streams), Logs and Settings tabs.
+- FastAPI apps get this for free.
+- For responses FastAPI can't type, add `[api.responses] "POST /v1/speech" = "audio"`.
+- Hide routes with `[api] hide = ["GET /ui/*"]`; entries are globs on `"METHOD /path"`.
+
+**Level 1: a status route.** It returns this (architecture §4.6):
+```json
+{"loaded": null, "busy": false, "idle_s": 12.0,
+ "stats": [{"label": "Calls", "value": 3}, {"label": "Notes today", "value": 1, "reset": "daily"}],
+ "jobs": [{"id": "j_1", "label": "fox", "progress": 0.4, "state": "running", "route": "#/s/my-mod/jobs"}]}
+```
+- Up to 4 stats show on the mod's tile, and numeric ones are charted over time automatically.
+- `jobs` appear in the header's jobs chip. Report finished jobs with their final state: `done`, `failed` or `cancelled`.
+- AIHub polls every 2 s while you're busy, loading or running jobs, otherwise every 10 s.
+
+**Level 2: dashboard widgets.**
+```toml
+[[ui.widgets]]
+id = "calls"
+title = "Calls per hour"
+kind = "bar"                        # line | area | bar | donut | number | table
+source = "GET /v1/widgets/calls"    # gets ?range=24h (the first of `ranges`)
+ranges = ["24h", "7d"]
+span = 4                            # of 12 grid columns: 3, 4, 6 or 12
+```
+The source returns `WidgetData`: `{"unit": "calls", "t": [unix…], "series": [{"name": "Calls", "values": [1, null, 3]}]}`.
+- Use `categories` instead of `t` for donuts and categorical bars.
+- Use `rows: [{…}]` for `table`.
+- Each series has one value per point. `aihub check` validates all of this; the Overview dashboard draws widgets from Phase 6.
+
+**Level 3: your own tabs.** `[ui] page = "ui/page.js"`:
+```js
+export default {
+  tabs: [{ id: 'hello', label: 'Hello' }],
+  mount(el, ctx) {
+    const { ui } = ctx;
+    if (ctx.service.state !== 'ready') { el.append(ui.empty('Not running', '', ui.button('Start', () => ctx.api.startService(ctx.service.id), { kind: 'primary' }))); return; }
+    const out = ui.h('div');
+    el.append(ui.card(ui.button('Call', async () => out.replaceChildren(ui.json((await ctx.call('GET', '/v1/hello', { query: { name: 'you' } })).json)), { kind: 'primary' }), out));
+    return () => {};                // optional cleanup (timers, listeners)
+  },
+};
+```
+`ctx` provides:
+
+| Field | What it is |
+|---|---|
+| `service` | this mod's summary, kept fresh |
+| `tab`, `params` | the current tab id and the hash parameters |
+| `call(method, path, {query, json, form, stream, onEvent, signal})` | your own API through the hub; resolves to `{status, ms, json \| text \| url}` |
+| `api` | the whole AIHub API (`startService`, `listOutputs`, …) |
+| `ui` | themed DOM helpers: `h`, `text`, `row`, `stack`, `card`, `button(label, onClick, {kind})`, `input`, `textarea`, `select`, `field`, `json`, `badge`, `empty`, `table` |
+| `toast(msg, level)`, `confirm({title, body, danger})` | the shell's toasts and confirm dialog |
+| `navigate(route)` | change the hash route |
+| `on(type, fn)` | AIHub events (`'service'`, `'job'`, `'output'`, … or `'*'`); removed automatically on unmount |
+
+Rules for page modules:
+- Never call `fetch`; use `ctx.call`, which also works against the mock.
+- Use `ctx.ui` or the theme variables (`var(--card)`, `var(--mut)`, …) rather than raw colors.
+- Show a Start button when the mod isn't running.
+- Tab ids can't be `overview`, `outputs`, `api`, `logs` or `settings`.
+
+After editing `page.js`, reload the browser tab. Pages for the built-in apps can instead be Claude Design components (`ui/Page.dc.html`; brief §5).
+
+## 6. Outputs, memory, models, tools
+
+- **Outputs:** write to `$AIHUB_OUTPUTS/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext>`.
+  - Write `<name>.part` first, then rename it.
+  - Add an optional `<file>.json` sidecar: `{title, kind, prompt, model, voice, seed, params, source}`.
+  - A multi-file output is a folder with `output.json` (`"complete": true`).
+  - Declare `[outputs] kinds = ["audio"]`. Files then appear on the Outputs page (Phase 4).
+- **Memory:** for mods that hold models in RAM or VRAM, declare:
+  ```toml
+  [memory]
+  estimate_gb = 9.2
+  load = "POST /v1/load"
+  unload = "POST /v1/unload"
+  triggers = ["POST /v1/speech"]
+  ```
+  - The Load and Unload buttons call these routes.
+  - Report `loaded` in your status.
+  - Phase 5 unloads idle mods to make room before a trigger route runs.
+- **Models:** `[models] dirs = ["tts"]` lists the `data/models/` subfolders you use. Find them via `$AIHUB_MODELS`.
+- **Tools:** `[tools] speak = { op = "POST /v1/speech", description = "…", confirm = false }` exposes an operation to the agent (Phase 13). `confirm = true` asks the user first, and also marks the operation destructive in the API tab.
+
+## 7. Bringing in an existing app
+
+1. **Pick the id and port.** Existing apps keep their ports (architecture §2); new ones use 5100–5199.
+2. **Make it read its port** (and output folder) from the environment, mapping in `env`: `env = { APP_PORT = "{port}", APP_OUT = "{outputs}" }`. If it can't, write `{port}` into its arguments in `command`.
+3. **Health:** use any cheap route that answers 2xx when it's ready, or `"tcp"`.
+4. **Python apps:** create a venv inside the mod folder (an `install.sh` like the template's). Point `command` at `.venv/bin/python`, and don't resolve or copy that symlink.
+5. **Already running elsewhere** (a container, ComfyUI in a toolbox): use `kind = "external"` with just `port` and `health`, or write a small adapter mod in front of it, like `comfy`.
+6. **Check it:** `aihub rescan`, then `aihub check <id> --start`.
+
+## 8. When `aihub check` fails
+
+| It says | Fix |
+|---|---|
+| `[run].helth: unknown key` | a typo; compare with §3 |
+| `[run].port … already used by X` | pick another port, or override it in `config.toml [services.<id>] port` |
+| `.venv/bin/python not found (run aihub install <id>?)` | `aihub install <id>` |
+| `unknown placeholder {output}` | the placeholders are `{outputs}`, `{models}` … (§3) |
+| `port 5123 is in use by <process>` | stop that process, or change the port |
+| `not healthy after 60s (/health HTTP 503)` | the app is slow or broken: `aihub logs <id>`; raise `start_timeout_s` if it is just slow |
+| `exited with status 1 while starting` | the traceback is in the check output and in `aihub logs <id>` |
+| `operations: not in the OpenAPI: [tools].x: POST /v1/x` | the route doesn't exist (or isn't in `/openapi.json`) |
+| `status: stats[0] needs a non-empty label` | fix the status body (§5, level 1) |
+| `widget calls: series[0] (Calls): 23 values for 24 points` | one value per point in `t` |
+| `page: no mount(el, ctx)` | the module must `export default { tabs, mount }` |

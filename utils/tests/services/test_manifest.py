@@ -394,3 +394,9 @@ def test_order_and_after(svc):
     assert [m.id for m in manifest.ordered(mods, order)] == ["relay", "tts", "aaa", "loop-a", "loop-b", "zzz"]
     # relay waits for tts; the unknown "ghost" is ignored; the a↔b cycle doesn't hang
     assert [m.id for m in start_order(mods, order)] == ["tts", "relay", "aaa", "loop-b", "loop-a", "zzz"]
+
+
+def test_empty_openapi_means_none(svc):
+    write(svc, "bin", 'id = "bin"\n[run]\ncommand = ["/usr/bin/x"]\nport = 5100\nopenapi = ""\nhealth = "tcp"\n')
+    [mod] = discover([svc])
+    assert mod.ok and mod.manifest.run.openapi is None

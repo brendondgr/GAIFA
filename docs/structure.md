@@ -11,6 +11,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `CLAUDE.md` | ✅ | Short rules for agents, true today |
 | `.claude/skills/aihub/` | ✅ | Project skill: how to work on AIHub (doc map, invariants, step workflow) |
 | `.claude/skills/plan/` | ✅ | Project skill: how to write and amend plans in this repo's format |
+| `.claude/skills/aihub-mod/` | ✅ | Project skill: building or porting a mod (points at `docs/mods.md`, requires `aihub check` to pass) |
 | `.gitignore` | ✅ | Keeps models, databases, outputs and venvs out of git |
 | `pyproject.toml` | ✅ | Hub dependencies (uv) |
 | `uv.lock` | ✅ | Locked hub dependencies; `uv sync` builds `.venv/` (ignored) from it |
@@ -31,6 +32,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `architecture.md` | The agreed design: decisions, layout, mod contract, runtime, API, memory, registry, config, metrics, Stage D |
 | `backend-plan.md` | The build plan: Phases 0–16 with steps, checks and deliverables; steps are ticked as they land |
 | `design-brief-ui.md` | UI brief for Claude Design; §6 and §11.7 are the UI-facing API contract |
+| `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures |
 | `structure.md` | This file |
 | `reference/ui-export-2026-10-04/` | Claude Design's Part A v1 export, the UI baseline (read-only reference) |
 

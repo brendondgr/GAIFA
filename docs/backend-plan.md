@@ -285,7 +285,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **Why:** gives a person or an agent writing a mod a fast write → check → fix loop without opening the UI.
   - *As built:* `utils/services/check.py`. Each check has a `status` (ok, fail, warn, skip) as well as `ok`; the mod passes when nothing failed. Checks that need the mod running are skipped with a hint while it's stopped, and `?start=1` / `aihub check <id> --start` starts it first. Also checked: the `state` (a failed mod reports its `last_error`), a missing `env_file` (warn), widget sources being in the OpenAPI, and page modules calling `fetch()` (warn). The manifest parser now reports a missing `[run].command` alongside field errors, so a bad manifest shows every problem at once.
   *Done when:* tests run it against `fake-ok` (all pass), a mod with a bad manifest, a mod whose health fails, and a status route with the wrong shape; `aihub check hello` passes on a fresh `aihub new hello`.
-- [ ] **2.11 The mod-authoring guide.**
+- [x] **2.11 The mod-authoring guide.**
   - **`docs/mods.md`:** the whole mod contract on one page, as a how-to:
     - the three requirements and the `service.toml` reference (linking architecture §4)
     - the four UI levels: nothing (generic page), `status` stats (auto-charted), `[[ui.widgets]]`, and a custom `ui/page.js` with its `ctx`
@@ -294,6 +294,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - the `aihub new` → edit → `aihub check` → `aihub restart` loop, and the common errors with their fixes
   - **Skill `.claude/skills/aihub-mod/SKILL.md`:** for agents asked to build or port a mod; points at `docs/mods.md` and the template, and requires `aihub check` to pass.
   - Link both from `CLAUDE.md`, the `aihub` skill and `services/_template/README.md`.
+  - *As built:* checked by following it: `aihub new hello` against a running hub passes `aihub check hello` (manifest, command, health, OpenAPI, operations, status, widget data, page) and shows its Hello tab inside the shell. The widget is validated by the check now and drawn on the dashboard from Phase 6. Writing the guide surfaced `openapi = ""` for mods with no OpenAPI (TOML has no null).
   *Done when:* following `docs/mods.md` from a clean checkout gives a mod that passes `aihub check` and shows its custom tab and a widget.
 
 **Wire — Phase 2:** `services`, `logs`, `operations`, `proxy` and `events` go live:

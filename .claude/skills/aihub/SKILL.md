@@ -15,6 +15,7 @@ The docs are the source of truth. Read the section you need before acting; don't
 | --- | --- |
 | Why is it built this way? | architecture §2 (decisions table) |
 | Where does a file go? | architecture §3, then [docs/structure.md](../../../docs/structure.md) for what exists today |
+| Building, porting or fixing a mod (how-to) | [docs/mods.md](../../../docs/mods.md) and the `aihub-mod` skill; `aihub check <id>` |
 | What must a mod provide? `service.toml` fields? | architecture §4.1–4.3 |
 | Placeholders, env vars, ports | architecture §4.4–4.5 |
 | Status route shape, stats → charts | architecture §4.6 |

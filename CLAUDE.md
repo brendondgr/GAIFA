@@ -4,7 +4,7 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 
 **Status:** Phase 1 done: the hub runs as `aihub.service` (system area live), with the UI baseline served at `/` on mock data elsewhere. Next: Phase 2.1. What exists: [docs/structure.md](docs/structure.md).
 
-**Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans.
+**Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans, and `aihub-mod` to build or port a mod (guide: [docs/mods.md](docs/mods.md)).
 
 ## Layout
 - `utils/`: hub code (Python package) · `services/`: mods · `web/`: the UI (Claude Design `.dc.html` export)
@@ -19,6 +19,7 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 - `aihub status | start | stop | restart | logs [-f] | doctor | open`: the hub as a systemd user service (`aihub install` writes `~/.config/systemd/user/aihub.service` and links `~/.local/bin/aihub`). After changing hub code, `aihub restart`.
 
 ## Mod contract
+Full how-to: [docs/mods.md](docs/mods.md). A mod is done when `aihub check <id>` passes.
 1. `services/<id>/service.toml`, with `id` matching `[a-z][a-z0-9-]{1,31}` and the folder name.
 2. An HTTP server on `127.0.0.1:<port>`, in any language.
 3. A health route that returns 2xx when ready.

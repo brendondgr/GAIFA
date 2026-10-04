@@ -99,6 +99,8 @@ class RunSpec(_Strict):
     @field_validator("status", "openapi")
     @classmethod
     def _route(cls, v: str | None) -> str | None:
+        if v == "":
+            return None  # TOML has no null: "" means "this mod has none"
         if v is not None and not v.startswith("/"):
             raise ValueError('must be a path starting with "/"')
         return v

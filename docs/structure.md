@@ -13,7 +13,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `.claude/skills/plan/` | ✅ | Project skill: how to write and amend plans in this repo's format |
 | `.gitignore` | ✅ | Keeps models, databases, outputs and venvs out of git |
 | `pyproject.toml` | ✅ | Hub dependencies (uv) |
-| `uv.lock` | ⏳ 1.1 | Written by `uv sync` |
+| `uv.lock` | ✅ | Locked hub dependencies; `uv sync` builds `.venv/` (ignored) from it |
 | `app.py` | ⏳ 1.5 | `python app.py` starts the hub |
 | `config.toml` | ⏳ 1.2 | User settings (architecture §9); a missing file means defaults |
 | `bin/` | 🧱 | `aihub` command (1.6) and `aihub.service.in` systemd template (1.6) |

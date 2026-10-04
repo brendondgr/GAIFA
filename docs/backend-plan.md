@@ -2,7 +2,7 @@
 
 How AIHub gets built, step by step: the backend described in [architecture.md](architecture.md), and the UI from [design-brief-ui.md](design-brief-ui.md) **wired in as each piece of the backend lands**. The visual and structural reference throughout is Claude Design's Part A v1 export in [reference/ui-export-2026-10-04/](reference/ui-export-2026-10-04/README.md).
 
-> This is a plan. Nothing in it has been implemented yet.
+> This is a plan. Ticked steps have landed; the rest is not implemented yet.
 
 **How to work this plan**
 - **Every phase has three parts:**
@@ -70,7 +70,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 
 ## Phase 1 — Repo, skeleton and UI baseline
 
-- [ ] **1.1 Create the repo.**
+- [x] **1.1 Create the repo.**
   - `git init`.
   - `.gitignore`:
     ```

@@ -22,18 +22,6 @@
         "gpu-layers-draft": 999
       }
     },
-    "gemma-4-E4B-it": {
-      "nicknames": [
-        "gemma4-E4B"
-      ],
-      "path": "models/Gemma4-E4B/Gemma4-E4B.gguf"
-    },
-    "ornith1-35B": {
-      "nicknames": [
-        "ornith1-35B"
-      ],
-      "path": "models/Ornith1-35B/ornith-1.0-35b-uncensored-Q4_K_M.gguf"
-    },
     "minicpm-5-2B": {
       "nicknames": [
         "MiniCPM5-2B"

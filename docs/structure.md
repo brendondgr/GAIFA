@@ -50,6 +50,8 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `manifest.py` | ✅ | `service.toml` schema (pydantic), `discover()` with collected errors, `effective()` config overrides, `launch_spec()` (placeholders + env), `start_order()` |
 | `backends/` | ✅ | `base.py` (`Backend` protocol, `UnitState`, `LogLine`), `systemd.py` (`aihub-<id>.service` via `systemd-run`, journal logs), `subprocess.py` (child processes + log ring; tests and `--dev`) |
 | `services.py` | ✅ | `ServiceManager`: discovery, adoption, autostart in `after` order, start/stop/restart, health monitor, restart-on-failure |
+| `loading.py` | ✅ | Load/unload through a mod's `[memory]` operations (in the background); Phase 5 adds make-room |
+| `api_models.py` | ✅ | Pydantic response models for the brief's §6.4 service types |
 | `status.py` | ✅ | Status polling (2 s busy / 10 s idle), `validate()` for the §4.6 shape, job events |
 | `service_views.py` | ✅ | `summary()` / `detail()`: a service as the brief's `ServiceSummary` / `ServiceDetail` |
 | `proxy.py` | ✅ | `ANY /api/s/<id>/*`: streaming passthrough, hop-by-hop headers dropped, redirects kept inside the proxy |

@@ -157,8 +157,10 @@ def load(path: Path) -> Config:
 def save(path: Path, changes: dict[str, Any]) -> Config:
     """Apply the nested `changes` to the file, keeping comments and order.
 
-    Only the keys given are touched. The result is validated before it is
-    written; on error the file is left unchanged and ConfigError is raised.
+    Only the keys given are touched; a `None` value removes its key, and
+    `Replace(value)` sets a table as a whole instead of merging into it. The
+    result is validated before it is written; on error the file is left
+    unchanged and ConfigError is raised.
     """
     doc = tomlkit.parse(path.read_text()) if path.exists() else tomlkit.document()
     _merge(doc, changes)
@@ -175,9 +177,24 @@ def build_paths(cfg: Config, root: Path | None = None) -> Paths:
         raise ConfigError(f"config.toml: {e}") from None
 
 
+class Replace:
+    """In `save()` changes: set this value as a whole instead of merging into the existing table."""
+
+    def __init__(self, value: Any) -> None:
+        self.value = value
+
+
 def _merge(table: Any, changes: dict[str, Any]) -> None:
     for key, value in changes.items():
-        if isinstance(value, dict) and key in table and isinstance(table[key], dict):
+        if value is None:  # None removes the key (TOML has no null)
+            if key in table:
+                del table[key]
+        elif isinstance(value, Replace):
+            if key in table:
+                del table[key]
+            if value.value is not None:
+                table[key] = value.value
+        elif isinstance(value, dict) and key in table and isinstance(table[key], dict):
             _merge(table[key], value)
         elif isinstance(value, dict) and key not in table:
             t = tomlkit.table()

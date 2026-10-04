@@ -350,7 +350,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `getSystem()` | `GET /api/system` | `System` |
 | `listServices()` | `GET /api/services` | `ServiceSummary[]` |
 | `getService(id)` | `GET /api/services/{id}` | `ServiceDetail` |
-| `startService(id)` | `POST /api/services/{id}/start` | `202 ServiceSummary` |
+| `startService(id)` | `POST /api/services/{id}/start` | `202 ServiceSummary` (add `?wait=1` to answer once the mod is ready or failed; start/stop/restart all accept it) |
 | `stopService(id)` | `POST /api/services/{id}/stop` | `202 ServiceSummary` |
 | `restartService(id)` | `POST /api/services/{id}/restart` | `202 ServiceSummary` |
 | `loadService(id, {makeRoom})` | `POST /api/services/{id}/load[?make_room=1]` | `202 ServiceSummary`, or `409 {code:"needs_room", detail, data:{plan: MakeRoomPlan}}` |
@@ -380,7 +380,7 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 
 ### 6.3 Error codes to handle
 
-`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `output_not_found`, `invalid_config`, `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
+`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `output_not_found`, `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
 
 ### 6.4 Types
 
@@ -422,9 +422,12 @@ interface ServiceDetail extends ServiceSummary {
   folder: string;                // "services/tts"
   outputs_dir: string | null;    // "outputs/tts"
   models: string[];              // registry ids
-  health: { ok: boolean; latency_ms: number | null; body: unknown } | null;
+  health: { ok: boolean; latency_ms: number | null; body: unknown; status?: number } | null;  // status = HTTP code (absent for tcp checks)
   manifest: Record<string, unknown>;   // parsed service.toml
   config: ServiceConfig;
+  jobs: Job[];                   // from the status route
+  in_flight: number;             // proxied requests in progress
+  last_request_ts: number | null;
 }
 
 interface ServiceConfig {

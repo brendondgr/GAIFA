@@ -63,6 +63,7 @@ class EventBus:
         self._subs: set[Subscription] = set()
         self._size = queue_size
         self._closed = False
+        self.closing = asyncio.Event()  # set by close(): other streams (logs) end on it too
 
     def subscribe(self) -> Subscription:
         sub = Subscription(self, self._size)
@@ -74,6 +75,7 @@ class EventBus:
     def close(self) -> None:
         """End every SSE stream, so shutdown doesn't wait on them."""
         self._closed = True
+        self.closing.set()
         self.publish(CLOSED)
 
     def publish(self, event: HubEvent) -> None:

@@ -147,9 +147,11 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
 
     app.include_router(system.router)
     hub.mark_live("system")
-    app.include_router(events.router)  # the `events` area goes live with services (Phase 2)
+    app.include_router(events.router)
     app.include_router(services.router)
-    app.include_router(proxy.router)  # live with the other service areas in 2.7, so the UI never mixes mock mods and a live proxy
+    app.include_router(proxy.router)
+    for area in ("services", "logs", "operations", "proxy", "events"):
+        hub.mark_live(area)
 
     app.include_router(web.router)
     app.mount("/", WebFiles(directory=paths.web, html=True, check_dir=False), name="web")

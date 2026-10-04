@@ -111,3 +111,16 @@ def test_build_paths_rejects_outside_root(tmp_path):
     cfg = config.validate({"paths": {"models": "/mnt/elsewhere"}})
     with pytest.raises(ConfigError, match="paths.models"):
         config.build_paths(cfg, tmp_path)
+
+
+def test_save_none_removes_and_replace_swaps_tables(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('# top\n[services.tts]  # tts\nidle_unload_s = 180\nenv = { A = "1", B = "2" }\n')
+    config.save(p, {"services": {"tts": {"idle_unload_s": None, "env": config.Replace({"C": "3"})}}})
+    text = p.read_text()
+    assert "# top" in text and "# tts" in text
+    cfg = config.load(p)
+    ov = cfg.services.overrides["tts"]
+    assert ov.idle_unload_s is None and ov.env == {"C": "3"}
+    config.save(p, {"services": {"tts": {"env": config.Replace(None), "missing": None}}})
+    assert config.load(p).services.overrides["tts"].env == {}

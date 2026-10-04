@@ -28,6 +28,7 @@ TEMPLATE = CODE / "bin" / "aihub.service.in"
 UNIT_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
 LINK = Path.home() / ".local" / "bin" / "aihub"
 LATER = {"new": "2.8", "models": "3"}
+WAIT_S = 600  # start/stop/restart wait for the mod to settle (start_timeout_s can be minutes)
 
 
 class HubDown(Exception):
@@ -211,17 +212,30 @@ def _lifecycle(action: str, target: str | None) -> int:
         if action == "start" and unit_installed():
             systemctl("start", UNIT)
             wait_up()
-        services = services_or_none()
-        ids = [s["id"] for s in services or [] if action != "start" or s.get("enabled", True)]
-        for sid in ids:
-            print(f"{action} {sid}: {call('POST', f'/api/services/{q(sid)}/{action}')['state']}")
-        if services is None:
-            print("this hub has no mods yet (they arrive in Phase 2)")
+        services = services_or_none() or []
+        rc = 0
+        for s in services:
+            if s["kind"] == "external" or s["manifest_errors"] or (action == "start" and not s.get("enabled", True)):
+                continue
+            if action == "stop" and s["state"] == "stopped":
+                continue
+            try:
+                rc |= _report(s["id"], call("POST", f"/api/services/{q(s['id'])}/{action}?wait=1", timeout=WAIT_S))
+            except ApiError as e:
+                print(f"{s['id']}: {e.detail} ({e.code})", file=sys.stderr)
+                rc = 1
         if action == "stop" and unit_installed():
             systemctl("stop", UNIT)
-        return 0
-    s = call("POST", f"/api/services/{q(target)}/{action}")
-    print(f"{target}: {s['state']}")
+        return rc
+    return _report(target, call("POST", f"/api/services/{q(target)}/{action}?wait=1", timeout=WAIT_S))
+
+
+def _report(sid: str, s: dict[str, Any]) -> int:
+    """Print a mod's state after start/stop/restart; 1 when it ended up failed."""
+    print(f"{sid}: {s['state']}")
+    if s["state"] == "failed" and s.get("last_error"):
+        print("  " + s["last_error"].replace("\n", "\n  "), file=sys.stderr)
+        return 1
     return 0
 
 
@@ -265,13 +279,16 @@ def cmd_status(args: argparse.Namespace) -> int:
     d = sysinfo["disk"]
     print(f"disk {human_bytes(d['free_bytes'])} free of {human_bytes(d['total_bytes'])}   root {sysinfo['paths']['root']}")
     services = services_or_none()
-    if services is None:
-        print("mods: none yet (Phase 2)")
-    elif services:
+    if not services:
+        print("mods: none (add one with `aihub new <id>`)")
+    else:
         rows = [["MOD", "STATE", "LOAD", "PORT", "MEMORY"]]
         for s in services:
             rows.append([s["id"], s["state"], s["load"], str(s["port"]), human_bytes(s["memory"]["used_bytes"])])
         print(table(rows))
+        for s in services:
+            for err in s["manifest_errors"]:
+                print(f"  {s['id']}: {err}", file=sys.stderr)
     return 0
 
 

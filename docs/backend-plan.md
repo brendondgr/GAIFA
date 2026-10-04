@@ -186,11 +186,12 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 
 ## Phase 2 — Running mods
 
-- [ ] **2.1 `utils/manifest.py`.**
+- [x] **2.1 `utils/manifest.py`.**
   - **Schema:** pydantic, exactly architecture §4.3, including `health = "tcp"` for binaries without an HTTP health route (a TCP connect counts as healthy).
   - **Discovery:** `services/*/service.toml`, skipping folders that start with `_` or `.`, so `_template` is never run.
   - **Errors are collected** into `manifest_errors` and never crash the hub.
   - **Placeholders and env:** expand them (architecture §4.4), build the env (hub vars + `env_file` + manifest `env` + config override), and resolve the effective port.
+  - *As built:* `discover()` returns a `Mod` per folder (id = folder name, even when the manifest is broken, so the UI can list it). Unknown keys are errors, to catch typos. `command` may be a string (shell-split). Ports that clash with another mod or the hub are manifest errors; clashes created by `config.toml` overrides come from `check_effective_ports()`. An unknown `{placeholder}` raises `ManifestError` at launch; `env_file` values are not expanded and a missing `env_file` is allowed. `start_order()` applies `after` (unknown ids ignored, cycles broken).
   *Done when:* tests cover a valid manifest, each error kind, placeholders, override merging and the `_template` skip.
 - [ ] **2.2 Backends: `utils/backends/{base,systemd,subprocess}.py`.**
   - **Protocol:** `start(spec)`, `stop(id, timeout)`, `state(id)` (`active|inactive|failed`, pid, started_ts), `list_ours()`, `logs(id, n)`, `follow(id)`.

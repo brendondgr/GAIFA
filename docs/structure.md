@@ -47,7 +47,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `events.py` | ✅ | `EventBus` (per-subscriber queue, overflow → resync), `ActivityLog`, `Alerts`, `sse_stream()` |
 | `server.py` | ✅ | `create_app()`, `Hub` (app state, live-area registry), lifespan, `HubError` + error envelope, static `web/` |
 | `cli.py` | ✅ | Standard-library CLI behind `bin/aihub`: serve, install, start/stop/restart, status, logs, load/unload, open, url, doctor |
-| `manifest.py` | ⏳ 2.1 | `service.toml` schema, discovery, placeholders |
+| `manifest.py` | ✅ | `service.toml` schema (pydantic), `discover()` with collected errors, `effective()` config overrides, `launch_spec()` (placeholders + env), `start_order()` |
 | `backends/` | ✅ pkg · ⏳ 2.2 | `base.py`, `systemd.py`, `subprocess.py` |
 | `services.py` | ⏳ 2.3 | Mod state machine, health and status polling |
 | `proxy.py` | ⏳ 2.5 | `/api/s/<id>/*` passthrough |

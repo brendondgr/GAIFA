@@ -200,6 +200,16 @@ delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
 
 `config.toml` may override `port`, `env` (merged), `enabled`, `autostart`, `idle_unload_s`, `auto_unload` and `priority` per mod.
 
+**Parsing rules** (`utils/manifest.py`):
+- Only `id` and `[run].port` are required, plus `[run].command` for `kind = "process"`. `name` defaults to the id, `icon` to `box`.
+- Unknown keys are errors, so a typo is reported rather than ignored. Each problem becomes one entry in the mod's `manifest_errors`; a broken mod is still listed (by folder name) and never stops the hub.
+- `command` is a list, or a string split like a shell would. The executable resolves against the mod folder when it contains a `/` (`.venv/bin/python`); a bare name (`python3`) is looked up on `PATH`. Other arguments starting with `./` or `../` also resolve against the mod folder; the rest are passed as written (relative to `cwd`).
+- Numbers and booleans in `env` become strings (`2` → `"2"`, `false` → `"false"`).
+- Operations (`[memory]`, `[[ui.widgets]].source`, `[tools]`, `[api.responses]` keys) are written `"METHOD /path"`.
+- `[ui].page` must be inside the mod's `ui/` folder.
+- Two mods can't share a port, and no mod may use the hub's port.
+- Mods not mentioned in `config.toml` are enabled and autostart.
+
 ### 4.4 Placeholders and environment
 
 **Placeholders** (allowed in `command`, `cwd` and `env` values):
@@ -214,6 +224,10 @@ delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
 | `{databases}` | `data/databases` (absolute) |
 | `{hf_home}` | `data/models/hf-cache` |
 | `{hub_url}` | `http://127.0.0.1:7000` |
+
+An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSON, `{UPPER}`) are left alone, and `env_file` values are never expanded.
+
+**Environment layers**, later ones winning: the hub's variables below → `env_file` → `[run].env` → `config.toml`'s `[services.<id>].env`.
 
 **Environment every mod gets:** `AIHUB_URL`, `AIHUB_SERVICE_ID`, `AIHUB_PORT`, `AIHUB_ROOT`, `AIHUB_MODELS`, `AIHUB_OUTPUTS`, `AIHUB_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`.
 

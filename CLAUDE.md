@@ -2,7 +2,7 @@
 
 One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/`, run as its own process. Design: [docs/architecture.md](docs/architecture.md). Build plan: [docs/backend-plan.md](docs/backend-plan.md). UI brief: [docs/design-brief-ui.md](docs/design-brief-ui.md).
 
-**Status:** Phase 1 done: the hub runs as `aihub.service` (system area live), with the UI baseline served at `/` on mock data elsewhere. Next: Phase 2.1. What exists: [docs/structure.md](docs/structure.md).
+**Status:** Phase 2 done: mods run as `aihub-<id>` systemd units (adopted across hub restarts), proxied at `/api/s/<id>/*`, with operations, logs, status, `aihub new` / `aihub check`, and mod pages in the shell. Live areas: system, services, logs, operations, proxy, events. Next: Phase 3.1 (models registry). What exists: [docs/structure.md](docs/structure.md).
 
 **Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans, and `aihub-mod` to build or port a mod (guide: [docs/mods.md](docs/mods.md)).
 

@@ -52,6 +52,7 @@ The docs are the source of truth. Read the section you need before acting; don't
 3. Build it, with tests in `utils/tests/<area>/test_<behavior>.py` (fake mods in `utils/tests/fixtures/mods/`).
 4. `uv run pytest` must be green. It includes the Node tests for `web/api.js` (`utils/tests/web/`); inside the toolbox they use the host's Node via `flatpak-spawn --host node`.
    To check against the installed hub, run `aihub restart` and reload the page (changing only the `#/…` hash doesn't reload it).
+   For UI checks with fake mods, run a second hub: `uv run python app.py --port 7077 --dev --demo-mods` (child processes; the installed hub on 7000 and its units are untouched). Tests never touch the real root or hub: `conftest.py` points `AIHUB_ROOT`/`AIHUB_URL` at throwaway values.
 5. In the same commit: tick the step in the plan, update `docs/structure.md` for new files, and update architecture / brief §6 / §11.7 if behavior differs from what they say.
 6. Commit as `AIHub (<phase>.<step>): <what was done>`. Push when the user asks or at the end of a phase.
 7. At the end of a phase, run its **Wire** and **Checks & deliverables** lists before starting the next phase.

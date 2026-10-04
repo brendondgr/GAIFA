@@ -305,17 +305,31 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 - the command palette's start/stop actions
 
 The live mods at this point are the fake mods (`python app.py --dev --demo-mods`) and any mod made with `aihub new`.
+- *As wired:* the overview's activity, alerts and jobs also come from the hub, through `GET /api/events/recent` (until `/api/overview` in Phase 6). The memory panel, models, outputs and settings stay mock until their phases.
 
 **Checks & deliverables — Phase 2**
-- [ ] With fake mods, every brief §8 service-page state can be reached for real:
+- [x] With fake mods, every brief §8 service-page state can be reached for real:
   - stopped, starting, ready, degraded, failed (with log excerpt), and unreachable
   - the manifest-error tile
   - API tab responses: JSON, audio, stream with Stop, upstream error, multipart upload, destructive confirm
   - Logs follow / pause / filter
   - Settings save with restart-required
-- [ ] On a hub restart, running mods stay up and are adopted, and the UI reconnects by itself.
-- [ ] `aihub new demo`, then restart: the mod appears in the sidebar, its tile and its API tab, **with no hub code changed**.
-- [ ] Delivered: `manifest.py`, `backends/`, `services.py`, `proxy.py`, `operations.py`, the service routes, `_template`, `aihub new`, `ModPage`, `aihub check` and `docs/mods.md`.
+  - *Checked 2026-10-04* in the browser against `python app.py --dev --demo-mods`:
+    - every state above: degraded by freezing a mod; starting via a slow mod; failed with its log tail; the manifest-error tile from a broken folder
+    - every API response kind, including a 200 KB multipart upload and a 50-event stream stopped partway
+    - the Logs live tail and filter, and Settings saved with the restart note
+    - the jobs chip, and the palette's "Start Fake OK"
+  - *Fixed along the way:*
+    - a port change no longer breaks the running mod
+    - Settings saves no longer pin defaults into config.toml
+    - stopping a stream keeps its lines
+    - `web/` files are revalidated, so upgrades reach the browser
+    - the activity feed is real
+- [x] On a hub restart, running mods stay up and are adopted, and the UI reconnects by itself.
+  - *Checked* with the installed hub (systemd): `aihub restart` left `aihub-demo.service` running with the same PID, and the hub logged "Adopted Demo, already running". The open page went: down banner → "Reconnected" toast → normal.
+- [x] `aihub new demo`, then restart: the mod appears in the sidebar, its tile and its API tab, **with no hub code changed**.
+  - *Checked:* no restart was needed (rescan). `demo` ran as `aihub-demo.service`, passed `aihub check demo`, showed its Hello tab, served journal logs and answered `/api/s/demo/v1/hello`. It was then removed.
+- [x] Delivered: `manifest.py`, `backends/`, `services/` (the supervisor package), `proxy.py`, `operations.py`, the service routes, `_template`, `aihub new`, `ModPage`, `aihub check` and `docs/mods.md`.
 
 ## Phase 3 — Models registry
 

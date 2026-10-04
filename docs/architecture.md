@@ -335,6 +335,7 @@ aihub-comfy.service                  comfy adapter            :5070  (+ ComfyUI 
 - **ready:** health every 5 s. 2 misses → `degraded`; 5 misses → stopped and `failed`; the process exiting → `failed`.
 - **failed:** `restart = "on-failure"` retries after 2 / 4 / 8 s, at most 3 times in 5 minutes, then gives up. A failure raises an alert and an activity item.
 - **On boot:** running `aihub-*` units started from this root are adopted (`starting` until healthy); one whose folder is gone is stopped. Then enabled mods with autostart start in the background, each after the mods in its `after` list.
+- **Settings changes while running:** a new port or env applies at the mod's next start. Until then, health checks and the proxy keep using the port the process was started with.
 - **External mods** (`kind = "external"`): health only. Never reachable = `stopped`; reachable = `ready`; lost = `degraded`, then `failed`. Start and stop are refused (`external_service`).
 - `python app.py --dev` runs mods as child processes instead of units; they stop with the hub.
 

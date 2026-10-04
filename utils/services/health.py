@@ -113,7 +113,7 @@ class HealthMixin(_Base):
         tail = await self._tail(svc)
         if gen != svc.gen:
             return
-        svc.pid = None
+        svc.pid = svc.live_port = None
         self._clear_runtime(svc, jobs_end="failed")
         self._set(svc, "failed", error=why + tail)
         self.alerts.set(

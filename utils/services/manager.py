@@ -126,6 +126,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
             return
         self._prepare_dirs(svc, spec)
         svc.command = spec.argv
+        svc.live_port = spec.port
         svc.health = svc.status = None
         svc.misses = 0
         self._set(svc, "starting")
@@ -169,7 +170,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
                 return
             if gen != svc.gen:
                 return
-            svc.pid = svc.started_ts = None
+            svc.pid = svc.started_ts = svc.live_port = None
             self._clear_runtime(svc)
             self._set(svc, "stopped")
             await self.activity.add(f"Stopped {svc.mod.name}", service=svc.id)

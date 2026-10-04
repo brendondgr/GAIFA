@@ -168,6 +168,7 @@ class DiscoveryMixin(_Base):
     async def _adopt(self, svc: Service) -> None:
         st = await self.backend.state(svc.id)
         svc.pid, svc.started_ts = st.pid, st.started_ts
+        svc.live_port = svc.eff.port  # adopted: assume the configured port (it was started with it)
         svc.command = self._command(svc)
         svc.gen += 1
         self._set(svc, "starting")

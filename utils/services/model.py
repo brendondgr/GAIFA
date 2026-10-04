@@ -56,6 +56,7 @@ class Service:
     jobs: list[dict[str, Any]] = field(default_factory=list)
     memory_estimate_gb: float | None = None
     pid: int | None = None
+    live_port: int | None = None  # the port of the running process; None while stopped
     started_ts: float | None = None
     command: list[str] = field(default_factory=list)
     health: dict[str, Any] | None = None
@@ -88,7 +89,8 @@ class Service:
 
     @property
     def port(self) -> int:
-        return self.eff.port
+        """The port it's listening on while running (a config change applies at the next start)."""
+        return self.live_port or self.eff.port
 
     @property
     def url(self) -> str:

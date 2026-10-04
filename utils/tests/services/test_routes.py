@@ -11,6 +11,7 @@ import httpx
 import pytest
 
 from utils.api_models import ServiceDetail, ServiceSummary
+from utils.tests.conftest import free_port
 from utils.tests.services.conftest import ready, until
 
 
@@ -201,7 +202,7 @@ async def test_save_config_restart_required_and_comments_kept(hub, rig):
     saved = tomllib.loads(text)["services"]["fake-ok"]
     assert saved["env"] == {"KEEP": "1", "NEW": "3"} and saved["port"] == 5999 and saved["idle_unload_s"] == 120  # DROP is gone
     svc = hub.services.get("fake-ok")
-    assert svc.port == 5999 and svc.state == "ready"  # still on the old port until restarted
+    assert svc.eff.port == 5999 and svc.port == rig.ports["fake-ok"] and svc.state == "ready"  # the new port applies at the next start
     async with httpx.AsyncClient(base_url=hub.url) as c:
         r = await c.put("/api/services/fake-ok/config", json={"idle_unload_s": None})
     assert r.json()["config"]["idle_unload_s"] is None and r.json()["restart_required"] is False
@@ -272,3 +273,19 @@ async def test_saving_defaults_writes_nothing(hub, rig):
         r = await c.put("/api/services/fake-ok/config", json={"env": {}})
         assert "fake-ok" not in tomllib.loads(cfg_file.read_text())["services"]  # env was its only key
         assert r.json()["config"]["env"] == {}
+
+
+async def test_port_change_applies_at_the_next_start(hub, rig):
+    """Changing the port of a running mod must not break it (health and proxy stay on the old port)."""
+    svc = hub.services.get("fake-ok")
+    old_port = svc.port
+    new_port = free_port()
+    async with httpx.AsyncClient(base_url=hub.url) as c:
+        r = await c.put("/api/services/fake-ok/config", json={"port": new_port})
+        assert r.json()["restart_required"] is True and r.json()["config"]["port"] == new_port
+        await asyncio.sleep(1.0)  # ~10 health checks at the test timing
+        assert svc.state == "ready" and svc.port == old_port
+        assert (await c.get("/api/s/fake-ok/health")).status_code == 200
+        assert (await c.get("/api/services/fake-ok")).json()["port"] == old_port
+        r = await c.post("/api/services/fake-ok/restart?wait=1")
+    assert r.json()["state"] == "ready" and r.json()["port"] == new_port and svc.port == new_port

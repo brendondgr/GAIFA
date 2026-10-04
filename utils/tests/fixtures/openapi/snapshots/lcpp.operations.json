@@ -1,0 +1,726 @@
+[
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_health",
+  "method": "GET",
+  "params": [],
+  "path": "/api/health",
+  "response": "json",
+  "summary": "Health",
+  "tag": "system",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_overview",
+  "method": "GET",
+  "params": [],
+  "path": "/api/overview",
+  "response": "json",
+  "summary": "Overview",
+  "tag": "system",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_system",
+  "method": "GET",
+  "params": [],
+  "path": "/api/system",
+  "response": "json",
+  "summary": "System",
+  "tag": "system",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_settings",
+  "method": "GET",
+  "params": [],
+  "path": "/api/settings",
+  "response": "json",
+  "summary": "Get Settings",
+  "tag": "system",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "put_api_settings",
+  "method": "PUT",
+  "params": [],
+  "path": "/api/settings",
+  "response": "json",
+  "summary": "Put Settings",
+  "tag": "system",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_recent",
+  "method": "GET",
+  "params": [],
+  "path": "/api/recent",
+  "response": "json",
+  "summary": "Recent",
+  "tag": "system",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_ports_suggest",
+  "method": "GET",
+  "params": [],
+  "path": "/api/ports/suggest",
+  "response": "json",
+  "summary": "Suggest Port",
+  "tag": "system",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_instances",
+  "method": "GET",
+  "params": [],
+  "path": "/api/instances",
+  "response": "json",
+  "summary": "List Instances",
+  "tag": "instances",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Spec",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_api_instances",
+  "method": "POST",
+  "params": [],
+  "path": "/api/instances",
+  "response": "json",
+  "summary": "Launch",
+  "tag": "instances",
+  "tool": {
+   "confirm": false,
+   "name": "start_llm"
+  }
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Spec",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_api_instances_preflight",
+  "method": "POST",
+  "params": [],
+  "path": "/api/instances/preflight",
+  "response": "json",
+  "summary": "Preflight",
+  "tag": "instances",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_api_instances_stop_all",
+  "method": "POST",
+  "params": [],
+  "path": "/api/instances/stop-all",
+  "response": "json",
+  "summary": "Stop All",
+  "tag": "instances",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_instances_name",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/instances/{name}",
+  "response": "json",
+  "summary": "Get Instance",
+  "tag": "instances",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_api_instances_name",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "dismiss",
+    "required": false,
+    "schema": {
+     "default": 0,
+     "title": "Dismiss",
+     "type": "integer"
+    }
+   }
+  ],
+  "path": "/api/instances/{name}",
+  "response": "json",
+  "summary": "Stop",
+  "tag": "instances",
+  "tool": {
+   "confirm": true,
+   "name": "stop_llm"
+  }
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_api_instances_name_restart",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/instances/{name}/restart",
+  "response": "json",
+  "summary": "Restart",
+  "tag": "instances",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_api_instances_name_models_model_id_action",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   {
+    "in": "path",
+    "name": "model_id",
+    "required": true,
+    "schema": {
+     "title": "Model Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "path",
+    "name": "action",
+    "required": true,
+    "schema": {
+     "title": "Action",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/instances/{name}/models/{model_id}/{action}",
+  "response": "json",
+  "summary": "Router Model",
+  "tag": "instances",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_instances_name_logs",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "lines",
+    "required": false,
+    "schema": {
+     "default": 200,
+     "maximum": 20000,
+     "minimum": 1,
+     "title": "Lines",
+     "type": "integer"
+    }
+   }
+  ],
+  "path": "/api/instances/{name}/logs",
+  "response": "json",
+  "summary": "Logs",
+  "tag": "instances",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "SSE: one ``LogLine`` JSON per event. The journal follower lives exactly\nas long as the client stays connected.",
+  "destructive": false,
+  "id": "get_api_instances_name_logs_stream",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/instances/{name}/logs/stream",
+  "response": "stream",
+  "summary": "Logs Stream",
+  "tag": "instances",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_models",
+  "method": "GET",
+  "params": [],
+  "path": "/api/models",
+  "response": "json",
+  "summary": "List Models",
+  "tag": "models",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_models_discovered",
+  "method": "GET",
+  "params": [],
+  "path": "/api/models/discovered",
+  "response": "json",
+  "summary": "Discovered",
+  "tag": "models",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_api_models_validate",
+  "method": "POST",
+  "params": [],
+  "path": "/api/models/validate",
+  "response": "json",
+  "summary": "Validate",
+  "tag": "models",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "put_api_models_defaults",
+  "method": "PUT",
+  "params": [],
+  "path": "/api/models/defaults",
+  "response": "json",
+  "summary": "Put Defaults",
+  "tag": "models",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "put_api_models_model_id",
+  "method": "PUT",
+  "params": [
+   {
+    "in": "path",
+    "name": "model_id",
+    "required": true,
+    "schema": {
+     "title": "Model Id",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/models/{model_id}",
+  "response": "json",
+  "summary": "Put Model",
+  "tag": "models",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_api_models_model_id",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "model_id",
+    "required": true,
+    "schema": {
+     "title": "Model Id",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/models/{model_id}",
+  "response": "empty",
+  "summary": "Delete Model",
+  "tag": "models",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_downloads",
+  "method": "GET",
+  "params": [],
+  "path": "/api/downloads",
+  "response": "json",
+  "summary": "List Downloads",
+  "tag": "downloads",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_api_downloads",
+  "method": "POST",
+  "params": [],
+  "path": "/api/downloads",
+  "response": "json",
+  "summary": "Start",
+  "tag": "downloads",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_api_downloads_resolve",
+  "method": "POST",
+  "params": [],
+  "path": "/api/downloads/resolve",
+  "response": "json",
+  "summary": "Resolve",
+  "tag": "downloads",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_api_downloads_job_id_cancel",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "job_id",
+    "required": true,
+    "schema": {
+     "title": "Job Id",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/downloads/{job_id}/cancel",
+  "response": "json",
+  "summary": "Cancel",
+  "tag": "downloads",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_api_downloads_job_id_retry",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "job_id",
+    "required": true,
+    "schema": {
+     "title": "Job Id",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/downloads/{job_id}/retry",
+  "response": "json",
+  "summary": "Retry",
+  "tag": "downloads",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_api_downloads_job_id",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "job_id",
+    "required": true,
+    "schema": {
+     "title": "Job Id",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/downloads/{job_id}",
+  "response": "empty",
+  "summary": "Dismiss",
+  "tag": "downloads",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_api_relay",
+  "method": "GET",
+  "params": [],
+  "path": "/api/relay",
+  "response": "json",
+  "summary": "Get Relay",
+  "tag": "relay",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_api_relay_test",
+  "method": "POST",
+  "params": [],
+  "path": "/api/relay/test",
+  "response": "json",
+  "summary": "Test Relay",
+  "tag": "relay",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_api_relay_registrations_key",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "key",
+    "required": true,
+    "schema": {
+     "title": "Key",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/relay/registrations/{key}",
+  "response": "empty",
+  "summary": "Remove Registration",
+  "tag": "relay",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_api_relay_cleanup",
+  "method": "POST",
+  "params": [],
+  "path": "/api/relay/cleanup",
+  "response": "json",
+  "summary": "Cleanup",
+  "tag": "relay",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_api_instances_name_relay",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/instances/{name}/relay",
+  "response": "json",
+  "summary": "Publish",
+  "tag": "relay",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_api_instances_name_relay",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/api/instances/{name}/relay",
+  "response": "json",
+  "summary": "Unpublish",
+  "tag": "relay",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "additionalProperties": true,
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_api_chat",
+  "method": "POST",
+  "params": [],
+  "path": "/api/chat",
+  "response": "json",
+  "summary": "Chat",
+  "tag": "chat",
+  "tool": null
+ }
+]

@@ -53,14 +53,14 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `status.py` | ✅ | Status polling (2 s busy / 10 s idle), `validate()` for the §4.6 shape, job events |
 | `service_views.py` | ✅ | `summary()` / `detail()`: a service as the brief's `ServiceSummary` / `ServiceDetail` |
 | `proxy.py` | ✅ | `ANY /api/s/<id>/*`: streaming passthrough, hop-by-hop headers dropped, redirects kept inside the proxy |
-| `operations.py` | ⏳ 2.6 | Mod OpenAPI → `Operation[]` |
+| `operations.py` | ✅ | Mod OpenAPI → `Operation[]` (refs inlined, file fields, response kinds, hide globs, tools), cached per process start |
 | `registry.py` | ⏳ 3 | Models registry |
 | `outputs.py` | ⏳ 4 | Outputs watcher and index |
 | `proc.py` | ✅ · ⏳ 5 | `port_listening()`, `port_owner()` (who holds a port, from /proc); per-process memory arrives in Phase 5 |
 | `memory.py` | ⏳ 5 | Memory sampling and make-room plans |
 | `metrics.py` | ⏳ 6.1 | Time series recorder and rollups |
 | `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`) |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`) |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -72,7 +72,7 @@ utils/tests/
 ├── conftest.py                 ✅     root, make_app/app/client (ASGI), fake_mod, hub_process, services_dir
 ├── fixtures/
 │   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok, fake-slow, fake-crash, fake-mem
-│   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay
+│   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay; snapshots/ = their converted Operation[]
 ├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli
 ├── web/api.test.mjs + test_api_js.py ✅  Node unit tests for web/api.js, run from pytest
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)

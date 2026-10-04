@@ -234,7 +234,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - Leave a hook point for memory triggers (Phase 5.5).
   - *As built:* the path is forwarded still percent-encoded, as the client sent it. Headers named in `Connection:` are dropped too, and `X-Forwarded-Host` / `-Proto` are added. `Location` headers pointing at the mod (`/x` or `http://127.0.0.1:<port>/x`) are rewritten to `/api/s/<id>/x`. The proxy client ignores `HTTP(S)_PROXY`. `ServiceManager.before_proxy` is the 5.5 hook. Tests run against a real uvicorn server (the in-process ASGI client buffers responses).
   *Done when:* tests cover JSON, binary audio, a 50 MB multipart upload, SSE arriving unbuffered (first event in under 200 ms), 4xx passthrough, and a mod that's down → 503.
-- [ ] **2.6 `utils/operations.py` + `GET /api/services/{id}/operations`.**
+- [x] **2.6 `utils/operations.py` + `GET /api/services/{id}/operations`.**
   - **Fetching:** fetch the mod's OpenAPI each time it becomes ready, and cache it per process start.
   - **Conversion to the brief's `Operation`:**
     - Resolve local `$ref`s.
@@ -244,6 +244,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - Hide `[api] hide` entries plus `/docs`, `/redoc`, the openapi route, static mounts, HEAD and OPTIONS.
     - `destructive` = DELETE or `confirm`.
     - `tool` comes from `[tools]`.
+  - *As built:* schemas are inlined and simplified for a generic form: `anyOf: [T, null]` → `T` + `nullable: true`, a single `allOf` is merged, and OpenAPI 3.1 file fields (`contentMediaType`) get `format: binary`. Recursive refs stop with a `(recursive: Name)` placeholder. `[api] hide` entries are globs on `"METHOD /path"` (`"* /admin/*/tunnel*"`). Without tags, the tag is the first path segment after `v1`/`api`. The list is fetched in the background when a mod becomes ready, cached per process start (pid + start time), and kept while the mod is stopped; a mod never read and not running gives `503 service_not_running`. Snapshots: `fixtures/openapi/snapshots/` (regenerate with `UPDATE_SNAPSHOTS=1`).
   *Done when:* tests convert `fake-ok` and the four real OpenAPI fixtures from 0.5, with snapshot assertions.
 - [ ] **2.7 Service routes** (UI brief §6.2): list, detail, start, stop, restart, load, unload, logs, logs/stream, operations, and `PUT config`.
   - **load/unload:** call the manifest operations through the proxy client. Make-room logic is added in Phase 5.
@@ -565,6 +566,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 - [ ] **8.1 Subtree + venv.** `git subtree add --prefix=services/gen3d ~/Projects/3DGenerate main`, then create the venv (Python 3.12). Move pytest and httpx into a dev requirements file. Ignored state: `data/` (the database and jobs, handled in 8.4).
 - [ ] **8.2 Code changes.**
+  - **Declare `POST /v1/jobs`'s request body** as a pydantic model: today it reads the raw request, so its OpenAPI has no body and the API tab shows no form (found in 2.6).
   - **New env vars:**
     - `GEN3D_DB` (default `$GEN3D_DATA/gen3d.db`)
     - `GEN3D_OUTPUTS` (default `$GEN3D_DATA/jobs`)

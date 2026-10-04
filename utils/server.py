@@ -103,7 +103,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, system, web
+    from utils.routes import events, services, system, web
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -148,6 +148,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(system.router)
     hub.mark_live("system")
     app.include_router(events.router)  # the `events` area goes live with services (Phase 2)
+    app.include_router(services.router)
     app.include_router(proxy.router)  # live with the other service areas in 2.7, so the UI never mixes mock mods and a live proxy
 
     app.include_router(web.router)

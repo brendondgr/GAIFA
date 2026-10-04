@@ -28,7 +28,7 @@ from typing import Any, Literal
 import httpx
 
 from utils import manifest as mf
-from utils import status
+from utils import operations, status
 from utils.backends.base import Backend, BackendError, LogLine, UnitState
 from utils.config import Config
 from utils.events import ActivityLog, Alerts, EventBus
@@ -85,6 +85,10 @@ class Service:
     health: dict[str, Any] | None = None
     status: dict[str, Any] | None = None
     status_ts: float | None = None
+    operations: list[dict[str, Any]] | None = None  # cached per process start (operations.py)
+    operations_key: tuple[Any, ...] | None = None
+    operations_ts: float | None = None
+    operations_error: str | None = None
     last_error: str | None = None
     in_flight: int = 0
     last_request_ts: float | None = None
@@ -154,7 +158,7 @@ class ServiceManager:
         self._closing = False
         self._boot_task: asyncio.Task[None] | None = None
         # Hooks for later steps: operations (2.6) refetch on ready, memory triggers (5.5).
-        self.on_ready: list[Callable[[Service], Awaitable[None]]] = []
+        self.on_ready: list[Callable[[Service], Awaitable[None]]] = [lambda svc: operations.refresh(self, svc)]
 
     # --- discovery ------------------------------------------------------------------
 

@@ -1,0 +1,647 @@
+[
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1",
+  "method": "GET",
+  "params": [],
+  "path": "/v1",
+  "response": "json",
+  "summary": "Info",
+  "tag": "general",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_health",
+  "method": "GET",
+  "params": [],
+  "path": "/health",
+  "response": "json",
+  "summary": "Health",
+  "tag": "health",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_load",
+  "method": "POST",
+  "params": [
+   {
+    "in": "query",
+    "name": "engine",
+    "required": false,
+    "schema": {
+     "default": "breeze",
+     "title": "Engine",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/load",
+  "response": "json",
+  "summary": "Load",
+  "tag": "load",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_unload",
+  "method": "POST",
+  "params": [
+   {
+    "description": "omit to unload all",
+    "in": "query",
+    "name": "engine",
+    "required": false,
+    "schema": {
+     "description": "omit to unload all",
+     "nullable": true,
+     "title": "Engine",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/unload",
+  "response": "json",
+  "summary": "Unload",
+  "tag": "unload",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_voices",
+  "method": "GET",
+  "params": [],
+  "path": "/v1/voices",
+  "response": "json",
+  "summary": "List Voices",
+  "tag": "voices",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "multipart/form-data",
+   "schema": {
+    "properties": {
+     "audio": {
+      "contentMediaType": "application/octet-stream",
+      "description": "reference clip, any format ffmpeg reads",
+      "format": "binary",
+      "title": "Audio",
+      "type": "string"
+     },
+     "language": {
+      "description": "Whisper language hint, e.g. en or zh",
+      "nullable": true,
+      "title": "Language",
+      "type": "string"
+     },
+     "name": {
+      "description": "what you will call it with, e.g. name=Brendon",
+      "title": "Name",
+      "type": "string"
+     },
+     "overwrite": {
+      "default": false,
+      "title": "Overwrite",
+      "type": "boolean"
+     },
+     "transcript": {
+      "default": "",
+      "description": "exact words spoken in the clip; omit to auto-transcribe",
+      "title": "Transcript",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "audio"
+    ],
+    "title": "Body_add_voice_v1_voices_post",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_voices",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/voices",
+  "response": "json",
+  "summary": "Add Voice",
+  "tag": "voices",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_voices_name",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/voices/{name}",
+  "response": "json",
+  "summary": "Voice Info",
+  "tag": "voices",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "rename": {
+      "nullable": true,
+      "title": "Rename",
+      "type": "string"
+     },
+     "transcript": {
+      "nullable": true,
+      "title": "Transcript",
+      "type": "string"
+     }
+    },
+    "title": "VoicePatch",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "patch_v1_voices_name",
+  "method": "PATCH",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/voices/{name}",
+  "response": "json",
+  "summary": "Edit Voice",
+  "tag": "voices",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_v1_voices_name",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/voices/{name}",
+  "response": "json",
+  "summary": "Delete Voice",
+  "tag": "voices",
+  "tool": {
+   "confirm": true,
+   "name": "delete_voice"
+  }
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_voices_name_audio",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "name",
+    "required": true,
+    "schema": {
+     "title": "Name",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/voices/{name}/audio",
+  "response": "audio",
+  "summary": "Voice Audio",
+  "tag": "voices",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "cfg_scale": {
+      "default": 4.0,
+      "title": "Cfg Scale",
+      "type": "number"
+     },
+     "instruction": {
+      "description": "natural-language description of the voice",
+      "title": "Instruction",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "overwrite": {
+      "default": false,
+      "title": "Overwrite",
+      "type": "boolean"
+     },
+     "sample_text": {
+      "default": "Hello, and welcome. This is a short sample of my voice, recorded so that I sound the same every time you hear me.",
+      "title": "Sample Text",
+      "type": "string"
+     },
+     "seed": {
+      "default": 42,
+      "title": "Seed",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "name",
+     "instruction"
+    ],
+    "title": "DesignRequest",
+    "type": "object"
+   }
+  },
+  "description": "Invent a voice from a description, then keep it as a named voice so it stays consistent.",
+  "destructive": false,
+  "id": "post_v1_voices_design",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/voices/design",
+  "response": "json",
+  "summary": "Design Voice",
+  "tag": "voices",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "cfg_scale": {
+      "description": "Breeze guidance; default 1, or 4 with an instruction",
+      "exclusiveMinimum": 0.0,
+      "maximum": 10.0,
+      "nullable": true,
+      "title": "Cfg Scale",
+      "type": "number"
+     },
+     "engine": {
+      "default": "auto",
+      "enum": [
+       "auto",
+       "breeze",
+       "kokoro"
+      ],
+      "title": "Engine",
+      "type": "string"
+     },
+     "format": {
+      "default": "wav",
+      "enum": [
+       "wav",
+       "flac",
+       "mp3",
+       "ogg",
+       "pcm"
+      ],
+      "title": "Format",
+      "type": "string"
+     },
+     "instruction": {
+      "description": "Breeze: describe the voice (design) or the delivery (direction)",
+      "nullable": true,
+      "title": "Instruction",
+      "type": "string"
+     },
+     "name": {
+      "description": "custom voice name, a Kokoro voice (af_heart...), or omit",
+      "nullable": true,
+      "title": "Name",
+      "type": "string"
+     },
+     "no_save": {
+      "default": false,
+      "description": "return the audio only; nothing is written to disk",
+      "title": "No Save",
+      "type": "boolean"
+     },
+     "request_id": {
+      "description": "client-chosen id (not for stream): sending the same id again, e.g. after a dropped connection, returns that request's result instead of generating again",
+      "maxLength": 64,
+      "nullable": true,
+      "title": "Request Id",
+      "type": "string"
+     },
+     "save_dir": {
+      "description": "folder to save into (on the server); relative paths are under the default outputs folder (~/Music/TTS)",
+      "nullable": true,
+      "title": "Save Dir",
+      "type": "string"
+     },
+     "seed": {
+      "default": 42,
+      "title": "Seed",
+      "type": "integer"
+     },
+     "speed": {
+      "default": 1.0,
+      "description": "Kokoro only",
+      "exclusiveMinimum": 0.25,
+      "maximum": 4.0,
+      "title": "Speed",
+      "type": "number"
+     },
+     "stream": {
+      "default": false,
+      "description": "stream raw PCM s16le as it is generated",
+      "title": "Stream",
+      "type": "boolean"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     },
+     "timings": {
+      "default": false,
+      "description": "return JSON {audio (base64), timings: {duration, words}} instead of audio; Kokoro gives native word times, Breeze is aligned with Whisper",
+      "title": "Timings",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "title": "SpeechRequest",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_speech",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/speech",
+  "response": "audio",
+  "summary": "Speech",
+  "tag": "speech",
+  "tool": {
+   "confirm": false,
+   "name": "speak"
+  }
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "description": "OpenAI-style body, so tools that speak /v1/audio/speech work unchanged.",
+    "properties": {
+     "input": {
+      "title": "Input",
+      "type": "string"
+     },
+     "instructions": {
+      "nullable": true,
+      "title": "Instructions",
+      "type": "string"
+     },
+     "model": {
+      "default": "auto",
+      "title": "Model",
+      "type": "string"
+     },
+     "no_save": {
+      "default": false,
+      "title": "No Save",
+      "type": "boolean"
+     },
+     "response_format": {
+      "default": "mp3",
+      "enum": [
+       "wav",
+       "flac",
+       "mp3",
+       "ogg",
+       "pcm"
+      ],
+      "title": "Response Format",
+      "type": "string"
+     },
+     "save_dir": {
+      "nullable": true,
+      "title": "Save Dir",
+      "type": "string"
+     },
+     "speed": {
+      "default": 1.0,
+      "title": "Speed",
+      "type": "number"
+     },
+     "voice": {
+      "nullable": true,
+      "title": "Voice",
+      "type": "string"
+     }
+    },
+    "required": [
+     "input"
+    ],
+    "title": "OpenAISpeech",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_audio_speech",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/audio/speech",
+  "response": "audio",
+  "summary": "Openai Speech",
+  "tag": "audio",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "Word timings for finished clips (e.g. video-maker captions and cues), via Whisper.\n\nmultipart: `items` = JSON [{\"id\", \"text\", \"language\"?}], plus one file `audio_<id>` per item.\nReturns {\"items\": {id: {\"duration\", \"sample_rate\", \"words\": [{\"w\", \"start\", \"end\"}]}}}.",
+  "destructive": false,
+  "id": "post_v1_align",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/align",
+  "response": "json",
+  "summary": "Align",
+  "tag": "align",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_enhance_tags",
+  "method": "GET",
+  "params": [],
+  "path": "/v1/enhance/tags",
+  "response": "json",
+  "summary": "Enhance Tags",
+  "tag": "enhance",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_enhance_models",
+  "method": "GET",
+  "params": [],
+  "path": "/v1/enhance/models",
+  "response": "json",
+  "summary": "Enhance Models",
+  "tag": "enhance",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "direction": {
+      "description": "the current instruction, as context for the LLM",
+      "nullable": true,
+      "title": "Direction",
+      "type": "string"
+     },
+     "model": {
+      "description": "LLM model id; default LOCALTTS_LLM_MODEL",
+      "nullable": true,
+      "title": "Model",
+      "type": "string"
+     },
+     "style": {
+      "default": "subtle",
+      "enum": [
+       "subtle",
+       "expressive"
+      ],
+      "title": "Style",
+      "type": "string"
+     },
+     "text": {
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "title": "EnhanceRequest",
+    "type": "object"
+   }
+  },
+  "description": "Add Breeze vocal-event tags and suggest a delivery, using an LLM. Returns text for review.",
+  "destructive": false,
+  "id": "post_v1_enhance",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/enhance",
+  "response": "json",
+  "summary": "Enhance Text",
+  "tag": "enhance",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_outputs",
+  "method": "GET",
+  "params": [],
+  "path": "/v1/outputs",
+  "response": "json",
+  "summary": "List Outputs",
+  "tag": "outputs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_outputs_filename",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "filename",
+    "required": true,
+    "schema": {
+     "title": "Filename",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/outputs/{filename}",
+  "response": "file",
+  "summary": "Get Output",
+  "tag": "outputs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_v1_outputs_filename",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "filename",
+    "required": true,
+    "schema": {
+     "title": "Filename",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/outputs/{filename}",
+  "response": "json",
+  "summary": "Delete Output",
+  "tag": "outputs",
+  "tool": null
+ }
+]

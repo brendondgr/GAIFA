@@ -1,0 +1,2094 @@
+[
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_health",
+  "method": "GET",
+  "params": [],
+  "path": "/health",
+  "response": "json",
+  "summary": "Health",
+  "tag": "health",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_path",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "path",
+    "required": true,
+    "schema": {
+     "title": "Path",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/{path}",
+  "response": "json",
+  "summary": "Proxy V1",
+  "tag": "openai-compatible",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_path",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "path",
+    "required": true,
+    "schema": {
+     "title": "Path",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/{path}",
+  "response": "json",
+  "summary": "Proxy V1",
+  "tag": "openai-compatible",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "put_v1_path",
+  "method": "PUT",
+  "params": [
+   {
+    "in": "path",
+    "name": "path",
+    "required": true,
+    "schema": {
+     "title": "Path",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/{path}",
+  "response": "json",
+  "summary": "Proxy V1",
+  "tag": "openai-compatible",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "patch_v1_path",
+  "method": "PATCH",
+  "params": [
+   {
+    "in": "path",
+    "name": "path",
+    "required": true,
+    "schema": {
+     "title": "Path",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/{path}",
+  "response": "json",
+  "summary": "Proxy V1",
+  "tag": "openai-compatible",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_v1_path",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "path",
+    "required": true,
+    "schema": {
+     "title": "Path",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/{path}",
+  "response": "json",
+  "summary": "Proxy V1",
+  "tag": "openai-compatible",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_endpoints",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/endpoints",
+  "response": "json",
+  "summary": "List Endpoints",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "alias": {
+      "maxLength": 64,
+      "nullable": true,
+      "title": "Alias",
+      "type": "string"
+     },
+     "available_models": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 200,
+      "title": "Available Models",
+      "type": "array"
+     },
+     "base_url": {
+      "minLength": 1,
+      "title": "Base Url",
+      "type": "string"
+     },
+     "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "kind": {
+      "enum": [
+       "local",
+       "remote_direct",
+       "remote_tunnel"
+      ],
+      "nullable": true,
+      "title": "Kind",
+      "type": "string"
+     },
+     "model_override": {
+      "nullable": true,
+      "title": "Model Override",
+      "type": "string"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "priority": {
+      "default": 100,
+      "title": "Priority",
+      "type": "integer"
+     },
+     "protocol": {
+      "default": "openai",
+      "enum": [
+       "openai",
+       "opencode"
+      ],
+      "title": "Protocol",
+      "type": "string"
+     },
+     "server_type": {
+      "default": "openai",
+      "enum": [
+       "llama.cpp",
+       "vLLM",
+       "ollama",
+       "openai",
+       "opencode"
+      ],
+      "title": "Server Type",
+      "type": "string"
+     },
+     "tunnel_command": {
+      "nullable": true,
+      "title": "Tunnel Command",
+      "type": "string"
+     },
+     "tunnel_id": {
+      "nullable": true,
+      "title": "Tunnel Id",
+      "type": "string"
+     },
+     "tunnel_local_port": {
+      "nullable": true,
+      "title": "Tunnel Local Port",
+      "type": "integer"
+     },
+     "upstream_key": {
+      "nullable": true,
+      "title": "Upstream Key",
+      "type": "string"
+     },
+     "weight": {
+      "default": 1,
+      "title": "Weight",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "name",
+     "base_url"
+    ],
+    "title": "EndpointCreate",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_endpoints",
+  "method": "POST",
+  "params": [],
+  "path": "/admin/endpoints",
+  "response": "json",
+  "summary": "Create Endpoint",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "alias": {
+      "nullable": true,
+      "title": "Alias",
+      "type": "string"
+     },
+     "available_models": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 200,
+      "nullable": true,
+      "title": "Available Models",
+      "type": "array"
+     },
+     "base_url": {
+      "nullable": true,
+      "title": "Base Url",
+      "type": "string"
+     },
+     "enabled": {
+      "nullable": true,
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "kind": {
+      "enum": [
+       "local",
+       "remote_direct",
+       "remote_tunnel"
+      ],
+      "nullable": true,
+      "title": "Kind",
+      "type": "string"
+     },
+     "model_override": {
+      "nullable": true,
+      "title": "Model Override",
+      "type": "string"
+     },
+     "name": {
+      "nullable": true,
+      "title": "Name",
+      "type": "string"
+     },
+     "priority": {
+      "nullable": true,
+      "title": "Priority",
+      "type": "integer"
+     },
+     "protocol": {
+      "enum": [
+       "openai",
+       "opencode"
+      ],
+      "nullable": true,
+      "title": "Protocol",
+      "type": "string"
+     },
+     "server_type": {
+      "enum": [
+       "llama.cpp",
+       "vLLM",
+       "ollama",
+       "openai",
+       "opencode"
+      ],
+      "nullable": true,
+      "title": "Server Type",
+      "type": "string"
+     },
+     "tunnel_command": {
+      "nullable": true,
+      "title": "Tunnel Command",
+      "type": "string"
+     },
+     "tunnel_id": {
+      "nullable": true,
+      "title": "Tunnel Id",
+      "type": "string"
+     },
+     "tunnel_local_port": {
+      "nullable": true,
+      "title": "Tunnel Local Port",
+      "type": "integer"
+     },
+     "upstream_key": {
+      "nullable": true,
+      "title": "Upstream Key",
+      "type": "string"
+     },
+     "weight": {
+      "nullable": true,
+      "title": "Weight",
+      "type": "integer"
+     }
+    },
+    "title": "EndpointPatch",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "patch_admin_endpoints_eid",
+  "method": "PATCH",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}",
+  "response": "json",
+  "summary": "Patch Endpoint",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_admin_endpoints_eid",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}",
+  "response": "empty",
+  "summary": "Delete Endpoint",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_endpoints_eid_activate",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}/activate",
+  "response": "json",
+  "summary": "Activate Endpoint",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_endpoints_eid_test",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}/test",
+  "response": "json",
+  "summary": "Test Endpoint",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_endpoints_tunnel_sessions",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/endpoints/tunnel-sessions",
+  "response": "json",
+  "summary": "Tunnel Sessions",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_endpoints_eid_routes",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}/routes",
+  "response": "json",
+  "summary": "List Routes",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "command": {
+      "minLength": 1,
+      "title": "Command",
+      "type": "string"
+     },
+     "label": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "label",
+     "command"
+    ],
+    "title": "TunnelRouteCreate",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_endpoints_eid_routes",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}/routes",
+  "response": "json",
+  "summary": "Create Route",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "command": {
+      "nullable": true,
+      "title": "Command",
+      "type": "string"
+     },
+     "label": {
+      "nullable": true,
+      "title": "Label",
+      "type": "string"
+     }
+    },
+    "title": "TunnelRoutePatch",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "patch_admin_endpoints_eid_routes_rid",
+  "method": "PATCH",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   },
+   {
+    "in": "path",
+    "name": "rid",
+    "required": true,
+    "schema": {
+     "title": "Rid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}/routes/{rid}",
+  "response": "json",
+  "summary": "Patch Route",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_admin_endpoints_eid_routes_rid",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   },
+   {
+    "in": "path",
+    "name": "rid",
+    "required": true,
+    "schema": {
+     "title": "Rid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}/routes/{rid}",
+  "response": "empty",
+  "summary": "Delete Route",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_endpoints_eid_routes_rid_activate",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   },
+   {
+    "in": "path",
+    "name": "rid",
+    "required": true,
+    "schema": {
+     "title": "Rid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}/routes/{rid}/activate",
+  "response": "json",
+  "summary": "Activate Route",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_endpoints_eid_routes_rid_test",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "eid",
+    "required": true,
+    "schema": {
+     "title": "Eid",
+     "type": "string"
+    }
+   },
+   {
+    "in": "path",
+    "name": "rid",
+    "required": true,
+    "schema": {
+     "title": "Rid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/endpoints/{eid}/routes/{rid}/test",
+  "response": "json",
+  "summary": "Test Route",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_ssh_hosts",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/ssh/hosts",
+  "response": "json",
+  "summary": "Ssh Hosts",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_ssh_resolve",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "host",
+    "required": true,
+    "schema": {
+     "title": "Host",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/ssh/resolve",
+  "response": "json",
+  "summary": "Ssh Resolve",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_endpoints_health",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/endpoints/health",
+  "response": "json",
+  "summary": "Pool Health",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_router",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/router",
+  "response": "json",
+  "summary": "Get Router",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "pinned_id": {
+      "nullable": true,
+      "title": "Pinned Id",
+      "type": "string"
+     },
+     "policy": {
+      "enum": [
+       "manual",
+       "priority"
+      ],
+      "nullable": true,
+      "title": "Policy",
+      "type": "string"
+     }
+    },
+    "title": "RouterUpdate",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "put_admin_router",
+  "method": "PUT",
+  "params": [],
+  "path": "/admin/router",
+  "response": "json",
+  "summary": "Put Router",
+  "tag": "endpoints",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_settings",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/settings",
+  "response": "json",
+  "summary": "Get Settings",
+  "tag": "settings",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "allow_cors": {
+      "nullable": true,
+      "title": "Allow Cors",
+      "type": "boolean"
+     },
+     "auto_failover": {
+      "nullable": true,
+      "title": "Auto Failover",
+      "type": "boolean"
+     },
+     "inject_stream_usage": {
+      "nullable": true,
+      "title": "Inject Stream Usage",
+      "type": "boolean"
+     },
+     "log_bodies": {
+      "nullable": true,
+      "title": "Log Bodies",
+      "type": "boolean"
+     },
+     "proxy_port": {
+      "nullable": true,
+      "title": "Proxy Port",
+      "type": "integer"
+     },
+     "queue_requests": {
+      "nullable": true,
+      "title": "Queue Requests",
+      "type": "boolean"
+     },
+     "retention_days": {
+      "nullable": true,
+      "title": "Retention Days",
+      "type": "integer"
+     },
+     "stream_passthrough": {
+      "nullable": true,
+      "title": "Stream Passthrough",
+      "type": "boolean"
+     }
+    },
+    "title": "SettingsPatch",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "put_admin_settings",
+  "method": "PUT",
+  "params": [],
+  "path": "/admin/settings",
+  "response": "json",
+  "summary": "Put Settings",
+  "tag": "settings",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_proxy",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/proxy",
+  "response": "json",
+  "summary": "Proxy Info",
+  "tag": "settings",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_logs_frontend",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "limit",
+    "required": false,
+    "schema": {
+     "default": 100,
+     "title": "Limit",
+     "type": "integer"
+    }
+   }
+  ],
+  "path": "/admin/logs/frontend",
+  "response": "json",
+  "summary": "Recent Frontend Logs",
+  "tag": "settings",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "events": {
+      "items": {
+       "properties": {
+        "detail": {
+         "maxLength": 4000,
+         "nullable": true,
+         "title": "Detail",
+         "type": "string"
+        },
+        "event": {
+         "maxLength": 200,
+         "minLength": 1,
+         "title": "Event",
+         "type": "string"
+        },
+        "level": {
+         "default": "info",
+         "enum": [
+          "debug",
+          "info",
+          "warn",
+          "error"
+         ],
+         "title": "Level",
+         "type": "string"
+        },
+        "ts": {
+         "nullable": true,
+         "title": "Ts",
+         "type": "number"
+        }
+       },
+       "required": [
+        "event"
+       ],
+       "title": "FrontendLogEvent",
+       "type": "object"
+      },
+      "maxItems": 200,
+      "title": "Events",
+      "type": "array"
+     }
+    },
+    "required": [
+     "events"
+    ],
+    "title": "FrontendLogBatch",
+    "type": "object"
+   }
+  },
+  "description": "Everything the dashboard does lands in the server log stream + DB.",
+  "destructive": false,
+  "id": "post_admin_logs_frontend",
+  "method": "POST",
+  "params": [],
+  "path": "/admin/logs/frontend",
+  "response": "json",
+  "summary": "Ingest Frontend Logs",
+  "tag": "settings",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_summary",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "window",
+    "required": false,
+    "schema": {
+     "default": "24h",
+     "nullable": true,
+     "title": "Window",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "from",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "From",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "to",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "To",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "endpoint_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Endpoint Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "model",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Model",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/stats/summary",
+  "response": "json",
+  "summary": "Summary",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_volume",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "detail",
+    "required": false,
+    "schema": {
+     "default": "summary",
+     "title": "Detail",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "window",
+    "required": false,
+    "schema": {
+     "default": "24h",
+     "nullable": true,
+     "title": "Window",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "from",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "From",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "to",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "To",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "endpoint_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Endpoint Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "model",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Model",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/stats/volume",
+  "response": "json",
+  "summary": "Volume",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_tokens_timeseries",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "detail",
+    "required": false,
+    "schema": {
+     "default": "summary",
+     "title": "Detail",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "window",
+    "required": false,
+    "schema": {
+     "default": "24h",
+     "nullable": true,
+     "title": "Window",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "from",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "From",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "to",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "To",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "endpoint_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Endpoint Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "model",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Model",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/stats/tokens/timeseries",
+  "response": "json",
+  "summary": "Tokens Timeseries",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_tokens_by_hour",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "window",
+    "required": false,
+    "schema": {
+     "default": "24h",
+     "nullable": true,
+     "title": "Window",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "from",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "From",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "to",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "To",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "endpoint_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Endpoint Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "model",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Model",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/stats/tokens/by-hour",
+  "response": "json",
+  "summary": "Tokens By Hour",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_tokens_by_day",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "window",
+    "required": false,
+    "schema": {
+     "default": "24h",
+     "nullable": true,
+     "title": "Window",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "from",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "From",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "to",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "To",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "endpoint_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Endpoint Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "model",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Model",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/stats/tokens/by-day",
+  "response": "json",
+  "summary": "Tokens By Day",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_by_model",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "window",
+    "required": false,
+    "schema": {
+     "default": "24h",
+     "nullable": true,
+     "title": "Window",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "from",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "From",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "to",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "To",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "endpoint_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Endpoint Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "model",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Model",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/stats/by-model",
+  "response": "json",
+  "summary": "By Model",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_by_endpoint",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "window",
+    "required": false,
+    "schema": {
+     "default": "24h",
+     "nullable": true,
+     "title": "Window",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "from",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "From",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "to",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "To",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "endpoint_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Endpoint Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "model",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Model",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/stats/by-endpoint",
+  "response": "json",
+  "summary": "By Endpoint",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_latency",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "window",
+    "required": false,
+    "schema": {
+     "default": "24h",
+     "nullable": true,
+     "title": "Window",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "from",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "From",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "to",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "To",
+     "type": "number"
+    }
+   },
+   {
+    "in": "query",
+    "name": "endpoint_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Endpoint Id",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "model",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Model",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/stats/latency",
+  "response": "json",
+  "summary": "Latency",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_stats_recent",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "limit",
+    "required": false,
+    "schema": {
+     "default": 90,
+     "title": "Limit",
+     "type": "integer"
+    }
+   }
+  ],
+  "path": "/admin/stats/recent",
+  "response": "json",
+  "summary": "Recent",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "In-flight requests plus the admission gate's own view.\n\n``in_flight`` counts everything relay is carrying (including requests\nstill waiting for a slot); ``active``/``waiting`` split that into what is\nactually at an upstream versus queued, which is the difference between\n\"the model server is slow\" and \"relay is about to start shedding\".",
+  "destructive": false,
+  "id": "get_admin_stats_live",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/stats/live",
+  "response": "json",
+  "summary": "Live",
+  "tag": "stats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_tunnels",
+  "method": "GET",
+  "params": [],
+  "path": "/admin/tunnels",
+  "response": "json",
+  "summary": "List Tunnels",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "compress": {
+      "default": true,
+      "title": "Compress",
+      "type": "boolean"
+     },
+     "enabled": {
+      "default": false,
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "extra_opts": {
+      "nullable": true,
+      "title": "Extra Opts",
+      "type": "string"
+     },
+     "keepalive": {
+      "default": true,
+      "title": "Keepalive",
+      "type": "boolean"
+     },
+     "key_path": {
+      "nullable": true,
+      "title": "Key Path",
+      "type": "string"
+     },
+     "local_port": {
+      "title": "Local Port",
+      "type": "integer"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "remote_host": {
+      "default": "127.0.0.1",
+      "title": "Remote Host",
+      "type": "string"
+     },
+     "remote_port": {
+      "title": "Remote Port",
+      "type": "integer"
+     },
+     "ssh_host": {
+      "title": "Ssh Host",
+      "type": "string"
+     },
+     "ssh_port": {
+      "default": 22,
+      "title": "Ssh Port",
+      "type": "integer"
+     },
+     "ssh_user": {
+      "title": "Ssh User",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name",
+     "ssh_host",
+     "ssh_user",
+     "remote_port",
+     "local_port"
+    ],
+    "title": "TunnelCreate",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_tunnels",
+  "method": "POST",
+  "params": [],
+  "path": "/admin/tunnels",
+  "response": "json",
+  "summary": "Create Tunnel",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "compress": {
+      "nullable": true,
+      "title": "Compress",
+      "type": "boolean"
+     },
+     "enabled": {
+      "nullable": true,
+      "title": "Enabled",
+      "type": "boolean"
+     },
+     "extra_opts": {
+      "nullable": true,
+      "title": "Extra Opts",
+      "type": "string"
+     },
+     "keepalive": {
+      "nullable": true,
+      "title": "Keepalive",
+      "type": "boolean"
+     },
+     "key_path": {
+      "nullable": true,
+      "title": "Key Path",
+      "type": "string"
+     },
+     "local_port": {
+      "nullable": true,
+      "title": "Local Port",
+      "type": "integer"
+     },
+     "name": {
+      "nullable": true,
+      "title": "Name",
+      "type": "string"
+     },
+     "remote_host": {
+      "nullable": true,
+      "title": "Remote Host",
+      "type": "string"
+     },
+     "remote_port": {
+      "nullable": true,
+      "title": "Remote Port",
+      "type": "integer"
+     },
+     "ssh_host": {
+      "nullable": true,
+      "title": "Ssh Host",
+      "type": "string"
+     },
+     "ssh_port": {
+      "nullable": true,
+      "title": "Ssh Port",
+      "type": "integer"
+     },
+     "ssh_user": {
+      "nullable": true,
+      "title": "Ssh User",
+      "type": "string"
+     }
+    },
+    "title": "TunnelPatch",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "patch_admin_tunnels_tid",
+  "method": "PATCH",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}",
+  "response": "json",
+  "summary": "Patch Tunnel",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_admin_tunnels_tid",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}",
+  "response": "empty",
+  "summary": "Delete Tunnel",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_tunnels_tid_start",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}/start",
+  "response": "json",
+  "summary": "Start Tunnel",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_tunnels_tid_stop",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}/stop",
+  "response": "json",
+  "summary": "Stop Tunnel",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_tunnels_tid_test",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}/test",
+  "response": "json",
+  "summary": "Test Tunnel",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_tunnels_tid_command",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}/command",
+  "response": "json",
+  "summary": "Tunnel Command",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_tunnels_tid_session",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}/session",
+  "response": "json",
+  "summary": "Tunnel Session Status",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_tunnels_tid_session_connect",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}/session/connect",
+  "response": "json",
+  "summary": "Tunnel Session Connect",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_tunnels_tid_session_disconnect",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}/session/disconnect",
+  "response": "json",
+  "summary": "Tunnel Session Disconnect",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "text": {
+      "maxLength": 4096,
+      "title": "Text",
+      "type": "string"
+     }
+    },
+    "required": [
+     "text"
+    ],
+    "title": "TunnelRespond",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_admin_tunnels_tid_session_respond",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "tid",
+    "required": true,
+    "schema": {
+     "title": "Tid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/tunnels/{tid}/session/respond",
+  "response": "json",
+  "summary": "Tunnel Session Respond",
+  "tag": "tunnels",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_admin_registrations",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "owner",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Owner",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/registrations",
+  "response": "json",
+  "summary": "List Registrations",
+  "tag": "registrations",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "description": "PUT /admin/registrations/{key}: make an endpoint exist, idempotently.\n\nGive ``port`` for a server on this machine (``host`` defaults to\n127.0.0.1 and the URL becomes ``http://host:port/v1``), or a full\n``base_url``.",
+    "properties": {
+     "alias": {
+      "maxLength": 64,
+      "nullable": true,
+      "title": "Alias",
+      "type": "string"
+     },
+     "available_models": {
+      "items": {
+       "type": "string"
+      },
+      "maxItems": 200,
+      "title": "Available Models",
+      "type": "array"
+     },
+     "base_url": {
+      "nullable": true,
+      "title": "Base Url",
+      "type": "string"
+     },
+     "host": {
+      "default": "127.0.0.1",
+      "maxLength": 253,
+      "title": "Host",
+      "type": "string"
+     },
+     "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+     },
+     "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+     },
+     "owner": {
+      "default": "external",
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Owner",
+      "type": "string"
+     },
+     "port": {
+      "maximum": 65535.0,
+      "minimum": 1.0,
+      "nullable": true,
+      "title": "Port",
+      "type": "integer"
+     },
+     "server_type": {
+      "default": "llama.cpp",
+      "enum": [
+       "llama.cpp",
+       "vLLM",
+       "ollama",
+       "openai",
+       "opencode"
+      ],
+      "title": "Server Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "RegistrationUpsert",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "put_admin_registrations_key",
+  "method": "PUT",
+  "params": [
+   {
+    "in": "path",
+    "name": "key",
+    "required": true,
+    "schema": {
+     "title": "Key",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/registrations/{key}",
+  "response": "json",
+  "summary": "Upsert Registration",
+  "tag": "registrations",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_admin_registrations_key",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "key",
+    "required": true,
+    "schema": {
+     "title": "Key",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/admin/registrations/{key}",
+  "response": "empty",
+  "summary": "Delete Registration",
+  "tag": "registrations",
+  "tool": null
+ }
+]

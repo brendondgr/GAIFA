@@ -1,0 +1,510 @@
+[
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1",
+  "method": "GET",
+  "params": [],
+  "path": "/v1",
+  "response": "json",
+  "summary": "Info",
+  "tag": "general",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_health",
+  "method": "GET",
+  "params": [],
+  "path": "/health",
+  "response": "json",
+  "summary": "Health",
+  "tag": "health",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "Every setting with type, default, range and help; drives the UI's settings menu.",
+  "destructive": false,
+  "id": "get_v1_options",
+  "method": "GET",
+  "params": [],
+  "path": "/v1/options",
+  "response": "json",
+  "summary": "Options",
+  "tag": "options",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_presets",
+  "method": "GET",
+  "params": [],
+  "path": "/v1/presets",
+  "response": "json",
+  "summary": "Presets",
+  "tag": "presets",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "How long a request would take if queued now (queue wait + its own stages), without queueing.",
+  "destructive": false,
+  "id": "post_v1_estimate",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/estimate",
+  "response": "json",
+  "summary": "Estimate",
+  "tag": "estimate",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_load",
+  "method": "POST",
+  "params": [
+   {
+    "description": "shape, parts or both",
+    "in": "query",
+    "name": "models",
+    "required": false,
+    "schema": {
+     "default": "shape,parts",
+     "description": "shape, parts or both",
+     "title": "Models",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/load",
+  "response": "json",
+  "summary": "Load",
+  "tag": "load",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_unload",
+  "method": "POST",
+  "params": [
+   {
+    "description": "also cancel a running job",
+    "in": "query",
+    "name": "force",
+    "required": false,
+    "schema": {
+     "default": false,
+     "description": "also cancel a running job",
+     "title": "Force",
+     "type": "boolean"
+    }
+   }
+  ],
+  "path": "/v1/unload",
+  "response": "json",
+  "summary": "Unload",
+  "tag": "unload",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_jobs",
+  "method": "GET",
+  "params": [
+   {
+    "in": "query",
+    "name": "chat_id",
+    "required": false,
+    "schema": {
+     "nullable": true,
+     "title": "Chat Id",
+     "type": "string"
+    }
+   },
+   {
+    "description": "e.g. queued,running",
+    "in": "query",
+    "name": "status",
+    "required": false,
+    "schema": {
+     "description": "e.g. queued,running",
+     "nullable": true,
+     "title": "Status",
+     "type": "string"
+    }
+   },
+   {
+    "in": "query",
+    "name": "limit",
+    "required": false,
+    "schema": {
+     "default": 100,
+     "maximum": 1000,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    }
+   }
+  ],
+  "path": "/v1/jobs",
+  "response": "json",
+  "summary": "List Jobs",
+  "tag": "jobs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "Queue a job. Body = JobRequest (see /v1/options for every field). `chat_id: \"new\"` starts a chat\ntitled from the prompt; `parent_id` continues from an earlier job's mesh or parts.",
+  "destructive": false,
+  "id": "post_v1_jobs",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/jobs",
+  "response": "json",
+  "summary": "Create Job",
+  "tag": "jobs",
+  "tool": {
+   "confirm": false,
+   "name": "make_3d"
+  }
+ },
+ {
+  "body": {
+   "content_type": "multipart/form-data",
+   "schema": {
+    "properties": {
+     "job": {
+      "default": "{\"stages\": [\"parts\", \"preview\"]}",
+      "description": "JobRequest JSON (without the shape stage)",
+      "title": "Job",
+      "type": "string"
+     },
+     "mesh": {
+      "contentMediaType": "application/octet-stream",
+      "description": "mesh to split / rig: .glb .gltf .obj .ply .stl .off",
+      "format": "binary",
+      "title": "Mesh",
+      "type": "string"
+     }
+    },
+    "required": [
+     "mesh"
+    ],
+    "title": "Body_create_job_upload_v1_jobs_upload_post",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_jobs_upload",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/jobs/upload",
+  "response": "json",
+  "summary": "Create Job Upload",
+  "tag": "jobs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_jobs_jid",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "jid",
+    "required": true,
+    "schema": {
+     "title": "Jid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/jobs/{jid}",
+  "response": "json",
+  "summary": "Get Job",
+  "tag": "jobs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_v1_jobs_jid",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "jid",
+    "required": true,
+    "schema": {
+     "title": "Jid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/jobs/{jid}",
+  "response": "json",
+  "summary": "Delete Job",
+  "tag": "jobs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "post_v1_jobs_jid_cancel",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "jid",
+    "required": true,
+    "schema": {
+     "title": "Jid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/jobs/{jid}/cancel",
+  "response": "json",
+  "summary": "Cancel Job",
+  "tag": "jobs",
+  "tool": {
+   "confirm": true,
+   "name": "cancel_3d"
+  }
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "nullable": true,
+    "properties": {
+     "new_seed": {
+      "default": true,
+      "title": "New Seed",
+      "type": "boolean"
+     }
+    },
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "Queue the same request again (same chat and parent); new_seed bumps the shape and parts seeds.",
+  "destructive": false,
+  "id": "post_v1_jobs_jid_retry",
+  "method": "POST",
+  "params": [
+   {
+    "in": "path",
+    "name": "jid",
+    "required": true,
+    "schema": {
+     "title": "Jid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/jobs/{jid}/retry",
+  "response": "json",
+  "summary": "Retry Job",
+  "tag": "jobs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_jobs_jid_download",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "jid",
+    "required": true,
+    "schema": {
+     "title": "Jid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/jobs/{jid}/download",
+  "response": "file",
+  "summary": "Job Zip",
+  "tag": "jobs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "SSE: `job` (full job object on every change), `worker` (state), `deleted`, `chat`.",
+  "destructive": false,
+  "id": "get_v1_events",
+  "method": "GET",
+  "params": [],
+  "path": "/v1/events",
+  "response": "stream",
+  "summary": "Events",
+  "tag": "events",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_jobs_jid_events",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "jid",
+    "required": true,
+    "schema": {
+     "title": "Jid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/jobs/{jid}/events",
+  "response": "stream",
+  "summary": "Job Events",
+  "tag": "jobs",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_chats",
+  "method": "GET",
+  "params": [],
+  "path": "/v1/chats",
+  "response": "json",
+  "summary": "List Chats",
+  "tag": "chats",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "nullable": true,
+    "properties": {
+     "title": {
+      "default": "New chat",
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "title": "Body",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "post_v1_chats",
+  "method": "POST",
+  "params": [],
+  "path": "/v1/chats",
+  "response": "json",
+  "summary": "Create Chat",
+  "tag": "chats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": false,
+  "id": "get_v1_chats_cid",
+  "method": "GET",
+  "params": [
+   {
+    "in": "path",
+    "name": "cid",
+    "required": true,
+    "schema": {
+     "title": "Cid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/chats/{cid}",
+  "response": "json",
+  "summary": "Get Chat",
+  "tag": "chats",
+  "tool": null
+ },
+ {
+  "body": {
+   "content_type": "application/json",
+   "schema": {
+    "properties": {
+     "title": {
+      "default": "New chat",
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "title": "ChatBody",
+    "type": "object"
+   }
+  },
+  "description": "",
+  "destructive": false,
+  "id": "patch_v1_chats_cid",
+  "method": "PATCH",
+  "params": [
+   {
+    "in": "path",
+    "name": "cid",
+    "required": true,
+    "schema": {
+     "title": "Cid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/chats/{cid}",
+  "response": "json",
+  "summary": "Rename Chat",
+  "tag": "chats",
+  "tool": null
+ },
+ {
+  "body": null,
+  "description": "",
+  "destructive": true,
+  "id": "delete_v1_chats_cid",
+  "method": "DELETE",
+  "params": [
+   {
+    "in": "path",
+    "name": "cid",
+    "required": true,
+    "schema": {
+     "title": "Cid",
+     "type": "string"
+    }
+   }
+  ],
+  "path": "/v1/chats/{cid}",
+  "response": "json",
+  "summary": "Delete Chat",
+  "tag": "chats",
+  "tool": null
+ }
+]

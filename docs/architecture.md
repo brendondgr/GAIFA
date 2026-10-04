@@ -188,7 +188,7 @@ ranges = ["7d", "30d"]
 span = 4                             # grid columns out of 12
 
 [api]
-hide = ["GET /ui/{path}"]
+hide = ["GET /ui/{path}"]              # globs on "METHOD /path", e.g. "* /admin/*"
 [api.responses]                     # response kinds FastAPI can't infer
 "POST /v1/speech" = "audio"
 "POST /v1/audio/speech" = "audio"

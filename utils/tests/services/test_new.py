@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+import random
 import shutil
 import socket
 import subprocess
@@ -14,7 +15,7 @@ import httpx
 import pytest
 
 from utils import manifest
-from utils.tests.conftest import REPO, free_port, wait_for
+from utils.tests.conftest import REPO, wait_for
 from utils.tests.services.conftest import until
 
 AIHUB = REPO / "bin" / "aihub"
@@ -28,8 +29,15 @@ def run(*args, root: Path, url: str = "http://127.0.0.1:1", timeout: float = 180
 
 @pytest.fixture
 def ports(root):
-    """A private port range for new mods, so tests never collide with real ones."""
-    lo = free_port()
+    """A private, currently free port range for new mods. It sits below Linux's ephemeral range
+    (32768+), where free_port() puts the other tests' mods and hubs, so none of them lands inside it."""
+    from utils.proc import port_listening
+
+    rng = random.Random()
+    for _ in range(100):
+        lo = rng.randrange(20000, 32000)
+        if not any(port_listening(p, timeout=0.05) for p in range(lo, lo + 31)):
+            break
     (root / "config.toml").write_text(f"[ports]\nnew_mods = [{lo}, {lo + 30}]\n")
     return lo
 

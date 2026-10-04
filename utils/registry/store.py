@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ValidationError
 
 from utils.paths import Paths, write_atomic
+from utils.registry import alerts as registry_alerts
 from utils.registry.model import ID_RE, VERSION, Entry, FileEntry, Patch, RegistryError, first_error, iso_ts
 
 if TYPE_CHECKING:
@@ -239,6 +240,7 @@ class Registry:
             k["count"] += 1
             k["size_bytes"] += _on_disk(v)
         totals = {"count": len(views), "size_bytes": sum(_on_disk(v) for v in views), "by_kind": by_kind}
+        registry_alerts.refresh(self, views)  # the statuses were just computed: keep the alerts in step
         kinds = {k for k in (kind or "").split(",") if k}
         needle = (q or "").strip().lower()
         shown = [
@@ -307,6 +309,7 @@ class Registry:
         self.entries[model_id] = new
         self.save()
         self.publish(model_id)
+        self.changed()
         return self.view(model_id)
 
     async def delete(self, model_id: str, files: bool = False) -> None:

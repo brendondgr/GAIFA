@@ -27,6 +27,7 @@ from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
 from utils.paths import DEFAULT_ROOT, Paths
 from utils.registry import Registry, RegistryError
+from utils.registry.alerts import Watcher as RegistryWatcher
 from utils.registry.verify import Verifier
 from utils.services import ServiceError, ServiceManager
 
@@ -128,6 +129,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             # 4. models registry: load registry.json (status is computed when read).
             hub.registry = Registry(paths, hub.bus, hub.activity, hub.alerts)
             hub.registry.load()
+            watcher = RegistryWatcher(hub.registry)
+            watcher.start()
+            stack.push_async_callback(watcher.close)
             verifier = Verifier(hub.registry)
             verifier.start()
             stack.push_async_callback(verifier.close)

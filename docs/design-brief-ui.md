@@ -367,7 +367,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `listModels(filter)` | `GET /api/models?kind=&service=&status=&q=` | `{ models: Model[], totals: Totals, disk: Disk }` |
 | `getModel(id)` | `GET /api/models/{id}` | `Model` |
 | `saveModel(id, patch)` | `PUT /api/models/{id}` body `ModelPatch` | `Model` |
-| `verifyModel(id)` | `POST /api/models/{id}/verify` | `202 Model` (status `verifying`) |
+| `verifyModel(id)` | `POST /api/models/{id}/verify[?reset=1]` | `202 Model` (status `verifying`, with `progress`; `model` events update it about once a second; `reset=1` records new checksums instead of comparing) |
 | `deleteModel(id, {files})` | `DELETE /api/models/{id}?files=0\|1` | `204` |
 | `scanModels()` | `POST /api/models/scan` | `{ discovered: Discovered[] }` |
 | `addModel(input)` | `POST /api/models` body `ModelInput` | `201 Model` |
@@ -382,7 +382,7 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 
 ### 6.3 Error codes to handle
 
-`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
+`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
 
 ### 6.4 Types
 

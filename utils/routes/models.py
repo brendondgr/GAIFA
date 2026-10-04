@@ -50,6 +50,11 @@ async def save_model(model_id: str, patch: Patch, request: Request) -> dict[str,
     return await _reg(request).update(model_id, patch)
 
 
+@router.post("/api/models/{model_id}/verify", status_code=202, summary="Hash a model's files in the background (reset=1 records new checksums)", response_model=Model, response_model_exclude_unset=True)
+async def verify_model(model_id: str, request: Request, reset: bool = False) -> dict[str, Any]:
+    return _reg(request).verifier.request(model_id, reset=reset)
+
+
 @router.delete("/api/models/{model_id}", status_code=204, summary="Remove a model from the registry (files=1 also deletes its files)")
 async def delete_model(model_id: str, request: Request, files: bool = False) -> Response:
     await _reg(request).delete(model_id, files=files)

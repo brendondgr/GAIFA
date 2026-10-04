@@ -54,6 +54,7 @@ class Registry:
         self.errors: list[str] = []  # why entries (or the whole file) were not loaded
         self.readonly: str | None = None  # set when registry.json can't be read: saves are refused
         self.progress: dict[str, float] = {}  # id → 0..1 while queued or being verified (verify.py)
+        self.verifier: Any = None  # verify.Verifier, set when it starts
         self._stamp: tuple[int, int] | None = None
 
     # ---- storage -------------------------------------------------------------

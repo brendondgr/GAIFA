@@ -51,9 +51,9 @@ def test_url_uses_config_port(tmp_path, monkeypatch):
     assert r.stdout.strip() == "http://127.0.0.1:7444/settings"
 
 
-def test_later_commands_name_their_phase():
-    r = run("models", "scan")
-    assert "Phase 3" in r.stderr
+def test_models_needs_a_running_hub():
+    r = run("models", "list")
+    assert r.returncode == 1 and "AIHub is not running" in r.stderr
 
 
 def test_human_formatting():

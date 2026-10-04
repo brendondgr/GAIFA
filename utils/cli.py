@@ -27,7 +27,6 @@ UNIT = "aihub.service"
 TEMPLATE = CODE / "bin" / "aihub.service.in"
 UNIT_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
 LINK = Path.home() / ".local" / "bin" / "aihub"
-LATER = {"models": "3"}
 WAIT_S = 600  # start/stop/restart wait for the mod to settle (start_timeout_s can be minutes)
 
 
@@ -150,6 +149,16 @@ def _mods() -> Any:
         import cli_mods  # type: ignore[no-redef]  # run as a script: utils/ is on sys.path
     cli_mods.cli = sys.modules[__name__]
     return cli_mods
+
+
+def cmd_models(args: argparse.Namespace) -> int:
+    """utils/cli_models.py, loaded only when a models command runs."""
+    try:
+        from utils import cli_models
+    except ImportError:
+        import cli_models  # type: ignore[no-redef]
+    cli_models.cli = sys.modules[__name__]
+    return cli_models.cmd_models(args)
 
 
 def cmd_new(args: argparse.Namespace) -> int:
@@ -366,11 +375,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 0 if all(ok for _, ok, _ in checks) else 1
 
 
-def cmd_later(args: argparse.Namespace) -> int:
-    print(f"aihub {args.cmd}: not built yet (plan Phase {LATER[args.cmd]})", file=sys.stderr)
-    return 2
-
-
 # --- entry --------------------------------------------------------------------
 
 
@@ -415,10 +419,19 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--start", action="store_true", help="start it first if it isn't running")
     p.set_defaults(fn=cmd_check)
-    p = sub.add_parser("models", help=f"scan | list | verify <id> (Phase {LATER['models']})")
-    p.add_argument("action", choices=["scan", "list", "verify"])
-    p.add_argument("id", nargs="?")
-    p.set_defaults(fn=cmd_later)
+    p = sub.add_parser("models", help="the models registry: list | show <id> | scan [--add] | verify <id>… | --all")
+    p.add_argument("action", choices=["list", "show", "scan", "verify"])
+    p.add_argument("ids", nargs="*", metavar="id")
+    p.add_argument("--kind", help="list: only these kinds (comma-separated)")
+    p.add_argument("--status", help="list: only this status")
+    p.add_argument("--service", help="list: only models this mod uses")
+    p.add_argument("-q", help="list: search id, name, path and tags")
+    p.add_argument("--problems", action="store_true", help="list: also print each model's problems")
+    p.add_argument("--add", action="store_true", help="scan: register everything found, with the suggested names")
+    p.add_argument("--all", action="store_true", help="verify: every model with files on disk")
+    p.add_argument("--reset", action="store_true", help="verify: forget the recorded checksums and record new ones")
+    p.add_argument("--no-wait", action="store_true", help="verify: queue them and return")
+    p.set_defaults(fn=cmd_models)
     return ap
 
 

@@ -27,6 +27,7 @@ from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
 from utils.paths import DEFAULT_ROOT, Paths
 from utils.registry import Registry, RegistryError
+from utils.registry.verify import Verifier
 from utils.services import ServiceError, ServiceManager
 
 DEMO_MODS = DEFAULT_ROOT / "utils" / "tests" / "fixtures" / "mods"
@@ -127,6 +128,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             # 4. models registry: load registry.json (status is computed when read).
             hub.registry = Registry(paths, hub.bus, hub.activity, hub.alerts)
             hub.registry.load()
+            verifier = Verifier(hub.registry)
+            verifier.start()
+            stack.push_async_callback(verifier.close)
             # 5. services: find manifests, adopt running units, autostart in the background.
             hub.services = ServiceManager(
                 paths, hub.config, hub.backend, hub.bus, hub.activity, hub.alerts, hub.port,

@@ -223,7 +223,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **Without a status route:** `load = "n/a"`, unless the mod has `[memory]`. Then the load state follows the hub's own load/unload calls, confirmed by memory.
   - *As built:* `utils/status.py`. `validate()` keeps the valid parts of a status body and lists the problems (2.10 reports them). Changes to load, busy, stats, the estimate or jobs publish a `service` event; `idle_s` alone doesn't. A hub-started `loading`/`unloading` holds until the mod confirms. A job that disappears while active is published as `done`; jobs still active when the mod stops become `cancelled` (`failed` when it crashed). The fake mod gained `POST /v1/jobs` and `FAKE_BAD_STATUS=1`.
   *Done when:* tests cover the stats, load and jobs mapping, events only on change, and a malformed status body.
-- [ ] **2.5 `utils/proxy.py`: `ANY /api/s/{id}/{path:path}`.**
+- [x] **2.5 `utils/proxy.py`: `ANY /api/s/{id}/{path:path}`.**
   - **Streaming both ways:** the request body streams to httpx, and the response is `StreamingResponse(resp.aiter_raw())` with `resp.aclose` as a background task.
   - **Headers:** drop hop-by-hop headers; add `X-Forwarded-Prefix: /api/s/<id>`.
   - **Timeouts:** connect 3 s, write 300 s (uploads), read none (streams), pool 10 s.
@@ -232,6 +232,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **No GZip middleware** on this route.
   - **Client disconnects** close the upstream request.
   - Leave a hook point for memory triggers (Phase 5.5).
+  - *As built:* the path is forwarded still percent-encoded, as the client sent it. Headers named in `Connection:` are dropped too, and `X-Forwarded-Host` / `-Proto` are added. `Location` headers pointing at the mod (`/x` or `http://127.0.0.1:<port>/x`) are rewritten to `/api/s/<id>/x`. The proxy client ignores `HTTP(S)_PROXY`. `ServiceManager.before_proxy` is the 5.5 hook. Tests run against a real uvicorn server (the in-process ASGI client buffers responses).
   *Done when:* tests cover JSON, binary audio, a 50 MB multipart upload, SSE arriving unbuffered (first event in under 200 ms), 4xx passthrough, and a mod that's down → 503.
 - [ ] **2.6 `utils/operations.py` + `GET /api/services/{id}/operations`.**
   - **Fetching:** fetch the mod's OpenAPI each time it becomes ready, and cache it per process start.

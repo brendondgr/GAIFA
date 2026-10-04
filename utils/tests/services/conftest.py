@@ -62,8 +62,11 @@ class Rig:
     def config(self, text: str) -> None:
         self.config_lines.append(text)
 
-    async def manager(self, autostart: bool = False, boot: bool = True, timing: Timing = FAST) -> ServiceManager:
+    def write_config(self) -> None:
         (self.root / "config.toml").write_text("\n".join(self.config_lines) + "\n")
+
+    async def manager(self, autostart: bool = False, boot: bool = True, timing: Timing = FAST) -> ServiceManager:
+        self.write_config()
         cfg = config.load(self.root / "config.toml")
         paths = config.build_paths(cfg, self.root)
         paths.ensure()
@@ -135,3 +138,50 @@ async def until(fn, timeout: float = 10, every: float = 0.02):
         if time.monotonic() > deadline:
             raise TimeoutError("condition not met")
         await asyncio.sleep(every)
+
+
+class Served:
+    """The hub app on a real port (uvicorn in this event loop), for streaming tests."""
+
+    def __init__(self, app, port: int) -> None:
+        self.app, self.port = app, port
+        self.url = f"http://127.0.0.1:{port}"
+
+    @property
+    def hub(self):
+        return self.app.state.hub
+
+    @property
+    def services(self):
+        return self.app.state.hub.services
+
+
+@pytest.fixture
+async def serve(rig, make_app):
+    """`await serve(**options)`: write the rig's config, build the app and serve it; mods autostart."""
+    import uvicorn
+
+    servers: list = []
+
+    async def start(timing: Timing = FAST, **opts) -> Served:
+        rig.write_config()
+        app = make_app(backend=rig.backend, port=free_port(), **opts)
+        app.state.hub.timing = timing
+        port = app.state.hub.port
+        server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", timeout_graceful_shutdown=2))
+        task = asyncio.create_task(server.serve())
+        servers.append((server, task))
+        await until(lambda: server.started, timeout=10)
+        served = Served(app, port)
+        return served
+
+    yield start
+    for server, task in servers:
+        app_hub = server.config.app.state.hub
+        app_hub.bus.close()
+        server.should_exit = True
+        await asyncio.wait_for(task, 15)
+
+
+async def ready(served: Served, *ids: str, timeout: float = 15) -> None:
+    await until(lambda: all(served.services.get(i).state == "ready" for i in ids), timeout=timeout)

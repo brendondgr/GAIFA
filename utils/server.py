@@ -26,7 +26,7 @@ from utils.config import Config
 from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
 from utils.paths import DEFAULT_ROOT, Paths
-from utils.services import ServiceManager
+from utils.services import ServiceError, ServiceManager
 
 DEMO_MODS = DEFAULT_ROOT / "utils" / "tests" / "fixtures" / "mods"
 
@@ -68,6 +68,7 @@ class Hub:
     activity: ActivityLog | None = None
     alerts: Alerts | None = None
     services: ServiceManager | None = None
+    timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
     sse_ping_s: float = SSE_PING_S
 
@@ -101,6 +102,7 @@ def default_backend(options: Options) -> Any:
 
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
+    from utils import proxy
     from utils.routes import events, system, web
 
     options = options or Options()
@@ -124,7 +126,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             # 5. services: find manifests, adopt running units, autostart in the background.
             hub.services = ServiceManager(
                 paths, hub.config, hub.backend, hub.bus, hub.activity, hub.alerts, hub.port,
-                extra_dirs=[DEMO_MODS] if hub.options.demo_mods else [],
+                extra_dirs=[DEMO_MODS] if hub.options.demo_mods else [], timing=hub.timing,
             )
             stack.push_async_callback(hub.services.close)
             await hub.services.boot(autostart=hub.options.autostart)
@@ -146,6 +148,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(system.router)
     hub.mark_live("system")
     app.include_router(events.router)  # the `events` area goes live with services (Phase 2)
+    app.include_router(proxy.router)  # live with the other service areas in 2.7, so the UI never mixes mock mods and a live proxy
 
     app.include_router(web.router)
     app.mount("/", WebFiles(directory=paths.web, html=True, check_dir=False), name="web")
@@ -176,6 +179,10 @@ def _envelope(status: int, code: str, detail: str, data: Any = None) -> JSONResp
 def _error_handlers(app: FastAPI) -> None:
     @app.exception_handler(HubError)
     async def _hub_error(_: Request, e: HubError) -> JSONResponse:
+        return _envelope(e.status, e.code, e.detail, e.data)
+
+    @app.exception_handler(ServiceError)
+    async def _service_error(_: Request, e: ServiceError) -> JSONResponse:
         return _envelope(e.status, e.code, e.detail, e.data)
 
     @app.exception_handler(StarletteHTTPException)

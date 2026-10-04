@@ -7,7 +7,9 @@ Interactive schema: `http://127.0.0.1:7710/api/docs`.
 **Errors** are always `{"detail": string, "code": string}` with an HTTP status.
 Codes: `port_in_use`, `port_reserved`, `name_taken`, `invalid_name`,
 `model_not_found`, `model_files_missing`, `model_in_use`, `instance_not_found`,
-`alias_conflict`, `relay_unreachable`, `invalid_param`, `daemon_error`.
+`alias_conflict`, `relay_unreachable`, `invalid_param`, `daemon_error`,
+`hf_not_found`, `hf_gated`, `hf_unreachable`, `not_gguf`, `download_not_found`,
+`disk_full`.
 
 `{name}` in instance routes also accepts the instance's **port**.
 
@@ -38,6 +40,12 @@ Codes: `port_in_use`, `port_reserved`, `name_taken`, `invalid_name`,
 | DELETE | `/api/models/{id}` | | `204` (`409 model_in_use` while running) |
 | POST | `/api/models/validate` | `ModelInput` | `{ok, files, errors}` |
 | GET | `/api/models/discovered` | | `Discovered[]` |
+| POST | `/api/downloads/resolve` | `{input}` | `HfRepo` |
+| GET | `/api/downloads` | | `Download[]` (newest first) |
+| POST | `/api/downloads` | `DownloadSpec` | `201 Download` |
+| POST | `/api/downloads/{id}/cancel` | | `Download` (partial files removed) |
+| POST | `/api/downloads/{id}/retry` | | `Download` (resumes `.part` files) |
+| DELETE | `/api/downloads/{id}` | | `204` (cancels first if still running) |
 | GET | `/api/relay` | | `{status, owned, others, routable_models}` |
 | POST | `/api/relay/test` | | `RelayStatus` |
 | DELETE | `/api/relay/registrations/{key}` | | `204` |
@@ -69,3 +77,43 @@ web UI's mock implements. Notes on the live implementation:
   isn't served). `stream_options.include_usage` is always requested.
 - **Recent**: a launch with `save_preset` is stored with `name` set to the
   preset name.
+
+### Hugging Face downloads
+
+These shapes are not in the design brief; `web/assets/mock.js` implements them
+too.
+
+- **resolve `input`** is a repo id (`openbmb/MiniCPM5-1B`), a repo URL
+  (optionally `/tree/<rev>`), or a file link
+  (`https://huggingface.co/<repo>/resolve/<rev>/<file>.gguf?download=true`,
+  or `/blob/`). The daemon reads the Hub API with the token from `HF_TOKEN` or
+  `~/.cache/huggingface/token` (`hf auth login`). The token is sent to
+  huggingface.co only, never to the CDN it redirects to.
+- **HfRepo**: `{repo, revision, sha, gated, kind, message, search_url,
+  choices, mmproj, drafts, selected, suggested_id, suggested_dir, free_bytes}`.
+  - `choices` is one entry per model GGUF, sorted by size: `{id, label, quant,
+    files: [{path, size_bytes, sha256}], size_bytes, complete, suggested_id}`.
+    Split parts are grouped into one choice, whose `id` is part 1.
+  - `mmproj` and `drafts` are the repo's `mmproj-*` and `mtp-*` sidecars.
+  - `selected` is set for a file link, or when the repo has one choice.
+    Otherwise the user picks.
+  - A repo without GGUFs comes back with `choices: []`. `kind` says what it
+    holds (`safetensors`, `awq`, `gptq`, …, from
+    `config.quantization_config.quant_method`), and `message` and
+    `search_url` point to a GGUF conversion.
+- **DownloadSpec**: `{repo, revision?, choice, mmproj?, draft?, dir?,
+  model_id?, nicknames?, add_to_catalog? = true}`.
+  - The daemon re-reads the repo and ignores client-sent sizes.
+  - `dir` is one folder name under `models/`.
+  - `model_id` must not be in the catalog yet. With a `draft`, the entry gets
+    `spec_type: draft-mtp`.
+- **Download**: `{id, repo, revision, label, dir, state, error, warning,
+  model_id, bytes_total, bytes_done, speed_bps, eta_s, created_ts,
+  finished_ts, files: [{path, name, size_bytes, done_bytes, state}]}`.
+  - `state` is `queued`, `downloading`, `done`, `failed` or `cancelled`.
+  - Downloads run one at a time inside the daemon. Each file streams to
+  `<name>.part`, is checked against its LFS sha256, then is renamed into
+  place.
+  - A daemon restart stops a download. Retry, or start it again, and it
+  resumes from the `.part` file.
+  - Finished jobs stay listed until dismissed or the daemon restarts.

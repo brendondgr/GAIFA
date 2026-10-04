@@ -35,6 +35,7 @@ class State:
     catalog: Catalog
     supervisor: Supervisor
     relay: Any = None  # lcpp.relay.RelayRegistrar once wired
+    downloads: Any = None  # lcpp.downloads.Downloads
     started: float = field(default_factory=time.time)
 
 
@@ -56,7 +57,9 @@ def create_app(paths: Paths | None = None, backend: Backend | None = None) -> Fa
         sup = Supervisor(paths, backend or make_backend(paths), settings, catalog)
         st = State(paths=paths, settings=settings, catalog=catalog, supervisor=sup)
         app.state.lcpp = st
+        from lcpp.downloads import Downloads
         from lcpp.relay import RelayRegistrar
+        st.downloads = Downloads(paths, catalog)
         st.relay = RelayRegistrar(st)
         sup.hooks.append(st.relay)
         await st.relay.start()
@@ -65,6 +68,7 @@ def create_app(paths: Paths | None = None, backend: Backend | None = None) -> Fa
         try:
             yield
         finally:
+            await st.downloads.close()
             await sup.close()
             await st.relay.close()
 
@@ -89,9 +93,9 @@ def create_app(paths: Paths | None = None, backend: Backend | None = None) -> Fa
         where = ".".join(str(p) for p in first.get("loc", []) if p != "body")
         return error("invalid_param", f"{where}: {first.get('msg', 'invalid request')}", 400)
 
-    from lcpp.daemon.routes import chat, instances, models, relay, system
+    from lcpp.daemon.routes import chat, downloads, instances, models, relay, system
 
-    for module in (system, instances, models, relay, chat):
+    for module in (system, instances, models, downloads, relay, chat):
         app.include_router(module.router)
 
     @app.get("/config.js", include_in_schema=False)

@@ -217,18 +217,8 @@ class Catalog:
     # ---- editing -----------------------------------------------------
     def validate_input(self, data: dict[str, Any]) -> dict[str, Any]:
         """Check a ModelInput from the UI. Returns ``{ok, files, errors}``."""
-        errors: list[str] = []
         mid = str(data.get("id") or "")
-        if not ID_RE.match(mid):
-            errors.append("id must be a slug (letters, digits, dots, dashes, underscores)")
-        nicknames = [str(n).strip() for n in data.get("nicknames") or [] if str(n).strip()]
-        for other in self.models.values():
-            if other.id == mid:
-                continue
-            clash = {n.casefold() for n in nicknames} & {n.casefold() for n in other.names}
-            if clash or mid.casefold() in {n.casefold() for n in other.nicknames}:
-                errors.append(f"a name is already used by model {other.id}")
-                break
+        errors = self.name_errors(mid, data.get("nicknames") or [])
         spec = data.get("spec_type") or None
         if data.get("draft") and spec and spec not in SPEC_TYPES:
             errors.append(f"spec_type must be one of {', '.join(sorted(SPEC_TYPES))}")
@@ -242,6 +232,21 @@ class Catalog:
             files = self.files(probe)
             errors.extend(self.problems(probe, files))
         return {"ok": not errors, "files": files, "errors": errors}
+
+    def name_errors(self, mid: str, nicknames: list[str]) -> list[str]:
+        """Problems with an id + nicknames, ignoring the entry ``mid`` itself."""
+        errors: list[str] = []
+        if not ID_RE.match(mid):
+            errors.append("id must be a slug (letters, digits, dots, dashes, underscores)")
+        nicks = {str(n).strip().casefold() for n in nicknames if str(n).strip()}
+        for other in self.models.values():
+            if other.id == mid:
+                continue
+            clash = nicks & {n.casefold() for n in other.names}
+            if clash or mid.casefold() in {n.casefold() for n in other.nicknames}:
+                errors.append(f"a name is already used by model {other.id}")
+                break
+        return errors
 
     def entry_from_input(self, data: dict[str, Any]) -> ModelEntry:
         check = self.validate_input(data)

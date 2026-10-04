@@ -47,6 +47,7 @@ export function createMockApi() {
     ];
     S.daemonStart = nowS() - 3600 * 5 - 60 * 12;
     S.chatUsed = 0;
+    S.downloads = [];
   }
   // ---- models ----
   function splitInfo(path) { const m = /-(\d{5})-of-(\d{5})\.gguf$/.exec(path); return m ? { idx: +m[1], n: +m[2], base: path.slice(0, m.index) } : null; }
@@ -151,6 +152,74 @@ export function createMockApi() {
   // ---- chat ----
   const REPLIES = ['Here is a concise answer. llama.cpp serves an OpenAI-compatible API on each instance, so any client that speaks `/v1/chat/completions` works unchanged. Streaming returns `chat.completion.chunk` events with a `delta.content` string; the final chunk carries `finish_reason: "stop"`.', 'Sure. The quickest way to check a server is a single curl against its `/v1/models` endpoint, which lists the loaded model id, followed by a short chat completion with `max_tokens` set low. If both return within a second or two, the instance is healthy and the KV cache is warm.', 'Good question. Speculative decoding keeps the draft model resident beside the target, proposes several tokens per step and verifies them in one forward pass. On this machine it roughly doubles tokens per second for long outputs while the accepted-token rate stays above 70%.'];
   const THINK = 'The user is asking a short technical question. I should answer directly, give one concrete example, and keep it under a paragraph.';
+  // ---- Hugging Face (a canned hub) + downloads ----
+  const HF_REPOS = {
+    'ewin-reg/MiniCPM5-1B-Agentic-Tooluse-v3-GGUF': { files: [['MiniCPM5-1B-Agentic-Tooluse-v3.F16.gguf', 2166551872], ['MiniCPM5-1B-Agentic-Tooluse-v3.Q4_K_M.gguf', 688065856], ['MiniCPM5-1B-Agentic-Tooluse-v3.Q8_0.gguf', 1153529152]] },
+    'unsloth/gemma-4-E4B-it-GGUF': { gated: 'auto', files: [['gemma-4-E4B-it-Q4_K_M.gguf', 4979541312], ['gemma-4-E4B-it-Q5_K_M.gguf', 5764519232], ['gemma-4-E4B-it-Q8_0.gguf', 8190130496], ['gemma-4-E4B-it-BF16.gguf', 15048001344], ['mmproj-F16.gguf', 990257152]] },
+    'openbmb/MiniCPM5-1B': { kind: 'safetensors' },
+  };
+  const QUANT = /[-_.](IQ\d[A-Z0-9_]*|Q\d[A-Z0-9_]*|BF16|F16|F32)$/i;
+  const stemOf = n => n.replace(/\.gguf$/i, '').replace(/-\d+-of-\d+$/, '');
+  const suggestId = n => stemOf(n).replace(QUANT, '').replace(/[^A-Za-z0-9.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '').toLowerCase() || 'model';
+  function hfRepo(repo) {
+    const known = HF_REPOS[repo]; if (known) return known; const name = repo.split('/')[1];
+    if (/gguf/i.test(name)) { const base = name.replace(/[-_.]?gguf$/i, ''); return { files: [['Q4_K_M', 4.9], ['Q5_K_M', 5.7], ['Q8_0', 8.5]].map(([q, g]) => [`${base}-${q}.gguf`, Math.round(g * GB)]) }; }
+    const q = /awq|gptq|exl2|mlx/i.exec(name); if (q) return { kind: q[0].toLowerCase() };
+    return null;
+  }
+  function hfParse(text) {
+    const raw = (text || '').trim(); if (/^[A-Za-z0-9][\w.-]*\/[\w.-]+$/.test(raw)) return { repo: raw, revision: 'main', file: null };
+    const m = /^(?:https?:\/\/)?(?:www\.)?(?:huggingface\.co|hf\.co)\/([\w.-]+\/[\w.-]+)(?:\/(resolve|blob|tree)\/([^/?#]+)(?:\/([^?#]+))?)?\/?(?:[?#].*)?$/.exec(raw);
+    if (!m) throw new ApiError(400, 'Enter a Hugging Face repo (owner/name) or a huggingface.co link', 'invalid_param');
+    return { repo: m[1], revision: m[3] || 'main', file: m[2] === 'tree' || !m[4] ? null : decodeURIComponent(m[4]) };
+  }
+  function hfChoices(r) {
+    const files = (r.files || []).map(([path, size_bytes]) => ({ path, size_bytes, sha256: null }));
+    const mmproj = files.filter(f => /^mmproj[-_]/i.test(f.path)), drafts = files.filter(f => /^mtp[-_]/i.test(f.path));
+    const choices = files.filter(f => !mmproj.includes(f) && !drafts.includes(f)).map(f => { const q = QUANT.exec(stemOf(f.path)); return { id: f.path, label: f.path, quant: q ? q[1].toUpperCase() : null, files: [f], size_bytes: f.size_bytes, complete: true, suggested_id: suggestId(f.path) }; }).sort((a, b) => a.size_bytes - b.size_bytes);
+    return { choices, mmproj, drafts };
+  }
+  const FREE = 812 * GB;
+  function hfResolve(text) {
+    const { repo, revision, file } = hfParse(text); const r = hfRepo(repo);
+    if (!r) throw new ApiError(404, `Repo ${repo} (revision ${revision}) was not found on Hugging Face.`, 'hf_not_found');
+    const g = hfChoices(r); const out = { repo, revision, sha: 'b8ed16e7', gated: r.gated || false, kind: 'gguf', message: null, search_url: null, ...g, selected: null, suggested_dir: repo.split('/')[1].replace(/[-_.]?gguf$/i, ''), suggested_id: null, free_bytes: FREE - S.downloads.reduce((a, j) => a + j.bytes_done, 0) };
+    if (file) { const c = g.choices.find(x => x.id === file); if (!c) { if (g.mmproj.some(f => f.path === file)) throw new ApiError(400, `${file} is a projector/draft sidecar, not a model. Link the model GGUF; its sidecars are offered alongside it.`, 'invalid_param'); throw new ApiError(404, `${file} is not in ${repo} at ${revision}`, 'hf_not_found'); } out.selected = c.id; }
+    else if (g.choices.length === 1) out.selected = g.choices[0].id;
+    if (!g.choices.length) { const label = { safetensors: 'full-precision safetensors weights', awq: 'AWQ-quantized weights', gptq: 'GPTQ-quantized weights' }[r.kind] || `${r.kind} weights`; out.kind = r.kind; out.search_url = `https://huggingface.co/models?search=${encodeURIComponent(repo.split('/')[1])}%20gguf`; out.message = `${repo} has ${label}, not GGUF. llama-server can only run GGUF, so look for a GGUF conversion of it.`; }
+    if (out.selected) out.suggested_id = g.choices.find(x => x.id === out.selected).suggested_id;
+    return out;
+  }
+  const dlView = j => { const { _t, _model, ...rest } = j; return clone(rest); };
+  const needDl = id => { const j = S.downloads.find(x => x.id === id); if (!j) throw new ApiError(404, `Download ${id} not found`, 'download_not_found'); return j; };
+  function runDownload(j) {
+    const t = j._t = Date.now(); j.state = 'downloading'; const rate = rnd(60, 110) * MB;
+    const tick = () => {
+      if (j._t !== t || j.state !== 'downloading') return; let budget = rate * 0.25;
+      for (const f of j.files) { if (f.state === 'done' || budget <= 0) continue; f.state = 'downloading'; const n = Math.min(budget, f.size_bytes - f.done_bytes); f.done_bytes += n; budget -= n; if (f.done_bytes >= f.size_bytes) { f.state = 'done'; FS.set(`${j.dir}/${f.name}`, f.size_bytes); } }
+      j.bytes_done = j.files.reduce((a, f) => a + f.done_bytes, 0); j.speed_bps = Math.round(rate); j.eta_s = Math.round((j.bytes_total - j.bytes_done) / rate);
+      if (j.bytes_done < j.bytes_total) { later(250, tick); return; }
+      j.state = 'done'; j.speed_bps = 0; j.eta_s = null; j.finished_ts = nowS();
+      if (j._model) { if (findModel(j._model.id)) j.warning = `"${j._model.id}" was added to the catalog meanwhile; add this one from Discovered GGUFs`; else S.catalog.push(j._model); }
+    };
+    later(250, tick);
+  }
+  function startDownload(spec) {
+    const r = hfRepo(spec.repo || ''); if (!r) throw new ApiError(404, `Repo ${spec.repo} was not found on Hugging Face.`, 'hf_not_found');
+    const g = hfChoices(r); const c = g.choices.find(x => x.id === spec.choice); if (!c) throw new ApiError(400, `${spec.choice || 'no file'} is not a GGUF model in ${spec.repo}`, 'invalid_param');
+    const dir = String(spec.dir || '').trim(); if (!/^[A-Za-z0-9][\w.+-]{0,127}$/.test(dir)) throw new ApiError(400, 'folder must be one name (letters, digits, . _ + -), no slashes', 'invalid_param');
+    const id = String(spec.model_id || c.suggested_id); const nicks = (spec.nicknames || []).filter(Boolean);
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(id)) throw new ApiError(400, 'id must be a slug (letters, digits, dots, dashes, underscores)', 'invalid_param');
+    if (S.catalog.some(m => m.id === id) || S.downloads.some(j => (j.state === 'queued' || j.state === 'downloading') && j.model_id === id)) throw new ApiError(400, `"${id}" is already in the catalog`, 'invalid_param');
+    const clash = S.catalog.find(m => nicks.some(n => m.nicknames.includes(n) || m.id === n)); if (clash) throw new ApiError(400, `a name is already used by model ${clash.id}`, 'invalid_param');
+    const side = [g.mmproj.find(f => f.path === spec.mmproj), g.drafts.find(f => f.path === spec.draft)];
+    const files = [...c.files, ...side.filter(Boolean)].map(f => ({ path: f.path, name: f.path.split('/').pop(), size_bytes: f.size_bytes, done_bytes: 0, state: 'queued' }));
+    const at = `${MODEL_DIR}/${dir}`, total = files.reduce((a, f) => a + f.size_bytes, 0);
+    const j = { id: Math.random().toString(16).slice(2, 10), repo: spec.repo, revision: spec.revision || 'main', label: c.label, dir: at, state: 'queued', error: null, warning: null, model_id: id, bytes_total: total, bytes_done: 0, speed_bps: 0, eta_s: null, created_ts: nowS(), finished_ts: null, files,
+      _model: { id, nicknames: nicks, path: `${at}/${files[0].name}`, mmproj: side[0] ? `${at}/${side[0].path}` : null, draft: side[1] ? `${at}/${side[1].path}` : null, spec_type: side[1] ? 'draft-mtp' : null, overrides: {} } };
+    S.downloads.unshift(j); runDownload(j); return dlView(j);
+  }
+
   // ---- the api ----
   const guard = () => { if (daemonDown) throw new ApiError(0, 'lcpp daemon not responding', 'network'); };
   const wait = (ms = 60) => new Promise(r => setTimeout(r, ms / speed));
@@ -203,6 +272,12 @@ export function createMockApi() {
     saveSettings: s => call(() => { if (!(s.ports.start >= 1024 && s.ports.end <= 65535 && s.ports.start < s.ports.end)) throw new ApiError(400, 'Port range must be within 1024–65535 and start before end', 'invalid_param'); if (!/^https?:\/\//.test(s.relay.url)) throw new ApiError(400, 'Relay URL must start with http:// or https://', 'invalid_param'); const restart = s.daemon.port !== S.settings.daemon.port; S.settings = clone(s); return { settings: clone(S.settings), restart_required: restart }; }),
     getRecent: () => call(() => clone(S.recent.slice(0, 5))),
     suggestPort: () => call(() => ({ port: freePort() })),
+    resolveHf: input => call(async () => { await wait(rnd(250, 600)); return hfResolve(input); }),
+    listDownloads: () => call(() => S.downloads.map(dlView)),
+    startDownload: spec => call(() => startDownload(spec)),
+    cancelDownload: id => call(() => { const j = needDl(id); if (j.state === 'queued' || j.state === 'downloading') { j._t = null; j.state = 'cancelled'; j.files.forEach(f => { if (FS.has(`${j.dir}/${f.name}`)) FS.delete(`${j.dir}/${f.name}`); f.done_bytes = 0; f.state = 'queued'; }); j.bytes_done = 0; j.speed_bps = 0; j.eta_s = null; j.finished_ts = nowS(); } return dlView(j); }),
+    retryDownload: id => call(() => { const j = needDl(id); if (j.state === 'done') throw new ApiError(400, 'That download already finished', 'invalid_param'); if (j.state !== 'downloading') { j.error = null; j.finished_ts = null; runDownload(j); } return dlView(j); }),
+    dismissDownload: id => call(() => { const j = needDl(id); j._t = null; S.downloads = S.downloads.filter(x => x !== j); return null; }),
   };
   function validate(m) {
     const errors = []; if (!m.id || !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(m.id)) errors.push('id must be a slug (letters, digits, dots, dashes)'); if (S.catalog.some(x => x.id !== m.id && x.nicknames.some(n => (m.nicknames || []).includes(n)))) errors.push('a nickname is already used by another model');

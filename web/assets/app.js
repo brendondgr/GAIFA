@@ -22,7 +22,7 @@ const api = LIVE ? createHttpApi(BASE) : (await import('./mock.js')).createMockA
    state / store
    ============================================================ */
 const store = {
-  state: { overview: null, loaded: false, daemonDown: false, downSince: 0, models: null, discovered: null, relay: null, settings: null, recent: [], layout: loadPref('lcpp.layout', 'grid'), theme: loadPref('lcpp.theme', 'system') },
+  state: { overview: null, loaded: false, daemonDown: false, downSince: 0, models: null, discovered: null, downloads: null, relay: null, settings: null, recent: [], layout: loadPref('lcpp.layout', 'grid'), theme: loadPref('lcpp.theme', 'system') },
   listeners: new Set(),
   subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); },
   set(patch) { Object.assign(this.state, patch); this.emit(); },
@@ -51,6 +51,24 @@ async function loadModels() { try { const [m, d] = await Promise.all([api.listMo
 async function loadRelay() { try { store.set({ relay: await api.getRelay() }); } catch (e) { if (e.status !== 0) toast(e.detail, 'error'); } }
 async function loadSettings() { try { store.set({ settings: await api.getSettings() }); } catch (e) { if (e.status !== 0) toast(e.detail, 'error'); } }
 async function loadRecent() { try { store.set({ recent: await api.getRecent() }); } catch { /* optional */ } }
+
+// ---- downloads: polled every 1 s only while one is queued/downloading and the tab is visible ----
+let dlTimer = null;
+const dlActive = j => j.state === 'queued' || j.state === 'downloading';
+async function loadDownloads() {
+  clearTimeout(dlTimer); let ok = true;
+  try {
+    const list = await api.listDownloads(); const prev = new Map((store.state.downloads || []).map(j => [j.id, j]));
+    for (const j of list) {
+      const p = prev.get(j.id); if (!p || !dlActive(p) || dlActive(j)) continue;
+      if (j.state === 'done') { toast(`Downloaded ${j.label}` + (j.warning ? `. ${j.warning}` : j.model_id ? `, added as ${j.model_id}` : ''), j.warning ? 'info' : 'success'); loadModels(); }
+      else if (j.state === 'failed') toast(`Download of ${j.label} failed: ${j.error}`, 'error');
+    }
+    store.set({ downloads: list });
+  } catch (e) { ok = false; if (e.status !== 0) toast(e.detail, 'error'); }
+  if (document.visibilityState === 'visible' && (store.state.downloads || []).some(dlActive)) dlTimer = setTimeout(loadDownloads, ok ? 1000 : 3000);
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') clearTimeout(dlTimer); else if ((store.state.downloads || []).some(dlActive)) loadDownloads(); });
 
 /* ============================================================
    components — toasts, dialogs, menus, editors
@@ -280,11 +298,12 @@ function closeLogs(silent) { if (!logsState) return; const st = logsState; logsS
    ============================================================ */
 function renderModels(root) {
   const wrap = h('div', { class: 'view' }); root.replaceChildren(wrap); let lastKey = null; const expanded = new Set();
+  const dl = downloadsCard();
   const search = h('input', { class: 'input', id: 'model-search', placeholder: 'Search models  /', 'aria-label': 'Search models', style: { width: '220px' }, onInput: () => { lastKey = null; draw(); } });
   function draw() {
     const s = store.state; const key = JSON.stringify([s.models, s.discovered, instances().map(i => [i.name, i.model_id, i.models]), [...expanded], search.value]); if (key === lastKey) return; lastKey = key;
     const head = h('div', { class: 'view-head' }, [h('h1', { class: 'title', text: 'Models' }), search, L.Button({ label: 'Add model', icon: 'plus', onClick: () => openModelEditor() })]);
-    if (!s.models) { wrap.replaceChildren(head, skeletonCards(2)); return; }
+    if (!s.models) { wrap.replaceChildren(head, dl.el, skeletonCards(2)); return; }
     const q = search.value.trim().toLowerCase(); const list = s.models.models.filter(m => !q || m.id.toLowerCase().includes(q) || m.nicknames.some(n => n.toLowerCase().includes(q)));
     const table = h('table', { class: 'table' }, [h('thead', {}, h('tr', {}, ['', 'id', 'nicknames', 'location', 'size', 'files', 'capabilities', 'ctx', 'running', ''].map(t => h('th', { scope: 'col', text: t })))), h('tbody', {}, list.flatMap(m => {
       const open = expanded.has(m.id); const running = m.running.length;
@@ -295,7 +314,7 @@ function renderModels(root) {
     }))]);
     const defaults = defaultsCard(s.models.defaults);
     const disc = h('section', { class: 'section' }, [h('div', { class: 'row' }, [h('h2', { class: 'card-head', style: { border: 0, padding: 0 }, text: 'Discovered GGUFs' }), h('span', { class: 'muted small', text: 'in the scan directories, not in the catalog' })]), !s.discovered ? L.Skeleton({ height: '60px' }) : !s.discovered.length ? h('div', { class: 'empty', style: { padding: '24px' }, text: 'Every GGUF in the scan directories is in the catalog.' }) : h('div', { class: 'card' }, L.Table({ columns: [{ label: 'path', cell: d => h('span', { class: 'mono small', text: d.path }) }, { label: 'size', num: true, cell: d => fmtGB(d.size_bytes) }, { label: 'suggested id', cell: d => h('code', { class: 'mono', text: d.suggested_id }) }, { label: '', cell: d => h('div', { style: { textAlign: 'right' } }, L.Button({ label: 'Add to catalog', icon: 'plus', size: 'sm', onClick: () => openModelEditor({ id: d.suggested_id, nicknames: [d.suggested_id], path: d.path, overrides: {}, files: [], isNew: true }) })) }], rows: s.discovered }))]);
-    wrap.replaceChildren(head, h('div', { class: 'card table-wrap' }, list.length ? table : h('div', { class: 'empty', style: { border: 0 }, text: q ? `No models match "${search.value}"` : 'No models configured yet.' })), h('div', { class: 'grid-2', style: { alignItems: 'start' } }, [defaults, disc]));
+    wrap.replaceChildren(head, dl.el, h('div', { class: 'card table-wrap' }, list.length ? table : h('div', { class: 'empty', style: { border: 0 }, text: q ? `No models match "${search.value}"` : 'No models configured yet.' })), h('div', { class: 'grid-2', style: { alignItems: 'start' } }, [defaults, disc]));
   }
   function defaultsCard(defaults) {
     const form = { ...defaults }; let saving = false; const fields = [];
@@ -306,8 +325,105 @@ function renderModels(root) {
     return L.Card({ title: 'Model defaults', body: h('div', { class: 'stack' }, [h('p', { class: 'muted small', text: 'Applied to every model unless a per-model override says otherwise.' }), h('div', { class: 'form-grid' }, [num('ctx-size'), sel('cache-type-k'), sel('cache-type-v'), num('n-gpu-layers'), num('batch-size'), num('ubatch-size')]), h('div', { class: 'row', style: { gap: '20px' } }, [tog('flash-attn'), tog('no-mmap')])]), footer: [saveBtn, revertBtn] });
   }
   async function deleteModel(m) { if (!await confirmDialog({ title: `Delete ${m.id} from the catalog?`, html: `The entry and its nicknames (${m.nicknames.map(n => `<code class="mono">${esc(n)}</code>`).join(', ')}) are removed from lcpp. <b>The files stay on disk</b> (${fmtGB(m.size_bytes)} in ${esc(m.path.slice(0, m.path.lastIndexOf('/')))}).`, label: 'Delete' })) return; try { await api.deleteModel(m.id); toast(`Deleted ${m.id}`, 'success'); loadModels(); } catch (e) { toast(e.detail, 'error'); } }
-  const unsub = store.subscribe(draw); draw(); if (!store.state.models) loadModels(); else loadModels();
-  return { destroy() { unsub(); }, focusSearch() { search.focus(); search.select(); } };
+  const unsub = store.subscribe(draw), unsubDl = store.subscribe(() => dl.update(store.state.downloads)); draw(); dl.update(store.state.downloads); loadModels(); loadDownloads();
+  return { destroy() { unsub(); unsubDl(); }, focusSearch() { search.focus(); search.select(); } };
+}
+
+// Downloads card: rows are keyed by job id and updated in place, so the 1 s
+// progress poll never rebuilds a button under the pointer.
+function downloadsCard() {
+  const rows = new Map(); const listEl = h('div', { class: 'stack', style: { gap: '0' } });
+  const el = L.Card({ title: 'Downloads', body: listEl }); el.hidden = true;
+  function update(list) {
+    list = list || []; el.hidden = !list.length; const ids = new Set(list.map(j => j.id));
+    for (const [id, r] of rows) if (!ids.has(id)) { r.el.remove(); rows.delete(id); }
+    list.forEach((j, k) => { let r = rows.get(j.id); if (!r) rows.set(j.id, r = downloadRow(j)); if (listEl.children[k] !== r.el) listEl.insertBefore(r.el, listEl.children[k] || null); r.update(j); });
+  }
+  return { el, update };
+}
+function downloadRow(j0) {
+  const fill = h('div', { class: 'meter-fill' }); const bar = h('div', { class: 'meter-bar', role: 'progressbar', 'aria-label': `${j0.label} progress`, 'aria-valuemin': '0', 'aria-valuemax': '100' }, fill);
+  const status = h('span'), meta = h('span', { class: 'meta' }), actions = h('div', { class: 'row', style: { flexWrap: 'nowrap', justifyContent: 'flex-end' } }), msg = h('div', { class: 'help msg' });
+  const el = h('div', { class: 'dl-row' }, [h('div', { class: 'dl-name' }, [h('span', { class: 'name', text: j0.label, title: `${j0.dir}/` }), h('a', { class: 'muted small mono', href: `https://huggingface.co/${j0.repo}`, target: '_blank', rel: 'noopener noreferrer', text: j0.repo })]), status, bar, meta, actions, msg]);
+  let lastState = null;
+  const act = (fn, id) => async () => { try { await fn(id); } catch (e) { toast(e.detail, 'error'); } loadDownloads(); };
+  function update(j) {
+    const pct = j.bytes_total ? Math.floor(100 * j.bytes_done / j.bytes_total) : 0; fill.style.width = pct + '%'; bar.setAttribute('aria-valuenow', String(pct));
+    fill.style.background = j.state === 'failed' ? 'var(--red)' : j.state === 'done' ? 'var(--green-ink)' : j.state === 'cancelled' ? 'var(--text-mut)' : '';
+    meta.textContent = `${fmtBytes(j.bytes_done)} / ${fmtBytes(j.bytes_total)}` + (j.state === 'downloading' && j.speed_bps ? ` · ${fmtBytes(j.speed_bps)}/s` + (j.eta_s != null ? ` · ${fmtDur(j.eta_s)} left` : '') : '');
+    const cur = j.files.find(f => f.state === 'downloading' || f.state === 'verifying'); const k = cur ? j.files.indexOf(cur) + 1 : 0;
+    msg.className = 'help msg' + (j.error ? ' help-err' : j.warning ? ' help-warn' : j.state === 'done' ? ' help-ok' : '');
+    msg.textContent = j.error || j.warning || (j.state === 'done' && j.model_id ? `Added to the catalog as ${j.model_id} (${j.dir}/)` : cur && cur.state === 'verifying' ? `verifying ${cur.name}…` : cur && j.files.length > 1 ? `file ${k} of ${j.files.length}: ${cur.name}` : '');
+    msg.hidden = !msg.textContent;
+    if (j.state === lastState) return; lastState = j.state;
+    const look = { queued: ['muted', 'queued'], downloading: ['amber', 'downloading'], done: ['green', 'done'], failed: ['red', 'failed'], cancelled: ['muted', 'cancelled'] }[j.state] || ['muted', j.state];
+    status.replaceChildren(L.StatusDot({ state: j.state, tone: look[0], label: look[1], pulse: j.state === 'downloading' }));
+    const dismiss = L.Button({ icon: 'x', size: 'sm', variant: 'ghost', title: 'Dismiss', onClick: act(api.dismissDownload, j.id) });
+    const cancel = L.Button({ label: 'Cancel', icon: 'x', size: 'sm', onClick: async () => { if (await confirmDialog({ title: `Cancel download of ${j.label}?`, html: `What has been downloaded so far is deleted from <code class="mono">${esc(j.dir)}/</code>.`, label: 'Cancel download' })) act(api.cancelDownload, j.id)(); } });
+    const retry = L.Button({ label: 'Retry', icon: 'refresh', size: 'sm', onClick: act(api.retryDownload, j.id) });
+    const launch = j.model_id && !j.warning ? L.Button({ label: 'Launch', icon: 'play', size: 'sm', variant: 'primary', onClick: () => openLaunch({ kind: 'single', model_id: j.model_id }) }) : null;
+    actions.replaceChildren(...(dlActive(j) ? [cancel] : j.state === 'done' ? [launch, dismiss] : [retry, dismiss]).filter(Boolean));
+  }
+  return { el, update };
+}
+
+// "Add model" → Hugging Face tab: resolve a repo or a .gguf link, pick a
+// quant (and sidecars), then download into models/<folder>/.
+function hfPanel(close) {
+  const st = { res: null, choice: null, mmproj: '', draft: '', id: '', idTouched: false, nicknames: [], dir: '' };
+  const HELP = 'A repo lists its GGUF files to choose from; a link to one .gguf picks that file.';
+  const lookBtn = L.Button({ label: 'Look up', icon: 'search', onClick: () => lookup() });
+  const inputF = L.Field({ label: 'Hugging Face repo or GGUF link', mono: true, placeholder: 'owner/name   or   https://huggingface.co/…/model.Q4_K_M.gguf', help: HELP, trailing: lookBtn });
+  inputF.control.addEventListener('keydown', e => { if (e.key === 'Enter' && !(e.ctrlKey || e.metaKey)) { e.preventDefault(); lookup(); } });
+  inputF.control.addEventListener('paste', () => setTimeout(lookup, 0));
+  const out = h('div', { class: 'stack', style: { gap: '14px' } }); const errBox = h('div', { class: 'help help-err' }); let summary = null, idF = null;
+  const dlBtn = L.Button({ label: 'Download', icon: 'download', variant: 'primary', disabled: true, onClick: () => submit() });
+  let seq = 0;
+  async function lookup() {
+    const q = inputF.control.value.trim(); if (!q) { inputF.setHelp('err', 'Enter a repo (owner/name) or a huggingface.co link'); return; }
+    const my = ++seq; lookBtn.classList.add('is-loading'); errBox.textContent = '';
+    try {
+      const r = await api.resolveHf(q); if (my !== seq) return;
+      Object.assign(st, { res: r, choice: r.selected, mmproj: r.mmproj.length === 1 ? r.mmproj[0].path : '', draft: '', dir: r.suggested_dir, id: r.suggested_id || '', idTouched: false, nicknames: [] });
+      inputF.setHelp('', HELP); draw();
+    } catch (e) { if (my !== seq) return; st.res = null; out.replaceChildren(); inputF.setHelp('err', e.detail); sync(); }
+    finally { if (my === seq) lookBtn.classList.remove('is-loading'); }
+  }
+  function draw() {
+    const r = st.res; const gguf = r.kind === 'gguf';
+    const head = h('div', { class: 'row' }, [h('a', { class: 'mono', href: `https://huggingface.co/${r.repo}`, target: '_blank', rel: 'noopener noreferrer', text: r.repo }), r.revision !== 'main' ? L.Badge(r.revision) : null, L.Badge({ label: gguf ? 'GGUF' : r.kind.toUpperCase(), tone: gguf ? 'green' : 'red' }), r.gated ? L.Badge({ label: 'gated', tone: 'accent' }) : null]);
+    if (!gguf) { summary = idF = null; out.replaceChildren(head, h('div', { class: 'inset stack', style: { gap: '8px' } }, [h('div', { class: 'help help-err', text: r.message }), h('a', { class: 'small', href: r.search_url, target: '_blank', rel: 'noopener noreferrer', text: 'Search Hugging Face for a GGUF conversion ↗' })])); sync(); return; }
+    const list = h('div', { class: 'choice-list', role: 'radiogroup', 'aria-label': 'GGUF file' }, r.choices.map(c => h('label', { class: 'choice-row' + (c.complete ? '' : ' is-dim'), title: c.id }, [
+      h('input', { type: 'radio', name: 'hf-choice', value: c.id, checked: c.id === st.choice, disabled: !c.complete, onChange: () => { st.choice = c.id; if (!st.idTouched) { st.id = c.suggested_id; idF.control.value = st.id; } sync(); } }),
+      c.quant ? L.Badge({ label: c.quant, tone: 'cyan' }) : h('span'), h('span', { class: 'mono small label', text: c.label }),
+      h('span', { class: 'muted small', text: c.files.length > 1 ? `${c.files.length} parts${c.complete ? '' : ', incomplete'}` : '' }), h('span', { class: 'mono small size', text: fmtBytes(c.size_bytes) })])));
+    const side = (label, key, pool) => pool.length ? L.Field({ label, optional: true, type: 'select', value: st[key], options: [{ value: '', label: 'none' }, ...pool.map(f => ({ value: f.path, label: `${f.path} (${fmtBytes(f.size_bytes)})` }))], onChange: v => { st[key] = v; sync(); } }) : null;
+    const sides = [side('vision projector (mmproj)', 'mmproj', r.mmproj), side('draft model (MTP)', 'draft', r.drafts)].filter(Boolean);
+    idF = L.Field({ label: 'catalog id', mono: true, value: st.id, help: 'unique slug', onInput: v => { st.id = v.trim(); st.idTouched = true; sync(); } });
+    const dirHelp = () => `saved to models/${st.dir || '…'}/`;
+    const dirF = L.Field({ label: 'folder', mono: true, value: st.dir, help: dirHelp(), onInput: v => { st.dir = v.trim(); dirF.setHelp('', dirHelp()); sync(); } });
+    const nickBox = h('div', { class: 'field' }, [h('span', { class: 'label', text: 'nicknames' }), chipInput({ values: st.nicknames, onChange: v => { st.nicknames = v; } })]);
+    summary = h('div', { class: 'help' });
+    out.replaceChildren(...[head, h('div', { class: 'stack', style: { gap: '6px' } }, [sectionLabel(r.choices.length > 1 ? `Choose a file · ${r.choices.length} available` : 'File'), list]), sides.length ? h('div', { class: 'form-grid' }, sides) : null, h('div', { class: 'form-grid' }, [idF, dirF]), nickBox, summary, errBox].filter(Boolean));
+    sync();
+  }
+  function sync() {
+    const r = st.res; const c = r && r.kind === 'gguf' && r.choices.find(x => x.id === st.choice);
+    dlBtn.disabled = !c || !st.id || !st.dir; if (!summary) return;
+    const extra = [['mmproj', r.mmproj], ['draft', r.drafts]].reduce((a, [k, pool]) => a + ((pool.find(f => f.path === st[k]) || {}).size_bytes || 0), 0);
+    const total = c ? c.size_bytes + extra : 0;
+    summary.textContent = c ? `${fmtBytes(total)} to download · ${fmtBytes(r.free_bytes)} free` : 'Choose a file to download.';
+    summary.className = 'help' + (c && total > r.free_bytes ? ' help-err' : '');
+  }
+  async function submit() {
+    if (dlBtn.disabled) return; const r = st.res; dlBtn.classList.add('is-loading'); errBox.textContent = '';
+    try {
+      const j = await api.startDownload({ repo: r.repo, revision: r.revision, choice: st.choice, mmproj: st.mmproj || null, draft: st.draft || null, dir: st.dir, model_id: st.id, nicknames: st.nicknames });
+      toast(`Downloading ${j.label} to ${j.dir}/`, 'success'); close(); loadDownloads();
+    } catch (e) { errBox.textContent = e.detail; if (e.status === 0) toast(e.detail, 'error'); }
+    finally { dlBtn.classList.remove('is-loading'); }
+  }
+  return { body: h('div', { class: 'stack', style: { gap: '14px' } }, [inputF, out]), actions: [dlBtn], submit, focus: () => inputF.control.focus() };
 }
 
 function openModelEditor(m = null) {
@@ -327,9 +443,16 @@ function openModelEditor(m = null) {
   const payload = () => ({ id: input.id, nicknames: input.nicknames, path: input.path, mmproj: input.mmproj || null, draft: input.draft || null, spec_type: input.draft ? (input.spec_type || 'draft') : null, overrides: input.overrides });
   const check = debounce(async () => { try { result = await api.validateModel(payload()); filesBox.replaceChildren(...result.files.map(f => h('div', { class: 'file-row' }, [h('span', { class: 'role', text: f.role === 'split' || (f.role === 'model' && f.part) ? `${f.role} ${f.part}` : f.role }), h('span', { text: f.path, style: { overflow: 'hidden', textOverflow: 'ellipsis' } }), h('span', { class: 'size muted', text: fmtBytes(f.size_bytes) }), h('span', { class: 'exists ' + (f.exists ? 'status-green' : 'status-red'), text: f.exists ? '✓ exists' : '✗ not found' })]))); const sp = result.files.filter(f => f.part); if (sp.length) filesBox.append(h('div', { class: 'help ' + (sp.every(f => f.exists) ? 'help-ok' : 'help-err'), text: `split 1 of ${sp.length} — ${sp.every(f => f.exists) ? 'all parts present' : sp.filter(f => !f.exists).length + ' part(s) missing'}` })); errBox.textContent = result.errors.join(' · '); pathF.setHelp(result.files[0] && result.files[0].exists ? 'ok' : input.path ? 'err' : '', result.files[0] && result.files[0].exists ? `exists, ${fmtBytes(result.files[0].size_bytes)}` : input.path ? 'not found' : ''); saveBtn.disabled = !result.ok; } catch (e) { if (e.status !== 0) toast(e.detail, 'error'); } }, 300);
   async function save() { saveBtn.classList.add('is-loading'); try { await api.saveModel(payload()); toast(`${isNew ? 'Added' : 'Saved'} ${input.id}`, 'success'); d.close('ok'); loadModels(); } catch (e) { toast(e.detail, 'error'); errBox.textContent = e.detail; } finally { saveBtn.classList.remove('is-loading'); } }
-  const d = L.Dialog({ title: isNew ? 'Add model to catalog' : `Edit ${m.id}`, body: h('div', { class: 'stack', style: { gap: '14px' } }, [dl, h('div', { class: 'form-grid' }, [idF, specF]), nickBox, pathF, h('div', { class: 'form-grid' }, [mmF, draftF]), h('div', { class: 'stack', style: { gap: '6px' } }, [sectionLabel('Files'), h('div', { class: 'inset' }, filesBox), errBox]), h('div', { class: 'stack', style: { gap: '6px' } }, [sectionLabel('Per-model overrides'), ov])]), actions: [L.Button({ label: 'Cancel', onClick: () => d.close('cancel') }), saveBtn] }); d.style.width = 'min(720px, calc(100vw - 32px))';
-  d.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (!saveBtn.disabled) save(); } });
-  openDialog(d); check();
+  const localBody = h('div', { class: 'stack', style: { gap: '14px' } }, [dl, h('div', { class: 'form-grid' }, [idF, specF]), nickBox, pathF, h('div', { class: 'form-grid' }, [mmF, draftF]), h('div', { class: 'stack', style: { gap: '6px' } }, [sectionLabel('Files'), h('div', { class: 'inset' }, filesBox), errBox]), h('div', { class: 'stack', style: { gap: '6px' } }, [sectionLabel('Per-model overrides'), ov])]);
+  const cancelBtn = L.Button({ label: 'Cancel', onClick: () => d.close('cancel') });
+  // A fresh "Add model" offers two sources; editing (or adding a discovered file) is local only.
+  const hf = m ? null : hfPanel(() => d.close('ok')); let tab = hf ? loadPref('lcpp.addTab', 'local') : 'local';
+  const tabs = hf ? L.Tabs({ value: tab, tabs: [{ value: 'local', label: 'Local file' }, { value: 'hf', label: 'Hugging Face' }], onChange: v => show(v, true) }) : null;
+  const d = L.Dialog({ title: isNew ? 'Add model to catalog' : `Edit ${m.id}`, body: hf ? h('div', { class: 'stack', style: { gap: '16px' } }, [tabs, localBody, hf.body]) : localBody, actions: [cancelBtn, saveBtn] }); d.style.width = 'min(720px, calc(100vw - 32px))';
+  function show(v, focus) { tab = v; savePref('lcpp.addTab', v); localBody.hidden = v !== 'local'; hf.body.hidden = v !== 'hf'; $('.dialog-foot', d).replaceChildren(cancelBtn, ...(v === 'hf' ? hf.actions : [saveBtn])); if (focus) (v === 'hf' ? hf.focus() : idF.control.focus()); }
+  if (hf) show(tab);
+  d.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); if (tab === 'hf') hf.submit(); else if (!saveBtn.disabled) save(); } });
+  openDialog(d); check(); if (tab === 'hf') hf.focus();
 }
 /* ============================================================
    views/playground — chat against an instance or via Relay
@@ -502,5 +625,5 @@ store.subscribe((() => { let last = null; return s => { if (s.daemonDown !== las
 drawHeader(); drawNav(); drawBanner();
 if (!location.hash) { suppressHash = false; history.replaceState(null, '', '#/instances'); }
 currentHash = location.hash;
-Promise.all([loadModels(), loadSettings(), loadRecent()]).then(() => { renderRoute(); });
+Promise.all([loadModels(), loadSettings(), loadRecent(), loadDownloads()]).then(() => { renderRoute(); });
 renderRoute(); refreshOverview();

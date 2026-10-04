@@ -40,6 +40,11 @@ changes, also run `utils/e2e_live.sh`.
 - **llama-server boolean flags come in three styles** (`--x on|off`,
   `--x/--no-x`, plain switch). See `cmdline.ON_OFF` / `NEGATABLE` before
   adding a param that "doesn't work".
+- **Hugging Face downloads run inside the daemon** (`lcpp.downloads`, httpx).
+  A daemon restart stops them. The `.part` file stays and a retry resumes it,
+  so do not delete `.part` files on failure, only on cancel or a checksum
+  mismatch. Tests fake the Hub with `httpx.MockTransport`. Never let one
+  reach the network.
 - **Relay model names are unique across endpoints.** A router must not
   advertise a model that a published single instance serves.
   - `relay._body` excludes those models.

@@ -51,7 +51,7 @@ lcpp ui                                   # open http://127.0.0.1:7710
 The web UI (`http://127.0.0.1:7710`) does the same things. It has five views:
 
 - **Instances:** launch with a live port check and memory estimate; stop, restart and view logs.
-- **Models:** edit the catalog and add discovered GGUFs.
+- **Models:** edit the catalog, add discovered GGUFs, and download GGUFs from Hugging Face.
 - **Playground:** chat directly or through the relay, with metrics.
 - **Relay:** registrations and orphans.
 - **Settings:** the options in `data/lcpp.json`.
@@ -97,8 +97,23 @@ here.
 
 ### Adding a model
 
-Put the GGUF in `models/<Name>/`. Then either use **Models → Discovered → Add
-to catalog** in the UI, or add an entry to `data/models.json`:
+**From Hugging Face:** open **Models → Add model → Hugging Face**. Enter one of:
+
+- a repo id, e.g. `unsloth/gemma-4-E4B-it-GGUF`
+- a link to one file, e.g. `https://huggingface.co/<repo>/resolve/main/<file>.gguf?download=true`
+
+A repo lists its quants (split parts grouped) and its `mmproj`/`mtp` sidecars
+to pick from. A link selects its file. The download goes to
+`models/<folder>/`, is checked against the Hub's sha256, and is added to the
+catalog. Gated or private repos use the token from `hf auth login`.
+
+llama-server runs only GGUF. A repo with only safetensors, AWQ or GPTQ
+weights (e.g. `openbmb/MiniCPM5-1B`) is reported as such, with a link to
+search for a GGUF conversion.
+
+**By hand:** put the GGUF in `models/<Name>/`. Then either use
+**Models → Discovered → Add to catalog** in the UI, or add an entry to
+`data/models.json`:
 
 ```json
 "my-model": {
@@ -122,7 +137,7 @@ highest:
 ## Develop
 
 ```bash
-make test         # 59 tests, ~20 s
+make test         # 81 tests, ~20 s
 make dev          # throwaway daemon on :7790 running instances as child processes
 make smoke        # real llama-server under systemd (MiniCPM on :7071)
 make idle-check   # startup time, RSS, idle CPU

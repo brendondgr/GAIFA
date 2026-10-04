@@ -23,6 +23,7 @@ Level = Literal["info", "warn", "error"]
 
 QUEUE_SIZE = 1000
 RESYNC: HubEvent = {"type": "resync"}
+CLOSED: HubEvent = {"type": "closed"}  # internal: ends sse_stream, never sent
 SSE_RETRY_MS = 3000
 SSE_PING_S = 15.0
 ACTIVITY_KEEP = 500
@@ -61,11 +62,19 @@ class EventBus:
     def __init__(self, queue_size: int = QUEUE_SIZE) -> None:
         self._subs: set[Subscription] = set()
         self._size = queue_size
+        self._closed = False
 
     def subscribe(self) -> Subscription:
         sub = Subscription(self, self._size)
         self._subs.add(sub)
+        if self._closed:
+            sub.put(CLOSED)
         return sub
+
+    def close(self) -> None:
+        """End every SSE stream, so shutdown doesn't wait on them."""
+        self._closed = True
+        self.publish(CLOSED)
 
     def publish(self, event: HubEvent) -> None:
         """Fan `event` out to every subscriber. Never blocks."""
@@ -177,6 +186,8 @@ async def sse_stream(bus: EventBus, ping_s: float = SSE_PING_S) -> AsyncIterator
             except TimeoutError:
                 yield ": ping\n\n"
                 continue
+            if event is CLOSED:
+                return
             yield sse_frame(event)
     finally:
         sub.close()

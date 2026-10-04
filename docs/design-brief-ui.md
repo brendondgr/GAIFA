@@ -379,7 +379,7 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 
 ### 6.3 Error codes to handle
 
-`service_not_found`, `service_not_running`, `service_failed`, `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `output_not_found`, `invalid_config`, `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`.
+`service_not_found`, `service_not_running`, `service_failed`, `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `output_not_found`, `invalid_config`, `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
 
 ### 6.4 Types
 

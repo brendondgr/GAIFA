@@ -2,7 +2,7 @@
 
 One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/`, run as its own process. Design: [docs/architecture.md](docs/architecture.md). Build plan: [docs/backend-plan.md](docs/backend-plan.md). UI brief: [docs/design-brief-ui.md](docs/design-brief-ui.md).
 
-**Status:** Phase 1 in progress: 1.2–1.4 done (`utils/paths.py`, `config.py`, `db.py`, `events.py`). Next: 1.5. What exists today: [docs/structure.md](docs/structure.md).
+**Status:** Phase 1 in progress: 1.2–1.5 done (`utils/` paths, config, db, events, server; `app.py`). Next: 1.6. What exists today: [docs/structure.md](docs/structure.md).
 
 **Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans.
 
@@ -14,7 +14,8 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 ## Commands
 - `uv sync`: install hub dependencies into `.venv/`
 - `uv run pytest`: the test suite (`utils/tests/`)
-- (planned) `python app.py` / `bin/aihub`
+- `uv run python app.py`: run the hub in the foreground on 127.0.0.1:7000 (`/api/docs` for the API)
+- (planned, 1.6) `bin/aihub`
 
 ## Mod contract
 1. `services/<id>/service.toml`, with `id` matching `[a-z][a-z0-9-]{1,31}` and the folder name.

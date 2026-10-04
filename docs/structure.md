@@ -14,7 +14,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `.gitignore` | ✅ | Keeps models, databases, outputs and venvs out of git |
 | `pyproject.toml` | ✅ | Hub dependencies (uv) |
 | `uv.lock` | ✅ | Locked hub dependencies; `uv sync` builds `.venv/` (ignored) from it |
-| `app.py` | ⏳ 1.5 | `python app.py` starts the hub |
+| `app.py` | ✅ | `python app.py [--port N] [--dev] [--no-autostart] [--demo-mods]` starts the hub on 127.0.0.1 and [::1] |
 | `config.toml` | ✅ | User settings (architecture §9); a missing file means defaults |
 | `bin/` | 🧱 | `aihub` command (1.6) and `aihub.service.in` systemd template (1.6) |
 | `docs/` | ✅ | Design, plan, UI brief, this file, `reference/` UI exports |
@@ -45,7 +45,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `config.py` | ✅ | `Config` (pydantic, §9), `load()`, `save()` via tomlkit, `service_override()`, loopback check |
 | `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version`, one writer thread, async helpers |
 | `events.py` | ✅ | `EventBus` (per-subscriber queue, overflow → resync), `ActivityLog`, `Alerts`, `sse_stream()` |
-| `server.py` | ⏳ 1.5 | `create_app()`, lifespan, static `web/`, error envelope |
+| `server.py` | ✅ | `create_app()`, `Hub` (app state, live-area registry), lifespan, `HubError` + error envelope, static `web/` |
 | `cli.py` | ⏳ 1.6 | Standard-library CLI behind `bin/aihub` |
 | `manifest.py` | ⏳ 2.1 | `service.toml` schema, discovery, placeholders |
 | `backends/` | ✅ pkg · ⏳ 2.2 | `base.py`, `systemd.py`, `subprocess.py` |
@@ -57,7 +57,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `memory.py`, `proc.py` | ⏳ 5 | Memory sampling and make-room plans; per-process memory |
 | `metrics.py` | ⏳ 6.1 | Time series recorder and rollups |
 | `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `events.py` (`GET /api/events`) |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`) |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -70,7 +70,7 @@ utils/tests/
 ├── fixtures/
 │   ├── mods/                   🧱     fake_ok, fake_slow, fake_crash, fake_mem (1.7)
 │   └── openapi/                🧱     real OpenAPI captures from Phase 0.5
-├── core/test_<behavior>.py     ✅     paths, config, db, events (server follows)
+├── core/test_<behavior>.py     ✅     paths, config, db, events, server
 ├── services/test_<behavior>.py        manifest, backends, state machine, proxy, operations
 └── <area>/test_<behavior>.py          registry, outputs, memory, metrics, …
 ```

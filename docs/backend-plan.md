@@ -118,7 +118,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **`Alerts`:** a keyed set; publishes `alert` / `alert_cleared`.
   - **`GET /api/events`** (router in `utils/routes/events.py`): SSE with `retry: 3000` and a `: ping` comment every 15 s.
   *Done when:* tests cover subscriber fan-out, overflow → resync, and SSE framing.
-- [ ] **1.5 `utils/server.py` + `app.py`.**
+- [x] **1.5 `utils/server.py` + `app.py`.**
   - **`create_app(paths, config, backend)`:** nothing at import time. The lifespan starts subsystems in the order in architecture §5 and stops them in reverse.
   - **Error envelope:** `{detail, code, data?}` for `HTTPException` and validation errors.
   - **Routes:**
@@ -127,6 +127,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - `/api/docs` and `/api/openapi.json`
     - static `web/` at `/` (the UI baseline arrives in 1.8)
   - **`app.py`:** argparse `--port`, `--dev` (subprocess backend), `--no-autostart`, `--demo-mods` (also load the fake mods from `utils/tests/fixtures/mods/`, for UI work before the real apps move in). It binds **both `127.0.0.1` and `[::1]`**; reuse gen3d's `__main__` socket code, which fixes browsers resolving `localhost` to IPv6.
+  - *As built:* `--dev` and `--demo-mods` are accepted and stored on `Options`; they take effect when the backends (2.2) and fake mods (1.7) exist. Ctrl+C exits 0; a `SIGINT`/`SIGTERM` first closes open SSE streams so shutdown doesn't wait on them.
   *Done when:* `python app.py` serves `/api/system` and `/api/docs`.
 - [ ] **1.6 `bin/aihub` + `utils/cli.py` + `bin/aihub.service.in`.**
   - **The bash wrapper** runs `utils/cli.py` (standard library only, `urllib`, like lcpp's CLI) with the hub venv.

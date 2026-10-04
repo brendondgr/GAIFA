@@ -124,3 +124,18 @@ def test_alerts_publish_changes_only():
     assert alerts.clear("disk") is True
     assert alerts.clear("disk") is False
     assert drain(sub) == [{"type": "alert_cleared", "id": "disk"}]
+
+
+async def test_close_ends_sse_streams():
+    bus = EventBus()
+    gen = sse_stream(bus, ping_s=10)
+    await anext(gen)
+    task = asyncio.ensure_future(anext(gen))
+    await asyncio.sleep(0.01)
+    bus.close()
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(task, 1)
+    late = sse_stream(bus)
+    await anext(late)
+    with pytest.raises(StopAsyncIteration):
+        await anext(late)

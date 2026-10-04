@@ -84,7 +84,7 @@ def hub_version() -> str:
 
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
-    from utils.routes import events, system
+    from utils.routes import events, system, web
 
     hub = Hub(paths=paths, config=config, backend=backend, options=options or Options(), version=hub_version())
 
@@ -121,6 +121,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     hub.mark_live("system")
     app.include_router(events.router)  # the `events` area goes live with services (Phase 2)
 
+    app.include_router(web.router)
     app.mount("/", WebFiles(directory=paths.web, html=True, check_dir=False), name="web")
     return app
 

@@ -22,7 +22,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `services/` | 🧱 | One folder per mod; `_template/` is filled in 2.8 |
 | `data/` | ✅ | Models, databases (below); `logs/` and `state/` arrive in Stage D |
 | `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…`, ignored by git |
-| `web/` | 🧱 | The UI, copied from the Claude Design export in 1.8 |
+| `web/` | ✅ | The UI (below) |
 
 ## `docs/`
 
@@ -57,7 +57,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `memory.py`, `proc.py` | ⏳ 5 | Memory sampling and make-room plans; per-process memory |
 | `metrics.py` | ⏳ 6.1 | Time series recorder and rollups |
 | `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`) |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`) |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -74,6 +74,18 @@ utils/tests/
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
 └── <area>/test_<behavior>.py          registry, outputs, memory, metrics, …
 ```
+
+## `web/` — the UI
+
+| File | Purpose |
+| :--- | :--- |
+| `Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html` | Claude Design's v1 export (the shell and every core page; shared components) |
+| `mock.js` | `createMockApi()`: the brief §6 contract on simulated data |
+| `support.js` | Claude Design's runtime. Generated: **never edit** |
+| `vendor/` | React and ReactDOM 18.3.1 (UMD), `fonts.css` + `fonts/` (IBM Plex Sans, JetBrains Mono, OFL) |
+| `PATCHES.md` | Every hand edit to the export files |
+
+`GET /` serves `Hub.dc.html` with the vendor scripts and `/config.js` added before `support.js`; see `utils/routes/web.py`.
 
 ## `data/`
 

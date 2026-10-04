@@ -153,13 +153,14 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - `fake-mem`: allocates N MB on `/v1/load` and frees it on `/v1/unload`
   - *As built:* the four share one standard-library server, `fixtures/mods/_fakemod.py` (`python3 ../_fakemod.py <mode>` in each `service.toml`), so they also prove a mod needs nothing but HTTP. `conftest.py` also has `fake_mod(mode)` (runs one on a free port), `hub_process` (a real `app.py`) and `services_dir(*ids)`. The app is built with no backend until 2.2 adds `SubprocessBackend`.
   *Done when:* `uv run pytest` is green.
-- [ ] **1.8 The UI baseline in `web/`.**
+- [x] **1.8 The UI baseline in `web/`.**
   - Copy the v1 export from `docs/reference/ui-export-2026-10-04/` into `web/`: `Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html`, `mock.js` and `support.js`.
   - Put React 18.3.1 and ReactDOM 18.3.1 (UMD production builds) in `web/vendor/`. Do the same for the IBM Plex Sans and JetBrains Mono fonts, with a local `@font-face` stylesheet.
   - **Serving `/`:** `utils/server.py` serves `Hub.dc.html` and adds `<script src="/vendor/react.production.min.js">`, `react-dom` and `<script src="/config.js">` before `support.js` as it goes out. The runtime then skips its unpkg download, and a future export drops in unchanged.
   - **Font links:** the Google Fonts `<link>`s are rewritten to the local stylesheet the same way.
   - **Component files:** `*.dc.html` are served as static files from `web/`.
   - **`web/PATCHES.md`** starts here. It lists every edit made to an export: the Hub → AIHub renames, and the 1.9 mode switch. Revision 2 (Phase 6) asks Claude Design to build these in, so the list goes back to empty.
+  - *As built:* the serving code is `utils/routes/web.py` (`GET /`, `GET /{name}.dc.html`). Fonts are the Latin subsets of `@fontsource` (400/500/600) with their OFL licenses in `web/vendor/fonts/`. Checked 2026-10-04 in the browser: every request went to 127.0.0.1:7000.
   *Done when:* `python app.py`, then opening `http://127.0.0.1:7000/`, shows the full v1 UI on mock data, and the browser's network panel shows **no request leaving 127.0.0.1**.
 - [ ] **1.9 `web/api.js`: the hybrid API.**
   - **HTTP client:** `ApiError` plus an HTTP implementation of every method in brief §6.2 and §11.7, returning the same shapes as the mock. SSE goes through `EventSource`, and non-JSON responses (audio, files) become blobs with object URLs.

@@ -24,4 +24,5 @@ testpaths = ["utils/tests"]
 pythonpath = ["."]
 addopts = "--import-mode=importlib"
 asyncio_mode = "auto"
+markers = ["systemd: needs a systemd user manager (skipped where there is none)"]
 asyncio_default_fixture_loop_scope = "function"

@@ -193,7 +193,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **Placeholders and env:** expand them (architecture §4.4), build the env (hub vars + `env_file` + manifest `env` + config override), and resolve the effective port.
   - *As built:* `discover()` returns a `Mod` per folder (id = folder name, even when the manifest is broken, so the UI can list it). Unknown keys are errors, to catch typos. `command` may be a string (shell-split). Ports that clash with another mod or the hub are manifest errors; clashes created by `config.toml` overrides come from `check_effective_ports()`. An unknown `{placeholder}` raises `ManifestError` at launch; `env_file` values are not expanded and a missing `env_file` is allowed. `start_order()` applies `after` (unknown ids ignored, cycles broken).
   *Done when:* tests cover a valid manifest, each error kind, placeholders, override merging and the `_template` skip.
-- [ ] **2.2 Backends: `utils/backends/{base,systemd,subprocess}.py`.**
+- [x] **2.2 Backends: `utils/backends/{base,systemd,subprocess}.py`.**
   - **Protocol:** `start(spec)`, `stop(id, timeout)`, `state(id)` (`active|inactive|failed`, pid, started_ts), `list_ours()`, `logs(id, n)`, `follow(id)`.
   - **systemd:**
     - start: `systemd-run --user --unit=aihub-<id> --property=KillMode=mixed --property=TimeoutStopSec=<stop_timeout_s> --working-directory=<cwd> --setenv=… -- <argv>`. Clear a stale failed unit with the same name first (`systemctl --user reset-failed aihub-<id>`).
@@ -202,6 +202,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - logs: `journalctl --user -u aihub-<id> -o json` (`-n N`, `-f`).
     - Port the existing pieces from `services/lcpp/src/lcpp/backends/systemd.py` (today at `~/Models/LLMs/src/lcpp/backends/systemd.py`).
   - **subprocess:** an asyncio subprocess in its own process group, with a log ring buffer. Used by tests and `--dev`.
+  - *As built:* the protocol is async (`start`, `stop`, `state` → `UnitState(active, pid, started_ts, result, exit_status)`, `list_ours`, `logs`, `follow`, `close`). `SystemdBackend(prefix=)` lets tests use their own unit names; logs use `journalctl --user -u`, so systemd's own lines (exit status) are included. `SubprocessBackend` stops like `KillMode=mixed` (SIGTERM to the main process, then SIGKILL to the group) and stops every child on `close()`. Starting a mod that is already running is a `BackendError` in both.
   *Done when:* both backends pass the same contract tests (systemd ones are marked and skipped where systemd isn't available).
 - [ ] **2.3 `utils/services.py`: the state machine.** `ServiceManager` holds one `Service` per manifest: state, load, timestamps, pid, health and status caches, stats, `last_error`, `in_flight`, `last_request_ts`.
   - **start:**

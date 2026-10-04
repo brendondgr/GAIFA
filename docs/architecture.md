@@ -330,7 +330,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `POST /api/memory/acquire` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[]}` or `409 needs_room {plan}` |
 | `GET /api/tools`, `POST /api/tools/{name}/call`, `POST /api/approvals/{id}` | later: agent tools and approval decisions |
 
-**Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`. Responses proxied from a mod are passed through unchanged. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all.
+**Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-AIHub-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all.
 
 ## 7. Memory manager
 

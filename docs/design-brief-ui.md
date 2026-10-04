@@ -337,7 +337,8 @@ export const api = createApi({ base: window.AIHUB_API_BASE ?? null, liveAreas: f
 
 - **Methods in a live area** call HTTP. Everything else answers from the mock.
 - **`subscribe`** merges live events for live areas with mock events for the rest.
-- **`api.liveAreas`** says which areas are live, so each page section can show a small **MOCK** badge while its area is still mocked.
+- **`api.liveAreas`** says which areas are live, so each page section can show a small **MOCK** badge while its area is still mocked. `api.isLive(area)` answers the same for one area.
+- **Errors in `callService`:** a non-2xx from the mod rejects with `upstream_error` (`detail` = the mod's message, `data.body` = its body). Hub errors carry an `X-AIHub-Error` header and reject with their own code.
 
 Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `memory`, `models`, `outputs`, `settings`, `events`, `metrics` (Section 11.7), `widgets` (Section 11.7) and `tools`.
 

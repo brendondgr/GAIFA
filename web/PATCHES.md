@@ -14,6 +14,9 @@
 |---|---|---|---|---|
 | 1 | `Hub.dc.html`, `mock.js` | `Hub` → `AIHub` in visible text (`the Hub` → `AIHub`); identifiers such as `setHubDown` unchanged | The product is AIHub | 1.8 |
 | 2 | `Hub.dc.html`, `mock.js` | `bin/hub` → `aihub` | The CLI is `aihub` (`bin/aihub`, linked into `~/.local/bin`) | 1.8 |
+| 3 | `Hub.dc.html` (`componentDidMount`) | `import('mock.js')` → `createMockApi()` replaced by `createApi({base, liveAreas, mock})` from `api.js`; `?mock` forces all-mock | The hybrid mode switch (brief §6.1) | 1.9 |
+| 4 | `Hub.dc.html` (sidebar footer, Settings → About) | Hard-coded `v0.1.0` → the hub's version from `getSystem()` (`sb.version`, `v.versions`) | Show the real version | 1.9 |
+| 5 | `Hub.dc.html` (Settings) | A **MOCK** note above each Settings section whose data comes from a mocked area (`SETTINGS_AREAS`, `se.mock`, `se.mockText`) | Brief §6.1: sections show a MOCK badge while their area is mocked | 1.9 |
 
 ## Known export behavior (not edits)
 

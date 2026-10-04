@@ -71,6 +71,7 @@ utils/tests/
 │   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok, fake-slow, fake-crash, fake-mem
 │   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay
 ├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli
+├── web/api.test.mjs + test_api_js.py ✅  Node unit tests for web/api.js, run from pytest
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
 └── <area>/test_<behavior>.py          registry, outputs, memory, metrics, …
 ```
@@ -81,6 +82,7 @@ utils/tests/
 | :--- | :--- |
 | `Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html` | Claude Design's v1 export (the shell and every core page; shared components) |
 | `mock.js` | `createMockApi()`: the brief §6 contract on simulated data |
+| `api.js` | Ours, not the export: `createApi({base, liveAreas, mock})` routes each method to HTTP or the mock by area; `createHttpApi()` |
 | `support.js` | Claude Design's runtime. Generated: **never edit** |
 | `vendor/` | React and ReactDOM 18.3.1 (UMD), `fonts.css` + `fonts/` (IBM Plex Sans, JetBrains Mono, OFL) |
 | `PATCHES.md` | Every hand edit to the export files |

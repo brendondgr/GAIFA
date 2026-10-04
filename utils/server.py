@@ -143,7 +143,8 @@ def _envelope(status: int, code: str, detail: str, data: Any = None) -> JSONResp
     body: dict[str, Any] = {"detail": detail, "code": code}
     if data is not None:
         body["data"] = data
-    return JSONResponse(body, status_code=status)
+    # Marks the hub's own errors, so the UI can tell them from a mod's proxied error responses.
+    return JSONResponse(body, status_code=status, headers={"X-AIHub-Error": code})
 
 
 def _error_handlers(app: FastAPI) -> None:

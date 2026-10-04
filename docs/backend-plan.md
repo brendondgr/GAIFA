@@ -162,7 +162,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **`web/PATCHES.md`** starts here. It lists every edit made to an export: the Hub → AIHub renames, and the 1.9 mode switch. Revision 2 (Phase 6) asks Claude Design to build these in, so the list goes back to empty.
   - *As built:* the serving code is `utils/routes/web.py` (`GET /`, `GET /{name}.dc.html`). Fonts are the Latin subsets of `@fontsource` (400/500/600) with their OFL licenses in `web/vendor/fonts/`. Checked 2026-10-04 in the browser: every request went to 127.0.0.1:7000.
   *Done when:* `python app.py`, then opening `http://127.0.0.1:7000/`, shows the full v1 UI on mock data, and the browser's network panel shows **no request leaving 127.0.0.1**.
-- [ ] **1.9 `web/api.js`: the hybrid API.**
+- [x] **1.9 `web/api.js`: the hybrid API.**
   - **HTTP client:** `ApiError` plus an HTTP implementation of every method in brief §6.2 and §11.7, returning the same shapes as the mock. SSE goes through `EventSource`, and non-JSON responses (audio, files) become blobs with object URLs.
   - **`createApi({base, liveAreas, mock})`:** routes each method to HTTP when its area is live, and to the mock otherwise. The method → area map follows brief §6.1.
   - **`subscribe`** merges the live `/api/events` stream (filtered to live areas) with mock events for the rest.
@@ -170,6 +170,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **`/config.js`** sets `AIHUB_API_BASE = ""` and `AIHUB_LIVE_AREAS`. That list comes from a registry in the hub: each subsystem registers its area when its routes are mounted. `?mock` forces everything to mock.
   - **Patch the export:** replace `import('mock.js')` → `createMockApi()` in `Hub.dc.html` with `createApi(...)`, and record it in `PATCHES.md`.
   - **Unit tests** (Node, no browser): area routing, merged subscribe, error mapping.
+  - *As built:* tests in `utils/tests/web/api.test.mjs`, run by `utils/tests/web/test_api_js.py` (Node from PATH, or the host's via `flatpak-spawn --host` inside the toolbox). While any area is live, `subscribe` keeps `/api/events` open even with `events` mocked: its error is how the UI sees the hub go down. `callService` turns a mod's own error into `upstream_error`. The hub's own errors carry an `X-AIHub-Error: <code>` header so the two can be told apart. Settings shows a MOCK note per section (`SETTINGS_AREAS`, patch 5).
 
 **Wire — Phase 1:** the `system` area goes live:
 - the sidebar footer (version, hub status dot)
@@ -177,11 +178,11 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 - the "AIHub not responding" banner, which appears when the hub stops and clears when it's back
 
 **Checks & deliverables — Phase 1**
-- [ ] `uv run pytest` is green, and `aihub install && aihub status` works after a re-login.
-- [ ] Opening `/` shows the full UI. Settings → About shows the real version, PID and uptime, and every other section shows a **MOCK** marker.
-- [ ] Stopping the hub shows the down banner within one retry; starting it clears it.
-- [ ] No requests go to outside hosts, checked in the browser's network panel.
-- [ ] Delivered: the repo, CLAUDE.md, `app.py`, `bin/aihub`, `utils/` (paths, config, db, events, server, cli), `web/` (baseline, vendor, `api.js`, `PATCHES.md`), and the test harness.
+- [x] `uv run pytest` is green, and `aihub install && aihub status` works after a re-login. *(Green: 88 tests. Installed 2026-10-04 with linger on and the unit enabled; the re-login itself is for the user to confirm.)*
+- [x] Opening `/` shows the full UI. Settings → About shows the real version, PID and uptime, and every other section shows a **MOCK** marker. *(The process info is under General; Paths is live too, so it has no marker.)*
+- [x] Stopping the hub shows the down banner within one retry; starting it clears it.
+- [x] No requests go to outside hosts, checked in the browser's network panel.
+- [x] Delivered: the repo, CLAUDE.md, `app.py`, `bin/aihub`, `utils/` (paths, config, db, events, server, cli), `web/` (baseline, vendor, `api.js`, `PATCHES.md`), and the test harness.
 
 ## Phase 2 — Running mods
 

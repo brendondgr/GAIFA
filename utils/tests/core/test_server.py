@@ -82,6 +82,7 @@ async def test_error_envelope(client):
     r = await client.get("/api/_test/hub-error")
     assert r.status_code == 409
     assert r.json() == {"detail": "not enough memory", "code": "needs_room", "data": {"plan": {"enough": False}}}
+    assert r.headers["x-aihub-error"] == "needs_room"
 
     r = await client.get("/api/nope")
     assert r.status_code == 404 and r.json() == {"detail": "Not Found", "code": "not_found"}

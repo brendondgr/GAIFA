@@ -1,0 +1,159 @@
+"""Shared test fixtures.
+
+- `root`: a temporary project root (AIHUB_ROOT), with an empty `services/`.
+- `make_app` / `app` / `client`: the hub app on that root with its lifespan
+  running, and an `httpx.AsyncClient` over ASGI.
+- `fake_mod`: starts a fake mod from `fixtures/mods/` on a free port.
+- `hub_process`: `python app.py` as a real process on a free port.
+
+The app is built with no backend until Phase 2.2 adds `SubprocessBackend`;
+then `make_app` passes it here, so tests never touch systemd.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+
+import httpx
+import pytest
+
+from utils import config
+from utils.server import Options, create_app
+
+REPO = Path(__file__).resolve().parents[2]
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+FAKE_MODS = FIXTURES / "mods"
+OPENAPI = FIXTURES / "openapi"
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def wait_for(url: str, timeout: float = 10, ok: Callable[[httpx.Response], bool] = lambda r: True) -> httpx.Response:
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            r = httpx.get(url, timeout=1)
+            if ok(r):
+                return r
+        except httpx.TransportError:
+            pass
+        if time.monotonic() > deadline:
+            raise TimeoutError(f"{url} did not answer within {timeout}s")
+        time.sleep(0.05)
+
+
+@pytest.fixture
+def root(tmp_path, monkeypatch) -> Path:
+    (tmp_path / "services").mkdir()
+    monkeypatch.setenv("AIHUB_ROOT", str(tmp_path))
+    return tmp_path
+
+
+@pytest.fixture
+def make_app(root):
+    def make(cfg: config.Config | None = None, **opts):
+        cfg = cfg or config.load(root / "config.toml")
+        return create_app(config.build_paths(cfg, root), cfg, backend=None, options=Options(**opts))
+
+    return make
+
+
+@pytest.fixture
+async def app(make_app):
+    app = make_app(port=7000)
+    async with app.router.lifespan_context(app):
+        yield app
+
+
+@pytest.fixture
+async def client(app):
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://hub") as c:
+        yield c
+
+
+@dataclass
+class FakeMod:
+    mode: str
+    port: int
+    outputs: Path
+    proc: subprocess.Popen
+
+    @property
+    def url(self) -> str:
+        return f"http://127.0.0.1:{self.port}"
+
+
+@pytest.fixture
+def fake_mod(tmp_path):
+    """`fake_mod("ok", FAKE_MEM_MB="8")` → a running FakeMod (listening; maybe not yet healthy)."""
+    started: list[FakeMod] = []
+
+    def start(mode: str, **env: str) -> FakeMod:
+        port = free_port()
+        outputs = tmp_path / "outputs" / f"fake-{mode}"
+        proc = subprocess.Popen(
+            [sys.executable, str(FAKE_MODS / "_fakemod.py"), mode],
+            env={**os.environ, "FAKE_PORT": str(port), "FAKE_OUTPUTS": str(outputs), **env},
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        )
+        mod = FakeMod(mode, port, outputs, proc)
+        started.append(mod)
+        wait_for(mod.url + "/openapi.json", timeout=10)
+        return mod
+
+    yield start
+    for mod in started:
+        if mod.proc.poll() is None:
+            mod.proc.kill()
+        mod.proc.wait(5)
+
+
+@pytest.fixture
+def hub_process(root):
+    """Run `python app.py --port <free>` on the temp root; yields its base URL."""
+    port = free_port()
+    proc = subprocess.Popen(
+        [sys.executable, str(REPO / "app.py"), "--port", str(port)],
+        env={**os.environ, "AIHUB_ROOT": str(root)},
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )
+    url = f"http://127.0.0.1:{port}"
+    try:
+        wait_for(url + "/api/system", timeout=20, ok=lambda r: r.status_code == 200)
+    except TimeoutError:
+        proc.kill()
+        pytest.fail("hub did not start:\n" + proc.communicate()[0])
+    proc.url = url  # type: ignore[attr-defined]
+    yield proc
+    if proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+@pytest.fixture
+def services_dir(root):
+    """Copy fake mods into the temp root's `services/`: `services_dir("fake-ok", ...)`."""
+
+    def copy(*ids: str) -> Path:
+        shutil.copy(FAKE_MODS / "_fakemod.py", root / "services" / "_fakemod.py")
+        for i in ids:
+            shutil.copytree(FAKE_MODS / i, root / "services" / i)
+        return root / "services"
+
+    return copy

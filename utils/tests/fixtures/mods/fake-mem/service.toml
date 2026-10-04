@@ -1,0 +1,22 @@
+# Test fixture: allocates 64 MB on /v1/load, frees it on /v1/unload
+id = "fake-mem"
+name = "Fake Memory"
+description = "allocates 64 MB on /v1/load, frees it on /v1/unload"
+icon = "box"
+version = "1.0.0"
+
+[run]
+command = ["python3", "../_fakemod.py", "mem"]   # relative paths resolve against this folder
+port = 5194
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+start_timeout_s = 15
+stop_timeout_s = 5
+restart = "no"
+
+[memory]
+estimate_gb = 0.0625
+load = "POST /v1/load"
+unload = "POST /v1/unload"

@@ -1,0 +1,24 @@
+# Test fixture: every route a mod can have: health, status, echo, audio, SSE, outputs
+id = "fake-ok"
+name = "Fake OK"
+description = "every route a mod can have: health, status, echo, audio, SSE, outputs"
+icon = "box"
+version = "1.0.0"
+
+[run]
+command = ["python3", "../_fakemod.py", "ok"]   # relative paths resolve against this folder
+port = 5191
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+start_timeout_s = 15
+stop_timeout_s = 5
+restart = "no"
+
+[outputs]
+kinds = ["text"]
+
+[api.responses]
+"POST /v1/speech" = "audio"
+"GET /v1/events" = "stream"

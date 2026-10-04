@@ -1,6 +1,5 @@
 import os
 import signal
-import socket
 import subprocess
 import sys
 import time
@@ -12,15 +11,14 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from utils import config
-from utils.server import HubError, Options, create_app
+from utils.server import HubError, create_app
 
 REPO = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture
-async def client(tmp_path):
-    cfg = config.Config()
-    app = create_app(config.build_paths(cfg, tmp_path), cfg, options=Options(port=7123))
+async def client(make_app):
+    app = make_app(port=7123)
 
     class Body(BaseModel):
         n: int
@@ -48,20 +46,20 @@ async def client(tmp_path):
             yield c
 
 
-async def test_lifespan_creates_dirs_and_db(client, tmp_path):
-    assert (tmp_path / "data/databases/hub.db").exists()
-    assert (tmp_path / "outputs").is_dir() and (tmp_path / "data/models").is_dir()
+async def test_lifespan_creates_dirs_and_db(client, root):
+    assert (root / "data/databases/hub.db").exists()
+    assert (root / "outputs").is_dir() and (root / "data/models").is_dir()
     assert client.app.state.hub.activity is not None
 
 
-async def test_system(client, tmp_path):
-    (tmp_path / "outputs/tts").mkdir()
-    (tmp_path / "outputs/tts/a.wav").write_bytes(b"x" * 1000)
+async def test_system(client, root):
+    (root / "outputs/tts").mkdir()
+    (root / "outputs/tts/a.wav").write_bytes(b"x" * 1000)
     s = (await client.get("/api/system")).json()
     assert s["hub"]["pid"] == os.getpid() and s["hub"]["port"] == 7123
     assert s["hub"]["version"] == "0.1.0" and s["hub"]["rss_bytes"] > 0
-    assert s["paths"]["root"] == str(tmp_path.resolve())
-    assert s["paths"]["outputs"] == str(tmp_path.resolve() / "outputs")
+    assert s["paths"]["root"] == str(root.resolve())
+    assert s["paths"]["outputs"] == str(root.resolve() / "outputs")
     assert s["usage"]["outputs_bytes"] == 1000
     assert s["usage"]["databases_bytes"] > 0
     assert 0 < s["disk"]["free_bytes"] <= s["disk"]["total_bytes"]
@@ -110,43 +108,20 @@ async def test_static_web(tmp_path):
             assert (await c.get("/x.txt")).text == "hello"
 
 
-def free_port() -> int:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
-
-
-def test_app_py_serves_both_stacks_and_stops_with_sse_open(tmp_path):
+def test_app_py_serves_both_stacks_and_stops_with_sse_open(hub_process):
     """`python app.py` end to end: IPv4 + IPv6, /api/system, /api/docs, SSE, quick shutdown."""
-    port = free_port()
-    env = {**os.environ, "AIHUB_ROOT": str(tmp_path)}
-    proc = subprocess.Popen(
-        [sys.executable, str(REPO / "app.py"), "--port", str(port)],
-        env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-    )
-    try:
-        for _ in range(100):
-            try:
-                if httpx.get(f"http://127.0.0.1:{port}/api/system", timeout=1).status_code == 200:
-                    break
-            except httpx.TransportError:
-                time.sleep(0.1)
-        else:
-            pytest.fail("hub did not start")
-        assert httpx.get(f"http://[::1]:{port}/api/system").json()["hub"]["port"] == port
-        assert httpx.get(f"http://127.0.0.1:{port}/api/docs").status_code == 200
-        with httpx.stream("GET", f"http://127.0.0.1:{port}/api/events", timeout=5) as r:
-            assert r.headers["content-type"].startswith("text/event-stream")
-            assert next(r.iter_lines()) == "retry: 3000"
-            t0 = time.monotonic()
-            proc.send_signal(signal.SIGINT)
-            assert proc.wait(timeout=8) == 0
-            assert "Traceback" not in proc.stdout.read()
-            assert time.monotonic() - t0 < 5
-    finally:
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait()
+    url = hub_process.url
+    port = int(url.rsplit(":", 1)[1])
+    assert httpx.get(f"http://[::1]:{port}/api/system").json()["hub"]["port"] == port
+    assert httpx.get(f"{url}/api/docs").status_code == 200
+    with httpx.stream("GET", f"{url}/api/events", timeout=5) as r:
+        assert r.headers["content-type"].startswith("text/event-stream")
+        assert next(r.iter_lines()) == "retry: 3000"
+        t0 = time.monotonic()
+        hub_process.send_signal(signal.SIGINT)
+        assert hub_process.wait(timeout=8) == 0
+        assert time.monotonic() - t0 < 5
+    assert "Traceback" not in hub_process.stdout.read()
 
 
 def test_app_py_refuses_non_loopback(tmp_path):

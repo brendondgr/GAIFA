@@ -143,14 +143,15 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - **When the hub is down**, it says so and suggests `aihub start`.
   - *As built:* `logs` reads the journal (`aihub.service`, or `aihub-<id>.service` for a mod), so it works with the hub down. `new` and `models` exit 2 naming the phase that builds them. Mod commands get the hub's `not_found` until Phase 2. Installed 2026-10-04; linger was already on.
   *Done when:* `aihub install && aihub status` works and survives a logout/login (linger).
-- [ ] **1.7 Test harness.**
+- [x] **1.7 Test harness.**
   - `utils/tests/conftest.py`: a temporary project root, the app built with `SubprocessBackend`, and an `httpx.AsyncClient` over ASGI.
   - Copy the real OpenAPI files from 0.5 into `utils/tests/fixtures/openapi/`.
-  - **Fake mods** in `utils/tests/fixtures/mods/`:
-    - `fake_ok`: health, status, openapi, echo, an audio route, an SSE route, and a route that writes an output
-    - `fake_slow`: becomes healthy after 3 s
-    - `fake_crash`: exits after 1 s
-    - `fake_mem`: allocates N MB on `/v1/load` and frees it on `/v1/unload`
+  - **Fake mods** in `utils/tests/fixtures/mods/` (hyphenated, since mod ids can't contain `_`):
+    - `fake-ok`: health, status, openapi, echo, an audio route, an SSE route, and a route that writes an output
+    - `fake-slow`: becomes healthy after 3 s
+    - `fake-crash`: exits after 1 s
+    - `fake-mem`: allocates N MB on `/v1/load` and frees it on `/v1/unload`
+  - *As built:* the four share one standard-library server, `fixtures/mods/_fakemod.py` (`python3 ../_fakemod.py <mode>` in each `service.toml`), so they also prove a mod needs nothing but HTTP. `conftest.py` also has `fake_mod(mode)` (runs one on a free port), `hub_process` (a real `app.py`) and `services_dir(*ids)`. The app is built with no backend until 2.2 adds `SubprocessBackend`.
   *Done when:* `uv run pytest` is green.
 - [ ] **1.8 The UI baseline in `web/`.**
   - Copy the v1 export from `docs/reference/ui-export-2026-10-04/` into `web/`: `Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html`, `mock.js` and `support.js`.
@@ -235,7 +236,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - Hide `[api] hide` entries plus `/docs`, `/redoc`, the openapi route, static mounts, HEAD and OPTIONS.
     - `destructive` = DELETE or `confirm`.
     - `tool` comes from `[tools]`.
-  *Done when:* tests convert `fake_ok` and the four real OpenAPI fixtures from 0.5, with snapshot assertions.
+  *Done when:* tests convert `fake-ok` and the four real OpenAPI fixtures from 0.5, with snapshot assertions.
 - [ ] **2.7 Service routes** (UI brief §6.2): list, detail, start, stop, restart, load, unload, logs, logs/stream, operations, and `PUT config`.
   - **load/unload:** call the manifest operations through the proxy client. Make-room logic is added in Phase 5.
   - **`PUT config`:** validate, then save through `config.save()`. Port, env and command changes return `restart_required: true`. Enabled and autostart apply immediately.
@@ -353,7 +354,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 - new outputs arriving live
 
 **Checks & deliverables — Phase 4**
-- [ ] Calling `fake_ok`'s output route makes the file appear on the Outputs page within 2 s, with no reload.
+- [ ] Calling `fake-ok`'s output route makes the file appear on the Outputs page within 2 s, with no reload.
 - [ ] Audio seeking works (Range requests) in Chromium and Firefox.
 - [ ] Deleting an output from the drawer removes its file, sidecar and preview.
 - [ ] 2,000 generated outputs page smoothly, and the totals stay correct.
@@ -378,7 +379,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - `auto_make_room = false` and no `make_room` → `409 needs_room` with `data.plan`.
     - Acquire returns `{granted: true, freed: [...]}`.
   - **One global lock**, so two loads never race for the same memory.
-  *Done when:* an end-to-end test with two `fake_mem` mods passes.
+  *Done when:* an end-to-end test with two `fake-mem` mods passes.
 - [ ] **5.5 Proxy triggers.**
   - A proxied request that matches a mod's `[memory] triggers` while the mod is unloaded runs the load rule first.
   - `needs_room` goes back to the caller as 409, and the caller retries with the header `X-AIHub-Make-Room: 1`.
@@ -392,7 +393,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 - the **Make room** dialog, on a real `needs_room`
 
 **Checks & deliverables — Phase 5**
-- [ ] With two `fake_mem` mods sized so they can't both fit:
+- [ ] With two `fake-mem` mods sized so they can't both fit:
   - loading the second shows the Make-room plan
   - "Unload & continue" frees the first and loads the second
   - the memory meter follows within 2 s
@@ -419,7 +420,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - `GET /api/activity/stats`
   - `GET /api/jobs/stats`
   - `GET /api/widgets` and `GET /api/widgets/{service}/{id}`: proxy each mod's `[[ui.widgets]]` source, cache it for 30 s, and validate it against `WidgetData`
-  - `fake_ok` gains one widget, for the tests
+  - `fake-ok` gains one widget, for the tests
 - [ ] **6.3 Overview, system and settings routes.**
   - `GET /api/overview` aggregates services, memory, the 8 newest outputs, 30 activity items, alerts, jobs and system.
   - `GET/PUT /api/settings` reads and writes `config.toml`; changing the hub port returns `restart_required`.
@@ -926,7 +927,7 @@ Everything here waits until Stages A–C are done and 13.4 has passed. The desig
   1. start `_template` as a temporary mod
   2. call it through the proxy
   3. write an output and see it indexed
-  4. load and unload a `fake_mem` mod
+  4. load and unload a `fake-mem` mod
   5. tear everything down
 
 ## Definition of done

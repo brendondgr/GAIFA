@@ -66,12 +66,12 @@ Tests stay inside the hub package, as the plan specifies. Group them by area as 
 
 ```text
 utils/tests/
-├── conftest.py                 ⏳ 1.7  temp project root, app on SubprocessBackend, ASGI client
+├── conftest.py                 ✅     root, make_app/app/client (ASGI), fake_mod, hub_process, services_dir
 ├── fixtures/
-│   ├── mods/                   🧱     fake_ok, fake_slow, fake_crash, fake_mem (1.7)
-│   └── openapi/                🧱     real OpenAPI captures from Phase 0.5
+│   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok, fake-slow, fake-crash, fake-mem
+│   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay
 ├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli
-├── services/test_<behavior>.py        manifest, backends, state machine, proxy, operations
+├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
 └── <area>/test_<behavior>.py          registry, outputs, memory, metrics, …
 ```
 

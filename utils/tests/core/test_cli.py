@@ -1,11 +1,7 @@
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
-
-import httpx
-import pytest
 
 from utils import cli
 
@@ -65,33 +61,15 @@ def test_human_formatting():
     assert cli.human_secs(59) == "59s" and cli.human_secs(3700) == "1h 1m" and cli.human_secs(90000) == "1d 1h"
 
 
-@pytest.fixture
-def live_hub(tmp_path):
-    with __import__("socket").socket() as s:
-        s.bind(("127.0.0.1", 0))
-        port = s.getsockname()[1]
-    env = {**os.environ, "AIHUB_ROOT": str(tmp_path)}
-    proc = subprocess.Popen([sys.executable, str(REPO / "app.py"), "--port", str(port)], env=env,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    url = f"http://127.0.0.1:{port}"
-    for _ in range(100):
-        try:
-            httpx.get(url + "/api/system", timeout=1)
-            break
-        except httpx.TransportError:
-            time.sleep(0.1)
-    yield url
-    proc.terminate()
-    proc.wait(10)
-
-
-def test_status_against_a_running_hub(live_hub, tmp_path):
+def test_status_against_a_running_hub(hub_process, tmp_path):
+    live_hub = hub_process.url
     r = run("status", env={"AIHUB_URL": live_hub, "XDG_CONFIG_HOME": str(tmp_path)})
     assert r.returncode == 0, r.stderr
     assert r.stdout.startswith("AIHub 0.1.0 at " + live_hub)
     assert "not installed" in r.stdout and "mods: none yet" in r.stdout
 
 
-def test_service_command_before_phase_2(live_hub):
+def test_service_command_before_phase_2(hub_process):
+    live_hub = hub_process.url
     r = run("start", "tts", env={"AIHUB_URL": live_hub})
     assert r.returncode == 1 and "(not_found)" in r.stderr

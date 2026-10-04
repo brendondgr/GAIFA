@@ -1,0 +1,193 @@
+"""Fake mods for tests and `app.py --demo-mods`. Standard library only, like any
+mod could be: the hub sees nothing but HTTP.
+
+    python3 _fakemod.py ok|slow|crash|mem      (port from FAKE_PORT, outputs from FAKE_OUTPUTS)
+
+ok     health, status, openapi, echo, audio, SSE and a route that writes an output
+slow   like ok, but /health answers 503 for the first FAKE_SLOW_S (3) seconds
+crash  like ok, but the process exits with status 1 after FAKE_CRASH_S (1) seconds
+mem    like ok, plus /v1/load allocates FAKE_MEM_MB (64) MB and /v1/unload frees it
+"""
+
+from __future__ import annotations
+
+import io
+import json
+import math
+import os
+import re
+import struct
+import sys
+import threading
+import time
+import wave
+from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
+
+MODE = sys.argv[1] if len(sys.argv) > 1 else "ok"
+PORT = int(os.environ.get("FAKE_PORT", "5190"))
+OUTPUTS = Path(os.environ.get("FAKE_OUTPUTS") or os.environ.get("AIHUB_OUTPUTS") or "outputs")
+STARTED = time.time()
+STATE = {"last_used": time.time(), "requests": 0, "outputs": 0, "memory": None}
+MB = 1024 * 1024
+
+
+def openapi() -> dict:
+    def op(summary, body=None, response="application/json"):
+        o = {"summary": summary, "responses": {"200": {"content": {response: {"schema": {}}}}}}
+        if body:
+            o["requestBody"] = {"content": {"application/json": {"schema": body}}}
+        return o
+
+    text = {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}
+    paths = {
+        "/health": {"get": op("Health")},
+        "/v1/status": {"get": op("Status")},
+        "/v1/echo": {"post": op("Echo the body and query", {"type": "object"})},
+        "/v1/speech": {"post": op("A short sine tone as WAV", text, "audio/wav")},
+        "/v1/events": {"get": op("Three server-sent events", response="text/event-stream")},
+        "/v1/outputs": {"post": op("Write a text output", text)},
+    }
+    if MODE == "mem":
+        paths["/v1/load"] = {"post": op("Allocate memory")}
+        paths["/v1/unload"] = {"post": op("Free memory")}
+    return {"openapi": "3.1.0", "info": {"title": f"fake-{MODE}", "version": "1.0.0"}, "paths": paths}
+
+
+def tone(seconds: float = 0.25, hz: float = 440.0, rate: int = 16000) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        n = int(seconds * rate)
+        w.writeframes(b"".join(struct.pack("<h", int(12000 * math.sin(2 * math.pi * hz * i / rate))) for i in range(n)))
+    return buf.getvalue()
+
+
+def write_output(text: str) -> Path:
+    """Per architecture §4.7: <date>/<HHMMSS>-<slug>.txt, via .part, with a sidecar."""
+    now = datetime.now()
+    day = OUTPUTS / now.strftime("%Y-%m-%d")
+    day.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:40] or "output"
+    path = day / f"{now.strftime('%H%M%S')}-{slug}.txt"
+    part = path.with_name(path.name + ".part")
+    part.write_text(text)
+    part.rename(path)
+    meta = {"title": text[:60], "kind": "text", "prompt": text, "source": {"service": f"fake-{MODE}"}}
+    path.with_name(path.name + ".json").write_text(json.dumps(meta))
+    return path
+
+
+class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def log_message(self, fmt, *args):  # quiet unless FAKE_VERBOSE
+        if os.environ.get("FAKE_VERBOSE"):
+            super().log_message(fmt, *args)
+
+    def send(self, status: int, body: bytes | dict | list, ctype: str = "application/json") -> None:
+        if not isinstance(body, bytes):
+            body = json.dumps(body).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def body(self) -> dict:
+        n = int(self.headers.get("Content-Length") or 0)
+        if not n:
+            return {}
+        try:
+            return json.loads(self.rfile.read(n))
+        except ValueError:
+            return {}
+
+    def do_GET(self) -> None:
+        url = urlsplit(self.path)
+        if url.path == "/health":
+            if MODE == "slow" and time.time() - STARTED < float(os.environ.get("FAKE_SLOW_S", "3")):
+                return self.send(503, {"status": "starting"})
+            return self.send(200, {"status": "ok", "mode": MODE})
+        if url.path == "/v1/status":
+            return self.send(200, status())
+        if url.path == "/openapi.json":
+            return self.send(200, openapi())
+        if url.path == "/v1/events":
+            return self.sse()
+        self.send(404, {"detail": f"no route {url.path}"})
+
+    def do_POST(self) -> None:
+        url = urlsplit(self.path)
+        STATE["requests"] += 1
+        STATE["last_used"] = time.time()
+        if url.path == "/v1/echo":
+            return self.send(200, {"json": self.body(), "query": parse_qs(url.query), "headers": dict(self.headers)})
+        if url.path == "/v1/speech":
+            self.body()
+            return self.send(200, tone(), "audio/wav")
+        if url.path == "/v1/outputs":
+            path = write_output(self.body().get("text") or "hello")
+            STATE["outputs"] += 1
+            return self.send(201, {"path": str(path)})
+        if MODE == "mem" and url.path == "/v1/load":
+            mb = int(self.body().get("mb") or os.environ.get("FAKE_MEM_MB", "64"))
+            block = bytearray(mb * MB)
+            for i in range(0, len(block), 4096):  # touch every page so it counts as RSS
+                block[i] = 1
+            STATE["memory"] = block
+            return self.send(200, {"loaded": True, "mb": mb})
+        if MODE == "mem" and url.path == "/v1/unload":
+            STATE["memory"] = None
+            return self.send(200, {"loaded": False})
+        self.send(404, {"detail": f"no route {url.path}"})
+
+    def sse(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        for i in range(3):
+            self.wfile.write(f"data: {json.dumps({'n': i})}\n\n".encode())
+            self.wfile.flush()
+            time.sleep(0.05)
+        self.close_connection = True
+
+
+def status() -> dict:
+    s: dict = {
+        "loaded": STATE["memory"] is not None if MODE == "mem" else None,
+        "busy": False,
+        "idle_s": round(time.time() - STATE["last_used"], 1),
+        "stats": [
+            {"label": "Requests", "value": STATE["requests"]},
+            {"label": "Outputs today", "value": STATE["outputs"], "reset": "daily"},
+        ],
+        "jobs": [],
+    }
+    if MODE == "mem":
+        s["memory_estimate_gb"] = round(int(os.environ.get("FAKE_MEM_MB", "64")) / 1024, 3)
+    return s
+
+
+def main() -> None:
+    if MODE not in {"ok", "slow", "crash", "mem"}:
+        sys.exit(f"unknown mode {MODE!r}")
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    server.daemon_threads = True
+    if MODE == "crash":
+        threading.Timer(float(os.environ.get("FAKE_CRASH_S", "1")), lambda: os._exit(1)).start()
+    print(f"fake-{MODE} listening on 127.0.0.1:{PORT}", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()

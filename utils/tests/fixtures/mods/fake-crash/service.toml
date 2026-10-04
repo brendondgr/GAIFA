@@ -1,0 +1,18 @@
+# Test fixture: exits with status 1 after 1 s
+id = "fake-crash"
+name = "Fake Crash"
+description = "exits with status 1 after 1 s"
+icon = "box"
+version = "1.0.0"
+
+[run]
+command = ["python3", "../_fakemod.py", "crash"]   # relative paths resolve against this folder
+port = 5193
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+start_timeout_s = 15
+stop_timeout_s = 5
+restart = "no"
+

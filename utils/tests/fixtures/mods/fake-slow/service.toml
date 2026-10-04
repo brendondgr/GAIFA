@@ -1,0 +1,18 @@
+# Test fixture: becomes healthy after 3 s
+id = "fake-slow"
+name = "Fake Slow"
+description = "becomes healthy after 3 s"
+icon = "box"
+version = "1.0.0"
+
+[run]
+command = ["python3", "../_fakemod.py", "slow"]   # relative paths resolve against this folder
+port = 5192
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+start_timeout_s = 15
+stop_timeout_s = 5
+restart = "no"
+

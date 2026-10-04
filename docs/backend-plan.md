@@ -50,13 +50,13 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 
 - [x] **0.1 Commit LocalTTS's uncommitted work.** 8 files are live in the running service but not committed: the 180 s idle default, the ROCm profiler fix, `KillMode=mixed`, and request de-duplication. Also fix the README, which still says engines unload after "10 minutes".
   *Done when:* `git status` is clean and `localtts status` is healthy.
-- [ ] **0.2 Commit lcpp's uncommitted work and fix its known bugs.**
+- [x] **0.2 Commit lcpp's uncommitted work and fix its known bugs.**
   - Commit the Hugging Face downloads feature (`downloads.py`, its routes and tests; 10 modified and 3 untracked files).
   - Fix `web/assets/utils.js:20`: `download()` calls `h()`, which only exists in `app.js`, so the logs drawer's "Download .log" button throws.
   - Make `supervisor._exit_future` fall back to polling when `os.pidfd_open` is missing.
   - Clean stale data: `data/generated/*.ini` (removed models), `serenity-26B-A4B` in `data/recent.local.json`, and the model in `utils/e2e_live.sh`.
   - **Ask the user** whether the catalog entries `gemma-4-E4B-it` and `ornith1-35B` (files missing) should be removed or kept for a re-download.
-  *Done when:* 81/81 tests pass on the system Python, and "Download .log" works.
+  *Done when:* 82/82 tests pass (81 + the no-pidfd test), and "Download .log" works.
 - [x] **0.3 Check the other two repos.** Commit anything pending in 3DGenerate and DashLLM. Remove the dead `RELAY_ADMIN_TOKEN`, `RELAY_API_KEY` and `RELAY_REQUIRE_CLIENT_KEY` from DashLLM's `.env` (`.env.example` was already clean).
 - [x] **0.4 Back up what will move** (small; the models are not copied, because moving them is a reversible rename). Copy these into `~/Backups/aihub-premigration-<date>/`:
   - `relay.db` and `gen3d.db`, using SQLite's online backup, not `cp`
@@ -919,7 +919,7 @@ Everything here waits until Stages A–C are done and 13.4 has passed. The desig
 - **The contract test** (6.6) keeps the backend and `web/api.js` in step. `api.js` has its own Node unit tests (1.9).
 - **The browser checks** in each phase's "Checks & deliverables" are run against the live backend, with `AIHUB_LIVE_AREAS` covering every area wired so far.
 - **The agent** (Stage D) is tested against a scripted OpenAI-compatible fake model, including a process kill and resume, plus a recorded live smoke run.
-- **Each moved app keeps its own test suite**, run from its folder: relay 154, lcpp 81, gen3d 25, and the new tts tests.
+- **Each moved app keeps its own test suite**, run from its folder: relay 154, lcpp 82, gen3d 25, and the new tts tests.
 - **A smoke check** (`aihub doctor --e2e`):
   1. start `_template` as a temporary mod
   2. call it through the proxy

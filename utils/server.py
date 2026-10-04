@@ -165,7 +165,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(services.router)
     app.include_router(proxy.router)
     app.include_router(models.router)
-    for area in ("services", "logs", "operations", "proxy", "events"):
+    for area in ("services", "logs", "operations", "proxy", "events", "models"):
         hub.mark_live(area)
 
     app.include_router(web.router)

@@ -27,7 +27,7 @@ export const METHOD_AREA = {
 
 // HubEvent type → area, for merging live and mock event streams.
 export const EVENT_AREA = {
-  service: 'services', memory: 'memory', output: 'outputs', output_deleted: 'outputs', model: 'models',
+  service: 'services', memory: 'memory', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
 };
 

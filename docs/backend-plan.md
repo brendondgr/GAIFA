@@ -365,12 +365,18 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 - the Models page: summary, filters, table, drawer, scan → add, verify with live progress, and the rule that blocks deleting models in use
 - the registry alerts on Overview
 - "models used" on service pages
+- *As wired:* web patch 7 (`web/PATCHES.md`): the `model_deleted` event; verify `progress` on the status badge and the drawer's button ("verifying 42%"); the in-use rule in the delete dialog matches the hub's; an empty registry offers "Scan for new files" instead of "Clear filters"; the Discovered list drops paths that get registered elsewhere (CLI, a mod). The hub also publishes a `model` event whenever a status changes on disk (checked once a minute and on every list), so the table follows files appearing or vanishing without a reload.
 
 **Checks & deliverables — Phase 3**
-- [ ] On a fake `data/models/` tree that covers every rule in 3.2, the scanner finds exactly the expected entries.
-- [ ] Verify shows live progress, and a deliberately corrupted file ends as **checksum mismatch**.
-- [ ] Deleting the files of a model used by a loaded fake mod is refused with `model_in_use`.
-- [ ] Delivered: `registry.py`, the model routes, and `aihub models scan|list|verify`.
+- [x] On a fake `data/models/` tree that covers every rule in 3.2, the scanner finds exactly the expected entries.
+  - *Checked:* `utils/tests/models/test_scan.py` (24 models from one example of every rule, plus everything that must be skipped), then all of them added through `POST /api/models` until a rescan found nothing. Also run read-only on the real model folders (45 models, 200 GB).
+- [x] Verify shows live progress, and a deliberately corrupted file ends as **checksum mismatch**.
+  - *Checked 2026-10-04* in the browser against a dev hub on a scratch root: a 6 GB file went "verifying 35%" → "71%" → ok in the drawer and the table; a file with one byte changed (same size, same mtime) ended as checksum mismatch, with an error alert on the Overview. Tests: `test_verify.py`, `test_cli_models.py`.
+- [x] Deleting the files of a model used by a loaded fake mod is refused with `model_in_use`.
+  - *Checked:* `test_used_by.py` (fake-mem with `[models] dirs`, loaded: refused; unloaded: deleted, empty folders removed) and in the browser: the delete dialog disables "Delete files too" while Speech Demo has the model loaded, and the API answers `409 model_in_use`.
+- [x] Delivered: `registry.py`, the model routes, and `aihub models scan|list|verify`.
+  - *As built:* the `utils/registry/` package, `utils/routes/models.py`, and `aihub models list | show | scan [--add] | verify`.
+  - *Fixed along the way:* `app.py` no longer marks the hub's listening sockets inheritable. uvloop's subprocess spawn doesn't close inheritable fds, so every `--dev` child mod held the hub's port, and could keep it bound after the hub exited (regression test in `core/test_server.py`). Installed (systemd) mods were never affected.
 
 ## Phase 4 — Outputs index
 

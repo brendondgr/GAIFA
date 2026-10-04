@@ -56,6 +56,7 @@ class Registry:
         self.readonly: str | None = None  # set when registry.json can't be read: saves are refused
         self.progress: dict[str, float] = {}  # id → 0..1 while queued or being verified (verify.py)
         self.verifier: Any = None  # verify.Verifier, set when it starts
+        self.last_status: dict[str, str] | None = None  # alerts.py: statuses at the last look
         self._stamp: tuple[int, int] | None = None
 
     # ---- storage -------------------------------------------------------------

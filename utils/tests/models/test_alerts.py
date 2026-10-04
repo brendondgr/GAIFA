@@ -74,6 +74,7 @@ async def test_watcher_notices_files_vanishing(models, bus):
     reg.load()
     w = Watcher(reg, every=0.05)
     w.start()
+    sub = bus.subscribe()
     try:
         assert "models-missing" not in ids(alerts)
         p.unlink()
@@ -82,6 +83,9 @@ async def test_watcher_notices_files_vanishing(models, bus):
                 break
             await asyncio.sleep(0.02)
         assert ids(alerts)["models-missing"] == "1 model has missing files"
+        events = [sub.queue.get_nowait() for _ in range(sub.queue.qsize())]
+        changed = [e["model"]["status"] for e in events if e["type"] == "model"]
+        assert changed == ["missing"]  # the UI hears about it without reloading
     finally:
         await w.close()
 

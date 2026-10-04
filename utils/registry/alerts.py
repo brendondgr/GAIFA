@@ -7,7 +7,8 @@ Alerts (brief `Alert`), with the same ids as the mock:
 - `registry-invalid` (error): registry.json or some of its entries can't be read
 
 They are recomputed after every change, whenever the list is read, and once a
-minute (files can disappear without the hub noticing).
+minute (files can disappear without the hub noticing). The same pass publishes a
+`model` event for every model whose status changed.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ def refresh(reg: Registry, views: list[dict[str, Any]] | None = None) -> None:
         return
     if views is None:
         views = [reg.view(mid, e) for mid, e in sorted(reg.entries.items())]
+    _publish_changes(reg, views)
     want: dict[str, tuple[str, str, dict[str, str]]] = {}
     missing = [v for v in views if v["status"] == "missing"]
     partial = [v for v in views if v["status"] == "partial"]
@@ -55,6 +57,18 @@ def refresh(reg: Registry, views: list[dict[str, Any]] | None = None) -> None:
         aid = a["id"]
         if (aid in FIXED or aid.startswith(PREFIX)) and aid not in want:
             alerts.clear(aid)
+
+
+def _publish_changes(reg: Registry, views: list[dict[str, Any]]) -> None:
+    """A `model` event for each model whose status changed since the last look: files that
+    appear, vanish or change on disk send no event of their own."""
+    seen = {v["id"]: v["status"] for v in views}
+    last = reg.last_status
+    if last is not None and reg.bus:
+        for v in views:
+            if last.get(v["id"], v["status"]) != v["status"] and v["status"] != "verifying":
+                reg.bus.publish({"type": "model", "model": v})
+    reg.last_status = seen
 
 
 class Watcher:

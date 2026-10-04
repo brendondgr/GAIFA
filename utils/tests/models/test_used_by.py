@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import re
+
 import httpx
 import pytest
 
+from utils.tests.conftest import free_port
 from utils.tests.models.conftest import Models
 from utils.tests.services.conftest import until
 
 
 def with_dirs(services, mod: str, dirs: list[str]) -> None:
+    """Add `[models] dirs` to a copied fixture mod, and give it a free port."""
     toml = services / mod / "service.toml"
-    toml.write_text(toml.read_text() + "\n[models]\ndirs = [" + ", ".join(f'"{d}"' for d in dirs) + "]\n")
+    text = re.sub(r"(?m)^port = \d+", f"port = {free_port()}", toml.read_text())
+    toml.write_text(text + "\n[models]\ndirs = [" + ", ".join(f'"{d}"' for d in dirs) + "]\n")
 
 
 @pytest.fixture

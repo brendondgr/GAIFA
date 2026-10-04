@@ -149,7 +149,11 @@ After editing `page.js`, reload the browser tab. Pages for the built-in apps can
   - The Load and Unload buttons call these routes.
   - Report `loaded` in your status.
   - Phase 5 unloads idle mods to make room before a trigger route runs.
-- **Models:** `[models] dirs = ["tts"]` lists the `data/models/` subfolders you use. Find them via `$AIHUB_MODELS`.
+- **Models:** keep weights in `data/models/` (`$AIHUB_MODELS`), in the folder for their kind (`llm/`, `tts/`, `comfyui/<role>/`, …; architecture §3).
+  - `[models] dirs = ["tts"]` (or deeper, `"comfyui/loras"`) lists the folders you use. Registered models in them show "used by" your mod, appear on its page, and their files can't be deleted while it is loaded or busy (or running at all, if it has no `[memory]`).
+  - **Register what you download** so it shows on the Models page with its source: `POST $AIHUB_URL/api/models` with `{"path": "tts/my-model", "name": "My Model", "kind": "tts", "source": {"type": "huggingface", "repo": "org/name", "revision": "<commit>"}}`. The hub finds the files with the scanner's rules (or send `"files": [{"path", "role", "sha256"}]`). A file that's already registered answers `409 model_exists`, so registering again is harmless.
+  - Download to `<name>.part` and rename when done; the registry shows a `.part` as downloading, and the scanner skips it.
+  - Or let the user find it: `aihub models scan --add`, or **Scan for new files** on the Models page.
 - **Tools:** `[tools] speak = { op = "POST /v1/speech", description = "…", confirm = false }` exposes an operation to the agent (Phase 13). `confirm = true` asks the user first, and also marks the operation destructive in the API tab.
 
 ## 7. Bringing in an existing app

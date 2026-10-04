@@ -2,7 +2,7 @@
 
 One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/`, run as its own process. Design: [docs/architecture.md](docs/architecture.md). Build plan: [docs/backend-plan.md](docs/backend-plan.md). UI brief: [docs/design-brief-ui.md](docs/design-brief-ui.md).
 
-**Status:** Phase 2 done: mods run as `aihub-<id>` systemd units (adopted across hub restarts), proxied at `/api/s/<id>/*`, with operations, logs, status, `aihub new` / `aihub check`, and mod pages in the shell. Live areas: system, services, logs, operations, proxy, events. Next: Phase 3.1 (models registry). What exists: [docs/structure.md](docs/structure.md).
+**Status:** Phase 3 done: the models registry (`data/models/registry.json`: computed status, scanner, background verify, used-by, alerts) on top of Phase 2's mods (`aihub-<id>` systemd units, proxied at `/api/s/<id>/*`, `aihub new` / `aihub check`, mod pages). Live areas: system, services, logs, operations, proxy, events, models. Next: Phase 4.1 (outputs index). What exists: [docs/structure.md](docs/structure.md).
 
 **Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans, and `aihub-mod` to build or port a mod (guide: [docs/mods.md](docs/mods.md)).
 
@@ -16,6 +16,7 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 - `uv run pytest`: the test suite (`utils/tests/`)
 - `uv run python app.py`: run the hub in the foreground on 127.0.0.1:7000 (`/api/docs` for the API)
 - `aihub new <id>`: a new mod from `services/_template/`, installed and loaded; `aihub rescan` after adding or removing mod folders by hand.
+- `aihub models list | show <id> | scan [--add] | verify <id>… | --all`: the models registry.
 - `aihub status | start | stop | restart | logs [-f] | doctor | open`: the hub as a systemd user service (`aihub install` writes `~/.config/systemd/user/aihub.service` and links `~/.local/bin/aihub`). After changing hub code, `aihub restart`.
 
 ## Mod contract

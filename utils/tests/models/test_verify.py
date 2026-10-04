@@ -195,3 +195,15 @@ async def test_verify_route(root, client):
         await asyncio.sleep(0.02)
     assert v["status"] == "ok"
     assert (await client.post("/api/models/nope/verify")).status_code == 404
+
+
+async def test_verifies_through_a_symlinked_folder(reg, models, ver, tmp_path_factory):
+    """data/models/llm linked to the old app's folder (a cutover step): readable, so verifiable."""
+    elsewhere = tmp_path_factory.mktemp("old-app")
+    (elsewhere / "m.gguf").write_bytes(b"weights" * 100)
+    (models.dir / "llm").symlink_to(elsewhere)
+    models.write({"m": {"files": [{"path": "llm/m.gguf", "size_bytes": 700}]}})
+    reg.load()
+    ver.request("m")
+    v = await done(reg)
+    assert v["status"] == "ok"

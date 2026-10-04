@@ -28,7 +28,8 @@ def _listen(host: str, port: int, family: socket.AddressFamily) -> socket.socket
         s.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
     s.bind((host, port))
     s.listen(2048)
-    s.set_inheritable(True)
+    # Not inheritable (Python's default): uvloop's subprocess spawn doesn't close inheritable fds,
+    # so `--dev` mods (child processes) would otherwise keep the hub's port bound after it exits.
     return s
 
 

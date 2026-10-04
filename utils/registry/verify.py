@@ -105,9 +105,7 @@ class Verifier:
             return
         todo: list[tuple[str, Path, int]] = []
         for f in e.files:
-            p = reg.inside(f.path)
-            if p is None:
-                continue
+            p = reg.abs(f.path)  # reading through a symlinked folder is fine; only deletes stay inside
             try:
                 st = p.stat()
             except OSError:
@@ -139,6 +137,8 @@ class Verifier:
             return  # deleted (or cancelled) meanwhile
         now = now_iso()
         mismatched, failed = [], []
+        if not results:
+            failed.append("no files could be read")
         for f in e.files:
             if f.path not in results:
                 continue

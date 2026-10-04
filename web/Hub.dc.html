@@ -645,7 +645,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
               </div>
             </sc-if>
             <sc-if value="{{ md.noRows }}" hint-placeholder-val="{{ false }}">
-              <div style="padding:40px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="font-weight:600">No models match these filters</div><button onClick="{{ md.clear }}" style="height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">Clear filters</button></div>
+              <div style="padding:40px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px"><div style="font-weight:600">{{ md.noRowsTitle }}</div><div style="color:var(--mut,#8A94A6);font-size:12.5px">{{ md.noRowsBody }}</div><button onClick="{{ md.noRowsAct }}" style="height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">{{ md.noRowsLabel }}</button></div>
             </sc-if>
           </div>
         </div>
@@ -1084,6 +1084,8 @@ const TONE = {
 const SETTINGS_AREAS = { general: ['settings', 'system'], paths: ['system'], memory: ['settings', 'memory'], services: ['settings', 'services'], interface: ['settings'], about: ['services', 'system'] };
 const STATE = { stopped: ['dim', false], starting: ['accent', true], ready: ['green', false], degraded: ['accent', false], stopping: ['dim', true], failed: ['red', false] };
 const LOAD = { unloaded: ['dim', false], loading: ['accent', true], loaded: ['cyan', false], unloading: ['accent', true] };
+// "verifying 42%" while a verify reports progress (patch 7)
+const mstatLabel = (m, label) => m.status === 'verifying' && m.progress != null ? `verifying ${Math.round(m.progress * 100)}%` : label;
 const MSTAT = { ok: ['green', 'ok'], missing: ['red', 'missing'], partial: ['accent', 'partial'], unverified: ['dim', 'unverified'], checksum_mismatch: ['red', 'checksum mismatch'], verifying: ['accent', 'verifying'] };
 const KINDS = [['llm', 'LLM'], ['tts', 'TTS'], ['stt', 'STT'], ['voice', 'Voice'], ['3d', '3D'], ['image', 'Image'], ['video', 'Video'], ['text-encoder', 'Text encoder'], ['vae', 'VAE'], ['lora', 'LoRA'], ['vision', 'Vision'], ['upscale', 'Upscale'], ['other', 'Other']];
 const OKINDS = [['audio', 'Audio'], ['image', 'Image'], ['video', 'Video'], ['model3d', '3D'], ['text', 'Text'], ['other', 'Other']];
@@ -1266,7 +1268,16 @@ class Component extends DCLogic {
         break;
       }
       case 'model': {
-        this.setState(st => { const list = [...st.mdl.list], i = list.findIndex(m => m.id === ev.model.id); if (i < 0) list.push(ev.model); else list[i] = ev.model; return { mdl: { ...st.mdl, list, drawer: st.mdl.drawer?.id === ev.model.id ? ev.model : st.mdl.drawer } }; });
+        const isNew = !s.mdl.list.some(m => m.id === ev.model.id), taken = new Set([ev.model.path, ...ev.model.files.map(f => f.path)]);
+        this.setState(st => { const list = [...st.mdl.list], i = list.findIndex(m => m.id === ev.model.id); if (i < 0) list.push(ev.model); else list[i] = ev.model;
+          const discovered = st.mdl.discovered && st.mdl.discovered.filter(d => !taken.has(d.path));  // added elsewhere (CLI, a mod): no longer "discovered"
+          return { mdl: { ...st.mdl, list, discovered, drawer: st.mdl.drawer?.id === ev.model.id ? ev.model : st.mdl.drawer } }; });
+        if (isNew && s.mdl.loaded) this.loadModels();  // totals by kind (patch 7)
+        break;
+      }
+      case 'model_deleted': {
+        this.setState(st => ({ mdl: { ...st.mdl, list: st.mdl.list.filter(m => m.id !== ev.id), drawer: st.mdl.drawer?.id === ev.id ? null : st.mdl.drawer } }));
+        if (s.mdl.loaded) this.loadModels();
         break;
       }
     }
@@ -1528,7 +1539,8 @@ class Component extends DCLogic {
   }
   closeModel() { if (this.state.route.page === 'models' && this.state.route.parts[1]) location.hash = '#/models'; else this.upd('mdl', { drawer: null }); }
   async verify(m) { try { await this.api.verifyModel(m.id); this.toast(`Verifying ${m.name}…`); } catch (e) { this.err(e); } }
-  modelBlocked(m) { const user = m.services.map(id => this.state.services.find(s => s.id === id)).find(s => s && s.state === 'ready' && ['loaded', 'loading'].includes(s.load)); return user || null; }
+  // The hub's rule (patch 7): a running mod that is loading, loaded, unloading or busy holds the files; one with no [memory] (load n/a) counts as loaded.
+  modelBlocked(m) { const user = m.services.map(id => this.state.services.find(s => s.id === id)).find(s => s && ['starting', 'ready', 'degraded', 'stopping'].includes(s.state) && (['loaded', 'loading', 'unloading', 'n/a'].includes(s.load) || s.busy)); return user || null; }
   askDeleteModel(m) { this.setState({ dialog: { kind: 'delModel', m, files: false, blocked: this.modelBlocked(m) } }); }
   async doDeleteModel() {
     const d = this.state.dialog;
@@ -1940,7 +1952,7 @@ class Component extends DCLogic {
     const rows = list.map(x => {
       const [t, label] = MSTAT[x.status] || ['dim', x.status], src = x.source;
       return { id: x.id, name: x.name, kind: (KINDS.find(k => k[0] === x.kind) || [, x.kind])[1], kst: badgeSt('dim', { sm: true, sq: true }), format: x.format, size: x.status === 'missing' ? '—' : fb(x.size_bytes),
-        services: x.services.map(id => ({ label: this.svcMap[id]?.name || id, href: '#/s/' + id })), sb: this.badge(label, t, x.status === 'verifying', { sm: true }),
+        services: x.services.map(id => ({ label: this.svcMap[id]?.name || id, href: '#/s/' + id })), sb: this.badge(mstatLabel(x, label), t, x.status === 'verifying', { sm: true }),
         source: !src ? '—' : src.type === 'huggingface' ? `hf: ${src.repo}@${src.revision}` : src.type === 'url' ? src.url : src.type === 'created' ? 'created locally' : 'local',
         open: () => this.go('#/models/' + x.id), onKey: e => { if (e.key === 'Enter') this.go('#/models/' + x.id); },
         verify: e => { e.stopPropagation(); this.verify(x); }, edit: e => { e.stopPropagation(); this.go('#/models/' + x.id); }, del: e => { e.stopPropagation(); this.askDeleteModel(x); },
@@ -1954,21 +1966,24 @@ class Component extends DCLogic {
       svcOpts: [{ v: '', label: 'All services' }, ...s.services.map(x => ({ v: x.id, label: x.name }))], svc: m.service, onSvc: e => this.upd('mdl', { service: e.target.value }),
       statusOpts: st.map(x => ({ v: x, label: x ? (MSTAT[x]?.[1] || x) : 'Any status' })), status: m.status, onStatus: e => { this.upd('mdl', { status: e.target.value }); if (this.state.route.params.status) history.replaceState(null, '', '#/models'); },
       hasFilters: !!(m.kinds.length || m.service || m.status || m.q), clear: () => { this.upd('mdl', { kinds: [], service: '', status: '', q: '' }); history.replaceState(null, '', '#/models'); },
-      rows, hasRows: rows.length > 0, noRows: rows.length === 0, shown: `${rows.length} of ${m.list.length}`, th: dn.th, thr: { ...dn.th, textAlign: 'right' },
+      rows, hasRows: rows.length > 0, noRows: rows.length === 0,
+      // an empty registry isn't a filter problem (patch 7)
+      noRowsTitle: m.list.length ? 'No models match these filters' : 'No models registered yet', noRowsBody: m.list.length ? '' : 'Scan data/models/ to find model files and add them.',
+      noRowsLabel: m.list.length ? 'Clear filters' : 'Scan for new files', noRowsAct: m.list.length ? () => { this.upd('mdl', { kinds: [], service: '', status: '', q: '' }); history.replaceState(null, '', '#/models'); } : () => this.scan(), shown: `${rows.length} of ${m.list.length}`, th: dn.th, thr: { ...dn.th, textAlign: 'right' },
       scan: () => this.scan(), scanLabel: m.scanning ? 'Scanning…' : 'Scan for new files', scanSt: btn('sec', { dis: m.scanning }), scanDis: m.scanning,
       hasDisc: !!m.discovered, discEmpty: !!m.discovered && m.discovered.length === 0, disc: (m.discovered || []).map(d => ({ path: d.path, size: fb(d.size_bytes), name: d.suggested_name, kind: (KINDS.find(k => k[0] === d.suggested_kind) || [, d.suggested_kind])[1], add: () => this.askAdd(d) })), closeDisc: () => this.upd('mdl', { discovered: null }) };
     // drawer
     const dm = m.drawer;
     if (dm) {
       const [t, label] = MSTAT[dm.status] || ['dim', dm.status], src = dm.source || {}, blocked = this.modelBlocked(dm);
-      v.dr = { show: true, name: dm.name, id: dm.id, sb: this.badge(label, t, dm.status === 'verifying'), kind: (KINDS.find(k => k[0] === dm.kind) || [, dm.kind])[1], format: dm.format, path: 'data/models/' + dm.path, size: fb(dm.size_bytes),
+      v.dr = { show: true, name: dm.name, id: dm.id, sb: this.badge(mstatLabel(dm, label), t, dm.status === 'verifying'), kind: (KINDS.find(k => k[0] === dm.kind) || [, dm.kind])[1], format: dm.format, path: 'data/models/' + dm.path, size: fb(dm.size_bytes),
         problems: dm.problems, hasProblems: dm.problems.length > 0,
         files: dm.files.map(f => ({ role: f.role, path: f.path, size: fb(f.size_bytes), exists: f.exists ? 'yes' : 'missing', est: { color: f.exists ? 'var(--gr,#3FB950)' : 'var(--rd,#F85149)', fontSize: 12 }, sha: f.sha256 ? f.sha256.slice(0, 12) + '…' : '—', hasSha: !!f.sha256, copySha: () => this.copy(f.sha256, 'sha256 copied'), verified: f.verified ? '✓ verified' : 'not verified', vst: { fontSize: 11.5, color: f.verified ? 'var(--gr,#3FB950)' : 'var(--mut,#8A94A6)' } })),
         src: [['Type', src.type || '—'], ...(src.repo ? [['Repository', src.repo]] : []), ...(src.revision ? [['Revision', src.revision]] : []), ...(src.url ? [['URL', src.url]] : []), ...(src.note ? [['Note', src.note]] : []), ['Added', new Date(dm.added_ts * 1000).toLocaleDateString()]].map(([k, val]) => ({ k, v: val })),
         services: dm.services.map(id => { const x = this.svcMap[id]; return { label: x?.name || id, href: '#/s/' + id, state: x ? (x.load === 'loaded' ? 'loaded' : x.state) : '' }; }),
         tags: m.edit?.tags ?? '', onTags: e => this.upd('mdl', x => ({ edit: { ...x.edit, tags: e.target.value } })), notes: m.edit?.notes ?? '', onNotes: e => this.upd('mdl', x => ({ edit: { ...x.edit, notes: e.target.value } })),
         metaDirty: m.edit && (m.edit.tags !== dm.tags.join(', ') || m.edit.notes !== dm.notes), saveMeta: () => this.saveModelMeta(), saveSt: btn('pri', { sm: true, dis: !(m.edit && (m.edit.tags !== dm.tags.join(', ') || m.edit.notes !== dm.notes)) }),
-        verify: () => this.verify(dm), verifySt: btn('sec', { dis: dm.status === 'verifying' || dm.status === 'missing' }), verifyLabel: dm.status === 'verifying' ? 'Verifying…' : 'Verify checksums', verifyDis: dm.status === 'verifying' || dm.status === 'missing',
+        verify: () => this.verify(dm), verifySt: btn('sec', { dis: dm.status === 'verifying' || dm.status === 'missing' }), verifyLabel: dm.status === 'verifying' ? (dm.progress != null ? `Verifying… ${Math.round(dm.progress * 100)}%` : 'Verifying…') : 'Verify checksums', verifyDis: dm.status === 'verifying' || dm.status === 'missing',
         del: () => this.askDeleteModel(dm), close: () => this.closeModel(), inUse: !!blocked, inUseText: blocked ? `In use by ${blocked.name} (loaded)` : '' };
     } else v.dr = { show: false };
     return v;

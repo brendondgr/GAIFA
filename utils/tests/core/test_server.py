@@ -68,7 +68,7 @@ async def test_system(client, root):
 async def test_config_js_lists_live_areas(client):
     r = await client.get("/config.js")
     assert r.headers["content-type"].startswith("text/javascript")
-    assert r.text == 'window.AIHUB_API_BASE = "";\nwindow.AIHUB_LIVE_AREAS = ["system", "services", "logs", "operations", "proxy", "events"];\n'
+    assert r.text == 'window.AIHUB_API_BASE = "";\nwindow.AIHUB_LIVE_AREAS = ["system", "services", "logs", "operations", "proxy", "events", "models"];\n'
 
 
 async def test_docs_and_openapi(client):
@@ -133,3 +133,29 @@ def test_app_py_refuses_non_loopback(tmp_path):
     )
     assert r.returncode == 2
     assert "hub.host" in r.stderr and "not loopback" in r.stderr
+
+
+def test_dev_mods_dont_inherit_the_hubs_port(services_dir, hub_process):
+    """A child mod must not hold the hub's listening socket: it would keep the port bound after the hub exits."""
+    import re
+    from urllib.parse import urlparse
+
+    from utils.proc import _listen_inodes
+    from utils.tests.conftest import free_port, wait_for
+
+    url = hub_process.url
+    toml = services_dir("fake-ok") / "fake-ok" / "service.toml"
+    toml.write_text(re.sub(r"(?m)^port = \d+", f"port = {free_port()}", toml.read_text()))
+    httpx.post(url + "/api/services/rescan", timeout=10)
+    r = wait_for(url + "/api/services/fake-ok", timeout=15, ok=lambda r: r.json().get("state") == "ready")
+    pid = r.json()["pid"]
+    hub_inodes = _listen_inodes(urlparse(url).port)
+    held = set()
+    for fd in os.listdir(f"/proc/{pid}/fd"):
+        try:
+            target = os.readlink(f"/proc/{pid}/fd/{fd}")
+        except OSError:
+            continue
+        if target.startswith("socket:["):
+            held.add(target[8:-1])
+    assert hub_inodes and not (held & hub_inodes)

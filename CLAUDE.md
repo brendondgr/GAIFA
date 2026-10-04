@@ -2,7 +2,9 @@
 
 One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/`, run as its own process. Design: [docs/architecture.md](docs/architecture.md). Build plan: [docs/backend-plan.md](docs/backend-plan.md). UI brief: [docs/design-brief-ui.md](docs/design-brief-ui.md).
 
-**Status:** Phase 1.1 (repo created). No hub code yet; work the plan step by step and tick steps off in `docs/backend-plan.md`.
+**Status:** Phase 1.1 (repo and skeleton created; `uv sync` pending). No hub code yet. What exists today: [docs/structure.md](docs/structure.md).
+
+**Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans.
 
 ## Layout
 - `utils/`: hub code (Python package) · `services/`: mods · `web/`: the UI (Claude Design `.dc.html` export)
@@ -26,4 +28,5 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 - Mods talk to the hub only over HTTP.
 - No import-time side effects.
 - Tests pass before every commit. Commit message style: `AIHub (2.3): Service state machine with health checks`.
-- Keep `docs/` in sync with behavior, in the same commit.
+- Keep `docs/` in sync with behavior, in the same commit. That includes `docs/structure.md` when files are added, moved or removed.
+- Files under ~500 lines; split any that pass 800.

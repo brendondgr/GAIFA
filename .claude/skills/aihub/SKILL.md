@@ -1,0 +1,64 @@
+---
+name: aihub
+description: Project guide for AIHub. Use before any work in this repo — implementing a plan step, adding or changing a mod, touching the hub API or UI wiring, or answering "where does X go / how does X work". Maps every question to the doc section that answers it, lists the invariants, and gives the step-by-step workflow for working docs/backend-plan.md.
+---
+
+# Working on AIHub
+
+AIHub is one local app (FastAPI hub on `127.0.0.1:7000`, no auth) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/` with a `service.toml`, run as its own process (a transient systemd user unit `aihub-<id>.service`). The hub supervises mods, proxies their APIs at `/api/s/<id>/*`, keeps a models registry, indexes outputs, manages the 121 GB of shared memory, records metrics, and serves the UI from `web/`.
+
+The docs are the source of truth. Read the section you need before acting; don't work from memory of them.
+
+## Where to look
+
+| Question | Read |
+| --- | --- |
+| Why is it built this way? | architecture §2 (decisions table) |
+| Where does a file go? | architecture §3, then [docs/structure.md](../../../docs/structure.md) for what exists today |
+| What must a mod provide? `service.toml` fields? | architecture §4.1–4.3 |
+| Placeholders, env vars, ports | architecture §4.4–4.5 |
+| Status route shape, stats → charts | architecture §4.6 |
+| Where and how mods write outputs | architecture §4.7 |
+| Boot order, request flow, processes | architecture §5 |
+| Hub-only routes, error envelope | architecture §6 |
+| UI-facing API contract (methods, types, errors) | design-brief-ui §6, §11.7 |
+| Memory sampling and make-room rule | architecture §7 |
+| Models registry format | architecture §8 |
+| `config.toml` | architecture §9 |
+| Each existing app → mod (ports, paths, changes) | architecture §10, plan Phases 7–11 |
+| Risks and gotchas | architecture §12 |
+| Metrics tables, retention, widgets | architecture §13, brief §11.5–11.7 |
+| Chat agent, approvals, sessions | architecture §14, plan Phases 14–16 |
+| What to build next, and its checks | backend-plan (first unticked step) |
+| Mod page modules (`page.js`, `Page.dc.html`) | brief §5 |
+| UI states that must be reachable | brief §8, §11.10 |
+| The UI baseline | `docs/reference/ui-export-2026-10-04/README.md` |
+
+## Invariants (never break these)
+- **Never run `git clean -x` or `-X`.** Ignored files include ~190 GB of model weights.
+- **Loopback only.** The hub refuses a non-loopback `hub.host`.
+- **Mods talk to the hub only over HTTP.** No hub imports in mods, no mod imports in the hub. Adding a mod never needs a hub code change.
+- **No import-time side effects.** Everything starts in `create_app()`'s lifespan, in the §5 order.
+- **Nothing written outside the project root**, except the Phase 12.4 allowlist.
+- **`web/support.js` is generated; never edit it.** Any change to an export goes in `web/PATCHES.md`.
+- **Errors use the envelope** `{detail, code, data?}`; proxied mod responses pass through unchanged.
+- **Mod ids and ports are fixed** (architecture §2): `relay` 4000, `opencode` 4096, `lcpp` 7710, `tts` 5040, `gen3d` 5050, `comfy` 5070; new mods 5100–5199.
+- **The existing apps keep running until their cutover step.** Stopping their services, moving models, or deleting anything in the old repos needs the user's approval.
+
+## Working a plan step
+1. Find the first unticked step in `docs/backend-plan.md`. Check its phase's earlier steps are ticked.
+2. Read the architecture and brief sections the step cites.
+3. Build it, with tests in `utils/tests/<area>/test_<behavior>.py` (fake mods in `utils/tests/fixtures/mods/`).
+4. `uv run pytest` must be green.
+5. In the same commit: tick the step in the plan, update `docs/structure.md` for new files, and update architecture / brief §6 / §11.7 if behavior differs from what they say.
+6. Commit as `AIHub (<phase>.<step>): <what was done>`. Push when the user asks or at the end of a phase.
+7. At the end of a phase, run its **Wire** and **Checks & deliverables** lists before starting the next phase.
+
+To write or change a plan, use the `plan` skill.
+
+## Code conventions
+- Python ≥ 3.12, FastAPI + uvicorn + httpx, pydantic v2, SQLite; dependencies via `uv` only.
+- Files under ~500 lines, 800 max. Small subsystems are single files in `utils/`; larger ones become a sub-package with `__init__.py`.
+- One FastAPI router per area in `utils/routes/`; each area registers itself as live for `/config.js`.
+- `utils/cli.py` is standard library only.
+- Atomic writes (`paths.write_atomic`) for registry and config; `config.save()` goes through `tomlkit` to keep comments.

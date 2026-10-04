@@ -59,7 +59,7 @@ AIHub/
 ├── bin/
 │   ├── aihub                the command: start · stop · status · logs · new · install · doctor …
 │   └── aihub.service.in     systemd unit template, used by `aihub install`
-├── docs/                    this file, backend-plan.md, design-brief-ui.md, reference/ (UI exports)
+├── docs/                    this file, backend-plan.md, design-brief-ui.md, structure.md (what exists today), reference/ (UI exports)
 ├── utils/                   the hub's code (Python package)
 │   ├── server.py            create_app(): FastAPI app, lifespan, static web/, error envelope
 │   ├── config.py            load, validate and save config.toml (comments kept)
@@ -78,7 +78,7 @@ AIHub/
 │   ├── tools.py             (later) agent tool catalog and approvals
 │   ├── cli.py               standard-library-only CLI behind bin/aihub
 │   ├── routes/              one FastAPI router per area
-│   └── tests/               pytest; fixtures/mods/ holds fake mods
+│   └── tests/               pytest, grouped by area (<area>/test_<behavior>.py); fixtures/mods/ holds fake mods
 ├── services/                one folder per mod (see §4)
 │   ├── _template/           what `aihub new <id>` copies
 │   ├── relay/  opencode/  lcpp/  tts/  gen3d/  comfy/
@@ -527,6 +527,7 @@ These are built after everything else works (backend-plan Phases 14–16). They 
 - **Tools.** Fetched from the hub's `GET /api/tools` (Phase 13) and executed through `POST /api/tools/{name}/call`.
 - **Graph.** A LangGraph `StateGraph` with an agent node and a tools node, plus a step cap. When it hits the cap it says so instead of inventing an answer, which was one of Mango-Tree's bugs.
 - **Saved state.** The checkpointer is `SqliteSaver` at `data/databases/agent.db`. Each chat is a LangGraph thread, and its state is saved after every step.
+- **Code layout.** Graph wiring, node logic, state and prompts are kept apart: `graph.py` only assembles and compiles, `nodes.py` holds node behavior, `state.py` the state schema, `prompts.py` the prompt text. A second agent gets its own `agents/<name>/` folder with the same four files.
 
 ### 14.2 Approvals survive restarts
 1. A tool marked `confirm` returns `needs_approval` from the hub.

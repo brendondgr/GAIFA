@@ -121,6 +121,7 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
   return {
     getOverview: () => req('GET', '/api/overview'),
     getSystem: () => req('GET', '/api/system'),
+    getRecentEvents: (limit = 80) => req('GET', `/api/events/recent${qs({ limit })}`),  // not in the brief: overview fill-in until Phase 6
     listServices: () => req('GET', '/api/services'),
     getService: id => req('GET', `/api/services/${enc(id)}`),
     startService: id => req('POST', `/api/services/${enc(id)}/start`),
@@ -197,6 +198,7 @@ export function createApi({ base = null, liveAreas = [], mock, fetch, EventSourc
     if (isLive('services')) parts.push(http.listServices().then(s => { ov.services = s; }));
     if (isLive('memory')) parts.push(http.getMemory().then(m => { ov.memory = m; }));
     if (isLive('outputs')) parts.push(http.listOutputs({ limit: 8 }).then(p => { ov.recent_outputs = p.items; }));
+    if (isLive('events')) parts.push(http.getRecentEvents().then(e => { ov.activity = e.activity; ov.alerts = e.alerts; ov.jobs = e.jobs; }));
     await Promise.all(parts);
     return ov;
   };

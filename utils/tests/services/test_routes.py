@@ -245,3 +245,30 @@ async def test_openapi_documents_the_routes(hub):
         assert path in doc["paths"], path
     assert "ServiceSummary" in doc["components"]["schemas"]
     assert not any(p.startswith("/api/s/") for p in doc["paths"])  # the proxy isn't part of the hub's own API
+
+
+async def test_recent_events(hub):
+    svc = hub.services.get("fake-ok")
+    async with httpx.AsyncClient(base_url=hub.url) as c:
+        await c.post(f"{svc.url}/v1/jobs", json={"label": "long", "seconds": 30})
+        await until(lambda: svc.jobs)
+        r = (await c.get("/api/events/recent?limit=5")).json()
+    assert len(r["activity"]) <= 5 and any("is ready" in a["text"] for a in r["activity"])
+    assert r["alerts"] == [] and r["jobs"][0]["service"] == "fake-ok" and r["jobs"][0]["state"] == "running"
+
+
+async def test_saving_defaults_writes_nothing(hub, rig):
+    cfg_file = rig.root / "config.toml"
+    async with httpx.AsyncClient(base_url=hub.url) as c:
+        cur = (await c.get("/api/services/fake-mem")).json()["config"]
+        r = await c.put("/api/services/fake-mem/config", json=cur)  # the whole form, unchanged
+        assert r.status_code == 200 and r.json()["restart_required"] is False
+        assert "fake-mem" not in tomllib.loads(cfg_file.read_text()).get("services", {})
+        r = await c.put("/api/services/fake-mem/config", json={**cur, "autostart": False})
+        assert tomllib.loads(cfg_file.read_text())["services"]["fake-mem"] == {"autostart": False}
+        r = await c.put("/api/services/fake-mem/config", json={**cur, "autostart": True})  # back to the default
+        assert tomllib.loads(cfg_file.read_text())["services"].get("fake-mem", {}) == {}
+        # fake-ok has env in config.toml; sending the manifest default ({}) removes it
+        r = await c.put("/api/services/fake-ok/config", json={"env": {}})
+        assert "fake-ok" not in tomllib.loads(cfg_file.read_text())["services"]  # env was its only key
+        assert r.json()["config"]["env"] == {}

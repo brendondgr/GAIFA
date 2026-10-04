@@ -163,6 +163,12 @@ test('getOverview is assembled from live areas until /api/overview exists', asyn
   assert.deepEqual(ov.services, ['mock']);
   assert.deepEqual(fetch.calls.map(c => c.url), ['/api/system']);
 
+  const live = fakeFetch(url => json(200, url.startsWith('/api/events/recent') ? { activity: [{ id: '1' }], alerts: [], jobs: [{ id: 'j' }] } : [{ id: 'live-svc' }]));
+  const ov2 = await createApi({ base: '', liveAreas: ['services', 'events'], mock: fakeMock(), fetch: live }).getOverview();
+  assert.deepEqual(ov2.services, [{ id: 'live-svc' }]);
+  assert.deepEqual([ov2.activity, ov2.alerts, ov2.jobs], [[{ id: '1' }], [], [{ id: 'j' }]]);
+  assert.deepEqual(live.calls.map(c => c.url).sort(), ['/api/events/recent?limit=80', '/api/services']);
+
   const down = createApi({ base: '', liveAreas: ['system'], mock: fakeMock(), fetch: async () => { throw new TypeError('x'); } });
   await assert.rejects(down.getOverview(), e => e.status === 0);
 });

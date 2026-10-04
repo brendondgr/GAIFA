@@ -99,11 +99,12 @@ async def test_health_misses_degrade_then_fail(rig):
     await mgr.start("fake-ok", wait=True)
     svc = mgr.get("fake-ok")
     os.kill(svc.pid, signal.SIGSTOP)  # alive but not answering
-    await until(lambda: svc.state == "degraded", timeout=5)
-    assert "health check failing" in svc.last_error
-    await until(lambda: svc.state == "failed", timeout=5)
+    await until(lambda: svc.state == "failed", timeout=10)
     assert "health check failed 5 times in a row" in svc.last_error
-    assert rig.states("fake-ok")[-3:] == ["ready", "degraded", "failed"]
+    # From the published events (not polling, which can miss the short degraded window under load):
+    states = rig.states("fake-ok")
+    assert states[-2:] == ["degraded", "failed"], states
+    assert any(e["type"] == "service" and e["service"]["state"] == "degraded" and "health check failing" in (e["service"]["last_error"] or "") for e in rig.events)
     assert await rig.backend.list_ours() == []  # the hung process was killed
 
 

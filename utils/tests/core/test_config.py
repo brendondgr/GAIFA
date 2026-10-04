@@ -123,4 +123,7 @@ def test_save_none_removes_and_replace_swaps_tables(tmp_path):
     ov = cfg.services.overrides["tts"]
     assert ov.idle_unload_s is None and ov.env == {"C": "3"}
     config.save(p, {"services": {"tts": {"env": config.Replace(None), "missing": None}}})
-    assert config.load(p).services.overrides["tts"].env == {}
+    assert "tts" not in config.load(p).services.overrides  # its last key went, so the table did too
+    assert "[services.tts]" not in p.read_text() and "# top" in p.read_text()
+    config.save(p, {"services": {"new": {"enabled": None}}})
+    assert "[services.new]" not in p.read_text()  # no empty tables

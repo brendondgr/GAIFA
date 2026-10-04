@@ -152,12 +152,18 @@ async def save_service_config(service_id: str, patch: ServiceConfigPatch, reques
     svc = mgr.get(service_id)
     sent = patch.model_dump(exclude_unset=True)
     old = svc.eff.as_dict()
+    # Only real overrides are written: a value equal to the mod's own default removes its key,
+    # so saving the whole form doesn't pin every default into config.toml.
+    defaults = effective(svc.mod, _without(hub.config, service_id)).as_dict()
     changes: dict[str, Any] = {}
     for key, value in sent.items():
-        if key == "env":
-            changes["env"] = config_mod.Replace(value or None)
+        if value == defaults[key] or value is None:
+            changes[key] = None  # back to the default (idle_unload_s: null = never, the default)
+            sent[key] = None
+        elif key == "env":
+            changes["env"] = config_mod.Replace(value)
         else:
-            changes[key] = value  # None (idle_unload_s: never) removes the key
+            changes[key] = value
     # Check port clashes against the other mods before writing anything.
     try:
         trial = config_mod.validate(_with_service(hub.config, service_id, sent))
@@ -194,3 +200,8 @@ def _with_service(cfg: config_mod.Config, service_id: str, sent: dict[str, Any])
     overrides[service_id] = current
     services.update(overrides)
     return data
+
+
+def _without(cfg: config_mod.Config, service_id: str) -> config_mod.Config:
+    """The config with no `[services.<id>]` override: the mod's defaults."""
+    return cfg.model_copy(update={"services": cfg.services.model_copy(update={"overrides": {k: v for k, v in cfg.services.overrides.items() if k != service_id}})})

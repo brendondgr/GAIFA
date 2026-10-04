@@ -11,7 +11,7 @@ port = 5191
 health = "/health"
 status = "/v1/status"
 openapi = "/openapi.json"
-env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}", FAKE_VERBOSE = "1" }   # verbose: request lines for the Logs tab
 start_timeout_s = 15
 stop_timeout_s = 5
 restart = "no"

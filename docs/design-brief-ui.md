@@ -361,7 +361,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `streamServiceLogs(id, onLine)` | `EventSource /api/services/{id}/logs/stream` | `{ close() }`; each `data:` is a `LogLine` |
 | `listOperations(id)` | `GET /api/services/{id}/operations` | `Operation[]` |
 | `callService(id, method, path, opts)` | `ANY /api/s/{id}{path}` | `ServiceResponse` (opts: `{ query, json, form, signal, stream, onEvent }`) |
-| `saveServiceConfig(id, cfg)` | `PUT /api/services/{id}/config` | `{ config: ServiceConfig, restart_required: boolean }` |
+| `saveServiceConfig(id, cfg)` | `PUT /api/services/{id}/config` | `{ config: ServiceConfig, restart_required: boolean }` (send the whole form or a subset; a value equal to the mod's default removes its override, so config.toml only holds real changes) |
 | `getMemory()` | `GET /api/memory` | `Memory` |
 | `planRoom(id, needsBytes)` | `POST /api/memory/plan` body `{service, needs_bytes}` | `MakeRoomPlan` |
 | `listModels(filter)` | `GET /api/models?kind=&service=&status=&q=` | `{ models: Model[], totals: Totals, disk: Disk }` |

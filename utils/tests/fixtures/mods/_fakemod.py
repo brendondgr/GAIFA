@@ -11,6 +11,7 @@ mem    like ok, plus /v1/load allocates FAKE_MEM_MB (64) MB and /v1/unload frees
 POST /v1/upload reads the body in chunks and returns its size and sha256 (for big uploads).
 GET /v1/events?n=3&gap=0.05 streams n server-sent events, gap seconds apart.
 GET /v1/redirect answers 307 to /v1/status.
+POST /v1/fail answers 500 {"detail": ...} (an upstream error); DELETE /v1/jobs/{id} removes a job (destructive).
 POST /v1/jobs {"label", "seconds"} starts a job that /v1/status reports with progress
 (busy while it runs). FAKE_BAD_STATUS=1 makes /v1/status return a malformed body.
 """
@@ -54,9 +55,13 @@ def openapi() -> dict:
         "/v1/status": {"get": op("Status")},
         "/v1/echo": {"post": op("Echo the body and query", {"type": "object"})},
         "/v1/speech": {"post": op("A short sine tone as WAV", text, "audio/wav")},
-        "/v1/events": {"get": op("Three server-sent events", response="text/event-stream")},
+        "/v1/events": {"get": {**op("Server-sent events (3 by default)", response="text/event-stream"), "parameters": [
+            {"name": "n", "in": "query", "required": False, "schema": {"type": "integer", "default": 3, "minimum": 1}},
+            {"name": "gap", "in": "query", "required": False, "schema": {"type": "number", "default": 0.05}}]}},
         "/v1/outputs": {"post": op("Write a text output", text)},
         "/v1/upload": {"post": {"summary": "Upload a file", "requestBody": {"content": {"multipart/form-data": {"schema": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}}}}, "responses": {"200": {"content": {"application/json": {"schema": {}}}}}}},
+        "/v1/fail": {"post": op("Always fails with HTTP 500")},
+        "/v1/jobs/{jid}": {"delete": {"summary": "Delete a job", "parameters": [{"name": "jid", "in": "path", "required": True, "schema": {"type": "string"}}], "responses": {"200": {"content": {"application/json": {"schema": {}}}}}}},
         "/v1/jobs": {"post": op("Start a job that runs for `seconds`", {"type": "object", "properties": {"label": {"type": "string"}, "seconds": {"type": "number"}}})},
     }
     if MODE == "mem":
@@ -162,6 +167,8 @@ class Handler(BaseHTTPRequestHandler):
                 h.update(chunk)
                 size += len(chunk)
             return self.send(200, {"size": size, "sha256": h.hexdigest(), "content_type": self.headers.get("Content-Type", "")})
+        if url.path == "/v1/fail":
+            return self.send(500, {"detail": "fake failure: this route always fails"})
         if url.path == "/v1/jobs":
             b = self.body()
             jid = f"j_{len(JOBS) + 1}"
@@ -177,6 +184,16 @@ class Handler(BaseHTTPRequestHandler):
         if MODE == "mem" and url.path == "/v1/unload":
             STATE["memory"] = None
             return self.send(200, {"loaded": False})
+        self.send(404, {"detail": f"no route {url.path}"})
+
+    def do_DELETE(self) -> None:
+        url = urlsplit(self.path)
+        STATE["last_used"] = time.time()
+        if url.path.startswith("/v1/jobs/"):
+            jid = url.path.rsplit("/", 1)[1]
+            if JOBS.pop(jid, None) is None:
+                return self.send(404, {"detail": f"no job {jid}"})
+            return self.send(200, {"deleted": jid})
         self.send(404, {"detail": f"no route {url.path}"})
 
     def sse(self, n: int = 3, gap: float = 0.05) -> None:

@@ -351,6 +351,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/outputs/{id}/file` | an output's main file (supports Range, for audio/video seeking) |
 | `GET /api/outputs/{id}/files/{path}` | a file inside a folder output |
 | `GET /api/outputs/{id}/preview` | thumbnail or poster |
+| `GET /api/events/recent?limit=` | recent activity, current alerts and running jobs; the UI fills its overview from it until `/api/overview` exists (Phase 6) |
 | `GET /api/services/{id}/check[?start=1]` | the mod self-test behind `aihub check`: `{ok, checks: [{name, status: ok\|fail\|warn\|skip, ok, detail}]}` |
 | `POST /api/services/rescan` | pick up added, removed and edited mod folders without restarting the hub: `{added, removed, changed}`; new mods autostart |
 | `POST /api/memory/acquire` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[]}` or `409 needs_room {plan}` |

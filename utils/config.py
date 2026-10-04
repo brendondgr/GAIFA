@@ -195,11 +195,15 @@ def _merge(table: Any, changes: dict[str, Any]) -> None:
             if value.value is not None:
                 table[key] = value.value
         elif isinstance(value, dict) and key in table and isinstance(table[key], dict):
+            had = len(table[key])
             _merge(table[key], value)
+            if had and not len(table[key]):  # this save removed its last key: drop the empty table
+                del table[key]
         elif isinstance(value, dict) and key not in table:
             t = tomlkit.table()
             _merge(t, value)
-            table[key] = t
+            if len(t):  # don't create a table that would be empty
+                table[key] = t
         else:
             table[key] = value
 

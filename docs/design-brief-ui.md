@@ -545,7 +545,8 @@ type HubEvent =
   | { type: "activity"; item: Activity }
   | { type: "job"; job: Job }
   | { type: "alert"; alert: Alert }
-  | { type: "alert_cleared"; id: string };
+  | { type: "alert_cleared"; id: string }
+  | { type: "resync" };            // events were dropped (slow client): refetch everything
 
 interface LogLine { ts: number; text: string; stream: "stdout" | "stderr" }
 ```

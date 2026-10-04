@@ -111,12 +111,12 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - Migration 001: `activity(id, ts, service, level, text, route)`, `service_peaks(service PK, peak_bytes, updated_ts)`, `kv(key PK, value)`.
   - One writer thread, a reader connection per thread, and `async` helpers (`execute`, `fetchone`, `fetchall`) built on `asyncio.to_thread`.
   *Done when:* migrations apply once and are idempotent; concurrent reads during a write work.
-- [ ] **1.4 `utils/events.py`.**
-  - **`EventBus`:** one bounded asyncio queue (1000) per subscriber. On overflow, drop the oldest and send `{"type":"resync"}`.
+- [x] **1.4 `utils/events.py`.**
+  - **`EventBus`:** one bounded asyncio queue (1000) per subscriber. On overflow, drop that subscriber's queued events and send `{"type":"resync"}` (the UI refetches, so the backlog is stale).
   - **`publish(HubEvent)`**.
   - **`ActivityLog`:** persisted, last 500 kept in memory, pruned after 30 days.
   - **`Alerts`:** a keyed set; publishes `alert` / `alert_cleared`.
-  - **`GET /api/events`:** SSE with `retry: 3000` and a `: ping` comment every 15 s.
+  - **`GET /api/events`** (router in `utils/routes/events.py`): SSE with `retry: 3000` and a `: ping` comment every 15 s.
   *Done when:* tests cover subscriber fan-out, overflow → resync, and SSE framing.
 - [ ] **1.5 `utils/server.py` + `app.py`.**
   - **`create_app(paths, config, backend)`:** nothing at import time. The lifespan starts subsystems in the order in architecture §5 and stops them in reverse.

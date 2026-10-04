@@ -2,7 +2,7 @@
 
 One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/`, run as its own process. Design: [docs/architecture.md](docs/architecture.md). Build plan: [docs/backend-plan.md](docs/backend-plan.md). UI brief: [docs/design-brief-ui.md](docs/design-brief-ui.md).
 
-**Status:** Phase 1 in progress: 1.2–1.3 done (`utils/paths.py`, `config.py`, `db.py`). Next: 1.4. What exists today: [docs/structure.md](docs/structure.md).
+**Status:** Phase 1 in progress: 1.2–1.4 done (`utils/paths.py`, `config.py`, `db.py`, `events.py`). Next: 1.5. What exists today: [docs/structure.md](docs/structure.md).
 
 **Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans.
 

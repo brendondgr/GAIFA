@@ -44,7 +44,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `paths.py` | ✅ | `Paths` (root, configurable dirs kept inside the root), `write_atomic()` |
 | `config.py` | ✅ | `Config` (pydantic, §9), `load()`, `save()` via tomlkit, `service_override()`, loopback check |
 | `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version`, one writer thread, async helpers |
-| `events.py` | ⏳ 1.4 | Event bus, SSE, activity log, alerts |
+| `events.py` | ✅ | `EventBus` (per-subscriber queue, overflow → resync), `ActivityLog`, `Alerts`, `sse_stream()` |
 | `server.py` | ⏳ 1.5 | `create_app()`, lifespan, static `web/`, error envelope |
 | `cli.py` | ⏳ 1.6 | Standard-library CLI behind `bin/aihub` |
 | `manifest.py` | ⏳ 2.1 | `service.toml` schema, discovery, placeholders |
@@ -57,7 +57,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `memory.py`, `proc.py` | ⏳ 5 | Memory sampling and make-room plans; per-process memory |
 | `metrics.py` | ⏳ 6.1 | Time series recorder and rollups |
 | `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `events.py` (`GET /api/events`) |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -70,7 +70,7 @@ utils/tests/
 ├── fixtures/
 │   ├── mods/                   🧱     fake_ok, fake_slow, fake_crash, fake_mem (1.7)
 │   └── openapi/                🧱     real OpenAPI captures from Phase 0.5
-├── core/test_<behavior>.py     ✅     paths, config, db (events, server follow)
+├── core/test_<behavior>.py     ✅     paths, config, db, events (server follows)
 ├── services/test_<behavior>.py        manifest, backends, state machine, proxy, operations
 └── <area>/test_<behavior>.py          registry, outputs, memory, metrics, …
 ```

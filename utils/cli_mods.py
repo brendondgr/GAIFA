@@ -212,6 +212,28 @@ def cmd_rescan(args: argparse.Namespace) -> int:
     return 0
 
 
+MARK = {"ok": "ok  ", "fail": "FAIL", "warn": "warn", "skip": "skip"}
+
+
+def cmd_check(args: argparse.Namespace) -> int:
+    """Print the hub's self-test of a mod; exit 1 when any check failed."""
+    q = "?start=1" if args.start else ""
+    r = cli.call("GET", f"/api/services/{cli.q(args.id)}/check{q}", timeout=cli.WAIT_S)
+    width = max(len(c["name"]) for c in r["checks"])
+    for c in r["checks"]:
+        print(f"{MARK.get(c['status'], c['status'])}  {c['name']:<{width}}  {c['detail']}")
+    failed = sum(1 for c in r["checks"] if c["status"] == "fail")
+    skipped = sum(1 for c in r["checks"] if c["status"] == "skip")
+    if not r["ok"]:
+        verdict = f"{failed} check{'s' if failed != 1 else ''} failed"
+    elif skipped:
+        verdict = f"no failures, but {skipped} check{'s' if skipped != 1 else ''} skipped (run with --start to check it running)"
+    else:
+        verdict = "all checks passed"
+    print(f"\n{args.id}: {verdict}")
+    return 0 if r["ok"] else 1
+
+
 def _fail(msg: str) -> int:
     print(f"aihub: {msg}", file=sys.stderr)
     return 2

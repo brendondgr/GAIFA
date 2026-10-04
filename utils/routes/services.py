@@ -16,7 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from utils import config as config_mod
 from utils import operations
-from utils.services import loading
+from utils.services import check, loading
 from utils.api_models import Logs, Operation, SavedConfig, ServiceConfigPatch, ServiceDetail, ServiceSummary
 from utils.events import SSE_RETRY_MS
 from utils.manifest import check_effective_ports, effective
@@ -137,6 +137,12 @@ async def _log_events(mgr: ServiceManager, service_id: str, external: bool, clos
 async def list_operations(service_id: str, request: Request) -> list[dict[str, Any]]:
     mgr = _mgr(request)
     return await operations.get(mgr, mgr.get(service_id))
+
+
+@router.get("/api/services/{service_id}/check", summary="Self-test a mod: manifest, command, health, OpenAPI, status, widgets, page")
+async def check_service(service_id: str, request: Request, start: bool = False) -> dict[str, Any]:
+    mgr = _mgr(request)
+    return await check.run(mgr, mgr.get(service_id), start=start)
 
 
 @router.put("/api/services/{service_id}/config", summary="Save a mod's [services.<id>] settings in config.toml", response_model=SavedConfig)

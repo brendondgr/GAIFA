@@ -160,6 +160,10 @@ def cmd_rescan(args: argparse.Namespace) -> int:
     return _mods().cmd_rescan(args)
 
 
+def cmd_check(args: argparse.Namespace) -> int:
+    return _mods().cmd_check(args)
+
+
 def cmd_install(args: argparse.Namespace) -> int:
     if args.id:
         return _mods().cmd_install_mod(args.id)
@@ -407,6 +411,10 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--no-install", action="store_true", help="don't run install.sh")
     p.set_defaults(fn=cmd_new)
     sub.add_parser("rescan", help="make the hub pick up added, removed or edited mod folders").set_defaults(fn=cmd_rescan)
+    p = sub.add_parser("check", help="self-test a mod: manifest, command, health, OpenAPI, status, widgets, page")
+    p.add_argument("id")
+    p.add_argument("--start", action="store_true", help="start it first if it isn't running")
+    p.set_defaults(fn=cmd_check)
     p = sub.add_parser("models", help=f"scan | list | verify <id> (Phase {LATER['models']})")
     p.add_argument("action", choices=["scan", "list", "verify"])
     p.add_argument("id", nargs="?")

@@ -354,6 +354,12 @@ def parse(folder: Path) -> Mod:
         mod.manifest = Manifest.model_validate(mod.raw)
     except ValidationError as e:
         mod.errors.extend(describe(e))
+        # Whole-model rules don't run once a field fails; report the common one anyway,
+        # so every problem shows at once.
+        run = mod.raw.get("run")
+        missing = '[run].command is required (or set kind = "external")'
+        if isinstance(run, dict) and run.get("kind", "process") == "process" and not run.get("command") and not any(missing in x for x in mod.errors):
+            mod.errors.append(f"{MANIFEST}: {missing}")
         return mod
     if mod.manifest.id != folder_id:
         mod.errors.append(f"{MANIFEST}: id {mod.manifest.id!r} must equal the folder name {folder_id!r}")

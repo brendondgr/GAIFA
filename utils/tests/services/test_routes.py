@@ -163,15 +163,18 @@ async def test_events_stream_carries_service_events(hub):
                     if line.startswith("data:"):
                         ev = json.loads(line[5:])
                         got.append(ev)
-                        if ev["type"] == "service" and ev["service"]["state"] == "ready":
+                        mine = [e["service"]["state"] for e in got if e["type"] == "service" and e["service"]["id"] == "fake-ok"]
+                        # Status polls also publish `service` events; wait for ready *after* the stop.
+                        if "stopped" in mine and mine[-1] == "ready":
                             return
 
         task = asyncio.create_task(read())
         await asyncio.sleep(0.2)
         await c.post("/api/services/fake-ok/restart")
         await asyncio.wait_for(task, 10)
-    states = [e["service"]["state"] for e in got if e["type"] == "service"]
-    assert states[:2] == ["stopping", "stopped"] and states[-1] == "ready"
+    states = [e["service"]["state"] for e in got if e["type"] == "service" and e["service"]["id"] == "fake-ok"]
+    changes = [st for i, st in enumerate(states) if i == 0 or st != states[i - 1]]
+    assert changes[-4:] == ["stopping", "stopped", "starting", "ready"], states
     assert any(e["type"] == "activity" for e in got)
 
 

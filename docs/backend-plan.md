@@ -270,7 +270,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
   - Move the Example **Hello** tab out of `Hub.dc.html` into `services/_template/ui/page.js`, and record it in `PATCHES.md`.
   - *As built:* the dc runtime reads `<dc-import name>` once, as a literal (`walkComponent`), and refuses a bound `<x-import from>`, so dynamic names don't work. Every `page.js` therefore goes through one static host, `web/ModPage.dc.html`, which `import()`s the module and mounts it on a callback ref; it remounts when the mod, tab, params or running state change, and otherwise just refreshes `ctx.service`. `ctx.ui` is `web/mod-ui.js` (themed DOM helpers: `h`, `card`, `button`, `input`, `field`, `json`, `empty`, `badge`, `table`, …). Summaries gained `page_url` (`/ui/services/<id>/<file>` or `/Mod_<id>.dc.html`). `Page.dc.html` pages (Part B) are served at `/Mod_<id>.dc.html`; the shell gets a literal `<dc-import name="Mod_<id>">` per built-in page when its phase lands. The shell now also handles `resync`. Checked in the browser: `aihub new hello` against a running hub shows its Hello tab, which calls the mod through the proxy; stopping it remounts the page's Start state; `?mock` shows the template's page for Example. Shell patch: `web/PATCHES.md` #6.
   *Done when:* `aihub new hello` gives a mod whose custom tab renders inside the shell.
-- [ ] **2.10 `aihub check <id>`: a mod self-test.**
+- [x] **2.10 `aihub check <id>`: a mod self-test.**
   - **Route:** `GET /api/services/{id}/check` returns `{ok, checks: [{name, ok, detail}]}`. The CLI prints it and exits 1 on any failure.
   - **Checks, in order:**
     - the manifest parses (each `manifest_errors` entry is one failure)
@@ -283,6 +283,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - `ui/page.js` or `ui/Page.dc.html` exists when declared, and `page.js` has a default export with `tabs` and `mount`
     - `[memory]` and `[tools]` operations name operations that exist in the OpenAPI
   - **Why:** gives a person or an agent writing a mod a fast write → check → fix loop without opening the UI.
+  - *As built:* `utils/services/check.py`. Each check has a `status` (ok, fail, warn, skip) as well as `ok`; the mod passes when nothing failed. Checks that need the mod running are skipped with a hint while it's stopped, and `?start=1` / `aihub check <id> --start` starts it first. Also checked: the `state` (a failed mod reports its `last_error`), a missing `env_file` (warn), widget sources being in the OpenAPI, and page modules calling `fetch()` (warn). The manifest parser now reports a missing `[run].command` alongside field errors, so a bad manifest shows every problem at once.
   *Done when:* tests run it against `fake-ok` (all pass), a mod with a bad manifest, a mod whose health fails, and a status route with the wrong shape; `aihub check hello` passes on a fresh `aihub new hello`.
 - [ ] **2.11 The mod-authoring guide.**
   - **`docs/mods.md`:** the whole mod contract on one page, as a how-to:

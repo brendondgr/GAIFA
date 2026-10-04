@@ -115,6 +115,10 @@ def test_template_mod_end_to_end(root, ports, hub_process):
         d = c.get("/api/services/hello").json()
         assert d["has_page"] and d["has_outputs"] and d["state"] == "ready"
         wait_for(url + "/api/services/hello", ok=lambda r: [s["label"] for s in r.json()["stats"]] == ["Calls", "Notes today"])
+    r = run("check", "hello", root=root, url=url)
+    assert r.returncode == 0 and r.stdout.endswith("hello: all checks passed\n"), r.stdout + r.stderr
+    for name in ("manifest", "command", "health", "openapi", "operations", "status", "widget calls", "page"):
+        assert any(line.startswith("ok    " + name) for line in r.stdout.splitlines()), (name, r.stdout)
 
 
 async def test_rescan_adds_changes_and_removes(rig):

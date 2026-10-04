@@ -26,6 +26,7 @@ from utils.config import Config
 from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
 from utils.paths import DEFAULT_ROOT, Paths
+from utils.registry import Registry, RegistryError
 from utils.services import ServiceError, ServiceManager
 
 DEMO_MODS = DEFAULT_ROOT / "utils" / "tests" / "fixtures" / "mods"
@@ -67,6 +68,7 @@ class Hub:
     db: Database | None = None
     activity: ActivityLog | None = None
     alerts: Alerts | None = None
+    registry: Registry | None = None
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -103,7 +105,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, services, system, web
+    from utils.routes import events, models, services, system, web
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -122,7 +124,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.activity = ActivityLog(hub.db, hub.bus)
             await hub.activity.load()
             hub.alerts = Alerts(hub.bus)
-            # 4. models registry: Phase 3.
+            # 4. models registry: load registry.json (status is computed when read).
+            hub.registry = Registry(paths, hub.bus, hub.activity, hub.alerts)
+            hub.registry.load()
             # 5. services: find manifests, adopt running units, autostart in the background.
             hub.services = ServiceManager(
                 paths, hub.config, hub.backend, hub.bus, hub.activity, hub.alerts, hub.port,
@@ -130,6 +134,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             )
             stack.push_async_callback(hub.services.close)
             await hub.services.boot(autostart=hub.options.autostart)
+            hub.registry.services = hub.services
             # 6–8 (outputs, memory, metrics) arrive in Phases 4–6.
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
@@ -150,6 +155,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(events.router)
     app.include_router(services.router)
     app.include_router(proxy.router)
+    app.include_router(models.router)
     for area in ("services", "logs", "operations", "proxy", "events"):
         hub.mark_live(area)
 
@@ -190,6 +196,10 @@ def _error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(ServiceError)
     async def _service_error(_: Request, e: ServiceError) -> JSONResponse:
+        return _envelope(e.status, e.code, e.detail, e.data)
+
+    @app.exception_handler(RegistryError)
+    async def _registry_error(_: Request, e: RegistryError) -> JSONResponse:
         return _envelope(e.status, e.code, e.detail, e.data)
 
     @app.exception_handler(StarletteHTTPException)

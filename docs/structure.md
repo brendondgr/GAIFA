@@ -55,13 +55,13 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `services/` | ✅ pkg | Running mods. `manager.py` (`ServiceManager`: start/stop/restart, logs), `discovery.py` (boot, adoption, autostart in `after` order, rescan), `health.py` (readiness, monitor, restart on failure, external mods), `status.py` (status polling, `validate()` for the §4.6 shape, job events), `loading.py` (load/unload via `[memory]`; Phase 5 adds make-room), `views.py` (`ServiceSummary` / `ServiceDetail` JSON), `check.py` (`aihub check`: the mod self-test), `model.py` (`Service`, `Timing`, `ServiceError`) |
 | `proxy.py` | ✅ | `ANY /api/s/<id>/*`: streaming passthrough, hop-by-hop headers dropped, redirects kept inside the proxy |
 | `operations.py` | ✅ | Mod OpenAPI → `Operation[]` (refs inlined, file fields, response kinds, hide globs, tools), cached per process start |
-| `registry.py` | ⏳ 3 | Models registry |
+| `registry/` | ✅ pkg | Models registry (architecture §8): `model.py` (stored shape, validation, `RegistryError`), `store.py` (`Registry`: load/save `registry.json`, computed status, totals, filters, edit, delete with the in-use rule) |
 | `outputs.py` | ⏳ 4 | Outputs watcher and index |
 | `proc.py` | ✅ · ⏳ 5 | `port_listening()`, `port_owner()` (who holds a port, from /proc); per-process memory arrives in Phase 5 |
 | `memory.py` | ⏳ 5 | Memory sampling and make-room plans |
 | `metrics.py` | ⏳ 6.1 | Time series recorder and rollups |
 | `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`) |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`) |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -77,7 +77,8 @@ utils/tests/
 ├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli
 ├── web/*.test.mjs + test_api_js.py ✅  Node unit tests (web/api.js; mod-ui.js + the template page.js on a fake DOM), run from pytest
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
-└── <area>/test_<behavior>.py          registry, outputs, memory, metrics, …
+├── models/test_<behavior>.py   ✅     registry storage and status, routes, safe deletes (conftest: a fake data/models/)
+└── <area>/test_<behavior>.py          outputs, memory, metrics, …
 ```
 
 ## `web/` — the UI

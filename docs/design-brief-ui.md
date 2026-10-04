@@ -382,7 +382,7 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 
 ### 6.3 Error codes to handle
 
-`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `output_not_found`, `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
+`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
 
 ### 6.4 Types
 
@@ -488,6 +488,7 @@ interface Model {
   source: { type: "huggingface" | "url" | "local" | "created";
             repo?: string; revision?: string; url?: string; note?: string } | null;
   added_ts: number; tags: string[]; notes: string;
+  progress?: number;             // 0–1, only while status is "verifying"
 }
 type ModelPatch = Partial<Pick<Model, "name" | "kind" | "services" | "source" | "tags" | "notes">>;
 interface ModelInput { path: string; kind: ModelKind; name: string; services?: string[]; source?: Model["source"] }
@@ -550,6 +551,7 @@ type HubEvent =
   | { type: "output"; output: Output }
   | { type: "output_deleted"; id: string }
   | { type: "model"; model: Model }
+  | { type: "model_deleted"; id: string }
   | { type: "activity"; item: Activity }
   | { type: "job"; job: Job }
   | { type: "alert"; alert: Alert }

@@ -157,3 +157,66 @@ class Operation(_Model):
     response: Literal["json", "audio", "image", "video", "model3d", "file", "stream", "empty"]
     destructive: bool
     tool: Tool | None
+
+
+# ---- models registry (Phase 3) ----
+
+ModelKind = Literal["llm", "tts", "stt", "voice", "3d", "image", "video", "text-encoder", "vae", "lora", "vision", "upscale", "other"]
+ModelStatus = Literal["ok", "missing", "partial", "unverified", "checksum_mismatch", "verifying"]
+
+
+class ModelFile(_Model):
+    path: str
+    role: str
+    size_bytes: int | None
+    exists: bool
+    sha256: str | None
+    verified: bool
+
+
+class ModelSource(_Model):
+    type: Literal["huggingface", "url", "local", "created"]
+    repo: str | None = None
+    revision: str | None = None
+    url: str | None = None
+    note: str | None = None
+
+
+class Model(_Model):
+    id: str
+    name: str
+    kind: ModelKind
+    format: str
+    services: list[str]
+    path: str
+    files: list[ModelFile]
+    size_bytes: int
+    status: ModelStatus
+    problems: list[str]
+    source: ModelSource | None
+    added_ts: float
+    tags: list[str]
+    notes: str
+    progress: float | None = Field(None, description="0–1 while status is verifying")
+
+
+class KindTotal(_Model):
+    count: int
+    size_bytes: int
+
+
+class ModelTotals(_Model):
+    size_bytes: int
+    count: int
+    by_kind: dict[str, KindTotal]
+
+
+class Disk(_Model):
+    free_bytes: int
+    total_bytes: int
+
+
+class ModelList(_Model):
+    models: list[Model]
+    totals: ModelTotals
+    disk: Disk

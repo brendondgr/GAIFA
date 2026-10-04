@@ -73,7 +73,7 @@ AIHub/
 │   ├── operations.py        mod OpenAPI → Operation[]
 │   ├── memory.py            memory sampling, plans to make room, acquire
 │   ├── proc.py              meminfo, AMD GPU sysfs/fdinfo, per-process memory (from lcpp)
-│   ├── registry.py          models registry: scan, verify, add, delete
+│   ├── registry/            models registry: storage, status, scan, verify, add, delete
 │   ├── outputs.py           outputs watcher, index, previews, file serving
 │   ├── tools.py             (later) agent tool catalog and approvals
 │   ├── cli.py               standard-library-only CLI behind bin/aihub
@@ -416,7 +416,15 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 ```
 
 - **Kinds:** `llm`, `tts`, `stt`, `voice`, `3d`, `image`, `video`, `text-encoder`, `vae`, `lora`, `vision`, `upscale`, `other`.
-- **`status`** (`ok` / `missing` / `partial` / `unverified` / `checksum_mismatch` / `verifying`) is computed when the registry is read, not stored.
+- **`status`** (`ok` / `missing` / `partial` / `unverified` / `checksum_mismatch` / `verifying`) is computed when the registry is read, not stored:
+  - `missing`: none of the files exists.
+  - `partial`: some file is missing, has a different size than recorded, or is still downloading (`<file>.part`).
+  - `checksum_mismatch`: verify found a file whose sha256 differs from the recorded one (it stores the new hash as `actual_sha256`).
+  - `ok`: every file has a recorded sha256 and hasn't been modified since its `verified_at`.
+  - `unverified`: anything else (no checksum yet, or changed since verification).
+  - `verifying`: queued or being hashed; the Model then carries `progress` (0–1).
+- **Robustness:** the hub reloads `registry.json` when it changes on disk. An entry it can't validate is reported and saved back unchanged; a file it can't read at all makes the registry read-only (`registry_invalid`) rather than being overwritten.
+- **Deleting files** removes only the recorded files inside `data/models` (a symlink's target too when it lies inside the model's own folder, as hf-cache blobs do), then any folders left empty. It is refused with `model_in_use` while a mod using the model is running and loading, loaded, unloading or busy; a running mod with no `[memory]` section counts as loaded.
 - **Who registers models:**
   - the scanner suggests entries and you confirm them
   - mods can register what they download (`POST /api/models` with their source)

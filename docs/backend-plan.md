@@ -333,12 +333,13 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 3 — Models registry
 
-- [ ] **3.1 `utils/registry.py` core + routes.**
+- [x] **3.1 `utils/registry.py` core + routes.**
   - **Storage:** load and save `registry.json` atomically, with sorted keys and 2-space indent.
   - **Status** is computed when read, from file stats and sha256 fields: `ok`, `missing`, `partial`, `unverified`, `checksum_mismatch` or `verifying`.
   - **Totals** by kind, plus disk usage.
   - **Routes:** `GET /api/models` (filters), `GET/PUT /api/models/{id}`, and `DELETE /api/models/{id}?files=`.
   - **Deleting files** only touches paths inside `data/models`, removes empty folders, and returns `model_in_use` while any mod using the model is loading, loaded or busy.
+  - *As built:* a package, `utils/registry/` (`model.py` stored shape and validation, `store.py` the `Registry`), with routes in `utils/routes/models.py`. The registry reloads itself when `registry.json` changes on disk. An entry that fails validation is kept unchanged on save and reported in `Registry.errors`; an unreadable file (bad JSON, another version) makes the registry read-only (`409 registry_invalid`) so it is never overwritten. Status rules: `missing` when no file exists; `partial` when one is missing, smaller or larger than recorded, or still a `<file>.part`; `checksum_mismatch` when verify recorded an `actual_sha256`; `ok` when every file has a checksum and hasn't been modified since `verified_at`; otherwise `unverified`. A running mod with no `[memory]` section counts as holding the model. Deleting a symlinked file removes the link, and its target only when that lies inside the model's own folder (hf-cache blobs); a folder link that leads out of `data/models` is refused. Deletes publish `{"type": "model_deleted", "id"}`.
 - [ ] **3.2 Scanner: `POST /api/models/scan` + `POST /api/models`.** Rules for recognising models:
   - **`llm/`:** GGUF grouping ported from lcpp's `catalog.discover` (sidecars `mmproj-*`/`mtp-*`, split tails `-0000N-of-0000M`).
   - **Hugging Face folders:** a folder with `config.json`, `model_index.json`, or `*.safetensors` + config is one `hf-dir` model.

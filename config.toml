@@ -1,0 +1,41 @@
+# AIHub settings. Each mod ships defaults in services/<id>/service.toml; values here override them.
+# The Settings page edits this file and keeps comments. A missing file means the defaults below.
+
+[hub]
+host = "127.0.0.1"          # loopback only; anything else is refused at startup
+port = 7000
+
+[paths]                     # relative to this file; must stay inside the project
+models = "data/models"
+databases = "data/databases"
+outputs = "outputs"
+
+[memory]
+reserve_gb = 12
+auto_make_room = false      # false: ask (Make-room dialog); true: unload idle mods automatically
+never_unload = ["lcpp"]     # stopping LLM instances is never automatic
+priority = ["comfy", "tts", "gen3d"]   # unloaded first → last
+
+[ports]
+new_mods = [5100, 5199]
+
+[ui]
+theme = "system"
+density = "comfortable"
+
+[services]
+order = ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode"]
+
+[services.tts]
+enabled = true
+autostart = true
+idle_unload_s = 180
+
+[services.gen3d]
+enabled = true
+autostart = true
+idle_unload_s = 600
+
+[services.comfy]
+enabled = true
+autostart = false

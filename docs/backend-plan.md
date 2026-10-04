@@ -99,7 +99,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
     - the mod contract in 5 lines
     - rules: **never `git clean -x/-X`** (deletes the models); nothing is written outside the project root except the allowlist in Phase 12.4; mods talk to the hub only over HTTP; no import-time side effects; tests pass before every commit; keep `docs/` in sync with behavior
   *Done when:* the first commit contains the docs, the skeleton folders and CLAUDE.md.
-- [ ] **1.2 `utils/paths.py` + `utils/config.py`.**
+- [x] **1.2 `utils/paths.py` + `utils/config.py`.**
   - **`Paths`:** the root is `app.py`'s folder, or `AIHUB_ROOT`. Derived dirs are created on startup. `write_atomic()` writes a temp file, then fsyncs and renames.
   - **`Config` (pydantic):** mirrors architecture §9. It's loaded with `tomllib`, and a missing file means defaults.
   - **Refuse to start** if `hub.host` isn't loopback (`127.0.0.1`, `::1` or `localhost`).

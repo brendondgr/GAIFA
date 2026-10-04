@@ -404,7 +404,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 host = "127.0.0.1"          # loopback only; anything else is refused at startup
 port = 7000
 
-[paths]                     # relative to this file
+[paths]                     # relative to this file; must stay inside the project
 models = "data/models"
 databases = "data/databases"
 outputs = "outputs"

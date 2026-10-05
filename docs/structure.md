@@ -78,7 +78,7 @@ utils/tests/
 │   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok (with a `requests` widget), fake-slow, fake-crash, fake-mem
 │   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay; snapshots/ = their converted Operation[]
 ├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli
-├── web/*.test.mjs + test_api_js.py ✅  Node unit tests (web/api.js; mod-ui.js + the template page.js on a fake DOM), run from pytest; test_contract.py: api.js routes ↔ hub routes, brief types ↔ response models, every route documented
+├── web/*.test.mjs + test_api_js.py ✅  Node unit tests (web/api.js; mod-ui.js + the template page.js on a fake DOM; the chart helpers and dashboard layout; the mock history), run from pytest; test_contract.py: api.js routes ↔ hub routes, brief types ↔ response models, every route documented
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
 ├── models/test_<behavior>.py   ✅     registry storage and status, routes, safe deletes, the scanner on a tree covering every rule, verify, used-by, alerts, the CLI (conftest: a fake data/models/)
 ├── outputs/test_<behavior>.py  ✅     what counts as an output, rows, the watcher, previews, routes (paging, Range, traversal), delete to trash, activity (conftest: a fake outputs/ tree; the host's ffmpeg inside a toolbox)
@@ -92,16 +92,20 @@ utils/tests/
 
 | File | Purpose |
 | :--- | :--- |
-| `Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html` | Claude Design's v1 export (the shell and every core page; shared components) |
+| `Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html` | The shell and every core page; shared components. Claude Design's v1 export, with revision 2 (brief §11) built here in plan 6.5 |
+| `chart-kit.js`, `charts.js` | Ours: the chart components of brief §11.6 (plain SVG on the page's React) and their shared frame, formatting and scales |
+| `views.js` | Ours: the widget card and data hook, the Overview Table and Timeline views, and the charts on the other pages (memory, storage, outputs histogram, a mod's stat charts) |
+| `dashboard.js` | Ours: the Overview Dashboard (KPI strip, widgets, Customize; brief §11.5) |
 | `mock.js` | `createMockApi()`: the brief §6 contract on simulated data |
+| `mock-history.js` | Ours: 7 days of seeded mock history for the chart methods (brief §11.9), with the Empty and Gaps scenarios |
 | `api.js` | Ours, not the export: `createApi({base, liveAreas, mock})` routes each method to HTTP or the mock by area; `createHttpApi()` |
 | `ModPage.dc.html` | Ours: the host that loads a mod's `ui/page.js` and calls `mount(el, ctx)` (brief §5) |
 | `mod-ui.js` | Ours: `ctx.ui`, themed DOM helpers for page modules |
 | `support.js` | Claude Design's runtime. Generated: **never edit** |
 | `vendor/` | React and ReactDOM 18.3.1 (UMD), `fonts.css` + `fonts/` (IBM Plex Sans, JetBrains Mono, OFL) |
-| `PATCHES.md` | Every hand edit to the export files |
+| `PATCHES.md` | The UI's history (v1 export → revision 2 built here), hand edits since, and the mock-only states |
 
-`GET /` serves `Hub.dc.html` with the vendor scripts and `/config.js` added before `support.js`; see `utils/routes/web.py`. `/ui/services/<id>/…` serves a mod's `ui/` folder, and `/Mod_<id>.dc.html` its `ui/Page.dc.html`.
+`GET /` serves `Hub.dc.html` with the vendor scripts and `/config.js` added before `support.js` (a page load gets an empty `<x-dc>`; the runtime fetches the template itself); see `utils/routes/web.py`. `/ui/services/<id>/…` serves a mod's `ui/` folder, and `/Mod_<id>.dc.html` its `ui/Page.dc.html`.
 
 ## `data/`
 

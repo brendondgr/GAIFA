@@ -2,12 +2,12 @@
 
 One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/`, run as its own process. Design: [docs/architecture.md](docs/architecture.md). Build plan: [docs/backend-plan.md](docs/backend-plan.md). UI brief: [docs/design-brief-ui.md](docs/design-brief-ui.md).
 
-**Status:** Phase 6 backend done (6.1–6.4, 6.6, 6.7): the metrics recorder and chart routes (`utils/metrics/`), mod widgets, `GET /api/overview`, `GET/PUT /api/settings`, the final alert list, and the contract test; on top of Phase 5's memory manager, Phase 4's outputs index, Phase 3's models registry and Phase 2's mods. Live areas: everything in Part A except `tools`. Open: step 6.5 (drop in the revision 2 export from Claude Design, then the Phase 6 UI checks), and the Phase 4 Firefox audio-seek check. What exists: [docs/structure.md](docs/structure.md).
+**Status:** Phase 6 built: the metrics recorder and chart routes (`utils/metrics/`), mod widgets, `GET /api/overview`, `GET/PUT /api/settings`, the final alert list, the contract test, and UI revision 2 built by hand (6.5: compact default, four Overview views, the dashboard and chart kit in `web/`), awaiting the user's review; on top of Phase 5's memory manager, Phase 4's outputs index, Phase 3's models registry and Phase 2's mods. Live areas: everything in Part A except `tools`. Open: the user's review of revision 2, the Phase 6 checks, and the Phase 4 Firefox audio-seek check. What exists: [docs/structure.md](docs/structure.md).
 
 **Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans, and `aihub-mod` to build or port a mod (guide: [docs/mods.md](docs/mods.md)).
 
 ## Layout
-- `utils/`: hub code (Python package) · `services/`: mods · `web/`: the UI (Claude Design `.dc.html` export)
+- `utils/`: hub code (Python package) · `services/`: mods · `web/`: the UI (Claude Design `.dc.html` format; revision 2 built here, see `web/PATCHES.md`)
 - `data/models/` (only `registry.json` is tracked) · `data/databases/` · `outputs/<mod>/<date>/`
 - `docs/`: architecture, plan, UI brief, `reference/` UI exports
 

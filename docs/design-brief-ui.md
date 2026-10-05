@@ -3,8 +3,8 @@
 > Companion docs: [architecture.md](architecture.md) (how AIHub works) and [backend-plan.md](backend-plan.md) (backend build steps). Section 6 of this brief, plus the additions in Section 11.7, is the authoritative contract for the UI-facing API.
 >
 > **Status (2026-10-04):** **Part A v1 is delivered.** Claude Design exported it in its `.dc.html` format; the reference copy is in [reference/ui-export-2026-10-04/](reference/ui-export-2026-10-04/README.md). It is the visual and structural baseline for everything else.
-> - **Next Claude Design pass: Part A revision 2** (Section 11): more compact, more charts, and several Overview views. Give Claude Design the export together with Section 11.
-> - **After that:** the Part B pages, one per mod as each one is moved in (backend-plan Phases 7–11).
+> - **Part A revision 2** (Section 11) was built by hand in this repo (backend-plan 6.5, 2026-10-05); what differs from Section 11 is under §11.11. `web/` is now the baseline.
+> - **Next Claude Design pass:** the Part B pages, one per mod as each one is moved in (backend-plan Phases 7–11). Give Claude Design the current `web/` folder and `web/PATCHES.md` with the Part B section.
 >
 > Paste everything below the line into Claude Design (`/design`). Attach these three files from the lcpp project as the starting design system: `~/Models/LLMs/web/assets/tokens.css`, `components.css` and `components.js`.
 > **Build Part A first.** Part B (the service-specific pages) is built afterwards, one page per pass, against the contract defined in Part A.
@@ -694,7 +694,7 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 
 ---
 
-## 11. Part A revision 2 — compact and graphical (next Claude Design pass)
+## 11. Part A revision 2 — compact and graphical (built by hand in plan 6.5)
 
 > Give Claude Design the **current `web/` folder** (the v1 export with AIHub's edits, listed in `web/PATCHES.md`), Section 6 and this section. **Change only what this section asks for.** Everything the current UI already does stays as it is.
 
@@ -869,6 +869,38 @@ interface WidgetData { unit?: string; t?: number[]; categories?: string[];
   - No chart triggers polling while the tab is hidden.
   - Every chart has a text alternative.
   - Nothing is loaded from a CDN.
+
+### 11.11 As built (plan 6.5)
+
+Revision 2 was built by hand in this repo, not in a Claude Design pass. Where it differs from the sections above:
+- **The chart components are plain ES modules, not `.dc.html` components.**
+  - They live in `web/chart-kit.js` and `web/charts.js` and draw SVG through the page's React. The shell puts them in a template as React elements (`{{ ov.dash }}`).
+  - **Why:** a data-driven chart needs hover state, a ResizeObserver and computed SVG paths. In a template, those paths would sit in `{{ … }}` inside SVG `d` attributes.
+  - The Overview's Dashboard, Table and Timeline views are modules too (`web/dashboard.js`, `web/views.js`). The Services view, the tiles, stays in the template.
+- **The Dashboard has a 15th widget, "Services":** a mini service list with state, memory and a 24 h sparkline. It shows every service above the fold, as §11.3 requires.
+- **Default layout (span):**
+  - Services 4, Memory over time 4, Memory now 4
+  - Outputs per day 6, LLM traffic 6
+  - Activity heatmap 6, Jobs 3, Model storage 3
+  - Service uptime 6, GPU memory 3, Outputs by service 3
+  - Recent outputs 6, Activity feed 6
+  - then one widget per mod widget, at its declared span
+
+  The grid packs densely. Spans of 3 and 4 become 6 under 1100 px, and everything is 12 under 760 px.
+- **"LLM traffic" appears only when the relay mod declares its `traffic` widget**, while relay runs (`listWidgets()` lists only running mods' widgets). Any other mod widget is drawn by its `kind`.
+- **KPI strip:**
+  - memory used, with its share of total and a 1 h sparkline
+  - services ready
+  - models loaded (mods whose load is `loaded`)
+  - jobs running (24 h sparkline)
+  - outputs today, compared with yesterday (7-day sparkline)
+  - LLM tokens today: the first mod stat labelled "Tokens today", or "—"
+- **Customize** lists every widget, with show/hide and move up/down. Changes apply at once and are saved about 0.5 s later as `saveSettings({ui: {dashboard}})`; Reset clears the layout.
+- **Compact tiles show their icon buttons on hover or focus** over the right of the first row, and always on touch screens. In comfortable, the buttons have text.
+- **Outputs histogram:** it covers the last 30 days and is only on the Outputs page, not on a service's Outputs tab, because `getOutputStats` has no service filter. Dragging sets a day range, shown as a chip; the dashboard links to `#/outputs?from=YYYY-MM-DD&to=…`.
+- **Raw-template requests (§11.2) are fixed by the hub, not by `<template>` wrapping.** A page load gets the page with an empty `<x-dc>`, and `support.js` renders from its own fetch of the same URL.
+- **Keyboard:** time charts, bars, the donut, the heatmap and the treemap move their readout with the arrow keys. The Timeline's text alternative is its summary label plus "View as table".
+- **Density:** this browser's choice (`localStorage`) wins; otherwise `Settings.ui.density`, whose default is `compact`. The theme works the same way.
 
 ---
 ---

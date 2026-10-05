@@ -1,27 +1,69 @@
-# Edits to the Claude Design export
+# The UI's history, and edits since revision 2
 
-`web/` holds Claude Design's export (`Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html`, `mock.js`, `support.js`), copied from [docs/reference/ui-export-2026-10-04/](../docs/reference/ui-export-2026-10-04/README.md) in plan step 1.8. Every hand edit to those files is listed here, so a new export can be checked against the list. Revision 2 (plan Phase 6) asks Claude Design to build these in, and the list goes back to empty.
+`web/` began as Claude Design's Part A v1 export (`Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html`, `mock.js`, `support.js`), copied from [docs/reference/ui-export-2026-10-04/](../docs/reference/ui-export-2026-10-04/README.md) in plan step 1.8.
 
-**Never edit `support.js`.** It's generated.
+**Revision 2 was built by hand (plan step 6.5, 2026-10-05).** Brief §11 was done in this repo instead of in another Claude Design pass, so `web/` is now AIHub's own code. A later Claude Design pass (the Part B pages, or a future revision) starts from the current `web/` folder plus this file. The "Edits since revision 2" table starts empty. Any hand edit to `Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html` or `mock.js` goes there, so a future export can be checked against the list.
+
+**Never edit `support.js`.** It's Claude Design's generated runtime.
 
 **Not edits (done by the hub as it serves the page, in `utils/routes/web.py`):**
 - `/vendor/react*.js` and `/config.js` `<script>` tags are added before `support.js` on `GET /`.
 - The Google Fonts `<link>`s become `/vendor/fonts.css` in every `.dc.html`.
+- A page load (`Sec-Fetch-Mode: navigate`) gets `Hub.dc.html` with an empty `<x-dc>`. `support.js` renders from its own `fetch` of the same URL, which gets the full template. The browser never parses the raw template, so the `{{ … }}` in `src`, `poster` and SVG `d` attributes no longer cause `/{{ … }}` 404s or `<path> attribute d` errors (brief §11.2).
 
-## Edits
+## Edits since revision 2
 
 | # | File(s) | Edit | Why | Step |
 |---|---|---|---|---|
-| 1 | `Hub.dc.html`, `mock.js` | `Hub` → `AIHub` in visible text (`the Hub` → `AIHub`); identifiers such as `setHubDown` unchanged | The product is AIHub | 1.8 |
-| 2 | `Hub.dc.html`, `mock.js` | `bin/hub` → `aihub` | The CLI is `aihub` (`bin/aihub`, linked into `~/.local/bin`) | 1.8 |
-| 3 | `Hub.dc.html` (`componentDidMount`) | `import('mock.js')` → `createMockApi()` replaced by `createApi({base, liveAreas, mock})` from `api.js`; `?mock` forces all-mock | The hybrid mode switch (brief §6.1) | 1.9 |
-| 4 | `Hub.dc.html` (sidebar footer, Settings → About) | Hard-coded `v0.1.0` → the hub's version from `getSystem()` (`sb.version`, `v.versions`) | Show the real version | 1.9 |
-| 5 | `Hub.dc.html` (Settings) | A **MOCK** note above each Settings section whose data comes from a mocked area (`SETTINGS_AREAS`, `se.mock`, `se.mockText`) | Brief §6.1: sections show a MOCK badge while their area is mocked | 1.9 |
-| 6 | `Hub.dc.html` (service page, `onEvent`, `componentDidMount`) | The hard-coded Example **Hello** tab (`CUSTOM_TABS`, `sayHello`, `sv.hello`) is gone. A mod with `has_page` gets its tabs from its page module (`loadPage` imports `page_url`, or `/ui/services/_template/page.js` in mock mode), rendered by the new `<dc-import name="ModPage">` host (`web/ModPage.dc.html`, ours) with `ctx` from brief §5 (`ctx.ui` = `web/mod-ui.js`, ours). Events also go to page modules (`modListeners`), and `resync` refetches the overview and the open service | Plan 2.9: mod pages come from the mods' own folders. `<dc-import>` takes only a literal `name`, and `<x-import>` only a literal `from`, so one static host loads every page module | 2.9 |
-| 7 | `Hub.dc.html` (`onEvent`, `modelBlocked`, `vmModels`) | Handles the new `model_deleted` event and refetches totals when a model is added or deleted elsewhere; the status badge and the drawer's Verify button show `progress` ("verifying 42%"); `modelBlocked` matches the hub's in-use rule (a running mod that is loading, loaded, unloading or busy; `n/a` counts as loaded) | Plan Phase 3 wire: live registry events and verify progress (brief §6.4 `Model.progress`) | 3 |
-| 8 | `Hub.dc.html` (`onEvent`, `vmOutputs` drawer, `cardVM`, `deleteOutput`) | The drawer plays live videos in a `<video>` (with the poster) instead of the mock placeholder, and offers Download for files the hub serves (`/api/…` URLs); an `output` event for an output already shown replaces its card instead of adding a second; live totals and filter-chip counts follow added and deleted outputs; text cards fall back to `meta.excerpt`; the delete dialog says the output moves to `outputs/.trash` (emptied after 30 days); the drawer's 3D and video boxes get `flex:none` (they collapsed to 0 px when the drawer's content overflowed, in the mock too); navigating to another page closes an open output drawer (`enterRoute`; it used to stay open over the Overview) | Plan Phase 4 wire: live outputs (a changed file is re-published; deletes go to the trash) | 4 wire |
-| 9 | `Hub.dc.html` (`sendOp`, `roomContinue`), `api.js` | A proxied call answered with `needs_room` (a memory trigger) opens the Make-room dialog from the API tab; "Unload & continue" resends it with `X-AIHub-Make-Room: 1` (`callService(…, { makeRoom: true })`), skipping the destructive-operation confirm the first send already asked | Plan Phase 5 wire: proxy triggers go through the same flow as Load | 5 wire |
+| — | | (none yet) | | |
 
-## Known export behavior (not edits)
+## Revision 2 (step 6.5): what changed
 
-- The browser parses the raw template before `support.js` renders it, so the console shows `<path> attribute d: Expected moveto…"{{ ic.x }}"` errors and requests for `/{{ sv.api.r.url }}`, and since patch 8 `/{{ odr.url }}` and `/{{ odr.poster }}` (404s on 127.0.0.1, from `<video src>`/`poster` in the raw markup). They're harmless and come from the export format; revision 2 can avoid them (e.g. `<template>`-wrapped markup).
+**New files (ours, plain ES modules on the page's React; no chart library, nothing from a CDN):**
+
+| File | What it is |
+|---|---|
+| `chart-kit.js` | Formatting, scales, null-safe paths and stacks, the size hook, and the frame every chart shares: loading/empty/error, legend toggles, tooltip, "View as table" |
+| `charts.js` | `AreaChart`, `LineChart`, `BarChart` (time or category axis, stacked, 2 y-axes, drag-to-select), `HBarChart`, `Donut`, `Sparkline`, `Heatmap`, `Treemap`, `Timeline`, `KpiTile` |
+| `views.js` | The widget `Card`, the `useData` hook (it never polls while the tab is hidden), the Overview Table and Timeline views, `MemoryChart`, `StorageChart`, `OutputsHistogram`, `ServiceCharts` |
+| `dashboard.js` | The Dashboard view: the KPI strip, 13 built-in widgets plus one per mod widget, and Customize |
+| `mock-history.js` | 7 days of seeded mock history for the chart methods, plus the "Empty history" and "Gaps" scenarios |
+
+**`Hub.dc.html` (the template plus `class Component`):**
+- **Edits 1–9 from v1 are kept.** They are the AIHub renames, the hybrid API switch, the real version, the Settings MOCK notes, page modules through `ModPage`, model events and verify progress, live outputs, and Make room from the API tab.
+- **Compact by default.** The density comes from this browser's choice, or else from `Settings.ui.density` (default `compact`).
+  - The shell is density-driven (`rootSt`, `hd.st`, `mainSt`, `h1St`): sidebar 208 px, header 44 px, base font 12.5 px, page padding 14–18 px, gaps 12 px.
+- **Overview with four views** (`?view=dashboard|services|table|timeline`; the choice is also kept in `localStorage` as `hub.ovView`):
+  - The Dashboard, Table and Timeline views are rendered by `dashboard.js` and `views.js` as React elements (`{{ ov.dash }}`, `{{ ov.table }}`, `{{ ov.timeline }}`).
+  - The Services view is v1's tiles in the compact form. Each tile has a mono status line, up to 4 stats with 24 h sparklines, and a ⋯ menu. Its icon buttons appear on hover or focus and are always shown on touch screens. The v1 memory, activity and recent-output sections stay below the tiles.
+- **Dashboard layout:** Customize and the range pickers save `Settings.ui.dashboard` through `saveSettings({ui: {dashboard}})` (`onLayout`, debounced), so the layout follows you between browsers.
+- **Sparkline history:** `loadHist()` fetches 1 h and 24 h of `mem.svc.*`, `mem.used`, `jobs.running` and the mods' numeric stat series. It refreshes every 60 s while the tab is visible.
+- **Graphics on other pages (§11.8):**
+  - the service header's 1 h memory sparkline
+  - a History card on the generic Overview tab: a chart per numeric stat, memory, and the mod's timeline lane
+  - the memory popover's 1 h stacked area
+  - the Models treemap and disk gauge, which replace the stacked bar; clicking a kind filters the table
+  - the Outputs histogram: drag across days to set a date filter, shown as a chip you can clear. The Overview links `#/outputs?from=&to=` and `?range=` work too
+  - the Settings → Memory 24 h chart, whose reserve line follows the unsaved value
+- **The `Shift+D` panel** gains History: Normal, Empty history, Gaps (2 h down).
+
+**`mock.js`:**
+- Numeric stats carry `series`.
+- `settings.ui` has `density: 'compact'` and `dashboard`.
+- `saveSettings` merges a partial save the way the hub does.
+- The chart methods come from `mock-history.js`.
+
+## States only the mock can produce
+
+These are the brief §8 and §11.10 states the live hub can't show on demand. Use `?mock` and `Shift+D` for them:
+- **Many outputs (2,000):** the live index shows whatever `outputs/` holds.
+- **Empty history:** live, only a fresh install or a new `data/databases/aihub.db` looks like this.
+- **Memory pressure** ("Load … then try Load on 3D Generate", and the variant where the plan falls short): live, these need mods big enough to fill 121 GB.
+- **"Install mod with no page"** (Transcribe): live, any mod without `ui/` looks like this.
+
+Everything else can be reached live:
+- **Gaps:** stop the hub for a while.
+- **Hub down:** `aihub stop`.
+- **A failed mod:** `fake-crash` with `--demo-mods`.
+- **A widget error:** stop the mod that serves it.
+- **A broken manifest:** a mod folder with a bad `service.toml`.

@@ -62,6 +62,23 @@ async def test_index_serves_the_export(web_client):
     assert "AIHub not responding" in r.text
 
 
+async def test_a_page_load_gets_an_empty_template(web_client):
+    """Brief §11.2: the browser never parses the raw template (its `{{ … }}` src/d attributes); the
+    runtime's own fetch of the same URL gets it."""
+    page = await web_client.get("/", headers={"Sec-Fetch-Mode": "navigate"})
+    full = await web_client.get("/", headers={"Sec-Fetch-Mode": "cors"})
+    assert page.headers["vary"] == "Sec-Fetch-Mode"
+    assert "<x-dc></x-dc>" in page.text
+    assert "data-dc-script" in page.text and HEAD_SCRIPTS in page.text  # the logic and scripts stay
+    assert "{{ ov.dash }}" in full.text and "AIHub not responding" in full.text
+
+
+async def test_every_web_module_is_served(web_client):
+    for name in ("charts.js", "chart-kit.js", "views.js", "dashboard.js", "mock-history.js"):
+        r = await web_client.get("/" + name)
+        assert r.status_code == 200 and "javascript" in r.headers["content-type"], name
+
+
 async def test_no_external_urls_in_what_the_page_loads(web_client):
     html = (await web_client.get("/")).text
     for url in re.findall(r'(?:src|href)="([^"]+)"', html):

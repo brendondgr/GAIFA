@@ -96,9 +96,10 @@ AIHub/
 │   ├── logs/                Stage D: per-mod logs (until then: journald)
 │   └── state/               Stage D: runtime state, e.g. lcpp's instance records (until then: $XDG_RUNTIME_DIR)
 ├── outputs/                 <mod>/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext> (+ .json sidecar) or a folder per job
-└── web/                     the UI, as Claude Design exports it
+└── web/                     the UI in Claude Design's .dc.html format (v1 export; revision 2 built here)
     ├── Hub.dc.html          shell + core pages (served at /, with vendor scripts and /config.js injected)
-    ├── *.dc.html            shared components: OutputCard, JsonView, ModPage, charts (§11.6 of the brief) …
+    ├── *.dc.html            shared components: OutputCard, JsonView, ModPage
+    ├── charts.js …          ours: chart kit, Overview views and dashboard (brief §11.4–11.6)
     ├── support.js           Claude Design runtime (generated; never edited)
     ├── mock.js              mock API (the brief's Section 6 contract)
     ├── api.js               ours: HTTP client + the hybrid mock/live switch

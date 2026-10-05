@@ -510,7 +510,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 6 — Metrics, dashboards and UI revision 2
 
-> **Ask Claude Design early.** Give it brief §11 and the v1 export any time after Phase 1, so the revision 2 export is ready by step 6.5.
+> **Revision 2 was built by hand** (6.5). The original plan was to ask Claude Design for it.
 
 - [x] **6.1 `utils/metrics.py`: the recorder** (architecture §13). *As built:* the `utils/metrics/` package (`store.py`, `recorder.py`); stats are recorded every 10 s from each mod's latest status; the low-disk alert from 6.4 is checked on each tick.
   - **Tables:** `metrics_raw`, `metrics_1m`, `metrics_1h`, `service_states`, `load_intervals`, `job_history`.
@@ -533,10 +533,20 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - `GET/PUT /api/settings` reads and writes `config.toml`; changing the hub port returns `restart_required`.
   - **The dashboard layout** (brief §11.5, Customize) is saved under `[ui.dashboard]` in `config.toml`, so it follows you between browsers.
 - [x] **6.4 Alert rules.** *As built:* the table in architecture §6; `manifest-<id>` and `disk-low` are new. Final list: manifest errors, failed mods, registry problems, disk free under 50 GB, memory over 92%, and watcher errors.
-- [ ] **6.5 Drop in Part A revision 2.**
-  - Replace `web/` with the revision 2 export, keeping `api.js`, `vendor/` and `PATCHES.md`. Re-apply any patch it didn't fold in.
-  - Check the changes against brief §11: compact default, the four Overview views, the dashboard widgets, chart components, graphics on the other pages, the renames, MOCK badges, and the hybrid switch.
-  - Apply the API changes Claude Design reported to **both** brief §6/§11.7 and the code, in one commit.
+- [x] **6.5 Part A revision 2.** *As built (2026-10-05):* built by hand in this repo at the user's request, instead of a Claude Design pass. Differences from §11 are in brief §11.11.
+  - **New modules:** `web/chart-kit.js` and `charts.js` (the §11.6 components), `views.js` and `dashboard.js` (the Overview views and the charts on other pages), and `mock-history.js` (§11.9). `Hub.dc.html` gets the compact shell, the view switch, compact tiles and the §11.8 graphics.
+  - **The raw-template fix (§11.2):** `utils/routes/web.py` serves a page load with an empty `<x-dc>`.
+  - **Docs:** `web/PATCHES.md` now records the history; the edits table starts empty.
+  - **API:** no changes to brief §6/§11.7.
+  - **Tests:** `utils/tests/web/charts.test.mjs`, `mockhistory.test.mjs`, and the page-load tests in `test_web.py`.
+  - *Checked in the browser:* everything below, on mock data and against a dev hub with the demo mods.
+    - At 1440 × 900 in compact, the Dashboard shows alerts, the KPI strip, every service and three charts with no scrolling.
+    - All four views, the service page, the memory popover, Models, the Outputs drag filter, and the Settings reserve line following the unsaved value.
+    - Customize hides a widget and writes `[ui.dashboard]` to `config.toml`; Reset removes it.
+    - "View as table" on every chart widget.
+    - Light theme.
+    - No horizontal page scroll at 360 px on any view or page.
+    - With mock data, the Dashboard is fully loaded about 220 ms after switching to it.
 - [x] **6.6 Contract test.** *As built:* `utils/tests/web/test_contract.py` parses `createHttpApi` in `web/api.js` (38 routes, the proxy included) and compares each brief §6.4/§11.7 interface's top-level fields with its pydantic model (`utils/api_models.py`). Parse the method → route table from `web/api.js` and assert that every route exists with the right method. Response models are pydantic classes matching brief §6.4 and §11.7, so `/api/openapi.json` documents the hub itself.
 - [x] **6.7 Hub operations for the agent.** *As built:* the same test checks that every `/api/…` operation has a summary and a JSON response model (files, images and event streams declare their content type). The proxy stays out of the spec; the spec's description points to `/api/s/{id}/…` and `/operations`. Give every hub route a summary and response model, so `/api/openapi.json` is complete and Phase 13 can build tools from it.
 
@@ -549,7 +559,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - the Settings → Memory chart, and the full Settings page
 - **All of Part A is now live.** The hybrid defaults to every area live, and mock data appears only with `?mock`.
 
-*Status (2026-10-05):* the backend half is wired. `/config.js` lists `metrics`, `widgets`, `overview` and `settings` as live, so the v1 UI's Overview comes from `GET /api/overview` and its Settings page reads and saves `config.toml` (checked in the browser against a dev hub with the demo mods). Every Part A area except `tools` (Phase 13) is live. The charts above need the revision 2 export (step 6.5).
+*Status (2026-10-05):* wired. `/config.js` lists `metrics`, `widgets`, `overview` and `settings` as live, and revision 2 (6.5) draws everything above from them. Every Part A area except `tools` (Phase 13) is live.
 
 **Checks & deliverables — Phase 6**
 - [ ] After fake mods have run for 2 h with load/unload cycles, every dashboard widget shows real data, and a planned 10-minute hub stop shows as a **gap**.

@@ -26,10 +26,13 @@ button:disabled{cursor:not-allowed;opacity:.5}
 ::-webkit-scrollbar-thumb{background:var(--bds,#2A3547);border-radius:10px;border:2px solid transparent;background-clip:padding-box}
 @keyframes hubpulse{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes hubshimmer{0%{background-position:-480px 0}100%{background-position:480px 0}}
+.hubtile .hubacts{position:absolute;top:8px;right:40px;z-index:2;padding:0 2px 0 14px;background:linear-gradient(90deg,transparent,var(--card,#11151D) 12px);opacity:0;pointer-events:none;transition:opacity .12s}
+.hubtile:hover .hubacts,.hubtile:focus-within .hubacts{opacity:1;pointer-events:auto}
+@media (hover: none){.hubtile .hubacts{position:static;opacity:1;pointer-events:auto;padding:0;background:none}}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}}
 </style>
 </helmet>
-<div style="display:flex;min-height:100vh;background:var(--bg,#0B0E14);color:var(--tx,#E6EAF2);font-size:13px;line-height:1.5">
+<div style="{{ rootSt }}">
 <aside aria-label="Main navigation" style="{{ sb.style }}">
   <div style="display:flex;align-items:center;gap:10px;padding:16px 16px 14px">
     <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="#FFB224"></rect><circle cx="16" cy="16" r="4.2" fill="#1A1200"></circle><path d="M16 5.5v6M16 20.5v6M5.5 16h6M20.5 16h6" stroke="#1A1200" stroke-width="2.6" stroke-linecap="round"></path></svg>
@@ -85,7 +88,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
 </sc-if>
 
 <div style="flex:1;min-width:0;display:flex;flex-direction:column">
-  <header style="position:sticky;top:0;z-index:40;height:52px;display:flex;align-items:center;gap:8px;padding:0 clamp(10px,2vw,20px);background:var(--bg,#0B0E14);border-bottom:1px solid var(--bd,#1D2430)">
+  <header style="{{ hd.st }}">
     <sc-if value="{{ mob }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ hd.onMenu }}" aria-label="Open navigation" style="width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--tx,#E6EAF2);cursor:pointer;flex:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="{{ ic.menu }}"></path></svg></button>
     </sc-if>
@@ -122,7 +125,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
     </div>
   </sc-if>
 
-  <main style="flex:1;width:100%;max-width:1680px;margin:0 auto;padding:clamp(14px,2.2vw,28px) clamp(12px,2.4vw,32px) 48px;display:flex;flex-direction:column;gap:20px;min-width:0">
+  <main style="{{ mainSt }}">
     <sc-if value="{{ notReady }}" hint-placeholder-val="{{ true }}">
       <div aria-busy="true" aria-label="Loading" style="display:flex;flex-direction:column;gap:16px">
         <div style="height:28px;width:200px;border-radius:6px;background:linear-gradient(90deg,var(--card,#11151D) 0,var(--hov,#161C28) 50%,var(--card,#11151D) 100%);background-size:960px 100%;animation:hubshimmer 1.4s linear infinite"></div>
@@ -135,10 +138,16 @@ button:disabled{cursor:not-allowed;opacity:.5}
     </sc-if>
 
     <sc-if value="{{ pg.overview }}" hint-placeholder-val="{{ false }}">
-      <div style="display:flex;flex-direction:column;gap:22px;min-width:0">
-        <div style="display:flex;flex-direction:column;gap:4px">
-          <h1 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em">Overview</h1>
-          <p style="margin:0;color:var(--mut,#8A94A6)">{{ ov.sub }}</p>
+      <div style="{{ ov.wrapSt }}">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="flex:1 1 220px;min-width:0;display:flex;flex-direction:column;gap:2px">
+            <h1 style="{{ h1St }}">Overview</h1>
+            <p style="margin:0;color:var(--mut,#8A94A6)">{{ ov.sub }}</p>
+          </div>
+          <sc-if value="{{ ov.isDash }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ ov.onCustomize }}" aria-pressed="{{ ov.customizing }}" style="{{ ov.custSt }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.edit }}"></path></svg>Customize</button>
+          </sc-if>
+          <div role="group" aria-label="Overview view" style="display:inline-flex;padding:2px;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--sb,#0D1119)"><sc-for list="{{ ov.views }}" as="x" hint-placeholder-count="4"><button onClick="{{ x.on }}" aria-pressed="{{ x.pressed }}" style="{{ x.st }}">{{ x.label }}</button></sc-for></div>
         </div>
         <sc-if value="{{ ov.hasAlerts }}" hint-placeholder-val="{{ false }}">
           <div role="region" aria-label="Alerts" style="display:flex;flex-direction:column;gap:6px">
@@ -152,53 +161,55 @@ button:disabled{cursor:not-allowed;opacity:.5}
             </sc-for>
           </div>
         </sc-if>
-
-        <section aria-labelledby="ov-svc" style="display:flex;flex-direction:column;gap:10px">
+        <sc-if value="{{ ov.isDash }}" hint-placeholder-val="{{ true }}">{{ ov.dash }}</sc-if>
+        <sc-if value="{{ ov.isTable }}" hint-placeholder-val="{{ false }}">{{ ov.table }}</sc-if>
+        <sc-if value="{{ ov.isTimeline }}" hint-placeholder-val="{{ false }}">{{ ov.timeline }}</sc-if>
+        <sc-if value="{{ ov.isServices }}" hint-placeholder-val="{{ false }}">
+        <div style="{{ ov.wrapSt }}">
+        <section aria-labelledby="ov-svc" style="display:flex;flex-direction:column;gap:8px">
           <h2 id="ov-svc" style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Services</h2>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:14px">
+          <div style="{{ ov.gridSt }}">
             <sc-for list="{{ ov.tiles }}" as="t" hint-placeholder-count="6">
-              <article style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0">
-                <div style="display:flex;align-items:center;gap:10px;min-width:0">
-                  <span style="width:34px;height:34px;flex:none;border-radius:8px;background:var(--inset,#131926);border:1px solid var(--bd,#1D2430);display:grid;place-items:center;color:var(--mut,#8A94A6)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ t.d }}"></path></svg></span>
-                  <div style="flex:1;min-width:0">
-                    <a href="{{ t.href }}" style="display:block;font-weight:600;font-size:14px;color:var(--tx,#E6EAF2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.name }}</a>
-                    <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">{{ t.port }} · {{ t.kind }}</div>
-                  </div>
+              <article class="hubtile" style="{{ t.cardSt }}">
+                <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                  <span style="{{ t.icoSt }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ t.d }}"></path></svg></span>
+                  <a href="{{ t.href }}" style="flex:1;min-width:0;font-weight:600;font-size:13px;color:var(--tx,#E6EAF2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.name }}</a>
+                  <span class="hubacts" style="display:inline-flex;gap:4px;flex:none">
+                    <sc-for list="{{ t.actions }}" as="a" hint-placeholder-count="2"><button onClick="{{ a.on }}" disabled="{{ a.dis }}" title="{{ a.label }}" aria-label="{{ a.aria }}" style="{{ a.st }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ a.d }}"></path></svg>{{ a.text }}</button></sc-for>
+                  </span>
                   <span style="{{ t.sb.st }}">{{ t.sb.dot }}{{ t.sb.label }}</span>
+                  <span style="position:relative;flex:none">
+                    <button onClick="{{ t.menuToggle }}" aria-label="{{ t.menuAria }}" aria-haspopup="menu" aria-expanded="{{ t.menuOpen }}" style="width:24px;height:24px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--mut,#8A94A6);cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.more }}"></path></svg></button>
+                    <sc-if value="{{ t.menuOpen }}" hint-placeholder-val="{{ false }}">
+                      <div onClick="{{ t.menuClose }}" aria-hidden="true" style="position:fixed;inset:0;z-index:44"></div>
+                      <div role="menu" style="position:absolute;right:0;top:28px;z-index:45;min-width:170px;padding:4px;border-radius:9px;background:var(--card,#11151D);border:1px solid var(--bds,#2A3547);box-shadow:0 14px 34px rgba(0,0,0,.4);display:flex;flex-direction:column">
+                        <sc-for list="{{ t.menu }}" as="m" hint-placeholder-count="3"><a role="menuitem" href="{{ m.href }}" onClick="{{ t.menuClose }}" style="display:flex;align-items:center;height:30px;padding:0 9px;border-radius:5px;color:var(--tx,#E6EAF2);font-size:12.5px;text-decoration:none" style-hover="background:var(--hov,#161C28)">{{ m.label }}</a></sc-for>
+                      </div>
+                    </sc-if>
+                  </span>
                 </div>
                 <sc-if value="{{ t.hasErr }}" hint-placeholder-val="{{ false }}">
-                  <div style="display:flex;flex-direction:column;gap:8px">
-                    <div style="padding:10px;border-radius:7px;background:var(--trd,rgba(248,81,73,.13));color:var(--rd,#F85149);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;word-break:break-word">{{ t.err }}</div>
-                    <a href="{{ t.errHref }}" style="font-size:12.5px;font-weight:500;white-space:nowrap">Show details →</a>
-                  </div>
+                  <div style="padding:6px 8px;border-radius:6px;background:var(--trd,rgba(248,81,73,.13));color:var(--rd,#F85149);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;word-break:break-word;max-height:52px;overflow:hidden">{{ t.err }}</div>
+                  <a href="{{ t.errHref }}" style="font-size:12px;font-weight:500;white-space:nowrap">Show details →</a>
                 </sc-if>
                 <sc-if value="{{ t.ok }}" hint-placeholder-val="{{ true }}">
-                  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--mut,#8A94A6)">
-                    <sc-if value="{{ t.hasLoad }}" hint-placeholder-val="{{ false }}"><span style="{{ t.lb.st }}">{{ t.lb.dot }}{{ t.lb.label }}</span></sc-if>
-                    <span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--tx,#E6EAF2);white-space:nowrap">{{ t.mem }}</span>
-                    <span aria-hidden="true">·</span>
-                    <span style="white-space:nowrap">{{ t.idle }}</span>
-                  </div>
-                  <sc-if value="{{ t.hasLastErr }}" hint-placeholder-val="{{ false }}"><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--rd,#F85149);word-break:break-word">{{ t.lastErr }}</div></sc-if>
-                  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;padding:10px 0;border-top:1px solid var(--bd,#1D2430);border-bottom:1px solid var(--bd,#1D2430)">
+                  <div title="{{ t.line }}" style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.line }}</div>
+                  <sc-if value="{{ t.hasLastErr }}" hint-placeholder-val="{{ false }}"><div title="{{ t.lastErr }}" style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--rd,#F85149);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.lastErr }}</div></sc-if>
+                  <div style="{{ t.statsSt }}">
                     <sc-for list="{{ t.stats }}" as="x" hint-placeholder-count="2">
-                      <div style="min-width:0">
-                        <div style="font-size:11.5px;color:var(--mut,#8A94A6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.label }}</div>
-                        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:15px;font-weight:500">{{ x.value }}<span style="font-size:11.5px;color:var(--mut,#8A94A6)">{{ x.unit }}{{ x.hint }}</span></div>
+                      <div style="min-width:0;display:flex;flex-direction:column;gap:1px">
+                        <div style="font-size:10.5px;color:var(--mut,#8A94A6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ x.label }}</div>
+                        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ x.value }}<span style="font-size:10.5px;color:var(--mut,#8A94A6)">{{ x.unit }}{{ x.hint }}</span></div>
+                        {{ x.spark }}
                       </div>
                     </sc-for>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:auto">
-                    <sc-for list="{{ t.actions }}" as="a" hint-placeholder-count="2">
-                      <button onClick="{{ a.on }}" disabled="{{ a.dis }}" style="{{ a.st }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ a.d }}"></path></svg>{{ a.label }}</button>
-                    </sc-for>
-                    <a href="{{ t.href }}" style="margin-left:auto;font-size:12.5px;font-weight:500;white-space:nowrap">Open →</a>
                   </div>
                 </sc-if>
               </article>
             </sc-for>
           </div>
         </section>
+
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;align-items:start">
           <section aria-labelledby="ov-mem" style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0">
@@ -273,6 +284,8 @@ button:disabled{cursor:not-allowed;opacity:.5}
             <div style="padding:28px;border:1px dashed var(--bds,#2A3547);border-radius:10px;text-align:center;color:var(--mut,#8A94A6)">Nothing produced yet. Outputs from Speech, 3D Generate and Images &amp; Video appear here.</div>
           </sc-if>
         </section>
+        </div>
+        </sc-if>
       </div>
     </sc-if>
     <sc-if value="{{ pg.service }}" hint-placeholder-val="{{ false }}">
@@ -289,7 +302,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
           <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px">
             <span style="width:46px;height:46px;flex:none;border-radius:10px;background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);display:grid;place-items:center;color:var(--tx,#E6EAF2)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ sv.d }}"></path></svg></span>
             <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:6px">
-              <h1 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em">{{ sv.name }}</h1>
+              <h1 style="{{ h1St }}">{{ sv.name }}</h1>
               <p style="margin:0;color:var(--mut,#8A94A6);text-wrap:pretty">{{ sv.desc }}</p>
               <div aria-live="polite" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;color:var(--mut,#8A94A6);padding-top:2px">
                 <span style="{{ sv.sb.st }}">{{ sv.sb.dot }}{{ sv.sb.label }}</span>
@@ -297,7 +310,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
                 <button onClick="{{ sv.copyPort }}" title="Copy base URL" style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:5px;border:1px solid var(--bd,#1D2430);background:var(--inset,#131926);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--tx,#E6EAF2);cursor:pointer">{{ sv.port }}<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.copy }}"></path></svg></button>
                 <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px">{{ sv.version }}</span>
                 <span aria-hidden="true">·</span>
-                <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--tx,#E6EAF2)">{{ sv.mem }}</span>
+                <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--tx,#E6EAF2)">{{ sv.mem }}</span><span style="display:inline-block;width:72px">{{ sv.memSpark }}</span>
                 <span aria-hidden="true">·</span><span>{{ sv.kind }}</span>
               </div>
             </div>
@@ -346,6 +359,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
           </sc-if>
 
           <sc-if value="{{ sv.t.overview }}" hint-placeholder-val="{{ false }}">
+            {{ sv.ov.charts }}
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px;align-items:start">
               <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0">
                 <div style="display:flex;align-items:center;gap:8px"><h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Health</h2><span style="flex:1"></span>
@@ -570,7 +584,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
       <sc-if value="{{ md.loaded }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
           <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
-            <div style="flex:1 1 260px"><h1 style="margin:0 0 4px;font-size:22px;font-weight:600;letter-spacing:-.01em">Models</h1><p style="margin:0;color:var(--mut,#8A94A6)">Everything in <code style="font-family:'JetBrains Mono',ui-monospace,monospace">data/models/</code>, from every service.</p></div>
+            <div style="flex:1 1 260px"><h1 style="{{ h1St }}">Models</h1><p style="margin:0;color:var(--mut,#8A94A6)">Everything in <code style="font-family:'JetBrains Mono',ui-monospace,monospace">data/models/</code>, from every service.</p></div>
             <button onClick="{{ md.scan }}" disabled="{{ md.scanDis }}" style="{{ md.scanSt }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.scan }}"></path></svg>{{ md.scanLabel }}</button>
           </div>
           <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px">
@@ -580,12 +594,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
               <div><div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Disk free</div><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:20px;font-weight:500">{{ md.free }}</div></div>
               <span style="margin-left:auto;font-size:12px;color:var(--mut,#8A94A6)">{{ md.diskLine }}</span>
             </div>
-            <div role="img" aria-label="Size by kind" style="display:flex;height:12px;border-radius:4px;overflow:hidden;background:var(--row,#1A2130);gap:1px">
-              <sc-for list="{{ md.segs }}" as="g" hint-placeholder-count="5"><span title="{{ g.tip }}" style="{{ g.st }}"></span></sc-for>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px">
-              <sc-for list="{{ md.segs }}" as="g" hint-placeholder-count="5"><span style="display:inline-flex;align-items:center;gap:6px;color:var(--mut,#8A94A6)"><span style="{{ g.sw }}"></span>{{ g.name }}<span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--tx,#E6EAF2)">{{ g.size }}</span></span></sc-for>
-            </div>
+            {{ md.chart }}
           </section>
 
           <sc-if value="{{ md.hasDisc }}" hint-placeholder-val="{{ false }}">
@@ -655,11 +664,12 @@ button:disabled{cursor:not-allowed;opacity:.5}
     <sc-if value="{{ showOutputs }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
         <sc-if value="{{ out.page }}" hint-placeholder-val="{{ true }}">
-          <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap"><div style="flex:1 1 260px"><h1 style="margin:0 0 4px;font-size:22px;font-weight:600;letter-spacing:-.01em">Outputs</h1><p style="margin:0;color:var(--mut,#8A94A6)">Everything any service produced, newest first.</p></div><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px">{{ out.total }}</span></div>
+          <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap"><div style="flex:1 1 260px"><h1 style="{{ h1St }}">Outputs</h1><p style="margin:0;color:var(--mut,#8A94A6)">Everything any service produced, newest first.</p></div><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px">{{ out.total }}</span></div>
+          {{ out.hist }}
         </sc-if>
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
           <div role="group" aria-label="View" style="display:inline-flex;padding:2px;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--sb,#0D1119)"><sc-for list="{{ out.views }}" as="x" hint-placeholder-count="2"><button onClick="{{ x.on }}" aria-pressed="{{ x.pressed }}" style="{{ x.st }}">{{ x.label }}</button></sc-for></div>
-          <div role="group" aria-label="Date range" style="display:inline-flex;padding:2px;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--sb,#0D1119)"><sc-for list="{{ out.ranges }}" as="x" hint-placeholder-count="4"><button onClick="{{ x.on }}" aria-pressed="{{ x.pressed }}" style="{{ x.st }}">{{ x.label }}</button></sc-for></div>
+          <div role="group" aria-label="Date range" style="display:inline-flex;padding:2px;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--sb,#0D1119)"><sc-for list="{{ out.ranges }}" as="x" hint-placeholder-count="4"><button onClick="{{ x.on }}" aria-pressed="{{ x.pressed }}" style="{{ x.st }}">{{ x.label }}</button></sc-for><sc-if value="{{ out.hasDays }}" hint-placeholder-val="{{ false }}"><button onClick="{{ out.clearDays }}" aria-pressed="true" aria-label="{{ out.daysAria }}" title="Clear the dragged date range" style="{{ out.daysSt }}">{{ out.daysLabel }} ✕</button></sc-if></div>
           <div style="display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--sb,#0D1119);flex:1 1 200px;max-width:340px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true" style="color:var(--mut,#8A94A6);flex:none"><path d="{{ ic.search }}"></path></svg>
             <input ref="{{ out.searchRef }}" value="{{ out.q }}" onChange="{{ out.onQ }}" placeholder="Search titles and prompts" aria-label="Search outputs" style="flex:1;min-width:0;border:0;background:transparent;height:30px;font-size:13px;outline:none">
@@ -721,7 +731,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
       <sc-if value="{{ se.loading }}" hint-placeholder-val="{{ false }}"><div style="color:var(--mut,#8A94A6)">Loading settings…</div></sc-if>
       <sc-if value="{{ se.loaded }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-          <h1 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em">Settings</h1>
+          <h1 style="{{ h1St }}">Settings</h1>
           <sc-if value="{{ se.restart }}" hint-placeholder-val="{{ false }}">
             <div role="status" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:10px;background:var(--tacc,rgba(255,178,36,.13));border:1px solid var(--acc,#FFB224)"><span style="flex:1;min-width:200px"><strong>Saved.</strong> Restart AIHub to apply the new port: <code style="font-family:'JetBrains Mono',ui-monospace,monospace">aihub restart</code></span><button onClick="{{ se.dismissRestart }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--card,#11151D);font-size:12px;cursor:pointer">Dismiss</button></div>
           </sc-if>
@@ -757,7 +767,8 @@ button:disabled{cursor:not-allowed;opacity:.5}
               </sc-if>
               <sc-if value="{{ se.sec.memory }}" hint-placeholder-val="{{ false }}">
                 <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:4px 16px">
-                  <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;flex-wrap:wrap"><label for="st-res" style="flex:1 1 220px"><div style="font-weight:500">Reserve</div><div style="font-size:12px;color:var(--mut,#8A94A6)">GB of unified memory AIHub always keeps free for the OS and desktop.</div></label><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><input id="st-res" type="number" min="0" max="64" value="{{ se.reserve }}" onChange="{{ se.onReserve }}" style="{{ se.resSt }}"><span role="alert" style="font-size:12px;color:var(--rd,#F85149)">{{ se.resErr }}</span></div></div>
+                  <div style="padding:12px 0 4px"><div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6);margin-bottom:6px">Last 24 hours</div>{{ se.memChart }}</div>
+                  <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;flex-wrap:wrap;border-top:1px solid var(--bd,#1D2430)"><label for="st-res" style="flex:1 1 220px"><div style="font-weight:500">Reserve</div><div style="font-size:12px;color:var(--mut,#8A94A6)">GB of unified memory AIHub always keeps free for the OS and desktop.</div></label><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><input id="st-res" type="number" min="0" max="64" value="{{ se.reserve }}" onChange="{{ se.onReserve }}" style="{{ se.resSt }}"><span role="alert" style="font-size:12px;color:var(--rd,#F85149)">{{ se.resErr }}</span></div></div>
                   <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--bd,#1D2430)"><div style="flex:1"><div style="font-weight:500">Automatically make room when a service needs memory</div><div style="font-size:12px;color:var(--mut,#8A94A6)">When off, AIHub shows you the plan and asks first.</div></div><button type="button" role="switch" aria-label="Automatically make room" aria-checked="{{ se.auto.on }}" onClick="{{ se.auto.toggle }}" style="{{ se.auto.track }}"><span style="{{ se.auto.knob }}"></span></button></div>
                   <div style="display:flex;flex-direction:column;gap:8px;padding:14px 0;border-top:1px solid var(--bd,#1D2430)"><div><div style="font-weight:500">Never auto-unload</div><div style="font-size:12px;color:var(--mut,#8A94A6)">These services are never part of a make-room plan.</div></div>
                     <div role="group" aria-label="Never auto-unload" style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ se.never }}" as="c" hint-placeholder-count="4"><button onClick="{{ c.on }}" aria-pressed="{{ c.pressed }}" style="{{ c.st }}">{{ c.label }}</button></sc-for></div></div>
@@ -841,6 +852,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
     <sc-if value="{{ pop.mem }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:12px">
         <div style="display:flex;align-items:baseline;gap:8px"><h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Unified memory</h2><span style="margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px">{{ pmem.total }}</span></div>
+        <div style="min-height:110px">{{ pmem.chart }}</div>
         <div style="position:relative;height:14px"><div style="position:absolute;inset:0;display:flex;border-radius:5px;overflow:hidden;background:var(--row,#1A2130)"><sc-for list="{{ pmem.segs }}" as="g" hint-placeholder-count="3"><span title="{{ g.tip }}" style="{{ g.st }}"></span></sc-for></div><span aria-hidden="true" style="{{ pmem.reserveZone }}"></span><span aria-hidden="true" style="{{ pmem.reserveSt }}"></span></div>
         <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px"><sc-for list="{{ pmem.legend }}" as="g" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:8px"><span style="{{ g.sw }}"></span><span style="flex:1;color:var(--mut,#8A94A6)">{{ g.name }}</span><span style="font-family:'JetBrains Mono',ui-monospace,monospace">{{ g.size }}</span></div></sc-for></div>
         <div style="font-size:11.5px;color:var(--mut,#8A94A6);font-family:'JetBrains Mono',ui-monospace,monospace;padding-top:8px;border-top:1px solid var(--bd,#1D2430)">{{ pmem.gpu }}</div>
@@ -1013,6 +1025,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
           <div style="display:flex;flex-direction:column;gap:6px"><div style="font-weight:500">Make unreachable (process up, health failing)</div><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ mk.unreach }}" as="x" hint-placeholder-count="4"><button onClick="{{ x.on }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12px;cursor:pointer">{{ x.label }}</button></sc-for></div></div>
           <div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ mk.actions }}" as="x" hint-placeholder-count="4"><button onClick="{{ x.on }}" style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);text-align:left;cursor:pointer" style-hover="border-color:var(--bdh,#3A4A63)"><span style="font-weight:500;font-size:13px">{{ x.label }}</span><span style="font-size:12px;color:var(--mut,#8A94A6)">{{ x.hint }}</span></button></sc-for></div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="flex:1;font-weight:500">Outputs</div><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ mk.outs }}" as="x" hint-placeholder-count="3"><button onClick="{{ x.on }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12px;cursor:pointer">{{ x.label }}</button></sc-for></div></div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="flex:1;font-weight:500">History</div><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ mk.hist }}" as="x" hint-placeholder-count="3"><button onClick="{{ x.on }}" aria-pressed="{{ x.pressed }}" style="{{ x.st }}">{{ x.label }}</button></sc-for></div></div>
         </div>
         <div style="display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--bd,#1D2430);margin-top:auto"><button onClick="{{ dlg.close }}" style="height:32px;padding:0 14px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">Done</button></div>
       </sc-if>
@@ -1125,15 +1138,18 @@ class Component extends DCLogic {
     ready: false, hubDown: false, retryIn: 0,
     route: { page: 'overview', parts: [], params: {}, hash: '#/overview' },
     vw: typeof window !== 'undefined' ? window.innerWidth : 1280, navOpen: false,
-    theme: lsGet('hub.theme', 'system'), density: lsGet('hub.density', 'comfortable'),
+    theme: lsGet('hub.theme', 'system'), density: lsGet('hub.density', 'compact'),
     pop: null, svcMenu: false, palette: null, toasts: [], dialog: null,
     services: [], memory: null, jobs: [], activity: [], alerts: [], recent: [], system: null, unread: 0,
     svc: null,
     mdl: { loaded: false, list: [], totals: null, disk: null, kinds: [], service: '', status: '', q: '', discovered: null, scanning: false, drawer: null, edit: null },
-    out: { loaded: false, items: [], cursor: null, totals: null, loading: false, view: 'grid', kinds: [], services: [], range: 'all', q: '', fixed: null, detail: null, promptOpen: false, fresh: {} },
+    out: { loaded: false, items: [], cursor: null, totals: null, loading: false, view: 'grid', kinds: [], services: [], range: 'all', days: null, q: '', fixed: null, detail: null, promptOpen: false, fresh: {} },
     st: { orig: null, draft: null, sys: null, err: null, saving: false, restart: false },
     audio: { key: null, playing: false, t: 0, dur: 0 },
     jopen: {}, speed: 1,
+    // revision 2: Overview views, dashboard layout (Settings.ui.dashboard), metric history for sparklines
+    ovView: lsGet('hub.ovView', 'dashboard'), dash: { order: [], hidden: [], ranges: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
+    tlRange: lsGet('hub.tlRange', '24h'), tlTable: false, svcRange: lsGet('hub.svcRange', '24h'), tileMenu: null, outTick: 0,
   };
 
   async componentDidMount() {
@@ -1150,7 +1166,10 @@ class Component extends DCLogic {
     this.applyTheme();
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
     this.pages = {}; this.modListeners = new Set();
-    const [mod, hub, modUi] = await Promise.all([import(new URL('mock.js', location.href).href), import(new URL('api.js', location.href).href), import(new URL('mod-ui.js', location.href).href)]);
+    const imp = f => import(new URL(f, location.href).href);
+    const [mod, hub, modUi, charts, views, dash] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js')]);
+    this.C = charts; this.V = views; this.D = dash;  // revision 2 chart kit (charts.js, views.js, dashboard.js)
+    this.histTimer = setInterval(() => { if (!document.hidden && this.state.ready && !this.state.hubDown) this.loadHist(); }, 60000);
     this.modUi = modUi.createUi();
     const forceMock = new URLSearchParams(location.search).has('mock');
     this.api = hub.createApi({ base: window.AIHUB_API_BASE ?? null, liveAreas: forceMock ? [] : (window.AIHUB_LIVE_AREAS || []), mock: mod.createMockApi() });
@@ -1161,7 +1180,7 @@ class Component extends DCLogic {
   componentWillUnmount() {
     window.removeEventListener('hashchange', this.onHash); window.removeEventListener('resize', this.onResize);
     window.removeEventListener('keydown', this.onKey); window.removeEventListener('scroll', this.onScroll);
-    clearInterval(this.clock); clearInterval(this.downTimer); this.sub?.close(); this.logSub?.close(); this.audioEl?.pause();
+    clearInterval(this.clock); clearInterval(this.histTimer); clearInterval(this.downTimer); this.sub?.close(); this.logSub?.close(); this.audioEl?.pause();
   }
   componentDidUpdate(pp, ps) {
     const el = this.logRef.current;
@@ -1211,9 +1230,42 @@ class Component extends DCLogic {
       const ov = await this.api.getOverview();
       this.applyOverview(ov); this.setState({ ready: true, hubDown: false });
       this.sub?.close(); this.sub = this.api.subscribe(this.onEvent, this.onStreamErr);
+      this.loadExtras();
       this.enterRoute(this.parse(), true);
     } catch (e) { this.goDown(); }
   }
+  // Revision 2: the dashboard layout and density/theme defaults from Settings, mod widgets, and sparkline history.
+  loadExtras() {
+    this.loadHist();
+    this.api.listWidgets().then(w => this.setState({ widgets: w })).catch(() => this.setState({ widgets: [] }));
+    this.api.getSettings().then(st => {
+      const u = st.ui || {};
+      this.setState({ dash: { order: [], hidden: [], ranges: {}, ...(u.dashboard || {}) } });
+      if (lsGet('hub.density', null) == null && u.density) this.setState({ density: u.density });  // this browser hasn't chosen: use the saved one
+      if (lsGet('hub.theme', null) == null && u.theme && u.theme !== this.state.theme) { this.setState({ theme: u.theme }); this.applyTheme(u.theme); }
+    }).catch(() => {});
+  }
+  async loadHist() {
+    const stats = this.state.services.flatMap(sv => sv.stats.filter(x => x.series && typeof x.value === 'number').map(x => x.series));
+    try {
+      const [a, b] = await Promise.all([this.api.getMetrics({ series: ['mem.svc.*', 'mem.used', 'jobs.running'], range: '1h' }), this.api.getMetrics({ series: ['mem.svc.*', 'jobs.running', ...stats], range: '24h' })]);
+      this.setState({ hist1: a, hist24: b });
+    } catch { /* sparklines stay as they were */ }
+  }
+  // Customize and range changes: shown at once, saved to config.toml ([ui.dashboard]) shortly after.
+  onLayout = next => {
+    this.setState({ dash: next });
+    clearTimeout(this.dashT);
+    this.dashT = setTimeout(async () => {
+      try {
+        const r = await this.api.saveSettings({ ui: { dashboard: next } }), saved = r.settings.ui.dashboard;
+        this.setState(st => st.st.orig ? { st: { ...st.st, orig: { ...st.st.orig, ui: { ...st.st.orig.ui, dashboard: saved } }, draft: { ...st.st.draft, ui: { ...st.st.draft.ui, dashboard: saved } } } } : null);
+      } catch (e) { this.err(e); }
+    }, 500);
+  };
+  bumpOutputs() { clearTimeout(this.outT); this.outT = setTimeout(() => this.setState(s => ({ outTick: s.outTick + 1 })), 2000); }
+  ovView() { const v = this.state.route.params.view; return ['dashboard', 'services', 'table', 'timeline'].includes(v) ? v : this.state.ovView; }
+  setView(v) { lsSet('hub.ovView', v); this.setState({ ovView: v, tileMenu: null }); this.go('#/overview?view=' + v); }
   applyOverview(ov) { this.setState({ services: ov.services, memory: ov.memory, jobs: ov.jobs.filter(j => ['queued', 'running'].includes(j.state)), activity: ov.activity, alerts: ov.alerts, recent: ov.recent_outputs, system: ov.system }); }
   onStreamErr = () => this.goDown();
   goDown() {
@@ -1228,7 +1280,7 @@ class Component extends DCLogic {
       const ov = await this.api.getOverview();
       this.applyOverview(ov); this.setState({ hubDown: false, ready: true });
       this.sub = this.api.subscribe(this.onEvent, this.onStreamErr);
-      this.toast('Reconnected to AIHub', 'success'); this.enterRoute(this.parse(), true);
+      this.toast('Reconnected to AIHub', 'success'); this.enterRoute(this.parse(), true); this.loadExtras();
     } catch { this.goDown(); }
   }
   onEvent = ev => {
@@ -1236,7 +1288,7 @@ class Component extends DCLogic {
     for (const l of this.modListeners || []) { try { l(ev); } catch (e) { console.error('[ModPage] event handler:', e); } }
     switch (ev.type) {
       case 'resync': {  // events were dropped or mods were added/removed: refetch (PATCHES #6)
-        this.api.getOverview().then(ov => this.applyOverview(ov)).catch(() => {});
+        this.api.getOverview().then(ov => { this.applyOverview(ov); this.loadExtras(); }).catch(() => {});
         if (s.route.page === 'service') this.enterRoute(this.parse(), true);  // the open mod may be gone
         break;
       }
@@ -1251,6 +1303,7 @@ class Component extends DCLogic {
       case 'alert': this.setState(st => ({ alerts: [...st.alerts.filter(a => a.id !== ev.alert.id), ev.alert] })); break;
       case 'alert_cleared': this.setState(st => ({ alerts: st.alerts.filter(a => a.id !== ev.id) })); break;
       case 'output': {
+        this.bumpOutputs();
         const o = ev.output, swap = list => list.map(x => x.id === o.id ? o : x);  // patch 8: a changed output replaces its card
         this.setState(st => {
           const patch = { recent: st.recent.some(x => x.id === o.id) ? swap(st.recent) : [o, ...st.recent].slice(0, 8) };
@@ -1265,6 +1318,7 @@ class Component extends DCLogic {
         break;
       }
       case 'output_deleted': {
+        this.bumpOutputs();
         if (ev.id === '*') { this.api.getOverview().then(ov => this.setState({ recent: ov.recent_outputs })).catch(() => {}); if (s.out.loaded) this.fetchOutputs(s.out, true); this.palOutputs = null; break; }
         this.setState(st => { const gone = st.out.items.find(o => o.id === ev.id), t = st.out.totals, dec = (m, k) => ({ ...m, [k]: Math.max(0, (m[k] || 0) - 1) });  // patch 8: totals follow
           const totals = gone && t ? { ...t, count: t.count - 1, size_bytes: t.size_bytes - gone.size_bytes, by_kind: dec(t.by_kind, gone.kind), by_service: dec(t.by_service, gone.service) } : t;
@@ -1346,7 +1400,8 @@ class Component extends DCLogic {
     }
     if (r.page === 'outputs') {
       const cur = this.state.out;
-      if (!cur.loaded || cur.fixed || force) { const o = { ...cur, fixed: null, detail: null }; this.setState({ out: o }); this.fetchOutputs(o, true); }
+      const pr = r.params, given = pr.from ? { range: 'days', days: [pr.from, pr.to || pr.from] } : ['today', '7d', '30d', 'all'].includes(pr.range) ? { range: pr.range, days: null } : null;  // links from the dashboard
+      if (!cur.loaded || cur.fixed || force || given) { const o = { ...cur, fixed: null, detail: null, ...(given || {}) }; this.setState({ out: o }); this.fetchOutputs(o, true); }
       if (r.parts[1]) this.loadOutputDetail(r.parts[1]); else this.upd('out', { detail: null });
     }
     if (r.page === 'settings' && (!this.state.st.orig || force)) this.loadSettings();
@@ -1584,7 +1639,7 @@ class Component extends DCLogic {
     if (o.kinds.length) f.kind = o.kinds.join(',');
     if (o.q) f.q = o.q;
     const now = Date.now() / 1000;
-    if (o.range === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); f.from = d / 1000; } else if (o.range === '7d') f.from = now - 7 * 86400; else if (o.range === '30d') f.from = now - 30 * 86400;
+    if (o.range === 'days' && o.days) { const [a, b] = o.days.map(k => new Date(k + 'T00:00:00').getTime() / 1000); f.from = a; f.to = b + 86399.999; } else if (o.range === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); f.from = d / 1000; } else if (o.range === '7d') f.from = now - 7 * 86400; else if (o.range === '30d') f.from = now - 30 * 86400;
     this.upd('out', { loading: true });
     try {
       const p = await this.api.listOutputs(f);
@@ -1743,13 +1798,23 @@ class Component extends DCLogic {
     if (sv.state === 'ready') return `up ${fdur(Date.now() / 1000 - sv.state_since)}`;
     return `${sv.state} ${fago(sv.state_since)}`;
   }
-  tileVM(sv) {
-    const err = sv.manifest_errors.length > 0, lb = sv.load === 'n/a' ? null : this.loadBadge(sv.load);
-    return { id: sv.id, name: sv.name, d: ICON[sv.icon] || ICON.puzzle, href: '#/s/' + sv.id, port: sv.port ? ':' + sv.port : 'no port', kind: sv.kind === 'external' ? 'external' : 'process',
-      sb: this.stateBadge(sv.state), hasErr: err, ok: !err, err: sv.manifest_errors[0] || '', errHref: `#/s/${sv.id}/settings`, hasLoad: !!lb, lb,
-      mem: this.memText(sv), idle: this.idleText(sv), hasLastErr: !err && !!sv.last_error && sv.state === 'failed', lastErr: sv.last_error,
-      stats: sv.stats.slice(0, 4).map(x => ({ label: x.label, value: fnum(x.value), unit: x.unit ? ' ' + x.unit : '', hint: x.hint ? ' ' + x.hint : '' })),
-      actions: this.svcActions(sv, true) };
+  // Revision 2 tile: name + state + ⋯ menu; one mono line (port, load, memory, idle); up to 4 stats with 24 h
+  // sparklines; actions as icon buttons on hover or focus (text buttons in comfortable).
+  tileVM(sv, compact = true) {
+    const err = sv.manifest_errors.length > 0, h = React.createElement, C = this.C, idx = this.svcMap[sv.id]?.idx ?? 0, open = this.state.tileMenu === sv.id;
+    const stats = sv.stats.slice(0, 4), hist = this.state.hist24?.series || {};
+    return { id: sv.id, name: sv.name, d: ICON[sv.icon] || ICON.puzzle, href: '#/s/' + sv.id,
+      sb: this.stateBadge(sv.state), hasErr: err, ok: !err, err: sv.manifest_errors[0] || '', errHref: `#/s/${sv.id}/settings`,
+      line: [sv.port ? ':' + sv.port : 'no port', sv.kind === 'external' ? 'external' : null, sv.load !== 'n/a' ? sv.load : null, this.memText(sv), this.idleText(sv)].filter(Boolean).join(' · '),
+      hasLastErr: !err && !!sv.last_error && sv.state === 'failed', lastErr: sv.last_error,
+      cardSt: { position: 'relative', background: 'var(--card,#11151D)', border: '1px solid var(--bd,#1D2430)', borderRadius: compact ? 9 : 10, padding: compact ? '10px 11px' : 16, display: 'flex', flexDirection: 'column', gap: compact ? 6 : 10, minWidth: 0 },
+      icoSt: { width: compact ? 26 : 32, height: compact ? 26 : 32, flex: 'none', borderRadius: 7, background: 'var(--inset,#131926)', border: '1px solid var(--bd,#1D2430)', display: 'grid', placeItems: 'center', color: 'var(--mut,#8A94A6)' },
+      statsSt: { display: stats.length ? 'grid' : 'none', gridTemplateColumns: `repeat(${Math.max(1, stats.length)},minmax(0,1fr))`, gap: '4px 10px', paddingTop: 6, borderTop: '1px solid var(--bd,#1D2430)' },
+      stats: stats.map(x => ({ label: x.label, value: fnum(x.value), unit: x.unit ? ' ' + x.unit : '', hint: x.hint && !compact ? ' ' + x.hint : '',
+        spark: C && x.series && typeof x.value === 'number' ? h(C.Sparkline, { values: hist[x.series] || [], color: SERIES[idx % SERIES.length], height: 16, label: `${sv.name} ${x.label}, 24 h`, unit: x.unit === 'ms' ? 'ms' : 'count' }) : null })),
+      actions: this.svcActions(sv, true).map(a => ({ ...a, text: compact ? '' : a.label, aria: `${a.label} ${sv.name}`, st: compact ? { ...a.st, width: 28, padding: 0 } : a.st })),
+      menuOpen: open, menuAria: `More for ${sv.name}`, menuToggle: () => this.setState({ tileMenu: open ? null : sv.id }), menuClose: () => this.setState({ tileMenu: null }),
+      menu: [['Open', ''], ['API', '/api'], ['Logs', '/logs'], ['Settings', '/settings']].map(([label, t]) => ({ label, href: `#/s/${sv.id}${t}` })) };
   }
   cardVM(o, fresh) {
     const sv = this.svcMap[o.service], key = 'o:' + o.id, a = this.state.audio, mine = a.key === key, pct = mine && a.dur ? a.t / a.dur : 0;
@@ -1786,7 +1851,7 @@ class Component extends DCLogic {
     const r = s.route, m = s.memory, pct = m ? m.used_bytes / m.total_bytes : 0, tone = pct > 0.92 ? 'red' : pct > 0.8 ? 'accent' : 'cyan';
     const sbBase = { display: 'flex', flexDirection: 'column', background: 'var(--sb,#0D1119)', borderRight: '1px solid var(--bd,#1D2430)', overflowY: 'auto', zIndex: 60 };
     const sb = {
-      style: mob ? { ...sbBase, position: 'fixed', top: 0, bottom: 0, left: 0, width: 268, transform: s.navOpen ? 'none' : 'translateX(-105%)', transition: 'transform .2s ease', boxShadow: s.navOpen ? '0 0 60px rgba(0,0,0,.5)' : 'none', visibility: s.navOpen ? 'visible' : 'hidden' } : { ...sbBase, position: 'sticky', top: 0, height: '100vh', width: 232, flex: 'none' },
+      style: mob ? { ...sbBase, position: 'fixed', top: 0, bottom: 0, left: 0, width: 268, transform: s.navOpen ? 'none' : 'translateX(-105%)', transition: 'transform .2s ease', boxShadow: s.navOpen ? '0 0 60px rgba(0,0,0,.5)' : 'none', visibility: s.navOpen ? 'visible' : 'hidden' } : { ...sbBase, position: 'sticky', top: 0, height: '100vh', width: s.density === 'compact' ? 208 : 232, flex: 'none' },
       backdrop: mob && s.navOpen, close: () => this.setState({ navOpen: false }),
       top: [{ href: '#/overview', label: 'Overview', d: ICON.grid, on: r.page === 'overview' }],
       svcs: s.services.map(sv => { const [t, p] = STATE[sv.state] || ['dim', false]; const on = r.page === 'service' && r.parts[1] === sv.id; return { href: '#/s/' + sv.id, label: sv.name, d: ICON[sv.icon] || ICON.puzzle, on, sr: `, ${sv.manifest_errors.length ? 'manifest error' : sv.state}`, dot: this.dot(TONE[t][0], p) }; }),
@@ -1798,6 +1863,7 @@ class Component extends DCLogic {
     const running = s.jobs.filter(j => j.state === 'running' || j.state === 'queued');
     const titles = { overview: 'Overview', models: 'Models', outputs: 'Outputs', settings: 'Settings', service: this.svcMap[r.parts[1]]?.name || 'Service' };
     const hd = {
+      st: { position: 'sticky', top: 0, zIndex: 40, height: s.density === 'compact' ? 44 : 52, display: 'flex', alignItems: 'center', gap: 8, padding: '0 clamp(10px,2vw,20px)', background: 'var(--bg,#0B0E14)', borderBottom: '1px solid var(--bd,#1D2430)' },
       title: titles[r.page] || '', memText: m ? `${(m.used_bytes / GB).toFixed(1)} / ${(m.total_bytes / GB).toFixed(1)} GB` : '— GB',
       memBar: { display: 'block', height: '100%', width: (pct * 100).toFixed(1) + '%', background: TONE[tone][0], borderRadius: 9, transition: 'width .6s ease' },
       memTextSt: { fontFamily: MONO, fontSize: 12, color: tone === 'cyan' ? 'var(--tx,#E6EAF2)' : TONE[tone][0], whiteSpace: 'nowrap' },
@@ -1812,11 +1878,25 @@ class Component extends DCLogic {
 
   vmOverview(s) {
     const svcs = s.services, ready = svcs.filter(x => x.state === 'ready').length, loaded = svcs.filter(x => x.load === 'loaded').length;
+    const compact = s.density === 'compact', view = this.ovView(), h = React.createElement, V = this.V, D = this.D;
+    const badge = (st, isLoad) => (isLoad ? this.loadBadge(st) : this.stateBadge(st));
+    const ov = {
+      views: [['dashboard', 'Dashboard'], ['services', 'Services'], ['table', 'Table'], ['timeline', 'Timeline']].map(([k, l]) => ({ label: l, st: segSt(view === k), pressed: view === k ? 'true' : 'false', on: () => this.setView(k) })),
+      isDash: view === 'dashboard', isServices: view === 'services', isTable: view === 'table', isTimeline: view === 'timeline',
+      wrapSt: { display: 'flex', flexDirection: 'column', gap: compact ? 12 : 22, minWidth: 0 },
+      gridSt: { display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(min(100%,${compact ? 230 : 290}px),1fr))`, gap: compact ? 10 : 14 },
+      customizing: s.customizing ? 'true' : 'false', onCustomize: () => this.setState(st => ({ customizing: !st.customizing })), custSt: btn(s.customizing ? 'pri' : 'sec', { sm: true }),
+      dash: view === 'dashboard' && D ? h(D.Dashboard, { api: this.api, services: svcs, memory: s.memory, jobs: s.jobs, activity: s.activity, recent: s.recent, hist1: s.hist1, hist24: s.hist24, widgets: s.widgets,
+        layout: s.dash, onLayout: this.onLayout, customizing: s.customizing, onCustomize: v => this.setState({ customizing: v }), go: hh => this.go(hh), badge, compact, outTick: s.outTick }) : null,
+      table: view === 'table' && V ? h(V.ServiceTable, { services: svcs, hist1: s.hist1, jobs: s.jobs, icons: ICON, badge, compact, actionsFor: sv => this.svcActions(sv, true).map(a => ({ label: a.label, d: a.d, on: a.on, dis: a.dis, primary: a.label === 'Start' })) }) : null,
+      timeline: view === 'timeline' && V ? h(V.TimelineView, { api: this.api, services: svcs, go: hh => this.go(hh), range: s.tlRange, onRange: r => { lsSet('hub.tlRange', r); this.setState({ tlRange: r }); }, table: s.tlTable, onTable: v => this.setState({ tlTable: v }), mock: !this.api.isLive?.('metrics') }) : null,
+    };
     return {
+      ...ov,
       sub: `${svcs.length} services · ${ready} ready · ${loaded} holding models in memory`,
       hasAlerts: s.alerts.length > 0,
-      alerts: [...s.alerts].sort((a, b) => (a.level === 'error' ? 0 : 1) - (b.level === 'error' ? 0 : 1)).map(a => { const t = a.level === 'error' ? 'red' : 'accent'; return { text: a.text, href: a.action?.route || '#/overview', label: a.action?.label || 'Open', level: a.level === 'error' ? 'Error' : 'Warning', st: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '9px 12px', borderRadius: 8, background: TONE[t][1], border: '1px solid ' + TONE[t][1] }, ist: { color: TONE[t][0], flex: 'none', display: 'flex' }, d: a.level === 'error' ? ICON.alert : ICON.info }; }),
-      tiles: svcs.map(sv => this.tileVM(sv)),
+      alerts: [...s.alerts].sort((a, b) => (a.level === 'error' ? 0 : 1) - (b.level === 'error' ? 0 : 1)).map(a => { const t = a.level === 'error' ? 'red' : 'accent'; return { text: a.text, href: a.action?.route || '#/overview', label: a.action?.label || 'Open', level: a.level === 'error' ? 'Error' : 'Warning', st: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: compact ? '6px 10px' : '9px 12px', borderRadius: 8, background: TONE[t][1], border: '1px solid ' + TONE[t][1] }, ist: { color: TONE[t][0], flex: 'none', display: 'flex' }, d: a.level === 'error' ? ICON.alert : ICON.info }; }),
+      tiles: view === 'services' ? svcs.map(sv => this.tileVM(sv, compact)) : [],
       mem: this.memVM(s.memory, true),
       hasRecent: s.recent.length > 0, noRecent: s.recent.length === 0,
       recent: s.recent.map(o => this.cardVM(o, s.out.fresh[o.id])),
@@ -1836,6 +1916,7 @@ class Component extends DCLogic {
     const tabs = this.tabsFor(d), tab = tabs.some(t => t.id === r.parts[2]) ? r.parts[2] : tabs[0].id;
     const v = { ok: true, id: d.id, name: d.name, desc: d.description, d: ICON[d.icon] || ICON.puzzle, sb: this.stateBadge(mf ? 'failed' : d.state), hasLoad: d.load !== 'n/a', lb: this.loadBadge(d.load),
       port: d.port ? `127.0.0.1:${d.port}` : 'no port', copyPort: () => this.copy(d.url, 'Base URL copied'), version: d.version ? 'v' + d.version : 'no version', mem: this.memText(d), kind: d.kind,
+      memSpark: this.C ? React.createElement(this.C.Sparkline, { values: s.hist1?.series?.['mem.svc.' + d.id] || [], color: SERIES[(this.svcMap[d.id]?.idx ?? 0) % SERIES.length], height: 16, label: `${d.name} memory, last hour`, unit: 'bytes' }) : null,
       actions: this.svcActions(d, false), canRestart: !mf && !['stopped', 'stopping'].includes(d.state), restart: () => this.restart(d), restartSt: btn('sec'),
       menuOpen: s.svcMenu, toggleMenu: () => this.setState(st => ({ svcMenu: !st.svcMenu, pop: null })), closeMenu: () => this.setState({ svcMenu: false }),
       menu: [{ label: 'Copy base URL', d: ICON.copy, on: () => { this.setState({ svcMenu: false }); this.copy(d.url, 'Base URL copied'); }, isLink: false, isBtn: true },
@@ -1871,7 +1952,9 @@ class Component extends DCLogic {
         stats: d.stats.map(x => ({ label: x.label, value: fnum(x.value) + (x.unit ? ' ' + x.unit : ''), hint: x.hint || '' })), hasStats: d.stats.length > 0,
         memRows: [['Used', fgb(d.memory.used_bytes)], ['Estimate when loaded', d.memory.estimate_bytes ? fgb(d.memory.estimate_bytes) : '—'], ['Peak', d.memory.peak_bytes ? fgb(d.memory.peak_bytes) : '—'], ['PID', d.pid ?? '—'], ['Started', d.started_ts ? fago(d.started_ts) : '—'], ['Folder', d.folder]].map(([k, val]) => ({ k, v: String(val) })),
         models: d.models.map(id => ({ label: id, href: '#/models/' + id })), hasModels: d.models.length > 0, noModels: !d.models.length,
-        hasOuts: !!sv.outs?.length, outs: (sv.outs || []).map(o => this.cardVM(o)), showOuts: d.has_outputs, outsHref: `#/s/${d.id}/outputs` };
+        hasOuts: !!sv.outs?.length, outs: (sv.outs || []).map(o => this.cardVM(o)), showOuts: d.has_outputs, outsHref: `#/s/${d.id}/outputs`,
+        charts: this.V ? React.createElement(this.V.Card, { title: 'History', ranges: ['1h', '6h', '24h', '7d'], range: s.svcRange, onRange: r => { lsSet('hub.svcRange', r); this.setState({ svcRange: r }); }, mock: !this.api.isLive?.('metrics'), pad: 12 },
+          React.createElement(this.V.ServiceCharts, { api: this.api, service: d, range: s.svcRange })) : null };
     }
     if (v.t.api) v.api = this.vmApi(s, d);
     if (v.t.logs) {
@@ -1958,6 +2041,7 @@ class Component extends DCLogic {
     const total = m.totals?.size_bytes || 1, byKind = m.totals?.by_kind || {};
     const segs = KINDS.filter(([k]) => byKind[k]?.size_bytes > 0).sort((a, b) => byKind[b[0]].size_bytes - byKind[a[0]].size_bytes).map(([k, l], i) => ({ name: l, size: fb(byKind[k].size_bytes), tip: `${l}: ${fb(byKind[k].size_bytes)} (${byKind[k].count})`,
       st: { display: 'block', height: '100%', width: (byKind[k].size_bytes / total * 100) + '%', background: SERIES[i % SERIES.length], minWidth: 2 }, sw: { width: 10, height: 10, borderRadius: 3, background: SERIES[i % SERIES.length], flex: 'none' } }));
+    const chart = this.V ? React.createElement(this.V.StorageChart, { totals: m.totals, disk: m.disk, kinds: Object.fromEntries(KINDS), height: s.density === 'compact' ? 110 : 140, onPick: r => this.upd('mdl', { kinds: m.kinds.length === 1 && m.kinds[0] === r.key ? [] : [r.key] }) }) : null;
     const rows = list.map(x => {
       const [t, label] = MSTAT[x.status] || ['dim', x.status], src = x.source;
       return { id: x.id, name: x.name, kind: (KINDS.find(k => k[0] === x.kind) || [, x.kind])[1], kst: badgeSt('dim', { sm: true, sq: true }), format: x.format, size: x.status === 'missing' ? '—' : fb(x.size_bytes),
@@ -1969,7 +2053,7 @@ class Component extends DCLogic {
         td: dn.td, tdm: { ...dn.td, fontFamily: MONO, fontSize: 12, color: 'var(--mut,#8A94A6)' }, tdr: { ...dn.td, fontFamily: MONO, fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap' } };
     });
     const st = ['', 'ok', 'missing', 'partial', 'unverified', 'checksum_mismatch', 'verifying'];
-    const v = { loading: false, loaded: true, sub: `${m.totals?.count ?? 0} models · ${fb(m.totals?.size_bytes)} on disk`, total: fb(m.totals?.size_bytes), count: String(m.totals?.count ?? 0), free: fb(m.disk?.free_bytes), diskLine: `${fb(m.disk?.free_bytes)} free of ${fb(m.disk?.total_bytes)}`, segs,
+    const v = { loading: false, loaded: true, sub: `${m.totals?.count ?? 0} models · ${fb(m.totals?.size_bytes)} on disk`, total: fb(m.totals?.size_bytes), count: String(m.totals?.count ?? 0), free: fb(m.disk?.free_bytes), diskLine: `${fb(m.disk?.free_bytes)} free of ${fb(m.disk?.total_bytes)}`, segs, chart,
       chips: KINDS.map(([k, l]) => { const on = m.kinds.includes(k); return { label: l, count: String(counts[k] || 0), st: { ...chipSt(on), opacity: counts[k] || on ? 1 : 0.5 }, pressed: on ? 'true' : 'false', on: () => this.upd('mdl', x => ({ kinds: on ? x.kinds.filter(y => y !== k) : [...x.kinds, k] })) }; }),
       q: m.q, onQ: e => this.upd('mdl', { q: e.target.value }), searchRef: this.searchRef,
       svcOpts: [{ v: '', label: 'All services' }, ...s.services.map(x => ({ v: x.id, label: x.name }))], svc: m.service, onSvc: e => this.upd('mdl', { service: e.target.value }),
@@ -2001,7 +2085,11 @@ class Component extends DCLogic {
     const o = s.out;
     const v = { embedded, page: !embedded, loading: !o.loaded, loaded: o.loaded, view: o.view };
     v.views = [['grid', 'Grid'], ['list', 'List']].map(([k, l]) => ({ label: l, st: segSt(o.view === k), pressed: o.view === k ? 'true' : 'false', on: () => this.upd('out', { view: k }) }));
-    v.ranges = [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['all', 'All']].map(([k, l]) => ({ label: l, st: segSt(o.range === k), pressed: o.range === k ? 'true' : 'false', on: () => this.setOut({ range: k }) }));
+    v.ranges = [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['all', 'All']].map(([k, l]) => ({ label: l, st: segSt(o.range === k), pressed: o.range === k ? 'true' : 'false', on: () => this.setOut({ range: k, days: null }) }));
+    const dl = k => new Date(k + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    v.hasDays = o.range === 'days' && !!o.days; v.daysLabel = v.hasDays ? (o.days[0] === o.days[1] ? dl(o.days[0]) : `${dl(o.days[0])} – ${dl(o.days[1])}`) : ''; v.daysAria = `Dates ${v.daysLabel}; clear`;
+    v.daysSt = segSt(true); v.clearDays = () => this.setOut({ range: 'all', days: null });
+    v.hist = !embedded && this.V ? React.createElement('div', { style: { marginTop: 4 } }, React.createElement(this.V.OutputsHistogram, { api: this.api, range: '30d', selected: v.hasDays ? o.days : null, onRange: (a, b) => this.setOut({ range: 'days', days: [a, b] }), refresh: s.outTick, height: 84 })) : null;
     const t = o.totals || { count: 0, size_bytes: 0, by_kind: {}, by_service: {} };
     v.total = `${fnum(t.count)} item${t.count === 1 ? '' : 's'} · ${fb(t.size_bytes)}`;
     v.kindChips = OKINDS.filter(([k]) => t.by_kind[k] || o.kinds.includes(k)).map(([k, l]) => { const on = o.kinds.includes(k); return { label: l, count: fnum(t.by_kind[k] || 0), st: chipSt(on), pressed: on ? 'true' : 'false', on: () => this.setOut({ kinds: on ? o.kinds.filter(x => x !== k) : [...o.kinds, k] }) }; });
@@ -2011,7 +2099,7 @@ class Component extends DCLogic {
     v.searchRef = this.searchRef;
     const hasF = o.kinds.length || o.services.length || o.q || o.range !== 'all';
     v.empty = o.loaded && !o.items.length && !o.loading; v.emptyTitle = hasF ? 'No outputs match these filters' : 'No outputs yet'; v.emptyBody = hasF ? 'Try a wider date range or clear the filters.' : 'Anything a service produces lands here — clips, images, videos and 3D models.';
-    v.hasF = !!hasF; v.clear = () => this.setOut({ kinds: [], services: [], q: '', range: 'all' });
+    v.hasF = !!hasF; v.clear = () => this.setOut({ kinds: [], services: [], q: '', range: 'all', days: null });
     v.grid = o.loaded && o.view === 'grid' && o.items.length > 0; v.list = o.loaded && o.view === 'list' && o.items.length > 0;
     if (v.grid) {
       const groups = []; let cur = null;
@@ -2055,6 +2143,7 @@ class Component extends DCLogic {
     v.disk = sys ? `${fb(sys.disk.free_bytes)} free of ${fb(sys.disk.total_bytes)}` : '';
     v.diskBar = sys ? { display: 'block', height: '100%', width: ((1 - sys.disk.free_bytes / sys.disk.total_bytes) * 100) + '%', background: 'var(--cy,#58C4DD)', borderRadius: 9 } : {};
     v.reserve = String(d.memory.reserve_gb); v.onReserve = e => this.setDraft(x => { x.memory.reserve_gb = e.target.value; }); v.resSt = inp(resBad || errField === 'memory.reserve_gb'); v.resErr = resBad ? 'Between 0 and 64 GB' : errField === 'memory.reserve_gb' ? st.err.detail : '';
+    v.memChart = sec === 'memory' && this.V ? React.createElement(this.V.MemoryChart, { api: this.api, services: s.services, range: '24h', height: 150, label: 'Memory, last 24 hours', reserveBytes: resBad ? undefined : Number(d.memory.reserve_gb) * GB }) : null;
     v.auto = this.tog(d.memory.auto_make_room, on => this.setDraft(x => { x.memory.auto_make_room = on; }));
     const known = s.services.filter(x => !x.manifest_errors.length);
     v.never = known.map(x => { const on = d.memory.never_unload.includes(x.id); return { label: x.name, st: chipSt(on), pressed: on ? 'true' : 'false', on: () => this.setDraft(y => { y.memory.never_unload = on ? y.memory.never_unload.filter(z => z !== x.id) : [...y.memory.never_unload, x.id]; }) }; });
@@ -2079,8 +2168,8 @@ class Component extends DCLogic {
     const v = {};
     const close = () => this.setState({ pop: null });
     v.pop = { any: !!s.pop, mem: s.pop === 'memory', jobs: s.pop === 'jobs', act: s.pop === 'activity', close,
-      st: { position: 'fixed', top: 58, right: 12, zIndex: 70, width: 'min(440px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 80px)', overflow: 'auto', background: 'var(--card,#11151D)', border: '1px solid var(--bds,#2A3547)', borderRadius: 12, boxShadow: '0 16px 50px rgba(0,0,0,.45)', padding: 16 } };
-    if (s.pop === 'memory') v.pmem = this.memVM(s.memory, true);
+      st: { position: 'fixed', top: s.density === 'compact' ? 50 : 58, right: 12, zIndex: 70, width: 'min(440px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 80px)', overflow: 'auto', background: 'var(--card,#11151D)', border: '1px solid var(--bds,#2A3547)', borderRadius: 12, boxShadow: '0 16px 50px rgba(0,0,0,.45)', padding: 16 } };
+    if (s.pop === 'memory') v.pmem = { ...this.memVM(s.memory, true), chart: this.V ? React.createElement(this.V.MemoryChart, { api: this.api, services: s.services, range: '1h', height: 110, label: 'Memory, last hour' }) : null };
     if (s.pop === 'jobs') v.pjobs = s.jobs.map(j => ({ label: j.label, href: j.route || '#/overview', pct: j.progress != null ? Math.round(j.progress * 100) + '%' : '', bar: { display: 'block', height: '100%', width: (j.progress || 0) * 100 + '%', background: 'var(--acc,#FFB224)', borderRadius: 9, transition: 'width .5s' }, state: j.state, svc: this.svcMap[j.service]?.name || j.service }));
     if (s.pop === 'activity') { v.pact = s.activity.slice(0, 30).map(a => this.actRow(a)); v.pactEmpty = !s.activity.length; }
     // drawers share a frame
@@ -2120,7 +2209,8 @@ class Component extends DCLogic {
           { label: 'Memory pressure — not enough', hint: 'Same, but Images & Video is pinned, so the plan falls short', on: act(() => mk.memoryPressure(true), 'Pressure applied; Images & Video pinned') },
           { label: 'Install broken mod', hint: 'services/broken with a manifest error', on: act(() => mk.installBroken()) },
           { label: 'Install mod with no page', hint: 'Transcribe on :5060 — generic tabs only', on: act(() => mk.installTranscribe()) }],
-        outs: [['empty', 'Empty'], ['seed', 'Seed (120)'], ['many', 'Many (2,000)']].map(([k, l]) => ({ label: l, on: act(() => mk.setOutputs(k)) })) };
+        outs: [['empty', 'Empty'], ['seed', 'Seed (120)'], ['many', 'Many (2,000)']].map(([k, l]) => ({ label: l, on: act(() => mk.setOutputs(k)) })),
+        hist: [['normal', 'Normal'], ['empty', 'Empty history'], ['gaps', 'Gaps (2 h down)']].map(([k, l]) => ({ label: l, st: chipSt(mk.historyMode === k), pressed: mk.historyMode === k ? 'true' : 'false', on: () => { mk.setHistory?.(k); this.forceUpdate(); } })) };
     }
     // palette
     if (s.palette) {
@@ -2149,7 +2239,13 @@ class Component extends DCLogic {
     const showOutputs = pg.outputs || (pg.service && !!sv?.ok && r.parts[2] === 'outputs' && !!s.svc?.detail?.has_outputs);
     const { sb, hd } = this.vmShell(s, mob);
     const out = showOutputs || s.out.detail ? this.vmOutputs(s, dn, !pg.outputs) : null;
+    const shell = {
+      rootSt: { display: 'flex', minHeight: '100vh', background: 'var(--bg,#0B0E14)', color: 'var(--tx,#E6EAF2)', fontSize: compact ? 12.5 : 13, lineHeight: 1.5 },
+      mainSt: { flex: 1, width: '100%', maxWidth: 1680, margin: '0 auto', padding: compact ? (s.vw < 600 ? '12px 12px 40px' : '14px 18px 40px') : 'clamp(14px,2.2vw,28px) clamp(12px,2.4vw,32px) 48px', display: 'flex', flexDirection: 'column', gap: compact ? 12 : 20, minWidth: 0 },
+      h1St: { margin: 0, fontSize: compact ? 18 : 22, fontWeight: 600, letterSpacing: '-.01em' },
+    };
     return {
+      ...shell,
       ic: ICON, mob, desk: !mob, ready, notReady: !ready, hubDown: s.hubDown, retryIn: String(s.retryIn), retryNow: () => this.retryNow(), openMock: () => this.setState({ dialog: { kind: 'mock' } }),
       pg, sb, hd,
       ov: pg.overview ? this.vmOverview(s) : null,

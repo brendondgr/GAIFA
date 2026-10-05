@@ -3,7 +3,11 @@ Claude Design export drops in unchanged (backend-plan 1.8):
 
 - local React/ReactDOM and `/config.js` are added before `support.js`, so the
   runtime skips its unpkg download and knows which areas are live;
-- Google Fonts `<link>`s become `/vendor/fonts.css` (in every `.dc.html`).
+- Google Fonts `<link>`s become `/vendor/fonts.css` (in every `.dc.html`);
+- a page load (`Sec-Fetch-Mode: navigate`) gets the page with an empty `<x-dc>`: the runtime
+  renders from its own `fetch` of the same URL, which gets the full template. So the browser
+  never parses the raw template, whose `{{ … }}` in `src`, `poster` and SVG `d` attributes
+  made it request `/{{ … }}` URLs and log path errors (brief §11.2).
 
 Mod pages (design brief §5): `/ui/services/<id>/<path>` serves `services/<id>/ui/`,
 and `/Mod_<id>.dc.html` a mod's `ui/Page.dc.html`.
@@ -51,6 +55,15 @@ def page_html(html: str) -> str:
     return html[: m.start()] + HEAD_SCRIPTS + html[m.start() :]
 
 
+def blank_template(html: str) -> str:
+    """The page with nothing inside `<x-dc>` (first `<x-dc>` to last `</x-dc>`, as support.js reads it)."""
+    m = re.search(r"<x-dc(?:\s[^>]*)?>", html)
+    end = html.rfind("</x-dc>")
+    if not m or end < m.end():
+        return html
+    return html[: m.end()] + html[end:]
+
+
 def _read(request: Request, name: str) -> str:
     path = request.app.state.hub.paths.web / name
     if not path.is_file():
@@ -60,7 +73,10 @@ def _read(request: Request, name: str) -> str:
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    return HTMLResponse(page_html(_read(request, PAGE)), headers=NO_CACHE)
+    html = page_html(_read(request, PAGE))
+    if request.headers.get("sec-fetch-mode") == "navigate":
+        html = blank_template(html)
+    return HTMLResponse(html, headers={**NO_CACHE, "Vary": "Sec-Fetch-Mode"})
 
 
 @router.get("/{name}.dc.html", response_class=HTMLResponse)

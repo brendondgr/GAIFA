@@ -1,5 +1,6 @@
 // AIHub mock API — in-memory AIHub + services with simulated time.
 // Implements the Section 6 contract; becomes web/js/mock.js in the vanilla port.
+import { createHistory, withSeries } from './mock-history.js';
 const GB = 1e9, MB = 1e6;
 export class ApiError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
@@ -224,9 +225,9 @@ const OPS = {
 function seedServices(base) {
   const svc = (o) => ({ version: '0.1.0', kind: 'process', state: 'ready', state_since: base - 3600 * 5, load: 'n/a', idle_s: 0, used: 0, estimate: null, peak: null, has_page: false, has_outputs: false, native_ui: null, enabled: true, autostart: true, last_error: null, manifest_errors: [], models: [], logs: [], healthy: true, ...o });
   return [
-    svc({ id: 'relay', name: 'LLM Relay', description: 'OpenAI-compatible relay with routing, tunnels and usage analytics.', icon: 'relay', port: 4000, version: '1.4.2', used: 0.2 * GB, stats: [{ label: 'Requests today', value: 1284 }, { label: 'Tokens today', value: '3.1', unit: 'M' }, { label: 'p50 TTFT', value: 412, unit: 'ms' }, { label: 'Endpoints', value: '2/3', hint: 'healthy' }], priority: 4 }),
+    svc({ id: 'relay', name: 'LLM Relay', description: 'OpenAI-compatible relay with routing, tunnels and usage analytics.', icon: 'relay', port: 4000, version: '1.4.2', used: 0.2 * GB, stats: [{ label: 'Requests today', value: 1284, reset: 'daily' }, { label: 'Tokens today', value: '3.1', unit: 'M' }, { label: 'p50 TTFT', value: 412, unit: 'ms' }, { label: 'Endpoints', value: '2/3', hint: 'healthy' }], priority: 4 }),
     svc({ id: 'lcpp', name: 'LLM Launcher', description: 'Starts and manages llama.cpp server instances.', icon: 'cpu', port: 7710, version: '0.9.0', load: 'loaded', used: 18.6 * GB, estimate: 18.6 * GB, peak: 19.4 * GB, idle_s: 40, models: ['gemma-4-26b-it', 'minicpm-5-2b', 'gemma-4-e4b-it', 'ornith1-35b'], stats: [{ label: 'Running', value: 1 }, { label: 'Catalog', value: 4 }, { label: 'On disk', value: '20.9', unit: 'GB' }], priority: 5 }),
-    svc({ id: 'tts', name: 'Speech', description: 'Text-to-speech with voice cloning and voice design.', icon: 'wave', port: 5040, version: '0.6.1', load: 'unloaded', estimate: 9.2 * GB, peak: 10.1 * GB, idle_s: 760, has_outputs: true, models: ['breeze-tts-2', 'kokoro-82m', 'whisper-large-v3-turbo', 'voice-brendon', 'voice-hope', 'voice-arabella'], stats: [{ label: 'Voices', value: 3 }, { label: 'Engines', value: 2 }, { label: 'Clips today', value: 12 }], priority: 0, idle_unload_s: 300 }),
+    svc({ id: 'tts', name: 'Speech', description: 'Text-to-speech with voice cloning and voice design.', icon: 'wave', port: 5040, version: '0.6.1', load: 'unloaded', estimate: 9.2 * GB, peak: 10.1 * GB, idle_s: 760, has_outputs: true, models: ['breeze-tts-2', 'kokoro-82m', 'whisper-large-v3-turbo', 'voice-brendon', 'voice-hope', 'voice-arabella'], stats: [{ label: 'Voices', value: 3 }, { label: 'Engines', value: 2 }, { label: 'Clips today', value: 12, reset: 'daily' }], priority: 0, idle_unload_s: 300 }),
     svc({ id: 'gen3d', name: '3D Generate', description: 'Text-to-3D meshes with part splitting and auto-rigging.', icon: 'cube', port: 5050, version: '0.3.0', load: 'unloaded', estimate: 52 * GB, peak: 52 * GB, idle_s: 5400, has_outputs: true, models: ['cube3d-v0.5', 'cubepart', 'qwen3-vl-4b-instruct', 'clip-vit-large-patch14'], stats: [{ label: 'Jobs', value: 17 }, { label: 'Queue', value: 0 }], priority: 2 }),
     svc({ id: 'comfy', name: 'Images & Video', description: 'ComfyUI in a container: image and video workflows.', icon: 'image', port: 8199, kind: 'external', version: '0.3.62', state: 'stopped', load: 'unloaded', estimate: 24 * GB, peak: 31 * GB, idle_s: null, has_outputs: true, native_ui: 'http://127.0.0.1:8199/', autostart: false, models: ['z-image-turbo-fp8', 'qwen-image-2.1-fp8', 'qwen-image-2.1-q8', 'wan2.1-t2v-14b-fp8', 'wan2.1-i2v-480p-14b-fp8', 'scail-2-q8', 'qwen3vl-8b-bf16', 'umt5-xxl-enc-fp8', 'qwen-3-4b', 'wan-2.1-vae', 'qwen-image-2.1-vae', 'wan21-lightx2v-lora', 'zit-watercolor', 'clip-vision-h', 'remacri-4x'], stats: [{ label: 'Workflows', value: 9 }], priority: 1, command: ['podman', 'start', 'comfyui'] }),
     svc({ id: 'example', name: 'Example', description: 'The mod template. Copy it with aihub new <id>.', icon: 'puzzle', port: 5099, used: 0.05 * GB, has_page: true, stats: [{ label: 'Calls', value: 0 }], priority: 3, autostart: false }),
@@ -247,6 +248,7 @@ export function createMockApi() {
   const T0 = Date.now() / 1000;
   const now = () => Date.now() / 1000;
   let speed = 1, hubDown = false;
+  const hubPort = 7000;   // the port this (simulated) hub runs on: a port change needs a restart unless it goes back to this
   const total = 121.0 * GB;
   let otherBytes = 14.25 * GB;
   const services = seedServices(T0);
@@ -260,7 +262,7 @@ export function createMockApi() {
     hub: { port: 7000 },
     memory: { reserve_gb: 12, auto_make_room: false, never_unload: ['lcpp'], priority: ['tts', 'comfy', 'gen3d', 'example', 'relay', 'lcpp'] },
     services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) },
-    ui: { theme: 'system', density: 'comfortable' },
+    ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} } },
   };
   const voices = [{ name: 'brendon', source: 'uploaded', duration_s: 22.2 }, { name: 'hope', source: 'uploaded', duration_s: 16.4 }, { name: 'arabella', source: 'designed', duration_s: 17.8 }];
   const activity = [], jobs = new Map(), alerts = new Map();
@@ -285,7 +287,7 @@ export function createMockApi() {
   function summary(s) {
     return { id: s.id, name: s.name, description: s.description, icon: s.icon, version: s.version, kind: s.kind, port: s.config?.port ?? s.port, url: `http://127.0.0.1:${s.config?.port ?? s.port}`,
       state: s.state, state_since: s.state_since, load: s.load, idle_s: s.load === 'n/a' ? null : s.idle_s, memory: { used_bytes: s.used, estimate_bytes: s.estimate, peak_bytes: s.peak },
-      stats: clone(s.stats), has_page: s.has_page, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
+      stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
       last_error: s.last_error, manifest_errors: [...s.manifest_errors] };
   }
   function detail(s) {
@@ -627,11 +629,18 @@ export function createMockApi() {
     async getOutput(id) { await net(); const o = outputs.find(x => x.id === id); if (!o) throw err(404, 'output_not_found', `No output "${id}"`); return clone(o); },
     async deleteOutput(id) { await net(); const i = outputs.findIndex(x => x.id === id); if (i < 0) throw err(404, 'output_not_found', `No output "${id}"`); outputs.splice(i, 1); emit({ type: 'output_deleted', id }); return null; },
     async getSettings() { await net(); return clone(settings); },
-    async saveSettings(s) { await net();
+    async saveSettings(patch) { await net();
+      // Like utils/settings.py: sections merge key by key; services.enabled/autostart merge per mod.
+      const s = clone(settings);
+      for (const [sec, v] of Object.entries(patch || {})) { if (v == null) continue;
+        if (typeof v !== 'object' || Array.isArray(v)) throw err(422, 'invalid_config', `${sec}: must be an object`, { field: sec });
+        s[sec] = { ...s[sec] }; for (const [k, x] of Object.entries(v)) s[sec][k] = sec === 'services' && (k === 'enabled' || k === 'autostart') && x && typeof x === 'object' ? { ...s[sec][k], ...clone(x) } : clone(x); }
+      for (const k of ['enabled', 'autostart']) { const bad = Object.keys(s.services[k] || {}).find(id => !svcById(id)); if (bad) throw err(422, 'invalid_config', `No mod '${bad}'`, { field: `services.${k}` }); }
+      if (JSON.stringify(s) === JSON.stringify(settings)) return { settings: clone(settings), restart_required: false };
       const port = Number(s.hub.port); if (!Number.isInteger(port) || port < 1024 || port > 65535) throw err(422, 'invalid_config', 'hub.port must be between 1024 and 65535', { field: 'hub.port' });
       if (services.some(x => x.config.port === port)) throw err(409, 'port_in_use', `Port ${port} is used by ${services.find(x => x.config.port === port).name}`, { field: 'hub.port' });
       if (!(s.memory.reserve_gb >= 0 && s.memory.reserve_gb <= 64)) throw err(422, 'invalid_config', 'memory.reserve_gb must be between 0 and 64', { field: 'memory.reserve_gb' });
-      const restart = port !== settings.hub.port; Object.assign(settings, clone(s)); settings.hub.port = port;
+      const restart = port !== settings.hub.port && port !== hubPort; Object.assign(settings, s); settings.hub.port = port;
       settings.memory.priority.forEach((id, i) => { const x = svcById(id); if (x) x.config.priority = i; });
       services.forEach(x => { if (s.services.enabled[x.id] != null) x.config.enabled = s.services.enabled[x.id]; if (s.services.autostart[x.id] != null) x.config.autostart = s.services.autostart[x.id]; });
       services.sort((a, b) => settings.services.order.indexOf(a.id) - settings.services.order.indexOf(b.id));
@@ -639,6 +648,10 @@ export function createMockApi() {
       return { settings: clone(settings), restart_required: restart }; },
     subscribe(onEvent, onError) { listeners.add(onEvent); if (onError) errorListeners.add(onError); return { close() { listeners.delete(onEvent); errorListeners.delete(onError); } }; },
   };
+
+  // ----- chart history (brief §11.7, §11.9): web/mock-history.js -----
+  const history = createHistory({ now, net, err, memory, summaries: () => services.map(summary), outputs: () => outputs, activity: () => activity, jobs: () => [...jobs.values()] });
+  listeners.add(history.observe); Object.assign(api, history.api);
 
   // ----- scenario controls (Shift+D panel) -----
   api.mock = {
@@ -655,6 +668,8 @@ export function createMockApi() {
       s.config = { enabled: false, autostart: false, port: 0, idle_unload_s: null, auto_unload: false, priority: 9, env: {} }; services.push(s); settings.services.order.push('broken'); pushSvc(s); refreshAlerts(); act('Found mod "broken" with a manifest error', 'broken', 'error', '#/s/broken/settings'); },
     installTranscribe() { if (svcById('transcribe')) return; const s = { ...seedServices(now())[5], id: 'transcribe', name: 'Transcribe', description: 'Speech-to-text with Whisper. Installed as a mod with no custom page.', icon: 'mic', port: 5060, version: '0.1.0', used: 0.3 * GB, has_page: false, stats: [{ label: 'Files today', value: 0 }], models: ['whisper-large-v3-turbo'], logs: [{ ts: now(), text: 'transcribe 0.1.0 listening on 127.0.0.1:5060', stream: 'stdout' }] };
       s.config = { enabled: true, autostart: true, port: 5060, idle_unload_s: null, auto_unload: true, priority: 6, env: {} }; s.pid = 47001; s.started_ts = now(); services.push(s); settings.services.order.push('transcribe'); settings.memory.priority.push('transcribe'); pushSvc(s); pushMem(); act('Installed mod "Transcribe"', 'transcribe', 'info', '#/s/transcribe'); },
+    get historyMode() { return history.mode; },
+    setHistory(mode) { history.setMode(mode); act(`Scenario: history → ${mode}`); emit({ type: 'resync' }); },
     setOutputs(mode) { outputs = mode === 'empty' ? [] : genOutputs(mode === 'many' ? 2000 : 120, now()); emit({ type: 'output_deleted', id: '*' }); act(`Scenario: outputs → ${mode}`); },
   };
   return api;

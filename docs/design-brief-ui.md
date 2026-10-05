@@ -696,7 +696,7 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 
 ## 11. Part A revision 2 — compact and graphical (next Claude Design pass)
 
-> Give Claude Design the v1 export (`reference/ui-export-2026-10-04/`) plus this section. **Change only what this section asks for.** Everything v1 already does stays as it is.
+> Give Claude Design the **current `web/` folder** (the v1 export with AIHub's edits, listed in `web/PATCHES.md`), Section 6 and this section. **Change only what this section asks for.** Everything the current UI already does stays as it is.
 
 ### 11.1 Keep from v1
 - **Layout:** the shell (sidebar, header with memory meter, jobs chip, activity bell and search), routes, the command palette, toasts, dialogs and the `Shift+D` mock panel.
@@ -706,6 +706,8 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 - **Look:** the light and dark tokens, and the accessibility work.
 
 ### 11.2 Housekeeping
+- **Fold in AIHub's edits:** everything listed in `web/PATCHES.md` (edits 1–9: the hybrid API switch, the real version, MOCK notes, page modules through `ModPage`, model events and verify progress, live outputs in the drawer, Make room from the API tab) becomes part of the export, so that list can go back to empty. Keep `api.js`, `mod-ui.js` and `ModPage.dc.html` as they are (they are AIHub's, not the export's), and never change `support.js`.
+- **No raw-template requests:** markup with `{{ … }}` in `src`, `poster` or SVG `d` attributes makes the browser fetch or parse it before `support.js` renders it (404s and console errors today). Avoid it, for example by wrapping such markup in `<template>`.
 - **Renames:** "Hub" → **AIHub** everywhere (logo text, titles, the down banner). `bin/hub` → `aihub` (CLI hints in the banner, Settings → About, and the "Add a mod" card).
 - **Data source:** replace the hard-coded `import('mock.js')` with the hybrid switch in Section 6.1.
 - **MOCK badges:** show a small **MOCK** badge on any page section whose area isn't in `api.liveAreas`. The footer MOCK button stays, for the scenario panel.

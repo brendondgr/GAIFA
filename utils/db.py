@@ -69,6 +69,67 @@ MIGRATIONS: list[str] = [
     CREATE INDEX outputs_created ON outputs (created_ts DESC, id);
     CREATE INDEX outputs_service ON outputs (service, created_ts DESC);
     """,
+    # 003: metrics (plan 6.1, architecture §13). `series` names each time series once; samples
+    # sit on a 10 s grid (`ts` in unix seconds). Rollups keep avg/min/max and the sample count
+    # `n`, so coarser rollups average by weight. The event tables feed timelines and job stats.
+    """
+    CREATE TABLE series (
+        id      INTEGER PRIMARY KEY,
+        name    TEXT NOT NULL UNIQUE,
+        label   TEXT NOT NULL,
+        unit    TEXT NOT NULL,
+        service TEXT,
+        reset   TEXT,
+        last_ts INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE metrics_raw (
+        sid   INTEGER NOT NULL,
+        ts    INTEGER NOT NULL,
+        value REAL,
+        PRIMARY KEY (sid, ts)
+    ) WITHOUT ROWID;
+    CREATE INDEX metrics_raw_ts ON metrics_raw (ts);
+    CREATE TABLE metrics_1m (
+        sid INTEGER NOT NULL, ts INTEGER NOT NULL,
+        avg REAL, min REAL, max REAL, n INTEGER NOT NULL,
+        PRIMARY KEY (sid, ts)
+    ) WITHOUT ROWID;
+    CREATE INDEX metrics_1m_ts ON metrics_1m (ts);
+    CREATE TABLE metrics_1h (
+        sid INTEGER NOT NULL, ts INTEGER NOT NULL,
+        avg REAL, min REAL, max REAL, n INTEGER NOT NULL,
+        PRIMARY KEY (sid, ts)
+    ) WITHOUT ROWID;
+    CREATE INDEX metrics_1h_ts ON metrics_1h (ts);
+    CREATE TABLE service_states (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        service TEXT NOT NULL,
+        state   TEXT NOT NULL,
+        from_ts REAL NOT NULL,
+        to_ts   REAL
+    );
+    CREATE INDEX service_states_span ON service_states (service, from_ts);
+    CREATE TABLE load_intervals (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        service TEXT NOT NULL,
+        from_ts REAL NOT NULL,
+        to_ts   REAL
+    );
+    CREATE INDEX load_intervals_span ON load_intervals (service, from_ts);
+    CREATE TABLE job_history (
+        id       INTEGER PRIMARY KEY AUTOINCREMENT,
+        service  TEXT NOT NULL,
+        job_id   TEXT NOT NULL,
+        label    TEXT NOT NULL,
+        state    TEXT NOT NULL,
+        start_ts REAL NOT NULL,
+        end_ts   REAL,
+        route    TEXT
+    );
+    CREATE INDEX job_history_start ON job_history (start_ts);
+    CREATE INDEX job_history_open ON job_history (service, job_id, end_ts);
+    CREATE INDEX activity_service ON activity (service, ts);
+    """,
 ]
 
 _STOP = object()

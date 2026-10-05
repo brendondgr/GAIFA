@@ -531,10 +531,12 @@ autostart = false
 
 | Series | Source | How often |
 |---|---|---|
-| `mem.total`, `mem.used`, `mem.available`, `mem.reserve`, `mem.other`, `gpu.gtt_used` | memory sampler (§7) | 10 s |
+| `mem.total`, `mem.used`, `mem.available`, `mem.reserve`, `mem.other`, `gpu.gtt_used` (and `gpu.vram_used` on GPUs with VRAM) | memory sampler (§7) | 10 s |
 | `mem.svc.<id>` | memory sampler, per mod | 10 s |
-| `jobs.running` | status polls | on change, then held |
-| `svc.<id>.stat.<slug>` | numeric `stats` from each mod's status route (§4.6) | every status poll (2–10 s) |
+| `jobs.running` | status polls | 10 s (the current count, so it is held between changes) |
+| `svc.<id>.stat.<slug>` | numeric `stats` from each ready mod's latest status (§4.6) | 10 s |
+
+**As built (plan 6.1, `utils/metrics/`):** the recorder ticks on a 10 s grid and reads the memory sampler's latest snapshot and each mod's latest status, so every series has one sample per 10 s bucket. A `"reset": "daily"` counter that drops on a new local day records one `null` for that tick, so charts break the line instead of drawing the reset as a drop. Each series is named once in a `series` table (label, unit, service, `reset`), which `GET /api/metrics/series` lists. A heartbeat in `kv` notes the last tick: rows still open when the hub stops are closed at its stop (or, after a crash, at the last heartbeat) and reopen when it starts again, so downtime is a gap in both the series and the timeline. A job its mod still reports after a hub restart continues its row.
 
 It also records **events** that charts need besides numbers:
 - `service_states` (every state change, for timelines and uptime)
@@ -547,11 +549,12 @@ Outputs and activity statistics are queried straight from their own tables.
 
 | Table | Holds | Kept for |
 |---|---|---|
-| `metrics_raw (series, ts, value)` | 10 s samples | 48 h |
-| `metrics_1m` | rollups: avg, min, max | 14 d |
-| `metrics_1h` | rollups: avg, min, max | 400 d |
+| `metrics_raw (sid, ts, value)` | 10 s samples | 48 h |
+| `metrics_1m` | rollups: avg, min, max, sample count `n` | 14 d |
+| `metrics_1h` | rollups: avg (weighted by `n`), min, max, `n` | 400 d |
+| `service_states`, `load_intervals`, `job_history` | events for timelines and job stats | 400 d after they end |
 
-An hourly task rolls up and prunes. `GET /api/metrics` chooses the table from the range:
+An hourly task (and one at startup) rolls up finished minutes and hours and prunes. Watermarks in `kv` mark what is rolled up, so a rollup never counts a sample twice, and a query reads rolled-up history from the coarse table and the rest from the finer ones. `GET /api/metrics` chooses the table from the range:
 - **≤ 6 h:** raw samples
 - **≤ 7 d:** 1-minute rollups
 - **longer:** 1-hour rollups

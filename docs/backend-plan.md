@@ -512,7 +512,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 > **Ask Claude Design early.** Give it brief §11 and the v1 export any time after Phase 1, so the revision 2 export is ready by step 6.5.
 
-- [ ] **6.1 `utils/metrics.py`: the recorder** (architecture §13).
+- [x] **6.1 `utils/metrics.py`: the recorder** (architecture §13). *As built:* the `utils/metrics/` package (`store.py`, `recorder.py`); stats are recorded every 10 s from each mod's latest status; the low-disk alert from 6.4 is checked on each tick.
   - **Tables:** `metrics_raw`, `metrics_1m`, `metrics_1h`, `service_states`, `load_intervals`, `job_history`.
   - **Recording:**
     - the memory sampler writes `mem.*`, `gpu.*` and `mem.svc.<id>` every 10 s

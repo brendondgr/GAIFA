@@ -20,21 +20,22 @@ def tables(db):
 
 
 def test_migrations_apply_once(db, tmp_path):
-    assert db.version == len(MIGRATIONS) == 2
-    assert {"activity", "service_peaks", "kv", "outputs"} <= tables(db)
+    assert db.version == len(MIGRATIONS) == 3
+    assert {"activity", "service_peaks", "kv", "outputs", "series", "metrics_raw", "metrics_1m", "metrics_1h",
+            "service_states", "load_intervals", "job_history"} <= tables(db)
     assert db.fetchone_sync("PRAGMA journal_mode")["journal_mode"] == "wal"
     db.close()
     again = Database(tmp_path / "hub.db")
     again.open()  # would fail with "table already exists" if 001 re-ran
-    assert again.version == 2
+    assert again.version == 3
     again.close()
 
 
 def test_new_migration_applies_on_top(tmp_path):
     conn = sqlite3.connect(tmp_path / "x.db", isolation_level=None)
-    assert migrate(conn) == 2
-    assert migrate(conn, MIGRATIONS + ["CREATE TABLE extra (x);"]) == 3
-    assert migrate(conn, MIGRATIONS + ["CREATE TABLE extra (x);"]) == 3
+    assert migrate(conn) == 3
+    assert migrate(conn, MIGRATIONS + ["CREATE TABLE extra (x);"]) == 4
+    assert migrate(conn, MIGRATIONS + ["CREATE TABLE extra (x);"]) == 4
 
 
 def test_failed_migration_rolls_back(tmp_path):

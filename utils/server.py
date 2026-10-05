@@ -27,6 +27,7 @@ from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
 from utils.memory import MemoryManager
 from utils.memory.triggers import hook as memory_hook
+from utils.metrics import Recorder
 from utils.outputs import OutputError, Outputs
 from utils.outputs.watch import Watcher as OutputsWatcher
 from utils.paths import DEFAULT_ROOT, Paths
@@ -79,6 +80,8 @@ class Hub:
     memory: MemoryManager | None = None
     memory_source: Any = None  # tests inject a fake (utils/memory/source.py)
     memory_every_s: float = 2.0
+    metrics: Recorder | None = None
+    metrics_every_s: float = 10.0
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -166,7 +169,11 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.services.before_proxy.append(memory_hook(hub.memory))
             await hub.memory.start()
             stack.push_async_callback(hub.memory.close)
-            # 8. metrics arrive in Phase 6.
+            # 8. metrics: record every 10 s and follow service and job events; roll up hourly.
+            hub.metrics = Recorder(hub.services, hub.memory, hub.db, hub.bus, hub.alerts,
+                                   disk_path=paths.root, every=hub.metrics_every_s)
+            await hub.metrics.start()
+            stack.push_async_callback(hub.metrics.close)
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 

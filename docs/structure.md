@@ -45,7 +45,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `__init__.py` | ✅ | Package marker; nothing runs at import time |
 | `paths.py` | ✅ | `Paths` (root, configurable dirs kept inside the root), `write_atomic()` |
 | `config.py` | ✅ | `Config` (pydantic, §9), `load()`, `save()` via tomlkit, `service_override()`, loopback check |
-| `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version` (001 activity/peaks/kv, 002 outputs), one writer thread, locked per-thread readers, async helpers |
+| `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version` (001 activity/peaks/kv, 002 outputs, 003 metrics), one writer thread, locked per-thread readers, async helpers |
 | `events.py` | ✅ | `EventBus` (per-subscriber queue, overflow → resync), `ActivityLog`, `Alerts`, `sse_stream()` |
 | `server.py` | ✅ | `create_app()`, `Hub` (app state, live-area registry), lifespan, `HubError` + error envelope, static `web/` |
 | `cli.py` | ✅ | Standard-library CLI behind `bin/aihub`: serve, install, start/stop/restart, status, logs, load/unload, open, url, doctor |
@@ -60,7 +60,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `outputs/` | ✅ pkg | Outputs index (architecture §4.7): `entries.py` (which files and folders are outputs, `scope_for`), `describe.py` (an output → its `outputs` row: sidecar, title, kind, main file, times), `media.py` (durations, sizes, previews via `wave`/Pillow/ffmpeg), `index.py` (`Outputs`: sync, reconcile, list/get, delete, files, previews), `watch.py` (`watchfiles` watcher, startup rescan, trash purge), `trash.py` (`outputs/.trash/<date>/`, purged after 30 days), `announce.py` (batched activity items) |
 | `proc.py` | ✅ | /proc and /sys facts: `meminfo`, `gpu`, process trees, RSS + DRM memory (`footprint`), unit cgroups, unit globs, container pids, `port_listening`, `port_owner` |
 | `memory/` | ✅ pkg | Memory manager (architecture §7): `source.py` (`ProcSource`: each mod's pids and footprint), `planner.py` (the load rule, `make_plan`), `manager.py` (`MemoryManager`: sampling, events, peaks, the `memory-high` alert, `ensure_room`, make-room, reservations), `triggers.py` (the proxy hook) |
-| `metrics.py` | ⏳ 6.1 | Time series recorder and rollups |
+| `metrics/` | ✅ pkg | Metrics (architecture §13): `store.py` (`Store`: series, samples on the 10 s grid, rollups with watermarks, retention, queries on an even `t` axis with gaps), `recorder.py` (`Recorder`: 10 s ticks from the memory snapshot and status stats, service/load/job history from events, closing rows at downtime, hourly rollup, the low-disk alert)) |
 | `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
 | `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`), `outputs.py` (`/api/outputs/...`, file serving with Range), `memory.py` (`/api/memory`, `/plan`, `/acquire`) |
 | `tests/` | ✅ | pytest suite (below) |
@@ -81,7 +81,8 @@ utils/tests/
 ├── models/test_<behavior>.py   ✅     registry storage and status, routes, safe deletes, the scanner on a tree covering every rule, verify, used-by, alerts, the CLI (conftest: a fake data/models/)
 ├── outputs/test_<behavior>.py  ✅     what counts as an output, rows, the watcher, previews, routes (paging, Range, traversal), delete to trash, activity (conftest: a fake outputs/ tree; the host's ffmpeg inside a toolbox)
 ├── memory/test_<behavior>.py   ✅     proc facts on fake /proc and /sys, the planner, the sampler, make-room end to end with two fake-mem mods, triggers, idle unload (conftest: a fake memory source)
-└── <area>/test_<behavior>.py          metrics, …
+├── metrics/test_<behavior>.py  ✅     rollups, retention, gaps, the recorder on fake services (conftest: an open hub.db, a fake clock)
+└── <area>/test_<behavior>.py          …
 ```
 
 ## `web/` — the UI

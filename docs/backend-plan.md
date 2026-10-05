@@ -549,6 +549,8 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - the Settings → Memory chart, and the full Settings page
 - **All of Part A is now live.** The hybrid defaults to every area live, and mock data appears only with `?mock`.
 
+*Status (2026-10-05):* the backend half is wired. `/config.js` lists `metrics`, `widgets`, `overview` and `settings` as live, so the v1 UI's Overview comes from `GET /api/overview` and its Settings page reads and saves `config.toml` (checked in the browser against a dev hub with the demo mods). Every Part A area except `tools` (Phase 13) is live. The charts above need the revision 2 export (step 6.5).
+
 **Checks & deliverables — Phase 6**
 - [ ] After fake mods have run for 2 h with load/unload cycles, every dashboard widget shows real data, and a planned 10-minute hub stop shows as a **gap**.
 - [ ] The brief's §11.3 above-the-fold rule holds at 1440 × 900 in compact. Every chart has "View as table". Every view works at 360 px.

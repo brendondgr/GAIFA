@@ -21,7 +21,8 @@ new_mods = [5100, 5199]
 
 [ui]
 theme = "system"
-density = "comfortable"
+density = "compact"         # or "comfortable"
+# [ui.dashboard] holds the Overview dashboard's layout (order, hidden, ranges); the UI writes it.
 
 [services]
 order = ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode"]

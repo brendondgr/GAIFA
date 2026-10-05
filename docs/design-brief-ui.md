@@ -390,7 +390,9 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 type ServiceState = "stopped" | "starting" | "ready" | "degraded" | "stopping" | "failed";
 type LoadState = "unloaded" | "loading" | "loaded" | "unloading" | "n/a";
 
-interface Stat { label: string; value: number | string; unit?: string; hint?: string }
+interface Stat { label: string; value: number | string; unit?: string; hint?: string;
+                reset?: "daily";        // a counter that starts again each day ("… today")
+                series?: string }       // numeric stats: the metric it is recorded as (svc.<id>.stat.<slug>), for sparklines
 
 interface ServiceSummary {
   id: string;                    // folder name under services/, e.g. "tts"

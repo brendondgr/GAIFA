@@ -63,19 +63,22 @@ async def delete_output(output_id: str, request: Request) -> Response:
     return Response(status_code=204)
 
 
-@router.get("/api/outputs/{output_id}/file", summary="An output's main file (supports Range)")
+@router.get("/api/outputs/{output_id}/file", summary="An output's main file (supports Range)",
+            response_class=FileResponse, responses={200: {"content": {"application/octet-stream": {}}, "description": "The file (its own content type); Range requests answer 206"}})
 @router.head("/api/outputs/{output_id}/file", include_in_schema=False)
 async def output_file(output_id: str, request: Request) -> FileResponse:
     return _send(await _outs(request).file(output_id))
 
 
-@router.get("/api/outputs/{output_id}/files/{path:path}", summary="A file inside a folder output (supports Range)")
+@router.get("/api/outputs/{output_id}/files/{path:path}", summary="A file inside a folder output (supports Range)",
+            response_class=FileResponse, responses={200: {"content": {"application/octet-stream": {}}, "description": "The file (its own content type); Range requests answer 206"}})
 @router.head("/api/outputs/{output_id}/files/{path:path}", include_in_schema=False)
 async def output_folder_file(output_id: str, path: str, request: Request) -> FileResponse:
     return _send(await _outs(request).file(output_id, path))
 
 
-@router.get("/api/outputs/{output_id}/preview", summary="An output's thumbnail or poster")
+@router.get("/api/outputs/{output_id}/preview", summary="An output's thumbnail or poster",
+            response_class=FileResponse, responses={200: {"content": {"image/jpeg": {}, "image/png": {}, "image/webp": {}}, "description": "The preview image"}})
 @router.head("/api/outputs/{output_id}/preview", include_in_schema=False)
 async def output_preview(output_id: str, request: Request, v: str | None = None) -> FileResponse:
     # `?v=` changes whenever the output does, so a versioned URL can be cached.

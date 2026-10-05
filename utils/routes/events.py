@@ -14,7 +14,8 @@ from utils.events import sse_stream
 router = APIRouter(tags=["events"])
 
 
-@router.get("/api/events", summary="Server-sent HubEvents")
+@router.get("/api/events", summary="Server-sent HubEvents", response_class=StreamingResponse,
+            responses={200: {"content": {"text/event-stream": {}}, "description": "Server-sent events; each `data:` is a HubEvent"}})
 async def events(request: Request) -> StreamingResponse:
     hub = request.app.state.hub
     return StreamingResponse(

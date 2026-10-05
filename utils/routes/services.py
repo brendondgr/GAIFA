@@ -17,7 +17,7 @@ from fastapi.responses import StreamingResponse
 from utils import config as config_mod
 from utils import operations
 from utils.services import check, loading
-from utils.api_models import Logs, Operation, SavedConfig, ServiceConfigPatch, ServiceDetail, ServiceSummary
+from utils.api_models import CheckReport, Logs, Operation, Rescan, SavedConfig, ServiceConfigPatch, ServiceDetail, ServiceSummary
 from utils.events import SSE_RETRY_MS
 from utils.manifest import check_effective_ports, effective
 from utils.services.views import detail, summary
@@ -38,7 +38,7 @@ async def list_services(request: Request) -> list[dict[str, Any]]:
     return [summary(mgr, s) for s in mgr.list()]
 
 
-@router.post("/api/services/rescan", summary="Pick up added, removed and edited mod folders (no hub restart)")
+@router.post("/api/services/rescan", summary="Pick up added, removed and edited mod folders (no hub restart)", response_model=Rescan)
 async def rescan_services(request: Request) -> dict[str, list[str]]:
     return await _mgr(request).rescan(autostart=request.app.state.hub.options.autostart)
 
@@ -87,7 +87,8 @@ async def service_logs(service_id: str, request: Request, lines: int = Query(200
     return {"lines": await _mgr(request).logs(service_id, lines)}
 
 
-@router.get("/api/services/{service_id}/logs/stream", summary="New log lines as server-sent events (each data: is a LogLine)")
+@router.get("/api/services/{service_id}/logs/stream", summary="New log lines as server-sent events (each data: is a LogLine)", response_class=StreamingResponse,
+            responses={200: {"content": {"text/event-stream": {}}, "description": "Server-sent events; each `data:` is a LogLine"}})
 async def stream_logs(service_id: str, request: Request) -> StreamingResponse:
     mgr = _mgr(request)
     svc = mgr.get(service_id)
@@ -139,7 +140,7 @@ async def list_operations(service_id: str, request: Request) -> list[dict[str, A
     return await operations.get(mgr, mgr.get(service_id))
 
 
-@router.get("/api/services/{service_id}/check", summary="Self-test a mod: manifest, command, health, OpenAPI, status, widgets, page")
+@router.get("/api/services/{service_id}/check", summary="Self-test a mod: manifest, command, health, OpenAPI, status, widgets, page", response_model=CheckReport)
 async def check_service(service_id: str, request: Request, start: bool = False) -> dict[str, Any]:
     mgr = _mgr(request)
     return await check.run(mgr, mgr.get(service_id), start=start)

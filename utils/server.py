@@ -185,6 +185,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
 
     app = FastAPI(
         title="AIHub",
+        description=("One local hub for every AI service on this machine. Each mod's own API is proxied unchanged at "
+                     "`/api/s/{id}/…` (any method); `GET /api/services/{id}/operations` lists it, from the mod's OpenAPI. "
+                     "Hub errors are `{detail, code, data?}` with an `X-AIHub-Error` header."),
         version=hub.version,
         lifespan=lifespan,
         docs_url="/api/docs",

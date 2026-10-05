@@ -563,3 +563,53 @@ class SettingsPatch(_Model):
 class SavedSettings(_Model):
     settings: Settings
     restart_required: bool
+
+
+# ---- the rest of the hub's routes (plan 6.7: every route documents its response) ----
+
+
+class Rescan(_Model):
+    added: list[str]
+    removed: list[str]
+    changed: list[str]
+
+
+class Check(_Model):
+    name: str
+    status: Literal["ok", "fail", "warn", "skip"]
+    ok: bool
+    detail: str
+
+
+class CheckReport(_Model):
+    """`aihub check <id>`: the mod self-test."""
+
+    ok: bool
+    checks: list[Check]
+
+
+class DiscoveredFile(_Model):
+    path: str
+    role: str
+    size_bytes: int | None
+
+
+class Discovered(_Model):
+    path: str
+    size_bytes: int
+    suggested_kind: ModelKind
+    suggested_name: str
+    suggested_id: str
+    format: str
+    files: list[DiscoveredFile]
+    source: ModelSource | None = None
+
+
+class ScanResult(_Model):
+    discovered: list[Discovered]
+
+
+class Grant(_Model):
+    granted: bool
+    freed: list[str] = Field(description="Mods unloaded to make room")
+    plan: MakeRoomPlan

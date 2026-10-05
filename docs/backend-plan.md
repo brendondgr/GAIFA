@@ -537,8 +537,8 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - Replace `web/` with the revision 2 export, keeping `api.js`, `vendor/` and `PATCHES.md`. Re-apply any patch it didn't fold in.
   - Check the changes against brief §11: compact default, the four Overview views, the dashboard widgets, chart components, graphics on the other pages, the renames, MOCK badges, and the hybrid switch.
   - Apply the API changes Claude Design reported to **both** brief §6/§11.7 and the code, in one commit.
-- [ ] **6.6 Contract test.** Parse the method → route table from `web/api.js` and assert that every route exists with the right method. Response models are pydantic classes matching brief §6.4 and §11.7, so `/api/openapi.json` documents the hub itself.
-- [ ] **6.7 Hub operations for the agent.** Give every hub route a summary and response model, so `/api/openapi.json` is complete and Phase 13 can build tools from it.
+- [x] **6.6 Contract test.** *As built:* `utils/tests/web/test_contract.py` parses `createHttpApi` in `web/api.js` (38 routes, the proxy included) and compares each brief §6.4/§11.7 interface's top-level fields with its pydantic model (`utils/api_models.py`). Parse the method → route table from `web/api.js` and assert that every route exists with the right method. Response models are pydantic classes matching brief §6.4 and §11.7, so `/api/openapi.json` documents the hub itself.
+- [x] **6.7 Hub operations for the agent.** *As built:* the same test checks that every `/api/…` operation has a summary and a JSON response model (files, images and event streams declare their content type). The proxy stays out of the spec; the spec's description points to `/api/s/{id}/…` and `/operations`. Give every hub route a summary and response model, so `/api/openapi.json` is complete and Phase 13 can build tools from it.
 
 **Wire — Phase 6:** `settings`, `metrics` and `widgets` go live, along with the `getOverview` aggregate.
 - **What that shows:**

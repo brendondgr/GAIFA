@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Request, Response
 
-from utils.api_models import Model, ModelList
+from utils.api_models import Model, ModelList, ScanResult
 from utils.registry import Patch, Registry
 from utils.registry import adding
 from utils.registry.model import KINDS, STATUSES, RegistryError
@@ -29,7 +29,7 @@ async def list_models(request: Request, kind: str | None = None, service: str | 
     return _reg(request).list(kind=kind, service=service, status=status, q=q)
 
 
-@router.post("/api/models/scan", summary="Model files in data/models that aren't registered yet, grouped into models")
+@router.post("/api/models/scan", summary="Model files in data/models that aren't registered yet, grouped into models", response_model=ScanResult, response_model_exclude_unset=True)
 async def scan_models(request: Request) -> dict[str, Any]:
     reg = _reg(request)
     return {"discovered": await asyncio.to_thread(adding.discovered, reg)}

@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
-from utils.api_models import MakeRoomPlan, SystemMemory
+from utils.api_models import Grant, MakeRoomPlan, SystemMemory
 from utils.memory.manager import ACQUIRE_TTL_S, MemoryManager
 from utils.memory.triggers import HEADER, YES
 
@@ -41,7 +41,7 @@ async def plan_room(body: PlanRequest, request: Request) -> dict[str, Any]:
     return await _mem(request).fresh_plan(body.service, body.needs_bytes)
 
 
-@router.post("/api/memory/acquire", summary="A mod asks for memory before it loads something; make_room=1 (or X-AIHub-Make-Room: 1) unloads others if needed")
+@router.post("/api/memory/acquire", summary="A mod asks for memory before it loads something; make_room=1 (or X-AIHub-Make-Room: 1) unloads others if needed", response_model=Grant)
 async def acquire(body: AcquireRequest, request: Request, make_room: bool = False) -> dict[str, Any]:
     mem = _mem(request)
     allow = make_room or request.headers.get(HEADER, "").strip().lower() in YES

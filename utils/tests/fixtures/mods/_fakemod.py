@@ -11,6 +11,8 @@ mem    like ok, plus /v1/load allocates FAKE_MEM_MB (64) MB and /v1/unload frees
 POST /v1/upload reads the body in chunks and returns its size and sha256 (for big uploads).
 GET /v1/events?n=3&gap=0.05 streams n server-sent events, gap seconds apart.
 GET /v1/redirect answers 307 to /v1/status.
+GET /v1/widgets/requests?range=24h is a WidgetData (fake-ok's dashboard widget); it counts its own
+calls in `calls`, and FAKE_BAD_WIDGET=1 makes it malformed.
 POST /v1/fail answers 500 {"detail": ...} (an upstream error); DELETE /v1/jobs/{id} removes a job (destructive).
 POST /v1/jobs {"label", "seconds"} starts a job that /v1/status reports with progress
 (busy while it runs). FAKE_BAD_STATUS=1 makes /v1/status return a malformed body.
@@ -61,6 +63,8 @@ def openapi() -> dict:
         "/v1/outputs": {"post": op("Write a text output", text)},
         "/v1/upload": {"post": {"summary": "Upload a file", "requestBody": {"content": {"multipart/form-data": {"schema": {"type": "object", "properties": {"file": {"type": "string", "format": "binary"}}}}}}, "responses": {"200": {"content": {"application/json": {"schema": {}}}}}}},
         "/v1/fail": {"post": op("Always fails with HTTP 500")},
+        "/v1/widgets/requests": {"get": {**op("Requests (dashboard widget)"), "parameters": [
+            {"name": "range", "in": "query", "required": False, "schema": {"type": "string", "default": "24h"}}]}},
         "/v1/jobs/{jid}": {"delete": {"summary": "Delete a job", "parameters": [{"name": "jid", "in": "path", "required": True, "schema": {"type": "string"}}], "responses": {"200": {"content": {"application/json": {"schema": {}}}}}}},
         "/v1/jobs": {"post": op("Start a job that runs for `seconds`", {"type": "object", "properties": {"label": {"type": "string"}, "seconds": {"type": "number"}}})},
     }
@@ -134,6 +138,8 @@ class Handler(BaseHTTPRequestHandler):
         if url.path == "/v1/events":
             q = parse_qs(url.query)
             return self.sse(int(q.get("n", ["3"])[0]), float(q.get("gap", ["0.05"])[0]))
+        if url.path == "/v1/widgets/requests":
+            return self.send(200, widget(parse_qs(url.query).get("range", ["24h"])[0]))
         if url.path == "/v1/redirect":
             self.send_response(307)
             self.send_header("Location", "/v1/status")
@@ -210,6 +216,17 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             STATE["sse_aborted"] = STATE.get("sse_aborted", 0) + 1
         self.close_connection = True
+
+
+def widget(rng: str) -> dict:
+    STATE["widget_calls"] = STATE.get("widget_calls", 0) + 1
+    if os.environ.get("FAKE_BAD_WIDGET"):
+        return {"series": [{"name": "Requests", "values": [1, "x"]}]}
+    n, step = (24, 3600) if rng == "24h" else (7, 86400)
+    end = int(time.time()) // step * step
+    return {"unit": "requests", "t": [end - (n - 1 - i) * step for i in range(n)],
+            "series": [{"name": "Requests", "values": [None] * (n - 1) + [STATE["requests"]]},
+                       {"name": "Calls", "values": [STATE["widget_calls"]] * n, "axis": "right"}]}
 
 
 def jobs() -> list[dict]:

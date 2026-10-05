@@ -26,7 +26,8 @@ async def test_fake_ok_passes(rig, serve):
     await ready(served, "fake-ok")
     r = await check(served, "fake-ok")
     assert r["ok"] is True
-    assert statuses(r) == {"manifest": "ok", "command": "ok", "state": "ok", "port": "ok", "health": "ok", "openapi": "ok", "status": "ok"}
+    assert statuses(r) == {"manifest": "ok", "command": "ok", "state": "ok", "port": "ok", "health": "ok", "openapi": "ok", "status": "ok",
+                          "operations": "ok", "widget requests": "ok"}
     assert all(c["ok"] for c in r["checks"])
 
 

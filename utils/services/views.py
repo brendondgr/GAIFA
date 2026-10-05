@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from utils.services.status import slug
+
 if TYPE_CHECKING:
     from utils.services import Service, ServiceManager
 
@@ -35,7 +37,7 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
             "estimate_bytes": round(estimate_gb * GB) if estimate_gb is not None else None,
             "peak_bytes": mgr.memory.peaks.get(svc.id) if mgr.memory else None,
         },
-        "stats": svc.stats,
+        "stats": [_with_series(svc.id, st) for st in svc.stats],
         "has_page": has_page(svc),
         "page_url": page_url(svc),
         "has_outputs": bool(m and m.outputs),
@@ -45,6 +47,14 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "last_error": svc.last_error,
         "manifest_errors": svc.errors,
     }
+
+
+def _with_series(sid: str, st: dict[str, Any]) -> dict[str, Any]:
+    """A numeric stat names the metric it is recorded as (brief §11.7), for tile sparklines."""
+    v = st.get("value")
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return {**st, "series": f"svc.{sid}.stat.{slug(st['label'])}"}
+    return st
 
 
 def detail(mgr: ServiceManager, svc: Service) -> dict[str, Any]:

@@ -22,3 +22,11 @@ kinds = ["text"]
 [api.responses]
 "POST /v1/speech" = "audio"
 "GET /v1/events" = "stream"
+
+[[ui.widgets]]
+id = "requests"
+title = "Requests"
+kind = "bar"
+source = "GET /v1/widgets/requests"
+ranges = ["24h", "7d"]
+span = 6

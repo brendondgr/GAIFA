@@ -382,7 +382,7 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 
 ### 6.3 Error codes to handle
 
-`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `output_not_deletable` (the output resolves outside `outputs/`, e.g. through a symlinked folder), `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
+`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `output_not_deletable` (the output resolves outside `outputs/`, e.g. through a symlinked folder), `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `widget_not_found`, `widget_invalid` (a mod's widget data doesn't match `WidgetData`), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
 
 ### 6.4 Types
 
@@ -811,7 +811,8 @@ What every chart must do:
 // Series names may end in ".*" to request a whole family, e.g. "mem.svc.*".
 interface Metrics { range: string; step_s: number; t: number[];            // unix seconds, one per bucket
                     series: Record<string, (number | null)[]> }             // null = no sample in that bucket
-interface SeriesInfo { name: string; label: string; unit: "bytes" | "count" | "seconds" | "ms" | "ratio" | string; service?: string }
+interface SeriesInfo { name: string; label: string; unit: "bytes" | "count" | "seconds" | "ms" | "ratio" | string; service?: string;
+                     reset?: "daily" }   // a counter that resets each day: a null marks the reset
 interface Timeline { from: number; to: number; lanes: {
   service: string;
   states: { from: number; to: number; state: ServiceState }[];
@@ -828,6 +829,14 @@ interface WidgetData { unit?: string; t?: number[]; categories?: string[];
 ```
 
 **Mods declare widgets in their `service.toml`** (see architecture §4), and AIHub proxies and caches them for 30 s. Each `ServiceSummary.stats[i]` also gains an optional `series` field (the metric name), so tiles can draw sparklines.
+
+**As built (plan 6.2):**
+- `getMetrics`: `series` is required; unknown names come back all `null`. Default `step` per range: 1h → 10 s, 6h → 60 s, 24h → 5 min, 7d → 30 min, 30d → 2 h (any `step` is rounded to the table's resolution, at most 2000 points). Ranges are `1h 6h 24h 7d 14d 30d` or any `<n>m|h|d` up to 400 d.
+- `getOutputStats({by:'day'})` returns every local day in the range, zeros included; `by:'service'|'kind'` returns only non-empty buckets, largest first.
+- `getActivityStats` returns every day × hour cell in the range (zeros included); `errors` counts `error`-level items.
+- `getJobStats` counts jobs started in the range; `p50_s`/`p90_s`/`max_s` are over the jobs that finished `done` (0 when none).
+- `getTimeline`: lanes for every mod (or `services`), in sidebar order; a band or span still open ends at `to`; a running job has `to: null`. Time the hub was down has no band (a gap).
+- `getWidget` errors: `widget_not_found` (404), `invalid_request` (422, a range the widget doesn't offer), `service_not_running` (503), `upstream_error` (502, the mod failed or didn't answer JSON) and `widget_invalid` (502, the data doesn't match `WidgetData`; `data.problems` lists why).
 
 ### 11.8 Graphics on the other pages
 - **Service page header:** a 1 h memory sparkline next to the memory figure.

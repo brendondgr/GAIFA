@@ -183,7 +183,7 @@ async def test_route_converts_fake_ok(hub):
     ops = {o["id"]: o for o in r.json()}
     assert set(ops) == {
         "get_health", "get_v1_status", "post_v1_echo", "post_v1_speech", "get_v1_events", "post_v1_outputs", "post_v1_upload", "post_v1_jobs",
-        "post_v1_fail", "delete_v1_jobs_jid",
+        "post_v1_fail", "delete_v1_jobs_jid", "get_v1_widgets_requests",
     }
     assert ops["delete_v1_jobs_jid"]["destructive"] and ops["delete_v1_jobs_jid"]["params"][0]["in"] == "path"
     assert ops["post_v1_speech"]["response"] == "audio"  # declared audio/wav (and [api.responses])
@@ -205,7 +205,7 @@ async def test_cached_per_process_start(hub):
     await hub.services.stop("fake-ok", wait=True)
     async with httpx.AsyncClient(base_url=hub.url) as c:
         r = await c.get("/api/services/fake-ok/operations")
-    assert r.status_code == 200 and len(r.json()) == 10  # the last list is kept while stopped
+    assert r.status_code == 200 and len(r.json()) == 11  # the last list is kept while stopped
 
 
 async def test_never_started_is_503(rig, serve):

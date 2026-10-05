@@ -520,7 +520,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - service, job and load events fill the event tables
   - **Hourly maintenance:** roll up and prune.
   *Done when:* tests cover rollup correctness (avg, min, max), retention, and null gaps across a simulated hub downtime.
-- [ ] **6.2 Chart data routes** (brief §11.7):
+- [x] **6.2 Chart data routes** (brief §11.7). *As built:* `utils/routes/metrics.py`, `utils/routes/widgets.py`, `utils/metrics/charts.py` and `utils/widgets.py`; the details are under brief §11.7 "As built".
   - `GET /api/metrics` (range → table, an even `t` axis, `.*` families) and `GET /api/metrics/series`
   - `GET /api/timeline`
   - `GET /api/outputs/stats`

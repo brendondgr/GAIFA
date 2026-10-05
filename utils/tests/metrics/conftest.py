@@ -77,3 +77,6 @@ def rec(db):
         return r
 
     return make
+
+
+from utils.tests.services.conftest import rig, serve  # noqa: E402,F401 (fixtures for the route tests)

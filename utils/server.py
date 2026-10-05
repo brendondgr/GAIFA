@@ -27,7 +27,7 @@ from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
 from utils.memory import MemoryManager
 from utils.memory.triggers import hook as memory_hook
-from utils.metrics import Recorder
+from utils.metrics import MetricsError, Recorder
 from utils.outputs import OutputError, Outputs
 from utils.outputs.watch import Watcher as OutputsWatcher
 from utils.paths import DEFAULT_ROOT, Paths
@@ -35,6 +35,7 @@ from utils.registry import Registry, RegistryError
 from utils.registry.alerts import Watcher as RegistryWatcher
 from utils.registry.verify import Verifier
 from utils.services import ServiceError, ServiceManager
+from utils.widgets import Widgets
 
 DEMO_MODS = DEFAULT_ROOT / "utils" / "tests" / "fixtures" / "mods"
 
@@ -82,6 +83,7 @@ class Hub:
     memory_every_s: float = 2.0
     metrics: Recorder | None = None
     metrics_every_s: float = 10.0
+    widgets: Widgets | None = None
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -118,7 +120,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, memory, models, outputs, services, system, web
+    from utils.routes import events, memory, metrics, models, outputs, services, system, web, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -174,6 +176,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
                                    disk_path=paths.root, every=hub.metrics_every_s)
             await hub.metrics.start()
             stack.push_async_callback(hub.metrics.close)
+            hub.widgets = Widgets(hub.services)
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 
@@ -194,9 +197,11 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(services.router)
     app.include_router(proxy.router)
     app.include_router(models.router)
+    app.include_router(metrics.router)  # before outputs: /api/outputs/stats isn't an output id
     app.include_router(outputs.router)
     app.include_router(memory.router)
-    for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory"):
+    app.include_router(widgets.router)
+    for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets"):
         hub.mark_live(area)
 
     app.include_router(web.router)
@@ -255,6 +260,10 @@ def _error_handlers(app: FastAPI) -> None:
     @app.exception_handler(OutputError)
     async def _output_error(_: Request, e: OutputError) -> JSONResponse:
         return _envelope(e.status, e.code, e.detail, e.data)
+
+    @app.exception_handler(MetricsError)
+    async def _metrics_error(_: Request, e: MetricsError) -> JSONResponse:
+        return _envelope(422, "invalid_request", str(e))
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(_: Request, e: StarletteHTTPException) -> JSONResponse:

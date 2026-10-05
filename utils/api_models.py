@@ -21,6 +21,7 @@ class Stat(_Model):
     unit: str | None = None
     hint: str | None = None
     reset: Literal["daily"] | None = None
+    series: str | None = Field(None, description="The metric series a numeric stat is recorded as (`svc.<id>.stat.<slug>`), for sparklines")
 
 
 class Memory(_Model):
@@ -313,3 +314,131 @@ class MakeRoomPlan(_Model):
     available_bytes: int
     unload: list[PlanStep]
     enough: bool
+
+
+# ---- charts (Phase 6, brief §11.7) ----
+
+
+class Metrics(_Model):
+    range: str
+    step_s: int
+    t: list[int] = Field(description="Unix seconds, one per bucket, evenly spaced")
+    series: dict[str, list[float | None]] = Field(description="One value per bucket; null = no sample (a gap)")
+
+
+class SeriesInfo(_Model):
+    name: str
+    label: str
+    unit: str = Field(description='"bytes", "count", "seconds", "ms", "ratio" or a mod\'s own unit')
+    service: str | None = None
+    reset: Literal["daily"] | None = None
+
+
+class StateBand(_Model):
+    from_: float = Field(alias="from")
+    to: float
+    state: ServiceState
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class Span(_Model):
+    from_: float = Field(alias="from")
+    to: float
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class JobBar(_Model):
+    id: str
+    label: str
+    from_: float = Field(alias="from")
+    to: float | None
+    state: Literal["queued", "running", "done", "failed", "cancelled"]
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class OutputDot(_Model):
+    ts: float
+    id: str
+    kind: OutputKind
+
+
+class LaneEvent(_Model):
+    ts: float
+    level: Literal["warn", "error"]
+    text: str
+
+
+class Lane(_Model):
+    service: str
+    states: list[StateBand]
+    loaded: list[Span]
+    jobs: list[JobBar]
+    outputs: list[OutputDot]
+    events: list[LaneEvent]
+
+
+class Timeline(_Model):
+    from_: float = Field(alias="from")
+    to: float
+    lanes: list[Lane]
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+class OutputBucket(_Model):
+    key: str = Field(description="A local date (YYYY-MM-DD), a mod id or a kind")
+    count: int
+    size_bytes: int
+    by_kind: dict[str, int]
+
+
+class OutputStats(_Model):
+    buckets: list[OutputBucket]
+
+
+class ActivityCell(_Model):
+    day: str
+    hour: int
+    count: int
+    errors: int
+
+
+class ActivityStats(_Model):
+    cells: list[ActivityCell]
+
+
+class JobServiceStats(_Model):
+    service: str
+    count: int
+    failed: int
+    p50_s: float
+    p90_s: float
+    max_s: float
+
+
+class JobStats(_Model):
+    by_service: list[JobServiceStats]
+
+
+class WidgetInfo(_Model):
+    service: str
+    id: str
+    title: str
+    kind: Literal["line", "area", "bar", "donut", "number", "table"]
+    ranges: list[str]
+    span: Literal[3, 4, 6, 12]
+
+
+class WidgetSeries(BaseModel):
+    name: str
+    values: list[float | None]
+    axis: Literal["left", "right"] | None = None
+
+
+class WidgetData(BaseModel):
+    """A mod's widget data (extra keys a mod sends are passed through)."""
+
+    unit: str | None = None
+    t: list[float] | None = None
+    categories: list[str] | None = None
+    series: list[WidgetSeries] = []
+    rows: list[dict[str, Any]] | None = None

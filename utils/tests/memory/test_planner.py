@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from utils.memory.planner import Candidate, describe, make_plan
 
-GB = 1024**3
+GB = 1000**3
 
 
 def cand(id: str, **kw) -> Candidate:

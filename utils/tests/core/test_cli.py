@@ -58,7 +58,7 @@ def test_models_needs_a_running_hub():
 
 def test_human_formatting():
     assert cli.human_bytes(512) == "512 B"
-    assert cli.human_bytes(3 * 1024**3) == "3.0 GB"
+    assert cli.human_bytes(3 * 1000**3) == "3.0 GB" and cli.human_bytes(999) == "999 B" and cli.human_bytes(1500) == "1.5 KB"
     assert cli.human_secs(59) == "59s" and cli.human_secs(3700) == "1h 1m" and cli.human_secs(90000) == "1d 1h"
 
 

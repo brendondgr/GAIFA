@@ -36,7 +36,7 @@ async def test_list_in_sidebar_order_with_full_summaries(hub):
         assert s["state"] == "ready"
     mem = items[0]
     # The manifest's estimate until the first status poll, then the mod's own (rounded) figure.
-    assert mem["load"] == "unloaded" and mem["memory"]["estimate_bytes"] in (round(0.0625 * 1024**3), round(0.062 * 1024**3))
+    assert mem["load"] == "unloaded" and mem["memory"]["estimate_bytes"] in (round(0.0625 * 1000**3), round(0.062 * 1000**3))
 
 
 async def test_detail(hub, rig):

@@ -15,7 +15,7 @@ log = logging.getLogger("aihub.services")
 
 ServiceState = Literal["stopped", "starting", "ready", "degraded", "stopping", "failed"]
 LoadState = Literal["unloaded", "loading", "loaded", "unloading", "n/a"]
-GB = 1024**3
+GB = 1000**3  # decimal GB, as the UI shows it (and config, manifests and status use)
 LOG_TAIL = 20
 
 

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from utils.services import Service, ServiceManager
 
-GB = 1024**3
+GB = 1000**3  # decimal GB, as the UI shows it (and config, manifests and status use)
 
 
 def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:

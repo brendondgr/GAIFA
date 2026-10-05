@@ -1385,6 +1385,7 @@ class Component extends DCLogic {
   async unload(sv) { try { await this.api.unloadService(sv.id); } catch (e) { this.err(e); } }
   async roomContinue() {
     const d = this.state.dialog; this.setState({ dialog: null });
+    if (d.retry) return d.retry();  // patch 9: a proxied call (API tab) is resent with X-AIHub-Make-Room
     try { await this.api.loadService(d.svc.id, { makeRoom: true }); this.toast(`Making room for ${d.svc.name}…`); } catch (e) { this.err(e); }
   }
   // ---------- API tab ----------
@@ -1438,7 +1439,7 @@ class Component extends DCLogic {
     if (['audio', 'image', 'video', 'model3d', 'file'].includes(op.response)) c += ' \\\n  -o response.bin';
     return c;
   }
-  async sendOp() {
+  async sendOp(makeRoom = false) {
     const sv = this.state.svc, op = sv.ops.find(o => o.id === sv.opId), ferr = {};
     this.opFields(op).forEach(f => {
       if (f.group) return;
@@ -1451,7 +1452,7 @@ class Component extends DCLogic {
       }
     });
     if (Object.keys(ferr).length) return this.updSvc({ ferr });
-    if (op.destructive) {
+    if (op.destructive && !makeRoom) {
       const name = sv.detail?.name || sv.id;
       const ok = await this.confirm({ title: `Send ${op.method} ${this.buildReq(op).path}?`, body: `${op.summary} on ${name}. This operation is marked destructive and cannot be undone.`, confirmLabel: 'Send request', danger: true });
       if (!ok) return;
@@ -1460,12 +1461,14 @@ class Component extends DCLogic {
     this.abort = ctl;
     this.updSvc({ ferr: {}, sending: true, resp: null, stream: op.response === 'stream' ? [] : null });
     try {
-      const res = await this.api.callService(sv.id, op.method, req.path, { query: req.query, json: req.json, form: req.form, signal: ctl.signal, stream: op.response === 'stream',
+      const res = await this.api.callService(sv.id, op.method, req.path, { query: req.query, json: req.json, form: req.form, signal: ctl.signal, stream: op.response === 'stream', makeRoom,
         onEvent: line => this.setState(s => s.svc ? { svc: { ...s.svc, stream: [...(s.svc.stream || []), { ts: Date.now() / 1000, text: line }].slice(-500) } } : null) });
       const kind = res.json !== undefined ? 'json' : res.blob ? (op.response === 'json' ? 'file' : op.response) : op.response === 'stream' ? 'stream' : 'empty';
       this.updSvc({ sending: false, resp: { ...res, kind, stopped: ctl.signal.aborted } });
     } catch (e) {
       if (e.status === 0) this.goDown();
+      // patch 9: a memory trigger needs room: the Make-room dialog, whose "Unload & continue" resends with makeRoom
+      if (e.code === 'needs_room' && e.data?.plan) { this.updSvc({ sending: false }); this.setState({ dialog: { kind: 'room', svc: { id: sv.id, name: sv.detail?.name || sv.id }, plan: e.data.plan, retry: () => this.sendOp(true) } }); return; }
       this.updSvc({ sending: false, resp: { error: true, status: e.status, ok: false, ms: Math.round(performance.now() - t0), code: e.code, detail: e.detail, data: e.data, kind: 'error' } });
     }
   }

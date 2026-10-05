@@ -111,6 +111,17 @@ test('callService: JSON, media blobs, mod errors and hub errors', async () => {
   await assert.rejects(http.callService('tts', 'GET', '/health'), e => e.code === 'service_not_running' && e.status === 503);
 });
 
+test('callService: needs_room from a memory trigger, then the makeRoom retry header', async () => {
+  const fetch = fakeFetch((url, init) => init.headers['X-AIHub-Make-Room'] === '1'
+    ? json(200, { ok: true })
+    : json(409, { detail: 'Loading Speech needs ~9.2 GB', code: 'needs_room', data: { plan: { service: 'tts', unload: [] } } }, { 'x-aihub-error': 'needs_room' }));
+  const http = createHttpApi('', { fetch });
+  await assert.rejects(http.callService('tts', 'POST', '/v1/speech', { json: {} }), e => e.code === 'needs_room' && e.status === 409 && e.data.plan.service === 'tts');
+  const r = await http.callService('tts', 'POST', '/v1/speech', { json: {}, makeRoom: true });
+  assert.deepEqual(r.json, { ok: true });
+  assert.equal(fetch.calls[0].headers['X-AIHub-Make-Room'], undefined);
+});
+
 test('callService streams server-sent events to onEvent', async () => {
   const body = 'data: {"n":0}\n\ndata: {"n":1}\n\n: comment\ndata: done\n\n';
   const http = createHttpApi('', { fetch: async () => new Response(body, { headers: { 'content-type': 'text/event-stream' } }) });

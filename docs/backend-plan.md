@@ -486,15 +486,27 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 - Overview's memory panel
 - the load/unload buttons everywhere
 - the **Make room** dialog, on a real `needs_room`
+- *As wired:* marking `memory` live was enough for the meter, popover, Overview panel and buttons, since `api.js` already routed them by area. Web patch 9 (`web/PATCHES.md`):
+  - a proxied call answered with `needs_room` opens the Make-room dialog from the API tab
+  - "Unload & continue" resends it with `X-AIHub-Make-Room: 1` (`callService(…, { makeRoom: true })` in `api.js`)
+  - *Fixed along the way:* the hub converted `reserve_gb` and `estimate_gb` with 1024³ while the UI (and the mock) show decimal GB, so "12 GB reserved" displayed as 12.9 GB and the hub's messages disagreed with the screen. **GB is 10⁹ bytes everywhere now**: config, manifests, status, the hub's messages, and `aihub`'s output. `GET /api/memory` returns the last sample's numbers with current load states.
 
 **Checks & deliverables — Phase 5**
-- [ ] With two `fake-mem` mods sized so they can't both fit:
+- [x] With two `fake-mem` mods sized so they can't both fit:
   - loading the second shows the Make-room plan
   - "Unload & continue" frees the first and loads the second
   - the memory meter follows within 2 s
-- [ ] A proxied trigger call (a "speak"-style operation on a fake mod, from the API tab) goes through the same flow.
-- [ ] Mods in `never_unload`, and busy mods, never appear in a plan.
-- [ ] Delivered: `proc.py`, `memory.py` (sampler, planner, executor, acquire), and proxy triggers.
+  - *Checked 2026-10-05* in the browser against a dev hub on a scratch root. Two fake-mem mods really allocated 2 GB each, with the reserve set so ~3.3 GB was free:
+    - Loading the second showed "needs ~2.0 GB; 0.9 GB is available… AIHub will unload: Big Model A, idle 11s, frees 2.2 GB" (its measured use).
+    - "Unload & continue" unloaded A in 0.1 s, when the meter went from 22.7 to 20.6 GB, and loaded B in 1.8 s, when the meter was back at 22.7 GB.
+    - Activity: "Unloaded Big Model A to make room for Big Model B".
+    - Tests: `test_make_room.py`.
+- [x] A proxied trigger call (a "speak"-style operation on a fake mod, from the API tab) goes through the same flow.
+  - *Checked:* `POST /v1/load` (a trigger) from Big Model B's API tab, with A loaded, opened the Make-room dialog ("needs ~2.2 GB", the learned peak). "Unload & continue" resent it and got the mod's `200 {"loaded": true, "mb": 2048}`, with A unloaded. Tests: `test_triggers.py`.
+- [x] Mods in `never_unload`, and busy mods, never appear in a plan.
+  - *Checked:* `test_planner.py` (never_unload, busy, in flight, auto_unload off, not loaded, no unload operation, the target itself), and end to end in `test_make_room.py::test_never_unload_mods_stay`, `test_busy_mods_stay` and `test_triggers.py` (a request in flight).
+- [x] Delivered: `proc.py`, `memory.py` (sampler, planner, executor, acquire), and proxy triggers.
+  - *As built:* `utils/proc.py`, the `utils/memory/` package, `utils/routes/memory.py`, `Backend.pids()`, and web patch 9.
 
 ## Phase 6 — Metrics, dashboards and UI revision 2
 

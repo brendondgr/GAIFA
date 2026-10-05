@@ -440,6 +440,8 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 
 ## 9. `config.toml`
 
+Sizes in GB (`reserve_gb`, a manifest's `estimate_gb`, a status's `memory_estimate_gb`) are decimal: 1 GB = 10⁹ bytes, as the UI and `aihub` show them.
+
 ```toml
 # AIHub settings. Each mod ships defaults in services/<id>/service.toml; values here override them.
 # The Settings page edits this file and keeps comments.

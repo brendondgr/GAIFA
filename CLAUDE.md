@@ -2,7 +2,7 @@
 
 One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/`, run as its own process. Design: [docs/architecture.md](docs/architecture.md). Build plan: [docs/backend-plan.md](docs/backend-plan.md). UI brief: [docs/design-brief-ui.md](docs/design-brief-ui.md).
 
-**Status:** Phase 4 built: the outputs index (`utils/outputs/`: `outputs/<mod>/<date>/…` indexed into `hub.db`, watched live, previews, `/api/outputs` with Range, deletes go to `outputs/.trash/`) on top of Phase 3's models registry and Phase 2's mods (`aihub-<id>` systemd units, proxied at `/api/s/<id>/*`, `aihub new` / `aihub check`, mod pages). Live areas: system, services, logs, operations, proxy, events, models, outputs. Open: the Phase 4 Firefox audio-seek check. Next: Phase 5.1 (memory manager). What exists: [docs/structure.md](docs/structure.md).
+**Status:** Phase 5 done: the memory manager (`utils/memory/`: every mod's measured RAM + GPU memory, make-room plans and unloads, reservations, proxy triggers, `POST /api/memory/acquire`) on top of Phase 4's outputs index, Phase 3's models registry and Phase 2's mods. Live areas: system, services, logs, operations, proxy, events, models, outputs, memory. Open: the Phase 4 Firefox audio-seek check. Next: Phase 6.1 (metrics recorder). What exists: [docs/structure.md](docs/structure.md).
 
 **Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans, and `aihub-mod` to build or port a mod (guide: [docs/mods.md](docs/mods.md)).
 

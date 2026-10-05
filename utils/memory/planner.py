@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-GB = 1024**3
+GB = 1000**3  # decimal GB, as the UI shows it (and config, manifests and status use)
 
 
 @dataclass

@@ -17,7 +17,7 @@ import pytest
 from utils.tests.conftest import free_port
 from utils.tests.services.conftest import FAST, rig, serve, until  # noqa: F401 (rig and serve are fixtures)
 
-GB = 1024**3
+GB = 1000**3
 
 
 class FakeSource:

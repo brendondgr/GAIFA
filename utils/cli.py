@@ -108,10 +108,11 @@ def wait_up(seconds: float = 20) -> bool:
 
 
 def human_bytes(n: float) -> str:
+    """Decimal units, like the UI: 1 GB = 10⁹ bytes."""
     for unit in ("B", "KB", "MB", "GB", "TB"):
-        if abs(n) < 1024 or unit == "TB":
+        if abs(n) < 1000 or unit == "TB":
             return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
-        n /= 1024
+        n /= 1000
     return f"{n} B"
 
 

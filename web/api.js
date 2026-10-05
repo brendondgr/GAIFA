@@ -71,8 +71,8 @@ function toForm(form) {
 export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bind(globalThis), EventSource: ES = globalThis.EventSource } = {}) {
   const url = path => base + path;
 
-  async function send(method, path, { json, body, signal } = {}) {
-    const init = { method, signal, headers: {} };
+  async function send(method, path, { json, body, signal, headers } = {}) {
+    const init = { method, signal, headers: { ...(headers || {}) } };
     if (json !== undefined) { init.body = JSON.stringify(json); init.headers['content-type'] = 'application/json'; }
     else if (body !== undefined) init.body = body;
     try {
@@ -168,7 +168,9 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
       const query = { ...Object.fromEntries(new URLSearchParams(q0 || '')), ...(opts.query || {}) };
       const body = opts.json !== undefined ? undefined : opts.form ? toForm(opts.form) : undefined;
       const t0 = Date.now();
-      const res = await send(method, `/api/s/${enc(id)}${p}${qs(query)}`, { json: opts.json, body, signal: opts.signal });
+      // makeRoom: retry of a call the hub answered with needs_room ("Unload & continue", plan 5.5).
+      const headers = opts.makeRoom ? { 'X-AIHub-Make-Room': '1' } : undefined;
+      const res = await send(method, `/api/s/${enc(id)}${p}${qs(query)}`, { json: opts.json, body, signal: opts.signal, headers });
       if (!res.ok) throw res.headers.get('x-aihub-error') ? await envelopeError(res) : await upstreamError(res);
       const ct = res.headers.get('content-type') || '';
       const out = { status: res.status, ok: true, ms: 0, content_type: ct.split(';')[0] };

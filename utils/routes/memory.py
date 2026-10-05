@@ -32,7 +32,8 @@ class AcquireRequest(BaseModel):
 @router.get("/api/memory", summary="Memory now: system, GPU, each mod, other, reserve", response_model=SystemMemory)
 async def get_memory(request: Request) -> dict[str, Any]:
     mem = _mem(request)
-    return mem.snapshot or await mem.sample(publish=False)
+    # The last sample's numbers with load states as of now (a load may have finished since).
+    return mem.view() if mem.snapshot else await mem.sample(publish=False)
 
 
 @router.post("/api/memory/plan", summary="What loading a mod would unload (nothing is changed)", response_model=MakeRoomPlan)

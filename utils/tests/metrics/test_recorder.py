@@ -143,3 +143,31 @@ async def test_disk_alert(db, rec, monkeypatch, tmp_path):
     free["v"] = 60 * GB
     r.check_disk()
     assert alerts.list() == []
+
+
+async def test_a_tick_that_wakes_early_keeps_its_bucket(db, rec, monkeypatch):
+    """asyncio.sleep can return a hair before the 10 s boundary: the tick is still stamped with it."""
+    import asyncio
+
+    r = rec(FakeSvc("a"))
+    r.clock.t = T0 + 3.0
+    ticks: list[int] = []
+    real_tick = r.tick
+
+    async def early(seconds):
+        r.clock.t += seconds - 0.0005  # wakes just short of the boundary
+        if len(ticks) >= 3:
+            raise asyncio.CancelledError
+
+    async def tick(ts=None):
+        ticks.append(ts)
+        return await real_tick(ts)
+
+    monkeypatch.setattr(recmod.asyncio, "sleep", early)
+    r.tick = tick
+    try:
+        await r._tick_loop()
+    except asyncio.CancelledError:
+        pass
+    rows = [ts for ts, _ in await series_values(db, "mem.used")]
+    assert rows == [T0 + 10, T0 + 20, T0 + 30]  # one sample per bucket, none in the bucket before

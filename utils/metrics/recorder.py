@@ -120,11 +120,16 @@ class Recorder:
     # ticks --------------------------------------------------------------------------
 
     async def _tick_loop(self) -> None:
+        last = 0.0
         while True:
             now = self.clock()
-            await asyncio.sleep(max(0.0, (now // self.every + 1) * self.every - now))
+            due = max((now // self.every + 1) * self.every, last + self.every)  # never the same boundary twice
+            last = due
+            await asyncio.sleep(max(0.0, due - now))
             try:
-                await self.tick()
+                # Stamp the tick with the boundary it waited for: a sleep that wakes a hair early
+                # would otherwise land in the previous 10 s bucket and leave this one empty.
+                await self.tick(ts=max(due, self.clock()) if self.every >= RAW_STEP else None)
             except Exception:  # noqa: BLE001: keep recording
                 log.exception("metrics tick")
 

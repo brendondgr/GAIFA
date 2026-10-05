@@ -342,7 +342,7 @@ export const api = createApi({ base: window.AIHUB_API_BASE ?? null, liveAreas: f
 - **`api.liveAreas`** says which areas are live, so each page section can show a small **MOCK** badge while its area is still mocked. `api.isLive(area)` answers the same for one area.
 - **Errors in `callService`:** a non-2xx from the mod rejects with `upstream_error` (`detail` = the mod's message, `data.body` = its body). Hub errors carry an `X-AIHub-Error` header and reject with their own code.
 
-Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `memory`, `models`, `outputs`, `settings`, `events`, `metrics` (Section 11.7), `widgets` (Section 11.7) and `tools`.
+Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `memory`, `models`, `outputs`, `settings`, `events`, `metrics` (Section 11.7), `widgets` (Section 11.7) and `tools`. The hub also lists `overview` once `GET /api/overview` exists (`getOverview` uses it then).
 
 ### 6.2 Methods → endpoints
 
@@ -374,7 +374,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `listOutputs(filter)` | `GET /api/outputs?service=&kind=&q=&from=&to=&cursor=&limit=` | `OutputPage` (`service` and `kind` are comma-separated lists; `q` matches every word; `limit` 1–500, default 60) |
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
 | `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
-| `getSettings()` | `GET /api/settings` | `Settings` |
+| `getSettings()` | `GET /api/settings` | `Settings` (`services.order` and `memory.priority` list every installed mod: the configured ids first, then the rest in sidebar order) |
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
 

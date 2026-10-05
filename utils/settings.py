@@ -27,11 +27,14 @@ MOD_DEFAULTS = {"enabled": True, "autostart": True}  # manifest.effective()'s de
 def view(hub: Hub) -> dict[str, Any]:
     cfg = hub.config
     svcs = hub.services.list() if hub.services else []
+    # Every installed mod appears in `order` and `priority` (the page reorders what it is given):
+    # the configured ids first, then the rest in sidebar order. Unchanged, nothing is written.
+    rest = lambda ids: list(ids) + [s.id for s in svcs if s.id not in ids]  # noqa: E731
     return {
         "hub": {"port": cfg.hub.port},
         "memory": {"reserve_gb": cfg.memory.reserve_gb, "auto_make_room": cfg.memory.auto_make_room,
-                   "never_unload": list(cfg.memory.never_unload), "priority": list(cfg.memory.priority)},
-        "services": {"order": list(cfg.services.order),
+                   "never_unload": list(cfg.memory.never_unload), "priority": rest(cfg.memory.priority)},
+        "services": {"order": rest(cfg.services.order),
                      "enabled": {s.id: s.eff.enabled for s in svcs},
                      "autostart": {s.id: s.eff.autostart for s in svcs}},
         "ui": {"theme": cfg.ui.theme, "density": cfg.ui.density, "dashboard": cfg.ui.dashboard.model_dump()},

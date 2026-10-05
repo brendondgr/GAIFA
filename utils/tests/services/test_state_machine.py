@@ -118,7 +118,7 @@ async def test_degraded_recovers(rig):
     os.kill(svc.pid, signal.SIGCONT)
     await until(lambda: svc.state == "ready", timeout=5)
     assert svc.last_error is None
-    assert "Fake OK is healthy again" in activity(mgr)
+    await until(lambda: "Fake OK is healthy again" in activity(mgr))  # written just after the state changes
 
 
 async def test_stop_and_restart(rig):

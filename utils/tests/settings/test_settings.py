@@ -29,8 +29,9 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
         s = (await c.get("/api/settings")).json()
         assert s == {
             "hub": {"port": served.hub.config.hub.port},
-            "memory": {"reserve_gb": 12, "auto_make_room": False, "never_unload": ["lcpp"], "priority": ["comfy", "tts", "gen3d"]},
-            "services": {"order": ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode"], "enabled": {"fake-ok": True}, "autostart": {"fake-ok": True}},
+            # installed mods missing from the lists follow the configured ids
+            "memory": {"reserve_gb": 12, "auto_make_room": False, "never_unload": ["lcpp"], "priority": ["comfy", "tts", "gen3d", "fake-ok"]},
+            "services": {"order": ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode", "fake-ok"], "enabled": {"fake-ok": True}, "autostart": {"fake-ok": True}},
             "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}}},
         }
         before = _file(served)
@@ -38,6 +39,12 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
         r = await c.put("/api/settings", json=s)
         assert r.status_code == 200 and r.json() == {"settings": s, "restart_required": False}
         assert _file(served) == before  # nothing changed, so nothing is rewritten (the comment stays)
+        # reordering writes the whole list; putting it back to the default order removes it
+        r = await c.put("/api/settings", json={"memory": {"priority": ["fake-ok", "comfy", "tts", "gen3d"]}})
+        assert tomllib.loads(_file(served))["memory"]["priority"] == ["fake-ok", "comfy", "tts", "gen3d"]
+        assert served.services.get("fake-ok").eff.priority == 0  # applies at once
+        await c.put("/api/settings", json={"memory": {"priority": ["comfy", "tts", "gen3d"]}})
+        assert "memory" not in tomllib.loads(_file(served)) or "priority" not in tomllib.loads(_file(served))["memory"]
         # a changed value equal to the default removes its key instead of pinning it
         await c.put("/api/settings", json={"memory": {"reserve_gb": 14}})
         assert tomllib.loads(_file(served))["memory"]["reserve_gb"] == 14

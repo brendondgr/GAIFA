@@ -128,7 +128,7 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
   return {
     getOverview: () => req('GET', '/api/overview'),
     getSystem: () => req('GET', '/api/system'),
-    getRecentEvents: (limit = 80) => req('GET', `/api/events/recent${qs({ limit })}`),  // not in the brief: overview fill-in until Phase 6
+    getRecentEvents: (limit = 80) => req('GET', `/api/events/recent${qs({ limit })}`),  // not in the brief: getOverview's fill-in while `overview` is mocked
     listServices: () => req('GET', '/api/services'),
     getService: id => req('GET', `/api/services/${enc(id)}`),
     startService: id => req('POST', `/api/services/${enc(id)}/start`),
@@ -198,7 +198,7 @@ export function createApi({ base = null, liveAreas = [], mock, fetch, EventSourc
     api[name] = isLive(area) ? http[name] : (mock?.[name] ? mock[name].bind(mock) : noMock(name));
   }
 
-  // Assembled from the per-area calls until the hub serves /api/overview (Phase 6).
+  // The hub's /api/overview when the `overview` area is live; otherwise the mock's, with live areas filled in.
   api.getOverview = async () => {
     if (isLive('overview')) return http.getOverview();
     const ov = await mock.getOverview();

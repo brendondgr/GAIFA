@@ -1,7 +1,9 @@
 """`hub.db`: SQLite in WAL mode, migrations by `PRAGMA user_version`.
 
 One writer thread owns the only write connection; every write is queued to
-it. Reads use one connection per thread. The async helpers run on
+it. Reads use one connection per thread, each with a lock held for the query, so
+`close()` waits for a query still running in a worker thread instead of closing
+the connection under it (which crashes SQLite). The async helpers run on
 `asyncio.to_thread` (reads) or the writer thread (writes), so the event loop
 never blocks on SQLite.
 """
@@ -42,6 +44,31 @@ MIGRATIONS: list[str] = [
         value TEXT
     );
     """,
+    # 002: the outputs index (plan 4.1). `path` is relative to the outputs dir; `files` and
+    # `meta` are JSON; `sig` (sizes + mtimes) tells a rescan whether an entry changed.
+    """
+    CREATE TABLE outputs (
+        id         TEXT PRIMARY KEY,
+        service    TEXT NOT NULL,
+        kind       TEXT NOT NULL,
+        title      TEXT NOT NULL,
+        path       TEXT NOT NULL UNIQUE,
+        is_dir     INTEGER NOT NULL DEFAULT 0,
+        main       TEXT,
+        preview    TEXT,
+        size_bytes INTEGER NOT NULL DEFAULT 0,
+        created_ts REAL NOT NULL,
+        duration_s REAL,
+        width      INTEGER,
+        height     INTEGER,
+        meta       TEXT NOT NULL DEFAULT '{}',
+        files      TEXT NOT NULL DEFAULT '[]',
+        search     TEXT NOT NULL DEFAULT '',
+        sig        TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX outputs_created ON outputs (created_ts DESC, id);
+    CREATE INDEX outputs_service ON outputs (service, created_ts DESC);
+    """,
 ]
 
 _STOP = object()
@@ -76,14 +103,16 @@ class Database:
         self._queue: queue.SimpleQueue[Any] = queue.SimpleQueue()
         self._thread: threading.Thread | None = None
         self._local = threading.local()
-        self._readers: list[sqlite3.Connection] = []
+        self._readers: list[tuple[sqlite3.Connection, threading.Lock]] = []
         self._readers_lock = threading.Lock()
+        self._closed = False
 
     # lifecycle ------------------------------------------------------------
 
     def open(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._writer = _connect(self.path)
+        self._closed = False
         self._writer.execute("PRAGMA journal_mode = WAL")
         self._writer.execute("PRAGMA synchronous = NORMAL")
         migrate(self._writer, self._migrations)
@@ -91,6 +120,7 @@ class Database:
         self._thread.start()
 
     def close(self) -> None:
+        self._closed = True
         if self._thread:
             self._queue.put(_STOP)
             self._thread.join()
@@ -99,14 +129,15 @@ class Database:
             self._writer.close()
             self._writer = None
         with self._readers_lock:
-            for c in self._readers:
-                c.close()
+            for c, lock in self._readers:
+                with lock:  # a query in flight in another thread finishes first
+                    c.close()
             self._readers.clear()
         self._local = threading.local()
 
     @property
     def version(self) -> int:
-        return self._reader().execute("PRAGMA user_version").fetchone()[0]
+        return self._read(lambda c: c.execute("PRAGMA user_version").fetchone()[0])
 
     # writes ---------------------------------------------------------------
 
@@ -153,21 +184,28 @@ class Database:
 
     # reads ----------------------------------------------------------------
 
-    def _reader(self) -> sqlite3.Connection:
-        conn = getattr(self._local, "conn", None)
-        if conn is None:
+    def _read(self, fn: Callable[[sqlite3.Connection], T]) -> T:
+        """`fn(conn)` on this thread's reader connection, holding its lock."""
+        reader = getattr(self._local, "reader", None)
+        if reader is None:
+            if self._closed:
+                raise RuntimeError("database is closed")
             conn = _connect(self.path)
             conn.execute("PRAGMA query_only = ON")
-            self._local.conn = conn
+            reader = self._local.reader = (conn, threading.Lock())
             with self._readers_lock:
-                self._readers.append(conn)
-        return conn
+                self._readers.append(reader)
+        conn, lock = reader
+        with lock:
+            if self._closed:
+                raise RuntimeError("database is closed")
+            return fn(conn)
 
     def fetchall_sync(self, sql: str, params: Iterable[Any] = ()) -> list[dict[str, Any]]:
-        return [dict(r) for r in self._reader().execute(sql, tuple(params)).fetchall()]
+        return self._read(lambda c: [dict(r) for r in c.execute(sql, tuple(params)).fetchall()])
 
     def fetchone_sync(self, sql: str, params: Iterable[Any] = ()) -> dict[str, Any] | None:
-        row = self._reader().execute(sql, tuple(params)).fetchone()
+        row = self._read(lambda c: c.execute(sql, tuple(params)).fetchone())
         return dict(row) if row else None
 
     async def fetchall(self, sql: str, params: Iterable[Any] = ()) -> list[dict[str, Any]]:

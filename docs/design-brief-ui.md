@@ -371,9 +371,9 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `deleteModel(id, {files})` | `DELETE /api/models/{id}?files=0\|1` | `204` |
 | `scanModels()` | `POST /api/models/scan` | `{ discovered: Discovered[] }` |
 | `addModel(input)` | `POST /api/models` body `ModelInput` | `201 Model` |
-| `listOutputs(filter)` | `GET /api/outputs?service=&kind=&q=&from=&to=&cursor=&limit=` | `OutputPage` |
+| `listOutputs(filter)` | `GET /api/outputs?service=&kind=&q=&from=&to=&cursor=&limit=` | `OutputPage` (`service` and `kind` are comma-separated lists; `q` matches every word; `limit` 1–500, default 60) |
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
-| `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204` |
+| `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
 | `getSettings()` | `GET /api/settings` | `Settings` |
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
@@ -382,7 +382,7 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 
 ### 6.3 Error codes to handle
 
-`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
+`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `output_not_deletable` (the output resolves outside `outputs/`, e.g. through a symlinked folder), `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
 
 ### 6.4 Types
 
@@ -513,12 +513,15 @@ interface Output {
   duration_s?: number;
   dims?: { w: number; h: number };
   meta: { prompt?: string; model?: string; voice?: string; seed?: number;
-          params?: Record<string, unknown>; [k: string]: unknown };
+          params?: Record<string, unknown>;
+          excerpt?: string;          // text outputs without a prompt: their first lines, for the card
+          [k: string]: unknown };
 }
 interface OutputPage {
   items: Output[]; next_cursor: string | null;
   totals: { count: number; size_bytes: number;
-            by_kind: Record<OutputKind, number>; by_service: Record<string, number> };
+            by_kind: Record<OutputKind, number>;      // counts with every filter except kind
+            by_service: Record<string, number> };     // counts with every filter except service
 }
 
 interface Activity { id: string; ts: number; service: string | null;

@@ -380,7 +380,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 4 — Outputs index
 
-- [ ] **4.1 Indexer** (migration 002: an `outputs` table with `id`, `service`, `kind`, `title`, `path` UNIQUE, `is_dir`, `main`, `preview`, `size_bytes`, `created_ts`, `duration_s`, `width`, `height`, `meta` JSON and `search`; indexes on `(created_ts DESC, id)` and `(service, created_ts DESC)`).
+- [x] **4.1 Indexer** (migration 002: an `outputs` table with `id`, `service`, `kind`, `title`, `path` UNIQUE, `is_dir`, `main`, `preview`, `size_bytes`, `created_ts`, `duration_s`, `width`, `height`, `meta` JSON and `search`; indexes on `(created_ts DESC, id)` and `(service, created_ts DESC)`).
   - **Where things are:**
     - Parse `outputs/<mod>/<date>/<entry>`, and be forgiving about files outside a date folder (use the mtime).
     - Skip `*.part`, dotfiles and sidecars.
@@ -394,21 +394,34 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - Duration via the stdlib `wave` module, falling back to `ffprobe`.
     - Image size via Pillow; video size via `ffprobe`.
   - **ids** = `sha1(relative path)[:12]`.
-- [ ] **4.2 Watcher.**
+  - *As built:* a package, `utils/outputs/`: `entries.py` (what counts as an output), `describe.py` (an output → its row), `media.py` (durations, sizes, previews), `index.py` (`Outputs`: the table, list/get/delete/files). The table also has `files` (JSON) and `sig` (sizes + mtimes, so a rescan skips unchanged outputs). Paths are relative to `outputs/`. Rules beyond the step:
+    - A folder **with** `output.json` is one folder output, skipped as a whole until it says `"complete": true`. Any **other** folder (a date folder, or a mod's own subfolder such as ComfyUI's `video/`) is walked into, and each file in it is an output.
+    - A sidecar is `<file>.json`, or `<stem>.json` next to a non-JSON file with that stem. A lone `.json` is a text output. Unfinished `*.tmp`, `*.crdownload` and `*.incomplete` files are skipped like `*.part`.
+    - Created time: the sidecar's `created_ts` if given; inside a date folder, that date plus the name's `HHMMSS-` time (or the file's time of day); otherwise the mtime.
+    - Text outputs without a prompt get `meta.excerpt` (the first 400 characters) for their card.
+    - Folder files get roles: `main`, `preview`, or their subfolder's name made singular (`parts/` → `part`).
+    - WAV durations use `wave`; float WAVs, other audio and video use `ffprobe`. Without ffmpeg, videos simply have no poster or duration.
+    - Symlinked folders are followed, except ones that loop back up.
+  - *Fixed along the way:* `Database.close()` could close a reader connection while a worker thread was mid-query (an app shutting down with a `to_thread` read in flight), which segfaults SQLite (3 crashes in 12 test runs). Each reader connection now has a lock held for the query, `close()` waits on it, and reads after close raise `database is closed` (regression test in `core/test_db.py`).
+- [x] **4.2 Watcher.**
   - `watchfiles.awatch` on `outputs/`, debounced 1 s, indexing once a file's size is stable.
   - New or changed files are indexed and publish `output`; deleted ones are removed and publish `output_deleted`.
   - **On startup**, a background rescan reconciles the database with the disk, with no event per file.
   *Done when:* tests cover `.part` → rename, a folder becoming complete, deletes, and the startup reconcile.
-- [ ] **4.3 Previews.**
+  - *As built:* `utils/outputs/watch.py`. A change marks its folder (`<service>/<date>`, else `<service>`) for a rescan; an output is indexed once its sig has held for 1 s (a time-based check, so an extra rescan mid-write can't index a half-written file). New and changed outputs publish `output`, removed ones `output_deleted`. The startup reconcile runs in the background in chunks of 25 and ends with one `output_deleted` with id `*` if anything changed (the UI refetches on it). If watching fails, e.g. `outputs/` was removed, an `outputs-watch` error alert is raised, the folder is recreated, and everything is rescanned once watching resumes. Tests: `test_watch.py`, including fake-ok's output appearing through the hub in under 2 s.
+- [x] **4.3 Previews.**
   - Images over 4 MP get a cached 640 px JPEG; videos get a poster frame at 1 s (`ffmpeg`). Both are stored as `.<name>.preview.jpg`.
   - 3D outputs use the sidecar `preview` or `preview.png`; audio has none.
   - Generated off the event loop; failures are logged and never block indexing.
-- [ ] **4.4 Output routes.**
+  - *As built:* images up to 4 MP are their own preview. A preview is made ahead of time by a one-at-a-time background queue, or on the first request for it (at most 2 at once), and remade when its file changes. Preview URLs carry `?v=<version>` and are cacheable for a week. If a big image can't be shrunk, its original is served; a video whose poster fails gets 404, and isn't retried until the file changes. Clips shorter than 1 s use their first frame. Tests: `test_previews.py` (video tests use the host's ffmpeg via `flatpak-spawn` inside the toolbox).
+- [x] **4.4 Output routes.**
   - **List:** filters for service, kind, `q`, `from` and `to`; keyset cursor on `(created_ts, id)`; totals by aggregate.
   - **Get** and **delete:** delete removes the file, sidecar and preview, or the whole folder, only inside `outputs/`, then publishes `output_deleted`.
   - **Files:** `file`, `files/{path}` (path-traversal guarded) and `preview`, all with **HTTP Range**. Check that Starlette's `FileResponse` returns 206; if not, implement it.
   *Done when:* tests cover paging, totals, Range and the traversal guard.
-- [ ] **4.5 Activity for outputs.** Each new output adds an activity item. Batch them: more than 5 from one mod within 10 s become a single "gen3d created 8 files".
+  - *As built:* `utils/routes/outputs.py`. `service` and `kind` take comma-separated lists; `q` matches every word against title, prompt and file name. `totals.by_kind` counts with every filter except kind, and `by_service` with every filter except service (the filter chips' counts). The cursor is `<created_ts>:<id>`; paging is stable across equal timestamps. **Delete moves the output to `outputs/.trash/<YYYY-MM-DD>/`** (your decision, 2026-10-05) with its sidecar and preview, or the whole folder; the trash is ignored by the index and purged after 30 days (at startup and every 6 h). A `<stem>.json` shared with another file stays. An output that resolves outside `outputs/` (a symlinked folder) is `409 output_not_deletable`. Starlette's `FileResponse` already answers Range with 206 (and 416 past the end). `files/{path}` only serves paths listed in that output's `files`, so traversal can't reach anything else. Tests: `test_routes.py`, `test_delete.py`.
+- [x] **4.5 Activity for outputs.** Each new output adds an activity item. Batch them: more than 5 from one mod within 10 s become a single "gen3d created 8 files".
+  - *As built:* `utils/outputs/announce.py`. A mod's new outputs are collected until it has been quiet for 2 s, or 10 s after the first; up to 5 become one item each (`Speech created "Good morning"`, linking to the output), more become one (`3D Generate created 8 outputs`). Changed outputs and the startup reconcile add none. Deleting adds `Moved "<title>" to the outputs trash`.
 
 **Wire — Phase 4:** `outputs` goes live:
 - the Outputs page: grid and list, filters, day groups, infinite scroll, and the detail drawer with every viewer

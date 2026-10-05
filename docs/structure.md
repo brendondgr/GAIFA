@@ -22,7 +22,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `utils/` | ✅ | The hub's Python package (below) |
 | `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js` |
 | `data/` | ✅ | Models, databases (below); `logs/` and `state/` arrive in Stage D |
-| `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…`, ignored by git |
+| `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…` (+ `.trash/`), ignored by git; indexed into `hub.db` |
 | `web/` | ✅ | The UI (below) |
 
 ## `docs/`
@@ -45,7 +45,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `__init__.py` | ✅ | Package marker; nothing runs at import time |
 | `paths.py` | ✅ | `Paths` (root, configurable dirs kept inside the root), `write_atomic()` |
 | `config.py` | ✅ | `Config` (pydantic, §9), `load()`, `save()` via tomlkit, `service_override()`, loopback check |
-| `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version`, one writer thread, async helpers |
+| `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version` (001 activity/peaks/kv, 002 outputs), one writer thread, locked per-thread readers, async helpers |
 | `events.py` | ✅ | `EventBus` (per-subscriber queue, overflow → resync), `ActivityLog`, `Alerts`, `sse_stream()` |
 | `server.py` | ✅ | `create_app()`, `Hub` (app state, live-area registry), lifespan, `HubError` + error envelope, static `web/` |
 | `cli.py` | ✅ | Standard-library CLI behind `bin/aihub`: serve, install, start/stop/restart, status, logs, load/unload, open, url, doctor |
@@ -57,12 +57,12 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `proxy.py` | ✅ | `ANY /api/s/<id>/*`: streaming passthrough, hop-by-hop headers dropped, redirects kept inside the proxy |
 | `operations.py` | ✅ | Mod OpenAPI → `Operation[]` (refs inlined, file fields, response kinds, hide globs, tools), cached per process start |
 | `registry/` | ✅ pkg | Models registry (architecture §8): `model.py` (stored shape, validation, `RegistryError`), `store.py` (`Registry`: load/save `registry.json`, computed status, totals, filters, edit, delete with the in-use rule), `scan.py` (the scanner's grouping rules), `adding.py` (`POST /api/models/scan` filtering, `POST /api/models`), `verify.py` (`Verifier`: the one-at-a-time checksum queue), `alerts.py` (registry alerts and the once-a-minute watcher) |
-| `outputs.py` | ⏳ 4 | Outputs watcher and index |
+| `outputs/` | ✅ pkg | Outputs index (architecture §4.7): `entries.py` (which files and folders are outputs, `scope_for`), `describe.py` (an output → its `outputs` row: sidecar, title, kind, main file, times), `media.py` (durations, sizes, previews via `wave`/Pillow/ffmpeg), `index.py` (`Outputs`: sync, reconcile, list/get, delete, files, previews), `watch.py` (`watchfiles` watcher, startup rescan, trash purge), `trash.py` (`outputs/.trash/<date>/`, purged after 30 days), `announce.py` (batched activity items) |
 | `proc.py` | ✅ · ⏳ 5 | `port_listening()`, `port_owner()` (who holds a port, from /proc); per-process memory arrives in Phase 5 |
 | `memory.py` | ⏳ 5 | Memory sampling and make-room plans |
 | `metrics.py` | ⏳ 6.1 | Time series recorder and rollups |
 | `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`) |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`), `outputs.py` (`/api/outputs/...`, file serving with Range) |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -79,7 +79,8 @@ utils/tests/
 ├── web/*.test.mjs + test_api_js.py ✅  Node unit tests (web/api.js; mod-ui.js + the template page.js on a fake DOM), run from pytest
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
 ├── models/test_<behavior>.py   ✅     registry storage and status, routes, safe deletes, the scanner on a tree covering every rule, verify, used-by, alerts, the CLI (conftest: a fake data/models/)
-└── <area>/test_<behavior>.py          outputs, memory, metrics, …
+├── outputs/test_<behavior>.py  ✅     what counts as an output, rows, the watcher, previews, routes (paging, Range, traversal), delete to trash, activity (conftest: a fake outputs/ tree; the host's ffmpeg inside a toolbox)
+└── <area>/test_<behavior>.py          memory, metrics, …
 ```
 
 ## `web/` — the UI

@@ -25,6 +25,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from utils.config import Config
 from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
+from utils.outputs import OutputError, Outputs
+from utils.outputs.watch import Watcher as OutputsWatcher
 from utils.paths import DEFAULT_ROOT, Paths
 from utils.registry import Registry, RegistryError
 from utils.registry.alerts import Watcher as RegistryWatcher
@@ -71,6 +73,7 @@ class Hub:
     activity: ActivityLog | None = None
     alerts: Alerts | None = None
     registry: Registry | None = None
+    outputs: Outputs | None = None
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -107,7 +110,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, models, services, system, web
+    from utils.routes import events, models, outputs, services, system, web
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -144,7 +147,14 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             await hub.services.boot(autostart=hub.options.autostart)
             hub.registry.services = hub.services
             hub.services.registry = hub.registry
-            # 6–8 (outputs, memory, metrics) arrive in Phases 4–6.
+            # 6. outputs: the index, then watch outputs/ (the startup rescan runs in the background).
+            hub.outputs = Outputs(paths, hub.db, hub.bus, hub.activity)
+            hub.outputs.start()
+            stack.push_async_callback(hub.outputs.close)
+            out_watcher = OutputsWatcher(hub.outputs, hub.alerts, name_of=_service_name(hub))
+            out_watcher.start()
+            stack.push_async_callback(out_watcher.close)
+            # 7–8 (memory, metrics) arrive in Phases 5–6.
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 
@@ -165,12 +175,23 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(services.router)
     app.include_router(proxy.router)
     app.include_router(models.router)
-    for area in ("services", "logs", "operations", "proxy", "events", "models"):
+    app.include_router(outputs.router)
+    for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs"):
         hub.mark_live(area)
 
     app.include_router(web.router)
     app.mount("/", WebFiles(directory=paths.web, html=True, check_dir=False), name="web")
     return app
+
+
+def _service_name(hub: Hub) -> Any:
+    """A mod's display name for activity text ("Speech created …"), or its id."""
+
+    def name_of(service_id: str) -> str:
+        svc = hub.services.services.get(service_id) if hub.services else None
+        return svc.mod.name if svc else service_id
+
+    return name_of
 
 
 class WebFiles(StaticFiles):
@@ -209,6 +230,10 @@ def _error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RegistryError)
     async def _registry_error(_: Request, e: RegistryError) -> JSONResponse:
+        return _envelope(e.status, e.code, e.detail, e.data)
+
+    @app.exception_handler(OutputError)
+    async def _output_error(_: Request, e: OutputError) -> JSONResponse:
         return _envelope(e.status, e.code, e.detail, e.data)
 
     @app.exception_handler(StarletteHTTPException)

@@ -74,7 +74,7 @@ AIHub/
 │   ├── memory.py            memory sampling, plans to make room, acquire
 │   ├── proc.py              meminfo, AMD GPU sysfs/fdinfo, per-process memory (from lcpp)
 │   ├── registry/            models registry: storage, status, scan, verify, add, delete
-│   ├── outputs.py           outputs watcher, index, previews, file serving
+│   ├── outputs/             outputs index: what counts, rows, media details and previews, watcher, trash
 │   ├── tools.py             (later) agent tool catalog and approvals
 │   ├── cli.py               standard-library-only CLI behind bin/aihub
 │   ├── routes/              one FastAPI router per area
@@ -258,8 +258,8 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 ### 4.7 Output conventions
 - **Where:** write into `{outputs}/<YYYY-MM-DD>/`.
 - **File outputs:** name them `<HHMMSS>-<slug>.<ext>`. Write to `<name>.part` first, then rename; the watcher ignores `*.part` and dotfiles.
-- **Folder outputs** (e.g. a 3D job): a folder `<id>-<slug>/`. It is indexed only once it contains `output.json` with `"complete": true`.
-- **Sidecar:** `<file>.json` next to a file output, or `output.json` inside a folder output. Every field is optional:
+- **Folder outputs** (e.g. a 3D job): a folder `<id>-<slug>/`. Write `output.json` with `"complete": false` when you create it and set `"complete": true` when the job is done: a folder with `output.json` is indexed as one output, and only once it is complete. A folder **without** `output.json` is just a folder: each file in it is its own output (so a mod's own subfolders, like ComfyUI's, work as they are).
+- **Sidecar:** `<file>.json` next to a file output (`<stem>.json` works too), or `output.json` inside a folder output. Every field is optional. `title`, `kind`, `main`, `preview`, `complete` and `created_ts` (unix seconds, for outputs copied in later) steer the index; everything else is shown as the output's metadata:
 
 ```json
 {
@@ -278,14 +278,16 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 ```
 
 - **Kind from extension**, when the sidecar doesn't give one:
-  - audio: wav, mp3, flac, ogg, opus
-  - image: png, jpg, jpeg, webp, gif
-  - video: mp4, webm, mov
-  - model3d: glb, gltf, obj, ply, stl
-  - text: txt, md, json
-  - archive: zip
+  - audio: wav, mp3, flac, ogg, opus, m4a, aac
+  - image: png, jpg, jpeg, webp, gif, bmp, avif
+  - video: mp4, webm, mov, mkv
+  - model3d: glb, gltf, obj, ply, stl, fbx
+  - text: txt, md, json, srt, vtt, csv
+  - archive: zip, tar, gz, 7z
   - anything else is `other`
-- **Previews:** the hub makes them itself (a video poster frame via ffmpeg) and stores them as hidden `.<name>.preview.jpg` files next to the output.
+- **Without a sidecar:** the title is the name as words (minus the `HHMMSS-` prefix); the time is the date folder plus that prefix, else the file's mtime. A folder's main file is the first model3d, then video, image, audio file.
+- **Previews:** the hub makes them itself (a 640 px JPEG for images over 4 MP, a video poster frame at 1 s via ffmpeg) and stores them as hidden `.<name>.preview.jpg` files next to the output. A 3D job brings its own (`preview` in the sidecar, or `preview.png`).
+- **Deleting** an output from the UI moves it, with its sidecar and preview, to `outputs/.trash/<YYYY-MM-DD>/`; the hub empties trash days older than 30 days. Dotfiles and dot-folders are never indexed.
 
 ### 4.8 Adding a mod
 1. Run `aihub new <id>`. It copies `services/_template/`, fills in the id, name and a free port, runs its `install.sh`, and asks the running hub to pick it up (`POST /api/services/rescan`). The mod appears in the sidebar, with an Overview tile, a working API tab and its Hello tab, and starts.
@@ -303,7 +305,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
    - find all manifests
    - adopt running `aihub-*` units
    - autostart enabled mods in `after` order
-6. outputs (rescan, then watch)
+6. outputs (watch `outputs/`, with a background rescan of what changed while the hub was down)
 7. memory sampler
 8. metrics recorder and rollups
 

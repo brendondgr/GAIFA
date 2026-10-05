@@ -136,8 +136,9 @@ After editing `page.js`, reload the browser tab. Pages for the built-in apps can
 - **Outputs:** write to `$AIHUB_OUTPUTS/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext>`.
   - Write `<name>.part` first, then rename it.
   - Add an optional `<file>.json` sidecar: `{title, kind, prompt, model, voice, seed, params, source}`.
-  - A multi-file output is a folder with `output.json` (`"complete": true`).
-  - Declare `[outputs] kinds = ["audio"]`. Files then appear on the Outputs page (Phase 4).
+  - A multi-file output is a folder with `output.json`: write it with `"complete": false` first and set `"complete": true` when done. A folder without `output.json` is just a folder (each file in it is an output).
+  - Sidecars may set `created_ts` (unix seconds) for outputs copied in later; the time otherwise comes from the date folder and the `HHMMSS-` prefix.
+  - Declare `[outputs] kinds = ["audio"]`. New files appear on the Outputs page within about 2 s, and in the activity feed.
 - **Memory:** for mods that hold models in RAM or VRAM, declare:
   ```toml
   [memory]

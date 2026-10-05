@@ -20,21 +20,21 @@ def tables(db):
 
 
 def test_migrations_apply_once(db, tmp_path):
-    assert db.version == len(MIGRATIONS) == 1
-    assert {"activity", "service_peaks", "kv"} <= tables(db)
+    assert db.version == len(MIGRATIONS) == 2
+    assert {"activity", "service_peaks", "kv", "outputs"} <= tables(db)
     assert db.fetchone_sync("PRAGMA journal_mode")["journal_mode"] == "wal"
     db.close()
     again = Database(tmp_path / "hub.db")
     again.open()  # would fail with "table already exists" if 001 re-ran
-    assert again.version == 1
+    assert again.version == 2
     again.close()
 
 
 def test_new_migration_applies_on_top(tmp_path):
     conn = sqlite3.connect(tmp_path / "x.db", isolation_level=None)
-    assert migrate(conn) == 1
-    assert migrate(conn, MIGRATIONS + ["CREATE TABLE extra (x);"]) == 2
-    assert migrate(conn, MIGRATIONS + ["CREATE TABLE extra (x);"]) == 2
+    assert migrate(conn) == 2
+    assert migrate(conn, MIGRATIONS + ["CREATE TABLE extra (x);"]) == 3
+    assert migrate(conn, MIGRATIONS + ["CREATE TABLE extra (x);"]) == 3
 
 
 def test_failed_migration_rolls_back(tmp_path):
@@ -99,3 +99,40 @@ def test_closed_db_refuses_writes(tmp_path):
     d = Database(tmp_path / "hub.db")
     with pytest.raises(RuntimeError, match="not open"):
         d.submit(lambda c: None)
+
+
+def test_close_waits_for_reads_in_other_threads(tmp_path):
+    """Closing while worker threads are mid-query (an app shutting down with a to_thread read
+    in flight) must not close a connection under a running query: that segfaults SQLite."""
+    import threading
+
+    for _ in range(20):
+        d = Database(tmp_path / "busy.db")
+        d.open()
+        d.submit(lambda c: c.executemany("INSERT INTO kv (key, value) VALUES (?, ?)", [(str(i), "v" * 200) for i in range(2000)])).result()
+        stop, errors = threading.Event(), []
+
+        def hammer():
+            while not stop.is_set():
+                try:
+                    d.fetchall_sync("SELECT a.key FROM kv a JOIN kv b ON a.value = b.value LIMIT 3000")
+                except RuntimeError:
+                    return  # "database is closed": the expected way out
+                except sqlite3.ProgrammingError:
+                    return
+                except Exception as e:  # noqa: BLE001
+                    errors.append(e)
+                    return
+
+        threads = [threading.Thread(target=hammer) for _ in range(4)]
+        for t in threads:
+            t.start()
+        time.sleep(0.02)
+        d.close()
+        stop.set()
+        for t in threads:
+            t.join(5)
+        assert not errors
+        with pytest.raises(RuntimeError, match="closed"):
+            d.fetchall_sync("SELECT 1")
+        (tmp_path / "busy.db").unlink()

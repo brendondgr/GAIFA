@@ -220,3 +220,49 @@ class ModelList(_Model):
     models: list[Model]
     totals: ModelTotals
     disk: Disk
+
+
+# ---- outputs (Phase 4) ----
+
+OutputKind = Literal["audio", "image", "video", "model3d", "text", "archive", "other"]
+
+
+class OutputFile(_Model):
+    path: str
+    kind: OutputKind
+    size_bytes: int
+    role: str | None = None
+
+
+class Dims(_Model):
+    w: int
+    h: int
+
+
+class Output(_Model):
+    id: str
+    service: str
+    kind: OutputKind
+    title: str
+    path: str = Field(description='"outputs/tts/2026-10-04/143012-good-morning.wav" (a file or a folder)')
+    files: list[OutputFile]
+    url: str = Field(description="The main file (supports Range)")
+    preview: str | None = Field(description="Thumbnail or poster, if there is one")
+    size_bytes: int
+    created_ts: float
+    duration_s: float | None = None
+    dims: Dims | None = None
+    meta: dict[str, Any] = Field(description="The sidecar's other fields: prompt, model, voice, seed, params, source, …; `excerpt` for text")
+
+
+class OutputTotals(_Model):
+    count: int
+    size_bytes: int
+    by_kind: dict[str, int] = Field(description="Counts with every filter except kind")
+    by_service: dict[str, int] = Field(description="Counts with every filter except service")
+
+
+class OutputPage(_Model):
+    items: list[Output]
+    next_cursor: str | None
+    totals: OutputTotals

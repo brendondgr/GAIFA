@@ -47,7 +47,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
         assert "memory" not in tomllib.loads(_file(served)) or "priority" not in tomllib.loads(_file(served))["memory"]
         # a changed value equal to the default removes its key instead of pinning it
         await c.put("/api/settings", json={"memory": {"reserve_gb": 14}})
-        assert tomllib.loads(_file(served))["memory"]["reserve_gb"] == 14
+        assert tomllib.loads(_file(served))["memory"]["reserve_gb"] == 14 and "14.0" not in _file(served)
         await c.put("/api/settings", json={"memory": {"reserve_gb": 12}})
         assert "memory" not in tomllib.loads(_file(served)) and "# my settings" in _file(served)
 
@@ -108,6 +108,7 @@ async def test_port_change_needs_a_restart_and_refusals(rig, serve):
             r = await c.put("/api/settings", json=body)
             assert r.status_code == 422 and r.json()["code"] == "invalid_config", body
             assert r.json()["data"]["field"] == field, body
+            assert not r.json()["detail"].startswith(field)  # the field is in data.field; the text reads on its own
         assert _file(served) == before  # nothing written
         r = await c.put("/api/settings", json={"extra": 1})
         assert r.status_code == 422 and r.json()["code"] == "invalid_request"

@@ -74,20 +74,23 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     except ValidationError as e:
         err = e.errors()[0]
         field = ".".join(str(p) for p in err["loc"])
-        raise _invalid(f"{field}: {err['msg']}", field) from None
+        raise _invalid(str(err["msg"]), field) from None  # data.field names the field
     mgr = hub.services
     known = {s.id for s in mgr.list()}
     for key in ("enabled", "autostart"):
         unknown = sorted(set(new["services"][key]) - known)
         if unknown:
-            raise _invalid(f"services.{key}: no mod {unknown[0]!r}", f"services.{key}")
+            raise _invalid(f"No mod {unknown[0]!r}", f"services.{key}")
+    gb = new["memory"]["reserve_gb"]
+    if float(gb).is_integer():
+        new["memory"]["reserve_gb"] = int(gb)  # written as 13, not 13.0
     port = new["hub"]["port"]
     clash = next((s for s in mgr.list() if s.port == port), None)
     if clash:
-        raise _invalid(f"hub.port: {port} is used by {clash.mod.name}", "hub.port")
+        raise _invalid(f"Port {port} is used by {clash.mod.name}", "hub.port")
     total = hub.memory.sys.get("total_bytes", 0) if hub.memory else 0
     if total and new["memory"]["reserve_gb"] * GB >= total:
-        raise _invalid(f"memory.reserve_gb: must be less than this machine's {total / GB:.0f} GB", "memory.reserve_gb")
+        raise _invalid(f"Must be less than this machine's {total / GB:.0f} GB", "memory.reserve_gb")
 
     # Only keys whose value changed are touched (an unchanged form leaves the file alone);
     # a changed value equal to AIHub's default removes its key instead of pinning it.

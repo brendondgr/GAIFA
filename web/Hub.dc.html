@@ -888,8 +888,8 @@ button:disabled{cursor:not-allowed;opacity:.5}
     </div>
     <div style="flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px">
       <sc-if value="{{ odr.isImage }}" hint-placeholder-val="{{ false }}"><figure style="margin:0;display:flex;flex-direction:column;gap:6px"><div role="img" aria-label="{{ odr.title }}" style="{{ odr.imgSt }}"></div><figcaption style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">{{ odr.dims }}</figcaption></figure></sc-if>
-      <sc-if value="{{ odr.isVideo }}" hint-placeholder-val="{{ false }}"><div style="position:relative;border-radius:8px;overflow:hidden;background:#000;aspect-ratio:832/480"><span aria-hidden="true" style="{{ odr.posterSt }}"></span><div style="position:absolute;inset:0;display:grid;place-items:center"><span style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:99px;background:rgba(11,14,20,.8);color:#E6EAF2;font-size:12.5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="{{ ic.play }}"></path></svg>Video player — mock has no video stream</span></div><span style="position:absolute;right:8px;bottom:8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(11,14,20,.8);color:#E6EAF2">{{ odr.dims }}</span></div></sc-if>
-      <sc-if value="{{ odr.is3d }}" hint-placeholder-val="{{ false }}"><div style="position:relative;border-radius:8px;overflow:hidden;aspect-ratio:4/3;background:var(--inset,#131926)"><span role="img" aria-label="Preview render" style="{{ odr.posterSt }}"></span><span style="position:absolute;top:10px;left:10px;height:22px;padding:0 8px;display:inline-flex;align-items:center;border-radius:4px;font-size:11px;font-weight:600;background:rgba(11,14,20,.8);color:#BC8CFF">3D</span><span style="position:absolute;left:10px;bottom:10px;right:10px;font-size:12px;color:#E6EAF2;padding:6px 10px;border-radius:6px;background:rgba(11,14,20,.75)">Viewer3D placeholder — the three.js viewer is wired in later. Showing preview.png.</span></div></sc-if>
+      <sc-if value="{{ odr.isVideo }}" hint-placeholder-val="{{ false }}"><sc-if value="{{ odr.hasVideo }}" hint-placeholder-val="{{ false }}"><video src="{{ odr.url }}" poster="{{ odr.poster }}" controls="controls" preload="metadata" style="flex:none;display:block;width:100%;max-height:60vh;border-radius:8px;background:#000"></video></sc-if><sc-if value="{{ odr.mockVideo }}" hint-placeholder-val="{{ true }}"><div style="flex:none;position:relative;border-radius:8px;overflow:hidden;background:#000;aspect-ratio:832/480"><span aria-hidden="true" style="{{ odr.posterSt }}"></span><div style="position:absolute;inset:0;display:grid;place-items:center"><span style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:99px;background:rgba(11,14,20,.8);color:#E6EAF2;font-size:12.5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="{{ ic.play }}"></path></svg>Video player — mock has no video stream</span></div><span style="position:absolute;right:8px;bottom:8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(11,14,20,.8);color:#E6EAF2">{{ odr.dims }}</span></div></sc-if></sc-if>
+      <sc-if value="{{ odr.is3d }}" hint-placeholder-val="{{ false }}"><div style="flex:none;position:relative;border-radius:8px;overflow:hidden;aspect-ratio:4/3;background:var(--inset,#131926)"><span role="img" aria-label="Preview render" style="{{ odr.posterSt }}"></span><span style="position:absolute;top:10px;left:10px;height:22px;padding:0 8px;display:inline-flex;align-items:center;border-radius:4px;font-size:11px;font-weight:600;background:rgba(11,14,20,.8);color:#BC8CFF">3D</span><span style="position:absolute;left:10px;bottom:10px;right:10px;font-size:12px;color:#E6EAF2;padding:6px 10px;border-radius:6px;background:rgba(11,14,20,.75)">Viewer3D placeholder — the three.js viewer is wired in later. Showing preview.png.</span></div></sc-if>
       <sc-if value="{{ odr.isAudio }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--bd,#1D2430);border-radius:10px;background:var(--inset,#131926)">
           <button onClick="{{ odr.player.onToggle }}" aria-label="{{ odr.player.aria }}" style="width:40px;height:40px;flex:none;border-radius:99px;border:0;background:var(--acc,#FFB224);color:#1A1200;display:grid;place-items:center;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="{{ odr.player.d }}"></path></svg></button>
@@ -1251,12 +1251,14 @@ class Component extends DCLogic {
       case 'alert': this.setState(st => ({ alerts: [...st.alerts.filter(a => a.id !== ev.alert.id), ev.alert] })); break;
       case 'alert_cleared': this.setState(st => ({ alerts: st.alerts.filter(a => a.id !== ev.id) })); break;
       case 'output': {
-        const o = ev.output;
+        const o = ev.output, swap = list => list.map(x => x.id === o.id ? o : x);  // patch 8: a changed output replaces its card
         this.setState(st => {
-          const patch = { recent: [o, ...st.recent].slice(0, 8) };
-          const f = st.out;
-          if (f.loaded && this.outMatches(o, f)) patch.out = { ...f, items: [o, ...f.items], fresh: { ...f.fresh, [o.id]: true }, totals: f.totals ? { ...f.totals, count: f.totals.count + 1, size_bytes: f.totals.size_bytes + o.size_bytes } : f.totals };
-          if (st.svc?.outs && st.svc.id === o.service) patch.svc = { ...st.svc, outs: [o, ...st.svc.outs].slice(0, 6) };
+          const patch = { recent: st.recent.some(x => x.id === o.id) ? swap(st.recent) : [o, ...st.recent].slice(0, 8) };
+          const f = st.out, had = f.items.find(x => x.id === o.id);
+          if (had) patch.out = { ...f, items: swap(f.items), detail: f.detail?.id === o.id ? o : f.detail, totals: f.totals ? { ...f.totals, size_bytes: f.totals.size_bytes - had.size_bytes + o.size_bytes } : f.totals };
+          else if (f.loaded && this.outMatches(o, f)) patch.out = { ...f, items: [o, ...f.items], fresh: { ...f.fresh, [o.id]: true }, totals: f.totals ? { ...f.totals, count: f.totals.count + 1, size_bytes: f.totals.size_bytes + o.size_bytes,
+            by_kind: { ...f.totals.by_kind, [o.kind]: (f.totals.by_kind[o.kind] || 0) + 1 }, by_service: { ...f.totals.by_service, [o.service]: (f.totals.by_service[o.service] || 0) + 1 } } : f.totals };
+          if (st.svc?.outs && st.svc.id === o.service) patch.svc = { ...st.svc, outs: st.svc.outs.some(x => x.id === o.id) ? swap(st.svc.outs) : [o, ...st.svc.outs].slice(0, 6) };
           return patch;
         });
         setTimeout(() => this.setState(st => { const fr = { ...st.out.fresh }; delete fr[o.id]; return { out: { ...st.out, fresh: fr } }; }), 3500);
@@ -1264,7 +1266,10 @@ class Component extends DCLogic {
       }
       case 'output_deleted': {
         if (ev.id === '*') { this.api.getOverview().then(ov => this.setState({ recent: ov.recent_outputs })).catch(() => {}); if (s.out.loaded) this.fetchOutputs(s.out, true); this.palOutputs = null; break; }
-        this.setState(st => ({ recent: st.recent.filter(o => o.id !== ev.id), out: { ...st.out, items: st.out.items.filter(o => o.id !== ev.id), detail: st.out.detail?.id === ev.id ? null : st.out.detail } }));
+        this.setState(st => { const gone = st.out.items.find(o => o.id === ev.id), t = st.out.totals, dec = (m, k) => ({ ...m, [k]: Math.max(0, (m[k] || 0) - 1) });  // patch 8: totals follow
+          const totals = gone && t ? { ...t, count: t.count - 1, size_bytes: t.size_bytes - gone.size_bytes, by_kind: dec(t.by_kind, gone.kind), by_service: dec(t.by_service, gone.service) } : t;
+          return { recent: st.recent.filter(o => o.id !== ev.id), out: { ...st.out, items: st.out.items.filter(o => o.id !== ev.id), totals, detail: st.out.detail?.id === ev.id ? null : st.out.detail },
+            ...(st.svc?.outs ? { svc: { ...st.svc, outs: st.svc.outs.filter(o => o.id !== ev.id) } } : {}) }; });
         break;
       }
       case 'model': {
@@ -1320,6 +1325,7 @@ class Component extends DCLogic {
     this.setState({ route: r });
     if (!this.state.ready) return;
     if (prev.page !== r.page || prev.parts[1] !== r.parts[1]) window.scrollTo(0, 0);
+    if (r.page !== 'outputs' && prev.hash !== r.hash && this.state.out.detail) this.upd('out', { detail: null });  // patch 8: leaving a page closes its output drawer
     if (r.page === 'service') {
       const id = r.parts[1];
       let d = this.state.svc?.id === id ? this.state.svc.detail : null;
@@ -1600,9 +1606,9 @@ class Component extends DCLogic {
     if (n) this.openOutput(n.id); else if (dir > 0 && o.cursor) this.fetchOutputs(o, false);
   }
   async deleteOutput(o) {
-    const ok = await this.confirm({ title: `Delete "${o.title}"?`, body: `Files are removed from disk: ${o.path}${o.files.length > 1 ? ` (${o.files.length} files, ${fb(o.size_bytes)})` : ''}.`, confirmLabel: 'Delete output', danger: true });
+    const ok = await this.confirm({ title: `Delete "${o.title}"?`, body: `Moves ${o.path}${o.files.length > 1 ? ` (${o.files.length} files, ${fb(o.size_bytes)})` : ''} to outputs/.trash, which is emptied after 30 days.`, confirmLabel: 'Delete output', danger: true });
     if (!ok) return;
-    try { await this.api.deleteOutput(o.id); this.closeOutput(); this.toast('Output deleted', 'success'); } catch (e) { this.err(e); }
+    try { await this.api.deleteOutput(o.id); this.closeOutput(); this.toast('Moved to the outputs trash', 'success'); } catch (e) { this.err(e); }
   }
   playAudio(key, url) {
     const a = this.audioEl;
@@ -1747,7 +1753,7 @@ class Component extends DCLogic {
     const badge = o.kind === 'audio' || o.kind === 'video' ? fmmss(o.duration_s) : o.dims ? `${o.dims.w}×${o.dims.h}` : o.kind === 'model3d' ? `${o.files.filter(f => f.role === 'part').length} parts` : '';
     return { id: o.id, title: o.title, sub: `${sv?.name || o.service} · ${fago(o.created_ts)}`, size: fb(o.size_bytes), aria: `${o.kind} output: ${o.title}`,
       hasPreview: !!o.preview && o.kind !== 'audio', preview: o.preview, isAudio: o.kind === 'audio', isText: o.kind === 'text' || (!o.preview && !['audio'].includes(o.kind)), is3d: o.kind === 'model3d', isVideo: o.kind === 'video',
-      hasBadge: !!badge, badge, textPreview: o.meta?.prompt || o.title, playD: mine && a.playing ? ICON.pause : ICON.play, playAria: mine && a.playing ? 'Pause' : 'Play',
+      hasBadge: !!badge, badge, textPreview: o.meta?.prompt || o.meta?.excerpt || o.title, playD: mine && a.playing ? ICON.pause : ICON.play, playAria: mine && a.playing ? 'Pause' : 'Play',
       bars: hashBars(key, 24).map((h, i) => ({ st: { flex: 1, height: h + '%', borderRadius: 2, background: i / 24 < pct ? 'var(--acc,#FFB224)' : 'var(--bdh,#3A4A63)' } })),
       onPlay: e => { e.stopPropagation(); this.playAudio(key, o.url); }, onOpen: () => this.openOutput(o.id), onKey: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.openOutput(o.id); } },
       cardSt: { display: 'flex', flexDirection: 'column', minWidth: 0, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', background: 'var(--card,#11151D)', border: '1px solid ' + (fresh ? 'var(--acc,#FFB224)' : 'var(--bd,#1D2430)'), transition: 'border-color .4s' } };
@@ -2017,6 +2023,7 @@ class Component extends DCLogic {
     const d = o.detail;
     if (d) {
       const sv = this.svcMap[d.service], m = d.meta || {}, idx = o.items.findIndex(x => x.id === d.id);
+      const liveUrl = /^\/api\//.test(d.url || ''), canDl = liveUrl || /^(blob:|data:)/.test(d.url);  // patch 8: the hub serves the file
       v.dr = { show: true, title: d.title, sub: `${sv?.name || d.service} · ${fday(d.created_ts)} ${fclock(d.created_ts)}`, isImage: d.kind === 'image', isAudio: d.kind === 'audio', is3d: d.kind === 'model3d', isVideo: d.kind === 'video', isOther: !['image', 'audio', 'model3d', 'video'].includes(d.kind),
         url: d.url, imgSt: { width: '100%', aspectRatio: d.dims ? `${d.dims.w}/${d.dims.h}` : '1', maxHeight: '60vh', borderRadius: 8, background: `var(--inset,#131926) url("${d.url}") center / contain no-repeat` }, posterSt: { display: 'block', width: '100%', height: '100%', background: `url("${d.preview || ''}") center / cover`, opacity: d.kind === 'video' ? 0.85 : 1 }, dims: d.dims ? `${d.dims.w}×${d.dims.h}` : '', player: d.kind === 'audio' ? this.player('o:' + d.id, d.url, d.duration_s, d.path.split('/').pop()) : null,
         meta: [['Service', sv?.name || d.service], ['Model', m.model], ['Voice', m.voice], ['Seed', m.seed], ['Size', fb(d.size_bytes)], ['Dimensions', d.dims ? `${d.dims.w}×${d.dims.h}` : null], ['Duration', d.duration_s ? `${d.duration_s}s` : null], ['Created', new Date(d.created_ts * 1000).toLocaleString()]].filter(x => x[1] != null && x[1] !== '').map(([k, val]) => ({ k, v: String(val) })),
@@ -2025,7 +2032,7 @@ class Component extends DCLogic {
         isFolder: d.files.length > 1, files: d.files.map(f => ({ path: f.path.replace(d.path + '/', ''), size: fb(f.size_bytes), role: f.role || f.kind, d: f.kind === 'image' ? ICON.image : f.kind === 'model3d' ? ICON.cube : f.kind === 'audio' ? ICON.wave : ICON.file })),
         path: d.path, copyPath: () => this.copy(d.path, 'Path copied'), svcHref: '#/s/' + d.service, svcName: sv?.name || d.service, del: () => this.deleteOutput(d), close: () => this.closeOutput(),
         prev: () => this.stepOutput(-1), next: () => this.stepOutput(1), prevDis: idx <= 0, nextDis: idx < 0 || (idx >= o.items.length - 1 && !o.cursor), pos: idx >= 0 ? `${idx + 1} of ${fnum(t.count)}` : '',
-        dlName: d.path.split('/').pop(), canDl: /^(blob:|data:)/.test(d.url), noDl: !/^(blob:|data:)/.test(d.url) };
+        dlName: d.path.split('/').pop(), canDl: canDl, noDl: !canDl, hasVideo: d.kind === 'video' && liveUrl, mockVideo: d.kind === 'video' && !liveUrl, poster: d.preview || '' };
     } else v.dr = { show: false };
     return v;
   }

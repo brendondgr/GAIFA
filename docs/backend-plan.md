@@ -428,13 +428,26 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 - Overview's recent outputs
 - each service's Outputs tab
 - new outputs arriving live
+- *As wired:* `api.js` already routed the outputs methods and the overview's recent outputs by area, so marking `outputs` live was enough for the data. Web patch 8 (`web/PATCHES.md`):
+  - the drawer plays live videos in a real `<video>` with the poster, and offers Download for files the hub serves
+  - an `output` event for an output already shown replaces its card (a changed file, or a sidecar written after its file, is published again)
+  - live totals and filter-chip counts follow added and deleted outputs
+  - text cards fall back to `meta.excerpt`, and the delete dialog names the trash
+  - the drawer's 3D and video boxes no longer collapse to 0 px when the drawer's content overflows (an export bug, in the mock too)
+  - navigating to another page closes an open output drawer
+  - The 3D drawer still shows the preview image; the three.js viewer arrives with gen3d in Phase 8 (8.7).
 
 **Checks & deliverables — Phase 4**
-- [ ] Calling `fake-ok`'s output route makes the file appear on the Outputs page within 2 s, with no reload.
+- [x] Calling `fake-ok`'s output route makes the file appear on the Outputs page within 2 s, with no reload.
+  - *Checked 2026-10-05* in the browser against a dev hub (on the host, for ffmpeg) on a scratch root: the card appeared after 1.1 s on the Outputs page and 1.07 s on Fake OK's Outputs tab, highlighted, with the counts updated and one card although the sidecar is written after the file. Test: `test_watch.py::test_a_mods_output_appears_live_through_the_hub` (hub's own watcher, default timings).
 - [ ] Audio seeking works (Range requests) in Chromium and Firefox.
-- [ ] Deleting an output from the drawer removes its file, sidecar and preview.
-- [ ] 2,000 generated outputs page smoothly, and the totals stay correct.
-- [ ] Delivered: `outputs.py` (indexer, watcher, previews) and the output routes.
+  - *Checked in Chromium:* the drawer's player seeks a WAV (0:04 of 0:05 after clicking at 75 %), and a video plays and seeks, through `206 Partial Content`. Range itself is covered in `test_routes.py` (206, suffix ranges, 416). Firefox still to be checked by hand.
+- [x] Deleting an output from the drawer removes its file, sidecar and preview.
+  - *Checked:* deleting a 6 MP PNG from the drawer moved the image, its `.json` sidecar and its `.preview.jpg` to `outputs/.trash/2026-10-05/comfy/2026-10-04/`, the page updated to 19 items without a reload, and the activity feed says `Moved "ComfyUI big 00002" to the outputs trash`. Tests: `test_delete.py`.
+- [x] 2,000 generated outputs page smoothly, and the totals stay correct.
+  - *Checked:* 2,000 files dropped into a running hub's `outputs/bulk/` were all indexed, with one activity item (`bulk created 2000 outputs`). Through the API, 34 pages of 60 returned 2,021 unique outputs (slowest page 7 ms). In the UI, infinite scroll loaded all 2,021 cards in 31 day groups, with "2,021 items · 4.0 MB" and the chip counts correct throughout.
+- [x] Delivered: `outputs.py` (indexer, watcher, previews) and the output routes.
+  - *As built:* the `utils/outputs/` package, `utils/routes/outputs.py`, and web patch 8.
 
 ## Phase 5 — Memory manager
 

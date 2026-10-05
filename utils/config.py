@@ -66,9 +66,18 @@ class PortsCfg(_Strict):
         return v
 
 
+class DashboardCfg(_Strict):
+    """`[ui.dashboard]`: the Overview dashboard's Customize choices (brief §11.5)."""
+
+    order: list[str] = []
+    hidden: list[str] = []
+    ranges: dict[str, str] = {}
+
+
 class UiCfg(_Strict):
     theme: Literal["system", "light", "dark"] = "system"
-    density: Literal["comfortable", "compact"] = "comfortable"
+    density: Literal["comfortable", "compact"] = "compact"
+    dashboard: DashboardCfg = DashboardCfg()
 
 
 class ServiceOverride(_Strict):

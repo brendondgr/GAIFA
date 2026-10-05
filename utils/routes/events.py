@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
+from utils.api_models import RecentEvents
 from utils.events import sse_stream
 
 router = APIRouter(tags=["events"])
@@ -23,7 +24,7 @@ async def events(request: Request) -> StreamingResponse:
     )
 
 
-@router.get("/api/events/recent", summary="Recent activity, current alerts and running jobs")
+@router.get("/api/events/recent", summary="Recent activity, current alerts and running jobs", response_model=RecentEvents, response_model_exclude_unset=True)
 async def recent(request: Request, limit: int = Query(80, ge=1, le=500)) -> dict[str, Any]:
     """Until `/api/overview` exists (Phase 6), the UI fills its overview's activity, alerts and jobs from this."""
     hub = request.app.state.hub

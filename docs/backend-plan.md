@@ -528,11 +528,11 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - `GET /api/jobs/stats`
   - `GET /api/widgets` and `GET /api/widgets/{service}/{id}`: proxy each mod's `[[ui.widgets]]` source, cache it for 30 s, and validate it against `WidgetData`
   - `fake-ok` gains one widget, for the tests
-- [ ] **6.3 Overview, system and settings routes.**
+- [x] **6.3 Overview, system and settings routes.** *As built:* `utils/routes/overview.py`, `utils/routes/settings.py` and `utils/settings.py`; a save writes only the values that changed (one changed back to the default removes its key), and `hub.port` reports the port in use until a restart. `[ui] density` now defaults to `compact`.
   - `GET /api/overview` aggregates services, memory, the 8 newest outputs, 30 activity items, alerts, jobs and system.
   - `GET/PUT /api/settings` reads and writes `config.toml`; changing the hub port returns `restart_required`.
   - **The dashboard layout** (brief §11.5, Customize) is saved under `[ui.dashboard]` in `config.toml`, so it follows you between browsers.
-- [ ] **6.4 Alert rules.** Final list: manifest errors, failed mods, registry problems, disk free under 50 GB, memory over 92%, and watcher errors.
+- [x] **6.4 Alert rules.** *As built:* the table in architecture §6; `manifest-<id>` and `disk-low` are new. Final list: manifest errors, failed mods, registry problems, disk free under 50 GB, memory over 92%, and watcher errors.
 - [ ] **6.5 Drop in Part A revision 2.**
   - Replace `web/` with the revision 2 export, keeping `api.js`, `vendor/` and `PATCHES.md`. Re-apply any patch it didn't fold in.
   - Check the changes against brief §11: compact default, the four Overview views, the dashboard widgets, chart components, graphics on the other pages, the renames, MOCK badges, and the hybrid switch.

@@ -356,11 +356,22 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/outputs/{id}/file` | an output's main file (supports Range, for audio/video seeking) |
 | `GET /api/outputs/{id}/files/{path}` | a file inside a folder output |
 | `GET /api/outputs/{id}/preview` | thumbnail or poster |
-| `GET /api/events/recent?limit=` | recent activity, current alerts and running jobs; the UI fills its overview from it until `/api/overview` exists (Phase 6) |
+| `GET /api/events/recent?limit=` | recent activity, current alerts and running jobs (the activity, alerts and jobs parts of `GET /api/overview`, with a larger `limit`) |
 | `GET /api/services/{id}/check[?start=1]` | the mod self-test behind `aihub check`: `{ok, checks: [{name, status: ok\|fail\|warn\|skip, ok, detail}]}` |
 | `POST /api/services/rescan` | pick up added, removed and edited mod folders without restarting the hub: `{added, removed, changed}`; new mods autostart |
 | `POST /api/memory/acquire[?make_room=1]` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[], plan}` or `409 needs_room {plan}`. `make_room=1` (or `X-AIHub-Make-Room: 1`, or `auto_make_room`) unloads first; the grant is reserved for 120 s |
 | `GET /api/tools`, `POST /api/tools/{name}/call`, `POST /api/approvals/{id}` | later: agent tools and approval decisions |
+
+**Alerts** (plan 6.4) are the banner items above the Overview grid. Each has a stable id, so it is raised once and cleared when its cause goes away:
+
+| Alert id | Level | Raised when | Cleared when |
+|---|---|---|---|
+| `manifest-<id>` | error | a mod's `service.toml` is invalid, or its `config.toml` override clashes (found at boot, rescan or a settings save) | the manifest is fixed and rescanned, or the folder is removed |
+| `svc-<id>` | error | a mod failed (crashed, failed to start, or stopped answering its health check) | it starts again, or is stopped |
+| `models-missing`, `models-partial`, `registry-invalid`, `sum-<model id>` (a checksum mismatch) | warn/error | registry problems (§8) | the registry watcher sees them fixed |
+| `disk-low` | warn (error under 10 GB) | the project's disk has under 50 GB free (checked every 10 s) | 55 GB or more is free |
+| `memory-high` | warn | memory is over 92% used | it drops under 90% |
+| `outputs-watch` | error | the outputs watcher stopped | it recovers |
 
 **Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-AIHub-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all.
 
@@ -466,7 +477,12 @@ new_mods = [5100, 5199]
 
 [ui]
 theme = "system"
-density = "comfortable"
+density = "compact"         # or "comfortable"
+
+[ui.dashboard]              # the Overview dashboard's Customize choices (written by the UI)
+order = ["kpi", "memory-time", "memory-now"]
+hidden = ["heatmap"]
+ranges = { memory-time = "6h" }
 
 [services]
 order = ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode"]

@@ -375,7 +375,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
 | `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
 | `getSettings()` | `GET /api/settings` | `Settings` |
-| `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` |
+| `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
 
 File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used directly in `<img>`, `<audio>`, `<video>` and download links.
@@ -544,10 +544,11 @@ interface Overview {
 }
 
 interface Settings {
-  hub: { port: number };
+  hub: { port: number };          // 1024–65535; a change applies after AIHub restarts (restart_required)
   memory: { reserve_gb: number; auto_make_room: boolean; never_unload: string[]; priority: string[] };
   services: { order: string[]; enabled: Record<string, boolean>; autostart: Record<string, boolean> };
-  ui: { theme: "system" | "light" | "dark"; density: "comfortable" | "compact" };
+  ui: { theme: "system" | "light" | "dark"; density: "comfortable" | "compact";   // compact is the default
+        dashboard: { order: string[]; hidden: string[]; ranges: Record<string, string> } };   // Customize (§11.5), saved in config.toml
 }
 
 type HubEvent =
@@ -747,7 +748,7 @@ A segmented control at the top right of the Overview switches views. The choice 
 | **Timeline** | One swimlane per service over 1 h / 6 h / 24 h / 7 d (Section 11.6, `Timeline`). Each lane shows state bands (stopped, starting, ready, failed), when models were loaded, jobs as bars, outputs as dots, and warning/error markers. Hover for details; click to jump to the service, job or output. |
 
 ### 11.5 Dashboard widgets
-Each widget is a card with a title, a range selector where it makes sense (1h · 6h · 24h · 7d · 30d), and a ⋯ menu ("View as table", "Open page"). A **Customize** button lets you show, hide and reorder widgets. The layout is saved in `localStorage` now and moves to Settings later. The grid uses 12 columns: widgets span 3, 4, 6 or 12 columns and collapse to one column under 760 px.
+Each widget is a card with a title, a range selector where it makes sense (1h · 6h · 24h · 7d · 30d), and a ⋯ menu ("View as table", "Open page"). A **Customize** button lets you show, hide and reorder widgets. The layout is saved in Settings (`Settings.ui.dashboard`: widget order, hidden widgets and each widget's range), so it follows you between browsers. The grid uses 12 columns: widgets span 3, 4, 6 or 12 columns and collapse to one column under 760 px.
 
 | # | Widget | Chart | Data |
 |---|---|---|---|

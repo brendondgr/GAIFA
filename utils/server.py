@@ -89,9 +89,11 @@ class Hub:
     live_areas: list[str] = field(default_factory=list)
     sse_ping_s: float = SSE_PING_S
 
+    listen_port: int | None = None  # fixed when the app is built: a saved hub.port applies at the next start
+
     @property
     def port(self) -> int:
-        return self.options.port or self.config.hub.port
+        return self.listen_port or self.options.port or self.config.hub.port
 
     def mark_live(self, area: str) -> None:
         if area not in self.live_areas:
@@ -120,10 +122,11 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, memory, metrics, models, outputs, services, system, web, widgets
+    from utils.routes import events, memory, metrics, models, outputs, overview, services, settings, system, web, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
+    hub.listen_port = hub.port
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -201,7 +204,10 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(outputs.router)
     app.include_router(memory.router)
     app.include_router(widgets.router)
-    for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets"):
+    app.include_router(overview.router)
+    app.include_router(settings.router)
+    for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
+                 "overview", "settings"):
         hub.mark_live(area)
 
     app.include_router(web.router)

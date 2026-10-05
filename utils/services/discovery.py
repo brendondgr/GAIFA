@@ -34,6 +34,18 @@ class DiscoveryMixin(_Base):
                 svc.state = "failed"
             services[mod.id] = svc
         self.services = services
+        self._manifest_alerts()
+
+    def _manifest_alerts(self) -> None:
+        """One alert per mod whose service.toml (or its config.toml override) is broken (plan 6.4)."""
+        want = {f"manifest-{s.id}": s for s in self.services.values() if s.errors}
+        for aid, svc in want.items():
+            more = f" (+{len(svc.errors) - 1} more)" if len(svc.errors) > 1 else ""
+            self.alerts.set(aid, "error", f"Mod \"{svc.id}\" has a manifest error: {svc.errors[0]}{more}", service=svc.id,
+                            action={"label": "Show details", "route": f"#/s/{svc.id}/settings"})
+        for a in self.alerts.list():
+            if a["id"].startswith("manifest-") and a["id"] not in want:
+                self.alerts.clear(a["id"])
 
     async def rescan(self, autostart: bool = True) -> dict[str, list[str]]:
         """Pick up added, removed and edited mod folders without restarting the hub.
@@ -84,6 +96,7 @@ class DiscoveryMixin(_Base):
                 self._publish(svc)
         order = [m.id for m in mf.ordered([s.mod for s in self.services.values()], self.config.services.order)]
         self.services = {sid: self.services[sid] for sid in order}
+        self._manifest_alerts()
         if added or removed:
             self.bus.publish({"type": "resync"})  # the UI refetches the service list
         if autostart and added:
@@ -109,6 +122,7 @@ class DiscoveryMixin(_Base):
             if svc.id in clashes and not svc.errors:
                 svc.errors.append(f"config.toml: [services.{svc.id}] {clashes[svc.id]}")
             self._publish(svc)
+        self._manifest_alerts()
 
     # --- boot and shutdown ----------------------------------------------------------------
 

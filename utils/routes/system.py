@@ -8,9 +8,12 @@ import os
 import shutil
 import time
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
+
+from utils.api_models import SystemInfo
 
 router = APIRouter(tags=["system"])
 
@@ -52,9 +55,13 @@ async def _usage(models: Path, databases: Path, outputs: Path) -> dict[str, int]
     return usage
 
 
-@router.get("/api/system", summary="Hub version, process, paths and disk usage")
+@router.get("/api/system", summary="Hub version, process, paths and disk usage", response_model=SystemInfo)
 async def get_system(request: Request) -> dict:
-    hub = request.app.state.hub
+    return await system_info(request.app.state.hub)
+
+
+async def system_info(hub: Any) -> dict[str, Any]:
+    """The brief's `System` (also part of `GET /api/overview`)."""
     p = hub.paths
     disk = shutil.disk_usage(p.root)
     return {

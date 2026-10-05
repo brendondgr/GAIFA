@@ -442,3 +442,124 @@ class WidgetData(BaseModel):
     categories: list[str] | None = None
     series: list[WidgetSeries] = []
     rows: list[dict[str, Any]] | None = None
+
+
+# ---- system, overview and settings (Phase 6.3) ----
+
+
+class HubProcess(_Model):
+    version: str
+    pid: int
+    uptime_s: int
+    rss_bytes: int
+    port: int
+
+
+class SystemPaths(_Model):
+    root: str
+    models: str
+    databases: str
+    outputs: str
+
+
+class Usage(_Model):
+    models_bytes: int
+    databases_bytes: int
+    outputs_bytes: int
+
+
+class SystemInfo(_Model):
+    """The brief's `System`."""
+
+    hub: HubProcess
+    paths: SystemPaths
+    usage: Usage
+    disk: Disk
+
+
+class Activity(_Model):
+    id: str
+    ts: float
+    service: str | None
+    level: Literal["info", "warn", "error"]
+    text: str
+    route: str | None = None
+
+
+class AlertAction(_Model):
+    label: str
+    route: str
+
+
+class Alert(_Model):
+    id: str
+    level: Literal["warn", "error"]
+    text: str
+    service: str | None = None
+    action: AlertAction | None = None
+
+
+class Overview(_Model):
+    services: list[ServiceSummary]
+    memory: SystemMemory
+    recent_outputs: list[Output]
+    activity: list[Activity]
+    alerts: list[Alert]
+    jobs: list[Job]
+    system: SystemInfo
+
+
+class RecentEvents(_Model):
+    activity: list[Activity]
+    alerts: list[Alert]
+    jobs: list[Job]
+
+
+class HubSettings(_Model):
+    port: int = Field(ge=1024, le=65535)
+
+
+class MemorySettings(_Model):
+    reserve_gb: float = Field(ge=0)
+    auto_make_room: bool
+    never_unload: list[str]
+    priority: list[str] = Field(description="Unloaded first → last")
+
+
+class ServicesSettings(_Model):
+    order: list[str]
+    enabled: dict[str, bool]
+    autostart: dict[str, bool]
+
+
+class DashboardLayout(_Model):
+    order: list[str] = Field([], description="Widget keys in the order shown (missing ones follow in the default order)")
+    hidden: list[str] = []
+    ranges: dict[str, str] = Field({}, description="Widget key → its chosen range")
+
+
+class UiSettings(_Model):
+    theme: Literal["system", "light", "dark"]
+    density: Literal["comfortable", "compact"]
+    dashboard: DashboardLayout
+
+
+class Settings(_Model):
+    hub: HubSettings
+    memory: MemorySettings
+    services: ServicesSettings
+    ui: UiSettings
+
+
+class SettingsPatch(_Model):
+    """`PUT /api/settings`: the whole `Settings` or any part of it; what is left out stays as it is."""
+
+    hub: dict[str, Any] | None = None
+    memory: dict[str, Any] | None = None
+    services: dict[str, Any] | None = None
+    ui: dict[str, Any] | None = None
+
+
+class SavedSettings(_Model):
+    settings: Settings
+    restart_required: bool

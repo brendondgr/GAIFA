@@ -127,6 +127,15 @@ class MemorySpec(_Strict):
     triggers: list[Op] = []
     extra_units: list[str] = []
     containers: list[str] = []
+    idle_unload_s: int | None = Field(None, ge=0)  # the default; config.toml may override (0 = never)
+    idle_unload_env: str | None = None  # the env variable the mod reads it from, e.g. LOCALTTS_IDLE_UNLOAD_S
+
+    @field_validator("idle_unload_env")
+    @classmethod
+    def _env_name(cls, v: str | None) -> str | None:
+        if v is not None and not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", v):
+            raise ValueError(f"{v!r} is not an environment variable name")
+        return v
 
 
 class ModelsSpec(_Strict):
@@ -412,12 +421,14 @@ def effective(mod: Mod, cfg: Config) -> Effective:
         "enabled": True,
         "autostart": True,
         "port": mod.manifest_port,
-        "idle_unload_s": None,
+        "idle_unload_s": mod.manifest.memory.idle_unload_s if mod.manifest and mod.manifest.memory else None,
         "auto_unload": True,
         "priority": cfg.memory.priority.index(mod.id) if mod.id in cfg.memory.priority else DEFAULT_PRIORITY,
         "env": {},
     }
     merged = cfg.service_override(mod.id, defaults)
+    if merged["idle_unload_s"] == 0:
+        merged["idle_unload_s"] = None  # config.toml writes "never" as 0 (TOML has no null)
     return Effective(**merged)
 
 
@@ -536,6 +547,11 @@ def launch_spec(mod: Mod, cfg: Config, paths: Paths, hub_port: int) -> LaunchSpe
         if env_file.exists():  # optional: secrets that haven't been written yet
             env.update(read_env_file(env_file))
     env.update({k: expand(v, values, f"[run].env.{k}") for k, v in m.run.env.items()})
+    if m.memory:  # idle unload stays inside the mod (plan 5.6): seconds, 0 = never
+        idle = str(eff.idle_unload_s or 0)
+        env["AIHUB_IDLE_UNLOAD_S"] = idle
+        if m.memory.idle_unload_env:
+            env[m.memory.idle_unload_env] = idle
     env.update({k: expand(v, values, f"config.toml [services.{mod.id}].env.{k}") for k, v in eff.env.items()})
     return LaunchSpec(
         id=mod.id,

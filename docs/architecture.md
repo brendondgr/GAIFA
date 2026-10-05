@@ -71,7 +71,7 @@ AIHub/
 │   ├── backends/            systemd.py (real), subprocess.py (tests and --dev)
 │   ├── proxy.py             /api/s/<id>/* passthrough (streaming, SSE, uploads)
 │   ├── operations.py        mod OpenAPI → Operation[]
-│   ├── memory.py            memory sampling, plans to make room, acquire
+│   ├── memory/              memory sampling, plans to make room, reservations, triggers, acquire
 │   ├── proc.py              meminfo, AMD GPU sysfs/fdinfo, per-process memory (from lcpp)
 │   ├── registry/            models registry: storage, status, scan, verify, add, delete
 │   ├── outputs/             outputs index: what counts, rows, media details and previews, watcher, trash
@@ -168,6 +168,8 @@ unload = "POST /v1/unload"
 triggers = ["POST /v1/speech", "POST /v1/audio/speech"]   # proxied calls that may load models
 extra_units = []                    # other systemd units counted as this mod's memory, e.g. "lcpp-*.service"
 containers = []                     # podman containers counted as this mod's memory
+idle_unload_s = 180                 # the mod's default; config.toml may override (0 = never)
+idle_unload_env = "LOCALTTS_IDLE_UNLOAD_S"   # the variable the mod reads it from (AIHUB_IDLE_UNLOAD_S is always set too)
 
 [models]
 dirs = ["tts", "voices"]            # data/models subfolders this mod uses
@@ -229,7 +231,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 
 **Environment layers**, later ones winning: the hub's variables below → `env_file` → `[run].env` → `config.toml`'s `[services.<id>].env`.
 
-**Environment every mod gets:** `AIHUB_URL`, `AIHUB_SERVICE_ID`, `AIHUB_PORT`, `AIHUB_ROOT`, `AIHUB_MODELS`, `AIHUB_OUTPUTS`, `AIHUB_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`.
+**Environment every mod gets:** `AIHUB_URL`, `AIHUB_SERVICE_ID`, `AIHUB_PORT`, `AIHUB_ROOT`, `AIHUB_MODELS`, `AIHUB_OUTPUTS`, `AIHUB_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`. A mod with `[memory]` also gets `AIHUB_IDLE_UNLOAD_S` (seconds, `0` = never) and the same value under its `idle_unload_env` name, after `[run].env` and before `config.toml`'s env.
 
 ### 4.5 Port rules
 - A mod keeps the port in its manifest unless `config.toml` overrides it.
@@ -357,7 +359,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/events/recent?limit=` | recent activity, current alerts and running jobs; the UI fills its overview from it until `/api/overview` exists (Phase 6) |
 | `GET /api/services/{id}/check[?start=1]` | the mod self-test behind `aihub check`: `{ok, checks: [{name, status: ok\|fail\|warn\|skip, ok, detail}]}` |
 | `POST /api/services/rescan` | pick up added, removed and edited mod folders without restarting the hub: `{added, removed, changed}`; new mods autostart |
-| `POST /api/memory/acquire` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[]}` or `409 needs_room {plan}` |
+| `POST /api/memory/acquire[?make_room=1]` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[], plan}` or `409 needs_room {plan}`. `make_room=1` (or `X-AIHub-Make-Room: 1`, or `auto_make_room`) unloads first; the grant is reserved for 120 s |
 | `GET /api/tools`, `POST /api/tools/{name}/call`, `POST /api/approvals/{id}` | later: agent tools and approval decisions |
 
 **Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-AIHub-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all.
@@ -386,6 +388,10 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 1. An explicit `POST /api/services/{id}/load`.
 2. A proxied call that matches the mod's `triggers` while the mod is unloaded.
 3. A mod calling `POST /api/memory/acquire` itself. lcpp (whose needs differ per model) and comfy (per workflow) use this.
+
+**Reservations:** planning and unloading happen under one lock, which isn't held while a mod loads (that can take minutes). Instead, each grant reserves its bytes, and other plans subtract what's still reserved. A reservation shrinks as the mod's measured use grows, and ends shortly after the load finishes (or when the mod unloads, or after 30 min / 120 s for acquire / 300 s for a trigger).
+
+**Proxy triggers:** a trigger in `[memory] triggers` is `"METHOD /path"`, where `{name}` matches one path segment and a trailing `*` matches the rest. A matching call to an unloaded mod makes room first, then goes through (the mod loads itself). Without room it returns `409 needs_room` with the plan, and the caller retries with `X-AIHub-Make-Room: 1`.
 
 **Known limit:** clients that call a mod's port directly (e.g. video-maker → `:5040`) bypass the hub. Their loads aren't managed unless the mod itself calls `acquire`.
 

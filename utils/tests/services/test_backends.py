@@ -161,6 +161,25 @@ async def test_stop_takes_the_children_too(backend, tmp_path):
     await until(lambda: _dead(child), timeout=5)
 
 
+async def test_pids_cover_the_mod_and_its_memory(backend, tmp_path):
+    """5.1: the memory sampler counts every process of the mod (systemd: the unit's cgroup)."""
+    from utils import proc
+
+    pidfile = tmp_path / "child.pid"
+    script = f"python3 -c 'b = bytearray(48 << 20); import time; time.sleep(120)' & echo $! > {pidfile}; wait"
+    await backend.start(spec(tmp_path, "mem", ["/bin/sh", "-c", script]))
+    await until(lambda: _exists(pidfile))
+    child = int(pidfile.read_text())
+    pids = await backend.pids("mem")
+    assert pids
+    assert child in pids or child in proc.process_tree(pids[0])
+    await asyncio.sleep(0.3)
+    assert proc.footprint(pids) >= 48 << 20
+    await backend.stop("mem", 2)
+    assert await backend.pids("mem") == []
+    assert await backend.pids("never-started") == []
+
+
 async def test_start_twice_is_an_error(backend, tmp_path):
     s = fake(tmp_path, "ok")
     await backend.start(s)

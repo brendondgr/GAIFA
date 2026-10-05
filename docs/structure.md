@@ -52,17 +52,17 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `cli_models.py` | ✅ | `aihub models list \| show \| scan [--add] \| verify` (standard library only, loaded on demand by `cli.py`) |
 | `cli_mods.py` | ✅ | `aihub new`, `aihub check`, `aihub install <id>`, `aihub rescan` (standard library only, loaded on demand by `cli.py`) |
 | `manifest.py` | ✅ | `service.toml` schema (pydantic), `discover()` with collected errors, `effective()` config overrides, `launch_spec()` (placeholders + env), `start_order()` |
-| `backends/` | ✅ | `base.py` (`Backend` protocol, `UnitState`, `LogLine`), `systemd.py` (`aihub-<id>.service` via `systemd-run`, journal logs), `subprocess.py` (child processes + log ring; tests and `--dev`) |
+| `backends/` | ✅ | `base.py` (`Backend` protocol incl. `pids()`, `UnitState`, `LogLine`), `systemd.py` (`aihub-<id>.service` via `systemd-run`, journal logs), `subprocess.py` (child processes + log ring; tests and `--dev`) |
 | `services/` | ✅ pkg | Running mods. `manager.py` (`ServiceManager`: start/stop/restart, logs), `discovery.py` (boot, adoption, autostart in `after` order, rescan), `health.py` (readiness, monitor, restart on failure, external mods), `status.py` (status polling, `validate()` for the §4.6 shape, job events), `loading.py` (load/unload via `[memory]`; Phase 5 adds make-room), `views.py` (`ServiceSummary` / `ServiceDetail` JSON), `check.py` (`aihub check`: the mod self-test), `model.py` (`Service`, `Timing`, `ServiceError`) |
 | `proxy.py` | ✅ | `ANY /api/s/<id>/*`: streaming passthrough, hop-by-hop headers dropped, redirects kept inside the proxy |
 | `operations.py` | ✅ | Mod OpenAPI → `Operation[]` (refs inlined, file fields, response kinds, hide globs, tools), cached per process start |
 | `registry/` | ✅ pkg | Models registry (architecture §8): `model.py` (stored shape, validation, `RegistryError`), `store.py` (`Registry`: load/save `registry.json`, computed status, totals, filters, edit, delete with the in-use rule), `scan.py` (the scanner's grouping rules), `adding.py` (`POST /api/models/scan` filtering, `POST /api/models`), `verify.py` (`Verifier`: the one-at-a-time checksum queue), `alerts.py` (registry alerts and the once-a-minute watcher) |
 | `outputs/` | ✅ pkg | Outputs index (architecture §4.7): `entries.py` (which files and folders are outputs, `scope_for`), `describe.py` (an output → its `outputs` row: sidecar, title, kind, main file, times), `media.py` (durations, sizes, previews via `wave`/Pillow/ffmpeg), `index.py` (`Outputs`: sync, reconcile, list/get, delete, files, previews), `watch.py` (`watchfiles` watcher, startup rescan, trash purge), `trash.py` (`outputs/.trash/<date>/`, purged after 30 days), `announce.py` (batched activity items) |
-| `proc.py` | ✅ · ⏳ 5 | `port_listening()`, `port_owner()` (who holds a port, from /proc); per-process memory arrives in Phase 5 |
-| `memory.py` | ⏳ 5 | Memory sampling and make-room plans |
+| `proc.py` | ✅ | /proc and /sys facts: `meminfo`, `gpu`, process trees, RSS + DRM memory (`footprint`), unit cgroups, unit globs, container pids, `port_listening`, `port_owner` |
+| `memory/` | ✅ pkg | Memory manager (architecture §7): `source.py` (`ProcSource`: each mod's pids and footprint), `planner.py` (the load rule, `make_plan`), `manager.py` (`MemoryManager`: sampling, events, peaks, the `memory-high` alert, `ensure_room`, make-room, reservations), `triggers.py` (the proxy hook) |
 | `metrics.py` | ⏳ 6.1 | Time series recorder and rollups |
 | `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`), `outputs.py` (`/api/outputs/...`, file serving with Range) |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`), `outputs.py` (`/api/outputs/...`, file serving with Range), `memory.py` (`/api/memory`, `/plan`, `/acquire`) |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -80,7 +80,8 @@ utils/tests/
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
 ├── models/test_<behavior>.py   ✅     registry storage and status, routes, safe deletes, the scanner on a tree covering every rule, verify, used-by, alerts, the CLI (conftest: a fake data/models/)
 ├── outputs/test_<behavior>.py  ✅     what counts as an output, rows, the watcher, previews, routes (paging, Range, traversal), delete to trash, activity (conftest: a fake outputs/ tree; the host's ffmpeg inside a toolbox)
-└── <area>/test_<behavior>.py          memory, metrics, …
+├── memory/test_<behavior>.py   ✅     proc facts on fake /proc and /sys, the planner, the sampler, make-room end to end with two fake-mem mods, triggers, idle unload (conftest: a fake memory source)
+└── <area>/test_<behavior>.py          metrics, …
 ```
 
 ## `web/` — the UI

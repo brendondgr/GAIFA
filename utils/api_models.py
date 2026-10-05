@@ -266,3 +266,50 @@ class OutputPage(_Model):
     items: list[Output]
     next_cursor: str | None
     totals: OutputTotals
+
+
+# ---- memory (Phase 5) ----
+
+
+class Gpu(_Model):
+    name: str
+    vram_total_bytes: int
+    vram_used_bytes: int
+    gtt_total_bytes: int
+    gtt_used_bytes: int
+
+
+class ServiceMemory(_Model):
+    id: str
+    used_bytes: int
+    estimate_bytes: int | None
+    load: LoadState
+    idle_s: float | None
+    auto_unload: bool
+    priority: int
+
+
+class SystemMemory(_Model):
+    """The brief's `Memory` (named apart from ServiceSummary's `Memory`)."""
+
+    total_bytes: int
+    used_bytes: int
+    available_bytes: int
+    reserve_bytes: int
+    gpu: Gpu | None
+    by_service: list[ServiceMemory]
+    other_bytes: int = Field(description="OS, desktop, browser: anything AIHub doesn't own")
+
+
+class PlanStep(_Model):
+    id: str
+    frees_bytes: int
+    reason: str
+
+
+class MakeRoomPlan(_Model):
+    service: str
+    needs_bytes: int
+    available_bytes: int
+    unload: list[PlanStep]
+    enough: bool

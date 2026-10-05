@@ -57,11 +57,12 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         self.t = timing or Timing()
         self.services: dict[str, Service] = {}
         self.registry: Any = None  # utils.registry.Registry, set by the lifespan: ServiceDetail.models
+        self.memory: Any = None  # utils.memory.MemoryManager, set by the lifespan: load rule, measured use
         self.client = httpx.AsyncClient(trust_env=False, timeout=self.t.health_timeout_s)
         from utils.proxy import make_client
 
         self.proxy_client = make_client()
-        self.before_proxy: list[Callable[[Service, str, str], Awaitable[None]]] = []  # memory triggers (5.5)
+        self.before_proxy: list[Callable[[Service, str, str, Any], Awaitable[None]]] = []  # (svc, method, path, headers): memory triggers (5.5)
         self._closing = False
         self._boot_task: asyncio.Task[None] | None = None
         # Hooks for later steps: operations (2.6) refetch on ready, memory triggers (5.5).

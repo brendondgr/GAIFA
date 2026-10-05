@@ -63,6 +63,10 @@ class Backend(Protocol):
         """The running mod's working directory, so the hub only touches mods from its own root."""
         ...
 
+    async def pids(self, service_id: str) -> list[int]:
+        """The running mod's processes (their descendants are added by the memory sampler)."""
+        ...
+
     async def logs(self, service_id: str, n: int) -> list[LogLine]:
         """The last `n` lines, oldest first."""
         ...

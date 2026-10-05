@@ -451,29 +451,35 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 5 — Memory manager
 
-- [ ] **5.1 `utils/proc.py`.**
+- [x] **5.1 `utils/proc.py`.**
   - Port lcpp's `proc.py`: `meminfo`, `gpu`, `rss_bytes`, `gpu_bytes` (DRM fdinfo), `process_tree`, `port_free`, `port_owner`.
   - Add **unit pids**: `ControlGroup` from `systemctl show`, then that cgroup's `cgroup.procs`.
   - Add **container pids**: `podman inspect --format '{{.State.Pid}}'` plus its process tree.
-- [ ] **5.2 Sampler** (every 2 s), producing the brief's `Memory` shape:
+  - *As built:* `meminfo`, `gpu`, `process_tree`, `rss_bytes`, `gpu_bytes` (each DRM client counted once, across the whole tree), `footprint(pids)`, `unit_cgroup`/`cgroup_pids`/`unit_pids` (sub-cgroups included), `units_matching(glob)` and `container_pid`. `port_free` wasn't ported: the hub's own `port_listening`/`port_owner` (Phase 2) already cover ports. Each backend gained `pids(id)`: systemd reads the unit's cgroup (its path cached while it exists), the subprocess backend returns its child. Checked live: the real meminfo and GPU, `aihub.service`'s cgroup, and a real systemd test unit's 48 MB child (`test_backends.py`). The GPU name comes from `/usr/share/hwdata/pci.ids`, which the toolbox lacks (it shows `GPU 1002:1586` there; the installed hub, on the host, gets the real name).
+- [x] **5.2 Sampler** (every 2 s), producing the brief's `Memory` shape:
   - **Per mod:** its unit, plus `extra_units` (globs resolved with `systemctl --user list-units`), plus `containers`. Each process counts RSS plus GPU memory.
   - **`other_bytes`** = used − the mods' total.
   - **Peaks:** update `service_peaks` while a mod is loaded and its usage exceeds the stored peak.
   - **Events and alerts:** publish `memory` when something moves by more than 1%, or every 10 s. Raise an alert above 92%.
-- [ ] **5.3 Planner: `plan(service, needs_bytes)`** following architecture §7, plus `GET /api/memory` and `POST /api/memory/plan`.
+  - *As built:* `utils/memory/` (`source.py` collects pids and reads numbers; `manager.py` the `MemoryManager`). `extra_units` globs and `containers` are re-resolved every 10 s; an external mod with neither is measured as whoever listens on its port. `by_service` lists mods with `[memory]` or measured use. A `memory` event also goes out when a load state changes or the reserve is edited. Peaks are written when a loaded mod's use grows by 1% or more. The `memory-high` alert (warn) clears below 90%. `ServiceSummary.memory` now carries the measured `used_bytes` and the learned `peak_bytes`. The source is injectable (`Hub.memory_source`), so the tests drive it with a fake that follows real fake mods' load states.
+- [x] **5.3 Planner: `plan(service, needs_bytes)`** following architecture §7, plus `GET /api/memory` and `POST /api/memory/plan`.
   *Done when:* tests with an injected fake memory source cover enough room, a covering plan, a not-enough plan, `never_unload` and busy exclusion.
-- [ ] **5.4 Executor.**
+  - *As built:* `utils/memory/planner.py` is a pure function (`make_plan`). Candidates must also be up and have an `unload` operation, and `auto_unload` must be on. Each frees its measured use, or its estimate if it isn't measured yet. `needs` is max(estimate, learned peak), where the estimate is the status's `memory_estimate_gb` or else the manifest's. Routes are in `utils/routes/memory.py`; `POST /api/memory/plan` takes an optional `needs_bytes`. The `needs_room` detail reads like "Loading Fake Memory 2 needs ~40.0 GB, 28.0 GB available. Unloading fake-mem makes room." Tests: `test_planner.py`, `test_make_room.py`.
+- [x] **5.4 Executor.**
   - **`make_room(plan)`:** unload one mod at a time through the manifest `unload` operation, then wait until memory drops by at least 70% of what's expected (30 s timeout). Each unload adds an activity item.
   - **Routes:** `POST /api/services/{id}/load?make_room=` and `POST /api/memory/acquire`.
     - `auto_make_room = false` and no `make_room` → `409 needs_room` with `data.plan`.
     - Acquire returns `{granted: true, freed: [...]}`.
   - **One global lock**, so two loads never race for the same memory.
   *Done when:* an end-to-end test with two `fake-mem` mods passes.
-- [ ] **5.5 Proxy triggers.**
+  - *As built:* `MemoryManager.ensure_room()` is the one way in for loads, triggers and acquire. Under the lock it plans, unloads one mod at a time (awaiting each mod's answer, then memory dropping by 70% of the expected amount within 30 s, with a warning activity if it doesn't), re-plans, and then **reserves** the bytes the load needs. The lock isn't held while a load runs (models can take minutes to load). Instead, a reservation keeps a second load from planning with the same memory: it shrinks as the mod's measured use grows, ends a couple of samples after the load finishes, and an unload clears it. Load routes answer `409 needs_room` at once when room is needed and wasn't allowed. Otherwise they return `202` and make room in the background; if room is gone by then, the load fails with an activity item. Two loads racing for the same 48 GB never both load (tested). Acquire reservations last 120 s. Activity: "Unloaded Speech to make room for 3D Generate (1.2s)", "Made room for lcpp (gemma-4)". Tests: `test_make_room.py` (two real fake-mem mods, 40 GB each in a 68 GB budget, on a fake source).
+- [x] **5.5 Proxy triggers.**
   - A proxied request that matches a mod's `[memory] triggers` while the mod is unloaded runs the load rule first.
   - `needs_room` goes back to the caller as 409, and the caller retries with the header `X-AIHub-Make-Room: 1`.
   - Mods with `in_flight > 0` are never unload candidates.
-- [ ] **5.6 Idle unload stays inside the mods.** AIHub passes `idle_unload_s` from `config.toml` to each mod through the env variable named in its manifest (`LOCALTTS_IDLE_UNLOAD_S`, `GEN3D_IDLE_UNLOAD_S`). Document the mapping in each manifest.
+  - *As built:* `utils/memory/triggers.py`, as a `before_proxy` hook (which now also gets the request headers). Trigger paths may use `{name}` for one segment and end in `*`. The mod loads by itself once the call arrives, so the hub only makes room and reserves (for 300 s, shrinking as use grows). The mod's load state still comes from its status. `X-AIHub-Make-Room: 1` is also accepted by `POST /api/memory/acquire`, as is `?make_room=1`. Tests: `test_triggers.py`.
+- [x] **5.6 Idle unload stays inside the mods.** AIHub passes `idle_unload_s` from `config.toml` to each mod through the env variable named in its manifest (`LOCALTTS_IDLE_UNLOAD_S`, `GEN3D_IDLE_UNLOAD_S`). Document the mapping in each manifest.
+  - *As built:* `[memory] idle_unload_s` (the mod's default) and `idle_unload_env` (the variable it reads) in `service.toml`. Every mod with `[memory]` gets `AIHUB_IDLE_UNLOAD_S`, plus the named variable, in seconds, with **0 meaning never**. A mod's explicit `env` still wins. `config.toml` writes "never" as `idle_unload_s = 0` when the mod's default isn't never (TOML has no null), and the Settings tab's Never box saves that. Changing it on a mod with `[memory]` now says "restart required". LocalTTS and 3DGenerate read 0 as "unload at once" today, so steps 7.2 and 8.2 must make 0 mean never. Tests: `test_idle_unload.py`.
 
 **Wire — Phase 5:** `memory` goes live:
 - the header memory meter and its popover
@@ -565,6 +571,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - `loaded` = any engine worker up; `busy` = any engine lock held; `idle_s`
     - stats: Voices, Engines installed, Clips today
   - **`LOCALTTS_VOICES_DIR`**, defaulting to `$LOCALTTS_DATA/voices`.
+  - **`LOCALTTS_IDLE_UNLOAD_S=0` means never** (plan 5.6; today 0 unloads at once). The manifest sets `[memory] idle_unload_s = 180` and `idle_unload_env = "LOCALTTS_IDLE_UNLOAD_S"`.
   - **Output path:**
     - `{outputs}/<YYYY-MM-DD>/<HHMMSS>-<slug(text[:40])>-<voice>.<ext>`, written as `.part`, then renamed.
     - Sidecar `<file>.json`: title, `kind: audio`, prompt = text, voice, engine, model, params (instructions, speed, format), `duration_s`, `source.request_id`.
@@ -622,6 +629,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 - [ ] **8.1 Subtree + venv.** `git subtree add --prefix=services/gen3d ~/Projects/3DGenerate main`, then create the venv (Python 3.12). Move pytest and httpx into a dev requirements file. Ignored state: `data/` (the database and jobs, handled in 8.4).
 - [ ] **8.2 Code changes.**
+  - **`GEN3D_IDLE_UNLOAD_S=0` means never** (plan 5.6; today 0 unloads at once). The manifest sets `[memory] idle_unload_s = 600` and `idle_unload_env = "GEN3D_IDLE_UNLOAD_S"`.
   - **Declare `POST /v1/jobs`'s request body** as a pydantic model: today it reads the raw request, so its OpenAPI has no body and the API tab shows no form (found in 2.6).
   - **New env vars:**
     - `GEN3D_DB` (default `$GEN3D_DATA/gen3d.db`)

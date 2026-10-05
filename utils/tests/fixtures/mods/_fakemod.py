@@ -236,7 +236,7 @@ def status() -> dict:
         "jobs": js,
     }
     if MODE == "mem":
-        s["memory_estimate_gb"] = round(int(os.environ.get("FAKE_MEM_MB", "64")) / 1024, 3)
+        s["memory_estimate_gb"] = float(os.environ.get("FAKE_ESTIMATE_GB") or round(int(os.environ.get("FAKE_MEM_MB", "64")) / 1024, 3))
     return s
 
 

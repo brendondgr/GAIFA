@@ -363,7 +363,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `callService(id, method, path, opts)` | `ANY /api/s/{id}{path}` | `ServiceResponse` (opts: `{ query, json, form, signal, stream, onEvent }`) |
 | `saveServiceConfig(id, cfg)` | `PUT /api/services/{id}/config` | `{ config: ServiceConfig, restart_required: boolean }` (send the whole form or a subset; a value equal to the mod's default removes its override, so config.toml only holds real changes) |
 | `getMemory()` | `GET /api/memory` | `Memory` |
-| `planRoom(id, needsBytes)` | `POST /api/memory/plan` body `{service, needs_bytes}` | `MakeRoomPlan` |
+| `planRoom(id, needsBytes)` | `POST /api/memory/plan` body `{service, needs_bytes}` | `MakeRoomPlan` (`needs_bytes` optional: the mod's estimate or learned peak) |
 | `listModels(filter)` | `GET /api/models?kind=&service=&status=&q=` | `{ models: Model[], totals: Totals, disk: Disk }` |
 | `getModel(id)` | `GET /api/models/{id}` | `Model` |
 | `saveModel(id, patch)` | `PUT /api/models/{id}` body `ModelPatch` | `Model` |
@@ -468,8 +468,8 @@ interface Memory {
 }
 
 interface MakeRoomPlan {
-  service: string; needs_bytes: number; available_bytes: number;
-  unload: { id: string; frees_bytes: number; reason: string }[];
+  service: string; needs_bytes: number; available_bytes: number;   // available = MemAvailable − reserve − other loads' reservations
+  unload: { id: string; frees_bytes: number; reason: string }[];  // reason: "priority 1, idle 12m"
   enough: boolean;
 }
 

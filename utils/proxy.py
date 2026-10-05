@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastapi import APIRouter, Request
@@ -31,8 +31,9 @@ HOP_BY_HOP = {
 }
 TIMEOUT = httpx.Timeout(connect=3.0, write=300.0, read=None, pool=10.0)
 
-# Phase 5.5 adds memory triggers here: awaited before a matching request is sent.
-BeforeHook = Callable[[Service, str, str], Awaitable[None]]
+# Awaited before a request is sent: (service, method, path, request headers). The memory
+# triggers (plan 5.5) make room here, or raise 409 needs_room.
+BeforeHook = Callable[[Service, str, str, Any], Awaitable[None]]
 
 
 def make_client() -> httpx.AsyncClient:
@@ -104,7 +105,7 @@ async def forward(mgr: ServiceManager, request: Request, service_id: str) -> Str
     method = request.method
 
     for hook in mgr.before_proxy:
-        await hook(svc, method, path)
+        await hook(svc, method, path, request.headers)
 
     has_body = "content-length" in request.headers or "transfer-encoding" in request.headers
     req = mgr.proxy_client.build_request(

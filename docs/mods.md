@@ -147,9 +147,12 @@ After editing `page.js`, reload the browser tab. Pages for the built-in apps can
   unload = "POST /v1/unload"
   triggers = ["POST /v1/speech"]
   ```
-  - The Load and Unload buttons call these routes.
-  - Report `loaded` in your status.
-  - Phase 5 unloads idle mods to make room before a trigger route runs.
+  - The Load and Unload buttons call these routes. Before a load, AIHub makes room by unloading idle mods (asking first unless `auto_make_room` is on).
+  - Report `loaded` in your status (and `memory_estimate_gb` if what you need varies).
+  - A proxied call to a `triggers` route while you're unloaded makes room first. `{id}` matches one path segment, a trailing `*` the rest. Without room the caller gets `409 needs_room`, and can retry with `X-AIHub-Make-Room: 1`.
+  - If what you load varies (a model picked per request), ask first: `POST $AIHUB_URL/api/memory/acquire` with `{"service": "<id>", "needs_bytes": N, "reason": "gemma-4"}` → `{granted, freed}` or `409 needs_room`.
+  - Unload yourself when idle: `idle_unload_s = 180` and `idle_unload_env = "MYMOD_IDLE_UNLOAD_S"` in `[memory]`. AIHub passes the user's setting in that variable and in `AIHUB_IDLE_UNLOAD_S`, in seconds, where **0 means never**.
+  - Your memory is measured, not declared: RSS plus GPU memory of every process in your unit, `extra_units` (globs, e.g. `"lcpp-*.service"`) and `containers`.
 - **Models:** keep weights in `data/models/` (`$AIHUB_MODELS`), in the folder for their kind (`llm/`, `tts/`, `comfyui/<role>/`, …; architecture §3).
   - `[models] dirs = ["tts"]` (or deeper, `"comfyui/loras"`) lists the folders you use. Registered models in them show "used by" your mod, appear on its page, and their files can't be deleted while it is loaded or busy (or running at all, if it has no `[memory]`).
   - **Register what you download** so it shows on the Models page with its source: `POST $AIHUB_URL/api/models` with `{"path": "tts/my-model", "name": "My Model", "kind": "tts", "source": {"type": "huggingface", "repo": "org/name", "revision": "<commit>"}}`. The hub finds the files with the scanner's rules (or send `"files": [{"path", "role", "sha256"}]`). A file that's already registered answers `409 model_exists`, so registering again is harmless.

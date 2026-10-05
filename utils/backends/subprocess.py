@@ -135,6 +135,10 @@ class SubprocessBackend:
         child = self._children.get(service_id)
         return child.cwd if child else None
 
+    async def pids(self, service_id: str) -> list[int]:
+        child = self._children.get(service_id)
+        return [child.proc.pid] if child and child.proc.returncode is None else []
+
     async def list_ours(self) -> list[str]:
         return sorted(i for i, c in self._children.items() if c.proc.returncode is None)
 

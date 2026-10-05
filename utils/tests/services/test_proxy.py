@@ -156,13 +156,13 @@ async def test_tracking(hub):
 async def test_before_proxy_hook_runs(hub):
     seen: list[tuple[str, str, str]] = []
 
-    async def hook(svc, method, path):
-        seen.append((svc.id, method, path))
+    async def hook(svc, method, path, headers):
+        seen.append((svc.id, method, path, headers.get("x-aihub-make-room")))
 
     hub.services.before_proxy.append(hook)
     async with httpx.AsyncClient(base_url=hub.url) as c:
-        await c.post("/api/s/fake-ok/v1/speech?x=1", json={"text": "a"})
-    assert seen == [("fake-ok", "POST", "/v1/speech")]
+        await c.post("/api/s/fake-ok/v1/speech?x=1", json={"text": "a"}, headers={"X-AIHub-Make-Room": "1"})
+    assert seen[-1] == ("fake-ok", "POST", "/v1/speech", "1")
 
 
 async def test_encoded_path_is_kept(hub):

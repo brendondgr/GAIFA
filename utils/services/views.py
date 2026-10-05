@@ -31,9 +31,9 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "idle_s": svc.idle_s,
         "busy": svc.busy,
         "memory": {
-            "used_bytes": 0,  # Phase 5 measures it
+            "used_bytes": mgr.memory.used.get(svc.id, 0) if mgr.memory else 0,
             "estimate_bytes": round(estimate_gb * GB) if estimate_gb is not None else None,
-            "peak_bytes": None,
+            "peak_bytes": mgr.memory.peaks.get(svc.id) if mgr.memory else None,
         },
         "stats": svc.stats,
         "has_page": has_page(svc),

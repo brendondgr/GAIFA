@@ -1,0 +1,283 @@
+"""The memory manager (architecture §7, plan 5.2–5.4): samples memory every 2 s, plans
+make-room, and frees memory one mod at a time.
+
+- **Sampling:** each running mod's footprint (`source.py`), the brief's `Memory` shape,
+  a `memory` event when anything moves by more than 1% of total (or a load state
+  changes, or every 10 s), learned peaks in `service_peaks`, and a `memory-high` alert
+  above 92% (cleared below 90%).
+- **Room:** `ensure_room()` is the one way in for loads, proxied triggers and mods'
+  `acquire` calls. Under one lock it plans, unloads if allowed (`make_room`, or
+  `[memory] auto_make_room`), and then **reserves** what the load needs, so a second load
+  planned meanwhile doesn't count the same memory. A reservation shrinks as the mod's
+  measured use grows, and ends when the load does (or after its time to live).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+from utils.memory.planner import GB, Candidate, describe, fmt_gb, make_plan, why_not
+from utils.memory.source import ProcSource, Source
+from utils.services.model import ServiceError
+
+if TYPE_CHECKING:
+    from utils.db import Database
+    from utils.events import ActivityLog, Alerts, EventBus
+    from utils.services import ServiceManager
+    from utils.services.model import Service
+
+log = logging.getLogger("aihub.memory")
+
+EVERY_S = 2.0
+PUBLISH_EVERY_S = 10.0
+MOVE_FRACTION = 0.01
+ALERT = "memory-high"
+ALERT_ABOVE, ALERT_CLEAR = 0.92, 0.90
+WAIT_S = 30.0  # for memory to drop after an unload
+DROP_FRACTION = 0.7  # …by at least this share of what the plan expected
+POLL_S = 0.25
+LOAD_TTL_S = 30 * 60.0  # a load that never finishes doesn't hold memory forever
+ACQUIRE_TTL_S = 120.0
+TRIGGER_TTL_S = 300.0
+
+
+@dataclass
+class Reservation:
+    bytes: int
+    base_used: int
+    expires: float
+    grown: int = 0  # the most the mod's measured use has grown since: a reservation only shrinks
+
+
+def needs_room(plan: dict[str, Any], name: str) -> ServiceError:
+    return ServiceError(409, "needs_room", describe(plan, name), {"plan": plan})
+
+
+class MemoryManager:
+    def __init__(self, services: ServiceManager, db: Database | None, bus: EventBus, alerts: Alerts | None = None,
+                 activity: ActivityLog | None = None, source: Source | None = None, every: float = EVERY_S,
+                 wait_s: float = WAIT_S, poll_s: float = POLL_S) -> None:
+        self.mgr, self.db, self.bus, self.alerts, self.activity = services, db, bus, alerts, activity
+        self.source: Source = source or ProcSource()
+        self.every, self.wait_s, self.poll_s = every, wait_s, poll_s
+        self.lock = asyncio.Lock()
+        self.sys: dict[str, int] = {"total_bytes": 0, "used_bytes": 0, "available_bytes": 0}
+        self.gpu: dict[str, Any] | None = None
+        self.used: dict[str, int] = {}
+        self.peaks: dict[str, int] = {}
+        self.reservations: dict[str, Reservation] = {}
+        self.snapshot: dict[str, Any] | None = None
+        self._last_pub: tuple[float, dict[str, Any]] | None = None
+        self._task: asyncio.Task[None] | None = None
+
+    @property
+    def cfg(self) -> Any:
+        return self.mgr.config.memory
+
+    # lifecycle -----------------------------------------------------------------
+
+    async def start(self) -> None:
+        if self.db:
+            rows = await self.db.fetchall("SELECT service, peak_bytes FROM service_peaks")
+            self.peaks = {r["service"]: r["peak_bytes"] for r in rows}
+        await self.sample()
+        self._task = asyncio.create_task(self._loop(), name="aihub-memory")
+
+    async def close(self) -> None:
+        if self._task:
+            self._task.cancel()
+            await asyncio.gather(self._task, return_exceptions=True)
+
+    async def _loop(self) -> None:
+        while True:
+            await asyncio.sleep(self.every)
+            try:
+                await self.sample()
+            except Exception:  # noqa: BLE001: keep sampling
+                log.exception("memory sample")
+
+    # sampling --------------------------------------------------------------------
+
+    async def sample(self, publish: bool = True) -> dict[str, Any]:
+        pids = await self.source.collect(self.mgr)
+        self.sys, self.gpu, self.used = await asyncio.to_thread(self.source.read, pids)
+        await self._learn_peaks()
+        mem = self.view()
+        self.snapshot = mem
+        if publish and self._moved(mem):
+            self.bus.publish({"type": "memory", "memory": mem})
+            self._last_pub = (time.monotonic(), mem)
+        self._alert(mem)
+        return mem
+
+    def estimate(self, svc: Service) -> int | None:
+        gb = svc.memory_estimate_gb if svc.memory_estimate_gb is not None else (svc.m.memory.estimate_gb if svc.m and svc.m.memory else None)
+        return round(gb * GB) if gb is not None else None
+
+    def needs(self, svc: Service) -> int:
+        return max(self.estimate(svc) or 0, self.peaks.get(svc.id, 0))
+
+    def view(self) -> dict[str, Any]:
+        """The brief's `Memory`."""
+        rows = []
+        for svc in self.mgr.list():
+            used = self.used.get(svc.id, 0)
+            if not (svc.has_memory or used):
+                continue
+            rows.append({"id": svc.id, "used_bytes": used, "estimate_bytes": self.estimate(svc), "load": svc.load,
+                         "idle_s": svc.idle_s, "auto_unload": svc.eff.auto_unload, "priority": svc.eff.priority})
+        return {
+            "total_bytes": self.sys["total_bytes"], "used_bytes": self.sys["used_bytes"],
+            "available_bytes": self.sys["available_bytes"], "reserve_bytes": round(self.cfg.reserve_gb * GB),
+            "gpu": self.gpu, "by_service": rows,
+            "other_bytes": max(0, self.sys["used_bytes"] - sum(self.used.values())),
+        }
+
+    def _moved(self, mem: dict[str, Any]) -> bool:
+        if self._last_pub is None:
+            return True
+        when, last = self._last_pub
+        if time.monotonic() - when >= PUBLISH_EVERY_S or mem["reserve_bytes"] != last["reserve_bytes"]:
+            return True
+        step = MOVE_FRACTION * max(1, mem["total_bytes"])
+        if abs(mem["used_bytes"] - last["used_bytes"]) > step:
+            return True
+        before = {r["id"]: r for r in last["by_service"]}
+        for r in mem["by_service"]:
+            b = before.get(r["id"])
+            if b is None or b["load"] != r["load"] or abs(b["used_bytes"] - r["used_bytes"]) > step:
+                return True
+        return len(before) != len(mem["by_service"])
+
+    async def _learn_peaks(self) -> None:
+        self.reserved()  # note each reservation's growth while the numbers are fresh
+        await self._peaks()
+
+    async def _peaks(self) -> None:
+        """A loaded mod's highest measured use, kept in `service_peaks` (written when it grows by 1%+)."""
+        for svc in self.mgr.list():
+            used = self.used.get(svc.id, 0)
+            old = self.peaks.get(svc.id, 0)
+            if svc.load != "loaded" or used <= old * (1 + MOVE_FRACTION):
+                continue
+            self.peaks[svc.id] = used
+            if self.db:
+                await self.db.execute(
+                    "INSERT INTO service_peaks (service, peak_bytes, updated_ts) VALUES (?, ?, ?) "
+                    "ON CONFLICT(service) DO UPDATE SET peak_bytes = excluded.peak_bytes, updated_ts = excluded.updated_ts",
+                    (svc.id, used, time.time()),
+                )
+
+    def _alert(self, mem: dict[str, Any]) -> None:
+        if not self.alerts or not mem["total_bytes"]:
+            return
+        share = mem["used_bytes"] / mem["total_bytes"]
+        if share > ALERT_ABOVE:
+            self.alerts.set(ALERT, "warn", f"Memory is {share:.0%} full ({fmt_gb(mem['used_bytes'])} of {fmt_gb(mem['total_bytes'])})",
+                            action={"label": "Open", "route": "#/overview"})
+        elif share < ALERT_CLEAR:
+            self.alerts.clear(ALERT)
+
+    # planning ----------------------------------------------------------------------
+
+    def candidates(self) -> list[Candidate]:
+        out = []
+        for svc in self.mgr.list():
+            mem = svc.m.memory if svc.m else None
+            out.append(Candidate(
+                id=svc.id, name=svc.mod.name, load=svc.load, up=svc.up, busy=svc.busy, in_flight=svc.in_flight,
+                auto_unload=svc.eff.auto_unload, unloadable=bool(mem and mem.unload), priority=svc.eff.priority,
+                idle_s=svc.idle_s, used_bytes=self.used.get(svc.id, 0), estimate_bytes=self.estimate(svc),
+            ))
+        return out
+
+    def _remaining(self, sid: str, r: Reservation) -> int:
+        r.grown = max(r.grown, self.used.get(sid, 0) - r.base_used)
+        return max(0, r.bytes - r.grown)
+
+    def reserved(self, but: str | None = None) -> int:
+        now = time.monotonic()
+        for sid in [s for s, r in self.reservations.items() if r.expires <= now]:
+            del self.reservations[sid]
+        return sum(self._remaining(sid, r) for sid, r in self.reservations.items() if sid != but)
+
+    def plan(self, service_id: str, needs_bytes: int | None = None, available: int | None = None) -> dict[str, Any]:
+        svc = self.mgr.get(service_id)
+        needs = needs_bytes if needs_bytes is not None else self.needs(svc)
+        avail = (self.sys["available_bytes"] if available is None else available) - round(self.cfg.reserve_gb * GB) - self.reserved(but=service_id)
+        return make_plan(service_id, needs, avail, self.candidates(), set(self.cfg.never_unload))
+
+    async def fresh_plan(self, service_id: str, needs_bytes: int | None = None) -> dict[str, Any]:
+        return self.plan(service_id, needs_bytes, await asyncio.to_thread(self.source.available))
+
+    async def precheck(self, service_id: str, make_room: bool = False, needs_bytes: int | None = None) -> dict[str, Any]:
+        """Raise `needs_room` now (for a 409) if a load can't go ahead as asked."""
+        plan = await self.fresh_plan(service_id, needs_bytes)
+        if plan["unload"] or not plan["enough"]:
+            if not plan["enough"] or not (make_room or self.cfg.auto_make_room):
+                raise needs_room(plan, self.mgr.get(service_id).mod.name)
+        return plan
+
+    # making room ------------------------------------------------------------------------
+
+    async def ensure_room(self, service_id: str, needs_bytes: int | None = None, *, make_room: bool = False,
+                          ttl: float = LOAD_TTL_S) -> tuple[dict[str, Any], list[str]]:
+        """Plan, unload what the plan says (if allowed), and reserve the memory. Returns
+        (plan, freed ids); raises `needs_room` when there isn't room and it can't be made."""
+        svc = self.mgr.get(service_id)
+        allowed = make_room or self.cfg.auto_make_room
+        async with self.lock:
+            plan = await self.fresh_plan(service_id, needs_bytes)
+            freed: list[str] = []
+            if plan["unload"] or not plan["enough"]:
+                if not plan["enough"] or not allowed:
+                    raise needs_room(plan, svc.mod.name)
+                freed = await self._make_room(plan, svc)
+                await self.sample()
+                plan = await self.fresh_plan(service_id, needs_bytes)
+                if not plan["enough"]:
+                    raise needs_room(plan, svc.mod.name)
+                if plan["unload"]:  # memory didn't drop as much as measured use promised
+                    raise needs_room(plan, svc.mod.name)
+            self.reservations[service_id] = Reservation(plan["needs_bytes"], self.used.get(service_id, 0), time.monotonic() + ttl)
+        return plan, freed
+
+    def unloaded(self, service_id: str) -> None:
+        """An unloaded mod holds nothing, reserved or not."""
+        self.reservations.pop(service_id, None)
+
+    def release(self, service_id: str) -> None:
+        """The load finished: keep the reservation one more sample or two, until its use is measured."""
+        r = self.reservations.get(service_id)
+        if r:
+            r.expires = min(r.expires, time.monotonic() + 2 * self.every)
+
+    async def _make_room(self, plan: dict[str, Any], target: Service) -> list[str]:
+        from utils.services import loading
+
+        never = set(self.cfg.never_unload)
+        freed: list[str] = []
+        by_id = {c.id: c for c in self.candidates()}
+        for u in plan["unload"]:
+            c = by_id.get(u["id"])
+            if c is None or why_not(c, target.id, never) is not None:
+                continue  # it changed meanwhile (became busy, was unloaded…)
+            other = self.mgr.get(u["id"])
+            before = await asyncio.to_thread(self.source.available)
+            if not await loading.unload_now(self.mgr, other, note=f" to make room for {target.mod.name}"):
+                continue
+            freed.append(other.id)
+            goal = before + DROP_FRACTION * u["frees_bytes"]
+            deadline = time.monotonic() + self.wait_s
+            while await asyncio.to_thread(self.source.available) < goal:
+                if time.monotonic() > deadline:
+                    if self.activity:
+                        await self.activity.add(f"{other.mod.name} unloaded, but memory didn't drop by the expected {fmt_gb(u['frees_bytes'])} within {self.wait_s:.0f}s",
+                                                service=other.id, level="warn")
+                    break
+                await asyncio.sleep(self.poll_s)
+        return freed

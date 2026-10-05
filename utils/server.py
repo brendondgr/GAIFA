@@ -25,6 +25,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from utils.config import Config
 from utils.db import Database
 from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
+from utils.memory import MemoryManager
+from utils.memory.triggers import hook as memory_hook
 from utils.outputs import OutputError, Outputs
 from utils.outputs.watch import Watcher as OutputsWatcher
 from utils.paths import DEFAULT_ROOT, Paths
@@ -74,6 +76,9 @@ class Hub:
     alerts: Alerts | None = None
     registry: Registry | None = None
     outputs: Outputs | None = None
+    memory: MemoryManager | None = None
+    memory_source: Any = None  # tests inject a fake (utils/memory/source.py)
+    memory_every_s: float = 2.0
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -110,7 +115,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, models, outputs, services, system, web
+    from utils.routes import events, memory, models, outputs, services, system, web
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -154,7 +159,14 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             out_watcher = OutputsWatcher(hub.outputs, hub.alerts, name_of=_service_name(hub))
             out_watcher.start()
             stack.push_async_callback(out_watcher.close)
-            # 7–8 (memory, metrics) arrive in Phases 5–6.
+            # 7. memory: sample every 2 s; loads, proxied triggers and acquire go through it.
+            hub.memory = MemoryManager(hub.services, hub.db, hub.bus, hub.alerts, hub.activity,
+                                       source=hub.memory_source, every=hub.memory_every_s)
+            hub.services.memory = hub.memory
+            hub.services.before_proxy.append(memory_hook(hub.memory))
+            await hub.memory.start()
+            stack.push_async_callback(hub.memory.close)
+            # 8. metrics arrive in Phase 6.
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 
@@ -176,7 +188,8 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(proxy.router)
     app.include_router(models.router)
     app.include_router(outputs.router)
-    for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs"):
+    app.include_router(memory.router)
+    for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory"):
         hub.mark_live(area)
 
     app.include_router(web.router)

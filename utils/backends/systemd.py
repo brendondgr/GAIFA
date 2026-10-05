@@ -17,6 +17,7 @@ import json
 import shutil
 from collections.abc import AsyncIterator
 
+from utils import proc
 from utils.backends.base import BackendError, LogLine, UnitState
 from utils.manifest import LaunchSpec
 
@@ -92,6 +93,7 @@ class SystemdBackend:
 
     def __init__(self, prefix: str = PREFIX) -> None:
         self.prefix = prefix  # tests use their own, so they never touch real mods
+        self._cgroups: dict[str, str] = {}  # unit → cgroup path (memory sampling)
 
     def unit(self, service_id: str) -> str:
         return f"{self.prefix}{service_id}.service"
@@ -134,6 +136,18 @@ class SystemdBackend:
     async def workdir(self, service_id: str) -> str | None:
         rc, out, _ = await _run("systemctl", "--user", "show", self.unit(service_id), "-p", "WorkingDirectory", "--value")
         return out.strip() or None if rc == 0 else None
+
+    async def pids(self, service_id: str) -> list[int]:
+        """Every process in the unit's cgroup. The cgroup path is cached while it exists."""
+        unit = self.unit(service_id)
+        cg = self._cgroups.get(unit)
+        if cg is None or not (proc.CGROUP_ROOT / cg.lstrip("/")).is_dir():
+            cg = await asyncio.to_thread(proc.unit_cgroup, unit)
+            if not cg:
+                self._cgroups.pop(unit, None)
+                return []
+            self._cgroups[unit] = cg
+        return await asyncio.to_thread(proc.cgroup_pids, cg)
 
     async def stop(self, service_id: str, timeout: float) -> None:
         unit = self.unit(service_id)

@@ -157,7 +157,10 @@ async def save_service_config(service_id: str, patch: ServiceConfigPatch, reques
     defaults = effective(svc.mod, _without(hub.config, service_id)).as_dict()
     changes: dict[str, Any] = {}
     for key, value in sent.items():
-        if value == defaults[key] or value is None:
+        if key == "idle_unload_s" and value in (None, 0):
+            # "never": written as 0 over a mod's own default (TOML has no null); no key when that's the default
+            changes[key] = sent[key] = 0 if defaults[key] is not None else None
+        elif value == defaults[key] or value is None:
             changes[key] = None  # back to the default (idle_unload_s: null = never, the default)
             sent[key] = None
         elif key == "env":
@@ -179,7 +182,8 @@ async def save_service_config(service_id: str, patch: ServiceConfigPatch, reques
     hub.config = cfg
     mgr.reconfigure(cfg)
     new = effective(svc.mod, cfg).as_dict()
-    restart_required = svc.state not in ("stopped", "failed") and any(old[k] != new[k] for k in RESTART_KEYS)
+    keys = RESTART_KEYS | ({"idle_unload_s"} if svc.has_memory else set())  # passed in the env (plan 5.6)
+    restart_required = svc.state not in ("stopped", "failed") and any(old[k] != new[k] for k in keys)
     if old["enabled"] and not new["enabled"] and svc.state not in ("stopped",) and not svc.external:
         await mgr.stop(service_id)  # disabling applies now
     await mgr.activity.add(f"Saved settings for {svc.mod.name}" + (" (restart to apply)" if restart_required else ""), service=service_id)

@@ -1,8 +1,10 @@
 """Load and unload a mod's models through its `[memory]` operations (plan 2.7).
 
 The call runs in the background: the route answers 202 with `load: "loading"`,
-and the result arrives as a `service` event. Phase 5 adds make-room planning
-in front of `load` and uses the same calls to free memory.
+and the result arrives as a `service` event. A load goes through the memory
+manager first (plan 5.4): it answers `409 needs_room` when the load needs room
+and `make_room` wasn't asked for (nor `auto_make_room` set); otherwise room is
+made and reserved in the background before the mod's load call.
 """
 
 from __future__ import annotations
@@ -40,11 +42,31 @@ async def load(mgr: ServiceManager, service_id: str, make_room: bool = False) ->
     _require_up(svc)
     if svc.load in ("loaded", "loading"):
         return svc
-    # make_room: Phase 5 plans and frees memory here; until then a load always proceeds.
+    mem = mgr.memory
+    if mem is not None:
+        await mem.precheck(svc.id, make_room)  # 409 needs_room, with the plan, for the Make-room dialog
     svc.load = "loading"
     mgr._publish(svc)
-    mgr._spawn(svc, _call(mgr, svc, svc.gen, method, path, "load"))
+    mgr._spawn(svc, _load(mgr, svc, svc.gen, method, path, make_room))
     return svc
+
+
+async def _load(mgr: ServiceManager, svc: Service, gen: int, method: str, path: str, make_room: bool) -> None:
+    mem = mgr.memory
+    if mem is not None:
+        try:
+            await mem.ensure_room(svc.id, make_room=make_room)
+        except ServiceError as e:
+            if gen == svc.gen:
+                svc.load = "unloaded"
+                mgr._publish(svc)
+                await mgr.activity.add(f"Couldn't load {svc.mod.name}: {e.detail}", service=svc.id, level="error")
+            return
+    try:
+        await _call(mgr, svc, gen, method, path, "load")
+    finally:
+        if mem is not None:
+            mem.release(svc.id)
 
 
 async def unload(mgr: ServiceManager, service_id: str) -> Service:
@@ -59,7 +81,21 @@ async def unload(mgr: ServiceManager, service_id: str) -> Service:
     return svc
 
 
-async def _call(mgr: ServiceManager, svc: Service, gen: int, method: str, path: str, which: str) -> None:
+async def unload_now(mgr: ServiceManager, svc: Service, note: str = "") -> bool:
+    """Unload and wait for the mod's answer (make-room). True when it unloaded."""
+    try:
+        method, path = _op(svc, "unload")
+    except ServiceError:
+        return False
+    if not svc.up or svc.load != "loaded":
+        return False
+    svc.load = "unloading"
+    mgr._publish(svc)
+    await _call(mgr, svc, svc.gen, method, path, "unload", note)
+    return svc.load == "unloaded"
+
+
+async def _call(mgr: ServiceManager, svc: Service, gen: int, method: str, path: str, which: str, note: str = "") -> None:
     t0 = time.monotonic()
     before = "unloaded" if which == "load" else "loaded"
     try:
@@ -73,8 +109,10 @@ async def _call(mgr: ServiceManager, svc: Service, gen: int, method: str, path: 
     verb = "Loaded" if which == "load" else "Unloaded"
     if ok:
         svc.load = "loaded" if which == "load" else "unloaded"
+        if which == "unload" and mgr.memory is not None:
+            mgr.memory.unloaded(svc.id)
         mgr._publish(svc)
-        await mgr.activity.add(f"{verb} {svc.mod.name} ({secs:.1f}s)", service=svc.id)
+        await mgr.activity.add(f"{verb} {svc.mod.name}{note} ({secs:.1f}s)", service=svc.id)
     else:
         svc.load = before
         mgr._publish(svc)

@@ -1569,7 +1569,7 @@ class Component extends DCLogic {
     if (d.page_url) return d.page_url;
     // Mock mode: the built-in mods show their real page modules (mock.js answers their native API);
     // any other mock mod with a page shows the template's.
-    const own = this.api.isLive('services') || ['tts', 'gen3d', 'relay', 'lcpp'].includes(d.id);
+    const own = this.api.isLive('services') || ['tts', 'gen3d', 'relay', 'lcpp', 'comfy'].includes(d.id);
     return own ? `/ui/services/${encodeURIComponent(d.id)}/page.js` : '/ui/services/_template/page.js';
   }
   async loadPage(d) {

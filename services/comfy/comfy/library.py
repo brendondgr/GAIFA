@@ -80,6 +80,7 @@ class Library:
             "inputs": {k: v.model_dump(exclude_none=True, exclude_defaults=True) for k, v in m.inputs.items()} if m else {},
             "outputs": {k: v.model_dump(exclude_none=True) for k, v in m.outputs.items()} if m else {},
             "presets": m.presets if m else {},
+            "set": m.set if m else {},
             "memory_gb": m.memory_gb if m else None,
             "issues_list": [i.json() for i in issues],
             "files": {"editor": bool(p.source), "api": bool(p.api), "manifest": p.dir is not None and (p.dir / "workflow.toml").exists()},

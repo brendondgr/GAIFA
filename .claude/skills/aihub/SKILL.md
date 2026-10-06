@@ -34,6 +34,7 @@ The docs are the source of truth. Read the section you need before acting; don't
 | Mod page modules (`page.js`, `Page.dc.html`) | brief §5 |
 | UI states that must be reachable | brief §8, §11.10 |
 | The UI baseline | `docs/reference/ui-export-2026-10-04/README.md` |
+| ComfyUI workflow packs (`workflow.toml`, tasks, the CLI) | [docs/workflows.md](../../../docs/workflows.md); skill `comfy-workflow` |
 
 ## Invariants (never break these)
 - **Never run `git clean -x` or `-X`.** Ignored files include ~190 GB of model weights.

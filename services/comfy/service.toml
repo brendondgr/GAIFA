@@ -43,7 +43,19 @@ dirs = ["comfyui"]
 kinds = ["image", "video"]
 
 [ui]
+page = "ui/page.js"
 native = "http://127.0.0.1:8199/"
+
+[[ui.widgets]]
+id = "made"
+title = "Images & videos per day"
+kind = "bar"
+source = "GET /v1/hub/widgets/made"
+ranges = ["7d", "30d"]
+span = 4
+
+[api]
+hide = ["GET /v1/hub/*"]
 
 [api.responses]
 "GET /v1/files/{path}" = "file"

@@ -4,7 +4,7 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 
 **Status:** Phase 6 built: the metrics recorder and chart routes (`utils/metrics/`), mod widgets, `GET /api/overview`, `GET/PUT /api/settings`, the final alert list, the contract test, and UI revision 2 built by hand (6.5: compact default, four Overview views, the dashboard and chart kit in `web/`), approved by the user on 2026-10-06; on top of Phase 5's memory manager, Phase 4's outputs index, Phase 3's models registry and Phase 2's mods. Live areas: everything in Part A except `tools`. Stage B done (Phases 7–10): tts (LocalTTS), gen3d (3DGenerate), relay (DashLLM), opencode and lcpp (LLMs) are mods with their pages; their old units are disabled. Open: the Phase 4 Firefox audio-seek check. Next: Phase 11 (comfy). What exists: [docs/structure.md](docs/structure.md).
 
-**Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans, and `aihub-mod` to build or port a mod (guide: [docs/mods.md](docs/mods.md)).
+**Skills:** load `aihub` before working here (doc map, invariants, how to work a plan step). Use `plan` to write or change plans, `aihub-mod` to build or port a mod (guide: [docs/mods.md](docs/mods.md)), and `comfy-workflow` for ComfyUI workflow packs (guide: [docs/workflows.md](docs/workflows.md)).
 
 ## Layout
 - `utils/`: hub code (Python package) · `services/`: mods · `web/`: the UI (Claude Design `.dc.html` format; revision 2 built here, see `web/PATCHES.md`)

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
+import shutil
+import subprocess
+from pathlib import Path
 
 router = APIRouter()
 
@@ -22,10 +25,39 @@ def _pack(request: Request, wid: str):
     return lib, p
 
 
+def _newest_image(request: Request, wid: str) -> Path | None:
+    """The newest image a pack made (or a frame of its newest video), as its card picture when it
+    has no preview of its own. Video frames are cached in data/previews/."""
+    s = request.app.state.settings
+    for r in request.app.state.db.runs(states=("done",), workflow=wid, limit=10):
+        for o in r.get("outputs") or []:
+            p = s.outputs.parent / o["path"]
+            if not p.is_file():
+                continue
+            if o.get("kind") == "image":
+                return p
+            if o.get("kind") == "video":
+                poster = s.data / "previews" / f"{r['id']}.jpg"
+                if not poster.exists() and shutil.which("ffmpeg"):
+                    poster.parent.mkdir(parents=True, exist_ok=True)
+                    subprocess.run(["ffmpeg", "-v", "quiet", "-y", "-ss", "0.5", "-i", str(p), "-frames:v", "1",
+                                    "-vf", "scale=480:-2", str(poster)], timeout=30, check=False)
+                if poster.exists():
+                    return poster
+    return None
+
+
+def _brief(request: Request, lib, p) -> dict:
+    b = lib.brief(p)
+    if not b["preview"] and _newest_image(request, p.id):
+        b["preview"] = f"/v1/workflows/{p.id}/preview"
+    return b
+
+
 @router.get("/v1/workflows", summary="Every workflow pack and draft, with its task and check state")
 def list_workflows(request: Request) -> dict:
     lib = _lib(request)
-    items = [lib.brief(p) for p in lib.packs.all()]
+    items = [_brief(request, lib, p) for p in lib.packs.all()]
     order = {"ready": 0, "broken": 1, "draft": 2}
     items.sort(key=lambda w: (order[w["state"]], w["task"], w["name"].lower()))
     return {"workflows": items, "defaults": request.app.state.db.defaults()}
@@ -55,12 +87,13 @@ def suggest(request: Request, wid: str) -> dict:
     return {"id": p.id, "manifest": s.manifest, "toml": toml, "notes": s.notes, "why": s.why}
 
 
-@router.get("/v1/workflows/{wid}/preview", summary="The workflow's card image")
+@router.get("/v1/workflows/{wid}/preview", summary="The workflow's card image (its preview, else its newest image)")
 def preview(request: Request, wid: str):
     _, p = _pack(request, wid)
-    if not p.preview:
+    f = p.preview or _newest_image(request, wid)
+    if not f:
         raise HTTPException(404, "no preview")
-    return FileResponse(p.preview)
+    return FileResponse(f, headers={"Cache-Control": "max-age=60"})
 
 
 @router.get("/v1/tasks", summary="The tasks packs implement, and the shared input names")

@@ -8,6 +8,8 @@ need the mod running are skipped (with a hint) when it isn't.
 
 from __future__ import annotations
 
+import fnmatch
+
 import asyncio
 import math
 import os
@@ -124,8 +126,9 @@ async def run(mgr: ServiceManager, svc: Service, start: bool = False) -> dict[st
         r.add("openapi", "skip", "not running")
     else:
         try:
-            ops = await operations.fetch(mgr, svc)
-            r.add("openapi", "ok", f"{len(ops)} operations")
+            ops = await operations.fetch(mgr, svc, include_hidden=True)   # widgets and tools may use hidden routes
+            hidden = sum(1 for o in ops if any(fnmatch.fnmatchcase(f"{o['method']} {o['path']}", g) for g in m.api.hide))
+            r.add("openapi", "ok", f"{len(ops) - hidden} operations" + (f" (+{hidden} hidden from the API tab)" if hidden else ""))
         except operations.OpenAPIError as e:
             r.add("openapi", "fail", str(e))
 

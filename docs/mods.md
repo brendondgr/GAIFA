@@ -129,7 +129,7 @@ Rules for page modules:
 - Show a Start button when the mod isn't running.
 - Tab ids can't be `overview`, `outputs`, `api`, `logs` or `settings`.
 
-After editing `page.js`, reload the browser tab. A page can also import `/mod-kit.js` (the Start button state, calls that may need memory, a segmented control, panels) and `/mod-charts.js` (the dashboard's charts as DOM elements: `chartCard({title, ranges, load, draw})`); `services/tts/ui/page.js` uses both. Pages for the built-in apps can instead be Claude Design components (`ui/Page.dc.html`; brief §5).
+After editing `page.js`, reload the browser tab. A page can also import `/mod-kit.js` (the Start button state, calls that may need memory, a segmented control, panels), `/mod-form.js` (`schemaForm`: a form from a JSON Schema, with file inputs) and `/mod-charts.js` (the dashboard's charts as DOM elements: `chartCard({title, ranges, load, draw})`); `services/tts/ui/page.js` uses both. Pages for the built-in apps can instead be Claude Design components (`ui/Page.dc.html`; brief §5).
 
 ## 6. Outputs, memory, models, tools
 

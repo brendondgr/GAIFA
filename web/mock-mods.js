@@ -2,6 +2,8 @@
 // through ctx.call. Moved out of mock.js in plan 8.7; `m` is mock.js's toolbox (state + helpers).
 // Written by us, not Claude Design.
 
+import { comfyMock } from './mock-comfy.js';
+
 export function createModMocks(m) {
   const { ok, media, upstream, svcById, pushSvc, act, doLoad, doUnload, loadSvc, ttsOutput, makeWav, clone, now, GB, jobs, emit, models, usedBytes, renderImageBlob, voices, KOKORO, voice } = m;
   return {
@@ -40,13 +42,7 @@ export function createModMocks(m) {
   gen3d: gen3dMock(m),
   lcpp: lcppMock(m),
   relay: relayMock(m),
-  comfy: {
-    'GET /system_stats': () => ok({ system: { os: 'posix', comfyui_version: '0.3.62', python_version: '3.12.7', pytorch_version: '2.8.0+rocm7.0' }, devices: [{ name: 'AMD Radeon 8060S', type: 'cuda', vram_total: 121.5 * GB, vram_free: 121.5 * GB - usedBytes() }] }),
-    'GET /object_info': () => ok({ KSampler: { input: { required: { seed: ['INT'], steps: ['INT'], cfg: ['FLOAT'] } } }, CLIPTextEncode: { input: { required: { text: ['STRING'] } } }, VAEDecode: {}, SaveImage: {} }),
-    'POST /prompt': ({ json }) => { if (!json?.prompt) throw upstream(400, 'prompt: missing'); return ok({ prompt_id: Math.random().toString(16).slice(2, 10), number: 1, node_errors: {} }); },
-    'GET /history/{prompt_id}': ({ pp }) => ok({ [pp.prompt_id]: { status: { status_str: 'success', completed: true }, outputs: { 9: { images: [{ filename: 'ComfyUI_00012_.png', type: 'output' }] } } } }),
-    'GET /view': async ({ query }) => { if (!query.filename) throw upstream(400, 'filename: required'); return media(await renderImageBlob([...query.filename].reduce((a, c) => a + c.charCodeAt(0), 0)), 'image/png'); },
-  },
+  comfy: comfyMock(m),
   transcribe: {
     'GET /health': () => ok({ status: 'ok', model: 'whisper-large-v3-turbo' }),
     'POST /v1/transcribe': ({ form }) => { const f = form?.get?.('file'); if (!f || !f.size) throw upstream(422, 'file: an audio file is required');

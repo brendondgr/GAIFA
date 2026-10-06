@@ -113,6 +113,10 @@ def test_upload_and_output_inputs(env):
     assert (s.input / "aihub" / "o42-x.png").read_bytes() == b"OUT"
     r = c.post("/v1/run", json={"workflow": "wan", "inputs": {"prompt": "x", "image": "output:missing"}})
     assert r.status_code == 422
+    first = run(c, {"workflow": "zimage", "inputs": {"prompt": "a still"}})["outputs"][0]["path"]   # "Use as input"
+    run(c, {"workflow": "wan", "inputs": {"prompt": "moves", "image": first}})
+    assert fake.prompts[-1]["prompt"]["10"]["inputs"]["image"] == "aihub/" + first.rsplit("/", 1)[1]
+    assert c.post("/v1/run", json={"workflow": "wan", "inputs": {"prompt": "x", "image": "../etc/passwd"}}).status_code == 422
 
 
 def test_cancel_and_failure(env):
@@ -172,3 +176,13 @@ def test_resolve_presets_and_derived(tmp_path):
         resolve(pack, schema, {"prompt": "x"}, preset="long")
     with pytest.raises(InputError, match="required"):
         resolve(pack, schema, {})
+
+
+def test_widget_and_stats(env):
+    c, *_ = env
+    run(c, {"workflow": "zimage", "inputs": {"prompt": "one"}})
+    w = c.get("/v1/hub/widgets/made", params={"range": "7d"}).json()
+    assert len(w["categories"]) == 7 and w["series"][0]["values"][-1] == 1 and w["series"][1]["values"][-1] == 0
+    st = c.get("/v1/stats", params={"range": "7d"}).json()
+    assert st["workflows"][0]["id"] == "zimage" and st["workflows"][0]["done"] == 1 and st["recent"]
+    assert c.get("/v1/stats", params={"range": "1y"}).status_code == 422

@@ -159,6 +159,11 @@ class Runner:
             (inp / "aihub").mkdir(parents=True, exist_ok=True)
             shutil.copyfile(p, inp / "aihub" / p.name)
             return f"aihub/{p.name}"
+        rel = self.s.outputs.parent / v                    # a result's path, as jobs report it ("comfy/<date>/…")
+        if not p.is_absolute() and ".." not in p.parts and rel.is_file() and rel.resolve().is_relative_to(self.s.outputs.parent.resolve()):
+            (inp / "aihub").mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(rel, inp / "aihub" / p.name)
+            return f"aihub/{p.name}"
         if (inp / v).exists():
             return v
         raise InputError(f"{v!r}: not an output id (output:<id>), an upload (upload:<name>) or a file in ComfyUI's input folder")

@@ -134,3 +134,16 @@ def test_page_checks(tmp_path):
     d = tmp_path / "Page.dc.html"
     d.write_text("<html><x-dc>hi</x-dc></html>")
     assert page_check(d) == ("ok", "Page.dc.html component")
+
+
+async def test_hidden_routes_still_count_for_widgets(rig, serve):
+    """[api] hide only leaves routes out of the API tab; a widget may use one (comfy, gen3d)."""
+    d = rig.add("fake-ok")
+    with open(d / "service.toml", "a") as f:
+        f.write('\n[api]\nhide = ["GET /v1/widgets/*"]\n')
+    served = await serve()
+    await ready(served, "fake-ok")
+    r = await check(served, "fake-ok")
+    st = {c["name"]: c for c in r["checks"]}
+    assert st["operations"]["status"] == "ok", st["operations"]
+    assert "hidden from the API tab" in st["openapi"]["detail"]

@@ -34,10 +34,12 @@ class OpenAPIError(ValueError):
 # --- conversion ---------------------------------------------------------------------
 
 
-def convert(doc: dict[str, Any], m: Manifest) -> list[dict[str, Any]]:
+def convert(doc: dict[str, Any], m: Manifest, include_hidden: bool = False) -> list[dict[str, Any]]:
+    """The API tab's operations. `[api] hide` leaves routes out of the tab; `include_hidden`
+    keeps them (for `aihub check`, where a widget or tool may point at a hidden route)."""
     if not isinstance(doc, dict) or not isinstance(doc.get("paths"), dict):
         raise OpenAPIError("not an OpenAPI document (no `paths`)")
-    hidden = [h.strip() for h in m.api.hide]
+    hidden = [] if include_hidden else [h.strip() for h in m.api.hide]
     tools = {spec.op: (name, spec) for name, spec in m.tools.items()}
     ops: list[dict[str, Any]] = []
     ids: set[str] = set()
@@ -253,7 +255,7 @@ def _allof(s: dict[str, Any]) -> None:
 # --- fetching and caching -------------------------------------------------------------
 
 
-async def fetch(mgr: ServiceManager, svc: Service) -> list[dict[str, Any]]:
+async def fetch(mgr: ServiceManager, svc: Service, include_hidden: bool = False) -> list[dict[str, Any]]:
     """Fetch and convert the mod's OpenAPI. Raises OpenAPIError with a readable reason."""
     assert svc.m
     if not svc.m.run.openapi:
@@ -269,7 +271,7 @@ async def fetch(mgr: ServiceManager, svc: Service) -> list[dict[str, Any]]:
         doc = r.json()
     except ValueError:
         raise OpenAPIError(f"GET {svc.m.run.openapi}: not JSON") from None
-    return convert(doc, svc.m)
+    return convert(doc, svc.m, include_hidden)
 
 
 def cache_key(svc: Service) -> tuple[Any, ...]:

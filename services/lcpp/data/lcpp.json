@@ -1,0 +1,31 @@
+{
+  "daemon": {
+    "port": 7710
+  },
+  "llama": {
+    "binary": "runtime/llama.cpp/bin/current/llama-server",
+    "environment": {
+      "AMD_VULKAN_ICD": "RADV",
+      "GPU_MAX_HW_QUEUES": "8"
+    },
+    "server_params": {
+      "jinja": true,
+      "reasoning": "auto",
+      "reasoning-format": "deepseek",
+      "reasoning-budget": -1
+    }
+  },
+  "ports": {
+    "start": 7071,
+    "end": 7199
+  },
+  "relay": {
+    "url": "http://127.0.0.1:4000",
+    "dashboard_url": "http://127.0.0.1:4000/",
+    "auto_register": true
+  },
+  "scan_dirs": [
+    "models",
+    "~/Models"
+  ]
+}

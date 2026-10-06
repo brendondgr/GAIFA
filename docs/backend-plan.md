@@ -894,11 +894,12 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
   - The adapter tails ComfyUI's log file to stdout, so it appears in the Logs tab (journald).
   - Add a `workflows` subcommand to `bin/comfyui` that runs the Python CLI from 11.5.
   *Done when:* `bin/comfyui start` serves on 8199 from the new folders, ComfyUI's browser lists the drafts, and the adapter's log tail shows ComfyUI's log in `aihub logs comfy`.
-- [ ] **11.3 Move models.**
+- [x] **11.3 Move models.**
   - `mv ~/Models/ComfyUI/models/* data/models/comfyui/` (114 GB, an instant rename), with a symlink at the old path for the legacy container.
   - Move `download_qwen_image_2.1.sh` into `services/comfy/scripts/`.
   - Register the models, and check the image/video classification by eye.
   *Done when:* `aihub models scan` shows no unregistered files under `comfyui/`, and ComfyUI's loaders list the same files as before.
+  - *As built:* 27 files (123 GB) moved and registered; `[models] dirs = ["comfyui"]` in the manifest; Hugging Face sources set for the Qwen-Image-2.1 files (from the download script, whose target is now `$COMFY_MODELS`); SAM 3.1 marked `other`. The legacy `strix-halo-image-video` container no longer exists. **The Krea2, FLUX2-Klein and Qwen-Image-Edit-2511 model files were already gone before the move** (an `/object_info` snapshot from 2026-08-26 lists them; nothing on disk has them now), so those development workflows convert and check but can't run until re-downloaded.
 - [ ] **11.4 Adapter: control and status.**
   - **`/health`** (the adapter itself).
   - **`/v1/status`:**

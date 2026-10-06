@@ -27,5 +27,8 @@ COMFY_WORKFLOWS = "{service_dir}/workflows"
 COMFY_CONTROL = "{service_dir}/bin/comfyui"
 COMFY_MODELS = "{models}/comfyui"
 
+[models]
+dirs = ["comfyui"]
+
 [outputs]
 kinds = ["image", "video"]

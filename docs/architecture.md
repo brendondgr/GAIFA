@@ -199,6 +199,10 @@ hide = ["GET /ui/{path}"]              # globs on "METHOD /path", e.g. "* /admin
 [tools]                             # used by the agent later
 speak = { op = "POST /v1/speech", description = "Speak text in a saved voice" }
 delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
+# job = true: the operation returns a job id, and the agent API waits for the job (plan 13.2)
+
+[agent]                             # optional: tools the mod lists at runtime (comfy: one per task)
+tools_source = "GET /v1/tools"      # → {"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST …", "job": {…}|null}]}
 ```
 
 `config.toml` may override `port`, `env` (merged), `enabled`, `autostart`, `idle_unload_s`, `auto_unload` and `priority` per mod.

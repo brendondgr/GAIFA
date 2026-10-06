@@ -104,3 +104,44 @@ def files(request: Request, path: str):
     if not p.is_relative_to(request.app.state.settings.outputs.resolve()) or not p.is_file():
         raise HTTPException(404, "no such result file")
     return FileResponse(p)
+
+
+class ToolCall(BaseModel):
+    arguments: dict[str, Any] = Field(default_factory=dict, description="The tool's arguments (its parameters schema)")
+
+
+@router.get("/v1/tools", summary="Agent tools: one per task with a ready workflow, plus list_workflows and run_workflow")
+def tools(request: Request) -> dict:
+    from .tools import catalog
+    st = request.app.state
+    return {"tools": catalog(st.library, st.db.defaults())}
+
+
+@router.post("/v1/tools/{name}/call", summary="Call an agent tool; image and video tools return a job")
+async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
+    from .resolve import InputError
+    from .tools import list_workflows, pick
+    st = request.app.state
+    lib, args = st.library, dict(body.arguments)
+    make_room = request.headers.get(HEADER, "").lower() in ("1", "true", "yes")
+    if name == "list_workflows":
+        return {"workflows": list_workflows(lib)}
+    if name == "run_workflow":
+        r = await st.runner.submit(args.get("workflow", ""), args.get("inputs") or {}, args.get("preset"), make_room)
+        return {"status": "running", "job_id": r["id"], "workflow": r["workflow"]}
+    task = next((t for t in lib.tasks.tasks.values() if t.tool == name), None)
+    if task is None:
+        raise HTTPException(404, f"no tool {name!r}")
+    try:
+        pack = pick(lib, task.id, args.pop("workflow", None), st.db.defaults())
+    except ValueError as e:
+        raise InputError(str(e)) from None
+    conv, _ = lib.analysed(pack)
+    from .schema import input_schema
+    takes = set(input_schema(pack, conv, lib.catalog, lib.tasks)["properties"])
+    ignored = sorted(set(args) - takes)
+    r = await st.runner.submit(pack.id, {k: v for k, v in args.items() if k in takes}, None, make_room)
+    out = {"status": "running", "job_id": r["id"], "workflow": pack.id}
+    if ignored:
+        out["ignored"] = ignored                  # shared inputs this workflow doesn't have
+    return out

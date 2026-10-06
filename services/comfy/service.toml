@@ -48,3 +48,12 @@ native = "http://127.0.0.1:8199/"
 [api.responses]
 "GET /v1/files/{path}" = "file"
 "GET /v1/workflows/{wid}/preview" = "image"
+
+[agent]
+tools_source = "GET /v1/tools"    # one tool per task (generate_image, animate_image, …); plan 11.10
+
+[tools]
+list_workflows = { op = "GET /v1/workflows", description = "The image and video workflows and their state" }
+run = { op = "POST /v1/run", description = "Run a workflow pack by id with its inputs", job = true }
+job = { op = "GET /v1/jobs/{job_id}", description = "A run's state and its output files" }
+cancel = { op = "POST /v1/queue/{job_id}/cancel", description = "Cancel a waiting or running run", confirm = true }

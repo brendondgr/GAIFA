@@ -220,6 +220,12 @@ class ToolSpec(_Strict):
     op: Op
     description: str = ""
     confirm: bool = False
+    job: bool = False             # the call returns a job id; the agent API waits for the job (plan 13.2)
+
+
+class AgentSpec(_Strict):
+    """[agent]: tools a mod lists at runtime (comfy's task tools), read by the tool catalog (plan 13.1)."""
+    tools_source: Op | None = None
 
 
 class Manifest(_Strict):
@@ -235,6 +241,7 @@ class Manifest(_Strict):
     ui: UiSpec = UiSpec()
     api: ApiSpec = ApiSpec()
     tools: dict[str, ToolSpec] = {}
+    agent: AgentSpec = AgentSpec()
 
     @field_validator("id")
     @classmethod

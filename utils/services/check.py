@@ -192,6 +192,8 @@ def _manifest_ops(m: mf.Manifest) -> list[tuple[str, str]]:
                 refs.append((f"[memory].{key}", getattr(m.memory, key)))
         refs += [("[memory].triggers", t) for t in m.memory.triggers]
     refs += [(f"[tools].{name}", t.op) for name, t in m.tools.items()]
+    if m.agent.tools_source:
+        refs.append(("[agent].tools_source", m.agent.tools_source))
     refs += [(f"[ui.widgets].{w.id}", w.source) for w in m.ui.widgets]
     return refs
 

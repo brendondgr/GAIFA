@@ -158,7 +158,7 @@ After editing `page.js`, reload the browser tab. A page can also import `/mod-ki
   - **Register what you download** so it shows on the Models page with its source: `POST $AIHUB_URL/api/models` with `{"path": "tts/my-model", "name": "My Model", "kind": "tts", "source": {"type": "huggingface", "repo": "org/name", "revision": "<commit>"}}`. The hub finds the files with the scanner's rules (or send `"files": [{"path", "role", "sha256"}]`). A file that's already registered answers `409 model_exists`, so registering again is harmless.
   - Download to `<name>.part` and rename when done; the registry shows a `.part` as downloading, and the scanner skips it.
   - Or let the user find it: `aihub models scan --add`, or **Scan for new files** on the Models page.
-- **Tools:** `[tools] speak = { op = "POST /v1/speech", description = "…", confirm = false }` exposes an operation to the agent (Phase 13). `confirm = true` asks the user first, and also marks the operation destructive in the API tab.
+- **Tools:** `[tools] speak = { op = "POST /v1/speech", description = "…", confirm = false }` exposes an operation to the agent (Phase 13). `confirm = true` asks the user first, and also marks the operation destructive in the API tab. `job = true` marks an operation that returns a job id, so the agent waits for the job's outputs. A mod whose tools change while it runs (comfy's grow with its workflow packs) lists them from a route instead: `[agent] tools_source = "GET /v1/tools"`, returning `{"tools": [{"type": "function", "function": {…}, "op": "POST /v1/tools/<name>/call", "job": …}]}`. ComfyUI workflows are themselves modular: see [workflows.md](workflows.md).
 
 ## 7. Bringing in an existing app
 

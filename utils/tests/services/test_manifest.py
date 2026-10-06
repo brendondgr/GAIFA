@@ -58,8 +58,11 @@ hide = ["GET /ui/{path}"]
 "POST /v1/speech" = "audio"
 
 [tools]
-speak = { op = "POST /v1/speech", description = "Speak text" }
+speak = { op = "POST /v1/speech", description = "Speak text", job = true }
 delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
+
+[agent]
+tools_source = "GET /v1/tools"
 """
 
 MINIMAL = """
@@ -113,6 +116,8 @@ def test_full_manifest_parses(svc):
     assert m.ui.widgets[0].span == 4 and m.ui.page == "ui/page.js"
     assert m.api.responses == {"POST /v1/speech": "audio"}
     assert m.tools["delete_voice"].confirm is True
+    assert m.tools["speak"].job is True and m.tools["delete_voice"].job is False
+    assert m.agent.tools_source == "GET /v1/tools"
 
 
 def test_minimal_manifest_defaults(svc):
@@ -123,6 +128,7 @@ def test_minimal_manifest_defaults(svc):
     assert m.name == "hello"  # name defaults to the id
     assert (m.icon, m.version, m.run.kind, m.run.health, m.run.openapi, m.run.status) == ("box", None, "process", "/health", "/openapi.json", None)
     assert m.memory is None and m.outputs is None and m.ui.page is None and m.tools == {}
+    assert m.agent.tools_source is None
 
 
 def test_command_as_a_string_is_split(svc):

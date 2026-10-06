@@ -162,6 +162,15 @@ def cmd_models(args: argparse.Namespace) -> int:
     return cli_models.cmd_models(args)
 
 
+def cmd_backup(args: argparse.Namespace) -> int:
+    """utils/cli_backup.py (plan 12.5), loaded only when a backup runs."""
+    try:
+        from utils import cli_backup
+    except ImportError:
+        import cli_backup  # type: ignore[no-redef]
+    return cli_backup.cmd_backup(args, Path(os.environ.get("AIHUB_ROOT") or CODE))  # read now, not at import
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     return _mods().cmd_new(args)
 
@@ -431,6 +440,9 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("-v", "--verbose", action="store_true", help="also list the checks that passed")
     p.add_argument("--json", action="store_true")
     p.set_defaults(fn=cmd_doctor)
+    p = sub.add_parser("backup", help="databases (online copy), registry, config.toml and the mods' .env files in a dated archive")
+    p.add_argument("folder", help="where to write aihub-backup-<date>.tar.gz (made if missing)")
+    p.set_defaults(fn=cmd_backup)
     p = sub.add_parser("new", help="create a mod from services/_template, install it and load it")
     p.add_argument("id", help="lowercase letters, digits and -, e.g. my-mod")
     p.add_argument("--name", help="display name (default: from the id)")

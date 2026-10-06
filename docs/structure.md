@@ -66,6 +66,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `cli.py` | ✅ | Standard-library CLI behind `bin/aihub`: serve, install, start/stop/restart, status, logs, load/unload, open, url, doctor (local checks + the hub's `/api/doctor`) |
 | `doctor.py` | ✅ | `GET /api/doctor` (plan 12.4): models on disk, manifests, paths outside the project and the allowlist, Stage D notes, ports, units, disk, offline mods |
 | `cli_models.py` | ✅ | `aihub models list \| show \| scan [--add] \| verify` (standard library only, loaded on demand by `cli.py`) |
+| `cli_backup.py` | ✅ | `aihub backup <folder>` (plan 12.5): online SQLite copies of every database, the registry, `config.toml` and `services/*/.env` in a dated owner-only archive (standard library only) |
 | `cli_mods.py` | ✅ | `aihub new`, `aihub check`, `aihub install <id>`, `aihub rescan` (standard library only, loaded on demand by `cli.py`) |
 | `manifest.py` | ✅ | `service.toml` schema (pydantic), `discover()` with collected errors, `effective()` config overrides, `launch_spec()` (placeholders + env), `start_order()` |
 | `backends/` | ✅ | `base.py` (`Backend` protocol incl. `pids()`, `UnitState`, `LogLine`), `systemd.py` (`aihub-<id>.service` via `systemd-run`, journal logs), `subprocess.py` (child processes + log ring; tests and `--dev`) |
@@ -93,7 +94,7 @@ utils/tests/
 ├── fixtures/
 │   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok (with a `requests` widget), fake-slow, fake-crash, fake-mem
 │   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay; snapshots/ = their converted Operation[]
-├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli, doctor
+├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli, doctor, backup
 ├── web/*.test.mjs + test_api_js.py ✅  Node unit tests (web/api.js; mod-ui.js + the template page.js on a fake DOM; the chart helpers and dashboard layout; the mock history), run from pytest; test_contract.py: api.js routes ↔ hub routes, brief types ↔ response models, every route documented
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
 ├── models/test_<behavior>.py   ✅     registry storage and status, routes, safe deletes, the scanner on a tree covering every rule, verify, used-by, alerts, the CLI (conftest: a fake data/models/)

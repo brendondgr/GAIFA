@@ -57,7 +57,7 @@ AIHub/
 ├── config.toml              your settings: hub, paths, memory rules, per-mod overrides
 ├── pyproject.toml, uv.lock  hub dependencies (uv); the hub's venv is the hidden `.venv/`
 ├── bin/
-│   ├── aihub                the command: start · stop · status · logs · new · install · doctor …
+│   ├── aihub                the command: start · stop · status · logs · new · install · doctor · backup …
 │   └── aihub.service.in     systemd unit template, used by `aihub install`
 ├── docs/                    this file, backend-plan.md, design-brief-ui.md, structure.md (what exists today), reference/ (UI exports)
 ├── utils/                   the hub's code (Python package)

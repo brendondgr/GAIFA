@@ -1059,15 +1059,15 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
   - No mod's resolved command or env points outside the project root, except the allowlist: `/usr`, `~/.config/tts-engines`, podman images, and `~/.local/bin` tools.
   - Every port is free or owned by its mod, every unit is healthy, and there's enough disk.
   - Mods running with `HF_HUB_OFFLINE` have every file they need.
-- [ ] **12.5 `aihub backup`.** An online SQLite backup of `data/databases/*.db`, plus `registry.json`, `config.toml` and `services/*/.env`, packed into a dated archive in a folder the user chooses.
+- [x] **12.5 `aihub backup`.** *As built:* `aihub backup <folder>` (`utils/cli_backup.py`, standard library) writes `aihub-backup-<date>-<time>.tar.gz`, owner-only (0600: it holds the `.env` secrets), with a `backup.json` listing; each database is copied with SQLite's online backup, integrity-checked and stored as one file. Live run: 4 databases, the registry, config and 2 `.env` files, 12.6 MB. An online SQLite backup of `data/databases/*.db`, plus `registry.json`, `config.toml` and `services/*/.env`, packed into a dated archive in a folder the user chooses.
 
 **Wire — Phase 12:** Settings → About gets a **Doctor** panel that shows `aihub doctor`'s results (`GET /api/doctor`). *Done (12.4; `web/PATCHES.md` row 6), checked live and in `?mock`.*
 
 **Checks & deliverables — Phase 12**
-- [ ] Both speech engines and a real 3D job work from the runtimes inside the mod folders.
-- [ ] `aihub doctor` reports nothing outside the allowlist, apart from the Stage D items (logs and lcpp's runtime state).
-- [ ] The old venvs are deleted only after you approve it.
-- [ ] Delivered: runtimes in `services/*/runtime/`, the transition symlinks removed, `aihub doctor` and `aihub backup`.
+- [x] Both speech engines and a real 3D job work from the runtimes inside the mod folders.
+- [ ] `aihub doctor` reports nothing outside the allowlist, apart from the Stage D items (logs and lcpp's runtime state). *Open:* opencode's `OPENCODE_PROJECT_DIR` (the folder the agent works in, set in its `.env`) is `~/Tools/DashLLM`; the user decides where it should point.
+- [x] The old venvs are deleted only after you approve it.
+- [x] Delivered: runtimes in `services/*/runtime/`, the transition symlinks removed, `aihub doctor` and `aihub backup`.
 
 ## Phase 13 — Agent-ready API
 

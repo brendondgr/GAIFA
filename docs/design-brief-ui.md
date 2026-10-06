@@ -263,7 +263,7 @@ One page with sections (hash `#/settings/<section>`), Save and Revert, an unsave
   - per service: enabled toggle, autostart toggle, and sidebar order (up/down)
   - an **"Add a mod"** card explaining the three steps (`bin/aihub new <id>`, edit `services/<id>/service.toml`, restart the AIHub), with a link to the template
 - **Interface**: theme (System/Light/Dark), density (Comfortable/Compact).
-- **About**: versions, and the CLI equivalents `bin/aihub status`, `bin/aihub start <id>`, `bin/aihub logs <id> -f`, `bin/aihub new <id>`.
+- **About**: versions, and the CLI equivalents `bin/aihub status`, `bin/aihub start <id>`, `bin/aihub logs <id> -f`, `bin/aihub new <id>`. A **Doctor** panel (plan 12.4) runs `getDoctor()`: the counts, then the warn and fail checks with their fixes, the rest folded; a Run again button. `aihub doctor` prints the same report.
 
 ---
 
@@ -811,6 +811,7 @@ What every chart must do:
 | `getJobStats({range})` | `GET /api/jobs/stats?range=7d` | `{ by_service: { service: string; count: number; failed: number; p50_s: number; p90_s: number; max_s: number }[] }` |
 | `listWidgets()` | `GET /api/widgets` | `WidgetInfo[]` |
 | `getWidget(service, id, {range})` | `GET /api/widgets/{service}/{id}?range=` | `WidgetData` |
+| `getDoctor()` | `GET /api/doctor` | `Doctor` (plan 12.4; Settings → About) |
 
 ```ts
 // Series names: "mem.total" "mem.used" "mem.available" "mem.reserve" "mem.other" "gpu.gtt_used"
@@ -830,6 +831,10 @@ interface Timeline { from: number; to: number; lanes: {
 interface OutputBucket { key: string; count: number; size_bytes: number; by_kind: Partial<Record<OutputKind, number>> }
 interface WidgetInfo { service: string; id: string; title: string; kind: "line" | "area" | "bar" | "donut" | "number" | "table";
                        ranges: string[]; span: 3 | 4 | 6 | 12 }
+interface DoctorCheck { area: "models" | "manifests" | "paths" | "ports" | "units" | "disk" | "offline";
+                       level: "ok" | "note" | "warn" | "fail"; title: string; detail: string; fix?: string }
+interface Doctor { ts: number; ok: boolean;                                  // ok = no "fail" checks
+                   counts: { ok: number; note: number; warn: number; fail: number }; checks: DoctorCheck[] }
 interface WidgetData { unit?: string; t?: number[]; categories?: string[];
                        series: { name: string; values: (number | null)[]; axis?: "left" | "right" }[];
                        rows?: Record<string, string | number>[] }   // for kind "table"

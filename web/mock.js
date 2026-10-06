@@ -502,6 +502,17 @@ export function createMockApi() {
   const api = {
     async getOverview() { await net(); return { services: services.map(summary), memory: memory(), recent_outputs: outputs.slice(0, 8).map(clone), activity: activity.slice(0, 30).map(clone), alerts: [...alerts.values()].map(clone), jobs: [...jobs.values()].map(clone), system: system() }; },
     async getSystem() { await net(); return system(); },
+    async getDoctor() {  // plan 12.4: the shape of GET /api/doctor, from the mock's own mods
+      await net();
+      const checks = [{ area: 'models', level: 'ok', title: 'models registry: 14 models, every file present', detail: '3 not checksummed yet (aihub models verify --all)' },
+        ...services.map(s => s.manifest_errors.length ? { area: 'manifests', level: 'fail', title: `${s.id}: invalid`, detail: s.manifest_errors.join('; '), fix: `aihub check ${s.id}` }
+          : { area: 'paths', level: 'ok', title: `${s.id}: everything inside the project`, detail: '' }),
+        { area: 'paths', level: 'note', title: 'logs: in the systemd journal (plan 16.1 moves them to data/logs/)', detail: services.map(s => `aihub-${s.id}.service`).join(', ') },
+        ...services.map(s => s.state === 'failed' ? { area: 'units', level: 'fail', title: `${s.id}: failed`, detail: '', fix: `aihub logs ${s.id}` } : { area: 'units', level: 'ok', title: `${s.id}: ${s.state}`, detail: '' }),
+        { area: 'disk', level: 'ok', title: '395 GB free of 1000 GB', detail: '/home/you/AIHub' }];
+      const counts = Object.fromEntries(['ok', 'note', 'warn', 'fail'].map(k => [k, checks.filter(c => c.level === k).length]));
+      return { ts: Date.now() / 1000, ok: !counts.fail, counts, checks };
+    },
     async listServices() { await net(); return services.map(summary); },
     async getService(id) { await net(); return detail(getSvc(id)); },
     async startService(id) { await net(); const s = getSvc(id); startSvc(s); return summary(s); },

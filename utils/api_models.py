@@ -477,6 +477,30 @@ class SystemInfo(_Model):
     disk: Disk
 
 
+class DoctorCheck(_Model):
+    area: Literal["models", "manifests", "paths", "ports", "units", "disk", "offline"]
+    level: Literal["ok", "note", "warn", "fail"]
+    title: str
+    detail: str
+    fix: str | None = None
+
+
+class DoctorCounts(_Model):
+    ok: int
+    note: int
+    warn: int
+    fail: int
+
+
+class Doctor(_Model):
+    """`aihub doctor`'s report (plan 12.4)."""
+
+    ts: float
+    ok: bool
+    counts: DoctorCounts
+    checks: list[DoctorCheck]
+
+
 class Activity(_Model):
     id: str
     ts: float

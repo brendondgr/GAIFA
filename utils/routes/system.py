@@ -13,7 +13,8 @@ from typing import Any
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
-from utils.api_models import SystemInfo
+from utils import doctor
+from utils.api_models import Doctor, SystemInfo
 
 router = APIRouter(tags=["system"])
 
@@ -76,6 +77,11 @@ async def system_info(hub: Any) -> dict[str, Any]:
         "usage": await _usage(p.models, p.databases, p.outputs),
         "disk": {"free_bytes": disk.free, "total_bytes": disk.total},
     }
+
+
+@router.get("/api/doctor", summary="Install checks: models on disk, manifests, paths outside the project, ports, units, disk, offline mods", response_model=Doctor, response_model_exclude_none=True)
+async def get_doctor(request: Request) -> dict:
+    return await doctor.run(request.app.state.hub)
 
 
 @router.get("/config.js", include_in_schema=False)

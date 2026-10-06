@@ -351,8 +351,12 @@ def cmd_open(args: argparse.Namespace) -> int:
     return subprocess.run([opener, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
 
 
+DOCTOR_MARK = {"ok": "ok ", "note": "·  ", "warn": "!  ", "fail": "BAD"}
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
-    """Checks that grow with the plan (full set in Phase 12.4)."""
+    """This install's checks (venv, config, unit), then the hub's own (`GET /api/doctor`, plan 12.4):
+    models on disk, manifests, paths outside the project, ports, units, disk, offline mods."""
     checks: list[tuple[str, bool, str]] = []
     venv = CODE / ".venv" / "bin" / "python"
     checks.append(("hub venv", venv.exists(), str(venv) if venv.exists() else "missing: run `uv sync`"))
@@ -366,14 +370,29 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     checks.append(("config.toml", cfg_ok, cfg_note))
     checks.append(("systemd unit", unit_installed(), str(UNIT_DIR / UNIT) if unit_installed() else "run `aihub install`"))
     checks.append(("linger", linger(), "on" if linger() else f"loginctl enable-linger {os.environ.get('USER', '')}"))
+    report = None
     try:
         h = call("GET", "/api/system", timeout=3)["hub"]
         checks.append(("hub", True, f"{h['version']} pid {h['pid']} at {hub_url()}"))
+        report = call("GET", "/api/doctor", timeout=60)
     except (HubDown, ApiError) as e:
         checks.append(("hub", False, str(e)))
-    for name, ok, note in checks:
-        print(f"{'ok ' if ok else 'BAD'}  {name:<13} {note}")
-    return 0 if all(ok for _, ok, _ in checks) else 1
+    if args.json:
+        print(json.dumps({"local": [{"name": n, "ok": ok, "detail": d} for n, ok, d in checks], "hub": report}, indent=1))
+    else:
+        for name, ok, note in checks:
+            print(f"{'ok ' if ok else 'BAD'}  {name:<13} {note}")
+        for c in (report or {}).get("checks", []):
+            if c["level"] == "ok" and not args.verbose:
+                continue
+            print(f"{DOCTOR_MARK[c['level']]}  {c['area']:<13} {c['title']}" + (f"\n     {'':<13} {c['detail']}" if c["detail"] and (c["level"] != "ok" or args.verbose) else ""))
+            if c.get("fix") and c["level"] in ("warn", "fail"):
+                print(f"     {'':<13} fix: {c['fix']}")
+        if report:
+            n = report["counts"]
+            print(f"\n{n['ok']} ok, {n['warn']} warning(s), {n['fail']} problem(s), {n['note']} note(s)" + ("" if args.verbose else "  (-v lists the ok checks)"))
+    failed = not all(ok for _, ok, _ in checks) or bool(report and not report["ok"])
+    return 1 if failed else 0
 
 
 # --- entry --------------------------------------------------------------------
@@ -408,7 +427,10 @@ def parser() -> argparse.ArgumentParser:
         p = sub.add_parser(name, help=what)
         p.add_argument("route", nargs="?")
         p.set_defaults(fn=fn)
-    sub.add_parser("doctor", help="check the install").set_defaults(fn=cmd_doctor)
+    p = sub.add_parser("doctor", help="check the install: venv, config, models, manifests, paths, ports, units, disk")
+    p.add_argument("-v", "--verbose", action="store_true", help="also list the checks that passed")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(fn=cmd_doctor)
     p = sub.add_parser("new", help="create a mod from services/_template, install it and load it")
     p.add_argument("id", help="lowercase letters, digits and -, e.g. my-mod")
     p.add_argument("--name", help="display name (default: from the id)")

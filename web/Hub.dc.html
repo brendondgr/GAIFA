@@ -825,6 +825,15 @@ button:disabled{cursor:not-allowed;opacity:.5}
                   <h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Versions</h2>
                   <dl style="margin:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;font-size:13px"><sc-for list="{{ se.versions }}" as="x" hint-placeholder-count="5"><dt>{{ x.k }}</dt><dd style="margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--mut,#8A94A6)">{{ x.v }}</dd></sc-for></dl>
                 </section>
+                <section aria-label="Doctor" style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
+                  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Doctor</h2><sc-if value="{{ se.doc.has }}" hint-placeholder-val="{{ false }}"><span style="{{ se.doc.chipSt }}">{{ se.doc.summary }}</span></sc-if><span style="flex:1"></span><span style="font-size:12px;color:var(--mut,#8A94A6)">{{ se.doc.when }}</span><button onClick="{{ se.doc.run }}" disabled="{{ se.doc.runDis }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">{{ se.doc.runLabel }}</button></div>
+                  <div style="font-size:12px;color:var(--mut,#8A94A6)">Models on disk, mod manifests, paths outside the project, ports, units, disk space and offline mods. The same report as <code>aihub doctor</code>.</div>
+                  <sc-if value="{{ se.doc.loading }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:var(--mut,#8A94A6)">Checking…</div></sc-if>
+                  <sc-if value="{{ se.doc.hasErr }}" hint-placeholder-val="{{ false }}"><div role="alert" style="font-size:13px;color:var(--rd,#F85149)">{{ se.doc.err }}</div></sc-if>
+                  <sc-if value="{{ se.doc.none }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px">Nothing needs attention.</div></sc-if>
+                  <sc-for list="{{ se.doc.rows }}" as="c" hint-placeholder-count="3"><div style="display:flex;gap:10px;padding:8px 10px;border-radius:7px;background:var(--inset,#131926)"><span aria-label="{{ c.lvl }}" style="{{ c.dot }}"></span><div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-size:13px"><span style="color:var(--mut,#8A94A6);font-size:11.5px;margin-right:6px">{{ c.area }}</span>{{ c.title }}</div><sc-if value="{{ c.hasDetail }}" hint-placeholder-val="{{ false }}"><div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6);overflow-wrap:anywhere">{{ c.detail }}</div></sc-if><sc-if value="{{ c.hasFix }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px">{{ c.fix }}</div></sc-if></div></div></sc-for>
+                  <sc-if value="{{ se.doc.has }}" hint-placeholder-val="{{ false }}"><button onClick="{{ se.doc.toggle }}" style="align-self:flex-start;border:0;background:transparent;padding:0;color:var(--cy,#58C4DD);font-size:12.5px;cursor:pointer">{{ se.doc.toggleLabel }}</button></sc-if>
+                </section>
                 <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:8px">
                   <h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Command line</h2>
                   <sc-for list="{{ se.cli }}" as="c" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;background:var(--inset,#131926);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px"><span style="color:var(--mut,#8A94A6)">$</span><span style="flex:1;min-width:0;overflow-x:auto;white-space:nowrap">{{ c.c }}</span><button onClick="{{ c.copy }}" aria-label="Copy command" style="width:26px;height:26px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--mut,#8A94A6);cursor:pointer"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.copy }}"></path></svg></button></div></sc-for>
@@ -1144,7 +1153,7 @@ class Component extends DCLogic {
     svc: null,
     mdl: { loaded: false, list: [], totals: null, disk: null, kinds: [], service: '', status: '', q: '', discovered: null, scanning: false, drawer: null, edit: null },
     out: { loaded: false, items: [], cursor: null, totals: null, loading: false, view: 'grid', kinds: [], services: [], range: 'all', days: null, q: '', fixed: null, detail: null, promptOpen: false, fresh: {} },
-    st: { orig: null, draft: null, sys: null, err: null, saving: false, restart: false },
+    st: { orig: null, draft: null, sys: null, err: null, saving: false, restart: false, doc: null },
     audio: { key: null, playing: false, t: 0, dur: 0 },
     jopen: {}, speed: 1,
     // revision 2: Overview views, dashboard layout (Settings.ui.dashboard), metric history for sparklines
@@ -1405,6 +1414,7 @@ class Component extends DCLogic {
       if (r.parts[1]) this.loadOutputDetail(r.parts[1]); else this.upd('out', { detail: null });
     }
     if (r.page === 'settings' && (!this.state.st.orig || force)) this.loadSettings();
+    if (r.page === 'settings' && r.parts[1] === 'about' && (!this.state.st.doc || force)) this.loadDoctor();
   }
 
   // ---------- services ----------
@@ -1690,6 +1700,11 @@ class Component extends DCLogic {
   // ---------- settings ----------
   async loadSettings() {
     try { const [s, sys] = await Promise.all([this.api.getSettings(), this.api.getSystem()]); this.upd('st', { orig: s, draft: clone(s), sys, err: null }); } catch (e) { this.err(e); }
+  }
+  async loadDoctor() {  // Settings → About → Doctor (plan 12.4): GET /api/doctor
+    this.upd('st', x => ({ doc: { ...(x.doc || {}), loading: true, err: null } }));
+    try { const report = await this.api.getDoctor(); this.upd('st', { doc: { report, loading: false, err: null, all: this.state.st.doc?.all || false } }); }
+    catch (e) { this.upd('st', x => ({ doc: { ...(x.doc || {}), loading: false, err: e } })); }
   }
   settingsDirty() { const st = this.state.st; return !!st.orig && JSON.stringify(st.orig) !== JSON.stringify(st.draft); }
   setDraft(fn) { this.setState(s => { const d = clone(s.st.draft); fn(d); return { st: { ...s.st, draft: d, err: null } }; }); }
@@ -2157,7 +2172,17 @@ class Component extends DCLogic {
     v.themes = [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => ({ label: l, st: segSt(s.theme === k), pressed: s.theme === k ? 'true' : 'false', on: () => this.setTheme(k) }));
     v.densities = [['comfortable', 'Comfortable'], ['compact', 'Compact']].map(([k, l]) => ({ label: l, st: segSt(s.density === k), pressed: s.density === k ? 'true' : 'false', on: () => this.setDensity(k) }));
     v.versions = [['AIHub', 'v' + (sys?.hub?.version || s.system?.hub?.version || '0.1.0')], ...s.services.map(x => [x.name, x.version ? 'v' + x.version : '—'])].map(([k, val]) => ({ k, v: val }));
-    v.cli = ['aihub status', 'aihub start <id>', 'aihub logs <id> -f', 'aihub new <id>'].map(c => ({ c, copy: () => this.copy(c, 'Command copied') }));
+    v.cli = ['aihub status', 'aihub start <id>', 'aihub logs <id> -f', 'aihub new <id>', 'aihub doctor'].map(c => ({ c, copy: () => this.copy(c, 'Command copied') }));
+    const doc = st.doc || {}, rep = doc.report, LV = { fail: ['Problem', 'var(--rd,#F85149)'], warn: ['Warning', 'var(--acc,#FFB224)'], note: ['Note', 'var(--cy,#58C4DD)'], ok: ['OK', 'var(--gr,#3FB950)'] };
+    const row = c => ({ title: c.title, detail: c.detail, fix: c.fix ? 'Fix: ' + c.fix : '', area: c.area, lvl: LV[c.level][0], hasDetail: !!c.detail, hasFix: !!c.fix,
+      dot: { flex: '0 0 auto', width: 8, height: 8, marginTop: 5, borderRadius: 9, background: LV[c.level][1] } });
+    const shown = rep ? rep.checks.filter(c => doc.all || c.level !== 'ok') : [];
+    v.doc = { loading: !!doc.loading && !rep, busy: !!doc.loading, hasErr: !!doc.err, err: doc.err?.detail || '', has: !!rep, rows: shown.map(row),
+      summary: rep ? (rep.counts.fail ? `${rep.counts.fail} problem${rep.counts.fail > 1 ? 's' : ''}` : rep.counts.warn ? 'No problems' : 'All good') + ` · ${rep.counts.ok} ok, ${rep.counts.warn} warning${rep.counts.warn === 1 ? '' : 's'}, ${rep.counts.note} note${rep.counts.note === 1 ? '' : 's'}` : '',
+      when: rep ? 'Checked ' + new Date(rep.ts * 1000).toLocaleTimeString() : '', none: !!rep && !shown.length,
+      chipSt: { padding: '2px 8px', borderRadius: 99, fontSize: 11.5, fontWeight: 600, color: 'var(--bg,#0B0E14)', background: rep ? LV[rep.counts.fail ? 'fail' : rep.counts.warn ? 'warn' : 'ok'][1] : 'var(--mut,#8A94A6)' },
+      toggle: () => this.upd('st', x => ({ doc: { ...x.doc, all: !x.doc?.all } })), toggleLabel: doc.all ? 'Hide passed checks' : `Show all ${rep ? rep.checks.length : ''} checks`,
+      run: () => this.loadDoctor(), runLabel: doc.loading ? 'Checking…' : 'Run again', runDis: !!doc.loading };
     const dirty = this.settingsDirty();
     v.dirty = dirty; v.invalid = portBad || resBad; v.save = () => this.saveSettings(); v.revert = () => this.upd('st', x => ({ draft: clone(x.orig), err: null }));
     v.saveSt = btn('pri', { dis: !dirty || portBad || resBad || st.saving }); v.saveDis = !dirty || portBad || resBad || st.saving; v.saveLabel = st.saving ? 'Saving…' : 'Save changes';

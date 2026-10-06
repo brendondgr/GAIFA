@@ -831,64 +831,207 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 11 — New `comfy` mod (ComfyUI)
 
-- [ ] **11.1 Scaffold** `services/comfy` from `_template`. The adapter is a FastAPI app on port 5070.
+ComfyUI workflows are **packs**: one folder per workflow, built the same way as mods. Dropping a folder in adds the workflow, editing its files changes it, and deleting the folder removes it. AIHub finds a pack's inputs by itself, checks it against what is installed, runs it, and offers it to the agent as a tool for its **task**. The guide for writing packs is `docs/workflows.md` (11.11).
+
+**A workflow pack** is `services/comfy/workflows/<id>/`, where `<id>` matches `[a-z][a-z0-9-]{1,47}`:
+```
+workflow.json        the ComfyUI editor file (it opens in ComfyUI as it is)
+workflow.api.json    optional: the API graph, used as given instead of converting workflow.json
+workflow.toml        optional: the pack's manifest. Without it the pack is a draft.
+preview.webp         optional: the card image (otherwise the newest result)
+assets/              optional: extra files the graph loads (LUTs, masks); copied into ComfyUI's input folder before a run
+```
+```toml
+name = "Z-Image Turbo"
+task = "text-to-image"           # from tasks.toml; "custom" when none fits
+description = "Fast photoreal text-to-image"   # becomes the tool description
+memory_gb = 18                   # optional: estimated from the model files, then learned from runs
+[inputs.prompt]  node = "6"  field = "text"    # or title = "Positive" instead of node
+[inputs.seed]    node = "3"  field = "seed"  default = -1   # -1 = random
+[inputs.width]   node = "5"  field = "width"  min = 512  max = 2048
+[outputs.image]  node = "9"
+[presets.portrait] width = 832  height = 1216   # named input sets shown in the Run form
+```
+Types, defaults and ranges come from ComfyUI's `/object_info`, so `workflow.toml` only states what differs.
+
+**Tasks** (`services/comfy/tasks.toml`, data rather than code) define the shared input names and what a task must have. A new task is a new table in that file.
+
+| Task | Required inputs | Output |
+|---|---|---|
+| `text-to-image` | `prompt` | image |
+| `image-edit` | `image`, `prompt` | image |
+| `image-to-video` | `image`, `prompt` | video |
+| `text-to-video` | `prompt` | video |
+| `upscale` | `image` | image |
+| `remove-background` | `image` | image |
+
+Shared input names: `prompt`, `negative`, `image`, `images`, `mask`, `width`, `height`, `aspect`, `megapixels`, `seed`, `steps`, `cfg`, `strength`, `frames`, `fps`, `seconds`. The adapter derives `width`/`height` from `aspect` + `megapixels`, and `frames` from `seconds` × `fps`, when a pack exposes only the underlying inputs.
+
+**Held-out workflows: a test of how easy importing is.** Packs are built and tuned on a **development set**. A **held-out set** is not opened during the build. Step 11.12 imports it with the code frozen and scores each workflow.
+
+| Set | Workflows | Source |
+|---|---|---|
+| Development | Krea2 01–03, Wan2.1 01–02, Qwen-Image 01–04, FLUX2-Klein 01 (each with a known-good `.api.json` in `~/Models/ComfyUI-next/workflows/claude/`), Z-Image (`ZIT.json`, `ZiT-Workflow.json`) | yours |
+| Held out, tier 1: same style, new models | Qwen-Image-2.1 01–03 (a GGUF loader, a switch node, `SaveImageAdvanced`, multiple reference images) | yours |
+| Held out, tier 2: official templates with subgraphs | Klein-9B: text-to-image, edit base, edit distilled | ComfyUI templates |
+| Held out, tier 3: community, custom nodes, video | Scail2-Wan2.1 basic + gguf (WanVideoWrapper), Z-Image Turbo V7 Basic | Civitai |
+| Held out, tier 4: stress | Z-Image All-in-One v1.2 (154 nodes, 5 subgraphs), Lonecat's Krea 2 Pro 6.0.4 (474 nodes, LUT files), Krea 2 Simple, Krea2 Turbo Dual Mode (Qwen-VL, SeedVR2) | Civitai |
+
+Tiers 1–3 are expected to run. For tier 4, the expected result is a correct conversion plus a clear list of what is missing; a run is a bonus. Only the node-type list of Qwen-Image-2.1 was looked at while this plan was written.
+
+- [ ] **11.1 Scaffold** `services/comfy` from `_template`: a FastAPI adapter on port 5070 in the package `services/comfy/comfy/`, with `data/databases/comfy.db` for runs and per-workflow statistics.
+  *Done when:* `aihub check comfy` passes, and the mod is listed as stopped.
 - [ ] **11.2 Bring the ComfyUI control script in.**
   - Move `~/.local/bin/comfyui` to `services/comfy/bin/comfyui` and change its folders:
     - `custom_nodes` → `services/comfy/custom_nodes` (moved from `~/Models/ComfyUI-next`)
     - `user` → `services/comfy/user`
     - `input` → `services/comfy/input`
     - `--output-directory {outputs}`
-  - `services/comfy/extra_model_paths.yaml` with `base_path: {models}/comfyui`.
+  - **The workflows folder is shared with ComfyUI.** `services/comfy/user/default/workflows` is a symlink to `../../../workflows`. Every pack opens in ComfyUI's workflow browser, and a workflow saved from ComfyUI into a new folder there becomes a draft pack.
+    - Check how ComfyUI's browser shows `workflow.api.json` files. If it lists them as broken workflows, rename them to `workflow.api` and update the format above and 11.11.
+  - Add `services/comfy/extra_model_paths.yaml` with `base_path: {models}/comfyui`.
   - The adapter tails ComfyUI's log file to stdout, so it appears in the Logs tab (journald).
+  - Add a `workflows` subcommand to `bin/comfyui` that runs the Python CLI from 11.5.
+  *Done when:* `bin/comfyui start` serves on 8199 from the new folders, and ComfyUI's browser lists a test pack.
 - [ ] **11.3 Move models.**
-  - `mv ~/Models/ComfyUI/models/* data/models/comfyui/` (114 GB, instant rename), with a symlink at the old path for the legacy container.
+  - `mv ~/Models/ComfyUI/models/* data/models/comfyui/` (114 GB, an instant rename), with a symlink at the old path for the legacy container.
   - Move `download_qwen_image_2.1.sh` into `services/comfy/scripts/`.
   - Register the models, and check the image/video classification by eye.
-- [ ] **11.4 Adapter routes.**
+  *Done when:* `aihub models scan` shows no unregistered files under `comfyui/`, and ComfyUI's loaders list the same files as before.
+- [ ] **11.4 Adapter: control and status.**
   - **`/health`** (the adapter itself).
   - **`/v1/status`:**
     - `loaded` = ComfyUI answers `/system_stats`; `busy` = its queue is running
-    - `jobs` from the queue with progress
-    - stats: Workflows, Queue
-  - **`/v1/load`:** start the toolbox and ComfyUI with `bin/comfyui start`, then wait until it's ready.
-  - **`/v1/unload`:** ComfyUI's `POST /free {"unload_models": true, "free_memory": true}`.
-  - **`/v1/shutdown`:** stop the container.
-  - **`/v1/workflows`** and **`/v1/workflows/{name}`:** built from `workflows/*/inputs.toml`, with a JSON Schema per workflow.
-  - **`/v1/run {workflow, inputs}`:**
-    1. Acquire memory (`memory_gb` from `inputs.toml`).
-    2. Upload input images (`/upload/image`).
-    3. Patch the graph: inputs, plus SaveImage's `filename_prefix` set to `<YYYY-MM-DD>/<HHMMSS>-<slug>`, so files land in dated folders by themselves.
-    4. `POST /prompt`.
-    5. Track progress on ComfyUI's websocket.
-    6. Write a sidecar next to each result: prompt, workflow, seed and params.
-  - **`/v1/queue`** and **`/v1/queue/{id}/cancel`** (`/interrupt` + queue delete).
-  - **Manifest:** `containers = ["strix-halo-comfyui"]`, `estimate_gb = 24`, `ui.native = "http://127.0.0.1:8199/"`, tool `run_workflow`.
-- [ ] **11.5 Workflows.** Each workflow lives in `workflows/<name>/workflow.json` (API format) plus `inputs.toml`:
-  ```toml
-  name = "Z-Image Turbo"
-  kind = "image"
-  memory_gb = 18
-  [inputs.prompt] node = "6"  field = "text"  type = "string"  required = true
-  [inputs.seed]   node = "3"  field = "seed"  type = "integer" default = -1   # -1 = random
-  [inputs.width]  node = "5"  field = "width" type = "integer" default = 1024
-  [outputs]       node = "9"
-  ```
-  - Add a helper (`scripts/suggest_inputs.py`) that drafts `inputs.toml` by finding `CLIPTextEncode.text`, `KSampler` seed/steps/cfg, empty-latent width/height, `LoadImage.image`, and the save/video-combine nodes.
-  - Export each existing UI workflow to API format in ComfyUI. This is a manual step per workflow: FLUX2-Klein, Krea2, Qwen-Image, Qwen-Image-2.1, SCAIL2, SDXL, Wan2.1, Wan2.2, Z-Image.
-  - Get **Z-Image (text→image)** and **Wan 2.1 (image→video)** working end to end first.
-- [ ] **11.6 Cut over.**
+    - `jobs` from the queue, with progress
+    - stats: Workflows (ready), Drafts, Queue
+  - **`/v1/load`:** `bin/comfyui start`, then wait until it's ready. **`/v1/unload`:** ComfyUI's `POST /free {"unload_models": true, "free_memory": true}`. **`/v1/shutdown`:** stop the container.
+  - **The node catalog** (`comfy/nodes.py`): fetch `/object_info` at every load and cache it in `services/comfy/data/object_info.json`, so packs can be checked while ComfyUI is down. It answers which node types exist, their inputs in order, their types and ranges, which nodes are output nodes, and the files each loader can see.
+  - **Manifest:** `containers = ["strix-halo-comfyui"]`, `estimate_gb = 24`, `ui.native = "http://127.0.0.1:8199/"`.
+  *Done when:* load, unload and status work against the live ComfyUI (`services/comfy/tests/test_control.py`, using a fake ComfyUI for CI), and the memory chart shows the drop on unload.
+- [ ] **11.5 Workflow packs: load, convert, check** (`comfy/packs.py`, `comfy/convert.py`, `comfy/check.py`, `comfy/cli.py`).
+  - **Loading:** scan `workflows/*/`, parse `workflow.toml` (unknown keys are errors, as in `service.toml`), and watch file modification times, so edits apply without a restart. A folder without `workflow.toml` is a draft. A broken pack is listed with its errors and never stops the adapter.
+  - **Editor → API conversion,** using the node catalog. It handles:
+    - widget values in input order, including the extra `control_after_generate` value after seed inputs
+    - widgets turned into inputs, and links
+    - Reroute, PrimitiveNode, Note and MarkdownNote
+    - muted nodes (dropped) and bypassed nodes (passed through by matching type)
+    - KJNodes Set/Get, and subgraphs flattened into the graph
+    Anything else fails with a `ConvertError` naming the node, its type and the reason. `workflow.api.json` skips the conversion.
+  - **Check** (`check(pack) → [Issue]`), where each issue is `{level, code, node?, detail, fix?}`:
+    - node types that aren't installed, named with the custom-node package when the graph records it (`cnr_id`)
+    - model files that aren't present: a loader's value that isn't in its file list, with the download URL when the node records one (`properties.models`) and the registry entry when one matches
+    - inputs that no longer point at a node or field
+    - task inputs that are missing
+  - **CLI:** `comfyui workflows list | show <id> | check <id>… | --all | new <id> --from <file> | copy <id> <new-id> | run <id> key=value…`.
+  - Tests use the development set as fixtures (`services/comfy/tests/fixtures/workflows/`) and a node-catalog snapshot (`fixtures/object_info.json`, trimmed to the node types the fixtures use).
+  *Done when:* every development workflow converts to its known-good `.api.json` (the same nodes, inputs and links, ignoring node order), a pack with a missing node or model reports exactly that, and editing a `workflow.toml` shows up in `/v1/workflows` within 2 s without a restart.
+- [ ] **11.6 Auto-detecting inputs** (`comfy/detect.py`): this drafts `workflow.toml` for a draft pack and fills `/v1/workflows/{id}/suggest`.
+  - **Prompts:** trace text-encode nodes to the sampler's `positive` and `negative` inputs to tell `prompt` from `negative`.
+  - **Sampler settings:** seed (including `RandomNoise.noise_seed`), steps and cfg on KSampler and SamplerCustom-style nodes.
+  - **Size:** width and height on empty-latent nodes, and resolution nodes.
+  - **Images:** `LoadImage` nodes become `image`, or `images` when there are several; a mask input becomes `mask`.
+  - **Video:** frame count and fps.
+  - **Outputs:** every output node, with its kind (image, video, audio, mesh).
+  - **The task** is guessed from the inputs and outputs it found. The guess is shown, never applied silently.
+  - **Memory:** the sizes of the model files the graph loads × 1.2, until a run has measured it (11.7).
+  *Done when:* for every development workflow, the suggestion matches a hand-written `expected.toml` fixture, and the score (right, wrong, missed) is printed by `pytest -k detect`.
+- [ ] **11.7 Running** (`comfy/run.py`).
+  - **Routes:**
+    - `GET /v1/workflows` and `GET /v1/workflows/{id}`: each with its JSON Schema, task, check issues and presets
+    - `POST /v1/run {workflow, inputs, preset?}`: returns `{job_id}`
+    - `GET /v1/jobs/{id}`, with `?wait=<s>`, which waits up to that long and then returns the outputs
+    - `/v1/queue`, and `/v1/queue/{id}/cancel` (`/interrupt` plus deleting it from the queue)
+    - `GET/PUT /v1/defaults`: the default pack per task, stored in `comfy.db`
+  - **A run, in order:**
+    1. Check the pack; refuse with its issues.
+    2. Resolve the inputs: preset, then defaults, then the caller's values. Make a random seed for -1. Derive `aspect` and `seconds`.
+    3. Acquire memory (`memory_gb`). A `needs_room` answer is relayed so `callRoom` works.
+    4. Upload input images (`/upload/image`), plus anything in `assets/`.
+    5. Patch the graph: the inputs, plus `filename_prefix` on every output node set to `<YYYY-MM-DD>/<HHMMSS>-<slug>`, so files land in dated folders.
+    6. `POST /prompt`, then follow progress on ComfyUI's websocket.
+    7. Write a sidecar next to each result: the workflow id, resolved inputs, seed and run time.
+    8. Record the run and its peak memory in `comfy.db`, read from the hub's memory API. The peak replaces the estimate in `memory_gb` when no value is given.
+  *Done when:* a fake-ComfyUI test covers the patching, the dated prefix, the sidecar, cancel and `needs_room`, and a live Z-Image run from `curl` lands in `outputs/comfy/<date>/` with its sidecar.
+- [ ] **11.8 Importing** (`comfy/importer.py`).
+  - **`POST /v1/import`** takes a file:
+    - an editor JSON or an API JSON
+    - a PNG, WebP or MP4 with ComfyUI metadata: `prompt` is the exact API graph, `workflow` is the editor file
+    - a zip that contains one of those, plus any extra files, which go in `assets/`
+  - **`GET /v1/import/history`** lists ComfyUI's recent runs. Importing one takes its exact API graph, and its editor file when ComfyUI stored one.
+  - **Every import:**
+    1. Create `workflows/<id>/`, with the id from the file name.
+    2. Run the check (11.5) and the detection (11.6).
+    3. Return `{id, issues, suggestion}`.
+    The pack stays a draft until `PUT /v1/workflows/{id}` saves its `workflow.toml`.
+  - **Missing pieces:**
+    - Missing model files with a known source are offered as downloads through the hub's model downloads, each needing a confirm in the UI.
+    - Missing custom nodes are only reported, with the package name: installing one runs third-party code, so you install it with ComfyUI-Manager.
+  *Done when:* each import source has a test that produces a draft with the expected issues, and an MP4 or PNG from `outputs/comfy` re-imports to the same API graph.
+- [ ] **11.9 Bring in the development set and cut over.**
+  - Import the development workflows as packs with `comfyui workflows new`, review their `workflow.toml`, and set the default pack per task.
   - Point `~/.local/bin/comfyui` at the mod's script.
   - **Verify:**
-    - an image run from the API tab appears on the Outputs page with its prompt
-    - a video run works
+    - an image run appears on the Outputs page with its prompt
+    - a Wan 2.1 image-to-video run works
     - the make-room flow works against gen3d
-- [ ] **11.7 Images & Video page (Part B5).** Build and wire the workflow cards, the Run form (a `SchemaForm` built from `inputs.toml`), queue progress, results, and the page's charts. Add an "Images per day" widget.
+  *Done when:* `comfyui workflows check --all` is clean for the development set, and the three checks pass.
+- [ ] **11.10 Tools for the agent.**
+  - **`GET /v1/tools`** in the comfy mod returns OpenAI-style functions:
+    - one per task that has a ready pack: `generate_image`, `edit_image`, `animate_image`, `generate_video`, `upscale_image`, `remove_background`
+      - each takes the task's shared inputs plus an optional `workflow` (an enum of the packs for that task)
+      - its description lists those packs' descriptions
+    - `list_workflows`, and `run_workflow {workflow, inputs}` for any pack
+  - **Hub: tools listed by a mod at runtime.** Add to the manifest (`utils/manifest.py`, architecture §4.3) `[agent] tools_source = "GET /v1/tools"`. Add `job = true` on `ToolSpec` for tools that return a job id. Phase 13 reads both.
+  - A task tool called without `workflow` uses the task's default pack (11.7), else its only ready pack.
+  *Done when:* `/v1/tools` changes when a pack is added or removed, without a restart, and the manifest test covers `[agent]` and `job`.
+- [ ] **11.11 Images & Video page (Part B5)**, as `services/comfy/ui/page.js`, plus the docs.
+  - **Workflows tab:** cards grouped by task, each with its preview, check state and a default star. Drafts carry a "Review" badge.
+  - **Run:**
+    - a `SchemaForm` built from the pack's schema, with preset chips
+    - queue progress
+    - results, with each result's sidecar and a "Use as input" action
+  - **Import:** drop a file, or pick from ComfyUI history. A **review screen** shows:
+    - the detected inputs (rename, hide, expose another node's field, set a range), the task and the issues with their fixes
+    - "Open in ComfyUI"
+    Saving writes `workflow.toml`.
+  - **Charts:** runs per workflow, and time per run. An "Images per day" dashboard widget.
+  - **Mock:** a comfy mock in `web/mock-mods.js`.
+  - **Docs:**
+    - `docs/workflows.md`, the pack guide: the folder, `workflow.toml`, tasks, presets, the CLI, editing in ComfyUI and saving back, common check issues and their fixes
+    - a `comfy-workflow` skill that follows the guide
+  *Done when:* the page works live and under `?mock` (import → review → run → result), and the guide is linked from `docs/mods.md`.
+- [ ] **11.12 Transfer test with the held-out workflows.**
+  1. **Freeze:** tag the commit `comfy-transfer-freeze`.
+  2. **Import every held-out workflow,** from its original file, through the page or the CLI, following only `docs/workflows.md`.
+  3. **Get the ground truth:** load the editor file in ComfyUI through the browser pane, and call `app.graphToPrompt()` to get ComfyUI's own API graph without running anything.
+  4. **Score each workflow** in `docs/comfy-transfer-report.md`. For each one record:
+     - **Converts:** whether it equals ComfyUI's own graph
+     - **Issues:** whether the reported missing nodes and models are right and complete
+     - **Inputs:** right, wrong or missed, against what a person would expose
+     - **Edits:** the lines of `workflow.toml` changed by hand
+     - **Runs:** yes or no, with the time
+     - **Code changes needed**
+  5. **Fix** what the scores show in separate commits (`AIHub (11.12): …`), then re-score.
+  6. **Report** the before and after scores side by side.
+  7. **Keep the regression fixtures:**
+     - your own workflows and the official templates go into `services/comfy/tests/fixtures/holdout/` with their ground truth
+     - the Civitai workflows are read from where they are, and their tests are skipped when the files are missing, so third-party files aren't committed
+  *Done when:* the report has both score tables, tiers 1–3 convert exactly and run, and every tier 4 workflow either converts or names the exact node it can't handle.
+
+**Wire — Phase 11:** the Images & Video page, the "Images per day" widget, comfy's jobs in the Activity panel, and its results on the Outputs page.
 
 **Checks & deliverables — Phase 11**
 - [ ] Z-Image and Wan 2.1 both run from the page. Results land in `outputs/comfy/<date>/` with sidecars and appear live.
+- [ ] Adding a pack folder, editing its `workflow.toml` and deleting it each show up on the page without a restart.
+- [ ] A workflow saved from ComfyUI into a new folder appears as a draft, and the review screen turns it into a working pack.
 - [ ] Unloading comfy (ComfyUI's `/free`) shows the memory drop on the chart.
 - [ ] `aihub doctor` finds the ComfyUI models only in `data/models/comfyui/`, plus the legacy symlink.
-- [ ] Delivered: `services/comfy` (adapter, control script, workflows, the `inputs.toml` helper), the ComfyUI models moved, and the page.
+- [ ] `docs/comfy-transfer-report.md` shows the held-out scores before and after fixes.
+- [ ] Delivered:
+  - `services/comfy`: the adapter, control script, packs, `tasks.toml`, converter, checker, detector, importer, CLI, tools route and page
+  - the ComfyUI models moved
+  - `docs/workflows.md` and the `comfy-workflow` skill
+  - the transfer report
 
 ## Phase 12 — Runtimes moved inside the mods
 
@@ -916,7 +1059,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 ## Phase 13 — Agent-ready API
 
 - [ ] **13.1 Tool catalog: `GET /api/tools`.**
-  - **Sources:** manifest `[tools]` plus their operations. Each becomes an OpenAI-style function:
+  - **Sources:** manifest `[tools]` plus their operations, and the functions from each running mod's `[agent] tools_source` route (comfy's task tools, Phase 11.10), re-read when the mod changes. Each becomes an OpenAI-style function:
     - `name`: `<mod>_<tool>`
     - `description`: from the manifest, else the OpenAPI summary or description
     - `parameters`: one JSON Schema merging the path/query params and the JSON body
@@ -927,6 +1070,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - **`confirm` tools** create an approval: a migration adds the `approvals` table, an `approval` event is published, and the call returns `{status: "needs_approval", approval_id}`.
   - **`POST /api/approvals/{id} {approve}`** comes from the UI. **A confirm tool cannot run without an approval; the hub enforces this**, not the model.
   - **Results:** JSON stays JSON; media becomes `{output_id, url, kind}`; errors become `{error: {code, detail}}`.
+  - **Long-running tools** (`job = true`, or a `tools_source` function marked `job`): the call returns the mod's job id, the hub follows that job's `job` events (progress goes to the Activity panel and, in Phase 14, the chat), and the call completes with the job's outputs. It waits up to 30 minutes, then returns `{status: "running", job_id}` with a `job_status` hub tool for checking later.
 - [ ] **13.3 MCP endpoint (optional).** Serve the same catalog at `/mcp` (streamable HTTP). Check it from Claude Code with `claude mcp add --transport http aihub http://127.0.0.1:7000/mcp`.
 - [ ] **13.4 Local tool-calling test (go/no-go for Chat).** A script sends 20 scripted requests with the tool catalog to Gemma 4 26B through the relay (llama.cpp with `--jinja`) and measures the share of valid tool calls. Record the result in `docs/`. Mango-Tree never passed a live run like this, so the Chat page waits for a pass.
 - [ ] **13.5 The gate for Stage D.** If 13.4 passes, Stage D can start. If it doesn't, try another model or chat template (a different GGUF, or llama.cpp's tool-call parsing settings) and re-run before building Chat.

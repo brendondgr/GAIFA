@@ -520,8 +520,10 @@ autostart = false
 
 **comfy mod:**
 - **The adapter:** a small FastAPI on 5070. Its load starts ComfyUI in the strix-halo toolbox (the existing `comfyui` script, moved into the mod), and its unload calls ComfyUI's `/free`. ComfyUI writes to `outputs/comfy` via `--output-directory` and reads models from `data/models/comfyui` via `extra_model_paths.yaml`.
-- **Workflows:** each is `workflows/<name>/workflow.json` (API format) plus an `inputs.toml` that maps friendly inputs (prompt, seed, size, image) to node fields.
-- **Running one:** `POST /v1/run {workflow, inputs}` patches the graph, queues it, and reports progress from ComfyUI's websocket.
+- **Workflow packs:** each workflow is a folder `services/comfy/workflows/<id>/`, built the way mods are. It holds the ComfyUI editor file `workflow.json`, an optional exact `workflow.api.json`, and an optional `workflow.toml` that names its task, its inputs (shared names such as `prompt`, `image`, `seed`, mapped to node fields) and presets. Adding, editing or deleting the folder applies without a restart. The folder is also ComfyUI's own workflows folder, so packs open in ComfyUI and workflows saved there become drafts. Plan Phase 11 has the format.
+- **Not hand-exported:** the adapter converts editor files to API graphs itself using ComfyUI's `/object_info` (cached, so packs can be checked while ComfyUI is down). It drafts the inputs by tracing the graph, and checks for missing nodes and model files. Imports also take API JSON, ComfyUI history, and PNG/WebP/MP4 files with embedded workflows.
+- **Running one:** `POST /v1/run {workflow, inputs}` acquires memory, patches the graph (including dated `filename_prefix` values), queues it, reports progress from ComfyUI's websocket, and writes a sidecar per result.
+- **Tasks:** `tasks.toml` defines tasks such as `text-to-image` and `image-to-video`. The agent gets one tool per task (`generate_image`, …) from the mod's `GET /v1/tools`, with an optional `workflow` choice, rather than one tool per workflow.
 
 **Agent-ready API** (Phase 13): `[tools]` sections become `/api/tools` (JSON-schema function definitions). Calls go through `/api/tools/{name}/call`, and tools marked `confirm` wait for an approval that the hub enforces. The same catalog can later be exposed as an MCP server, so Claude Code can drive AIHub too.
 

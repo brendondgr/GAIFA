@@ -51,7 +51,7 @@ def test_adopts_a_running_comfyui_and_reports_its_queue(tmp_path, fake):
     fake.up = True
     fake.queue_running = [[1, "abc", {}, {}, []]]
     with TestClient(create_app(make(tmp_path, fake))) as c:
-        assert wait(lambda: c.get("/v1/status").json()["loaded"])
+        assert wait(lambda: (lambda s: s["loaded"] and s["busy"])(c.get("/v1/status").json()))
         st = c.get("/v1/status").json()
         assert st["busy"] is True and st["jobs"][0]["state"] == "running"
         assert {x["label"]: x["value"] for x in st["stats"]}["Queue"] == 1

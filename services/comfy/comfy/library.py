@@ -11,6 +11,7 @@ import httpx
 
 from .check import Issue, check, convert, summary
 from .convert import Converted
+from .detect import Suggestion, model_sizes, suggest, to_toml
 from .nodes import NodeCatalog
 from .packs import Pack, Packs
 from .schema import input_schema
@@ -21,8 +22,10 @@ MODELS_TTL_S = 60
 
 
 class Library:
-    def __init__(self, packs: Packs, catalog: NodeCatalog, tasks: Tasks, hub_url: str = ""):
+    def __init__(self, packs: Packs, catalog: NodeCatalog, tasks: Tasks, hub_url: str = "", models_dir=None):
         self.packs, self.catalog, self.tasks, self.hub_url = packs, catalog, tasks, hub_url
+        self.models_dir = models_dir
+        self._sizes: tuple[float, dict[str, int]] = (0.0, {})
         self.models: dict[str, dict] = {}          # file name → {id, source}, from AIHub's registry
         self._models_at = 0.0
         self._cache: dict[str, tuple[tuple, Converted | None, list[Issue]]] = {}
@@ -69,6 +72,20 @@ class Library:
             "nodes": self.nodes(conv),
         })
         return out
+
+    def sizes(self) -> dict[str, int]:
+        if time.monotonic() - self._sizes[0] > 300:
+            self._sizes = (time.monotonic(), model_sizes(self.models_dir))
+        return self._sizes[1]
+
+    def suggest(self, p: Pack) -> tuple[Suggestion | None, str]:
+        """A drafted workflow.toml for the pack (its current one is ignored)."""
+        conv, _ = self.analysed(p)
+        if conv is None:
+            return None, ""
+        name = p.manifest.name if p.manifest and p.manifest.name else p.id
+        s = suggest(conv, self.catalog, p.editor(), name, self.sizes())
+        return s, to_toml(s)
 
     def nodes(self, conv: Converted | None) -> list[dict]:
         """The graph's nodes, for the review screen: id, type, title and current field values."""

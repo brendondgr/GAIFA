@@ -1,0 +1,9 @@
+task = "image-edit"
+outputs = ["18"]
+[want]
+prompt = "11.prompt"
+image = "8.image"
+seed = "16.seed"
+[maybe]
+steps = "16.steps"
+cfg = "16.cfg"

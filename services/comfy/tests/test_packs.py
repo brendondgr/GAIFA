@@ -194,3 +194,20 @@ def test_cli_new_copy_list_check(tmp_path, settings, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "zimage-2" in out and "ready" in out and "draft" in out
     assert cli.main(["new", "Bad", "--from", "x"]) == 2
+
+
+def test_suggest_route_and_cli_accept(tmp_path, settings, monkeypatch, capsys):
+    make_pack(settings.workflows, "wan", fixture="wan21-i2v", toml=None)
+    with TestClient(create_app(settings)) as c:
+        c.app.state.catalog.info = CAT.info
+        c.app.state.catalog.version += 1
+        r = c.get("/v1/workflows/wan/suggest").json()
+        assert r["manifest"]["task"] == "image-to-video" and "[inputs.frames]" in r["toml"]
+    for k, v in {"COMFY_WORKFLOWS": settings.workflows, "COMFY_VIEW": settings.comfy_view, "COMFY_DATA": settings.data}.items():
+        monkeypatch.setenv(k, str(v))
+    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:1")
+    (settings.data / "object_info.json").write_text((FIX / "object_info.json").read_text())
+    assert cli.main(["new", "zimage", "--from", str(FIX / "workflows" / "zit-workflow.json"), "--accept"]) == 0
+    out = capsys.readouterr().out
+    assert "wrote workflows/zimage/workflow.toml" in out and "zimage: ready" in out
+    assert cli.main(["suggest", "zimage", "--write"]) == 1          # never overwrites

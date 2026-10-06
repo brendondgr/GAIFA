@@ -1,0 +1,16 @@
+task = "image-edit"
+outputs = ["18"]
+[want]
+prompt = "5.text"
+image = "8.image"
+seed = "15.seed"
+[maybe]
+steps = "15.steps"
+cfg = "15.cfg"
+width = "9.width"
+height = "9.height"
+[missed]                # the box the object goes in (CreateShapeMask "Hat region ← adjust me")
+region_x = "10.location_x"
+region_y = "10.location_y"
+region_width = "10.shape_width"
+region_height = "10.shape_height"

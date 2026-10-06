@@ -1,0 +1,11 @@
+task = "image-edit"
+outputs = ["28"]
+[want]
+prompt = "11.prompt"        # ① the edit instruction
+prompt_2 = "23.text"        # ② the refiner's texture prompt
+image = "8.image"
+seed = "16.seed"
+[maybe]
+steps = "16.steps"
+cfg = "16.cfg"
+strength = "26.denoise"     # the refiner's denoise

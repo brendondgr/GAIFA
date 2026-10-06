@@ -1,0 +1,13 @@
+task = "image-to-video"
+outputs = ["18"]
+[want]
+prompt = "7.text"
+image = "10.image"
+seed = "15.seed"
+frames = "14.length"
+[maybe]
+steps = "15.steps"
+cfg = "15.cfg"
+width = "14.width"
+height = "14.height"
+fps = "17.fps"

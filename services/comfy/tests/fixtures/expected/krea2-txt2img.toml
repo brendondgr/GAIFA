@@ -1,0 +1,10 @@
+task = "text-to-image"
+outputs = ["11"]
+[want]
+prompt = "5.text"
+seed = "9.seed"
+width = "8.width"
+height = "8.height"
+[maybe]
+steps = "9.steps"
+cfg = "9.cfg"

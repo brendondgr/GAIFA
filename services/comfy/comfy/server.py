@@ -54,7 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         st.control = control.Controller(st.client, st.catalog, str(settings.control),
                                         settings.load_timeout_s, settings.idle_unload_s)
         st.packs = Packs(settings.workflows, settings.comfy_view)
-        st.library = Library(st.packs, st.catalog, Tasks.load(), settings.hub_url)
+        st.library = Library(st.packs, st.catalog, Tasks.load(), settings.hub_url, settings.models)
         tasks = [asyncio.create_task(logtail.follow(settings.data / "comfyui.log")),
                  asyncio.create_task(st.control.run()),
                  asyncio.create_task(_watch(st.library))]

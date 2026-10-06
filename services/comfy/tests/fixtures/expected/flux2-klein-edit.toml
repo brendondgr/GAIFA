@@ -1,0 +1,11 @@
+# What a person would expose (hand-written, plan 11.6). want: should be found; maybe: fine either
+# way; missed: a person would want it and the detector doesn't find it (recorded, not failed).
+task = "image-edit"
+outputs = ["21"]
+[want]
+prompt = "9.text"
+image = "5.image"
+seed = "15.noise_seed"
+[maybe]
+steps = "17.steps"
+cfg = "14.cfg"          # distilled: fixed at 1.0

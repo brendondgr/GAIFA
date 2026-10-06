@@ -1,0 +1,12 @@
+task = "image-edit"
+outputs = ["13"]
+[want]
+prompt = "5.text"
+image = "8.image"
+strength = "11.denoise"
+seed = "11.seed"
+[maybe]
+steps = "11.steps"
+cfg = "11.cfg"
+width = "9.width"       # the source image is resized to this
+height = "9.height"

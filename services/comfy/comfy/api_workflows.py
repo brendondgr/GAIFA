@@ -45,6 +45,16 @@ async def check_workflow(request: Request, wid: str) -> dict:
     return {"id": p.id, "state": lib.state(p, issues), "issues": [i.json() for i in issues]}
 
 
+@router.get("/v1/workflows/{wid}/suggest", summary="A drafted workflow.toml: detected inputs, outputs, task and memory")
+def suggest(request: Request, wid: str) -> dict:
+    lib, p = _pack(request, wid)
+    s, toml = lib.suggest(p)
+    if s is None:
+        _, issues = lib.analysed(p)
+        raise HTTPException(422, "the workflow can't be converted: " + "; ".join(i.detail for i in issues if i.level == "error"))
+    return {"id": p.id, "manifest": s.manifest, "toml": toml, "notes": s.notes, "why": s.why}
+
+
 @router.get("/v1/workflows/{wid}/preview", summary="The workflow's card image")
 def preview(request: Request, wid: str):
     _, p = _pack(request, wid)

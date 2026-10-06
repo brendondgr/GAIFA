@@ -1,0 +1,12 @@
+task = "text-to-video"
+outputs = ["14"]
+[want]
+prompt = "7.text"
+seed = "11.seed"
+width = "10.width"
+height = "10.height"
+frames = "10.length"
+[maybe]
+steps = "11.steps"
+cfg = "11.cfg"
+fps = "13.fps"

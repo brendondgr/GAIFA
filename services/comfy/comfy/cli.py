@@ -28,7 +28,7 @@ def _library(s: Settings) -> Library:
     packs = Packs(s.workflows, s.comfy_view)
     packs.scan()
     lib = Library(packs, NodeCatalog.load(s.data / "object_info.json"), Tasks.load(),
-                  s.hub_url or os.environ.get("AIHUB_URL", "http://127.0.0.1:7000"))
+                  s.hub_url or os.environ.get("AIHUB_URL", "http://127.0.0.1:7000"), s.models)
     asyncio.run(lib.refresh_models(force=True))
     return lib
 
@@ -149,8 +149,35 @@ def cmd_new(lib: Library, args) -> int:
         shutil.copyfile(src, d / (EDITOR if is_editor(data) else API))
         print(f"made workflows/{args.id}/ ({'editor file' if is_editor(data) else 'API graph'})")
     lib.packs.scan()
-    print("next: write workflow.toml (docs/workflows.md), then: comfyui workflows check " + args.id)
+    if args.accept:
+        return cmd_suggest(lib, argparse.Namespace(id=args.id, write=True))
+    print(f"next: comfyui workflows suggest {args.id}   (review it, then add --write)")
     return 0
+
+
+def cmd_suggest(lib: Library, args) -> int:
+    p = _get(lib, args.id)
+    if p is None:
+        return 1
+    s, toml = lib.suggest(p)
+    if s is None:
+        print(f"{args.id} can't be converted; see: comfyui workflows check {args.id}", file=sys.stderr)
+        return 1
+    if not args.write:
+        print(toml, end="")
+        for n in s.notes:
+            print(f"# note: {n}")
+        return 0
+    if p.dir is None:
+        p = lib.packs.adopt(p.id)
+    target = p.dir / "workflow.toml"
+    if target.exists():
+        print(f"{target} exists; not overwriting it (delete it first to start over)", file=sys.stderr)
+        return 1
+    target.write_text(toml)
+    lib.packs.scan()
+    print(f"wrote workflows/{p.id}/workflow.toml")
+    return cmd_check(lib, argparse.Namespace(ids=[p.id], all=False, verbose=False))
 
 
 def cmd_copy(lib: Library, args) -> int:
@@ -180,12 +207,17 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("new", help="a new pack from a workflow file (or a draft saved in ComfyUI)")
     p.add_argument("id")
     p.add_argument("--from", dest="source", required=True, help="an editor .json, an API .json, or a draft's id")
+    p.add_argument("--accept", action="store_true", help="write the suggested workflow.toml straight away")
+    p = sub.add_parser("suggest", help="draft a workflow.toml from the graph (prints it; --write saves it)")
+    p.add_argument("id")
+    p.add_argument("--write", action="store_true")
     p = sub.add_parser("copy", help="copy a pack to a new id")
     p.add_argument("id")
     p.add_argument("new_id")
     args = ap.parse_args(argv)
     lib = _library(Settings.from_env())
-    return {"list": cmd_list, "show": cmd_show, "check": cmd_check, "new": cmd_new, "copy": cmd_copy}[args.cmd](lib, args)
+    return {"list": cmd_list, "show": cmd_show, "check": cmd_check, "new": cmd_new, "copy": cmd_copy,
+            "suggest": cmd_suggest}[args.cmd](lib, args)
 
 
 if __name__ == "__main__":

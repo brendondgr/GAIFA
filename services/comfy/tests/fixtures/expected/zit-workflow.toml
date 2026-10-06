@@ -1,0 +1,13 @@
+task = "text-to-image"
+outputs = ["77"]
+[want]
+prompt = "67.text"
+seed = "70.seed"
+width = "68.width"
+height = "68.height"
+[maybe]
+negative = "71.text"
+steps = "70.steps"
+cfg = "70.cfg"
+[missed]
+lora_strength = "72.strength_model"     # the watercolor LoRA's weight

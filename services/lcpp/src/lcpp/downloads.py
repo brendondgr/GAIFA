@@ -32,6 +32,8 @@ from urllib.parse import quote, unquote, urlsplit
 
 import httpx
 
+from lcpp import aihub
+
 from lcpp.catalog import QUANT_SUFFIX_RE, SIDECAR_RE, SPLIT_RE, Catalog, suggest_id
 from lcpp.instances import LcppError
 from lcpp.paths import Paths
@@ -206,7 +208,7 @@ class Downloads:
 
     @property
     def models_dir(self) -> Path:
-        return self.paths.root / "models"
+        return self.paths.models_dir
 
     def _client(self) -> httpx.AsyncClient:
         token = hf_token()
@@ -322,9 +324,9 @@ class Downloads:
                 errors.insert(0, f'"{mid}" is already being downloaded')
             if errors:
                 raise LcppError("invalid_param", errors[0], field="model_id")
-            model = {"id": mid, "nicknames": nicknames, "path": self.paths.display(files[0].dest),
-                     "mmproj": self.paths.display(dest_dir / side["mmproj"]["path"].rsplit("/", 1)[-1]) if side["mmproj"] else None,
-                     "draft": self.paths.display(dest_dir / side["draft"]["path"].rsplit("/", 1)[-1]) if side["draft"] else None,
+            model = {"id": mid, "nicknames": nicknames, "path": self.paths.display_model(files[0].dest),
+                     "mmproj": self.paths.display_model(dest_dir / side["mmproj"]["path"].rsplit("/", 1)[-1]) if side["mmproj"] else None,
+                     "draft": self.paths.display_model(dest_dir / side["draft"]["path"].rsplit("/", 1)[-1]) if side["draft"] else None,
                      "spec_type": "draft-mtp" if side["draft"] else None, "overrides": {}}
 
         need = sum(f.size - self._have(f) for f in files)
@@ -363,6 +365,11 @@ class Downloads:
                         await self._fetch(c, job, f)
                 if job.model:
                     job.warning = await asyncio.to_thread(self._register, job.model)
+                hub = await aihub.register_download(
+                    job.dest_dir, model_id=job.model["id"] if job.model else None,
+                    name=job.model["id"] if job.model else job.label, repo=job.repo, revision=job.revision,
+                    files=[(f.dest, f.sha256) for f in job.files])
+                job.warning = "; ".join(w for w in (job.warning, hub) if w) or None
                 job.state = "done"
         except asyncio.CancelledError:
             job.state = "cancelled"

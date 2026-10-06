@@ -190,10 +190,10 @@ def test_download_adds_model_with_sidecars(client, home):
     assert (d / "Mini-1B.Q4_K_M.gguf").read_bytes() == blob("Mini-1B.Q4_K_M.gguf", 1000)
     assert not list(d.glob("*.part"))
     m = next(m for m in client.get("/api/models").json()["models"] if m["id"] == "mini-1b")
-    assert m["ok"] and m["nicknames"] == ["mini1b"] and m["path"] == "models/Mini-1B/Mini-1B.Q4_K_M.gguf"
+    assert m["ok"] and m["nicknames"] == ["mini1b"] and m["path"] == "Mini-1B/Mini-1B.Q4_K_M.gguf"
     assert m["capabilities"]["vision"] and m["capabilities"]["speculative"]
     saved = json.loads(home.models_file.read_text())["models"]["mini-1b"]
-    assert saved["mmproj"] == "models/Mini-1B/mmproj-Mini-1B-F16.gguf" and saved["spec_type"] == "draft-mtp"
+    assert saved["mmproj"] == "Mini-1B/mmproj-Mini-1B-F16.gguf" and saved["spec_type"] == "draft-mtp"
     assert client.delete(f"/api/downloads/{job['id']}").status_code == 204
     assert client.get("/api/downloads").json() == []
 

@@ -64,7 +64,7 @@ def _resolve_paths(paths: Paths, params: dict[str, Any]) -> dict[str, Any]:
     out = dict(params)
     for key in list(out):
         if norm_key(key) in PATH_PARAMS and out[key]:
-            out[key] = str(paths.resolve(out[key]))
+            out[key] = str(paths.model(out[key]))  # sidecars are model files
     return out
 
 
@@ -81,7 +81,7 @@ def single_params(catalog: Catalog, settings: dict[str, Any], entry: ModelEntry,
 def single_argv(paths: Paths, settings: dict[str, Any], catalog: Catalog, entry: ModelEntry,
                 port: int, overrides: dict[str, Any] | None = None) -> list[str]:
     params = _resolve_paths(paths, single_params(catalog, settings, entry, overrides))
-    main = paths.resolve(entry.path)
+    main = paths.model(entry.path)
     return [
         str(binary_path(paths, settings)), "--host", HOST, "--port", str(port),
         "--model", str(main), "--alias", ",".join(entry.names),
@@ -101,7 +101,7 @@ def render_preset(paths: Paths, catalog: Catalog, entries: list[ModelEntry],
     for entry in entries:
         params = _resolve_paths(paths, catalog.effective(entry, overrides))
         lines.append(f"[{entry.id}]")
-        lines.append(f"model = {paths.resolve(entry.path)}")
+        lines.append(f"model = {paths.model(entry.path)}")
         for key, value in params.items():
             key = norm_key(key)
             if key in RESERVED or value is None or value == "":

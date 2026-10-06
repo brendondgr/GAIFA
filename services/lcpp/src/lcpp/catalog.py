@@ -116,8 +116,12 @@ class Catalog:
         models_raw = raw.get("models") or {}
         if not isinstance(defaults, dict) or not isinstance(models_raw, dict):
             raise CatalogError("models.json needs 'defaults' and 'models' objects")
+        moved = _strip_models_prefix(models_raw)
         models = {mid: ModelEntry.from_json(mid, m) for mid, m in models_raw.items()}
-        return cls(paths, dict(defaults), models)
+        cat = cls(paths, dict(defaults), models)
+        if moved:
+            cat.save()  # once: "models/X/…" became "X/…" (relative to the models folder)
+        return cat
 
     def save(self) -> None:
         doc = {"defaults": self.defaults, "models": {m.id: m.to_json() for m in self.models.values()}}
@@ -144,7 +148,7 @@ class Catalog:
     # ---- files -------------------------------------------------------
     def files(self, m: ModelEntry) -> list[dict[str, Any]]:
         files: list[dict[str, Any]] = []
-        main = self.paths.resolve(m.path)
+        main = self.paths.model(m.path)
         parts = split_parts(main)
         if parts:
             for i, p in enumerate(parts, 1):
@@ -152,14 +156,14 @@ class Catalog:
         else:
             files.append(self._file("model", main))
         if m.mmproj:
-            files.append(self._file("mmproj", self.paths.resolve(m.mmproj)))
+            files.append(self._file("mmproj", self.paths.model(m.mmproj)))
         if m.draft:
-            files.append(self._file("draft", self.paths.resolve(m.draft)))
+            files.append(self._file("draft", self.paths.model(m.draft)))
         return files
 
     def _file(self, role: str, p: Path, part: str | None = None) -> dict[str, Any]:
         size = _size(p)
-        f: dict[str, Any] = {"role": role, "path": self.paths.display(p),
+        f: dict[str, Any] = {"role": role, "path": self.paths.display_model(p),
                              "size_bytes": size, "exists": size is not None}
         if part:
             f["part"] = part
@@ -171,7 +175,7 @@ class Catalog:
             if f["exists"]:
                 continue
             msg = f"{f['role']}{' ' + f['part'] if 'part' in f else ''} file not found: {f['path']}"
-            doubled = self.paths.resolve(f["path"] + ".gguf") if f["path"].endswith(".gguf") else None
+            doubled = self.paths.model(f["path"] + ".gguf") if f["path"].endswith(".gguf") else None
             if doubled and doubled.exists():
                 msg += f" (found {doubled.name}; rename it)"
             out.append(msg)
@@ -198,9 +202,9 @@ class Catalog:
     def view(self, m: ModelEntry, running: list[str] | None = None) -> dict[str, Any]:
         files = self.files(m)
         problems = self.problems(m, files)
-        main = self.paths.resolve(m.path)
+        main = self.paths.model(m.path)
         try:
-            main.relative_to(self.paths.root / "models")
+            main.relative_to(self.paths.models_dir)
             location = "models"
         except ValueError:
             location = "external"
@@ -293,11 +297,11 @@ class Catalog:
         known: set[Path] = set()
         for m in self.models.values():
             for f in self.files(m):
-                known.add(self.paths.resolve(f["path"]).resolve())
+                known.add(self.paths.model(f["path"]).resolve())
         seen: set[Path] = set()
         out: list[dict[str, Any]] = []
         for d in scan_dirs:
-            base = self.paths.resolve(d)
+            base = self.paths.scan_dir(d)
             if not base.is_dir():
                 continue
             for p in sorted([*base.glob("*.gguf"), *base.glob("*/*.gguf")]):
@@ -311,10 +315,23 @@ class Catalog:
                 if (m and int(m.group("index")) != 1) or SIDECAR_RE.match(p.name):
                     continue
                 out.append({
-                    "path": self.paths.display(p), "size_bytes": _size(real) or 0,
+                    "path": self.paths.display_model(p), "size_bytes": _size(real) or 0,
                     "suggested_id": suggest_id(p.name), "dir": self.paths.display(p.parent),
                 })
         return out
+
+
+def _strip_models_prefix(models_raw: dict[str, Any]) -> bool:
+    """Catalog paths used to be relative to the repo ("models/X/f.gguf"); they are relative to the
+    models folder now ("X/f.gguf", LCPP_MODELS_DIR). Rewrites the raw entries in place."""
+    changed = False
+    for m in models_raw.values():
+        for key in ("path", "mmproj", "draft"):
+            v = m.get(key)
+            if isinstance(v, str) and v.startswith("models/"):
+                m[key] = v[len("models/"):]
+                changed = True
+    return changed
 
 
 def suggest_id(filename: str) -> str:

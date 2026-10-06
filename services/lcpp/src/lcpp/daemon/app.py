@@ -43,8 +43,8 @@ def state(request: Request) -> State:
     return request.app.state.lcpp
 
 
-def error(code: str, detail: str, status: int) -> JSONResponse:
-    return JSONResponse({"detail": detail, "code": code}, status_code=status)
+def error(code: str, detail: str, status: int, data: dict | None = None) -> JSONResponse:
+    return JSONResponse({"detail": detail, "code": code, **({"data": data} if data else {})}, status_code=status)
 
 
 def create_app(paths: Paths | None = None, backend: Backend | None = None) -> FastAPI:
@@ -77,7 +77,7 @@ def create_app(paths: Paths | None = None, backend: Backend | None = None) -> Fa
 
     @app.exception_handler(LcppError)
     async def _lcpp_error(_: Request, e: LcppError):
-        return error(e.code, e.detail, e.status)
+        return error(e.code, e.detail, e.status, getattr(e, "data", None))
 
     @app.exception_handler(CatalogError)
     async def _catalog_error(_: Request, e: CatalogError):
@@ -93,9 +93,9 @@ def create_app(paths: Paths | None = None, backend: Backend | None = None) -> Fa
         where = ".".join(str(p) for p in first.get("loc", []) if p != "body")
         return error("invalid_param", f"{where}: {first.get('msg', 'invalid request')}", 400)
 
-    from lcpp.daemon.routes import chat, downloads, instances, models, relay, system
+    from lcpp.daemon.routes import chat, downloads, hub, instances, models, relay, system
 
-    for module in (system, instances, models, downloads, relay, chat):
+    for module in (system, instances, models, downloads, relay, chat, hub):
         app.include_router(module.router)
 
     @app.get("/config.js", include_in_schema=False)

@@ -72,7 +72,10 @@ def home(tmp_path: Path) -> Paths:
     root = tmp_path / "lcpp"
     (root / "data").mkdir(parents=True)
     (root / "data/lcpp.json").write_text(json.dumps(SETTINGS))
-    (root / "data/models.json").write_text(json.dumps(MODELS))
+    models = json.loads(json.dumps(MODELS))
+    # Outside the models folder, a catalog path is absolute (relative ones are models-relative).
+    models["models"]["big-split"]["path"] = str(root / "extra/Big/Big-00001-of-00003.gguf")
+    (root / "data/models.json").write_text(json.dumps(models))
     for rel, size in FILES.items():
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)

@@ -52,3 +52,14 @@ test('the mock gen3d box GLB is a valid glTF binary', async () => {
   assert.equal(json.nodes.length, 2);
   assert.equal(json.buffers[0].byteLength, buf.getUint32(20 + jlen, true));
 });
+
+test('callRoom also answers a needs_room that a mod passes back from the hub', async () => {
+  const calls = [];
+  const plan = { needs_bytes: 20e9, available_bytes: 2e9, unload: [{ id: 'tts', frees_bytes: 13e9 }], enough: true };
+  const ctx = {
+    service: { name: 'LLM Launcher' }, confirm: async () => true,
+    call: async (m, p, o = {}) => { calls.push(!!o.makeRoom); if (!o.makeRoom) throw Object.assign(new Error('x'), { code: 'upstream_error', data: { body: { code: 'needs_room', detail: 'x', data: { plan } } } }); return { status: 201 }; },
+  };
+  assert.equal((await kit.callRoom(ctx, 'POST', '/api/instances')).status, 201);
+  assert.deepEqual(calls, [false, true]);
+});

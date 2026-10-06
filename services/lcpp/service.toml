@@ -1,0 +1,50 @@
+# LLM Launcher: lcpp, moved in from ~/Models/LLMs (plan Phase 10). Starts and manages llama.cpp
+# server instances; each instance is its own systemd unit (lcpp-<name>.service), so instances keep
+# running when this daemon restarts. Fields: architecture §4.3. Its port is in data/lcpp.json
+# (daemon.port, 7710); AIHub passes its port with --port.
+id = "lcpp"
+name = "LLM Launcher"
+description = "Starts and manages llama.cpp model servers, and publishes them to the relay"
+icon = "cpu"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "-m", "lcpp.daemon", "--port", "{port}"]
+port = 7710
+health = "/api/health"
+status = "/api/status"
+openapi = "/api/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 20
+restart = "on-failure"
+install = "aihub-install.sh"
+
+[run.env]
+LCPP_HOME = "{service_dir}"
+LCPP_MODELS_DIR = "{models}/llm"
+LCPP_BACKEND = "systemd"
+
+[memory]
+# No load/unload operations: instances are started and stopped on the Launcher page, and lcpp is
+# in [memory] never_unload. A launch asks AIHub for memory itself (POST /api/memory/acquire).
+extra_units = ["lcpp-*.service"]
+
+[models]
+dirs = ["llm"]
+
+[ui]
+# page = "ui/page.js"            # the Launcher page (plan 10.7)
+native = "/"
+
+[api]
+hide = ["GET /", "GET /config.js", "GET /assets/*", "GET /api/docs"]
+
+[api.responses]
+"GET /api/instances/{name}/logs/stream" = "stream"
+"POST /api/chat" = "stream"
+
+[tools]
+list_llms = { op = "GET /api/models", description = "The model catalog: GGUFs, sizes, capabilities and which are running" }
+list_instances = { op = "GET /api/instances", description = "Running llama.cpp instances with port, model, state and relay publishing" }
+start_llm = { op = "POST /api/instances", description = "Launch a model (asks AIHub for memory first)" }
+stop_llm = { op = "DELETE /api/instances/{name}", description = "Stop an instance", confirm = true }

@@ -23,12 +23,14 @@ STATES = ("starting", "ready", "stopping", "failed")
 class LcppError(Exception):
     """An error with an API code (see docs/api.md) and an HTTP status."""
 
-    def __init__(self, code: str, detail: str, status: int = 400, field: str | None = None):
+    def __init__(self, code: str, detail: str, status: int = 400, field: str | None = None,
+                 data: dict | None = None):
         super().__init__(detail)
         self.code = code
         self.detail = detail
         self.status = status
         self.field = field
+        self.data = data  # extra context, e.g. AIHub's make-room plan for needs_room
 
 
 def relay_off() -> dict[str, Any]:

@@ -116,7 +116,7 @@ def test_models_crud_validate_discover_defaults(client):
     v = client.post("/api/models/validate", json={"id": "fresh", "path": "models/New/fresh-7B-Q8_0.gguf"}).json()
     assert v["ok"] and v["files"][0]["exists"]
     disc = client.get("/api/models/discovered").json()
-    assert {d["path"] for d in disc} == {"models/New/fresh-7B-Q8_0.gguf", "extra/Loose-12B-Q4_K_M.gguf"}
+    assert {d["path"].rsplit("lcpp/", 1)[-1] for d in disc} == {"New/fresh-7B-Q8_0.gguf", "extra/Loose-12B-Q4_K_M.gguf"}
     r = client.put("/api/models/fresh", json={"id": "fresh", "nicknames": ["fr"],
                                               "path": "models/New/fresh-7B-Q8_0.gguf",
                                               "overrides": {"ctx-size": 8192}})

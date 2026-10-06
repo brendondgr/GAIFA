@@ -50,14 +50,15 @@ def test_per_model_override_wins(home):
 def test_discover_skips_known_sidecars_and_split_tails(home):
     cat = Catalog.load(home)
     found = {d["path"]: d for d in cat.discover(["models", "extra"])}
-    assert set(found) == {"models/New/fresh-7B-Q8_0.gguf", "extra/Loose-12B-Q4_K_M.gguf"}
-    assert found["extra/Loose-12B-Q4_K_M.gguf"]["suggested_id"] == "loose-12b"
+    loose = str(home.root / "extra/Loose-12B-Q4_K_M.gguf")  # outside the models folder: absolute
+    assert set(found) == {"New/fresh-7B-Q8_0.gguf", loose}
+    assert found[loose]["suggested_id"] == "loose-12b"
 
 
 def test_discover_dedupes_symlinks_to_catalog_files(home):
     (home.root / "extra/link.gguf").symlink_to(home.root / "models/Gemma4-19B/g19.gguf")
     cat = Catalog.load(home)
-    assert "extra/link.gguf" not in {d["path"] for d in cat.discover(["extra"])}
+    assert str(home.root / "extra/link.gguf") not in {d["path"] for d in cat.discover(["extra"])}
 
 
 def test_validate_input(home):

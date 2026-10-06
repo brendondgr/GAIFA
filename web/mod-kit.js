@@ -45,8 +45,11 @@ export async function callRoom(ctx, method, path, opts = {}) {
   try {
     return await ctx.call(method, path, opts);
   } catch (e) {
-    if (e.code !== 'needs_room' || !e.data?.plan) throw e;
-    const p = e.data.plan;
+    // From the hub (a memory trigger) the plan is in e.data; from a mod that asked the hub itself
+    // (lcpp's launch), the mod's own error body carries it: { code: 'needs_room', data: { plan } }.
+    const body = e.data?.body;
+    const p = e.code === 'needs_room' ? e.data?.plan : body?.code === 'needs_room' ? body.data?.plan : null;
+    if (!p) throw e;
     const names = (p.unload || []).map(u => `${u.id} (${fmtBytes(u.frees_bytes)})`).join(', ');
     const go = await ctx.confirm({
       title: p.enough ? 'Make room?' : 'Not enough memory',

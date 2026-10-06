@@ -27,11 +27,19 @@ def _default_state_dir() -> Path:
 class Paths:
     root: Path
     state: Path
+    models: Path | None = None  # LCPP_MODELS_DIR; None = <root>/models
 
     @classmethod
     def default(cls) -> "Paths":
         root = Path(os.environ.get("LCPP_HOME") or REPO_ROOT)
-        return cls(root=root, state=_default_state_dir())
+        models = os.environ.get("LCPP_MODELS_DIR")
+        return cls(root=root, state=_default_state_dir(),
+                   models=Path(os.path.expanduser(models)) if models else None)
+
+    @property
+    def models_dir(self) -> Path:
+        """Where GGUFs live: catalog paths are relative to it, and downloads land in it."""
+        return self.models or self.root / "models"
 
     @property
     def data(self) -> Path:
@@ -65,6 +73,31 @@ class Paths:
         """Expand ``~``/``$VARS``; relative paths are relative to the repo root."""
         raw = Path(os.path.expandvars(os.path.expanduser(str(value))))
         return raw if raw.is_absolute() else self.root / raw
+
+    def model(self, value: str | os.PathLike[str]) -> Path:
+        """A catalog path: ``~``/``$VARS`` expanded; relative paths are relative to the models folder."""
+        raw = Path(os.path.expandvars(os.path.expanduser(str(value))))
+        if raw.is_absolute():
+            return raw
+        if raw.parts[:1] == ("models",):  # the old repo-relative form: "models/X/f.gguf"
+            raw = Path(*raw.parts[1:])
+        return self.models_dir / raw
+
+    def display_model(self, path: str | os.PathLike[str]) -> str:
+        """A model file the way the catalog stores it: models-relative, else ``~/``-relative."""
+        p = self.model(path)
+        try:
+            return str(p.relative_to(self.models_dir))
+        except ValueError:
+            pass
+        try:
+            return "~/" + str(p.relative_to(Path.home()))
+        except ValueError:
+            return str(p)  # absolute: model() reads it back unchanged
+
+    def scan_dir(self, value: str) -> Path:
+        """A ``scan_dirs`` entry; "models" (the default) means the models folder, wherever it is."""
+        return self.models_dir if value.strip().rstrip("/") == "models" else self.resolve(value)
 
     def display(self, path: str | os.PathLike[str]) -> str:
         """The short form shown to people: repo-relative, else ``~/``-relative."""

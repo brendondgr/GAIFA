@@ -28,6 +28,7 @@ from lcpp import gguf, proc, settings as settings_mod
 from lcpp.backends import Backend, LogLine
 from lcpp.catalog import Catalog, CatalogError, ModelEntry
 from lcpp.cmdline import render_preset, reserved_keys, router_argv, single_argv, single_params
+from lcpp import aihub
 from lcpp.instances import NAME_RE, Instance, InstanceStore, LcppError, relay_off
 from lcpp.paths import Paths, write_atomic
 
@@ -286,7 +287,7 @@ class Supervisor:
     def estimate_bytes(self, entry: ModelEntry, params: dict[str, Any]) -> int:
         size = self.catalog.size_bytes(entry)
         try:
-            meta = gguf.read_metadata(self.paths.resolve(entry.path))
+            meta = gguf.read_metadata(self.paths.model(entry.path))
             kv = gguf.kv_cache_bytes(
                 meta, int(params.get("ctx-size") or 4096),
                 str(params.get("cache-type-k") or "f16"), str(params.get("cache-type-v") or "f16"),
@@ -396,13 +397,17 @@ class Supervisor:
         return self.plan(raw_spec).preflight
 
     # ---- launch ---------------------------------------------------------------
-    async def launch(self, raw_spec: Any, remember: bool = True) -> tuple[Instance, list[str]]:
+    async def launch(self, raw_spec: Any, remember: bool = True,
+                     make_room: bool = False) -> tuple[Instance, list[str]]:
+        """``make_room``: under AIHub, let it unload other mods if the memory isn't free."""
         async with self.lock:
             plan = await asyncio.to_thread(self.plan, raw_spec)
             if plan.preflight["errors"]:
                 first = plan.preflight["errors"][0]
                 status = 404 if first["code"] == "model_not_found" else 409
                 raise LcppError(first["code"], first["detail"], status, first["field"])
+            # Under AIHub: ask for the memory first (raises needs_room with AIHub's plan).
+            await aihub.acquire(plan.preflight["estimated_bytes"], make_room, f"launch {plan.name}")
             spec = plan.spec
             if plan.preset is not None:
                 write_atomic(self.paths.generated / f"{plan.name}.ini", plan.preset)

@@ -772,14 +772,14 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 10 — Move in `lcpp` (LLMs)
 
-- [ ] **10.1 Subtree + venv.**
+- [x] **10.1 Subtree + venv.** *As built:* uv's managed Python 3.14 (the old venv used the host's `/usr/bin/python3.14`, which the toolbox lacks).
   - `git subtree add --prefix=services/lcpp ~/Models/LLMs master`.
   - Ignored state:
     - `cp -a runtime/` (llama.cpp binaries, 146 MB)
     - `data/recent.local.json`
     - `data/generated/` is regenerated automatically
   - `uv sync` (Python 3.14).
-- [ ] **10.2 Code.**
+- [x] **10.2 Code.** *As built:* `src/lcpp/aihub.py` and `daemon/routes/hub.py`. Paths outside the models folder are stored absolute (or `~/`), and a legacy `models/…` path still resolves. An unreachable hub logs a warning and the launch goes ahead; `X-AIHub-Make-Room: 1` on `POST /api/instances` (the UI's "Unload & continue") becomes `make_room=1` on the acquire. lcpp's error envelope gains `data` (the plan). 90 tests (82 + 8); six existing tests were updated for models-relative paths.
   - **`LCPP_MODELS_DIR`** (default `<LCPP_HOME>/models`) in `paths.py`:
     - catalog relative paths resolve against it
     - one-time rewrite of `data/models.json` from `models/X/…` to `X/…`
@@ -795,7 +795,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - `jobs` = starting instances and downloads with progress
   - **Relay metadata:** `manager_url` points at `http://127.0.0.1:7000/#/s/lcpp`.
   - **Tests:** the existing 81, plus models-folder resolution and acquire against a fake hub.
-- [ ] **10.3 `services/lcpp/service.toml`.**
+- [x] **10.3 `services/lcpp/service.toml`.** *As built:* the port is passed as `--port {port}`.
   - **run:** `[".venv/bin/python", "-m", "lcpp.daemon"]`, port 7710, health `/api/health`, status `/api/status`, openapi `/api/openapi.json`.
   - **env:** `LCPP_HOME={service_dir}`, `LCPP_MODELS_DIR={models}/llm`, `LCPP_BACKEND=systemd`.
   - **memory:** `extra_units = ["lcpp-*.service"]`, and no load/unload operations, since instances are managed on lcpp's own page. It's in `never_unload`.

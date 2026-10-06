@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
+from lcpp import aihub
 from lcpp import settings as settings_mod
 from lcpp.instances import Instance, LcppError
 
@@ -159,7 +160,7 @@ class RelayRegistrar:
             "name": inst.name, "port": inst.port, "host": settings_mod.HOST,
             "alias": inst.relay.get("alias"), "available_models": models,
             "server_type": "llama.cpp", "owner": OWNER,
-            "meta": {"manager_url": settings_mod.daemon_url(self.st.settings) + "/",
+            "meta": {"manager_url": aihub.page_url() or settings_mod.daemon_url(self.st.settings) + "/",
                      "instance": inst.name, "registered_ts": time.time()},
         }
 

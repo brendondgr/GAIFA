@@ -608,7 +608,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - `LOCALTTS_HOST=127.0.0.1`, `LOCALTTS_PORT={port}`, `LOCALTTS_NO_SYSTEMD=1`
     - `LOCALTTS_OUTPUTS_DIR={outputs}`, `LOCALTTS_VOICES_DIR={models}/voices`
     - `LOCALTTS_IDLE_UNLOAD_S` (from config)
-    - `LOCALTTS_BREEZE_PYTHON=~/venvs/breeze-tts/bin/python`, `LOCALTTS_KOKORO_PYTHON=~/venvs/kokoro/bin/python` (until Phase 12)
+    - `LOCALTTS_BREEZE_PYTHON=~/venvs/breeze-tts/bin/python`, `LOCALTTS_KOKORO_PYTHON=~/venvs/kokoro/bin/python` (until Phase 12; now `{service_dir}/runtime/venvs/…`)
     - `BREEZE_MODEL={models}/tts/breeze-tts-2`
     - `HF_HOME={hf_home}`, `HF_HUB_OFFLINE=1`
     - `LOCALTTS_LLM_URL=http://127.0.0.1:4000/v1`
@@ -1048,7 +1048,7 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
 
 ## Phase 12 — Runtimes moved inside the mods
 
-- [ ] **12.1 Speech engines inside the mod.**
+- [ ] **12.1 Speech engines inside the mod.** *As built (2026-10-06):* the engine installers already took `--prefix`/`--src`, so `engines/` (video-maker's synced copy) is unchanged. `services/tts/scripts/install-runtime.sh` builds `runtime/venvs/{kokoro,breeze-tts}` from `locks/*.txt` (the old venvs' exact packages, frozen so a newer ROCm nightly can't change torch), then runs both installers, which rewrote `engines.json` and the `kokoro-tts`/`breeze-tts` launchers and passed their smoke tests. The Breeze source (pinned commit + patch) was copied to `runtime/breeze-tts`. Kokoro, Breeze and `/v1/align` verified through the hub. Waiting on the deletion approval below; `~/venvs/breeze` (6.9 GB, an early Breeze experiment named only in `~/Projects/breeze-tts-handoff/SETUP_CUDA.md`) is also unused.
   - Recreate the Breeze and Kokoro venvs in `services/tts/runtime/venvs/` with LocalTTS's engine installer (add a `--prefix` option if it has none), and the Breeze source in `services/tts/runtime/breeze-tts`. Update the manifest and verify both engines.
   - **Ask before deleting** `~/venvs/breeze-tts` and `~/venvs/kokoro` (13.5 GB). video-maker's `kokoro-tts`/`breeze-tts` commands use them, so update `engines.json` and those wrappers first.
   - **Ask before deleting** the orphan `~/venvs/breeze-next` (7 GB).

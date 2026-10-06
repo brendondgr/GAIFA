@@ -25,9 +25,10 @@ LOCALTTS_NO_SYSTEMD = "1"
 LOCALTTS_DATA = "{service_dir}/data"
 LOCALTTS_OUTPUTS_DIR = "{outputs}"
 LOCALTTS_VOICES_DIR = "{models}/voices"
-# The engine venvs stay outside the project until plan Phase 12.1.
-LOCALTTS_BREEZE_PYTHON = "~/venvs/breeze-tts/bin/python"
-LOCALTTS_KOKORO_PYTHON = "~/venvs/kokoro/bin/python"
+# The engines run from runtime/ (plan 12.1; rebuilt by scripts/install-runtime.sh).
+LOCALTTS_BREEZE_PYTHON = "{service_dir}/runtime/venvs/breeze-tts/bin/python"
+LOCALTTS_KOKORO_PYTHON = "{service_dir}/runtime/venvs/kokoro/bin/python"
+BREEZE_REPO = "{service_dir}/runtime/breeze-tts"
 BREEZE_MODEL = "{models}/tts/breeze-tts-2"
 HF_HOME = "{hf_home}"
 HF_HUB_OFFLINE = "1"

@@ -535,7 +535,7 @@ autostart = false
 
 ## 12. Risks and gotchas
 
-1. **Python venvs aren't relocatable.** Recreate them (`uv venv` + install) instead of moving them. The heavy engine venvs and CubeArt stay where they are until Phase 12.
+1. **Python venvs aren't relocatable.** Recreate them (`uv venv` + install) instead of moving them. The speech engine venvs are rebuilt in `services/tts/runtime/` from pinned package lists (`services/tts/locks/`); CubeArt stays where it is until Phase 12.2.
 2. **`git subtree` brings tracked files only.** Each app's ignored-but-needed state has to be copied separately, and `backend-plan.md` lists it for every app.
 3. **Container bind mounts and symlinks:** a symlink inside a mount that points outside it is broken inside the container. Mount real paths, such as `data/models/3d` for gen3d.
 4. **The Hugging Face cache uses a shared blob store** (`~/.cache/huggingface/hub/blobs`). Copy repos with `cp -rL` to dereference the links, and leave the originals in place for other projects.

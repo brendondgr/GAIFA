@@ -67,8 +67,10 @@ class Settings:
     idle_unload_s: float = float(os.environ.get("LOCALTTS_IDLE_UNLOAD_S", "180"))  # 0 = never
     load_timeout_s: float = float(os.environ.get("LOCALTTS_LOAD_TIMEOUT_S", "900"))
     breeze_python: Path = _engine_python("LOCALTTS_BREEZE_PYTHON", "breeze",
-                                         "~/venvs/breeze-tts/bin/python", "~/venvs/breeze-next/bin/python")
-    kokoro_python: Path = _engine_python("LOCALTTS_KOKORO_PYTHON", "kokoro", "~/venvs/kokoro/bin/python")
+                                         str(ROOT / "runtime/venvs/breeze-tts/bin/python"),
+                                         "~/venvs/breeze-tts/bin/python")
+    kokoro_python: Path = _engine_python("LOCALTTS_KOKORO_PYTHON", "kokoro", str(ROOT / "runtime/venvs/kokoro/bin/python"),
+                                         "~/venvs/kokoro/bin/python")
     default_engine: str = os.environ.get("LOCALTTS_DEFAULT_ENGINE", "kokoro")
     default_kokoro_voice: str = os.environ.get("LOCALTTS_DEFAULT_KOKORO_VOICE", "af_heart")
     # AI-Enhance: any OpenAI-compatible chat endpoint (default: the DashLLM relay on this machine).

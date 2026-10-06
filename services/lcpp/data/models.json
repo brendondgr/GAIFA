@@ -14,9 +14,9 @@
       "nicknames": [
         "gemma4-26B"
       ],
-      "path": "models/Gemma4-26B/Gemma4-26B-A4B-Q4KM.gguf",
-      "mmproj": "models/Gemma4-26B/mmproj-Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-BF16.gguf",
-      "draft": "models/Gemma4-26B/mtp-gemma-4-26B-A4B-it.gguf",
+      "path": "Gemma4-26B/Gemma4-26B-A4B-Q4KM.gguf",
+      "mmproj": "Gemma4-26B/mmproj-Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-BF16.gguf",
+      "draft": "Gemma4-26B/mtp-gemma-4-26B-A4B-it.gguf",
       "spec_type": "draft-mtp",
       "params": {
         "gpu-layers-draft": 999
@@ -26,7 +26,7 @@
       "nicknames": [
         "MiniCPM5-2B"
       ],
-      "path": "models/MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf",
+      "path": "MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf",
       "params": {
         "ctx-size": 131072
       }

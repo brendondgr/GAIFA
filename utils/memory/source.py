@@ -54,8 +54,7 @@ class ProcSource:
         for name in m.containers:
             got = self._cached(("container", name))
             if got is None:
-                pid = await asyncio.to_thread(proc.container_pid, name)
-                got = [pid] if pid else []
+                got = await asyncio.to_thread(proc.container_pids, name)
                 self._cache[("container", name)] = (time.monotonic(), got)
             pids += got
         return pids

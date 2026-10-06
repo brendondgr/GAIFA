@@ -168,7 +168,7 @@ load = "POST /v1/load"
 unload = "POST /v1/unload"
 triggers = ["POST /v1/speech", "POST /v1/audio/speech"]   # proxied calls that may load models
 extra_units = []                    # other systemd units counted as this mod's memory, e.g. "lcpp-*.service"
-containers = []                     # podman containers counted as this mod's memory
+containers = []                     # podman containers counted as this mod's memory (globs allowed)
 idle_unload_s = 180                 # the mod's default; config.toml may override (0 = never)
 idle_unload_env = "LOCALTTS_IDLE_UNLOAD_S"   # the variable the mod reads it from (AIHUB_IDLE_UNLOAD_S is always set too)
 

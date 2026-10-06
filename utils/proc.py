@@ -211,6 +211,21 @@ def container_pid(name: str) -> int | None:
     return int(out) if out.isdigit() and out != "0" else None
 
 
+def container_pids(pattern: str) -> list[int]:
+    """Main pids of the running containers whose names match a glob (`gen3d-worker-*`); a plain
+    name is one `podman inspect`."""
+    if not any(c in pattern for c in "*?["):
+        pid = container_pid(pattern)
+        return [pid] if pid else []
+    out = _cmd("podman", "ps", "--format", "{{.Names}} {{.Pid}}") or ""
+    pids = []
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 2 and fnmatch.fnmatch(parts[0], pattern) and parts[1].isdigit() and parts[1] != "0":
+            pids.append(int(parts[1]))
+    return pids
+
+
 def port_listening(port: int, timeout: float = 0.5) -> bool:
     """True when something accepts connections on 127.0.0.1:<port> (or [::1]:<port>)."""
     for family, host in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):

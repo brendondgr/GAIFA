@@ -803,8 +803,8 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - **api.responses:** log stream and chat → `stream`.
   - **tools:** `list_llms`, `list_instances`, `start_llm`, `stop_llm` (confirm).
   - **ui:** `native = "/"`.
-- [ ] **10.4 Move models.** `mv ~/Models/LLMs/models/* data/models/llm/`, with a symlink at `~/Models/LLMs/models`. Running instances are unaffected: open files survive a rename, and the old path still resolves. Register both models; fill in their Hugging Face sources by hand where lcpp has no download record.
-- [ ] **10.5 Cut over.**
+- [x] **10.4 Move models.** *As built (2026-10-06):* no instances were running. `data/models.json` was rewritten to models-relative paths on the first load. Registered `gemma-4-26b-it` and `minicpm-5-2b` with a `local` source and a note from their GGUF metadata: no Hugging Face repo was recorded for either, so it's left for the owner to fill in. `mv ~/Models/LLMs/models/* data/models/llm/`, with a symlink at `~/Models/LLMs/models`. Running instances are unaffected: open files survive a rename, and the old path still resolves. Register both models; fill in their Hugging Face sources by hand where lcpp has no download record.
+- [x] **10.5 Cut over.** *As built:* no instance was running at the cutover, so survival was checked by restarting the lcpp mod with MiniCPM running: same pid, re-adopted, still registered. A launch through the proxy went through acquire (200) and registered with the relay (`owner: lcpp`, manager link to `#/s/lcpp`); the memory panel counts the `lcpp-*` unit (6.2 GB); make room for gen3d unloads tts and never lcpp. `lcpp service …` now delegates to `aihub`. Container names in `[memory] containers` may be globs (gen3d's `gen3d-worker-*` was never matched by `podman inspect`).
   - `systemctl --user disable --now lcpp.service`. Instances keep running, because they are their own units.
   - `aihub start lcpp`. It re-adopts running instances from the unchanged `$XDG_RUNTIME_DIR/lcpp` state.
   - **Verify:**
@@ -813,7 +813,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - a new launch goes through acquire
     - the memory panel counts the `lcpp-*` units
   - `uv tool install --editable services/lcpp` to point the `lcpp` CLI at the new copy.
-- [ ] **10.6** `MOVED.md` in `~/Models/LLMs`. Only this folder; the rest of `~/Models` is handled in Phase 11.
+- [x] **10.6** `MOVED.md` in `~/Models/LLMs`. Only this folder; the rest of `~/Models` is handled in Phase 11.
 - [ ] **10.7 LLM Launcher page (Part B1).** Port lcpp's existing views into tabs inside the shell (Instances, Catalog, Playground, Relay publishing), and add the instance-memory chart and tokens/s per reply.
 
 **Checks & deliverables — Phase 10**

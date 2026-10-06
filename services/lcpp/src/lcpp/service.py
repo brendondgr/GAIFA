@@ -1,4 +1,5 @@
-"""``lcpp service …`` — install and control lcppd as a systemd user unit.
+"""``lcpp service …`` — install and control lcppd as a systemd user unit, or, inside AIHub
+(services/lcpp), hand start/stop/restart/status/logs to `aihub`.
 
 The user manager starts it at boot (linger is enabled for this user), so the
 daemon is up before anyone logs in, idle, with no model loaded.
@@ -57,8 +58,21 @@ def uninstall() -> int:
     return 0
 
 
+def aihub(paths: Paths) -> Path | None:
+    """AIHub's `aihub` command when lcpp runs as its mod (services/lcpp), else None."""
+    cli = paths.root.parent.parent / "bin" / "aihub"
+    return cli if (paths.root / "service.toml").is_file() and cli.is_file() else None
+
+
 def run(cmd: str) -> int:
     paths = Paths.default()
+    hub = aihub(paths)
+    if hub:  # AIHub runs lcppd as its `lcpp` mod; lcpp.service is not used
+        if cmd in ("install", "uninstall"):
+            print("lcppd runs as AIHub's lcpp mod; AIHub starts it (see `aihub status`)")
+            return 0
+        args = {"logs": ["logs", "-f", "lcpp"], "status": ["status"]}.get(cmd, [cmd, "lcpp"])
+        return subprocess.run([str(hub), *args]).returncode
     if cmd == "install":
         return install(paths)
     if cmd == "uninstall":

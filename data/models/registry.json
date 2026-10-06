@@ -268,6 +268,48 @@
       },
       "tags": []
     },
+    "gemma-4-26b-it": {
+      "added": "2026-10-06T02:22:21-04:00",
+      "files": [
+        {
+          "path": "llm/Gemma4-26B/Gemma4-26B-A4B-Q4KM.gguf",
+          "role": "model",
+          "sha256": "3c13133469e431312fffb8b1d9c85ae42199e6bb5746ea1da84e8ddf2097d73c",
+          "size_bytes": 16796015520,
+          "verified_at": "2026-10-06T02:22:33-04:00"
+        },
+        {
+          "path": "llm/Gemma4-26B/mmproj-Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-BF16.gguf",
+          "role": "mmproj",
+          "sha256": "b5346e5bfd906f5e16878c2d0b8243e948ca7410fa28ea35be9b0c54a0ac10b7",
+          "size_bytes": 1194827776,
+          "verified_at": "2026-10-06T02:22:33-04:00"
+        },
+        {
+          "path": "llm/Gemma4-26B/mtp-gemma-4-26B-A4B-it.gguf",
+          "role": "draft",
+          "sha256": "62bd3af7f66c9308de9a5454233852f8c7324c93767e8dfb824ed45b9179864a",
+          "size_bytes": 251937728,
+          "verified_at": "2026-10-06T02:22:33-04:00"
+        }
+      ],
+      "format": "gguf",
+      "kind": "llm",
+      "name": "Gemma 4 26B-A4B it (Q4_K_M, QAT, HauhauCS balanced)",
+      "notes": "With its mmproj (vision) and MTP draft (speculative decoding).",
+      "path": "llm/Gemma4-26B",
+      "services": [
+        "lcpp"
+      ],
+      "source": {
+        "note": "GGUF general.name: Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced; downloaded before lcpp recorded sources. Set the Hugging Face repo here if known.",
+        "type": "local"
+      },
+      "tags": [
+        "vision",
+        "speculative"
+      ]
+    },
     "kokoro-82m": {
       "added": "2026-10-06T01:27:38-04:00",
       "files": [
@@ -501,6 +543,31 @@
         "repo": "hexgrad/Kokoro-82M",
         "revision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
         "type": "huggingface"
+      },
+      "tags": []
+    },
+    "minicpm-5-2b": {
+      "added": "2026-10-06T02:22:21-04:00",
+      "files": [
+        {
+          "path": "llm/MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf",
+          "role": "model",
+          "sha256": "c5415f8989bf88a8288f1b55a3cc371af53c07b0faa220a63bd7a990cfaba078",
+          "size_bytes": 2679710688,
+          "verified_at": "2026-10-06T02:22:34-04:00"
+        }
+      ],
+      "format": "gguf",
+      "kind": "llm",
+      "name": "MiniCPM5 2.6B (Q8_0)",
+      "notes": "",
+      "path": "llm/MiniCPM5-2B",
+      "services": [
+        "lcpp"
+      ],
+      "source": {
+        "note": "GGUF general.organization: Openbmb, name: MiniCPM5 2.6B; downloaded before lcpp recorded sources.",
+        "type": "local"
       },
       "tags": []
     },

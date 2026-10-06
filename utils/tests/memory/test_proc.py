@@ -105,6 +105,8 @@ def test_units_and_containers(monkeypatch):
             return "/user.slice/x.service\n" if args[3] == "ok.service" else "\n"
         if args[:2] == ("podman", "inspect"):
             return {"comfyui": "4242\n", "stopped": "0\n"}.get(args[-1])
+        if args[:2] == ("podman", "ps"):
+            return "gen3d-worker-12-1 5151\ncomfyui 4242\ngen3d-worker-12-2 0\n"
         return None
 
     monkeypatch.setattr(proc, "_cmd", fake_cmd)
@@ -112,6 +114,8 @@ def test_units_and_containers(monkeypatch):
     assert proc.unit_cgroup("ok.service") == "/user.slice/x.service" and proc.unit_cgroup("gone.service") is None
     assert proc.container_pid("comfyui") == 4242
     assert proc.container_pid("stopped") is None and proc.container_pid("missing") is None
+    assert proc.container_pids("gen3d-worker-*") == [5151]          # a glob: podman ps, names matched
+    assert proc.container_pids("comfyui") == [4242] and proc.container_pids("missing") == []
 
 
 def test_real_cmd_failures_are_none():

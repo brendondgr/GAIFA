@@ -1,0 +1,73 @@
+# 3D Generate: 3DGenerate (Cube3D v0.5 + CubePart), moved in from ~/Projects/3DGenerate (plan Phase 8).
+# Fields: architecture §4.3. Standalone use still works: `python -m gen3d` reads the same GEN3D_*
+# variables (gen3d.env.example), with its own defaults.
+id = "gen3d"
+name = "3D Generate"
+description = "Text to 3D meshes, named parts and game rigs (Cube3D + CubePart)"
+icon = "cube"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "-m", "gen3d"]
+port = 5050
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 60
+restart = "on-failure"
+install = "aihub-install.sh"
+
+[run.env]
+GEN3D_HOST = "127.0.0.1"
+GEN3D_PORT = "{port}"
+GEN3D_NO_SYSTEMD = "1"
+GEN3D_DATA = "{service_dir}/data"
+GEN3D_DB = "{databases}/gen3d.db"
+GEN3D_OUTPUTS = "{outputs}"
+GEN3D_WEIGHTS = "{models}/3d"
+GEN3D_CUBEART = "~/Models/3D/CubeArt"          # code, venv and caches; moved inside in plan Phase 12.2
+GEN3D_BLENDER = "~/.local/bin/blender"         # preview renders
+
+[memory]
+estimate_gb = 52                               # the Quality preset's peak; Low-poly needs ~30
+load = "POST /v1/load"
+unload = "POST /v1/unload"
+triggers = ["POST /v1/jobs", "POST /v1/jobs/upload", "POST /v1/load", "POST /v1/jobs/{jid}/retry"]
+containers = ["gen3d-worker-*"]
+idle_unload_s = 600
+idle_unload_env = "GEN3D_IDLE_UNLOAD_S"
+
+[models]
+dirs = ["3d"]
+
+[outputs]
+kinds = ["model3d"]
+
+[ui]
+page = "ui/page.js"
+native = "/ui/"
+
+[[ui.widgets]]
+id = "stages"
+title = "Job time per stage"
+kind = "bar"
+source = "GET /v1/hub/widgets/stages"
+ranges = ["7d", "30d"]
+span = 6
+
+[api]
+hide = ["GET /", "GET /ui/*", "GET /v1/hub/*"]
+
+[api.responses]
+"GET /v1/jobs/{jid}/files/{path}" = "file"
+"GET /v1/jobs/{jid}/download" = "file"
+"GET /v1/events" = "stream"
+"GET /v1/jobs/{jid}/events" = "stream"
+
+[tools]
+make_3d = { op = "POST /v1/jobs", description = "Queue a text-to-3D job: shape, then optional parts, rig and preview" }
+job_status = { op = "GET /v1/jobs/{jid}", description = "One job's state, stages, ETA and files" }
+list_jobs = { op = "GET /v1/jobs", description = "Recent jobs, newest first" }
+cancel_job = { op = "POST /v1/jobs/{jid}/cancel", description = "Cancel a queued or running job", confirm = true }
+delete_job = { op = "DELETE /v1/jobs/{jid}", description = "Delete a job and its files (permanent)", confirm = true }

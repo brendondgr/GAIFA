@@ -89,7 +89,7 @@ def main() -> None:
     m.add_argument("--url", required=True)
     m.add_argument("--parts", help='comma-separated part names, e.g. "seat, backrest, legs"')
     m.add_argument("--rig", action="store_true", help="rig the parts for games")
-    m.add_argument("--preset", choices=["fast", "balanced", "quality"])
+    m.add_argument("--preset", choices=["lowpoly", "fast", "balanced", "quality"])
     m.add_argument("--seed", type=int)
     m.add_argument("--res", type=float, help="shape resolution_base (7-9)")
     m.add_argument("--steps", type=int, help="CubePart steps")

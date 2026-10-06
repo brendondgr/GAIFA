@@ -45,9 +45,13 @@ class CubeWorker:
                 "uptime_s": round(time.time() - self.started_at, 1) if self.started_at and self.up else None}
 
     def command(self) -> list[str]:
-        ca, data, workers = str(settings.cubeart), str(settings.data), str(ROOT / "workers")
+        # Mount real paths, never symlinks: a link that points outside its mount is broken inside
+        # the container (AIHub architecture §12.3). The jobs folder is the only writable mount
+        # besides CubeArt's own caches.
+        ca, jobs, workers = str(settings.cubeart), str(settings.jobs_dir.resolve()), str(ROOT / "workers")
+        weights = str(settings.weights.resolve())
         env = {
-            "GEN3D_CUBEART": ca, "HF_HUB_OFFLINE": "1", "HF_HOME": f"{ca}/hf_cache",
+            "GEN3D_CUBEART": ca, "GEN3D_WEIGHTS": weights, "HF_HUB_OFFLINE": "1", "HF_HOME": f"{ca}/hf_cache",
             "XDG_CACHE_HOME": f"{ca}/.cache", "TORCHINDUCTOR_CACHE_DIR": f"{ca}/.cache/inductor",
             "TRITON_CACHE_DIR": f"{ca}/.cache/triton", "MIOPEN_USER_DB_PATH": f"{ca}/.cache/miopen",
             "PYTORCH_HIP_ALLOC_CONF": "expandable_segments:True", "TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL": "1",
@@ -58,7 +62,9 @@ class CubeWorker:
         cmd = [settings.podman, "run", "--rm", "-i", "--name", self.name, "--network", "none", "--ipc", "host",
                "--device", "/dev/kfd", "--device", "/dev/dri", "--group-add", "keep-groups",
                "--security-opt", "label=disable", "--security-opt", "seccomp=unconfined",
-               "-v", f"{ca}:{ca}", "-v", f"{data}:{data}", "-v", f"{workers}:{workers}:ro", "-w", workers]
+               "-v", f"{ca}:{ca}", "-v", f"{jobs}:{jobs}", "-v", f"{workers}:{workers}:ro", "-w", workers]
+        if not weights.startswith(ca.rstrip("/") + "/"):
+            cmd[cmd.index("-w"):cmd.index("-w")] = ["-v", f"{weights}:{weights}:ro"]
         for k, v in env.items():
             cmd += ["-e", f"{k}={v}"]
         script = (f"unset HSA_OVERRIDE_GFX_VERSION; source {ca}/.venv/bin/activate && "

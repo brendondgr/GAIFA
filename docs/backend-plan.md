@@ -653,8 +653,8 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 8 — Move in `gen3d` (3DGenerate)
 
-- [ ] **8.1 Subtree + venv.** `git subtree add --prefix=services/gen3d ~/Projects/3DGenerate main`, then create the venv (Python 3.12). Move pytest and httpx into a dev requirements file. Ignored state: `data/` (the database and jobs, handled in 8.4).
-- [ ] **8.2 Code changes.**
+- [x] **8.1 Subtree + venv.** *As built:* same as tts (uv-managed Python 3.12, `aihub-install.sh`). `git subtree add --prefix=services/gen3d ~/Projects/3DGenerate main`, then create the venv (Python 3.12). Move pytest and httpx into a dev requirements file. Ignored state: `data/` (the database and jobs, handled in 8.4).
+- [x] **8.2 Code changes.** *As built:* `gen3d/hub.py` (status: Jobs, Queue, Avg time; jobs with progress over stages, finished ones kept for 2 min with AIHub's `cancelled` spelling); `output.json` also carries `status`, `created_ts` and `error`; an upload's folder is named after its file; `GEN3D_BLENDER` expands `~`. 35 tests (25 + 10 in `tests/test_aihub.py`).
   - **`GEN3D_IDLE_UNLOAD_S=0` means never** (plan 5.6; today 0 unloads at once). The manifest sets `[memory] idle_unload_s = 600` and `idle_unload_env = "GEN3D_IDLE_UNLOAD_S"`.
   - **Declare `POST /v1/jobs`'s request body** as a pydantic model: today it reads the raw request, so its OpenAPI has no body and the API tab shows no form (found in 2.6).
   - **New env vars:**
@@ -677,7 +677,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - `jobs` = queued and running jobs with progress
   - **Small debts on the way:** stop calling the private `runner._publish_job`, and add `lowpoly` to the CLI presets.
   - **Tests:** extend the existing 25 (fake worker) to cover the folder layout and `output.json`.
-- [ ] **8.3 `services/gen3d/service.toml`.**
+- [x] **8.3 `services/gen3d/service.toml`.** *As built:* also `GEN3D_BLENDER = "~/.local/bin/blender"`, retry as a memory trigger, and the "Job time per stage" widget from 8.7.
   - **run:** `.venv/bin/python -m gen3d`, port 5050.
   - **env:**
     - `GEN3D_HOST`, `GEN3D_PORT`, `GEN3D_NO_SYSTEMD=1`

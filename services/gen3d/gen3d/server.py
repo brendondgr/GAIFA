@@ -20,9 +20,9 @@ from pydantic import BaseModel, ValidationError
 from . import __version__
 from .config import settings
 from .events import Broadcaster
-from .options import PRESETS, catalogue, parse_request
+from .options import PRESETS, JobRequest, catalogue, parse_request
 from .queue import Runner
-from .store import TERMINAL, Store, new_id
+from .store import TERMINAL, Store, job_folder, new_id
 
 log = logging.getLogger("gen3d")
 MESH_TYPES = {".glb", ".gltf", ".obj", ".ply", ".stl", ".off"}
@@ -112,7 +112,8 @@ def health(request: Request):
     w = r.worker.status()
     if r.worker.up and not r.current:
         idle = time.monotonic() - r.last_activity
-        w.update(idle_s=round(idle, 1), unloads_in_s=round(max(0.0, settings.idle_unload_s - idle), 1))
+        w.update(idle_s=round(idle, 1), unloads_in_s=round(max(0.0, settings.idle_unload_s - idle), 1)
+                 if settings.idle_unload_s > 0 else None)
     return {"status": "ok", "version": __version__, "worker": w, "queue": r.health(),
             "idle_unload_s": settings.idle_unload_s, "data": str(settings.data),
             "cubeart": str(settings.cubeart), "fake_worker": settings.fake_worker}
@@ -182,7 +183,8 @@ def _resolve_chat(store: Store, chat_id: str | None, title: str) -> str | None:
     return chat_id
 
 
-def _queue(request: Request, raw: dict, jid: str | None = None, input_mesh: str | None = None) -> dict:
+def _queue(request: Request, raw: dict, jid: str | None = None, input_mesh: str | None = None,
+           folder: str | None = None) -> dict:
     store, runner = _store(request), _runner(request)
     req = parse_request(raw)
     parent = store.get_job(req.parent_id) if req.parent_id else None
@@ -192,20 +194,22 @@ def _queue(request: Request, raw: dict, jid: str | None = None, input_mesh: str 
     chat_id = _resolve_chat(store, req.chat_id, title)
     req.chat_id = chat_id
     job = store.create_job(req.model_dump(), chat_id=chat_id, parent_id=req.parent_id, title=title,
-                           stages=req.stages, jid=jid)
+                           stages=req.stages, jid=jid, folder=folder)
     if input_mesh:
         job = store.update_job(job["id"], input_mesh=input_mesh)
     if chat_id and raw.get("chat_id") == "new":
         runner.events.publish("chat", store.get_chat(chat_id))
     runner.kick()
-    runner._publish_job(job["id"])
+    runner.publish_job(job["id"])
     return runner.public(store.get_job(job["id"]))
 
 
 @app.post("/v1/jobs", status_code=201)
-async def create_job(request: Request):
+async def create_job(request: Request, body: JobRequest):
     """Queue a job. Body = JobRequest (see /v1/options for every field). `chat_id: "new"` starts a chat
     titled from the prompt; `parent_id` continues from an earlier job's mesh or parts."""
+    # `body` documents and validates the request; the raw JSON is queued, so a preset still applies
+    # only under the options the caller left out (options.apply_preset).
     raw = await request.json()
     if not isinstance(raw, dict):
         raise HTTPException(422, "body must be a JSON object")
@@ -230,14 +234,15 @@ async def create_job_upload(
     raw.setdefault("title", Path(mesh.filename or "upload").stem)
     parse_request(raw)  # validate before writing anything
     jid = new_id("j_")
-    jdir = _store(request).job_dir(jid)
+    folder = job_folder(jid, raw["title"])
+    jdir = _store(request).jobs_dir / folder
     jdir.mkdir(parents=True, exist_ok=True)
     data = await mesh.read()
     if not data or len(data) > MAX_UPLOAD:
         shutil.rmtree(jdir, ignore_errors=True)
         raise HTTPException(400, "the mesh upload is empty or larger than 300 MB")
     (jdir / f"input{ext}").write_bytes(data)
-    return _queue(request, raw, jid=jid, input_mesh=f"input{ext}")
+    return _queue(request, raw, jid=jid, input_mesh=f"input{ext}", folder=folder)
 
 
 @app.get("/v1/jobs")
@@ -383,3 +388,8 @@ async def delete_chat(request: Request, cid: str):
     deleted = store.delete_chat(cid)
     r.events.publish("deleted", {"chat_id": cid, "jobs": deleted})
     return {"deleted": cid, "jobs": deleted}
+
+
+from . import hub  # noqa: E402  (the AIHub routes: status and the dashboard widget)
+
+app.include_router(hub.router)

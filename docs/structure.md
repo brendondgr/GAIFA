@@ -32,6 +32,7 @@ The four existing apps come in with `git subtree add` (their history is kept), s
 | Mod | From | Added for AIHub |
 | :--- | :--- | :--- |
 | `tts` | `~/Projects/LocalTTS` (plan Phase 7) | `service.toml`, `aihub-install.sh` (venv only), `localtts/outputs.py` (dated outputs + sidecars), `localtts/hub.py` (`/v1/status`, the "Clips per day" widget), `ui/page.js` (the Speech page: Speak and Voices tabs), `tests/` (`.venv/bin/python -m pytest` in the mod folder), `requirements-dev.txt`, `pytest.ini`; `bin/localtts` delegates to `aihub` |
+| `gen3d` | `~/Projects/3DGenerate` (plan Phase 8) | `service.toml`, `aihub-install.sh`, `gen3d/hub.py` (`/v1/status`, the "Job time per stage" widget), `store.py`'s dated job folders (`dir` column) and `output.json`, `scripts/migrate_jobs_to_outputs.py`, `tests/test_aihub.py`, `requirements-dev.txt` (pytest moved out of `requirements.txt`) |
 
 ## `docs/`
 

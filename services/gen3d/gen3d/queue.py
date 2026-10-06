@@ -83,11 +83,12 @@ class Runner:
                 log.exception("job %s crashed the runner", job["id"])
                 self.store.update_job(job["id"], status="failed", error="internal error (see gen3d logs)",
                                       finished=time.time())
-                self._publish_job(job["id"])
+                self.store.write_output_json(job["id"])
+                self.publish_job(job["id"])
             self.last_activity = time.monotonic()
 
     async def _maybe_idle_unload(self) -> None:
-        if self.worker.up and not self.current and \
+        if settings.idle_unload_s > 0 and self.worker.up and not self.current and \
                 time.monotonic() - self.last_activity > settings.idle_unload_s:
             await self.worker.stop(reason=f"idle {settings.idle_unload_s:.0f}s")
             self.events.publish("worker", self.worker.status())
@@ -99,7 +100,7 @@ class Runner:
         req = JobRequest.model_validate(job["request"])
         self.current = jid
         self.store.update_job(jid, status="running", started=job.get("started") or time.time(), error=None)
-        self._publish_job(jid)
+        self.publish_job(jid)
         try:
             for stage in list(job["stages"]):
                 job = self.store.get_job(jid)
@@ -118,7 +119,8 @@ class Runner:
         finally:
             self._cancel.discard(jid)
             self.current = None
-            self._publish_job(jid)
+            self.store.write_output_json(jid)
+            self.publish_job(jid)
             self.events.publish("worker", self.worker.status())
 
     def _mark_rest(self, jid: str, state: str) -> None:
@@ -223,7 +225,7 @@ class Runner:
         now = time.monotonic()
         if publish or "state" in fields or now - self._last_pub > PUBLISH_EVERY_S:
             self._last_pub = now
-            self._publish_job(jid)
+            self.publish_job(jid)
 
     # ---- cancel / views -------------------------------------------------------------------------
 
@@ -234,7 +236,8 @@ class Runner:
         if job["status"] == "queued":
             self._mark_rest(jid, "canceled")
             self.store.update_job(jid, status="canceled", finished=time.time())
-            self._publish_job(jid)
+            self.store.write_output_json(jid)
+            self.publish_job(jid)
             return self.store.get_job(jid)
         self._cancel.add(jid)
         await self.worker.cancel()  # stops the worker process: the only way to interrupt a GPU call
@@ -291,7 +294,8 @@ class Runner:
         out["eta"] = sched.get(job["id"])
         return out
 
-    def _publish_job(self, jid: str) -> None:
+    def publish_job(self, jid: str) -> None:
+        """Send the job's current state to every /v1/events listener."""
         job = self.store.get_job(jid)
         if job:
             self.events.publish("job", self.public(job))

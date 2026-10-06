@@ -1,4 +1,9 @@
-"""Persistent state: chats, jobs and stage timings in SQLite; job outputs in data/jobs/<id>/.
+"""Persistent state: chats, jobs and stage timings in SQLite; each job's files in its own folder.
+
+A job's folder is `<jobs_dir>/<YYYY-MM-DD>/<job id>-<slug>/` (the `dir` column, relative to the
+jobs folder; under AIHub that is outputs/gen3d). Jobs from before the column have none and live
+in `<jobs_dir>/<job id>/`. Each folder gets an `output.json` (AIHub architecture §4.7): written
+with `complete: false` when the job is queued, and `complete: true` once it is done.
 
 Everything is small and fast, so one connection guarded by a lock is plenty (the GPU is the
 bottleneck by five orders of magnitude).
@@ -7,6 +12,7 @@ bottleneck by five orders of magnitude).
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sqlite3
 import threading
@@ -28,7 +34,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     stages TEXT NOT NULL DEFAULT '{}',     -- {stage: {state, step, total, started, finished, seconds, eta_s, note}}
     result TEXT NOT NULL DEFAULT '{}',     -- stage outputs: faces, parts, files...
     error TEXT,
-    created REAL NOT NULL, started REAL, finished REAL
+    created REAL NOT NULL, started REAL, finished REAL,
+    dir TEXT                               -- the job folder, relative to the jobs folder
 );
 CREATE INDEX IF NOT EXISTS jobs_chat ON jobs(chat_id, created);
 CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status, created);
@@ -47,6 +54,16 @@ def new_id(prefix: str) -> str:
     return f"{prefix}{uuid.uuid4().hex[:10]}"
 
 
+def slug(text: str, n: int = 40) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", (text or "")[:n].lower()).strip("-") or "job"
+
+
+def job_folder(jid: str, title: str | None, created: float | None = None) -> str:
+    """`<YYYY-MM-DD>/<job id>-<slug>`: where a new job's files go, relative to the jobs folder."""
+    day = time.strftime("%Y-%m-%d", time.localtime(created if created is not None else time.time()))
+    return f"{day}/{jid}-{slug(title or '')}"
+
+
 class Store:
     def __init__(self, db_path: Path | None = None, jobs_dir: Path | None = None):
         self.db_path = db_path or settings.db_path
@@ -57,6 +74,8 @@ class Store:
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
+        if "dir" not in {r[1] for r in self._db.execute("PRAGMA table_info(jobs)")}:
+            self._db.execute("ALTER TABLE jobs ADD COLUMN dir TEXT")
         self._lock = threading.Lock()
 
     def _q(self, sql: str, args: tuple = ()) -> list[sqlite3.Row]:
@@ -100,19 +119,35 @@ class Store:
     # ---- jobs ---------------------------------------------------------------------------------
 
     def job_dir(self, jid: str) -> Path:
-        return self.jobs_dir / jid
+        rows = self._q("SELECT dir FROM jobs WHERE id=?", (jid,))
+        return self.jobs_dir / (rows[0]["dir"] if rows and rows[0]["dir"] else jid)
 
     def create_job(self, request: dict, *, chat_id: str | None, parent_id: str | None,
-                   title: str | None, stages: list[str], jid: str | None = None) -> dict:
+                   title: str | None, stages: list[str], jid: str | None = None, folder: str | None = None) -> dict:
         jid = jid or new_id("j_")
-        self.job_dir(jid).mkdir(parents=True, exist_ok=True)
+        folder = folder or job_folder(jid, title)
+        (self.jobs_dir / folder).mkdir(parents=True, exist_ok=True)
         st = {s: {"state": "pending"} for s in stages}
-        self._q("""INSERT INTO jobs (id, chat_id, parent_id, title, status, request, stages, created)
-                   VALUES (?,?,?,?,?,?,?,?)""",
-                (jid, chat_id, parent_id, title, "queued", json.dumps(request), json.dumps(st), time.time()))
+        self._q("""INSERT INTO jobs (id, chat_id, parent_id, title, status, request, stages, created, dir)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (jid, chat_id, parent_id, title, "queued", json.dumps(request), json.dumps(st), time.time(), folder))
         if chat_id:
             self.touch_chat(chat_id)
+        self.write_output_json(jid)
         return self.get_job(jid)
+
+    def write_output_json(self, jid: str) -> None:
+        """The folder's sidecar for AIHub's Outputs page; `complete` only once the job is done."""
+        job = self.get_job(jid)
+        if not job:
+            return
+        jdir = self.job_dir(jid)
+        if not jdir.is_dir():
+            return
+        meta = output_meta(job, jdir)
+        tmp = jdir / ".output.json.tmp"
+        tmp.write_text(json.dumps(meta, indent=2, ensure_ascii=False))
+        tmp.replace(jdir / "output.json")
 
     def _row(self, r: sqlite3.Row) -> dict:
         d = dict(r)
@@ -132,6 +167,9 @@ class Store:
             sql += " AND status IN (%s)" % ",".join("?" * len(status.split(","))); args += status.split(",")
         sql += " ORDER BY created DESC LIMIT ?"; args.append(limit)
         return [self._row(r) for r in self._q(sql, tuple(args))]
+
+    def count(self, status: str) -> int:
+        return self._q("SELECT COUNT(*) AS n FROM jobs WHERE status=?", (status,))[0]["n"]
 
     def queued(self) -> list[dict]:
         return [self._row(r) for r in self._q("SELECT * FROM jobs WHERE status='queued' ORDER BY created")]
@@ -172,3 +210,39 @@ class Store:
 
     def close(self) -> None:
         self._db.close()
+
+
+MAIN_FILES = ("rigged.glb", "parts.glb", "mesh.glb")
+
+
+def output_meta(job: dict, jdir: Path) -> dict:
+    """`output.json` for a job folder: title = prompt, kind model3d, the newest GLB as `main`."""
+    req, res = job.get("request") or {}, job.get("result") or {}
+    main = next((f for f in MAIN_FILES if (jdir / f).is_file()), None)
+    if main is None and job.get("input_mesh") and (jdir / job["input_mesh"]).is_file():
+        main = job["input_mesh"]
+    peaks = [v.get("peak_gpu_gb") for v in res.values() if isinstance(v, dict) and v.get("peak_gpu_gb") is not None]
+    shape, parts, rig = req.get("shape") or {}, req.get("parts") or {}, req.get("rig") or {}
+    meta = {
+        "title": job.get("title") or req.get("prompt") or job["id"],
+        "kind": "model3d",
+        "complete": job.get("status") == "done" and main is not None,
+        "created_ts": job.get("created"),
+        "prompt": req.get("prompt") or None,
+        "seed": shape.get("seed") if "shape" in (req.get("stages") or []) else None,
+        "params": {"preset": req.get("preset"), "stages": req.get("stages"),
+                   "budgets": {"shape": shape.get("target_faces"), "parts": parts.get("target_faces"),
+                               "rig": rig.get("target_faces")},
+                   "parts": parts.get("parts") or None},
+        "source": {"service": "gen3d", "job_id": job["id"], "parent_id": job.get("parent_id")},
+        "status": job.get("status"),
+    }
+    if main:
+        meta["main"] = main
+    if (jdir / "preview.png").is_file():
+        meta["preview"] = "preview.png"
+    if peaks:
+        meta["peak_gpu_gb"] = max(peaks)
+    if job.get("error"):
+        meta["error"] = job["error"]
+    return meta

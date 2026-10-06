@@ -31,7 +31,7 @@ The four existing apps come in with `git subtree add` (their history is kept), s
 
 | Mod | From | Added for AIHub |
 | :--- | :--- | :--- |
-| `tts` | `~/Projects/LocalTTS` (plan Phase 7) | `service.toml`, `aihub-install.sh` (venv only), `localtts/outputs.py` (dated outputs + sidecars), `localtts/hub.py` (`/v1/status`, the "Clips per day" widget), `tests/` (`.venv/bin/python -m pytest` in the mod folder), `requirements-dev.txt`, `pytest.ini` |
+| `tts` | `~/Projects/LocalTTS` (plan Phase 7) | `service.toml`, `aihub-install.sh` (venv only), `localtts/outputs.py` (dated outputs + sidecars), `localtts/hub.py` (`/v1/status`, the "Clips per day" widget), `ui/page.js` (the Speech page: Speak and Voices tabs), `tests/` (`.venv/bin/python -m pytest` in the mod folder), `requirements-dev.txt`, `pytest.ini`; `bin/localtts` delegates to `aihub` |
 
 ## `docs/`
 
@@ -109,6 +109,8 @@ utils/tests/
 | `api.js` | Ours, not the export: `createApi({base, liveAreas, mock})` routes each method to HTTP or the mock by area; `createHttpApi()` |
 | `ModPage.dc.html` | Ours: the host that loads a mod's `ui/page.js` and calls `mount(el, ctx)` (brief §5) |
 | `mod-ui.js` | Ours: `ctx.ui`, themed DOM helpers for page modules |
+| `mod-kit.js` | Ours: shared pieces for the built-in mods' pages (Part B): `requireRunning`, `callRoom` (answers `needs_room` with a confirm, then retries with make-room), `segmented`, `panel`, `header`, `columns`, `stat`, `store`, formatting |
+| `mod-charts.js` | Ours: the §11.6 charts inside page modules: `chartCard` (a widget card with ranges, "View as table" and the data hook), `chart`, `rh` (createElement), `mountReact`, `waveform`, `wavSamples` |
 | `support.js` | Claude Design's runtime. Generated: **never edit** |
 | `vendor/` | React and ReactDOM 18.3.1 (UMD), `fonts.css` + `fonts/` (IBM Plex Sans, JetBrains Mono, OFL) |
 | `PATCHES.md` | The UI's history (v1 export → revision 2 built here), hand edits since, and the mock-only states |

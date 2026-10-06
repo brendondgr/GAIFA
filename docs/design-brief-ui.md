@@ -301,6 +301,8 @@ Rules: a page module never calls `fetch` directly, never styles with raw colors,
 
 **As built (plan 2.9).** In the `.dc.html` shell, `web/ModPage.dc.html` hosts every page module: it `import()`s `ServiceSummary.page_url` and calls `mount(el, ctx)` on its own element, remounting when the mod, the tab, the hash params or the running state change. `ctx.ui` is `web/mod-ui.js`, plain DOM helpers that use the theme variables, because the export has no importable `components.js`: `h(tag, attrs, ...children)`, `text`, `row`, `stack`, `card`, `button(label, onClick, {kind})`, `input`, `textarea`, `select`, `field(label, control, hint)`, `json(value)`, `badge(label, tone)`, `empty(title, body, action)` and `table(rows)`. `ctx.on('*', fn)` receives every event. Tab ids can't reuse the generic ones (`overview`, `outputs`, `api`, `logs`, `settings`). If `mount` throws, ModPage shows the error and the other tabs keep working.
 
+**As built (plan 7.7).** The Part B pages are built by hand as `ui/page.js` modules, like revision 2. Two shared modules help: `web/mod-kit.js` (the not-running state, `callRoom` for calls that may need make-room, a segmented control, panels) and `web/mod-charts.js` (mounts the §11.6 chart components into a page module's DOM: `chartCard`, `chart`, `waveform`). In `?mock`, the built-in mods show their real page modules and `mock.js` answers their native API.
+
 **In the `.dc.html` shell (from revision 2 on), a mod's page can come in either of two formats.** Either way, it lives in the mod's own folder.
 
 | Format | Who uses it | How it loads |

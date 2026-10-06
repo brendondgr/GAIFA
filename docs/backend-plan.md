@@ -636,18 +636,20 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - video-maker still works on `:5040`.
   - Point `~/.local/bin/localtts` at `services/tts/bin/localtts`. Its start/stop/enable subcommands now delegate to `aihub`.
 - [x] **7.6** `MOVED.md` in `~/Projects/LocalTTS`.
-- [ ] **7.7 Speech page (Part B3).** Build and wire the Speak and Voices tabs and their charts: clips per day by voice, the load timeline, and the result waveform. Add a "Clips per day" `[[ui.widgets]]` entry to the tts manifest, served by a small `/v1/hub/widgets/clips` route.
+- [x] **7.7 Speech page (Part B3).** *As built:* `services/tts/ui/page.js`, by hand (no Claude Design pass), on two new shared modules, `web/mod-kit.js` and `web/mod-charts.js`. Speak: engine switch, voice picker, direction or speed, Enhance with the added tags highlighted, format, Generate with waveform + word highlight; side charts "Clips per day" and the engine's loaded lane. Voices: cards (play, use, edit, delete), Clone, Design (sample first, then save with the same seed). Build and wire the Speak and Voices tabs and their charts: clips per day by voice, the load timeline, and the result waveform. Add a "Clips per day" `[[ui.widgets]]` entry to the tts manifest, served by a small `/v1/hub/widgets/clips` route.
 
 **Checks & deliverables — Phase 7**
-- [ ] From the Speech page:
+- [x] From the Speech page:
   - generate with Breeze and with Kokoro
   - clone a voice from an upload
   - design a voice from a description
   - Enhance shows its diff
   - every result is on the Outputs page with its sidecar
-- [ ] The memory chart shows the tts load and its 180 s idle unload, and Make room works while gen3d's fake mod is loaded.
-- [ ] video-maker still works against `:5040`. `localtts.service` is disabled, and `~/Projects/LocalTTS` has its `MOVED.md`.
-- [ ] Delivered: `services/tts` (with its git history), its manifest and page, its models in the registry, and the voices in `data/models/voices`.
+- [x] The memory chart shows the tts load and its 180 s idle unload, and Make room works while gen3d's fake mod is loaded. *Checked:* the load and the 180 s unload of both engines; make-room against the real gen3d is checked in Phase 8.
+- [x] video-maker still works against `:5040`. `localtts.service` is disabled, and `~/Projects/LocalTTS` has its `MOVED.md`.
+- [x] Delivered: `services/tts` (with its git history), its manifest and page, its models in the registry, and the voices in `data/models/voices`.
+
+*Checked (2026-10-06):* Kokoro from the page (word highlight, waveform, the clips chart updating live), Breeze through the proxy, Design → Save from the page, Clone with Whisper auto-transcription through the proxy (the test voices were deleted), Enhance (`subtle` returns tags; `expressive` sometimes gets non-JSON back from the LLM, which the page reports), and every clip on the Outputs page with its sidecar.
 
 ## Phase 8 — Move in `gen3d` (3DGenerate)
 

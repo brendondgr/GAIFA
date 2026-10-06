@@ -15,7 +15,8 @@
 
 | # | File(s) | Edit | Why | Step |
 |---|---|---|---|---|
-| — | | (none yet) | | |
+| 1 | `Hub.dc.html` | `pageUrl`: in `?mock`, `tts`, `gen3d`, `relay` and `lcpp` load their own `services/<id>/ui/page.js` instead of the template's | The Part B pages are page modules in the mods' folders, and mock.js answers their native API | 7.7 |
+| 2 | `mock.js` | The `tts` mock answers LocalTTS's real API shapes (`/v1/voices` → `{custom, kokoro}`, design/PATCH/clone, `timings`, enhance, the clips widget); `tts` has a page; the API-tab operations match | So the Speech page works in `?mock` | 7.7 |
 
 ## Revision 2 (step 6.5): what changed
 

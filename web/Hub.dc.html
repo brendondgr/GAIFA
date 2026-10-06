@@ -1567,8 +1567,10 @@ class Component extends DCLogic {
   // ---------- mod pages (PATCHES #6): services/<id>/ui/page.js in the ModPage host ----------
   pageUrl(d) {
     if (d.page_url) return d.page_url;
-    // Mock mode: every mock mod with a page shows the template's page module.
-    return this.api.isLive('services') ? `/ui/services/${encodeURIComponent(d.id)}/page.js` : '/ui/services/_template/page.js';
+    // Mock mode: the built-in mods show their real page modules (mock.js answers their native API);
+    // any other mock mod with a page shows the template's.
+    const own = this.api.isLive('services') || ['tts', 'gen3d', 'relay', 'lcpp'].includes(d.id);
+    return own ? `/ui/services/${encodeURIComponent(d.id)}/page.js` : '/ui/services/_template/page.js';
   }
   async loadPage(d) {
     const cur = this.pages[d.id], ver = d.started_ts || 0;

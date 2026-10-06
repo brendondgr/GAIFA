@@ -172,13 +172,13 @@ const OPS = {
   tts: [
     op('GET', '/health', 'Health check', { tag: 'System' }),
     op('GET', '/v1/voices', 'List saved voices', { tag: 'Voices', tool: { name: 'list_voices', confirm: false } }),
-    op('POST', '/v1/voices', 'Clone a voice from a clip', { tag: 'Voices', ct: 'multipart/form-data', body: S.obj({ name: S.str('Voice name, used as the id', { minLength: 1 }), file: S.str('Reference clip (wav/mp3, 8–30 s)', { format: 'binary' }), transcript: S.str('What is said in the clip. Leave empty to auto-transcribe.', { 'x-multiline': true }) }, ['name', 'file']) }),
-    op('POST', '/v1/voices/design', 'Design a voice from a description', { tag: 'Voices', response: 'audio', body: S.obj({ description: S.str('e.g. "a calm older narrator with a slight rasp"', { 'x-multiline': true }), seed: S.int('Random seed', { minimum: 0 }) }, ['description']) }),
-    op('DELETE', '/v1/voices/{name}', 'Delete a voice', { tag: 'Voices', destructive: true, tool: { name: 'delete_voice', confirm: true }, params: [P('name', 'path', true, S.str('Voice name', { enum: ['brendon', 'hope', 'arabella'] }))], response: 'empty' }),
+    op('POST', '/v1/voices', 'Clone a voice from a clip', { tag: 'Voices', ct: 'multipart/form-data', body: S.obj({ name: S.str('Voice name, used as the id', { minLength: 1 }), audio: S.str('Reference clip, any format ffmpeg reads (3–60 s)', { format: 'binary' }), transcript: S.str('What is said in the clip. Leave empty to auto-transcribe.', { 'x-multiline': true }) }, ['name', 'audio']) }),
+    op('POST', '/v1/voices/design', 'Design a voice from a description and save it', { tag: 'Voices', body: S.obj({ name: S.str('Name to save it as'), instruction: S.str('e.g. "a calm older narrator with a slight rasp"', { 'x-multiline': true }), seed: S.int('Random seed', { minimum: 0 }) }, ['name', 'instruction']) }),
+    op('DELETE', '/v1/voices/{name}', 'Delete a voice', { tag: 'Voices', destructive: true, tool: { name: 'delete_voice', confirm: true }, params: [P('name', 'path', true, S.str('Voice name', { enum: ['Brendon', 'Hope', 'Arabella'] }))], response: 'empty' }),
     op('POST', '/v1/speech', 'Synthesize speech', { tag: 'Speech', response: 'audio', tool: { name: 'speak', confirm: false }, description: 'Generate speech with a saved voice or a Kokoro built-in voice. The result is also written to outputs/tts.',
-      body: S.obj({ text: S.str('Text to speak', { 'x-multiline': true }), engine: S.str('Engine', { enum: ['breeze-tts-2', 'kokoro'], default: 'breeze-tts-2' }), voice: S.str('Voice', { enum: ['brendon', 'hope', 'arabella', 'af_heart', 'am_michael'], default: 'hope' }), direction: S.str('Delivery direction (Breeze only)'), speed: S.num('Speed (Kokoro only)', { minimum: 0.5, maximum: 2, default: 1 }), format: S.str('Format', { enum: ['wav', 'mp3'], default: 'wav' }), timings: S.bool('Return word timings', { default: false }) }, ['text']) }),
+      body: S.obj({ text: S.str('Text to speak', { 'x-multiline': true }), engine: S.str('Engine', { enum: ['auto', 'breeze', 'kokoro'], default: 'auto' }), voice: S.str('Voice', { enum: ['Brendon', 'Hope', 'Arabella', 'af_heart', 'am_michael'], default: 'hope' }), direction: S.str('Delivery direction (Breeze only)'), speed: S.num('Speed (Kokoro only)', { minimum: 0.5, maximum: 2, default: 1 }), format: S.str('Format', { enum: ['wav', 'mp3'], default: 'wav' }), timings: S.bool('Return word timings', { default: false }) }, ['text']) }),
     op('POST', '/v1/audio/speech', 'OpenAI-compatible speech', { tag: 'Speech', response: 'audio', body: S.obj({ model: S.str('Model', { default: 'tts-1' }), input: S.str('Text', { 'x-multiline': true }), voice: S.str('Voice', { default: 'hope' }), response_format: S.str('Format', { enum: ['wav', 'mp3'], default: 'mp3' }) }, ['input']) }),
-    op('POST', '/v1/enhance', 'Add vocal tags to text', { tag: 'Speech', body: S.obj({ text: S.str('Plain text', { 'x-multiline': true }), style: S.str('Style hint', { enum: ['natural', 'dramatic', 'calm'], default: 'natural' }) }, ['text']) }),
+    op('POST', '/v1/enhance', 'Add vocal tags to text', { tag: 'Speech', body: S.obj({ text: S.str('Plain text', { 'x-multiline': true }), style: S.str('Style', { enum: ['subtle', 'expressive'], default: 'subtle' }) }, ['text']) }),
     op('POST', '/v1/load', 'Load models into memory', { tag: 'System' }),
     op('POST', '/v1/unload', 'Unload models', { tag: 'System' }),
   ],
@@ -227,7 +227,7 @@ function seedServices(base) {
   return [
     svc({ id: 'relay', name: 'LLM Relay', description: 'OpenAI-compatible relay with routing, tunnels and usage analytics.', icon: 'relay', port: 4000, version: '1.4.2', used: 0.2 * GB, stats: [{ label: 'Requests today', value: 1284, reset: 'daily' }, { label: 'Tokens today', value: '3.1', unit: 'M' }, { label: 'p50 TTFT', value: 412, unit: 'ms' }, { label: 'Endpoints', value: '2/3', hint: 'healthy' }], priority: 4 }),
     svc({ id: 'lcpp', name: 'LLM Launcher', description: 'Starts and manages llama.cpp server instances.', icon: 'cpu', port: 7710, version: '0.9.0', load: 'loaded', used: 18.6 * GB, estimate: 18.6 * GB, peak: 19.4 * GB, idle_s: 40, models: ['gemma-4-26b-it', 'minicpm-5-2b', 'gemma-4-e4b-it', 'ornith1-35b'], stats: [{ label: 'Running', value: 1 }, { label: 'Catalog', value: 4 }, { label: 'On disk', value: '20.9', unit: 'GB' }], priority: 5 }),
-    svc({ id: 'tts', name: 'Speech', description: 'Text-to-speech with voice cloning and voice design.', icon: 'wave', port: 5040, version: '0.6.1', load: 'unloaded', estimate: 9.2 * GB, peak: 10.1 * GB, idle_s: 760, has_outputs: true, models: ['breeze-tts-2', 'kokoro-82m', 'whisper-large-v3-turbo', 'voice-brendon', 'voice-hope', 'voice-arabella'], stats: [{ label: 'Voices', value: 3 }, { label: 'Engines', value: 2 }, { label: 'Clips today', value: 12, reset: 'daily' }], priority: 0, idle_unload_s: 300 }),
+    svc({ id: 'tts', name: 'Speech', description: 'Text-to-speech with voice cloning and voice design.', icon: 'wave', port: 5040, version: '0.6.1', load: 'unloaded', estimate: 13 * GB, peak: 16.7 * GB, idle_s: 760, has_outputs: true, has_page: true, native_ui: 'http://127.0.0.1:5040/ui/', models: ['breeze-tts-2', 'kokoro-82m', 'whisper-large-v3-turbo', 'voice-brendon', 'voice-hope', 'voice-arabella'], stats: [{ label: 'Voices', value: 3 }, { label: 'Engines installed', value: 2 }, { label: 'Clips today', value: 12, reset: 'daily' }], priority: 0, idle_unload_s: 180 }),
     svc({ id: 'gen3d', name: '3D Generate', description: 'Text-to-3D meshes with part splitting and auto-rigging.', icon: 'cube', port: 5050, version: '0.3.0', load: 'unloaded', estimate: 52 * GB, peak: 52 * GB, idle_s: 5400, has_outputs: true, models: ['cube3d-v0.5', 'cubepart', 'qwen3-vl-4b-instruct', 'clip-vit-large-patch14'], stats: [{ label: 'Jobs', value: 17 }, { label: 'Queue', value: 0 }], priority: 2 }),
     svc({ id: 'comfy', name: 'Images & Video', description: 'ComfyUI in a container: image and video workflows.', icon: 'image', port: 8199, kind: 'external', version: '0.3.62', state: 'stopped', load: 'unloaded', estimate: 24 * GB, peak: 31 * GB, idle_s: null, has_outputs: true, native_ui: 'http://127.0.0.1:8199/', autostart: false, models: ['z-image-turbo-fp8', 'qwen-image-2.1-fp8', 'qwen-image-2.1-q8', 'wan2.1-t2v-14b-fp8', 'wan2.1-i2v-480p-14b-fp8', 'scail-2-q8', 'qwen3vl-8b-bf16', 'umt5-xxl-enc-fp8', 'qwen-3-4b', 'wan-2.1-vae', 'qwen-image-2.1-vae', 'wan21-lightx2v-lora', 'zit-watercolor', 'clip-vision-h', 'remacri-4x'], stats: [{ label: 'Workflows', value: 9 }], priority: 1, command: ['podman', 'start', 'comfyui'] }),
     svc({ id: 'example', name: 'Example', description: 'The mod template. Copy it with aihub new <id>.', icon: 'puzzle', port: 5099, used: 0.05 * GB, has_page: true, stats: [{ label: 'Calls', value: 0 }], priority: 3, autostart: false }),
@@ -264,7 +264,12 @@ export function createMockApi() {
     services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) },
     ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} } },
   };
-  const voices = [{ name: 'brendon', source: 'uploaded', duration_s: 22.2 }, { name: 'hope', source: 'uploaded', duration_s: 16.4 }, { name: 'arabella', source: 'designed', duration_s: 17.8 }];
+  // LocalTTS's own voice shape (GET /v1/voices → { custom, kokoro }), so the Speech page works on the mock.
+  const voice = (name, source, duration_s, transcript, extra = {}) => ({ engine: 'breeze', name, transcript, duration_s, created: '2026-09-26T10:30:00-0400', source, instruction: null, language: null, transcript_auto: false, ...extra });
+  const voices = [voice('Brendon', 'upload', 22.2, 'This morning, my refrigerator asked me to stop calling it a refrigerator.'),
+    voice('Hope', 'upload', 16.4, 'This is a reference voice line for your narrator.', { transcript_auto: true }),
+    voice('Arabella', 'design', 17.8, 'Hello, and welcome. This is a short sample of my voice.', { instruction: 'a bright, clear storyteller' })];
+  const KOKORO = 'af_heart af_alloy af_aoede af_bella af_jessica af_kore af_nicole af_nova af_river af_sarah af_sky am_adam am_echo am_eric am_fenrir am_liam am_michael am_onyx am_puck am_santa bf_alice bf_emma bf_isabella bf_lily bm_daniel bm_fable bm_george bm_lewis'.split(' ');
   const activity = [], jobs = new Map(), alerts = new Map();
   const listeners = new Set(), errorListeners = new Set(), logListeners = new Map();
   let seq = 1;
@@ -480,22 +485,36 @@ export function createMockApi() {
       'POST /v1/echo': ({ json }) => { if (!json?.message) throw upstream(422, 'body.message: field required'); return ok({ echo: json, received_ts: Math.floor(now()) }); },
     },
     tts: {
-      'GET /health': () => ok({ status: 'ok', engines: ['breeze-tts-2', 'kokoro-82m'], loaded: svcById('tts').load === 'loaded' }),
-      'GET /v1/voices': () => ok({ voices: clone(voices) }),
-      'POST /v1/voices': ({ form }) => { const name = form?.get?.('name'), file = form?.get?.('file');
-        if (!name) throw upstream(422, 'name: field required'); if (!file || !file.size) throw upstream(422, 'file: a reference clip is required');
-        if (voices.some(v => v.name === name)) throw upstream(409, `voice "${name}" already exists`);
-        const v = { name: String(name).toLowerCase(), source: 'uploaded', duration_s: 12.0, transcript: form.get('transcript') || '(auto) Hello, this is my voice.' }; voices.push(v); svcById('tts').stats[0].value = voices.length; pushSvc(svcById('tts')); act(`Speech: voice "${v.name}" cloned`, 'tts'); return ok(v, 201); },
-      'POST /v1/voices/design': ({ json }) => { if (!json?.description) throw upstream(422, 'description: field required'); return media(makeWav(3, json.seed || 7), 'audio/wav'); },
-      'DELETE /v1/voices/{name}': ({ pp }) => { const i = voices.findIndex(v => v.name === pp.name); if (i < 0) throw upstream(404, `voice "${pp.name}" not found`); voices.splice(i, 1); svcById('tts').stats[0].value = voices.length; pushSvc(svcById('tts')); return { status: 204 }; },
-      'POST /v1/speech': ({ json }) => { if (!json?.text?.trim()) throw upstream(422, 'text must not be empty');
+      'GET /health': () => ok({ status: 'ok', engines: { breeze: { state: svcById('tts').load === 'loaded' ? 'ready' : 'unloaded' }, kokoro: { state: 'unloaded' } }, voices: voices.length }),
+      'GET /v1/voices': () => ok({ custom: clone(voices), kokoro: KOKORO }),
+      'GET /v1/voices/{name}/audio': () => media(makeWav(4, 3), 'audio/wav'),
+      'POST /v1/voices': ({ form }) => { const name = form?.name ?? form?.get?.('name'), file = form?.audio ?? form?.get?.('audio');
+        if (!name) throw upstream(422, 'name: field required'); if (!file || !file.size) throw upstream(422, 'audio: a reference clip is required');
+        if (voices.some(v => v.name.toLowerCase() === String(name).toLowerCase())) throw upstream(409, `voice '${name}' exists; pass overwrite=true to replace it`);
+        const tr = form?.transcript ?? form?.get?.('transcript'), v = voice(String(name), 'upload', 12.0, tr || 'Hello, this is my voice.', { transcript_auto: !tr });
+        voices.push(v); svcById('tts').stats[0].value = voices.length; pushSvc(svcById('tts')); act(`Speech: voice "${v.name}" cloned`, 'tts'); return ok(clone(v), 201); },
+      'PATCH /v1/voices/{name}': ({ pp, json }) => { const v = voices.find(x => x.name === pp.name); if (!v) throw upstream(404, `no voice named '${pp.name}'`);
+        if (json?.transcript) Object.assign(v, { transcript: json.transcript, transcript_auto: false }); if (json?.rename) v.name = json.rename; return ok(clone(v)); },
+      'POST /v1/voices/design': ({ json }) => { if (!json?.name || !json?.instruction) throw upstream(422, 'name and instruction are required');
+        const v = voice(json.name, 'design', 8.1, json.sample_text || 'Hello, and welcome.', { instruction: json.instruction }); voices.push(v); svcById('tts').stats[0].value = voices.length; pushSvc(svcById('tts')); return ok({ ...clone(v), stats: { audio_s: 8.1 } }, 201); },
+      'DELETE /v1/voices/{name}': ({ pp }) => { const i = voices.findIndex(v => v.name === pp.name); if (i < 0) throw upstream(404, `no voice named '${pp.name}'`); voices.splice(i, 1); svcById('tts').stats[0].value = voices.length; pushSvc(svcById('tts')); return ok({ deleted: pp.name, permanent: true }); },
+      'POST /v1/speech': async ({ json }) => { if (!json?.text?.trim()) throw upstream(400, 'text is empty');
         const s = svcById('tts'); if (s.load === 'unloaded') doLoad(s);
-        return media(ttsOutput(json.text.trim(), json.voice || 'hope', json.engine === 'kokoro' ? 'kokoro-82m' : 'breeze-tts-2', json.format || 'wav', { direction: json.direction, speed: json.speed }), 'audio/wav'); },
+        const engine = json.engine === 'kokoro' || KOKORO.includes(json.voice) ? 'kokoro' : 'breeze', v = json.voice || (engine === 'kokoro' ? 'af_heart' : 'design');
+        const blob = json.no_save ? makeWav(4, json.seed || 7) : ttsOutput(json.text.trim(), v, engine === 'kokoro' ? 'kokoro-82m' : 'breeze-tts-2', json.format || 'wav', { instructions: json.instruction, speed: json.speed });
+        if (!json.timings) return media(blob, 'audio/wav');
+        const buf = new Uint8Array(await blob.arrayBuffer()); let bin = ''; buf.forEach(c => { bin += String.fromCharCode(c); });
+        const words = json.text.trim().split(/\s+/), dur = Math.max(1.5, (buf.length - 44) / 2 / 16000), step = dur / words.length;
+        return ok({ audio: btoa(bin), format: 'wav', sample_rate: 16000, engine, voice: v, saved: json.no_save ? 'no' : 'mock.wav',
+          timings: { duration: dur, sample_rate: 16000, words: words.map((w, i) => ({ w, start: +(i * step).toFixed(2), end: +((i + 1) * step).toFixed(2) })) }, stats: { rtf: 0.4 } }); },
       'POST /v1/audio/speech': ({ json }) => { if (!json?.input) throw upstream(422, 'input: field required'); return media(ttsOutput(json.input, json.voice || 'hope', 'breeze-tts-2', json.response_format || 'mp3', { openai: true }), 'audio/wav'); },
-      'POST /v1/enhance': ({ json }) => { if (!json?.text) throw upstream(422, 'text: field required'); const tags = { natural: ['[warm]', '[pause]'], dramatic: ['[whisper]', '[excited]'], calm: ['[soft]', '[slow]'] }[json.style || 'natural'];
-        const parts = json.text.split(/(?<=[.!?])\s+/); return ok({ text: parts.map((p, i) => (i % 2 === 0 ? tags[0] + ' ' : '') + p + (i === 0 && parts.length > 1 ? ' ' + tags[1] : '')).join(' '), added: tags }); },
-      'POST /v1/load': () => { loadSvc(svcById('tts'), true).catch(() => {}); return ok({ status: 'loading' }, 202); },
-      'POST /v1/unload': () => { doUnload(svcById('tts')); return ok({ status: 'unloading' }, 202); },
+      'POST /v1/enhance': ({ json }) => { if (!json?.text) throw upstream(400, 'text is empty'); const parts = json.text.split(/(?<=[.!?])\s+/);
+        return ok({ text: parts.map((p, i) => (i === 0 ? '(laugh) ' : '') + p).join(' '), delivery: 'Warm and amused, unhurried.', tags_added: 1, model: 'gemma-4-26b-it' }); },
+      'GET /v1/hub/widgets/clips': ({ query }) => { const n = query.range === '30d' ? 30 : 7, day = 86400e3;
+        const cats = Array.from({ length: n }, (_, i) => new Date(Date.now() - (n - 1 - i) * day).toISOString().slice(5, 10));
+        return ok({ unit: 'count', categories: cats, series: ['Hope', 'af_heart', 'Brendon'].map((name, k) => ({ name, values: cats.map((_, i) => Math.max(0, Math.round(3 * Math.sin(i / 2 + k * 2) + 2 - k))) })) }); },
+      'POST /v1/load': () => { loadSvc(svcById('tts'), true).catch(() => {}); return ok({ engine: 'breeze', state: 'loading' }); },
+      'POST /v1/unload': () => { doUnload(svcById('tts')); return ok({ unloaded: ['breeze'] }); },
     },
     gen3d: {
       'GET /v1/presets': () => ok({ presets: [{ id: 'low-poly', faces: 4000, eta_s: 40 }, { id: 'fast', faces: 12000, eta_s: 70 }, { id: 'balanced', faces: 20000, eta_s: 120 }, { id: 'quality', faces: 60000, eta_s: 260 }] }),

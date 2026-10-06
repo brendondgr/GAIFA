@@ -135,13 +135,23 @@ def test_migration_moves_old_folders_and_rewrites_paths(tmp_path):
     (old / jid / "mesh.glb").write_bytes(b"glTF")
     (old / jid / "parts" / "manifest.json").write_text(json.dumps({"source_mesh": str(old / jid / "mesh.glb")}))
     (old / "j_orphan").mkdir()
+    child = "j_child00001"  # a parts job whose manifest points at its parent's mesh
+    store = Store(db_path=db, jobs_dir=old)
+    store._q("INSERT INTO jobs (id, title, status, request, stages, result, created, parent_id) VALUES (?,?,?,?,?,?,?,?)",
+             (child, "parts", "done", json.dumps({"stages": ["parts"]}), "{}", "{}", created + 60, jid))
+    store.close()
+    (old / child / "parts").mkdir(parents=True)
+    (old / child / "parts.glb").write_bytes(b"glTF")
+    (old / child / "parts" / "manifest.json").write_text(json.dumps({"source_mesh": str(old / jid / "mesh.glb")}))
     r = migrate(db, old, out)
     dst = out / "2026-09-20" / f"{jid}-pirate-s-chest"
-    assert r["moved"] == [(jid, str(old / jid), str(dst))] and r["orphans"] == ["j_orphan"]
+    assert r["moved"][0] == (jid, str(old / jid), str(dst)) and r["orphans"] == ["j_orphan"]
+    child_dst = Path(r["moved"][1][2])
+    assert json.loads((child_dst / "parts" / "manifest.json").read_text())["source_mesh"] == str(dst / "mesh.glb")
     assert json.loads((dst / "parts" / "manifest.json").read_text())["source_mesh"] == str(dst / "mesh.glb")
     meta = json.loads((dst / "output.json").read_text())
     assert meta["complete"] is True and meta["main"] == "mesh.glb" and meta["created_ts"] == created
-    assert sqlite3.connect(db).execute("SELECT dir FROM jobs").fetchone()[0] == f"2026-09-20/{jid}-pirate-s-chest"
+    assert sqlite3.connect(db).execute("SELECT dir FROM jobs WHERE id=?", (jid,)).fetchone()[0] == f"2026-09-20/{jid}-pirate-s-chest"
     assert migrate(db, old, out)["moved"] == []  # a second run does nothing
 
 

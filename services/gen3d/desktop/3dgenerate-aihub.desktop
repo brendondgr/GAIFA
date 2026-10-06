@@ -1,0 +1,21 @@
+[Desktop Entry]
+# Under AIHub: opens the 3D Generate page in AIHub. @AIHUB@ is AIHub's root (installed by plan step 8.5).
+Type=Application
+Name=3D Generate
+GenericName=3D model generator
+Comment=Open 3D Generate in AIHub (Cube3D + CubePart)
+Exec=@AIHUB@/bin/aihub open "#/s/gen3d"
+Icon=3dgenerate
+Terminal=false
+Categories=Graphics;3DGraphics;
+Keywords=3D;mesh;Cube3D;CubePart;generate;
+StartupNotify=false
+Actions=new-job;stop-generator;
+
+[Desktop Action new-job]
+Name=New 3D job
+Exec=@AIHUB@/bin/aihub open "#/s/gen3d/create"
+
+[Desktop Action stop-generator]
+Name=Stop generator (free the GPU)
+Exec=@AIHUB@/bin/aihub unload gen3d

@@ -41,3 +41,14 @@ test('callRoom asks, then retries with makeRoom; a refusal cancels', async () =>
   assert.deepEqual(calls, ['first', 'Make room?', 'retry']);
   await assert.rejects(kit.callRoom(mk(false), 'POST', '/v1/speech'), e => e.cancelled === true);
 });
+
+test('the mock gen3d box GLB is a valid glTF binary', async () => {
+  const { boxesGlb } = await load('mock-mods.js');
+  const buf = new DataView(await boxesGlb([{ name: 'a', center: [0, 0, 0], size: [1, 1, 1] }, { name: 'b', center: [1, 0, 0], size: [1, 2, 1], color: [255, 0, 0] }]).arrayBuffer());
+  assert.equal(buf.getUint32(0, true), 0x46546C67);           // "glTF"
+  assert.equal(buf.getUint32(8, true), buf.byteLength);
+  const jlen = buf.getUint32(12, true);
+  const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf.buffer, 20, jlen)));
+  assert.equal(json.nodes.length, 2);
+  assert.equal(json.buffers[0].byteLength, buf.getUint32(20 + jlen, true));
+});

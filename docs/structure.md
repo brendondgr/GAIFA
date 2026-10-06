@@ -32,7 +32,7 @@ The four existing apps come in with `git subtree add` (their history is kept), s
 | Mod | From | Added for AIHub |
 | :--- | :--- | :--- |
 | `tts` | `~/Projects/LocalTTS` (plan Phase 7) | `service.toml`, `aihub-install.sh` (venv only), `localtts/outputs.py` (dated outputs + sidecars), `localtts/hub.py` (`/v1/status`, the "Clips per day" widget), `ui/page.js` (the Speech page: Speak and Voices tabs), `tests/` (`.venv/bin/python -m pytest` in the mod folder), `requirements-dev.txt`, `pytest.ini`; `bin/localtts` delegates to `aihub` |
-| `gen3d` | `~/Projects/3DGenerate` (plan Phase 8) | `service.toml`, `aihub-install.sh`, `gen3d/hub.py` (`/v1/status`, the "Job time per stage" widget), `store.py`'s dated job folders (`dir` column) and `output.json`, `scripts/migrate_jobs_to_outputs.py`, `tests/test_aihub.py`, `requirements-dev.txt` (pytest moved out of `requirements.txt`) |
+| `gen3d` | `~/Projects/3DGenerate` (plan Phase 8) | `service.toml`, `aihub-install.sh`, `gen3d/hub.py` (`/v1/status`, the "Job time per stage" widget), `store.py`'s dated job folders (`dir` column) and `output.json`, `scripts/migrate_jobs_to_outputs.py`, `tests/test_aihub.py`, `requirements-dev.txt` (pytest moved out of `requirements.txt`), `ui/page.js` (the 3D Generate page: Create and Jobs tabs), `desktop/3dgenerate-aihub.desktop`; `bin/gen3d` delegates to `aihub` |
 
 ## `docs/`
 
@@ -111,9 +111,11 @@ utils/tests/
 | `ModPage.dc.html` | Ours: the host that loads a mod's `ui/page.js` and calls `mount(el, ctx)` (brief §5) |
 | `mod-ui.js` | Ours: `ctx.ui`, themed DOM helpers for page modules |
 | `mod-kit.js` | Ours: shared pieces for the built-in mods' pages (Part B): `requireRunning`, `callRoom` (answers `needs_room` with a confirm, then retries with make-room), `segmented`, `panel`, `header`, `columns`, `stat`, `store`, formatting |
+| `viewer3d.js` | Ours: `mountViewer(el, {files, url, rig})`, the Viewer3D (orbit, file tabs, wireframe, part visibility, rig sliders), adapted from gen3d's viewer; three.js r16x is vendored in `vendor/three/` (its addons import it relatively, so no import map) |
+| `mock-mods.js` | Ours: the built-in mods' native APIs on the mock (`createModMocks(m)`, moved out of `mock.js`): tts, gen3d (jobs with stages, live events, box GLBs), lcpp, relay, comfy, transcribe |
 | `mod-charts.js` | Ours: the §11.6 charts inside page modules: `chartCard` (a widget card with ranges, "View as table" and the data hook), `chart`, `rh` (createElement), `mountReact`, `waveform`, `wavSamples` |
 | `support.js` | Claude Design's runtime. Generated: **never edit** |
-| `vendor/` | React and ReactDOM 18.3.1 (UMD), `fonts.css` + `fonts/` (IBM Plex Sans, JetBrains Mono, OFL) |
+| `vendor/` | three.js (`three/`, MIT, from 3DGenerate), React and ReactDOM 18.3.1 (UMD), `fonts.css` + `fonts/` (IBM Plex Sans, JetBrains Mono, OFL) |
 | `PATCHES.md` | The UI's history (v1 export → revision 2 built here), hand edits since, and the mock-only states |
 
 `GET /` serves `Hub.dc.html` with the vendor scripts and `/config.js` added before `support.js` (a page load gets an empty `<x-dc>`; the runtime fetches the template itself); see `utils/routes/web.py`. `/ui/services/<id>/…` serves a mod's `ui/` folder, and `/Mod_<id>.dc.html` its `ui/Page.dc.html`.

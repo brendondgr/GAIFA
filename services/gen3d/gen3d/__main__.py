@@ -37,6 +37,13 @@ def _sockets() -> list[socket.socket]:
     return socks
 
 
+class _QuietPolls(logging.Filter):
+    """Drop access-log lines for the health and status polls (AIHub polls every few seconds)."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args if isinstance(record.args, tuple) else ()
+        return not (len(args) >= 3 and args[1] == "GET" and str(args[2]).split("?")[0] in ("/health", "/v1/status"))
+
+
 class Server(uvicorn.Server):
     def handle_exit(self, sig, frame) -> None:
         # close the SSE streams first so the graceful shutdown does not wait on them
@@ -49,6 +56,7 @@ class Server(uvicorn.Server):
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.getLogger("uvicorn.access").addFilter(_QuietPolls())
     config = uvicorn.Config(
         "gen3d.server:app", log_level="info",
         # Browsers keep idle connections for minutes; uvicorn's 5 s default closes them first and a

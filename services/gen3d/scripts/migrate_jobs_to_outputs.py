@@ -3,8 +3,9 @@
     python scripts/migrate_jobs_to_outputs.py --db DB --old OLD_JOBS --outputs OUTPUTS [--dry-run]
 
 For each job in the database whose folder is still `<OLD>/<id>/` (no `dir` yet): move it to
-`<OUTPUTS>/<created date>/<id>-<slug>/`, set `dir`, rewrite the absolute paths in
-`parts/manifest.json`, and write `output.json` (AIHub architecture §4.7). Folders with no job in
+`<OUTPUTS>/<created date>/<id>-<slug>/`, set `dir`, and write `output.json` (AIHub architecture
+§4.7). Then every JSON file in the moved folders has old absolute paths rewritten, including paths
+into other jobs' folders (`parts/manifest.json` points at the parent job's mesh). Folders with no job in
 the database are left where they are and listed. Safe to run again: moved jobs are skipped.
 """
 
@@ -21,18 +22,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from gen3d.store import Store, job_folder  # noqa: E402
 
 
-def rewrite_paths(folder: Path, old: Path, new: Path) -> int:
-    """Replace the old folder's absolute path in every JSON file under `folder`; returns files changed."""
+def rewrite_paths(folder: Path, moves: dict[str, str]) -> int:
+    """Replace each old absolute folder path with its new one in every JSON file under `folder`."""
     n = 0
     for p in folder.rglob("*.json"):
-        text = p.read_text()
-        if str(old) in text:
-            p.write_text(text.replace(str(old), str(new)))
+        text = new = p.read_text()
+        for old, dst in moves.items():
+            new = new.replace(old + "/", dst + "/").replace(f'"{old}"', f'"{dst}"')
+        if new != text:
+            p.write_text(new)
             n += 1
     return n
 
 
 def migrate(db: Path, old: Path, outputs: Path, dry_run: bool = False) -> dict:
+    old, outputs = old.resolve(), outputs.resolve()
     store = Store(db_path=db, jobs_dir=outputs)
     moved, skipped = [], []
     try:
@@ -52,9 +56,12 @@ def migrate(db: Path, old: Path, outputs: Path, dry_run: bool = False) -> dict:
                 continue
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(src), str(dst))
-            rewrite_paths(dst, src, dst)
             store.update_job(jid, dir=folder)
             store.write_output_json(jid)
+        moves = {src: dst for _, src, dst in moved}
+        if not dry_run:
+            for _, _, dst in moved:
+                rewrite_paths(Path(dst), moves)
         orphans = sorted(p.name for p in old.iterdir() if p.is_dir() and p.name not in known) if old.is_dir() else []
     finally:
         store.close()

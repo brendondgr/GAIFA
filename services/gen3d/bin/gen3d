@@ -25,7 +25,10 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 URL="http://$HOST:$PORT"
 
-if [[ -n "${GEN3D_NO_SYSTEMD:-}" ]]; then MODE=process
+# Inside AIHub (services/gen3d), AIHub runs the server: start/stop/logs go through `aihub`.
+AIHUB="$ROOT/../../bin/aihub"
+if [[ -x "$AIHUB" && -f "$ROOT/service.toml" && -z "${GEN3D_STANDALONE:-}" ]]; then MODE=aihub
+elif [[ -n "${GEN3D_NO_SYSTEMD:-}" ]]; then MODE=process
 elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then MODE=systemd
 else MODE=process; fi
 
@@ -59,6 +62,7 @@ pid_alive() { [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
 
 svc_enable() {
   case "$MODE" in
+    aihub) echo "gen3d: AIHub starts it (autostart: Settings, or [services.gen3d] autostart in AIHub's config.toml)" ;;
     systemd)
       mkdir -p "$HOME/.config/systemd/user"
       sed "s|@ROOT@|$ROOT|g" "$ROOT/systemd/gen3d.service" > "$HOME/.config/systemd/user/gen3d.service"
@@ -73,12 +77,14 @@ svc_enable() {
 }
 svc_disable() {
   case "$MODE" in
+    aihub) echo "gen3d: set [services.gen3d] autostart = false in AIHub's config.toml" ;;
     systemd) systemctl --user disable "$UNIT"; echo "gen3d: will not start at boot" ;;
     process) echo "gen3d: nothing to disable" ;;
   esac
 }
 svc_start() {
   case "$MODE" in
+    aihub) "$AIHUB" start gen3d ;;
     systemd)
       [[ -f "$HOME/.config/systemd/user/gen3d.service" ]] || svc_enable
       systemctl --user start "$UNIT" ;;
@@ -91,6 +97,7 @@ svc_start() {
 }
 svc_stop() {
   case "$MODE" in
+    aihub) "$AIHUB" stop gen3d ;;
     systemd) systemctl --user stop "$UNIT" ;;
     process)
       if pid_alive; then
@@ -102,6 +109,7 @@ svc_stop() {
 }
 svc_state() {
   case "$MODE" in
+    aihub) "$AIHUB" status 2>/dev/null | awk '$1 == "gen3d" {print $2 " (AIHub mod gen3d)"}' ;;
     systemd) echo "$(systemctl --user is-active "$UNIT" 2>/dev/null || true) (autostart: $(systemctl --user is-enabled "$UNIT" 2>/dev/null || true))" ;;
     process) pid_alive && echo "running (pid $(cat "$PIDFILE"))" || echo "stopped" ;;
   esac
@@ -116,7 +124,8 @@ case "$cmd" in
   start) svc_start; wait_up && echo "gen3d: running at $URL" ;;
   stop) svc_stop; echo "gen3d: stopped" ;;
   restart)
-    if [[ "$MODE" == systemd ]]; then
+    if [[ "$MODE" == aihub ]]; then "$AIHUB" restart gen3d
+    elif [[ "$MODE" == systemd ]]; then
       [[ -f "$HOME/.config/systemd/user/gen3d.service" ]] || svc_enable
       systemctl --user restart "$UNIT"
     else svc_stop; svc_start; fi
@@ -144,7 +153,8 @@ EOF
   logs)
     follow=(); n=100
     for a in "$@"; do [[ "$a" == -f ]] && follow=(-f) || n="$a"; done
-    if [[ "$MODE" == systemd ]]; then journalctl --user -u "$UNIT" -n "$n" --no-hostname -o short-iso "${follow[@]}"
+    if [[ "$MODE" == aihub ]]; then "$AIHUB" logs gen3d "${follow[@]}"
+    elif [[ "$MODE" == systemd ]]; then journalctl --user -u "$UNIT" -n "$n" --no-hostname -o short-iso "${follow[@]}"
     else tail -n "$n" "${follow[@]}" "$LOGFILE"; fi ;;
   enable) svc_enable ;;
   disable) svc_disable ;;
@@ -157,6 +167,7 @@ EOF
   cancel)
     need_up; api POST "/v1/jobs/${1:?job id}/cancel" | "$PY" -m json.tool ;;
   open)
+    if [[ "$MODE" == aihub ]]; then exec "$AIHUB" open "#/s/gen3d"; fi
     if ! api GET /health >/dev/null; then
       command -v notify-send >/dev/null && notify-send -i 3dgenerate "3DGenerate" "Starting the service…" 2>/dev/null || true
       svc_start; wait_up || exit 1

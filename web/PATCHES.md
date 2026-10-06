@@ -17,6 +17,7 @@
 |---|---|---|---|---|
 | 1 | `Hub.dc.html` | `pageUrl`: in `?mock`, `tts`, `gen3d`, `relay` and `lcpp` load their own `services/<id>/ui/page.js` instead of the template's | The Part B pages are page modules in the mods' folders, and mock.js answers their native API | 7.7 |
 | 2 | `mock.js` | The `tts` mock answers LocalTTS's real API shapes (`/v1/voices` → `{custom, kokoro}`, design/PATCH/clone, `timings`, enhance, the clips widget); `tts` has a page; the API-tab operations match | So the Speech page works in `?mock` | 7.7 |
+| 3 | `mock.js` | The mods' native handlers (tts, gen3d, lcpp, relay, comfy, transcribe) moved to `mock-mods.js` (`createModMocks(M)`; `M` hands over mock.js's state and helpers); gen3d's mock answers 3DGenerate's real API (options, estimate, jobs with stages, `/v1/events`, files as box GLBs) | mock.js was near the 800-line limit, and the 3D page needs gen3d's real shapes | 8.7 |
 
 ## Revision 2 (step 6.5): what changed
 

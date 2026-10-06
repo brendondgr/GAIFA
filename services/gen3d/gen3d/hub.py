@@ -71,6 +71,8 @@ def stages_widget(request: Request, range: str = Query("7d", description="7d or 
     jobs = sorted(jobs, key=lambda j: j["finished"])[-30:]
     series = [{"name": s, "values": [round((j["stages"].get(s) or {}).get("seconds") or 0, 1) or None for j in jobs]}
               for s in STAGE_ORDER]
-    return {"unit": "seconds", "categories": [(j.get("title") or j["id"])[:24] for j in jobs],
+    # Short labels (finish time); a job's title is in `rows` for the table view.
+    return {"unit": "seconds", "categories": [time.strftime("%m-%d %H:%M", time.localtime(j["finished"])) for j in jobs],
+            "rows": [{"job": j.get("title") or j["id"], **{s: (j["stages"].get(s) or {}).get("seconds") or 0 for s in STAGE_ORDER}} for j in jobs],
             "series": [s for s in series if any(v for v in s["values"])]}
 

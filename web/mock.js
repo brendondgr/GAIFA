@@ -1,6 +1,7 @@
 // AIHub mock API — in-memory AIHub + services with simulated time.
 // Implements the Section 6 contract; becomes web/js/mock.js in the vanilla port.
 import { createHistory, withSeries } from './mock-history.js';
+import { createModMocks } from './mock-mods.js';
 const GB = 1e9, MB = 1e6;
 export class ApiError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
@@ -479,80 +480,13 @@ export function createMockApi() {
     const s = svcById('tts'); s.idle_s = 0; s.stats[2].value = Number(s.stats[2].value) + 1; pushSvc(s); act(`Speech generated "${text.slice(0, 40)}${text.length > 40 ? '…' : ''}"`, 'tts', 'info', `#/outputs/${o.id}`);
     return blob;
   }
+  const M = { ok, media, upstream, svcById, pushSvc, act, doLoad, doUnload, loadSvc, ttsOutput, makeWav, clone, now, GB, jobs, emit, models, usedBytes, renderImageBlob, voices, KOKORO, voice, runJob, later };
   const H = {
     example: {
       'GET /v1/hello': ({ query }) => { const s = svcById('example'); s.stats[0].value = Number(s.stats[0].value) + 1; pushSvc(s); return ok({ message: `Hello, ${query.name || 'world'}!` }); },
       'POST /v1/echo': ({ json }) => { if (!json?.message) throw upstream(422, 'body.message: field required'); return ok({ echo: json, received_ts: Math.floor(now()) }); },
     },
-    tts: {
-      'GET /health': () => ok({ status: 'ok', engines: { breeze: { state: svcById('tts').load === 'loaded' ? 'ready' : 'unloaded' }, kokoro: { state: 'unloaded' } }, voices: voices.length }),
-      'GET /v1/voices': () => ok({ custom: clone(voices), kokoro: KOKORO }),
-      'GET /v1/voices/{name}/audio': () => media(makeWav(4, 3), 'audio/wav'),
-      'POST /v1/voices': ({ form }) => { const name = form?.name ?? form?.get?.('name'), file = form?.audio ?? form?.get?.('audio');
-        if (!name) throw upstream(422, 'name: field required'); if (!file || !file.size) throw upstream(422, 'audio: a reference clip is required');
-        if (voices.some(v => v.name.toLowerCase() === String(name).toLowerCase())) throw upstream(409, `voice '${name}' exists; pass overwrite=true to replace it`);
-        const tr = form?.transcript ?? form?.get?.('transcript'), v = voice(String(name), 'upload', 12.0, tr || 'Hello, this is my voice.', { transcript_auto: !tr });
-        voices.push(v); svcById('tts').stats[0].value = voices.length; pushSvc(svcById('tts')); act(`Speech: voice "${v.name}" cloned`, 'tts'); return ok(clone(v), 201); },
-      'PATCH /v1/voices/{name}': ({ pp, json }) => { const v = voices.find(x => x.name === pp.name); if (!v) throw upstream(404, `no voice named '${pp.name}'`);
-        if (json?.transcript) Object.assign(v, { transcript: json.transcript, transcript_auto: false }); if (json?.rename) v.name = json.rename; return ok(clone(v)); },
-      'POST /v1/voices/design': ({ json }) => { if (!json?.name || !json?.instruction) throw upstream(422, 'name and instruction are required');
-        const v = voice(json.name, 'design', 8.1, json.sample_text || 'Hello, and welcome.', { instruction: json.instruction }); voices.push(v); svcById('tts').stats[0].value = voices.length; pushSvc(svcById('tts')); return ok({ ...clone(v), stats: { audio_s: 8.1 } }, 201); },
-      'DELETE /v1/voices/{name}': ({ pp }) => { const i = voices.findIndex(v => v.name === pp.name); if (i < 0) throw upstream(404, `no voice named '${pp.name}'`); voices.splice(i, 1); svcById('tts').stats[0].value = voices.length; pushSvc(svcById('tts')); return ok({ deleted: pp.name, permanent: true }); },
-      'POST /v1/speech': async ({ json }) => { if (!json?.text?.trim()) throw upstream(400, 'text is empty');
-        const s = svcById('tts'); if (s.load === 'unloaded') doLoad(s);
-        const engine = json.engine === 'kokoro' || KOKORO.includes(json.voice) ? 'kokoro' : 'breeze', v = json.voice || (engine === 'kokoro' ? 'af_heart' : 'design');
-        const blob = json.no_save ? makeWav(4, json.seed || 7) : ttsOutput(json.text.trim(), v, engine === 'kokoro' ? 'kokoro-82m' : 'breeze-tts-2', json.format || 'wav', { instructions: json.instruction, speed: json.speed });
-        if (!json.timings) return media(blob, 'audio/wav');
-        const buf = new Uint8Array(await blob.arrayBuffer()); let bin = ''; buf.forEach(c => { bin += String.fromCharCode(c); });
-        const words = json.text.trim().split(/\s+/), dur = Math.max(1.5, (buf.length - 44) / 2 / 16000), step = dur / words.length;
-        return ok({ audio: btoa(bin), format: 'wav', sample_rate: 16000, engine, voice: v, saved: json.no_save ? 'no' : 'mock.wav',
-          timings: { duration: dur, sample_rate: 16000, words: words.map((w, i) => ({ w, start: +(i * step).toFixed(2), end: +((i + 1) * step).toFixed(2) })) }, stats: { rtf: 0.4 } }); },
-      'POST /v1/audio/speech': ({ json }) => { if (!json?.input) throw upstream(422, 'input: field required'); return media(ttsOutput(json.input, json.voice || 'hope', 'breeze-tts-2', json.response_format || 'mp3', { openai: true }), 'audio/wav'); },
-      'POST /v1/enhance': ({ json }) => { if (!json?.text) throw upstream(400, 'text is empty'); const parts = json.text.split(/(?<=[.!?])\s+/);
-        return ok({ text: parts.map((p, i) => (i === 0 ? '(laugh) ' : '') + p).join(' '), delivery: 'Warm and amused, unhurried.', tags_added: 1, model: 'gemma-4-26b-it' }); },
-      'GET /v1/hub/widgets/clips': ({ query }) => { const n = query.range === '30d' ? 30 : 7, day = 86400e3;
-        const cats = Array.from({ length: n }, (_, i) => new Date(Date.now() - (n - 1 - i) * day).toISOString().slice(5, 10));
-        return ok({ unit: 'count', categories: cats, series: ['Hope', 'af_heart', 'Brendon'].map((name, k) => ({ name, values: cats.map((_, i) => Math.max(0, Math.round(3 * Math.sin(i / 2 + k * 2) + 2 - k))) })) }); },
-      'POST /v1/load': () => { loadSvc(svcById('tts'), true).catch(() => {}); return ok({ engine: 'breeze', state: 'loading' }); },
-      'POST /v1/unload': () => { doUnload(svcById('tts')); return ok({ unloaded: ['breeze'] }); },
-    },
-    gen3d: {
-      'GET /v1/presets': () => ok({ presets: [{ id: 'low-poly', faces: 4000, eta_s: 40 }, { id: 'fast', faces: 12000, eta_s: 70 }, { id: 'balanced', faces: 20000, eta_s: 120 }, { id: 'quality', faces: 60000, eta_s: 260 }] }),
-      'POST /v1/estimate': ({ json }) => { const base = { 'low-poly': 40, fast: 70, balanced: 120, quality: 260 }[json?.preset || 'balanced'] || 120; const n = (json?.stages || ['shape', 'parts', 'rig', 'preview']).length; return ok({ eta_s: Math.round(base * n / 4), peak_bytes: 52 * GB, needs_load: svcById('gen3d').load !== 'loaded' }); },
-      'POST /v1/jobs': ({ json }) => { if (!json?.prompt?.trim()) throw upstream(422, 'prompt: field required'); return ok(runJob(json.prompt.trim(), json), 202); },
-      'GET /v1/jobs': () => ok({ jobs: [...jobs.values()].map(clone) }),
-      'GET /v1/jobs/{id}': ({ pp }) => { const j = jobs.get(pp.id); if (!j) throw upstream(404, `job ${pp.id} not found`); return ok(clone(j)); },
-      'POST /v1/jobs/{id}/cancel': ({ pp }) => { const j = jobs.get(pp.id); if (!j) throw upstream(404, `job ${pp.id} not found`); j.state = 'cancelled'; emit({ type: 'job', job: clone(j) }); jobs.delete(pp.id); return ok(clone(j)); },
-      'GET /v1/events': () => ({ stream: async function* () { for (let i = 0; i < 40; i++) { const js = [...jobs.values()]; yield JSON.stringify(js.length ? { type: 'job', job: js[0] } : { type: 'heartbeat', ts: Math.floor(now()) }); await new Promise(r => setTimeout(r, 700)); } } }),
-    },
-    lcpp: {
-      'GET /api/overview': () => ok({ instances: [{ name: 'gemma4-26B-7071', model: 'gemma-4-26b-it', port: 7071, state: 'ready', ctx: 32768, mem_bytes: svcById('lcpp').used }], catalog: 4, on_disk_bytes: 20.9 * GB }),
-      'GET /api/models': () => ok({ models: models.filter(m => m.services.includes('lcpp')).map(m => ({ id: m.id, name: m.name, status: m.status, size_bytes: m.size_bytes })) }),
-      'POST /api/instances': ({ json }) => { const m = models.find(x => x.id === json?.model); if (!m) throw upstream(422, 'model: unknown catalog model'); if (m.status !== 'ok') throw upstream(409, `${m.id}: files missing`); return ok({ name: `${json.name || m.id}-${json.port || 7072}`, state: 'starting' }, 202); },
-      'DELETE /api/instances/{name}': ({ pp }) => { if (pp.name !== 'gemma4-26B-7071') throw upstream(404, `instance ${pp.name} not found`); return ok({ name: pp.name, state: 'stopping' }, 202); },
-      'GET /api/instances/{name}/logs/stream': ({ pp }) => ({ stream: async function* () { for (let i = 0; i < 200; i++) { yield `[${pp.name}] slot ${i % 4} | prompt ${Math.floor(200 + Math.random() * 3000)} tok, gen ${Math.floor(20 + Math.random() * 400)} tok, ${(30 + Math.random() * 20).toFixed(1)} t/s`; await new Promise(r => setTimeout(r, 450)); } } }),
-    },
-    relay: {
-      'GET /admin/stats/summary': ({ query }) => ok({ window: query.window || '24h', requests: Number(svcById('relay').stats[0].value), tokens: 3100000, ttft_p50_ms: 412, ttft_p95_ms: 1380, tok_s: 41.7, error_rate: 0.012 }),
-      'GET /admin/stats/by-model': () => ok({ dimensions: ['model'], source: 'requests', rows: [{ model: 'gemma-4-26b-it', requests: 1031, tokens: 2610000 }, { model: 'minicpm-5-2b', requests: 241, tokens: 402000 }, { model: 'openrouter/auto', requests: 12, tokens: 88000 }] }),
-      'GET /admin/endpoints': () => ok({ endpoints: [{ id: 'lcpp/gemma4-26B-7071', url: 'http://127.0.0.1:7071/v1', owner: 'lcpp', healthy: true }, { id: 'openrouter', url: 'https://openrouter.ai/api/v1', owner: null, healthy: true }, { id: 'lab-box', url: 'http://10.0.0.12:8080/v1', owner: null, healthy: false }] }),
-      'GET /v1/models': () => ok({ object: 'list', data: [{ id: 'gemma-4-26b-it', object: 'model', owned_by: 'lcpp' }, { id: 'minicpm-5-2b', object: 'model', owned_by: 'lcpp' }] }),
-      'POST /v1/chat/completions': ({ json }) => { if (!json?.messages?.length) throw upstream(400, 'messages: must contain at least one message');
-        const words = 'Shared pool of light — / weights and frames drink from one well, / nothing waits its turn.'.split(' ');
-        return { stream: async function* () { for (const w of words) { yield JSON.stringify({ choices: [{ delta: { content: w + ' ' } }] }); await new Promise(r => setTimeout(r, 140)); } yield '[DONE]'; } }; },
-    },
-    comfy: {
-      'GET /system_stats': () => ok({ system: { os: 'posix', comfyui_version: '0.3.62', python_version: '3.12.7', pytorch_version: '2.8.0+rocm7.0' }, devices: [{ name: 'AMD Radeon 8060S', type: 'cuda', vram_total: 121.5 * GB, vram_free: 121.5 * GB - usedBytes() }] }),
-      'GET /object_info': () => ok({ KSampler: { input: { required: { seed: ['INT'], steps: ['INT'], cfg: ['FLOAT'] } } }, CLIPTextEncode: { input: { required: { text: ['STRING'] } } }, VAEDecode: {}, SaveImage: {} }),
-      'POST /prompt': ({ json }) => { if (!json?.prompt) throw upstream(400, 'prompt: missing'); return ok({ prompt_id: Math.random().toString(16).slice(2, 10), number: 1, node_errors: {} }); },
-      'GET /history/{prompt_id}': ({ pp }) => ok({ [pp.prompt_id]: { status: { status_str: 'success', completed: true }, outputs: { 9: { images: [{ filename: 'ComfyUI_00012_.png', type: 'output' }] } } } }),
-      'GET /view': async ({ query }) => { if (!query.filename) throw upstream(400, 'filename: required'); return media(await renderImageBlob([...query.filename].reduce((a, c) => a + c.charCodeAt(0), 0)), 'image/png'); },
-    },
-    transcribe: {
-      'GET /health': () => ok({ status: 'ok', model: 'whisper-large-v3-turbo' }),
-      'POST /v1/transcribe': ({ form }) => { const f = form?.get?.('file'); if (!f || !f.size) throw upstream(422, 'file: an audio file is required');
-        return ok({ text: 'Good morning! The coffee is ready and the forecast looks bright.', language: 'en', duration_s: 4.2, file: f.name, segments: [{ start: 0, end: 1.4, text: 'Good morning!' }, { start: 1.4, end: 4.2, text: 'The coffee is ready and the forecast looks bright.' }] }); },
-    },
+    ...createModMocks(M),
   };
   function route(id, method, path) {
     const table = H[id] || {};

@@ -690,33 +690,34 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - **api.responses:** job files and download → `file`; events → `stream`.
   - **tools:** `make_3d`, `job_status`, `list_jobs`, `cancel_job` (confirm), `delete_job` (confirm).
   - **ui:** `native = "/ui/"`.
-- [ ] **8.4 Move** (old service stopped, no jobs running).
+- [x] **8.4 Move** (old service stopped, no jobs running). *As built (2026-10-06):* also `Qwen-Image` (CubePart reads its transformer config); registered `cube3d-v0.5`, `cubepart`, `qwen3-vl-4b-instruct`, `clip-vit-large-patch14`, `qwen-image-config`. The migration also rewrites paths into *other* jobs' folders (a parts job's `manifest.json` points at its parent's mesh); all 8 `source_mesh` paths resolve.
   - `mv ~/Models/3D/CubeArt/weights/{cube3d-v0.5,cubepart,Qwen3-VL-4B-Instruct,clip-vit-large-patch14} data/models/3d/`.
   - Replace `~/Models/3D/CubeArt/weights` with a symlink to `data/models/3d`, so CubeArt's own host scripts still work. Inside the container the real path is mounted.
   - Move `data/gen3d.db` (with `-wal`/`-shm`) to `data/databases/`.
   - Run the job migration script.
   - Register the 3D models.
-- [ ] **8.5 Cut over.**
+- [x] **8.5 Cut over.** *As built:* the fake worker is covered by the 35 mod tests instead of a config override. A real Low-poly fox (shape → parts → rig → preview) ran through the proxy: header job chip with progress, `output.json` with `complete: true` and `main: rigged.glb`, the preview on the Outputs page, a job bar in its Timeline lane, the worker container counted as gen3d's memory (28 GB peak). Make room for gen3d plans to unload tts. `~/.local/bin/gen3d` now delegates to `aihub`.
   - `systemctl --user disable --now gen3d.service`, then `aihub start gen3d`.
   - **Verify:**
     - A fake-worker job runs (config env override `GEN3D_FAKE_WORKER=1`).
     - One real low-poly job runs end to end: header job chip, output with preview, and the make-room dialog when other mods are loaded.
   - Point `3dgenerate.desktop` at `aihub open '#/s/gen3d'`.
-- [ ] **8.6** `MOVED.md` in `~/Projects/3DGenerate`.
-- [ ] **8.7 3D Generate page (Part B4).**
+- [x] **8.6** `MOVED.md` in `~/Projects/3DGenerate`.
+- [x] **8.7 3D Generate page (Part B4).** *As built:* `services/gen3d/ui/page.js` and the shared `web/viewer3d.js`. Create: prompt, preset, stages, part template, face budgets, seed, live ETA with a per-step bar, mesh upload; charts "Job time per stage" and "Job durations · 30 days". Jobs: live list (SSE), stage Gantt (actual vs dashed ETA), viewer with file tabs and rig sliders, parts with colours and visibility, peak GPU per stage, follow-ups (split, rig, re-split, new seed), zip download, cancel, delete.
   - Build and wire the Create and Jobs tabs, with live SSE progress and the stage Gantt.
   - Hook gen3d's three.js viewer (`gen3d/web/viewer.js`, vendored under `web/vendor/three/`) into the `Viewer3D` component interface.
   - Add a "Job time per stage" widget.
 
 **Checks & deliverables — Phase 8**
-- [ ] A low-poly job run from the 3D page:
+- [x] A low-poly job run from the 3D page:
   - shows progress in the header chip and on the page
   - shows the GLB in the viewer, with rig sliders
   - appears as an output with its preview
   - shows as a job bar in its Timeline lane
-- [ ] The 17 migrated jobs can be browsed on the Outputs page.
-- [ ] Make room unloads tts and comfy, never lcpp.
-- [ ] Delivered: `services/gen3d`, the job migration, the weights in `data/models/3d`, and the page.
+  *Checked (2026-10-06):* the fox job above, queued through the proxy (the page queues the same call) and viewed on the Jobs tab: rigged GLB in the viewer, rig sliders, 4 parts with visibility toggles.
+- [x] The 17 migrated jobs can be browsed on the Outputs page. *Checked:* the 14 finished ones are outputs with previews; the 3 failed or cancelled ones have `complete: false` (by design, 8.2) and are browsable on the Jobs tab.
+- [x] Make room unloads tts and comfy, never lcpp. *Checked:* the plan for gen3d unloads tts; comfy and lcpp aren't mods yet, so their part is checked in Phases 10 and 11.
+- [x] Delivered: `services/gen3d`, the job migration, the weights in `data/models/3d`, and the page.
 
 ## Phase 9 — Move in `relay` (DashLLM) and `opencode`
 

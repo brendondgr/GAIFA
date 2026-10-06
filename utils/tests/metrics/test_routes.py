@@ -23,14 +23,18 @@ async def test_metrics_series_and_stats(rig, serve):
     async with httpx.AsyncClient(base_url=served.url) as c:
         await c.post("/api/s/fake-ok/v1/echo", json={})
         await until(lambda: hub.services.get("fake-ok").stats and hub.services.get("fake-ok").stats[0]["value"] >= 1)
-        await hub.metrics.tick()
+        await until(lambda: hub.memory.snapshot is not None)     # the tick records what the sampler last saw
+        # The axis ends at the last complete 10 s bucket: record into one it surely has (a tick in a
+        # bucket that began a moment ago fell outside it; this was the suite's intermittent failure).
+        await hub.metrics.tick(ts=time.time() - 10)
         r = await c.get("/api/metrics", params={"series": "mem.used,svc.fake-ok.stat.*,nope", "range": "1h"})
         assert r.status_code == 200
         m = r.json()
         assert m["range"] == "1h" and m["step_s"] == 10 and len(m["t"]) in (360, 361)
         assert all(b - a == 10 for a, b in zip(m["t"], m["t"][1:]))
         assert set(m["series"]) == {"mem.used", "svc.fake-ok.stat.requests", "svc.fake-ok.stat.outputs_today", "nope"}
-        assert m["series"]["mem.used"][-1] > 0 and m["series"]["svc.fake-ok.stat.requests"][-1] >= 1
+        last = lambda vals: [v for v in vals if v is not None][-1]  # noqa: E731  (the newest recorded value)
+        assert last(m["series"]["mem.used"]) > 0 and last(m["series"]["svc.fake-ok.stat.requests"]) >= 1
         assert m["series"]["nope"] == [None] * len(m["t"])
         assert all(len(v) == len(m["t"]) for v in m["series"].values())
         # longer ranges read the rollups, on their own axis

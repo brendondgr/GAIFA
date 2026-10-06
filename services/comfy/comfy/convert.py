@@ -22,12 +22,19 @@ from typing import Any
 from .nodes import InputSpec, NodeCatalog, _spec
 
 MUTED, BYPASS = 2, 4
-SUBGRAPH_IN, SUBGRAPH_OUT = -10, -20
+SUBGRAPH_IN, SUBGRAPH_OUT = "-10", "-20"
 CONTROL_VALUES = {"fixed", "increment", "decrement", "randomize"}
 UPLOAD_VALUES = {"image", "video", "audio", "Upload", "upload"}
 UPLOAD_FLAGS = ("image_upload", "video_upload", "audio_upload", "animated_image_upload")
 WIDGET_TYPES = {"INT", "FLOAT", "STRING", "BOOLEAN", "COMBO", "COMFY_DYNAMICCOMBO_V3"}
-EDITOR_ONLY = {"Note", "MarkdownNote", "Reroute", "PrimitiveNode", "SetNode", "GetNode"}
+EDITOR_ONLY = {"Note", "MarkdownNote", "Reroute", "PrimitiveNode", "SetNode", "GetNode",
+               # rgthree's editor helpers: they switch or group other nodes, and never run
+               "Fast Groups Bypasser (rgthree)", "Fast Groups Muter (rgthree)", "Fast Bypasser (rgthree)",
+               "Fast Muter (rgthree)", "Mute / Bypass Repeater (rgthree)", "Mute / Bypass Relay (rgthree)",
+               "Node Collector (rgthree)", "Bookmark (rgthree)", "Label (rgthree)", "Reroute (rgthree)"}
+PASS_THROUGH = {"Reroute", "Reroute (rgthree)"}
+# cg-use-everywhere: links that exist only in the editor, made by broadcasting a value to inputs
+BROADCAST = ("Anything Everywhere", "Prompts Everywhere", "Seed Everywhere")
 
 
 class ConvertError(Exception):
@@ -42,6 +49,7 @@ class Converted:
     missing: dict[str, str] = field(default_factory=dict)       # exec id → node type not in the catalog
     notes: list[dict] = field(default_factory=list)             # {node, type, detail}: things worth a look
     titles: dict[str, str] = field(default_factory=dict)        # exec id → the node's title in the editor
+    broadcast: list[str] = field(default_factory=list)          # "Anything Everywhere" nodes: links only the editor makes
 
 
 @dataclass(frozen=True)
@@ -60,10 +68,10 @@ def is_editor(d: Any) -> bool:
 
 @dataclass
 class _Link:
-    id: int
-    origin: int
+    id: str
+    origin: str
     origin_slot: int
-    target: int
+    target: str
     target_slot: int
     type: str
 
@@ -73,15 +81,15 @@ class _Scope:
 
     def __init__(self, nodes: list[dict], links: list, defs: dict[str, dict], parent: _Scope | None = None,
                  owner: dict | None = None, prefix: str = ""):
-        self.nodes = {int(n["id"]): n for n in nodes}
-        self.links: dict[int, _Link] = {}
+        self.nodes = {str(n["id"]): n for n in nodes}       # ids may be ints or strings ("2682:0")
+        self.links: dict[str, _Link] = {}
         for raw in links or []:
             ln = _link(raw)
             if ln:
                 self.links[ln.id] = ln
         self.defs, self.parent, self.owner, self.prefix = defs, parent, owner, prefix
 
-    def exec_id(self, node_id: int) -> str:
+    def exec_id(self, node_id) -> str:
         return f"{self.prefix}{node_id}"
 
     def input_link(self, node: dict, slot: int) -> _Link | None:
@@ -89,19 +97,22 @@ class _Scope:
         if slot >= len(ins):
             return None
         lid = ins[slot].get("link")
-        return self.links.get(int(lid)) if lid is not None else None
+        return self.links.get(str(lid)) if lid is not None else None
 
     def child(self, node: dict) -> _Scope:
         d = self.defs[node["type"]]
-        return _Scope(d.get("nodes") or [], d.get("links") or [], self.defs, self, node, f"{self.exec_id(int(node['id']))}:")
+        return _Scope(d.get("nodes") or [], d.get("links") or [], self.defs, self, node, f"{self.exec_id(node['id'])}:")
 
 
 def _link(raw) -> _Link | None:
-    if isinstance(raw, list) and len(raw) >= 5:
-        return _Link(int(raw[0]), int(raw[1]), int(raw[2]), int(raw[3]), int(raw[4]), str(raw[5]) if len(raw) > 5 else "*")
-    if isinstance(raw, dict) and "id" in raw:
-        return _Link(int(raw["id"]), int(raw["origin_id"]), int(raw["origin_slot"]), int(raw["target_id"]),
-                     int(raw["target_slot"]), str(raw.get("type", "*")))
+    try:
+        if isinstance(raw, list) and len(raw) >= 5:
+            return _Link(str(raw[0]), str(raw[1]), int(raw[2]), str(raw[3]), int(raw[4]), str(raw[5]) if len(raw) > 5 else "*")
+        if isinstance(raw, dict) and "id" in raw:
+            return _Link(str(raw["id"]), str(raw["origin_id"]), int(raw["origin_slot"]), str(raw["target_id"]),
+                         int(raw["target_slot"]), str(raw.get("type", "*")))
+    except (TypeError, ValueError):
+        return None
     return None
 
 
@@ -136,6 +147,9 @@ class _Converter:
                 continue
             if t in EDITOR_ONLY and not self.catalog.has(t):
                 continue
+            if str(t).startswith(BROADCAST) and not self.catalog.has(t):
+                self.out.broadcast.append(scope.exec_id(nid))
+                continue
             eid = scope.exec_id(nid)
             if not self.catalog.has(t):
                 if not self._has_links(scope, node):
@@ -160,7 +174,7 @@ class _Converter:
         for slot, ui in enumerate(ui_inputs):
             if ui.get("link") is None:
                 continue
-            ln = scope.links.get(int(ui["link"]))
+            ln = scope.links.get(str(ui["link"]))
             if ln is None:
                 continue
             src = self._source(scope, ln)
@@ -182,9 +196,14 @@ class _Converter:
         sockets = {i.get("name") for i in node.get("inputs") or [] if not i.get("widget")}
         specs = [s for s in self.catalog.inputs(t) if self._is_widget(s, sockets)]
         out: dict[str, Any] = {}
+        if t in CUSTOM_WIDGETS:
+            return CUSTOM_WIDGETS[t](values)
         if isinstance(values, dict):              # some custom nodes (VideoHelperSuite) save by name
             for s in specs:
                 out[s.name] = values.get(s.name, _default(s))
+            for k, v in values.items():           # widgets their editor adds per format (crf, pix_fmt, …)
+                if k not in out and k not in sockets and (v is None or isinstance(v, (str, int, float, bool))):
+                    out[k] = v
             return out
         queue = list(values or [])
         self._consume(specs, queue, out, "")
@@ -194,7 +213,7 @@ class _Converter:
     def _is_widget(spec: InputSpec, sockets: set) -> bool:
         if spec.name in sockets:
             return False                           # a socket in this saved node (forceInput, converted)
-        return spec.type in WIDGET_TYPES and not spec.options.get("forceInput")
+        return (spec.type in WIDGET_TYPES or spec.type in DISPLAY_WIDGETS) and not spec.options.get("forceInput")
 
     def _consume(self, specs: list[InputSpec], queue: list, out: dict, prefix: str) -> None:
         for s in specs:
@@ -232,11 +251,11 @@ class _Converter:
         t = node.get("type")
         if node.get("mode") == MUTED:
             return None
+        if node.get("mode") == BYPASS:                 # a bypassed subgraph passes through too
+            return self._through_bypass(scope, node, ln, depth)
         if t in scope.defs:
             return self._from_subgraph_output(scope.child(node), ln.origin_slot, depth)
-        if node.get("mode") == BYPASS:
-            return self._through_bypass(scope, node, ln, depth)
-        if t == "Reroute" and not self.catalog.has(t):
+        if t in PASS_THROUGH and not self.catalog.has(t):
             up = scope.input_link(node, 0)
             return self._source(scope, up, depth + 1) if up else None
         if t == "PrimitiveNode" and not self.catalog.has(t):
@@ -261,21 +280,30 @@ class _Converter:
         order = [ln.origin_slot] + [i for i in range(len(ins)) if i != ln.origin_slot] if ln.origin_slot < len(ins) else range(len(ins))
         for i in order:
             if i < len(ins) and ins[i].get("type") == out_type and ins[i].get("link") is not None:
-                up = scope.links.get(int(ins[i]["link"]))
+                up = scope.links.get(str(ins[i]["link"]))
                 return self._source(scope, up, depth + 1) if up else None
+        # No input of that type: ComfyUI's editor falls back to the input at the same slot number
+        # (seen on a held-out workflow: a bypassed SAM2Segment's MASK output carried its prompt).
+        if ln.origin_slot < len(ins) and ins[ln.origin_slot].get("link") is not None:
+            up = scope.links.get(str(ins[ln.origin_slot]["link"]))
+            return self._source(scope, up, depth + 1) if up else None
         return None
 
     def _from_subgraph_input(self, scope: _Scope, slot: int, depth: int):
         owner, parent = scope.owner, scope.parent
         if owner is None or parent is None:
             return None
-        up = parent.input_link(owner, slot)
-        if up is not None:
-            return self._source(parent, up, depth + 1)
-        # Not connected outside: a value typed on the subgraph node itself (a promoted widget).
         ins = owner.get("inputs") or []
         sg_inputs = (scope.defs[owner["type"]].get("inputs") or [])
         name = (sg_inputs[slot].get("name") if slot < len(sg_inputs) else None) or (ins[slot].get("name") if slot < len(ins) else None)
+        # The subgraph node lists its inputs in its own order (widgets promoted later go at the end),
+        # so the outside link is found by the input's name; the slot number is only a fallback.
+        outer = next((i for i, x in enumerate(ins) if x.get("name") == name),
+                     slot if len(ins) == len(sg_inputs) else None)
+        up = parent.input_link(owner, outer) if outer is not None else None   # no outside socket: the inner value stands
+        if up is not None:
+            return self._source(parent, up, depth + 1)
+        # Not connected outside: a value typed on the subgraph node itself (a promoted widget).
         vals = owner.get("widgets_values")
         if not isinstance(vals, list):
             return None
@@ -297,7 +325,30 @@ class _Converter:
         return None
 
 
+def _power_lora(values) -> dict:
+    """rgthree's Power Lora Loader saves [{}, {type: header}, {on, lora, strength}…, {}, ""]; its
+    editor sends them as PowerLoraLoaderHeaderWidget, lora_1…lora_n and "➕ Add Lora"."""
+    out: dict[str, Any] = {}
+    n = 0
+    for v in values or []:
+        if isinstance(v, dict) and v.get("type"):
+            out[str(v["type"])] = v
+        elif isinstance(v, dict) and "lora" in v:
+            n += 1
+            out[f"lora_{n}"] = {k: x for k, x in v.items() if x is not None}   # the editor leaves out unset strengthTwo
+    if values and values[-1] == "":
+        out["➕ Add Lora"] = ""
+    return out
+
+
+CUSTOM_WIDGETS = {"Power Lora Loader (rgthree)": _power_lora}
+# Widgets that only show something (no value of their own in the saved file): what the editor sends.
+DISPLAY_WIDGETS = {"IMAGECOMPARE": {"__value__": ["", ""]}}
+
+
 def _default(s: InputSpec) -> Any:
+    if s.type in DISPLAY_WIDGETS:
+        return DISPLAY_WIDGETS[s.type]
     if "default" in s.options:
         return s.options["default"]
     if s.type == "COMFY_DYNAMICCOMBO_V3":
@@ -330,6 +381,52 @@ def _apply_proxy_widgets(wf: dict) -> dict:
     return wf
 
 
+def _renumber(wf: dict) -> dict:
+    """Give subgraph nodes whose ids collide with an id used before them a new id after the
+    workflow's last one, in definition order, as ComfyUI's editor does when it loads a file (so a
+    pack's node ids are the ones ComfyUI shows, and keeps once it saves the workflow again)."""
+    defs = (wf.get("definitions") or {}).get("subgraphs") or []
+    if not defs:
+        return wf
+    used = {str(n.get("id")) for n in wf.get("nodes") or []}
+    last = int((wf.get("state") or {}).get("lastNodeId") or wf.get("last_node_id") or 0)
+    plan: list[dict[str, str]] = []
+    for sg in defs:
+        m: dict[str, str] = {}
+        for n in sg.get("nodes") or []:
+            i = str(n.get("id"))
+            if i in used:
+                last += 1
+                m[i] = str(last)
+                used.add(m[i])
+            else:
+                used.add(i)
+        plan.append(m)
+    if not any(plan):
+        return wf
+    wf = copy.deepcopy(wf)
+    for sg, m in zip((wf.get("definitions") or {}).get("subgraphs") or [], plan, strict=False):
+        if not m:
+            continue
+        for n in sg.get("nodes") or []:
+            if str(n.get("id")) in m:
+                n["id"] = int(m[str(n["id"])]) if m[str(n["id"])].isdigit() else m[str(n["id"])]
+        for ln in sg.get("links") or []:
+            for k in ("origin_id", "target_id"):
+                if isinstance(ln, dict) and str(ln.get(k)) in m:
+                    ln[k] = int(m[str(ln[k])])
+            if isinstance(ln, list):
+                for k in (1, 3):
+                    if str(ln[k]) in m:
+                        ln[k] = int(m[str(ln[k])])
+        for owner in [n for n in wf.get("nodes") or []] + [n for d in (wf.get("definitions") or {}).get("subgraphs") or [] for n in d.get("nodes") or []]:
+            if owner.get("type") == sg.get("id"):
+                pw = (owner.get("properties") or {}).get("proxyWidgets")
+                if pw:
+                    owner["properties"]["proxyWidgets"] = [[m.get(str(a), a), b] for a, b in pw]
+    return wf
+
+
 def to_api(workflow: dict, catalog: NodeCatalog) -> Converted:
     """Convert an editor workflow; an API graph is returned as it is."""
     if is_api(workflow):
@@ -338,7 +435,7 @@ def to_api(workflow: dict, catalog: NodeCatalog) -> Converted:
         raise ConvertError("not a ComfyUI workflow (neither an editor file nor an API graph)")
     if not catalog:
         raise ConvertError("the node catalog is empty: load ComfyUI once so its node list is cached")
-    wf = _apply_proxy_widgets(workflow)
+    wf = _apply_proxy_widgets(_renumber(workflow))
     conv = _Converter(wf, catalog)
     out = conv.run()
     _overrides(conv.root, out)

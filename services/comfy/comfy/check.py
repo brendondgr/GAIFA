@@ -140,6 +140,11 @@ def check(pack: Pack, catalog: NodeCatalog, tasks: Tasks, models: dict[str, dict
         issues.append(Issue("error", "no_output", "the graph has no output node (Save Image, Save Video, …)"))
     if pack.manifest is not None:
         issues += _check_manifest(pack, conv, catalog, tasks)
+    for eid in conv.broadcast:
+        issues.append(Issue("error", "editor_links", f"node {eid} broadcasts values to other nodes' inputs (Anything Everywhere): "
+                            "those links exist only in ComfyUI's editor", node=eid,
+                            fix="Run it once in ComfyUI and import it from history (the exact graph has the links), "
+                                "or connect those inputs directly and save."))
     for n in conv.notes:
         issues.append(Issue("info", "left_out", f"{n['type']}: {n['detail']}", node=n["node"]))
     order = {"error": 0, "warning": 1, "info": 2}

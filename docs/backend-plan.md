@@ -561,12 +561,12 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 *Status (2026-10-05):* wired. `/config.js` lists `metrics`, `widgets`, `overview` and `settings` as live, and revision 2 (6.5) draws everything above from them. Every Part A area except `tools` (Phase 13) is live.
 
-**Checks & deliverables — Phase 6**
-- [ ] After fake mods have run for 2 h with load/unload cycles, every dashboard widget shows real data, and a planned 10-minute hub stop shows as a **gap**.
-- [ ] The brief's §11.3 above-the-fold rule holds at 1440 × 900 in compact. Every chart has "View as table". Every view works at 360 px.
-- [ ] The §8 and §11.10 states can be reached against the live backend. States only the mock can produce (e.g. "Many outputs") are listed as mock-only in `PATCHES.md`.
-- [ ] The contract test passes, and `web/PATCHES.md` is empty or every entry is explained.
-- [ ] Delivered: `metrics.py`, the chart-data routes, the overview and settings routes, the revision 2 UI, and a fully live Part A.
+**Checks & deliverables — Phase 6** *(approved by the user 2026-10-06)*
+- [x] After fake mods have run for 2 h with load/unload cycles, every dashboard widget shows real data, and a planned 10-minute hub stop shows as a **gap**. *Checked:* a 2 h soak on a scratch hub (125 load/unload cycles, 125 jobs, 42 outputs); the 10-minute stop is 9 null 60 s buckets and no timeline band crosses it. "Model storage" and "LLM traffic" need real mods, so they are checked in Phases 7 and 9.
+- [x] The brief's §11.3 above-the-fold rule holds at 1440 × 900 in compact. Every chart has "View as table". Every view works at 360 px.
+- [x] The §8 and §11.10 states can be reached against the live backend. States only the mock can produce (e.g. "Many outputs") are listed as mock-only in `PATCHES.md`.
+- [x] The contract test passes, and `web/PATCHES.md` is empty or every entry is explained.
+- [x] Delivered: `metrics.py`, the chart-data routes, the overview and settings routes, the revision 2 UI, and a fully live Part A.
 
 ---
 

@@ -27,14 +27,15 @@ from .nodes import NodeCatalog
 
 PASS_THROUGH = re.compile(r"ZeroOut|Guidance|ReferenceLatent|CFGNorm|Conditioning(?!Zero)|ControlNetApply|Inpaint|Average|Combine",
                           re.I)
-TEXT_FIELDS = ("text", "prompt", "positive", "text_g", "text_l", "t5xxl", "clip_l")
+TEXT_FIELDS = ("text", "prompt", "positive", "prompt_text", "value", "string", "text_g", "text_l", "t5xxl", "clip_l")
 SEED_FIELDS = ("seed", "noise_seed")
 FRAME_FIELDS = ("length", "frames", "num_frames", "video_length", "frame_count")
 FPS_FIELDS = ("fps", "frame_rate")
 VIDEO_SAVE = re.compile(r"Video|Animated|GIF|WEBM|MP4", re.I)
 AUDIO_SAVE = re.compile(r"Audio", re.I)
 MESH_SAVE = re.compile(r"3D|GLB|Mesh", re.I)
-SKIP_OUTPUTS = re.compile(r"Preview|ImageCompare|Display|Show", re.I)
+BG_WORDS = re.compile(r"remov\w*\s+(the\s+)?background|background\s+remov|transparent\s+background|cut\s*out", re.I)
+SKIP_OUTPUTS = re.compile(r"Preview|Compar|Display|Show", re.I)
 
 
 @dataclass
@@ -82,47 +83,68 @@ class _Graph:
         return sorted(self.g, key=lambda e: (depth(e), _num(e)))
 
     def string_field(self, eid: str) -> str | None:
-        """The typed-text field of a node: a literal multiline STRING (or a known text name)."""
+        """A literal typed-text field: a known text name first, then any multiline STRING."""
         t = self.cls(eid)
         for name in TEXT_FIELDS:
             if self.literal(eid, name) and isinstance(self.inputs(eid)[name], str):
                 spec = self.cat.input(t, name)
                 if spec is None or spec.type == "STRING":
                     return name
+        processor = any(self.src(eid, k) and (not self.cat.has(self.cls(self.src(eid, k)))
+                                              or "STRING" in self.cat.outputs(self.cls(self.src(eid, k))))
+                        for k in self.inputs(eid))
+        if processor:                    # it edits text that comes from elsewhere (RegexReplace, concat)
+            return None
         for name, v in self.inputs(eid).items():
             spec = self.cat.input(t, name)
             if spec and spec.type == "STRING" and spec.options.get("multiline") and isinstance(v, str):
                 return name
         return None
 
-    def text_source(self, eid: str, field_name: str) -> tuple[str, str]:
-        """A text field fed by a string node (a primitive) is set on that node instead."""
-        up = self.src(eid, field_name)
-        if up:
-            for name, v in self.inputs(up).items():
-                if isinstance(v, str) and (self.cat.input(self.cls(up), name) or None) is not None:
-                    return up, name
-        return eid, field_name
+    def string_source(self, eid: str | None, depth: int = 0):
+        """Where a string node's text is typed: (node, field), Unknown(node) when it comes from a node
+        that isn't installed (its fields can't be known), or None."""
+        if eid is None or depth > 12:
+            return None
+        if not self.cat.has(self.cls(eid)):
+            return Unknown(eid)
+        f = self.string_field(eid)
+        if f:
+            return eid, f
+        for name, v in self.inputs(eid).items():           # a text processor: follow its text input
+            up = self.src(eid, name)
+            if up and (not self.cat.has(self.cls(up)) or "STRING" in self.cat.outputs(self.cls(up))):
+                return self.string_source(up, depth + 1)
+        return None
+
+
+@dataclass(frozen=True)
+class Unknown:
+    node: str
 
 
 def _num(e: str) -> list:
     return [int(x) if x.isdigit() else 0 for x in e.split(":")]
 
 
-def _trace_text(gr: _Graph, start: str | None, depth: int = 0) -> tuple[str, str] | None | str:
-    """From a conditioning input upstream to the node holding the text. "zero" when it's zeroed."""
+def _trace_text(gr: _Graph, start: str | None, depth: int = 0):
+    """From a conditioning input upstream to where its text is typed: (node, field), "zero" when
+    it's zeroed, Unknown(node) when the text comes from a node that isn't installed, or None. A field
+    that's linked is never the answer: its value is set by whatever feeds it."""
     if start is None or depth > 12:
         return None
     t = gr.cls(start)
+    if not gr.cat.has(t):
+        return Unknown(start)
     if "ZeroOut" in t:
         return "zero"
     f = gr.string_field(start)
     if f:
-        return gr.text_source(start, f)
-    if f is None and any(k in gr.inputs(start) for k in TEXT_FIELDS) and not PASS_THROUGH.search(t):
-        k = next(k for k in TEXT_FIELDS if k in gr.inputs(start))
-        if gr.src(start, k):
-            return gr.text_source(start, k)
+        return start, f
+    for k in TEXT_FIELDS:                                     # a text encoder whose text is linked
+        up = gr.src(start, k)
+        if up:
+            return gr.string_source(up)
     for name in ("conditioning", "positive", "conditioning_1", "conditioning_to", "cond", "conditioning_from"):
         up = gr.src(start, name)
         if up:
@@ -166,6 +188,70 @@ def _sampler_field(gr: _Graph, sampler: str, names: tuple[str, ...], hops: int =
     return None
 
 
+LATENT_PASS = ("samples", "latent", "latent_image", "samples_from")
+
+
+def _size(gr: _Graph, sampler: str) -> tuple[dict[str, tuple[str, str]], str | None, str | None]:
+    """The size the sampler's latent is made at, traced from its latent input: literal width/height
+    on the empty latent, the primitives or resolution picker feeding it, or the input image's resize
+    (img2img). Returns ({input: (node, field)}, the latent node, a note when a switch chooses it)."""
+    e = gr.src(sampler, "latent_image") or gr.src(sampler, "latent")
+    if e is None:                                             # a guider: the SamplerCustom using it has the latent
+        for c, _, _ in gr.consumers.get(sampler, []):
+            e = gr.src(c, "latent_image") or gr.src(c, "latent")
+            if e:
+                break
+    for _ in range(12):
+        if e is None:
+            return {}, None, None
+        ins = gr.inputs(e)
+        latents_in = [k for k, v in ins.items() if isinstance(v, list) and gr.src(e, k)
+                      and "LATENT" in gr.cat.outputs(gr.cls(gr.src(e, k)) or "")]
+        if "width" in ins and "height" in ins:
+            out = {}
+            for k in ("width", "height"):
+                if gr.literal(e, k):
+                    out[k] = (e, k)
+                else:
+                    up = gr.src(e, k)
+                    if up and gr.literal(up, "value") and isinstance(gr.inputs(up)["value"], int):
+                        out[k] = (up, "value")                 # a primitive int (PrimitiveInt, Width/Height)
+                    elif up and gr.literal(up, "aspect_ratio") and gr.literal(up, "megapixels"):
+                        return {"aspect": (up, "aspect_ratio"), "megapixels": (up, "megapixels")}, e, None
+            return (out if len(out) == 2 else {}), e, None
+        if len(latents_in) > 1 or not gr.cat.has(gr.cls(e)):
+            return {}, None, f"the image size is chosen by node {e} ({gr.cls(e)}): set it there, or map width/height by hand"
+        if latents_in:
+            e = gr.src(e, latents_in[0])
+            continue
+        if "pixels" in ins:                                   # VAEEncode: img2img, sized by the input image
+            p = gr.src(e, "pixels")
+            for _ in range(6):
+                if p is None:
+                    break
+                if gr.literal(p, "width") and gr.literal(p, "height") and isinstance(gr.inputs(p)["width"], int):
+                    return {"width": (p, "width"), "height": (p, "height")}, p, None
+                p = gr.src(p, "image")
+        return {}, None, None
+    return {}, None, None
+
+
+def _reaches(gr: _Graph, start: str, targets: set[str]) -> bool:
+    """Does an image reach a sampler other than as words (through a node that only makes text)?"""
+    todo, seen = [start], set()
+    while todo:
+        e = todo.pop()
+        for c, _, _ in gr.consumers.get(e, []):
+            if c in targets:
+                return True
+            outs = gr.cat.outputs(gr.cls(c))
+            if c in seen or (outs and all(o == "STRING" for o in outs)):
+                continue
+            seen.add(c)
+            todo.append(c)
+    return False
+
+
 def suggest(conv: Converted, catalog: NodeCatalog, editor: dict | None = None, name: str = "",
             model_sizes: dict[str, int] | None = None) -> Suggestion:
     gr = _Graph(conv, catalog)
@@ -180,8 +266,13 @@ def suggest(conv: Converted, catalog: NodeCatalog, editor: dict | None = None, n
     # ---- prompts --------------------------------------------------------------------------
     samplers = _samplers(gr)
     prompts: list[tuple[str, str]] = []
+    prompt_elsewhere = False
     for s in samplers:
         pos = _trace_text(gr, gr.src(s, "positive") or gr.src(s, "conditioning"))
+        if isinstance(pos, Unknown) and not prompts:
+            prompt_elsewhere = True
+            notes.append(f"the prompt comes from node {pos.node} ({gr.cls(pos.node)}), which isn't installed: "
+                         "install it, then map prompt to its text field")
         if isinstance(pos, tuple) and pos not in prompts:
             text = gr.inputs(pos[0]).get(pos[1])
             same = next((p for p in prompts if gr.inputs(p[0]).get(p[1]) == text), None)
@@ -216,18 +307,20 @@ def suggest(conv: Converted, catalog: NodeCatalog, editor: dict | None = None, n
                 put("strength", s, "denoise")
 
     # ---- size and frames --------------------------------------------------------------------
-    sized = [e for e in gr.order() if gr.literal(e, "width") and gr.literal(e, "height")
-             and isinstance(gr.inputs(e)["width"], int)]
-    latents = [e for e in sized if "LATENT" in catalog.outputs(gr.cls(e)) or "Latent" in gr.cls(e)]
-    main = (latents or sized or [None])[0]
-    if main:
-        w, h = gr.inputs(main)["width"], gr.inputs(main)["height"]
-        put("width", main, "width")
-        put("height", main, "height")
-        for e in sized:
-            if e != main and gr.inputs(e)["width"] == w and gr.inputs(e)["height"] == h:
-                inputs["width"].setdefault("also", []).append(f"{e}.width")
-                inputs["height"].setdefault("also", []).append(f"{e}.height")
+    main = None
+    if samplers:
+        size, main, why_not = _size(gr, samplers[0])
+        for key, (eid, fld) in size.items():
+            put(key, eid, fld)
+        if why_not:
+            notes.append(why_not)
+        if "width" in inputs and gr.literal(inputs["width"]["node"], inputs["width"]["field"]):
+            w = gr.inputs(inputs["width"]["node"])[inputs["width"]["field"]]
+            h = gr.inputs(inputs["height"]["node"])[inputs["height"]["field"]]
+            for e in gr.order():                     # an input-image resize to the same size follows it
+                if e != inputs["width"]["node"] and gr.inputs(e).get("width") == w and gr.inputs(e).get("height") == h:
+                    inputs["width"].setdefault("also", []).append(f"{e}.width")
+                    inputs["height"].setdefault("also", []).append(f"{e}.height")
     for e in ([main] if main else []) + [x for x in gr.order() if x != main]:
         hit = next((f for f in FRAME_FIELDS if gr.literal(e, f) and isinstance(gr.inputs(e)[f], int)), None)
         if hit and "frames" not in inputs and ("Latent" in gr.cls(e) or "Video" in gr.cls(e)):
@@ -240,6 +333,7 @@ def suggest(conv: Converted, catalog: NodeCatalog, editor: dict | None = None, n
 
     # ---- images and masks -----------------------------------------------------------------
     n_img = 0
+    caption_only: set[str] = set()
     for e in gr.order():
         t = gr.cls(e)
         if t == "LoadImageMask" and "mask" not in inputs:
@@ -247,17 +341,33 @@ def suggest(conv: Converted, catalog: NodeCatalog, editor: dict | None = None, n
             continue
         if t in ("LoadImage", "LoadImageOutput") or (catalog.input(t, "image") and catalog.input(t, "image").options.get("image_upload")):
             uses = gr.consumers.get(e, [])
-            if uses and all(slot == 1 for _, _, slot in uses) and "mask" not in inputs:
+            if not uses:
+                continue                                   # feeds nothing that runs (a bypassed branch)
+            if all(slot == 1 for _, _, slot in uses) and "mask" not in inputs:
                 put("mask", e, "image")                    # only its MASK output is used
                 continue
             n_img += 1
-            put("image" if n_img == 1 else f"image_{n_img}", e, "image")
+            key = "image" if n_img == 1 else f"image_{n_img}"
+            put(key, e, "image")
+            if samplers and not _reaches(gr, e, set(samplers)):
+                inputs[key]["required"] = False             # only described in words (a captioner): optional
+                caption_only.add(key)
+
+    n_vid = 0
+    for e in gr.order():                                      # videos to load (a driving video, a clip to edit)
+        t = gr.cls(e)
+        fld = next((f for f in ("video", "file") if gr.literal(e, f)), None)
+        spec = catalog.input(t, fld) if fld else None
+        if fld and gr.consumers.get(e) and ("LoadVideo" in t.replace(" ", "") or (spec and spec.options.get("video_upload"))):
+            n_vid += 1
+            put("video" if n_vid == 1 else f"video_{n_vid}", e, fld)
 
     # ---- outputs ----------------------------------------------------------------------------
     outs: dict[str, dict] = {}
-    saves = [e for e in gr.order() if catalog.is_output(gr.cls(e)) and not SKIP_OUTPUTS.search(gr.cls(e))]
-    if not saves:
-        saves = [e for e in gr.order() if catalog.is_output(gr.cls(e)) and "Preview" in gr.cls(e)]
+    saves = [e for e in gr.order() if catalog.is_output(gr.cls(e)) and not SKIP_OUTPUTS.search(gr.cls(e))
+             and gr.inputs(e).get("save_output") is not False]          # VideoHelperSuite previews
+    if not saves:                                              # nothing saves: image/video previews stand in
+        saves = [e for e in gr.order() if catalog.is_output(gr.cls(e)) and re.search(r"Preview(Image|Video)", gr.cls(e))]
     for e in saves:
         t = gr.cls(e)
         kind = "video" if VIDEO_SAVE.search(t) else "audio" if AUDIO_SAVE.search(t) else "mesh" if MESH_SAVE.search(t) else "image"
@@ -266,14 +376,16 @@ def suggest(conv: Converted, catalog: NodeCatalog, editor: dict | None = None, n
 
     # ---- task, memory, words ----------------------------------------------------------------
     kinds = {o["kind"] for o in outs.values()}
-    has_img, has_prompt = "image" in inputs, "prompt" in inputs
+    has_img = "image" in inputs and "image" not in caption_only
+    has_prompt = "prompt" in inputs or prompt_elsewhere
     types = " ".join(gr.cls(e) for e in gr.g)
+    prompt_text = str(gr.inputs(inputs["prompt"]["node"]).get(inputs["prompt"]["field"]) or "") if "prompt" in inputs else ""
     if "video" in kinds:
         task = "image-to-video" if has_img else "text-to-video"
+    elif "image" in kinds and has_img and (re.search(r"Background|RMBG|Matting", types, re.I) or BG_WORDS.search(prompt_text)):
+        task = "remove-background"
     elif "image" in kinds and has_img and has_prompt:
         task = "image-edit"
-    elif "image" in kinds and has_img and re.search(r"Background|RMBG|Matting", types, re.I):
-        task = "remove-background"
     elif "image" in kinds and has_img and re.search(r"Upscale", types):
         task = "upscale"
     elif "image" in kinds and has_prompt:

@@ -70,6 +70,10 @@ description = "The input image: an AIHub output id or an uploaded file"
 type = "files"
 description = "Several input images (references)"
 
+[inputs.video]
+type = "file"
+description = "An input video (a clip to restyle, or one whose motion drives the result)"
+
 [inputs.mask]
 type = "file"
 description = "A mask image: white is the area to change"

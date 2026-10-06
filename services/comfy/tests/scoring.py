@@ -20,8 +20,10 @@ def score(manifest: dict, expected: dict) -> dict:
     wrong = [k for k, t in want.items() if k in got and got[k] != t]
     wrong += [k for k, t in got.items() if k not in want and t in want.values()]
     wrong += [k for k, t in maybe.items() if k in got and got[k] != t]
+    recovered = [k for k, t in known.items() if got.get(k) == t]     # a recorded miss that is now found
+    right += recovered
     missed = [k for k in want if k not in got] + [k for k, t in known.items() if t not in got.values()]
-    extra = [k for k in got if k not in want and k not in maybe and got[k] not in want.values()]
+    extra = [k for k in got if k not in want and k not in maybe and k not in recovered and got[k] not in want.values()]
     outs = sorted(v["node"] for v in manifest.get("outputs", {}).values())
     return {"right": right, "wrong": wrong, "missed": missed, "extra": extra,
             "task_ok": manifest.get("task") == expected.get("task"),

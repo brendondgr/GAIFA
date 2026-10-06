@@ -89,14 +89,17 @@ def resolve(pack: Pack, schema: dict, values: dict[str, Any] | None, preset: str
         raise InputError("; ".join(errors), errors)
     if "seed" in props and (out.get("seed") is None or out.get("seed") == -1):
         out["seed"] = (rng or random).randint(0, SEED_MAX)
-    _derive(out, props, values)
+    _derive(out, props, values, set(pack.manifest.inputs) if pack.manifest else set())
     return out
 
 
-def _derive(out: dict, props: dict, given: dict) -> None:
+def _derive(out: dict, props: dict, given: dict, mapped: set[str] = frozenset()) -> None:
     """aspect + megapixels → width/height (multiples of 16), seconds → frames (kept 4k+1 when the
-    workflow's own frame count is, as Wan's are). Only when the caller (or preset) asked."""
-    if "aspect" in props and ("aspect" in given or "megapixels" in given):
+    workflow's own frame count is, as Wan's are). Only when the caller (or preset) asked, and only for
+    names the pack doesn't map to a field itself (a resolution picker takes aspect + megapixels as they are)."""
+    if "aspect" in mapped or "megapixels" in mapped:
+        pass
+    elif "aspect" in props and ("aspect" in given or "megapixels" in given):
         w0, h0 = out.get("width") or 1024, out.get("height") or 1024
         if "aspect" in given or out.get("aspect"):
             m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*[:x/]\s*(\d+(?:\.\d+)?)\s*", str(out.get("aspect") or "1:1"))
@@ -107,14 +110,16 @@ def _derive(out: dict, props: dict, given: dict) -> None:
         h = math.sqrt(mp * 1e6 * b / a)
         out["width"], out["height"] = _r16(h * a / b), _r16(h)
     for k in ("aspect", "megapixels"):
-        out.pop(k, None)
-    if "seconds" in props and given.get("seconds"):
+        if k not in mapped:
+            out.pop(k, None)
+    if "seconds" in props and given.get("seconds") and "seconds" not in mapped:
         fps = float(out.get("fps") or 16)
         frames = max(1, round(float(given["seconds"]) * fps))
         if int(props.get("frames", {}).get("default") or 0) % 4 == 1:
             frames = 4 * round((frames - 1) / 4) + 1
         out["frames"] = frames
-    out.pop("seconds", None)
+    if "seconds" not in mapped:
+        out.pop("seconds", None)
 
 
 def _r16(x: float) -> int:

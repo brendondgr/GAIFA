@@ -186,3 +186,16 @@ def test_widget_and_stats(env):
     st = c.get("/v1/stats", params={"range": "7d"}).json()
     assert st["workflows"][0]["id"] == "zimage" and st["workflows"][0]["done"] == 1 and st["recent"]
     assert c.get("/v1/stats", params={"range": "1y"}).status_code == 422
+
+
+def test_a_mapped_aspect_is_passed_as_it_is(tmp_path):
+    """Qwen-Image-2.1's ResolutionSelector takes aspect + megapixels itself (held-out, 11.12)."""
+    d = tmp_path / "q"
+    d.mkdir()
+    (d / "workflow.json").write_text("{}")
+    (d / "workflow.toml").write_text('task = "text-to-image"\n[inputs.prompt]\nnode = "7"\nfield = "prompt"\n'
+                                     '[inputs.aspect]\nnode = "6"\nfield = "aspect_ratio"\n[inputs.megapixels]\nnode = "6"\nfield = "megapixels"\n')
+    schema = {"properties": {"prompt": {"type": "string"}, "aspect": {"type": "string", "enum": ["1:1 (Square)", "16:9 (Wide)"]},
+                             "megapixels": {"type": "number", "default": 1.0}}}
+    v = resolve(load_pack(d), schema, {"prompt": "x", "aspect": "16:9 (Wide)", "megapixels": 2})
+    assert v == {"prompt": "x", "aspect": "16:9 (Wide)", "megapixels": 2.0}

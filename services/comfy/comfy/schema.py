@@ -12,7 +12,7 @@ from .packs import Pack
 from .tasks import Tasks
 
 JSON_TYPES = {"INT": "integer", "FLOAT": "number", "STRING": "string", "BOOLEAN": "boolean", "COMBO": "string"}
-FILE_LOADERS = {"LoadImage", "LoadImageMask", "LoadVideo", "LoadAudio"}
+FILE_LOADERS = {"LoadImage", "LoadImageMask", "LoadVideo", "LoadAudio", "VHS_LoadVideo", "VHS_LoadVideoPath"}
 FILE = {"type": "string", "format": "aihub-file",
         "description": "An AIHub output id (output:<id>), an uploaded file name, or a URL path under /api/outputs/"}
 
@@ -38,6 +38,8 @@ def input_schema(pack: Pack, conv: Converted | None, catalog: NodeCatalog, tasks
             JSON_TYPES.get(spec.type) if spec else None) or "string"
         if kind == "file":
             p: dict[str, Any] = dict(FILE)
+            if name.startswith("video") or (cls and "Video" in cls):
+                p["x-kind"] = "video"
         elif kind == "files":
             p = {"type": "array", "items": dict(FILE)}
         else:

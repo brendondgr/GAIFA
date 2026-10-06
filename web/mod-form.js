@@ -1,6 +1,7 @@
 // A form built from a JSON Schema, for mod page modules: strings (a text area when x-multiline),
 // numbers with their range, booleans, enums, and files (format "aihub-file": upload one, or pick a
-// recent AIHub output). Written by us, not Claude Design. Import as '/mod-form.js'.
+// recent AIHub output; `x-kind: "video"` on a property offers videos). Written by us, not Claude Design.
+// Import as '/mod-form.js'.
 //
 //   const form = schemaForm(ctx, schema, { values, upload: file => ctx.call('POST', '/v1/uploads', …) });
 //   el.append(form);  form.values() → {name: value}  form.set({name: value})  form.onchange = fn
@@ -94,6 +95,7 @@ function cast(p, v) {
  *  "output:<id>", or a name already known to the mod. */
 function fileField(ctx, name, p, o, changed) {
   const { ui } = ctx;
+  o = p['x-kind'] ? { ...o, kinds: [p['x-kind']] } : o;          // a video input offers videos
   let value = null;
   const thumb = h('div', { style: 'width:72px;height:72px;border-radius:7px;background:var(--inset,#131926) center/cover no-repeat;border:1px solid var(--bd,#1D2430);flex:none' });
   const label = h('span', { style: `font-size:12px;font-family:${MONO};color:var(--mut,#8A94A6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px` }, 'none');

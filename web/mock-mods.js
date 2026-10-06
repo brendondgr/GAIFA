@@ -45,15 +45,7 @@ export function createModMocks(m) {
     'DELETE /api/instances/{name}': ({ pp }) => { if (pp.name !== 'gemma4-26B-7071') throw upstream(404, `instance ${pp.name} not found`); return ok({ name: pp.name, state: 'stopping' }, 202); },
     'GET /api/instances/{name}/logs/stream': ({ pp }) => ({ stream: async function* () { for (let i = 0; i < 200; i++) { yield `[${pp.name}] slot ${i % 4} | prompt ${Math.floor(200 + Math.random() * 3000)} tok, gen ${Math.floor(20 + Math.random() * 400)} tok, ${(30 + Math.random() * 20).toFixed(1)} t/s`; await new Promise(r => setTimeout(r, 450)); } } }),
   },
-  relay: {
-    'GET /admin/stats/summary': ({ query }) => ok({ window: query.window || '24h', requests: Number(svcById('relay').stats[0].value), tokens: 3100000, ttft_p50_ms: 412, ttft_p95_ms: 1380, tok_s: 41.7, error_rate: 0.012 }),
-    'GET /admin/stats/by-model': () => ok({ dimensions: ['model'], source: 'requests', rows: [{ model: 'gemma-4-26b-it', requests: 1031, tokens: 2610000 }, { model: 'minicpm-5-2b', requests: 241, tokens: 402000 }, { model: 'openrouter/auto', requests: 12, tokens: 88000 }] }),
-    'GET /admin/endpoints': () => ok({ endpoints: [{ id: 'lcpp/gemma4-26B-7071', url: 'http://127.0.0.1:7071/v1', owner: 'lcpp', healthy: true }, { id: 'openrouter', url: 'https://openrouter.ai/api/v1', owner: null, healthy: true }, { id: 'lab-box', url: 'http://10.0.0.12:8080/v1', owner: null, healthy: false }] }),
-    'GET /v1/models': () => ok({ object: 'list', data: [{ id: 'gemma-4-26b-it', object: 'model', owned_by: 'lcpp' }, { id: 'minicpm-5-2b', object: 'model', owned_by: 'lcpp' }] }),
-    'POST /v1/chat/completions': ({ json }) => { if (!json?.messages?.length) throw upstream(400, 'messages: must contain at least one message');
-      const words = 'Shared pool of light — / weights and frames drink from one well, / nothing waits its turn.'.split(' ');
-      return { stream: async function* () { for (const w of words) { yield JSON.stringify({ choices: [{ delta: { content: w + ' ' } }] }); await new Promise(r => setTimeout(r, 140)); } yield '[DONE]'; } }; },
-  },
+  relay: relayMock(m),
   comfy: {
     'GET /system_stats': () => ok({ system: { os: 'posix', comfyui_version: '0.3.62', python_version: '3.12.7', pytorch_version: '2.8.0+rocm7.0' }, devices: [{ name: 'AMD Radeon 8060S', type: 'cuda', vram_total: 121.5 * GB, vram_free: 121.5 * GB - usedBytes() }] }),
     'GET /object_info': () => ok({ KSampler: { input: { required: { seed: ['INT'], steps: ['INT'], cfg: ['FLOAT'] } } }, CLIPTextEncode: { input: { required: { text: ['STRING'] } } }, VAEDecode: {}, SaveImage: {} }),
@@ -192,5 +184,50 @@ function gen3dMock(m) {
       return ok({ unit: 'seconds', categories: js.map(j => j.title.slice(0, 24)), series: STAGES.map(s => ({ name: s, values: js.map(j => j.stages[s]?.seconds ?? null) })).filter(s => s.values.some(v => v)) }); },
     'POST /v1/load': () => { loadSvc(svcById('gen3d'), true).catch(() => {}); return ok({ state: 'starting' }); },
     'POST /v1/unload': () => { m.doUnload(svcById('gen3d')); return ok({ stopped: true, state: 'stopped' }); },
+  };
+}
+
+// ---- relay: DashLLM's admin API shapes ({dimensions, source} datasets) -------------------------
+function relayMock(m) {
+  const { ok, upstream, svcById, now } = m;
+  const EP = [
+    { id: 'ep-lcpp', name: 'gemma4-26B-7071', alias: 'gemma-4-26b-it', kind: 'local', server_type: 'llama.cpp', protocol: 'openai', available_models: ['gemma-4-26b-it'], base_url: 'http://127.0.0.1:7071/v1', health: 'healthy', ewma_latency_ms: 212, active: true, share: 0.81, enabled: true, owner: 'lcpp' },
+    { id: 'ep-sky', name: 'skynet', alias: 'skynet', kind: 'remote_tunnel', server_type: 'vLLM', protocol: 'openai', available_models: [], base_url: 'http://127.0.0.1:9090/v1', tunnel_command: 'ssh -N -L 127.0.0.1:9090:localhost:9090 skynet', health: 'healthy', ewma_latency_ms: 279, active: false, share: 0.17, enabled: true, owner: null },
+    { id: 'ep-lab', name: 'lab-box', alias: 'lab', kind: 'remote', server_type: 'openai', protocol: 'openai', available_models: [], base_url: 'http://10.0.0.12:8080/v1', health: 'failed', ewma_latency_ms: null, active: false, share: 0.02, enabled: true, owner: null },
+  ];
+  const MODELS = ['gemma-4-26b-it', 'minicpm-5-2b', 'skynet', 'agent'];
+  const hours = w => (w === '1h' ? 60 : w === '7d' ? 168 : w === '30d' ? 720 : 24);
+  const step = w => (w === '1h' ? 60 : 3600);
+  const labels = w => { const n = hours(w), st = step(w), t0 = Math.floor(now() / st) * st; return Array.from({ length: n }, (_, i) => { const d = new Date((t0 - (n - 1 - i) * st) * 1000), p = x => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }); };
+  const wave = (i, k) => Math.max(0, Math.round(40 + 35 * Math.sin(i / 3 + k) + 10 * Math.sin(i * 1.7)));
+  return {
+    'GET /admin/stats/summary': ({ query }) => { const req = Number(svcById('relay').stats[0].value) * (query.window === '7d' ? 6 : query.window === '30d' ? 22 : 1);
+      return ok({ requests: req, errors: Math.round(req * 0.012), error_rate: 0.012, prompt_tokens: req * 1400, completion_tokens: req * 1000, total_tokens: req * 2400, cost_usd: 0, ttft_ms: { p50: 412, p95: 1380 }, latency_ms: { p50: 2400, p95: 7100 }, tokens_per_sec: { p50: 41.7 } }); },
+    'GET /admin/stats/tokens/timeseries': ({ query }) => ok({ dimensions: ['time', 'input', 'output'], source: labels(query.window).map((t, i) => [t, wave(i, 0) * 900, wave(i, 1) * 700]) }),
+    'GET /admin/stats/volume': ({ query }) => ok({ dimensions: ['time', 'requests', 'errors'], source: labels(query.window).map((t, i) => [t, wave(i, 0), i % 9 === 0 ? 1 : 0]) }),
+    'GET /admin/stats/latency': ({ query }) => ok({ dimensions: ['time', 'ttft_p50', 'ttft_p95', 'tps_p50'], source: labels(query.window).map((t, i) => [t, 380 + wave(i, 2), 1200 + wave(i, 3) * 4, 38 + (i % 7)]) }),
+    'GET /admin/stats/tokens/by-hour': () => ok({ dimensions: ['hour', 'input', 'output'], source: Array.from({ length: 24 }, (_, hh) => [hh, hh > 7 && hh < 23 ? wave(hh, 0) * 3000 : 0, hh > 7 && hh < 23 ? wave(hh, 1) * 2200 : 0]) }),
+    'GET /admin/stats/by-model': () => ok({ dimensions: ['model', 'requests', 'tokens', 'cost', 'avg_tps', 'errors'], source: [['gemma-4-26b-it', 1031, 2610000, 0, 41.2, 9], ['skynet', 241, 402000, 0, 146.3, 3], ['agent', 12, 88000, 0, 0, 0]] }),
+    'GET /admin/stats/by-endpoint': () => ok({ dimensions: ['endpoint', 'requests', 'tokens', 'errors'], source: EP.map((e, i) => [e.name, [1031, 241, 12][i], 0, [9, 3, 12][i]]) }),
+    'GET /admin/stats/live': () => ok({ in_flight: 1, active: 1, waiting: 0, max_concurrency: 256 }),
+    'GET /admin/stats/recent': () => { const t = now(); return ok({ rows: Array.from({ length: 30 }, (_, i) => ({ id: `req_${i}`, ts: t - i * 37, endpoint_name: EP[i % 2].name, route: 'chat.completions', model: i % 2 ? 'skynet' : 'gemma-4-26b-it', status: i % 11 === 5 ? 502 : 200, error: i % 11 === 5 ? 'upstream timed out' : null, prompt_tokens: 400 + i * 7, completion_tokens: 300 + i * 5, total_tokens: 700 + i * 12, ttft_ms: 400, latency_ms: 2200 + i * 30, tokens_per_sec: 41 + (i % 5), stream: i % 3 === 0, ok: i % 11 !== 5, state: i % 11 === 5 ? 'error' : 'done' })), counts: { done: 27, error: 3 } }); },
+    'GET /admin/endpoints': () => ok(EP.map(e => ({ ...e }))),
+    'GET /admin/router': () => ok({ policy: 'priority', pinned_id: null, resolved_id: 'ep-lcpp', resolved_name: EP[0].name }),
+    'POST /admin/endpoints': ({ json }) => { if (!json?.name || !json?.base_url) throw upstream(422, 'name and base_url are required'); const e = { id: 'ep-' + Math.random().toString(16).slice(2, 8), alias: json.name, kind: 'remote', protocol: 'openai', health: 'unknown', share: 0, enabled: true, owner: null, available_models: [], ...json }; EP.push(e); return ok(e, 201); },
+    'PATCH /admin/endpoints/{eid}': ({ pp, json }) => { const e = EP.find(x => x.id === pp.eid); if (!e) throw upstream(404, 'no endpoint'); Object.assign(e, json); return ok(e); },
+    'DELETE /admin/endpoints/{eid}': ({ pp }) => { const i = EP.findIndex(x => x.id === pp.eid); if (i < 0) throw upstream(404, 'no endpoint'); EP.splice(i, 1); return ok({ deleted: pp.eid }); },
+    'POST /admin/endpoints/{eid}/activate': ({ pp }) => { EP.forEach(e => { e.active = e.id === pp.eid; }); return ok({ ok: true }); },
+    'POST /admin/endpoints/{eid}/test': ({ pp }) => { const e = EP.find(x => x.id === pp.eid); return ok(e?.health === 'failed' ? { ok: false, error: 'connection refused' } : { ok: true, latency_ms: 231 }); },
+    'GET /admin/endpoints/{eid}/tunnel': ({ pp }) => ok({ endpoint_id: pp.eid, status: 'connected', prompt: null, prompt_secret: false, output: [], last_error: null, local_port: 9090, pid: 4242, uptime_s: 5400 }),
+    'POST /admin/endpoints/{eid}/tunnel/connect': () => ok({ status: 'connecting' }),
+    'POST /admin/endpoints/{eid}/tunnel/disconnect': () => ok({ status: 'idle' }),
+    'GET /admin/tunnels': () => ok([]),
+    'GET /admin/proxy': () => ok({ base_url: 'http://localhost:4000/v1', port: 4000, example_model: 'auto', uptime_s: 18000, requests_total: 148117, active_clients: 1, db_size_bytes: 47e6 }),
+    'GET /admin/status': () => ok({ loaded: null, busy: false, stats: svcById('relay').stats }),
+    'GET /admin/hub/widgets/traffic': ({ query }) => { const L = labels(query.range === '7d' ? '7d' : '24h'); return ok({ unit: 'count', t: L.map(x => new Date(x).getTime() / 1000), series: [{ name: 'Requests', values: L.map((_, i) => wave(i, 0)) }, { name: 'Tokens', values: L.map((_, i) => wave(i, 1) * 1600), axis: 'right' }] }); },
+    'GET /v1/models': () => ok({ object: 'list', data: MODELS.map(id => ({ id, object: 'model', owned_by: 'relay' })) }),
+    'POST /v1/chat/completions': ({ json }) => { if (!json?.messages?.length) throw upstream(400, 'messages: must contain at least one message');
+      const words = 'Shared pool of light — / weights and frames drink from one well, / nothing waits its turn.'.split(' ');
+      return { stream: async function* () { for (const w of words) { yield JSON.stringify({ choices: [{ delta: { content: w + ' ' } }] }); await new Promise(r => setTimeout(r, 140)); } yield '[DONE]'; } }; },
   };
 }

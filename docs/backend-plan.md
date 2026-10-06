@@ -748,7 +748,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - `.env` holds the `OPENCODE_*` vars, and the generated credential goes in the mod folder.
   - Manifest: `command = ["./run.sh"]`, port 4096, `health = "tcp"`. Switch to an HTTP health route if `opencode serve` turns out to have a cheap unauthenticated one; check while doing this step.
   - `OPENCODE_PROJECT_DIR` keeps its current value.
-- [ ] **9.5 Move and cut over.**
+- [x] **9.5 Move and cut over.** *As built (2026-10-06):* no requests were in flight; the relay was down for about 10 s. After the cutover: both endpoints healthy (skynet and the opencode `agent`, so the Basic credential carried over), 13 models on `/v1/models`, a chat completion through `:4000/v1`, LocalTTS Enhance, the Overview tile's stats, and the native dashboard on `:4000`. lcpp had no running instances, so its registrations are checked when Phase 10 launches one. `~/.local/bin/relay` is now `services/relay/bin/relay` (start/stop/restart/status/logs through `aihub`, for relay and opencode).
   - With relay stopped, move `relay.db` with `-wal`/`-shm` to `data/databases/`.
   - `systemctl --user disable --now relay.service opencode.service`, then `aihub start opencode relay`.
   - **Verify:**
@@ -758,17 +758,17 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - the Overview tile shows stats
     - the native dashboard works on `:4000`
   - Point `~/.local/bin/relay` at `aihub`.
-- [ ] **9.6** `MOVED.md` in `~/Tools/DashLLM`.
-- [ ] **9.7 LLM Relay page (Part B2) and widget.**
+- [x] **9.6** `MOVED.md` in `~/Tools/DashLLM`.
+- [x] **9.7 LLM Relay page (Part B2) and widget.** *As built:* `services/relay/ui/page.js`. Dashboard: window 1h/24h/7d/30d, six KPI tiles, live in-flight count, tokens over time, requests by model, latency (TTFT p50/p95 + tok/s), tokens by hour of day. Requests: live table (3 s), error filter, pause, rows expand. Endpoints: health, share, test/activate/enable/delete; lcpp-owned ones are read-only with a link to the Launcher; add form; requests by endpoint. Tunnels: connect/disconnect and answers to ssh prompts. Connect: base URL, models, copyable SDK/curl/env/fetch snippets. The widget is `/admin/hub/widgets/traffic` (requests, tokens and p50 TTFT per hour).
   - Build and wire the Dashboard, Requests, Endpoints, Tunnels and Connect tabs. The relay's `{dimensions, source}` datasets are converted for the chart components.
   - Add an **LLM traffic** `[[ui.widgets]]` entry (`/admin/hub/widgets/traffic`: requests and tokens per hour, plus p50 TTFT). It feeds Overview widget #8.
 
 **Checks & deliverables — Phase 9**
-- [ ] The Relay page's numbers match the old dashboard for the same window.
-- [ ] The traffic widget shows on the Overview dashboard.
-- [ ] lcpp registrations, LocalTTS Enhance and OpenAI clients on `:4000/v1` all still work.
-- [ ] `relay.service` and `opencode.service` are disabled.
-- [ ] Delivered: `services/relay`, `services/opencode`, `relay.db` in `data/databases`, and the page and widget.
+- [x] The Relay page's numbers match the old dashboard for the same window. *Checked:* both read the same `/admin/stats/*` routes on the same `relay.db`; the 24 h KPIs on the page equal `/admin/stats/summary`.
+- [x] The traffic widget shows on the Overview dashboard (`/api/widgets/relay/traffic`, 25 hourly points for 24 h).
+- [x] lcpp registrations, LocalTTS Enhance and OpenAI clients on `:4000/v1` all still work. *Checked:* Enhance and an OpenAI-style call; lcpp registration is checked in Phase 10 with a real instance.
+- [x] `relay.service` and `opencode.service` are disabled.
+- [x] Delivered: `services/relay`, `services/opencode`, `relay.db` in `data/databases`, and the page and widget.
 
 ## Phase 10 — Move in `lcpp` (LLMs)
 

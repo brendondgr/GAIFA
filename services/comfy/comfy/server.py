@@ -9,10 +9,11 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from . import api_run, api_workflows, control, hub, logtail
+from . import api_import, api_run, api_workflows, control, hub, logtail
 from .client import ComfyClient, ComfyError
 from .config import Settings
 from .db import DB
+from .downloads import Downloads
 from .library import Library
 from .nodes import NodeCatalog
 from .packs import Packs
@@ -58,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         st.packs = Packs(settings.workflows, settings.comfy_view)
         st.library = Library(st.packs, st.catalog, Tasks.load(), settings.hub_url, settings.models)
         st.runner = Runner(settings, st.db, st.client, st.library, st.control)
+        st.downloads = Downloads(settings.models, settings.hub_url)
         tasks = [asyncio.create_task(logtail.follow(settings.data / "comfyui.log")),
                  asyncio.create_task(st.control.run()),
                  asyncio.create_task(_watch(st.library)),
@@ -100,4 +102,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(control.router)
     app.include_router(api_workflows.router)
     app.include_router(api_run.router)
+    app.include_router(api_import.router)
     return app

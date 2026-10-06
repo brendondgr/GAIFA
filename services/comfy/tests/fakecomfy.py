@@ -217,6 +217,7 @@ class FakeHub(FakeComfy):
         self.room = True
         self.used = 5e9
         self.files: dict[str, tuple[str, bytes]] = {}
+        self.registered: list[dict] = []
         super().__init__()
 
     def _app(self) -> FastAPI:
@@ -251,5 +252,15 @@ class FakeHub(FakeComfy):
         @app.get("/api/models")
         def models():
             return {"models": []}
+
+        @app.post("/api/models")
+        async def add_model(request: Request):
+            hub.registered.append(await request.json())
+            return {"id": "new-model"}
+
+        @app.get("/files/{name}")
+        def serve(name: str):
+            from fastapi.responses import Response
+            return Response(b"x" * 1000, media_type="application/octet-stream")
 
         return app

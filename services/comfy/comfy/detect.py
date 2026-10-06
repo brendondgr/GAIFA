@@ -331,19 +331,28 @@ def model_sizes(models_dir: Path | None) -> dict[str, int]:
     return out
 
 
-def to_toml(s: Suggestion) -> str:
-    """workflow.toml text, with a comment naming each input's node."""
+def to_toml(s: Suggestion, estimate: bool = True) -> str:
+    """workflow.toml text, with a comment naming each input's node. A suggested memory_gb is an
+    estimate, written as a comment so it doesn't pin the amount (runs measure it)."""
     m = s.manifest
-    lines = [f'name = {_q(m.get("name", ""))}', f'task = {_q(m["task"])}']
+    lines = [f'name = {_q(m.get("name", ""))}', f'task = {_q(m.get("task", "custom"))}']
     if m.get("description"):
         lines.append(f'description = {_q(m["description"])}')
-    if m.get("memory_gb"):
+    if m.get("tags"):
+        lines.append(f'tags = {_v(m["tags"])}')
+    if m.get("memory_gb") and estimate:
         lines.append(f'# memory_gb = {m["memory_gb"]}    # estimated from the model files; each run measures it, so set it only to override')
+    elif m.get("memory_gb"):
+        lines.append(f'memory_gb = {m["memory_gb"]}')
     for key, v in m.get("inputs", {}).items():
         lines += ["", f"[inputs.{key}]" + (f"          # {s.why[key]}" if key in s.why else "")]
         lines += [f"{k} = {_v(x)}" for k, x in v.items()]
     for key, v in m.get("outputs", {}).items():
         lines += ["", f"[outputs.{key}]"] + [f"{k} = {_v(x)}" for k, x in v.items()]
+    for key, v in (m.get("presets") or {}).items():
+        lines += ["", f"[presets.{key}]"] + [f"{k} = {_v(x)}" for k, x in v.items()]
+    if m.get("set"):
+        lines += ["", "[set]"] + [f"{_q(k)} = {_v(x)}" for k, x in m["set"].items()]
     return "\n".join(lines) + "\n"
 
 
@@ -352,6 +361,10 @@ def _q(s: str) -> str:
 
 
 def _v(x: Any) -> str:
+    if x is None:
+        return '""'
+    if isinstance(x, dict):
+        return "{ " + ", ".join(f"{_q(k)} = {_v(v)}" for k, v in x.items()) + " }"
     if isinstance(x, bool):
         return "true" if x else "false"
     if isinstance(x, (int, float)):

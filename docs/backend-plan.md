@@ -851,6 +851,7 @@ memory_gb = 18                   # optional: estimated from the model files, the
 [inputs.width]   node = "5"  field = "width"  min = 512  max = 2048
 [outputs.image]  node = "9"
 [presets.portrait] width = 832  height = 1216   # named input sets shown in the Run form
+[set]             "66.unet_name" = "z_image_turbo_fp8_e4m3fn.safetensors"   # fixed values (added in 11.7)
 ```
 Types, defaults and ranges come from ComfyUI's `/object_info`, so `workflow.toml` only states what differs.
 
@@ -959,7 +960,7 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
     8. Record the run and its peak memory in `comfy.db`, read from the hub's memory API. The peak replaces the estimate in `memory_gb` when no value is given.
   *Done when:* a fake-ComfyUI test covers the patching, the dated prefix, the sidecar, cancel and `needs_room`, and a live Z-Image run from `curl` lands in `outputs/comfy/<date>/` with its sidecar.
   - *As built:* `comfy/resolve.py` (defaults < preset < caller, validation, random seeds below 2³², aspect + megapixels → width/height in multiples of 16, seconds → frames kept 4k+1 when the graph's own count is, `patch`), `comfy/run.py` (`Runner`: acquire, start ComfyUI if needed, assets, queue, websocket progress, history reconcile after gaps or restarts, sidecars, peak memory from AIHub's `/api/services/comfy`), `comfy/api_run.py` (`/v1/run`, `/v1/jobs[/{id}?wait=]`, `/v1/queue`, `/v1/queue/{id}/cancel`, `/v1/defaults`, `/v1/uploads`, `/v1/files/{path}`). File inputs take `output:<id>` (fetched from AIHub into `input/aihub/`), `upload:<name>` or a file already in ComfyUI's input folder. Memory to acquire: `memory_gb` if the pack sets it, else the last 10 runs' peak + 5%, else the model files × 1.2 (the suggested `workflow.toml` writes the estimate as a comment so it doesn't pin it). **Added:** `[set]` in `workflow.toml` (`"66.unet_name" = …`): fixed field values applied before every check and run, for adjusting a workflow without opening ComfyUI. Status gains a "Made today" stat and the runs as jobs. **Live:** the first pack, `zimage-turbo` (from `ZIT.json`, with `[set]` pointing at the fp8 model you have), ran from `curl` through the hub in 40 s including ComfyUI's start; the image and its sidecar are in `outputs/comfy/2026-10-06/` and on the Outputs page; peak 35 GB.
-- [ ] **11.8 Importing** (`comfy/importer.py`).
+- [x] **11.8 Importing** (`comfy/importer.py`).
   - **`POST /v1/import`** takes a file:
     - an editor JSON or an API JSON
     - a PNG, WebP or MP4 with ComfyUI metadata: `prompt` is the exact API graph, `workflow` is the editor file
@@ -974,6 +975,7 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
     - Missing model files with a known source are offered as downloads through the hub's model downloads, each needing a confirm in the UI.
     - Missing custom nodes are only reported, with the package name: installing one runs third-party code, so you install it with ComfyUI-Manager.
   *Done when:* each import source has a test that produces a draft with the expected issues, and an MP4 or PNG from `outputs/comfy` re-imports to the same API graph.
+  - *As built:* `comfy/importer.py` (PNG tEXt/iTXt, WebP EXIF `prompt:`/`workflow:` tags, video container tags via ffprobe, zips with the top folder stripped and other files kept as `assets/`), `comfy/api_import.py` (`POST /v1/import` with an optional `id`, `GET /v1/import/history`, `POST /v1/import/history/{prompt_id}`, `PUT /v1/workflows/{id}` with `toml` (saved as written, comments kept) or `manifest` (written as TOML), `DELETE /v1/workflows/{id}` (moved to `workflows/.trash/`), `POST/GET /v1/downloads`), `comfy/downloads.py` (https only, into `data/models/comfyui/<folder>/` via `.part`, then registered in AIHub with a Hugging Face or URL source). An imported API graph is kept as `workflow.api.json` only when there's no editor file or it doesn't convert, since an API graph would otherwise hide later edits made in ComfyUI. Live: the fox PNG from 11.7 re-imported to its exact graph with the suggested inputs.
 - [ ] **11.9 Bring in the development set and cut over.**
   - Turn the development drafts (and Krea2 03 and the two Z-Image files) into packs with `comfyui workflows new`, review their `workflow.toml`, and set the default pack per task.
   - Point `~/.local/bin/comfyui` at the mod's script.

@@ -1,0 +1,142 @@
+{
+ "9": {
+  "class_type": "SaveImage",
+  "inputs": {
+   "filename_prefix": "2026-10-06/143619-a-red-fox-sitting-in-a-snowy-pine-forest",
+   "images": [
+    "65",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Save Image"
+  }
+ },
+ "62": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen_3_4b.safetensors",
+   "type": "lumina2",
+   "device": "default"
+  },
+  "_meta": {
+   "title": "Load CLIP"
+  }
+ },
+ "63": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "ae.safetensors"
+  },
+  "_meta": {
+   "title": "Load VAE"
+  }
+ },
+ "65": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "70",
+    0
+   ],
+   "vae": [
+    "63",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "VAE Decode"
+  }
+ },
+ "67": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "a red fox sitting in a snowy pine forest at dawn, soft light, photograph",
+   "clip": [
+    "62",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "CLIP Text Encode (Prompt)"
+  }
+ },
+ "68": {
+  "class_type": "EmptySD3LatentImage",
+  "inputs": {
+   "width": 1232,
+   "height": 816,
+   "batch_size": 1
+  },
+  "_meta": {
+   "title": "EmptySD3LatentImage"
+  }
+ },
+ "69": {
+  "class_type": "ModelSamplingAuraFlow",
+  "inputs": {
+   "shift": 3.0,
+   "sampling": "flow",
+   "model": [
+    "66",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "ModelSamplingAuraFlow"
+  }
+ },
+ "70": {
+  "class_type": "KSampler",
+  "inputs": {
+   "seed": 3467959972,
+   "steps": 8,
+   "cfg": 1.0,
+   "sampler_name": "res_multistep",
+   "scheduler": "simple",
+   "denoise": 1.0,
+   "model": [
+    "69",
+    0
+   ],
+   "positive": [
+    "67",
+    0
+   ],
+   "negative": [
+    "71",
+    0
+   ],
+   "latent_image": [
+    "68",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "KSampler"
+  }
+ },
+ "71": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "low quality, bad anatomy, extra digits, missing digits, extra limbs, missing limbs",
+   "clip": [
+    "62",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "CLIP Text Encode (Prompt)"
+  }
+ },
+ "66": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "z_image_turbo_fp8_e4m3fn.safetensors",
+   "weight_dtype": "fp8_e4m3fn"
+  },
+  "_meta": {
+   "title": "Load Diffusion Model"
+  }
+ }
+}

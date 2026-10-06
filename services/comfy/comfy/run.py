@@ -240,6 +240,9 @@ class Runner:
                 await self.finish(run["id"], pid, h[pid])
 
     async def sample_peaks(self) -> None:
+        active = {r["id"] for r in self.db.runs(states=("running",), limit=50)}
+        for rid in set(self._peaks) - active:
+            self._peaks.pop(rid, None)               # finished or cancelled without our noticing
         if not self.s.hub_url or not self._peaks:
             return
         try:
@@ -344,6 +347,7 @@ class Runner:
                 await self.client.delete_queued([pid])
         self.db.update_run(rid, state="cancelled", finished=time.time(), error="cancelled")
         self.live.pop(rid, None)
+        self._peaks.pop(rid, None)
         self._done(rid)
         return self.db.run(rid)
 

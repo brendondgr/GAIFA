@@ -1,0 +1,44 @@
+name = "Wan 2.1 — text to video"
+task = "text-to-video"
+description = "A ~5 s 480p clip from text (Wan 2.1 14B, LightX2V 6 steps)"
+# memory_gb = 26.4    # estimated from the model files; each run measures it, so set it only to override
+
+[inputs.prompt]          # CLIPTextEncode "Positive prompt"
+node = "7"
+field = "text"
+
+[inputs.seed]          # KSampler "KSampler · 6 steps @ CFG 1.0"
+node = "11"
+field = "seed"
+default = -1
+
+[inputs.steps]          # KSampler "KSampler · 6 steps @ CFG 1.0"
+node = "11"
+field = "steps"
+
+[inputs.cfg]          # KSampler "KSampler · 6 steps @ CFG 1.0"
+node = "11"
+field = "cfg"
+
+[inputs.width]          # EmptyHunyuanLatentVideo "Empty video latent 832x480 x81"
+node = "10"
+field = "width"
+
+[inputs.height]          # EmptyHunyuanLatentVideo "Empty video latent 832x480 x81"
+node = "10"
+field = "height"
+
+[inputs.frames]          # EmptyHunyuanLatentVideo "Empty video latent 832x480 x81"
+node = "10"
+field = "length"
+
+[inputs.fps]          # CreateVideo "CreateVideo @ 16 fps"
+node = "13"
+field = "fps"
+
+[outputs.video]
+node = "14"
+kind = "video"
+
+[presets.short]
+frames = 33

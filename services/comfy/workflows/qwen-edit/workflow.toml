@@ -1,0 +1,31 @@
+name = "Qwen-Image-Edit-2511 — instruction edit (baseline)"
+task = "image-edit"
+
+[inputs.prompt]          # TextEncodeQwenImageEditPlus "Instruction  ← the image enters here"
+node = "10"
+field = "prompt"
+
+[inputs.negative]          # TextEncodeQwenImageEditPlus "Negative"
+node = "12"
+field = "prompt"
+
+[inputs.seed]          # KSampler "KSampler · 20 steps @ CFG 4.0"
+node = "14"
+field = "seed"
+default = -1
+
+[inputs.steps]          # KSampler "KSampler · 20 steps @ CFG 4.0"
+node = "14"
+field = "steps"
+
+[inputs.cfg]          # KSampler "KSampler · 20 steps @ CFG 4.0"
+node = "14"
+field = "cfg"
+
+[inputs.image]          # LoadImage "Source image"
+node = "7"
+field = "image"
+
+[outputs.image]
+node = "16"
+kind = "image"

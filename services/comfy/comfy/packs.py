@@ -282,7 +282,10 @@ class Packs:
         if d.exists():
             raise FileExistsError(f"workflows/{new_id} already exists")
         d.mkdir(parents=True)
+        parent = loose.source.parent
         shutil.move(str(loose.source), d / EDITOR)
+        if self.view and parent != self.view and parent.is_relative_to(self.view) and not any(parent.iterdir()):
+            parent.rmdir()                     # the folder it was saved in, now empty
         self.scan()
         return self._packs[new_id]
 

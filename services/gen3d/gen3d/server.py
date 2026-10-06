@@ -146,6 +146,7 @@ async def estimate(request: Request):
 async def load(request: Request, models: str = Query("shape,parts", description="shape, parts or both")):
     r = _runner(request)
     wanted = [m for m in models.split(",") if m in ("shape", "parts")]
+    r.last_activity = time.monotonic()      # before the worker starts: the idle unloader mustn't stop it mid-load
     await r.worker.load(wanted)
     r.last_activity = time.monotonic()
     r.events.publish("worker", r.worker.status())

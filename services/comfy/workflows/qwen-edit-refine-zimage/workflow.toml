@@ -1,0 +1,37 @@
+name = "Qwen-Edit-2511 Lightning → Z-Image Turbo refiner"
+task = "image-edit"
+# memory_gb = 17.4    # estimated from the model files; each run measures it, so set it only to override
+
+[inputs.prompt]          # TextEncodeQwenImageEditPlus "① Instruction ← edit goes here"
+node = "11"
+field = "prompt"
+
+[inputs.prompt_2]          # CLIPTextEncode "② Texture prompt"
+node = "23"
+field = "text"
+
+[inputs.seed]          # KSampler "① KSampler · 4 steps @ CFG 1.0"
+node = "16"
+field = "seed"
+default = -1
+also = ["26.seed"]
+
+[inputs.steps]          # KSampler "① KSampler · 4 steps @ CFG 1.0"
+node = "16"
+field = "steps"
+
+[inputs.cfg]          # KSampler "① KSampler · 4 steps @ CFG 1.0"
+node = "16"
+field = "cfg"
+
+[inputs.strength]          # KSampler "② KSampler · denoise 0.25 (5 real steps)"
+node = "26"
+field = "denoise"
+
+[inputs.image]          # LoadImage "Source image"
+node = "8"
+field = "image"
+
+[outputs.image]
+node = "28"
+kind = "image"

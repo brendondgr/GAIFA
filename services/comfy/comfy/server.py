@@ -49,6 +49,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(message)s")
+        logging.getLogger("httpx").setLevel(logging.WARNING)      # the poller's requests every 2 s
         st = app.state
         st.settings = settings
         st.db = DB(settings.db)

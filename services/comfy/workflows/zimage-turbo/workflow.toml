@@ -1,5 +1,6 @@
 name = "Z-Image Turbo"
 description = "Fast photoreal text to image (Z-Image Turbo, 8 steps)"
+tags = ["photo", "fast"]
 task = "text-to-image"
 # memory_gb = 10.1    # estimated from the model files; each run measures it, so set it only to override
 
@@ -35,6 +36,14 @@ field = "height"
 [outputs.image]
 node = "9"
 kind = "image"
+
+[presets.portrait]
+width = 832
+height = 1216
+
+[presets.landscape]
+width = 1216
+height = 832
 
 [set]
 "66.unet_name" = "z_image_turbo_fp8_e4m3fn.safetensors"   # the bf16 file this graph names isn't downloaded

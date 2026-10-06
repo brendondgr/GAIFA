@@ -158,3 +158,22 @@ def test_migration_moves_old_folders_and_rewrites_paths(tmp_path):
 def test_job_folder_name():
     assert job_folder("j_1", "A  b/c!", time.mktime((2026, 1, 2, 3, 4, 5, 0, 0, -1))) == "2026-01-02/j_1-a-b-c"
     assert job_folder("j_1", None).endswith("/j_1-job")
+
+
+def test_idle_unload_never_stops_a_worker_that_is_loading(c, monkeypatch):
+    """A load after a long idle spell: the idle unloader ran mid-load and killed the worker (2026-10-06)."""
+    import asyncio
+
+    r = c.app.state.runner
+    r.last_activity = time.monotonic() - 10_000          # idle for hours
+    seen = {}
+    real_load = r.worker.load
+
+    async def slow_load(wanted):
+        await real_load(wanted)
+        await r._maybe_idle_unload()                      # the idle check fires while loading
+        seen["up"] = r.worker.up
+
+    monkeypatch.setattr(r.worker, "load", slow_load)
+    assert c.post("/v1/load").status_code == 200
+    assert seen["up"] is True

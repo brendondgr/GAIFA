@@ -152,6 +152,8 @@ def test_loose_drafts_and_adopt(tmp_path):
     p = packs.adopt("my-portrait", "portrait")
     assert p.source == root / "portrait" / "workflow.json" and (view / "portrait.json").is_symlink()
     assert not (view / "My Portrait.json").exists()
+    packs.adopt("krea2-01-krea2-turbo-txt2img", "krea2")
+    assert not (view / "Krea2").exists()                   # its now-empty folder goes too
 
 
 def test_routes_and_live_edits(tmp_path, settings):

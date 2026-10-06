@@ -1,0 +1,35 @@
+name = "Krea 2 Turbo — image to image (masked add-an-object)"
+task = "image-edit"
+
+[inputs.prompt]          # CLIPTextEncode "Positive prompt"
+node = "5"
+field = "text"
+
+[inputs.seed]          # KSampler "KSampler  ·  denoise 1.0 inside the mask"
+node = "15"
+field = "seed"
+default = -1
+
+[inputs.steps]          # KSampler "KSampler  ·  denoise 1.0 inside the mask"
+node = "15"
+field = "steps"
+
+[inputs.cfg]          # KSampler "KSampler  ·  denoise 1.0 inside the mask"
+node = "15"
+field = "cfg"
+
+[inputs.width]          # ImageScale "Resize to 832x1248 (/16 clean)"
+node = "9"
+field = "width"
+
+[inputs.height]          # ImageScale "Resize to 832x1248 (/16 clean)"
+node = "9"
+field = "height"
+
+[inputs.image]          # LoadImage "Source image"
+node = "8"
+field = "image"
+
+[outputs.image]
+node = "18"
+kind = "image"

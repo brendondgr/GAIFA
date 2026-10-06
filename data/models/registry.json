@@ -698,6 +698,32 @@
       },
       "tags": []
     },
+    "smollm2-135m-instruct": {
+      "added": "2026-10-06T02:28:38-04:00",
+      "files": [
+        {
+          "path": "llm/SmolLM2-135M-Instruct/SmolLM2-135M-Instruct-Q4_K_M.gguf",
+          "role": "weights",
+          "sha256": "ed5fa30c487b282ec156c29062f1222e5c20875a944ac98289dbd242e947f747",
+          "size_bytes": 105454144,
+          "verified_at": null
+        }
+      ],
+      "format": "gguf",
+      "kind": "llm",
+      "name": "smollm2-135m-instruct",
+      "notes": "",
+      "path": "llm/SmolLM2-135M-Instruct",
+      "services": [
+        "lcpp"
+      ],
+      "source": {
+        "repo": "unsloth/SmolLM2-135M-Instruct-GGUF",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
     "voice-arabella": {
       "added": "2026-10-06T01:27:38-04:00",
       "files": [

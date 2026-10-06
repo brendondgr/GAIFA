@@ -117,3 +117,14 @@ too.
   - A daemon restart stops a download. Retry, or start it again, and it
   resumes from the `.part` file.
   - Finished jobs stay listed until dismissed or the daemon restarts.
+
+## Under AIHub
+
+When lcpp runs as AIHub's `lcpp` mod (`services/lcpp`, AIHub plan Phase 10), the daemon has `AIHUB_URL` and these apply. Without it, nothing below changes lcpp's behavior.
+
+- **`GET /api/status`** → `{loaded, busy, stats, jobs}` (AIHub's status shape): `loaded` = an instance is ready, `busy` = one is starting or a download is running; stats Running, Catalog, On disk (GB); jobs = starting instances and downloads with progress (finished downloads stay for 2 min).
+- **Memory acquire.** `POST /api/instances` asks AIHub for the preflight's `estimated_bytes` first (`POST {AIHUB_URL}/api/memory/acquire`). When other mods would have to be unloaded, the launch fails with **409 `needs_room`** and AIHub's plan in `data.plan`. Sending the launch again with **`X-AIHub-Make-Room: 1`** lets AIHub unload them. If AIHub can't be reached, the launch goes ahead (and is logged).
+- **Errors** may carry a `data` object: `{detail, code, data?}`.
+- **Downloads** are registered in AIHub's models registry when they finish (`POST {AIHUB_URL}/api/models`: the folder, kind `llm`, the Hugging Face repo and revision, each file's sha256). A failure becomes the job's `warning`.
+- **Models folder.** `LCPP_MODELS_DIR` (AIHub: `data/models/llm`). Catalog paths are relative to it (`Gemma4-26B/x.gguf`); paths outside it are stored absolute or `~/`-relative. The old repo-relative form (`models/Gemma4-26B/x.gguf`) still resolves, and `data/models.json` is rewritten once when it is loaded. A `scan_dirs` entry `"models"` means this folder.
+- **Relay metadata.** Registrations link `manager_url` to the Launcher page in AIHub (`{AIHUB_URL}/#/s/lcpp`).

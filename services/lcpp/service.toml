@@ -33,7 +33,7 @@ extra_units = ["lcpp-*.service"]
 dirs = ["llm"]
 
 [ui]
-# page = "ui/page.js"            # the Launcher page (plan 10.7)
+page = "ui/page.js"
 native = "/"
 
 [api]

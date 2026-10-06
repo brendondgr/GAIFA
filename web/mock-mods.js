@@ -38,13 +38,7 @@ export function createModMocks(m) {
     'POST /v1/unload': () => { doUnload(svcById('tts')); return ok({ unloaded: ['breeze'] }); },
   },
   gen3d: gen3dMock(m),
-  lcpp: {
-    'GET /api/overview': () => ok({ instances: [{ name: 'gemma4-26B-7071', model: 'gemma-4-26b-it', port: 7071, state: 'ready', ctx: 32768, mem_bytes: svcById('lcpp').used }], catalog: 4, on_disk_bytes: 20.9 * GB }),
-    'GET /api/models': () => ok({ models: models.filter(m => m.services.includes('lcpp')).map(m => ({ id: m.id, name: m.name, status: m.status, size_bytes: m.size_bytes })) }),
-    'POST /api/instances': ({ json }) => { const m = models.find(x => x.id === json?.model); if (!m) throw upstream(422, 'model: unknown catalog model'); if (m.status !== 'ok') throw upstream(409, `${m.id}: files missing`); return ok({ name: `${json.name || m.id}-${json.port || 7072}`, state: 'starting' }, 202); },
-    'DELETE /api/instances/{name}': ({ pp }) => { if (pp.name !== 'gemma4-26B-7071') throw upstream(404, `instance ${pp.name} not found`); return ok({ name: pp.name, state: 'stopping' }, 202); },
-    'GET /api/instances/{name}/logs/stream': ({ pp }) => ({ stream: async function* () { for (let i = 0; i < 200; i++) { yield `[${pp.name}] slot ${i % 4} | prompt ${Math.floor(200 + Math.random() * 3000)} tok, gen ${Math.floor(20 + Math.random() * 400)} tok, ${(30 + Math.random() * 20).toFixed(1)} t/s`; await new Promise(r => setTimeout(r, 450)); } } }),
-  },
+  lcpp: lcppMock(m),
   relay: relayMock(m),
   comfy: {
     'GET /system_stats': () => ok({ system: { os: 'posix', comfyui_version: '0.3.62', python_version: '3.12.7', pytorch_version: '2.8.0+rocm7.0' }, devices: [{ name: 'AMD Radeon 8060S', type: 'cuda', vram_total: 121.5 * GB, vram_free: 121.5 * GB - usedBytes() }] }),
@@ -229,5 +223,53 @@ function relayMock(m) {
     'POST /v1/chat/completions': ({ json }) => { if (!json?.messages?.length) throw upstream(400, 'messages: must contain at least one message');
       const words = 'Shared pool of light — / weights and frames drink from one well, / nothing waits its turn.'.split(' ');
       return { stream: async function* () { for (const w of words) { yield JSON.stringify({ choices: [{ delta: { content: w + ' ' } }] }); await new Promise(r => setTimeout(r, 140)); } yield '[DONE]'; } }; },
+  };
+}
+
+// ---- lcpp: lcppd's API (instances, catalog, preflight, chat stream, downloads, relay, settings) ----
+function lcppMock(m) {
+  const { ok, upstream, svcById, now, GB } = m;
+  const CAT = [
+    { id: 'gemma-4-26B-it', nicknames: ['gemma4-26B'], path: 'Gemma4-26B/Gemma4-26B-A4B-Q4KM.gguf', location: 'models', size_bytes: 18.2 * GB, ok: true, problems: [], capabilities: { vision: true, speculative: true, split: false }, effective: { 'ctx-size': 262144 } },
+    { id: 'minicpm-5-2B', nicknames: ['MiniCPM5-2B'], path: 'MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf', location: 'models', size_bytes: 2.7 * GB, ok: true, problems: [], capabilities: { vision: false, speculative: false, split: false }, effective: { 'ctx-size': 131072 } },
+  ];
+  const inst = new Map([['gemma4-26b-7071', { name: 'gemma4-26b-7071', kind: 'single', model_id: 'gemma-4-26B-it', models: [], port: 7071, url: 'http://127.0.0.1:7071/v1', state: 'ready', started_ts: now() - 5400, rss_bytes: 18.6 * GB, params: { 'ctx-size': 32768, 'cache-type-k': 'q8_0', 'cache-type-v': 'q8_0' }, capabilities: { vision: true, speculative: true }, relay: { state: 'registered', alias: 'gemma4-26B', key: 'lcpp:7071', health: 'healthy' }, last_error: null }]]);
+  const view = () => [...inst.values()].map(i => ({ ...i, models: [], argv: [] }));
+  const find = n => { const i = inst.get(n); if (!i) throw upstream(404, `Instance ${n} not found`); return i; };
+  const est = id => (CAT.find(c => c.id === id)?.size_bytes || 0) * 1.4;
+  let portN = 7072;
+  return {
+    'GET /api/health': () => ok({ ok: true }),
+    'GET /api/overview': () => ok({ instances: view(), system: {}, relay: { reachable: true } }),
+    'GET /api/instances': () => ok(view()),
+    'POST /api/instances/preflight': ({ json }) => { const e = est(json?.model_id); const errors = CAT.some(c => c.id === json?.model_id) ? [] : [{ code: 'model_not_found', detail: 'Pick a model', field: 'model_id' }];
+      return ok({ port: json?.port || portN, port_ok: true, name: json?.name || `${(json?.model_id || 'model').toLowerCase()}-${json?.port || portN}`, name_ok: true, estimated_bytes: e, available_bytes: 64 * GB, warnings: e > 60 * GB ? ['Little headroom for other work.'] : [], errors, argv: [] }); },
+    'POST /api/instances': ({ json }) => { const c = CAT.find(x => x.id === json?.model_id); if (!c) throw upstream(404, 'Model is not in the catalog');
+      const name = json.name || `${c.id.toLowerCase()}-${portN}`, i = { name, kind: 'single', model_id: c.id, models: [], port: portN, url: `http://127.0.0.1:${portN}/v1`, state: 'starting', started_ts: now(), rss_bytes: 0.4 * GB, params: json.params || {}, capabilities: c.capabilities, relay: json.relay?.enabled ? { state: 'pending', alias: json.relay.alias || c.nicknames[0] } : { state: 'off' }, last_error: null };
+      portN++; inst.set(name, i); setTimeout(() => { i.state = 'ready'; i.rss_bytes = c.size_bytes * 1.1; if (i.relay.state === 'pending') i.relay.state = 'registered'; }, 2500);
+      svcById('lcpp').used += c.size_bytes; return ok({ instance: i, warnings: [] }, 201); },
+    'DELETE /api/instances/{name}': ({ pp, query }) => { const i = find(pp.name); if (query.dismiss) { inst.delete(pp.name); return { status: 204 }; } inst.delete(pp.name); svcById('lcpp').used = Math.max(0, svcById('lcpp').used - i.rss_bytes); return ok({ ...i, state: 'stopping' }, 202); },
+    'POST /api/instances/{name}/restart': ({ pp }) => ok({ ...find(pp.name), state: 'starting' }, 202),
+    'POST /api/instances/{name}/relay': ({ pp, json }) => { const i = find(pp.name); i.relay = { state: 'registered', alias: json?.alias || i.model_id }; return ok(i); },
+    'DELETE /api/instances/{name}/relay': ({ pp }) => { const i = find(pp.name); i.relay = { state: 'off' }; return ok(i); },
+    'GET /api/instances/{name}/logs': ({ pp }) => ok({ lines: Array.from({ length: 20 }, (_, k) => ({ ts: now() - 20 + k, text: `[${pp.name}] srv  update_slots: all slots are idle (${k})`, stream: 'stdout' })) }),
+    'GET /api/instances/{name}/logs/stream': ({ pp }) => ({ stream: async function* () { for (let i = 0; i < 200; i++) { yield JSON.stringify({ ts: now(), text: `[${pp.name}] slot ${i % 4} | prompt ${Math.floor(200 + Math.random() * 3000)} tok, gen ${Math.floor(20 + Math.random() * 400)} tok, ${(30 + Math.random() * 20).toFixed(1)} t/s` }); await new Promise(r => setTimeout(r, 450)); } } }),
+    'POST /api/chat': ({ json }) => { if (!json?.request?.messages?.length) throw upstream(400, 'messages are required');
+      const words = 'Shared pool of light — weights and frames drink from one well, nothing waits its turn.'.split(' ');
+      return { stream: async function* () { for (const w of words) { yield JSON.stringify({ choices: [{ delta: { content: w + ' ' } }] }); await new Promise(r => setTimeout(r, 90)); } yield JSON.stringify({ lcpp_metrics: { ttft_ms: 120, tokens_per_s: 38 + Math.round(Math.random() * 10), prompt_tokens: 24, completion_tokens: words.length, total_ms: 1500 } }); } }; },
+    'GET /api/models': () => ok({ models: CAT.map(c => ({ ...c, running: view().filter(i => i.model_id === c.id).map(i => i.name) })), defaults: {} }),
+    'GET /api/models/discovered': () => ok([{ path: 'Qwen3-4B/Qwen3-4B-Q4_K_M.gguf', size_bytes: 2.5 * GB, suggested_id: 'qwen3-4b', dir: 'Qwen3-4B' }]),
+    'PUT /api/models/{id}': ({ pp, json }) => { CAT.push({ id: pp.id, nicknames: json?.nicknames || [], path: json?.path, location: 'models', size_bytes: 2.5 * GB, ok: true, problems: [], capabilities: { vision: false, speculative: false, split: false }, effective: {} }); return ok(CAT.at(-1)); },
+    'DELETE /api/models/{id}': ({ pp }) => { const k = CAT.findIndex(c => c.id === pp.id); if (k >= 0) CAT.splice(k, 1); return { status: 204 }; },
+    'GET /api/downloads': () => ok([]),
+    'POST /api/downloads/resolve': ({ json }) => ok({ repo: json?.input || 'owner/repo', revision: 'main', gated: false, choices: [{ id: 'model-Q4_K_M.gguf', label: 'model.gguf', quant: 'Q4_K_M', size_bytes: 2.5 * GB, complete: true, suggested_id: 'model' }], mmproj: [], drafts: [], selected: 'model-Q4_K_M.gguf', suggested_dir: 'Model', free_bytes: 480 * GB }),
+    'POST /api/downloads': () => ok({ id: 'dl1', state: 'queued' }, 202),
+    'GET /api/relay': () => ok({ status: { url: 'http://127.0.0.1:4000', reachable: true, latency_ms: 2, error: null },
+      owned: view().filter(i => i.relay.state === 'registered').map(i => ({ key: `lcpp:${i.port}`, instance: i.name, alias: i.relay.alias, models: [i.model_id], health: 'healthy', registered_ts: now() - 600, orphan: false })),
+      others: [{ name: 'skynet', health: 'healthy', base_url: 'http://127.0.0.1:9090/v1' }] }),
+    'POST /api/relay/test': () => ok({ reachable: true, latency_ms: 2 }),
+    'GET /api/settings': () => ok({ daemon: { port: 7710 }, llama: { binary: 'runtime/llama.cpp/bin/current/llama-server', environment: { AMD_VULKAN_ICD: 'RADV' }, server_params: { jinja: true } }, ports: { start: 7071, end: 7199 }, relay: { url: 'http://127.0.0.1:4000', dashboard_url: 'http://127.0.0.1:4000/', auto_register: true }, scan_dirs: ['models', '~/Models'] }),
+    'PUT /api/settings': ({ json }) => ok(json),
+    'GET /api/status': () => ok({ loaded: inst.size > 0, busy: false, stats: svcById('lcpp').stats }),
   };
 }

@@ -30,6 +30,10 @@
       "params": {
         "ctx-size": 131072
       }
+    },
+    "smollm2-135m-instruct": {
+      "nicknames": [],
+      "path": "SmolLM2-135M-Instruct/SmolLM2-135M-Instruct-Q4_K_M.gguf"
     }
   }
 }

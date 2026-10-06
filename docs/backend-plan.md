@@ -814,17 +814,18 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - the memory panel counts the `lcpp-*` units
   - `uv tool install --editable services/lcpp` to point the `lcpp` CLI at the new copy.
 - [x] **10.6** `MOVED.md` in `~/Models/LLMs`. Only this folder; the rest of `~/Models` is handled in Phase 11.
-- [ ] **10.7 LLM Launcher page (Part B1).** Port lcpp's existing views into tabs inside the shell (Instances, Catalog, Playground, Relay publishing), and add the instance-memory chart and tokens/s per reply.
+- [x] **10.7 LLM Launcher page (Part B1).** *As built:* `services/lcpp/ui/page.js`, a port of lcpp's views onto `mod-kit.js`/`mod-charts.js`. Instances: cards (state, URL, memory, params, relay state; stop, restart, publish, logs with live follow, chat), a Launch form with live preflight (needs vs available, warnings) that uses `callRoom` for make-room, and the Launcher's memory over 1 h. Catalog: entries with problems and capabilities, a size treemap, discovered GGUFs to add, Hugging Face downloads with progress. Playground: streaming chat (reasoning shown above the answer), tokens/s and TTFT per reply with a chart. Relay publishing: status, test, owned registrations (unregister, remove orphans), other endpoints. Launcher settings: lcpp's own `lcpp.json` (its own tab: a page module can't add to the generic Settings tab). Router launches and per-model overrides stay in lcpp's native UI (linked in the header). Port lcpp's existing views into tabs inside the shell (Instances, Catalog, Playground, Relay publishing), and add the instance-memory chart and tokens/s per reply.
 
 **Checks & deliverables — Phase 10**
-- [ ] From the Launcher page:
+- [x] From the Launcher page:
   - launch an instance (memory acquire shows Make room when needed)
   - chat in the Playground
   - publish it to the relay
   - stop it
-- [ ] Instances that were running survived the cutover without a restart.
-- [ ] A Hugging Face download lands in `data/models/llm/`, is registered with its source, and appears on the Models page.
-- [ ] Delivered: `services/lcpp`, the GGUFs in `data/models/llm`, and the page.
+  *Checked (2026-10-06):* MiniCPM 5 2B launched through the proxy with relay publishing (acquire granted; the needs_room → Make room path is covered by lcpp's tests and `callRoom`'s), chatted in the Playground (77.8 tok/s), registered on the relay with its manager link, and stopped.
+- [x] Instances that were running survived the cutover without a restart. *Checked:* none were running at the cutover; restarting the lcpp mod with MiniCPM running kept its pid and re-adopted it.
+- [x] A Hugging Face download lands in `data/models/llm/`, is registered with its source, and appears on the Models page. *Checked:* `unsloth/SmolLM2-135M-Instruct-GGUF` (Q4_K_M, 105 MB) → `data/models/llm/SmolLM2-135M-Instruct/`, registered as `smollm2-135m-instruct` with repo, revision and sha256, and added to lcpp's catalog.
+- [x] Delivered: `services/lcpp`, the GGUFs in `data/models/llm`, and the page.
 
 # Stage C — New capabilities
 

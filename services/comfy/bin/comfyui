@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# comfyui — control ComfyUI in the kyuz0 AMD Strix Halo (gfx1151) toolbox, for AIHub's
+# comfy mod (plan Phase 11.2). Moved here from ~/.local/bin/comfyui.
+#
+#   comfyui start      ensure the toolbox is up, launch ComfyUI, wait for the UI
+#   comfyui stop       stop ComfyUI (and the toolbox container)
+#   comfyui restart    stop + start
+#   comfyui status     container state + whether the web UI answers
+#   comfyui logs       follow ComfyUI's log  (comfyui logs 100  -> last 100 lines)
+#   comfyui shell      drop into the toolbox  (toolbox enter)
+#   comfyui update     pull a newer toolbox image and recreate the container
+#   comfyui workflows  workflow packs: list, show, check, new, copy, run (comfyui workflows -h)
+#
+# Runtime: kyuz0/amd-strix-halo-comfyui (ROCm nightly + PyTorch, gfx1151-tuned, AOTriton).
+# ComfyUI lives at /opt/ComfyUI inside the container. Everything else is in this mod's
+# folder or AIHub's data folders; the toolbox shares $HOME, so the paths are the same inside.
+#   custom_nodes/  user/  input/   this mod (gitignored); user/default/workflows -> ../../../workflows
+#   models         $COMFY_MODELS   (default: <AIHub>/data/models/comfyui)
+#   output         $COMFY_OUTPUTS  (default: <AIHub>/outputs/comfy)
+#   log, pid       data/
+# The toolbox shares the host network, so the port below is the host port.
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+MOD="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+ROOT="$(cd "$MOD/../.." && pwd)"
+
+TOOLBOX="${COMFY_TOOLBOX:-strix-halo-comfyui}"
+IMAGE="docker.io/kyuz0/amd-strix-halo-comfyui:latest"
+PORT="${COMFY_PORT_UI:-8199}"
+MODELS="${COMFY_MODELS:-$ROOT/data/models/comfyui}"
+OUTPUTS="${COMFY_OUTPUTS:-$ROOT/outputs/comfy}"
+DATA="${COMFY_DATA:-$MOD/data}"
+
+URL="http://127.0.0.1:${PORT}"
+YAML="$MOD/extra_model_paths.yaml"
+LOG="$DATA/comfyui.log"                  # host-visible (home is shared with the container)
+PIDFILE="$DATA/comfyui.pid"              # container-namespace PID of the ComfyUI process
+
+# gfx1151 launch flags (kyuz0 defaults): --disable-mmap avoids the slow ROCm mmap path above
+# 64GB that hangs model loading; --fp32-vae keeps the FLUX.2 small-decoder VAE numerically safe.
+# --listen must stay a loopback address: ComfyUI-Manager gates custom-node installs on
+# is_loopback(args.listen), and binding 0.0.0.0 makes it refuse every install.
+LAUNCH="cd /opt/ComfyUI && exec python main.py \
+  --listen 127.0.0.1 --port ${PORT} \
+  --extra-model-paths-config ${YAML} \
+  --output-directory ${OUTPUTS} \
+  --input-directory ${MOD}/input \
+  --user-directory ${MOD}/user \
+  --database-url sqlite:///${MOD}/user/comfyui.db \
+  --disable-mmap --fp32-vae \
+  --enable-manager"
+
+web_up()      { curl -fsS --max-time 2 "$URL/system_stats" >/dev/null 2>&1; }
+ctr_exists()  { podman container exists "$TOOLBOX"; }
+ctr_running() { [ "$(podman inspect -f '{{.State.Running}}' "$TOOLBOX" 2>/dev/null)" = "true" ]; }
+# The toolbox image lacks pgrep/pkill, so track the process by PID file instead.
+comfy_pid()   { cat "$PIDFILE" 2>/dev/null; }
+comfy_alive() { local p; p="$(comfy_pid)"; [ -n "$p" ] && podman exec "$TOOLBOX" kill -0 "$p" 2>/dev/null; }
+
+ensure_container() {
+  if ! ctr_exists; then
+    echo "[comfyui] Toolbox '$TOOLBOX' not found — creating it from $IMAGE ..."
+    toolbox create "$TOOLBOX" --image "$IMAGE" -- \
+      --device /dev/dri --device /dev/kfd \
+      --group-add video --group-add render --security-opt seccomp=unconfined
+  fi
+  ctr_running || { echo "[comfyui] Starting toolbox container ..."; podman start "$TOOLBOX" >/dev/null; }
+}
+
+# The toolbox ships a minimal venv; the custom nodes need a couple of pure-python deps (NOT
+# torch). Idempotent and fast when already present; re-heals after `comfyui update`.
+ensure_deps() {
+  # ComfyUI 0.8+ loads ComfyUI-Manager 4.x as the pip package `comfyui_manager` (driven by
+  # --enable-manager), NOT as a custom_nodes checkout.
+  if ! podman exec -u "$USER" "$TOOLBOX" python -c "import gguf, comfyui_manager" >/dev/null 2>&1; then
+    echo "[comfyui] Installing custom-node deps into the toolbox venv (no torch) ..."
+    podman exec -u "$USER" "$TOOLBOX" python -m pip install --no-cache-dir -q gguf || true
+    podman exec -u "$USER" "$TOOLBOX" python -m pip install --no-cache-dir -q --pre comfyui_manager || true
+  fi
+}
+
+wait_for_ui() {
+  echo -n "[comfyui] Waiting for the web UI"
+  for _ in $(seq 1 150); do
+    if web_up; then echo "" ; echo "[comfyui] UP  ->  $URL" ; return 0 ; fi
+    if [ -s "$PIDFILE" ] && ! comfy_alive; then
+      echo "" ; echo "[comfyui] ComfyUI process exited. Recent log:" ; tail -n 40 "$LOG" 2>/dev/null ; return 1
+    fi
+    echo -n "." ; sleep 2
+  done
+  echo "" ; echo "[comfyui] Not answering yet — check: comfyui logs" ; return 1
+}
+
+case "${1:-}" in
+  start)
+    mkdir -p "$DATA" "$OUTPUTS" "$MOD/input" "$MOD/user/default" "$MOD/custom_nodes" "$MOD/workflows"
+    ensure_container
+    if web_up; then echo "[comfyui] Already running -> $URL" ; exit 0 ; fi
+    if comfy_alive; then echo "[comfyui] ComfyUI process already up, waiting for UI..." ; wait_for_ui ; exit $? ; fi
+    ensure_deps
+    : > "$LOG" ; rm -f "$PIDFILE"
+    echo "[comfyui] Launching ComfyUI inside the toolbox (models: $MODELS) ..."
+    podman exec -d -u "$USER" -e TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 \
+      -e COMFY_MODELS="$MODELS" -e COMFY_MOD="$MOD" \
+      "$TOOLBOX" bash -lc "echo \$\$ > '$PIDFILE'; $LAUNCH >> '$LOG' 2>&1"
+    wait_for_ui
+    ;;
+  stop)
+    echo "[comfyui] Stopping ComfyUI ..."
+    pid="$(comfy_pid)"
+    if [ -n "$pid" ] && ctr_running; then podman exec -u "$USER" "$TOOLBOX" kill "$pid" 2>/dev/null || true; fi
+    rm -f "$PIDFILE"
+    if ctr_running; then echo "[comfyui] Stopping toolbox container ..."; podman stop "$TOOLBOX" >/dev/null; fi
+    echo "[comfyui] Stopped."
+    ;;
+  restart)
+    "$0" stop || true
+    "$0" start
+    ;;
+  status)
+    echo "Image  : $IMAGE"
+    echo "Mod    : $MOD"
+    echo "Models : $MODELS"
+    echo "Outputs: $OUTPUTS"
+    if ctr_running; then echo "Toolbox: running ($TOOLBOX)"; else echo "Toolbox: stopped"; fi
+    if ctr_running && comfy_alive; then echo "ComfyUI: process up (pid $(comfy_pid))"; else echo "ComfyUI: not running"; fi
+    if web_up; then echo "Web UI : UP  ->  $URL"; else echo "Web UI : not responding"; fi
+    ;;
+  logs)
+    [ -f "$LOG" ] || { echo "[comfyui] No log yet at $LOG (start it first)."; exit 1; }
+    if [ "${2:-}" = "-f" ] || [ -z "${2:-}" ]; then tail -n 200 -f "$LOG"; else tail -n "$2" "$LOG"; fi
+    ;;
+  shell)
+    exec toolbox enter "$TOOLBOX"
+    ;;
+  update)
+    echo "[comfyui] Pulling newer toolbox image ..."
+    podman pull "$IMAGE"
+    "$0" stop || true
+    podman rm -f "$TOOLBOX" 2>/dev/null || true
+    ensure_container
+    "$0" start
+    ;;
+  workflows|wf)
+    shift
+    cd "$MOD" && exec "$MOD/.venv/bin/python" -m comfy.cli "$@"
+    ;;
+  ""|-h|--help|help)
+    grep '^#' "$0" | sed 's/^# \{0,1\}//' | sed '1,2d;/^-\{10,\}/q'
+    ;;
+  *)
+    echo "Unknown command: $1"
+    echo "Usage: comfyui {start|stop|restart|status|logs|shell|update|workflows}"
+    exit 1
+    ;;
+esac

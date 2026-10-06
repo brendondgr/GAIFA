@@ -1,0 +1,31 @@
+# Where ComfyUI finds models and custom nodes (passed by bin/comfyui as --extra-model-paths-config).
+# $COMFY_MODELS is set by bin/comfyui: AIHub's data/models/comfyui unless overridden.
+# Relative base paths resolve against this file's folder (ComfyUI's utils/extra_config.py).
+comfyui:
+    base_path: $COMFY_MODELS
+    is_default: true
+    audio_encoders: audio_encoders
+    checkpoints: checkpoints
+    clip: clip
+    clip_vision: clip_vision
+    configs: configs
+    controlnet: controlnet
+    diffusers: diffusers
+    diffusion_models: diffusion_models
+    embeddings: embeddings
+    gligen: gligen
+    hypernetworks: hypernetworks
+    latent_upscale_models: latent_upscale_models
+    loras: loras
+    model_patches: model_patches
+    photomaker: photomaker
+    style_models: style_models
+    text_encoders: text_encoders
+    ultralytics: ultralytics
+    unet: unet
+    upscale_models: upscale_models
+    vae: vae
+    vae_approx: vae_approx
+aihub_mod:
+    base_path: ./
+    custom_nodes: custom_nodes

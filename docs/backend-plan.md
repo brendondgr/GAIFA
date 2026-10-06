@@ -881,18 +881,19 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
 
 - [x] **11.1 Scaffold** `services/comfy` from `_template`: a FastAPI adapter on port 5070 in the package `services/comfy/comfy/`, with `data/databases/comfy.db` for runs and per-workflow statistics.
   *Done when:* `aihub check comfy` passes, and the mod is listed as stopped.
-- [ ] **11.2 Bring the ComfyUI control script in.**
+- [x] **11.2 Bring the ComfyUI control script in.**
   - Move `~/.local/bin/comfyui` to `services/comfy/bin/comfyui` and change its folders:
     - `custom_nodes` → `services/comfy/custom_nodes` (moved from `~/Models/ComfyUI-next`)
     - `user` → `services/comfy/user`
     - `input` → `services/comfy/input`
     - `--output-directory {outputs}`
-  - **The workflows folder is shared with ComfyUI.** `services/comfy/user/default/workflows` is a symlink to `../../../workflows`. Every pack opens in ComfyUI's workflow browser, and a workflow saved from ComfyUI into a new folder there becomes a draft pack.
-    - Check how ComfyUI's browser shows `workflow.api.json` files. If it lists them as broken workflows, rename them to `workflow.api` and update the format above and 11.11.
+  - **ComfyUI's workflows folder** (`services/comfy/user/default/workflows`) is ComfyUI's view of the packs, kept by the adapter (11.5): a symlink `<id>.json` per pack to its `workflow.json`. Any other `.json` there (a workflow saved from ComfyUI under a new name) is a draft.
+    - *As built:* ComfyUI's browser lists every non-hidden file in that folder, and opening an API graph there gives an empty canvas, so it can't point at the pack folders themselves (each pack's `workflow.toml`, preview and API graph would show). ComfyUI saves by writing a temporary file and renaming it over the old one, which replaces the symlink; the adapter moves that file into the pack and puts the symlink back.
+    - The curated workflows from `~/Models/ComfyUI-next/user/default/workflows` start there as drafts, except the held-out Qwen-Image-2.1; the originals are kept in `~/Models/ComfyUI-next/workflows/user-original/`.
   - Add `services/comfy/extra_model_paths.yaml` with `base_path: {models}/comfyui`.
   - The adapter tails ComfyUI's log file to stdout, so it appears in the Logs tab (journald).
   - Add a `workflows` subcommand to `bin/comfyui` that runs the Python CLI from 11.5.
-  *Done when:* `bin/comfyui start` serves on 8199 from the new folders, and ComfyUI's browser lists a test pack.
+  *Done when:* `bin/comfyui start` serves on 8199 from the new folders, ComfyUI's browser lists the drafts, and the adapter's log tail shows ComfyUI's log in `aihub logs comfy`.
 - [ ] **11.3 Move models.**
   - `mv ~/Models/ComfyUI/models/* data/models/comfyui/` (114 GB, an instant rename), with a symlink at the old path for the legacy container.
   - Move `download_qwen_image_2.1.sh` into `services/comfy/scripts/`.
@@ -909,7 +910,8 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
   - **Manifest:** `containers = ["strix-halo-comfyui"]`, `estimate_gb = 24`, `ui.native = "http://127.0.0.1:8199/"`.
   *Done when:* load, unload and status work against the live ComfyUI (`services/comfy/tests/test_control.py`, using a fake ComfyUI for CI), and the memory chart shows the drop on unload.
 - [ ] **11.5 Workflow packs: load, convert, check** (`comfy/packs.py`, `comfy/convert.py`, `comfy/check.py`, `comfy/cli.py`).
-  - **Loading:** scan `workflows/*/`, parse `workflow.toml` (unknown keys are errors, as in `service.toml`), and watch file modification times, so edits apply without a restart. A folder without `workflow.toml` is a draft. A broken pack is listed with its errors and never stops the adapter.
+  - **Loading:** scan `workflows/*/`, parse `workflow.toml` (unknown keys are errors, as in `service.toml`), and watch file modification times, so edits apply without a restart. A pack folder without `workflow.toml` is a draft, as is any loose `.json` in ComfyUI's workflows folder. A broken pack is listed with its errors and never stops the adapter.
+  - **ComfyUI's view** (`sync_comfy_view()`, on every scan): create the `<id>.json` symlinks, remove ones whose pack is gone (only symlinks into `workflows/`, never regular files), and move a regular file that replaced a pack's symlink (a save from ComfyUI) into that pack as `workflow.json`.
   - **Editor → API conversion,** using the node catalog. It handles:
     - widget values in input order, including the extra `control_after_generate` value after seed inputs
     - widgets turned into inputs, and links
@@ -968,7 +970,7 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
     - Missing custom nodes are only reported, with the package name: installing one runs third-party code, so you install it with ComfyUI-Manager.
   *Done when:* each import source has a test that produces a draft with the expected issues, and an MP4 or PNG from `outputs/comfy` re-imports to the same API graph.
 - [ ] **11.9 Bring in the development set and cut over.**
-  - Import the development workflows as packs with `comfyui workflows new`, review their `workflow.toml`, and set the default pack per task.
+  - Turn the development drafts (and Krea2 03 and the two Z-Image files) into packs with `comfyui workflows new`, review their `workflow.toml`, and set the default pack per task.
   - Point `~/.local/bin/comfyui` at the mod's script.
   - **Verify:**
     - an image run appears on the Outputs page with its prompt
@@ -985,7 +987,7 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
   - A task tool called without `workflow` uses the task's default pack (11.7), else its only ready pack.
   *Done when:* `/v1/tools` changes when a pack is added or removed, without a restart, and the manifest test covers `[agent]` and `job`.
 - [ ] **11.11 Images & Video page (Part B5)**, as `services/comfy/ui/page.js`, plus the docs.
-  - **Workflows tab:** cards grouped by task, each with its preview, check state and a default star. Drafts carry a "Review" badge.
+  - **Workflows tab:** cards grouped by task, each with its preview, check state and a default star. Drafts (including workflows saved from ComfyUI) carry a "Review" badge.
   - **Run:**
     - a `SchemaForm` built from the pack's schema, with preset chips
     - queue progress
@@ -1023,7 +1025,7 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
 **Checks & deliverables — Phase 11**
 - [ ] Z-Image and Wan 2.1 both run from the page. Results land in `outputs/comfy/<date>/` with sidecars and appear live.
 - [ ] Adding a pack folder, editing its `workflow.toml` and deleting it each show up on the page without a restart.
-- [ ] A workflow saved from ComfyUI into a new folder appears as a draft, and the review screen turns it into a working pack.
+- [ ] A workflow saved from ComfyUI under a new name appears as a draft, and the review screen turns it into a working pack. Saving a pack's workflow in ComfyUI updates the pack.
 - [ ] Unloading comfy (ComfyUI's `/free`) shows the memory drop on the chart.
 - [ ] `aihub doctor` finds the ComfyUI models only in `data/models/comfyui/`, plus the legacy symlink.
 - [ ] `docs/comfy-transfer-report.md` shows the held-out scores before and after fixes.

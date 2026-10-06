@@ -25,6 +25,7 @@ COMFY_DB = "{databases}/comfy.db"
 COMFY_OUTPUTS = "{outputs}"
 COMFY_WORKFLOWS = "{service_dir}/workflows"
 COMFY_CONTROL = "{service_dir}/bin/comfyui"
+COMFY_MODELS = "{models}/comfyui"
 
 [outputs]
 kinds = ["image", "video"]

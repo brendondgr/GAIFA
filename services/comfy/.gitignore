@@ -1,10 +1,8 @@
-# Machine state, not source: the node-catalog cache, ComfyUI's own folders, and output
-# when running standalone. Workflow packs (workflows/) are tracked.
+# Machine state, not source: the node-catalog cache and ComfyUI's log, ComfyUI's own folders
+# (user/ includes its workflows folder: generated symlinks to the packs, plus drafts), and
+# output when running standalone. Workflow packs (workflows/) are tracked.
 /data/
 /custom_nodes/
-/user/*
-!/user/default/
-/user/default/*
-!/user/default/workflows
+/user/
 /input/
 /output/

@@ -23,6 +23,7 @@ class Settings:
     db: Path                 # runs, statistics, per-task defaults
     outputs: Path            # ComfyUI's --output-directory
     workflows: Path          # the packs
+    comfy_view: Path         # ComfyUI's own workflows folder (symlinks to the packs, drafts)
     control: Path            # bin/comfyui
     hub_url: str             # "" when not under AIHub
     load_timeout_s: float
@@ -40,6 +41,7 @@ class Settings:
             db=_path(env, "COMFY_DB", data / "comfy.db"),
             outputs=_path(env, "COMFY_OUTPUTS", ROOT / "output"),
             workflows=_path(env, "COMFY_WORKFLOWS", ROOT / "workflows"),
+            comfy_view=_path(env, "COMFY_VIEW", ROOT / "user" / "default" / "workflows"),
             control=_path(env, "COMFY_CONTROL", ROOT / "bin" / "comfyui"),
             hub_url=env.get("AIHUB_URL", "").rstrip("/"),
             load_timeout_s=float(env.get("COMFY_LOAD_TIMEOUT_S", "600")),

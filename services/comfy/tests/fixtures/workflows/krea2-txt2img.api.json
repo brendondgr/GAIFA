@@ -1,0 +1,140 @@
+{
+ "2": {
+  "inputs": {
+   "unet_name": "krea2TurboFP8_krea2TURBO.safetensors",
+   "weight_dtype": "default"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "Krea 2 Turbo (diffusion model)"
+  }
+ },
+ "3": {
+  "inputs": {
+   "clip_name": "qwen3vl_4b_bf16.safetensors",
+   "type": "krea2",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "Qwen3-VL-4B  ·  type = krea2"
+  }
+ },
+ "4": {
+  "inputs": {
+   "vae_name": "qwen_image_vae.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "VAE"
+  }
+ },
+ "5": {
+  "inputs": {
+   "text": "a photograph of a red merle australian shepherd dog sitting on carpet indoors, wearing a black silk top hat, warm lamp light, shallow depth of field, sharp detail on the fur",
+   "clip": [
+    "3",
+    0
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Positive prompt"
+  }
+ },
+ "6": {
+  "inputs": {
+   "text": "",
+   "clip": [
+    "3",
+    0
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Negative (unused at CFG 1.0)"
+  }
+ },
+ "7": {
+  "inputs": {
+   "conditioning": [
+    "6",
+    0
+   ]
+  },
+  "class_type": "ConditioningZeroOut",
+  "_meta": {
+   "title": "ConditioningZeroOut"
+  }
+ },
+ "8": {
+  "inputs": {
+   "width": 832,
+   "height": 1248,
+   "batch_size": 1
+  },
+  "class_type": "EmptySD3LatentImage",
+  "_meta": {
+   "title": "Empty latent 832x1248"
+  }
+ },
+ "9": {
+  "inputs": {
+   "seed": 812310042,
+   "steps": 10,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1,
+   "model": [
+    "2",
+    0
+   ],
+   "positive": [
+    "5",
+    0
+   ],
+   "negative": [
+    "7",
+    0
+   ],
+   "latent_image": [
+    "8",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "KSampler  ·  turbo = 10 steps @ CFG 1.0"
+  }
+ },
+ "10": {
+  "inputs": {
+   "samples": [
+    "9",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAEDecode"
+  }
+ },
+ "11": {
+  "inputs": {
+   "filename_prefix": "krea2/t2i/2026-10-06_t2i",
+   "images": [
+    "10",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "Save"
+  }
+ }
+}

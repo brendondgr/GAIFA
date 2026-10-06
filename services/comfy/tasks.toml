@@ -1,0 +1,123 @@
+# Tasks a workflow pack can implement (`task = "…"` in its workflow.toml), and the shared input
+# names packs use. The agent gets one tool per task that has a ready pack (`tool`), so any pack
+# that implements a task can stand in for another. Add a task by adding a table here.
+# Guide: docs/workflows.md.
+
+[tasks.text-to-image]
+name = "Text to image"
+tool = "generate_image"
+description = "Make an image from a text description."
+required = ["prompt"]
+output = "image"
+
+[tasks.image-edit]
+name = "Image edit"
+tool = "edit_image"
+description = "Change an existing image as the prompt instructs."
+required = ["image", "prompt"]
+output = "image"
+
+[tasks.image-to-video]
+name = "Image to video"
+tool = "animate_image"
+description = "Animate a still image into a short video, guided by a prompt."
+required = ["image", "prompt"]
+output = "video"
+
+[tasks.text-to-video]
+name = "Text to video"
+tool = "generate_video"
+description = "Make a short video from a text description."
+required = ["prompt"]
+output = "video"
+
+[tasks.upscale]
+name = "Upscale"
+tool = "upscale_image"
+description = "Make an image larger and sharper."
+required = ["image"]
+output = "image"
+
+[tasks.remove-background]
+name = "Remove background"
+tool = "remove_background"
+description = "Cut the subject out of an image, leaving a transparent background."
+required = ["image"]
+output = "image"
+
+[tasks.custom]
+name = "Custom"
+description = "Anything else: offered to the agent only through run_workflow."
+required = []
+
+# ---- shared input names --------------------------------------------------------------------
+# `type` is the JSON type; `derived` inputs aren't graph fields: the adapter turns them into the
+# fields a pack does map (aspect + megapixels → width/height, seconds → frames).
+
+[inputs.prompt]
+type = "string"
+description = "What to make, in plain words"
+
+[inputs.negative]
+type = "string"
+description = "What to avoid"
+
+[inputs.image]
+type = "file"
+description = "The input image: an AIHub output id or an uploaded file"
+
+[inputs.images]
+type = "files"
+description = "Several input images (references)"
+
+[inputs.mask]
+type = "file"
+description = "A mask image: white is the area to change"
+
+[inputs.width]
+type = "integer"
+description = "Width in pixels"
+
+[inputs.height]
+type = "integer"
+description = "Height in pixels"
+
+[inputs.aspect]
+type = "string"
+derived = true
+description = "Aspect ratio such as 1:1, 16:9 or 9:16 (sets width and height)"
+choices = ["1:1", "4:3", "3:4", "3:2", "2:3", "16:9", "9:16", "21:9"]
+
+[inputs.megapixels]
+type = "number"
+derived = true
+description = "Image size in megapixels, used with aspect (default 1.0)"
+
+[inputs.seed]
+type = "integer"
+description = "Random seed; -1 picks one"
+
+[inputs.steps]
+type = "integer"
+description = "Sampling steps"
+
+[inputs.cfg]
+type = "number"
+description = "Prompt guidance (CFG)"
+
+[inputs.strength]
+type = "number"
+description = "How much to change the input image (denoise), 0 to 1"
+
+[inputs.frames]
+type = "integer"
+description = "Number of video frames"
+
+[inputs.fps]
+type = "integer"
+description = "Frames per second"
+
+[inputs.seconds]
+type = "number"
+derived = true
+description = "Video length in seconds (sets frames)"

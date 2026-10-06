@@ -9,11 +9,14 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from . import control, hub, logtail
+from . import api_workflows, control, hub, logtail
 from .client import ComfyClient, ComfyError
 from .config import Settings
 from .db import DB
+from .library import Library
 from .nodes import NodeCatalog
+from .packs import Packs
+from .tasks import Tasks
 
 log = logging.getLogger("comfy")
 
@@ -24,6 +27,17 @@ async def _cancel(task: asyncio.Task) -> None:
     task.cancel()
     with suppress(asyncio.CancelledError, TimeoutError):
         await asyncio.wait_for(asyncio.shield(task), 5)
+
+
+async def _watch(lib: Library) -> None:
+    """Pick up pack edits (and saves made in ComfyUI) within a second, without a restart."""
+    while True:
+        try:
+            lib.packs.scan()
+            await lib.refresh_models()
+        except Exception:  # noqa: BLE001
+            log.exception("workflow scan failed")
+        await asyncio.sleep(1.0)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -39,8 +53,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         st.catalog = NodeCatalog.load(settings.data / "object_info.json")
         st.control = control.Controller(st.client, st.catalog, str(settings.control),
                                         settings.load_timeout_s, settings.idle_unload_s)
+        st.packs = Packs(settings.workflows, settings.comfy_view)
+        st.library = Library(st.packs, st.catalog, Tasks.load(), settings.hub_url)
         tasks = [asyncio.create_task(logtail.follow(settings.data / "comfyui.log")),
-                 asyncio.create_task(st.control.run())]
+                 asyncio.create_task(st.control.run()),
+                 asyncio.create_task(_watch(st.library))]
         try:
             yield
         finally:
@@ -68,4 +85,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(hub.router)
     app.include_router(control.router)
+    app.include_router(api_workflows.router)
     return app

@@ -40,6 +40,7 @@ class NodeCatalog:
     def __init__(self, info: dict[str, Any] | None = None, path: Path | None = None):
         self.info: dict[str, Any] = info or {}
         self.path = path
+        self.version = 0
 
     @classmethod
     def load(cls, path: Path) -> NodeCatalog:
@@ -50,6 +51,7 @@ class NodeCatalog:
 
     def save(self, info: dict) -> None:
         self.info = info
+        self.version += 1
         if self.path:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".part")

@@ -1,0 +1,271 @@
+{
+ "2": {
+  "inputs": {
+   "unet_name": "flux-2-klein-9b-fp8.safetensors",
+   "weight_dtype": "default"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "FLUX.2 Klein 9B distilled"
+  }
+ },
+ "3": {
+  "inputs": {
+   "clip_name": "qwen_3_8b_fp8mixed.safetensors",
+   "type": "flux2",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "Qwen3-8B  ·  type = flux2"
+  }
+ },
+ "4": {
+  "inputs": {
+   "vae_name": "flux2-vae.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "FLUX.2 VAE"
+  }
+ },
+ "5": {
+  "inputs": {
+   "image": "example_dog.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "Source image"
+  }
+ },
+ "6": {
+  "inputs": {
+   "upscale_method": "lanczos",
+   "megapixels": 1,
+   "resolution_steps": 16,
+   "image": [
+    "5",
+    0
+   ]
+  },
+  "class_type": "ImageScaleToTotalPixels",
+  "_meta": {
+   "title": "Fit to ~1 MP (/16)"
+  }
+ },
+ "7": {
+  "inputs": {
+   "pixels": [
+    "6",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  },
+  "class_type": "VAEEncode",
+  "_meta": {
+   "title": "VAEEncode → reference latent"
+  }
+ },
+ "8": {
+  "inputs": {
+   "image": [
+    "6",
+    0
+   ]
+  },
+  "class_type": "GetImageSize",
+  "_meta": {
+   "title": "GetImageSize → drives output size"
+  }
+ },
+ "9": {
+  "inputs": {
+   "text": "Add a black silk top hat to the dog's head.",
+   "clip": [
+    "3",
+    0
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "Instruction  ← say what to change"
+  }
+ },
+ "10": {
+  "inputs": {
+   "conditioning": [
+    "9",
+    0
+   ],
+   "latent": [
+    "7",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent",
+  "_meta": {
+   "title": "ReferenceLatent  ← the image enters here"
+  }
+ },
+ "11": {
+  "inputs": {
+   "conditioning": [
+    "9",
+    0
+   ]
+  },
+  "class_type": "ConditioningZeroOut",
+  "_meta": {
+   "title": "Negative (unused at CFG 1.0)"
+  }
+ },
+ "12": {
+  "inputs": {
+   "conditioning": [
+    "11",
+    0
+   ],
+   "latent": [
+    "7",
+    0
+   ]
+  },
+  "class_type": "ReferenceLatent",
+  "_meta": {
+   "title": "ReferenceLatent (negative)"
+  }
+ },
+ "14": {
+  "inputs": {
+   "cfg": 1,
+   "model": [
+    "2",
+    0
+   ],
+   "positive": [
+    "10",
+    0
+   ],
+   "negative": [
+    "12",
+    0
+   ]
+  },
+  "class_type": "CFGGuider",
+  "_meta": {
+   "title": "CFGGuider  ·  cfg 1.0 (distilled)"
+  }
+ },
+ "15": {
+  "inputs": {
+   "noise_seed": 812310042
+  },
+  "class_type": "RandomNoise",
+  "_meta": {
+   "title": "Random noise  ← re-roll me first"
+  }
+ },
+ "16": {
+  "inputs": {
+   "sampler_name": "euler"
+  },
+  "class_type": "KSamplerSelect",
+  "_meta": {
+   "title": "Sampler"
+  }
+ },
+ "17": {
+  "inputs": {
+   "steps": 4,
+   "width": [
+    "8",
+    0
+   ],
+   "height": [
+    "8",
+    1
+   ]
+  },
+  "class_type": "Flux2Scheduler",
+  "_meta": {
+   "title": "Flux2Scheduler  ·  4 steps"
+  }
+ },
+ "18": {
+  "inputs": {
+   "width": [
+    "8",
+    0
+   ],
+   "height": [
+    "8",
+    1
+   ],
+   "batch_size": 1
+  },
+  "class_type": "EmptyFlux2LatentImage",
+  "_meta": {
+   "title": "Empty latent — 128 ch"
+  }
+ },
+ "19": {
+  "inputs": {
+   "noise": [
+    "15",
+    0
+   ],
+   "guider": [
+    "14",
+    0
+   ],
+   "sampler": [
+    "16",
+    0
+   ],
+   "sigmas": [
+    "17",
+    0
+   ],
+   "latent_image": [
+    "18",
+    0
+   ]
+  },
+  "class_type": "SamplerCustomAdvanced",
+  "_meta": {
+   "title": "Sample"
+  }
+ },
+ "20": {
+  "inputs": {
+   "samples": [
+    "19",
+    0
+   ],
+   "vae": [
+    "4",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAEDecode"
+  }
+ },
+ "21": {
+  "inputs": {
+   "filename_prefix": "flux2-klein/edit/2026-10-06_edit",
+   "images": [
+    "20",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "Save"
+  }
+ }
+}

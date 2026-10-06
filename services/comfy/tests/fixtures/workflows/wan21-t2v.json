@@ -1,0 +1,709 @@
+{
+  "id": "01_wan21_text-to-video",
+  "revision": 0,
+  "last_node_id": 14,
+  "last_link_id": 13,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        -40,
+        -60
+      ],
+      "size": [
+        560,
+        1700
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "title": "Note",
+      "properties": {},
+      "widgets_values": [
+        "# Status: verified working on this box (2026-08-24)\n\nAll four model slots are present and were checked **by tensor layout**, not by\nfilename:\n\n| slot | file | verified |\n|---|---|---|\n| diffusion model | `wan2.1_t2v_14B_fp8_e4m3fn.safetensors` / `wan2.1_i2v_480p_14B_fp8_e4m3fn.safetensors` | \u2705 |\n| text encoder | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | \u2705 loads as `WanTEModel`, 6419 MB |\n| VAE | `wan_2.1_vae.safetensors` | \u2705 |\n| CLIP-Vision (I2V) | `clip_vision_h.safetensors` | \u2705 1208 MB |\n| speed LoRA | `Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors` | \u2705 native `diffusion_model.*` keys |\n\n## \u26a0 `weight_dtype` must stay on `fp8_e4m3fn` \u2014 this is not cosmetic\n\nThe checkpoint is fp8 on disk (15.3 GB). With `weight_dtype = default`, ComfyUI\n**upcasts it to fp16 on load**: the log reads\n\n```\nRequested to load WAN21\nloaded completely; 31269.80 MB loaded     <-- 30.5 GB, not 15.3\n```\n\nAdd the 6.3 GB encoder, 1.2 GB CLIP-Vision and 0.5 GB VAE and you are at ~38.5 GB\nof weights before a single activation is allocated. On 2026-08-24 that OOM-killed\nComfyUI outright:\n\n```\nkernel: Out of memory: Killed process (python) anon-rss:31872944kB\n```\n\nand on the retry it survived only by swapping \u2014 step 1 ran at **4.6 s/it**, step 2\nat **149 s/it**, step 3 at **197 s/it**. A 40\u00d7 cliff like that is always thrash,\nnever compute.\n\n`fp8_e4m3fn` keeps the transformer at its native ~15 GB and halves the footprint.\n\n## The other memory lever: the text encoder\n\n`CLIPLoader device = cpu` keeps umT5 (6.3 GB) off the GPU allocator. It encodes\nonce per prompt, so the CPU round-trip costs seconds and buys back 6 GB for the\npart that runs 81 \u00d7 steps times.\n\nIf you are still tight, the order to cut is: **frames \u2192 resolution \u2192 steps.**\nFrames are the cheapest thing to give up and the most expensive thing to keep.\n\n# Wan 2.1 \u2014 text to video\n\n## The matched set \u2014 change one, change all five\n\n| slot | value |\n|---|---|\n| text encoder | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` \u2014 `CLIPLoader type = **wan**`, `device = cpu` |\n| VAE | `wan_2.1_vae.safetensors` (16-ch; this is correct for **all** Wan 2.1 and Wan 2.2 **14B**) |\n| patch node | `ModelSamplingSD3` \u2014 **mandatory**, this is Wan's shift node |\n| latent | 16-channel video latent |\n\n`device = cpu` on the encoder keeps umT5 (\u224811 GB) off the GPU. On unified memory\nthat is a sensible trade: the text encode runs once, the transformer runs 6\u00d781.\n\n## Speed vs quality \u2014 the two paths, and they move together\n\nThe lightx2v LoRA is a **CFG-step-distilled** LoRA. Switching paths means\nchanging **three** things, not one. This is the setting people get wrong.\n\n| | LoRA | steps | CFG | shift |\n|---|---|---|---|---|\n| **fast (shipped default)** | ON @ 0.8 | 6 | **1.0** | **5.0** |\n| quality | BYPASS the LoRA | 30 | **6.0** | **8.0** |\n\nThe negative prompt is inert at CFG 1.0, which is why it runs through\n`ConditioningZeroOut`. Taking the quality path? **Bypass the ConditioningZeroOut\ntoo** \u2014 one right-click \u2014 and the real negative comes back to life.\n\nBe realistic about the quality path on this hardware: 30 steps of a 14B\ntransformer over 81 frames is a very long run. Start on the fast path.\n\n## The 4n+1 frame rule\n\nEvery Wan latent node computes `((length - 1) // 4) + 1`. Only **1, 5, 9 \u2026 81,\n121** land on a chunk boundary; off-grid values are silently truncated and give\nyou a mangled final chunk. The widget steps by 4 to help you, but it will still\nlet you type 50.\n\n`81` frames @ 16 fps = **5.06 s**, which is the 14B\ntraining length. Going much past 81 drifts.\n\n## Resolution\n\n480p is `832 x 480` (landscape) or `480 x 832` (portrait). Both are /16-clean and\nboth are what the 14B was trained on. 720p is `1280 x 704` \u2014 note **704**, not\n720, because 720 is not divisible by 16.\n\nResolution is far more expensive than steps here: every extra pixel is paid\n81 times over.\n"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "UNETLoader",
+      "pos": [
+        600,
+        0
+      ],
+      "size": [
+        420,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "wan2.1_t2v_14B_fp8_e4m3fn.safetensors",
+        "fp8_e4m3fn"
+      ],
+      "title": "Wan 2.1 diffusion model  \u00b7  weight_dtype = fp8_e4m3fn",
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 3,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        600,
+        120
+      ],
+      "size": [
+        420,
+        106
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors",
+        0.8
+      ],
+      "title": "lightx2v speed LoRA  \u00b7  bypass me for the quality path",
+      "color": "#325",
+      "bgcolor": "#437"
+    },
+    {
+      "id": 4,
+      "type": "ModelSamplingSD3",
+      "pos": [
+        600,
+        260
+      ],
+      "size": [
+        420,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            6
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "ModelSamplingSD3"
+      },
+      "widgets_values": [
+        5.0
+      ],
+      "title": "ModelSamplingSD3  \u00b7  shift 5.0 (8.0 without the LoRA)"
+    },
+    {
+      "id": 5,
+      "type": "CLIPLoader",
+      "pos": [
+        600,
+        350
+      ],
+      "size": [
+        420,
+        106
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            3,
+            4
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        "wan",
+        "cpu"
+      ],
+      "title": "umT5-XXL  \u00b7  type = wan, on CPU",
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 6,
+      "type": "VAELoader",
+      "pos": [
+        600,
+        500
+      ],
+      "size": [
+        420,
+        58
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            11
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "wan_2.1_vae.safetensors"
+      ],
+      "title": "Wan 2.1 VAE",
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 7,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1080,
+        0
+      ],
+      "size": [
+        440,
+        220
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            7
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "Cinematic drone shot flying low over a misty pine forest at sunrise, golden light breaking through the fog, slow forward push, volumetric god rays, shallow haze, 35mm film grain"
+      ],
+      "title": "Positive prompt",
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 8,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1080,
+        260
+      ],
+      "size": [
+        440,
+        180
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "\u8272\u8c03\u8273\u4e3d\uff0c\u8fc7\u66dd\uff0c\u9759\u6001\uff0c\u7ec6\u8282\u6a21\u7cca\u4e0d\u6e05\uff0c\u5b57\u5e55\uff0c\u98ce\u683c\uff0c\u4f5c\u54c1\uff0c\u753b\u4f5c\uff0c\u753b\u9762\uff0c\u9759\u6b62\uff0c\u6574\u4f53\u53d1\u7070\uff0c\u6700\u5dee\u8d28\u91cf\uff0c\u4f4e\u8d28\u91cf\uff0cJPEG\u538b\u7f29\u6b8b\u7559\uff0c\u4e11\u964b\u7684\uff0c\u6b8b\u7f3a\u7684\uff0c\u591a\u4f59\u7684\u624b\u6307\uff0c\u753b\u5f97\u4e0d\u597d\u7684\u624b\u90e8\uff0c\u753b\u5f97\u4e0d\u597d\u7684\u8138\u90e8\uff0c\u7578\u5f62\u7684\uff0c\u6bc1\u5bb9\u7684\uff0c\u5f62\u6001\u7578\u5f62\u7684\u80a2\u4f53\uff0c\u624b\u6307\u878d\u5408\uff0c\u9759\u6b62\u4e0d\u52a8\u7684\u753b\u9762\uff0c\u6742\u4e71\u7684\u80cc\u666f\uff0c\u4e09\u6761\u817f\uff0c\u80cc\u666f\u4eba\u5f88\u591a\uff0c\u5012\u7740\u8d70"
+      ],
+      "title": "Negative (standard Wan set)",
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 9,
+      "type": "ConditioningZeroOut",
+      "pos": [
+        1080,
+        470
+      ],
+      "size": [
+        340,
+        30
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            8
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "ConditioningZeroOut"
+      },
+      "widgets_values": [],
+      "title": "ZeroOut \u2014 bypass this on the quality path",
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 10,
+      "type": "EmptyHunyuanLatentVideo",
+      "pos": [
+        1080,
+        560
+      ],
+      "size": [
+        340,
+        130
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            9
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "EmptyHunyuanLatentVideo"
+      },
+      "widgets_values": [
+        832,
+        480,
+        81,
+        1
+      ],
+      "title": "Empty video latent 832x480 x81"
+    },
+    {
+      "id": 11,
+      "type": "KSampler",
+      "pos": [
+        1560,
+        0
+      ],
+      "size": [
+        340,
+        262
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 6
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 7
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 8
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            10
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        812310042,
+        "fixed",
+        6,
+        1.0,
+        "euler",
+        "simple",
+        1.0
+      ],
+      "title": "KSampler \u00b7 6 steps @ CFG 1.0",
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 12,
+      "type": "VAEDecode",
+      "pos": [
+        2000,
+        0
+      ],
+      "size": [
+        300,
+        46
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 10
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "title": "VAEDecode"
+    },
+    {
+      "id": 13,
+      "type": "CreateVideo",
+      "pos": [
+        2000,
+        100
+      ],
+      "size": [
+        300,
+        110
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 12
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "CreateVideo"
+      },
+      "widgets_values": [
+        16.0,
+        8
+      ],
+      "title": "CreateVideo @ 16 fps"
+    },
+    {
+      "id": 14,
+      "type": "SaveVideo",
+      "pos": [
+        2000,
+        240
+      ],
+      "size": [
+        560,
+        480
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 13
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "SaveVideo"
+      },
+      "widgets_values": [
+        "wan21/t2v/%date:yyyy-MM-dd%_t2v",
+        "auto",
+        "auto"
+      ],
+      "title": "Save MP4"
+    }
+  ],
+  "links": [
+    [
+      1,
+      2,
+      0,
+      3,
+      0,
+      "MODEL"
+    ],
+    [
+      2,
+      3,
+      0,
+      4,
+      0,
+      "MODEL"
+    ],
+    [
+      3,
+      5,
+      0,
+      7,
+      0,
+      "CLIP"
+    ],
+    [
+      4,
+      5,
+      0,
+      8,
+      0,
+      "CLIP"
+    ],
+    [
+      5,
+      8,
+      0,
+      9,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      6,
+      4,
+      0,
+      11,
+      0,
+      "MODEL"
+    ],
+    [
+      7,
+      7,
+      0,
+      11,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      8,
+      9,
+      0,
+      11,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      9,
+      10,
+      0,
+      11,
+      3,
+      "LATENT"
+    ],
+    [
+      10,
+      11,
+      0,
+      12,
+      0,
+      "LATENT"
+    ],
+    [
+      11,
+      6,
+      0,
+      12,
+      1,
+      "VAE"
+    ],
+    [
+      12,
+      12,
+      0,
+      13,
+      0,
+      "IMAGE"
+    ],
+    [
+      13,
+      13,
+      0,
+      14,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.65,
+      "offset": [
+        80,
+        80
+      ]
+    }
+  },
+  "version": 0.4
+}

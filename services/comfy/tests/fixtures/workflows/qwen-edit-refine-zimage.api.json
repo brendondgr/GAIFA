@@ -1,0 +1,392 @@
+{
+ "2": {
+  "inputs": {
+   "unet_name": "qwen_image_edit_2511_fp8mixed.safetensors",
+   "weight_dtype": "fp8_e4m3fn"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "① Qwen-Image-Edit-2511 · fp8_e4m3fn"
+  }
+ },
+ "3": {
+  "inputs": {
+   "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+   "strength_model": 1,
+   "model": [
+    "2",
+    0
+   ]
+  },
+  "class_type": "LoraLoaderModelOnly",
+  "_meta": {
+   "title": "① Lightning 4-step LoRA"
+  }
+ },
+ "4": {
+  "inputs": {
+   "shift": 3.1,
+   "sampling": "flow",
+   "model": [
+    "3",
+    0
+   ]
+  },
+  "class_type": "ModelSamplingAuraFlow",
+  "_meta": {
+   "title": "① ModelSamplingAuraFlow · shift 3.1"
+  }
+ },
+ "5": {
+  "inputs": {
+   "strength": 1,
+   "pre_cfg": true,
+   "model": [
+    "4",
+    0
+   ]
+  },
+  "class_type": "CFGNorm",
+  "_meta": {
+   "title": "① CFGNorm"
+  }
+ },
+ "6": {
+  "inputs": {
+   "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "① Qwen2.5-VL-7B · qwen_image"
+  }
+ },
+ "7": {
+  "inputs": {
+   "vae_name": "qwen_image_vae.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "① Qwen Image VAE"
+  }
+ },
+ "8": {
+  "inputs": {
+   "image": "example_dog.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "Source image"
+  }
+ },
+ "9": {
+  "inputs": {
+   "image": [
+    "8",
+    0
+   ]
+  },
+  "class_type": "FluxKontextImageScale",
+  "_meta": {
+   "title": "Snap to Qwen bucket"
+  }
+ },
+ "10": {
+  "inputs": {
+   "pixels": [
+    "9",
+    0
+   ],
+   "vae": [
+    "7",
+    0
+   ]
+  },
+  "class_type": "VAEEncode",
+  "_meta": {
+   "title": "① sampling latent"
+  }
+ },
+ "11": {
+  "inputs": {
+   "prompt": "Add a black silk top hat to the dog's head.",
+   "clip": [
+    "6",
+    0
+   ],
+   "vae": [
+    "7",
+    0
+   ],
+   "image1": [
+    "9",
+    0
+   ]
+  },
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "_meta": {
+   "title": "① Instruction ← edit goes here"
+  }
+ },
+ "12": {
+  "inputs": {
+   "reference_latents_method": "index",
+   "conditioning": [
+    "11",
+    0
+   ]
+  },
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "_meta": {
+   "title": "① ref method (pos)"
+  }
+ },
+ "13": {
+  "inputs": {
+   "prompt": "",
+   "clip": [
+    "6",
+    0
+   ],
+   "vae": [
+    "7",
+    0
+   ],
+   "image1": [
+    "9",
+    0
+   ]
+  },
+  "class_type": "TextEncodeQwenImageEditPlus",
+  "_meta": {
+   "title": "① Negative"
+  }
+ },
+ "14": {
+  "inputs": {
+   "reference_latents_method": "index",
+   "conditioning": [
+    "13",
+    0
+   ]
+  },
+  "class_type": "FluxKontextMultiReferenceLatentMethod",
+  "_meta": {
+   "title": "① ref method (neg) — MUST match pos"
+  }
+ },
+ "15": {
+  "inputs": {
+   "conditioning": [
+    "14",
+    0
+   ]
+  },
+  "class_type": "ConditioningZeroOut",
+  "_meta": {
+   "title": "① ZeroOut (CFG 1.0)"
+  }
+ },
+ "16": {
+  "inputs": {
+   "seed": 812310042,
+   "steps": 4,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1,
+   "model": [
+    "5",
+    0
+   ],
+   "positive": [
+    "12",
+    0
+   ],
+   "negative": [
+    "15",
+    0
+   ],
+   "latent_image": [
+    "10",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "① KSampler · 4 steps @ CFG 1.0"
+  }
+ },
+ "17": {
+  "inputs": {
+   "samples": [
+    "16",
+    0
+   ],
+   "vae": [
+    "7",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "① VAEDecode → pixels"
+  }
+ },
+ "18": {
+  "inputs": {
+   "images": [
+    "17",
+    0
+   ]
+  },
+  "class_type": "PreviewImage",
+  "_meta": {
+   "title": "① Stage 1 output (pre-refine) ← compare me"
+  }
+ },
+ "19": {
+  "inputs": {
+   "unet_name": "z_image_turbo_fp8_e4m3fn.safetensors",
+   "weight_dtype": "default"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "② Z-Image Turbo"
+  }
+ },
+ "20": {
+  "inputs": {
+   "clip_name": "qwen_3_4b.safetensors",
+   "type": "lumina2",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "② encoder · type = lumina2"
+  }
+ },
+ "21": {
+  "inputs": {
+   "vae_name": "ae.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "② ae.safetensors"
+  }
+ },
+ "22": {
+  "inputs": {
+   "pixels": [
+    "17",
+    0
+   ],
+   "vae": [
+    "21",
+    0
+   ]
+  },
+  "class_type": "VAEEncode",
+  "_meta": {
+   "title": "② VAEEncode ← hand-off between families"
+  }
+ },
+ "23": {
+  "inputs": {
+   "text": "photograph of a red merle australian shepherd dog wearing a black silk top hat, sitting on carpet in a warm indoor hallway, individual fur strands, fine carpet weave, natural film grain, sharp micro-detail, photorealistic",
+   "clip": [
+    "20",
+    0
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "② Texture prompt"
+  }
+ },
+ "24": {
+  "inputs": {
+   "text": "",
+   "clip": [
+    "20",
+    0
+   ]
+  },
+  "class_type": "CLIPTextEncode",
+  "_meta": {
+   "title": "② Negative"
+  }
+ },
+ "25": {
+  "inputs": {
+   "conditioning": [
+    "24",
+    0
+   ]
+  },
+  "class_type": "ConditioningZeroOut",
+  "_meta": {
+   "title": "② ZeroOut (CFG 1.0)"
+  }
+ },
+ "26": {
+  "inputs": {
+   "seed": 812310042,
+   "steps": 20,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 0.25,
+   "model": [
+    "19",
+    0
+   ],
+   "positive": [
+    "23",
+    0
+   ],
+   "negative": [
+    "25",
+    0
+   ],
+   "latent_image": [
+    "22",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "② KSampler · denoise 0.25 (5 real steps)"
+  }
+ },
+ "27": {
+  "inputs": {
+   "samples": [
+    "26",
+    0
+   ],
+   "vae": [
+    "21",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "② VAEDecode"
+  }
+ },
+ "28": {
+  "inputs": {
+   "filename_prefix": "qwen-edit/refined-zimage/2026-10-06_refined",
+   "images": [
+    "27",
+    0
+   ]
+  },
+  "class_type": "SaveImage",
+  "_meta": {
+   "title": "② Save (refined)"
+  }
+ }
+}

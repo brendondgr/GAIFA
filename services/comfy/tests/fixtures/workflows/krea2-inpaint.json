@@ -1,0 +1,1034 @@
+{
+  "id": "03_krea2-turbo_i2i-inpaint-add-object",
+  "revision": 0,
+  "last_node_id": 19,
+  "last_link_id": 22,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "MarkdownNote",
+      "pos": [
+        -40,
+        -560
+      ],
+      "size": [
+        560,
+        1140
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "title": "Note",
+      "properties": {},
+      "widgets_values": [
+        "# Krea 2 Turbo \u2014 image to image (masked add-an-object)\n\n**Matched set (change one, change all five):**\n\n| slot | value |\n|---|---|\n| diffusion model | `krea2TurboFP8_krea2TURBO.safetensors` |\n| text encoder | `qwen3vl_4b_bf16.safetensors` \u2014 `CLIPLoader type = **krea2**` |\n| VAE | `qwen_image_vae.safetensors` |\n| latent | from `VAEEncode` (16-ch) |\n| patch node | **none** \u2014 Krea 2 has no `ModelSampling*` and no `FluxGuidance` |\n\n`type=krea2` is not guessable: an unknown string silently falls back to CLIP-L\nand fails much later with a shape error.\n\n**Turbo is guidance-distilled \u21d2 CFG stays at 1.0.** The negative branch is never\nevaluated at CFG 1.0, which is why the negative prompt runs through\n`ConditioningZeroOut` instead of carrying text. Raising CFG degrades output.\n\n### This is the top-hat workflow\n\nKrea 2 Turbo is a **plain text-to-image model** \u2014 there is no Krea 2 inpaint\ncheckpoint and no edit conditioning to load. So the edit is done the\nmodel-agnostic way: `SetLatentNoiseMask` tells the sampler *\"only these latent\ncells are yours; re-paste the original everywhere else after every step.\"*\nThe model still sees the whole latent each step, so it grows a hat that matches\nthe dog's lighting and perspective instead of a floating sticker.\n\n### Do this, in order\n\n1. Drop the photo at\n   `/home/bdgr/Models/ComfyUI-next/input/example_dog.png`\n   (or just click **choose file to upload** on the Source image node).\n2. Hit **Queue**. Look at the red overlay in **Mask preview** first \u2014 that red\n   box is exactly where the hat will be drawn.\n3. Nudge `location_x / location_y / shape_width / shape_height` on **Hat region**\n   until the box sits above the head with its lower edge overlapping the skull.\n   Coordinates are in the resized 832x1248 frame, origin top-left,\n   `location_*` is the **centre** of the box.\n4. Re-queue.\n\n**The box must overlap the head.** A box floating in empty space above the dog\ngives the model no anchor and you get a hat in mid-air.\n\n### Painted mask instead\nRight-click Source image \u2192 **Open in MaskEditor**, paint the hat area, save,\nthen drag `LoadImage`'s **MASK** output onto **Feather the seam**'s `mask` input.\nThat replaces the rectangle. Everything downstream is unchanged.\n\n### If the hat does not blend\n- raise `blur_radius` on **Feather the seam** (24 \u2192 40) for a softer seam\n- raise `expand` to give the model more room to draw the brim\n- drop KSampler `denoise` to `0.85` so a ghost of the original guides it\n- re-roll `seed` \u2014 a 10-step turbo model is genuinely seed-sensitive here\n"
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    },
+    {
+      "id": 2,
+      "type": "UNETLoader",
+      "pos": [
+        0,
+        620
+      ],
+      "size": [
+        340,
+        82
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            12
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "krea2TurboFP8_krea2TURBO.safetensors",
+        "default"
+      ],
+      "title": "Krea 2 Turbo (diffusion model)",
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 3,
+      "type": "CLIPLoader",
+      "pos": [
+        0,
+        740
+      ],
+      "size": [
+        340,
+        106
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            1,
+            2
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen3vl_4b_bf16.safetensors",
+        "krea2",
+        "default"
+      ],
+      "title": "Qwen3-VL-4B  \u00b7  type = krea2",
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": [
+        0,
+        890
+      ],
+      "size": [
+        340,
+        58
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            9,
+            17
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ],
+      "title": "VAE",
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 5,
+      "type": "CLIPTextEncode",
+      "pos": [
+        420,
+        620
+      ],
+      "size": [
+        420,
+        200
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            13
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "a red merle australian shepherd dog wearing a tall black silk top hat, the hat sits squarely on the dog's head, glossy satin band, crisp brim, matching the warm indoor lamp light and soft shadows of the photograph, photorealistic, sharp focus"
+      ],
+      "title": "Positive prompt",
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 6,
+      "type": "CLIPTextEncode",
+      "pos": [
+        420,
+        860
+      ],
+      "size": [
+        420,
+        90
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            3
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "title": "Negative (unused at CFG 1.0)",
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 7,
+      "type": "ConditioningZeroOut",
+      "pos": [
+        420,
+        980
+      ],
+      "size": [
+        300,
+        30
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            14
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "ConditioningZeroOut"
+      },
+      "widgets_values": [],
+      "title": "ConditioningZeroOut",
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 8,
+      "type": "LoadImage",
+      "pos": [
+        0,
+        1080
+      ],
+      "size": [
+        400,
+        400
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            4
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "example_dog.png",
+        "image"
+      ],
+      "title": "Source image",
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 9,
+      "type": "ImageScale",
+      "pos": [
+        420,
+        1120
+      ],
+      "size": [
+        300,
+        130
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            6,
+            8,
+            18
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "ImageScale"
+      },
+      "widgets_values": [
+        "lanczos",
+        832,
+        1248,
+        "center"
+      ],
+      "title": "Resize to 832x1248 (/16 clean)"
+    },
+    {
+      "id": 10,
+      "type": "CreateShapeMask",
+      "pos": [
+        0,
+        1520
+      ],
+      "size": [
+        320,
+        260
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            5
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "mask_inverted",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-kjnodes",
+        "ver": "1.1.7",
+        "Node name for S&R": "CreateShapeMask"
+      },
+      "widgets_values": [
+        "square",
+        1,
+        416,
+        205,
+        0,
+        832,
+        1248,
+        470,
+        340
+      ],
+      "title": "Hat region  \u2190 adjust me",
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 11,
+      "type": "GrowMaskWithBlur",
+      "pos": [
+        360,
+        1520
+      ],
+      "size": [
+        320,
+        250
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            7,
+            11,
+            20
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "mask_inverted",
+          "type": "MASK",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-kjnodes",
+        "ver": "1.1.7",
+        "Node name for S&R": "GrowMaskWithBlur"
+      },
+      "widgets_values": [
+        16,
+        0.0,
+        true,
+        false,
+        24.0,
+        1.0,
+        1.0,
+        false
+      ],
+      "title": "Feather the seam"
+    },
+    {
+      "id": 12,
+      "type": "ImageAndMaskPreview",
+      "pos": [
+        720,
+        1520
+      ],
+      "size": [
+        380,
+        420
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 6
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 7
+        }
+      ],
+      "outputs": [
+        {
+          "name": "composite",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-kjnodes",
+        "ver": "1.1.7",
+        "Node name for S&R": "ImageAndMaskPreview"
+      },
+      "widgets_values": [
+        0.55,
+        "255, 40, 40",
+        false
+      ],
+      "title": "Mask preview"
+    },
+    {
+      "id": 13,
+      "type": "VAEEncode",
+      "pos": [
+        760,
+        1160
+      ],
+      "size": [
+        240,
+        46
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 8
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            10
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "VAEEncode"
+      },
+      "widgets_values": [],
+      "title": "VAEEncode \u2192 latent"
+    },
+    {
+      "id": 14,
+      "type": "SetLatentNoiseMask",
+      "pos": [
+        760,
+        1260
+      ],
+      "size": [
+        280,
+        46
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 10
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 11
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            15
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "SetLatentNoiseMask"
+      },
+      "widgets_values": [],
+      "title": "SetLatentNoiseMask  \u2190 the edit happens here",
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 15,
+      "type": "KSampler",
+      "pos": [
+        1120,
+        620
+      ],
+      "size": [
+        330,
+        262
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 12
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 13
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 14
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            16
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        812310042,
+        "fixed",
+        10,
+        1.0,
+        "euler",
+        "simple",
+        1.0
+      ],
+      "title": "KSampler  \u00b7  denoise 1.0 inside the mask",
+      "color": "#223",
+      "bgcolor": "#335"
+    },
+    {
+      "id": 16,
+      "type": "VAEDecode",
+      "pos": [
+        1500,
+        620
+      ],
+      "size": [
+        210,
+        46
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 16
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 17
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            19,
+            22
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": [],
+      "title": "VAEDecode"
+    },
+    {
+      "id": 17,
+      "type": "ImageCompositeMasked",
+      "pos": [
+        1500,
+        720
+      ],
+      "size": [
+        320,
+        140
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "destination",
+          "type": "IMAGE",
+          "link": 18
+        },
+        {
+          "name": "source",
+          "type": "IMAGE",
+          "link": 19
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            21
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "ImageCompositeMasked"
+      },
+      "widgets_values": [
+        0,
+        0,
+        false
+      ],
+      "title": "Paste back \u2014 keeps un-masked pixels bit-exact"
+    },
+    {
+      "id": 18,
+      "type": "SaveImage",
+      "pos": [
+        1880,
+        620
+      ],
+      "size": [
+        560,
+        700
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "krea2/inpaint/%date:yyyy-MM-dd%_tophat"
+      ],
+      "title": "Save"
+    },
+    {
+      "id": 19,
+      "type": "PreviewImage",
+      "pos": [
+        1880,
+        1380
+      ],
+      "size": [
+        400,
+        340
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.28.0",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": [],
+      "title": "Raw sampler output (before paste-back)"
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      5,
+      0,
+      "CLIP"
+    ],
+    [
+      2,
+      3,
+      0,
+      6,
+      0,
+      "CLIP"
+    ],
+    [
+      3,
+      6,
+      0,
+      7,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      4,
+      8,
+      0,
+      9,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      10,
+      0,
+      11,
+      0,
+      "MASK"
+    ],
+    [
+      6,
+      9,
+      0,
+      12,
+      0,
+      "IMAGE"
+    ],
+    [
+      7,
+      11,
+      0,
+      12,
+      1,
+      "MASK"
+    ],
+    [
+      8,
+      9,
+      0,
+      13,
+      0,
+      "IMAGE"
+    ],
+    [
+      9,
+      4,
+      0,
+      13,
+      1,
+      "VAE"
+    ],
+    [
+      10,
+      13,
+      0,
+      14,
+      0,
+      "LATENT"
+    ],
+    [
+      11,
+      11,
+      0,
+      14,
+      1,
+      "MASK"
+    ],
+    [
+      12,
+      2,
+      0,
+      15,
+      0,
+      "MODEL"
+    ],
+    [
+      13,
+      5,
+      0,
+      15,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      14,
+      7,
+      0,
+      15,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      15,
+      14,
+      0,
+      15,
+      3,
+      "LATENT"
+    ],
+    [
+      16,
+      15,
+      0,
+      16,
+      0,
+      "LATENT"
+    ],
+    [
+      17,
+      4,
+      0,
+      16,
+      1,
+      "VAE"
+    ],
+    [
+      18,
+      9,
+      0,
+      17,
+      0,
+      "IMAGE"
+    ],
+    [
+      19,
+      16,
+      0,
+      17,
+      1,
+      "IMAGE"
+    ],
+    [
+      20,
+      11,
+      0,
+      17,
+      2,
+      "MASK"
+    ],
+    [
+      21,
+      17,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ],
+    [
+      22,
+      16,
+      0,
+      19,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.65,
+      "offset": [
+        80,
+        80
+      ]
+    }
+  },
+  "version": 0.4
+}

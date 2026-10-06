@@ -18,7 +18,7 @@ def fake():
 
 def make(tmp_path, fake, **env) -> Settings:
     return Settings.from_env({"COMFY_DATA": str(tmp_path / "data"), "COMFY_OUTPUTS": str(tmp_path / "out"),
-                              "COMFY_WORKFLOWS": str(tmp_path / "wf"), "COMFY_URL": fake.url,
+                              "COMFY_WORKFLOWS": str(tmp_path / "wf"), "COMFY_VIEW": str(tmp_path / "view"), "COMFY_URL": fake.url,
                               "COMFY_CONTROL": str(fake_control(tmp_path / "comfyui", fake.url)), **env})
 
 

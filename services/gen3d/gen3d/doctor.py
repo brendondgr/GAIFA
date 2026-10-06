@@ -27,7 +27,7 @@ def checks() -> list[tuple[str, bool, str]]:
     for label, rel in {"upstream clone (cube/)": "cube/cube3d", "CubePart code": "cube/cubepart/cube_part",
                        "worker venv (.venv)": ".venv/bin/activate"}.items():
         p = settings.cubeart / rel
-        out.append((label, p.exists(), str(p)))
+        out.append((label, p.exists(), str(p) + ("" if p.exists() else "  (scripts/install-runtime.sh)")))
     podman = shutil.which(settings.podman)
     out.append(("podman", bool(podman), podman or f"{settings.podman} not on PATH"))
     if podman:

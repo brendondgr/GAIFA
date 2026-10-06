@@ -26,7 +26,7 @@ GEN3D_DATA = "{service_dir}/data"
 GEN3D_DB = "{databases}/gen3d.db"
 GEN3D_OUTPUTS = "{outputs}"
 GEN3D_WEIGHTS = "{models}/3d"
-GEN3D_CUBEART = "~/Models/3D/CubeArt"          # code, venv and caches; moved inside in plan Phase 12.2
+GEN3D_CUBEART = "{service_dir}/runtime/CubeArt" # code, venv and caches (plan 12.2; scripts/install-runtime.sh)
 GEN3D_BLENDER = "~/.local/bin/blender"         # preview renders
 
 [memory]

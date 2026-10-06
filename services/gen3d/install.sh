@@ -5,8 +5,8 @@
 #   ./install.sh                 # server + command + boot service
 #   ./install.sh --no-service    # no boot service (run it with `gen3d start`)
 #
-# The models themselves (Cube3D, CubePart weights, the ROCm container and its venv) are set up in
-# ~/Models/3D/CubeArt (GEN3D_CUBEART); this only checks they are there.
+# The models themselves (Cube3D, CubePart code and the container's venv) are set up in
+# runtime/CubeArt (GEN3D_CUBEART) by scripts/install-runtime.sh; this only checks they are there.
 set -euo pipefail
 if [ -z "${GEN3D_NO_HOST:-}" ] && { [ -e /run/.toolboxenv ] || [ -e /run/.containerenv ]; }; then
   if command -v flatpak-spawn >/dev/null 2>&1; then exec flatpak-spawn --host bash "$(readlink -f "$0")" "$@"

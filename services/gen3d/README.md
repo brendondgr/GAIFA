@@ -16,7 +16,7 @@ stops after **10 minutes** without a job and starts again on the next one.
 needed) or `gen3d open` · API docs: http://127.0.0.1:5050/docs
 
 Built for an AMD Strix Halo (Radeon 8060S, gfx1151, ROCm) with the models set up in
-`~/Models/3D/CubeArt` (see [Models](#models)).
+`runtime/CubeArt` (see [Models](#models)).
 
 ## Web UI
 
@@ -229,7 +229,7 @@ browser / curl ──HTTP──> gen3d (FastAPI, .venv)  ──stdin/stdout JSON
 ```
 
 - **One worker**, started on the first job: `podman run -i` of `docker.io/kyuz0/amd-strix-halo-comfyui`
-  (the same torch 2.13 / ROCm 7.14 build ComfyUI uses) with `~/Models/3D/CubeArt/.venv` layered
+  (the same torch 2.13 / ROCm 7.14 build ComfyUI uses) with `runtime/CubeArt/.venv` layered
   on top. It loads Cube3D and CubePart when first needed and keeps them while jobs keep coming.
   **Unload = stop the container**, which returns every byte of GPU memory; it happens after
   `GEN3D_IDLE_UNLOAD_S` (600) without a job, on `gen3d unload`, or when a running job is canceled
@@ -264,7 +264,8 @@ fills 8 slots.
 
 ## Models
 
-3DGenerate uses what `~/Models/3D/CubeArt` set up (`GEN3D_CUBEART`):
+3DGenerate uses what `runtime/CubeArt` holds (`GEN3D_CUBEART`; `scripts/install-runtime.sh` builds it, with the
+exact packages in `locks/cubeart.txt`):
 
 - `weights/`: `cube3d-v0.5/` (shape_gpt, shape_tokenizer), `clip-vit-large-patch14/`,
   `cubepart/` (multi_part_dit, vae), `Qwen3-VL-4B-Instruct/`, `Qwen-Image/transformer/config.json`
@@ -298,7 +299,7 @@ Edit `~/.config/gen3d/gen3d.env`, then `gen3d restart`:
 | `GEN3D_DATA` | `<repo>/data` | jobs database and job folders |
 | `GEN3D_IDLE_UNLOAD_S` | 600 | idle seconds before the worker (and its GPU memory) goes away |
 | `GEN3D_PRELOAD` | empty | `1` = start the worker and load both models when the service starts |
-| `GEN3D_CUBEART` | `~/Models/3D/CubeArt` | weights, venv and upstream code |
+| `GEN3D_CUBEART` | `runtime/CubeArt` | weights, venv and upstream code |
 | `GEN3D_IMAGE` | `docker.io/kyuz0/amd-strix-halo-comfyui:latest` | the ROCm image the worker runs in |
 | `GEN3D_BLENDER` | `blender` | empty disables previews |
 | `GEN3D_KEEP_ALIVE_S` | 330 | HTTP keep-alive; keep it above the browser's |
@@ -310,7 +311,7 @@ Edit `~/.config/gen3d/gen3d.env`, then `gen3d restart`:
   too). Out of memory is the usual cause when ComfyUI or an LLM is holding the unified memory at
   the same time: `comfyui stop`, `llamacpp-stop`, or lower `parts.resolution_base`.
 - **The first CubePart job is slower** than the ETA said: torch.compile builds its kernels once
-  (~25 s); the cache in `~/Models/3D/CubeArt/.cache` keeps them for later runs.
+  (~25 s); the cache in `runtime/CubeArt/.cache` keeps them for later runs.
 - **A part came back empty** (the card says "No geometry for …"): CubePart found nothing matching
   that name. Try another seed (**New seed**) or a more literal name; name only parts that exist.
 - **"straps" (or another generic name) swallowed a frame or platform**: generic names absorb

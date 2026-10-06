@@ -39,7 +39,7 @@ def test_load_unload_and_status(tmp_path, fake):
         assert fake.up
         st = c.get("/v1/status").json()
         assert st["loaded"] is True and st["busy"] is False and st["idle_s"] is not None
-        assert [x["label"] for x in st["stats"]] == ["Workflows", "Drafts", "Queue"]
+        assert [x["label"] for x in st["stats"]] == ["Workflows", "Drafts", "Queue", "Made today"]
         # the node catalog is fetched at load and cached on disk
         assert (s.data / "object_info.json").exists() and c.app.state.catalog.has("KSampler")
         assert c.post("/v1/unload").json() == {"loaded": False}

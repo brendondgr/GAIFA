@@ -44,3 +44,7 @@ kinds = ["image", "video"]
 
 [ui]
 native = "http://127.0.0.1:8199/"
+
+[api.responses]
+"GET /v1/files/{path}" = "file"
+"GET /v1/workflows/{wid}/preview" = "image"

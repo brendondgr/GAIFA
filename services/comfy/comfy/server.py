@@ -9,13 +9,15 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from . import api_workflows, control, hub, logtail
+from . import api_run, api_workflows, control, hub, logtail
 from .client import ComfyClient, ComfyError
 from .config import Settings
 from .db import DB
 from .library import Library
 from .nodes import NodeCatalog
 from .packs import Packs
+from .resolve import InputError
+from .run import NeedsRoom, Runner
 from .tasks import Tasks
 
 log = logging.getLogger("comfy")
@@ -55,9 +57,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                         settings.load_timeout_s, settings.idle_unload_s)
         st.packs = Packs(settings.workflows, settings.comfy_view)
         st.library = Library(st.packs, st.catalog, Tasks.load(), settings.hub_url, settings.models)
+        st.runner = Runner(settings, st.db, st.client, st.library, st.control)
         tasks = [asyncio.create_task(logtail.follow(settings.data / "comfyui.log")),
                  asyncio.create_task(st.control.run()),
-                 asyncio.create_task(_watch(st.library))]
+                 asyncio.create_task(_watch(st.library)),
+                 asyncio.create_task(st.runner.listen()),
+                 asyncio.create_task(st.runner.loop())]
         try:
             yield
         finally:
@@ -79,6 +84,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def _comfy_error(request: Request, e: ComfyError):
         return JSONResponse({"detail": e.detail, "code": "comfyui", "data": e.data}, status_code=e.status)
 
+    @app.exception_handler(InputError)
+    async def _input_error(request: Request, e: InputError):
+        return JSONResponse({"detail": e.detail, "code": "invalid_input", "data": {"errors": e.errors}}, status_code=422)
+
+    @app.exception_handler(NeedsRoom)
+    async def _needs_room(request: Request, e: NeedsRoom):
+        return JSONResponse({"detail": e.detail, "code": "needs_room", "data": {"plan": e.plan}}, status_code=409)
+
     @app.get("/health", summary="The adapter is up")
     def health() -> dict:
         return {"status": "ok"}
@@ -86,4 +99,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(hub.router)
     app.include_router(control.router)
     app.include_router(api_workflows.router)
+    app.include_router(api_run.router)
     return app

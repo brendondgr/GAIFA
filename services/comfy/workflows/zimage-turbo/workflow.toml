@@ -1,0 +1,40 @@
+name = "Z-Image Turbo"
+description = "Fast photoreal text to image (Z-Image Turbo, 8 steps)"
+task = "text-to-image"
+# memory_gb = 10.1    # estimated from the model files; each run measures it, so set it only to override
+
+[inputs.prompt]          # CLIPTextEncode "CLIP Text Encode (Prompt)"
+node = "67"
+field = "text"
+
+[inputs.negative]          # CLIPTextEncode "CLIP Text Encode (Prompt)"
+node = "71"
+field = "text"
+
+[inputs.seed]          # KSampler "KSampler"
+node = "70"
+field = "seed"
+default = -1
+
+[inputs.steps]          # KSampler "KSampler"
+node = "70"
+field = "steps"
+
+[inputs.cfg]          # KSampler "KSampler"
+node = "70"
+field = "cfg"
+
+[inputs.width]          # EmptySD3LatentImage "EmptySD3LatentImage"
+node = "68"
+field = "width"
+
+[inputs.height]          # EmptySD3LatentImage "EmptySD3LatentImage"
+node = "68"
+field = "height"
+
+[outputs.image]
+node = "9"
+kind = "image"
+
+[set]
+"66.unet_name" = "z_image_turbo_fp8_e4m3fn.safetensors"   # the bf16 file this graph names isn't downloaded

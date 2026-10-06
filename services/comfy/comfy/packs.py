@@ -81,6 +81,15 @@ class Manifest(_Strict):
     inputs: dict[str, InputMap] = {}
     outputs: dict[str, OutputMap] = {}
     presets: dict[str, dict[str, Any]] = {}
+    set: dict[str, Any] = {}            # fixed values: "<node>.<field>" = value, applied before every check and run
+
+    @field_validator("set")
+    @classmethod
+    def _set_keys(cls, v: dict) -> dict:
+        for k in v:
+            if "." not in k:
+                raise ValueError(f"set: {k!r} must be \"<node id>.<field>\"")
+        return v
 
     @field_validator("inputs", "outputs", "presets")
     @classmethod

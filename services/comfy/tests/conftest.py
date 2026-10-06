@@ -18,5 +18,6 @@ def settings(tmp_path) -> Settings:
 
 @pytest.fixture(autouse=True)
 def fast_poll(monkeypatch):
-    from comfy import control
+    from comfy import control, run
     monkeypatch.setattr(control, "POLL_S", 0.05)
+    monkeypatch.setattr(run, "LOOP_S", 0.1)

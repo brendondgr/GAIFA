@@ -211,3 +211,14 @@ def test_suggest_route_and_cli_accept(tmp_path, settings, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "wrote workflows/zimage/workflow.toml" in out and "zimage: ready" in out
     assert cli.main(["suggest", "zimage", "--write"]) == 1          # never overwrites
+
+
+def test_set_overrides_fields_before_check_and_run(lib, tmp_path):
+    d = make_pack(tmp_path / "workflows", "zimage", toml=ZIT_TOML + '\n[set]\n"66.unet_name" = "gone.safetensors"\n"70.steps" = 6\n')
+    lib.packs.scan()
+    conv, issues = lib.analysed(lib.packs.get("zimage"))
+    assert conv.graph["70"]["inputs"]["steps"] == 6
+    assert any(i.code == "missing_model" and "gone.safetensors" in i.detail for i in issues)
+    (d / "workflow.toml").write_text(ZIT_TOML + '\n[set]\n"999.x" = 1\n')
+    lib.packs.scan()
+    assert any(i.code == "set_unmapped" for i in lib.analysed(lib.packs.get("zimage"))[1])

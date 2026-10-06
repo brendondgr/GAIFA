@@ -21,6 +21,18 @@ log = logging.getLogger("comfy")
 MODELS_TTL_S = 60
 
 
+def apply_set(conv: Converted, values: dict) -> list[Issue]:
+    """workflow.toml's [set]: fixed field values on the converted graph."""
+    issues = []
+    for target, v in values.items():
+        node, _, fld = target.partition(".")
+        if node not in conv.graph:
+            issues.append(Issue("error", "set_unmapped", f"set: node {node} isn't in the graph ({target})"))
+        else:
+            conv.graph[node]["inputs"][fld] = v
+    return issues
+
+
 class Library:
     def __init__(self, packs: Packs, catalog: NodeCatalog, tasks: Tasks, hub_url: str = "", models_dir=None):
         self.packs, self.catalog, self.tasks, self.hub_url = packs, catalog, tasks, hub_url
@@ -40,7 +52,9 @@ class Library:
             return hit[1], hit[2]
         conv, errs = convert(p, self.catalog) if self.catalog else (None, [Issue(
             "warning", "no_catalog", "ComfyUI's node list isn't cached yet: load comfy once to check this workflow")])
-        issues = errs if conv is None else check(p, self.catalog, self.tasks, self.models, conv)
+        if conv is not None and p.manifest and p.manifest.set:
+            errs += apply_set(conv, p.manifest.set)
+        issues = errs if conv is None else errs + check(p, self.catalog, self.tasks, self.models, conv)
         self._cache[p.id] = (key, conv, issues)
         return conv, issues
 

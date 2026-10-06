@@ -338,7 +338,7 @@ def to_toml(s: Suggestion) -> str:
     if m.get("description"):
         lines.append(f'description = {_q(m["description"])}')
     if m.get("memory_gb"):
-        lines.append(f'memory_gb = {m["memory_gb"]}              # estimated from the model files; runs measure it')
+        lines.append(f'# memory_gb = {m["memory_gb"]}    # estimated from the model files; each run measures it, so set it only to override')
     for key, v in m.get("inputs", {}).items():
         lines += ["", f"[inputs.{key}]" + (f"          # {s.why[key]}" if key in s.why else "")]
         lines += [f"{k} = {_v(x)}" for k, x in v.items()]

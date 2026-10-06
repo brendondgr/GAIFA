@@ -173,7 +173,7 @@ def _check_manifest(pack: Pack, conv: Converted, catalog: NodeCatalog, tasks: Ta
         if catalog.has(cls) and catalog.input(cls, im.field) is None and im.field not in conv.graph[eid]["inputs"]:
             out.append(Issue("error", "input_unmapped", f"input {name!r}: {cls} (node {eid}) has no field {im.field!r}", node=eid))
         for extra in im.also:
-            node_id, _, fld = extra.rpartition(".")
+            node_id, _, fld = extra.partition(".")          # node ids have no dots; fields may
             if node_id not in conv.graph:
                 out.append(Issue("error", "input_unmapped", f"input {name!r}: also-target node {node_id} isn't in the graph"))
     for name, om in m.outputs.items():

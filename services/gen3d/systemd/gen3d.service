@@ -1,0 +1,25 @@
+# TEMPLATE. @ROOT@ is replaced with this clone's absolute path by `gen3d enable`.
+[Unit]
+Description=3DGenerate - Cube3D + CubePart 3D asset API and chat UI (127.0.0.1:5050)
+Documentation=file://@ROOT@/README.md
+After=network.target
+
+[Service]
+Type=exec
+WorkingDirectory=@ROOT@
+# Optional overrides (port, idle timeout, CubeArt location...); see gen3d.env.example.
+EnvironmentFile=-%h/.config/gen3d/gen3d.env
+Environment=PYTHONUNBUFFERED=1
+# podman, and Blender for previews (often in ~/.local/bin); the env file can override
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=@ROOT@/.venv/bin/python -m gen3d
+Restart=on-failure
+RestartSec=3
+# Stop signals the server only: it cancels the running job, marks it for resume and stops the GPU
+# worker container itself (a SIGTERM to the whole cgroup would kill podman mid-cleanup).
+KillMode=mixed
+TimeoutStopSec=60
+LimitCORE=0
+
+[Install]
+WantedBy=default.target

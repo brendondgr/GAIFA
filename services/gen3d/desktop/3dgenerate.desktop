@@ -1,0 +1,25 @@
+[Desktop Entry]
+# TEMPLATE. @ROOT@ is replaced with this clone's absolute path by `gen3d launcher` (run by install.sh).
+Type=Application
+Name=3DGenerate
+GenericName=3D model generator
+Comment=Start the 3DGenerate service (Cube3D + CubePart) and open its web UI
+Exec=@ROOT@/bin/gen3d open
+Icon=3dgenerate
+Terminal=false
+Categories=Graphics;3DGraphics;
+Keywords=3D;mesh;Cube3D;CubePart;generate;
+StartupNotify=false
+Actions=start-generator;stop-generator;stop-service;
+
+[Desktop Action start-generator]
+Name=Start generator (load models)
+Exec=@ROOT@/bin/gen3d open --load
+
+[Desktop Action stop-generator]
+Name=Stop generator (free the GPU)
+Exec=@ROOT@/bin/gen3d unload
+
+[Desktop Action stop-service]
+Name=Stop 3DGenerate
+Exec=@ROOT@/bin/gen3d stop

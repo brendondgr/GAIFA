@@ -7,7 +7,6 @@ import base64
 import contextlib
 import json
 import logging
-import re
 import tempfile
 import time
 import uuid
@@ -21,7 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from pydantic import AliasChoices, BaseModel, Field
 
-from . import __version__, audio, enhance, voices
+from . import __version__, audio, enhance, outputs, voices
 from .config import settings
 from .engines import ENGINES, EngineError, align_clips, transcribe
 
@@ -288,8 +287,8 @@ class SpeechRequest(BaseModel):
     format: Format = Field("wav", validation_alias=AliasChoices("format", "response_format"))
     stream: bool = Field(False, description="stream raw PCM s16le as it is generated")
     no_save: bool = Field(False, description="return the audio only; nothing is written to disk")
-    save_dir: str | None = Field(None, description="folder to save into (on the server); relative paths "
-                                                   "are under the default outputs folder (~/Music/TTS)")
+    save_dir: str | None = Field(None, description="subfolder of the outputs folder to save into; by default "
+                                                   "clips go in a dated folder (<YYYY-MM-DD>/)")
     timings: bool = Field(False, description="return JSON {audio (base64), timings: {duration, words}} instead "
                                              "of audio; Kokoro gives native word times, Breeze is aligned with Whisper")
     request_id: str | None = Field(None, max_length=64,
@@ -343,16 +342,25 @@ async def _collect(engine, params: dict) -> tuple[bytes, dict]:
     return b"".join(parts), stats
 
 
-def _output_path(voice: str, fmt: str, save_dir: str | None = None) -> Path:
-    folder = settings.outputs_dir
-    if save_dir and save_dir.strip():
-        folder = settings.outputs_dir / Path(save_dir.strip()).expanduser()  # absolute paths win
+MODELS = {"breeze": "breeze-tts-2", "kokoro": "kokoro-82m"}
+
+
+def _output_path(text: str, voice: str, fmt: str, save_dir: str | None = None) -> Path:
     try:
-        folder.mkdir(parents=True, exist_ok=True)
+        return outputs.output_path(settings.outputs_dir, text, voice, fmt if fmt != "pcm" else "wav", save_dir)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     except OSError as exc:
-        raise HTTPException(400, f"cannot save into {str(folder)!r}: {exc.strerror}") from exc
-    stem = f"{time.strftime('%Y%m%d-%H%M%S')}_{voices.slug(voice) or 'voice'}_{uuid.uuid4().hex[:6]}"
-    return folder / f"{stem}.{fmt if fmt != 'pcm' else 'wav'}"
+        raise HTTPException(400, f"cannot save into the outputs folder: {exc.strerror}") from exc
+
+
+def _save(out: Path, data: bytes, req: SpeechRequest, engine: str, voice: str, fmt: str, stats: dict) -> None:
+    """The clip, then its sidecar (what AIHub's Outputs page shows)."""
+    outputs.save(out, data, outputs.sidecar(
+        text=req.text, voice=voice, engine=engine, model=MODELS.get(engine, engine),
+        params={"instructions": req.instruction, "speed": req.speed if engine == "kokoro" else None,
+                "format": fmt, "seed": req.seed if engine == "breeze" else None, "cfg_scale": req.cfg_scale},
+        duration_s=stats.get("audio_s"), request_id=req.request_id or uuid.uuid4().hex[:12]))
 
 
 def _log_done(engine: str, voice: str, stats: dict, out: Path | None, streamed: bool) -> None:
@@ -369,7 +377,7 @@ async def _speak(req: SpeechRequest):
         await engine.ensure_loaded()
         sr = engine.info.get("sample_rate", 24000)
         save_fmt = req.format if req.format != "pcm" else "wav"
-        out_path = None if req.no_save else _output_path(voice, save_fmt, req.save_dir)
+        out_path = None if req.no_save else _output_path(req.text, voice, save_fmt, req.save_dir)
 
         async def body():
             parts, stats = [], {}
@@ -385,7 +393,7 @@ async def _speak(req: SpeechRequest):
             finally:
                 await gen.aclose()
             if out_path:
-                out_path.write_bytes(audio.encode(b"".join(parts), sr, save_fmt))
+                _save(out_path, audio.encode(b"".join(parts), sr, save_fmt), req, engine_name, voice, save_fmt, stats)
             _log_done(engine_name, voice, stats, out_path, streamed=True)
 
         headers = {**base_headers, "X-Sample-Rate": str(sr), "X-Sample-Format": "s16le", "X-Channels": "1",
@@ -394,7 +402,7 @@ async def _speak(req: SpeechRequest):
             headers["X-LocalTTS-Path"] = quote(str(out_path))
         return StreamingResponse(body(), media_type="audio/pcm", headers=headers)
 
-    out = None if req.no_save else _output_path(voice, req.format, req.save_dir)  # fail before generating
+    out = None if req.no_save else _output_path(req.text, voice, req.format, req.save_dir)  # fail before generating
     pcm, stats = await _collect(engine, params)
     sr = engine.info.get("sample_rate", 24000)
     data = audio.encode(pcm, sr, req.format)
@@ -405,7 +413,8 @@ async def _speak(req: SpeechRequest):
     if req.no_save:
         headers["X-LocalTTS-Saved"] = "no"
     else:
-        out.write_bytes(data if req.format != "pcm" else audio.encode(pcm, sr, "wav"))
+        _save(out, data if req.format != "pcm" else audio.encode(pcm, sr, "wav"), req, engine_name, voice,
+              req.format if req.format != "pcm" else "wav", stats)
         headers["X-LocalTTS-Saved"] = out.name
         headers["X-LocalTTS-Path"] = quote(str(out))  # percent-encoded: headers are latin-1
     if req.timings:
@@ -547,31 +556,37 @@ async def enhance_text(body: EnhanceRequest):
 
 # ---- saved outputs -----------------------------------------------------------------------
 
-_SAFE_FILE = re.compile(r"^[A-Za-z0-9._\-]+$")
-
-
 def _output_or_404(filename: str) -> Path:
-    p = settings.outputs_dir / filename
-    if not _SAFE_FILE.match(filename) or not p.is_file():
+    p = outputs.resolve(settings.outputs_dir, filename)
+    if p is None:
         raise HTTPException(404, f"no saved output {filename!r}")
     return p
 
 
 @app.get("/v1/outputs")
 def list_outputs():
-    files = sorted(settings.outputs_dir.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
-    return {"dir": str(settings.outputs_dir), "files": [
-        {"file": p.name, "bytes": p.stat().st_size,
+    """Every saved clip, newest first; `file` is relative to the outputs folder (e.g. 2026-10-06/…)."""
+    base = settings.outputs_dir
+    files = sorted(outputs.clips(base), key=lambda p: p.stat().st_mtime, reverse=True)
+    return {"dir": str(base), "files": [
+        {"file": p.relative_to(base).as_posix(), "bytes": p.stat().st_size,
          "created": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(p.stat().st_mtime))}
-        for p in files if p.is_file()]}
+        for p in files]}
 
 
-@app.get("/v1/outputs/{filename}")
+@app.get("/v1/outputs/{filename:path}")
 def get_output(filename: str):
     return FileResponse(_output_or_404(filename))
 
 
-@app.delete("/v1/outputs/{filename}")
+@app.delete("/v1/outputs/{filename:path}")
 def delete_output(filename: str):
-    _output_or_404(filename).unlink()  # permanent, no trash
+    p = _output_or_404(filename)
+    p.unlink()  # permanent, no trash (AIHub's Outputs page moves to its trash instead)
+    p.with_name(p.name + ".json").unlink(missing_ok=True)
     return {"deleted": filename, "permanent": True}
+
+
+from . import hub  # noqa: E402  (the AIHub routes: status and the dashboard widget)
+
+app.include_router(hub.router)

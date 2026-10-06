@@ -25,6 +25,14 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…` (+ `.trash/`), ignored by git; indexed into `hub.db` |
 | `web/` | ✅ | The UI (below) |
 
+## `services/` (the mods)
+
+The four existing apps come in with `git subtree add` (their history is kept), so most of each folder is the app's own code. These are the parts added for AIHub:
+
+| Mod | From | Added for AIHub |
+| :--- | :--- | :--- |
+| `tts` | `~/Projects/LocalTTS` (plan Phase 7) | `service.toml`, `aihub-install.sh` (venv only), `localtts/outputs.py` (dated outputs + sidecars), `localtts/hub.py` (`/v1/status`, the "Clips per day" widget), `tests/` (`.venv/bin/python -m pytest` in the mod folder), `requirements-dev.txt`, `pytest.ini` |
+
 ## `docs/`
 
 | File | Purpose |

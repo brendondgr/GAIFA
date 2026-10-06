@@ -59,9 +59,12 @@ class Settings:
     host: str = os.environ.get("LOCALTTS_HOST", "127.0.0.1")
     port: int = int(os.environ.get("LOCALTTS_PORT", "5040"))
     data: Path = _path("LOCALTTS_DATA", str(ROOT / "data"))
+    # Saved voices; under AIHub they live with the models (data/models/voices).
+    voices: Path = field(default_factory=lambda: _path(
+        "LOCALTTS_VOICES_DIR", str(_path("LOCALTTS_DATA", str(ROOT / "data")) / "voices")))
     outputs: Path = _path("LOCALTTS_OUTPUTS_DIR", "~/Music/TTS")
     keep_alive_s: int = int(os.environ.get("LOCALTTS_KEEP_ALIVE_S", "330"))  # > any browser's idle pool
-    idle_unload_s: float = float(os.environ.get("LOCALTTS_IDLE_UNLOAD_S", "180"))
+    idle_unload_s: float = float(os.environ.get("LOCALTTS_IDLE_UNLOAD_S", "180"))  # 0 = never
     load_timeout_s: float = float(os.environ.get("LOCALTTS_LOAD_TIMEOUT_S", "900"))
     breeze_python: Path = _engine_python("LOCALTTS_BREEZE_PYTHON", "breeze",
                                          "~/venvs/breeze-tts/bin/python", "~/venvs/breeze-next/bin/python")
@@ -78,7 +81,7 @@ class Settings:
 
     @property
     def voices_dir(self) -> Path:
-        return self.data / "voices"
+        return self.voices
 
     @property
     def outputs_dir(self) -> Path:

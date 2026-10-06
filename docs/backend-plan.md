@@ -586,11 +586,11 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 7 — Move in `tts` (LocalTTS)
 
-- [ ] **7.1 Subtree + venv.**
+- [x] **7.1 Subtree + venv.** *As built:* the venv uses uv's managed Python 3.12 (in `~/.local/share/uv`), so it works on the host and in the toolbox; `aihub-install.sh` rebuilds it, and `requirements-dev.txt` adds pytest.
   - `git subtree add --prefix=services/tts ~/Projects/LocalTTS main`.
   - `uv venv --python 3.12 services/tts/.venv && uv pip install -r services/tts/requirements.txt`.
   - Ignored state: only `data/voices/` (moved in 7.4).
-- [ ] **7.2 Code changes in `services/tts`.**
+- [x] **7.2 Code changes in `services/tts`.** *As built:* `localtts/outputs.py` and `localtts/hub.py`; the sidecar also records `engine`, and a `save_dir` (relative only) replaces the dated folder. 20 tests in `services/tts/tests/`.
   - **`GET /v1/status`:**
     - `loaded` = any engine worker up; `busy` = any engine lock held; `idle_s`
     - stats: Voices, Engines installed, Clips today
@@ -602,7 +602,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - `save_dir` is limited to subfolders of the outputs folder. It currently accepts absolute paths and can write anywhere.
     - `/v1/outputs` listing becomes recursive.
   - **First tests for LocalTTS:** output naming, the sidecar writer, and the status route with the engines stubbed.
-- [ ] **7.3 `services/tts/service.toml`.**
+- [x] **7.3 `services/tts/service.toml`.** *As built:* also `LOCALTTS_DATA={service_dir}/data`, `install = "aihub-install.sh"`, and the "Clips per day" widget from 7.7.
   - **run:** `command = [".venv/bin/python", "-m", "localtts"]`, port 5040, health `/health`, status `/v1/status`.
   - **env:**
     - `LOCALTTS_HOST=127.0.0.1`, `LOCALTTS_PORT={port}`, `LOCALTTS_NO_SYSTEMD=1`

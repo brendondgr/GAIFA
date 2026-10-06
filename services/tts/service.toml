@@ -1,0 +1,76 @@
+# Speech: LocalTTS (Breeze TTS 2 + Kokoro), moved in from ~/Projects/LocalTTS (plan Phase 7).
+# Fields: architecture §4.3. Standalone use still works: `python -m localtts` reads the same
+# LOCALTTS_* variables (localtts.env.example), with its own defaults.
+id = "tts"
+name = "Speech"
+description = "Text to speech with Breeze TTS 2 and Kokoro: voice cloning and voice design"
+icon = "wave"
+version = "0.6.1"
+
+[run]
+command = [".venv/bin/python", "-m", "localtts"]
+port = 5040
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 180               # in-flight generations finish on stop (uvicorn waits 150 s)
+restart = "on-failure"
+install = "aihub-install.sh"
+
+[run.env]
+LOCALTTS_HOST = "127.0.0.1"
+LOCALTTS_PORT = "{port}"
+LOCALTTS_NO_SYSTEMD = "1"
+LOCALTTS_DATA = "{service_dir}/data"
+LOCALTTS_OUTPUTS_DIR = "{outputs}"
+LOCALTTS_VOICES_DIR = "{models}/voices"
+# The engine venvs stay outside the project until plan Phase 12.1.
+LOCALTTS_BREEZE_PYTHON = "~/venvs/breeze-tts/bin/python"
+LOCALTTS_KOKORO_PYTHON = "~/venvs/kokoro/bin/python"
+BREEZE_MODEL = "{models}/tts/breeze-tts-2"
+HF_HOME = "{hf_home}"
+HF_HUB_OFFLINE = "1"
+LOCALTTS_LLM_URL = "http://127.0.0.1:4000/v1"
+
+[memory]
+estimate_gb = 9.2
+load = "POST /v1/load"
+unload = "POST /v1/unload"
+triggers = ["POST /v1/speech", "POST /v1/audio/speech", "POST /v1/voices/design", "POST /v1/voices", "POST /v1/align"]
+idle_unload_s = 180
+idle_unload_env = "LOCALTTS_IDLE_UNLOAD_S"
+
+[models]
+dirs = ["tts", "voices"]
+
+[outputs]
+kinds = ["audio"]
+
+[ui]
+page = "ui/page.js"
+native = "/ui/"
+
+[[ui.widgets]]
+id = "clips"
+title = "Clips per day"
+kind = "bar"
+source = "GET /v1/hub/widgets/clips"
+ranges = ["7d", "30d"]
+span = 6
+
+[api]
+hide = ["GET /", "GET /ui/*", "GET /v1/hub/*"]
+
+[api.responses]
+"POST /v1/speech" = "audio"
+"POST /v1/audio/speech" = "audio"
+"GET /v1/voices/{name}/audio" = "audio"
+"GET /v1/outputs/{filename}" = "audio"
+
+[tools]
+speak = { op = "POST /v1/speech", description = "Speak text in a saved voice, a Kokoro voice, or a described voice; the clip is saved to Outputs" }
+list_voices = { op = "GET /v1/voices", description = "List saved (Breeze) voices and Kokoro's built-in voices" }
+design_voice = { op = "POST /v1/voices/design", description = "Invent a voice from a description and save it under a name" }
+clone_voice = { op = "POST /v1/voices", description = "Save a voice cloned from a 3-60 s reference clip" }
+delete_voice = { op = "DELETE /v1/voices/{name}", description = "Delete a saved voice (permanent)", confirm = true }

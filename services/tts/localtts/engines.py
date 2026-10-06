@@ -101,7 +101,7 @@ class Engine:
         return True
 
     async def maybe_idle_unload(self) -> None:
-        if (self.alive and self.state == "ready" and not self._lock.locked()
+        if (settings.idle_unload_s > 0 and self.alive and self.state == "ready" and not self._lock.locked()
                 and time.monotonic() - self.last_used > settings.idle_unload_s):
             await self.unload(reason=f"idle for {settings.idle_unload_s:.0f}s")
 
@@ -112,7 +112,7 @@ class Engine:
             "pid": self.proc.pid if self.alive else None,
             "idle_s": round(idle, 1) if self.alive else None,
             "unloads_in_s": round(max(0.0, settings.idle_unload_s - idle), 1)
-            if self.alive and self.state == "ready" else None,
+            if self.alive and self.state == "ready" and settings.idle_unload_s > 0 else None,
             **({"info": self.info} if self.info else {}),
         }
 

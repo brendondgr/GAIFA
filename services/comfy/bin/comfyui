@@ -155,8 +155,8 @@ case "${1:-}" in
     "$0" start
     ;;
   workflows|wf)
-    shift
-    cd "$MOD" && exec "$MOD/.venv/bin/python" -m comfy.cli "$@"
+    shift   # stays in the caller's folder, so relative paths (--from ./x.json) work
+    PYTHONPATH="$MOD${PYTHONPATH:+:$PYTHONPATH}" exec "$MOD/.venv/bin/python" -m comfy.cli "$@"
     ;;
   ""|-h|--help|help)
     grep '^#' "$0" | sed 's/^# \{0,1\}//' | sed '1,2d;/^-\{10,\}/q'

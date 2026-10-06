@@ -46,7 +46,7 @@ function addView(el, ctx, cleanups) {
     if (id.value.trim()) fd.append('id', id.value.trim());
     try {
       const r = (await ctx.call('POST', '/v1/import', { form: fd })).json;
-      ctx.toast(`Imported as ${r.id}`, 'success');
+      ctx.toast(r.also?.length ? `Imported ${r.also.length + 1} workflows: ${[r.id, ...r.also].join(', ')}` : `Imported as ${r.id}`, 'success');
       ctx.navigate(`#/s/comfy/import?review=${r.id}`);
     } catch (e) { status.textContent = errText(e); }
     file.value = '';

@@ -145,6 +145,25 @@ def read_file(name: str, data: bytes) -> Found:
     return found
 
 
+def read_all(name: str, data: bytes) -> list[Found]:
+    """Every workflow in a file: one for most files, one per workflow JSON in a zip that holds
+    several (Civitai packs often ship variants side by side)."""
+    if not name.lower().endswith(".zip"):
+        return [read_file(name, data)]
+    first = read_zip(name, data)
+    z = zipfile.ZipFile(io.BytesIO(data))
+    jsons = [i.filename for i in z.infolist() if i.filename.lower().endswith(".json") and not i.filename.startswith("__MACOSX")
+             and (is_editor(d := _json(z.read(i))) or is_api(d))]
+    if len(jsons) <= 1:
+        return [first]
+    out = []
+    for fn in sorted(jsons):
+        f = Found(source=f"{name}:{fn}", assets=first.assets)
+        _take(f, _json(z.read(fn)))
+        out.append(f)
+    return out
+
+
 def read_zip(name: str, data: bytes) -> Found:
     try:
         z = zipfile.ZipFile(io.BytesIO(data))

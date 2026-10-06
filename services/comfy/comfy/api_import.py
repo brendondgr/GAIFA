@@ -48,12 +48,20 @@ async def import_file(request: Request, file: UploadFile, id: str | None = Form(
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "file too large")
     lib = request.app.state.library
+    name = file.filename or "workflow.json"
     try:
-        found = importer.read_file(file.filename or "workflow.json", data)
-        pid = importer.create(lib.packs, lib.catalog, found, id, file.filename or "workflow")
+        found = importer.read_all(name, data)
+        ids = []
+        for i, f in enumerate(found):
+            hint = f.source.rsplit(":", 1)[-1] if len(found) > 1 else name
+            wid = (f"{id}-{i + 1}" if id and len(found) > 1 else id)
+            ids.append(importer.create(lib.packs, lib.catalog, f, wid, hint))
     except importer.ImportError_ as e:
         raise HTTPException(422, e.detail) from None
-    return _imported(request, pid)
+    out = _imported(request, ids[0])
+    if len(ids) > 1:
+        out["also"] = ids[1:]                     # a zip with several workflows: one draft each
+    return out
 
 
 @router.get("/v1/import/history", summary="ComfyUI's recent runs, to import one (exact graphs)")

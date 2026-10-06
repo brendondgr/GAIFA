@@ -147,3 +147,31 @@ def test_downloads_register_in_aihub(tmp_path):
             with pytest.raises(ValueError):
                 Downloads(tmp_path).start("http://example.com/x.safetensors", "vae")
     asyncio.run(go())
+
+
+def test_zip_with_several_workflows_imports_each(env):
+    """A Civitai pack with four variants imported only one, silently (held-out, 11.12)."""
+    c, fake, s = env
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("ZImgBasic.json", json.dumps(EDITOR))
+        z.writestr("ZImgFull.json", json.dumps(EDITOR))
+        z.writestr("readme.txt", "hi")
+    r = c.post("/v1/import", files={"file": ("pack.zip", b.getvalue(), "application/zip")}, data={"id": "zpack"}).json()
+    assert r["id"] == "zpack-1" and r["also"] == ["zpack-2"]
+    assert (s.workflows / "zpack-2" / "assets" / "readme.txt").exists()
+
+
+def test_cli_imports_media_and_zips_from_relative_paths(tmp_path, settings, monkeypatch, capsys):
+    """The CLI only read JSON, and its wrapper changed folder so relative paths failed (11.12)."""
+    from comfy import cli
+    for k, v in {"COMFY_WORKFLOWS": settings.workflows, "COMFY_VIEW": settings.comfy_view, "COMFY_DATA": settings.data}.items():
+        monkeypatch.setenv(k, str(v))
+    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:1")
+    settings.data.mkdir(parents=True)
+    (settings.data / "object_info.json").write_text((FIX / "object_info.json").read_text())
+    (tmp_path / "shot.png").write_bytes(png({"workflow": EDITOR, "prompt": API}))
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["new", "from-png", "--from", "shot.png"]) == 0
+    assert (settings.workflows / "from-png" / "workflow.json").exists()
+    assert "made workflows/from-png/ (editor file)" in capsys.readouterr().out

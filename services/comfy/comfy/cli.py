@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 from .config import Settings
-from .convert import is_api, is_editor
+from . import importer
 from .library import Library
 from .nodes import NodeCatalog
 from .packs import API, EDITOR, PACK_ID, Packs
@@ -133,25 +133,32 @@ def cmd_new(lib: Library, args) -> int:
         print(f"workflows/{args.id} already exists", file=sys.stderr)
         return 1
     src = Path(args.source).expanduser()
+    ids = [args.id]
     if lib.packs.get(args.source) and lib.packs.get(args.source).dir is None:
         p = lib.packs.adopt(args.source, args.id)         # a draft saved in ComfyUI
         print(f"made workflows/{p.id}/ from the ComfyUI draft {args.source}")
     else:
         try:
-            data = json.loads(src.read_text())
-        except (OSError, ValueError) as e:
+            found = importer.read_all(src.name, src.read_bytes())     # JSON, PNG/WebP/video, or a zip
+        except OSError as e:
             print(f"can't read {src}: {e}", file=sys.stderr)
             return 1
-        if not (is_editor(data) or is_api(data)):
-            print(f"{src} isn't a ComfyUI workflow (editor file or API graph)", file=sys.stderr)
+        except importer.ImportError_ as e:
+            print(e.detail, file=sys.stderr)
             return 1
-        d.mkdir(parents=True)
-        shutil.copyfile(src, d / (EDITOR if is_editor(data) else API))
-        print(f"made workflows/{args.id}/ ({'editor file' if is_editor(data) else 'API graph'})")
+        ids = [args.id if len(found) == 1 else f"{args.id}-{i + 1}" for i in range(len(found))]
+        for wid, f in zip(ids, found, strict=True):
+            importer.create(lib.packs, lib.catalog, f, wid, src.name)
+            files = [k for k, v in {"editor file": EDITOR, "API graph": API}.items() if (lib.packs.root / wid / v).exists()]
+            extra = f", {len(f.assets)} asset file(s)" if f.assets else ""
+            print(f"made workflows/{wid}/ ({' + '.join(files)}{extra}) from {f.source}")
     lib.packs.scan()
     if args.accept:
-        return cmd_suggest(lib, argparse.Namespace(id=args.id, write=True))
-    print(f"next: comfyui workflows suggest {args.id}   (review it, then add --write)")
+        rc = 0
+        for wid in ids:
+            rc |= cmd_suggest(lib, argparse.Namespace(id=wid, write=True))
+        return rc
+    print(f"next: comfyui workflows suggest {ids[0]}   (review it, then add --write)")
     return 0
 
 

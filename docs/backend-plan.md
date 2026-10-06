@@ -721,18 +721,18 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 
 ## Phase 9 — Move in `relay` (DashLLM) and `opencode`
 
-- [ ] **9.1 Subtree + venvs.**
+- [x] **9.1 Subtree + venvs.** *As built:* `uv sync` with uv's managed Python 3.12; the built dashboard (`web/frontend/dist`) was copied from the old repo instead of rebuilt (`aihub-install.sh` builds it when it's missing).
   - `git subtree add --prefix=services/relay ~/Tools/DashLLM main`.
   - Ignored state:
     - `.env` → `services/relay/.env`
     - recreate `web/backend/.venv` with `uv sync`
     - `npm ci && npm run build` in `web/frontend` (its own UI stays the native UI until the Part B relay page exists)
-- [ ] **9.2 Code.**
+- [x] **9.2 Code.** *As built:* `app/routes/admin_hub.py`; `p50 TTFT` is `null` when no streamed request had a first token (non-streamed calls have no TTFT). 173 tests (170 + 3).
   - Add `GET /admin/status`: stats = requests today, tokens today, p50 TTFT over 24 h, healthy endpoints x/y; `loaded: null`.
   - Default the bind address to `127.0.0.1`.
   - Remove `scripts/relay`, which hardcodes `$HOME/Tools/DashLLM`.
   - Its 154 tests still run from `services/relay/web/backend`.
-- [ ] **9.3 `services/relay/service.toml`.**
+- [x] **9.3 `services/relay/service.toml`.** *As built:* also `OPENCODE_AUTH_FILE` pointing at the opencode mod's minted credential, and the "LLM traffic" widget from 9.7.
   - **run:**
     - `command = ["web/backend/.venv/bin/uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "{port}"]`
     - `cwd = "web/backend"`, `env_file = ".env"`
@@ -743,7 +743,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - `RELAY_HOST=127.0.0.1`, `RELAY_PORT={port}`
   - **ui:** `native = "/"`.
   - **tools:** `relay_stats` (`GET /admin/stats/summary`), `list_endpoints`.
-- [ ] **9.4 `services/opencode/`, a manifest-only mod.**
+- [x] **9.4 `services/opencode/`, a manifest-only mod.** *As built:* `health = "tcp"`: `opencode serve` answers 401 on every route, `/global/health` included. `OPENCODE_PROJECT_DIR` was empty, which meant DashLLM's folder; `.env` now says so explicitly.
   - Copy `scripts/opencode-serve.sh` and `scripts/opencode-auth.sh` from DashLLM as `run.sh` and `auth.sh`.
   - `.env` holds the `OPENCODE_*` vars, and the generated credential goes in the mod folder.
   - Manifest: `command = ["./run.sh"]`, port 4096, `health = "tcp"`. Switch to an HTTP health route if `opencode serve` turns out to have a cheap unauthenticated one; check while doing this step.

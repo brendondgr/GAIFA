@@ -32,6 +32,8 @@ The four existing apps come in with `git subtree add` (their history is kept), s
 | Mod | From | Added for AIHub |
 | :--- | :--- | :--- |
 | `tts` | `~/Projects/LocalTTS` (plan Phase 7) | `service.toml`, `aihub-install.sh` (venv only), `localtts/outputs.py` (dated outputs + sidecars), `localtts/hub.py` (`/v1/status`, the "Clips per day" widget), `ui/page.js` (the Speech page: Speak and Voices tabs), `tests/` (`.venv/bin/python -m pytest` in the mod folder), `requirements-dev.txt`, `pytest.ini`; `bin/localtts` delegates to `aihub` |
+| `relay` | `~/Tools/DashLLM` (plan Phase 9) | `service.toml`, `aihub-install.sh` (`uv sync` in `web/backend`; npm for the dashboard), `web/backend/app/routes/admin_hub.py` (`/admin/status`, the "LLM traffic" widget), `tests/backend/test_aihub.py`; default bind 127.0.0.1; `scripts/relay` removed |
+| `opencode` | DashLLM's `opencode.service` (plan 9.4) | Manifest-only: `service.toml`, `run.sh` and `auth.sh` (from DashLLM's `scripts/opencode-serve.sh` / `opencode-auth.sh`), `.env` and `opencode-auth.env` (both gitignored), `README.md` |
 | `gen3d` | `~/Projects/3DGenerate` (plan Phase 8) | `service.toml`, `aihub-install.sh`, `gen3d/hub.py` (`/v1/status`, the "Job time per stage" widget), `store.py`'s dated job folders (`dir` column) and `output.json`, `scripts/migrate_jobs_to_outputs.py`, `tests/test_aihub.py`, `requirements-dev.txt` (pytest moved out of `requirements.txt`), `ui/page.js` (the 3D Generate page: Create and Jobs tabs), `desktop/3dgenerate-aihub.desktop`; `bin/gen3d` delegates to `aihub` |
 
 ## `docs/`

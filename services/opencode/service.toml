@@ -1,0 +1,20 @@
+# OpenCode agent server: `opencode serve` on :4096, the relay's "agent" upstream. A manifest-only
+# mod (plan 9.4): run.sh and auth.sh came from DashLLM's scripts/opencode-serve.sh and
+# opencode-auth.sh. Settings and provider keys are in .env (gitignored); the HTTP Basic credential
+# is OPENCODE_SERVER_PASSWORD there, or opencode-auth.env, minted on first start.
+id = "opencode"
+name = "OpenCode"
+description = "OpenCode agent server behind the relay (the \"agent\" model)"
+icon = "chat"
+
+[run]
+command = ["./run.sh"]
+port = 4096
+health = "tcp"                       # every route needs Basic auth (401), so the port is the check
+env_file = ".env"
+start_timeout_s = 30
+stop_timeout_s = 30                  # an agent turn can run for minutes; don't cut it shorter
+restart = "on-failure"
+
+[run.env]
+OPENCODE_PORT = "{port}"

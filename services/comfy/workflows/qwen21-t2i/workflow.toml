@@ -1,0 +1,32 @@
+name = "Qwen-Image 2.1 — text to image"
+task = "text-to-image"
+# memory_gb = 39.5    # estimated from the model files; each run measures it, so set it only to override
+
+[inputs.prompt]          # TextEncodeQwenImage21 "Prompt"
+node = "7"
+field = "prompt"
+
+[inputs.seed]          # KSampler "KSampler"
+node = "9"
+field = "seed"
+default = -1
+
+[inputs.steps]          # KSampler "KSampler"
+node = "9"
+field = "steps"
+
+[inputs.cfg]          # KSampler "KSampler"
+node = "9"
+field = "cfg"
+
+[inputs.aspect]          # ResolutionSelector "Output size (4.0 MP = native 2048x2048)"
+node = "6"
+field = "aspect_ratio"
+
+[inputs.megapixels]          # ResolutionSelector "Output size (4.0 MP = native 2048x2048)"
+node = "6"
+field = "megapixels"
+
+[outputs.image]
+node = "11"
+kind = "image"

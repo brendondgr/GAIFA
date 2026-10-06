@@ -1012,7 +1012,7 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
     - a `comfy-workflow` skill that follows the guide
   *Done when:* the page works live and under `?mock` (import → review → run → result), and the guide is linked from `docs/mods.md`.
   - *As built:* `services/comfy/ui/page.js` (Workflows: cards by task with state, problems, the ★ default per task, and an "Images & videos per day" chart), `ui/run.js` (Run: workflow picker, presets, the form, the queue with live progress, results with "Use as input" and "Run again", "Time per run" and "Runs per workflow" charts), `ui/import.js` (Import: drop a file, ComfyUI's history, drafts; the review screen with detected inputs to keep, rename or add from any node's field, the task, problems with Download buttons, "Edit as TOML", Remove). New shared module `web/mod-form.js` (`schemaForm`: a form from a JSON Schema with file inputs that upload or pick a recent output), for any mod. Adapter additions: `/v1/hub/widgets/made` (the dashboard widget), `/v1/stats`, card previews from the newest image or a video frame (`data/previews/`), result paths accepted as file inputs. Mock: `web/mock-comfy.js` (comfy is a ready, unloaded process mod with its page under `?mock`; `Hub.dc.html` `pageUrl` patch row 1). Guide `docs/workflows.md`, skill `.claude/skills/comfy-workflow/`. **Hub fix:** `aihub check` counted routes hidden from the API tab (`[api] hide`) as missing, so gen3d's widget failed too. Verified live: a Z-Image IntoRealism run from the page (form → ComfyUI started → progress → result, 35 s); the review screen on `krea2-txt2img` lists its three missing models with their folders.
-- [ ] **11.12 Transfer test with the held-out workflows.**
+- [x] **11.12 Transfer test with the held-out workflows.**
   1. **Freeze:** tag the commit `comfy-transfer-freeze`.
   2. **Import every held-out workflow,** from its original file, through the page or the CLI, following only `docs/workflows.md`.
   3. **Get the ground truth:** load the editor file in ComfyUI through the browser pane, and call `app.graphToPrompt()` to get ComfyUI's own API graph without running anything.
@@ -1029,17 +1029,18 @@ Tiers 1–3 are expected to run. For tier 4, the expected result is a correct co
      - your own workflows and the official templates go into `services/comfy/tests/fixtures/holdout/` with their ground truth
      - the Civitai workflows are read from where they are, and their tests are skipped when the files are missing, so third-party files aren't committed
   *Done when:* the report has both score tables, tiers 1–3 convert exactly and run, and every tier 4 workflow either converts or names the exact node it can't handle.
+  - *As built:* see [comfy-transfer-report.md](comfy-transfer-report.md). Ground truth came from ComfyUI's own editor for 12 of 13 (it can't convert Lonecat's Krea 2 Pro itself). Over tiers 1–3: exact conversions 2 → 8 of 9 (the ninth differs only in a display value), inputs 24 right / 2 wrong / 9 missed / 3 extra → 30 / 0 / 3 / 0 (the 3 misses sit on uninstalled custom nodes), tasks and outputs 8 → 9 of 9. Fixes in three commits: converter (`189faed`: subgraph inputs by name, ComfyUI's id renumbering, string ids, bypass rules, per-format and rgthree widgets, editor-only helpers, `editor_links`), detection (`53342b3`: linked text never mapped, size traced from the latent, dead and caption-only images, remove-background, preview outputs, the `video` input, mapped `aspect`), import (`f120d4d`: CLI relative paths and media/zip files, one draft per workflow in a zip). "Tiers 1–3 run" is met where their files exist: the three Qwen-Image-2.1 packs ran (tier 1); Klein (3 model files, download URLs recorded in the templates), SCAIL 2 basic (2 model files), SCAIL 2 gguf (custom node `KikoPurgeVRAM`) and Z-Image V7 (Impact Pack, easy-use, Image Saver) are blocked only on downloads or installs that need your go-ahead, and the check names each one. `tests/transfer.py` scores any version of the code (`COMFY_CODE=`), `tests/test_holdout.py` keeps the six committed ones (yours and the official templates) as regression tests and reads the seven third-party ones from where they are; their packs stay out of git (`workflows/.gitignore`).
 
 **Wire — Phase 11:** the Images & Video page, the "Images per day" widget, comfy's jobs in the Activity panel, and its results on the Outputs page.
 
 **Checks & deliverables — Phase 11**
-- [ ] Z-Image and Wan 2.1 both run from the page. Results land in `outputs/comfy/<date>/` with sidecars and appear live.
-- [ ] Adding a pack folder, editing its `workflow.toml` and deleting it each show up on the page without a restart.
-- [ ] A workflow saved from ComfyUI under a new name appears as a draft, and the review screen turns it into a working pack. Saving a pack's workflow in ComfyUI updates the pack.
-- [ ] Unloading comfy (ComfyUI's `/free`) shows the memory drop on the chart.
-- [ ] `aihub doctor` finds the ComfyUI models only in `data/models/comfyui/`, plus the legacy symlink.
-- [ ] `docs/comfy-transfer-report.md` shows the held-out scores before and after fixes.
-- [ ] Delivered:
+- [x] Z-Image and Wan 2.1 both run from the page. Results land in `outputs/comfy/<date>/` with sidecars and appear live. *(Z-Image IntoRealism, 35 s; Wan 2.1 text-to-video with the `short` preset, 33 frames at 832×480, 507 s, peak 68 GB; both on the Outputs page with their prompts.)*
+- [x] Adding a pack folder, editing its `workflow.toml` and deleting it each show up on the page without a restart.
+- [x] A workflow saved from ComfyUI under a new name appears as a draft, and the review screen turns it into a working pack. Saving a pack's workflow in ComfyUI updates the pack. *(Checked through ComfyUI's own save endpoint: "My Night Shots" became the draft `my-night-shots`; a save of `zimage-turbo.json` replaced the symlink and the edit landed in the pack.)*
+- [x] Unloading comfy (ComfyUI's `/free`) shows the memory drop on the chart.
+- [x] `aihub doctor` finds the ComfyUI models only in `data/models/comfyui/`, plus the legacy symlink. *(Doctor's model checks arrive in 12.4; checked by hand: `aihub models scan` finds nothing unregistered, `~/Models/ComfyUI/models` is the symlink, and no model file is left in the old folders.)*
+- [x] `docs/comfy-transfer-report.md` shows the held-out scores before and after fixes.
+- [x] Delivered:
   - `services/comfy`: the adapter, control script, packs, `tasks.toml`, converter, checker, detector, importer, CLI, tools route and page
   - the ComfyUI models moved
   - `docs/workflows.md` and the `comfy-workflow` skill

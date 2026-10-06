@@ -1,0 +1,27 @@
+name = "Klein9b edit distilled"
+task = "image-edit"
+
+[inputs.prompt]          # CLIPTextEncode "CLIP Text Encode (Positive Prompt)"
+node = "75:74"
+field = "text"
+
+[inputs.seed]          # RandomNoise "RandomNoise"
+node = "75:73"
+field = "noise_seed"
+default = -1
+
+[inputs.steps]          # Flux2Scheduler "Flux2Scheduler"
+node = "75:62"
+field = "steps"
+
+[inputs.cfg]          # CFGGuider "CFG Guider"
+node = "75:63"
+field = "cfg"
+
+[inputs.image]          # LoadImage "Load Image"
+node = "76"
+field = "image"
+
+[outputs.image]
+node = "9"
+kind = "image"

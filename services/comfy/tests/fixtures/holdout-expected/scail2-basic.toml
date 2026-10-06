@@ -1,0 +1,14 @@
+task = "image-to-video"            # pose transfer: a reference image + a driving video → video
+outputs = ["49"]
+[want]
+prompt = "6.text"
+image = "58.image"
+seed = "3.seed"
+frames = "101.length"
+[maybe]
+negative = "7.text"
+steps = "3.steps"
+cfg = "3.cfg"
+fps = "49.frame_rate"
+[missed]
+video = "113.video"                # the driving video (VHS_LoadVideo): no shared name or rule for it

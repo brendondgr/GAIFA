@@ -1,0 +1,10 @@
+task = "text-to-image"            # mode A (the default) is text → image; mode B starts from a reference image
+outputs = ["9"]
+[want]
+prompt = "10.prompt_text"
+seed = "7.seed"
+[maybe]
+negative = "5.text"
+image = "12.image"
+steps = "7.steps"
+cfg = "7.cfg"

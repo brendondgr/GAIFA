@@ -1,0 +1,12 @@
+# Written before the detector ran on it (plan 11.12). want / maybe / missed as in fixtures/expected/.
+task = "text-to-image"
+outputs = ["11"]
+[want]
+prompt = "7.prompt"
+seed = "9.seed"
+aspect = "6.aspect_ratio"          # size is a ResolutionSelector (aspect + megapixels), not width/height
+megapixels = "6.megapixels"
+[maybe]
+steps = "9.steps"
+cfg = "9.cfg"
+negative = "7.negative_prompt"

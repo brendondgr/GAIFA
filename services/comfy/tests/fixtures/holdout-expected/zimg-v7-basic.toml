@@ -1,0 +1,10 @@
+# Uses custom nodes that aren't installed (Impact Pack, easy-use, Image Saver): their fields can't be known.
+task = "text-to-image"
+outputs = ["38"]
+[want]
+seed = "24.seed"
+[maybe]
+[missed]
+prompt = "0.wildcard_text"         # ImpactWildcardProcessor (not installed)
+width = "14.value"                 # easy int (not installed)
+height = "18.value"

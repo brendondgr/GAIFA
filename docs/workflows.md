@@ -32,7 +32,12 @@ services/comfy/workflows/<id>/
 
 Every import becomes a **draft**. It is checked against your installed nodes and models, and AIHub suggests its inputs. Review it on the page, or run `comfyui workflows suggest <id>`. Saving the review (or `--write`) writes `workflow.toml`, and the draft becomes a pack.
 
-**From a zip:** the workflow JSON is used, and the zip's other files (LUTs, example images) are kept in `assets/`. An editor file is preferred over an API graph. The API graph is kept as `workflow.api.json` only when the editor file is missing or doesn't convert.
+**From a zip:** each workflow JSON in it becomes its own draft (`<id>-1`, `<id>-2`, … when there are several, as Civitai packs often ship variants). The zip's other files (LUTs, example images) are kept in each pack's `assets/`. An editor file is preferred over an API graph; the API graph is kept as `workflow.api.json` only when the editor file is missing or doesn't convert.
+
+**What isn't found by itself** (add it by hand in `workflow.toml`, or with "Expose another field" on the review screen):
+- inputs on custom nodes that aren't installed: their fields can't be known until they are (the check names the package; a note says where the prompt comes from)
+- a size chosen by a switch between several latents
+- other settings a workflow author marks by hand (a mask box, a LoRA strength): any node field can be an input
 
 ## 3. `workflow.toml`
 
@@ -91,13 +96,17 @@ A pack's `task` says what it does. The agent gets **one tool per task** that has
 | `remove-background` | `remove_background` | `image` | image |
 | `custom` | only through `run_workflow` | — | — |
 
-**Shared names:** `prompt`, `negative`, `image` (`image_2`, … for more), `mask`, `width`, `height`, `seed`, `steps`, `cfg`, `strength` (denoise), `frames`, `fps`.
+**Shared names:**
+- `prompt` (`prompt_2` for a second stage), `negative`
+- `image` (`image_2`, … for more), `mask`, `video` (a clip to restyle, or one whose motion drives the result)
+- `width`, `height`, `seed`, `steps`, `cfg`, `strength` (denoise), `frames`, `fps`
+- `aspect` and `megapixels` when the workflow picks its size with a resolution node (they're passed as they are)
 
 **Derived inputs.** You don't map these; the adapter turns them into fields the pack does map:
 - `aspect` + `megapixels` set `width` and `height`, in multiples of 16
 - `seconds` sets `frames`, kept at 4k+1 when the graph's own frame count is (Wan)
 
-**File inputs** (`image`, `mask`) take any of these:
+**File inputs** (`image`, `mask`, `video`) take any of these:
 - `output:<id>`: an AIHub output
 - `upload:<name>`: from `POST /v1/uploads`, or the Upload button
 - a result's path, such as `comfy/2026-10-06/….png` (the "Use as input" button)
@@ -123,7 +132,7 @@ comfyui workflows list                    every pack and draft, with its state
 comfyui workflows show <id>               inputs, nodes (ids, types, titles, values) and problems
 comfyui workflows check <id>… | --all     problems, with how to fix each
 comfyui workflows suggest <id> [--write]  the drafted workflow.toml (--write saves it if there's none)
-comfyui workflows new <id> --from <file|draft-id> [--accept]
+comfyui workflows new <id> --from <file|draft-id> [--accept]   (a JSON, PNG/WebP/MP4 or zip; relative paths work)
 comfyui workflows copy <id> <new-id>
 ```
 
@@ -140,16 +149,18 @@ These commands work while ComfyUI is down: they use ComfyUI's node list as cache
 | `input_unmapped` | An input points at a node or field that doesn't exist (often after a re-save renumbered nodes) | Fix `node`/`title`/`field`; `comfyui workflows show <id>` lists the nodes |
 | `task_input_missing` | The task needs an input name the pack doesn't map | Map it (for example `image`), or choose another task |
 | `convert_failed` | The editor file couldn't be turned into an API graph | Run it once in ComfyUI and import it from history, or put the exact graph in `workflow.api.json` |
+| `editor_links` | An "Anything Everywhere" node broadcasts values to other nodes' inputs; those links exist only in ComfyUI's editor | Run it once in ComfyUI and import it from history (the exact graph has the links), or connect those inputs directly and save |
 | `no_output` | Nothing saves results | Add a Save Image / Save Video node in ComfyUI |
 | `left_out` (note) | An editor-only node that isn't installed and isn't connected (a bookmark, a group helper) | Nothing; it doesn't affect the run |
 
-**What converts.** The converter matches ComfyUI's own frontend on the development workflows (plan 11.5). It handles:
+**What converts.** The converter matches ComfyUI's own frontend exactly on the 12 development workflows and on 11 of 13 held-out ones (plan 11.12, [comfy-transfer-report.md](comfy-transfer-report.md)). It handles:
 - widget values, including seed control values and upload buttons
 - dynamic inputs (`format.codec`)
 - links, Reroute, Primitive nodes, KJNodes Set/Get, and notes
 - muted and bypassed nodes
-- subgraphs, including promoted widgets
+- subgraphs, including promoted widgets, renumbered the way ComfyUI does when ids collide
 - inputs added to a node since the file was saved (they take their defaults)
+- rgthree's Power Lora Loader values, and rgthree's editor-only helpers (group bypassers, bookmarks)
 
 For anything it can't follow, it names the node.
 

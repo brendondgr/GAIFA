@@ -1,0 +1,32 @@
+name = "Qwen-Image 2.1 — edit with references"
+task = "image-edit"
+# memory_gb = 39.5    # estimated from the model files; each run measures it, so set it only to override
+
+[inputs.prompt]          # TextEncodeQwenImage21 "Instruction (use <image1>, <image2>, …)"
+node = "13"
+field = "prompt"
+
+[inputs.seed]          # KSampler "KSampler"
+node = "17"
+field = "seed"
+default = -1
+
+[inputs.steps]          # KSampler "KSampler"
+node = "17"
+field = "steps"
+
+[inputs.cfg]          # KSampler "KSampler"
+node = "17"
+field = "cfg"
+
+[inputs.image]          # LoadImage "image_1 · edit target"
+node = "7"
+field = "image"
+
+[inputs.image_2]          # LoadImage "image_2 · reference"
+node = "8"
+field = "image"
+
+[outputs.image]
+node = "19"
+kind = "image"

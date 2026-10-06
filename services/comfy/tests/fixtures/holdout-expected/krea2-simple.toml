@@ -1,0 +1,8 @@
+task = "text-to-image"
+outputs = ["213"]
+[want]
+prompt = "48.value"
+seed = "276.seed"
+[maybe]
+negative = "271.value"
+cfg = "282.value"

@@ -1,0 +1,4 @@
+task = "text-to-image"
+# outputs: not judged (the real save nodes are custom nodes that aren't installed)
+[want]
+[maybe]

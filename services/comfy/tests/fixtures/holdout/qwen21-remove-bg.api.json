@@ -1,0 +1,233 @@
+{
+ "1": {
+  "inputs": {
+   "unet_name": "qwen-image-2.1-UC-Q8_0.gguf"
+  },
+  "class_type": "UnetLoaderGGUF",
+  "_meta": {
+   "title": "Diffusion \u00b7 UC Q8_0 GGUF (default)"
+  }
+ },
+ "2": {
+  "inputs": {
+   "unet_name": "qwen-image-2.1-UC-fp8.safetensors",
+   "weight_dtype": "default"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "Diffusion \u00b7 UC FP8 (alternative)"
+  }
+ },
+ "3": {
+  "inputs": {
+   "switch": false,
+   "on_false": [
+    "1",
+    0
+   ],
+   "on_true": [
+    "2",
+    0
+   ]
+  },
+  "class_type": "ComfySwitchNode",
+  "_meta": {
+   "title": "Use FP8 instead of Q8_0?  (false = Q8_0)"
+  }
+ },
+ "4": {
+  "inputs": {
+   "clip_name": "qwen3vl_8b_bf16.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "Text encoder \u00b7 Qwen3-VL 8B BF16"
+  }
+ },
+ "5": {
+  "inputs": {
+   "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "VAE \u00b7 Qwen-Image 2.1 BF16"
+  }
+ },
+ "6": {
+  "inputs": {
+   "device": "auto",
+   "dtype": "default",
+   "model": [
+    "3",
+    0
+   ]
+  },
+  "class_type": "QwenImage21Cache",
+  "_meta": {
+   "title": "Prefix KV cache (auto = VRAM then RAM)"
+  }
+ },
+ "7": {
+  "inputs": {
+   "image": "angry_broccoli.png"
+  },
+  "class_type": "LoadImage",
+  "_meta": {
+   "title": "image_1 \u00b7 edit target"
+  }
+ },
+ "8": {
+  "inputs": {
+   "prompt": "Remove the background, and output a PNG image",
+   "negative_prompt": "",
+   "resolution": 0,
+   "clip": [
+    "4",
+    0
+   ],
+   "images.image_1": [
+    "7",
+    0
+   ],
+   "vae": [
+    "5",
+    0
+   ]
+  },
+  "class_type": "TextEncodeQwenImage21",
+  "_meta": {
+   "title": "Instruction"
+  }
+ },
+ "9": {
+  "inputs": {
+   "aspect_ratio": "1:1 (Square)",
+   "megapixels": 1,
+   "multiple": 32
+  },
+  "class_type": "ResolutionSelector",
+  "_meta": {
+   "title": "Custom output size (only used when switch = true)"
+  }
+ },
+ "10": {
+  "inputs": {
+   "width": [
+    "9",
+    0
+   ],
+   "height": [
+    "9",
+    1
+   ],
+   "batch_size": 1
+  },
+  "class_type": "EmptyLatentImage",
+  "_meta": {
+   "title": "Empty Latent Image"
+  }
+ },
+ "11": {
+  "inputs": {
+   "switch": false,
+   "on_false": [
+    "8",
+    2
+   ],
+   "on_true": [
+    "10",
+    0
+   ]
+  },
+  "class_type": "ComfySwitchNode",
+  "_meta": {
+   "title": "Custom size?  (false = follow image_1)"
+  }
+ },
+ "12": {
+  "inputs": {
+   "seed": 1,
+   "steps": 40,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1,
+   "model": [
+    "6",
+    0
+   ],
+   "positive": [
+    "8",
+    0
+   ],
+   "negative": [
+    "8",
+    1
+   ],
+   "latent_image": [
+    "11",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "KSampler"
+  }
+ },
+ "13": {
+  "inputs": {
+   "samples": [
+    "12",
+    0
+   ],
+   "vae": [
+    "5",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAE Decode"
+  }
+ },
+ "14": {
+  "inputs": {
+   "filename_prefix": "Qwen21/remove_bg",
+   "format": "png",
+   "format.bit_depth": "8-bit",
+   "format.input_color_space": "sRGB",
+   "images": [
+    "13",
+    0
+   ]
+  },
+  "class_type": "SaveImageAdvanced",
+  "_meta": {
+   "title": "Save Image (Advanced)"
+  }
+ },
+ "15": {
+  "inputs": {
+   "compare_view": {
+    "__value__": [
+     "",
+     ""
+    ]
+   },
+   "image_a": [
+    "7",
+    0
+   ],
+   "image_b": [
+    "14",
+    0
+   ]
+  },
+  "class_type": "ImageCompare",
+  "_meta": {
+   "title": "Before / after"
+  }
+ }
+}

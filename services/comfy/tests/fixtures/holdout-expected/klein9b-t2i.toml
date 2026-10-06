@@ -1,0 +1,11 @@
+task = "text-to-image"
+outputs = ["9"]
+[want]
+prompt = "75:74.text"
+seed = "75:73.noise_seed"
+width = "75:68.value"
+height = "75:69.value"
+[maybe]
+steps = "75:62.steps"
+cfg = "75:63.cfg"
+negative = "75:67.text"

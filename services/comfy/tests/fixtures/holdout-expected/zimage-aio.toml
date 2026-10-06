@@ -1,0 +1,5 @@
+# Tier 4: judged on converting and naming what's missing; inputs are a bonus.
+task = "text-to-image"
+# outputs: not judged (the real save nodes are custom nodes that aren't installed)
+[want]
+[maybe]

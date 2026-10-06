@@ -1,0 +1,163 @@
+{
+ "1": {
+  "inputs": {
+   "unet_name": "qwen-image-2.1-UC-Q8_0.gguf"
+  },
+  "class_type": "UnetLoaderGGUF",
+  "_meta": {
+   "title": "Diffusion \u00b7 UC Q8_0 GGUF (default)"
+  }
+ },
+ "2": {
+  "inputs": {
+   "unet_name": "qwen-image-2.1-UC-fp8.safetensors",
+   "weight_dtype": "default"
+  },
+  "class_type": "UNETLoader",
+  "_meta": {
+   "title": "Diffusion \u00b7 UC FP8 (alternative)"
+  }
+ },
+ "3": {
+  "inputs": {
+   "switch": false,
+   "on_false": [
+    "1",
+    0
+   ],
+   "on_true": [
+    "2",
+    0
+   ]
+  },
+  "class_type": "ComfySwitchNode",
+  "_meta": {
+   "title": "Use FP8 instead of Q8_0?  (false = Q8_0)"
+  }
+ },
+ "4": {
+  "inputs": {
+   "clip_name": "qwen3vl_8b_bf16.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  },
+  "class_type": "CLIPLoader",
+  "_meta": {
+   "title": "Text encoder \u00b7 Qwen3-VL 8B BF16"
+  }
+ },
+ "5": {
+  "inputs": {
+   "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "class_type": "VAELoader",
+  "_meta": {
+   "title": "VAE \u00b7 Qwen-Image 2.1 BF16"
+  }
+ },
+ "6": {
+  "inputs": {
+   "aspect_ratio": "1:1 (Square)",
+   "megapixels": 1,
+   "multiple": 32
+  },
+  "class_type": "ResolutionSelector",
+  "_meta": {
+   "title": "Output size (4.0 MP = native 2048x2048)"
+  }
+ },
+ "7": {
+  "inputs": {
+   "prompt": "A cinematic photo of a red fox curled up asleep on a mossy log in a misty pine forest at dawn, soft golden rim light, shallow depth of field, sharp fur detail",
+   "negative_prompt": "",
+   "resolution": 1024,
+   "clip": [
+    "4",
+    0
+   ]
+  },
+  "class_type": "TextEncodeQwenImage21",
+  "_meta": {
+   "title": "Prompt"
+  }
+ },
+ "8": {
+  "inputs": {
+   "width": [
+    "6",
+    0
+   ],
+   "height": [
+    "6",
+    1
+   ],
+   "batch_size": 1
+  },
+  "class_type": "EmptyLatentImage",
+  "_meta": {
+   "title": "Empty Latent Image"
+  }
+ },
+ "9": {
+  "inputs": {
+   "seed": 1,
+   "steps": 40,
+   "cfg": 1,
+   "sampler_name": "euler",
+   "scheduler": "simple",
+   "denoise": 1,
+   "model": [
+    "3",
+    0
+   ],
+   "positive": [
+    "7",
+    0
+   ],
+   "negative": [
+    "7",
+    1
+   ],
+   "latent_image": [
+    "8",
+    0
+   ]
+  },
+  "class_type": "KSampler",
+  "_meta": {
+   "title": "KSampler"
+  }
+ },
+ "10": {
+  "inputs": {
+   "samples": [
+    "9",
+    0
+   ],
+   "vae": [
+    "5",
+    0
+   ]
+  },
+  "class_type": "VAEDecode",
+  "_meta": {
+   "title": "VAE Decode"
+  }
+ },
+ "11": {
+  "inputs": {
+   "filename_prefix": "Qwen21/t2i",
+   "format": "png",
+   "format.bit_depth": "8-bit",
+   "format.input_color_space": "sRGB",
+   "images": [
+    "10",
+    0
+   ]
+  },
+  "class_type": "SaveImageAdvanced",
+  "_meta": {
+   "title": "Save Image (Advanced)"
+  }
+ }
+}

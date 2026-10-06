@@ -1,0 +1,13 @@
+task = "image-edit"
+outputs = ["9"]
+# base: node 81 is a second reference image (a logo); distilled: node 121 only feeds a bypassed subgraph
+[want]
+prompt = "75:74.text"
+image = "76.image"
+seed = "75:73.noise_seed"
+[maybe]
+steps = "75:62.steps"
+cfg = "75:63.cfg"
+negative = "75:67.text"
+megapixels = "75:80.megapixels"
+image_2 = "81.image"

@@ -1,0 +1,15 @@
+task = "image-to-video"
+outputs = ["8"]
+[want]
+prompt = "179.text"
+image = "178.image"
+seed = "19.noise_seed"
+frames = "114.length"
+[maybe]
+negative = "180.text"
+steps = "18.steps"
+cfg = "19.cfg"
+width = "183.value"
+height = "182.value"
+[missed]
+video = "33.video"

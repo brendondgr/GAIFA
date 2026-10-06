@@ -1,0 +1,11 @@
+# Packs made from third-party workflows (Civitai and community uploads) stay on this machine:
+# they're someone else's files, some carry large assets, and their prompts aren't ours to publish.
+# Your own packs and ComfyUI's official templates are tracked.
+scail2-basic/
+scail2-gguf/
+zimg-v7-basic/
+zimg-v7-*/
+zimage-aio/
+lonecat-krea2-pro/
+krea2-simple/
+krea2-dualmode/

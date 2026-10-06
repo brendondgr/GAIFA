@@ -1,0 +1,12 @@
+task = "remove-background"
+outputs = ["14"]
+[want]
+image = "7.image"
+[maybe]
+prompt = "8.prompt"
+seed = "12.seed"
+steps = "12.steps"
+cfg = "12.cfg"
+negative = "8.negative_prompt"
+aspect = "9.aspect_ratio"
+megapixels = "9.megapixels"

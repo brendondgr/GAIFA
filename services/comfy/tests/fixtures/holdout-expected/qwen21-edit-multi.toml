@@ -1,0 +1,13 @@
+task = "image-edit"
+outputs = ["19"]
+[want]
+prompt = "13.prompt"
+image = "7.image"
+image_2 = "8.image"
+seed = "17.seed"
+[maybe]
+steps = "17.steps"
+cfg = "17.cfg"
+negative = "13.negative_prompt"
+aspect = "14.aspect_ratio"
+megapixels = "14.megapixels"

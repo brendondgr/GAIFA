@@ -619,14 +619,14 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - **ui:** `native = "/ui/"`.
   - **api.responses:** speech routes and voice audio → `audio`.
   - **tools:** `speak`, `list_voices`, `design_voice`, `clone_voice`, `delete_voice` (confirm).
-- [ ] **7.4 Move models and voices** (old service stopped).
+- [x] **7.4 Move models and voices** (old service stopped). *As built (2026-10-06):* Whisper copied as `refs/` + dereferenced `snapshots/` only (no duplicate blob store); Kokoro's model and all 28 English voices downloaded into `data/models/hf-cache`; registered as `breeze-tts-2`, `kokoro-82m`, `whisper-large-v3-turbo`, `voice-arabella`, `voice-brendon`, `voice-hope`.
   - `mv ~/models/breeze-tts-2 data/models/tts/`, and leave a symlink back.
   - Fetch the rest of Kokoro's voices (only 6 of 28 are cached) into the new cache: `HF_HOME=data/models/hf-cache` with the kokoro venv's `hf download hexgrad/Kokoro-82M`.
   - `cp -rL` `models--openai--whisper-large-v3-turbo` into `data/models/hf-cache/hub/`. Copy, don't move: the old cache's shared blob store is used by other projects.
   - `mv ~/Projects/LocalTTS/data/voices data/models/voices`, and leave a symlink back.
   - Update `~/.config/tts-engines/engines.json` (`breeze.weights`, `voices_dirs`); **video-maker reads it**.
   - `aihub models scan`, then register `breeze-tts-2`, `kokoro-82m`, `whisper-large-v3-turbo` and the three voices with their sources.
-- [ ] **7.5 Cut over.**
+- [x] **7.5 Cut over.** *As built:* Kokoro and Breeze speak through the proxy; both clips are on the Outputs page with sidecars; both engines unloaded after 180 s idle; video-maker's calls (Breeze `stream` + `no_save`, `/v1/align`, Kokoro `timings`) work on `:5040`. The memory panel first showed 30 GB: the hub summed RSS over Breeze's forked compile workers, so mod memory now counts PSS (Breeze ≈ 13 GB with its GTT; the manifest estimate is 13). `localtts` delegates start/stop/restart/logs/status to `aihub` when it runs from `services/tts`.
   - `systemctl --user disable --now localtts.service`, then `aihub start tts`.
   - **Verify:**
     - Health works through the proxy.
@@ -635,7 +635,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
     - The memory panel shows about 9 GB loaded, and the engine unloads after 180 s idle.
     - video-maker still works on `:5040`.
   - Point `~/.local/bin/localtts` at `services/tts/bin/localtts`. Its start/stop/enable subcommands now delegate to `aihub`.
-- [ ] **7.6** `MOVED.md` in `~/Projects/LocalTTS`.
+- [x] **7.6** `MOVED.md` in `~/Projects/LocalTTS`.
 - [ ] **7.7 Speech page (Part B3).** Build and wire the Speak and Voices tabs and their charts: clips per day by voice, the load timeline, and the result waveform. Add a "Clips per day" `[[ui.widgets]]` entry to the tts manifest, served by a small `/v1/hub/widgets/clips` route.
 
 **Checks & deliverables — Phase 7**

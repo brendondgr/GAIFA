@@ -1,1 +1,569 @@
-{"version": 1, "models": {}}
+{
+  "models": {
+    "breeze-tts-2": {
+      "added": "2026-10-06T01:27:38-04:00",
+      "files": [
+        {
+          "path": "tts/breeze-tts-2/LICENSE",
+          "role": "other",
+          "sha256": "f158b88cd51473925e1ce8c39f4c7c9e419304ad71371896c4ff18fa1351dca2",
+          "size_bytes": 18719,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/README.md",
+          "role": "config",
+          "sha256": "0d15450e77dae7a606ce692d904d25e508111187ec95f14901d7d848e8ad5a19",
+          "size_bytes": 9818,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/config.json",
+          "role": "config",
+          "sha256": "57849eb756ca1602efe89afcc5c70379dd127f8deeb9f655204d4340190ea929",
+          "size_bytes": 10161,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/generation_config.json",
+          "role": "config",
+          "sha256": "2ef3f2c0ab8d9ad241059138a795433c5410fd9954efb9625674ecd2a9529434",
+          "size_bytes": 251,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/model-00001-of-00002.safetensors",
+          "role": "weights",
+          "sha256": "abf813781256e10cbe81f2dbb415f897556225d4dfa0282d67aa8ea164e114a9",
+          "size_bytes": 4961989890,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/model-00002-of-00002.safetensors",
+          "role": "weights",
+          "sha256": "36aa73b1a11361e1774db90d9c63c63303b294c022de112aa51904d940edcef1",
+          "size_bytes": 2004567152,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/model.safetensors.index.json",
+          "role": "config",
+          "sha256": "19977e3d96bb502ed3165b48adff094f6bd71ec3d349940d1a3ba6a0060bd5e3",
+          "size_bytes": 109004,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/special_tokens_map.json",
+          "role": "tokenizer",
+          "sha256": "194f265bb588d142a16f27d9576104eb3dab3d7ba9961541d2d6e3d5e77e6470",
+          "size_bytes": 886,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "d3ec9ac3eb2392389b9f5112e85d8b43316494addb587ba7b7a9d61eac23af96",
+          "size_bytes": 33386945,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": "2c084fd6725c2284e8aa6da095a8d036d48fe79665595bfcd50371821b620e44",
+          "size_bytes": 1157960,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/assets/breezeblue-logo.png",
+          "role": "other",
+          "sha256": "a4ccfb05960cca88569160218b618bc0a6d5993029aa5b5997ee4794f0093725",
+          "size_bytes": 27533,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/assets/tts-elo-leaderboard.svg",
+          "role": "other",
+          "sha256": "abd9a589b3e6c3a61c0ff9c584ed0d7ba8bfdd11b7fc77d7920b5f09ba2c642f",
+          "size_bytes": 60367,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/audio_tokenizer/config.json",
+          "role": "config",
+          "sha256": "ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167",
+          "size_bytes": 2336,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/audio_tokenizer/configuration.json",
+          "role": "config",
+          "sha256": "6bc26d64eb5024b4d1dab5a52371958b429256d6c9d59787f1f5294a54e0cebd",
+          "size_bytes": 76,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/audio_tokenizer/model.safetensors",
+          "role": "weights",
+          "sha256": "836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258",
+          "size_bytes": 682293092,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "tts/breeze-tts-2/audio_tokenizer/preprocessor_config.json",
+          "role": "config",
+          "sha256": "fcb3805e597e786d4067706e602f6688524640f8d3396790e2e09b5942fcbdfb",
+          "size_bytes": 234,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        }
+      ],
+      "format": "hf-dir",
+      "kind": "tts",
+      "name": "Breeze TTS 2",
+      "notes": "Research and non-commercial use only (BreezeBlue license).",
+      "path": "tts/breeze-tts-2",
+      "services": [
+        "tts"
+      ],
+      "source": {
+        "repo": "BreezeBlue/breeze-tts-2",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
+    "kokoro-82m": {
+      "added": "2026-10-06T01:27:38-04:00",
+      "files": [
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/config.json",
+          "role": "config",
+          "sha256": "5abb01e2403b072bf03d04fde160443e209d7a0dad49a423be15196b9b43c17f",
+          "size_bytes": 2351,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth",
+          "role": "weights",
+          "sha256": "496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4",
+          "size_bytes": 327212226,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_alloy.pt",
+          "role": "weights",
+          "sha256": "6d877149dd8b348fbad12e5845b7e43d975390e9f3b68a811d1d86168bef5aa3",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_aoede.pt",
+          "role": "weights",
+          "sha256": "c03bd1a4c3716c2d8eaa3d50022f62d5c31cfbd6e15933a00b17fefe13841cc4",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_bella.pt",
+          "role": "weights",
+          "sha256": "8cb64e02fcc8de0327a8e13817e49c76c945ecf0052ceac97d3081480e8e48d6",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_heart.pt",
+          "role": "weights",
+          "sha256": "0ab5709b8ffab19bfd849cd11d98f75b60af7733253ad0d67b12382a102cb4ff",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_jessica.pt",
+          "role": "weights",
+          "sha256": "cdfdccb8cc975aa34ee6b89642963b0064237675de0e41a30ae64cc958dd4e87",
+          "size_bytes": 523435,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_kore.pt",
+          "role": "weights",
+          "sha256": "8bfbc512321c3db49dff984ac675fa5ac7eaed5a96cc31104d3a9080e179d69d",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_nicole.pt",
+          "role": "weights",
+          "sha256": "c5561808bcf5250fe8c5f5de32caf2d94f27e57e95befdb098c5c85991d4c5da",
+          "size_bytes": 523430,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_nova.pt",
+          "role": "weights",
+          "sha256": "e0233676ddc21908c37a1f102f6b88a59e4e5c1bd764983616eb9eda629dbcd2",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_river.pt",
+          "role": "weights",
+          "sha256": "e149459bd9c084416b74756b9bd3418256a8b839088abb07d463730c369dab8f",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_sarah.pt",
+          "role": "weights",
+          "sha256": "49bd364ea3be9eb3e9685e8f9a15448c4883112a7c0ff7ab139fa4088b08cef9",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/af_sky.pt",
+          "role": "weights",
+          "sha256": "c799548aed06e0cb0d655a85a01b48e7f10484d71663f9a3045a5b9362e8512c",
+          "size_bytes": 523351,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_adam.pt",
+          "role": "weights",
+          "sha256": "ced7e284aba12472891be1da3ab34db84cc05cc02b5889535796dbf2d8b0cb34",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_echo.pt",
+          "role": "weights",
+          "sha256": "8bcfdc852bc985fb45c396c561e571ffb9183930071f962f1b50df5c97b161e8",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_eric.pt",
+          "role": "weights",
+          "sha256": "ada66f0eefff34ec921b1d7474d7ac8bec00cd863c170f1c534916e9b8212aae",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_fenrir.pt",
+          "role": "weights",
+          "sha256": "98e507eca1db08230ae3b6232d59c10aec9630022d19accac4f5d12fcec3c37a",
+          "size_bytes": 523430,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_liam.pt",
+          "role": "weights",
+          "sha256": "c82550757ddb31308b97f30040dda8c2d609a9e2de6135848d0a948368138518",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_michael.pt",
+          "role": "weights",
+          "sha256": "9a443b79a4b22489a5b0ab7c651a0bcd1a30bef675c28333f06971abbd47bd37",
+          "size_bytes": 523435,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_onyx.pt",
+          "role": "weights",
+          "sha256": "e8452be16cd0f6da7b4579eaf7b1e4506e92524882053d86d72b96b9a7fed584",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_puck.pt",
+          "role": "weights",
+          "sha256": "dd1d8973f4ce4b7d8ae407c77a435f485dabc052081b80ea75c4f30b84f36223",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/am_santa.pt",
+          "role": "weights",
+          "sha256": "7f2f7582fa2b1f160e90aafe6d0b442a685e773608b6667e545d743b073e97a7",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bf_alice.pt",
+          "role": "weights",
+          "sha256": "d292651b6af6c0d81705c2580dcb4463fccc0ff7b8d618a471dbb4e45655b3f3",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bf_emma.pt",
+          "role": "weights",
+          "sha256": "d0a423deabf4a52b4f49318c51742c54e21bb89bbbe9a12141e7758ddb5da701",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bf_isabella.pt",
+          "role": "weights",
+          "sha256": "cdd4c37003805104d1d08fb1e05855c8fb2c68de24ca6e71f264a30aaa59eefd",
+          "size_bytes": 523440,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bf_lily.pt",
+          "role": "weights",
+          "sha256": "6e09c2e481e2d53004d7e5ae7d3a325369e130a6f45c35a6002de75084be9285",
+          "size_bytes": 523420,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bm_daniel.pt",
+          "role": "weights",
+          "sha256": "fc3fce4e9c12ed4dbc8fa9680cfe51ee190a96444ce7c3ad647549a30823fc5d",
+          "size_bytes": 523430,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bm_fable.pt",
+          "role": "weights",
+          "sha256": "d44935f3135257a9064df99f007fc1342ff1aa767552b4a4fa4c3b2e6e59079c",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bm_george.pt",
+          "role": "weights",
+          "sha256": "f1bc812213dc59774769e5c80004b13eeb79bd78130b11b2d7f934542dab811b",
+          "size_bytes": 523430,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bm_lewis.pt",
+          "role": "weights",
+          "sha256": "b5204750dcba01029d2ac9cec17aec3b20a6d64073c579d694a23cb40effbd0e",
+          "size_bytes": 523425,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--hexgrad--Kokoro-82M/refs/main",
+          "role": "ref",
+          "sha256": "dc2759f2664ff984b4dc8f6d783ef61ce0b6a0c4c3b7da2ba6c9fa7b59cbc097",
+          "size_bytes": 40,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        }
+      ],
+      "format": "hf-dir",
+      "kind": "tts",
+      "name": "Kokoro 82M",
+      "notes": "All 28 English voices (a*, b*).",
+      "path": "hf-cache/hub/models--hexgrad--Kokoro-82M",
+      "services": [
+        "tts"
+      ],
+      "source": {
+        "repo": "hexgrad/Kokoro-82M",
+        "revision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
+    "voice-arabella": {
+      "added": "2026-10-06T01:27:38-04:00",
+      "files": [
+        {
+          "path": "voices/arabella/reference.wav",
+          "role": "reference",
+          "sha256": "bfc5ebb1ae8ecd65ab627e86735388226100453b79a146d4a78639b0d7745cb6",
+          "size_bytes": 1991236,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "voices/arabella/voice.json",
+          "role": "meta",
+          "sha256": "7408b92567a81bb0ffa9f18f208e8a265086295f2b1fc399839f18028ece32dc",
+          "size_bytes": 673,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        }
+      ],
+      "format": "wav",
+      "kind": "voice",
+      "name": "Voice: Arabella",
+      "notes": "",
+      "path": "voices/arabella",
+      "services": [
+        "tts"
+      ],
+      "source": {
+        "note": "uploaded reference clip",
+        "type": "created"
+      },
+      "tags": []
+    },
+    "voice-brendon": {
+      "added": "2026-10-06T01:27:38-04:00",
+      "files": [
+        {
+          "path": "voices/brendon/reference.wav",
+          "role": "reference",
+          "sha256": "21fce4585310c78bc4d8c5322eebf3da790f0ea85731fef2c89cdf7df915a608",
+          "size_bytes": 1065678,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "voices/brendon/voice.json",
+          "role": "meta",
+          "sha256": "0fa23c99f8a446ad42f1a675243df8aa1e987c1e720d11e295dc5da065da3261",
+          "size_bytes": 502,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        }
+      ],
+      "format": "wav",
+      "kind": "voice",
+      "name": "Voice: Brendon",
+      "notes": "",
+      "path": "voices/brendon",
+      "services": [
+        "tts"
+      ],
+      "source": {
+        "note": "uploaded reference clip",
+        "type": "created"
+      },
+      "tags": []
+    },
+    "voice-hope": {
+      "added": "2026-10-06T01:27:38-04:00",
+      "files": [
+        {
+          "path": "voices/hope/reference.wav",
+          "role": "reference",
+          "sha256": "3aec963a25e6e60221a88ae956a308f53c0f57f596532eac8db71baf8b53a969",
+          "size_bytes": 1853310,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        },
+        {
+          "path": "voices/hope/voice.json",
+          "role": "meta",
+          "sha256": "79d274371685b084c385294cdecf77d640e54b1b1476ddb7b5377eb337628c8e",
+          "size_bytes": 674,
+          "verified_at": "2026-10-06T01:27:47-04:00"
+        }
+      ],
+      "format": "wav",
+      "kind": "voice",
+      "name": "Voice: Hope",
+      "notes": "",
+      "path": "voices/hope",
+      "services": [
+        "tts"
+      ],
+      "source": {
+        "note": "uploaded reference clip",
+        "type": "created"
+      },
+      "tags": []
+    },
+    "whisper-large-v3-turbo": {
+      "added": "2026-10-06T01:27:38-04:00",
+      "files": [
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/added_tokens.json",
+          "role": "config",
+          "sha256": "3c51f66c4c21f9e126970078f11ae77a78c74aee8df606ee9daba86e467108e0",
+          "size_bytes": 34648,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/config.json",
+          "role": "config",
+          "sha256": "c5b526b3e3cd64cd8940dabb45e8ba726629e22d8ed389c29b552f9140daf04a",
+          "size_bytes": 1256,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/generation_config.json",
+          "role": "config",
+          "sha256": "cce11bfe3aaa6ae9e072ea2637caaec8795e68d9b67e655a5af16ee509681a4c",
+          "size_bytes": 3772,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/merges.txt",
+          "role": "tokenizer",
+          "sha256": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+          "size_bytes": 493869,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/model.safetensors",
+          "role": "weights",
+          "sha256": "542566a422ae4f3fd23f1ba11add198fca01bbf82e66e6a2857b3f608b1eb9d1",
+          "size_bytes": 1617824864,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/normalizer.json",
+          "role": "config",
+          "sha256": "bf1c507dc8724ca9cf9903640dacfb69dae2f00edee4f21ceba106a7392f26dd",
+          "size_bytes": 52666,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/preprocessor_config.json",
+          "role": "config",
+          "sha256": "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711",
+          "size_bytes": 340,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/special_tokens_map.json",
+          "role": "tokenizer",
+          "sha256": "baea4ea09372eb4fca86b4e4346139fd73cb807d5087e9de0948e971739c3e74",
+          "size_bytes": 2186,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/tokenizer.json",
+          "role": "tokenizer",
+          "sha256": "297b13372ac43916285644fb9687add3cc62ee2a1adb60da3dc25cc94c1871fd",
+          "size_bytes": 2710337,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": "844b642c73a91359722f47b35705f7174686df33d252695d8572cf9ac03a6389",
+          "size_bytes": 282843,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/snapshots/41f01f3fe87f28c78e2fbf8b568835947dd65ed9/vocab.json",
+          "role": "tokenizer",
+          "sha256": "e2aa043ef015641d363d8288e7c241c85e36a5c761fb303598e0710233344387",
+          "size_bytes": 1036558,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        },
+        {
+          "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo/refs/main",
+          "role": "ref",
+          "sha256": "c937a7c2929afeff12ad3273356974d1bdd49a7fead22c33613a227b67c71269",
+          "size_bytes": 40,
+          "verified_at": "2026-10-06T01:27:48-04:00"
+        }
+      ],
+      "format": "hf-dir",
+      "kind": "stt",
+      "name": "Whisper large-v3 turbo",
+      "notes": "Transcribes voice references and aligns word timings.",
+      "path": "hf-cache/hub/models--openai--whisper-large-v3-turbo",
+      "services": [
+        "tts"
+      ],
+      "source": {
+        "repo": "openai/whisper-large-v3-turbo",
+        "type": "huggingface"
+      },
+      "tags": []
+    }
+  },
+  "version": 1
+}

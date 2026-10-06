@@ -28,7 +28,10 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 URL="http://$HOST:$PORT"
 
-if [[ -n "${LOCALTTS_NO_SYSTEMD:-}" ]]; then MODE=process
+# Inside AIHub (services/tts), AIHub runs the server: start/stop/logs go through `aihub`.
+AIHUB="$ROOT/../../bin/aihub"
+if [[ -x "$AIHUB" && -f "$ROOT/service.toml" && -z "${LOCALTTS_STANDALONE:-}" ]]; then MODE=aihub
+elif [[ -n "${LOCALTTS_NO_SYSTEMD:-}" ]]; then MODE=process
 elif command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then MODE=systemd
 elif [[ "$(uname -s)" == Darwin ]]; then MODE=launchd
 else MODE=process; fi
@@ -63,6 +66,7 @@ pid_alive() { [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
 # ---- service manager back ends ----------------------------------------------------------------
 svc_enable() {
   case "$MODE" in
+    aihub) echo "localtts: AIHub starts it (autostart: Settings, or [services.tts] autostart in AIHub's config.toml)" ;;
     systemd)
       mkdir -p "$HOME/.config/systemd/user"
       sed "s|@ROOT@|$ROOT|g" "$ROOT/systemd/localtts.service" > "$HOME/.config/systemd/user/localtts.service"
@@ -96,6 +100,7 @@ EOF
 }
 svc_disable() {
   case "$MODE" in
+    aihub) echo "localtts: set [services.tts] autostart = false in AIHub's config.toml" ;;
     systemd) systemctl --user disable "$UNIT"; echo "localtts: will not start at boot" ;;
     launchd) launchctl unload -w "$PLIST" 2>/dev/null || true; rm -f "$PLIST"; echo "localtts: LaunchAgent removed" ;;
     process) echo "localtts: nothing to disable" ;;
@@ -103,6 +108,7 @@ svc_disable() {
 }
 svc_start() {
   case "$MODE" in
+    aihub) "$AIHUB" start tts ;;
     systemd)
       [[ -f "$HOME/.config/systemd/user/localtts.service" ]] || svc_enable
       systemctl --user start "$UNIT" ;;
@@ -116,6 +122,7 @@ svc_start() {
 }
 svc_stop() {
   case "$MODE" in
+    aihub) "$AIHUB" stop tts ;;
     systemd) systemctl --user stop "$UNIT" ;;
     launchd) launchctl stop io.localtts.server 2>/dev/null || true ;;
     process)
@@ -128,6 +135,7 @@ svc_stop() {
 }
 svc_state() {
   case "$MODE" in
+    aihub) "$AIHUB" status 2>/dev/null | awk '$1 == "tts" {print $2 " (AIHub mod tts)"}' ;;
     systemd) echo "$(systemctl --user is-active "$UNIT" 2>/dev/null || true) (autostart: $(systemctl --user is-enabled "$UNIT" 2>/dev/null || true))" ;;
     launchd) launchctl list io.localtts.server >/dev/null 2>&1 && echo "loaded (LaunchAgent)" || echo "not loaded" ;;
     process) pid_alive && echo "running (pid $(cat "$PIDFILE"))" || echo "stopped" ;;
@@ -145,7 +153,8 @@ case "$cmd" in
   stop)
     svc_stop; echo "localtts: stopped" ;;
   restart)
-    if [[ "$MODE" == systemd ]]; then
+    if [[ "$MODE" == aihub ]]; then "$AIHUB" restart tts
+    elif [[ "$MODE" == systemd ]]; then
       [[ -f "$HOME/.config/systemd/user/localtts.service" ]] || svc_enable
       systemctl --user restart "$UNIT"
     else svc_stop; svc_start; fi
@@ -169,7 +178,8 @@ EOF
   logs)
     follow=(); n=100
     for a in "$@"; do [[ "$a" == -f ]] && follow=(-f) || n="$a"; done
-    if [[ "$MODE" == systemd ]]; then journalctl --user -u "$UNIT" -n "$n" --no-hostname -o short-iso "${follow[@]}"
+    if [[ "$MODE" == aihub ]]; then "$AIHUB" logs tts "${follow[@]}"
+    elif [[ "$MODE" == systemd ]]; then journalctl --user -u "$UNIT" -n "$n" --no-hostname -o short-iso "${follow[@]}"
     else tail -n "$n" "${follow[@]}" "$LOGFILE"; fi ;;
   enable) svc_enable ;;
   disable) svc_disable ;;

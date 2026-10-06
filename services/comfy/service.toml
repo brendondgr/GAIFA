@@ -1,0 +1,30 @@
+# Images & Video: an adapter for ComfyUI (plan Phase 11). The adapter (port 5070) starts ComfyUI in
+# the strix-halo-comfyui toolbox (port 8199) on load, and runs workflow packs from workflows/.
+# Fields: architecture §4.3. Workflow packs: docs/workflows.md.
+id = "comfy"
+name = "Images & Video"
+description = "ComfyUI workflows: text to image, image edits and video"
+icon = "image"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "-m", "comfy"]
+port = 5070
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 30
+restart = "on-failure"
+install = "install.sh"
+
+[run.env]
+COMFY_URL = "http://127.0.0.1:8199"
+COMFY_DATA = "{service_dir}/data"
+COMFY_DB = "{databases}/comfy.db"
+COMFY_OUTPUTS = "{outputs}"
+COMFY_WORKFLOWS = "{service_dir}/workflows"
+COMFY_CONTROL = "{service_dir}/bin/comfyui"
+
+[outputs]
+kinds = ["image", "video"]

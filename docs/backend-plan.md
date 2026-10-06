@@ -879,7 +879,7 @@ Shared input names: `prompt`, `negative`, `image`, `images`, `mask`, `width`, `h
 
 Tiers 1–3 are expected to run. For tier 4, the expected result is a correct conversion plus a clear list of what is missing; a run is a bonus. Only the node-type list of Qwen-Image-2.1 was looked at while this plan was written.
 
-- [ ] **11.1 Scaffold** `services/comfy` from `_template`: a FastAPI adapter on port 5070 in the package `services/comfy/comfy/`, with `data/databases/comfy.db` for runs and per-workflow statistics.
+- [x] **11.1 Scaffold** `services/comfy` from `_template`: a FastAPI adapter on port 5070 in the package `services/comfy/comfy/`, with `data/databases/comfy.db` for runs and per-workflow statistics.
   *Done when:* `aihub check comfy` passes, and the mod is listed as stopped.
 - [ ] **11.2 Bring the ComfyUI control script in.**
   - Move `~/.local/bin/comfyui` to `services/comfy/bin/comfyui` and change its folders:

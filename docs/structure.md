@@ -27,7 +27,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 
 ## `services/` (the mods)
 
-The four existing apps come in with `git subtree add` (their history is kept), so most of each folder is the app's own code. These are the parts added for AIHub:
+The existing apps come in with `git subtree add` (their history is kept), so most of each folder is the app's own code. These are the parts added for AIHub; `comfy` is new:
 
 | Mod | From | Added for AIHub |
 | :--- | :--- | :--- |
@@ -36,6 +36,7 @@ The four existing apps come in with `git subtree add` (their history is kept), s
 | `opencode` | DashLLM's `opencode.service` (plan 9.4) | Manifest-only: `service.toml`, `run.sh` and `auth.sh` (from DashLLM's `scripts/opencode-serve.sh` / `opencode-auth.sh`), `.env` and `opencode-auth.env` (both gitignored), `README.md` |
 | `lcpp` | `~/Models/LLMs` (plan Phase 10) | `service.toml`, `aihub-install.sh` (`uv sync`, Python 3.14), `src/lcpp/aihub.py` (memory acquire before a launch, downloads registered in AIHub, the page URL for the relay), `src/lcpp/daemon/routes/hub.py` (`/api/status`), `LCPP_MODELS_DIR` in `paths.py` (catalog paths are models-relative), `src/tests/test_aihub.py`, `ui/page.js` (the LLM Launcher page: Instances, Catalog, Playground, Relay publishing, Launcher settings); `lcpp service …` delegates to `aihub`; `runtime/` (llama.cpp, gitignored) copied over |
 | `gen3d` | `~/Projects/3DGenerate` (plan Phase 8) | `service.toml`, `aihub-install.sh`, `gen3d/hub.py` (`/v1/status`, the "Job time per stage" widget), `store.py`'s dated job folders (`dir` column) and `output.json`, `scripts/migrate_jobs_to_outputs.py`, `tests/test_aihub.py`, `requirements-dev.txt` (pytest moved out of `requirements.txt`), `ui/page.js` (the 3D Generate page: Create and Jobs tabs), `desktop/3dgenerate-aihub.desktop`; `bin/gen3d` delegates to `aihub` |
+| `comfy` | new (plan Phase 11); ComfyUI itself runs in the `strix-halo-comfyui` toolbox on 8199 | The adapter package `comfy/`: `config.py` (`COMFY_*` settings), `db.py` (`comfy.db`: runs, per-task defaults), `server.py` (`create_app`), `hub.py` (`/v1/status`); `service.toml`, `install.sh`, `tests/` (`.venv/bin/python -m pytest` in the mod folder) |
 
 ## `docs/`
 

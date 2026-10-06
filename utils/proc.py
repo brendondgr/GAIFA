@@ -211,18 +211,29 @@ def container_pid(name: str) -> int | None:
     return int(out) if out.isdigit() and out != "0" else None
 
 
+def container_members(pid: int, proc: Path = PROC, root: Path = CGROUP_ROOT) -> list[int]:
+    """Every process in a podman container: the main pid plus everything in its libpod cgroup.
+    `podman exec` processes (how a toolbox runs ComfyUI) aren't descendants of the main pid, and
+    toolbox containers share the host's PID namespace, so the cgroup is what tells them apart."""
+    text = _read(proc / str(pid) / "cgroup") or ""
+    path = next((line[3:].strip() for line in text.splitlines() if line.startswith("0::")), "")
+    if "libpod-" not in path:
+        return [pid]
+    return [pid] + [p for p in cgroup_pids(path, root) if p != pid]
+
+
 def container_pids(pattern: str) -> list[int]:
-    """Main pids of the running containers whose names match a glob (`gen3d-worker-*`); a plain
-    name is one `podman inspect`."""
+    """Every process of the running containers whose names match a glob (`gen3d-worker-*`); a
+    plain name is one `podman inspect`."""
     if not any(c in pattern for c in "*?["):
         pid = container_pid(pattern)
-        return [pid] if pid else []
+        return container_members(pid) if pid else []
     out = _cmd("podman", "ps", "--format", "{{.Names}} {{.Pid}}") or ""
     pids = []
     for line in out.splitlines():
         parts = line.split()
         if len(parts) == 2 and fnmatch.fnmatch(parts[0], pattern) and parts[1].isdigit() and parts[1] != "0":
-            pids.append(int(parts[1]))
+            pids += [p for p in container_members(int(parts[1])) if p not in pids]
     return pids
 
 

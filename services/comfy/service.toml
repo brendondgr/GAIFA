@@ -27,8 +27,20 @@ COMFY_WORKFLOWS = "{service_dir}/workflows"
 COMFY_CONTROL = "{service_dir}/bin/comfyui"
 COMFY_MODELS = "{models}/comfyui"
 
+[memory]
+estimate_gb = 24                    # a typical image workflow; each run acquires its pack's own amount
+load = "POST /v1/load"
+unload = "POST /v1/unload"
+triggers = ["POST /v1/load"]
+containers = ["strix-halo-comfyui"]
+idle_unload_s = 600
+idle_unload_env = "COMFY_IDLE_UNLOAD_S"
+
 [models]
 dirs = ["comfyui"]
 
 [outputs]
 kinds = ["image", "video"]
+
+[ui]
+native = "http://127.0.0.1:8199/"

@@ -26,6 +26,8 @@ class Settings:
     control: Path            # bin/comfyui
     hub_url: str             # "" when not under AIHub
     load_timeout_s: float
+    idle_unload_s: float     # 0 = never
+    quit_on_exit: bool       # stop an idle ComfyUI when the adapter stops
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> Settings:
@@ -41,4 +43,6 @@ class Settings:
             control=_path(env, "COMFY_CONTROL", ROOT / "bin" / "comfyui"),
             hub_url=env.get("AIHUB_URL", "").rstrip("/"),
             load_timeout_s=float(env.get("COMFY_LOAD_TIMEOUT_S", "600")),
+            idle_unload_s=float(env.get("COMFY_IDLE_UNLOAD_S") or 600),
+            quit_on_exit=env.get("COMFY_QUIT_ON_EXIT", "1").lower() not in ("0", "false", "no", "off"),
         )

@@ -5,6 +5,7 @@
 #
 #   comfyui start      ensure the toolbox is up, launch ComfyUI, wait for the UI
 #   comfyui stop       stop ComfyUI (and the toolbox container)
+#   comfyui quit       stop ComfyUI only; the toolbox keeps running (AIHub's unload)
 #   comfyui restart    stop + start
 #   comfyui status     container state + whether the web UI answers
 #   comfyui logs       follow ComfyUI's log  (comfyui logs 100  -> last 100 lines)
@@ -115,6 +116,16 @@ case "${1:-}" in
     if ctr_running; then echo "[comfyui] Stopping toolbox container ..."; podman stop "$TOOLBOX" >/dev/null; fi
     echo "[comfyui] Stopped."
     ;;
+  quit)
+    pid="$(comfy_pid)"
+    if [ -n "$pid" ] && ctr_running; then
+      podman exec -u "$USER" "$TOOLBOX" kill "$pid" 2>/dev/null || true
+      for _ in $(seq 1 30); do comfy_alive || break; sleep 0.5; done
+      comfy_alive && podman exec -u "$USER" "$TOOLBOX" kill -9 "$pid" 2>/dev/null || true
+    fi
+    rm -f "$PIDFILE"
+    echo "[comfyui] ComfyUI stopped (toolbox left running)."
+    ;;
   restart)
     "$0" stop || true
     "$0" start
@@ -152,7 +163,7 @@ case "${1:-}" in
     ;;
   *)
     echo "Unknown command: $1"
-    echo "Usage: comfyui {start|stop|restart|status|logs|shell|update|workflows}"
+    echo "Usage: comfyui {start|stop|quit|restart|status|logs|shell|update|workflows}"
     exit 1
     ;;
 esac

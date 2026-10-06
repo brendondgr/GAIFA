@@ -381,7 +381,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 **Sampling** (every 2 s):
 - **System:** `/proc/meminfo` (`MemTotal`, `MemAvailable`).
 - **GPU:** AMD sysfs `mem_info_gtt_*` / `mem_info_vram_*`.
-- **Per mod:** the processes in its unit's cgroup, plus its `extra_units` and `containers`. For each process, count PSS (from `smaps_rollup`, so pages shared by forked workers count once; RSS if it can't be read) plus GPU memory from DRM fdinfo (`drm-memory-gtt` / `vram`). This logic comes from lcpp's `proc.py`.
+- **Per mod:** the processes in its unit's cgroup, plus its `extra_units` and `containers`. A container's processes are its main pid plus everything in its `libpod-*` cgroup: `podman exec` processes (how a toolbox runs ComfyUI) aren't children of the main pid, and toolbox containers share the host's PID namespace. For each process, count PSS (from `smaps_rollup`, so pages shared by forked workers count once; RSS if it can't be read) plus GPU memory from DRM fdinfo (`drm-memory-gtt` / `vram`). This logic comes from lcpp's `proc.py`.
 - **Peaks:** each mod's observed peak is stored in `hub.db`, and used as the estimate when it's larger than the manifest's.
 
 **Load rule:**

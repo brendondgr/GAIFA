@@ -110,12 +110,28 @@ def test_units_and_containers(monkeypatch):
         return None
 
     monkeypatch.setattr(proc, "_cmd", fake_cmd)
+    monkeypatch.setattr(proc, "container_members", lambda pid: [pid])
     assert proc.units_matching("lcpp-*.service") == ["lcpp-gemma.service", "lcpp-qwen.service"]
     assert proc.unit_cgroup("ok.service") == "/user.slice/x.service" and proc.unit_cgroup("gone.service") is None
     assert proc.container_pid("comfyui") == 4242
     assert proc.container_pid("stopped") is None and proc.container_pid("missing") is None
     assert proc.container_pids("gen3d-worker-*") == [5151]          # a glob: podman ps, names matched
     assert proc.container_pids("comfyui") == [4242] and proc.container_pids("missing") == []
+
+
+def test_container_members_come_from_its_libpod_cgroup(tmp_path):
+    """A toolbox container shares the host's PID namespace and runs ComfyUI via `podman exec`, so
+    its processes are found through the container's cgroup, not the main pid's children."""
+    procdir, cg = tmp_path / "proc", tmp_path / "cg"
+    scope = "/user.slice/user@1000.service/user.slice/libpod-abc.scope/container"
+    (procdir / "4242").mkdir(parents=True)
+    (procdir / "4242" / "cgroup").write_text(f"0::{scope}\n")
+    (cg / scope.lstrip("/")).mkdir(parents=True)
+    (cg / scope.lstrip("/") / "cgroup.procs").write_text("4242\n4300\n4301\n")
+    assert proc.container_members(4242, procdir, cg) == [4242, 4300, 4301]
+    (procdir / "5151").mkdir()
+    (procdir / "5151" / "cgroup").write_text("0::/user.slice/app.slice/something.service\n")
+    assert proc.container_members(5151, procdir, cg) == [5151]    # not a libpod cgroup: just the pid
 
 
 def test_real_cmd_failures_are_none():

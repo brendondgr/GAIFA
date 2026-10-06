@@ -123,6 +123,16 @@ def rss_bytes(pid: int, proc: Path = PROC) -> int:
     return 0
 
 
+def pss_bytes(pid: int, proc: Path = PROC) -> int:
+    """The process's proportional share of its memory (`Pss` in `smaps_rollup`): pages shared
+    with other processes (forked workers, shared libraries) are split between them, so a sum
+    over many processes counts each page once. Falls back to RSS when `smaps_rollup` can't be read."""
+    for line in (_read(proc / str(pid) / "smaps_rollup") or "").splitlines():
+        if line.startswith("Pss:"):
+            return int(line.split()[1]) * 1024
+    return rss_bytes(pid, proc)
+
+
 def gpu_bytes(pid: int, seen: set[str] | None = None, proc: Path = PROC) -> int:
     """GTT + VRAM held by the process's DRM clients. A client already in `seen` (shared with
     another process, e.g. after a fork) isn't counted again."""
@@ -145,12 +155,14 @@ def gpu_bytes(pid: int, seen: set[str] | None = None, proc: Path = PROC) -> int:
 
 
 def footprint(pids: Iterable[int], proc: Path = PROC) -> int:
-    """RSS + GPU memory of these processes and all their descendants, each counted once."""
+    """PSS + GPU memory of these processes and all their descendants, each counted once.
+    PSS rather than RSS: a mod with 30 forked compile workers would otherwise count the memory
+    they share 30 times."""
     every: list[int] = []
     for pid in pids:
         every.extend(p for p in process_tree(pid, proc) if p not in every)
     seen: set[str] = set()
-    return sum(rss_bytes(p, proc) + gpu_bytes(p, seen, proc) for p in every)
+    return sum(pss_bytes(p, proc) + gpu_bytes(p, seen, proc) for p in every)
 
 
 # ---- units and containers ---------------------------------------------------------

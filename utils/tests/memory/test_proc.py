@@ -47,6 +47,15 @@ def fake_proc(root, pid: int, rss_kib: int, children=(), fdinfo: dict[str, str] 
         (d / "fdinfo" / fd).write_text(text)
 
 
+def test_pss_is_preferred_to_rss_so_shared_pages_count_once(tmp_path):
+    fake_proc(tmp_path, 20, 4000, children=[21])
+    fake_proc(tmp_path, 21, 4000)
+    for pid in (20, 21):  # a forked worker: both show 4000 kB resident, 3000 kB of it shared
+        (tmp_path / str(pid) / "smaps_rollup").write_text(f"Rss:\t4000 kB\nPss:\t2500 kB\n")
+    assert proc.pss_bytes(20, tmp_path) == 2500 * KIB
+    assert proc.footprint([20], tmp_path) == 5000 * KIB
+
+
 def drm(client: int, gtt_kib: int, vram_kib: int = 0) -> str:
     return f"pos:\t0\ndrm-driver:\tamdgpu\ndrm-client-id:\t{client}\ndrm-memory-gtt:\t{gtt_kib} KiB\ndrm-memory-vram:\t{vram_kib} KiB\n"
 

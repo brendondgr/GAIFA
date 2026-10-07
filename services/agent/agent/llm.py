@@ -25,7 +25,57 @@ Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", te
 GEMMA_CALL = re.compile(r"<\|tool_call\>\s*call:([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*<tool_call\|>", re.S)
 HERMES_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
 FENCED = re.compile(r"```(?:json|tool_code|tool)?\s*(\{.*?\})\s*```", re.S)
-THINK = re.compile(r"<think>(.*?)</think>", re.S)
+THINK = re.compile(r"^\s*<(think|thinking)>(.*?)(?:</\1>|$)", re.S)
+PLANNING = re.compile(r"^\s*(\*\s*)?(the user\b|user:|i should\b|i need to\b|i will\b|i'll\b|let me\b|now i\b|okay[,.]|ok[,.]|wait[,.]|"
+                      r"plan:|first,? i\b|my plan\b|the request\b|the task\b)", re.I)
+
+
+class TagRouter:
+    """Streams content deltas, routing a leading `<think>…</think>` block to "thinking"."""
+
+    def __init__(self) -> None:
+        self.buf = ""
+        self.mode = "start"      # start → (think →) text
+
+    def feed(self, piece: str) -> list[tuple[str, str]]:
+        if self.mode == "text":
+            return [("text", piece)]
+        self.buf += piece
+        if self.mode == "start":
+            head = self.buf.lstrip()
+            if not head:
+                return []
+            for tag in ("<think>", "<thinking>"):
+                if tag.startswith(head[: len(tag)]) and len(head) < len(tag):
+                    return []            # could still become the tag: wait
+                if head.startswith(tag):
+                    self.mode, self.close, self.buf = "think", tag.replace("<", "</"), head[len(tag):]
+                    break
+            else:
+                self.mode, out, self.buf = "text", self.buf, ""
+                return [("text", out)]
+        # think: emit up to the closing tag, keeping a possible partial tag back
+        i = self.buf.find(self.close)
+        if i >= 0:
+            out = [("thinking", self.buf[:i])] if self.buf[:i] else []
+            rest = self.buf[i + len(self.close):].lstrip("\n")
+            self.mode, self.buf = "text", ""
+            return out + ([("text", rest)] if rest else [])
+        keep = len(self.close) - 1
+        out_text, self.buf = self.buf[:-keep] if len(self.buf) > keep else "", self.buf[-keep:] if len(self.buf) > keep else self.buf
+        return [("thinking", out_text)] if out_text else []
+
+
+def split_planning(text: str) -> tuple[str, str]:
+    """(thinking, reply): leading paragraphs that are the model planning to itself ("The user
+    wants…", "I should…"), when it skipped its thinking channel. Only when a real reply follows."""
+    paras = re.split(r"\n\s*\n", text.strip())
+    i = 0
+    while i < len(paras) and PLANNING.match(paras[i]):
+        i += 1
+    if 0 < i < len(paras):
+        return "\n\n".join(paras[:i]), "\n\n".join(paras[i:])
+    return "", text
 
 
 class LLMError(Exception):
@@ -65,6 +115,7 @@ class Reply:
     finish: str | None = None
     model: str | None = None
     leaked: bool = False
+    split: bool = False          # planning moved out of the reply (split_planning)
 
 
 def _loose_json(raw: str) -> dict[str, Any] | None:
@@ -146,6 +197,7 @@ class LLM:
             body["tools"] = tools
             body["tool_choice"] = "auto"
         reply = Reply(model=model)
+        shown = TagRouter()
         calls: dict[int, dict[str, Any]] = {}
         t_think: float | None = None
         try:
@@ -181,7 +233,8 @@ class LLM:
                                 reply.thinking_s = round(time.monotonic() - t_think, 1)
                             reply.text += d["content"]
                             if on_delta:
-                                await on_delta("text", d["content"])
+                                for kind, piece in shown.feed(d["content"]):
+                                    await on_delta(kind, piece)
                         for tc in d.get("tool_calls") or []:
                             slot = calls.setdefault(int(tc.get("index", len(calls))), {"id": None, "name": "", "arguments": ""})
                             if tc.get("id"):
@@ -201,11 +254,15 @@ class LLM:
             c = calls[i]
             if c["name"]:
                 reply.tool_calls.append(ToolCall(c["id"] or f"tc_{i}", c["name"], c["arguments"]))
-        if reply.text and not reply.thinking:
-            m = THINK.search(reply.text)
+        if reply.text:
+            m = THINK.match(reply.text)
             if m:
-                reply.thinking = m.group(1).strip()
-                reply.text = THINK.sub("", reply.text).strip()
+                reply.thinking = (reply.thinking + "\n" + m.group(2).strip()).strip()
+                reply.text = reply.text[m.end():].strip()
+            if not reply.thinking:
+                plan, rest = split_planning(reply.text)
+                if plan:
+                    reply.thinking, reply.text, reply.split = plan, rest, True
         if not reply.tool_calls and reply.text and known:
             text, leaked = reparse(reply.text, known)
             if leaked:

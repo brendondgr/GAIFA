@@ -20,6 +20,9 @@ from typing import Any
 import httpx
 
 REF = re.compile(r"#(\d+)\b")
+EQUIV = {"comfy_generate_image": ("zimage-turbo", "zimage-intorealism", "qwen21-t2i"), "comfy_animate_image": ("wan21-i2v",),
+         "comfy_generate_video": ("wan21-t2v",), "comfy_edit_image": ("qwen21-edit-multi",),
+         "comfy_remove_background": ("qwen21-remove-bg",)}
 
 
 @dataclass
@@ -42,16 +45,33 @@ class Run:
         return [c for c in self.of("tool_call", events) if (name is None or c["name"] == name) and (by is None or c.get("by") == by)]
 
     def results(self, name: str | None = None, events: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+        if name in EQUIV:
+            evs = self.events if events is None else events
+            ids = {c["id"] for c, _ in self._equiv(name, evs)}
+            return [r for r in self.of("tool_result", evs) if r["id"] in ids]
         return [r for r in self.of("tool_result", events) if name is None or r["name"] == name]
 
+    def _equiv(self, name: str, evs: list[dict[str, Any]]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        """(call, the arguments it ran with) for `name`, counting `comfy_run_workflow` with one of
+        `name`'s workflows as the same thing."""
+        decided = {d["id"]: d.get("arguments") for d in self.of("decision", evs) if d.get("approve")}
+        out = []
+        for c in self.calls(None, by=None, events=evs):
+            args = decided.get(c["id"]) or c.get("arguments") or {}
+            if c["name"] == name:
+                out.append((c, args))
+            elif c["name"] == "comfy_run_workflow" and args.get("workflow") in EQUIV.get(name, ()):
+                out.append((c, {**(args.get("inputs") or {}), "workflow": args["workflow"]}))
+        return out
+
     def done(self, name: str, events: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
-        return [r for r in self.results(name, events) if r["status"] == "done"]
+        evs = self.events if events is None else events
+        ids = {c["id"] for c, _ in self._equiv(name, evs)}
+        return [r for r in self.of("tool_result", evs) if r["id"] in ids and r["status"] == "done"]
 
     def final_args(self, name: str, events: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
         """The arguments each `name` call ran with (after card edits)."""
-        evs = self.events if events is None else events
-        decided = {d["id"]: d.get("arguments") for d in self.of("decision", evs) if d.get("approve")}
-        return [decided.get(c["id"]) or c.get("arguments") or {} for c in self.calls(name, by=None, events=evs)]
+        return [a for _, a in self._equiv(name, self.events if events is None else events)]
 
     def asked(self) -> bool:
         return bool(self.of("question"))

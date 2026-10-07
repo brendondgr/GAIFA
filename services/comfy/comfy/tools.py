@@ -78,7 +78,9 @@ def catalog(lib: Library, defaults: dict[str, str]) -> list[dict]:
     all_ready = sorted(p.id for ps in by_task.values() for p in ps)
     tools.append(_fn("list_workflows", "List the image and video workflows, with their tasks and inputs.",
                      {"type": "object", "properties": {}}, job=False, risk="read"))
-    tools.append(_fn("run_workflow", "Run any workflow with its own inputs (see list_workflows).",
+    tools.append(_fn("run_workflow", "Run a workflow by id with its own inputs (see list_workflows). Only for workflows the "
+                     "task tools don't cover: for images, edits, animation, video and background removal use generate_image, "
+                     "edit_image, animate_image, generate_video and remove_background (they take a `workflow` too).",
                      {"type": "object", "properties": {
                          "workflow": {"type": "string", "enum": all_ready},
                          "inputs": {"type": "object", "description": "The workflow's inputs by name"},

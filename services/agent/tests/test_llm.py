@@ -83,3 +83,36 @@ async def test_read_batches_run_in_parallel_and_others_in_order(env):
     await env.send(tid, "make two")
     tl = env.hub.timeline
     assert [x[1] for x in tl] == ["start", "end", "start", "end"]   # writes ran one after the other
+
+
+def test_split_planning_and_think_tags():
+    from agent.llm import split_planning
+
+    t, r = split_planning("The user wants a fox. I should call the tool.\n\nHere's your fox (#1). Want me to animate it?")
+    assert t.startswith("The user wants") and r.startswith("Here's your fox")
+    assert split_planning("The user wants a fox. I should ask what style.") == ("", "The user wants a fox. I should ask what style.")
+    assert split_planning("Here's your fox.") == ("", "Here's your fox.")
+
+
+async def test_think_tags_in_content_become_thinking(env):
+    env.model.queue({"text": "<think>The user greets me; reply briefly.</think>Hello! How can I help?"},
+                    {"text": "The user asked again. I should be brief.\n\nHi again!"})
+    tid = await env.thread()
+    await env.send(tid, "hi")
+    await env.send(tid, "hi again")
+    th = env.payloads(tid, "thinking")
+    assert th[0]["text"] == "The user greets me; reply briefly." and th[1]["text"].startswith("The user asked again")
+    assert [a["text"] for a in env.payloads(tid, "assistant")] == ["Hello! How can I help?", "Hi again!"]
+
+
+def test_tag_router_streams_think_as_thinking():
+    from agent.llm import TagRouter
+
+    r = TagRouter()
+    out = []
+    for piece in ["<th", "ink>plan", "ning here</th", "ink>Hello", " there"]:
+        out += r.feed(piece)
+    assert "".join(t for k, t in out if k == "thinking") == "planning here"
+    assert "".join(t for k, t in out if k == "text") == "Hello there"
+    r = TagRouter()
+    assert r.feed("Hi") == [("text", "Hi")] and r.feed(" you") == [("text", " you")]

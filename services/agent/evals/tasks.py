@@ -51,6 +51,21 @@ def arg_prefix(name: str, key: str, prefix: str):
     return (f"{name}.{key} is {prefix}", c)
 
 
+def aspect_is(name: str, ratio: str):
+    """The image's aspect: `aspect` starting with `ratio`, or width/height in that ratio."""
+    w0, h0 = (float(x) for x in ratio.split(":"))
+
+    def c(r: Run):
+        vals = r.final_args(name)
+        for a in vals:
+            if str(a.get("aspect", "")).startswith(ratio):
+                return True, f"aspect={a.get('aspect')}"
+            if a.get("width") and a.get("height") and abs(float(a["width"]) / float(a["height"]) - w0 / h0) < 0.03:
+                return True, f"{a['width']}×{a['height']}"
+        return False, f"{[{k: a.get(k) for k in ('aspect', 'width', 'height')} for a in vals][:2]}"
+    return (f"{name} is {ratio}", c)
+
+
 def asked():
     return ("asked a question", lambda r: (r.asked(), "" if r.asked() else "no ask_user"))
 
@@ -60,9 +75,11 @@ def not_asked():
 
 
 def asked_before(name: str):
+    """A question card, or a reply that asks in words ("?"), before `name` ran."""
     def c(r: Run):
         types = [(e["type"], e["payload"].get("name")) for e in r.events]
-        qi = next((i for i, t in enumerate(types) if t[0] == "question"), None)
+        qi = next((i for i, (e, t) in enumerate(zip(r.events, types)) if t[0] == "question" or
+                   (t[0] == "assistant" and "?" in (e["payload"].get("text") or ""))), None)
         gi = next((i for i, t in enumerate(types) if t == ("tool_result", name) and r.events[i]["payload"]["status"] == "done"), None)
         if qi is None:
             return False, "never asked"
@@ -153,7 +170,7 @@ SPEAK, M3D, VIEW = "tts_speak", "gen3d_make_3d", "view_output"
 TASKS: list[Task] = [
     # 1. single generations
     Task("img_full", "single", ["Make a 16:9 photo of a red fox sitting in fresh snow at sunrise."],
-         [ran(IMG), arg_has(IMG, "prompt", "fox"), arg_prefix(IMG, "aspect", "16:9"), not_asked(), kinds("image")]),
+         [ran(IMG), arg_has(IMG, "prompt", "fox"), aspect_is(IMG, "16:9"), not_asked(), kinds("image")]),
     Task("img_needs_subject", "single", ["Make me an image."],
          [asked_before(IMG), ran(IMG), arg_has(IMG, "prompt", "lighthouse")], answer=typed("A lighthouse on a cliff at night")),
     Task("speech_named", "single", ["Say 'Good morning, everyone' in the af_heart voice."],
@@ -163,7 +180,7 @@ TASKS: list[Task] = [
     Task("video_text", "single", ["Make a short video of waves crashing on a beach."],
          [ran(VID), arg_has(VID, "prompt", "wave"), kinds("video")]),
     Task("card_edit", "single", ["Make an image of a lighthouse at dusk."],
-         [ran(IMG), arg_prefix(IMG, "aspect", "9:16")], card=edit(aspect="9:16 (Portrait Widescreen)"),
+         [ran(IMG), aspect_is(IMG, "9:16")], card=edit(aspect="9:16 (Portrait Widescreen)"),
          note="the parameter card changes the aspect; what ran must be 9:16"),
     # 2. chains
     Task("img_then_video", "chain", ["Make an image of a sailboat on a calm lake.", "Now animate it: the boat drifts slowly."],
@@ -200,7 +217,7 @@ TASKS: list[Task] = [
           ("didn't guess a voice silently", lambda r: (r.asked() or not r.done(SPEAK), ""))], answer=first_option),
     # 4. must not ask
     Task("full_image_spec", "no-ask", ["Generate a 9:16 watercolor painting of a heron standing in a misty marsh, using the painterly zimage-intorealism workflow."],
-         [not_asked(), ran(IMG), arg_prefix(IMG, "aspect", "9:16"), arg_has(IMG, "workflow", "intorealism")]),
+         [not_asked(), ran(IMG), aspect_is(IMG, "9:16"), arg_has(IMG, "workflow", "intorealism")]),
     Task("full_speech", "no-ask", ["Use the bf_emma voice to say: The meeting starts at ten."],
          [not_asked(), ran(SPEAK), arg_has(SPEAK, "name", "bf_emma")]),
     Task("list_voices", "no-ask", ["What voices do I have?"],

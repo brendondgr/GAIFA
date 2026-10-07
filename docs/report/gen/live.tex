@@ -48,27 +48,24 @@ And I've read it aloud for you as well (\#2). Would you like me to animate the i
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/c634df2a6b2d.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
 \end{livecase}
 
-\begin{livecase}{L7\_compact\_continue · Gemma 4 31B · \textcolor{badred}{FAIL} · 118 s}
+\begin{livecase}{L7\_compact\_continue · Gemma 4 31B · \textcolor{badred}{FAIL} · 121 s}
 \textbf{Prompts:} \emph{``Make an image of an old stone bridge over a stream.''} $\rightarrow$ \emph{``/compact''} $\rightarrow$ \emph{``Edit the image you made earlier: make it night, with a full moon.''}\par
-\textbf{Tools:} \texttt{generate\_image $\rightarrow$ view\_output $\rightarrow$ edit\_image $\rightarrow$ read\_skill $\rightarrow$ edit\_image $\rightarrow$ list\_workflows}\par
+\textbf{Tools:} \texttt{list\_workflows $\rightarrow$ generate\_image $\rightarrow$ memory\_status $\rightarrow$ unload\_service $\rightarrow$ generate\_image $\rightarrow$ read\_skill $\rightarrow$ edit\_image}\par
 \textbf{Outputs:} \#1 image\par
-\textbf{Final reply:} {\small I keep getting an error that a second reference image (image\_2) is required for the edit workflow, but the tool definition says image\_2 is optional (or at least it should be for a simple "make it night" edit). Let me try a workaround --- I'll generate a new night version from scratch that matches the original scene:
+\textbf{Final reply:} {\small Here's the image: a mossy old stone bridge over a gentle woodland stream with dappled sunlight through autumn leaves.
 
-<center>
-<a href="https://skynet.ai/outputs/bf668d2d5de5" target="\_blank"><img src="https://skynet.ai/o}\par
+Would you like to animate it, edit it, make a 3D model, or something else?}\par
 \textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$)\par
+{\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: comfy\_edit\_image ran.}\par
 \smallskip\noindent
-\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/bf668d2d5de5.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/9cc51449b9d4.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
 \end{livecase}
 
-\begin{livecase}{L8\_fork · Gemma 4 31B · \textcolor{badred}{FAIL} · 108 s}
+\begin{livecase}{L8\_fork · Gemma 4 31B · \textcolor{badred}{FAIL} · 114 s}
 \textbf{Prompts:} \emph{``Make an image of a fox in a meadow.''} $\rightarrow$ \emph{``Edit it: make the fox a wolf.''}\par
-\textbf{Tools:} \texttt{generate\_image $\rightarrow$ edit\_image $\rightarrow$ list\_workflows}\par
-\textbf{Outputs:} \#1 image\par
-\textbf{Final reply:} {\small Would you rather I try to find an alternative edit method, or shall I just create a fresh image of a wolf in a meadow?}\par
-\textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$)\par
-\smallskip\noindent
-\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/7c1f9deb3569.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
+\textbf{Tools:} \texttt{generate\_image}\par
+\textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$); fork edits the first image (image=[] from comfy\_generate\_image: []); ran to the end (ValueError: max() iterable argument is empty)\par
+{\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: comfy\_edit\_image ran.}\par
 \end{livecase}
 
 \begin{livecase}{L10\_must\_ask · Gemma 4 31B · \textcolor{badred}{FAIL} · 113 s}

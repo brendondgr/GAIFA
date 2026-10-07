@@ -55,7 +55,8 @@ async def main(argv: list[str]) -> None:
             print("RESULT ok=", r.get("ok"), "seconds=", round(time.time() - t0, 1), "peak_gb=", peak, "limit_gb=", limit,
                   json.dumps([{k: x.get(k) for k in ("action", "target", "ok", "error")} for x in r.get("results", [])]))
             OUT.mkdir(parents=True, exist_ok=True)
-            (OUT / f"session-{sid.replace(' ', '_')}.json").write_text(json.dumps({"plan": dry, "result": r, "samples": samples,
+            n = len(list(OUT.glob("session-*.json"))) + 1
+            (OUT / f"session-{n}-{sid.replace(' ', '_')}.json").write_text(json.dumps({"plan": dry, "result": r, "samples": samples,
                                                                                    "peak_gb": peak, "limit_gb": limit}, indent=1))
         elif cmd in ("load", "unload"):
             r = await c.post(f"/api/services/{argv[1]}/{cmd}" + ("?make_room=1" if cmd == "load" else ""))

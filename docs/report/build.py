@@ -147,11 +147,29 @@ def thumb(oid: str, kind: str) -> str | None:
 
 def write_live() -> None:
     blocks = []
-    for f, model in (("live-skynet.json", "Gemma 4 31B"), ("live-26b.json", "Gemma 4 26B")):
-        d = load(f)
-        if not d:
-            continue
-        for r in d["rows"]:
+    sets = []
+    first, again = load("live-skynet.json"), load("live-skynet-2.json")
+    if first:
+        rows = list(first["rows"])
+        if again:
+            by = {r["task"]: r for r in again["rows"]}
+            merged = []
+            for r in rows:
+                if r["task"] in by:
+                    n = dict(by[r["task"]])
+                    if not r["ok"]:
+                        n["earlier"] = "; ".join(c["check"] for c in r["checks"] if not c["ok"])[:160]
+                    merged.append(n)
+                else:
+                    merged.append(r)
+            rows = merged
+        sets.append((rows, "Gemma 4 31B"))
+    if (vid := load("live-video.json")):
+        sets.append((vid["rows"], "Gemma 4 31B, in the Video work session"))
+    if (d26 := load("live-26b.json")):
+        sets.append((d26["rows"], "Gemma 4 26B"))
+    for rows, model in sets:
+        for r in rows:
             evs = None
             thread = r.get("thread")
             if thread:
@@ -176,6 +194,8 @@ def write_live() -> None:
                 body.append(r"\textbf{Final reply:} {\small " + tex(re.sub(r"\*\*|__|`", "", r["final"])[:420]) + r"}\par")
             if bad:
                 body.append(r"\textbf{Failed checks:} " + tex("; ".join(f"{c['check']} ({c['why'][:80]})" for c in bad)) + r"\par")
+            if r.get("earlier"):
+                body.append(r"{\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: " + tex(r["earlier"]) + r".}\par")
             if pics:
                 body.append(r"\smallskip\noindent")
                 for t, cap in pics[:4]:
@@ -201,9 +221,16 @@ def write_glance() -> None:
     runs = dict(eval_runs())
     main = runs.get("31B · final") or runs.get("31B · v2") or {}
     b26 = runs.get("26B · final") or runs.get("26B · 1 run") or {}
-    lives = [d for f in ("live-skynet.json", "live-26b.json") if (d := load(f))]
-    lp = sum(r["ok"] for d in lives for r in d["rows"])
-    lt = sum(len(d["rows"]) for d in lives)
+    lt = lp = 0
+    first, again, d26 = load("live-skynet.json"), load("live-skynet-2.json"), load("live-26b.json")
+    if first:
+        final = {r["task"]: r for r in first["rows"]}
+        final.update({r["task"]: r for r in (again or {}).get("rows", [])})
+        lt, lp = len(final), sum(r["ok"] for r in final.values())
+    if d26:
+        lt, lp = lt + len(d26["rows"]), lp + sum(r["ok"] for r in d26["rows"])
+    if (vid := load("live-video.json")):
+        lt, lp = lt + len(vid["rows"]), lp + sum(r["ok"] for r in vid["rows"])
 
     def pk(d: dict) -> str:
         s = d.get("summary")
@@ -241,7 +268,7 @@ def write_p1516() -> None:
         plots = []
         for f in switches:
             d = json.loads(f.read_text())
-            name = f.stem.removeprefix("session-").replace("_", " ")
+            name = f.stem.removeprefix("session-").split("-", 1)[-1].replace("_", " ")
             steps = ", ".join(f"{st['action'].replace('_', ' ')} {st['target']}" for st in d["plan"]["steps"]) or "nothing to do"
             res = d["result"]
             ok = res.get("ok")

@@ -5,3 +5,27 @@ Before each turn, the meter's prediction (last usage, minus thinking, plus an es
 \emph{What's running right now?} & 3,028 & 3,030 & -0.1\% \\
 \emph{Summarize our chat in one sentence.} & 3,629 & 3,669 & -1.1\% \\
 \bottomrule\end{tabular}
+\subsection*{What's left outside the folder}
+\code{aihub doctor --inventory} on this install:
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{5.2cm}lp{1.8cm}>{\raggedright\arraybackslash}p{5.6cm}@{}}\toprule Path & Kind & Used by & Why \\ \midrule\endhead
+\code{\textasciitilde{}/.local/share/uv/tools/lcpp} & \textcolor{badred}{outside} & lcpp & installed as a uv tool (a copy of the mod's CLI); reinstall from the mod folder \\
+\code{/home/bdgr/Tools/DashLLM} & \textcolor{badred}{outside} & opencode & env OPENCODE\_PROJECT\_DIR \\
+\code{/run/user/1000/lcpp} & \textcolor{warnamber}{runtime} & lcpp & runtime state from before data/state/ (tmpfs: gone at the next reboot) \\
+\code{\textasciitilde{}/.local/bin/breeze-tts} & \textcolor{okgreen}{allowlisted} & breeze-tts & command-line wrapper $\rightarrow$ a script into the project \\
+\code{podman container strix-halo-comfyui} & \textcolor{okgreen}{allowlisted} & comfy & the container the mod runs its models in \\
+\code{\textasciitilde{}/.local/bin/comfyui} & \textcolor{okgreen}{allowlisted} & comfyui & command-line wrapper $\rightarrow$ \textasciitilde{}/Agents/AIHub/services/comfy/bin/comfyui \\
+\code{\textasciitilde{}/.local/bin/cubeart} & \textcolor{okgreen}{allowlisted} & cubeart & command-line wrapper $\rightarrow$ \textasciitilde{}/Agents/AIHub/services/gen3d/runtime/CubeArt/cubeart \\
+\code{\textasciitilde{}/.local/bin/blender} & \textcolor{okgreen}{allowlisted} & gen3d & env GEN3D\_BLENDER \\
+\code{podman container gen3d-worker-*} & \textcolor{okgreen}{allowlisted} & gen3d & the container the mod runs its models in \\
+\code{\textasciitilde{}/.local/bin/gen3d} & \textcolor{okgreen}{allowlisted} & gen3d & command-line wrapper $\rightarrow$ \textasciitilde{}/Agents/AIHub/services/gen3d/bin/gen3d \\
+\code{\textasciitilde{}/.config/systemd/user/aihub.service} & \textcolor{okgreen}{allowlisted} & hub & the hub's systemd unit (aihub install) \\
+\code{\textasciitilde{}/.local/bin/aihub} & \textcolor{okgreen}{allowlisted} & hub & command-line wrapper $\rightarrow$ \textasciitilde{}/Agents/AIHub/bin/aihub \\
+\code{systemd journal (aihub-*.service)} & \textcolor{okgreen}{allowlisted} & hub & a second copy of the logs; data/logs/ is the first \\
+\code{\textasciitilde{}/.local/bin/kokoro-tts} & \textcolor{okgreen}{allowlisted} & kokoro-tts & command-line wrapper $\rightarrow$ a script into the project \\
+\code{\textasciitilde{}/.local/bin/lcpp} & \textcolor{okgreen}{allowlisted} & lcpp & command-line wrapper $\rightarrow$ \textasciitilde{}/.local/share/uv/tools/lcpp/bin/lcpp \\
+\code{\textasciitilde{}/.local/bin/localtts} & \textcolor{okgreen}{allowlisted} & localtts & command-line wrapper $\rightarrow$ \textasciitilde{}/Agents/AIHub/services/tts/bin/localtts \\
+\code{\textasciitilde{}/.local/bin/relay} & \textcolor{okgreen}{allowlisted} & relay & command-line wrapper $\rightarrow$ \textasciitilde{}/Agents/AIHub/services/relay/bin/relay \\
+\bottomrule\end{longtable}
+On a fresh clone of the repository (no \code{.env} files, no installs), the same check finds 6 allowlisted, 1 runtime and 1 outside item(s): the only outside one is this machine's uv-tool install of the lcpp CLI, not something the folder needs.
+\subsection*{Logs in data/logs}
+The shippers wrote these files during the night (sizes at the end): agent.log 2.2 MB, aihub.log 0.0 MB, comfy.log 0.5 MB, gen3d.log 0.1 MB, lcpp.log 0.0 MB, relay.log 2.0 MB, tts.log 0.0 MB.

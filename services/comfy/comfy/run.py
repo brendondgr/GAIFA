@@ -130,7 +130,7 @@ class Runner:
             return m.memory_gb
         peak = self.db.peak_gb(pack.id)
         if peak:
-            return round(peak * 1.05, 1)
+            return round(peak * 1.1, 1)
         return memory_estimate(conv, self.lib.catalog, self.lib.sizes()) or DEFAULT_GB
 
     async def acquire(self, gb: float, make_room: bool, reason: str) -> None:

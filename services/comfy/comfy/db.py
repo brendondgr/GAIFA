@@ -81,11 +81,16 @@ class DB:
             return [self._row(r) for r in self._c.execute(q, args).fetchall()]
 
     def peak_gb(self, workflow: str) -> float | None:
-        """The highest memory a finished run of this workflow measured, over its last 10 runs."""
+        """The typical peak memory of this workflow: the median over its last 10 finished runs (a run
+        measured while another workflow's models were still loaded mustn't inflate it for good)."""
         with self._lock:
-            r = self._c.execute("SELECT MAX(peak_gb) FROM (SELECT peak_gb FROM runs WHERE workflow=? AND state='done' "
-                                "AND peak_gb IS NOT NULL ORDER BY finished DESC LIMIT 10)", (workflow,)).fetchone()
-        return r[0]
+            rows = [r[0] for r in self._c.execute("SELECT peak_gb FROM runs WHERE workflow=? AND state='done' "
+                                                  "AND peak_gb IS NOT NULL ORDER BY finished DESC LIMIT 10", (workflow,))]
+        if not rows:
+            return None
+        rows.sort()
+        mid = len(rows) // 2
+        return rows[mid] if len(rows) % 2 else (rows[mid - 1] + rows[mid]) / 2
 
     def defaults(self) -> dict[str, str]:
         with self._lock:

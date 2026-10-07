@@ -24,3 +24,11 @@ def test_db_runs_and_defaults(tmp_path):
     assert db.defaults() == {"text-to-image": "zimage"}
     db.set_default("text-to-image", None)
     assert db.defaults() == {}
+
+
+def test_peak_is_the_median_of_recent_runs(tmp_path):
+    db = DB(tmp_path / "c.db")
+    for i, gb in enumerate([36.0, 35.5, 45.2, 36.4, 43.0]):     # two runs measured with leftovers loaded
+        db.add_run(f"r{i}", "zimage", "x", {})
+        db.update_run(f"r{i}", state="done", peak_gb=gb, finished=float(i))
+    assert db.peak_gb("zimage") == 36.4

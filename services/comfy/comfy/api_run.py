@@ -118,6 +118,11 @@ def tools(request: Request) -> dict:
     return {"tools": catalog(st.library, st.db.defaults())}
 
 
+def fill_references(required: list[str], args: dict[str, Any]) -> dict[str, Any]:
+    """Required extra reference images (`image_2`, …) the caller didn't give → the main image."""
+    return {k: args["image"] for k in required if k not in args and args.get("image") and re.fullmatch(r"image_\d+", k)}
+
+
 @router.post("/v1/tools/{name}/call", summary="Call an agent tool; image and video tools return a job")
 async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
     from .resolve import InputError
@@ -139,10 +144,16 @@ async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
         raise InputError(str(e)) from None
     conv, _ = lib.analysed(pack)
     from .schema import input_schema
-    takes = set(input_schema(pack, conv, lib.catalog, lib.tasks)["properties"])
+    sch = input_schema(pack, conv, lib.catalog, lib.tasks)
+    takes = set(sch["properties"])
     ignored = sorted(set(args) - takes)
-    r = await st.runner.submit(pack.id, {k: v for k, v in args.items() if k in takes}, None, make_room)
+    # A workflow that wants more reference images than the task tool offers (qwen21-edit-multi's
+    # image_2): the main image stands in, so a plain edit still runs.
+    filled = fill_references(sch.get("required", []), args)
+    r = await st.runner.submit(pack.id, {**{k: v for k, v in args.items() if k in takes}, **filled}, None, make_room)
     out = {"status": "running", "job_id": r["id"], "workflow": pack.id}
+    if filled:
+        out["filled"] = {k: "the main image" for k in filled}
     if ignored:
         out["ignored"] = ignored                  # shared inputs this workflow doesn't have
     return out

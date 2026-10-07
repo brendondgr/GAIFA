@@ -66,6 +66,5 @@ skills = "skills"
 tools_source = "GET /v1/tools"    # one tool per task (generate_image, animate_image, …); plan 11.10
 
 [tools]
-run = { op = "POST /v1/run", risk = "generate", ask = ["workflow", "preset"], description = "Run a workflow pack by id with its inputs", job = true, job_status = "GET /v1/jobs/{job_id}?wait=60", job_cancel = "POST /v1/queue/{job_id}/cancel" }
 job = { op = "GET /v1/jobs/{job_id}", description = "A run's state and its output files" }
 cancel = { op = "POST /v1/queue/{job_id}/cancel", description = "Cancel a waiting or running run", confirm = true }

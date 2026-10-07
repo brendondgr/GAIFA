@@ -57,3 +57,11 @@ def test_aspect_labels_match_by_ratio():
     assert _same_ratio("1:1 (Square)", ["1:1", "16:9"]) == "1:1"
     assert _same_ratio("16:9", ["1:1 (Square)", "16:9 (Widescreen)"]) == "16:9 (Widescreen)"
     assert _same_ratio("5:4", ["1:1", "16:9"]) == "5:4"
+
+
+def test_missing_reference_images_reuse_the_main_one():
+    from comfy.api_run import fill_references
+
+    assert fill_references(["image", "image_2", "prompt"], {"image": "output:abc", "prompt": "night"}) == {"image_2": "output:abc"}
+    assert fill_references(["image", "image_2"], {"image": "a", "image_2": "b"}) == {}
+    assert fill_references(["image_2"], {"prompt": "x"}) == {}

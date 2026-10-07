@@ -93,6 +93,10 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
         nonlocal step, step_id
         if not step:
             return
+        by_user = [e for e in step if e["type"] == "tool_call" and e["payload"].get("by") == "user"]
+        if by_user:      # a button: say so, or the model takes the call (and its result) for its own
+            names = ", ".join(e["payload"]["name"] for e in by_user)
+            msgs.append({"role": "user", "content": f"(I pressed a button that ran {names} directly; its result follows.)"})
         m = _call_msg(step)
         msgs.append(m)
         img_msgs = []

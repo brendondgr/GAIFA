@@ -138,7 +138,8 @@ async def test_action_button_runs_without_a_model_call(env):
     env.model.queue({"text": "I see you made a fox."})
     await env.send(tid, "nice, what next?")
     msgs = env.model.received[-1]["messages"]
-    assert [m["role"] for m in msgs[1:]] == ["assistant", "tool", "user"]    # the model sees the button's call
+    assert [m["role"] for m in msgs[1:]] == ["user", "assistant", "tool", "user"]    # the model sees the button's call
+    assert "pressed a button" in msgs[1]["content"] and "fake_make_image" in msgs[1]["content"]
 
 
 async def test_ask_modes(env):

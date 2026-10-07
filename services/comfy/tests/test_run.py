@@ -132,12 +132,15 @@ def test_cancel_and_failure(env):
     assert job["state"] == "failed" and "boom" in job["error"] and "KSampler" in job["error"]
 
 
-def test_needs_room_is_relayed(env):
+def test_needs_room_is_relayed(env, monkeypatch):
+    import comfy.run
+
+    monkeypatch.setattr(comfy.run, "ROOM_WAIT_S", 0.01)
     c, fake, hub, _ = env
     hub.room = False
     r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "x"}})
     assert r.status_code == 409 and r.json()["code"] == "needs_room" and r.json()["data"]["plan"]["unload"] == ["gen3d"]
-    assert fake.freed >= 1 and len(hub.acquires) == 2     # it freed its own models and asked again before giving up
+    assert fake.freed >= 1 and len(hub.acquires) == 7     # it freed its own models and kept asking (30 s) before giving up
     r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "x"}}, headers={"X-AIHub-Make-Room": "1"})
     assert r.status_code == 202 and hub.acquires[-1]["make_room"] == "1"
 
@@ -200,3 +203,16 @@ def test_a_mapped_aspect_is_passed_as_it_is(tmp_path):
                              "megapixels": {"type": "number", "default": 1.0}}}
     v = resolve(load_pack(d), schema, {"prompt": "x", "aspect": "16:9 (Wide)", "megapixels": 2})
     assert v == {"prompt": "x", "aspect": "16:9 (Wide)", "megapixels": 2.0}
+
+
+def test_switching_workflows_frees_the_last_ones_models(env, monkeypatch):
+    import comfy.run
+
+    monkeypatch.setattr(comfy.run, "ROOM_WAIT_S", 0.01)
+    c, fake, hub, _ = env
+    run(c, {"workflow": "zimage", "inputs": {"prompt": "a"}})
+    run(c, {"workflow": "zimage", "inputs": {"prompt": "b"}})
+    assert fake.freed == 0                                    # same workflow: its models stay loaded
+    up = c.post("/v1/uploads", files={"file": ("in.png", b"\x89PNG\r\n\x1a\n" + b"0" * 64, "image/png")}).json()
+    run(c, {"workflow": "wan", "inputs": {"prompt": "moves", "image": up["value"]}})
+    assert fake.freed == 1                                    # a different one: the old models go first

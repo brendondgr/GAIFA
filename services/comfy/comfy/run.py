@@ -34,6 +34,8 @@ KIND_BY_EXT = {".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "ima
                ".mp3": "audio", ".glb": "model3d", ".obj": "model3d"}
 
 
+ROOM_WAIT_S = 5.0     # between asks for memory after freeing ComfyUI's models (memory comes back in a few seconds)
+
 class NeedsRoom(Exception):
     def __init__(self, detail: str, plan: Any):
         super().__init__(detail)
@@ -45,6 +47,7 @@ class Runner:
         self.s, self.db, self.client, self.lib, self.control = settings, db, client, library, control
         self.client_id = uuid.uuid4().hex
         self.events: dict[str, asyncio.Event] = {}
+        self.last_pack: str | None = None
         self.live: dict[str, dict] = {}          # run id → {total, done, node_frac, cached}
         self.by_prompt: dict[str, str] = {}      # ComfyUI prompt id → run id
         self._peaks: dict[str, float] = {}
@@ -71,17 +74,30 @@ class Runner:
         for k in files & set(values):
             values[k] = await self.materialize(values[k])
         needs = self.needs_gb(pack, conv)
+        if self.last_pack and self.last_pack != pack.id and await self.client.up():
+            # Another workflow's models are still loaded: free them, so AIHub sees the room and this
+            # run's measured peak is its own (not the two added together).
+            log.info("switching %s → %s: freeing ComfyUI's models first", self.last_pack, pack.id)
+            await self.client.free()
+            await asyncio.sleep(ROOM_WAIT_S / 2)
+        self.last_pack = pack.id
         try:
             await self.acquire(needs, make_room, f"{pack.name}")
         except NeedsRoom:
-            # ComfyUI may still hold another workflow's models, which AIHub counts as used: free them
-            # (this mod can't be unloaded to make room for itself) and ask once more.
+            # ComfyUI may still hold models AIHub counts as used: free them (this mod can't be
+            # unloaded to make room for itself) and ask again while the memory comes back (up to 30 s).
             if not await self.client.up():
                 raise
             log.info("not enough room for %s: freeing ComfyUI's own models first", pack.id)
             await self.client.free()
-            await asyncio.sleep(3)
-            await self.acquire(needs, make_room, f"{pack.name}")
+            for attempt in range(6):
+                await asyncio.sleep(ROOM_WAIT_S)
+                try:
+                    await self.acquire(needs, make_room, f"{pack.name}")
+                    break
+                except NeedsRoom:
+                    if attempt == 5:
+                        raise
         if not await self.client.up():
             await self.control.load()
         self.control.touch()

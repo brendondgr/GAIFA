@@ -140,7 +140,11 @@ def _voice_or_404(name: str) -> voices.Voice:
 
 
 @app.get("/v1/voices")
-def list_voices():
+def list_voices(brief: bool = Query(False, description="names, engines and descriptions only (no transcripts): for the agent")):
+    if brief:
+        return {"custom": [{k: v for k, v in x.public().items() if k in ("name", "engine", "description", "instruction", "kind")}
+                           for x in voices.all_voices()],
+                "kokoro": voices.KOKORO_VOICES}
     return {
         "custom": [v.public() for v in voices.all_voices()],
         "kokoro": voices.KOKORO_VOICES,

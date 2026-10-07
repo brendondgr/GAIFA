@@ -147,3 +147,29 @@ async def test_parallel_calls_with_dropped_closers_still_run(env):
     await env.send(tid, "go")
     by = {r["name"]: r for r in env.payloads(tid, "tool_result")}
     assert by["read_skill"]["status"] == "done" and by["update_todos"]["status"] == "done"
+
+
+def test_reparse_gemma_without_the_opening_tag():
+    known = {"load_tools"}
+    text, calls = reparse('load_tools{group:<|"|>comfy<|"|>}<tool_call|>', known)
+    assert calls and calls[0].name == "load_tools" and json.loads(calls[0].arguments) == {"group": "comfy"} and text == ""
+    assert reparse('unknown{a:1}<tool_call|>', known)[1] == []
+
+
+async def test_repeated_identical_calls_are_stopped(env):
+    env.model.queue(*[{"tool_calls": [{"name": "hub_list_services", "arguments": {}}]} for _ in range(4)], {"text": "done"})
+    tid = await env.thread()
+    await env.send(tid, "loop")
+    res = env.payloads(tid, "tool_result")
+    assert [r["status"] for r in res] == ["done", "done", "error", "error"]
+    assert res[2]["error"]["code"] == "repeated_call"
+    assert len([c for c in env.hub.calls if c["name"] == "hub_list_services"]) == 2
+
+
+async def test_grammar_constrained_models_get_every_tool(env):
+    env.model.models["main"]["source"] = "props"
+    env.agent.llm._models = (0.0, [])
+    tid = await env.thread()
+    await env.send(tid, "hi")
+    names = {t["function"]["name"] for t in env.model.received[-1]["tools"]}
+    assert {"fake_make_image", "tts_speak", "gen3d_make_3d"} <= names

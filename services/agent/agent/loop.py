@@ -41,6 +41,7 @@ class Config:
     max_steps: int = 25
     default_window: int = 32768
     data: Any = None   # Path of data/agent
+    all_tools_models: tuple[str, ...] = ()
 
 
 @dataclass
@@ -218,8 +219,8 @@ class Agent:
     async def _turn(self, tid: str) -> None:
         self.set_state(tid, "running")
         thread = self.store.thread(tid) or {}
-        tools = ToolSet(self.hub, thread.get("settings") or {})
         model = thread.get("model") or self.cfg.model
+        tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
         steps = 0
         final = "idle"
         try:
@@ -354,6 +355,12 @@ class Agent:
                 "code": "invalid_arguments", "detail": p["bad_arguments"],
                 "fix": "send the arguments as one JSON object matching the schema" + (f": {json.dumps(schema)[:1500]}" if schema else "")}})
             return "ok"
+        if self._repeated(tid, e) >= 3:
+            self._result(tid, cid, name, {"status": "error", "error": {
+                "code": "repeated_call", "detail": f"{name} was already called with these same arguments {self._repeated(tid, e) - 1} "
+                "times in this turn; its result won't change",
+                "fix": "use the result you already have and move on to the next step (load_tools if the tool you need isn't loaded)"}})
+            return "ok"
         if name in LOCAL_NAMES:
             return await self.local.run(tid, cid, name, args or {}, tools, thread)
         # a hub tool: decided approval, a call already started, or a new call
@@ -414,6 +421,14 @@ class Agent:
                 self.transient(tid, "progress", {"id": cid, "progress": st.get("progress"), "note": st.get("note"),
                                                  "elapsed_s": st.get("elapsed_s"), "job_id": st.get("job_id")})
 
+    def _repeated(self, tid: str, e: dict[str, Any]) -> int:
+        """How many calls of this tool with these arguments since the last user message (this one included)."""
+        evs = self.store.events(tid)
+        start = max((x["seq"] for x in evs if x["type"] == "user"), default=0)
+        key = (e["payload"]["name"], json.dumps(e["payload"].get("arguments") or {}, sort_keys=True))
+        return sum(1 for x in evs if x["type"] == "tool_call" and x["seq"] > start and x["seq"] <= e["seq"]
+                   and (x["payload"]["name"], json.dumps(x["payload"].get("arguments") or {}, sort_keys=True)) == key)
+
     def _save_loaded(self, tid: str, tools: ToolSet) -> None:
         t = self.store.thread(tid) or {}
         s = dict(t.get("settings") or {})
@@ -442,6 +457,14 @@ class Agent:
                  "tool_index": ctx.est(parts["tools"]), "outputs": ctx.est(parts["outputs"] + parts["summary"])}
         return prompts.build(parts), sizes
 
+    async def all_tools(self, model: str) -> bool:
+        """Load every tool for this model? Yes when its server constrains tool calls with a grammar
+        (llama.cpp: the relay's facts come from `/props`), or when AGENT_ALL_TOOLS lists it."""
+        if model in self.cfg.all_tools_models:
+            return True
+        meta = await self.llm.meta(model)
+        return meta.get("source") == "props"
+
     async def window(self, model: str) -> int:
         meta = await self.llm.meta(model)
         return int(meta.get("context_length") or self.cfg.default_window)
@@ -460,7 +483,7 @@ class Agent:
     async def meter(self, tid: str, model: str | None = None) -> dict[str, Any]:
         thread = self.store.thread(tid) or {}
         model = model or thread.get("model") or self.cfg.model
-        tools = ToolSet(self.hub, thread.get("settings") or {})
+        tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
         await tools.refresh()
         _, sizes = await self.messages(tid, tools, model)
         m = ctx.meter(self.store.events(tid), await self.window(model), sizes)

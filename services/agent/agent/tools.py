@@ -78,8 +78,11 @@ def function(t: dict[str, Any]) -> dict[str, Any]:
 class ToolSet:
     """The tools one thread sees right now."""
 
-    def __init__(self, hub: HubAPI, settings: dict[str, Any]) -> None:
+    def __init__(self, hub: HubAPI, settings: dict[str, Any], all_tools: bool = False) -> None:
         self.hub = hub
+        # Every tool loaded up front: for servers that constrain tool calls with a grammar (llama.cpp),
+        # where the model can only name tools it was given; deferred ones would be unreachable.
+        self.all_tools = all_tools
         self.loaded: list[str] = list(settings.get("loaded") or [])
         self.pinned: set[str] = set(settings.get("pinned") or [])
         self.disabled: set[str] = set(settings.get("disabled") or [])
@@ -92,7 +95,7 @@ class ToolSet:
         except Exception:  # noqa: BLE001 - the hub may be restarting: keep what we had
             self.index = self.index or []
         names = [t["name"] for t in self.index if t["mod"] not in self.disabled and
-                 (t["core"] or t["mod"] in self.pinned or t["name"] in self.loaded)]
+                 (self.all_tools or t["core"] or t["mod"] in self.pinned or t["name"] in self.loaded)]
         self.full = {t["name"]: t for t in await self.hub.tools(names)} if names else {}
 
     def by_name(self, name: str) -> dict[str, Any] | None:

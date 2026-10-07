@@ -22,7 +22,7 @@ import httpx
 
 Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", text)
 
-GEMMA_CALL = re.compile(r"<\|tool_call\>\s*call:([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*<tool_call\|>", re.S)
+GEMMA_CALL = re.compile(r"(?:<\|tool_call\>\s*)?(?:call:)?([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*<tool_call\|>", re.S)
 HERMES_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
 FENCED = re.compile(r"```(?:json|tool_code|tool)?\s*(\{.*?\})\s*```", re.S)
 CHANNEL_OPEN = re.compile(r"<\|channel\>(?:thought|analysis|final)?\s*")
@@ -173,6 +173,8 @@ def reparse(text: str, known: set[str]) -> tuple[str, list[ToolCall]]:
     calls: list[ToolCall] = []
     out = text
     for m in GEMMA_CALL.finditer(text):
+        if m.group(1) not in known and not m.group(0).lstrip().startswith("<|tool_call>"):
+            continue          # without the opening tag, only a known tool name counts
         args = _loose_json(m.group(2)) or {}
         calls.append(ToolCall(f"tc_{len(calls)}", m.group(1), json.dumps(args)))
         out = out.replace(m.group(0), "")

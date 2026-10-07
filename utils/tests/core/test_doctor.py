@@ -70,7 +70,7 @@ async def test_doctor_reports_each_area(services_dir, root, make_app):
     taken = by[("ports", f"fake-mem: port {busy} is taken while the mod is stopped")]
     assert taken["level"] == "fail" and "pid" in taken["detail"]
     assert by[("offline", "fake-ok: runs offline without 1 model(s)")]["detail"] == "gone (missing)"
-    assert any(t.startswith("logs: in the systemd journal") for t in titles)
+    assert any(t.startswith("logs: in data/logs/") for t in titles)
     assert any(a == "disk" for a, _ in by)
 
 

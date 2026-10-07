@@ -121,7 +121,7 @@ def _paths(hub: Any) -> list[dict[str, Any]]:
             note = "; ".join(allowed) if allowed else ""
             out.append(check("paths", "ok", f"{s.id}: everything inside the project" + (" or allowlisted" if allowed else ""), note))
         if later:
-            out.append(check("paths", "note", f"{s.id}: Stage D (plan 16.2)", "; ".join(later)))
+            out.append(check("paths", "note", f"{s.id}: runtime paths on tmpfs (cleared at reboot)", "; ".join(later)))
     return out
 
 
@@ -191,14 +191,17 @@ def _offline(hub: Any, views: dict[str, dict[str, Any]]) -> list[dict[str, Any]]
 
 
 def _stage_d(hub: Any) -> list[dict[str, Any]]:
-    """What stays outside until Stage D (plan 16.1, 16.2): logs, and mods' runtime state."""
+    """Logs and mods' runtime state, inside the project since plan 16.1 and 16.2; leftovers from before are noted."""
     ids = [s.id for s in hub.services.list()] if hub.services else []
-    out = [check("paths", "note", "logs: in the systemd journal (plan 16.1 moves them to data/logs/)",
-                 ", ".join(f"aihub-{i}.service" for i in ids))]
+    logs = hub.paths.logs
+    shipped = sorted(p.stem for p in logs.glob("*.log")) if logs.is_dir() else []
+    out = [check("paths", "ok", f"logs: in {logs.relative_to(hub.paths.root)}/ ({len(shipped)} files; the systemd journal keeps a second copy)",
+                 ", ".join(shipped))]
     for base in STAGE_D:
         for i in ids:
             if (base / i).exists():
-                out.append(check("paths", "note", f"{i}: runtime state in {base / i} (plan 16.2)", ""))
+                out.append(check("paths", "note", f"{i}: leftover runtime state in {base / i}",
+                                 "from before data/state/ (plan 16.2); tmpfs, so it's gone at the next reboot"))
     return out
 
 

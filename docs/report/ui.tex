@@ -3,6 +3,9 @@ The Chat page is new in \code{web/chat/}. It is plain ES modules on the page's R
 \newcommand{\shot}[3]{\begin{minipage}[t]{#3\linewidth}\centering\includegraphics[width=\linewidth]{img/#1}\\[2pt]{\footnotesize\color{muted}#2}\end{minipage}}
 
 \begin{center}
+\shot{live-l2-end.png}{A real thread on the live hub (live run L2): the 3D model made from the robot image, with its four-view preview, \emph{View in 3D} and \emph{Rig}, then the agent's reply offering next steps. The context meter shows 7.4k of the 31B's 131k.}{0.98}
+\end{center}
+\begin{center}
 \shot{chat-question-card.png}{A question card: options with descriptions, multi-select, ``Other…'' for typed answers. Answered cards collapse to a summary.}{0.49}\hfill
 \shot{chat-parameter-card.png}{A parameter card (an approval): the \code{ask} fields are editable; what you set is what runs.}{0.49}
 \end{center}
@@ -26,6 +29,11 @@ The Chat page is new in \code{web/chat/}. It is plain ES modules on the page's R
 \shot{chat-narrow-900.png}{At 900 px wide.}{0.55}\hfill
 \shot{chat-phone.png}{Phone width: the thread list becomes a drawer, and nothing scrolls sideways.}{0.2}\hfill
 \shot{settings-agent.png}{Settings $\rightarrow$ Agent: AGENT.md, memory, Show thinking.}{0.2}
+\end{center}
+
+\begin{center}
+\shot{sessions-panel-plan.png}{Sessions: switching first shows the plan (each step and its memory change, and whether it fits).}{0.49}\hfill
+\shot{api-tab-approval-card.png}{The API tab: calling a generating tool goes through the same approval card.}{0.49}
 \end{center}
 
 \subsection*{Adding to it: the extension points}

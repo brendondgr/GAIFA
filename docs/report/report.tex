@@ -160,6 +160,7 @@ The gate in plan 13.5 is pass\textasciicircum{}3 $\geq$ 80\% on the primary mode
 \item \emph{v2} adds the fixes for leaked reasoning and fairer checks.
 \item \emph{v3} comes after the first live-test fixes. In \emph{v3 + 2 re-run}, two tasks that failed only because of my eval script (a stale card value) and a duplicate comfy tool were run again.
 \item \emph{final} is the whole eval again, on the code as it stands at the end of the night.
+\item \emph{5 weakest, re-checked} runs the five tasks that missed a run in \emph{final} again, three times each, after the last prompt fix (turned-off groups and read-only are now stated in the prompt).
 \item \emph{All tools loaded} skips tools-on-demand, one run per task.
 \item The 26B ran on llama.cpp with every tool loaded (bug \#15).
 \end{itemize}

@@ -46,7 +46,7 @@ def eval_runs() -> list[tuple[str, dict]]:
     """(label, data) for each eval file, in a fixed order."""
     order = [("eval-skynet-deferred.json", "31B · v1"), ("eval-skynet-v2.json", "31B · v2"),
              ("eval-skynet-v3.json", "31B · v3 as run"), ("eval-skynet-final.json", "31B · v3 + 2 re-run"),
-             ("eval-skynet-v4.json", "31B · final"),
+             ("eval-skynet-v4.json", "31B · final"), ("eval-skynet-after.json", "31B · 5 weakest, re-checked"),
              ("eval-skynet-all-tools.json", "31B · all tools loaded"),
              ("eval-26b-r1.json", "26B · 1 run"), ("eval-26b-v3.json", "26B · final")]
     return [(label, d) for f, label in order if (d := load(f))]
@@ -73,7 +73,7 @@ def write_eval() -> None:
     (GEN / "eval_summary.tex").write_text("\n".join(lines) + "\n")
     # pass rate by group (pgfplots coordinates)
     coords = []
-    for label, d in runs:
+    for label, d in [(l, d) for l, d in runs if l in ("31B · v1", "31B · final", "31B · all tools loaded", "26B · final", "26B · 1 run")]:
         g = by_group(d)
         coords.append(r"\addplot coordinates {" + " ".join(f"({GROUP_SHORT[k]},{v})" for k, v in g.items()) + "};")
         coords.append(r"\addlegendentry{" + tex(label) + "}")
@@ -168,6 +168,10 @@ def write_live() -> None:
                 else:
                     merged.append(r)
             rows = merged
+        vid_rows = {r["task"]: r for r in (load("live-video.json") or {}).get("rows", [])}
+        for r in rows:
+            if not r["ok"] and r["task"] in vid_rows and vid_rows[r["task"]]["ok"]:
+                r["after"] = "Run again in the Video work session below, with the local LLM stopped: it passed."
         sets.append((rows, "Gemma 4 31B"))
     if (vid := load("live-video.json")):
         sets.append((vid["rows"], "Gemma 4 31B, in the Video work session"))
@@ -199,6 +203,8 @@ def write_live() -> None:
                 body.append(r"\textbf{Final reply:} {\small " + tex(re.sub(r"\*\*|__|`", "", r["final"])[:420]) + r"}\par")
             if bad:
                 body.append(r"\textbf{Failed checks:} " + tex("; ".join(f"{c['check']} ({c['why'][:80]})" for c in bad)) + r"\par")
+            if r.get("after"):
+                body.append(r"{\footnotesize\color{muted} " + tex(r["after"]) + r"}\par")
             if r.get("earlier"):
                 body.append(r"{\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: " + tex(r["earlier"]) + r".}\par")
             if pics:
@@ -213,10 +219,12 @@ def write_live() -> None:
 
 def write_tests() -> None:
     d = load("test-counts.json") or {}
-    lines = [r"\begin{tabular}{@{}llr@{}}", r"\toprule", r"Suite & Command & Result \\", r"\midrule"]
+    lines = [r"\begin{tabular}{@{}lrrrr@{}}", r"\toprule", r"Suite & Passed & Failed & Skipped & Time \\", r"\midrule"]
+    tot = [0, 0, 0, 0]
     for s in d.get("suites", []):
-        lines.append(f"{tex(s['name'])} & \\texttt{{{tex(s['command'])}}} & {tex(s['result'])} \\\\")
-    lines += [r"\bottomrule", r"\end{tabular}"]
+        lines.append(f"{tex(s['name'])} & {s['passed']} & {s['failed']} & {s['skipped']} & {s['seconds']} s \\\\")
+        tot = [tot[0] + s["passed"], tot[1] + s["failed"], tot[2] + s["skipped"], tot[3] + s["seconds"]]
+    lines += [r"\midrule", f"\\textbf{{All}} & \\textbf{{{tot[0]}}} & {tot[1]} & {tot[2]} & {tot[3]} s \\\\", r"\bottomrule", r"\end{tabular}"]
     (GEN / "tests.tex").write_text("\n".join(lines) + "\n")
 
 

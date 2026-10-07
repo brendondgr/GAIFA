@@ -12,6 +12,38 @@ Run on 6–7 October 2026. The full account, with every prompt, transcript notes
 ## Results
 
 <!-- RESULTS -->
+| Run | Tasks × runs | pass@1 | pass^k | Mean time |
+|---|---|---|---|---|
+| Gemma 4 31B, first run (v1) | 30 × 3 | 86.7% | 21/30 (70%) | 32 s |
+| 31B, v2 (leaked-reasoning fix) | 30 × 3 | 94.4% | 25/30 (83%) | 20 s |
+| 31B, v3 (+2 tasks re-run) | 30 × 3 | 97.8% | 29/30 (97%) | 23 s |
+| 31B, final code | 30 × 3 | 95.6% | 26/30 (87%) | 18 s |
+| 31B, 5 weakest tasks re-checked | 5 × 3 | 100.0% | 5/5 (100%) | 22 s |
+| 31B, all tools loaded | 30 × 1 | 100.0% | 30/30 (100%) | 33 s |
+| Gemma 4 26B, 1 run (local) | 30 × 1 | 90.0% | 27/30 (90%) | 83 s |
+
+| Live case | Model (latest run) | Result | Time | Tools |
+|---|---|---|---|---|
+| L1_fox | 31B | pass | 37 s | comfy_generate_image |
+| L2_image_to_3d | 31B | pass | 229 s | read_skill, read_skill, read_skill, comfy_generate_image, view_output, gen3d_make_3d, hub_ |
+| L3_image_to_video | 31B, Video work session | pass | 1266 s | comfy_generate_image, comfy_animate_image |
+| L4_describe_speak | 31B | pass | 80 s | comfy_generate_image, view_output, tts_speak, tts_speak |
+| L7_compact_continue | 31B, re-run after fixes | pass | 556 s | comfy_generate_image, comfy_edit_image |
+| L8_fork | 31B, re-run after fixes | fail | 35 s | comfy_generate_image, hub_memory_status |
+| L10_must_ask | 31B, re-run after fixes | pass | 117 s | read_skill, gen3d_make_3d |
+| L5_L6_buttons | 31B, re-run after fixes | pass | 354 s | comfy_generate_image, comfy_remove_background |
+| L1_fox | 26B | pass | 62 s | comfy_generate_image |
+| L4_describe_speak | 26B | pass | 113 s | comfy_generate_image, view_output, tts_speak |
+
+(Each live case shows its latest run; the report lists every earlier failure and its cause.)
+
+**Other live checks:**
+- **Pending card and question survive restarts.** A pending parameter card and a pending question both survived `aihub restart` plus `aihub restart agent`, then finished (`evals/restart_live.py`): pass.
+- **Context meter.** It was within 1.1% of the 31B's own prompt-token count (`evals/meter_check.py`).
+- **Compaction.** In a thread capped at 6k tokens, 5 clears and a model-written summary still answered a question about the first turn (`evals/compact_live.py`): pass.
+- **Sessions.** "LLM work", "3D work" and "Video work" were saved on the real mods, and switching between them peaked at 46 GB of a 118 GB limit; the 26B relaunched with its settings (`evals/sessions_live.py`).
+- **MCP.** Claude Code listed 41 AIHub tools and called two. Its `tts_speak` call became a denied approval, and nothing ran.
+<!-- /RESULTS -->
 
 ## Gate
 

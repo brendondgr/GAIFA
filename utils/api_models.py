@@ -460,12 +460,16 @@ class SystemPaths(_Model):
     models: str
     databases: str
     outputs: str
+    logs: str     # data/logs: mod and hub logs (plan 16.1)
+    state: str    # data/state: mods' runtime state (plan 16.2)
 
 
 class Usage(_Model):
     models_bytes: int
     databases_bytes: int
     outputs_bytes: int
+    logs_bytes: int
+    state_bytes: int
 
 
 class SystemInfo(_Model):

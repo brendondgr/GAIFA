@@ -25,6 +25,8 @@ export const METHOD_AREA = {
   listWidgets: 'widgets', getWidget: 'widgets',
   listTools: 'tools', getToolIndex: 'tools', callTool: 'tools', getToolCall: 'tools', cancelToolCall: 'tools',
   listApprovals: 'tools', getApproval: 'tools', decideApproval: 'tools',
+  listSessions: 'sessions', saveSession: 'sessions', renameSession: 'sessions', deleteSession: 'sessions',
+  restoreSession: 'sessions', getSessionState: 'sessions',
 };
 
 // HubEvent type → area, for merging live and mock event streams.
@@ -32,6 +34,7 @@ export const EVENT_AREA = {
   service: 'services', memory: 'memory', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
   approval: 'tools', tool_call: 'tools',
+  session: 'sessions', session_step: 'sessions',
 };
 
 const enc = encodeURIComponent;
@@ -174,6 +177,12 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     listApprovals: ({ state } = {}) => req('GET', `/api/approvals${qs({ state })}`),
     getApproval: id => req('GET', `/api/approvals/${enc(id)}`),
     decideApproval: (id, { approve, args, reason, wait } = {}) => req('POST', `/api/approvals/${enc(id)}${qs({ wait })}`, { json: { approve, arguments: args, reason } }),
+    listSessions: () => req('GET', '/api/sessions'),
+    saveSession: name => req('POST', '/api/sessions', { json: { name } }),
+    renameSession: (id, name) => req('PUT', `/api/sessions/${enc(id)}`, { json: { name } }),
+    deleteSession: id => req('DELETE', `/api/sessions/${enc(id)}`),
+    restoreSession: (id, { dryRun = false } = {}) => req('POST', `/api/sessions/${enc(id)}/restore${dryRun ? '?dry_run=1' : ''}`),
+    getSessionState: () => req('GET', '/api/sessions/state'),
 
     async callService(id, method, path, opts = {}) {
       const [p, q0] = path.split('?');

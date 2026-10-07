@@ -45,7 +45,7 @@ function injectCss() {
 }
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
 
-export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, go = x => { location.hash = x; } }) {
+export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, openSessions, go = x => { location.hash = x; } }) {
   const React = R(), { useState, useEffect, useRef, useMemo, useLayoutEffect } = React;
   const c = getChatClient(api), tid = route?.parts?.[1] || null;
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
@@ -199,7 +199,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, go
 
   // ---- render ----
   const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: setQ, archived, onArchived: v => { setArchived(v); setListLoading(true); },
-    onNew: () => { go('#/chat'); setDrawer(false); setTimeout(() => inputRef.current?.focus(), 50); }, onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null });
+    onNew: () => { go('#/chat'); setDrawer(false); setTimeout(() => inputRef.current?.focus(), 50); }, onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null });
   const items = view.items, last = items[items.length - 1];
   const busyTool = items.some(i => (i.kind === 'tool' || i.kind === 'approval') && !i.result && (i.progress || i.run));
   const working = running && !view.pending.length && !(last?.streaming) && !busyTool;

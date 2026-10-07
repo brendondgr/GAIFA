@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from utils import api_models as am
+from utils.routes import sessions as rs
 from utils.tools import api as ta
 from utils.tests.conftest import REPO
 
@@ -81,6 +82,8 @@ MODELS: dict[str, type[BaseModel]] = {
     "Doctor": am.Doctor, "DoctorCheck": am.DoctorCheck,
     "ToolIndexItem": ta.ToolIndexItem, "Tool": ta.Tool, "ToolOutput": ta.ToolOutput, "ToolCallResult": ta.ToolCallResult,
     "Approval": ta.Approval,
+    "Session": rs.Session, "SessionStep": rs.SessionStep, "SessionMemory": rs.SessionMemory, "SessionRestore": rs.Restore,
+    "SessionState": rs.SessionState,
 }
 # fields the hub adds beyond the brief, on purpose (none today)
 EXTRA: dict[str, set[str]] = {}

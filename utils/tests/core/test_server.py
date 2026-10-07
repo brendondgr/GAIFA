@@ -62,6 +62,8 @@ async def test_system(client, root):
     assert s["paths"]["outputs"] == str(root.resolve() / "outputs")
     assert s["usage"]["outputs_bytes"] == 1000
     assert s["usage"]["databases_bytes"] > 0
+    assert s["paths"]["logs"] == str(root.resolve() / "data" / "logs") and s["paths"]["state"] == str(root.resolve() / "data" / "state")
+    assert s["usage"]["logs_bytes"] >= 0 and s["usage"]["state_bytes"] >= 0
     assert 0 < s["disk"]["free_bytes"] <= s["disk"]["total_bytes"]
 
 

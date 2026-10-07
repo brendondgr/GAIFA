@@ -82,3 +82,21 @@ test('template page: says hello through ctx.call and shows the JSON', async () =
   assert.equal(ctx.subs[0][0], 'service');
   assert.match(el.textContent, /services\/hello\/ui\/page\.js/);
 });
+
+test('schemaForm: form.onchange gets the values object, never a DOM event', async () => {
+  const { schemaForm } = await import(pathToFileURL(path.join(root, 'web/mod-form.js')).href);
+  const form = schemaForm({ ui, api: {} }, { properties: { aspect: { type: 'string', enum: ['1:1', '16:9'] }, n: { type: 'integer' } } }, { values: { aspect: '1:1' } });
+  const got = [];
+  form.onchange = v => got.push(v);
+  assert.equal(typeof form.onchange, 'function');
+  // an own accessor: assigning it doesn't set the element's DOM event-handler property
+  const d = Object.getOwnPropertyDescriptor(form, 'onchange');
+  assert.ok(d && d.get && d.set);
+  const sel = form.find(e => e.tagName === 'SELECT');
+  sel.value = '16:9';
+  sel.dispatch('change');
+  assert.deepEqual(got.at(-1), { aspect: '16:9' });
+  form.onchange = null;
+  sel.dispatch('change');
+  assert.equal(got.length, 1);
+});

@@ -46,13 +46,17 @@ def rss_bytes(pid: int | None = None) -> int:
     return 0
 
 
-async def _usage(models: Path, databases: Path, outputs: Path) -> dict[str, int]:
-    key = (str(models), str(databases), str(outputs))
+USAGE_KEYS = ("models_bytes", "databases_bytes", "outputs_bytes", "logs_bytes", "state_bytes")
+
+
+async def _usage(*dirs: Path) -> dict[str, int]:
+    """Sizes of models, databases, outputs, logs and state (cached for a minute)."""
+    key = tuple(str(d) for d in dirs)
     hit = _usage_cache.get(key)
     if hit and time.monotonic() - hit[0] < USAGE_TTL_S:
         return hit[1]
-    sizes = await asyncio.gather(*(asyncio.to_thread(dir_bytes, p) for p in (models, databases, outputs)))
-    usage = dict(zip(("models_bytes", "databases_bytes", "outputs_bytes"), sizes))
+    sizes = await asyncio.gather(*(asyncio.to_thread(dir_bytes, p) for p in dirs))
+    usage = dict(zip(USAGE_KEYS, sizes))
     _usage_cache[key] = (time.monotonic(), usage)
     return usage
 
@@ -74,8 +78,9 @@ async def system_info(hub: Any) -> dict[str, Any]:
             "rss_bytes": rss_bytes(),
             "port": hub.port,
         },
-        "paths": {"root": str(p.root), "models": str(p.models), "databases": str(p.databases), "outputs": str(p.outputs)},
-        "usage": await _usage(p.models, p.databases, p.outputs),
+        "paths": {"root": str(p.root), "models": str(p.models), "databases": str(p.databases), "outputs": str(p.outputs),
+                  "logs": str(p.logs), "state": str(p.state)},
+        "usage": await _usage(p.models, p.databases, p.outputs, p.logs, p.state),
         "disk": {"free_bytes": disk.free, "total_bytes": disk.total},
     }
 

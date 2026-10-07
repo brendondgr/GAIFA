@@ -27,7 +27,10 @@ const TOOLS = [
   ['comfy_remove_background', 'comfy', 'generate', 'Cut the subject out of an image, leaving a transparent background.', obj({ image: P.image }, ['image']), []],
   ['comfy_upscale_image', 'comfy', 'generate', 'Upscale an image 2× or 4× (4x Remacri).', obj({ image: P.image, scale: { type: 'integer', enum: [2, 4], description: 'How much bigger' } }, ['image']), ['scale']],
   ['gen3d_make_3d', 'gen3d', 'generate', 'Make a 3D model (GLB) from a text description.', obj({ prompt: P.prompt, preset: { type: 'string', enum: ['low-poly', 'fast', 'balanced', 'quality'], description: 'Quality preset (default balanced)' }, template: { type: 'string', enum: ['chair', 'character', 'vehicle', 'weapon', 'creature'], description: 'Part template' }, seed: P.seed }, ['prompt']), ['preset']],
-  ['tts_speak', 'tts', 'generate', 'Speak text aloud; the clip is saved to Outputs.', obj({ text: { type: 'string', description: 'Text to speak', 'x-multiline': true }, voice: { type: 'string', enum: ['Brendon', 'Hope', 'Arabella', 'af_heart', 'am_michael'], description: 'Voice (default Hope)' }, direction: { type: 'string', description: 'Delivery direction (Breeze voices only)' }, speed: { type: 'number', minimum: 0.5, maximum: 2, description: 'Speed (Kokoro only)' } }, ['text']), ['voice']],
+  // the same inputs as mock.js's POST /v1/speech operation (a tool's schema comes from its operation)
+  ['tts_speak', 'tts', 'generate', 'Speak text aloud; the clip is saved to Outputs.', obj({ text: { type: 'string', description: 'Text to speak', 'x-multiline': true }, engine: { type: 'string', enum: ['auto', 'breeze', 'kokoro'], description: 'Engine' },
+    voice: { type: 'string', enum: ['Brendon', 'Hope', 'Arabella', 'af_heart', 'am_michael'], description: 'Voice (default Hope)' }, direction: { type: 'string', description: 'Delivery direction (Breeze voices only)' },
+    speed: { type: 'number', minimum: 0.5, maximum: 2, description: 'Speed (Kokoro only)' }, format: { type: 'string', enum: ['wav', 'mp3'], description: 'Format' }, timings: { type: 'boolean', description: 'Return word timings' } }, ['text']), ['voice']],
   ['tts_clone_voice', 'tts', 'write', 'Save a voice cloned from a 3-60 s reference clip.', obj({ name: { type: 'string', description: 'Voice name' }, audio: { type: 'string', format: 'aihub-file', 'x-kind': 'audio', description: 'Reference clip' }, transcript: { type: 'string', description: 'What is said in the clip (empty: transcribe it)' } }, ['name', 'audio']), ['name']],
   ['tts_list_voices', 'tts', 'read', 'List saved voices and the built-in ones', obj({}, []), [], true],
   ['tts_delete_voice', 'tts', 'destructive', 'Delete a saved voice (permanent)', obj({ name: { type: 'string', description: 'Voice name' } }, ['name']), ['name']],
@@ -36,7 +39,10 @@ const TOOLS = [
   ['example_hello', 'example', 'read', 'Say hello', obj({ name: { type: 'string', description: 'Who to greet' } }, []), []],
 ];
 
-export function createToolMocks({ emit, net, err, later, now }) {
+const KIND_OF = { comfy_generate_image: 'image', comfy_edit_image: 'image', comfy_remove_background: 'image', comfy_upscale_image: 'image', comfy_animate_image: 'video', comfy_generate_video: 'video', gen3d_make_3d: 'model3d', tts_speak: 'audio' };
+
+/** outputs(): mock.js's outputs, so a finished generate call returns one of them (optional). */
+export function createToolMocks({ emit, net, err, later, now, outputs = () => [] }) {
   const tools = TOOLS.map(([name, mod, risk, summary, parameters, ask, core]) => ({ name, mod, risk, core: !!core, summary, available: true,
     description: summary + (mod === 'comfy' ? '\nRuns as a job: the call returns when it has finished, with its outputs.' : ''), parameters, ask, examples: [], job: risk === 'generate', source: mod === 'hub' ? 'hub' : 'manifest' }));
   const byName = new Map(tools.map(t => [t.name, t]));
@@ -65,7 +71,11 @@ export function createToolMocks({ emit, net, err, later, now }) {
     const tick = () => {
       if (c.status !== 'running') return;
       i++; c.progress = Math.min(1, i / 8); c.elapsed_s = i * 0.5; c.note = i < 8 ? `step ${i}/8` : 'saving';
-      if (i >= 8) { c.status = 'done'; c.result = { ok: true }; c.outputs = []; }
+      if (i >= 8) {
+        c.status = 'done'; c.result = { ok: true };
+        const o = outputs().find(x => x.kind === KIND_OF[t.name]);
+        c.outputs = o ? [{ output_id: o.id, ref: 'output:' + o.id, kind: o.kind, title: o.title, url: o.url, preview: o.preview, summary: `${o.kind} · ${o.service}`, prompt: args.prompt || args.text }] : [];
+      }
       emit({ type: 'tool_call', call: structuredClone(c) });
       if (c.status === 'running') later(500, tick);
     };

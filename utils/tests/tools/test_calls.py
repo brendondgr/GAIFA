@@ -272,3 +272,16 @@ async def test_dry_run_makes_a_stand_in(th):
     assert r["outputs"][0]["kind"] == "audio" and r["outputs"][0]["output_id"] != a["output_id"]
     r = (await th.client.post("/api/tools/fake_tools_get_item/call", json={"arguments": {"item_id": "x"}, "origin": {"dry_run": True}})).json()
     assert r["result"]["id"] == "x"     # reads still run
+
+
+async def test_calls_ask_the_memory_triggers_to_make_room(th):
+    """A tool call carries X-AIHub-Make-Room (agent.make_room), and the memory trigger hook sees it
+    whatever its case (it was missed once: a 3D job then failed with needs_room)."""
+    seen = []
+
+    async def hook(svc, method, path, headers):
+        seen.append(headers.get("x-aihub-make-room"))
+
+    th.hub.services.before_proxy.append(hook)
+    r = await th.call("fake_tools_make_image", {"prompt": "x"}, mode="auto")
+    assert r["status"] == "done" and seen == ["1"]

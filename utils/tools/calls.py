@@ -437,8 +437,8 @@ class Calls:
         headers = {"X-AIHub-Origin": json.dumps({"tool_call": c.id, **c.origin})[:500]}
         if self.hub.config.agent.make_room:
             headers["X-AIHub-Make-Room"] = "1"
-        for hook in self.hub.services.before_proxy:
-            await hook(svc, route.method, path, headers)
+        for hook in self.hub.services.before_proxy:       # the memory triggers read headers case-insensitively
+            await hook(svc, route.method, path, httpx.Headers(headers))
         kw: dict[str, Any] = {"params": query, "headers": headers}
         if route.body == "multipart":
             kw["data"] = {k: (json.dumps(v) if isinstance(v, (dict, list)) else str(v)) for k, v in body.items()}

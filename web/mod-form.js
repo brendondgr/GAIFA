@@ -25,7 +25,11 @@ export function schemaForm(ctx, schema, o = {}) {
   const moreBox = h('details', { style: 'border-top:1px solid var(--bd,#1D2430);padding-top:8px' },
     h('summary', { style: 'cursor:pointer;font-size:12px;color:var(--mut,#8A94A6)' }, 'More settings'), more);
   const el = h('div', { style: 'display:flex;flex-direction:column;gap:10px;min-width:0' }, main);
-  const changed = () => el.onchange?.(el.values());
+  // `form.onchange = fn` is ours, not the DOM's: an own property shadows the element's event-handler
+  // property, so native `change` events bubbling from the inputs never call fn with an Event.
+  let onChange = null;
+  Object.defineProperty(el, 'onchange', { configurable: true, enumerable: true, get: () => onChange, set: fn => { onChange = typeof fn === 'function' ? fn : null; } });
+  const changed = () => onChange?.(el.values());
 
   for (const name of names) {
     const p = props[name];

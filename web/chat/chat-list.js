@@ -35,7 +35,7 @@ export const LIST_CSS = `
 @media (hover:none){.aichat-item .aichat-more{opacity:1}}
 `;
 
-export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onNew, onOpen, onRename, onArchive, onDelete, onClose }) {
+export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions }) {
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 10px 8px 12px' } },
       h('span', { style: { ...label11, flex: 1 } }, 'Chats'),
@@ -53,5 +53,6 @@ export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArc
       threads.map(t => h(Item, { key: t.id, t, active: t.id === activeId, onOpen: () => onOpen?.(t),
         onRename: v => onRename(t, v), onArchive: () => onArchive(t), onDelete: () => onDelete(t) }))),
     h('div', { style: { padding: '8px 10px', borderTop: '1px solid ' + T.bd, display: 'flex', alignItems: 'center', gap: 6 } },
-      h('button', { type: 'button', 'aria-pressed': archived ? 'true' : 'false', onClick: () => onArchived(!archived), style: chipSt(archived, { sm: true }) }, h(Icon, { d: 'archive', size: 12 }), archived ? 'Showing archived' : 'Archived')));
+      h('button', { type: 'button', 'aria-pressed': archived ? 'true' : 'false', onClick: () => onArchived(!archived), style: chipSt(archived, { sm: true }) }, h(Icon, { d: 'archive', size: 12 }), archived ? 'Showing archived' : 'Archived'),
+      onSessions ? h('button', { type: 'button', onClick: onSessions, title: 'Save or switch setups (what runs and what is loaded)', style: { ...chipSt(false, { sm: true }), marginLeft: 'auto' } }, h(Icon, { d: 'bookmark', size: 12 }), 'Sessions') : null));
 }

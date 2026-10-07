@@ -466,6 +466,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
                         <sc-if value="{{ sv.api.notRunning }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--acct,#FFB224)">Service is not running — the request will fail.</span></sc-if>
                       </div>
                     </div>
+                    {{ sv.api.toolEl }}
                     <sc-if value="{{ sv.api.r.show }}" hint-placeholder-val="{{ false }}">
                       <section aria-label="Response" aria-live="polite" style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0">
                         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Response</h3><span style="{{ sv.api.r.sst }}">{{ sv.api.r.status }}</span><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px">{{ sv.api.r.ms }}</span><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">{{ sv.api.r.ct }}</span></div>
@@ -820,6 +821,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
                 </section>
               </sc-if>
               <sc-if value="{{ se.sec.agent }}" hint-placeholder-val="{{ false }}">{{ se.agentEl }}</sc-if>
+              <sc-if value="{{ se.sec.sessions }}" hint-placeholder-val="{{ false }}">{{ se.sessionsEl }}</sc-if>
               <sc-if value="{{ se.sec.about }}" hint-placeholder-val="{{ false }}">
                 <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
                   <h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Versions</h2>
@@ -1026,6 +1028,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
         </div>
         <div style="display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--bd,#1D2430);margin-top:auto"><button onClick="{{ dlg.close }}" style="height:32px;padding:0 14px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">Close</button></div>
       </sc-if>
+      <sc-if value="{{ dlg.sessions }}" hint-placeholder-val="{{ false }}"><div style="padding:18px 20px">{{ sessEl }}</div></sc-if>
       <sc-if value="{{ dlg.mock }}" hint-placeholder-val="{{ false }}">
         <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
           <div style="display:flex;align-items:center;gap:10px"><h2 style="margin:0;font-size:16px">Mock scenarios</h2><span style="height:20px;padding:0 7px;border-radius:4px;border:1px solid var(--pu,#BC8CFF);color:var(--pu,#BC8CFF);font-size:10.5px;font-weight:600;display:inline-flex;align-items:center">MOCK ONLY</span><span style="margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--mut,#8A94A6)">Shift+D</span></div>
@@ -1066,6 +1069,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
   </div>
 </sc-if>
 
+{{ restoreEl }}
 <div aria-live="polite" style="{{ toastWrap }}">
   <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
     <div role="{{ t.role }}" style="pointer-events:auto;display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:10px;background:var(--card,#11151D);border:1px solid var(--bds,#2A3547);box-shadow:0 12px 34px rgba(0,0,0,.4);font-size:13px">
@@ -1104,7 +1108,7 @@ const TONE = {
   purple: ['var(--pu,#BC8CFF)', 'var(--tpu,rgba(188,140,255,.13))'], dim: ['var(--mut,#8A94A6)', 'var(--hov,#161C28)'],
 };
 // Settings section → the api areas its data comes from (AIHub patch 5, see PATCHES.md).
-const SETTINGS_AREAS = { general: ['settings', 'system'], paths: ['system'], memory: ['settings', 'memory'], services: ['settings', 'services'], interface: ['settings'], agent: [], about: ['services', 'system'] };
+const SETTINGS_AREAS = { general: ['settings', 'system'], paths: ['system'], memory: ['settings', 'memory'], services: ['settings', 'services'], interface: ['settings'], agent: [], sessions: ['sessions'], about: ['services', 'system'] };
 const STATE = { stopped: ['dim', false], starting: ['accent', true], ready: ['green', false], degraded: ['accent', false], stopping: ['dim', true], failed: ['red', false] };
 const LOAD = { unloaded: ['dim', false], loading: ['accent', true], loaded: ['cyan', false], unloading: ['accent', true] };
 // "verifying 42%" while a verify reports progress (patch 7)
@@ -1160,7 +1164,7 @@ class Component extends DCLogic {
     // revision 2: Overview views, dashboard layout (Settings.ui.dashboard), metric history for sparklines
     ovView: lsGet('hub.ovView', 'dashboard'), dash: { order: [], hidden: [], ranges: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
     tlRange: lsGet('hub.tlRange', '24h'), tlTable: false, svcRange: lsGet('hub.svcRange', '24h'), tileMenu: null, outTick: 0,
-    approvals: [], apLoaded: false, toolIx: null,  // Phase 13 Wire: the header's Approvals popover; the API tab's tool risk levels
+    approvals: [], apLoaded: false, toolIx: null, sessions: [],  // sessions: the palette's "Switch to …" (Wire 15)  // Phase 13 Wire: the header's Approvals popover; the API tab's tool risk levels
   };
 
   async componentDidMount() {
@@ -1178,10 +1182,10 @@ class Component extends DCLogic {
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
     this.pages = {}; this.modListeners = new Set();
     const imp = f => import(new URL(f, location.href).href);
-    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
-      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js')]);
+    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
+      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js')]);
     this.C = charts; this.V = views; this.D = dash;  // revision 2 chart kit (charts.js, views.js, dashboard.js)
-    this.Chat = chat; this.ChatSettings = chatSettings; this.ChatAp = chatAp;  // plan 14.1: the Chat page, Settings → Agent, the Approvals popover (web/chat/)
+    this.Chat = chat; this.ChatSettings = chatSettings; this.ChatAp = chatAp; this.Sess = sess; this.ApiTool = apiTool;  // plan 14.1: the Chat page, Settings → Agent, the Approvals popover (web/chat/)
     this.histTimer = setInterval(() => { if (!document.hidden && this.state.ready && !this.state.hubDown) this.loadHist(); }, 60000);
     this.modUi = modUi.createUi();
     const forceMock = new URLSearchParams(location.search).has('mock');
@@ -1198,7 +1202,10 @@ class Component extends DCLogic {
   componentDidUpdate(pp, ps) {
     const el = this.logRef.current;
     if (el && this.state.svc?.follow) el.scrollTop = el.scrollHeight;
-    if (this.state.palette && !ps.palette) setTimeout(() => this.palRef.current?.focus(), 0);
+    // support.js passes only prevProps, so the previous palette state is kept here
+    const palOpen = !!this.state.palette;
+    if (palOpen && !this._palOpen) setTimeout(() => this.palRef.current?.focus(), 0);
+    this._palOpen = palOpen;
   }
 
   // ---------- state helpers ----------
@@ -1249,7 +1256,7 @@ class Component extends DCLogic {
   }
   // Revision 2: the dashboard layout and density/theme defaults from Settings, mod widgets, and sparkline history.
   loadExtras() {
-    this.loadHist(); this.loadApprovals();
+    this.loadHist(); this.loadApprovals(); this.loadSessions();
     this.api.listWidgets().then(w => this.setState({ widgets: w })).catch(() => this.setState({ widgets: [] }));
     this.api.getSettings().then(st => {
       const u = st.ui || {};
@@ -1263,6 +1270,8 @@ class Component extends DCLogic {
     clearTimeout(this.apT);
     this.apT = setTimeout(() => this.api.listApprovals().then(a => this.setState({ approvals: a, apLoaded: true })).catch(() => this.setState({ apLoaded: true })), 120);
   }
+  loadSessions() { this.api.listSessions?.().then(l => this.setState({ sessions: l })).catch(() => {}); }
+  openSessions(focus = null) { this.setState({ dialog: { kind: 'sessions', focus }, palette: null, pop: null }); }
   loadToolIndex() { if (!this.state.toolIx) this.api.getToolIndex().then(ix => this.setState({ toolIx: Object.fromEntries(ix.map(t => [t.name, t.risk])) })).catch(() => {}); }
   toolRisk(mod, tool) { return this.state.toolIx?.[`${mod}_${tool.name}`] || null; }
   async loadHist() {
@@ -1320,6 +1329,7 @@ class Component extends DCLogic {
       }
       case 'memory': this.setState({ memory: ev.memory }); break;
       case 'approval': this.loadApprovals(); break;
+      case 'session': this.loadSessions(); break;
       case 'activity': this.setState(st => ({ activity: [ev.item, ...st.activity].slice(0, 80), unread: st.pop === 'activity' ? 0 : st.unread + 1 })); break;
       case 'job': this.setState(st => { let j = st.jobs.filter(x => x.id !== ev.job.id); if (['queued', 'running'].includes(ev.job.state)) j = [...j, ev.job]; return { jobs: j }; }); break;
       case 'alert': this.setState(st => ({ alerts: [...st.alerts.filter(a => a.id !== ev.alert.id), ev.alert] })); break;
@@ -1488,7 +1498,7 @@ class Component extends DCLogic {
     const form = {};
     this.opFields(op).forEach(f => { if (!f.group && f.sch.default !== undefined) form[f.key] = Array.isArray(f.sch.default) ? [...f.sch.default] : f.sch.default; });
     this.files = {}; this.abort?.abort();
-    this.updSvc({ opId: op.id, form, chip: {}, ferr: {}, resp: null, stream: null, sending: false });
+    this.updSvc({ opId: op.id, form, chip: {}, ferr: {}, resp: null, stream: null, sending: false, toolRun: null });
   }
   setField(key, v) { this.updSvc(s => ({ form: { ...s.form, [key]: v }, ferr: { ...s.ferr, [key]: undefined } })); }
   buildReq(op) {
@@ -1531,6 +1541,12 @@ class Component extends DCLogic {
       }
     });
     if (Object.keys(ferr).length) return this.updSvc({ ferr });
+    // Wire 13: an operation that is an agent tool with risk other than read goes through the tool call, so it asks first (api-tool.js)
+    const risk = op.tool ? this.toolRisk(sv.id, op.tool) : null, hasFile = this.opFields(op).some(f => !f.group && f.sch.format === 'binary' && this.files[f.key]);
+    if (risk && risk !== 'read' && !makeRoom && !hasFile && this.ApiTool) {
+      this.updSvc({ ferr: {}, resp: null, toolRun: { key: Date.now(), name: `${sv.id}_${op.tool.name}`, args: this.ApiTool.toolArgs(this.opFields(op), sv.form) } });
+      return;
+    }
     if (op.destructive && !makeRoom) {
       const name = sv.detail?.name || sv.id;
       const ok = await this.confirm({ title: `Send ${op.method} ${this.buildReq(op).path}?`, body: `${op.summary} on ${name}. This operation is marked destructive and cannot be undone.`, confirmLabel: 'Send request', danger: true });
@@ -1754,7 +1770,11 @@ class Component extends DCLogic {
       if (sv.load === 'loaded') out.push({ label: `Unload ${sv.name}`, sub: 'Action', d: ICON.down, run: run(() => this.unload(sv)) });
       out.push({ label: `${sv.name} › API`, sub: 'Tab', d, run: nav(`#/s/${sv.id}/api`) }, { label: `${sv.name} › Logs`, sub: 'Tab', d, run: nav(`#/s/${sv.id}/logs`) });
     });
-    ['general', 'paths', 'memory', 'services', 'interface', 'about'].forEach(x => out.push({ label: `Settings › ${cap(x)}`, sub: 'Page', d: ICON.gear, run: nav('#/settings/' + x) }));
+    ['general', 'paths', 'memory', 'services', 'interface', 'agent', 'sessions', 'about'].forEach(x => out.push({ label: `Settings › ${cap(x)}`, sub: 'Page', d: ICON.gear, run: nav('#/settings/' + x) }));
+    if (this.api.listSessions) {  // Wire 15: sessions from the palette
+      out.push({ label: 'Save session…', sub: 'Action', d: ICON.download, run: () => this.openSessions('save') }, { label: 'Switch to session…', sub: 'Action', d: ICON.refresh, run: () => this.openSessions() });
+      this.state.sessions.forEach(x => out.push({ label: `Switch to ${x.name}`, sub: 'Session', d: ICON.refresh, run: () => this.openSessions(x.id) }));
+    }
     this.state.mdl.list.forEach(m => out.push({ label: m.name, sub: `Model · ${m.id}`, d: ICON.layers, run: nav('#/models/' + m.id) }));
     (this.palOutputs || []).forEach(o => out.push({ label: o.title, sub: `Output · ${o.service}`, d: ICON.folder, run: nav('#/outputs/' + o.id) }));
     return out;
@@ -2050,6 +2070,7 @@ class Component extends DCLogic {
     Object.assign(v, { sel: { method: sel.method, mst: badgeSt(METHOD[sel.method] || 'dim', { sq: true, mono: true }), path: sel.path, summary: sel.summary, desc: sel.description !== sel.summary ? sel.description : '', isTool: !!sel.tool, toolText: sel.tool ? `Agent tool: ${d.id}_${sel.tool.name}${this.toolRisk(d.id, sel.tool) ? ' · ' + this.toolRisk(d.id, sel.tool) : ''}${sel.tool.confirm || ['generate', 'write', 'destructive'].includes(this.toolRisk(d.id, sel.tool)) ? ' · asks first' : ''}` : '', isDestr: sel.destructive,
         resp: sel.response, ct: sel.body?.content_type || '', hasBody: !!sel.body, hub: `/api/s/${d.id}${sel.path}` },
       fields, hasFields: fields.length > 0, noFields: fields.length === 0, send: () => this.sendOp(), sendLabel: sv.sending ? (sel.response === 'stream' ? 'Streaming…' : 'Sending…') : 'Send', sendSt: btn(sel.destructive ? 'danger' : 'pri', { dis: sv.sending }), sending: sv.sending,
+      toolEl: sv.toolRun && this.ApiTool ? React.createElement(this.ApiTool.ToolRun, { key: sv.toolRun.key, api: this.api, name: sv.toolRun.name, args: sv.toolRun.args, toast: (t, l) => this.toast(t, l), onClose: () => this.updSvc({ toolRun: null }) }) : null,
       curl: () => this.copy(this.curlFor(sel), 'curl command copied'), streaming: sv.sending && sel.response === 'stream', stop: () => this.stopStream(), notRunning: d.state !== 'ready' });
     if (rs || (sv.sending && sel.response === 'stream')) {
       const ok = rs ? rs.ok : true, t = !rs ? 'accent' : ok ? 'green' : 'red';
@@ -2162,9 +2183,11 @@ class Component extends DCLogic {
   vmSettings(s) {
     const st = s.st, r = s.route;
     if (!st.draft) return { loading: true };
-    const SECS = ['general', 'paths', 'memory', 'services', 'interface', 'agent', 'about'];  // agent: Settings → Agent (plan 14.1, chat/chat-settings.js)
+    const SECS = ['general', 'paths', 'memory', 'services', 'interface', 'agent', 'sessions', 'about'];  // sessions: Wire 15 (sessions.js)  // agent: Settings → Agent (plan 14.1, chat/chat-settings.js)
     const d = st.draft, sys = st.sys, sec = SECS.includes(r.parts[1]) ? r.parts[1] : 'general';
     const v = { loaded: true, loading: false, nav: SECS.map(x => ({ label: cap(x), href: '#/settings/' + x, st: navSt(x === sec), cur: x === sec ? 'page' : undefined })), sec: Object.fromEntries(SECS.map(x => [x, x === sec])) };
+    v.sessionsEl = sec === 'sessions' && this.Sess ? React.createElement('section', { style: { background: 'var(--card,#11151D)', border: '1px solid var(--bd,#1D2430)', borderRadius: 10, padding: 16 } },
+      React.createElement(this.Sess.SessionsPanel, { api: this.api, toast: (t, l) => this.toast(t, l), on: this.modOn })) : null;
     v.agentEl = sec === 'agent' && this.ChatSettings ? React.createElement(this.ChatSettings.AgentSettings, { api: this.api, toast: (t, l) => this.toast(t, l) }) : null;
     const miss = (SETTINGS_AREAS[sec] || []).filter(a => !this.api.isLive?.(a));
     v.mock = miss.length > 0; v.mockText = `Mock data: the ${miss.join(' and ')} ${miss.length > 1 ? 'areas aren’t' : 'area isn’t'} live yet.`;
@@ -2173,7 +2196,8 @@ class Component extends DCLogic {
     const inp = bad => ({ height: 32, width: 140, padding: '0 10px', borderRadius: 6, border: '1px solid ' + (bad ? 'var(--rd,#F85149)' : 'var(--bds,#2A3547)'), background: 'var(--sb,#0D1119)', fontFamily: MONO, fontSize: 13 });
     v.port = String(d.hub.port); v.onPort = e => this.setDraft(x => { x.hub.port = e.target.value; }); v.portSt = inp(portBad || errField === 'hub.port'); v.portErr = portBad ? 'Use a port between 1024 and 65535' : errField === 'hub.port' ? st.err.detail : '';
     v.info = sys ? [['Version', 'v' + sys.hub.version], ['PID', sys.hub.pid], ['Uptime', fdur(sys.hub.uptime_s)], ['Memory (RSS)', fb(sys.hub.rss_bytes)]].map(([k, val]) => ({ k, v: String(val) })) : [];
-    v.paths = sys ? [['Project root', sys.paths.root, ''], ['Models', sys.paths.models, fb(sys.usage.models_bytes)], ['Databases', sys.paths.databases, fb(sys.usage.databases_bytes)], ['Outputs', sys.paths.outputs, fb(sys.usage.outputs_bytes)]].map(([k, p, sz]) => ({ k, p, sz, copy: () => this.copy(p, 'Path copied') })) : [];
+    v.paths = sys ? [['Project root', sys.paths.root, ''], ['Models', sys.paths.models, fb(sys.usage.models_bytes)], ['Databases', sys.paths.databases, fb(sys.usage.databases_bytes)], ['Outputs', sys.paths.outputs, fb(sys.usage.outputs_bytes)],
+      ...(sys.paths.logs ? [['Logs', sys.paths.logs, fb(sys.usage.logs_bytes)]] : []), ...(sys.paths.state ? [['State', sys.paths.state, fb(sys.usage.state_bytes)]] : [])].map(([k, p, sz]) => ({ k, p, sz, copy: () => this.copy(p, 'Path copied') })) : [];
     v.disk = sys ? `${fb(sys.disk.free_bytes)} free of ${fb(sys.disk.total_bytes)}` : '';
     v.diskBar = sys ? { display: 'block', height: '100%', width: ((1 - sys.disk.free_bytes / sys.disk.total_bytes) * 100) + '%', background: 'var(--cy,#58C4DD)', borderRadius: 9 } : {};
     v.reserve = String(d.memory.reserve_gb); v.onReserve = e => this.setDraft(x => { x.memory.reserve_gb = e.target.value; }); v.resSt = inp(resBad || errField === 'memory.reserve_gb'); v.resErr = resBad ? 'Between 0 and 64 GB' : errField === 'memory.reserve_gb' ? st.err.detail : '';
@@ -2225,7 +2249,7 @@ class Component extends DCLogic {
     const d = s.dialog;
     v.dlgSt = mob ? { width: '100vw', height: '100%', maxHeight: '100vh', borderRadius: 0, background: 'var(--card,#11151D)', display: 'flex', flexDirection: 'column', overflow: 'auto' }
       : { width: 'min(560px, calc(100vw - 32px))', maxHeight: 'calc(100vh - 64px)', borderRadius: 12, background: 'var(--card,#11151D)', border: '1px solid var(--bds,#2A3547)', boxShadow: '0 24px 70px rgba(0,0,0,.5)', display: 'flex', flexDirection: 'column', overflow: 'auto' };
-    v.dlg = { show: !!d, confirm: d?.kind === 'confirm', room: d?.kind === 'room', addModel: d?.kind === 'addModel', delModel: d?.kind === 'delModel', mock: d?.kind === 'mock', manifest: d?.kind === 'manifest', close: () => d?.kind === 'confirm' ? this.closeConfirm(false) : this.setState({ dialog: null }), stop: e => e.stopPropagation() };
+    v.dlg = { show: !!d, confirm: d?.kind === 'confirm', room: d?.kind === 'room', addModel: d?.kind === 'addModel', delModel: d?.kind === 'delModel', mock: d?.kind === 'mock', manifest: d?.kind === 'manifest', sessions: d?.kind === 'sessions', close: () => d?.kind === 'confirm' ? this.closeConfirm(false) : this.setState({ dialog: null }), stop: e => e.stopPropagation() };
     if (d?.kind === 'confirm') v.cf = { title: d.title, body: d.body, label: d.confirmLabel || 'Confirm', st: btn(d.danger ? 'danger' : 'pri'), ok: () => this.closeConfirm(true), cancel: () => this.closeConfirm(false) };
     if (d?.kind === 'room') {
       const p = d.plan, name = n => this.svcMap[n]?.name || n, freed = p.unload.reduce((a, u) => a + u.frees_bytes, 0);
@@ -2242,6 +2266,7 @@ class Component extends DCLogic {
       v.dm = { name: d.m.name, opts: [opt(false, 'Remove from registry only', `Files stay in data/models/${d.m.path}. A later scan will list them again.`, false), opt(true, `Delete files too (${fb(d.m.size_bytes)})`, d.blocked ? `Not available: ${d.blocked.name} is running with this model loaded. Unload or stop it first.` : `Permanently deletes ${d.m.files.length} file${d.m.files.length > 1 ? 's' : ''} from disk.`, !!d.blocked)],
         err: d.error || '', hasErr: !!d.error, go: () => this.doDeleteModel(), st: btn('danger'), label: d.files ? 'Delete model and files' : 'Remove from registry' };
     }
+    if (d?.kind === 'sessions') v.sessEl = this.Sess ? React.createElement(this.Sess.SessionsPanel, { api: this.api, toast: (t, l) => this.toast(t, l), on: this.modOn, focus: d.focus, onClose: () => this.setState({ dialog: null }) }) : null;
     if (d?.kind === 'manifest') v.mf = { name: d.svc.name, path: d.svc.folder + '/service.toml', json: this.jl(d.svc.manifest, 'dlgmf'), errors: d.svc.manifest_errors, hasErr: d.svc.manifest_errors.length > 0 };
     if (d?.kind === 'mock') {
       const mk = this.api.mock, sp = mk.speed;
@@ -2299,7 +2324,8 @@ class Component extends DCLogic {
       showOutputs: !!showOutputs, out: out || {}, odr: out?.dr || { show: false },
       md: pg.models ? this.vmModels(s, dn) : null,
       se: pg.settings ? this.vmSettings(s) : null,
-      chatEl: pg.chat && this.Chat ? React.createElement(this.Chat.ChatPage, { api: this.api, route: r, toast: (t, l) => this.toast(t, l), confirm: o => this.confirm(o), openOutput: id => this.loadOutputDetail(id), go: hh => this.go(hh) }) : null,
+      chatEl: pg.chat && this.Chat ? React.createElement(this.Chat.ChatPage, { api: this.api, route: r, toast: (t, l) => this.toast(t, l), confirm: o => this.confirm(o), openOutput: id => this.loadOutputDetail(id), openSessions: () => this.openSessions(), go: hh => this.go(hh) }) : null,
+      restoreEl: ready && this.Sess ? React.createElement(this.Sess.RestorePrompt, { api: this.api, onRestore: id => this.openSessions(id) }) : null,
       ...this.vmOverlays(s, mob),
       goHome: () => this.go('#/overview'),
     };

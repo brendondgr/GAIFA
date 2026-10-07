@@ -3,6 +3,7 @@
 import { createHistory, withSeries } from './mock-history.js';
 import { createModMocks } from './mock-mods.js';
 import { createToolMocks } from './mock-tools.js';
+import { createSessionMocks } from './mock-sessions.js';
 const GB = 1e9, MB = 1e6;
 export class ApiError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
@@ -178,7 +179,7 @@ const OPS = {
     op('POST', '/v1/voices/design', 'Design a voice from a description and save it', { tag: 'Voices', body: S.obj({ name: S.str('Name to save it as'), instruction: S.str('e.g. "a calm older narrator with a slight rasp"', { 'x-multiline': true }), seed: S.int('Random seed', { minimum: 0 }) }, ['name', 'instruction']) }),
     op('DELETE', '/v1/voices/{name}', 'Delete a voice', { tag: 'Voices', destructive: true, tool: { name: 'delete_voice', confirm: true }, params: [P('name', 'path', true, S.str('Voice name', { enum: ['Brendon', 'Hope', 'Arabella'] }))], response: 'empty' }),
     op('POST', '/v1/speech', 'Synthesize speech', { tag: 'Speech', response: 'audio', tool: { name: 'speak', confirm: false }, description: 'Generate speech with a saved voice or a Kokoro built-in voice. The result is also written to outputs/tts.',
-      body: S.obj({ text: S.str('Text to speak', { 'x-multiline': true }), engine: S.str('Engine', { enum: ['auto', 'breeze', 'kokoro'], default: 'auto' }), voice: S.str('Voice', { enum: ['Brendon', 'Hope', 'Arabella', 'af_heart', 'am_michael'], default: 'hope' }), direction: S.str('Delivery direction (Breeze only)'), speed: S.num('Speed (Kokoro only)', { minimum: 0.5, maximum: 2, default: 1 }), format: S.str('Format', { enum: ['wav', 'mp3'], default: 'wav' }), timings: S.bool('Return word timings', { default: false }) }, ['text']) }),
+      body: S.obj({ text: S.str('Text to speak', { 'x-multiline': true }), engine: S.str('Engine', { enum: ['auto', 'breeze', 'kokoro'], default: 'auto' }), voice: S.str('Voice', { enum: ['Brendon', 'Hope', 'Arabella', 'af_heart', 'am_michael'], default: 'Hope' }), direction: S.str('Delivery direction (Breeze only)'), speed: S.num('Speed (Kokoro only)', { minimum: 0.5, maximum: 2, default: 1 }), format: S.str('Format', { enum: ['wav', 'mp3'], default: 'wav' }), timings: S.bool('Return word timings', { default: false }) }, ['text']) }),
     op('POST', '/v1/audio/speech', 'OpenAI-compatible speech', { tag: 'Speech', response: 'audio', body: S.obj({ model: S.str('Model', { default: 'tts-1' }), input: S.str('Text', { 'x-multiline': true }), voice: S.str('Voice', { default: 'hope' }), response_format: S.str('Format', { enum: ['wav', 'mp3'], default: 'mp3' }) }, ['input']) }),
     op('POST', '/v1/enhance', 'Add vocal tags to text', { tag: 'Speech', body: S.obj({ text: S.str('Plain text', { 'x-multiline': true }), style: S.str('Style', { enum: ['subtle', 'expressive'], default: 'subtle' }) }, ['text']) }),
     op('POST', '/v1/load', 'Load models into memory', { tag: 'System' }),
@@ -316,8 +317,8 @@ export function createMockApi() {
   }
   function system() {
     return { hub: { version: '0.1.0', pid: 31337, uptime_s: Math.round(now() - T0 + 7200), rss_bytes: 92 * MB, port: settings.hub.port },
-      paths: { root: '/home/ops/AIHub', models: '/home/ops/AIHub/data/models', databases: '/home/ops/AIHub/data/databases', outputs: '/home/ops/AIHub/outputs' },
-      usage: { models_bytes: models.reduce((a, m) => a + (m.status === 'missing' ? 0 : m.size_bytes), 0), databases_bytes: 412 * MB, outputs_bytes: outputs.reduce((a, o) => a + o.size_bytes, 0) },
+      paths: { root: '/home/ops/AIHub', models: '/home/ops/AIHub/data/models', databases: '/home/ops/AIHub/data/databases', outputs: '/home/ops/AIHub/outputs', logs: '/home/ops/AIHub/data/logs', state: '/home/ops/AIHub/data/state' },
+      usage: { logs_bytes: 38 * MB, state_bytes: 24 * 1024, models_bytes: models.reduce((a, m) => a + (m.status === 'missing' ? 0 : m.size_bytes), 0), databases_bytes: 412 * MB, outputs_bytes: outputs.reduce((a, o) => a + o.size_bytes, 0) },
       disk: { free_bytes: 450 * GB, total_bytes: 952 * GB } };
   }
   const pubModel = m => clone(m);
@@ -618,7 +619,9 @@ export function createMockApi() {
   const history = createHistory({ now, net, err, memory, summaries: () => services.map(summary), outputs: () => outputs, activity: () => activity, jobs: () => [...jobs.values()] });
   listeners.add(history.observe); Object.assign(api, history.api);
   // ----- agent tools and approvals (brief §11.12): web/mock-tools.js -----
-  Object.assign(api, createToolMocks({ emit, net, err, later, now }));
+  Object.assign(api, createToolMocks({ emit, net, err, later, now, outputs: () => outputs }));
+  // ----- sessions (plan 15, brief §11.14): web/mock-sessions.js -----
+  Object.assign(api, createSessionMocks({ emit, net, err, later, now, api }));
 
   // ----- scenario controls (Shift+D panel) -----
   api.mock = {

@@ -537,8 +537,8 @@ interface Job { id: string; service: string; label: string; progress: number | n
 
 interface System {
   hub: { version: string; pid: number; uptime_s: number; rss_bytes: number; port: number };
-  paths: { root: string; models: string; databases: string; outputs: string };
-  usage: { models_bytes: number; databases_bytes: number; outputs_bytes: number };
+  paths: { root: string; models: string; databases: string; outputs: string; logs: string; state: string };   // logs, state: data/logs, data/state (Phase 16)
+  usage: { models_bytes: number; databases_bytes: number; outputs_bytes: number; logs_bytes: number; state_bytes: number };
   disk: Disk;
 }
 
@@ -1046,6 +1046,8 @@ interface Approval { id: string; tool: string; arguments: object;  // as the mod
                      created_ts: number; decided_ts?: number; schema?: JSONSchema; description?: string }
 ```
 
+**API tab (as built, Wire 13):** an operation that is an agent tool whose risk isn't `read` is sent as `callTool("<mod>_<tool>", args, {mode: "ask"})` (`web/api-tool.js`), so it asks first like any client: the chat's parameter card shows inline, Run / Cancel decide the approval, then the call's progress and its outputs (links to Outputs) show under the form. Read tools and operations with a file upload are still sent directly through the proxy.
+
 **Error codes in `error.code`:** `invalid_arguments` (with `problems[]`, each `{field, detail, fix}`), `unknown_tool`, `denied`, `denied_by_user`, `unknown_output`, `service_not_running`, `mod_error` (the mod refused: 4xx), `upstream_error` (5xx or no answer), `job_failed`, `job_timeout`, `needs_room`, `interrupted` (the hub restarted). Deciding an approval twice is a hub error `409 already_decided`; edited arguments that don't validate are `422 invalid_arguments` and the approval stays pending.
 
 ### 11.13 Chat (plan 14.1) as built
@@ -1089,3 +1091,46 @@ registerPreview('pointcloud', ({ output, ctx }) => h(MyViewer, { src: output.url
 - **Cards** are looked up as `<kind>:<tool name>`, then `<kind>`, then the generic card, and each renders in an error boundary: an unknown or broken card never breaks the thread. Props: `{item, ctx}`; `ctx` carries `api`, `outputs` (this chat's `#n` outputs), `tools` (the catalog), `answer(qid, answers)`, `decide(approval, approve, args)`, `cancel()`, `runAction(action, output)`, `openOutput(id)`, `showThinking`, `running`.
 - **Actions** have `on` (an output kind or `composer`) and one of `tool` (opens a parameter card prefilled by `args(output)`, then `POST /v1/threads/{id}/action`: no model call), `prompt(output)` (sends a message), `attach` (adds the output to the composer) or `run(output, ctx)`. An action whose `tool` (or `needs`) isn't in the catalog is hidden. **Actions are also derived:** any catalog tool (not the hub's, not destructive) with a file input whose `x-kind` fits the output's kind becomes a button with no UI code (live: Clone voice on audio; in the mock also Upscale image), deduplicated against the registered ones.
 - **Built-in actions:** image → Animate, Edit, Remove background (tools), Make 3D and Describe (prompts; gen3d is text-only), Use as reference (attach); video → Describe; model3d → Rig; composer → Image, Video, 3D, Speech, Edit image.
+
+### 11.14 Sessions (plan Phase 15, Wire 15)
+
+The `sessions` area: named setups (which mods run, which are loaded, lcpp's LLM instances) that can be saved and restored. An auto-saved "Last session" is kept by the hub.
+
+**Methods** (area `sessions`):
+
+| Method | Endpoint |
+|---|---|
+| `listSessions()` | `GET /api/sessions` (named ones newest first, the auto one last) |
+| `saveSession(name)` | `POST /api/sessions {name}` (201; the same name replaces that session) |
+| `renameSession(id, name)` | `PUT /api/sessions/{id} {name}` (409 `conflict` when the name is taken) |
+| `deleteSession(id)` | `DELETE /api/sessions/{id}` (204) |
+| `restoreSession(id, {dryRun})` | `POST /api/sessions/{id}/restore[?dry_run=1]`: the plan; without `dry_run` it runs it (409 `busy` while another restore runs) |
+| `getSessionState()` | `GET /api/sessions/state` |
+
+**Events:** `{type: "session", session}` when one is saved (without its snapshot); `{type: "session_step", session: id, step: SessionStep}` as each step of a restore finishes.
+
+```ts
+interface Session { id: string; name: string; auto: boolean;           // auto: the hub's "Last session"
+                    created_ts: number; updated_ts: number;
+                    summary: string;                                      // "LLMs: gemma4-26B; loaded: comfy; 6 mods running"
+                    snapshot: { version: number; ts: number; mods: Record<string, { running: boolean; load: LoadState }>;
+                                lcpp: object[]; notes: string[] } }
+interface SessionStep { action: "stop_llm" | "unload" | "start" | "launch_llm" | "load" | "skip";
+                        target: string; detail: string; bytes?: number | null;   // negative: frees memory
+                        spec?: object | null;                               // launch_llm: the instance's launch spec
+                        ok?: boolean | null; error?: string | null }        // in results, after it ran
+interface SessionMemory { available_bytes: number; freed_bytes: number; needed_bytes: number; reserve_bytes: number;
+                          after_bytes: number;                                // available + freed − needed − reserve
+                          fits: boolean }
+interface SessionRestore { session: string; steps: SessionStep[]; memory: SessionMemory; dry_run: boolean;
+                           results?: SessionStep[] | null; ok?: boolean | null }   // when it ran
+interface SessionState { unclean_shutdown: boolean;                       // the hub didn't stop cleanly last time
+                         last_auto: Session | null; restoring: string | null; restore_on_boot: boolean }
+```
+
+**As built (UI):**
+- **The Sessions panel** (`web/sessions.js`, a module on the page's React) opens from the Chat page (a Sessions button at the bottom of the thread list) as a dialog, and is the whole of **Settings → Sessions**. It lists every session with its summary and age (the auto one marked "auto"), and has **Save current setup…** (a name; the same name replaces).
+- **Switch** first shows the dry-run plan: each step with its icon, detail and memory (−frees / +needs), then the memory line "available + freed − needed − reserve = after" with a fits / doesn't-fit badge. **Switch** runs it; each step ticks off live from `session_step` events (running, done, failed with its error), and the result is a toast.
+- Rename (inline) and Delete (with a confirm) per session.
+- **Command palette:** "Save session…" and "Switch to session…" (both open the panel; Switch opens a session's plan when typed as "Switch to <name>").
+- **On page load**, when `unclean_shutdown` is set and a last auto session exists, a toast offers **Restore last session?** (Restore opens its plan; Dismiss is remembered for this tab in `sessionStorage`).

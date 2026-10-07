@@ -515,9 +515,10 @@ class Agent:
         if not reply.text.strip() and not reply.tool_calls:
             # An empty reply (the server dropped a call it couldn't parse, or the model stopped early):
             # ask once more rather than leave the user with nothing.
+            # vLLM's streaming parsers can drop a tool call made right after the thinking: ask again without streaming.
             self.emit(tid, "note", {"text": "the model's reply was empty; asked again", "level": "info"})
-            nudge = [*msgs, {"role": "user", "content": "(Your last reply was empty. Continue: answer the user, or call the tool you meant to call.)"}]
-            retry = await self.llm.chat(model, nudge, tools.functions(), delta, known)
+            self.transient(tid, "delta_reset", {"step": step})
+            retry = await self.llm.chat(model, msgs, tools.functions(), None, known, stream=False)
             retry.thinking = (reply.thinking + "\n" + retry.thinking).strip()
             reply = retry
         if reply.thinking:

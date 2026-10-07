@@ -66,6 +66,17 @@ class FakeModel:
             r = self._pick(body)
             if r.get("status"):
                 return JSONResponse({"error": {"message": r.get("text") or "scripted failure"}}, status_code=r["status"])
+            if body.get("stream") is False:
+                calls = [{"id": tc.get("id") or f"call_{i}", "type": "function",
+                          "function": {"name": tc["name"], "arguments": tc["arguments"] if isinstance(tc.get("arguments"), str)
+                                       else json.dumps(tc.get("arguments") or {})}} for i, tc in enumerate(r.get("tool_calls") or [])]
+                msg = {"role": "assistant", "content": (r.get("text") or "") + (r.get("leaked") or "")}
+                if r.get("thinking"):
+                    msg["reasoning"] = r["thinking"]
+                if calls:
+                    msg["tool_calls"] = calls
+                return {"choices": [{"index": 0, "message": msg, "finish_reason": "tool_calls" if calls else "stop"}],
+                        "usage": r.get("usage") or {"prompt_tokens": 100, "completion_tokens": 10}}
             return StreamingResponse(self._stream(r, body), media_type="text/event-stream")
 
         return app

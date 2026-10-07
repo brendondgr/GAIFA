@@ -39,9 +39,24 @@ async def main(model: str) -> None:
                          "compactions": [e["payload"]["stage"] for e in evs if e["type"] == "compact"],
                          "reply": next((e["payload"]["text"] for e in reversed(evs) if e["type"] == "assistant"), "")[:300]})
             print(json.dumps(rows[-1]), flush=True)
+        # then /compact by hand: the model writes the summary, and the first turn now lives only in it
+        before = (await c.get(f"/v1/threads/{tid}/context")).json()
+        after = (await c.post(f"/v1/threads/{tid}/compact")).json()
+        await c.post(f"/v1/threads/{tid}/messages", json={"text": "Remind me: what's my favourite animal?"})
+        for _ in range(1200):
+            if not (await c.get(f"/v1/threads/{tid}")).json()["running"]:
+                break
+            await asyncio.sleep(0.5)
+        evs = (await c.get(f"/v1/threads/{tid}/events")).json()
+        final = next((e["payload"]["text"] for e in reversed(evs) if e["type"] == "assistant"), "")
+        rows.append({"turn": "/compact, then: Remind me: what's my favourite animal?", "used_before": before["used"],
+                     "used_after": after["used"], "window": after["window"], "reply": final[:300],
+                     "compactions": [e["payload"]["stage"] for e in evs if e["type"] == "compact"]})
+        print(json.dumps(rows[-1]), flush=True)
         summ = [e["payload"].get("summary") for e in evs if e["type"] == "compact" and e["payload"].get("stage") == "summary"]
-    out = {"model": model, "thread": tid, "rows": rows, "summary": summ[-1] if summ else None,
-           "ok": bool(summ) and "leopard" in rows[-1]["reply"].lower() and rows[-1]["state"] == "idle"}
+    clears = rows[-2]["compactions"].count("clear")
+    out = {"model": model, "thread": tid, "rows": rows, "summary": summ[-1] if summ else None, "clears": clears,
+           "ok": bool(summ) and clears > 0 and "leopard" in final.lower() and "leopard" in rows[-2]["reply"].lower()}
     p = Path(__file__).resolve().parents[3] / "docs" / "report" / "data" / "compact-live.json"
     p.write_text(json.dumps(out, indent=1))
     print("ok", out["ok"])

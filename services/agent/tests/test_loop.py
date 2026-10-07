@@ -267,10 +267,12 @@ async def test_concurrent_requests_dont_trip_the_store(env):
     assert all(results), results.count(False)
 
 
-async def test_an_empty_reply_is_asked_again(env):
-    env.model.queue({"text": ""}, {"text": "Here you go."})
+async def test_an_empty_reply_is_asked_again_without_streaming(env):
+    env.model.queue({"text": ""}, {"tool_calls": [{"name": "hub_list_services", "arguments": {}}]}, {"text": "Here you go."})
     tid = await env.thread()
     await env.send(tid, "hello")
+    assert env.model.received[1]["stream"] is False       # the retry
+    assert env.payloads(tid, "tool_call")[0]["name"] == "hub_list_services"
     assert env.payloads(tid, "assistant")[-1]["text"] == "Here you go."
     assert "empty" in env.payloads(tid, "note")[0]["text"]
 

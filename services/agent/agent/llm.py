@@ -230,14 +230,36 @@ class LLM:
                 return m.get("meta") or {}
         return {}
 
+    async def _once(self, body: dict[str, Any], reply: Reply) -> None:
+        """A non-streaming request (the fallback when a streamed reply came back empty)."""
+        try:
+            r = await self.client.post(self.base + "/chat/completions", json={**body, "stream": False})
+        except httpx.HTTPError as e:
+            raise LLMError(f"{type(e).__name__}: {e}"[:400], retryable=True) from None
+        if r.status_code >= 400:
+            raise LLMError(f"HTTP {r.status_code}: {_detail(r.text[:600])}", r.status_code, retryable=r.status_code in (429, 500, 502, 503, 504))
+        d = r.json()
+        m = (d.get("choices") or [{}])[0].get("message") or {}
+        reply.text = m.get("content") or ""
+        reply.thinking = m.get("reasoning") or m.get("reasoning_content") or ""
+        for i, tc in enumerate(m.get("tool_calls") or []):
+            fn = tc.get("function") or {}
+            args = fn.get("arguments")
+            reply.tool_calls.append(ToolCall(tc.get("id") or f"tc_{i}", fn.get("name") or "", args if isinstance(args, str) else json.dumps(args or {})))
+        reply.usage = {k: int(v) for k, v in (d.get("usage") or {}).items() if isinstance(v, (int, float))}
+
     async def chat(self, model: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None,
-                   on_delta: Delta | None = None, known: set[str] | None = None) -> Reply:
+                   on_delta: Delta | None = None, known: set[str] | None = None, stream: bool = True) -> Reply:
         body: dict[str, Any] = {"model": model, "messages": messages, "stream": True,
                                 "stream_options": {"include_usage": True}}
         if tools:
             body["tools"] = tools
             body["tool_choice"] = "auto"
         reply = Reply(model=model)
+        if not stream:
+            body.pop("stream_options")
+            await self._once(body, reply)
+            return self._finish(reply, known)
         shown = TagRouter()
         calls: dict[int, dict[str, Any]] = {}
         t_think: float | None = None
@@ -295,6 +317,10 @@ class LLM:
             c = calls[i]
             if c["name"]:
                 reply.tool_calls.append(ToolCall(c["id"] or f"tc_{i}", c["name"], c["arguments"]))
+        return self._finish(reply, known)
+
+    def _finish(self, reply: Reply, known: set[str] | None) -> Reply:
+        """Thinking markers and tool calls written as text, after the reply is complete."""
         if reply.text and "<channel|>" in reply.text:
             # Gemma 4's thought channel when the server's reasoning parser missed its opening:
             # "<|channel>thought …<channel|>reply" or just "…<channel|>reply"

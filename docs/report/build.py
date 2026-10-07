@@ -152,8 +152,9 @@ def write_live() -> None:
     blocks = []
     sets = []
     first, again = load("live-skynet.json"), load("live-skynet-2.json")
-    if (btn := load("live-buttons.json")):
-        again = {"rows": [r for r in (again or {}).get("rows", []) if r["task"] not in {b["task"] for b in btn["rows"]}] + btn["rows"]}
+    for extra in ("live-buttons.json", "live-fork.json"):
+        if (btn := load(extra)):
+            again = {"rows": [r for r in (again or {}).get("rows", []) if r["task"] not in {b["task"] for b in btn["rows"]}] + btn["rows"]}
     if first:
         rows = list(first["rows"])
         if again:
@@ -239,7 +240,8 @@ def write_glance() -> None:
     if first:
         final = {r["task"]: r for r in first["rows"]}
         final.update({r["task"]: r for r in (again or {}).get("rows", [])})
-        final.update({r["task"]: r for r in (load("live-buttons.json") or {}).get("rows", [])})
+        for extra in ("live-buttons.json", "live-fork.json"):
+            final.update({r["task"]: r for r in (load(extra) or {}).get("rows", [])})
         lt, lp = len(final), sum(r["ok"] for r in final.values())
     if d26:
         lt, lp = lt + len(d26["rows"]), lp + sum(r["ok"] for r in d26["rows"])
@@ -261,6 +263,22 @@ def write_glance() -> None:
     for v, l in cells:
         out.append("\\begin{minipage}[t]{0.158\\linewidth}\\kpi{" + v + "}{" + l + "}\\end{minipage}\\hfill")
     (GEN / "glance.tex").write_text("\n".join(out) + "\n")
+
+
+def write_timeline() -> None:
+    """The night's commits, from git."""
+    import subprocess
+
+    out = subprocess.run(["git", "log", "--since=2026-10-06 23:00", "--reverse", "--format=%ad\t%s", "--date=format:%H:%M"],
+                         cwd=HERE.parents[1], capture_output=True, text=True).stdout.strip().splitlines()
+    rows = [r"\begin{longtable}{@{}l>{\raggedright\arraybackslash}p{14.2cm}@{}}", r"\toprule", r"Time & Commit \\", r"\midrule\endhead"]
+    for line in out:
+        t, subj = line.split("\t", 1)
+        subj = subj.removeprefix("AIHub ")
+        head, _, rest = subj.partition(": ")
+        rows.append(f"{t} & \\textbf{{{tex(head)}}} {tex(rest[:230])}{'…' if len(rest) > 230 else ''} \\\\")
+    rows += [r"\bottomrule", r"\end{longtable}"]
+    (GEN / "timeline.tex").write_text("\n".join(rows) + "\n")
 
 
 def write_b26() -> None:
@@ -359,4 +377,5 @@ if __name__ == "__main__":
     write_glance()
     write_p1516()
     write_b26()
+    write_timeline()
     print("wrote", sorted(p.name for p in GEN.iterdir()))

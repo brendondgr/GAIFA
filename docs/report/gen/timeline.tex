@@ -1,0 +1,37 @@
+\begin{longtable}{@{}l>{\raggedright\arraybackslash}p{14.2cm}@{}}
+\toprule
+Time & Commit \\
+\midrule\endhead
+00:00 & \textbf{(plan)} Phases 13--14 rewritten for a Claude-Code-style chat agent: our own loop (no LangGraph), tools with risk levels loaded on demand, question and parameter cards, chained outputs, model facts and a context meter, compaction, skills an… \\
+00:33 & \textbf{(13.1, 13.2)} the agent's tool catalog and calls: utils/tools/ (catalog from [tools], tools\_source and hub tools with risk, ask, examples, core, hide/fixed; flat schemas with x-kind file inputs; validation whose errors name the fix; permissions… \\
+00:34 & \textbf{(13.3)} the relay reports model facts: /v1/models entries carry meta \{context\_length, tools, vision, reasoning, source\} from llama.cpp /props, vLLM max\_model\_len or a max\_tokens probe through another relay, with a per-endpoint override (E… \\
+00:47 & \textbf{(13.4)} MCP endpoint POST /mcp: the tool catalog over streamable HTTP (stateless, 2026-07-28 and the 2025 initialize era), annotations from risk, ask calls as input\_required elicitation or an explanation plus aihub\_wait\_approval, Origin c… \\
+01:10 & \textbf{(14.2--14.11, 13.5 harness)} the agent mod services/agent: our own loop (model client with thinking and leaked-call parsing, turns with pauses, queued messages, cancel, actions, fallback; append-only event log with fork; tools on demand; context meter and com… \\
+01:26 & \textbf{(15.1--15.3, 16.1--16.3)} sessions (snapshots with lcpp launch specs, a restore plan run through the memory manager, auto-save, the unclean-shutdown flag, restore at boot, session tools); logs in data/logs/ (per-mod shippers, rotation, the hub's own log, t… \\
+01:26 & \textbf{(13.5, 14.3)} reasoning that leaks into replies is caught: <think> tags routed to thinking while streaming, leading planning paragraphs split off; prompt rules for asking in words when options don't fit; eval checks accept width/height for an a… \\
+01:28 & \textbf{(14.1, Wire 13--14)} the Chat page (web/chat/: thread list, streaming with folded thinking, question/parameter/tool/result/todo/memory cards from a card registry, result actions from an actions registry plus ones derived from the tool catalog, quick a… \\
+01:28 & \textbf{(14.3, 13.5)} Gemma's <channel|> thought marker in content splits off as thinking; the eval reads the hub-normalized arguments and answers a question asked in words with the task's text \\
+01:39 & \textbf{(13.2, 14.3, fixes from the live runs)} tools\_source calls send \{arguments: \ldots{}\} (comfy had silently run its defaults); comfy refuses unknown fields and matches aspect labels by ratio, and its tools offer the shared aspect choices; the agent's store serializes every use o… \\
+01:46 & \textbf{(Wire 13, 15, 16; 13.2 fix)} Sessions panel (Chat and Settings $\rightarrow$ Sessions; switch shows the plan first, steps tick off live), the command-palette session actions and the restore-last-session prompt; Settings $\rightarrow$ Paths shows data/logs and data/state; ask tools f… \\
+01:47 & \textbf{(13.2)} coerce strips quotes a model wraps around a string value ('"16:9"') \\
+01:49 & \textbf{(comfy, from the live runs)} the task tools' edit with qwen21-edit-multi reuses the main image as the required second reference (every agent edit failed with 'image\_2: required'); the redundant manifest tool comfy\_run is gone (run\_workflow covers it) \\
+01:53 & \textbf{(14.7, 13.5, 14.12)} the context meter leaves out the thinking that isn't sent back; eval scripts: live smoke test, the Phase 15 session check, the meter check; the eval counts comfy\_run as run\_workflow and uses the plain aspect choices \\
+02:16 & \textbf{(14.6, 14.3, from the 26B eval)} models on grammar-constrained servers (llama.cpp, facts from /props) get every tool loaded, since they can only name the tools they're given (the 26B kept 'calling' tts\_list\_voices when it meant the deferred tts\_speak); a third id… \\
+02:19 & \textbf{(report)} the overnight report's sources (report.tex and its parts, build.py from the eval, live and test data), the data so far, UI screenshots; evals/restart\_live.py \\
+02:23 & \textbf{(UI fix)} the sidebar's MOCK button shows only in ?mock or while an area is mocked; plan checks for Phase 13 ticked; live screenshots \\
+02:40 & \textbf{(14.7)} a thread may cap its own context window (settings.window); evals/compact\_live.py; report: troubleshooting cases, the issues found since, the 26B and all-tools results so far \\
+02:46 & \textbf{(comfy, agent; from the live runs)} comfy frees ComfyUI's own models and asks again when AIHub refuses room (it held the last workflow's models and blocked itself); a flaky comfy idle-unload test now waits for the status; the agent asks once more after an empty repl… \\
+02:48 & \textbf{(14.3)} an empty streamed reply is asked again without streaming (vLLM's streaming parsers drop a tool call made right after the thinking; 8/8 non-streamed requests kept it); the compaction check forces a summary and asks again; report: i… \\
+02:50 & \textbf{(14.4)} a restart is not a Stop: on a graceful shutdown the agent leaves running turns as they are (no 'stopped by the user', the hub call keeps going), and the next start resumes them; tested with a second app on the same database \\
+02:52 & \textbf{(14.7)} after a compaction the meter shows the estimate of what's left instead of the last pre-compaction usage; live compaction check passes (5 clears, a model-written summary keeps the first turn) \\
+02:52 & \textbf{(opencode)} openapi = "" (its OpenAPI is behind Basic auth like every route), so aihub check passes again; report data: inventory, logs, aihub check results \\
+03:06 & \textbf{(report, evals)} live results merge re-runs with their first attempts; the session check numbers each switch; ragged-right report tables \\
+03:07 & \textbf{(comfy, from the live runs)} switching workflows frees the previous workflow's models first (measured peaks were inflated by leftovers, and AIHub refused room ComfyUI itself was holding); after a refusal it asks again for up to 30 s while freed memory comes b… \\
+03:08 & \textbf{(comfy)} a workflow's memory estimate is the median of its last 10 peaks (+10\%), not the highest, so a run measured with leftovers loaded doesn't inflate it for good \\
+03:11 & \textbf{(14.5, from the live runs)} a button's tool call is introduced in the model's history as the user's ('I pressed a button that ran \ldots{}'), so the model doesn't take it, or its failure, for its own (asked what the buttons made, it had described unrelated outputs) \\
+03:25 & \textbf{(14.6)} the system prompt says which tool groups are turned off in the chat and when it's read-only (the 31B sometimes wandered through load\_tools looking for a disabled group's tools) \\
+03:43 & \textbf{(15.2, from the live switches)} a session plan doesn't load or unload mods without those operations (lcpp reports 'loaded' from its instances, which are their own steps); the live switches otherwise worked: the 26B came back with its launch settings and register… \\
+03:45 & \textbf{(16.4, plan)} Phase 13--16 checks and Wire items recorded with their evidence; architecture §14 as built; report: issues 24--25, sessions coverage, what's not done \\
+03:47 & \textbf{(report)} docs/agent-eval.md filled from the data (agent\_eval\_md.py); report: the live thread figure, sessions and API-tab screenshots, tests table, chart series \\
+\bottomrule
+\end{longtable}

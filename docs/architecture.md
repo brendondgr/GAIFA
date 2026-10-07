@@ -645,7 +645,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
   - **Restarts:** a graceful restart leaves turns running, and they resume at the next start.
   - **Memory:** eval threads (`dry_run`) never write memory.
   - **Turned-off groups:** `load_tools` and `find_tools` say a group is turned off in this chat (an error for the group, `turned_off` for named tools) rather than listing its tools as unknown.
-  - **Prompt rules:** the system prompt says which groups are off and when a chat is read-only, and forbids stopping mods or LLMs to make room.
+  - **Prompt rules:** the system prompt asks the model to look at an image (`view_output`) before describing it, says which groups are off and when a chat is read-only, and forbids stopping mods or LLMs to make room.
   - **Evaluation:** the eval and live results are in [agent-eval.md](agent-eval.md).
 
 ### 14.2 Threads, questions and approvals survive restarts

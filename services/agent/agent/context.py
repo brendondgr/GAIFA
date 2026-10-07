@@ -145,6 +145,8 @@ def meter(events: list[dict[str, Any]], window: int | None, parts: dict[str, int
         if e["type"] == "usage":
             last_usage = e
     est_total = sum(parts.values())
+    if last_usage and any(e["type"] == "compact" and e["seq"] > last_usage["seq"] for e in events):
+        last_usage = None       # compacted since the model last counted: the estimate of what's left is closer
     if last_usage:
         u = last_usage["payload"]
         # completion_tokens includes the thinking, which is never sent back: leave it out

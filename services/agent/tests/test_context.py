@@ -138,3 +138,11 @@ async def test_thread_window_cap(env):
     tid2 = await env.thread(settings={"window": 999999})
     await env.send(tid2, "hi")
     assert (await env.client.get(f"/v1/threads/{tid2}/context")).json()["window"] == 8000   # never above the model's
+
+
+def test_meter_uses_the_estimate_after_a_compaction():
+    evs = [{"seq": 1, "type": "user", "payload": {"text": "x"}},
+           {"seq": 2, "type": "usage", "payload": {"prompt_tokens": 5000, "completion_tokens": 10}},
+           {"seq": 3, "type": "compact", "payload": {"stage": "clear", "cleared": [1]}}]
+    m = ctx.meter(evs, 8000, {"messages": 1200, "instructions": 800})
+    assert m["used"] == 2000 and m["estimated"] is True

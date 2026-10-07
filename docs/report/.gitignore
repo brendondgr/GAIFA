@@ -4,3 +4,7 @@
 *.out
 *.toc
 .lastlog
+# Local only, never pushed: run data (transcripts, local paths), screenshots and output thumbnails, the built PDF
+/data/
+/img/
+/report.pdf

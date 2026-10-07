@@ -1,6 +1,6 @@
 # Agent eval and live smoke test (plan 13.5, 14.12)
 
-Run on 6–7 October 2026. The full account, with every prompt, transcript notes, charts and the live outputs, is the overnight report: [report/report.pdf](report/report.pdf). The raw data is in [report/data/](report/data/).
+Run on 6–7 October 2026. The full account, with every prompt, transcript notes, charts and the live outputs, is the overnight report, `docs/report/report.pdf`. It and its raw data (`docs/report/data/`) and images stay on this machine (gitignored); the tables below come from that data.
 
 ## How it was run
 

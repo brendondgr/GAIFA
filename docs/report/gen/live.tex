@@ -48,43 +48,60 @@ And I've read it aloud for you as well (\#2). Would you like me to animate the i
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/c634df2a6b2d.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
 \end{livecase}
 
-\begin{livecase}{L7\_compact\_continue · Gemma 4 31B · \textcolor{badred}{FAIL} · 121 s}
+\begin{livecase}{L7\_compact\_continue · Gemma 4 31B · \textcolor{okgreen}{PASS} · 556 s}
 \textbf{Prompts:} \emph{``Make an image of an old stone bridge over a stream.''} $\rightarrow$ \emph{``/compact''} $\rightarrow$ \emph{``Edit the image you made earlier: make it night, with a full moon.''}\par
-\textbf{Tools:} \texttt{list\_workflows $\rightarrow$ generate\_image $\rightarrow$ memory\_status $\rightarrow$ unload\_service $\rightarrow$ generate\_image $\rightarrow$ read\_skill $\rightarrow$ edit\_image}\par
-\textbf{Outputs:} \#1 image\par
-\textbf{Final reply:} {\small Here's the image: a mossy old stone bridge over a gentle woodland stream with dappled sunlight through autumn leaves.
+\textbf{Tools:} \texttt{generate\_image $\rightarrow$ edit\_image}\par
+\textbf{Outputs:} \#1 image, \#2 image\par
+\textbf{Final reply:} {\small Here's the nighttime version --- the same scene under a full moon with cool blue light and stars.
 
-Would you like to animate it, edit it, make a 3D model, or something else?}\par
-\textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$)\par
+Would you like to animate it, make another edit, or try something else?}\par
 {\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: comfy\_edit\_image ran.}\par
 \smallskip\noindent
-\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/9cc51449b9d4.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/2504e9abce42.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/4922b9d4c62e.jpg}\\{\scriptsize \#2 image}\end{minipage}\hfill
 \end{livecase}
 
-\begin{livecase}{L8\_fork · Gemma 4 31B · \textcolor{badred}{FAIL} · 114 s}
+\begin{livecase}{L8\_fork · Gemma 4 31B · \textcolor{badred}{FAIL} · 35 s}
 \textbf{Prompts:} \emph{``Make an image of a fox in a meadow.''} $\rightarrow$ \emph{``Edit it: make the fox a wolf.''}\par
-\textbf{Tools:} \texttt{generate\_image}\par
-\textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$); fork edits the first image (image=[] from comfy\_generate\_image: []); ran to the end (ValueError: max() iterable argument is empty)\par
+\textbf{Tools:} \texttt{generate\_image $\rightarrow$ memory\_status}\par
+\textbf{Final reply:} {\small I haven't been able to create the fox image yet --- we still need to free up some memory first (I recommend unloading lcpp, which is using about 35 GB).
+
+But I'll go ahead and switch to a wolf in a meadow for you once we have enough room. Shall I unload lcpp and get started?}\par
+\textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$); fork edits the first image (image=[] from comfy\_generate\_image: [])\par
 {\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: comfy\_edit\_image ran.}\par
 \end{livecase}
 
-\begin{livecase}{L10\_must\_ask · Gemma 4 31B · \textcolor{badred}{FAIL} · 113 s}
+\begin{livecase}{L10\_must\_ask · Gemma 4 31B · \textcolor{okgreen}{PASS} · 117 s}
 \textbf{Prompts:} \emph{``Make a 3D model and split it into parts.''}\par
-\textbf{Tools:} \texttt{update\_todos $\rightarrow$ make\_3d $\rightarrow$ update\_todos $\rightarrow$ make\_3d $\rightarrow$ unload\_service $\rightarrow$ memory\_status $\rightarrow$ make\_3d}\par
+\textbf{Tools:} \texttt{read\_skill $\rightarrow$ make\_3d}\par
 \textbf{Outputs:} \#1 model3d\par
-\textbf{Final reply:} {\small I've created the 3D model of a wooden chair with the parts split into legs, seat, and backrest.
+\textbf{Final reply:} {\small I've created a 3D model of a wooden chair. Would you like me to refine it, add specific named parts, or rig it so the pieces can move independently?
 
-You can view the preview and download the model (GLB format with separated parts) --- you can import it into Blender or any 3D tool and the parts will be individually selectable.
-
-Next steps: You could rig it for animation, adjust the part split, or I can make a different chair style.}\par
-\textbf{Failed checks:} asked before making it ()\par
+(The current model has the basic shape and preview --- if you'd like me to split it into named parts like "backrest", "seat", and "legs" for editing or animation, just let me know!)}\par
+{\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: asked before making it.}\par
 \smallskip\noindent
-\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/2564702baa79.jpg}\\{\scriptsize \#1 model3d}\end{minipage}\hfill
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/7a917fb2ee98.jpg}\\{\scriptsize \#1 model3d}\end{minipage}\hfill
 \end{livecase}
 
-\begin{livecase}{L5\_L6\_buttons · Gemma 4 31B · \textcolor{badred}{FAIL} · 7 s}
+\begin{livecase}{L5\_L6\_buttons · Gemma 4 31B · \textcolor{badred}{FAIL} · 5 s}
 \textbf{Prompts:} \emph{``(buttons, no prompt)''}\par
 \textbf{Tools:} \texttt{generate\_image $\rightarrow$ search\_outputs}\par
-\textbf{Final reply:} {\small Your two buttons made a 3D model of a simple wooden chair and an image of an owl perched in a meadow among wildflowers.}\par
-\textbf{Failed checks:} button removed the background of \#1 (); real image ([]); reply mentions apple/background (Your two buttons made a 3D model of a simple wooden chair and an image of an owl)\par
+\textbf{Final reply:} {\small Your two buttons made an image of a red fox sitting in a meadow and a 3D model of a simple wooden chair.}\par
+\textbf{Failed checks:} button removed the background of \#1 (); real image ([]); reply mentions apple/background (Your two buttons made an image of a red fox sitting in a meadow and a 3D model o)\par
+{\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: button removed the background of \#1; real image; reply mentions apple/background.}\par
+\end{livecase}
+
+\begin{livecase}{L1\_fox · Gemma 4 26B · \textcolor{okgreen}{PASS} · 62 s}
+\textbf{Prompts:} \emph{``Make me an image of a fox.''}\par
+\textbf{Tools:} \texttt{generate\_image}\par
+\textbf{Outputs:} \#1 image\par
+\textbf{Final reply:} {\small I've created a beautiful image of a fox sitting in a lush forest with sunlight filtering through the trees.
+
+What would you like to do next?
+- Animate it into a short video
+- Edit the image (e.g., change the time of day or the setting)
+- Create a 3D model of the fox
+- Describe the image in detail}\par
+\smallskip\noindent
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/36d8e0212606.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
 \end{livecase}

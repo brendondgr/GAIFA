@@ -1,3 +1,5 @@
+\subsection*{A pending card and a pending question survive restarts}
+Thread A waited on a parameter card and thread B on a question card. Then the hub and the agent were both restarted (2.0 s). After the restart: A was \emph{waiting}, B was \emph{waiting}, and the approval was still pending at the hub. Approving A and answering B then finished both, with outputs \{'a': ['image'], 'b': ['image']\}. Result: \ok.
 \subsection*{The context meter against the model's own count}
 Before each turn, the meter's prediction (last usage, minus thinking, plus an estimate of what was added) is compared with the \code{prompt\_tokens} the 31B then reported:
 \begin{tabular}{@{}lrrr@{}}\toprule Turn & Predicted & Actual & Error \\ \midrule

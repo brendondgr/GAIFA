@@ -454,7 +454,10 @@ class Agent:
         summary, _, _ = ctx.summary_state(events)
         parts = {"agent_md": k.agent_md(), "memory": k.memory_index(), "skills": await k.skill_list(),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
-                 "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision")),
+                 "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
+                 + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "
+                    "the user can turn them back on in the composer)" if tools.disabled else "")
+                 + ("\nThis chat is read-only: only tools that read can run." if (self.store.thread(tid) or {}).get("mode") == "read_only" else ""),
                  "outputs": prompts.outputs_table(ctx.outputs(events)), "summary": summary}
         sizes = {"instructions": ctx.est(prompts.BASE + parts["agent_md"] + parts["env"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),

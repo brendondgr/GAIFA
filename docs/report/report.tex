@@ -154,7 +154,16 @@ The test plan (\code{docs/test-plan.md}) was written before the code: 15 areas a
 \input{gen/eval_summary.tex}
 
 \medskip
-The gate in plan 13.5 is pass\textasciicircum{}3 $\geq$ 80\% on the primary model (Gemma 4 31B). \emph{v1} is the first run, with the first prompts. \emph{v2} adds the fixes for leaked reasoning and fairer checks. \emph{final} is the run after the live-test fixes. ``Infra.\ errors'' counts runs that broke for reasons outside the agent's decisions: my hub restarts during v1, and a store race found and fixed overnight (Section~\ref{sec:issues}).
+The gate in plan 13.5 is pass\textasciicircum{}3 $\geq$ 80\% on the primary model (Gemma 4 31B). The runs, in order:
+\begin{itemize}[leftmargin=*]
+\item \emph{v1} is the first run, with the first prompts. Its failures were mostly leaked reasoning, plus my hub restarts in the middle of it.
+\item \emph{v2} adds the fixes for leaked reasoning and fairer checks.
+\item \emph{v3} comes after the first live-test fixes. In \emph{v3 + 2 re-run}, two tasks that failed only because of my eval script (a stale card value) and a duplicate comfy tool were run again.
+\item \emph{final} is the whole eval again, on the code as it stands at the end of the night.
+\item \emph{All tools loaded} skips tools-on-demand, one run per task.
+\item The 26B ran on llama.cpp with every tool loaded (bug \#15).
+\end{itemize}
+``Infra.\ errors'' counts runs that broke for reasons outside the agent's decisions.
 
 \begin{center}
 \begin{tikzpicture}

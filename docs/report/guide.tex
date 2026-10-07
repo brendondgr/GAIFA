@@ -12,7 +12,7 @@ Your own text read aloud & Put the text in the message: \emph{``Read this aloud:
 A 3D model & \emph{``Make a 3D model of a low-poly treasure chest.''} & One gen3d job; the card offers the preset (\emph{fast} is about a minute) and the stages. \\
 Image $\rightarrow$ 3D & \emph{``Turn that robot into a 3D model.''} (after an image) or in one message: \emph{``Make an image of a red dragon, then turn it into a 3D model.''} & gen3d takes text only, so the agent \emph{looks at the image} (\code{view\_output}; both models see images) and writes a 3D prompt describing the object, then runs gen3d. \\
 Image $\rightarrow$ video & \emph{``Now animate it: the boat drifts slowly.''} & \code{animate\_image} with the earlier image as input. Describe the \emph{motion}, not the scene. About 5 s of 480p; it takes minutes. \\
-Edit an image & \emph{``Make it winter, with snow on the roof.''} & \code{edit\_image} on the image you mean (``it'' = the latest; \#2 or ``the cabin image'' for an older one). \\
+Edit an image & \emph{``Make it winter, with snow on the roof.''} & \code{edit\_image} on the image you mean (``it'' = the latest; \#2 or ``the cabin image'' for an older one). The only ready edit workflow (Qwen-Image 2.1) takes about 9--10 minutes per edit on this machine. \\
 Several steps at once & \emph{``Make an image of a mountain village, animate it with drifting clouds, and narrate a one-sentence description of it.''} & It writes a checklist (pinned at the top), runs the steps in order with a card each, and marks failures, asking whether to retry, change or skip. \\
 Refer to earlier outputs & \emph{``the image you made earlier''}, \emph{``\#2''}, \emph{``my most recent image''} & Outputs in the chat are numbered \#1, \#2\ldots{}; \emph{``my most recent image''} searches your Outputs. \\
 Look at an image & \emph{``Describe \#1 in two sentences.''} / \emph{``Which of the two is more colorful?''} & \code{view\_output} sends the picture to the model. \\
@@ -27,5 +27,7 @@ Something destructive & \emph{``Delete all my saved voices.''} & Every deletion 
 \item \textbf{Use the mode picker} instead of instructions: \emph{Use defaults} runs generating tools without cards (only destructive ones ask); \emph{Read only} lets it look but not make or change anything.
 \item \textbf{Buttons are faster than words} for the obvious next step: Animate, Edit, Remove background and Make 3D on an image card run the tool directly (with a card for its settings), and the model sees what you did when you next write.
 \item \textbf{Memory}: \emph{``Remember that I prefer 16:9 images.''} writes it to \code{data/agent/memory}, and every new chat starts with it.
+\item \textbf{How long things take here} (measured tonight): an image 20--60 s, an edit about 9 minutes, a 3D model 1--2 minutes (\emph{fast}), speech a few seconds, a 5 s video several minutes. One GPU job runs at a time; ask for the next step while one runs and it queues.
+\item \textbf{When memory is short} the agent tells you what holds it and asks. It never stops your LLM on its own; say ``stop the LLM'' if that's what you want.
 \item \textbf{Long chats}: type \code{/compact} to summarize the older part, or branch from an earlier message to try something else without losing the original.
 \end{itemize}

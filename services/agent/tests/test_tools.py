@@ -51,6 +51,7 @@ async def test_pinned_and_disabled_groups(env):
     req = env.model.received[0]
     assert "tts_speak" in tool_names(req) and "gen3d_make_3d" not in tool_names(req)
     assert "gen3d" not in req["messages"][0]["content"].split("## More tools")[1].split("##")[0]
+    assert "Turned off in this chat: gen3d" in req["messages"][0]["content"]
     res = env.payloads(tid, "tool_result")[0]
     assert res["status"] == "denied" and res["error"]["code"] == "disabled"
     assert not [a for a in env.hub.attempts if a["name"] == "gen3d_make_3d"]     # never reached the hub

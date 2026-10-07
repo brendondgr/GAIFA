@@ -45,7 +45,8 @@ def short_tool(t: str) -> str:
 def eval_runs() -> list[tuple[str, dict]]:
     """(label, data) for each eval file, in a fixed order."""
     order = [("eval-skynet-deferred.json", "31B · v1"), ("eval-skynet-v2.json", "31B · v2"),
-             ("eval-skynet-v3.json", "31B · v3 as run"), ("eval-skynet-final.json", "31B · final"),
+             ("eval-skynet-v3.json", "31B · v3 as run"), ("eval-skynet-final.json", "31B · v3 + 2 re-run"),
+             ("eval-skynet-v4.json", "31B · final"),
              ("eval-skynet-all-tools.json", "31B · all tools loaded"),
              ("eval-26b-r1.json", "26B · 1 run"), ("eval-26b-v3.json", "26B · final")]
     return [(label, d) for f, label in order if (d := load(f))]
@@ -78,7 +79,9 @@ def write_eval() -> None:
         coords.append(r"\addlegendentry{" + tex(label) + "}")
     (GEN / "eval_groups.tex").write_text("\n".join(coords) + "\n")
     # per-task table for the final runs
-    finals = [(l, d) for l, d in runs if l in ("31B · v1", "31B · final", "26B · final", "26B · 1 run")]
+    have = dict(runs)
+    best31 = "31B · final" if "31B · final" in have else "31B · v3 + 2 re-run"
+    finals = [(l, d) for l, d in runs if l in ("31B · v1", best31, "26B · final", "26B · 1 run")]
     head = " & ".join(tex(l) for l, _ in finals)
     rows = [r"\begin{longtable}{@{}p{2.9cm}p{7.6cm}" + "c" * len(finals) + "@{}}", r"\toprule",
             f"Task & Prompt (turns) & {head} \\\\", r"\midrule", r"\endhead"]
@@ -103,7 +106,7 @@ def write_eval() -> None:
     (GEN / "eval_tasks.tex").write_text("\n".join(rows) + "\n")
     # failures of the final runs, grouped by check
     fails: dict[str, list[str]] = {}
-    for label, d in [(l, d) for l, d in finals if l != "31B · v1"]:
+    for label, d in [(l, d) for l, d in finals if l != "31B · v1"]:  # the final runs' failures
         for r in d["rows"]:
             for c in r["checks"]:
                 if not c["ok"]:
@@ -149,6 +152,8 @@ def write_live() -> None:
     blocks = []
     sets = []
     first, again = load("live-skynet.json"), load("live-skynet-2.json")
+    if (btn := load("live-buttons.json")):
+        again = {"rows": [r for r in (again or {}).get("rows", []) if r["task"] not in {b["task"] for b in btn["rows"]}] + btn["rows"]}
     if first:
         rows = list(first["rows"])
         if again:
@@ -219,13 +224,14 @@ def write_glance() -> None:
     tests = load("test-counts.json") or {}
     passed = sum(s.get("passed", 0) for s in tests.get("suites", []))
     runs = dict(eval_runs())
-    main = runs.get("31B · final") or runs.get("31B · v2") or {}
+    main = runs.get("31B · final") or runs.get("31B · v3 + 2 re-run") or {}
     b26 = runs.get("26B · final") or runs.get("26B · 1 run") or {}
     lt = lp = 0
     first, again, d26 = load("live-skynet.json"), load("live-skynet-2.json"), load("live-26b.json")
     if first:
         final = {r["task"]: r for r in first["rows"]}
         final.update({r["task"]: r for r in (again or {}).get("rows", [])})
+        final.update({r["task"]: r for r in (load("live-buttons.json") or {}).get("rows", [])})
         lt, lp = len(final), sum(r["ok"] for r in final.values())
     if d26:
         lt, lp = lt + len(d26["rows"]), lp + sum(r["ok"] for r in d26["rows"])

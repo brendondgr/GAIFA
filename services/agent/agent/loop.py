@@ -272,10 +272,12 @@ class Agent:
     async def _cancelled(self, tid: str) -> None:
         for e in self._unresolved(tid):
             p = e["payload"]
-            call = self._find(tid, "call", p["id"])
-            if call and call["payload"].get("call_id"):
+            # the hub call's id: on the `call` event, or on the `decision` when it went through a card
+            started = self._find(tid, "call", p["id"]) or self._find(tid, "decision", p["id"])
+            call_id = (started or {}).get("payload", {}).get("call_id")
+            if call_id:
                 try:
-                    await self.hub.cancel_call(call["payload"]["call_id"])
+                    await self.hub.cancel_call(call_id)
                 except Exception:  # noqa: BLE001
                     pass
             self._result(tid, p["id"], p["name"], {"status": "cancelled", "error": {"code": "cancelled", "detail": "stopped by the user"}})

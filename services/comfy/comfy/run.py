@@ -35,6 +35,7 @@ KIND_BY_EXT = {".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "ima
 
 
 ROOM_WAIT_S = 5.0     # between asks for memory after freeing ComfyUI's models (memory comes back in a few seconds)
+INTERRUPT_GRACE_S = 90.0   # after an interrupt, how long ComfyUI may keep running the prompt before it is unloaded as stuck
 
 class NeedsRoom(Exception):
     def __init__(self, detail: str, plan: Any):
@@ -374,6 +375,7 @@ class Runner:
             running = {e[1] for e in q.get("queue_running") or []}
             if pid in running:
                 await self.client.interrupt(pid)
+                asyncio.create_task(self._unstick(pid))
             else:
                 await self.client.delete_queued([pid])
         self.db.update_run(rid, state="cancelled", finished=time.time(), error="cancelled")
@@ -381,6 +383,24 @@ class Runner:
         self._peaks.pop(rid, None)
         self._done(rid)
         return self.db.run(rid)
+
+    async def _unstick(self, pid: str) -> None:
+        """An interrupt only lands between steps. If the prompt is still running after the grace time,
+        ComfyUI is stuck inside one (seen: a GPU kernel that never returned while the LLM shared the
+        GPU), so ComfyUI is unloaded; the next job starts it fresh."""
+        deadline = time.monotonic() + INTERRUPT_GRACE_S
+        while time.monotonic() < deadline:
+            await asyncio.sleep(min(5.0, INTERRUPT_GRACE_S / 10))
+            try:
+                if pid not in {e[1] for e in (await self.client.queue()).get("queue_running") or []}:
+                    return
+            except Exception:  # noqa: BLE001 - ComfyUI went away: nothing to unstick
+                return
+        log.warning("ComfyUI didn't stop prompt %s within %.0f s of the interrupt; unloading it", pid, INTERRUPT_GRACE_S)
+        try:
+            await self.control.unload()
+        except Exception as e:  # noqa: BLE001
+            log.error("couldn't unload a stuck ComfyUI: %s", e)
 
     async def wait(self, rid: str, secs: float) -> dict | None:
         run = self.db.run(rid)

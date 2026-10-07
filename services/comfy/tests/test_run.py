@@ -132,6 +132,24 @@ def test_cancel_and_failure(env):
     assert job["state"] == "failed" and "boom" in job["error"] and "KSampler" in job["error"]
 
 
+def test_a_prompt_that_ignores_the_interrupt_unloads_comfyui(env, monkeypatch):
+    """Stop on an edit stuck inside one GPU step: the interrupt never landed and ComfyUI ran on for half an hour."""
+    import comfy.run
+
+    monkeypatch.setattr(comfy.run, "INTERRUPT_GRACE_S", 0.5)
+    c, fake, *_ = env
+    fake.hold, fake.stuck = True, True
+    r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "stuck"}}).json()
+    time.sleep(0.3)
+    assert c.post(f"/v1/queue/{r['id']}/cancel").json()["state"] == "cancelled"
+    t0 = time.monotonic()
+    while fake.up and time.monotonic() - t0 < 5:
+        time.sleep(0.05)
+    assert not fake.up, "the stuck ComfyUI was unloaded"
+    fake.hold = fake.stuck = False
+    assert run(c, {"workflow": "zimage", "inputs": {"prompt": "after"}})["state"] == "done"     # the next job starts it again
+
+
 def test_needs_room_is_relayed(env, monkeypatch):
     import comfy.run
 

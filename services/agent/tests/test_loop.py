@@ -107,6 +107,24 @@ async def test_cancel_stops_the_tool_call_at_the_hub(env):
     assert env.payloads(tid, "note")[-1]["text"] == "stopped by the user"
 
 
+async def test_cancel_stops_an_approved_call_at_the_hub(env):
+    """A call that went through a card has its call_id on the decision, not a `call` event: Stop
+    left ComfyUI working on an approved edit for half an hour."""
+    env.model.queue({"tool_calls": [{"name": "fake_render", "arguments": {"prompt": "slow", "seconds": 30}}]})
+    tid = await env.thread(mode="ask")
+    await env.send(tid, "render slowly")
+    ap = env.payloads(tid, "approval")[-1]
+    await env.client.post(f"/v1/threads/{tid}/approval", json={"approval_id": ap["approval_id"], "approve": True}, timeout=5)
+    for _ in range(100):
+        if env.agent.store.thread(tid)["state"] == "running" and env.hub.calls:
+            break
+        await asyncio.sleep(0.05)
+    r = await env.client.post(f"/v1/threads/{tid}/cancel")
+    assert r.status_code == 200
+    assert env.payloads(tid, "tool_result")[-1]["status"] == "cancelled"
+    assert env.hub.cancelled, "the approved call was cancelled at the hub"
+
+
 async def test_cancel_during_the_model_stream(env):
     env.model.queue({"text": "x" * 4000, "chunk": 4, "gap": 0.01})
     tid = await env.thread()

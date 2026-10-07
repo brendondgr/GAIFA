@@ -35,6 +35,7 @@ class FakeComfy:
         self.queue_pending: list = []
         self.uploads: dict[str, bytes] = {}
         self.interrupted: list = []
+        self.stuck = False      # ignore interrupts (a GPU kernel that never returns)
         self.deleted: list = []
         self.app = self._app()
         self.port = free_port()
@@ -125,6 +126,7 @@ class FakeComfy:
         @app.post("/__fake/quit")
         def quit_():
             fake.up = False
+            fake.queue_running = []
             return {}
 
         return app
@@ -144,7 +146,7 @@ class FakeComfy:
         await self._send("execution_start", {"prompt_id": pid})
         outputs, interrupted, error = {}, False, None
         for nid, node in graph.items():
-            while self.hold and not self._interrupt(pid):
+            while self.hold and (self.stuck or not self._interrupt(pid)) and self.up:
                 await asyncio.sleep(0.02)
             if self._interrupt(pid):
                 interrupted = True

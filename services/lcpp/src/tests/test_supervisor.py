@@ -222,3 +222,24 @@ def test_recent_and_presets(fake_home):
         await until(lambda: not sup.instances)
         await sup.close()
     run(scenario())
+
+
+def test_reconcile_forgets_records_from_before_a_reboot(fake_home, monkeypatch):
+    """Plan 16.2: state survives reboots now (data/state/lcpp), so a record whose unit is gone and
+    that started before the last boot is forgotten, not shown as failed."""
+    import lcpp.supervisor as supmod
+
+    async def scenario():
+        sup = make_supervisor(fake_home)
+        await sup.start()
+        a, _ = await sup.launch({"model_id": "minicpm", "port": 17079})
+        await until(lambda: a.state == "ready")
+        await sup.close()
+        os.killpg(a.pid, signal.SIGKILL)        # the "reboot": the unit is gone
+        await asyncio.sleep(0.2)
+        monkeypatch.setattr(supmod, "boot_time", lambda: time.time() + 1)
+        sup2 = make_supervisor(fake_home, backend=sup.backend)
+        await sup2.start()
+        assert a.name not in sup2.instances
+        await sup2.close()
+    run(scenario())

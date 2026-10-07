@@ -336,6 +336,15 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_logs(args: argparse.Namespace) -> int:
+    """`data/logs/<id>.log` (or `aihub.log`) when it exists (plan 16.1), else the journal."""
+    root = Path(os.environ.get("AIHUB_ROOT") or CODE)
+    f = root / "data" / "logs" / f"{args.id or 'aihub'}.log"
+    if f.is_file() and not getattr(args, "journal", False):
+        cmd = ["tail", "-n", str(args.n)] + (["-F"] if args.follow else []) + [str(f)]
+        try:
+            return subprocess.run(cmd).returncode
+        except KeyboardInterrupt:
+            return 0
     unit = UNIT if args.id is None else f"aihub-{args.id}.service"
     cmd = ["journalctl", "--user", "-u", unit, "-n", str(args.n), "--no-pager", "-o", "short-iso"]
     if args.follow:
@@ -379,6 +388,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     checks.append(("config.toml", cfg_ok, cfg_note))
     checks.append(("systemd unit", unit_installed(), str(UNIT_DIR / UNIT) if unit_installed() else "run `aihub install`"))
     checks.append(("linger", linger(), "on" if linger() else f"loginctl enable-linger {os.environ.get('USER', '')}"))
+    if getattr(args, "inventory", False):
+        return cmd_inventory(args)
     report = None
     try:
         h = call("GET", "/api/system", timeout=3)["hub"]
@@ -404,6 +415,24 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def cmd_inventory(args: argparse.Namespace) -> int:
+    """`aihub doctor --inventory` (plan 16.3): every path outside the project, with its reason."""
+    try:
+        inv = call("GET", "/api/doctor/inventory", timeout=60)
+    except (HubDown, ApiError) as e:
+        print(f"aihub doctor --inventory: {e}")
+        return 1
+    if args.json:
+        print(json.dumps(inv, indent=1))
+        return 0 if inv["ok"] else 1
+    mark = {"allowlisted": "ok ", "runtime": "·  ", "outside": "BAD"}
+    for it in sorted(inv["items"], key=lambda i: ({"outside": 0, "runtime": 1, "allowlisted": 2}[i["kind"]], i["used_by"])):
+        print(f"{mark[it['kind']]}  {it['used_by']:<10} {it['path']}\n     {'':<10} {it['reason']}")
+    c = inv["counts"]
+    print(f"\n{c['allowlisted']} allowlisted, {c['runtime']} runtime leftover(s), {c['outside']} outside the allowlist")
+    return 0 if inv["ok"] else 1
+
+
 # --- entry --------------------------------------------------------------------
 
 
@@ -423,9 +452,10 @@ def parser() -> argparse.ArgumentParser:
         p.add_argument("id", nargs="?")
         p.set_defaults(fn=fn)
     sub.add_parser("status", help="hub and mod status").set_defaults(fn=cmd_status)
-    p = sub.add_parser("logs", help="journal of the hub (no id) or a mod")
+    p = sub.add_parser("logs", help="the hub's log (no id) or a mod's: data/logs/<id>.log, else the journal")
     p.add_argument("id", nargs="?")
     p.add_argument("-f", "--follow", action="store_true")
+    p.add_argument("--journal", action="store_true", help="read the systemd journal instead of data/logs/")
     p.add_argument("-n", type=int, default=100, metavar="N", help="lines (default 100)")
     p.set_defaults(fn=cmd_logs)
     for name, fn in (("load", cmd_load), ("unload", cmd_unload)):
@@ -439,6 +469,7 @@ def parser() -> argparse.ArgumentParser:
     p = sub.add_parser("doctor", help="check the install: venv, config, models, manifests, paths, ports, units, disk")
     p.add_argument("-v", "--verbose", action="store_true", help="also list the checks that passed")
     p.add_argument("--json", action="store_true")
+    p.add_argument("--inventory", action="store_true", help="list every path outside the project, with its reason (plan 16.3)")
     p.set_defaults(fn=cmd_doctor)
     p = sub.add_parser("backup", help="databases (online copy), registry, config.toml and the mods' .env files in a dated archive")
     p.add_argument("folder", help="where to write aihub-backup-<date>.tar.gz (made if missing)")

@@ -87,6 +87,7 @@ class Hub:
     tools: Any = None       # tools.catalog.Catalog
     approvals: Any = None   # tools.approvals.Approvals
     calls: Any = None       # tools.calls.Calls
+    sessions: Any = None    # sessions.Sessions
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -125,7 +126,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, services, settings, skills, system, tools, web, widgets
+    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, services, sessions, settings, skills, system, tools, web, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -136,6 +137,19 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
         async with AsyncExitStack() as stack:
             # 1. config: already validated; create the derived dirs.
             paths.ensure()
+            # 1b. the hub's own log file (plan 16.1)
+            from utils.logfiles import LogFiles, hub_handler
+
+            fh = hub_handler(paths.logs)
+            for name in ("", "uvicorn.error"):
+                logging.getLogger(name).addHandler(fh)
+
+            def _close_log() -> None:
+                for name in ("", "uvicorn.error"):
+                    logging.getLogger(name).removeHandler(fh)
+                fh.close()
+
+            stack.callback(_close_log)
             # 2. db
             hub.db = Database(paths.hub_db)
             hub.db.open()
@@ -160,7 +174,20 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
                 extra_dirs=[DEMO_MODS] if hub.options.demo_mods else [], timing=hub.timing,
             )
             stack.push_async_callback(hub.services.close)
+            # mods' output → data/logs/<id>.log, followed from the start (plan 16.1)
+            hub.services.logfiles = LogFiles(paths.logs)
+            hub.services.logfiles.backend = hub.backend
+            stack.push_async_callback(hub.services.logfiles.close)
+
+            async def ship(svc: Any) -> None:
+                if not svc.external:
+                    hub.services.logfiles.ship(svc.id)
+
+            hub.services.on_ready.append(ship)
             await hub.services.boot(autostart=hub.options.autostart)
+            for svc in hub.services.list():
+                if svc.up and not svc.external:
+                    hub.services.logfiles.ship(svc.id)
             hub.registry.services = hub.services
             hub.services.registry = hub.registry
             # 6. outputs: the index, then watch outputs/ (the startup rescan runs in the background).
@@ -196,6 +223,12 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.calls = Calls(hub, hub.tools, hub.approvals)
             stack.push_async_callback(hub.calls.close)
             await hub.calls.resume()
+            # 10. sessions: auto-save, the unclean-shutdown flag, restore at boot (if set).
+            from utils.sessions import Sessions
+
+            hub.sessions = Sessions(hub)
+            await hub.sessions.start()
+            stack.push_async_callback(hub.sessions.close)
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 
@@ -227,9 +260,10 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(settings.router)
     app.include_router(tools.router)
     app.include_router(skills.router)
+    app.include_router(sessions.router)
     app.include_router(mcp.router)  # /mcp: the tools over MCP (13.4)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings", "tools"):
+                 "overview", "settings", "tools", "sessions"):
         hub.mark_live(area)
 
     app.include_router(web.router)
@@ -288,6 +322,12 @@ def _error_handlers(app: FastAPI) -> None:
     @app.exception_handler(OutputError)
     async def _output_error(_: Request, e: OutputError) -> JSONResponse:
         return _envelope(e.status, e.code, e.detail, e.data)
+
+    from utils.sessions import SessionError
+
+    @app.exception_handler(SessionError)
+    async def _session_error(_: Request, e: SessionError) -> JSONResponse:
+        return _envelope(e.status, e.code, e.detail)
 
     @app.exception_handler(MetricsError)
     async def _metrics_error(_: Request, e: MetricsError) -> JSONResponse:

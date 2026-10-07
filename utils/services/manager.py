@@ -67,6 +67,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         self._boot_task: asyncio.Task[None] | None = None
         # Hooks for later steps: operations (2.6) refetch on ready, memory triggers (5.5).
         self.on_ready: list[Callable[[Service], Awaitable[None]]] = [lambda svc: operations.refresh(self, svc)]
+        self.logfiles: Any = None   # logfiles.LogFiles (plan 16.1), set by the hub
 
     def get(self, service_id: str) -> Service:
         svc = self.services.get(service_id)
@@ -203,6 +204,10 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         svc = self.get(service_id)
         if svc.external:
             return []
+        if self.logfiles is not None:     # data/logs/<id>.log (plan 16.1); the backend until it has lines
+            lines = await asyncio.to_thread(self.logfiles.read, svc.id, n)
+            if lines:
+                return lines
         try:
             return await self.backend.logs(svc.id, n)
         except BackendError as e:

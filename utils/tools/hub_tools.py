@@ -96,6 +96,22 @@ async def list_models(hub: Hub, args: dict[str, Any]) -> Any:
                        for m in reg["models"][: int(args.get("limit") or 30)]], "total": reg["totals"]["count"]}
 
 
+async def save_session(hub: Hub, args: dict[str, Any]) -> Any:
+    s = await hub.sessions.save(args["name"])
+    return {"id": s["id"], "name": s["name"], "summary": s["summary"]}
+
+
+async def list_sessions(hub: Hub, args: dict[str, Any]) -> Any:
+    return {"sessions": [{"id": s["id"], "name": s["name"], "auto": s["auto"], "summary": s["summary"],
+                          "saved": round(s["updated_ts"])} for s in await hub.sessions.list()]}
+
+
+async def restore_session(hub: Hub, args: dict[str, Any]) -> Any:
+    r = await hub.sessions.restore(args["name"], dry_run=bool(args.get("dry_run")))
+    return {"steps": [s["detail"] for s in r["steps"]], "fits": r["memory"]["fits"], "ok": r.get("ok"),
+            "problems": [f"{x['detail']}: {x.get('error')}" for x in r.get("results") or [] if not x["ok"]]}
+
+
 async def job_status(hub: Hub, args: dict[str, Any]) -> Any:
     return await hub.calls.status(args["call_id"], wait=float(args.get("wait") or 0))
 
@@ -123,6 +139,13 @@ def tools() -> list[ToolDef]:
         t("list_models", "The models on disk (registry): kind, size, status and which mods use them.",
           _obj({"kind": {"type": "string"}, "q": {"type": "string"},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 30}}), list_models),
+        t("save_session", "Save what runs and what's loaded now as a named session (e.g. 'LLM work').",
+          _obj({"name": {"type": "string"}}, ["name"]), save_session, "write"),
+        t("list_sessions", "The saved sessions (named setups) with what each has running and loaded.", _obj({}), list_sessions),
+        t("restore_session", "Switch to a saved session: stops, unloads, starts and loads mods to match it (through the "
+          "memory manager). dry_run shows the steps only.",
+          _obj({"name": {"type": "string", "description": "The session's name or id"}, "dry_run": {"type": "boolean", "default": False}},
+               ["name"]), restore_session, "write"),
         t("job_status", "The state of an earlier tool call that is still running (by its call_id), with its result when done.",
           _obj({"call_id": {"type": "string"}, "wait": {"type": "number", "minimum": 0, "maximum": 600,
                                                          "description": "Seconds to wait for it to finish"}}, ["call_id"]),

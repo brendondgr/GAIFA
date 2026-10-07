@@ -1,9 +1,9 @@
 """Where lcpp keeps things.
 
 Everything hangs off one repo root so tests can point a whole instance of lcpp
-at a temporary directory. Runtime state lives in ``$XDG_RUNTIME_DIR`` (tmpfs):
-it is gone after a reboot, which is exactly the "nothing runs at boot" rule —
-there is no stale instance record to reconcile against after a power cycle.
+at a temporary directory. Runtime state lives in ``LCPP_STATE_DIR`` (under AIHub:
+``data/state/lcpp``, which survives reboots: the reconcile forgets records from before
+the last boot), else ``$XDG_RUNTIME_DIR/lcpp`` (tmpfs).
 """
 
 from __future__ import annotations

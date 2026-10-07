@@ -1245,15 +1245,15 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
 
 ## Phase 15 — Save states: sessions
 
-- [ ] **15.1 Snapshots.**
+- [x] **15.1 Snapshots.** *As built:* `utils/sessions.py`; the snapshot keeps lcpp's launch spec from `GET /api/instances` (kind, model, port, params, relay alias) and each instance's memory; ComfyUI and gen3d are covered by their mods' load state.
   - **What's recorded:** which mods are running and loaded, lcpp's instances with their full LaunchSpec (from `GET /api/s/lcpp/api/instances`), and the ComfyUI and gen3d worker load states.
   - **Where:** a `sessions` table in `hub.db` (id, name, created, auto, snapshot JSON).
-- [ ] **15.2 Session routes.**
+- [x] **15.2 Session routes.** *As built:* `utils/routes/sessions.py`; `restore` runs stop LLMs → unload → start → launch LLMs → load (loads through the memory manager with make-room; LLM launches ask AIHub for memory themselves); mods that run but aren't in the session keep running; `GET /api/sessions/state` reports an unclean last shutdown (a `kv` flag) for the "Restore last session?" toast; the auto session is "Last session".
   - `GET/POST /api/sessions` and `PUT/DELETE /api/sessions/{id}`.
   - `POST /api/sessions/{id}/restore?dry_run=1` returns the steps and a memory plan. A real restore runs them in order through the memory manager.
   - **Auto-save:** an `auto` session is saved every 5 min and on clean shutdown.
   - **Restore at boot:** `[sessions] restore_on_boot = false` in `config.toml`.
-- [ ] **15.3 Session tools for the agent:** `save_session`, `list_sessions`, `restore_session` (confirm).
+- [x] **15.3 Session tools for the agent:** *As built:* `hub_save_session`, `hub_list_sessions`, `hub_restore_session` (risk `write`: a card asks first; `dry_run` shows the steps). `save_session`, `list_sessions`, `restore_session` (confirm).
 
 **Wire — Phase 15:** `sessions` goes live:
 - the Sessions panel, in Chat and in Settings → Sessions
@@ -1267,12 +1267,12 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
 
 ## Phase 16 — Everything inside the folder
 
-- [ ] **16.1 Logs in `data/logs/`.** A log shipper in the hub follows each mod's journal and appends to `data/logs/<id>.log` (rotated at 10 MB, 5 files kept). The hub's own log goes to `data/logs/aihub.log`. The Logs tab and `aihub logs` read these files, and journald stays as a second copy.
-- [ ] **16.2 Runtime state in `data/state/`.**
+- [x] **16.1 Logs in `data/logs/`.** *As built:* `utils/logfiles.py`: one shipper per mod follows the backend (`journalctl -f` per unit, or the child's pipes) into `data/logs/<id>.log` (`<iso time> out|err <text>`); the Logs tab reads the file once it has lines; `aihub logs [id] [-f]` tails the file (`--journal` for the journal); the hub's log is `data/logs/aihub.log`. A log shipper in the hub follows each mod's journal and appends to `data/logs/<id>.log` (rotated at 10 MB, 5 files kept). The hub's own log goes to `data/logs/aihub.log`. The Logs tab and `aihub logs` read these files, and journald stays as a second copy.
+- [x] **16.2 Runtime state in `data/state/`.** *As built:* `LCPP_STATE_DIR={root}/data/state/lcpp` (the running 26B's record was copied over and lcpp kept managing it); the reconcile forgets records that started before the last boot (`/proc/stat` btime). ComfyUI's pidfile already lives in the mod (`services/comfy/data/`), inside the project. The old `/run/user/1000/lcpp` copy stays until the next reboot (tmpfs).
   - lcpp gets `LCPP_STATE_DIR={root}/data/state/lcpp`.
   - Its reconcile treats records whose units are gone (after a reboot) as gone, and session restore relaunches them.
   - The comfy pidfile and the hub's own lock files move here too.
-- [ ] **16.3 `aihub doctor --inventory`.** Lists every path outside the project that anything uses, each with its reason. The allowlist is now final: the systemd unit file, podman images, system tools, and the `~/.local/bin` wrappers.
+- [x] **16.3 `aihub doctor --inventory`.** *As built:* `utils/inventory.py`, `GET /api/doctor/inventory`, `aihub doctor --inventory`. Live: 14 allowlisted, 1 runtime leftover (the old lcpp tmpfs folder), 2 outside: lcpp's CLI installed as a uv tool (`~/.local/share/uv/tools/lcpp`) and opencode's `OPENCODE_PROJECT_DIR` (both need the user's decision). Lists every path outside the project that anything uses, each with its reason. The allowlist is now final: the systemd unit file, podman images, system tools, and the `~/.local/bin` wrappers.
 - [ ] **16.4 Final docs pass.** `architecture.md` and CLAUDE.md describe the finished system, and this plan is fully checked off.
 
 **Wire — Phase 16:** the Logs tab reads `data/logs/`, and Settings → Paths shows `data/logs` and `data/state` with their sizes.

@@ -58,6 +58,16 @@ class Paths:
         return self.root / "services"
 
     @property
+    def logs(self) -> Path:
+        """Mods' and the hub's log files (plan 16.1)."""
+        return self.root / "data" / "logs"
+
+    @property
+    def state(self) -> Path:
+        """Mods' runtime state, e.g. lcpp's instance records (plan 16.2)."""
+        return self.root / "data" / "state"
+
+    @property
     def hub_db(self) -> Path:
         return self.databases / "hub.db"
 

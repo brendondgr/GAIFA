@@ -158,6 +158,21 @@ def normalize_spec(raw: Any, auto_register: bool) -> dict[str, Any]:
     }
 
 
+def boot_time() -> float:
+    """When the machine booted (/proc/stat btime); 0 when unknown."""
+    try:
+        for line in open("/proc/stat"):
+            if line.startswith("btime "):
+                return float(line.split()[1])
+    except OSError:
+        pass
+    return 0.0
+
+
+def _before_boot(started_ts: float | None) -> bool:
+    return bool(started_ts) and started_ts < boot_time()
+
+
 def _auto_name(base: str, port: int) -> str:
     slug = re.sub(r"[^a-z0-9-]+", "-", base.lower()).strip("-") or "model"
     return f"{slug[:40]}-{port}"
@@ -207,7 +222,10 @@ class Supervisor:
                 else:
                     self._spawn(inst.name, self._monitor(inst))
                 continue
-            if inst.state == "stopping":
+            if inst.state == "stopping" or _before_boot(inst.started_ts):
+                # Stopped on purpose, or the machine rebooted since it started: the record is stale
+                # (state lives in AIHub's data/state/ now, which survives reboots; plan 16.2). A
+                # session restore relaunches what should run.
                 self._forget(inst)
                 await self._emit("instance_gone", inst)
                 continue

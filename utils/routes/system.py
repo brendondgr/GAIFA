@@ -8,9 +8,10 @@ import os
 import shutil
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
 from fastapi.responses import Response
 
 from utils import doctor
@@ -82,6 +83,27 @@ async def system_info(hub: Any) -> dict[str, Any]:
 @router.get("/api/doctor", summary="Install checks: models on disk, manifests, paths outside the project, ports, units, disk, offline mods", response_model=Doctor, response_model_exclude_none=True)
 async def get_doctor(request: Request) -> dict:
     return await doctor.run(request.app.state.hub)
+
+
+class InventoryItem(BaseModel):
+    path: str
+    kind: Literal["allowlisted", "runtime", "outside"]
+    used_by: str
+    reason: str
+
+
+class Inventory(BaseModel):
+    ok: bool = Field(description="Nothing outside the allowlist (runtime leftovers are fine)")
+    counts: dict[str, int]
+    items: list[InventoryItem]
+
+
+@router.get("/api/doctor/inventory", summary="Every path outside the project that anything uses, with its reason (plan 16.3)",
+            response_model=Inventory)
+async def get_inventory(request: Request) -> dict:
+    from utils.inventory import inventory
+
+    return await asyncio.to_thread(inventory, request.app.state.hub)
 
 
 @router.get("/config.js", include_in_schema=False)

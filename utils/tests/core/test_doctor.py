@@ -78,3 +78,18 @@ async def test_doctor_is_clean_on_an_empty_install(client):
     r = (await client.get("/api/doctor")).json()
     assert r["counts"]["fail"] == 0 and r["ok"] is True
     assert [c for c in r["checks"] if c["area"] == "models"][0]["title"].startswith("models registry: 0 models")
+
+
+async def test_inventory_lists_paths_outside_with_reasons(services_dir, root, make_app):
+    services = services_dir("fake-ok")
+    _mod(services, "fake-ok", 'ELSEWHERE = "/etc/aihub-inventory-test", TOOL = "/usr/bin/ffmpeg", IMG = "docker.io/kyuz0/image:latest"')
+    app = make_app(port=7000, autostart=False)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://hub") as c:
+            inv = (await c.get("/api/doctor/inventory")).json()
+    by = {i["path"]: i for i in inv["items"]}
+    assert by["/etc/aihub-inventory-test"]["kind"] == "outside" and by["/etc/aihub-inventory-test"]["used_by"] == "fake-ok"
+    assert by["/usr/bin/ffmpeg"]["kind"] == "allowlisted" and by["/usr/bin/ffmpeg"]["reason"] == "system tool"
+    assert by["docker.io/kyuz0/image:latest"]["reason"].startswith("podman image")
+    assert any(i["path"].startswith("systemd journal") for i in inv["items"])
+    assert inv["ok"] is False and inv["counts"]["outside"] == 1

@@ -21,7 +21,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `docs/` | ✅ | Design, plan, UI brief, this file, `reference/` UI exports |
 | `utils/` | ✅ | The hub's Python package (below) |
 | `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js` |
-| `data/` | ✅ | Models, databases (below); `logs/` and `state/` arrive in Stage D |
+| `data/` | ✅ | Models, databases, logs, runtime state and the agent's files (below) |
 | `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…` (+ `.trash/`), ignored by git; indexed into `hub.db` |
 | `web/` | ✅ | The UI (below) |
 
@@ -69,6 +69,9 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `cli.py` | ✅ | Standard-library CLI behind `bin/aihub`: serve, install, start/stop/restart, status, logs, load/unload, open, url, doctor (local checks + the hub's `/api/doctor`) |
 | `doctor.py` | ✅ | `GET /api/doctor` (plan 12.4): models on disk, manifests, paths outside the project and the allowlist, Stage D notes, ports, units, disk, offline mods |
 | `cli_models.py` | ✅ | `aihub models list \| show \| scan [--add] \| verify` (standard library only, loaded on demand by `cli.py`) |
+| `sessions.py` | ✅ | Sessions (plan Phase 15): snapshots of what runs and what's loaded (lcpp's instances with their launch specs), the restore plan and run through the memory manager, auto-save, the unclean-shutdown flag, restore at boot |
+| `logfiles.py` | ✅ | Logs in `data/logs/` (plan 16.1): the per-mod shippers, rotation (10 MB × 5), reading back for the Logs tab, the hub's own log handler |
+| `inventory.py` | ✅ | `aihub doctor --inventory` (plan 16.3): every path outside the project with its reason (allowlisted, runtime, outside) |
 | `cli_backup.py` | ✅ | `aihub backup <folder>` (plan 12.5): online SQLite copies of every database, the registry, `config.toml` and `services/*/.env` in a dated owner-only archive (standard library only) |
 | `cli_mods.py` | ✅ | `aihub new`, `aihub check`, `aihub install <id>`, `aihub rescan` (standard library only, loaded on demand by `cli.py`) |
 | `manifest.py` | ✅ | `service.toml` schema (pydantic), `discover()` with collected errors, `effective()` config overrides, `launch_spec()` (placeholders + env), `start_order()` |
@@ -84,7 +87,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `settings.py` | ✅ | The Settings page: `view()` (config.toml as the brief's `Settings`) and `save()` (partial saves, only changed values written, applied live; the port at the next start) |
 | `widgets.py` | ✅ | `Widgets`: running mods' `[[ui.widgets]]`, their data fetched from each `source`, validated against `WidgetData` and cached for 30 s |
 | `tools/` | ✅ pkg | Agent tools (plan Phase 13): `catalog.py` (`Catalog`, `ToolDef`: manifest tools, `tools_source` functions and hub tools, kept per mod in `kv` so a stopped mod's tools stay listed; search), `schema.py` (one flat schema per operation, `x-kind` file inputs, validation with fixes, `coerce`), `hub_tools.py` (the `hub_*` tools), `approvals.py` (permissions deny → ask → allow, modes, the `approvals` table), `calls.py` (`Calls`: run, follow jobs, cancel, resume after a restart), `results.py` (output references from paths and binary responses, the 8 KB cap), `api.py` (response models), `mcp.py` (the MCP endpoint, plan 13.4: JSON-RPC over streamable HTTP in both eras, `server/discover`, `tools/list`, `tools/call`, the Origin check), `mcp_approval.py` (MCP results, approvals as `input_required` elicitation with a signed `requestState`, `aihub_wait_approval`) |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/api/doctor`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`), `outputs.py` (`/api/outputs/...`, file serving with Range), `memory.py` (`/api/memory`, `/plan`, `/acquire`), `metrics.py` (`/api/metrics`, `/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`), `widgets.py` (`/api/widgets/...`), `overview.py` (`/api/overview`), `settings.py` (`/api/settings`), `tools.py` (`/api/tools...`, `/api/approvals...`), `mcp.py` (`POST /mcp`) |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/api/doctor`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`), `outputs.py` (`/api/outputs/...`, file serving with Range), `memory.py` (`/api/memory`, `/plan`, `/acquire`), `metrics.py` (`/api/metrics`, `/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`), `widgets.py` (`/api/widgets/...`), `overview.py` (`/api/overview`), `settings.py` (`/api/settings`), `tools.py` (`/api/tools...`, `/api/approvals...`), `mcp.py` (`POST /mcp`), `skills.py` (`/api/skills...`), `sessions.py` (`/api/sessions...`); `system.py` also serves `/api/doctor/inventory` |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -98,12 +101,13 @@ utils/tests/
 │   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok (with a `requests` widget), fake-slow, fake-crash, fake-mem, fake-tools (agent tools of every kind: a job, file inputs, binary results, a tools_source)
 │   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay; snapshots/ = their converted Operation[]
 ├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli, doctor, backup
-├── web/*.test.mjs + test_api_js.py ✅  Node unit tests (web/api.js; mod-ui.js + the template page.js on a fake DOM; the chart helpers and dashboard layout; the mock history), run from pytest; test_contract.py: api.js routes ↔ hub routes, brief types ↔ response models, every route documented
+├── web/*.test.mjs + test_api_js.py ✅  Node unit tests (web/api.js; mod-ui.js + the template page.js on a fake DOM; the chart helpers and dashboard layout; the mock history; chat.test.mjs: the chat's Markdown, thread view, card and action registries, client errors and the scripted mock agent), run from pytest; test_contract.py: api.js routes ↔ hub routes, brief types ↔ response models, every route documented
 ├── services/test_<behavior>.py ✅     fake mods (manifest, backends, state machine, proxy, operations follow)
 ├── models/test_<behavior>.py   ✅     registry storage and status, routes, safe deletes, the scanner on a tree covering every rule, verify, used-by, alerts, the CLI (conftest: a fake data/models/)
 ├── outputs/test_<behavior>.py  ✅     what counts as an output, rows, the watcher, previews, routes (paging, Range, traversal), delete to trash, activity (conftest: a fake outputs/ tree; the host's ffmpeg inside a toolbox)
 ├── memory/test_<behavior>.py   ✅     proc facts on fake /proc and /sys, the planner, the sampler, make-room end to end with two fake-mem mods, triggers, idle unload (conftest: a fake memory source)
 ├── settings/test_<behavior>.py ✅     GET/PUT /api/settings and GET /api/overview against fake-ok
+├── sessions/test_sessions.py   ✅     save, switch and restore through the memory manager (fake-mem), auto-save at shutdown, the unclean flag, restore at boot, the tools
 ├── tools/test_skills.py        ✅     the mods' skills over /api/skills
 ├── tools/test_<behavior>.py    ✅     the catalog (manifest + tools_source + hub tools, search, a stopped mod), calls (validation, permissions, approvals with edits, no bypass, capping, media, jobs, cancel, restart) and MCP (both eras, approvals, the `mcp` SDK against a hub process) against fake-tools
 ├── metrics/test_<behavior>.py  ✅     rollups, retention, gaps, the recorder on fake services, the chart routes and widgets against fake-ok (conftest: an open hub.db, a fake clock)
@@ -129,6 +133,8 @@ utils/tests/
 | `viewer3d.js` | Ours: `mountViewer(el, {files, url, rig})`, the Viewer3D (orbit, file tabs, wireframe, part visibility, rig sliders), adapted from gen3d's viewer; three.js r16x is vendored in `vendor/three/` (its addons import it relatively, so no import map) |
 | `mock-mods.js` | Ours: the built-in mods' native APIs on the mock (`createModMocks(m)`, moved out of `mock.js`): tts, gen3d (jobs with stages, live events, box GLBs), relay (DashLLM's `{dimensions, source}` stats, endpoints, tunnels), lcpp (instances, catalog, preflight, chat stream, downloads, relay, settings), comfy, transcribe |
 | `mod-charts.js` | Ours: the §11.6 charts inside page modules: `chartCard` (a widget card with ranges, "View as table" and the data hook), `chart`, `rh` (createElement), `mountReact`, `waveform`, `wavSamples` |
+| `mock-tools.js` | Ours: the `tools` area on the mock (`createToolMocks`): a small catalog with risk levels, calls as fake jobs, approvals (one pending from an MCP client) |
+| `chat/` | Ours: the Chat page (plan 14.1; brief §11.13). `chat.js` the page (`ChatPage`, `getChatClient`; re-exports the registries), `chat-api.js` the agent client through `/api/s/agent` (SSE with reconnect `after=lastSeq`) or the mock, `chat-mock.js` the scripted mock agent, `chat-thread.js` events → card items (pure), `chat-cards.js` the **card registry** and the simple cards, `chat-forms.js` question and parameter cards (schemaForm, file pickers), `chat-results.js` the result card and the **preview registry**, `chat-actions.js` the **actions registry** (result buttons, quick actions, derived from the tool catalog), `chat-list.js` / `chat-header.js` / `chat-composer.js` the page parts, `chat-md.js` the safe Markdown renderer, `chat-ui.js` tokens, icons, buttons, popover, prefs, `chat-settings.js` Settings → Agent, `chat-approvals.js` the header's Approvals popover |
 | `support.js` | Claude Design's runtime. Generated: **never edit** |
 | `vendor/` | three.js (`three/`, MIT, from 3DGenerate), React and ReactDOM 18.3.1 (UMD), `fonts.css` + `fonts/` (IBM Plex Sans, JetBrains Mono, OFL) |
 | `PATCHES.md` | The UI's history (v1 export → revision 2 built here), hand edits since, and the mock-only states |
@@ -142,6 +148,8 @@ utils/tests/
 | `data/models/registry.json` | yes | The models registry (architecture §8) |
 | `data/models/<kind>/…` | no | Model weights (~190 GB once moved in) |
 | `data/databases/` | no | `hub.db`, `relay.db`, `gen3d.db`, `agent.db` |
+| `data/logs/` | no | `<mod>.log` and `aihub.log`, rotated at 10 MB, 5 kept (plan 16.1) |
+| `data/state/` | no | Mods' runtime state that must survive a reboot, e.g. `lcpp/instances/` (plan 16.2) |
 | `data/agent/` | no | The agent's `AGENT.md`, `memory/` (MEMORY.md + topic files) and your own `skills/<name>/SKILL.md` (plan 14.9) |
 
 ## Conventions

@@ -606,7 +606,7 @@ These are built after everything else works (backend-plan Phases 14–16). They 
 
 ### 14.1 The agent is a mod: `services/agent/`
 It works the way Claude Code does, scaled to a local model. The reasons and sources are in [agent-architecture.md](agent-architecture.md).
-- **One loop, no framework.** Call the model, run its tool calls, append the results, and repeat until a reply has no tool calls. It stops at a step cap (25) and says so instead of inventing an answer, which was one of Mango-Tree's bugs. Dependencies: FastAPI, uvicorn, httpx.
+- **One loop, no framework.** Call the model, run its tool calls, append the results, and repeat until a reply has no tool calls. It stops at a step cap (25) and says so instead of inventing an answer, which was one of Mango-Tree's bugs. A call repeated with the same arguments is refused from the third time; after the second refusal in a turn, the next model call gets `tool_choice: "none"` and a note asking for a plain answer, so a stuck turn ends in words instead of running to the cap. Dependencies: FastAPI, uvicorn, httpx.
 - **Model.** Through the relay (`http://127.0.0.1:4000/v1`), so every call shows in its stats. The default is `skynet` (Gemma 4 31B on the GPU box, 131,072 tokens), with the local Gemma 4 26B as the fallback.
   - No `max_tokens`: thinking and output may use the whole window.
   - Thinking (`reasoning` / `reasoning_content`) is stored and shown on request, and never re-sent to the model.
@@ -644,6 +644,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
   - **Buttons:** a button's call is introduced in the history as the user's.
   - **Restarts:** a graceful restart leaves turns running, and they resume at the next start.
   - **Memory:** eval threads (`dry_run`) never write memory.
+  - **Turned-off groups:** `load_tools` and `find_tools` say a group is turned off in this chat (an error for the group, `turned_off` for named tools) rather than listing its tools as unknown.
   - **Prompt rules:** the system prompt says which groups are off and when a chat is read-only, and forbids stopping mods or LLMs to make room.
   - **Evaluation:** the eval and live results are in [agent-eval.md](agent-eval.md).
 

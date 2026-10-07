@@ -66,3 +66,18 @@ async def test_unknown_tool_is_an_error_not_a_crash(env):
     res = env.payloads(tid, "tool_result")[0]
     assert res["status"] == "error" and res["error"]["code"] == "unknown_tool"
     assert env.agent.store.thread(tid)["state"] == "idle"
+
+
+async def test_a_disabled_group_says_so_when_loaded_or_searched(env):
+    """The 26B looped on load_tools(group=gen3d) when the replies only listed the tools as 'unknown'."""
+    tid = await env.thread(settings={"disabled": ["gen3d"]})
+    env.model.queue({"tool_calls": [{"name": "load_tools", "arguments": {"group": "gen3d"}}]},
+                    {"tool_calls": [{"name": "load_tools", "arguments": {"names": ["gen3d_make_3d", "fake_get"]}}]},
+                    {"tool_calls": [{"name": "find_tools", "arguments": {"query": "gen3d"}}]}, {"text": "3D is off in this chat."})
+    await env.send(tid, "make a 3D chair")
+    by_group, by_name, found = env.payloads(tid, "tool_result")[:3]
+    assert by_group["status"] == "error" and by_group["error"]["code"] == "disabled"
+    assert "gen3d tools are turned off" in by_group["error"]["detail"]
+    assert '"loaded": ["fake_get"]' in by_name["content"] and "turned off" in by_name["content"] and "unknown" not in by_name["content"]
+    assert "gen3d tools are turned off" in found["content"]
+    assert "gen3d" not in found["content"].split("The groups are:")[1]

@@ -83,11 +83,14 @@ class Local:
     # ---- tools on demand ---------------------------------------------------------------------
 
     async def t_find_tools(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
-        hits = await self.a.hub.search(str(args.get("query") or ""))
+        query = str(args.get("query") or "")
+        hits = await self.a.hub.search(query)
+        off = sorted({h["mod"] for h in hits if h["mod"] in tools.disabled} | {g for g in tools.disabled if g in query.lower()})
         hits = [h for h in hits if h["mod"] not in tools.disabled]
         if not hits:
-            return self.ok(tid, cid, "find_tools", "No tools match. The groups are: " +
-                           ", ".join(sorted({t["mod"] for t in tools.index})))
+            groups = sorted({t["mod"] for t in tools.index} - tools.disabled)
+            return self.ok(tid, cid, "find_tools", (_off_note(off) + " " if off else "") +
+                           "No tools match. The groups are: " + ", ".join(groups))
         return self.ok(tid, cid, "find_tools", {"tools": [{"name": h["name"], "summary": h["summary"], "risk": h["risk"],
                                                            "loaded": h["name"] in tools.full} for h in hits],
                                                 "next": "load_tools with the names you need"})
@@ -96,10 +99,18 @@ class Local:
         names = args.get("names") or []
         if isinstance(names, str):
             names = [n.strip() for n in names.split(",")]
-        ok, bad = tools.load(names, args.get("group"))
+        group = args.get("group")
+        if group and group in tools.disabled:
+            return self.err(tid, cid, "load_tools", "disabled", _off_note([group]),
+                            "don't try again; tell the user, who can turn the group back on in the composer")
+        ok, bad = tools.load(names, group)
         await tools.refresh()
         self.a._save_loaded(tid, tools)
         out: dict[str, Any] = {"loaded": ok}
+        off = sorted({t["mod"] for n in bad if (t := tools.by_name(n)) and t["mod"] in tools.disabled})
+        bad = [n for n in bad if not ((t := tools.by_name(n)) and t["mod"] in tools.disabled)]
+        if off:
+            out["turned_off"] = _off_note(off) + " Don't try again; tell the user, who can turn them back on in the composer."
         if bad:
             out["unknown"] = bad
             out["fix"] = "use find_tools to get exact names"
@@ -202,3 +213,7 @@ def to_data_url(data: bytes) -> str:
     except Exception:  # noqa: BLE001 - send it as it is
         pass
     return "data:image/jpeg;base64," + base64.b64encode(data).decode()
+
+
+def _off_note(groups: list[str]) -> str:
+    return f"The {', '.join(groups)} tools are turned off in this chat, so they can't be loaded or used."

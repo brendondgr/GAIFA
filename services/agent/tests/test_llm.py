@@ -164,6 +164,19 @@ async def test_repeated_identical_calls_are_stopped(env):
     assert [r["status"] for r in res] == ["done", "done", "error", "error"]
     assert res[2]["error"]["code"] == "repeated_call"
     assert len([c for c in env.hub.calls if c["name"] == "hub_list_services"]) == 2
+    # the second refused repeat ends the tool phase: that last model call had tool_choice "none"
+    assert env.model.received[-1]["tool_choice"] == "none" and "Tools are off for this reply" in json.dumps(env.model.received[-1]["messages"][-1])
+    assert env.payloads(tid, "assistant")[-1]["text"] == "done"
+
+
+async def test_a_turn_that_keeps_repeating_ends_in_words(env):
+    """Even if the model still calls a tool when told not to, the turn ends with a reply, not more calls."""
+    env.model.queue(*[{"tool_calls": [{"name": "hub_list_services", "arguments": {}}]} for _ in range(8)])
+    tid = await env.thread()
+    await env.send(tid, "loop")
+    assert len(env.payloads(tid, "tool_call")) == 4
+    assert "kept repeating" in env.payloads(tid, "assistant")[-1]["text"]
+    assert (await env.client.get(f"/v1/threads/{tid}")).json()["state"] == "idle"
 
 
 async def test_grammar_constrained_models_get_every_tool(env):

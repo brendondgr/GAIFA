@@ -249,12 +249,13 @@ class LLM:
         reply.usage = {k: int(v) for k, v in (d.get("usage") or {}).items() if isinstance(v, (int, float))}
 
     async def chat(self, model: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None,
-                   on_delta: Delta | None = None, known: set[str] | None = None, stream: bool = True) -> Reply:
+                   on_delta: Delta | None = None, known: set[str] | None = None, stream: bool = True,
+                   tool_choice: str = "auto") -> Reply:
         body: dict[str, Any] = {"model": model, "messages": messages, "stream": True,
                                 "stream_options": {"include_usage": True}}
         if tools:
             body["tools"] = tools
-            body["tool_choice"] = "auto"
+            body["tool_choice"] = tool_choice
         reply = Reply(model=model)
         if not stream:
             body.pop("stream_options")

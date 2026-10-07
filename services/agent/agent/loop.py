@@ -32,6 +32,9 @@ from .tools import LOCAL_NAMES, ToolSet
 log = logging.getLogger("agent.loop")
 POLL_S = 15
 HUB_MODE = {"ask": "ask", "auto": "auto", "read_only": "read_only"}
+# Sent (not stored) when a turn only repeats itself; that model call gets tool_choice "none".
+WRAP_UP = ("(A note from the app, not from the user: you have repeated the same tool call and its result won't change. "
+           "Tools are off for this reply. Answer the user in plain text: what you did, what blocked you, and what they can do.)")
 
 
 @dataclass
@@ -242,9 +245,10 @@ class Agent:
                 if stop:
                     final = "error"
                     return
-                reply, model = await self._model(tid, tools, model)
+                stuck = self._stuck(tid)
+                reply, model = await self._model(tid, tools, model, wrap_up=stuck)
                 steps += 1
-                if not reply.tool_calls:
+                if not reply.tool_calls or stuck:
                     return
         except asyncio.CancelledError:
             if self.shutting_down:      # not the user's Stop: leave the turn to resume after the restart
@@ -433,6 +437,13 @@ class Agent:
         return sum(1 for x in evs if x["type"] == "tool_call" and x["seq"] > start and x["seq"] <= e["seq"]
                    and (x["payload"]["name"], json.dumps(x["payload"].get("arguments") or {}, sort_keys=True)) == key)
 
+    def _stuck(self, tid: str) -> bool:
+        """The turn only repeats itself: the last result was a refused repeat, and not the first one since the user spoke."""
+        evs = self.store.events(tid)
+        start = max((x["seq"] for x in evs if x["type"] == "user"), default=0)
+        codes = [((x["payload"].get("error") or {}).get("code")) for x in evs if x["type"] == "tool_result" and x["seq"] > start]
+        return bool(codes) and codes[-1] == "repeated_call" and codes.count("repeated_call") >= 2
+
     def _save_loaded(self, tid: str, tools: ToolSet) -> None:
         t = self.store.thread(tid) or {}
         s = dict(t.get("settings") or {})
@@ -500,16 +511,21 @@ class Agent:
         m["model"] = model
         return m
 
-    async def _model(self, tid: str, tools: ToolSet, model: str) -> tuple[Reply, str]:
+    async def _model(self, tid: str, tools: ToolSet, model: str, wrap_up: bool = False) -> tuple[Reply, str]:
         step = new_id("s_")
         msgs, sizes = await self.messages(tid, tools, model)
+        choice = "auto"
+        if wrap_up:     # the thrash guard: no more tools this turn, say what happened
+            choice = "none"
+            msgs.append({"role": "user", "content": WRAP_UP})
+            self.emit(tid, "note", {"text": "the model kept repeating a call; asked it to answer without tools", "level": "warn"})
 
         async def delta(kind: str, text: str) -> None:
             self.transient(tid, "delta", {"kind": kind, "text": text, "step": step})
 
         known = tools.visible() | {t["name"] for t in tools.index}
         try:
-            reply = await self.llm.chat(model, msgs, tools.functions(), delta, known)
+            reply = await self.llm.chat(model, msgs, tools.functions(), delta, known, tool_choice=choice)
         except LLMError as e:
             fb = self.cfg.fallback
             if not e.retryable or not fb or fb == model:
@@ -518,16 +534,22 @@ class Agent:
             self.transient(tid, "delta_reset", {"step": step})
             model = fb
             msgs, sizes = await self.messages(tid, tools, model)
-            reply = await self.llm.chat(model, msgs, tools.functions(), delta, known)
+            if wrap_up:
+                msgs.append({"role": "user", "content": WRAP_UP})
+            reply = await self.llm.chat(model, msgs, tools.functions(), delta, known, tool_choice=choice)
         if not reply.text.strip() and not reply.tool_calls:
             # An empty reply (the server dropped a call it couldn't parse, or the model stopped early):
             # ask once more rather than leave the user with nothing.
             # vLLM's streaming parsers can drop a tool call made right after the thinking: ask again without streaming.
             self.emit(tid, "note", {"text": "the model's reply was empty; asked again", "level": "info"})
             self.transient(tid, "delta_reset", {"step": step})
-            retry = await self.llm.chat(model, msgs, tools.functions(), None, known, stream=False)
+            retry = await self.llm.chat(model, msgs, tools.functions(), None, known, stream=False, tool_choice=choice)
             retry.thinking = (reply.thinking + "\n" + retry.thinking).strip()
             reply = retry
+        if wrap_up:
+            reply.tool_calls = []
+            if not reply.text.strip():
+                reply.text = "I couldn't finish this: I kept repeating the same step without getting anywhere."
         if reply.thinking:
             self.emit(tid, "thinking", {"text": reply.thinking, "seconds": reply.thinking_s, "step": step})
         if reply.text or not reply.tool_calls:

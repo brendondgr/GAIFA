@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import time
@@ -25,6 +26,7 @@ Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", te
 GEMMA_CALL = re.compile(r"(?:<\|tool_call\>\s*)?(?:call:)?([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*<tool_call\|>", re.S)
 HERMES_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
 FENCED = re.compile(r"```(?:json|tool_code|tool)?\s*(\{.*?\})\s*```", re.S)
+ONE_FENCE = re.compile(r"^```[A-Za-z_]*\s*\n?(.*?)\s*```$", re.S)
 CHANNEL_OPEN = re.compile(r"<\|channel\>(?:thought|analysis|final)?\s*")
 THINK = re.compile(r"^\s*<(think|thinking)>(.*?)(?:</\1>|$)", re.S)
 PLANNING = re.compile(r"^\s*(\*\s*)?(the user\b|user:|i should\b|i need to\b|i will\b|i'll\b|let me\b|now i\b|okay[,.]|ok[,.]|wait[,.]|"
@@ -199,7 +201,45 @@ def reparse(text: str, known: set[str]) -> tuple[str, list[ToolCall]]:
             if isinstance(obj, dict) and obj.get("name") in known:
                 calls.append(ToolCall(f"tc_{len(calls)}", obj["name"], json.dumps(obj.get("arguments") or obj.get("parameters") or {})))
                 out = out.replace(c, "").replace("```json", "").replace("```", "")
+    if not calls and (py := _python_calls(text, known)):
+        return "", [ToolCall(f"tc_{i}", name, json.dumps(args)) for i, (name, args) in enumerate(py)]
     return out.strip(), calls
+
+
+def _python_calls(text: str, known: set[str]) -> list[tuple[str, dict[str, Any]]] | None:
+    """A reply that is nothing but Python-style calls of known tools with literal keyword arguments,
+    e.g. `comfy_generate_image(aspect='9:16', prompt='a heron')` (the 26B now and then). Parsed, never run."""
+    body = text.strip()
+    if m := ONE_FENCE.match(body):
+        body = m.group(1)
+    body = body.strip("`").strip()
+    if "(" not in body:
+        return None
+    try:
+        tree = ast.parse(body, mode="exec")
+    except SyntaxError:
+        return None
+    out = []
+    for st in tree.body:
+        call = st.value if isinstance(st, ast.Expr) else None
+        if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == "print" and len(call.args) == 1:
+            call = call.args[0]       # print(tool(...))
+        if not isinstance(call, ast.Call) or call.args:
+            return None
+        f = call.func
+        name = f.id if isinstance(f, ast.Name) else f.attr if isinstance(f, ast.Attribute) else None   # tool(...) / default_api.tool(...)
+        if name not in known:
+            return None
+        args: dict[str, Any] = {}
+        for kw in call.keywords:
+            if kw.arg is None:
+                return None
+            try:
+                args[kw.arg] = ast.literal_eval(kw.value)
+            except (ValueError, SyntaxError):
+                return None
+        out.append((name, args))
+    return out or None
 
 
 class LLM:

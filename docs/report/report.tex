@@ -163,6 +163,7 @@ The gate in plan 13.5 is pass\textasciicircum{}3 $\geq$ 80\% on the primary mode
 \item \emph{5 weakest, re-checked} runs the five tasks that missed a run in \emph{final} again, three times each, after the last prompt fix (turned-off groups and read-only are now stated in the prompt).
 \item \emph{All tools loaded} skips tools-on-demand, one run per task.
 \item The 26B ran on llama.cpp with every tool loaded (bug \#15).
+\item \emph{26B · final} is the whole eval three times on the 26B. It showed two problems the 31B hadn't: it looped on a group turned off in the chat (bug \#27), and it described an image from its own prompt without looking at it (now a prompt rule). \emph{2 fixed tasks} runs those two tasks again, three times on each model, on the fixed code.
 \end{itemize}
 ``Infra.\ errors'' counts runs that broke for reasons outside the agent's decisions.
 

@@ -186,3 +186,27 @@ async def test_grammar_constrained_models_get_every_tool(env):
     await env.send(tid, "hi")
     names = {t["function"]["name"] for t in env.model.received[-1]["tools"]}
     assert {"fake_make_image", "tts_speak", "gen3d_make_3d"} <= names
+
+
+def test_reparse_python_style_calls():
+    """The 26B sometimes writes the call as Python text instead of making it."""
+    known = {"comfy_generate_image", "tts_speak"}
+    text, calls = reparse("comfy_generate_image(aspect='9:16', prompt='a heron standing in a misty marsh, watercolor painting', "
+                          "workflow='zimage-intorealism')", known)
+    assert text == "" and calls[0].name == "comfy_generate_image"
+    assert json.loads(calls[0].arguments) == {"aspect": "9:16", "prompt": "a heron standing in a misty marsh, watercolor painting",
+                                              "workflow": "zimage-intorealism"}
+    _, calls = reparse("```python\nprint(default_api.tts_speak(text=\"hi\", speed=1.2))\n```", known)
+    assert calls[0].name == "tts_speak" and json.loads(calls[0].arguments) == {"text": "hi", "speed": 1.2}
+    # prose, unknown tools, positional or non-literal arguments are left alone
+    for t in ["I'll call comfy_generate_image(prompt='x') now.", "rm_rf(path='/')", "comfy_generate_image('x')",
+              "comfy_generate_image(prompt=open('/etc/passwd').read())", "Sure (of course)."]:
+        assert reparse(t, known)[1] == [], t
+
+
+async def test_a_python_style_call_runs(env):
+    env.model.queue({"text": "fake_get(key='a')"}, {"text": "got it"})
+    tid = await env.thread(settings={"pinned": ["fake"]})
+    await env.send(tid, "get a")
+    call = env.payloads(tid, "tool_call")[0]
+    assert call["name"] == "fake_get" and call["arguments"] == {"key": "a"} and call.get("leaked")

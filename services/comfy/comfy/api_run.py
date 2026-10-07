@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 router = APIRouter()
 HEADER = "x-aihub-make-room"
@@ -107,6 +107,7 @@ def files(request: Request, path: str):
 
 
 class ToolCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")   # arguments sent flat by mistake must fail, not run the defaults
     arguments: dict[str, Any] = Field(default_factory=dict, description="The tool's arguments (its parameters schema)")
 
 

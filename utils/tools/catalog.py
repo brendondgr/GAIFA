@@ -223,7 +223,7 @@ class Catalog:
             mark_files(params)
             m, p = op.split(" ", 1)
             job = it.get("job") if isinstance(it.get("job"), dict) else None
-            route = Route(m, p, body="json" if m != "GET" else None)
+            route = Route(m, p, body="json" if m != "GET" else None, wrap="arguments" if m != "GET" else None)
             if m == "GET":
                 route.params = {k: "query" for k in params.get("properties", {})}
             risk = it.get("risk") if it.get("risk") in ("read", "write", "generate", "destructive") else (

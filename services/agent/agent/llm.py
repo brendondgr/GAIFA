@@ -98,6 +98,8 @@ class ToolCall:
             v = json.loads(raw)
         except ValueError as e:
             fixed = _loose_json(raw)
+            if fixed is None:
+                fixed = close_json(raw)
             if fixed is not None:
                 return fixed, None
             return None, f"arguments aren't valid JSON ({e.msg} at {e.pos})"
@@ -117,6 +119,42 @@ class Reply:
     model: str | None = None
     leaked: bool = False
     split: bool = False          # planning moved out of the reply (split_planning)
+
+
+def close_json(raw: str) -> dict[str, Any] | None:
+    """JSON cut short at the end → closed (open string, objects and arrays). vLLM's streaming
+    Gemma 4 tool parser drops the closing `"}` of every call but the last when a reply has several."""
+    stack: list[str] = []
+    in_str = esc = False
+    for ch in raw:
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]":
+            if not stack or stack.pop() != ch:
+                return None
+    if not stack and not in_str:
+        return None
+    s = raw + ('"' if in_str else "")
+    t = s.rstrip()
+    if t.endswith(","):
+        s = t[:-1]
+    elif t.endswith(":"):
+        s = t + " null"
+    s += "".join(reversed(stack))
+    try:
+        v = json.loads(s)
+    except ValueError:
+        return None
+    return v if isinstance(v, dict) else None
 
 
 def _loose_json(raw: str) -> dict[str, Any] | None:

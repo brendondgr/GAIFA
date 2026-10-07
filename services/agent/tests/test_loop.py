@@ -239,3 +239,29 @@ async def test_status_and_widget(env):
     w = (await env.client.get("/v1/widgets/messages?range=7d")).json()
     assert len(w["t"]) == 7 and w["series"][0]["values"][-1] == 1
     assert len((await env.client.get("/v1/widgets/messages?range=30d")).json()["t"]) == 30
+
+
+async def test_concurrent_requests_dont_trip_the_store(env):
+    """Many requests at once (FastAPI runs the plain routes on worker threads, all sharing one
+    SQLite connection): every answer is right."""
+    import asyncio
+    import random
+
+    ids = [await env.thread(title=f"t{i}") for i in range(5)]
+    for t in ids:
+        env.agent.emit(t, "user", {"text": "x"})
+
+    async def one():
+        tid = random.choice(ids)
+        kind = random.choice(["get", "events", "create"])
+        if kind == "get":
+            r = await env.client.get(f"/v1/threads/{tid}")
+            return r.status_code == 200 and r.json()["id"] == tid
+        if kind == "events":
+            r = await env.client.get(f"/v1/threads/{tid}/events")
+            return r.status_code == 200 and all(e["thread_id"] == tid for e in r.json())
+        r = await env.client.post("/v1/threads", json={"title": "race"})
+        return r.status_code == 201 and r.json()["title"] == "race"
+
+    results = await asyncio.gather(*(one() for _ in range(300)))
+    assert all(results), results.count(False)

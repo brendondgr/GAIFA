@@ -444,7 +444,7 @@ class Calls:
             kw["data"] = {k: (json.dumps(v) if isinstance(v, (dict, list)) else str(v)) for k, v in body.items()}
             kw["files"] = files or None
         elif route.body == "json" or body or whole is not None:
-            kw["json"] = whole if route.body_key else body
+            kw["json"] = whole if route.body_key else ({route.wrap: body} if route.wrap else body)
         svc.in_flight += 1
         try:
             r = await self.client.request(route.method, svc.url + path, **kw)

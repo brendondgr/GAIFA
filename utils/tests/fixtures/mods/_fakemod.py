@@ -296,6 +296,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, tone(), "audio/wav")
             if url.path in ("/v1/render", "/v1/tools/paint/call"):
                 b = self.body()
+                if url.path.startswith("/v1/tools/"):      # a tools_source call: {"arguments": {...}}
+                    extra = set(b) - {"arguments"}
+                    if extra:
+                        return self.send(422, {"detail": f"unknown fields {sorted(extra)}"})
+                    b = b.get("arguments") or {}
                 rid = f"r_{len(RENDERS) + 1}"
                 RENDERS[rid] = {"id": rid, "state": "running", "prompt": b.get("prompt") or "x", "start": time.time(),
                                 "seconds": float(b.get("seconds") or 0.5), "fail": bool(b.get("fail")), "progress": 0.0,

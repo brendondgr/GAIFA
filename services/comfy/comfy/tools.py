@@ -62,6 +62,8 @@ def catalog(lib: Library, defaults: dict[str, str]) -> list[dict]:
                     shared = lib.tasks.inputs[k]
                     q = {kk: vv for kk, vv in v.items() if kk in ("type", "enum", "minimum", "maximum", "format", "items")}
                     q["description"] = shared.get("description") or v.get("description", "")
+                    if shared.get("choices"):      # one list for every pack (each pack's own labels are matched by ratio)
+                        q["enum"] = list(shared["choices"])
                     if k == "seed":
                         q["minimum"] = -1
                     props[k] = q

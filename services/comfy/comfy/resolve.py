@@ -55,6 +55,8 @@ def _coerce(name: str, v: Any, p: dict, errors: list[str]) -> Any:
     except (TypeError, ValueError):
         errors.append(f"{name}: expected {t}, got {v!r}")
         return v
+    if "enum" in p and v not in p["enum"] and isinstance(v, str):
+        v = _same_ratio(v, p["enum"])
     if "enum" in p and v not in p["enum"]:
         errors.append(f"{name}: {v!r} isn't one of {', '.join(map(str, p['enum'][:12]))}")
     if isinstance(v, (int, float)) and not isinstance(v, bool):
@@ -63,6 +65,19 @@ def _coerce(name: str, v: Any, p: dict, errors: list[str]) -> Any:
         if "maximum" in p and v > p["maximum"]:
             errors.append(f"{name}: {v} is above the maximum {p['maximum']}")
     return v
+
+
+RATIO = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*[:x/]\s*(\d+(?:\.\d+)?)")
+
+
+def _same_ratio(v: str, choices: list) -> str:
+    """"16:9" ↔ "16:9 (Widescreen)": packs label their aspect choices differently; the one choice
+    with the same ratio stands in for the value (anything else is left for the enum check)."""
+    m = RATIO.match(v)
+    if not m:
+        return v
+    hits = [c for c in choices if isinstance(c, str) and (cm := RATIO.match(c)) and cm.groups() == m.groups()]
+    return hits[0] if len(hits) == 1 else v
 
 
 def resolve(pack: Pack, schema: dict, values: dict[str, Any] | None, preset: str | None = None,

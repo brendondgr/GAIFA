@@ -74,11 +74,20 @@ class Store:
         self._c.row_factory = sqlite3.Row
         self._c.execute("PRAGMA journal_mode=WAL")
         self._c.execute("PRAGMA busy_timeout=5000")
+        self._lock = threading.RLock()   # one connection, shared by FastAPI's worker threads: every use goes through it
         self._c.executescript(SCHEMA)
-        self._lock = threading.Lock()
 
     def close(self) -> None:
-        self._c.close()
+        with self._lock:
+            self._c.close()
+
+    def _all(self, sql: str, args: Any = ()) -> list[sqlite3.Row]:
+        with self._lock:
+            return self._c.execute(sql, args).fetchall()
+
+    def _one(self, sql: str, args: Any = ()) -> Any:
+        with self._lock:
+            return self._c.execute(sql, args).fetchone()
 
     # ---- threads ---------------------------------------------------------------------------
 
@@ -102,7 +111,7 @@ class Store:
         return self.thread(tid)  # type: ignore[return-value]
 
     def thread(self, tid: str) -> dict[str, Any] | None:
-        return self._thread(self._c.execute("SELECT * FROM threads WHERE id = ?", (tid,)).fetchone())
+        return self._thread(self._one("SELECT * FROM threads WHERE id = ?", (tid,)))
 
     def threads(self, q: str | None = None, archived: bool = False, limit: int = 200) -> list[dict[str, Any]]:
         sql, args = "SELECT * FROM threads WHERE archived = ?", [int(archived)]
@@ -112,7 +121,7 @@ class Store:
             args += [f"%{q}%", f"%{q}%"]
         sql += " ORDER BY updated DESC LIMIT ?"
         args.append(limit)
-        return [self._thread(r) for r in self._c.execute(sql, args).fetchall()]  # type: ignore[misc]
+        return [self._thread(r) for r in self._all(sql, args)]  # type: ignore[misc]
 
     def update_thread(self, tid: str, **fields: Any) -> dict[str, Any] | None:
         allowed = {"title", "model", "mode", "state", "settings", "archived"}
@@ -168,14 +177,14 @@ class Store:
             args += list(types)
         sql += " ORDER BY seq"
         return [{"thread_id": r["thread_id"], "seq": r["seq"], "ts": r["ts"], "type": r["type"],
-                 "payload": json.loads(r["payload"])} for r in self._c.execute(sql, args).fetchall()]
+                 "payload": json.loads(r["payload"])} for r in self._all(sql, args)]
 
     def event(self, tid: str, seq: int) -> dict[str, Any] | None:
         evs = self.events(tid, seq - 1, seq)
         return evs[0] if evs else None
 
     def last_seq(self, tid: str) -> int:
-        return self._c.execute("SELECT COALESCE(MAX(seq), 0) FROM events WHERE thread_id = ?", (tid,)).fetchone()[0]
+        return self._one("SELECT COALESCE(MAX(seq), 0) FROM events WHERE thread_id = ?", (tid,))[0]
 
     def fork(self, tid: str, seq: int) -> dict[str, Any]:
         src = self.thread(tid)
@@ -196,16 +205,16 @@ class Store:
     # ---- stats -----------------------------------------------------------------------------
 
     def stats(self, since: float) -> dict[str, int]:
-        threads = self._c.execute("SELECT COUNT(*) FROM threads WHERE archived = 0").fetchone()[0]
-        msgs = self._c.execute("SELECT COUNT(*) FROM events WHERE type = 'user' AND ts >= ?", (since,)).fetchone()[0]
+        threads = self._one("SELECT COUNT(*) FROM threads WHERE archived = 0")[0]
+        msgs = self._one("SELECT COUNT(*) FROM events WHERE type = 'user' AND ts >= ?", (since,))[0]
         toks = 0
-        for (p,) in self._c.execute("SELECT payload FROM events WHERE type = 'usage' AND ts >= ?", (since,)).fetchall():
+        for (p,) in self._all("SELECT payload FROM events WHERE type = 'usage' AND ts >= ?", (since,)):
             u = json.loads(p)
             toks += int(u.get("prompt_tokens") or 0) + int(u.get("completion_tokens") or 0)
         return {"threads": threads, "messages": msgs, "tokens": toks}
 
     def per_day(self, since: float) -> list[tuple[float, int]]:
-        rows = self._c.execute("SELECT ts FROM events WHERE type = 'user' AND ts >= ?", (since,)).fetchall()
+        rows = self._all("SELECT ts FROM events WHERE type = 'user' AND ts >= ?", (since,))
         return [(r[0], 1) for r in rows]
 
 

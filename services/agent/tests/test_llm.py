@@ -126,3 +126,24 @@ async def test_gemma_channel_marker_splits_thinking(env):
     await env.send(tid, "b")
     assert [a["text"] for a in env.payloads(tid, "assistant")] == ["Here's your fox!", "Hello again."]
     assert [t["text"] for t in env.payloads(tid, "thinking")] == ["The image is done. I should tell the user.", "Planning a reply."]
+
+
+def test_close_json_repairs_truncated_arguments():
+    from agent.llm import ToolCall, close_json
+
+    assert close_json('{"name": "comfy/choosing-a-workflow') == {"name": "comfy/choosing-a-workflow"}
+    assert close_json('{"items": [{"state": "pending", "text": "a') == {"items": [{"state": "pending", "text": "a"}]}
+    assert close_json('{"a": 1,') == {"a": 1}
+    assert close_json('{"a": "x"}') is None          # nothing to close
+    assert close_json('{"a": ]') is None               # broken, not just cut short
+    assert ToolCall("1", "read_skill", '{"name": "gen3d/making-3d').parsed() == ({"name": "gen3d/making-3d"}, None)
+
+
+async def test_parallel_calls_with_dropped_closers_still_run(env):
+    env.model.queue({"tool_calls": [{"name": "read_skill", "arguments": '{"name": "fake/drawing'},
+                                    {"name": "update_todos", "arguments": '{"items": [{"text": "draw", "state": "pending"}]}'}]},
+                    {"text": "ok"})
+    tid = await env.thread()
+    await env.send(tid, "go")
+    by = {r["name"]: r for r in env.payloads(tid, "tool_result")}
+    assert by["read_skill"]["status"] == "done" and by["update_todos"]["status"] == "done"

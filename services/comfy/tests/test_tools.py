@@ -49,3 +49,11 @@ def test_list_and_run_workflow_tools(env):  # noqa: F811
     r = c.post("/v1/tools/run_workflow/call", json={"arguments": {"workflow": "zimage", "inputs": {"prompt": "x"}}}).json()
     assert r["status"] == "running"
     assert c.post("/v1/tools/nope/call", json={"arguments": {}}).status_code == 404
+
+
+def test_aspect_labels_match_by_ratio():
+    from comfy.resolve import _same_ratio
+
+    assert _same_ratio("1:1 (Square)", ["1:1", "16:9"]) == "1:1"
+    assert _same_ratio("16:9", ["1:1 (Square)", "16:9 (Widescreen)"]) == "16:9 (Widescreen)"
+    assert _same_ratio("5:4", ["1:1", "16:9"]) == "5:4"

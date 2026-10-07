@@ -33,6 +33,7 @@ class Route:
     body_key: str | None = None                            # a non-object body sent whole from this argument
     files: list[str] = field(default_factory=list)         # multipart fields that are files
     fixed: dict[str, Any] = field(default_factory=dict)    # always sent (manifest `fixed`)
+    wrap: str | None = None                                # JSON body sent as {wrap: arguments} (tools_source calls)
 
 
 def clean(s: Any) -> Any:

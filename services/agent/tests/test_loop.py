@@ -283,3 +283,32 @@ async def test_eval_threads_never_write_memory(env):
     await env.send(tid, "remember a test fact")
     assert not (env.agent.cfg.data / "memory").exists()
     assert env.payloads(tid, "memory")[0]["dry_run"] is True
+
+
+async def test_a_graceful_restart_resumes_the_turn(env, tmp_path):
+    """Stopping the app mid-turn (a restart) is not the user's Stop: the turn stays running, its hub
+    call isn't cancelled, and the next start picks it up and finishes it."""
+    from agent.server import create_app
+
+    env.model.queue({"tool_calls": [{"name": "fake_render", "arguments": {"prompt": "slow", "seconds": 6}}]}, {"text": "Rendered."})
+    tid = await env.thread(mode="auto")
+    await env.send(tid, "render", wait=False)
+    for _ in range(100):
+        if env.events(tid, "call"):
+            break
+        await asyncio.sleep(0.05)
+    env.agent.shutting_down = True
+    t = env.agent.tasks[tid]
+    t.cancel()
+    await asyncio.gather(t, return_exceptions=True)
+    assert env.agent.store.thread(tid)["state"] == "running" and not env.hub.cancelled
+    assert not env.payloads(tid, "note")
+    app2 = create_app(env.agent.cfg, db=env.agent.store.path, hub_url=env.hub_url, llm_url=env.llm_url)
+    async with app2.router.lifespan_context(app2):
+        a2 = app2.state.agent
+        for _ in range(400):
+            if not a2.running(tid) and a2.store.thread(tid)["state"] == "idle":
+                break
+            await asyncio.sleep(0.05)
+        texts = [e["payload"]["text"] for e in a2.store.events(tid) if e["type"] == "assistant"]
+        assert texts[-1] == "Rendered." and a2.store.thread(tid)["state"] == "idle"

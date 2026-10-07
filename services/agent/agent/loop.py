@@ -80,6 +80,7 @@ class Agent:
         self.local = Local(self)
         self.on_turn_end: list[Callable[[str], Awaitable[None]]] = []
         self._deciding: set[str] = set()
+        self.shutting_down = False   # set before the app stops: turns then stay `running` and resume at the next start
 
     # ---- events ------------------------------------------------------------------------------
 
@@ -246,6 +247,8 @@ class Agent:
                 if not reply.tool_calls:
                     return
         except asyncio.CancelledError:
+            if self.shutting_down:      # not the user's Stop: leave the turn to resume after the restart
+                raise
             final = "idle"
             await asyncio.shield(self._cancelled(tid))
         except Exception as e:  # noqa: BLE001
@@ -253,7 +256,8 @@ class Agent:
             self.emit(tid, "error", {"code": "agent_error", "detail": f"{type(e).__name__}: {e}"[:500]})
             final = "error"
         finally:
-            self.set_state(tid, final)
+            if not self.shutting_down:
+                self.set_state(tid, final)
             for cb in self.on_turn_end:
                 try:
                     await cb(tid)

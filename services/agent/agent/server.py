@@ -102,6 +102,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         finally:
             stop.set()
             watcher.cancel()
+            agent.shutting_down = True
             for t in list(agent.tasks.values()):
                 t.cancel()
             await asyncio.gather(*agent.tasks.values(), watcher, return_exceptions=True)

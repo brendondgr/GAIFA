@@ -133,8 +133,12 @@ def no_invented_inputs(name: str, key: str):
 
 
 def typed(text: str):
-    """An answer that types `text` into "Other" for every question."""
-    return lambda q: {x["question"]: text for x in q["questions"]}
+    """An answer that types `text` into "Other" for every question (and the reply when the model
+    asks in words instead of a card)."""
+    def answer(q):
+        return {x["question"]: text for x in q["questions"]}
+    answer.text = text
+    return answer
 
 
 def deny(tool_prefix: str):

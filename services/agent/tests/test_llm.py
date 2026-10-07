@@ -116,3 +116,13 @@ def test_tag_router_streams_think_as_thinking():
     assert "".join(t for k, t in out if k == "text") == "Hello there"
     r = TagRouter()
     assert r.feed("Hi") == [("text", "Hi")] and r.feed(" you") == [("text", " you")]
+
+
+async def test_gemma_channel_marker_splits_thinking(env):
+    env.model.queue({"text": "The image is done. I should tell the user.<channel|>Here's your fox!"},
+                    {"text": "<|channel>thoughtPlanning a reply.<channel|>Hello again."})
+    tid = await env.thread()
+    await env.send(tid, "a")
+    await env.send(tid, "b")
+    assert [a["text"] for a in env.payloads(tid, "assistant")] == ["Here's your fox!", "Hello again."]
+    assert [t["text"] for t in env.payloads(tid, "thinking")] == ["The image is done. I should tell the user.", "Planning a reply."]

@@ -55,9 +55,10 @@ class Run:
         """(call, the arguments it ran with) for `name`, counting `comfy_run_workflow` with one of
         `name`'s workflows as the same thing."""
         decided = {d["id"]: d.get("arguments") for d in self.of("decision", evs) if d.get("approve")}
+        normalized = {a["id"]: a.get("arguments") for a in self.of("approval", evs)}   # as the hub read them
         out = []
         for c in self.calls(None, by=None, events=evs):
-            args = decided.get(c["id"]) or c.get("arguments") or {}
+            args = decided.get(c["id"]) or normalized.get(c["id"]) or c.get("arguments") or {}
             if c["name"] == name:
                 out.append((c, args))
             elif c["name"] == "comfy_run_workflow" and args.get("workflow") in EQUIV.get(name, ()):
@@ -193,6 +194,22 @@ class Harness:
                     await self.c.post(f"/v1/threads/{tid}/approval", json={"approval_id": a["approval_id"], "approve": ok})
             else:
                 return
+        return
+
+    async def _followup(self, task: Task, tid: str, deadline: float) -> None:
+        """The model asked in words instead of a card: answer with the task's typed text, once."""
+        text = getattr(task.answer, "text", None)
+        if not text:
+            return
+        evs = await self._events(tid)
+        last_user = max((e["seq"] for e in evs if e["type"] == "user"), default=0)
+        after = [e for e in evs if e["seq"] > last_user]
+        asked = any(e["type"] == "assistant" and "?" in (e["payload"].get("text") or "") for e in after)
+        acted = any(e["type"] == "tool_result" and e["payload"].get("status") == "done" and
+                    e["payload"].get("name") not in ("read_skill", "load_tools", "find_tools", "ask_user", "tts_list_voices",
+                                                     "hub_search_outputs", "hub_list_services") for e in after)
+        if asked and not acted:
+            await self._drive(task, tid, text, deadline)
 
     async def run(self, task: Task) -> Run:
         run = Run(task.id, self.model)
@@ -220,6 +237,8 @@ class Harness:
             run.extra["thread"] = tid
             for i, text in enumerate(task.turns, 1):
                 await self._drive(task, tid, text, deadline)
+                if i == len(task.turns):
+                    await self._followup(task, tid, deadline)
                 if task.compact_after_turn == i:
                     await self.c.post(f"/v1/threads/{tid}/compact")
                 if task.fork_after_turn == i:

@@ -25,6 +25,7 @@ Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", te
 GEMMA_CALL = re.compile(r"<\|tool_call\>\s*call:([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*<tool_call\|>", re.S)
 HERMES_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
 FENCED = re.compile(r"```(?:json|tool_code|tool)?\s*(\{.*?\})\s*```", re.S)
+CHANNEL_OPEN = re.compile(r"<\|channel\>(?:thought|analysis|final)?\s*")
 THINK = re.compile(r"^\s*<(think|thinking)>(.*?)(?:</\1>|$)", re.S)
 PLANNING = re.compile(r"^\s*(\*\s*)?(the user\b|user:|i should\b|i need to\b|i will\b|i'll\b|let me\b|now i\b|okay[,.]|ok[,.]|wait[,.]|"
                       r"plan:|first,? i\b|my plan\b|the request\b|the task\b)", re.I)
@@ -254,7 +255,15 @@ class LLM:
             c = calls[i]
             if c["name"]:
                 reply.tool_calls.append(ToolCall(c["id"] or f"tc_{i}", c["name"], c["arguments"]))
+        if reply.text and "<channel|>" in reply.text:
+            # Gemma 4's thought channel when the server's reasoning parser missed its opening:
+            # "<|channel>thought …<channel|>reply" or just "…<channel|>reply"
+            before, _, after = reply.text.rpartition("<channel|>")
+            before = CHANNEL_OPEN.sub("", before).strip()
+            reply.thinking = (reply.thinking + "\n" + before).strip()
+            reply.text = after.strip()
         if reply.text:
+            reply.text = CHANNEL_OPEN.sub("", reply.text)
             m = THINK.match(reply.text)
             if m:
                 reply.thinking = (reply.thinking + "\n" + m.group(2).strip()).strip()

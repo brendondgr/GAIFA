@@ -11,6 +11,7 @@ icon = "chat"
 command = ["./run.sh"]
 port = 4096
 health = "tcp"                       # every route needs Basic auth (401), so the port is the check
+openapi = ""                         # behind the same auth: the hub can't read it (no API tab)
 env_file = ".env"
 start_timeout_s = 30
 stop_timeout_s = 30                  # an agent turn can run for minutes; don't cut it shorter

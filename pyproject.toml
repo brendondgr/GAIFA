@@ -15,6 +15,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "mcp>=2.3.0",
     "pytest",
     "pytest-asyncio",
 ]

@@ -82,7 +82,8 @@ def write_eval() -> None:
     # per-task table for the final runs
     have = dict(runs)
     best31 = "31B · final" if "31B · final" in have else "31B · v3 + 2 re-run"
-    finals = [(l, d) for l, d in runs if l in ("31B · v1", best31, "26B · final", "26B · 1 run")]
+    best26 = "26B · final" if "26B · final" in have else "26B · 1 run"
+    finals = [(l, d) for l, d in runs if l in ("31B · v1", best31, best26)]
     head = " & ".join(tex(l) for l, _ in finals)
     rows = [r"\begin{longtable}{@{}p{2.9cm}p{7.6cm}" + "c" * len(finals) + "@{}}", r"\toprule",
             f"Task & Prompt (turns) & {head} \\\\", r"\midrule", r"\endhead"]
@@ -194,6 +195,17 @@ def write_live() -> None:
                         t = thumb(o["output_id"], o["kind"]) if o["kind"] in ("image", "video", "model3d") else None
                         if t:
                             pics.append((t, f"\\#{o['n']} {o['kind']}"))
+            branch = None
+            if r.get("fork_thread") and (raw := fetch(f"/api/s/agent/v1/threads/{r['fork_thread']}/events")):
+                fev = json.loads(raw)
+                seen = {o["output_id"] for e in evs or [] if e["type"] == "tool_result" for o in e["payload"].get("outputs") or []}
+                new = [o for e in fev if e["type"] == "tool_result" for o in e["payload"].get("outputs") or [] if o["output_id"] not in seen]
+                last = [e["payload"]["text"] for e in fev if e["type"] == "assistant" and e["payload"].get("text")]
+                branch = (r.get("fork_turn") or "", last[-1] if last else "")
+                for o in new:
+                    t = thumb(o["output_id"], o["kind"]) if o["kind"] in ("image", "video", "model3d") else None
+                    if t:
+                        pics.append((t, f"branch: {o['kind']}"))
             status = r"\textcolor{okgreen}{PASS}" if r["ok"] else r"\textcolor{badred}{FAIL}"
             bad = [c for c in r["checks"] if not c["ok"]]
             body = [r"\begin{livecase}{" + tex(r["task"]) + " · " + model + " · " + status + f" · {r['seconds']:.0f} s" + "}"]
@@ -203,6 +215,9 @@ def write_live() -> None:
                 body.append(r"\textbf{Outputs:} " + tex(", ".join(outs)) + r"\par")
             if r.get("final"):
                 body.append(r"\textbf{Final reply:} {\small " + tex(re.sub(r"\*\*|__|`", "", r["final"])[:420]) + r"}\par")
+            if branch:
+                body.append(r"\textbf{Branch} (forked after the first reply): \emph{``" + tex(branch[0]) + r"''}"
+                            + (r" $\rightarrow$ {\small " + tex(re.sub(r"\*\*|__|`", "", branch[1])[:300]) + "}" if branch[1] else "") + r"\par")
             if bad:
                 body.append(r"\textbf{Failed checks:} " + tex("; ".join(f"{c['check']} ({c['why'][:80]})" for c in bad)) + r"\par")
             if r.get("after"):
@@ -246,8 +261,11 @@ def write_glance() -> None:
         lt, lp = len(final), sum(r["ok"] for r in final.values())
     if d26:
         lt, lp = lt + len(d26["rows"]), lp + sum(r["ok"] for r in d26["rows"])
-    if (vid := load("live-video.json")):
-        lt, lp = lt + len(vid["rows"]), lp + sum(r["ok"] for r in vid["rows"])
+    if (vid := load("live-video.json")):     # a case re-run in the Video work session counts once, by that run
+        new = [r for r in vid["rows"] if not (first and r["task"] in final)]
+        if first:
+            lp += sum(r["ok"] and not final[r["task"]]["ok"] for r in vid["rows"] if r["task"] in final)
+        lt, lp = lt + len(new), lp + sum(r["ok"] for r in new)
 
     def pk(d: dict) -> str:
         s = d.get("summary")
@@ -259,7 +277,7 @@ def write_glance() -> None:
 
     cells = [(f"{passed}", "automated tests passing"), (pk(main), "31B eval, pass\\textasciicircum{}3 (gate 80\\%)"),
              (p1(main), "31B eval, single runs"), (pk(b26), "26B eval, pass\\textasciicircum{}3"),
-             (f"{lp}/{lt}", "live conversations passed"), (str((load("summary.json") or {}).get("bugs", "--")), "bugs found and fixed")]
+             (f"{lp}/{lt}", "live cases passed (latest run)"), (str((load("summary.json") or {}).get("bugs", "--")), "bugs found and fixed")]
     out = ["\\noindent"]
     for v, l in cells:
         out.append("\\begin{minipage}[t]{0.158\\linewidth}\\kpi{" + v + "}{" + l + "}\\end{minipage}\\hfill")
@@ -297,34 +315,36 @@ def write_p1516() -> None:
         out.append(r"\subsection*{Switching sessions on the real mods}")
         out.append(r"Each switch ran its plan through the memory manager while memory was sampled every second. "
                    r"The dashed line is the limit (total minus the 12~GB reserve).")
-        rows = [r"\begin{tabular}{@{}lp{7.2cm}rrr@{}}", r"\toprule", r"Switch to & Steps & Time & Peak & Result \\", r"\midrule"]
+        rows = [r"\par\medskip\noindent\begin{tabular}{@{}lp{8.4cm}rrr@{}}", r"\toprule", r"Switch to & Steps & Time & Peak & Result \\", r"\midrule"]
         plots = []
-        for f in switches:
+        tmax = 10
+        for n, f in enumerate(switches, 1):
             d = json.loads(f.read_text())
             name = f.stem.removeprefix("session-").split("-", 1)[-1].replace("_", " ")
             steps = ", ".join(f"{st['action'].replace('_', ' ')} {st['target']}" for st in d["plan"]["steps"]) or "nothing to do"
             res = d["result"]
             ok = res.get("ok")
             t = round(d["samples"][-1]["t"] - d["samples"][0]["t"]) if d["samples"] else 0
-            rows.append(f"{tex(name)} & {tex(steps)} & {t} s & {d['peak_gb']:.0f} GB & "
+            rows.append(f"{n}. {tex(name)} & {tex(steps)} & {t} s & {d['peak_gb']:.0f} GB & "
                         + (r"\textcolor{okgreen}{ok}" if ok else r"\textcolor{badred}{problem}") + r" \\")
             t0 = d["samples"][0]["t"] if d["samples"] else 0
             coords = " ".join(f"({x['t'] - t0:.0f},{x['used_gb']})" for x in d["samples"][::2])
-            plots.append((name, coords, d["limit_gb"]))
-        rows += [r"\bottomrule", r"\end{tabular}"]
+            plots.append((f"{n}. {name}", coords, d["limit_gb"]))
+            tmax = max(tmax, t)
+        rows += [r"\bottomrule", r"\end{tabular}\par"]
         out += rows
         bad = {f.stem.split("-", 2)[1]: e for f in switches for e in [json.loads(f.read_text())] if not e["result"].get("ok")}
         if bad:
             out.append(r"\par{\footnotesize\color{muted} The switches marked \emph{problem} ran before the fix for bug \#25: their only failed step was "
                        r"``load lcpp'' (lcpp has no load operation; its instance had already been launched). Everything else in them worked.}")
         out.append(r"\begin{center}\begin{tikzpicture}\begin{axis}[width=\linewidth,height=5.2cm,xlabel={seconds into the switch},"
-                   r"ylabel={memory used (GB)},ymin=0,ymax=135,legend style={font=\scriptsize,draw=none,at={(0.5,-0.32)},anchor=north,legend columns=4},"
+                   r"ylabel={memory used (GB)},ymin=0,ymax=135,xmin=0,legend style={font=\scriptsize,draw=none,at={(0.5,-0.32)},anchor=north,legend columns=4},"
                    r"ymajorgrids,grid style={line},axis line style={line},tick style={line},label style={font=\small},tick label style={font=\small}]")
         colors = ["accent", "purple", "teal", "okgreen", "badred", "muted"]
         for i, (name, coords, limit) in enumerate(plots):
             out.append(rf"\addplot[thick,color={colors[i % 6]}] coordinates {{{coords}}};\addlegendentry{{{tex(name)}}}")
         if plots:
-            out.append(rf"\addplot[dashed,color=badred,domain=0:600] {{{plots[0][2]}}};\addlegendentry{{limit}}")
+            out.append(rf"\addplot[dashed,color=badred,domain=0:{tmax},samples=2] {{{plots[0][2]}}};\addlegendentry{{limit}}")
         out.append(r"\end{axis}\end{tikzpicture}\end{center}")
     r = load("restart-live.json")
     if r:
@@ -340,10 +360,10 @@ def write_p1516() -> None:
         out.append(r"\subsection*{The context meter against the model's own count}")
         out.append(r"Before each turn, the meter's prediction (last usage, minus thinking, plus an estimate of what was added) "
                    r"is compared with the \code{prompt\_tokens} the 31B then reported:")
-        out.append(r"\begin{tabular}{@{}lrrr@{}}\toprule Turn & Predicted & Actual & Error \\ \midrule")
+        out.append(r"\par\medskip\noindent\begin{tabular}{@{}lrrr@{}}\toprule Turn & Predicted & Actual & Error \\ \midrule")
         for x in m["rows"]:
             out.append(f"\\emph{{{tex(x['turn'])}}} & {x['predicted']:,} & {x['actual']:,} & {x['error_pct']}\\% \\\\")
-        out.append(r"\bottomrule\end{tabular}")
+        out.append(r"\bottomrule\end{tabular}\par")
     inv = load("inventory-live.json")
     fresh = load("fresh-inventory.json")
     if inv:

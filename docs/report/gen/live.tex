@@ -62,14 +62,21 @@ Would you like to animate it, make another edit, or try something else?}\par
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/4922b9d4c62e.jpg}\\{\scriptsize \#2 image}\end{minipage}\hfill
 \end{livecase}
 
-\begin{livecase}{L8\_fork · Gemma 4 31B · \textcolor{badred}{FAIL} · 35 s}
+\begin{livecase}{L8\_fork · Gemma 4 31B · \textcolor{okgreen}{PASS} · 1024 s}
 \textbf{Prompts:} \emph{``Make an image of a fox in a meadow.''} $\rightarrow$ \emph{``Edit it: make the fox a wolf.''}\par
-\textbf{Tools:} \texttt{generate\_image $\rightarrow$ memory\_status}\par
-\textbf{Final reply:} {\small I haven't been able to create the fox image yet --- we still need to free up some memory first (I recommend unloading lcpp, which is using about 35 GB).
+\textbf{Tools:} \texttt{generate\_image $\rightarrow$ edit\_image}\par
+\textbf{Outputs:} \#1 image, \#2 image\par
+\textbf{Final reply:} {\small The fox has been replaced with a grey wolf, keeping the meadow and golden hour lighting the same.
 
-But I'll go ahead and switch to a wolf in a meadow for you once we have enough room. Shall I unload lcpp and get started?}\par
-\textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$); fork edits the first image (image=[] from comfy\_generate\_image: [])\par
+Would you like to animate this scene, make a 3D model of the wolf, or something else?}\par
+\textbf{Branch} (forked after the first reply): \emph{``Edit it: make the fox an owl.''} $\rightarrow$ {\small Done --- the fox has been replaced with a great horned owl perched on a rock in the same meadow.
+
+Would you like to animate it, make a 3D model of the owl, or try another edit?}\par
 {\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: comfy\_edit\_image ran.}\par
+\smallskip\noindent
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/bd8b8305db42.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/dfb767101899.jpg}\\{\scriptsize \#2 image}\end{minipage}\hfill
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/66d6b8ccddf2.jpg}\\{\scriptsize branch: image}\end{minipage}\hfill
 \end{livecase}
 
 \begin{livecase}{L10\_must\_ask · Gemma 4 31B · \textcolor{okgreen}{PASS} · 117 s}

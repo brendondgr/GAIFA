@@ -21,6 +21,9 @@ Run on 6–7 October 2026. The full account, with every prompt, transcript notes
 | 31B, 5 weakest tasks re-checked | 5 × 3 | 100.0% | 5/5 (100%) | 22 s |
 | 31B, all tools loaded | 30 × 1 | 100.0% | 30/30 (100%) | 33 s |
 | Gemma 4 26B, 1 run (local) | 30 × 1 | 90.0% | 27/30 (90%) | 83 s |
+| 26B, 3 runs (local) | 30 × 3 | 91.1% | 24/30 (80%) | 78 s |
+| 26B, the 4 tasks fixed after its eval, re-checked | 4 × 3 | 91.7% | 3/4 (75%) | 120 s |
+| 31B, the same 4 tasks on the fixed code | 4 × 3 | 100.0% | 4/4 (100%) | 18 s |
 
 | Live case | Model (latest run) | Result | Time | Tools |
 |---|---|---|---|---|
@@ -29,7 +32,7 @@ Run on 6–7 October 2026. The full account, with every prompt, transcript notes
 | L3_image_to_video | 31B, Video work session | pass | 1266 s | comfy_generate_image, comfy_animate_image |
 | L4_describe_speak | 31B | pass | 80 s | comfy_generate_image, view_output, tts_speak, tts_speak |
 | L7_compact_continue | 31B, re-run after fixes | pass | 556 s | comfy_generate_image, comfy_edit_image |
-| L8_fork | 31B, re-run after fixes | fail | 35 s | comfy_generate_image, hub_memory_status |
+| L8_fork | 31B, re-run after fixes | pass | 1024 s | comfy_generate_image, comfy_edit_image |
 | L10_must_ask | 31B, re-run after fixes | pass | 117 s | read_skill, gen3d_make_3d |
 | L5_L6_buttons | 31B, re-run after fixes | pass | 354 s | comfy_generate_image, comfy_remove_background |
 | L1_fox | 26B | pass | 62 s | comfy_generate_image |

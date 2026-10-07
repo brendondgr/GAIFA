@@ -163,7 +163,7 @@ The gate in plan 13.5 is pass\textasciicircum{}3 $\geq$ 80\% on the primary mode
 \item \emph{5 weakest, re-checked} runs the five tasks that missed a run in \emph{final} again, three times each, after the last prompt fix (turned-off groups and read-only are now stated in the prompt).
 \item \emph{All tools loaded} skips tools-on-demand, one run per task.
 \item The 26B ran on llama.cpp with every tool loaded (bug \#15).
-\item \emph{26B · final} is the whole eval three times on the 26B. It showed three problems the 31B hadn't: it looped on a group turned off in the chat (bug \#27), it wrote a tool call as Python text or in a variant of Gemma's tags (bug \#28), and it described an image from its own prompt without looking at it (now a prompt rule). \emph{4 fixed tasks} runs those four tasks again, three times on each model, on the fixed code.
+\item \emph{26B · final} is the whole eval three times on the 26B. It showed three problems the 31B hadn't: it looped on a group turned off in the chat (bug \#27), it wrote a tool call as Python text or in a variant of Gemma's tags (bug \#28), and it described an image from its own prompt without looking at it (now a prompt rule). \emph{4 fixed tasks} runs those four tasks again, three times on each model, on the fixed code. On the 26B the first re-check missed 2 of 12 runs; one miss was yet another way of writing a call (now read too). On the second, shown here, its one miss was the runaway reply (bug \#30). It happened while I had a live comfy edit sharing the GPU, and the guard for it came after this run.
 \end{itemize}
 ``Infra.\ errors'' counts runs that broke for reasons outside the agent's decisions.
 
@@ -214,7 +214,7 @@ Each case is a real conversation through the hub's proxy, with no dry run. The h
 
 % ---------------------------------------------------------------- 10
 \section{Open items and decisions for you}\label{sec:open}
-\input{open.tex}
+{\sloppy\input{open.tex}\par}
 
 \appendix
 \section{Test plan coverage}

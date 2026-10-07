@@ -660,7 +660,7 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
 - **Chats.** Threads, the step history behind **rewind and branch** (continue from any earlier checkpoint), and titles and search (agent mod's tables in `agent.db`).
 - **Sessions.** The hub can **snapshot the current setup**: which mods are running and loaded, lcpp's instances with their launch settings, and ComfyUI's state. Each snapshot is saved under a name in `hub.db`.
   - **Restore** replays a snapshot through the memory manager, so it never overcommits memory.
-  - Optionally, the last session is restored at boot.
+  - Optionally, the last session is restored at boot. At each start the previous run's auto-saved "Last session" is copied to "Before restart", which the auto-save never overwrites; the boot restore and the unclean-shutdown offer use that copy (before this, an auto-save five minutes after a reboot replaced the setup worth restoring).
   - Named setups ("LLM work", "3D work") can be switched with one action.
 - **Backups.** `aihub backup` (Phase 12.5) also covers `agent.db` and the session snapshots.
 

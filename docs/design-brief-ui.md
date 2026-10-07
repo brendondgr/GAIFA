@@ -1094,7 +1094,7 @@ registerPreview('pointcloud', ({ output, ctx }) => h(MyViewer, { src: output.url
 
 ### 11.14 Sessions (plan Phase 15, Wire 15)
 
-The `sessions` area: named setups (which mods run, which are loaded, lcpp's LLM instances) that can be saved and restored. An auto-saved "Last session" is kept by the hub.
+The `sessions` area: named setups (which mods run, which are loaded, lcpp's LLM instances) that can be saved and restored. An auto-saved "Last session" is kept by the hub, and at each start it copies the previous one to "Before restart" (both `auto`).
 
 **Methods** (area `sessions`):
 
@@ -1125,7 +1125,7 @@ interface SessionMemory { available_bytes: number; freed_bytes: number; needed_b
 interface SessionRestore { session: string; steps: SessionStep[]; memory: SessionMemory; dry_run: boolean;
                            results?: SessionStep[] | null; ok?: boolean | null }   // when it ran
 interface SessionState { unclean_shutdown: boolean;                       // the hub didn't stop cleanly last time
-                         last_auto: Session | null; restoring: string | null; restore_on_boot: boolean }
+                         last_auto: Session | null /* "Before restart" */; restoring: string | null; restore_on_boot: boolean }
 ```
 
 **As built (UI):**

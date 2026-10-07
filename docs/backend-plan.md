@@ -1253,7 +1253,7 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
   - `GET/POST /api/sessions` and `PUT/DELETE /api/sessions/{id}`.
   - `POST /api/sessions/{id}/restore?dry_run=1` returns the steps and a memory plan. A real restore runs them in order through the memory manager.
   - **Auto-save:** an `auto` session is saved every 5 min and on clean shutdown.
-  - **Restore at boot:** `[sessions] restore_on_boot = false` in `config.toml`.
+  - **Restore at boot:** `[sessions] restore_on_boot = false` in `config.toml`. *As built after the first real reboot (2026-10-07):* each start copies the previous "Last session" to "Before restart" (never auto-saved over); restore at boot and `GET /api/sessions/state`'s `last_auto` use it.
 - [x] **15.3 Session tools for the agent:** *As built:* `hub_save_session`, `hub_list_sessions`, `hub_restore_session` (risk `write`: a card asks first; `dry_run` shows the steps). `save_session`, `list_sessions`, `restore_session` (confirm).
 
 **Wire — Phase 15:** `sessions` goes live: *Done: the Sessions panel (Chat and Settings → Sessions), the command-palette actions, the restore prompt after an unclean shutdown (`web/sessions.js`).*

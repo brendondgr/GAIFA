@@ -85,8 +85,15 @@ async def test_autosave_at_shutdown_unclean_flag_and_restore_on_boot(services_di
     async with app.router.lifespan_context(app):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://hub") as c:
             st = (await c.get("/api/sessions/state")).json()
-            assert st["unclean_shutdown"] is False and st["last_auto"]["name"] == "Last session"
+            assert st["unclean_shutdown"] is False and st["last_auto"]["name"] == "Before restart"
             assert st["last_auto"]["snapshot"]["mods"]["fake-ok"]["running"] is True
+            # the auto-save after the start replaces "Last session" but never "Before restart" (the reboot bug)
+            await c.post("/api/services/fake-ok/stop?wait=1")
+            await app.state.hub.sessions.save("Last session", auto=True)
+            st = (await c.get("/api/sessions/state")).json()
+            assert st["last_auto"]["snapshot"]["mods"]["fake-ok"]["running"] is True
+            await c.post("/api/services/fake-ok/start?wait=1")
+            await app.state.hub.sessions.save("Last session", auto=True)    # the latest auto-save: fake-ok running
             await app.state.hub.db.execute("UPDATE kv SET value = '0' WHERE key = 'sessions:clean_shutdown'")
             app.state.hub.config.sessions.autosave_s = 0      # stop like a crash: nothing saved, the flag stays 0
             app.state.hub.sessions._kv = lambda *a: asyncio.sleep(0)
@@ -99,7 +106,7 @@ async def test_autosave_at_shutdown_unclean_flag_and_restore_on_boot(services_di
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://hub") as c:
             st = (await c.get("/api/sessions/state")).json()
             assert st["unclean_shutdown"] is True and st["restore_on_boot"] is True
-            for _ in range(150):      # "Last session" had fake-ok running: restore-at-boot starts it
+            for _ in range(150):      # "Before restart" had fake-ok running: restore-at-boot starts it
                 if (await c.get("/api/services/fake-ok")).json()["state"] == "ready":
                     break
                 await asyncio.sleep(0.1)

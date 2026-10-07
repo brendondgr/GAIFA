@@ -11,8 +11,11 @@ A snapshot holds each mod's running and load state and lcpp's instances with the
 5. load the session's loaded mods (each through the memory manager, which makes room)
 
 Mods that run now but not in the session keep running (processes are cheap; models aren't).
-An `auto` session ("Last session") is saved every `sessions.autosave_s` and at a clean shutdown;
-with `sessions.restore_on_boot` it is restored after the mods have started.
+An `auto` session ("Last session") is saved every `sessions.autosave_s` and at a clean shutdown.
+At startup the previous run's "Last session" is first copied to "Before restart", which the
+auto-save never touches: after a reboot the auto-save would otherwise replace the setup worth
+restoring with the bare state the machine booted into. `sessions.restore_on_boot` and the
+unclean-shutdown offer both use "Before restart".
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("aihub.sessions")
 AUTO_NAME = "Last session"
+BOOT_NAME = "Before restart"     # the previous run's last setup, kept at startup
 GB = 1e9
 CLEAN_KEY = "sessions:clean_shutdown"
 
@@ -76,6 +80,7 @@ class Sessions:
         row = await self.hub.db.fetchone("SELECT value FROM kv WHERE key = ?", (CLEAN_KEY,))
         self.unclean_previous = row is not None and row["value"] == "0"
         await self._kv(CLEAN_KEY, "0")
+        await self._keep_previous()
         every = self.hub.config.sessions.autosave_s
         if every:
             self._task = asyncio.create_task(self._autosave(every))
@@ -98,6 +103,23 @@ class Sessions:
         await self.hub.db.execute("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                                   (key, value))
 
+    async def _keep_previous(self) -> None:
+        """Copy the previous run's "Last session" to "Before restart" (its save time kept)."""
+        last = await self.hub.db.fetchone("SELECT snapshot, updated_ts FROM sessions WHERE name = ? AND auto = 1", (AUTO_NAME,))
+        if last is None:
+            return
+        old = await self.hub.db.fetchone("SELECT id FROM sessions WHERE name = ?", (BOOT_NAME,))
+        if old:
+            await self.hub.db.execute("UPDATE sessions SET snapshot = ?, updated_ts = ?, auto = 1 WHERE id = ?",
+                                      (last["snapshot"], last["updated_ts"], old["id"]))
+        else:
+            await self.hub.db.execute("INSERT INTO sessions (id, name, auto, snapshot, created_ts, updated_ts) VALUES (?, ?, 1, ?, ?, ?)",
+                                      ("ss_" + secrets.token_hex(5), BOOT_NAME, last["snapshot"], last["updated_ts"], last["updated_ts"]))
+
+    async def before_restart(self) -> dict[str, Any] | None:
+        row = await self.hub.db.fetchone("SELECT * FROM sessions WHERE name = ? AND auto = 1", (BOOT_NAME,))
+        return _row(row) if row else None
+
     async def _autosave(self, every: float) -> None:
         while True:
             await asyncio.sleep(every)
@@ -108,7 +130,7 @@ class Sessions:
 
     async def _restore_on_boot(self) -> None:
         await asyncio.sleep(5)    # let autostart finish first
-        row = await self.hub.db.fetchone("SELECT * FROM sessions WHERE auto = 1 ORDER BY updated_ts DESC LIMIT 1")
+        row = await self.hub.db.fetchone("SELECT * FROM sessions WHERE name = ? AND auto = 1", (BOOT_NAME,))
         if row:
             log.info("restoring %s at boot", row["name"])
             try:

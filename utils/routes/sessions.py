@@ -55,7 +55,7 @@ class Restore(_M):
 
 class SessionState(_M):
     unclean_shutdown: bool = Field(description="The hub didn't stop cleanly last time (offer to restore the last session)")
-    last_auto: Session | None
+    last_auto: Session | None = Field(description='The setup before this start ("Before restart"): what to offer to restore')
     restoring: str | None
     restore_on_boot: bool
 
@@ -73,11 +73,11 @@ async def list_sessions(request: Request) -> list[dict[str, Any]]:
     return await _s(request).list()
 
 
-@router.get("/api/sessions/state", summary="Whether the last shutdown was unclean, and the last auto-saved session", response_model=SessionState)
+@router.get("/api/sessions/state", summary="Whether the last shutdown was unclean, and the setup from before this start",
+            response_model=SessionState)
 async def session_state(request: Request) -> dict[str, Any]:
     s = _s(request)
-    autos = [x for x in await s.list() if x["auto"]]
-    return {"unclean_shutdown": s.unclean_previous, "last_auto": autos[0] if autos else None, "restoring": s.restoring,
+    return {"unclean_shutdown": s.unclean_previous, "last_auto": await s.before_restart(), "restoring": s.restoring,
             "restore_on_boot": request.app.state.hub.config.sessions.restore_on_boot}
 
 

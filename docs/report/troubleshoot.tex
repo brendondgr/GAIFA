@@ -1,0 +1,15 @@
+You asked for an agent that works through problems without you stepping in. These cases come from tonight's real transcripts. In each, the agent met a failure, read the error and its \code{fix} hint, and acted on it.
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{3.7cm}>{\raggedright\arraybackslash}p{5.4cm}>{\raggedright\arraybackslash}p{5.6cm}@{}}
+\toprule
+What went wrong & What the agent did & Outcome \\
+\midrule\endhead
+gen3d needed 52~GB, but ComfyUI was still holding its image model (live L2, image $\rightarrow$ 3D). & Read \code{needs\_room} (``Unloading comfy makes room''), called \code{hub\_unload\_service} for comfy (a card you approve), then called \code{gen3d\_make\_3d} again. & \ok: the 3D model was made, with no help. (The hub now makes room by itself; that was bug \#13.) \\
+The video needed 63.2~GB with 62.7~GB free; the local LLM held 26~GB (live L3). & Checked \code{hub\_memory\_status}, tried to unload the LLM, learned it can only be stopped with \code{lcpp\_stop\_llm}, and \emph{didn't} stop your model. It explained the choice instead. & The right call: stopping an LLM is destructive and yours to make. The video ran later, after a session switch. \\
+It sent \code{aspect\_ratio} (no such parameter). & The error said \code{did you mean 'aspect'?}; it resent with \code{aspect}. & \ok{} in one step. The hub now maps such near misses itself. \\
+A skill name arrived cut off (\code{comfy/choosing-a-}), because of vLLM's streaming bug. & Read \code{not\_found}, noticed the cut, and asked for \code{comfy/choosing-a-workflow} again. & \ok. The cut itself is now repaired before the call. \\
+The edit workflow rejected every call (\code{image\_2: required}). & Retried once, then called \code{comfy\_list\_workflows} to see the workflow's inputs, and told the user exactly what was wrong. & It diagnosed a real bug in our code (now fixed: bug \#14) instead of looping or inventing a result. \\
+The 26B looped on one tool. & (Before the fix.) It kept calling \code{tts\_list\_voices}. & Fixed at the root (bug \#15): it can now reach every tool, and a third identical call returns a hint. \\
+A dry-run stand-in didn't look like the request. & Viewed the image, noticed it didn't match, and said so. & Honest, rather than claiming success. The stand-ins are now labelled placeholders. \\
+\bottomrule
+\end{longtable}

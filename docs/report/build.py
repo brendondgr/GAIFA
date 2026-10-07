@@ -222,6 +222,12 @@ def write_glance() -> None:
     (GEN / "glance.tex").write_text("\n".join(out) + "\n")
 
 
+def write_b26() -> None:
+    d = load("eval-26b-v3.json") or load("eval-26b-r1.json")
+    runs = d["runs"] if d else 0
+    (GEN / "b26runs.tex").write_text((f"{runs} time(s) per task" if d else "not at all") + "\n")
+
+
 def write_p1516() -> None:
     """Sessions switched on the real mods (memory sampled each second), the restart test, the meter
     check, logs and the inventory."""
@@ -307,4 +313,5 @@ if __name__ == "__main__":
     write_tests()
     write_glance()
     write_p1516()
+    write_b26()
     print("wrote", sorted(p.name for p in GEN.iterdir()))

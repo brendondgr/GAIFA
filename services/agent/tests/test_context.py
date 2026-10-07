@@ -129,3 +129,12 @@ async def test_system_prompt_order(env):
     assert order == sorted(order)
     assert "Always answer in French." in s and "likes 16:9" in s and "- fake/drawing: How to pick image settings" in s
     assert "#1 image via fake_make_image" in s
+
+
+async def test_thread_window_cap(env):
+    tid = await env.thread(settings={"window": 3000})
+    await env.send(tid, "hi")
+    assert (await env.client.get(f"/v1/threads/{tid}/context")).json()["window"] == 3000
+    tid2 = await env.thread(settings={"window": 999999})
+    await env.send(tid2, "hi")
+    assert (await env.client.get(f"/v1/threads/{tid2}/context")).json()["window"] == 8000   # never above the model's

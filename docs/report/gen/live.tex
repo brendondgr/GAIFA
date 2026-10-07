@@ -1,7 +1,7 @@
 \begin{livecase}{L1\_fox · Gemma 4 31B · \textcolor{okgreen}{PASS} · 37 s}
 \textbf{Prompts:} \emph{``Make me an image of a fox.''}\par
 \textbf{Tools:} \texttt{generate\_image}\par
-\textbf{Outputs:} \textbackslash\{\}\#1 image\par
+\textbf{Outputs:} \#1 image\par
 \textbf{Final reply:} {\small Here's your fox image. You can animate it, edit it, make a 3D model, or I can describe it for you.}\par
 \smallskip\noindent
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/9c43f4743f15.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
@@ -10,15 +10,15 @@
 \begin{livecase}{L2\_image\_to\_3d · Gemma 4 31B · \textcolor{okgreen}{PASS} · 229 s}
 \textbf{Prompts:} \emph{``Make an image of a cute robot toy, then turn it into a 3D model.''}\par
 \textbf{Tools:} \texttt{read\_skill $\rightarrow$ read\_skill $\rightarrow$ read\_skill $\rightarrow$ generate\_image $\rightarrow$ view\_output $\rightarrow$ make\_3d $\rightarrow$ unload\_service $\rightarrow$ make\_3d}\par
-\textbf{Outputs:} \textbackslash\{\}\#1 image, \textbackslash\{\}\#2 model3d\par
+\textbf{Outputs:} \#1 image, \#2 model3d\par
 \textbf{Final reply:} {\small Done! Here's your cute robot:
 
-**Image:** \#1 (\#output:fe618dd0ba88) --- A charming little blue robot with big eyes and a friendly smile, looking right at you.
-**3D Model:** \#2 (\#output:f25c5b52a9ad) --- A matching 3D version with a round body, yellow feet, and that same antenna with the little ball on top.
+Image: \#1 (\#output:fe618dd0ba88) --- A charming little blue robot with big eyes and a friendly smile, looking right at you.
+3D Model: \#2 (\#output:f25c5b52a9ad) --- A matching 3D version with a round body, yellow feet, and that same antenna with the little ball on top.
 
 You can:
-- **Animate** the image into a short video (he could wave, blink, or tilt his head)
-- **Rig** the 3D model}\par
+- Animate the image into a short video (he could wave, blink, or tilt his head)
+- Rig the 3D model so its arms and}\par
 \smallskip\noindent
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/fe618dd0ba88.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/f25c5b52a9ad.jpg}\\{\scriptsize \#2 model3d}\end{minipage}\hfill
@@ -27,8 +27,8 @@ You can:
 \begin{livecase}{L3\_image\_to\_video · Gemma 4 31B · \textcolor{badred}{FAIL} · 103 s}
 \textbf{Prompts:} \emph{``Make a 16:9 image of a sailboat on a calm lake at sunset.''} $\rightarrow$ \emph{``Now animate it: the boat drifts slowly and the water ripples.''}\par
 \textbf{Tools:} \texttt{generate\_image $\rightarrow$ generate\_image $\rightarrow$ animate\_image $\rightarrow$ memory\_status $\rightarrow$ unload\_service $\rightarrow$ animate\_image $\rightarrow$ unload\_service $\rightarrow$ animate\_image}\par
-\textbf{Outputs:} \textbackslash\{\}\#1 image\par
-\textbf{Final reply:} {\small Okay, `hub\_unload\_service` for `lcpp` failed because it doesn't support the `unload` operation (it uses `lcpp\_stop\_llm` instead). I should stop any running LLM instances to free up memory. Let me check what's running.
+\textbf{Outputs:} \#1 image\par
+\textbf{Final reply:} {\small Okay, hub\_unload\_service for lcpp failed because it doesn't support the unload operation (it uses lcpp\_stop\_llm instead). I should stop any running LLM instances to free up memory. Let me check what's running.
 }\par
 \textbf{Failed checks:} comfy\_animate\_image ran (comfy\_animate\_image ran 0$\times$)\par
 \smallskip\noindent
@@ -38,7 +38,7 @@ You can:
 \begin{livecase}{L4\_describe\_speak · Gemma 4 31B · \textcolor{okgreen}{PASS} · 80 s}
 \textbf{Prompts:} \emph{``Make an image of an owl reading in a library.''} $\rightarrow$ \emph{``Describe the image in two sentences, then read your description aloud with the af\_heart voice.''}\par
 \textbf{Tools:} \texttt{generate\_image $\rightarrow$ view\_output $\rightarrow$ speak $\rightarrow$ speak}\par
-\textbf{Outputs:} \textbackslash\{\}\#1 image, \textbackslash\{\}\#2 audio\par
+\textbf{Outputs:} \#1 image, \#2 audio\par
 \textbf{Final reply:} {\small Here's your description of the image:
 
 A wise owl wearing round reading glasses gazes intently at a large open book, perched at a desk in a warmly lit old library. Behind it, rows of leather-bound books fill tall wooden shelves, with a soft desk lamp casting a golden glow over the scene.
@@ -51,11 +51,11 @@ And I've read it aloud for you as well (\#2). Would you like me to animate the i
 \begin{livecase}{L7\_compact\_continue · Gemma 4 31B · \textcolor{badred}{FAIL} · 118 s}
 \textbf{Prompts:} \emph{``Make an image of an old stone bridge over a stream.''} $\rightarrow$ \emph{``/compact''} $\rightarrow$ \emph{``Edit the image you made earlier: make it night, with a full moon.''}\par
 \textbf{Tools:} \texttt{generate\_image $\rightarrow$ view\_output $\rightarrow$ edit\_image $\rightarrow$ read\_skill $\rightarrow$ edit\_image $\rightarrow$ list\_workflows}\par
-\textbf{Outputs:} \textbackslash\{\}\#1 image\par
-\textbf{Final reply:} {\small I keep getting an error that a second reference image (`image\_2`) is required for the edit workflow, but the tool definition says `image\_2` is optional (or at least it should be for a simple "make it night" edit). Let me try a workaround --- I'll generate a new night version from scratch that matches the original scene:
+\textbf{Outputs:} \#1 image\par
+\textbf{Final reply:} {\small I keep getting an error that a second reference image (image\_2) is required for the edit workflow, but the tool definition says image\_2 is optional (or at least it should be for a simple "make it night" edit). Let me try a workaround --- I'll generate a new night version from scratch that matches the original scene:
 
 <center>
-<a href="https://skynet.ai/outputs/bf668d2d5de5" target="\_blank"><img src="https://skynet.}\par
+<a href="https://skynet.ai/outputs/bf668d2d5de5" target="\_blank"><img src="https://skynet.ai/o}\par
 \textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$)\par
 \smallskip\noindent
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/bf668d2d5de5.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
@@ -64,7 +64,7 @@ And I've read it aloud for you as well (\#2). Would you like me to animate the i
 \begin{livecase}{L8\_fork · Gemma 4 31B · \textcolor{badred}{FAIL} · 108 s}
 \textbf{Prompts:} \emph{``Make an image of a fox in a meadow.''} $\rightarrow$ \emph{``Edit it: make the fox a wolf.''}\par
 \textbf{Tools:} \texttt{generate\_image $\rightarrow$ edit\_image $\rightarrow$ list\_workflows}\par
-\textbf{Outputs:} \textbackslash\{\}\#1 image\par
+\textbf{Outputs:} \#1 image\par
 \textbf{Final reply:} {\small Would you rather I try to find an alternative edit method, or shall I just create a fresh image of a wolf in a meadow?}\par
 \textbf{Failed checks:} comfy\_edit\_image ran (comfy\_edit\_image ran 0$\times$)\par
 \smallskip\noindent
@@ -74,12 +74,12 @@ And I've read it aloud for you as well (\#2). Would you like me to animate the i
 \begin{livecase}{L10\_must\_ask · Gemma 4 31B · \textcolor{badred}{FAIL} · 113 s}
 \textbf{Prompts:} \emph{``Make a 3D model and split it into parts.''}\par
 \textbf{Tools:} \texttt{update\_todos $\rightarrow$ make\_3d $\rightarrow$ update\_todos $\rightarrow$ make\_3d $\rightarrow$ unload\_service $\rightarrow$ memory\_status $\rightarrow$ make\_3d}\par
-\textbf{Outputs:} \textbackslash\{\}\#1 model3d\par
-\textbf{Final reply:} {\small I've created the 3D model of a wooden chair with the parts split into **legs**, **seat**, and **backrest**.
+\textbf{Outputs:} \#1 model3d\par
+\textbf{Final reply:} {\small I've created the 3D model of a wooden chair with the parts split into legs, seat, and backrest.
 
 You can view the preview and download the model (GLB format with separated parts) --- you can import it into Blender or any 3D tool and the parts will be individually selectable.
 
-**Next steps:** You could rig it for animation, adjust the part split, or I can make a different chair style.}\par
+Next steps: You could rig it for animation, adjust the part split, or I can make a different chair style.}\par
 \textbf{Failed checks:} asked before making it ()\par
 \smallskip\noindent
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/2564702baa79.jpg}\\{\scriptsize \#1 model3d}\end{minipage}\hfill

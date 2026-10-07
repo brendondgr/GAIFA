@@ -465,9 +465,12 @@ class Agent:
         meta = await self.llm.meta(model)
         return meta.get("source") == "props"
 
-    async def window(self, model: str) -> int:
+    async def window(self, model: str, tid: str | None = None) -> int:
+        """The model's window, or the thread's own cap (`settings.window`) when that is smaller."""
         meta = await self.llm.meta(model)
-        return int(meta.get("context_length") or self.cfg.default_window)
+        w = int(meta.get("context_length") or self.cfg.default_window)
+        cap = ((self.store.thread(tid) or {}).get("settings") or {}).get("window") if tid else None
+        return min(w, int(cap)) if isinstance(cap, (int, float)) and cap > 0 else w
 
     async def messages(self, tid: str, tools: ToolSet, model: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
         system, sizes = await self.system_prompt(tid, tools, model)
@@ -486,7 +489,7 @@ class Agent:
         tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
         await tools.refresh()
         _, sizes = await self.messages(tid, tools, model)
-        m = ctx.meter(self.store.events(tid), await self.window(model), sizes)
+        m = ctx.meter(self.store.events(tid), await self.window(model, tid), sizes)
         m["model"] = model
         return m
 
@@ -523,7 +526,7 @@ class Agent:
             if reply.leaked:
                 payload["leaked"] = True
             self.emit(tid, "tool_call", payload)
-        window = await self.window(model)
+        window = await self.window(model, tid)
         self.emit(tid, "usage", {**reply.usage, "model": model, "window": window})
         events = self.store.events(tid)
         self.transient(tid, "context", ctx.meter(events, window, sizes) | {"model": model})
@@ -531,7 +534,7 @@ class Agent:
 
     async def _compact_if_needed(self, tid: str, tools: ToolSet, model: str, force: bool = False) -> bool:
         """Returns True when the turn must stop (the thrash guard)."""
-        window = await self.window(model)
+        window = await self.window(model, tid)
         msgs, sizes = await self.messages(tid, tools, model)
         used = ctx.est(msgs) + sizes["tools"]
         if not force and used < ctx.CLEAR_AT * window:

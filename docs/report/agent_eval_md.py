@@ -18,8 +18,8 @@ for f, label in [("eval-skynet-deferred.json", "Gemma 4 31B, first run (v1)"), (
                  ("eval-skynet-final.json", "31B, v3 (+2 tasks re-run)"), ("eval-skynet-v4.json", "31B, final code"),
                  ("eval-skynet-after.json", "31B, 5 weakest tasks re-checked"), ("eval-skynet-all-tools.json", "31B, all tools loaded"),
                  ("eval-26b-r1.json", "Gemma 4 26B, 1 run (local)"), ("eval-26b-v3.json", "26B, 3 runs (local)"),
-                 ("eval-26b-fixcheck.json", "26B, the 2 tasks fixed after its eval, re-checked"),
-                 ("eval-skynet-fixcheck.json", "31B, the same 2 tasks on the fixed code")]:
+                 ("eval-26b-fixcheck.json", "26B, the 4 tasks fixed after its eval, re-checked"),
+                 ("eval-skynet-fixcheck.json", "31B, the same 4 tasks on the fixed code")]:
     d = s(f)
     if d:
         x = d["summary"]

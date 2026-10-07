@@ -542,6 +542,13 @@ class Agent:
             if wrap_up:
                 msgs.append({"role": "user", "content": WRAP_UP})
             reply = await self.llm.chat(model, msgs, tools.functions(), delta, known, tool_choice=choice)
+        if reply.runaway:
+            self.emit(tid, "note", {"text": "the model started repeating itself; stopped it and asked again", "level": "warn"})
+            self.transient(tid, "delta_reset", {"step": step})
+            reply = await self.llm.chat(model, msgs, tools.functions(), delta, known, tool_choice=choice)
+            if reply.runaway:
+                reply.tool_calls, reply.thinking = [], reply.thinking[:2000]
+                reply.text = ("I got stuck repeating myself and stopped. Please ask again, perhaps one step at a time.")
         if not reply.text.strip() and not reply.tool_calls:
             # An empty reply (the server dropped a call it couldn't parse, or the model stopped early):
             # ask once more rather than leave the user with nothing.

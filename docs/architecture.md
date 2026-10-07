@@ -608,7 +608,7 @@ These are built after everything else works (backend-plan Phases 14–16). They 
 It works the way Claude Code does, scaled to a local model. The reasons and sources are in [agent-architecture.md](agent-architecture.md).
 - **One loop, no framework.** Call the model, run its tool calls, append the results, and repeat until a reply has no tool calls. It stops at a step cap (25) and says so instead of inventing an answer, which was one of Mango-Tree's bugs. A call repeated with the same arguments is refused from the third time; after the second refusal in a turn, the next model call gets `tool_choice: "none"` and a note asking for a plain answer, so a stuck turn ends in words instead of running to the cap. Dependencies: FastAPI, uvicorn, httpx.
 - **Model.** Through the relay (`http://127.0.0.1:4000/v1`), so every call shows in its stats. The default is `skynet` (Gemma 4 31B on the GPU box, 131,072 tokens), with the local Gemma 4 26B as the fallback.
-  - No `max_tokens`: thinking and output may use the whole window.
+  - No `max_tokens`: thinking and output may use the whole window. A reply that degenerates into one span repeated over and over (≥ 10 × 300 characters) is cut off and asked once more; a second runaway ends the turn with an honest note.
   - Thinking (`reasoning` / `reasoning_content`) is stored and shown on request, and never re-sent to the model.
   - Tool calls leaked into the text are re-parsed: Gemma's tags (also its `<call:…</call>` variant), Hermes', a known tool's name used as a tag (`<ask_user>{…}</ask_user>`), JSON objects, and a reply that is nothing but Python-style calls of known tools with literal arguments (parsed with `ast`, never run).
 - **Tools.**

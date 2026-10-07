@@ -229,3 +229,32 @@ def test_reparse_a_tool_name_used_as_a_tag():
     assert text == "What kind of chair?" and calls[0].name == "ask_user"
     assert json.loads(calls[0].arguments) == {"questions": [{"options": [{"description": "Sleek.", "label": "Modern"}], "question": "What style?"}]}
     assert reparse("<b>{not a tool}</b>", known)[1] == []
+
+
+def test_looping_spots_a_degenerate_tail_only():
+    from agent.llm import looping
+    unit = "Let me think about the dragon's wings again. "
+    assert looping("Start. " + unit * 200)
+    prose = " ".join(f"Step {i}: the model looks at part {i} of the image and notes its colour, shape and size." for i in range(200))
+    assert not looping(prose)                       # long, but no span repeats exactly
+    assert not looping(unit * 20)                   # too short to call
+
+
+async def test_a_runaway_reply_is_cut_and_asked_again(env):
+    """The 26B once streamed 23,762 tokens of thinking in 9 minutes; now it's cut off and retried once."""
+    env.model.queue({"thinking": "I should check the dragon. " * 600, "text": "never shown", "chunk": 400}, {"text": "Here it is."})
+    tid = await env.thread()
+    await env.send(tid, "go")
+    assert env.payloads(tid, "assistant")[-1]["text"] == "Here it is."
+    assert any("repeating itself" in n["text"] for n in env.payloads(tid, "note"))
+
+
+async def test_two_runaways_end_the_turn_honestly(env):
+    loop = {"thinking": "again and again and again. " * 600, "chunk": 400}
+    env.model.queue(dict(loop), dict(loop), {"text": "should not be reached"})
+    tid = await env.thread()
+    await env.send(tid, "go")
+    last = env.payloads(tid, "assistant")[-1]
+    assert "stuck repeating myself" in last["text"]
+    assert len(env.payloads(tid, "thinking")[-1]["text"]) <= 2000
+    assert (await env.client.get(f"/v1/threads/{tid}")).json()["state"] == "idle"

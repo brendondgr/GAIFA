@@ -1156,7 +1156,7 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
   - **`env`:** `AGENT_DB={databases}/agent.db`, `AGENT_DATA={root}/data/agent`, `AGENT_LLM_URL=http://127.0.0.1:4000/v1`, `AGENT_MODEL=skynet` (Gemma 4 31B, 131,072 tokens), `AGENT_FALLBACK_MODEL=gemma4-26b-7071`.
   *Done when:* `aihub check agent` passes.
 - [x] **14.3 The model client: `agent/llm.py`.** *As built:* `stream_options.include_usage`; leaked calls in Gemma's `<|tool_call>call:name{…}<tool_call|>` (with its `<|"|>` strings), Hermes `<tool_call>` and lone/fenced JSON naming a known tool; `<think>` blocks in content become thinking. Live: the 31B corrects a wrong argument name from the hub's `fix`.
-  - Streams `/v1/chat/completions` from the relay with the tool schemas. **No `max_tokens`:** the model may use the whole window for thinking and output.
+  - Streams `/v1/chat/completions` from the relay with the tool schemas. **No `max_tokens`:** the model may use the whole window for thinking and output. *As built:* a reply that only repeats itself is cut off and asked again once (the 26B once streamed 23,762 tokens in 9 minutes).
   - **Thinking** comes from `reasoning` (vLLM) or `reasoning_content` (llama.cpp). It is stored and streamed, but not sent back to the model on later turns.
   - **Tool calls:** native `tool_calls` first. If tool-call markup leaks into `content` (a reported Gemma 4 issue on llama.cpp), it is re-parsed. Malformed JSON arguments go back to the model as an error with the schema, once. Calls run in parallel when every tool in the batch is `read`, otherwise one at a time.
   - **Usage:** `prompt_tokens` and `completion_tokens` from every response feed the context meter (14.7).

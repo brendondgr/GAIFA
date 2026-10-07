@@ -49,7 +49,7 @@ def eval_runs() -> list[tuple[str, dict]]:
              ("eval-skynet-v4.json", "31B · final"), ("eval-skynet-after.json", "31B · 5 weakest, re-checked"),
              ("eval-skynet-all-tools.json", "31B · all tools loaded"),
              ("eval-26b-r1.json", "26B · 1 run"), ("eval-26b-v3.json", "26B · final"),
-             ("eval-26b-fixcheck.json", "26B · 2 fixed tasks"), ("eval-skynet-fixcheck.json", "31B · 2 fixed tasks")]
+             ("eval-26b-fixcheck.json", "26B · 4 fixed tasks"), ("eval-skynet-fixcheck.json", "31B · 4 fixed tasks")]
     return [(label, d) for f, label in order if (d := load(f))]
 
 

@@ -1,6 +1,7 @@
 """The model client (plan 14.3): `/v1/chat/completions` on the relay, streamed.
 
-- **No `max_tokens`:** thinking and output may use the whole window.
+- **No `max_tokens`:** thinking and output may use the whole window. A reply that degenerates into
+  repeating one span (`looping`) is cut off instead (`Reply.runaway`); the loop asks once more.
 - **Thinking** arrives as `reasoning` (vLLM) or `reasoning_content` (llama.cpp); it's returned
   separately and never sent back to the model.
 - **Tool calls:** native `tool_calls` first; if the model writes the call as text instead (Gemma's
@@ -123,6 +124,19 @@ class Reply:
     model: str | None = None
     leaked: bool = False
     split: bool = False          # planning moved out of the reply (split_planning)
+    runaway: bool = False        # cut off: the model kept repeating itself (looping)
+
+
+LOOP_WINDOW, LOOP_SPAN, LOOP_REPEATS = 8000, 300, 10
+
+
+def looping(text: str) -> bool:
+    """The end of the text is one span repeated over and over (a degenerate generation: the 26B
+    once streamed 23,762 tokens in 9 minutes). Needs ≥ 3,000 characters of exact repetition."""
+    if len(text) < LOOP_SPAN * LOOP_REPEATS:
+        return False
+    tail = text[-LOOP_WINDOW:]
+    return tail.count(tail[-LOOP_SPAN:]) >= LOOP_REPEATS
 
 
 def close_json(raw: str) -> dict[str, Any] | None:
@@ -311,6 +325,7 @@ class LLM:
         shown = TagRouter()
         calls: dict[int, dict[str, Any]] = {}
         t_think: float | None = None
+        checked = 0          # length of thinking + text at the last `looping` check
         try:
             async with self.client.stream("POST", self.base + "/chat/completions", json=body) as r:
                 if r.status_code >= 400:
@@ -357,6 +372,12 @@ class LLM:
                                 slot["arguments"] += fn["arguments"] if isinstance(fn["arguments"], str) else json.dumps(fn["arguments"])
                         if ch.get("finish_reason"):
                             reply.finish = ch["finish_reason"]
+                    if len(reply.thinking) + len(reply.text) - checked >= 1000:
+                        checked = len(reply.thinking) + len(reply.text)
+                        if looping(reply.thinking) or looping(reply.text):
+                            reply.runaway = True
+                            reply.finish = "runaway"
+                            break       # leaving the stream closes it, and the server stops generating
         except httpx.HTTPError as e:
             raise LLMError(f"{type(e).__name__}: {e}"[:400] or type(e).__name__, retryable=True) from None
         if t_think and not reply.thinking_s:

@@ -29,5 +29,6 @@ Something destructive & \emph{``Delete all my saved voices.''} & Every deletion 
 \item \textbf{Memory}: \emph{``Remember that I prefer 16:9 images.''} writes it to \code{data/agent/memory}, and every new chat starts with it.
 \item \textbf{How long things take here} (measured tonight): an image 20--60 s, an edit about 9 minutes, a 3D model 1--2 minutes (\emph{fast}), speech a few seconds, a 5 s video several minutes. One GPU job runs at a time; ask for the next step while one runs and it queues.
 \item \textbf{When memory is short} the agent tells you what holds it and asks. It never stops your LLM on its own; say ``stop the LLM'' if that's what you want.
+\item \textbf{Which model}: the 31B (skynet) is the steadier choice for long chains and judgement calls. The local 26B passes the same eval (80\,\% at pass\textasciicircum{}3), but it is more literal: name each step (``make the image, look at it, then read your description aloud'') rather than leaving one implied, and if a chain stops early, say ``continue''.
 \item \textbf{Long chats}: type \code{/compact} to summarize the older part, or branch from an earlier message to try something else without losing the original.
 \end{itemize}

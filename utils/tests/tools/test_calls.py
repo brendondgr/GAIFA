@@ -252,6 +252,7 @@ def test_coerce_forgives_small_slips():
         "aspect": "16:9 (Widescreen)", "steps": 8, "hd": True, "mode": "Fast"}
     assert coerce(s, {"aspect": "4:3", "steps": "x"}) == {"aspect": "4:3", "steps": "x"}
     assert coerce(s, {"aspect_ratio": "16:9", "step": 4}) == {"aspect": "16:9 (Widescreen)", "steps": 4}
+    assert coerce(s, {"aspect": '"16:9"'}) == {"aspect": "16:9 (Widescreen)"}        # quotes the model added
     assert coerce(s, {"aspect_ratio": "1:1", "aspect": "16:9"}) == {"aspect_ratio": "1:1", "aspect": "16:9 (Widescreen)"}  # no clash
 
 

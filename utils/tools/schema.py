@@ -260,6 +260,8 @@ def coerce(schema: dict[str, Any], args: Any) -> Any:
         if not isinstance(p, dict):
             continue
         t = p.get("type")
+        if isinstance(v, str) and len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'" and t in ("string", None):
+            v = out[k] = v[1:-1]          # '"16:9"': the quotes came from the model, not the value
         if isinstance(v, str) and "enum" in p and v not in p["enum"]:
             low = v.strip().lower()
             hits = [e for e in p["enum"] if isinstance(e, str) and (e.lower() == low or e.lower().startswith(low + " "))]

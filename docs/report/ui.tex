@@ -1,0 +1,37 @@
+The Chat page is new in \code{web/chat/}. It is plain ES modules on the page's React, with no build step, and it works on the live hub and in \code{?mock}, where a scripted agent stands in. Screenshots are from headless Chromium at 1440 $\times$ 900.
+
+\newcommand{\shot}[3]{\begin{minipage}[t]{#3\linewidth}\centering\includegraphics[width=\linewidth]{img/#1}\\[2pt]{\footnotesize\color{muted}#2}\end{minipage}}
+
+\begin{center}
+\shot{chat-question-card.png}{A question card: options with descriptions, multi-select, ``Other…'' for typed answers. Answered cards collapse to a summary.}{0.49}\hfill
+\shot{chat-parameter-card.png}{A parameter card (an approval): the \code{ask} fields are editable; what you set is what runs.}{0.49}
+\end{center}
+\begin{center}
+\shot{chat-result-card.png}{A result card: the output with its \#n, and action buttons. Some come from the actions registry; others are derived from any tool that takes an image.}{0.49}\hfill
+\shot{chat-tool-progress.png}{A tool card with live job progress and Stop.}{0.49}
+\end{center}
+\begin{center}
+\shot{chat-thinking-folded.png}{Thinking folded to one line per step, shown only with \emph{Show thinking} on\ldots}{0.49}\hfill
+\shot{chat-thinking-expanded.png}{\ldots and expanded in place, without moving the rest of the thread.}{0.49}
+\end{center}
+\begin{center}
+\shot{chat-context-meter.png}{The context meter (used / window) and its breakdown popover.}{0.49}\hfill
+\shot{header-approvals-popover.png}{The header \emph{Approvals} popover: pending cards from any client (chat, MCP, the API tab).}{0.49}
+\end{center}
+\begin{center}
+\shot{chat-thread-light.png}{Light theme.}{0.49}\hfill
+\shot{chat-parameter-card-error.png}{An edit the hub rejects is shown on the card, and the card stays open.}{0.49}
+\end{center}
+\begin{center}
+\shot{chat-narrow-900.png}{At 900 px wide.}{0.55}\hfill
+\shot{chat-phone.png}{Phone width: the thread list becomes a drawer, and nothing scrolls sideways.}{0.2}\hfill
+\shot{settings-agent.png}{Settings $\rightarrow$ Agent: AGENT.md, memory, Show thinking.}{0.2}
+\end{center}
+
+\subsection*{Adding to it: the extension points}
+\begin{itemize}[leftmargin=*]
+\item \textbf{A new card}: \code{registerCard('my\_event', (\{item, ctx\}) => …)} for a new event type, or \code{registerCard('result:<tool>', …)} / \code{'approval:<tool>'} to give one tool its own look. A type nobody registered renders as a collapsed JSON card, and each card has its own error boundary, so a broken card never breaks the thread.
+\item \textbf{A new button}: \code{registerAction(\{id, on: 'image'|'video'|'audio'|'model3d'|'composer', label, tool, args(output)\})}, or \code{prompt(output)} to send a chat message instead. A mod also gets buttons \emph{for free}: any tool with an \code{x-kind} file input matching an output's kind appears on that output's card.
+\item \textbf{A new preview}: \code{registerPreview(kind, Component)} for a new output kind.
+\item \textbf{A new skill}: \code{services/<mod>/skills/<name>/SKILL.md} with a \code{description}, and \code{[agent] skills = "skills"} in the manifest. The agent lists it, reads it when needed, and it becomes a \code{/<name>} slash command.
+\end{itemize}

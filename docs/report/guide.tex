@@ -1,0 +1,31 @@
+What follows comes from the eval and live transcripts: what the agent does with each kind of request, and how to phrase things so it does what you mean on the first try. Plain language works; no special syntax is needed.
+
+\begin{longtable}{@{}p{3.6cm}p{5.6cm}p{5.6cm}@{}}
+\toprule
+You want & Say it like this & What happens \\
+\midrule\endhead
+An image, your way & \emph{``Make a 16:9 photo of a red fox sitting in fresh snow at sunrise.''} & One call, no questions. The parameter card shows the workflow, aspect and size, already filled from your words; press Run or change them. \\
+An image, open-ended & \emph{``Make me an image.''} / \emph{``Draw something for me.''} & It asks what the subject should be (a question card with options, or a one-line question), then generates. It never invents a subject. \\
+A particular style or workflow & \emph{``\ldots a watercolor painting\ldots{} using the painterly workflow''}; \emph{``\ldots with text on a sign''} & It reads the comfy skill and picks \code{zimage-intorealism} for paintings or \code{qwen21-t2i} for text in images. Naming the workflow (\code{zimage-intorealism}) always works. \\
+Speech in a voice & \emph{``Say `Good morning, everyone' in the af\_heart voice.''} / \emph{``Use the Arabella voice to say: \ldots''} & One call. Without a voice it uses the default; with \emph{``in my voice''} it lists your voices and asks which. \\
+Your own text read aloud & Put the text in the message: \emph{``Read this aloud: \ldots''} & With \emph{``Read my paragraph''} and no text, it asks you to paste it. \\
+A 3D model & \emph{``Make a 3D model of a low-poly treasure chest.''} & One gen3d job; the card offers the preset (\emph{fast} is about a minute) and the stages. \\
+Image $\rightarrow$ 3D & \emph{``Turn that robot into a 3D model.''} (after an image) or in one message: \emph{``Make an image of a red dragon, then turn it into a 3D model.''} & gen3d takes text only, so the agent \emph{looks at the image} (\code{view\_output}; both models see images) and writes a 3D prompt describing the object, then runs gen3d. \\
+Image $\rightarrow$ video & \emph{``Now animate it: the boat drifts slowly.''} & \code{animate\_image} with the earlier image as input. Describe the \emph{motion}, not the scene. About 5 s of 480p; it takes minutes. \\
+Edit an image & \emph{``Make it winter, with snow on the roof.''} & \code{edit\_image} on the image you mean (``it'' = the latest; \#2 or ``the cabin image'' for an older one). \\
+Several steps at once & \emph{``Make an image of a mountain village, animate it with drifting clouds, and narrate a one-sentence description of it.''} & It writes a checklist (pinned at the top), runs the steps in order with a card each, and marks failures, asking whether to retry, change or skip. \\
+Refer to earlier outputs & \emph{``the image you made earlier''}, \emph{``\#2''}, \emph{``my most recent image''} & Outputs in the chat are numbered \#1, \#2\ldots{}; \emph{``my most recent image''} searches your Outputs. \\
+Look at an image & \emph{``Describe \#1 in two sentences.''} / \emph{``Which of the two is more colorful?''} & \code{view\_output} sends the picture to the model. \\
+What's going on & \emph{``What's running, and how much memory is free?''} & Hub tools answer directly; no card (they only read). \\
+Something destructive & \emph{``Delete all my saved voices.''} & Every deletion is a card you must approve; denying one stops it. \\
+\bottomrule
+\end{longtable}
+
+\subsection*{Things that help}
+\begin{itemize}[leftmargin=*]
+\item \textbf{Say the settings you care about in words} (``16:9'', ``watercolor'', ``fast preset''). The card fills them in; whatever you leave out uses sensible defaults you can still change on the card.
+\item \textbf{Use the mode picker} instead of instructions: \emph{Use defaults} runs generating tools without cards (only destructive ones ask); \emph{Read only} lets it look but not make or change anything.
+\item \textbf{Buttons are faster than words} for the obvious next step: Animate, Edit, Remove background and Make 3D on an image card run the tool directly (with a card for its settings), and the model sees what you did when you next write.
+\item \textbf{Memory}: \emph{``Remember that I prefer 16:9 images.''} writes it to \code{data/agent/memory}, and every new chat starts with it.
+\item \textbf{Long chats}: type \code{/compact} to summarize the older part, or branch from an earlier message to try something else without losing the original.
+\end{itemize}

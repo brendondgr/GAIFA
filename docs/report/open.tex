@@ -1,0 +1,17 @@
+\subsection*{Decisions only you can make}
+\begin{enumerate}[leftmargin=*]
+\item \textbf{opencode's working folder.} \code{OPENCODE\_PROJECT\_DIR} in \code{services/opencode/.env} still points at \code{\textasciitilde/Tools/DashLLM}. It's one of the two paths \code{aihub doctor --inventory} lists outside the project. Choose where opencode should work, or accept it as allowlisted.
+\item \textbf{lcpp's CLI is installed as a uv tool} (\code{\textasciitilde/.local/share/uv/tools/lcpp}, linked from \code{\textasciitilde/.local/bin/lcpp}). That's the other path outside the project. Replacing it with a link into \code{services/lcpp/.venv} means uninstalling the uv tool, and I didn't delete anything without asking.
+\item \textbf{Approving from an MCP client.} With MCP's form elicitation, a client that shows the form (Claude Code in interactive mode) can approve a card itself. That matches the plan, but you may prefer that only AIHub approves; removing the form path makes every client send you to AIHub's Approvals popover instead.
+\item \textbf{Leftover from the move}: the old lcpp state folder \code{/run/user/1000/lcpp} is now unused; it is tmpfs and disappears at the next reboot.
+\end{enumerate}
+
+\subsection*{Not done, or only partly}
+\input{notdone.tex}
+
+\subsection*{Housekeeping after the night}
+\begin{itemize}[leftmargin=*]
+\item The eval's dry-run stand-ins are in \code{outputs/eval/} (labelled ``DRY RUN''), and its threads are titled ``eval …'' in the Chat page. Delete them from the Outputs and Chat pages when you've looked at them; nothing else uses them.
+\item Real outputs from the live runs are in \code{outputs/comfy}, \code{outputs/gen3d} and \code{outputs/tts} like any others.
+\item Nothing was pushed to GitHub. The night's work is a series of local commits on \code{main} (\code{git log}).
+\end{itemize}

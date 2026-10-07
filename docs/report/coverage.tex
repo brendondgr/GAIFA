@@ -1,0 +1,23 @@
+Status of every area in \code{docs/test-plan.md} (written before the code). \ok{} means every check in the area passed; \partly{} lists what's missing; \emph{evidence} names the tests or runs.
+
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{3.3cm}>{\raggedright\arraybackslash}p{1.3cm}>{\raggedright\arraybackslash}p{9.6cm}@{}}
+\toprule
+Area (checks) & Status & Evidence and gaps \\
+\midrule\endhead
+1 Tool catalog (1.1–1.14) & \ok & \code{utils/tests/tools/test\_catalog.py} (5 tests: manifest + runtime + hub tools, merged schemas, defaults, x-kind, index size, names, search, a stopped mod), contract test; live: 41 tools, search ranks the right tool first. \\
+2 Calls and approvals (2.1–2.20) & \partly & \code{test\_calls.py} (22 tests: validation with fixes, deny/ask/allow and modes, approval with edits, denial, decided twice, no bypass, approvals across a hub restart and expiry, capping, binary results, jobs with progress, cancel, file inputs, mod errors, hub tools, two pending approvals, the make-room header, dry runs). \emph{Gap (2.20):} permissions are read from \code{config.toml} at hub start; Settings $\rightarrow$ Agent shows them but doesn't edit them yet. \\
+3 Model facts (3.1–3.6) & \ok & relay suite 189 tests (props, vLLM, probe, override, unreachable, cache); live: skynet 131,072, 26B 262,144. \\
+4 MCP (4.1–4.5) & \ok & \code{test\_mcp.py} (8 tests incl.\ the official \code{mcp} SDK against a hub process); live: Claude Code listed 41 tools and called two; its \code{tts\_speak} became a denied approval. \\
+5 The loop (5.1–5.20) & \ok & \code{services/agent/tests/test\_loop.py} (16 tests incl.\ a \code{SIGKILL} while waiting, queued messages, cancel during a stream and a job, fork, replay, fallback model, two threads at once, 300 concurrent requests); live: the relay shows the agent's traffic. \\
+6 Asking and approving (6.1–6.10) & \ok & \code{test\_asking.py} (9 tests); the eval's \emph{must ask} / \emph{must not ask} groups; live runs answered real cards. \\
+7 Tools on demand (7.1–7.5) & \ok & \code{test\_tools.py} (5 tests). \\
+8 Context (8.1–8.8) & \ok & \code{test\_context.py} (7 tests: window from meta and default, meter, capping and \code{read\_result}, both compaction stages, the thrash guard, prompt order); live meter check (Section 8 data). \\
+9 Chaining (9.1–9.7) & \ok & \code{test\_chaining.py} (5 tests); eval chains; live image $\rightarrow$ 3D and describe $\rightarrow$ speak with real outputs. \\
+10 Skills, memory, todos (10.1–10.6) & \ok & \code{test\_memory.py}, \code{test\_todos.py}, \code{test\_skills.py}. \\
+11 Chat UI (11.1–11.18) & \ok & Node tests (\code{chat.test.mjs}, \code{sessions.test.mjs}); browser checks in \code{?mock} and live (screenshots in Section 7). \\
+12 Sessions (12.1–12.7) & \input{gen/cov_sessions.tex} \\
+13 Inside the folder (13.1–13.6) & \ok & \code{test\_logfiles.py}, the inventory test, lcpp's reboot test; live: lcpp moved to \code{data/state/lcpp} with the 26B still managed; inventory on the live install and on a fresh clone. \\
+14 Regression and safety (14.1–14.6) & \ok & all suites green at every commit; \code{aihub check} passes for every mod (agent included); the injection task passed every run; no out-of-memory during the night (the memory manager refused and explained instead). \\
+15 Agent eval & \ok & Section 4: the 31B passes the 80\% gate. \\
+\bottomrule
+\end{longtable}

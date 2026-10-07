@@ -1,0 +1,5 @@
+.preview/
+*.aux
+*.log
+*.out
+*.toc

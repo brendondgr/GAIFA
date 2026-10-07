@@ -1,0 +1,21 @@
+Every problem below was found by a test during the night, then fixed and re-tested. The ``Found by'' column shows which level caught it. The live runs and the eval found the problems that matter most to you.
+
+\begin{longtable}{@{}p{0.4cm}p{6.2cm}p{5.6cm}p{2.0cm}@{}}
+\toprule
+\# & Problem & Fix & Found by \\
+\midrule\endhead
+1 & \textbf{ComfyUI ignored the agent's prompt.} The hub sent a runtime tool's arguments flat; comfy expects \code{\{"arguments": …\}}, so it silently ran the workflow's built-in example. ``A cute robot toy'' became an anime girl with fox ears. & The hub wraps \code{tools\_source} calls; comfy now \emph{refuses} unknown fields instead of running defaults; the fake mod follows the real contract, so the tests would catch it. & live run L2 \\
+2 & \textbf{Several tool calls in one reply lost their endings.} vLLM's streaming Gemma 4 parser on skynet never sends the closing \code{"\}} of every call but the last, so \code{read\_skill} got \code{\{"name": "comfy/choosing-a-workflow}. & Truncated JSON is closed (open string, brackets) and used; tested on the raw stream. & live run L2, raw stream capture \\
+3 & \textbf{The model's reasoning leaked into replies.} In v1, 194 of 424 replies began ``The user wants… I should…''. Each time, vLLM's reasoning parser missed the start of Gemma's thought channel, leaving \code{thinking<channel|>reply} in the text. & The client splits on \code{<channel|>} and \code{<think>} (also while streaming). Leading planning paragraphs move to thinking, and the prompt asks for \code{<think>} tags. & eval v1 transcripts \\
+4 & \textbf{The agent returned 500s under concurrent requests.} Its single SQLite connection was shared by FastAPI's worker threads without a lock on reads (\code{sqlite3.InterfaceError}). In the eval this looked like random harness errors. & Every use of the connection goes through one lock. A test with 300 concurrent requests, and a live race test (240 requests, 0 bad). & eval, then a race test \\
+5 & \textbf{Aspect ratios didn't match between packs.} The tool offered ``1:1 (Square)'' (one pack's labels), and comfy then rejected it for another pack that wants ``1:1''. & Comfy matches aspect values by ratio; its tools offer the shared plain list. & live direct call \\
+6 & \textbf{Approving a card recorded the decision twice.} The approval route and the hub-event watcher raced. & The agent marks a decision in progress, and the watcher skips it. & eval transcript \\
+7 & \textbf{Dry-run stand-ins confused the model.} It looked at an unrelated image, decided the tool was broken, and regenerated. & A dry run now makes a labelled placeholder drawn from the prompt (images), or a copy of a real output titled after the request. & eval v1 \\
+8 & \textbf{The model guessed argument names} (\code{aspect\_ratio}, \code{step}). & Near-miss names are mapped when unambiguous; otherwise the error names the right one (it then corrects itself). & eval \\
+9 & \textbf{The agent's dashboard widget returned 500s.} A query parameter named \code{range} hid Python's \code{range}. & Renamed; covered by a test. & \code{aihub check agent} \\
+10 & \textbf{A deferred tool's schema was missing from the retry hint} for malformed arguments. & The schema is fetched before the error goes back. & unit test \\
+11 & \textbf{Read-only threads and turned-off tool groups made the model wander} (up to 10 tool calls before it gave up). & A turned-off group is refused by the agent before the hub, with a clear message. & eval \\
+12 & \textbf{Chat UI}: two quick option clicks lost the first; a shared form helper passed a browser event as the form value; images collapsed to zero height; the page outgrew the window; scroll-to-bottom missed late content. & Fixed in \code{web/chat/} and \code{mod-form.js}. & browser checks \\
+13 & \textbf{My own mistakes, for honesty}: I restarted the hub three times during the first eval, which broke 11 runs (they're counted as infrastructure errors); a \code{pkill -f} pattern matched my own shell; two test fixtures had the old live-area list. & Rule kept from then on: no restarts during evals; kill by PID. & — \\
+\bottomrule
+\end{longtable}

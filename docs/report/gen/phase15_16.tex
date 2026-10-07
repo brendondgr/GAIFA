@@ -1,0 +1,7 @@
+\subsection*{The context meter against the model's own count}
+Before each turn, the meter's prediction (last usage, minus thinking, plus an estimate of what was added) is compared with the \code{prompt\_tokens} the 31B then reported:
+\begin{tabular}{@{}lrrr@{}}\toprule Turn & Predicted & Actual & Error \\ \midrule
+\emph{Tell me a two-line poem about foxes.} & 2,989 & 2,995 & -0.2\% \\
+\emph{What's running right now?} & 3,028 & 3,030 & -0.1\% \\
+\emph{Summarize our chat in one sentence.} & 3,629 & 3,669 & -1.1\% \\
+\bottomrule\end{tabular}

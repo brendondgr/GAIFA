@@ -1,0 +1,209 @@
+% AIHub overnight report: Phases 13–16. Build: python3 build.py && lualatex report.tex (twice).
+\documentclass[10.5pt,a4paper]{article}
+\usepackage[margin=2.1cm,top=2.2cm,bottom=2.4cm]{geometry}
+\usepackage{fontspec}
+\usepackage[sans]{plex-otf}
+\renewcommand{\familydefault}{\sfdefault}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs,longtable,array,tabularx}
+\usepackage{enumitem}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+\definecolor{ink}{HTML}{1B2230}
+\definecolor{muted}{HTML}{6B7485}
+\definecolor{accent}{HTML}{E8A100}
+\definecolor{purple}{HTML}{8B5CF6}
+\definecolor{teal}{HTML}{0E9F9A}
+\definecolor{okgreen}{HTML}{1E9E5A}
+\definecolor{warnamber}{HTML}{C47F00}
+\definecolor{badred}{HTML}{D23B3B}
+\definecolor{panel}{HTML}{F4F6FA}
+\definecolor{line}{HTML}{D9DEE7}
+\color{ink}
+\hypersetup{colorlinks=true,linkcolor=purple,urlcolor=purple,pdftitle={AIHub overnight report: Phases 13-16}}
+
+\titleformat{\section}{\Large\bfseries\color{ink}}{\color{accent}\thesection}{0.6em}{}[\vspace{-2pt}{\color{line}\rule{\linewidth}{0.6pt}}]
+\titleformat{\subsection}{\large\bfseries\color{ink}}{\color{accent}\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{14pt}{8pt}
+\setlist{itemsep=2pt,topsep=4pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small\color{muted}AIHub · overnight report}
+\fancyhead[R]{\small\color{muted}Phases 13–16 · 7 October 2026}
+\fancyfoot[C]{\small\color{muted}\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+\newtcolorbox{note}[1][]{colback=panel,colframe=line,boxrule=0.5pt,arc=3pt,left=8pt,right=8pt,top=6pt,bottom=6pt,#1}
+\newtcolorbox{livecase}[1]{colback=white,colframe=line,boxrule=0.6pt,arc=3pt,left=8pt,right=8pt,top=5pt,bottom=6pt,
+  title={\small\bfseries #1},coltitle=ink,colbacktitle=panel,breakable,fonttitle=\sffamily}
+\newcommand{\kpi}[2]{\begin{tcolorbox}[colback=panel,colframe=line,boxrule=0.5pt,arc=4pt,width=\linewidth,halign=center,valign=top,top=4pt,bottom=4pt,height=2.25cm]
+  {\LARGE\bfseries\color{ink}#1}\\[1pt]{\footnotesize\color{muted}#2}\end{tcolorbox}}
+\newcommand{\ok}{\textcolor{okgreen}{\textbf{pass}}}
+\newcommand{\bad}{\textcolor{badred}{\textbf{fail}}}
+\newcommand{\partly}{\textcolor{warnamber}{\textbf{partly}}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\begin{document}
+
+% ---------------------------------------------------------------- title
+\begin{tikzpicture}[remember picture,overlay]
+  \fill[ink] (current page.north west) rectangle ([yshift=-5.3cm]current page.north east);
+  \node[anchor=north west,text=white,font=\sffamily] at ([xshift=2.1cm,yshift=-1.4cm]current page.north west)
+    {\begin{minipage}{15cm}{\Huge\bfseries AIHub overnight report}\\[6pt]
+     {\Large\color{accent}Phases 13–16: tools, the chat agent, sessions, everything in the folder}\\[6pt]
+     {\normalsize\color{line} Built and tested overnight, 6–7 October 2026 · prepared by Claude}\end{minipage}};
+\end{tikzpicture}
+\vspace*{4.4cm}
+
+\input{gen/glance.tex}
+
+\begin{note}
+\textbf{In one paragraph.} Phases 13–16 are built and committed: a tool catalog with risk levels and approvals the hub enforces, an MCP endpoint that Claude Code uses, model facts from the relay, our own Claude-Code-style agent (one loop, tools on demand, question and parameter cards, chained outputs, a context meter and compaction), a Chat page whose cards and actions come from registries, sessions, and logs and state inside the project. Before shipping each piece it was tested at three levels: unit tests against fakes, a 30-task agent eval run three times per model, and live conversations that made real images, 3D models, videos and speech on this machine. The live runs found bugs the fakes could not, and these were fixed during the night (Section~\ref{sec:issues}). Section~\ref{sec:open} lists what still needs your decision.
+\end{note}
+
+\tableofcontents
+\newpage
+
+% ---------------------------------------------------------------- 1
+\section{What was built}
+\input{phases.tex}
+
+\section{How the pieces fit together}
+\begin{center}
+\begin{tikzpicture}[
+  box/.style={draw=line,fill=panel,rounded corners=3pt,align=center,font=\small,minimum height=0.9cm,inner sep=5pt},
+  hub/.style={box,fill=accent!14,draw=accent!70},
+  mod/.style={box,fill=white},
+  ext/.style={box,fill=purple!8,draw=purple!50},
+  arr/.style={-{Stealth[length=2mm]},draw=muted,thick},
+  lab/.style={font=\scriptsize,color=muted,fill=white,inner sep=1pt}]
+  \node[ext] (ui) at (0,6.2) {Chat page\\\scriptsize web/chat/ (card + action registries)};
+  \node[ext] (cc) at (6.3,6.2) {Claude Code\\\scriptsize any MCP client};
+  \node[mod,minimum width=3.4cm] (agent) at (0,3.9) {\textbf{agent mod} (:5100)\\\scriptsize loop · event log · context\\\scriptsize skills · memory · todos};
+  \node[hub,minimum width=6.2cm,minimum height=2.3cm] (hub) at (6.3,3.4) {};
+  \node[font=\small\bfseries,anchor=north] at (hub.north) {AIHub hub (:7000)};
+  \node[box,fill=white,font=\scriptsize,minimum height=0.6cm] (cat) at ($(hub.center)+(-1.6,0.05)$) {tool catalog\\risk · ask · x-kind};
+  \node[box,fill=white,font=\scriptsize,minimum height=0.6cm] (ap) at ($(hub.center)+(1.6,0.05)$) {calls · approvals\\jobs · outputs};
+  \node[box,fill=white,font=\scriptsize,minimum height=0.5cm] (mcp) at ($(hub.center)+(0,-0.8)$) {/mcp · sessions · logs · memory manager};
+  \node[mod] (relay) at (0,1.2) {relay (:4000)\\\scriptsize model facts};
+  \node[ext] (m31) at (-2.2,-0.5) {Gemma 4 31B\\\scriptsize skynet · 131k};
+  \node[ext] (m26) at (2.1,-0.5) {Gemma 4 26B\\\scriptsize local · 262k};
+  \node[mod] (comfy) at (4.3,0.6) {comfy\\\scriptsize images · video};
+  \node[mod] (gen3d) at (6.4,0.6) {gen3d\\\scriptsize 3D};
+  \node[mod] (tts) at (8.4,0.6) {tts\\\scriptsize speech};
+  \draw[arr] (ui) -- node[lab,right]{/api/s/agent} (agent);
+  \draw[arr] (ui.east) -- node[lab,above]{approvals} ($(hub.north west)+(0.4,0)$);
+  \draw[arr] (cc) -- node[lab,right]{MCP} (hub);
+  \draw[arr] (agent.east) -- node[lab,above]{tools, calls} (hub.west);
+  \draw[arr] (agent) -- node[lab,right]{chat} (relay);
+  \draw[arr] (relay) -- (m31); \draw[arr] (relay) -- (m26);
+  \draw[arr] (hub.south) ++(-2,0) -- (comfy); \draw[arr] (hub.south) -- (gen3d); \draw[arr] (hub.south) ++(2,0) -- (tts);
+\end{tikzpicture}
+\end{center}
+The agent never talks to a mod directly: every tool call goes through the hub, which validates the arguments, applies your permissions, asks for approval where needed, follows long jobs and turns results into output references (\code{output:<id>}). The same calls are open to any MCP client, and the hub enforces approval there too.
+
+\subsection{One turn of the agent}
+\begin{center}
+\begin{tikzpicture}[node distance=0.55cm,
+  st/.style={draw=line,fill=panel,rounded corners=3pt,font=\small,align=center,minimum width=3.1cm,minimum height=0.8cm},
+  dec/.style={diamond,draw=line,fill=white,font=\scriptsize,align=center,aspect=2.2,inner sep=1pt},
+  pause/.style={st,fill=purple!8,draw=purple!50},
+  arr/.style={-{Stealth[length=2mm]},draw=muted,thick}]
+  \node[st] (msg) {User message\\\scriptsize or a button (action)};
+  \node[st,below=of msg] (ctx) {Rebuild messages from the log\\\scriptsize compact at 70\% / 85\%};
+  \node[st,below=of ctx] (llm) {Model call (stream)\\\scriptsize thinking split off · no max\_tokens};
+  \node[dec,below=of llm] (tc) {tool\\calls?};
+  \node[st,right=1.6cm of tc] (run) {Run tools\\\scriptsize reads in parallel};
+  \node[pause,above=1.6cm of run,xshift=1.2cm] (card) {Question / parameter card\\\scriptsize turn pauses (\code{waiting})};
+  \node[st,below=of tc] (done) {Reply · next steps\\\scriptsize turn ends};
+  \draw[arr] (msg) -- (ctx); \draw[arr] (ctx) -- (llm); \draw[arr] (llm) -- (tc);
+  \draw[arr] (tc) -- node[font=\scriptsize,above]{yes} (run);
+  \draw[arr] (tc) -- node[font=\scriptsize,right]{no} (done);
+  \draw[arr] (run) -- node[font=\scriptsize,right,align=left]{asks or\\needs approval} (card);
+  \draw[arr] (card.north) |- node[font=\scriptsize,above,pos=0.75]{answer / Run} (ctx.east);
+  \draw[arr] (run.south) -- ++(0,-0.4) -| node[font=\scriptsize,below,pos=0.25]{results} ($(llm.west)+(-0.6,0)$) |- (ctx.west);
+\end{tikzpicture}
+\end{center}
+Every step is an event in an append-only log (\code{agent.db}). A paused turn holds nothing in memory, so killing the agent, or restarting the hub, loses nothing. A fork copies the log up to a chosen event: that's how rewind and branch work.
+
+% ---------------------------------------------------------------- 3
+\section{How everything was tested}
+The test plan (\code{docs/test-plan.md}) was written before the code: 15 areas and about 140 checks. Every piece was then tested at three levels:
+\begin{enumerate}[leftmargin=*]
+\item \textbf{Unit tests with fakes.} The hub's tool tests use a fake mod (\code{fake-tools}) that has every kind of tool: a job, file inputs, binary results and a runtime tool list. The agent's tests use a scripted OpenAI-compatible model and a stand-in hub, so the loop is tested with no model or GPU. One test kills the agent with \code{SIGKILL} while it waits for an answer and starts it again.
+\item \textbf{The agent eval.} 30 scripted conversations in six groups. A harness answers the agent's questions and cards from a script, and the outcome is graded (right tool, arguments, outputs, asked or not, nothing invented). Each task runs 3 times, and \emph{pass\textasciicircum{}3} counts a task only when all three runs pass. To fit 90 conversations per model into minutes, generating tools ran as \emph{dry runs}: the hub made a labelled stand-in output instead of using the GPU, so chains still had real output ids.
+\item \textbf{Live runs.} Real conversations through the whole stack that made real images, 3D models, videos and speech, one at a time on the GPU. These found the bugs the fakes could not (Section~\ref{sec:issues}).
+\end{enumerate}
+
+\subsection{Automated test suites (final run)}
+\input{gen/tests.tex}
+
+% ---------------------------------------------------------------- 4
+\section{The agent eval}
+\subsection{Results}
+\input{gen/eval_summary.tex}
+
+\medskip
+The gate in plan 13.5 is pass\textasciicircum{}3 $\geq$ 80\% on the primary model (Gemma 4 31B). \emph{v1} is the first run, with the first prompts. \emph{v2} adds the fixes for leaked reasoning and fairer checks. \emph{final} is the run after the live-test fixes. ``Infra.\ errors'' counts runs that broke for reasons outside the agent's decisions: my hub restarts during v1, and a store race found and fixed overnight (Section~\ref{sec:issues}).
+
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[ybar,width=\linewidth,height=6.2cm,bar width=6pt,ymin=0,ymax=105,ylabel={pass@1 (\%)},
+  symbolic x coords={Single,Chains,MustAsk,NoAsk,Safety,Context},
+  xtick=data,xticklabel style={font=\small},ylabel style={font=\small},yticklabel style={font=\small},
+  legend style={font=\scriptsize,at={(0.5,-0.18)},anchor=north,legend columns=3,draw=none},
+  enlarge x limits=0.12,ymajorgrids,grid style={line},axis line style={line},tick style={line},
+  cycle list={{fill=muted!50,draw=none},{fill=accent!70,draw=none},{fill=purple!70,draw=none},{fill=teal!70,draw=none},{fill=okgreen!60,draw=none},{fill=badred!50,draw=none}}]
+\input{gen/eval_groups.tex}
+\end{axis}
+\end{tikzpicture}
+\end{center}
+{\footnotesize\color{muted} Groups: single generations, chains, must ask, must not ask, refusals and safety, context.}
+
+\subsection{Every task, with its prompt}
+\input{gen/eval_tasks.tex}
+
+\subsection{What failed in the final runs}
+\input{gen/eval_failures.tex}
+
+% ---------------------------------------------------------------- 5
+\section{Live runs: real outputs on this machine}
+Each case is a real conversation through the hub's proxy, with no dry run. The harness answered questions and approved cards as a person would (for 3D it picked the \emph{fast} preset). Thumbnails are the real outputs.
+
+\input{gen/live.tex}
+
+% ---------------------------------------------------------------- 6
+\section{How to word requests}
+\input{guide.tex}
+
+% ---------------------------------------------------------------- 7
+\section{The Chat page}
+\input{ui.tex}
+
+% ---------------------------------------------------------------- 8
+\section{Sessions, logs, state and the inventory}
+\input{gen/phase15_16.tex}
+
+% ---------------------------------------------------------------- 9
+\section{Issues found and fixed overnight}\label{sec:issues}
+\input{issues.tex}
+
+% ---------------------------------------------------------------- 10
+\section{Open items and decisions for you}\label{sec:open}
+\input{open.tex}
+
+\appendix
+\section{Test plan coverage}
+\input{coverage.tex}
+
+\end{document}

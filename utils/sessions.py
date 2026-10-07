@@ -196,9 +196,17 @@ class Sessions:
                 steps.append({"action": "stop_llm", "target": i["name"], "detail": f"stop {i.get('relay', {}).get('alias') or i['name']}",
                               "bytes": -int(i.get("rss_bytes") or 0)})
                 freed += int(i.get("rss_bytes") or 0)
+        def has_op(mod: str, op: str) -> bool:
+            """Mods without a load/unload operation (lcpp: its instances are its load) aren't loaded or unloaded here."""
+            try:
+                mm = self.hub.services.get(mod).m
+            except Exception:  # noqa: BLE001
+                return False
+            return bool(mm and mm.memory and getattr(mm.memory, op))
+
         for m, v in now["mods"].items():
             t = target["mods"].get(m)
-            if v["load"] == "loaded" and (t is None or t.get("load") != "loaded"):
+            if v["load"] == "loaded" and (t is None or t.get("load") != "loaded") and has_op(m, "unload"):
                 used = mem.used.get(m, 0) if mem else 0
                 steps.append({"action": "unload", "target": m, "detail": f"unload {m}", "bytes": -used})
                 freed += used
@@ -217,7 +225,7 @@ class Sessions:
                 needed += b
         for m, t in target["mods"].items():
             cur = now["mods"].get(m)
-            if cur and t.get("load") == "loaded" and cur["load"] != "loaded":
+            if cur and t.get("load") == "loaded" and cur["load"] != "loaded" and has_op(m, "load"):
                 svc = self.hub.services.get(m)
                 b = mem.needs(svc) if mem else 0
                 steps.append({"action": "load", "target": m, "detail": f"load {m}", "bytes": b})

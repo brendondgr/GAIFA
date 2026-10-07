@@ -104,3 +104,20 @@ async def test_autosave_at_shutdown_unclean_flag_and_restore_on_boot(services_di
                     break
                 await asyncio.sleep(0.1)
             assert (await c.get("/api/services/fake-ok")).json()["state"] == "ready"
+
+
+async def test_mods_without_load_ops_are_left_to_their_own_steps(services_dir, root, make_app):
+    """lcpp reports `loaded` from its instances and has no load operation: a session switch must not
+    try to load or unload it (its instances are stopped and launched as their own steps)."""
+    _mods(services_dir, "fake-ok")
+    cfg = config.load(root / "config.toml")
+    app = await _app(make_app, cfg)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://hub", timeout=60) as c:
+            await wait_ready(c, "fake-ok")
+            s = app.state.hub.sessions
+            snap = await s.snapshot()
+            snap["mods"]["fake-ok"]["load"] = "loaded"          # as lcpp reports it
+            saved = await s.save("Odd", snapshot=snap)
+            plan = (await c.post(f"/api/sessions/{saved['id']}/restore?dry_run=1")).json()
+            assert not [st for st in plan["steps"] if st["target"] == "fake-ok"]

@@ -30,6 +30,7 @@
 | 13 | `Hub.dc.html`, `mock.js` | Settings → Paths lists `data/logs` and `data/state` with their sizes (`System.paths/usage` gained `logs`, `state`) | Wire 16 | 16 |
 | 14 | `Hub.dc.html`, `mock.js`, `mock-tools.js` | API tab: an operation that is an agent tool with risk other than read is sent as a tool call (`api-tool.js` `ToolRun`: `callTool(<mod>_<tool>, args, {mode: 'ask'})`, the parameter card inline, `decideApproval`, progress, outputs as links); a file upload still goes direct. The mock's `tts_speak` tool takes the same inputs as its `POST /v1/speech` operation (whose voice default is now `Hope`, one of its enum values); finished mock tool calls return an output | Wire 13 | 14.1 |
 | 15 | `Hub.dc.html` | `componentDidUpdate` no longer reads `prevState` (support.js passes only `prevProps`, so opening the palette threw on every update and its input wasn't focused) | Bug fix | 14.1 |
+| 16 | `Hub.dc.html` | The sidebar's MOCK button (mock scenarios, Shift+D) shows only in `?mock` or while some area is mocked | On the live hub it read as if the page were a mock | 16 |
 
 ## Revision 2 (step 6.5): what changed
 

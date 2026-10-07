@@ -1104,7 +1104,7 @@ The hub becomes one tool catalog with risk levels, approvals the hub enforces, e
   *Done when:* the relay's tests cover the three sources and the override; `curl :4000/v1/models` shows `context_length: 131072` for `skynet` and `262144` for the local Gemma 4 26B.
 - [x] **13.4 MCP endpoint: `utils/tools/mcp.py`, `/mcp`.** *As built:* `utils/tools/mcp.py`, `mcp_approval.py`, `utils/routes/mcp.py`. One stateless endpoint serves both eras: 2026-07-28 requests (per-request `_meta`, the `MCP-Protocol-Version`/`Mcp-Method`/`Mcp-Name` headers checked, `server/discover`, `resultType`) and the 2025 `initialize` era (2025-03-26, 2025-06-18, 2025-11-25); JSON responses only. An `ask` call to a 2026-07-28 client that declares form elicitation answers `input_required` with the ask fields (accept = approve with the edits, decline = deny), a url-only client gets a link to AIHub, and others get an explanation plus `aihub_wait_approval`. The `mcp` SDK (2.3.0, dev dependency) lists and calls tools in both modes in the tests; live on :7000: 36 tools. The same catalog over MCP (spec 2026-07-28, streamable HTTP, stateless). Annotations from `risk` (`readOnlyHint` for read, `destructiveHint` for destructive). `ask` calls answer with MCP's `input_required` result carrying the approval, and the approval also shows in the hub's Approvals popover. Loopback only; a bad `Origin` gets 403. This is how Claude Code (or any MCP client) uses AIHub: `claude mcp add --transport http aihub http://127.0.0.1:7000/mcp`.
   *Done when:* `utils/tests/tools/test_mcp.py` lists and calls tools with the `mcp` client library; an `ask` tool can't run over MCP without an approval; Claude Code lists AIHub's tools.
-- [ ] **13.5 Agent evaluation: `services/agent/evals/` (go/no-go for Chat).** Built before the chat: a small harness that runs the Phase 14 loop headless (it lands here first as `agent/loop.py` with a fake UI that answers questions from a script).
+- [x] **13.5 Agent evaluation: `services/agent/evals/` (go/no-go for Chat).** *As built:* dry runs (generating tools make labelled stand-ins in `outputs/eval/`) for the 3 × 30 runs, live runs for real outputs (`evals/live.py`), a vision check (both models see images). The 31B passes the gate (29/30 at pass^3 after the night's fixes); results in `docs/agent-eval.md` and the overnight report. Models on llama.cpp get every tool loaded (grammar-constrained calls can't reach deferred tools). Built before the chat: a small harness that runs the Phase 14 loop headless (it lands here first as `agent/loop.py` with a fake UI that answers questions from a script).
   - **30 tasks** from real use, each a scripted conversation with expected outcomes: single generations; chains (an image, then 3D from it; an image, then a video; describe an image, then speak the description); requests missing a required choice (the agent must ask, not guess); and refusals (a disabled tool).
   - **Graded on outcomes:** the right tool, valid arguments, outputs exist, it asked when a choice was missing, it didn't ask when everything was given, it never invented a result.
   - **Each task runs 3 times**, scored pass^3 (all three pass), on Gemma 4 31B (`skynet`, primary) and Gemma 4 26B (local), with tools deferred and with all tools loaded.
@@ -1118,11 +1118,11 @@ The hub becomes one tool catalog with risk levels, approvals the hub enforces, e
 - calling an `ask` tool from the API tab goes through the real approval flow
 
 **Checks & deliverables — Phase 13**
-- [ ] An `ask` tool can't run without an approval, even when called directly over HTTP or MCP.
-- [ ] An approval with edited arguments runs with the edited values.
-- [ ] Claude Code can list and call AIHub tools over MCP.
-- [ ] The relay reports each model's context window; the eval result is recorded in `docs/agent-eval.md` and passes the gate.
-- [ ] Delivered: `utils/tools/` (catalog, calls, approvals, MCP), the tool and approval routes, the relay's model facts, the eval harness and its result.
+- [x] An `ask` tool can't run without an approval, even when called directly over HTTP or MCP. *(Tests; live: Claude Code's `tts_speak` became a denied approval and nothing ran.)*
+- [x] An approval with edited arguments runs with the edited values. *(Tests; the eval's `card_edit` 3/3.)*
+- [x] Claude Code can list and call AIHub tools over MCP. *(Live: 41 tools listed, `hub_memory_status` and `hub_list_services` called.)*
+- [x] The relay reports each model's context window; the eval result is recorded in `docs/agent-eval.md` and passes the gate. *(31B final: 29/30 at pass^3.)*
+- [x] Delivered: `utils/tools/` (catalog, calls, approvals, MCP), the tool and approval routes, the relay's model facts, the eval harness and its result.
 
 ---
 
@@ -1240,7 +1240,7 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
 - [ ] "Make me an image of a fox, then turn it into a 3D model": it asks or shows the parameter cards, both outputs appear in the thread and on the Outputs page, the 3D job used the fox image, and the Relay page shows the agent's traffic.
 - [ ] A pending question and a pending approval both survive restarts of the hub and the agent.
 - [ ] The context meter matches the relay's reported usage, and compaction keeps the thread working past 85%.
-- [ ] A fork from an earlier message creates a separate thread, and the original is unchanged.
+- [x] A fork from an earlier message creates a separate thread, and the original is unchanged. *(Tests; the eval's `fork` 3/3 checks the original byte for byte.)*
 - [ ] Delivered: `services/agent`, `agent.db`, `data/agent/` (AGENT.md, skills, memory), the Chat page, Settings → Agent, the scripted-model test suite and `docs/agent-eval.md`.
 
 ## Phase 15 — Save states: sessions

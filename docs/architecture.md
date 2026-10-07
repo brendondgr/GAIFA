@@ -618,6 +618,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
 - **Chaining.** Each result gets a reference (`#1`, `#2`…) listed in the prompt, and file inputs take `output:<id>`. Image → 3D, image → video and "describe this, then speak it" are ordinary tool calls. `view_output` shows an image to a vision-capable model.
 - **Context.**
   - **The meter:** the window comes from the relay's model facts and the use from each response's `usage`. Both show in the thread header with a breakdown.
+  - **Model facts** (plan 13.3): each `/v1/models` entry carries `meta: {context_length, tools, vision, reasoning, source}`, read from llama.cpp's `/props`, vLLM's `max_model_len`, or a one-time probe through another relay; a per-endpoint `facts_override` wins. `null` means unknown.
   - **Tool results:** capped in the history; the full result can be read back with `read_result`.
   - **Compaction:** at 70% old tool results are cleared, and at 85% older turns are summarized.
 - **Instructions, skills, memory.**

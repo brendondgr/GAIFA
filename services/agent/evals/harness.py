@@ -227,7 +227,7 @@ class Harness:
                 if asyncio.iscoroutine(r):
                     await r
             for attempt in range(5):
-                r = await self.c.post("/v1/threads", json={"title": f"eval {task.id}", "model": self.model, "mode": task.mode,
+                r = await self.c.post("/v1/threads", json={"title": f"{'eval' if self.dry_run else 'live'} {task.id}", "model": self.model, "mode": task.mode,
                                                            "settings": settings})
                 if r.status_code == 201:
                     tid = r.json()["id"]

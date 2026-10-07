@@ -45,6 +45,7 @@ The existing apps come in with `git subtree add` (their history is kept), so mos
 | `architecture.md` | The agreed design: decisions, layout, mod contract, runtime, API, memory, registry, config, metrics, Stage D |
 | `workflows.md` | ComfyUI workflow packs: the folder, `workflow.toml`, tasks, editing, the CLI, problems and fixes (plan 11.11) |
 | `comfy-transfer-report.md` | Plan 11.12: the held-out ComfyUI workflows scored before and after fixes, what they found, and what's still a limit |
+| `agent-architecture.md` | The chat agent's design and the research behind it: Claude Code's structure, the literature, frameworks considered, and facts checked on this machine (plan Phases 13–14) |
 | `backend-plan.md` | The build plan: Phases 0–16 with steps, checks and deliverables; steps are ticked as they land |
 | `design-brief-ui.md` | UI brief for Claude Design; §6 and §11.7 are the UI-facing API contract |
 | `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures |
@@ -143,4 +144,4 @@ utils/tests/
 - **File length:** aim for under 500 lines; split any file that passes 800.
 - **Packages:** `uv` only (`uv add`, `uv sync`, `uv run`).
 - **No `libs/`:** shared code lives in `utils/`, and mods share nothing with the hub except HTTP.
-- **Mods** follow their own internal layout; the agent mod (Stage D) follows the LangGraph layout noted in architecture §14.1.
+- **Mods** follow their own internal layout; the agent mod (Stage D) follows the layout in architecture §14.1 (`llm.py`, `loop.py`, `store.py`, `context.py`, `tools.py`, `prompts.py`, `server.py`).

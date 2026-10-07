@@ -42,7 +42,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Look | **Compact by default**, with charts everywhere and four Overview views (Dashboard, Services, Table, Timeline) | requested; the design brief's §11 is Part A revision 2 |
 | Metrics | The hub records time series in `hub.db` (10 s samples kept 48 h, 1 min rollups 14 d, 1 h rollups 400 d) | charts need history, not just the current value |
 | Mod UIs | Optional `services/<id>/ui/page.js` or `ui/Page.dc.html`, plus optional dashboard widgets (`[[ui.widgets]]`). Without them, a mod still gets a full generic page, and its numeric stats are charted automatically. | adding a mod needs no UI work |
-| Chat, agent, save states | **Built last** (backend-plan Stage D): the agent is a mod built on **LangGraph with a SQLite checkpointer**; sessions can be saved and restored; logs and runtime state move inside the folder | requested: do these once everything else is built |
+| Chat, agent, save states | **Built last** (backend-plan Stage D): the agent is a mod with **its own loop, modelled on Claude Code** (no agent framework): tools load on demand, it asks for choices with question and parameter cards, threads are an append-only event log in SQLite; sessions can be saved and restored; logs and runtime state move inside the folder | requested: do these once everything else is built. Research: [agent-architecture.md](agent-architecture.md). A framework (LangGraph) was the earlier plan; a hand-written loop gives the control a local model needs (thinking fields, leaked tool calls, tool loading) |
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
@@ -595,20 +595,45 @@ The results are always on an evenly spaced `t` axis, with `null` for gaps. A hub
 These are built after everything else works (backend-plan Phases 14–16). They come together because the chat interface is where they're needed.
 
 ### 14.1 The agent is a mod: `services/agent/`
-- **Isolated dependencies.** It has its own venv (`langgraph`, `langgraph-checkpoint-sqlite`, `langchain-openai`), so none of that touches the hub. Mango-Tree had pulled LangChain into its core.
-- **Model.** `ChatOpenAI(base_url="http://127.0.0.1:4000/v1")`, so every agent call goes through the relay and shows up in its stats. Models are picked from the relay's `/v1/models`.
-- **Tools.** Fetched from the hub's `GET /api/tools` (Phase 13) and executed through `POST /api/tools/{name}/call`.
-- **Graph.** A LangGraph `StateGraph` with an agent node and a tools node, plus a step cap. When it hits the cap it says so instead of inventing an answer, which was one of Mango-Tree's bugs.
-- **Saved state.** The checkpointer is `SqliteSaver` at `data/databases/agent.db`. Each chat is a LangGraph thread, and its state is saved after every step.
-- **Code layout.** Graph wiring, node logic, state and prompts are kept apart: `graph.py` only assembles and compiles, `nodes.py` holds node behavior, `state.py` the state schema, `prompts.py` the prompt text. A second agent gets its own `agents/<name>/` folder with the same four files.
+It works the way Claude Code does, scaled to a local model. The reasons and sources are in [agent-architecture.md](agent-architecture.md).
+- **One loop, no framework.** Call the model, run its tool calls, append the results, and repeat until a reply has no tool calls. It stops at a step cap (25) and says so instead of inventing an answer, which was one of Mango-Tree's bugs. Dependencies: FastAPI, uvicorn, httpx.
+- **Model.** Through the relay (`http://127.0.0.1:4000/v1`), so every call shows in its stats. The default is `skynet` (Gemma 4 31B on the GPU box, 131,072 tokens), with the local Gemma 4 26B as the fallback.
+  - No `max_tokens`: thinking and output may use the whole window.
+  - Thinking (`reasoning` / `reasoning_content`) is stored and shown on request, and never re-sent to the model.
+  - Tool calls leaked into the text are re-parsed.
+- **Tools.**
+  - **Source:** the hub's catalog (`GET /api/tools`, Phase 13), called through `POST /api/tools/{name}/call`.
+  - **Local tools:** `ask_user`, `update_todos`, `find_tools`, `load_tools`, `read_skill`, `view_output`, `read_result`, `remember`.
+  - **Loading:** only the `core` tools are loaded. The rest are listed by group (name and one line), and their schemas are loaded on demand.
+- **Asking.** Choices are a fixed step rather than the model's judgement:
+  - `ask_user` puts question cards in the thread
+  - every `generate`/`write` call becomes a parameter card (a hub approval whose `ask` fields you can edit) unless the thread is in "Use defaults"
+  - buttons on result cards and quick actions append a tool call directly, so clicking and typing end up in the same thread
+- **Chaining.** Each result gets a reference (`#1`, `#2`…) listed in the prompt, and file inputs take `output:<id>`. Image → 3D, image → video and "describe this, then speak it" are ordinary tool calls. `view_output` shows an image to a vision-capable model.
+- **Context.**
+  - **The meter:** the window comes from the relay's model facts and the use from each response's `usage`. Both show in the thread header with a breakdown.
+  - **Tool results:** capped in the history; the full result can be read back with `read_result`.
+  - **Compaction:** at 70% old tool results are cleared, and at 85% older turns are summarized.
+- **Instructions, skills, memory.**
+  - **`data/agent/AGENT.md`:** standing instructions.
+  - **Skills:** a mod's `skills/<name>/SKILL.md` (served by the hub at `/api/skills`) and your own in `data/agent/skills/`. They are listed by description, read when needed, and each is also a slash command.
+  - **Memory:** `data/agent/memory/` holds an index plus topic files, written with `remember`.
+- **Code layout:**
+  - `llm.py`: the model client
+  - `loop.py`
+  - `store.py`: the event log
+  - `context.py`
+  - `tools.py`
+  - `prompts.py`
+  - `server.py`
 
-### 14.2 Approvals survive restarts
-1. A tool marked `confirm` returns `needs_approval` from the hub.
-2. The tools node calls LangGraph's `interrupt({approval_id, tool, args})`, and the checkpoint is saved.
-3. The Chat UI shows an Approve/Deny card. Answering it calls `POST /api/approvals/{id}`, and the hub executes the tool (or doesn't) and stores the result.
-4. The UI then calls the agent's resume route, and the graph continues with `Command(resume=…)`.
+### 14.2 Threads, questions and approvals survive restarts
+1. **The event log.** A thread is an append-only log in `agent.db` (`threads`, `events`): messages, thinking, tool calls, results, questions, answers, approvals and compaction marks. The model's messages are rebuilt from it, and a page reconnects with `GET /v1/threads/{id}/events?after=`.
+2. **Pausing.** A question or a parameter card ends the request in a `waiting` state. Nothing is held in memory.
+3. **Answering.** The answer (`/answer`), or the hub's approval with the edited arguments (`/approval`), is appended, and the same turn continues from the log.
+4. **Rewind and branch.** Fork copies the events up to a chosen point into a new thread.
 
-Both the checkpoint and the approval are on disk, so a reboot in the middle of step 3 loses nothing.
+Both the event log and the hub's approval are on disk, so a reboot between steps 2 and 3 loses nothing.
 
 ### 14.3 Save states
 - **Chats.** Threads, the step history behind **rewind and branch** (continue from any earlier checkpoint), and titles and search (agent mod's tables in `agent.db`).

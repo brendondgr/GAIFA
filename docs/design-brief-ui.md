@@ -1001,6 +1001,6 @@ Not built yet. Keep the shell ready for it (Section 3). It gets its own brief wh
   - streaming replies
   - tool-call cards, with **Approve / Deny** for tools marked `confirm`; a pending approval is still waiting after a reload or restart
   - result cards that reuse `AudioPlayer`, `ImageView`, `Viewer3D` and `OutputCard`
-- **Rewind / branch:** pick an earlier step in a thread and continue from there. This uses LangGraph checkpoints.
+- **Rewind / branch:** pick an earlier step in a thread and continue from there. It forks the thread's event log at that point (architecture §14.2); the full chat brief is plan step 14.1.
 - **Sessions panel:** save the current setup (what's running and loaded), restore it, and switch between named setups.
 - **Composer:** model picker (via the relay), tool-group toggles, and attachments from Outputs.

@@ -210,3 +210,12 @@ async def test_a_python_style_call_runs(env):
     await env.send(tid, "get a")
     call = env.payloads(tid, "tool_call")[0]
     assert call["name"] == "fake_get" and call["arguments"] == {"key": "a"} and call.get("leaked")
+
+
+def test_reparse_gemma_call_tags():
+    """The 26B once closed its call with </call>: `<call:name{…}</call>` after a checklist."""
+    known = {"comfy_generate_image"}
+    text, calls = reparse('<ul><li>[ ] Generate an image</li></ul><call:comfy_generate_image{prompt:<|"|>a red dragon<|"|>}</call>', known)
+    assert calls and calls[0].name == "comfy_generate_image" and json.loads(calls[0].arguments) == {"prompt": "a red dragon"}
+    assert "call:" not in text and "Generate an image" in text
+    assert reparse("<call:rm{path:1}</call>", known)[1] == []

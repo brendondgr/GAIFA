@@ -81,3 +81,13 @@ async def test_a_disabled_group_says_so_when_loaded_or_searched(env):
     assert '"loaded": ["fake_get"]' in by_name["content"] and "turned off" in by_name["content"] and "unknown" not in by_name["content"]
     assert "gen3d tools are turned off" in found["content"]
     assert "gen3d" not in found["content"].split("The groups are:")[1]
+
+
+async def test_a_disabled_mod_cant_be_started_from_the_chat(env):
+    """With gen3d off, the 26B called hub_start_service(gen3d) instead."""
+    tid = await env.thread(mode="auto", settings={"disabled": ["gen3d"]})
+    env.model.queue({"tool_calls": [{"name": "hub_start_service", "arguments": {"id": "gen3d"}}]}, {"text": "3D is off here."})
+    await env.send(tid, "start 3D")
+    res = env.payloads(tid, "tool_result")[0]
+    assert res["status"] == "denied" and res["error"]["code"] == "disabled" and "gen3d" in res["error"]["detail"]
+    assert not [a for a in env.hub.attempts if a["name"] == "hub_start_service"]

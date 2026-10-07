@@ -32,6 +32,7 @@ from .tools import LOCAL_NAMES, ToolSet
 log = logging.getLogger("agent.loop")
 POLL_S = 15
 HUB_MODE = {"ask": "ask", "auto": "auto", "read_only": "read_only"}
+SERVICE_TOOLS = {"hub_start_service", "hub_stop_service", "hub_unload_service"}   # their `id` is a mod
 # Sent (not stored) when a turn only repeats itself; that model call gets tool_choice "none".
 WRAP_UP = ("(A note from the app, not from the user: you have repeated the same tool call and its result won't change. "
            "Tools are off for this reply. Answer the user in plain text: what you did, what blocked you, and what they can do.)")
@@ -386,9 +387,12 @@ class Agent:
                 self._save_loaded(tid, tools)
             mode = "auto" if p.get("by") == "user" else HUB_MODE.get(thread.get("mode") or "ask", "ask")
             meta = tools.by_name(name)
-            if meta and meta["mod"] in tools.disabled:
+            off = meta["mod"] if meta and meta["mod"] in tools.disabled else None
+            if name in SERVICE_TOOLS and str((args or {}).get("id")) in tools.disabled:
+                off = str(args["id"])      # starting or stopping a turned-off mod is using it too
+            if off:
                 self._result(tid, cid, name, {"status": "denied", "error": {
-                    "code": "disabled", "detail": f"the {meta['mod']} tools are turned off in this chat",
+                    "code": "disabled", "detail": f"the {off} tools are turned off in this chat",
                     "fix": "don't use them; tell the user, who can turn the group back on in the composer"}})
                 return "ok"
             origin = {"service": "agent", "thread": tid, "tool_call_id": cid}

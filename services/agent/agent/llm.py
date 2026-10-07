@@ -23,7 +23,8 @@ import httpx
 
 Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", text)
 
-GEMMA_CALL = re.compile(r"(?:<\|tool_call\>\s*)?(?:call:)?([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*<tool_call\|>", re.S)
+# Gemma's own `<|tool_call>call:name{…}<tool_call|>`, also written as `<call:name{…}</call>` by the 26B
+GEMMA_CALL = re.compile(r"(?:<\|tool_call\>\s*)?<?(?:call:)?([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*(?:<tool_call\|>|</call>)", re.S)
 HERMES_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
 FENCED = re.compile(r"```(?:json|tool_code|tool)?\s*(\{.*?\})\s*```", re.S)
 ONE_FENCE = re.compile(r"^```[A-Za-z_]*\s*\n?(.*?)\s*```$", re.S)

@@ -25,6 +25,7 @@ export { registerPreview } from './chat-results.js';
 export { ParamCard } from './chat-forms.js';
 
 const R = () => globalThis.React;
+const LIST_PAGE = 200;    // chats per page in the list (Show more adds a page)
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
 const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to AIHub” in Hope’s voice', 'What can you do?'];
 const PAGE_CSS = `.aichat-box:focus-within{border-color:var(--bdh,#3A4A63)!important}
@@ -50,7 +51,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const c = getChatClient(api), tid = route?.parts?.[1] || null;
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
   const [showThinking] = usePref(SHOW_THINKING, false);
-  const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [archived, setArchived] = useState(false);
+  const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [archived, setArchived] = useState(false), [limit, setLimit] = useState(LIST_PAGE);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [thread, setThread] = useState(null), [events, setEvents] = useState([]), [live, setLive] = useState(EMPTY_LIVE), [running, setRunning] = useState(false), [conn, setConn] = useState('open'), [ready, setReady] = useState(false);
   const [drafts, setDrafts] = useState({}), [attachments, setAttachments] = useState([]), [toolForms, setToolForms] = useState([]);
@@ -63,11 +64,11 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
 
   // ---- data ----
   const loadList = async () => {
-    try { setThreads(await c.threads({ q, archived })); setDown(null); } catch (e) { fail(e); }
+    try { setThreads(await c.threads({ q, archived, limit })); setDown(null); } catch (e) { fail(e); }
     setListLoading(false);
   };
   loadRef.current = loadList;
-  useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, archived]);
+  useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, archived, limit]);
   useEffect(() => {
     injectCss();
     c.models().then(setModels).catch(fail);
@@ -198,7 +199,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   };
 
   // ---- render ----
-  const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: setQ, archived, onArchived: v => { setArchived(v); setListLoading(true); },
+  const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: v => { setQ(v); setLimit(LIST_PAGE); }, archived, onArchived: v => { setArchived(v); setLimit(LIST_PAGE); setListLoading(true); }, onMore: threads.length >= limit ? () => setLimit(n => n + LIST_PAGE) : null,
     onNew: () => { go('#/chat'); setDrawer(false); setTimeout(() => inputRef.current?.focus(), 50); }, onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null });
   const items = view.items, last = items[items.length - 1];
   const busyTool = items.some(i => (i.kind === 'tool' || i.kind === 'approval') && !i.result && (i.progress || i.run));

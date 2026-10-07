@@ -35,10 +35,10 @@ export const LIST_CSS = `
 @media (hover:none){.aichat-item .aichat-more{opacity:1}}
 `;
 
-export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions }) {
+export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions }) {
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 10px 8px 12px' } },
-      h('span', { style: { ...label11, flex: 1 } }, 'Chats'),
+      h('span', { style: { ...label11, flex: 1 } }, archived ? 'Archived chats' : 'Chats'),
       h(Btn, { kind: 'pri', sm: true, icon: 'plus', label: 'New chat', onClick: onNew }),
       onClose ? h(Btn, { kind: 'ghost', sm: true, icon: 'x', title: 'Close', onClick: onClose }) : null),
     h('div', { style: { padding: '0 10px 8px' } },
@@ -51,7 +51,8 @@ export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArc
       !threads.length ? h('div', { style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } },
         loading ? 'Loading…' : q ? `No chats match “${q}”.` : archived ? 'No archived chats.' : 'No chats yet. Start one →') : null,
       threads.map(t => h(Item, { key: t.id, t, active: t.id === activeId, onOpen: () => onOpen?.(t),
-        onRename: v => onRename(t, v), onArchive: () => onArchive(t), onDelete: () => onDelete(t) }))),
+        onRename: v => onRename(t, v), onArchive: () => onArchive(t), onDelete: () => onDelete(t) })),
+      onMore ? h('button', { type: 'button', onClick: onMore, style: { ...chipSt(false, { sm: true }), alignSelf: 'center', margin: '8px 0 4px' } }, 'Show more') : null),
     h('div', { style: { padding: '8px 10px', borderTop: '1px solid ' + T.bd, display: 'flex', alignItems: 'center', gap: 6 } },
       h('button', { type: 'button', 'aria-pressed': archived ? 'true' : 'false', onClick: () => onArchived(!archived), style: chipSt(archived, { sm: true }) }, h(Icon, { d: 'archive', size: 12 }), archived ? 'Showing archived' : 'Archived'),
       onSessions ? h('button', { type: 'button', onClick: onSessions, title: 'Save or switch setups (what runs and what is loaded)', style: { ...chipSt(false, { sm: true }), marginLeft: 'auto' } }, h(Icon, { d: 'bookmark', size: 12 }), 'Sessions') : null));

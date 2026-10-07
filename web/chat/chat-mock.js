@@ -225,12 +225,12 @@ export function createMockClient(api, { speed = 1 } = {}) {
   return {
     live: false,
     async models() { await net(); return structuredClone(MODELS); },
-    async threads({ q, archived } = {}) {
+    async threads({ q, archived, limit = 200 } = {}) {
       await seed(); await net();
       const qq = (q || '').toLowerCase();
       return [...threads.values()].filter(t => !!t.thread.archived === !!archived)
         .filter(t => !qq || t.thread.title.toLowerCase().includes(qq) || t.events.some(e => ['user', 'assistant'].includes(e.type) && String(e.payload.text).toLowerCase().includes(qq)))
-        .sort((a, b) => b.thread.updated - a.thread.updated).map(pub);
+        .sort((a, b) => b.thread.updated - a.thread.updated).slice(0, limit).map(pub);
     },
     async create(body = {}) { await net(); return pub(newThread(body)); },
     async get(tid) { await seed(); await net(); return pub(T(tid)); },

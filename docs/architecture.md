@@ -610,7 +610,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
 - **Model.** Through the relay (`http://127.0.0.1:4000/v1`), so every call shows in its stats. The default is `skynet` (Gemma 4 31B on the GPU box, 131,072 tokens), with the local Gemma 4 26B as the fallback.
   - No `max_tokens`: thinking and output may use the whole window.
   - Thinking (`reasoning` / `reasoning_content`) is stored and shown on request, and never re-sent to the model.
-  - Tool calls leaked into the text are re-parsed: Gemma's tags (also its `<call:…</call>` variant) and Hermes', JSON objects, and a reply that is nothing but Python-style calls of known tools with literal arguments (parsed with `ast`, never run).
+  - Tool calls leaked into the text are re-parsed: Gemma's tags (also its `<call:…</call>` variant), Hermes', a known tool's name used as a tag (`<ask_user>{…}</ask_user>`), JSON objects, and a reply that is nothing but Python-style calls of known tools with literal arguments (parsed with `ast`, never run).
 - **Tools.**
   - **Source:** the hub's catalog (`GET /api/tools`, Phase 13), called through `POST /api/tools/{name}/call`.
   - **Local tools:** `ask_user`, `update_todos`, `find_tools`, `load_tools`, `read_skill`, `view_output`, `read_result`, `remember`.

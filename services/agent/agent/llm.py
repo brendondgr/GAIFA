@@ -26,6 +26,7 @@ Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", te
 # Gemma's own `<|tool_call>call:name{…}<tool_call|>`, also written as `<call:name{…}</call>` by the 26B
 GEMMA_CALL = re.compile(r"(?:<\|tool_call\>\s*)?<?(?:call:)?([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*(?:<tool_call\|>|</call>)", re.S)
 HERMES_CALL = re.compile(r"<tool_call>\s*(\{.*?\})\s*</tool_call>", re.S)
+TAG_CALL = re.compile(r"<([A-Za-z][A-Za-z0-9_]*)>\s*(\{.*?\})\s*</\1>", re.S)    # <ask_user>{…}</ask_user> (the 26B)
 FENCED = re.compile(r"```(?:json|tool_code|tool)?\s*(\{.*?\})\s*```", re.S)
 ONE_FENCE = re.compile(r"^```[A-Za-z_]*\s*\n?(.*?)\s*```$", re.S)
 CHANNEL_OPEN = re.compile(r"<\|channel\>(?:thought|analysis|final)?\s*")
@@ -189,6 +190,11 @@ def reparse(text: str, known: set[str]) -> tuple[str, list[ToolCall]]:
         if isinstance(obj, dict) and obj.get("name"):
             calls.append(ToolCall(f"tc_{len(calls)}", obj["name"], json.dumps(obj.get("arguments") or obj.get("parameters") or {})))
             out = out.replace(m.group(0), "")
+    if not calls:
+        for m in TAG_CALL.finditer(text):
+            if m.group(1) in known and (args := _loose_json(m.group(2))) is not None:
+                calls.append(ToolCall(f"tc_{len(calls)}", m.group(1), json.dumps(args)))
+                out = out.replace(m.group(0), "")
     if not calls:
         cands = [m.group(1) for m in FENCED.finditer(text)]
         stripped = text.strip()

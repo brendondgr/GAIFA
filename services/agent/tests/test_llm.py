@@ -219,3 +219,13 @@ def test_reparse_gemma_call_tags():
     assert calls and calls[0].name == "comfy_generate_image" and json.loads(calls[0].arguments) == {"prompt": "a red dragon"}
     assert "call:" not in text and "Generate an image" in text
     assert reparse("<call:rm{path:1}</call>", known)[1] == []
+
+
+def test_reparse_a_tool_name_used_as_a_tag():
+    """The 26B wrote <ask_user>{questions: […]}</ask_user> after its text."""
+    known = {"ask_user"}
+    text, calls = reparse('What kind of chair?\n\n<ask_user>{questions: [{options: [{description: "Sleek.", label: "Modern"}], '
+                          'question: "What style?"}]}</ask_user>', known)
+    assert text == "What kind of chair?" and calls[0].name == "ask_user"
+    assert json.loads(calls[0].arguments) == {"questions": [{"options": [{"description": "Sleek.", "label": "Modern"}], "question": "What style?"}]}
+    assert reparse("<b>{not a tool}</b>", known)[1] == []

@@ -440,8 +440,9 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
 **Checks & deliverables — Phase 4**
 - [x] Calling `fake-ok`'s output route makes the file appear on the Outputs page within 2 s, with no reload.
   - *Checked 2026-10-05* in the browser against a dev hub (on the host, for ffmpeg) on a scratch root: the card appeared after 1.1 s on the Outputs page and 1.07 s on Fake OK's Outputs tab, highlighted, with the counts updated and one card although the sidecar is written after the file. Test: `test_watch.py::test_a_mods_output_appears_live_through_the_hub` (hub's own watcher, default timings).
-- [ ] Audio seeking works (Range requests) in Chromium and Firefox.
-  - *Checked in Chromium:* the drawer's player seeks a WAV (0:04 of 0:05 after clicking at 75 %), and a video plays and seeks, through `206 Partial Content`. Range itself is covered in `test_routes.py` (206, suffix ranges, 416). Firefox still to be checked by hand.
+- [x] Audio seeking works (Range requests) in Chromium and Firefox.
+  - *Checked in Chromium:* the drawer's player seeks a WAV (0:04 of 0:05 after clicking at 75 %), and a video plays and seeks, through `206 Partial Content`. Range itself is covered in `test_routes.py` (206, suffix ranges, 416).
+  - *Checked in Firefox 157* (headless, driven over WebDriver BiDi, 7 Oct 2026): in the Outputs drawer, a 52.8 MB, 18:20 WAV played, a click at 75 % of the bar seeked to 13:45 and a click at 10 % to 1:53. Firefox fetched the file with `Range: bytes=0-`, then `Range: bytes=39583744-` for the seek, and the hub answered `206` both times; a 5 s MP4 also played and seeked.
 - [x] Deleting an output from the drawer removes its file, sidecar and preview.
   - *Checked:* deleting a 6 MP PNG from the drawer moved the image, its `.json` sidecar and its `.preview.jpg` to `outputs/.trash/2026-10-05/comfy/2026-10-04/`, the page updated to 19 items without a reload, and the activity feed says `Moved "ComfyUI big 00002" to the outputs trash`. Tests: `test_delete.py`.
 - [x] 2,000 generated outputs page smoothly, and the totals stay correct.

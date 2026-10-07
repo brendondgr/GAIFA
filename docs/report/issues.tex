@@ -29,7 +29,8 @@ Every problem below was found by a test during the night, then fixed and re-test
 23 & \textbf{A flaky comfy test} (\code{test\_idle\_unload}) read the status a moment too early under load. & It waits for the status. & repeated runs \\
 24 & \textbf{The model described the wrong outputs after a button failed.} Asked what two buttons had made, it described unrelated recent outputs: in its history, a button's tool call looked like its own, so it ignored the failure. & A button's call is now introduced in the history as the user's (``I pressed a button that ran \ldots''). The rerun answered correctly. & live run L5/L6 \\
 25 & \textbf{Session switches reported a problem that wasn't one}: the plan tried to ``load'' lcpp, whose load state comes from its instances. & Mods without load/unload operations are left to their own steps; the switches then reported OK. & live switches \\
-26 & \textbf{My own mistakes, for honesty}: I restarted the hub three times during the first eval, which broke 11 runs (they're counted as infrastructure errors); a \code{pkill -f} pattern matched my own shell; two test fixtures had the old live-area list. & Rule kept from then on: no restarts during evals; kill by PID. & — \\
+26 & \textbf{The output drawer offered ``Open in eval''} for the eval's stand-in outputs, a page that doesn't exist (found in the Firefox check). & The button shows only when the output's service is a mod. & Firefox, by hand \\
+27 & \textbf{My own mistakes, for honesty}: I restarted the hub three times during the first eval, which broke 11 runs (they're counted as infrastructure errors); a \code{pkill -f} pattern matched my own shell; two test fixtures had the old live-area list. & Rule kept from then on: no restarts during evals; kill by PID. & — \\
 \bottomrule
 \end{longtable}
 

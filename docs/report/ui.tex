@@ -36,6 +36,12 @@ The Chat page is new in \code{web/chat/}. It is plain ES modules on the page's R
 \shot{api-tab-approval-card.png}{The API tab: calling a generating tool goes through the same approval card.}{0.49}
 \end{center}
 
+\paragraph{Firefox.} The last open check from Phase 4. Headless Firefox 157, driven over WebDriver BiDi, played a 52.8 MB, 18-minute WAV in the Outputs drawer and seeked with clicks on the bar: 75\,\% landed on 13:45 of 18:20 and 10\,\% on 1:53. A logging proxy showed Firefox asking for \code{bytes=39583744-} for the seek and the hub answering \code{206}. The Chat and Overview pages render the same as in Chromium. The drawer also offered ``Open in eval'' for the eval stand-ins, which have no mod page; that button now shows only for mods.
+
+\begin{center}
+\shot{firefox-drawer-seek.png}{Firefox: the drawer's player at 13:45 of 18:20 after a click at 75\,\%.}{0.6}
+\end{center}
+
 \subsection*{Adding to it: the extension points}
 \begin{itemize}[leftmargin=*]
 \item \textbf{A new card}: \code{registerCard('my\_event', (\{item, ctx\}) => …)} for a new event type, or \code{registerCard('result:<tool>', …)} / \code{'approval:<tool>'} to give one tool its own look. A type nobody registered renders as a collapsed JSON card, and each card has its own error boundary, so a broken card never breaks the thread.

@@ -265,6 +265,13 @@ class Harness:
                     run.events = await self._events(tid)
                 except Exception:  # noqa: BLE001
                     pass
+        if self.dry_run:  # dry-run threads go to Archived, out of the chat list (live ones stay as examples)
+            for t in (tid, run.extra.get("fork")):
+                if t:
+                    try:
+                        await self.c.patch(f"/v1/threads/{t}", json={"archived": True})
+                    except Exception:  # noqa: BLE001
+                        pass
         run.seconds = round(time.monotonic() - t0, 1)
         return run
 

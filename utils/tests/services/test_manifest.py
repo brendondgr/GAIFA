@@ -58,7 +58,7 @@ hide = ["GET /ui/{path}"]
 "POST /v1/speech" = "audio"
 
 [tools]
-speak = { op = "POST /v1/speech", description = "Speak text", job = true }
+speak = { op = "POST /v1/speech", description = "Speak text", job = true, job_status = "GET /v1/jobs/{id}", risk = "generate", ask = ["voice"], core = true }
 delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
 
 [agent]
@@ -117,6 +117,7 @@ def test_full_manifest_parses(svc):
     assert m.api.responses == {"POST /v1/speech": "audio"}
     assert m.tools["delete_voice"].confirm is True
     assert m.tools["speak"].job is True and m.tools["delete_voice"].job is False
+    assert m.tools["speak"].risk == "generate" and m.tools["speak"].ask == ["voice"] and m.tools["speak"].core
     assert m.agent.tools_source == "GET /v1/tools"
 
 
@@ -256,7 +257,7 @@ def test_fake_mod_fixtures_are_valid():
     from utils.tests.conftest import FAKE_MODS
 
     mods = discover([FAKE_MODS])
-    assert [m.id for m in mods] == ["fake-crash", "fake-mem", "fake-ok", "fake-slow"]
+    assert [m.id for m in mods] == ["fake-crash", "fake-mem", "fake-ok", "fake-slow", "fake-tools"]
     assert all(m.ok for m in mods), [m.errors for m in mods]
 
 

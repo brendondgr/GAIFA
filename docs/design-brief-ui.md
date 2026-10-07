@@ -1004,3 +1004,46 @@ Not built yet. Keep the shell ready for it (Section 3). It gets its own brief wh
 - **Rewind / branch:** pick an earlier step in a thread and continue from there. It forks the thread's event log at that point (architecture §14.2); the full chat brief is plan step 14.1.
 - **Sessions panel:** save the current setup (what's running and loaded), restore it, and switch between named setups.
 - **Composer:** model picker (via the relay), tool-group toggles, and attachments from Outputs.
+
+### 11.12 Agent tools and approvals (plan Phase 13)
+
+The `tools` area. The chat (Stage D) and outside clients (MCP) use the same calls; the UI shows them in the API tab (tool badges with the risk level), the header **Approvals** popover and the chat's parameter cards.
+
+**Methods** (area `tools`):
+
+| Method | Endpoint |
+|---|---|
+| `listTools({q?, names?})` | `GET /api/tools` (`q`: best 8 by keywords; `names`: these, 404 `unknown_tool` with `data.close`) |
+| `getToolIndex()` | `GET /api/tools/index` |
+| `callTool(name, args, {mode?, origin?, wait?})` | `POST /api/tools/{name}/call?wait=` |
+| `getToolCall(id, {wait?})`, `cancelToolCall(id)` | `GET /api/tools/calls/{id}`, `POST /api/tools/calls/{id}/cancel` |
+| `listApprovals({state?})`, `getApproval(id)` | `GET /api/approvals` (pending; `state=all`), `GET /api/approvals/{id}` |
+| `decideApproval(id, {approve, args?, reason?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs |
+
+Also `GET /api/tools/calls/{id}/result?offset=&limit=` pages a capped result. **Events:** `{type: "approval", approval: Approval}` when one is created or decided; `{type: "tool_call", call: ToolCallResult & {origin}}` as a call starts, makes progress and ends.
+
+```ts
+type Risk = "read" | "write" | "generate" | "destructive";
+interface ToolIndexItem { name: string; mod: string;                // "hub" for the hub's own tools
+                          risk: Risk; core: boolean; summary: string; available: boolean; why?: string }
+interface Tool extends ToolIndexItem { description: string;
+                          parameters: JSONSchema;                   // one flat object; file inputs carry "x-kind": image|video|audio|mesh|file
+                          ask: string[];                            // inputs the user chooses: editable on the parameter card
+                          examples: object[]; job: boolean; source: "manifest" | "tools_source" | "hub" }
+interface ToolOutput { output_id: string; ref: string;              // "output:<id>": what file inputs take
+                       kind: string; title: string; url: string; preview?: string; summary: string; prompt?: string }
+interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "done" | "error" | "cancelled";
+                           tool: string | null; call_id?: string; approval_id?: string;
+                           result?: any;                            // JSON over 8 KB: {truncated, preview, full}
+                           outputs?: ToolOutput[];
+                           error?: { code: string; detail: string; fix?: string; problems?: object[] };
+                           progress?: number; note?: string; job_id?: string; elapsed_s?: number;
+                           arguments?: object; ask_fields?: string[]; risk?: Risk; schema?: JSONSchema; description?: string }  // needs_approval
+interface Approval { id: string; tool: string; arguments: object;  // as the model sent them
+                     final?: object;                                // as run (after edits)
+                     ask_fields: string[]; risk: Risk; origin: object;
+                     state: "pending" | "approved" | "denied" | "expired"; reason?: string; call_id?: string;
+                     created_ts: number; decided_ts?: number; schema?: JSONSchema; description?: string }
+```
+
+**Error codes in `error.code`:** `invalid_arguments` (with `problems[]`, each `{field, detail, fix}`), `unknown_tool`, `denied`, `denied_by_user`, `unknown_output`, `service_not_running`, `mod_error` (the mod refused: 4xx), `upstream_error` (5xx or no answer), `job_failed`, `job_timeout`, `needs_room`, `interrupted` (the hub restarted). Deciding an approval twice is a hub error `409 already_decided`; edited arguments that don't validate are `422 invalid_arguments` and the approval stays pending.

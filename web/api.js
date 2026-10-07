@@ -23,12 +23,15 @@ export const METHOD_AREA = {
   getMetrics: 'metrics', listMetricSeries: 'metrics', getTimeline: 'metrics', getOutputStats: 'metrics',
   getActivityStats: 'metrics', getJobStats: 'metrics',
   listWidgets: 'widgets', getWidget: 'widgets',
+  listTools: 'tools', getToolIndex: 'tools', callTool: 'tools', getToolCall: 'tools', cancelToolCall: 'tools',
+  listApprovals: 'tools', getApproval: 'tools', decideApproval: 'tools',
 };
 
 // HubEvent type → area, for merging live and mock event streams.
 export const EVENT_AREA = {
   service: 'services', memory: 'memory', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
+  approval: 'tools', tool_call: 'tools',
 };
 
 const enc = encodeURIComponent;
@@ -163,6 +166,14 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     getJobStats: ({ range } = {}) => req('GET', `/api/jobs/stats${qs({ range })}`),
     listWidgets: () => req('GET', '/api/widgets'),
     getWidget: (service, id, { range } = {}) => req('GET', `/api/widgets/${enc(service)}/${enc(id)}${qs({ range })}`),
+    listTools: ({ q, names } = {}) => req('GET', `/api/tools${qs({ q, names })}`),
+    getToolIndex: () => req('GET', '/api/tools/index'),
+    callTool: (name, args = {}, { mode, origin, wait } = {}) => req('POST', `/api/tools/${enc(name)}/call${qs({ wait })}`, { json: { arguments: args, mode, origin } }),
+    getToolCall: (id, { wait } = {}) => req('GET', `/api/tools/calls/${enc(id)}${qs({ wait })}`),
+    cancelToolCall: id => req('POST', `/api/tools/calls/${enc(id)}/cancel`),
+    listApprovals: ({ state } = {}) => req('GET', `/api/approvals${qs({ state })}`),
+    getApproval: id => req('GET', `/api/approvals/${enc(id)}`),
+    decideApproval: (id, { approve, args, reason, wait } = {}) => req('POST', `/api/approvals/${enc(id)}${qs({ wait })}`, { json: { approve, arguments: args, reason } }),
 
     async callService(id, method, path, opts = {}) {
       const [p, q0] = path.split('?');

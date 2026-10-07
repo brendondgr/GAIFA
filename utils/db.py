@@ -130,6 +130,51 @@ MIGRATIONS: list[str] = [
     CREATE INDEX job_history_open ON job_history (service, job_id, end_ts);
     CREATE INDEX activity_service ON activity (service, ts);
     """,
+    # 004: agent tools (plan 13.2). A call that needs approval waits in `approvals` (the
+    # arguments as the model sent them, and as finally run); `tool_calls` keeps each call's
+    # state and full result (results shown to the model are capped; `full` reads them back).
+    """
+    CREATE TABLE approvals (
+        id         TEXT PRIMARY KEY,
+        tool       TEXT NOT NULL,
+        arguments  TEXT NOT NULL,
+        final      TEXT,
+        ask_fields TEXT NOT NULL DEFAULT '[]',
+        risk       TEXT NOT NULL,
+        origin     TEXT NOT NULL DEFAULT '{}',
+        state      TEXT NOT NULL CHECK (state IN ('pending', 'approved', 'denied', 'expired')),
+        reason     TEXT,
+        call_id    TEXT,
+        created_ts REAL NOT NULL,
+        decided_ts REAL
+    );
+    CREATE INDEX approvals_state ON approvals (state, created_ts);
+    CREATE TABLE tool_calls (
+        id          TEXT PRIMARY KEY,
+        tool        TEXT NOT NULL,
+        arguments   TEXT NOT NULL,
+        origin      TEXT NOT NULL DEFAULT '{}',
+        state       TEXT NOT NULL CHECK (state IN ('running', 'done', 'error', 'cancelled')),
+        approval_id TEXT,
+        job         TEXT,
+        result      TEXT,
+        created_ts  REAL NOT NULL,
+        finished_ts REAL
+    );
+    CREATE INDEX tool_calls_created ON tool_calls (created_ts);
+    """,
+    # 005: sessions (plan 15.1): named snapshots of what runs and what's loaded.
+    """
+    CREATE TABLE sessions (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        auto       INTEGER NOT NULL DEFAULT 0,
+        snapshot   TEXT NOT NULL,
+        created_ts REAL NOT NULL,
+        updated_ts REAL NOT NULL
+    );
+    CREATE UNIQUE INDEX sessions_name ON sessions (name);
+    """,
 ]
 
 _STOP = object()

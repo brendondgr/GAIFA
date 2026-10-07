@@ -18,9 +18,23 @@ CALL_OP = "POST /v1/tools/{name}/call"
 JOB = {"status": "GET /v1/jobs/{job_id}?wait=60", "cancel": "POST /v1/queue/{job_id}/cancel"}
 
 
-def _fn(name: str, description: str, parameters: dict, job: bool = True) -> dict:
-    return {"type": "function", "function": {"name": name, "description": description, "parameters": parameters},
-            "op": CALL_OP.replace("{name}", name), "job": JOB if job else None}
+ASK = ("workflow", "aspect", "megapixels", "seconds")   # choices shown on the parameter card (plan 13.1)
+KIND = {"image": "image", "images": "image", "mask": "image", "video": "video"}
+EXAMPLES = {"generate_image": [{"prompt": "a red fox sitting in fresh snow, golden hour", "aspect": "16:9 (Widescreen)"}],
+            "animate_image": [{"image": "output:<id of an image>", "prompt": "the fox turns its head and blinks"}],
+            "edit_image": [{"image": "output:<id>", "prompt": "make it night time"}]}
+
+
+def _fn(name: str, description: str, parameters: dict, job: bool = True, risk: str = "generate") -> dict:
+    for k, p in (parameters.get("properties") or {}).items():
+        if k in KIND:
+            p["x-kind"] = KIND[k]
+    ask = [k for k in ASK if k in (parameters.get("properties") or {})]
+    out = {"type": "function", "function": {"name": name, "description": description, "parameters": parameters},
+           "op": CALL_OP.replace("{name}", name), "job": JOB if job else None, "risk": risk, "ask": ask}
+    if name in EXAMPLES:
+        out["examples"] = EXAMPLES[name]
+    return out
 
 
 def ready_by_task(lib: Library) -> dict[str, list]:
@@ -63,7 +77,7 @@ def catalog(lib: Library, defaults: dict[str, str]) -> list[dict]:
                                                      "additionalProperties": False}))
     all_ready = sorted(p.id for ps in by_task.values() for p in ps)
     tools.append(_fn("list_workflows", "List the image and video workflows, with their tasks and inputs.",
-                     {"type": "object", "properties": {}}, job=False))
+                     {"type": "object", "properties": {}}, job=False, risk="read"))
     tools.append(_fn("run_workflow", "Run any workflow with its own inputs (see list_workflows).",
                      {"type": "object", "properties": {
                          "workflow": {"type": "string", "enum": all_ready},

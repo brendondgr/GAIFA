@@ -46,5 +46,5 @@ hide = ["GET /", "GET /config.js", "GET /assets/*", "GET /api/docs"]
 [tools]
 list_llms = { op = "GET /api/models", description = "The model catalog: GGUFs, sizes, capabilities and which are running" }
 list_instances = { op = "GET /api/instances", description = "Running llama.cpp instances with port, model, state and relay publishing" }
-start_llm = { op = "POST /api/instances", description = "Launch a model (asks AIHub for memory first)" }
+start_llm = { op = "POST /api/instances", risk = "write", description = "Launch a model (asks AIHub for memory first)" }
 stop_llm = { op = "DELETE /api/instances/{name}", description = "Stop an instance", confirm = true }

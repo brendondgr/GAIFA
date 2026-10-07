@@ -1,0 +1,37 @@
+# Test fixture: a mod with agent tools (plan 13): manifest tools of every risk, a job, file
+# inputs, binary results and a tools_source.
+id = "fake-tools"
+name = "Fake Tools"
+description = "agent tools of every kind"
+
+[run]
+command = ["python3", "../_fakemod.py", "tools"]
+port = 5195
+health = "/health"
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+start_timeout_s = 15
+stop_timeout_s = 5
+restart = "no"
+
+[outputs]
+kinds = ["image", "audio"]
+
+[api.responses]
+"POST /v1/say" = "audio"
+"POST /v1/beep" = "audio"
+
+[agent]
+tools_source = "GET /v1/tools"
+
+[tools]
+get_item = { op = "GET /v1/items/{item_id}", description = "Read one item" }
+make_image = { op = "POST /v1/images", description = "Make an image", risk = "generate", ask = ["aspect", "steps"], examples = [{ prompt = "a red fox", aspect = "16:9" }] }
+say = { op = "POST /v1/say", description = "Speak text", risk = "generate" }
+beep = { op = "POST /v1/beep", description = "A beep", risk = "generate" }
+render = { op = "POST /v1/render", description = "Render a scene", risk = "generate", job = true, job_status = "GET /v1/render/{rid}", job_cancel = "POST /v1/render/{rid}/cancel" }
+upload_mesh = { op = "POST /v1/mesh", description = "Send a mesh" }
+big = { op = "GET /v1/big", description = "Lots of rows" }
+wipe = { op = "DELETE /v1/jobs/{jid}", description = "Delete a job", confirm = true }
+fail = { op = "POST /v1/fail", description = "Always fails", risk = "read" }
+get_item_quiet = { op = "GET /v1/items/{item_id}", description = "Read one item, never verbose", fixed = { verbose = true }, hide = [] }
+make_image_simple = { op = "POST /v1/images", description = "Make an image with defaults", risk = "generate", hide = ["steps", "reference"] }

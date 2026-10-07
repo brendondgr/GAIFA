@@ -84,6 +84,9 @@ class Hub:
     metrics: Recorder | None = None
     metrics_every_s: float = 10.0
     widgets: Widgets | None = None
+    tools: Any = None       # tools.catalog.Catalog
+    approvals: Any = None   # tools.approvals.Approvals
+    calls: Any = None       # tools.calls.Calls
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -122,7 +125,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, memory, metrics, models, outputs, overview, services, settings, system, web, widgets
+    from utils.routes import events, memory, metrics, models, outputs, overview, services, settings, system, tools, web, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -180,6 +183,19 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             await hub.metrics.start()
             stack.push_async_callback(hub.metrics.close)
             hub.widgets = Widgets(hub.services)
+            # 9. agent tools: the catalog, approvals and calls; calls following a job resume.
+            from utils.tools import hub_tools
+            from utils.tools.approvals import Approvals
+            from utils.tools.calls import Calls
+            from utils.tools.catalog import Catalog
+
+            hub.tools = Catalog(hub)
+            hub.tools.add_hub_tools(hub_tools.tools())
+            hub.services.on_ready.append(hub.tools.refresh_mod)
+            hub.approvals = Approvals(hub.db, hub.bus, hub.config)
+            hub.calls = Calls(hub, hub.tools, hub.approvals)
+            stack.push_async_callback(hub.calls.close)
+            await hub.calls.resume()
             log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 
@@ -209,8 +225,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(widgets.router)
     app.include_router(overview.router)
     app.include_router(settings.router)
+    app.include_router(tools.router)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings"):
+                 "overview", "settings", "tools"):
         hub.mark_live(area)
 
     app.include_router(web.router)

@@ -46,6 +46,7 @@ The existing apps come in with `git subtree add` (their history is kept), so mos
 | `workflows.md` | ComfyUI workflow packs: the folder, `workflow.toml`, tasks, editing, the CLI, problems and fixes (plan 11.11) |
 | `comfy-transfer-report.md` | Plan 11.12: the held-out ComfyUI workflows scored before and after fixes, what they found, and what's still a limit |
 | `agent-architecture.md` | The chat agent's design and the research behind it: Claude Code's structure, the literature, frameworks considered, and facts checked on this machine (plan Phases 13–14) |
+| `test-plan.md` | The checks and edge cases for Phases 13–16, written before building them; results go in the overnight report |
 | `backend-plan.md` | The build plan: Phases 0–16 with steps, checks and deliverables; steps are ticked as they land |
 | `design-brief-ui.md` | UI brief for Claude Design; §6 and §11.7 are the UI-facing API contract |
 | `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures |
@@ -81,8 +82,8 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `metrics/` | ✅ pkg | Metrics (architecture §13): `store.py` (`Store`: series, samples on the 10 s grid, rollups with watermarks, retention, queries on an even `t` axis with gaps), `recorder.py` (`Recorder`: 10 s ticks from the memory snapshot and status stats, service/load/job history from events, closing rows at downtime, hourly rollup, the low-disk alert)) |
 | `settings.py` | ✅ | The Settings page: `view()` (config.toml as the brief's `Settings`) and `save()` (partial saves, only changed values written, applied live; the port at the next start) |
 | `widgets.py` | ✅ | `Widgets`: running mods' `[[ui.widgets]]`, their data fetched from each `source`, validated against `WidgetData` and cached for 30 s |
-| `tools.py` | ⏳ 13 | Agent tool catalog and approvals |
-| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/api/doctor`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`), `outputs.py` (`/api/outputs/...`, file serving with Range), `memory.py` (`/api/memory`, `/plan`, `/acquire`), `metrics.py` (`/api/metrics`, `/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`), `widgets.py` (`/api/widgets/...`), `overview.py` (`/api/overview`), `settings.py` (`/api/settings`) |
+| `tools/` | ✅ pkg | Agent tools (plan Phase 13): `catalog.py` (`Catalog`, `ToolDef`: manifest tools, `tools_source` functions and hub tools, kept per mod in `kv` so a stopped mod's tools stay listed; search), `schema.py` (one flat schema per operation, `x-kind` file inputs, validation with fixes, `coerce`), `hub_tools.py` (the `hub_*` tools), `approvals.py` (permissions deny → ask → allow, modes, the `approvals` table), `calls.py` (`Calls`: run, follow jobs, cancel, resume after a restart), `results.py` (output references from paths and binary responses, the 8 KB cap), `api.py` (response models) |
+| `routes/` | ✅ pkg | One FastAPI router per area, added with each area: `system.py` (`/api/system`, `/api/doctor`, `/config.js`), `events.py` (`/api/events`), `web.py` (`/`, `*.dc.html`), `services.py` (`/api/services/...`), `models.py` (`/api/models/...`), `outputs.py` (`/api/outputs/...`, file serving with Range), `memory.py` (`/api/memory`, `/plan`, `/acquire`), `metrics.py` (`/api/metrics`, `/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`), `widgets.py` (`/api/widgets/...`), `overview.py` (`/api/overview`), `settings.py` (`/api/settings`), `tools.py` (`/api/tools...`, `/api/approvals...`) |
 | `tests/` | ✅ | pytest suite (below) |
 
 ## `utils/tests/`
@@ -93,7 +94,7 @@ Tests stay inside the hub package, as the plan specifies. Group them by area as 
 utils/tests/
 ├── conftest.py                 ✅     root, make_app/app/client (ASGI), fake_mod, hub_process, services_dir
 ├── fixtures/
-│   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok (with a `requests` widget), fake-slow, fake-crash, fake-mem
+│   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok (with a `requests` widget), fake-slow, fake-crash, fake-mem, fake-tools (agent tools of every kind: a job, file inputs, binary results, a tools_source)
 │   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay; snapshots/ = their converted Operation[]
 ├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli, doctor, backup
 ├── web/*.test.mjs + test_api_js.py ✅  Node unit tests (web/api.js; mod-ui.js + the template page.js on a fake DOM; the chart helpers and dashboard layout; the mock history), run from pytest; test_contract.py: api.js routes ↔ hub routes, brief types ↔ response models, every route documented
@@ -102,6 +103,7 @@ utils/tests/
 ├── outputs/test_<behavior>.py  ✅     what counts as an output, rows, the watcher, previews, routes (paging, Range, traversal), delete to trash, activity (conftest: a fake outputs/ tree; the host's ffmpeg inside a toolbox)
 ├── memory/test_<behavior>.py   ✅     proc facts on fake /proc and /sys, the planner, the sampler, make-room end to end with two fake-mem mods, triggers, idle unload (conftest: a fake memory source)
 ├── settings/test_<behavior>.py ✅     GET/PUT /api/settings and GET /api/overview against fake-ok
+├── tools/test_<behavior>.py    ✅     the catalog (manifest + tools_source + hub tools, search, a stopped mod), calls (validation, permissions, approvals with edits, no bypass, capping, media, jobs, cancel, restart) against fake-tools
 ├── metrics/test_<behavior>.py  ✅     rollups, retention, gaps, the recorder on fake services, the chart routes and widgets against fake-ok (conftest: an open hub.db, a fake clock)
 └── <area>/test_<behavior>.py          …
 ```

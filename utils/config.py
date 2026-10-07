@@ -111,6 +111,24 @@ class ServicesCfg(BaseModel):
         return out
 
 
+class PermissionsCfg(_Strict):
+    """Tool permissions (plan 13.2): name globs checked deny → ask → allow, then the default by risk."""
+    deny: list[str] = []
+    ask: list[str] = []
+    allow: list[str] = ["hub_start_service"]
+
+
+class AgentCfg(_Strict):
+    permissions: PermissionsCfg = PermissionsCfg()
+    make_room: bool = True          # tool calls unload idle mods when a model needs room
+    approval_ttl_h: float = Field(24, gt=0)
+
+
+class SessionsCfg(_Strict):
+    restore_on_boot: bool = False
+    autosave_s: int = Field(300, ge=0)   # 0 = no auto-save
+
+
 class Config(_Strict):
     hub: HubCfg = HubCfg()
     paths: PathsCfg = PathsCfg()
@@ -118,6 +136,8 @@ class Config(_Strict):
     ports: PortsCfg = PortsCfg()
     ui: UiCfg = UiCfg()
     services: ServicesCfg = ServicesCfg()
+    agent: AgentCfg = AgentCfg()
+    sessions: SessionsCfg = SessionsCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

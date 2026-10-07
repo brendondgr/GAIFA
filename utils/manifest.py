@@ -216,16 +216,42 @@ class ApiSpec(_Strict):
         return v
 
 
+Risk = Literal["read", "write", "generate", "destructive"]
+
+
 class ToolSpec(_Strict):
     op: Op
     description: str = ""
-    confirm: bool = False
+    confirm: bool = False         # the same as risk = "destructive"
+    risk: Risk | None = None      # default: read for GET, destructive for DELETE or confirm, else write (plan 13.1)
+    ask: list[str] = []           # inputs the user chooses: editable on the parameter card
+    examples: list[dict[str, Any]] = []
+    core: bool = False            # always loaded in the chat (plan 14.6)
+    hide: list[str] = []          # parameters the agent doesn't see (the mod's default applies)
+    fixed: dict[str, Any] = {}    # values always sent, hidden from the agent (e.g. stream = false)
     job: bool = False             # the call returns a job id; the agent API waits for the job (plan 13.2)
+    job_status: Op | None = None  # "GET /v1/jobs/{id}": `{id}` (or any one placeholder) is the job id
+    job_cancel: Op | None = None
+
+    @model_validator(mode="after")
+    def _job(self) -> ToolSpec:
+        if self.job and not self.job_status:
+            raise ValueError("job = true needs job_status (the operation that reports the job, e.g. \"GET /v1/jobs/{id}\")")
+        return self
 
 
 class AgentSpec(_Strict):
-    """[agent]: tools a mod lists at runtime (comfy's task tools), read by the tool catalog (plan 13.1)."""
+    """[agent]: tools a mod lists at runtime (comfy's task tools), read by the tool catalog (plan 13.1),
+    and the mod's skills folder (plan 14.9)."""
     tools_source: Op | None = None
+    skills: str | None = None     # a folder inside the mod: skills/<name>/SKILL.md
+
+    @field_validator("skills")
+    @classmethod
+    def _skills(cls, v: str | None) -> str | None:
+        if v is not None and (v.startswith("/") or ".." in Path(v).parts):
+            raise ValueError(f"{v!r} must be a folder inside the mod")
+        return v
 
 
 class Manifest(_Strict):

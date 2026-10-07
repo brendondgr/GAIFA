@@ -7,6 +7,8 @@ ok     health, status, openapi, echo, audio, SSE, jobs and a route that writes a
 slow   like ok, but /health answers 503 for the first FAKE_SLOW_S (3) seconds
 crash  like ok, but the process exits with status 1 after FAKE_CRASH_S (1) seconds
 mem    like ok, plus /v1/load allocates FAKE_MEM_MB (64) MB and /v1/unload frees it
+tools  like ok, plus routes for agent tools (plan 13): items, an image output, speech with a saved
+       path, a render job (GET /v1/render/{rid}, cancel), multipart upload, and GET /v1/tools
 
 POST /v1/upload reads the body in chunks and returns its size and sha256 (for big uploads).
 GET /v1/events?n=3&gap=0.05 streams n server-sent events, gap seconds apart.
@@ -68,10 +70,83 @@ def openapi() -> dict:
         "/v1/jobs/{jid}": {"delete": {"summary": "Delete a job", "parameters": [{"name": "jid", "in": "path", "required": True, "schema": {"type": "string"}}], "responses": {"200": {"content": {"application/json": {"schema": {}}}}}}},
         "/v1/jobs": {"post": op("Start a job that runs for `seconds`", {"type": "object", "properties": {"label": {"type": "string"}, "seconds": {"type": "number"}}})},
     }
+    if MODE == "tools":
+        paths.update(tool_paths())
     if MODE == "mem":
         paths["/v1/load"] = {"post": op("Allocate memory")}
         paths["/v1/unload"] = {"post": op("Free memory")}
-    return {"openapi": "3.1.0", "info": {"title": f"fake-{MODE}", "version": "1.0.0"}, "paths": paths}
+    return {"openapi": "3.1.0", "info": {"title": f"fake-{MODE}", "version": "1.0.0"}, "paths": paths, "components": COMPONENTS}
+
+
+def tool_paths() -> dict:
+    def ok(summary, body=None, params=None, response="application/json", method="post"):
+        o = {"summary": summary, "responses": {"200": {"content": {response: {"schema": {}}}}}}
+        if body:
+            o["requestBody"] = {"required": True, "content": {"application/json": {"schema": body}}}
+        if params:
+            o["parameters"] = params
+        return {method: o}
+
+    item = [{"name": "item_id", "in": "path", "required": True, "schema": {"type": "string"}},
+            {"name": "verbose", "in": "query", "required": False, "schema": {"type": "boolean", "default": False}}]
+    image = {"$ref": "#/components/schemas/ImageReq"}
+    return {
+        "/v1/items/{item_id}": ok("Get one item", params=item, method="get"),
+        "/v1/images": ok("Make an image (a PNG output)", image),
+        "/v1/say": ok("Speak text: WAV bytes, saved to outputs", {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}, response="audio/wav"),
+        "/v1/beep": ok("A WAV the mod doesn't save", {"type": "object", "properties": {}}, response="audio/wav"),
+        "/v1/render": ok("Start a render job", {"type": "object", "properties": {"prompt": {"type": "string"}, "seconds": {"type": "number", "default": 0.5}, "fail": {"type": "boolean", "default": False}}, "required": ["prompt"]}),
+        "/v1/render/{rid}": ok("A render job", params=[{"name": "rid", "in": "path", "required": True, "schema": {"type": "string"}}], method="get"),
+        "/v1/render/{rid}/cancel": ok("Cancel a render", params=[{"name": "rid", "in": "path", "required": True, "schema": {"type": "string"}}]),
+        "/v1/mesh": {"post": {"summary": "Upload a mesh", "requestBody": {"content": {"multipart/form-data": {"schema": {"type": "object", "properties": {"mesh": {"type": "string", "format": "binary"}, "note": {"type": "string"}}, "required": ["mesh"]}}}}, "responses": {"200": {"content": {"application/json": {"schema": {}}}}}}},
+        "/v1/big": ok("A large JSON result", method="get"),
+        "/v1/tools": ok("Runtime tools", method="get"),
+        "/v1/tools/{name}/call": ok("Call a runtime tool", {"type": "object"}, [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}]),
+    }
+
+
+COMPONENTS = {"schemas": {"ImageReq": {"type": "object", "title": "ImageReq", "properties": {
+    "prompt": {"type": "string", "title": "Prompt", "description": "what to draw"},
+    "aspect": {"type": "string", "enum": ["1:1", "16:9", "9:16"], "default": "1:1"},
+    "steps": {"type": "integer", "minimum": 1, "maximum": 50, "default": 8},
+    "reference": {"anyOf": [{"type": "string", "format": "aihub-file"}, {"type": "null"}], "description": "an image to follow"},
+}, "required": ["prompt"]}}}
+RENDERS: dict[str, dict] = {}
+
+
+def png(w: int = 4, h: int = 4) -> bytes:
+    import zlib
+    raw = b"".join(b"\x00" + b"\xff\x80\x00" * w for _ in range(h))
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+
+
+def save(name: str, data: bytes, meta: dict) -> Path:
+    now = datetime.now()
+    day = OUTPUTS / now.strftime("%Y-%m-%d")
+    day.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "output"
+    path = day / f"{now.strftime('%H%M%S')}-{slug}-{len(list(day.iterdir()))}{Path(name).suffix or '.bin'}"
+    part = path.with_name(path.name + ".part")
+    part.write_bytes(data)
+    path.with_name(path.name + ".json").write_text(json.dumps(meta))
+    part.rename(path)
+    return path
+
+
+def render_state(r: dict) -> dict:
+    if r["state"] == "running":
+        p = (time.time() - r["start"]) / r["seconds"]
+        if p >= 1:
+            if r["fail"]:
+                r.update(state="failed", error="the fake render failed")
+            else:
+                f = save(r["prompt"] + ".png", png(), {"title": r["prompt"], "prompt": r["prompt"], "kind": "image"})
+                r.update(state="done", outputs=[{"path": str(f.relative_to(OUTPUTS.parent)), "kind": "image"}])
+        else:
+            r["progress"] = round(p, 2)
+    return {k: v for k, v in r.items() if k not in ("start",)}
 
 
 def tone(seconds: float = 0.25, hz: float = 440.0, rate: int = 16000) -> bytes:
@@ -140,6 +215,25 @@ class Handler(BaseHTTPRequestHandler):
             return self.sse(int(q.get("n", ["3"])[0]), float(q.get("gap", ["0.05"])[0]))
         if url.path == "/v1/widgets/requests":
             return self.send(200, widget(parse_qs(url.query).get("range", ["24h"])[0]))
+        if MODE == "tools":
+            m = re.fullmatch(r"/v1/items/([^/]+)", url.path)
+            if m:
+                return self.send(200, {"id": m.group(1), "verbose": parse_qs(url.query).get("verbose", ["false"])[0]})
+            m = re.fullmatch(r"/v1/render/([^/]+)", url.path)
+            if m:
+                r = RENDERS.get(m.group(1))
+                return self.send(200, render_state(r)) if r else self.send(404, {"detail": "no render"})
+            if url.path == "/v1/big":
+                return self.send(200, {"rows": [{"i": i, "text": "x" * 50} for i in range(400)]})
+            if url.path == "/v1/tools":
+                return self.send(200, {"tools": [
+                    {"type": "function", "function": {"name": "paint", "description": "Paint a picture (runtime tool).",
+                     "parameters": {"type": "object", "properties": {"prompt": {"type": "string"}, "image": {"type": "string", "format": "aihub-file"},
+                                                                    "style": {"type": "string", "enum": ["oil", "ink"]}}, "required": ["prompt"]}},
+                     "op": "POST /v1/tools/paint/call", "job": {"status": "GET /v1/render/{job_id}", "cancel": "POST /v1/render/{job_id}/cancel"},
+                     "risk": "generate", "ask": ["style"], "examples": [{"prompt": "a fox", "style": "ink"}]},
+                    {"type": "function", "function": {"name": "styles", "description": "List styles.", "parameters": {"type": "object", "properties": {}}},
+                     "op": "POST /v1/tools/styles/call", "job": None, "risk": "read", "core": True}]})
         if url.path == "/v1/redirect":
             self.send_response(307)
             self.send_header("Location", "/v1/status")
@@ -180,6 +274,45 @@ class Handler(BaseHTTPRequestHandler):
             jid = f"j_{len(JOBS) + 1}"
             JOBS[jid] = {"id": jid, "label": b.get("label") or jid, "start": time.time(), "seconds": float(b.get("seconds") or 1)}
             return self.send(202, {"id": jid})
+        if MODE == "tools":
+            if url.path == "/v1/images":
+                b = self.body()
+                f = save(b.get("prompt", "image") + ".png", png(), {"title": b.get("prompt"), "prompt": b.get("prompt"), "kind": "image",
+                                                                    "params": {"aspect": b.get("aspect"), "steps": b.get("steps"), "reference": b.get("reference")}})
+                return self.send(200, {"path": str(f), "aspect": b.get("aspect"), "steps": b.get("steps"), "reference": b.get("reference")})
+            if url.path == "/v1/say":
+                b = self.body()
+                f = save(b.get("text", "speech") + ".wav", tone(), {"title": b.get("text"), "kind": "audio"})
+                data = tone()
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/wav")
+                self.send_header("X-AIHub-Output", str(f))
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if url.path == "/v1/beep":
+                self.body()
+                return self.send(200, tone(), "audio/wav")
+            if url.path in ("/v1/render", "/v1/tools/paint/call"):
+                b = self.body()
+                rid = f"r_{len(RENDERS) + 1}"
+                RENDERS[rid] = {"id": rid, "state": "running", "prompt": b.get("prompt") or "x", "start": time.time(),
+                                "seconds": float(b.get("seconds") or 0.5), "fail": bool(b.get("fail")), "progress": 0.0,
+                                "style": b.get("style"), "image": b.get("image")}
+                return self.send(202, {"id": rid, "state": "running"} if url.path == "/v1/render" else {"status": "running", "job_id": rid})
+            if url.path == "/v1/tools/styles/call":
+                self.body()
+                return self.send(200, {"styles": ["oil", "ink"]})
+            m = re.fullmatch(r"/v1/render/([^/]+)/cancel", url.path)
+            if m and m.group(1) in RENDERS:
+                RENDERS[m.group(1)]["state"] = "cancelled"
+                STATE["cancelled"] = STATE.get("cancelled", 0) + 1
+                return self.send(200, {"id": m.group(1), "state": "cancelled"})
+            if url.path == "/v1/mesh":
+                n = int(self.headers.get("Content-Length") or 0)
+                data = self.rfile.read(n)
+                return self.send(200, {"bytes": len(data), "has_glb_name": b'filename="' in data, "content_type": self.headers.get("Content-Type", "")[:30]})
         if MODE == "mem" and url.path == "/v1/load":
             mb = int(self.body().get("mb") or os.environ.get("FAKE_MEM_MB", "64"))
             block = bytearray(mb * MB)
@@ -258,7 +391,7 @@ def status() -> dict:
 
 
 def main() -> None:
-    if MODE not in {"ok", "slow", "crash", "mem"}:
+    if MODE not in {"ok", "slow", "crash", "mem", "tools"}:
         sys.exit(f"unknown mode {MODE!r}")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     server.daemon_threads = True

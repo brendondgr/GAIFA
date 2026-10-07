@@ -196,13 +196,17 @@ hide = ["GET /ui/{path}"]              # globs on "METHOD /path", e.g. "* /admin
 "POST /v1/speech" = "audio"
 "POST /v1/audio/speech" = "audio"
 
-[tools]                             # used by the agent later
-speak = { op = "POST /v1/speech", description = "Speak text in a saved voice" }
+[tools]                             # the agent's tools (plan 13.1): <mod>_<name>, schema from the OpenAPI
+speak = { op = "POST /v1/speech", description = "Speak text in a saved voice", risk = "generate", ask = ["name"], hide = ["stream"] }
 delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
-# job = true: the operation returns a job id, and the agent API waits for the job (plan 13.2)
+# risk: read | write | generate | destructive (default: read for GET, destructive for DELETE/confirm, else write)
+# ask = [...] inputs the user chooses (parameter card) · examples = [{...}] · core = true (always loaded)
+# hide = [...] / fixed = {...}: parameters kept from the model / always sent
+# job = true + job_status = "GET /v1/jobs/{id}" (+ job_cancel): the hub follows the job to its outputs
 
 [agent]                             # optional: tools the mod lists at runtime (comfy: one per task)
-tools_source = "GET /v1/tools"      # → {"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST …", "job": {…}|null}]}
+tools_source = "GET /v1/tools"      # → {"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST …", "job": {…}|null, "risk", "ask", "examples", "core"}]}
+skills = "skills"                   # optional: skills/<name>/SKILL.md for the agent (plan 14.9)
 ```
 
 `config.toml` may override `port`, `env` (merged), `enabled`, `autostart`, `idle_unload_s`, `auto_unload` and `priority` per mod.
@@ -366,7 +370,9 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/doctor` | the checks behind `aihub doctor` and Settings → About → Doctor (plan 12.4): models on disk, manifests, paths outside the project (allowlist: `/usr`, `~/.config/tts-engines`, `~/.local/bin`, podman images; Stage D items are notes), ports, units, disk, offline mods. Shape: UI brief §11.7 `Doctor` |
 | `POST /api/services/rescan` | pick up added, removed and edited mod folders without restarting the hub: `{added, removed, changed}`; new mods autostart |
 | `POST /api/memory/acquire[?make_room=1]` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[], plan}` or `409 needs_room {plan}`. `make_room=1` (or `X-AIHub-Make-Room: 1`, or `auto_make_room`) unloads first; the grant is reserved for 120 s |
-| `GET /api/tools`, `POST /api/tools/{name}/call`, `POST /api/approvals/{id}` | later: agent tools and approval decisions |
+| `GET /api/tools[?q=][?names=]`, `GET /api/tools/index` | the agent's tool catalog (plan 13.1): every mod's `[tools]` and `tools_source` functions plus the hub's own `hub_*` tools, with risk, `ask` fields, examples and `core`; a stopped mod's tools stay listed (`available: false`; a call starts it) |
+| `POST /api/tools/{name}/call {arguments, origin, mode}?wait=`, `GET /api/tools/calls/{id}[/result]`, `POST …/cancel` | a tool call (plan 13.2): validated (errors name the field and the fix), checked against `[agent.permissions]` deny → ask → allow then the risk default, run as a hub task (jobs followed to the end; outputs mapped to `output:<id>`; JSON capped at 8 KB). Shapes: UI brief §11.12 |
+| `GET /api/approvals`, `GET/POST /api/approvals/{id} {approve, arguments?}` | approvals (plan 13.2): a call that must ask is stored in `approvals` (hub.db) and runs nothing; the decision may carry edited arguments, which are validated and are what runs |
 
 **Alerts** (plan 6.4) are the banner items above the Overview grid. Each has a stable id, so it is raised once and cleared when its cause goes away:
 

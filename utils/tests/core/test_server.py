@@ -68,7 +68,7 @@ async def test_system(client, root):
 async def test_config_js_lists_live_areas(client):
     r = await client.get("/config.js")
     assert r.headers["content-type"].startswith("text/javascript")
-    assert r.text == 'window.AIHUB_API_BASE = "";\nwindow.AIHUB_LIVE_AREAS = ["system", "services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets", "overview", "settings"];\n'
+    assert r.text == 'window.AIHUB_API_BASE = "";\nwindow.AIHUB_LIVE_AREAS = ["system", "services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets", "overview", "settings", "tools"];\n'
 
 
 async def test_docs_and_openapi(client):

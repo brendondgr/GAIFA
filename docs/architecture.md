@@ -651,7 +651,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
 ### 14.2 Threads, questions and approvals survive restarts
 1. **The event log.** A thread is an append-only log in `agent.db` (`threads`, `events`): messages, thinking, tool calls, results, questions, answers, approvals and compaction marks. The model's messages are rebuilt from it, and a page reconnects with `GET /v1/threads/{id}/events?after=`.
 2. **Pausing.** A question or a parameter card ends the request in a `waiting` state. Nothing is held in memory.
-3. **Answering.** The answer (`/answer`), or the hub's approval with the edited arguments (`/approval`), is appended, and the same turn continues from the log.
+3. **Answering.** The answer (`/answer`), or the hub's approval with the edited arguments (`/approval`), is appended, and the same turn continues from the log. A card decided in the hub's Approvals popover continues the thread the same way; Stop dismisses a waiting card, and the hub's echo of that denial is ignored, so a stopped turn stays stopped.
 4. **Rewind and branch.** Fork copies the events up to a chosen point into a new thread.
 
 Both the event log and the hub's approval are on disk, so a reboot between steps 2 and 3 loses nothing.

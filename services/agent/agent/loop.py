@@ -178,8 +178,8 @@ class Agent:
                                             for e in self.store.events(tid, types=("decision",))):
             return
         ap = next((e for e in self.store.events(tid, types=("approval",)) if e["payload"]["approval_id"] == a["id"]), None)
-        if ap is None:
-            return
+        if ap is None or self._find(tid, "tool_result", ap["payload"]["id"]) is not None:
+            return      # already settled here (Stop or a button dismissed the card): the hub's echo mustn't restart the turn
         approve = a["state"] == "approved"
         res = {"status": "running" if approve else "denied", "call_id": a.get("call_id"),
                "error": None if approve else {"code": "denied_by_user", "detail": a.get("reason") or "the user said no"}}
@@ -286,6 +286,7 @@ class Agent:
             p = e["payload"]
             ap = self._find(tid, "approval", p["id"])
             if ap and not self._find(tid, "decision", p["id"]):
+                self._deciding.add(ap["payload"]["approval_id"])
                 try:
                     await self.hub.decide(ap["payload"]["approval_id"], False, None, why)
                 except Exception:  # noqa: BLE001

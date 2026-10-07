@@ -155,3 +155,22 @@ async def test_ask_modes(env):
     await env.send(ro, "make y")
     assert env.payloads(ro, "tool_result")[-1]["status"] == "denied"
     assert env.agent.store.thread(ro)["state"] == "idle"
+
+
+async def test_stop_while_a_card_waits_stays_stopped(env):
+    """Stop dismissed the card, then the hub's 'denied' event came back and restarted the turn
+    (found on a live thread: the model carried on after the user's Stop)."""
+    tid = await env.thread()
+    env.model.queue({"tool_calls": [{"name": "fake_make_image", "arguments": {"prompt": "an owl"}}]}, {"text": "Should not appear."})
+    await env.send(tid, "an owl")
+    assert env.agent.store.thread(tid)["state"] == "waiting"
+    await asyncio.sleep(0.3)   # the agent's hub event stream is connected
+    n = len(env.model.received)
+    r = await env.client.post(f"/v1/threads/{tid}/cancel")
+    assert r.status_code == 200
+    await asyncio.sleep(0.6)   # the hub's approval event arrives
+    await env.settle(tid)
+    assert env.agent.store.thread(tid)["state"] == "idle"
+    assert len(env.model.received) == n
+    assert len(env.payloads(tid, "tool_result")) == 1
+    assert not [a for a in env.payloads(tid, "assistant") if a["text"] == "Should not appear."]

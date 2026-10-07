@@ -147,7 +147,10 @@ def meter(events: list[dict[str, Any]], window: int | None, parts: dict[str, int
     est_total = sum(parts.values())
     if last_usage:
         u = last_usage["payload"]
-        base = int(u.get("prompt_tokens") or 0) + int(u.get("completion_tokens") or 0)
+        # completion_tokens includes the thinking, which is never sent back: leave it out
+        thought = sum(est(e["payload"].get("text") or "") for e in events
+                      if e["type"] == "thinking" and e["seq"] < last_usage["seq"] and e["seq"] > last_usage["seq"] - 6)
+        base = int(u.get("prompt_tokens") or 0) + max(0, int(u.get("completion_tokens") or 0) - thought)
         added = sum(est({k: v for k, v in e["payload"].items() if k != "thinking"}) for e in events
                     if e["seq"] > last_usage["seq"] and e["type"] in ("user", "tool_result", "assistant", "tool_call"))
         used = base + added

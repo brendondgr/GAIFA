@@ -61,7 +61,7 @@ class Run:
             args = decided.get(c["id"]) or normalized.get(c["id"]) or c.get("arguments") or {}
             if c["name"] == name:
                 out.append((c, args))
-            elif c["name"] == "comfy_run_workflow" and args.get("workflow") in EQUIV.get(name, ()):
+            elif c["name"] in ("comfy_run_workflow", "comfy_run") and args.get("workflow") in EQUIV.get(name, ()):
                 out.append((c, {**(args.get("inputs") or {}), "workflow": args["workflow"]}))
         return out
 

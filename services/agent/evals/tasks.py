@@ -184,7 +184,7 @@ TASKS: list[Task] = [
     Task("video_text", "single", ["Make a short video of waves crashing on a beach."],
          [ran(VID), arg_has(VID, "prompt", "wave"), kinds("video")]),
     Task("card_edit", "single", ["Make an image of a lighthouse at dusk."],
-         [ran(IMG), aspect_is(IMG, "9:16")], card=edit(aspect="9:16 (Portrait Widescreen)"),
+         [ran(IMG), aspect_is(IMG, "9:16")], card=edit(aspect="9:16"),
          note="the parameter card changes the aspect; what ran must be 9:16"),
     # 2. chains
     Task("img_then_video", "chain", ["Make an image of a sailboat on a calm lake.", "Now animate it: the boat drifts slowly."],

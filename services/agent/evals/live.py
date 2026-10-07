@@ -81,7 +81,7 @@ async def buttons(h: Harness, model: str) -> Run:
         await h._settle(tid, time.monotonic() + 900)
 
     await c.post(f"/v1/threads/{tid}/action", json={"tool": IMG, "arguments": {"prompt": "a red apple on a white table, studio photo",
-                                                                               "aspect": "1:1 (Square)"}})
+                                                                               "aspect": "1:1"}})
     await settle()
     evs = await h._events(tid)
     img = [o for e in evs if e["type"] == "tool_result" for o in e["payload"].get("outputs") or []]

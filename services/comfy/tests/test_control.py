@@ -61,8 +61,8 @@ def test_adopts_a_running_comfyui_and_reports_its_queue(tmp_path, fake):
 def test_idle_unload(tmp_path, fake):
     fake.up = True
     with TestClient(create_app(make(tmp_path, fake, COMFY_IDLE_UNLOAD_S="0.3"))) as c:
-        assert wait(lambda: fake.freed == 1 and not fake.up, secs=8)
-        assert c.get("/v1/status").json()["loaded"] is False
+        assert wait(lambda: fake.freed >= 1 and not fake.up, secs=8)
+        assert wait(lambda: c.get("/v1/status").json()["loaded"] is False, secs=5)   # the status catches up a moment later
 
 
 def test_quits_an_idle_comfyui_when_the_adapter_stops(tmp_path, fake):

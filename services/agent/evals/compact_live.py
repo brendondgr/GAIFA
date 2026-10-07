@@ -12,18 +12,20 @@ from pathlib import Path
 
 import httpx
 
-TURNS = ["Hi! My favourite animal is the snow leopard. Please remember that for this chat. Now, which mods are running?",
+TURNS = ["Hi! My favourite animal is the snow leopard (just for this chat; no need to save it to memory). Now, which mods are running?",
          "How much memory is free right now, and what does each mod hold?",
          "List my saved voices and the Kokoro voices.",
          "Search my outputs for images and list the five newest with their titles.",
          "Which models are on disk? Just the LLMs.",
+         "Show me the tools you have for speech, with a one-line description each.",
+         "Which mods are running now, and are any of them busy?",
          "What's my favourite animal, which I told you at the start?"]
 
 
 async def main(model: str) -> None:
     rows = []
     async with httpx.AsyncClient(base_url="http://127.0.0.1:7000/api/s/agent", timeout=900) as c:
-        tid = (await c.post("/v1/threads", json={"title": "compaction check", "model": model, "settings": {"window": 9000}})).json()["id"]
+        tid = (await c.post("/v1/threads", json={"title": "compaction check", "model": model, "settings": {"window": 6000}})).json()["id"]
         for text in TURNS:
             await c.post(f"/v1/threads/{tid}/messages", json={"text": text})
             for _ in range(1200):

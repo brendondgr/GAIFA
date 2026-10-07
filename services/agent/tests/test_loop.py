@@ -265,3 +265,19 @@ async def test_concurrent_requests_dont_trip_the_store(env):
 
     results = await asyncio.gather(*(one() for _ in range(300)))
     assert all(results), results.count(False)
+
+
+async def test_an_empty_reply_is_asked_again(env):
+    env.model.queue({"text": ""}, {"text": "Here you go."})
+    tid = await env.thread()
+    await env.send(tid, "hello")
+    assert env.payloads(tid, "assistant")[-1]["text"] == "Here you go."
+    assert "empty" in env.payloads(tid, "note")[0]["text"]
+
+
+async def test_eval_threads_never_write_memory(env):
+    env.model.queue({"tool_calls": [{"name": "remember", "arguments": {"text": "test fact"}}]}, {"text": "ok"})
+    tid = await env.thread(settings={"dry_run": True})
+    await env.send(tid, "remember a test fact")
+    assert not (env.agent.cfg.data / "memory").exists()
+    assert env.payloads(tid, "memory")[0]["dry_run"] is True

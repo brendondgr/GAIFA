@@ -137,6 +137,7 @@ def test_needs_room_is_relayed(env):
     hub.room = False
     r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "x"}})
     assert r.status_code == 409 and r.json()["code"] == "needs_room" and r.json()["data"]["plan"]["unload"] == ["gen3d"]
+    assert fake.freed >= 1 and len(hub.acquires) == 2     # it freed its own models and asked again before giving up
     r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "x"}}, headers={"X-AIHub-Make-Room": "1"})
     assert r.status_code == 202 and hub.acquires[-1]["make_room"] == "1"
 

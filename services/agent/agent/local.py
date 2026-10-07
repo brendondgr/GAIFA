@@ -119,6 +119,9 @@ class Local:
         text = str(args.get("text") or "").strip()
         if not text:
             return self.err(tid, cid, "remember", "invalid_arguments", "text is empty")
+        if (thread.get("settings") or {}).get("dry_run"):     # an eval thread: never touch the real memory
+            self.a.emit(tid, "memory", {"text": text, "topic": args.get("topic"), "dry_run": True})
+            return self.ok(tid, cid, "remember", "Saved to memory.")
         topic = Knowledge(self.a.cfg.data, self.a.hub).remember(text, args.get("topic"))
         self.a.emit(tid, "memory", {"text": text, "topic": topic})
         return self.ok(tid, cid, "remember", f"Saved to memory{f' ({topic})' if topic else ''}.")

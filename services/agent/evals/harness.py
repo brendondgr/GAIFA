@@ -119,7 +119,9 @@ def first_option(q: dict[str, Any]) -> dict[str, Any]:
 
 
 def approve_all(a: dict[str, Any]) -> tuple[bool, dict[str, Any] | None]:
-    return True, None
+    """The default answer to a card: approve, except destructive ones (stopping a mod, deleting),
+    which a careful person would refuse unless they asked for it."""
+    return a.get("risk") != "destructive", None
 
 
 class Harness:

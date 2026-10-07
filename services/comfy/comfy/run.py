@@ -71,7 +71,17 @@ class Runner:
         for k in files & set(values):
             values[k] = await self.materialize(values[k])
         needs = self.needs_gb(pack, conv)
-        await self.acquire(needs, make_room, f"{pack.name}")
+        try:
+            await self.acquire(needs, make_room, f"{pack.name}")
+        except NeedsRoom:
+            # ComfyUI may still hold another workflow's models, which AIHub counts as used: free them
+            # (this mod can't be unloaded to make room for itself) and ask once more.
+            if not await self.client.up():
+                raise
+            log.info("not enough room for %s: freeing ComfyUI's own models first", pack.id)
+            await self.client.free()
+            await asyncio.sleep(3)
+            await self.acquire(needs, make_room, f"{pack.name}")
         if not await self.client.up():
             await self.control.load()
         self.control.touch()

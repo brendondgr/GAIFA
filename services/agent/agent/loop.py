@@ -512,6 +512,14 @@ class Agent:
             model = fb
             msgs, sizes = await self.messages(tid, tools, model)
             reply = await self.llm.chat(model, msgs, tools.functions(), delta, known)
+        if not reply.text.strip() and not reply.tool_calls:
+            # An empty reply (the server dropped a call it couldn't parse, or the model stopped early):
+            # ask once more rather than leave the user with nothing.
+            self.emit(tid, "note", {"text": "the model's reply was empty; asked again", "level": "info"})
+            nudge = [*msgs, {"role": "user", "content": "(Your last reply was empty. Continue: answer the user, or call the tool you meant to call.)"}]
+            retry = await self.llm.chat(model, nudge, tools.functions(), delta, known)
+            retry.thinking = (reply.thinking + "\n" + retry.thinking).strip()
+            reply = retry
         if reply.thinking:
             self.emit(tid, "thinking", {"text": reply.thinking, "seconds": reply.thinking_s, "step": step})
         if reply.text or not reply.tool_calls:

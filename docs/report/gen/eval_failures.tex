@@ -1,7 +1,13 @@
 \begin{itemize}[leftmargin=*,itemsep=2pt]
-\item \texttt{disabled\_group}: reply mentions off/disabled/not available/can't/cannot/unavailable \newline {\footnotesize\color{muted} 26B · 1 run run 1: ```python
+\item \texttt{animate\_without\_image}: no invented outputs \newline {\footnotesize\color{muted} 31B · final run 1: mentions \#[1, 2, 3, 4, 5] that don't exist}
+\item \texttt{disabled\_group}: reply mentions off/disabled/not available/can't/cannot/unavailable \newline {\footnotesize\color{muted} 31B · final run 3: I'm having a little trouble loading the 3D tools. Let me try one more time with a different approach.
+
+What ki; 26B · 1 run run 1: ```python
 gen3d\_make\_3d(prompt="a simple wooden dining chair with four legs and a backrest, realistic texture"}
+\item \texttt{img\_then\_edit}: comfy\_edit\_image ran \newline {\footnotesize\color{muted} 31B · final run 1: comfy\_edit\_image ran 0$\times$}
+\item \texttt{img\_then\_edit}: comfy\_edit\_image.image is comfy\_generate\_image's output \newline {\footnotesize\color{muted} 31B · final run 1: image=[] from comfy\_generate\_image: ['138b8d3a7ab4', '9f22e5496a26']}
+\item \texttt{img\_then\_edit}: comfy\_edit\_image.prompt mentions snow/winter \newline {\footnotesize\color{muted} 31B · final run 1: prompt=[]}
 \item \texttt{read\_only}: reply mentions read-only/read only/can't/cannot/not allowed \newline {\footnotesize\color{muted} 26B · 1 run run 1: The image generation service is currently a bit busy processing another task. Would you like to wait a moment }
-\item \texttt{search\_then\_3d}: gen3d\_make\_3d ran \newline {\footnotesize\color{muted} 31B · v3 + 2 re-run run 2: gen3d\_make\_3d ran 0$\times$; 31B · v3 + 2 re-run run 3: gen3d\_make\_3d ran 0$\times$}
+\item \texttt{search\_then\_3d}: gen3d\_make\_3d ran \newline {\footnotesize\color{muted} 31B · final run 3: gen3d\_make\_3d ran 0$\times$}
 \item \texttt{three\_steps}: used update\_todos \newline {\footnotesize\color{muted} 26B · 1 run run 1: }
 \end{itemize}

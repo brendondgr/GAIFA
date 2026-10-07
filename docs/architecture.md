@@ -638,6 +638,15 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
   - `prompts.py`
   - `server.py`
 
+- **As built (plan Phases 13–14, 2026-10-07):**
+  - **Models:** models on grammar-constrained servers (llama.cpp, facts from `/props`) get every tool loaded, since they can only name tools they were given; others get tools on demand.
+  - **Model output:** the client repairs what vLLM's streaming parsers drop. Truncated tool-call JSON is closed, a reply that comes back empty is asked again without streaming, and Gemma's `<channel|>` thought marker is split off as thinking.
+  - **Buttons:** a button's call is introduced in the history as the user's.
+  - **Restarts:** a graceful restart leaves turns running, and they resume at the next start.
+  - **Memory:** eval threads (`dry_run`) never write memory.
+  - **Prompt rules:** the system prompt says which groups are off and when a chat is read-only, and forbids stopping mods or LLMs to make room.
+  - **Evaluation:** the eval and live results are in [agent-eval.md](agent-eval.md).
+
 ### 14.2 Threads, questions and approvals survive restarts
 1. **The event log.** A thread is an append-only log in `agent.db` (`threads`, `events`): messages, thinking, tool calls, results, questions, answers, approvals and compaction marks. The model's messages are rebuilt from it, and a page reconnects with `GET /v1/threads/{id}/events?after=`.
 2. **Pausing.** A question or a parameter card ends the request in a `waiting` state. Nothing is held in memory.

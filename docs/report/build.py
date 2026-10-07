@@ -286,6 +286,10 @@ def write_p1516() -> None:
             plots.append((name, coords, d["limit_gb"]))
         rows += [r"\bottomrule", r"\end{tabular}"]
         out += rows
+        bad = {f.stem.split("-", 2)[1]: e for f in switches for e in [json.loads(f.read_text())] if not e["result"].get("ok")}
+        if bad:
+            out.append(r"\par{\footnotesize\color{muted} The switches marked \emph{problem} ran before the fix for bug \#25: their only failed step was "
+                       r"``load lcpp'' (lcpp has no load operation; its instance had already been launched). Everything else in them worked.}")
         out.append(r"\begin{center}\begin{tikzpicture}\begin{axis}[width=\linewidth,height=5.2cm,xlabel={seconds into the switch},"
                    r"ylabel={memory used (GB)},ymin=0,ymax=135,legend style={font=\scriptsize,draw=none,at={(0.5,-0.32)},anchor=north,legend columns=4},"
                    r"ymajorgrids,grid style={line},axis line style={line},tick style={line},label style={font=\small},tick label style={font=\small}]")

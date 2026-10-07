@@ -1,3 +1,25 @@
+\subsection*{Switching sessions on the real mods}
+Each switch ran its plan through the memory manager while memory was sampled every second. The dashed line is the limit (total minus the 12~GB reserve).
+\begin{tabular}{@{}lp{7.2cm}rrr@{}}
+\toprule
+Switch to & Steps & Time & Peak & Result \\
+\midrule
+LLM work & unload comfy, launch llm gemma4-26b-7071, load lcpp, load tts & 6 s & 41 GB & \textcolor{badred}{problem} \\
+3D work & stop llm gemma4-26b-7071, unload tts, load gen3d & 50 s & 41 GB & \textcolor{okgreen}{ok} \\
+LLM work & unload gen3d, launch llm gemma4-26b-7071, load lcpp, load tts & 12 s & 41 GB & \textcolor{badred}{problem} \\
+3D work & stop llm gemma4-26b-7071, unload tts, load gen3d & 42 s & 45 GB & \textcolor{okgreen}{ok} \\
+LLM work & unload gen3d, launch llm gemma4-26b-7071, load tts & 10 s & 41 GB & \textcolor{okgreen}{ok} \\
+\bottomrule
+\end{tabular}
+\par{\footnotesize\color{muted} The switches marked \emph{problem} ran before the fix for bug \#25: their only failed step was ``load lcpp'' (lcpp has no load operation; its instance had already been launched). Everything else in them worked.}
+\begin{center}\begin{tikzpicture}\begin{axis}[width=\linewidth,height=5.2cm,xlabel={seconds into the switch},ylabel={memory used (GB)},ymin=0,ymax=135,legend style={font=\scriptsize,draw=none,at={(0.5,-0.32)},anchor=north,legend columns=4},ymajorgrids,grid style={line},axis line style={line},tick style={line},label style={font=\small},tick label style={font=\small}]
+\addplot[thick,color=accent] coordinates {(0,41.18) (2,12.23) (4,26.99) (6,27.06)};\addlegendentry{LLM work}
+\addplot[thick,color=purple] coordinates {(0,27.06) (2,13.13) (4,13.72) (6,21.67) (8,22.49) (10,23.37) (12,15.49) (14,18.66) (16,19.96) (18,19.69) (20,20.87) (22,21.9) (24,23.12) (26,23.12) (28,24.72) (30,28.89) (32,32.71) (34,36.43) (36,39.95) (38,40.66) (40,40.68) (42,40.51) (44,40.42) (46,40.48) (48,40.46) (50,40.53)};\addlegendentry{3D work}
+\addplot[thick,color=teal] coordinates {(0,40.53) (2,40.51) (4,11.85) (6,26.78) (8,27.04) (10,33.93) (12,40.58)};\addlegendentry{LLM work}
+\addplot[thick,color=okgreen] coordinates {(0,45.45) (2,24.34) (4,23.91) (6,11.45) (8,11.57) (10,11.63) (12,12.92) (14,16.07) (16,18.91) (18,20.32) (20,21.49) (22,22.48) (24,23.38) (26,31.63) (28,35.39) (30,39.02) (32,40.24) (34,40.24) (36,40.24) (38,40.05) (40,42.16) (42,40.09)};\addlegendentry{3D work}
+\addplot[thick,color=badred] coordinates {(0,40.1) (2,11.28) (4,26.36) (6,26.36) (8,26.95) (10,41.44)};\addlegendentry{LLM work}
+\addplot[dashed,color=badred,domain=0:600] {118.44999999999999};\addlegendentry{limit}
+\end{axis}\end{tikzpicture}\end{center}
 \subsection*{A pending card and a pending question survive restarts}
 Thread A waited on a parameter card and thread B on a question card. Then the hub and the agent were both restarted (2.0 s). After the restart: A was \emph{waiting}, B was \emph{waiting}, and the approval was still pending at the hub. Approving A and answering B then finished both, with outputs \{'a': ['image'], 'b': ['image']\}. Result: \ok.
 \subsection*{The context meter against the model's own count}

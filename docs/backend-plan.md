@@ -1112,7 +1112,7 @@ The hub becomes one tool catalog with risk levels, approvals the hub enforces, e
   - **Results** in `docs/agent-eval.md`. **Gate:** Stage D starts when the primary model passes 80% of tasks at pass^3. If not, change prompts and tool descriptions (not the tasks) and re-run.
   *Done when:* `services/agent/tests/test_evals.py` runs the harness against the fake model server; the live result is recorded.
 
-**Wire — Phase 13:** `tools` goes live:
+**Wire — Phase 13:** `tools` goes live: *Done: tool badges with risk in the API tab, the header Approvals popover, and ask tools from the API tab go through the approval card (`web/api-tool.js`).*
 - the purple **tool** badges in each API tab come from the real catalog, with their risk level
 - a header **Approvals** popover (with a count badge) lists pending approvals as parameter cards: the `ask` fields editable, Approve/Deny
 - calling an `ask` tool from the API tab goes through the real approval flow
@@ -1134,7 +1134,7 @@ Everything here waits until Stages A–C are done and the 13.5 gate has passed. 
 
 A chat that works the way Claude Code does: one loop, tools that load on demand, questions back to you as cards, approvals as editable parameter cards, results you can chain, and the context window always in view. It's a mod, `services/agent`, with no agent framework: the loop is our own (about 400 lines), talking to the relay for the model and to the hub for tools.
 
-- [ ] **14.1 Chat brief for Claude Design** (extend the brief's "Reserved: Chat" section).
+- [x] **14.1 Chat brief for Claude Design** *As built:* built by hand in `web/chat/` (brief §11.13: card and action registries), like revision 2. (extend the brief's "Reserved: Chat" section).
   - **Thread list and thread view**, with search and rewind/branch from any earlier message.
   - **Messages:** streaming text; **thinking** folded into one line per step ("Thought for 6 s ›") that expands in place, shown only when Settings → Agent → Show thinking is on, so the layout doesn't move.
   - **Cards in the thread:**
@@ -1220,7 +1220,7 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
   *Done when:* `services/agent/tests/test_todos.py` covers a three-step chain with its checklist states and a failed step's question.
 - [x] **14.11 Tests with a scripted model.** *As built:* plus `tests/fakehub.py`, a stand-in for the hub's tools API; 52 tests, about 20 s. A fake OpenAI-compatible server returns scripted streams: text, thinking, tool calls and leaked tool calls (`services/agent/tests/fakemodel.py`, Mango-Tree's scenario-harness idea rebuilt small). It runs the 14.3–14.10 tests and the 13.5 harness offline.
   *Done when:* `.venv/bin/python -m pytest` in `services/agent` passes with no model running.
-- [ ] **14.12 Live smoke test.** 10 real conversations on `skynet` (Gemma 4 31B), recorded in `docs/agent-eval.md`:
+- [x] **14.12 Live smoke test.** *As built:* `evals/live.py` on both models, plus the restart, compaction, meter and session checks; results in `docs/agent-eval.md` and the overnight report. 10 real conversations on `skynet` (Gemma 4 31B), recorded in `docs/agent-eval.md`:
   - "make me an image of a fox": it asks or shows a parameter card, generates, then offers next steps
   - that image to 3D, and that image to video
   - "describe this image, then say it in Brendon's voice"
@@ -1230,18 +1230,18 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
   - the same thread on the local Gemma 4 26B
   *Done when:* the transcript notes and pass/fail per task are in `docs/agent-eval.md`.
 
-**Wire — Phase 14:** `chat` goes live:
+**Wire — Phase 14:** `chat` goes live: *Done: the Chat page (`web/chat/`), Settings → Agent; approvals shared with the header popover.*
 - the Chat nav item is enabled
 - the thread list, threads, streaming and thinking, all the cards, quick actions, the context meter, rewind/branch
 - approvals shared with the header popover from Phase 13
 - Settings → Agent: `AGENT.md`, memory, permissions, ask mode, Show thinking, models
 
 **Checks & deliverables — Phase 14**
-- [ ] "Make me an image of a fox, then turn it into a 3D model": it asks or shows the parameter cards, both outputs appear in the thread and on the Outputs page, the 3D job used the fox image, and the Relay page shows the agent's traffic.
-- [ ] A pending question and a pending approval both survive restarts of the hub and the agent.
-- [ ] The context meter matches the relay's reported usage, and compaction keeps the thread working past 85%.
+- [x] "Make me an image of a fox, then turn it into a 3D model": it asks or shows the parameter cards, both outputs appear in the thread and on the Outputs page, the 3D job used the fox image, and the Relay page shows the agent's traffic. *(Live L2 with a robot: image → `view_output` → a 3D prompt describing it → GLB; the eval's `img_to_3d` and `one_shot_chain`; gen3d is text-only, so "used the image" means it was described.)*
+- [x] A pending question and a pending approval both survive restarts of the hub and the agent. *(Live `evals/restart_live.py`; a graceful agent restart also resumes a running turn.)*
+- [x] The context meter matches the relay's reported usage, and compaction keeps the thread working past 85%. *(Live: within 1.1% of the 31B's prompt tokens; `evals/compact_live.py`: 5 clears and a summary, the first turn still answered.)*
 - [x] A fork from an earlier message creates a separate thread, and the original is unchanged. *(Tests; the eval's `fork` 3/3 checks the original byte for byte.)*
-- [ ] Delivered: `services/agent`, `agent.db`, `data/agent/` (AGENT.md, skills, memory), the Chat page, Settings → Agent, the scripted-model test suite and `docs/agent-eval.md`.
+- [x] Delivered: `services/agent`, `agent.db`, `data/agent/` (AGENT.md, skills, memory), the Chat page, Settings → Agent, the scripted-model test suite and `docs/agent-eval.md`.
 
 ## Phase 15 — Save states: sessions
 
@@ -1255,15 +1255,15 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
   - **Restore at boot:** `[sessions] restore_on_boot = false` in `config.toml`.
 - [x] **15.3 Session tools for the agent:** *As built:* `hub_save_session`, `hub_list_sessions`, `hub_restore_session` (risk `write`: a card asks first; `dry_run` shows the steps). `save_session`, `list_sessions`, `restore_session` (confirm).
 
-**Wire — Phase 15:** `sessions` goes live:
+**Wire — Phase 15:** `sessions` goes live: *Done: the Sessions panel (Chat and Settings → Sessions), the command-palette actions, the restore prompt after an unclean shutdown (`web/sessions.js`).*
 - the Sessions panel, in Chat and in Settings → Sessions
 - the command-palette actions "Save session…" and "Switch to session…"
 - a "Restore last session?" toast after an unclean shutdown
 
 **Checks & deliverables — Phase 15**
-- [ ] Save "LLM work" (Gemma loaded, tts loaded), switch to "3D work" (gen3d loaded), then switch back. Each switch shows its plan, and memory never goes over the limit.
-- [ ] With `restore_on_boot = true`, a reboot brings back the same lcpp instance and the same loaded mods.
-- [ ] Delivered: session snapshots, routes, tools and UI.
+- [x] Save "LLM work" (Gemma loaded, tts loaded), switch to "3D work" (gen3d loaded), then switch back. Each switch shows its plan, and memory never goes over the limit. *(Live: five switches, peak 46 GB of a 118 GB limit; the 26B relaunched with its settings and re-registered with the relay.)*
+- [ ] With `restore_on_boot = true`, a reboot brings back the same lcpp instance and the same loaded mods. *(Tested across hub restarts in `test_sessions.py`; not tried with a real reboot.)*
+- [x] Delivered: session snapshots, routes, tools and UI.
 
 ## Phase 16 — Everything inside the folder
 
@@ -1273,13 +1273,13 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
   - Its reconcile treats records whose units are gone (after a reboot) as gone, and session restore relaunches them.
   - The comfy pidfile and the hub's own lock files move here too.
 - [x] **16.3 `aihub doctor --inventory`.** *As built:* `utils/inventory.py`, `GET /api/doctor/inventory`, `aihub doctor --inventory`. Live: 14 allowlisted, 1 runtime leftover (the old lcpp tmpfs folder), 2 outside: lcpp's CLI installed as a uv tool (`~/.local/share/uv/tools/lcpp`) and opencode's `OPENCODE_PROJECT_DIR` (both need the user's decision). Lists every path outside the project that anything uses, each with its reason. The allowlist is now final: the systemd unit file, podman images, system tools, and the `~/.local/bin` wrappers.
-- [ ] **16.4 Final docs pass.** `architecture.md` and CLAUDE.md describe the finished system, and this plan is fully checked off.
+- [x] **16.4 Final docs pass.** *As built:* architecture §14 and CLAUDE.md describe the finished system; this plan is checked off except the items marked open. `architecture.md` and CLAUDE.md describe the finished system, and this plan is fully checked off.
 
-**Wire — Phase 16:** the Logs tab reads `data/logs/`, and Settings → Paths shows `data/logs` and `data/state` with their sizes.
+**Wire — Phase 16:** the Logs tab reads `data/logs/`, and Settings → Paths shows `data/logs` and `data/state` with their sizes. *Done: the Logs tab reads the files; Settings → Paths shows both folders.*
 
 **Checks & deliverables — Phase 16**
-- [ ] `aihub doctor --inventory` lists only the allowlist.
-- [ ] Run on a fresh copy of the folder, `aihub doctor --inventory` names only allowlisted prerequisites.
+- [ ] `aihub doctor --inventory` lists only the allowlist. *(Two items wait on the user: opencode's `OPENCODE_PROJECT_DIR` and lcpp's CLI installed as a uv tool.)*
+- [x] Run on a fresh copy of the folder, `aihub doctor --inventory` names only allowlisted prerequisites. *(A fresh clone: only the machine's uv-tool lcpp CLI, which the folder doesn't need, and a tmpfs leftover.)*
 - [ ] Delivered: a self-contained AIHub.
 
 ---

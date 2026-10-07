@@ -2,5 +2,12 @@
 \toprule
 Suite & Command & Result \\
 \midrule
+Hub (utils/tests; includes the Node UI tests) & \texttt{uv run pytest (.)} & 494 passed in 161.44s (0:02:41) \\
+Agent (scripted model, stand-in hub) & \texttt{.venv/bin/python -m pytest (services/agent)} & 67 passed in 32.90s \\
+Images \& Video (comfy) & \texttt{.venv/bin/python -m pytest (services/comfy)} & 106 passed, 1 skipped, 19 warnings in 15.68s \\
+LLM Relay & \texttt{uv run pytest (services/relay/web/backend)} & 189 passed, 1 warning in 30.84s \\
+LLM Launcher (lcpp) & \texttt{uv run pytest (services/lcpp)} & 91 passed, 2 warnings in 39.33s \\
+Speech (tts) & \texttt{.venv/bin/python -m pytest (services/tts)} & 20 passed, 1 warning in 0.73s \\
+3D Generate (gen3d) & \texttt{.venv/bin/python -m pytest (services/gen3d)} & 36 passed, 1 warning in 10.73s \\
 \bottomrule
 \end{tabular}

@@ -83,12 +83,27 @@ But I'll go ahead and switch to a wolf in a meadow for you once we have enough r
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/7a917fb2ee98.jpg}\\{\scriptsize \#1 model3d}\end{minipage}\hfill
 \end{livecase}
 
-\begin{livecase}{L5\_L6\_buttons · Gemma 4 31B · \textcolor{badred}{FAIL} · 5 s}
+\begin{livecase}{L5\_L6\_buttons · Gemma 4 31B · \textcolor{okgreen}{PASS} · 354 s}
 \textbf{Prompts:} \emph{``(buttons, no prompt)''}\par
-\textbf{Tools:} \texttt{generate\_image $\rightarrow$ search\_outputs}\par
-\textbf{Final reply:} {\small Your two buttons made an image of a red fox sitting in a meadow and a 3D model of a simple wooden chair.}\par
-\textbf{Failed checks:} button removed the background of \#1 (); real image ([]); reply mentions apple/background (Your two buttons made an image of a red fox sitting in a meadow and a 3D model o)\par
+\textbf{Tools:} \texttt{generate\_image $\rightarrow$ remove\_background}\par
+\textbf{Outputs:} \#1 image, \#2 image\par
+\textbf{Final reply:} {\small Your buttons made a studio photo of a red apple and then removed its background.}\par
 {\footnotesize\color{muted} Re-run after the night's fixes; the first attempt failed: button removed the background of \#1; real image; reply mentions apple/background.}\par
+\smallskip\noindent
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/ca2fdbb759c5.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/83f5ce284f22.jpg}\\{\scriptsize \#2 image}\end{minipage}\hfill
+\end{livecase}
+
+\begin{livecase}{L3\_image\_to\_video · Gemma 4 31B, in the Video work session · \textcolor{okgreen}{PASS} · 1266 s}
+\textbf{Prompts:} \emph{``Make a 16:9 image of a sailboat on a calm lake at sunset.''} $\rightarrow$ \emph{``Now animate it: the boat drifts slowly and the water ripples.''}\par
+\textbf{Tools:} \texttt{generate\_image $\rightarrow$ animate\_image}\par
+\textbf{Outputs:} \#1 image, \#2 video\par
+\textbf{Final reply:} {\small The sailboat now drifts slowly across the lake with gentle ripples spreading over the water.
+
+Would you like to edit the video, make a 3D model of the sailboat, or generate something new?}\par
+\smallskip\noindent
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/15e0cb82a614.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/6d35b6a0df33.jpg}\\{\scriptsize \#2 video}\end{minipage}\hfill
 \end{livecase}
 
 \begin{livecase}{L1\_fox · Gemma 4 26B · \textcolor{okgreen}{PASS} · 62 s}
@@ -104,4 +119,18 @@ What would you like to do next?
 - Describe the image in detail}\par
 \smallskip\noindent
 \begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/36d8e0212606.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
+\end{livecase}
+
+\begin{livecase}{L4\_describe\_speak · Gemma 4 26B · \textcolor{okgreen}{PASS} · 113 s}
+\textbf{Prompts:} \emph{``Make an image of an owl reading in a library.''} $\rightarrow$ \emph{``Describe the image in two sentences, then read your description aloud with the af\_heart voice.''}\par
+\textbf{Tools:} \texttt{generate\_image $\rightarrow$ view\_output $\rightarrow$ speak}\par
+\textbf{Outputs:} \#1 image, \#2 audio\par
+\textbf{Final reply:} {\small The description has been spoken aloud. 
+
+What would you like to do next?
+- Animate the owl: Make it blink or move its head.
+- Edit the scene: Change the lighting or add more magic.
+- Create a 3D model: Turn the owl into a 3D asset.}\par
+\smallskip\noindent
+\begin{minipage}[t]{0.23\linewidth}\centering\includegraphics[width=\linewidth,height=3.2cm,keepaspectratio]{img/live/18e7bff8c693.jpg}\\{\scriptsize \#1 image}\end{minipage}\hfill
 \end{livecase}

@@ -2,6 +2,7 @@
 // Implements the Section 6 contract; becomes web/js/mock.js in the vanilla port.
 import { createHistory, withSeries } from './mock-history.js';
 import { createModMocks } from './mock-mods.js';
+import { createToolMocks } from './mock-tools.js';
 const GB = 1e9, MB = 1e6;
 export class ApiError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
@@ -616,6 +617,8 @@ export function createMockApi() {
   // ----- chart history (brief §11.7, §11.9): web/mock-history.js -----
   const history = createHistory({ now, net, err, memory, summaries: () => services.map(summary), outputs: () => outputs, activity: () => activity, jobs: () => [...jobs.values()] });
   listeners.add(history.observe); Object.assign(api, history.api);
+  // ----- agent tools and approvals (brief §11.12): web/mock-tools.js -----
+  Object.assign(api, createToolMocks({ emit, net, err, later, now }));
 
   // ----- scenario controls (Shift+D panel) -----
   api.mock = {

@@ -49,11 +49,6 @@ button:disabled{cursor:not-allowed;opacity:.5}
         <span>{{ n.label }}</span>
       </a>
     </sc-for>
-    <span title="Coming later" aria-disabled="true" style="display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:6px;color:var(--dim,#737D90);cursor:not-allowed">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.chat }}"></path></svg>
-      <span>Chat</span>
-      <span style="margin-left:auto;font-size:10px;font-weight:600;letter-spacing:.07em;padding:1px 6px;border-radius:4px;border:1px solid var(--bd,#1D2430)">LATER</span>
-    </span>
     <div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6);padding:18px 10px 6px">Services</div>
     <sc-for list="{{ sb.svcs }}" as="n" hint-placeholder-count="6">
       <a href="{{ n.href }}" aria-current="{{ n.cur }}" style="{{ n.st }}" style-hover="background:var(--hov,#161C28);color:var(--tx,#E6EAF2);text-decoration:none">
@@ -104,6 +99,10 @@ button:disabled{cursor:not-allowed;opacity:.5}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.bolt }}"></path></svg>{{ hd.jobsText }}
       </button>
     </sc-if>
+    <button onClick="{{ hd.onApprovals }}" aria-label="{{ hd.apAria }}" title="Approvals" style="position:relative;width:34px;height:32px;display:grid;place-items:center;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--card,#11151D);color:var(--mut,#8A94A6);cursor:pointer;flex:none" style-hover="color:var(--tx,#E6EAF2)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.shield }}"></path></svg>
+      <sc-if value="{{ hd.hasAp }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:var(--pu,#BC8CFF);color:#160A2B;font-size:10px;font-weight:600;display:grid;place-items:center;font-family:'JetBrains Mono',ui-monospace,monospace">{{ hd.apCount }}</span></sc-if>
+    </button>
     <button onClick="{{ hd.onBell }}" aria-label="{{ hd.bellAria }}" style="position:relative;width:34px;height:32px;display:grid;place-items:center;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--card,#11151D);color:var(--mut,#8A94A6);cursor:pointer;flex:none" style-hover="color:var(--tx,#E6EAF2)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.bell }}"></path></svg>
       <sc-if value="{{ hd.hasUnread }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:var(--acc,#FFB224);color:#1A1200;font-size:10px;font-weight:600;display:grid;place-items:center;font-family:'JetBrains Mono',ui-monospace,monospace">{{ hd.unread }}</span></sc-if>
@@ -410,7 +409,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
                         <button onClick="{{ o.on }}" aria-pressed="{{ o.cur }}" style="{{ o.st }}" style-hover="background:var(--hov,#161C28)">
                           <span style="display:flex;align-items:center;gap:8px;min-width:0;width:100%"><span style="{{ o.mst }}">{{ o.method }}</span><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">{{ o.path }}</span></span>
                           <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:var(--mut,#8A94A6)"><span>{{ o.summary }}</span>
-                            <sc-if value="{{ o.isTool }}" hint-placeholder-val="{{ false }}"><span title="{{ o.toolName }}" style="height:18px;padding:0 6px;border-radius:4px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;background:var(--tpu,rgba(188,140,255,.13));color:var(--pu,#BC8CFF)">tool</span></sc-if>
+                            <sc-if value="{{ o.isTool }}" hint-placeholder-val="{{ false }}"><span title="{{ o.toolName }}" style="height:18px;padding:0 6px;border-radius:4px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;background:var(--tpu,rgba(188,140,255,.13));color:var(--pu,#BC8CFF)">{{ o.toolBadge }}</span></sc-if>
                             <sc-if value="{{ o.isDestr }}" hint-placeholder-val="{{ false }}"><span style="height:18px;padding:0 6px;border-radius:4px;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center;background:var(--trd,rgba(248,81,73,.13));color:var(--rd,#F85149)">destructive</span></sc-if>
                           </span>
                         </button>
@@ -820,6 +819,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
                   <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--bd,#1D2430);flex-wrap:wrap"><div style="flex:1 1 200px"><div style="font-weight:500">Density</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Compact tightens tables.</div></div><div role="group" aria-label="Density" style="display:inline-flex;padding:2px;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--sb,#0D1119)"><sc-for list="{{ se.densities }}" as="x" hint-placeholder-count="2"><button onClick="{{ x.on }}" aria-pressed="{{ x.pressed }}" style="{{ x.st }}">{{ x.label }}</button></sc-for></div></div>
                 </section>
               </sc-if>
+              <sc-if value="{{ se.sec.agent }}" hint-placeholder-val="{{ false }}">{{ se.agentEl }}</sc-if>
               <sc-if value="{{ se.sec.about }}" hint-placeholder-val="{{ false }}">
                 <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
                   <h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Versions</h2>
@@ -851,7 +851,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
       <div style="padding:56px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px"><h1 style="margin:0;font-size:18px">Page not found</h1><a href="#/overview">Go to Overview</a></div>
     </sc-if>
     <sc-if value="{{ pg.chat }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:56px 20px;text-align:center;color:var(--mut,#8A94A6)">Chat is coming later.</div>
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column">{{ chatEl }}</div>
     </sc-if>
   </main>
 </div>
@@ -880,6 +880,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
         </sc-for>
       </div>
     </sc-if>
+    <sc-if value="{{ pop.ap }}" hint-placeholder-val="{{ false }}">{{ pap }}</sc-if>
     <sc-if value="{{ pop.act }}" hint-placeholder-val="{{ false }}">
       <div style="display:flex;flex-direction:column;gap:4px">
         <h2 style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Activity</h2>
@@ -1090,7 +1091,7 @@ const ICON = {
   up: 'M12 19V5M6 11l6-6 6 6', down: 'M12 5v14M6 13l6 6 6-6', download: 'M12 4v11M7 10l5 5 5-5M4 20h16', copy: 'M9 9h11v11H9zM5 15V4h11',
   ext: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6', more: 'M4 12a1 1 0 1 0 2 0 1 1 0 1 0-2 0M11 12a1 1 0 1 0 2 0 1 1 0 1 0-2 0M18 12a1 1 0 1 0 2 0 1 1 0 1 0-2 0',
   x: 'M6 6l12 12M18 6L6 18', check: 'M5 12l5 5 9-10', alert: 'M12 3l10 18H2zM12 10v4M12 17.5v.01', info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5v.01',
-  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13', edit: 'M4 20h4L19 9l-4-4L4 16z', plus: 'M12 5v14M5 12h14', menu: 'M4 6h16M4 12h16M4 18h16',
+  trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13', shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4', edit: 'M4 20h4L19 9l-4-4L4 16z', plus: 'M12 5v14M5 12h14', menu: 'M4 6h16M4 12h16M4 18h16',
   chevR: 'M9 6l6 6-6 6', chevL: 'M15 6l-6 6 6 6', chevU: 'M6 15l6-6 6 6', chevD: 'M6 9l6 6 6-6',
   memory: 'M3 8h18v8H3zM7 8v8M11 8v8M15 8v8M7 16v3M17 16v3', file: 'M6 3h8l4 4v14H6zM14 3v4h4', video: 'M3 6h13v12H3zM16 10l5-3v10l-5-3z',
   terminal: 'M4 5h16v14H4zM7 9l3 3-3 3M12 15h5', bolt: 'M13 3L5 14h6l-1 7 8-11h-6z', scan: 'M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M4 12h16',
@@ -1103,7 +1104,7 @@ const TONE = {
   purple: ['var(--pu,#BC8CFF)', 'var(--tpu,rgba(188,140,255,.13))'], dim: ['var(--mut,#8A94A6)', 'var(--hov,#161C28)'],
 };
 // Settings section → the api areas its data comes from (AIHub patch 5, see PATCHES.md).
-const SETTINGS_AREAS = { general: ['settings', 'system'], paths: ['system'], memory: ['settings', 'memory'], services: ['settings', 'services'], interface: ['settings'], about: ['services', 'system'] };
+const SETTINGS_AREAS = { general: ['settings', 'system'], paths: ['system'], memory: ['settings', 'memory'], services: ['settings', 'services'], interface: ['settings'], agent: [], about: ['services', 'system'] };
 const STATE = { stopped: ['dim', false], starting: ['accent', true], ready: ['green', false], degraded: ['accent', false], stopping: ['dim', true], failed: ['red', false] };
 const LOAD = { unloaded: ['dim', false], loading: ['accent', true], loaded: ['cyan', false], unloading: ['accent', true] };
 // "verifying 42%" while a verify reports progress (patch 7)
@@ -1159,6 +1160,7 @@ class Component extends DCLogic {
     // revision 2: Overview views, dashboard layout (Settings.ui.dashboard), metric history for sparklines
     ovView: lsGet('hub.ovView', 'dashboard'), dash: { order: [], hidden: [], ranges: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
     tlRange: lsGet('hub.tlRange', '24h'), tlTable: false, svcRange: lsGet('hub.svcRange', '24h'), tileMenu: null, outTick: 0,
+    approvals: [], apLoaded: false, toolIx: null,  // Phase 13 Wire: the header's Approvals popover; the API tab's tool risk levels
   };
 
   async componentDidMount() {
@@ -1176,8 +1178,10 @@ class Component extends DCLogic {
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
     this.pages = {}; this.modListeners = new Set();
     const imp = f => import(new URL(f, location.href).href);
-    const [mod, hub, modUi, charts, views, dash] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js')]);
+    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
+      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js')]);
     this.C = charts; this.V = views; this.D = dash;  // revision 2 chart kit (charts.js, views.js, dashboard.js)
+    this.Chat = chat; this.ChatSettings = chatSettings; this.ChatAp = chatAp;  // plan 14.1: the Chat page, Settings → Agent, the Approvals popover (web/chat/)
     this.histTimer = setInterval(() => { if (!document.hidden && this.state.ready && !this.state.hubDown) this.loadHist(); }, 60000);
     this.modUi = modUi.createUi();
     const forceMock = new URLSearchParams(location.search).has('mock');
@@ -1245,7 +1249,7 @@ class Component extends DCLogic {
   }
   // Revision 2: the dashboard layout and density/theme defaults from Settings, mod widgets, and sparkline history.
   loadExtras() {
-    this.loadHist();
+    this.loadHist(); this.loadApprovals();
     this.api.listWidgets().then(w => this.setState({ widgets: w })).catch(() => this.setState({ widgets: [] }));
     this.api.getSettings().then(st => {
       const u = st.ui || {};
@@ -1254,6 +1258,13 @@ class Component extends DCLogic {
       if (lsGet('hub.theme', null) == null && u.theme && u.theme !== this.state.theme) { this.setState({ theme: u.theme }); this.applyTheme(u.theme); }
     }).catch(() => {});
   }
+  // Phase 13 Wire: pending approvals (the header button's count and popover), refreshed on `approval` events.
+  loadApprovals() {
+    clearTimeout(this.apT);
+    this.apT = setTimeout(() => this.api.listApprovals().then(a => this.setState({ approvals: a, apLoaded: true })).catch(() => this.setState({ apLoaded: true })), 120);
+  }
+  loadToolIndex() { if (!this.state.toolIx) this.api.getToolIndex().then(ix => this.setState({ toolIx: Object.fromEntries(ix.map(t => [t.name, t.risk])) })).catch(() => {}); }
+  toolRisk(mod, tool) { return this.state.toolIx?.[`${mod}_${tool.name}`] || null; }
   async loadHist() {
     const stats = this.state.services.flatMap(sv => sv.stats.filter(x => x.series && typeof x.value === 'number').map(x => x.series));
     try {
@@ -1297,6 +1308,7 @@ class Component extends DCLogic {
     for (const l of this.modListeners || []) { try { l(ev); } catch (e) { console.error('[ModPage] event handler:', e); } }
     switch (ev.type) {
       case 'resync': {  // events were dropped or mods were added/removed: refetch (PATCHES #6)
+        this.loadApprovals();
         this.api.getOverview().then(ov => { this.applyOverview(ov); this.loadExtras(); }).catch(() => {});
         if (s.route.page === 'service') this.enterRoute(this.parse(), true);  // the open mod may be gone
         break;
@@ -1307,6 +1319,7 @@ class Component extends DCLogic {
         break;
       }
       case 'memory': this.setState({ memory: ev.memory }); break;
+      case 'approval': this.loadApprovals(); break;
       case 'activity': this.setState(st => ({ activity: [ev.item, ...st.activity].slice(0, 80), unread: st.pop === 'activity' ? 0 : st.unread + 1 })); break;
       case 'job': this.setState(st => { let j = st.jobs.filter(x => x.id !== ev.job.id); if (['queued', 'running'].includes(ev.job.state)) j = [...j, ev.job]; return { jobs: j }; }); break;
       case 'alert': this.setState(st => ({ alerts: [...st.alerts.filter(a => a.id !== ev.alert.id), ev.alert] })); break;
@@ -1399,6 +1412,7 @@ class Component extends DCLogic {
       if (tab === 'outputs') { const o = { ...this.state.out, fixed: id, kinds: [], services: [], q: '', range: 'all', detail: null }; this.setState({ out: o }); this.fetchOutputs(o, true); }
       if (tab === 'overview' && d.has_outputs) this.api.listOutputs({ service: id, limit: 6 }).then(p => this.updSvc({ outs: p.items })).catch(() => {});
       if (tab === 'api' && !this.state.svc?.ops) this.api.listOperations(id).then(ops => this.updSvc({ ops })).catch(e => this.err(e));
+      if (tab === 'api') this.loadToolIndex();
       return;
     }
     this.closeLogs();
@@ -1729,7 +1743,7 @@ class Component extends DCLogic {
   }
   palItems() {
     const out = [], nav = h => () => { this.setState({ palette: null }); this.go(h); }, run = fn => () => { this.setState({ palette: null }); fn(); };
-    [['Overview', '#/overview', ICON.grid], ['Models', '#/models', ICON.layers], ['Outputs', '#/outputs', ICON.folder], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
+    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['Models', '#/models', ICON.layers], ['Outputs', '#/outputs', ICON.folder], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
     this.state.services.forEach(sv => {
       const d = ICON[sv.icon] || ICON.puzzle;
       out.push({ label: sv.name, sub: `Service · ${sv.state}`, d, run: nav('#/s/' + sv.id) });
@@ -1870,7 +1884,7 @@ class Component extends DCLogic {
     const sb = {
       style: mob ? { ...sbBase, position: 'fixed', top: 0, bottom: 0, left: 0, width: 268, transform: s.navOpen ? 'none' : 'translateX(-105%)', transition: 'transform .2s ease', boxShadow: s.navOpen ? '0 0 60px rgba(0,0,0,.5)' : 'none', visibility: s.navOpen ? 'visible' : 'hidden' } : { ...sbBase, position: 'sticky', top: 0, height: '100vh', width: s.density === 'compact' ? 208 : 232, flex: 'none' },
       backdrop: mob && s.navOpen, close: () => this.setState({ navOpen: false }),
-      top: [{ href: '#/overview', label: 'Overview', d: ICON.grid, on: r.page === 'overview' }],
+      top: [{ href: '#/overview', label: 'Overview', d: ICON.grid, on: r.page === 'overview' }, { href: '#/chat', label: 'Chat', d: ICON.chat, on: r.page === 'chat' }],
       svcs: s.services.map(sv => { const [t, p] = STATE[sv.state] || ['dim', false]; const on = r.page === 'service' && r.parts[1] === sv.id; return { href: '#/s/' + sv.id, label: sv.name, d: ICON[sv.icon] || ICON.puzzle, on, sr: `, ${sv.manifest_errors.length ? 'manifest error' : sv.state}`, dot: this.dot(TONE[t][0], p) }; }),
       lib: [{ href: '#/models', label: 'Models', d: ICON.layers, on: r.page === 'models' }, { href: '#/outputs', label: 'Outputs', d: ICON.folder, on: r.page === 'outputs' }],
       bottom: [{ href: '#/settings', label: 'Settings', d: ICON.gear, on: r.page === 'settings' }],
@@ -1878,7 +1892,7 @@ class Component extends DCLogic {
     };
     [...sb.top, ...sb.svcs, ...sb.lib, ...sb.bottom].forEach(n => { n.st = navSt(n.on); n.cur = n.on ? 'page' : undefined; if (!n.dot) n.dot = null; if (!n.sr) n.sr = ''; });
     const running = s.jobs.filter(j => j.state === 'running' || j.state === 'queued');
-    const titles = { overview: 'Overview', models: 'Models', outputs: 'Outputs', settings: 'Settings', service: this.svcMap[r.parts[1]]?.name || 'Service' };
+    const titles = { overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', settings: 'Settings', service: this.svcMap[r.parts[1]]?.name || 'Service' };
     const hd = {
       st: { position: 'sticky', top: 0, zIndex: 40, height: s.density === 'compact' ? 44 : 52, display: 'flex', alignItems: 'center', gap: 8, padding: '0 clamp(10px,2vw,20px)', background: 'var(--bg,#0B0E14)', borderBottom: '1px solid var(--bd,#1D2430)' },
       title: titles[r.page] || '', memText: m ? `${(m.used_bytes / GB).toFixed(1)} / ${(m.total_bytes / GB).toFixed(1)} GB` : '— GB',
@@ -1888,6 +1902,7 @@ class Component extends DCLogic {
       memWarn: pct > 0.8, onMem: () => this.togglePop('memory'),
       hasJobs: running.length > 0, jobsText: `${running.length} running`, onJobs: () => this.togglePop('jobs'),
       unread: s.unread > 99 ? '99+' : String(s.unread), hasUnread: s.unread > 0, bellAria: `Activity${s.unread ? `, ${s.unread} unread` : ''}`, onBell: () => this.togglePop('activity'),
+      apCount: s.approvals.length > 99 ? '99+' : String(s.approvals.length), hasAp: s.approvals.length > 0, apAria: `Approvals${s.approvals.length ? `, ${s.approvals.length} waiting` : ''}`, onApprovals: () => { this.togglePop('approvals'); this.loadApprovals(); },
       onSearch: () => this.togglePalette(), onMenu: () => this.setState({ navOpen: true }), kbd: /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K',
     };
     return { sb, hd };
@@ -2006,7 +2021,7 @@ class Component extends DCLogic {
     if (!ops) return { loading: true };
     const q = sv.filter.toLowerCase(), groups = {};
     ops.filter(o => !q || `${o.method} ${o.path} ${o.summary} ${o.tag}`.toLowerCase().includes(q)).forEach(o => {
-      (groups[o.tag] = groups[o.tag] || []).push({ id: o.id, method: o.method, mst: badgeSt(METHOD[o.method] || 'dim', { sm: true, sq: true, mono: true }), path: o.path, summary: o.summary, isTool: !!o.tool, toolName: o.tool ? `tool: ${o.tool.name}` : '', isDestr: o.destructive,
+      (groups[o.tag] = groups[o.tag] || []).push({ id: o.id, method: o.method, mst: badgeSt(METHOD[o.method] || 'dim', { sm: true, sq: true, mono: true }), path: o.path, summary: o.summary, isTool: !!o.tool, toolName: o.tool ? `tool: ${d.id}_${o.tool.name}${this.toolRisk(d.id, o.tool) ? ' · risk: ' + this.toolRisk(d.id, o.tool) : ''}` : '', toolBadge: o.tool && this.toolRisk(d.id, o.tool) ? `tool · ${this.toolRisk(d.id, o.tool)}` : 'tool', isDestr: o.destructive,
         st: { display: 'flex', flexDirection: 'column', gap: 4, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 7, cursor: 'pointer', border: '1px solid ' + (o.id === sv.opId ? 'var(--bds,#2A3547)' : 'transparent'), background: o.id === sv.opId ? 'var(--hov,#161C28)' : 'transparent', color: 'var(--tx,#E6EAF2)' },
         on: () => this.selectOp(o), cur: o.id === sv.opId ? 'true' : 'false' });
     });
@@ -2032,7 +2047,7 @@ class Component extends DCLogic {
         onFile: e => { this.files[key] = e.target.files[0] || null; this.setField(key, e.target.files[0]?.name || ''); }, fileName: val ? `${val}` : 'No file chosen', accept: key.includes('file') ? 'audio/*' : '' };
     });
     const rs = sv.resp;
-    Object.assign(v, { sel: { method: sel.method, mst: badgeSt(METHOD[sel.method] || 'dim', { sq: true, mono: true }), path: sel.path, summary: sel.summary, desc: sel.description !== sel.summary ? sel.description : '', isTool: !!sel.tool, toolText: sel.tool ? `Agent tool: ${sel.tool.name}${sel.tool.confirm ? ' · asks to confirm' : ''}` : '', isDestr: sel.destructive,
+    Object.assign(v, { sel: { method: sel.method, mst: badgeSt(METHOD[sel.method] || 'dim', { sq: true, mono: true }), path: sel.path, summary: sel.summary, desc: sel.description !== sel.summary ? sel.description : '', isTool: !!sel.tool, toolText: sel.tool ? `Agent tool: ${d.id}_${sel.tool.name}${this.toolRisk(d.id, sel.tool) ? ' · ' + this.toolRisk(d.id, sel.tool) : ''}${sel.tool.confirm || ['generate', 'write', 'destructive'].includes(this.toolRisk(d.id, sel.tool)) ? ' · asks first' : ''}` : '', isDestr: sel.destructive,
         resp: sel.response, ct: sel.body?.content_type || '', hasBody: !!sel.body, hub: `/api/s/${d.id}${sel.path}` },
       fields, hasFields: fields.length > 0, noFields: fields.length === 0, send: () => this.sendOp(), sendLabel: sv.sending ? (sel.response === 'stream' ? 'Streaming…' : 'Sending…') : 'Send', sendSt: btn(sel.destructive ? 'danger' : 'pri', { dis: sv.sending }), sending: sv.sending,
       curl: () => this.copy(this.curlFor(sel), 'curl command copied'), streaming: sv.sending && sel.response === 'stream', stop: () => this.stopStream(), notRunning: d.state !== 'ready' });
@@ -2147,8 +2162,10 @@ class Component extends DCLogic {
   vmSettings(s) {
     const st = s.st, r = s.route;
     if (!st.draft) return { loading: true };
-    const d = st.draft, sys = st.sys, sec = ['general', 'paths', 'memory', 'services', 'interface', 'about'].includes(r.parts[1]) ? r.parts[1] : 'general';
-    const v = { loaded: true, loading: false, nav: ['general', 'paths', 'memory', 'services', 'interface', 'about'].map(x => ({ label: cap(x), href: '#/settings/' + x, st: navSt(x === sec), cur: x === sec ? 'page' : undefined })), sec: Object.fromEntries(['general', 'paths', 'memory', 'services', 'interface', 'about'].map(x => [x, x === sec])) };
+    const SECS = ['general', 'paths', 'memory', 'services', 'interface', 'agent', 'about'];  // agent: Settings → Agent (plan 14.1, chat/chat-settings.js)
+    const d = st.draft, sys = st.sys, sec = SECS.includes(r.parts[1]) ? r.parts[1] : 'general';
+    const v = { loaded: true, loading: false, nav: SECS.map(x => ({ label: cap(x), href: '#/settings/' + x, st: navSt(x === sec), cur: x === sec ? 'page' : undefined })), sec: Object.fromEntries(SECS.map(x => [x, x === sec])) };
+    v.agentEl = sec === 'agent' && this.ChatSettings ? React.createElement(this.ChatSettings.AgentSettings, { api: this.api, toast: (t, l) => this.toast(t, l) }) : null;
     const miss = (SETTINGS_AREAS[sec] || []).filter(a => !this.api.isLive?.(a));
     v.mock = miss.length > 0; v.mockText = `Mock data: the ${miss.join(' and ')} ${miss.length > 1 ? 'areas aren’t' : 'area isn’t'} live yet.`;
     const errField = st.err?.data?.field;
@@ -2194,10 +2211,12 @@ class Component extends DCLogic {
   vmOverlays(s, mob) {
     const v = {};
     const close = () => this.setState({ pop: null });
-    v.pop = { any: !!s.pop, mem: s.pop === 'memory', jobs: s.pop === 'jobs', act: s.pop === 'activity', close,
+    v.pop = { any: !!s.pop, mem: s.pop === 'memory', jobs: s.pop === 'jobs', act: s.pop === 'activity', ap: s.pop === 'approvals', close,
       st: { position: 'fixed', top: s.density === 'compact' ? 50 : 58, right: 12, zIndex: 70, width: 'min(440px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 80px)', overflow: 'auto', background: 'var(--card,#11151D)', border: '1px solid var(--bds,#2A3547)', borderRadius: 12, boxShadow: '0 16px 50px rgba(0,0,0,.45)', padding: 16 } };
     if (s.pop === 'memory') v.pmem = { ...this.memVM(s.memory, true), chart: this.V ? React.createElement(this.V.MemoryChart, { api: this.api, services: s.services, range: '1h', height: 110, label: 'Memory, last hour' }) : null };
     if (s.pop === 'jobs') v.pjobs = s.jobs.map(j => ({ label: j.label, href: j.route || '#/overview', pct: j.progress != null ? Math.round(j.progress * 100) + '%' : '', bar: { display: 'block', height: '100%', width: (j.progress || 0) * 100 + '%', background: 'var(--acc,#FFB224)', borderRadius: 9, transition: 'width .5s' }, state: j.state, svc: this.svcMap[j.service]?.name || j.service }));
+    if (s.pop === 'approvals') v.pap = this.ChatAp ? React.createElement(this.ChatAp.ApprovalsPanel, { api: this.api, approvals: s.approvals, loading: !s.apLoaded, toast: (t, l) => this.toast(t, l),
+      onDecided: id => this.setState(st => ({ approvals: st.approvals.filter(a => a.id !== id) })) }) : null;
     if (s.pop === 'activity') { v.pact = s.activity.slice(0, 30).map(a => this.actRow(a)); v.pactEmpty = !s.activity.length; }
     // drawers share a frame
     v.drawerSt = mob ? { position: 'fixed', left: 0, right: 0, bottom: 0, height: '90vh', zIndex: 80, background: 'var(--card,#11151D)', borderTop: '1px solid var(--bds,#2A3547)', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', boxShadow: '0 -16px 50px rgba(0,0,0,.45)' }
@@ -2268,7 +2287,7 @@ class Component extends DCLogic {
     const out = showOutputs || s.out.detail ? this.vmOutputs(s, dn, !pg.outputs) : null;
     const shell = {
       rootSt: { display: 'flex', minHeight: '100vh', background: 'var(--bg,#0B0E14)', color: 'var(--tx,#E6EAF2)', fontSize: compact ? 12.5 : 13, lineHeight: 1.5 },
-      mainSt: { flex: 1, width: '100%', maxWidth: 1680, margin: '0 auto', padding: compact ? (s.vw < 600 ? '12px 12px 40px' : '14px 18px 40px') : 'clamp(14px,2.2vw,28px) clamp(12px,2.4vw,32px) 48px', display: 'flex', flexDirection: 'column', gap: compact ? 12 : 20, minWidth: 0 },
+      mainSt: pg.chat ? { flex: 'none', width: '100%', minWidth: 0, height: `calc(100dvh - ${compact ? 44 : 52}px)`, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' } : { flex: 1, width: '100%', maxWidth: 1680, margin: '0 auto', padding: compact ? (s.vw < 600 ? '12px 12px 40px' : '14px 18px 40px') : 'clamp(14px,2.2vw,28px) clamp(12px,2.4vw,32px) 48px', display: 'flex', flexDirection: 'column', gap: compact ? 12 : 20, minWidth: 0 },
       h1St: { margin: 0, fontSize: compact ? 18 : 22, fontWeight: 600, letterSpacing: '-.01em' },
     };
     return {
@@ -2280,6 +2299,7 @@ class Component extends DCLogic {
       showOutputs: !!showOutputs, out: out || {}, odr: out?.dr || { show: false },
       md: pg.models ? this.vmModels(s, dn) : null,
       se: pg.settings ? this.vmSettings(s) : null,
+      chatEl: pg.chat && this.Chat ? React.createElement(this.Chat.ChatPage, { api: this.api, route: r, toast: (t, l) => this.toast(t, l), confirm: o => this.confirm(o), openOutput: id => this.loadOutputDetail(id), go: hh => this.go(hh) }) : null,
       ...this.vmOverlays(s, mob),
       goHome: () => this.go('#/overview'),
     };

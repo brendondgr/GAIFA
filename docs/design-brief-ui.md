@@ -1047,3 +1047,45 @@ interface Approval { id: string; tool: string; arguments: object;  // as the mod
 ```
 
 **Error codes in `error.code`:** `invalid_arguments` (with `problems[]`, each `{field, detail, fix}`), `unknown_tool`, `denied`, `denied_by_user`, `unknown_output`, `service_not_running`, `mod_error` (the mod refused: 4xx), `upstream_error` (5xx or no answer), `job_failed`, `job_timeout`, `needs_room`, `interrupted` (the hub restarted). Deciding an approval twice is a hub error `409 already_decided`; edited arguments that don't validate are `422 invalid_arguments` and the approval stays pending.
+
+### 11.13 Chat (plan 14.1) as built
+
+Built by hand in `web/chat/` (plain ES modules on the page's React, like the dashboard), not in a Claude Design pass. The shell mounts `ChatPage` for `#/chat` and `#/chat/<thread id>` in a full-height main area; `?mock` runs it on a scripted mock agent (`chat-mock.js`).
+
+**The page**
+- **Thread list** (248 px; a drawer under 760 px of page width): search, New chat, and per chat Rename / Archive / Delete (with a confirm), an Archived toggle, a dot for running (amber) or waiting (purple) chats.
+- **Header:** the title (click to rename), the running / waiting state, the model picker (`skynet · 131k`, from the agent's `/v1/models`), the ask mode (Ask about choices / Use defaults / Read only), the **context meter** (`8.6k / 131k` with a bar; a popover with the breakdown, the 70% and 85% compaction marks and Compact now), and Branch (copy the chat). Under 700 px the model and mode move into a popover.
+- **Thread:** a 760 px column of cards; a sticky **Plan** bar while any todo isn't done; "working" dots while a turn runs without visible output. The view stays at the bottom while you are there (new events, images loading, forms mounting).
+- **Composer:** a growing text box (Enter sends, Shift+Enter is a new line, a message sent during a turn is queued and marked), attachment chips (a picker of this chat's and recent outputs), tool-group toggles (Auto / Pinned / Off per mod → the thread's `settings.pinned` / `disabled`), the quick actions, Stop, and slash commands with a suggestion list: `/compact`, `/clear`, `/model <id>`, `/context`, and `/<skill>` (sends "Use the <id> skill: …").
+- **Reconnect:** the stream is `GET /v1/threads/{id}/stream?after=<last seq>`; on an error it reopens after 0.8–10 s from the last seq it saw, and replays are de-duplicated by seq. Pending question and parameter cards are rebuilt from the event log, so they survive a reload or a restart.
+- **Rewind / branch:** hovering a message shows Branch from here: `POST /fork {seq: previous}`, then the new chat opens with that message in the box to edit.
+- **Header Approvals** (Phase 13 Wire): a shield button with a purple count; the popover lists every pending approval (chat, MCP, API) as a compact parameter card with Approve / Deny. **API tab:** tool badges show the risk (`tool · generate`).
+- **Settings → Agent:** Show thinking (this browser, `localStorage aihub.chat.showThinking`, default off), the models, AGENT.md and MEMORY.md editors, topic files, skills, the modes and how permissions work.
+
+**Events → cards.** `chat-thread.js` `buildView(events, live)` folds the log into items. A `tool_call` becomes a **tool** item (its `call`, live `progress` and `tool_result` folded in), or an **approval** item when an `approval` event names it (with its `decision`); `ask_user` becomes a **question** item with its `answer`; a result with outputs adds a **result** item; `update_todos` and `remember` calls are hidden (their `todos` / `memory` events have cards); `usage`, `state`, `call`, `answer`, `decision` are folded. Every other event type is an item of its own kind. Live `delta` events show streaming text and thinking until the stored `assistant` / `thinking` event of that step replaces them.
+
+**Built-in cards:** user (right-aligned; Branch from here, Copy, `queued`), assistant (safe Markdown: every character escaped first, only http(s) / mailto / `#` / `/` links), thinking (one folded line, "Thought for 6 s ›", drawn only with Show thinking on), tool (name, short arguments, progress bar, Stop, error with fix, Details), question (1–4 questions, options with descriptions as radio or checkbox rows, "Other…", a schemaForm when the question has a `schema`; Enter on an option picks it and submits a single question; answered → a one-line summary), parameter (the `ask` fields first, plus required fields still empty, through `schemaForm`; the rest under "All settings"; file inputs (`x-kind`) offer this chat's outputs of that kind as thumbnails, then "More from Outputs"; Run / Cancel; a 422 shows inline and the card stays; once decided "Ran with …" or "Cancelled", with the run's progress), result (`#n`, title, kind; image, video, audio, or a 3D poster with "View in 3D" (viewer3d.js); Open in Outputs, Download; action buttons), todos, memory ("Remembered: …"), note, error (detail and fix), compact ("Earlier messages summarized", opens the summary). Anything else gets the **generic card**: the event type, collapsed JSON.
+
+**Extending the chat (the modularity contract).** Import from `web/chat/chat.js`:
+
+```js
+import { registerCard, registerAction, registerPreview } from '/chat/chat.js';
+
+// A card for a new event type (the agent emits {type: "storyboard", payload: {...}}):
+registerCard('storyboard', ({ item, ctx }) => h('div', null, item.ev.payload.title));
+// One tool's own look, for its tool / parameter / result card:
+registerCard('result:gen3d_make_3d', MyMeshResult);
+registerCard('approval:tts_speak', MyVoicePicker);
+
+// A result button, or a composer quick action ('composer'):
+registerAction({ id: 'image.upscale', on: 'image', label: 'Upscale', icon: 'upscale',
+  tool: 'comfy_upscale_image', args: o => ({ image: { $file: 'output:' + o.output_id } }) });
+registerAction({ id: 'audio.transcribe', on: 'audio', label: 'Transcribe', prompt: o => `Transcribe #${o.n}` });
+
+// How results of a new output kind are shown:
+registerPreview('pointcloud', ({ output, ctx }) => h(MyViewer, { src: output.url }));
+```
+
+- **Cards** are looked up as `<kind>:<tool name>`, then `<kind>`, then the generic card, and each renders in an error boundary: an unknown or broken card never breaks the thread. Props: `{item, ctx}`; `ctx` carries `api`, `outputs` (this chat's `#n` outputs), `tools` (the catalog), `answer(qid, answers)`, `decide(approval, approve, args)`, `cancel()`, `runAction(action, output)`, `openOutput(id)`, `showThinking`, `running`.
+- **Actions** have `on` (an output kind or `composer`) and one of `tool` (opens a parameter card prefilled by `args(output)`, then `POST /v1/threads/{id}/action`: no model call), `prompt(output)` (sends a message), `attach` (adds the output to the composer) or `run(output, ctx)`. An action whose `tool` (or `needs`) isn't in the catalog is hidden. **Actions are also derived:** any catalog tool (not the hub's, not destructive) with a file input whose `x-kind` fits the output's kind becomes a button with no UI code (live: Clone voice on audio; in the mock also Upscale image), deduplicated against the registered ones.
+- **Built-in actions:** image → Animate, Edit, Remove background (tools), Make 3D and Describe (prompts; gen3d is text-only), Use as reference (attach); video → Describe; model3d → Rig; composer → Image, Video, 3D, Speech, Edit image.

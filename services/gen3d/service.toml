@@ -71,3 +71,6 @@ job_status = { op = "GET /v1/jobs/{jid}", description = "One job's state, stages
 list_jobs = { op = "GET /v1/jobs", description = "Recent jobs, newest first" }
 cancel_job = { op = "POST /v1/jobs/{jid}/cancel", description = "Cancel a queued or running job", confirm = true }
 delete_job = { op = "DELETE /v1/jobs/{jid}", description = "Delete a job and its files (permanent)", confirm = true }
+
+[agent]
+skills = "skills"            # skills/<name>/SKILL.md for the chat agent (plan 14.9)

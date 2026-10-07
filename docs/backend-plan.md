@@ -1149,18 +1149,18 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
   - **A placeholder Sessions panel**, filled in Phase 15.
   - **Mock:** a scripted agent that asks, shows a parameter card, streams a result and offers actions.
   *Done when:* the brief section is written and Claude Design's export (or a hand build, as in 6.5) is in `web/`, reachable in `?mock`.
-- [ ] **14.2 The agent mod** (`aihub new agent`, port from the 5100 range).
+- [x] **14.2 The agent mod** *As built:* port 5100; `agent/` also has `local.py` (the local tools), `knowledge.py` (AGENT.md, skills, memory) and `hubapi.py` (the hub client; `hub.py` became the status and widget routes inside `server.py`). `aihub check agent` passes. (`aihub new agent`, port from the 5100 range).
   - **Files:** `agent/llm.py` (the model client), `agent/loop.py`, `agent/store.py` (threads and events), `agent/context.py`, `agent/tools.py` (local tools + the hub catalog), `agent/prompts.py`, `agent/server.py` (`create_app`), `agent/hub.py` (status and widget). Dependencies: FastAPI, uvicorn, httpx; no agent framework.
   - **Manifest:** status (stats: threads, messages today, tokens today; jobs: running turns), a "Messages per day" widget, `[memory]` none (the model lives in the relay's endpoints).
   - **`env`:** `AGENT_DB={databases}/agent.db`, `AGENT_DATA={root}/data/agent`, `AGENT_LLM_URL=http://127.0.0.1:4000/v1`, `AGENT_MODEL=skynet` (Gemma 4 31B, 131,072 tokens), `AGENT_FALLBACK_MODEL=gemma4-26b-7071`.
   *Done when:* `aihub check agent` passes.
-- [ ] **14.3 The model client: `agent/llm.py`.**
+- [x] **14.3 The model client: `agent/llm.py`.** *As built:* `stream_options.include_usage`; leaked calls in Gemma's `<|tool_call>call:name{…}<tool_call|>` (with its `<|"|>` strings), Hermes `<tool_call>` and lone/fenced JSON naming a known tool; `<think>` blocks in content become thinking. Live: the 31B corrects a wrong argument name from the hub's `fix`.
   - Streams `/v1/chat/completions` from the relay with the tool schemas. **No `max_tokens`:** the model may use the whole window for thinking and output.
   - **Thinking** comes from `reasoning` (vLLM) or `reasoning_content` (llama.cpp). It is stored and streamed, but not sent back to the model on later turns.
   - **Tool calls:** native `tool_calls` first. If tool-call markup leaks into `content` (a reported Gemma 4 issue on llama.cpp), it is re-parsed. Malformed JSON arguments go back to the model as an error with the schema, once. Calls run in parallel when every tool in the batch is `read`, otherwise one at a time.
   - **Usage:** `prompt_tokens` and `completion_tokens` from every response feed the context meter (14.7).
   *Done when:* `services/agent/tests/test_llm.py` covers streaming, both reasoning fields, a leaked tool call, a malformed-argument retry, and parallel vs sequential batches, against the fake model server.
-- [ ] **14.4 The loop and threads: `agent/loop.py`, `agent/store.py`.**
+- [x] **14.4 The loop and threads: `agent/loop.py`, `agent/store.py`.** *As built:* extra events `call` (the hub call id, so a restarted agent waits for a running call) and `state`; a message typed while a question or card waits dismisses it (the card is denied at the hub); a thread a crash left `running` resumes at startup; decisions made in the hub's popover reach the thread through `/api/events`. The kill -9 test runs the agent as a real process.
   - **One turn:** call the model, run its tool calls, append the results, repeat until a reply has no tool calls. **Stops:** done; `max_steps` (25, settable) with an honest "I stopped at the step limit"; error; cancelled.
   - **Pauses:** an `ask_user` call or an approval ends the request in a `waiting` state. The answer (`POST /v1/threads/{id}/answer` or `/approval`) appends it and continues the same turn.
   - **Interruptions:** Stop cancels the running model call or tool (a running job is cancelled through its mod). A message sent during a turn is queued and read after the current tool calls, as Claude Code does.
@@ -1173,7 +1173,7 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
     - `POST /v1/threads/{id}/answer`, `/approval`, `/action`, `/fork {seq}`, `/cancel`
   - Titles are generated after the first reply.
   *Done when:* `services/agent/tests/test_loop.py` covers a multi-step turn, the step cap, a pause for a question answered after **killing and restarting the agent process**, a queued message, cancel, and a fork from an earlier `seq` that leaves the original unchanged.
-- [ ] **14.5 Asking and approving: `ask_user`, parameter cards, actions.**
+- [x] **14.5 Asking and approving: `ask_user`, parameter cards, actions.** *As built:* actions run with mode `auto` (the UI shows its own card first); a question may carry a `schema` (a form).
   - **`ask_user` tool** (local, `core`): 1–4 questions, each with a header, 2–4 options with descriptions, `multi_select`, and an optional `schema` (a form). "Other" is always allowed. The answers come back as the tool result.
   - **Parameter cards:** an `ask` or `generate` tool call becomes a hub approval (13.2). The card shows the model's arguments with the `ask` fields editable. The user's edits are what runs. This makes "which model, which size" a fixed step rather than the model's choice. In a live test on 2026-10-06, the 31B model picked an aspect ratio itself instead of asking.
   - **Ask mode** (thread setting, default **Ask about choices**):
@@ -1183,12 +1183,12 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
   - **Prompt rules** (`agent/prompts.py`): ask with `ask_user` when the request leaves an open choice that no tool default covers; after a result, offer the likely next steps as options.
   - **Buttons are actions:** a result card's button or a quick action posts `/v1/threads/{id}/action {tool, arguments}`. That appends a user-initiated tool call (with its parameter card) to the thread, with no model call first. The model sees it in the history and carries on from there, so clicking and typing lead to the same thread.
   *Done when:* `services/agent/tests/test_asking.py` covers a question answered with an option, with "Other" and with a form; a parameter card edited then run; a denied card; an action button that runs without a model call; and each ask mode.
-- [ ] **14.6 Tools on demand: `agent/tools.py`.**
+- [x] **14.6 Tools on demand: `agent/tools.py`.** *As built:* a call to a deferred tool loads it automatically; a disabled group's call is refused by the agent with `disabled` and never reaches the hub (global denies stay in `[agent.permissions]`).
   - **Always loaded:** the `core` tools: `ask_user`, `update_todos`, `find_tools`, `load_tools`, `read_skill`, `view_output`, `read_result`, `remember`, and the hub's `core` tools.
   - **Deferred:** the rest are listed in the system prompt by group (one line per mod: what it does and its tool names) from `GET /api/tools/index`. `find_tools(query)` and `load_tools(names | group)` add full schemas to the thread, and they stay loaded across compaction.
   - **The toggles** in the composer pin a group (always loaded) or turn it off. The hub also refuses a disabled tool when it's called: two gates.
   *Done when:* `services/agent/tests/test_tools.py` covers the index in the prompt, find → load → call, pinned and disabled groups, and a refused disabled call.
-- [ ] **14.7 Context: `agent/context.py`.**
+- [x] **14.7 Context: `agent/context.py`.** *As built:* the breakdown is estimated at 4 characters per token and scaled to the model's reported total; the 70%/85% checks use the estimate of the rebuilt prompt, so a compaction counts at once.
   - **Window** from the relay's `meta.context_length` (13.3), else a per-model setting.
   - **Used:** the last response's `prompt_tokens + completion_tokens`, plus an estimate for anything added since. Sent to the UI after every step as `{used, window, breakdown}`. The breakdown is estimated per section with the endpoint's `/tokenize` when it has one, else 4 characters per token.
   - **Tool results:** capped at 4,000 tokens in the history. The rest is kept in the event, and `read_result(event, offset)` pages through it.
@@ -1199,12 +1199,12 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
     - if a compaction can't bring usage under 70% (one huge item), it stops and says so instead of looping
   - **System prompt order:** base prompt, `AGENT.md`, the memory index, the skill list, the deferred tool index, the environment (date, running and loaded mods, free memory), the thread's outputs table.
   *Done when:* `services/agent/tests/test_context.py` covers the window from `meta` and from the setting, the meter values, result capping and `read_result`, both compaction stages, the thrash guard, and the prompt order.
-- [ ] **14.8 Chaining outputs: references and `view_output`.**
+- [x] **14.8 Chaining outputs: references and `view_output`.** *As built:* gen3d is text-only (Cube3D), so image → 3D goes through `view_output` (the model looks at the image) and a 3D prompt; both models see images (13.5's vision check).
   - **References:** every result in a thread gets a short reference (`#1`, `#2`…). A small **outputs table** in the system prompt lists them: ref, kind, tool, a short summary and `output:<id>`. "Make that fox into a 3D model" resolves to `{"$file": "output:<id>"}`.
   - **File inputs** offer the thread's outputs of a matching kind (`x-kind`) on parameter cards. Result-card buttons fill them in.
   - **`view_output(ref)`** sends an image (or a video's poster frame) to the model when its endpoint has `vision` (13.3), so it can describe an image, write from it, or check a result. Otherwise it returns the output's sidecar (prompt, settings).
   *Done when:* `services/agent/tests/test_chaining.py` covers an image → 3D chain by reference, an image used as a reference input, a description written via `view_output`, and the non-vision fallback.
-- [ ] **14.9 Instructions, skills and memory.**
+- [x] **14.9 Instructions, skills and memory.** *As built:* hub routes in `utils/routes/skills.py`; first skills `comfy/choosing-a-workflow`, `tts/voices`, `gen3d/making-3d`; `data/agent/` is gitignored (personal).
   - **`AGENT.md`** (`data/agent/AGENT.md`, edited in Settings → Agent): standing instructions, under 200 lines, re-read every turn.
   - **Skills, loaded only when needed:**
     - a mod ships `services/<id>/skills/<name>/SKILL.md` (frontmatter `name`, `description`), declared as `[agent] skills = "skills"`; the hub serves `GET /api/skills` and `GET /api/skills/{mod}/{name}`
@@ -1213,12 +1213,12 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
     - first skills: comfy (choosing a workflow and its settings per task), tts (voices and direction), gen3d (presets, parts and rigs)
   - **Memory:** `data/agent/memory/MEMORY.md` (an index of up to 200 lines, in every prompt) plus topic files read on demand. `remember(text, topic)` writes them and shows a small card in the thread. Settings → Agent lists and edits memories, e.g. "likes 16:9", "my voice is Brendon".
   *Done when:* `utils/tests/tools/test_skills.py` (hub routes) and `services/agent/tests/test_memory.py` cover skills listed then read, a slash command, and memory written, shown in the prompt and edited.
-- [ ] **14.10 Multi-step requests: todos.**
+- [x] **14.10 Multi-step requests: todos.** *As built:* as planned; the checklist is a `todos` event (the UI pins the latest).
   - **`update_todos(items)`:** for requests with three or more steps ("an image, then animate it, then narrate it"), the agent writes a checklist (pending → in progress → done), shown pinned in the thread.
   - **Steps run in order**, each with its own parameter card unless the thread is in Use defaults.
   - **A failed step** is marked failed with its error, and the agent asks whether to retry, change it, or skip.
   *Done when:* `services/agent/tests/test_todos.py` covers a three-step chain with its checklist states and a failed step's question.
-- [ ] **14.11 Tests with a scripted model.** A fake OpenAI-compatible server returns scripted streams: text, thinking, tool calls and leaked tool calls (`services/agent/tests/fakemodel.py`, Mango-Tree's scenario-harness idea rebuilt small). It runs the 14.3–14.10 tests and the 13.5 harness offline.
+- [x] **14.11 Tests with a scripted model.** *As built:* plus `tests/fakehub.py`, a stand-in for the hub's tools API; 52 tests, about 20 s. A fake OpenAI-compatible server returns scripted streams: text, thinking, tool calls and leaked tool calls (`services/agent/tests/fakemodel.py`, Mango-Tree's scenario-harness idea rebuilt small). It runs the 14.3–14.10 tests and the 13.5 harness offline.
   *Done when:* `.venv/bin/python -m pytest` in `services/agent` passes with no model running.
 - [ ] **14.12 Live smoke test.** 10 real conversations on `skynet` (Gemma 4 31B), recorded in `docs/agent-eval.md`:
   - "make me an image of a fox": it asks or shows a parameter card, generates, then offers next steps

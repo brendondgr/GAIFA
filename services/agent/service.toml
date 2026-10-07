@@ -1,0 +1,33 @@
+# AIHub's chat agent (plan Phase 14): our own Claude-Code-style loop. The model comes from the
+# relay (every call shows on its Requests page); tools come from the hub's catalog.
+id = "agent"
+name = "Agent"
+description = "The chat agent: asks, shows parameter cards, chains outputs"
+icon = "chat"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "-m", "agent"]
+port = 5100
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { AGENT_DB = "{databases}/agent.db", AGENT_DATA = "{root}/data/agent", AGENT_LLM_URL = "http://127.0.0.1:4000/v1", AGENT_MODEL = "skynet", AGENT_FALLBACK_MODEL = "gemma4-26B", AGENT_MAX_STEPS = "25" }
+start_timeout_s = 20
+stop_timeout_s = 15
+restart = "on-failure"
+after = ["relay"]
+install = "install.sh"
+
+[[ui.widgets]]
+id = "messages"
+title = "Chat messages per day"
+kind = "bar"
+source = "GET /v1/widgets/messages"
+ranges = ["7d", "30d"]
+span = 4
+
+[api]
+hide = ["GET /v1/threads/{tid}/stream"]
+[api.responses]
+"GET /v1/threads/{tid}/stream" = "stream"

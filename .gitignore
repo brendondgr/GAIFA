@@ -14,3 +14,7 @@ __pycache__/
 
 # Claude Code per-user settings
 .claude/settings.local.json
+# Stage D state: the agent's instructions, memory and skills (personal), logs and runtime state
+/data/agent/
+/data/logs/
+/data/state/

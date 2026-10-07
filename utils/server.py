@@ -125,7 +125,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, services, settings, system, tools, web, widgets
+    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, services, settings, skills, system, tools, web, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -226,6 +226,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(overview.router)
     app.include_router(settings.router)
     app.include_router(tools.router)
+    app.include_router(skills.router)
     app.include_router(mcp.router)  # /mcp: the tools over MCP (13.4)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
                  "overview", "settings", "tools"):

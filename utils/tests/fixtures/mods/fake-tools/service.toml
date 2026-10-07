@@ -22,6 +22,7 @@ kinds = ["image", "audio"]
 
 [agent]
 tools_source = "GET /v1/tools"
+skills = "skills"
 
 [tools]
 get_item = { op = "GET /v1/items/{item_id}", description = "Read one item" }

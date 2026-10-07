@@ -251,3 +251,24 @@ def test_coerce_forgives_small_slips():
     assert coerce(s, {"aspect": "16:9", "steps": "8", "hd": "true", "mode": "fast"}) == {
         "aspect": "16:9 (Widescreen)", "steps": 8, "hd": True, "mode": "Fast"}
     assert coerce(s, {"aspect": "4:3", "steps": "x"}) == {"aspect": "4:3", "steps": "x"}
+    assert coerce(s, {"aspect_ratio": "16:9", "step": 4}) == {"aspect": "16:9 (Widescreen)", "steps": 4}
+    assert coerce(s, {"aspect_ratio": "1:1", "aspect": "16:9"}) == {"aspect_ratio": "1:1", "aspect": "16:9 (Widescreen)"}  # no clash
+
+
+async def test_dry_run_makes_a_stand_in(th):
+    r = await th.client.post("/api/tools/fake_tools_make_image/call?wait=10",
+                             json={"arguments": {"prompt": "a pretend fox", "aspect": "16:9"}, "mode": "auto", "origin": {"dry_run": True}})
+    d = r.json()
+    assert d["status"] == "done" and d["result"]["state"] == "done"
+    [o] = d["outputs"]
+    assert o["kind"] == "image" and o["title"] == "a pretend fox"
+    assert not list((th.root / "outputs" / "fake-tools").rglob("*.png"))      # the mod made nothing
+    assert len(list((th.root / "outputs" / "eval").rglob("*.png"))) == 1
+    meta = (await th.client.get(f"/api/outputs/{o['output_id']}")).json()["meta"]
+    assert meta["dry_run"] is True and meta["params"]["aspect"] == "16:9"
+    a = (await th.call("fake_tools_say", {"text": "real clip"}, mode="auto"))["outputs"][0]
+    r = (await th.client.post("/api/tools/fake_tools_say/call?wait=10", json={"arguments": {"text": "pretend clip"}, "mode": "auto",
+                                                                             "origin": {"dry_run": True}})).json()
+    assert r["outputs"][0]["kind"] == "audio" and r["outputs"][0]["output_id"] != a["output_id"]
+    r = (await th.client.post("/api/tools/fake_tools_get_item/call", json={"arguments": {"item_id": "x"}, "origin": {"dry_run": True}})).json()
+    assert r["result"]["id"] == "x"     # reads still run

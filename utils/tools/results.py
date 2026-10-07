@@ -153,3 +153,79 @@ def saved_path(headers: Any) -> str | None:
         if v:
             return unquote(v)
     return None
+
+
+MADE = (("3d", "model3d"), ("mesh", "model3d"), ("video", "video"), ("animate", "video"), ("speak", "audio"),
+        ("voice", "audio"), ("speech", "audio"), ("image", "image"), ("background", "image"), ("upscale", "image"))
+
+
+def made_kind(tool: str) -> str | None:
+    """The output kind a generating tool makes, from its name (for dry runs)."""
+    low = tool.lower()
+    for word, kind in MADE:
+        if word in low:
+            return kind
+    return None
+
+
+def stand_in(hub: Hub, kind: str, tool: str, args: dict[str, Any], source: dict[str, Any] | None) -> str:
+    """A dry run's output in `outputs/eval/<date>/`: an image drawn from the prompt, or a copy of
+    `source` (an outputs row). Returns its path relative to outputs/."""
+    import hashlib
+    import shutil
+
+    words = str(args.get("prompt") or args.get("text") or args.get("description") or tool)
+    now = time.localtime()
+    day = hub.paths.outputs / "eval" / time.strftime("%Y-%m-%d", now)
+    day.mkdir(parents=True, exist_ok=True)
+    slug = re.sub(r"[^a-z0-9]+", "-", words.lower()).strip("-")[:40] or "output"
+    stem = f"{time.strftime('%H%M%S', now)}-dry-{slug}-{hashlib.sha1(json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:4]}"
+    side = {"title": words[:80], "kind": kind, "prompt": words, "dry_run": True, "params": {k: v for k, v in args.items() if k != "prompt"},
+            "source": {"service": "eval", "tool": tool}}
+    if kind == "image" or source is None:
+        from PIL import Image, ImageDraw
+
+        w, h = 1024, 576
+        a = str(args.get("aspect") or "")
+        if a.startswith(("9:16", "2:3", "3:4")):
+            w, h = 576, 1024
+        elif a.startswith("1:1"):
+            w, h = 768, 768
+        hue = int(hashlib.sha1(words.encode()).hexdigest()[:2], 16)
+        im = Image.new("RGB", (w, h), (40 + hue // 3, 60 + (hue * 7) % 120, 90 + (hue * 3) % 140))
+        d = ImageDraw.Draw(im)
+        lines, line = [], ""
+        for word in words.split():
+            if len(line) + len(word) > 34:
+                lines.append(line)
+                line = ""
+            line += word + " "
+        lines.append(line)
+        y = h // 2 - 14 * len(lines[:12])
+        for ln in lines[:12]:
+            d.text((40, y), ln.strip(), fill=(255, 255, 255))
+            y += 28
+        d.text((40, 30), "DRY RUN (eval stand-in)", fill=(255, 230, 120))
+        path = day / f"{stem}.png"
+        im.save(path.with_name(path.name + ".part"), "PNG")
+        path.with_name(path.name + ".json").write_text(json.dumps(side, indent=1))
+        path.with_name(path.name + ".part").rename(path)
+        return str(path.relative_to(hub.paths.outputs))
+    src = hub.paths.outputs / source["path"]
+    if source["is_dir"]:
+        dst = day / stem
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(".*"))
+        meta = {}
+        try:
+            meta = json.loads((dst / "output.json").read_text())
+        except (OSError, ValueError):
+            pass
+        meta.update(side)
+        meta["complete"] = True
+        (dst / "output.json").write_text(json.dumps(meta, indent=1))
+        return str(dst.relative_to(hub.paths.outputs))
+    dst = day / f"{stem}{src.suffix}"
+    shutil.copyfile(src, dst.with_name(dst.name + ".part"))
+    dst.with_name(dst.name + ".json").write_text(json.dumps(side, indent=1))
+    dst.with_name(dst.name + ".part").rename(dst)
+    return str(dst.relative_to(hub.paths.outputs))

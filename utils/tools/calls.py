@@ -376,7 +376,33 @@ class Calls:
         mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         return (path.name, await asyncio.to_thread(path.read_bytes), mime)
 
+    async def _dry_run(self, c: Call) -> bool:
+        """`origin.dry_run` (the agent eval): a generating tool makes a stand-in output under
+        `outputs/eval/` instead of running (an image drawn from the prompt; a copy of the newest real
+        video, audio or 3D model), titled from the arguments, so chains and cards are tested without
+        the GPU."""
+        if not c.origin.get("dry_run") or c.tool.risk != "generate":
+            return False
+        kind = (c.tool.response if c.tool.response in ("audio", "image", "video", "model3d") else None) \
+            or results.made_kind(c.tool.name) or "image"
+        source = None
+        if kind != "image":
+            page = await self.hub.outputs.list(kind=kind, service=c.tool.mod, limit=1)
+            if not page["items"]:
+                page = await self.hub.outputs.list(kind=kind, limit=200)
+            source = next((o for o in page["items"] if o["service"] != "eval"), None)
+            if source is None:
+                raise ToolError("dry_run", f"dry run: no existing {kind} to stand in for {c.tool.name}")
+            source = (await self.hub.outputs.row(source["id"]))
+        rel = await asyncio.to_thread(results.stand_in, self.hub, kind, c.tool.name, c.arguments, source)
+        await asyncio.sleep(0.3)
+        c.outputs = await results.outputs_for(self.hub, [rel])
+        c.result = {"state": "done", "arguments": c.arguments}
+        return True
+
     async def _mod_call(self, c: Call, resume_job: str | None) -> None:
+        if await self._dry_run(c):
+            return
         tool, route = c.tool, c.tool.route
         if resume_job:
             svc = await self._ensure_up(c)

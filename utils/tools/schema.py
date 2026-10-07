@@ -240,13 +240,22 @@ def defaults(schema: dict[str, Any], args: dict[str, Any]) -> dict[str, Any]:
 
 
 def coerce(schema: dict[str, Any], args: Any) -> Any:
-    """Forgive what small models get slightly wrong, before validation: "16:9" for the one enum
-    value "16:9 (Widescreen)", "8" for an integer, "true" for a boolean, a case-only enum mismatch."""
+    """Forgive what small models get slightly wrong, before validation: a near-miss argument name
+    (`aspect_ratio` for `aspect`), "16:9" for the one enum value "16:9 (Widescreen)", "8" for an
+    integer, "true" for a boolean, a case-only enum mismatch."""
     if not isinstance(args, dict):
         return args
     out = dict(args)
-    for k, v in args.items():
-        p = (schema.get("properties") or {}).get(k)
+    props = schema.get("properties") or {}
+    for k in list(out):
+        if k not in props and props:
+            close = [c for c in difflib.get_close_matches(k, list(props), n=2, cutoff=0.6) if c not in out]
+            stem = [c for c in props if c not in out and (k.startswith(c + "_") or c.startswith(k + "_"))]
+            pick = stem if len(stem) == 1 else close
+            if len(pick) == 1:      # aspect_ratio → aspect, voice_name → name … only when unambiguous
+                out[pick[0]] = out.pop(k)
+    for k, v in list(out.items()):
+        p = props.get(k)
         if not isinstance(p, dict):
             continue
         t = p.get("type")

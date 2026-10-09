@@ -711,6 +711,54 @@
       "source": null,
       "tags": []
     },
+    "qwen-image-2.1-turbo-fp8": {
+      "added": "2026-10-09T17:21:44-04:00",
+      "files": [
+        {
+          "path": "comfyui/diffusion_models/qwen-image-2.1-turbo-fp8.safetensors",
+          "role": "weights",
+          "sha256": "024e1befc5f7557e250489839582166daf5994dc4449f01e7d12912cb300e21b",
+          "size_bytes": 7133546412,
+          "verified_at": "2026-10-09T17:21:54-04:00"
+        }
+      ],
+      "format": "safetensors",
+      "kind": "image",
+      "name": "qwen-image-2.1-turbo-fp8",
+      "notes": "Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs",
+      "path": "comfyui/diffusion_models/qwen-image-2.1-turbo-fp8.safetensors",
+      "services": [],
+      "source": {
+        "repo": "abenzerps/Qwen-Image-2.1-Turbo-Quantized",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
+    "qwen-image-2.1-turbo-q8-0": {
+      "added": "2026-10-09T17:21:44-04:00",
+      "files": [
+        {
+          "path": "comfyui/diffusion_models/qwen-image-2.1-turbo-Q8_0.gguf",
+          "role": "weights",
+          "sha256": "9c2fd9b645811ae5f2b41e60adee832510a23929bc05bd6f8cc48d34a17b079e",
+          "size_bytes": 7591558176,
+          "verified_at": "2026-10-09T17:21:51-04:00"
+        }
+      ],
+      "format": "gguf",
+      "kind": "image",
+      "name": "qwen-image-2.1-turbo-Q8_0",
+      "notes": "Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs",
+      "path": "comfyui/diffusion_models/qwen-image-2.1-turbo-Q8_0.gguf",
+      "services": [],
+      "source": {
+        "repo": "abenzerps/Qwen-Image-2.1-Turbo-Quantized",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
     "qwen-image-2.1-uc-fp8": {
       "added": "2026-10-06T14:02:18-04:00",
       "files": [

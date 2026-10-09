@@ -1,0 +1,292 @@
+{
+ "1": {
+  "class_type": "UnetLoaderGGUF",
+  "inputs": {
+   "unet_name": "qwen-image-2.1-turbo-Q8_0.gguf"
+  },
+  "_meta": {
+   "title": "Diffusion \u00b7 Turbo Q8_0 GGUF (default)"
+  }
+ },
+ "2": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "qwen-image-2.1-turbo-fp8.safetensors",
+   "weight_dtype": "default"
+  },
+  "_meta": {
+   "title": "Diffusion \u00b7 Turbo FP8 (alternative)"
+  }
+ },
+ "3": {
+  "class_type": "ComfySwitchNode",
+  "inputs": {
+   "switch": false,
+   "on_false": [
+    "1",
+    0
+   ],
+   "on_true": [
+    "2",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Use FP8 instead of Q8_0?  (false = Q8_0)"
+  }
+ },
+ "4": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "qwen3vl_8b_bf16.safetensors",
+   "type": "qwen_image",
+   "device": "default"
+  },
+  "_meta": {
+   "title": "Text encoder \u00b7 Qwen3-VL 8B BF16"
+  }
+ },
+ "5": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "_meta": {
+   "title": "VAE \u00b7 Qwen-Image 2.1 BF16"
+  }
+ },
+ "6": {
+  "class_type": "QwenImage21Cache",
+  "inputs": {
+   "device": "auto",
+   "dtype": "default",
+   "model": [
+    "3",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Prefix KV cache (auto = VRAM then RAM)"
+  }
+ },
+ "7": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "portrait_model_denim.png"
+  },
+  "_meta": {
+   "title": "image_1 \u00b7 edit target"
+  }
+ },
+ "8": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "clothing_light_blue_denim_shirt.png"
+  },
+  "_meta": {
+   "title": "image_2 \u00b7 reference"
+  }
+ },
+ "13": {
+  "class_type": "TextEncodeQwenImage21",
+  "inputs": {
+   "prompt": "Keep the character and pose in <image1> unchanged, put this light blue denim shirt from <image2> on the character, preserve the original facial features, hair, body shape and pose, the denim shirt fits naturally on body, realistic denim fabric texture, natural clothing folds, keep the original background and original lighting, high fashion editorial photography, sharp details",
+   "negative_prompt": "",
+   "resolution": 1024,
+   "clip": [
+    "4",
+    0
+   ],
+   "images.image_1": [
+    "7",
+    0
+   ],
+   "images.image_2": [
+    "8",
+    0
+   ],
+   "vae": [
+    "5",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Instruction (use <image1>, <image2>, \u2026)"
+  }
+ },
+ "14": {
+  "class_type": "ResolutionSelector",
+  "inputs": {
+   "aspect_ratio": "1:1 (Square)",
+   "megapixels": 1.0,
+   "multiple": 32
+  },
+  "_meta": {
+   "title": "Custom output size (only used when switch = true)"
+  }
+ },
+ "15": {
+  "class_type": "EmptyLatentImage",
+  "inputs": {
+   "batch_size": 1,
+   "width": [
+    "14",
+    0
+   ],
+   "height": [
+    "14",
+    1
+   ]
+  },
+  "_meta": {
+   "title": "EmptyLatentImage"
+  }
+ },
+ "16": {
+  "class_type": "ComfySwitchNode",
+  "inputs": {
+   "switch": false,
+   "on_false": [
+    "13",
+    2
+   ],
+   "on_true": [
+    "15",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Custom size?  (false = follow image_1)"
+  }
+ },
+ "17": {
+  "class_type": "ManualSigmas",
+  "inputs": {
+   "sigmas": "1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.0"
+  },
+  "_meta": {
+   "title": "Turbo schedule (8 steps, do not edit)"
+  }
+ },
+ "18": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 1
+  },
+  "_meta": {
+   "title": "Seed"
+  }
+ },
+ "19": {
+  "class_type": "CFGGuider",
+  "inputs": {
+   "cfg": 1.0,
+   "model": [
+    "6",
+    0
+   ],
+   "positive": [
+    "13",
+    0
+   ],
+   "negative": [
+    "13",
+    1
+   ]
+  },
+  "_meta": {
+   "title": "CFG (1 = official)"
+  }
+ },
+ "20": {
+  "class_type": "KSamplerSelect",
+  "inputs": {
+   "sampler_name": "euler"
+  },
+  "_meta": {
+   "title": "KSamplerSelect"
+  }
+ },
+ "21": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "18",
+    0
+   ],
+   "guider": [
+    "19",
+    0
+   ],
+   "sampler": [
+    "20",
+    0
+   ],
+   "sigmas": [
+    "17",
+    0
+   ],
+   "latent_image": [
+    "16",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Sampler"
+  }
+ },
+ "22": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "21",
+    0
+   ],
+   "vae": [
+    "5",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "VAEDecode"
+  }
+ },
+ "23": {
+  "class_type": "SaveImageAdvanced",
+  "inputs": {
+   "filename_prefix": "Qwen21Turbo/edit",
+   "format": "png",
+   "format.bit_depth": "8-bit",
+   "format.input_color_space": "sRGB",
+   "images": [
+    "22",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "SaveImageAdvanced"
+  }
+ },
+ "24": {
+  "class_type": "ImageCompare",
+  "inputs": {
+   "compare_view": {
+    "__value__": [
+     "",
+     ""
+    ]
+   },
+   "image_a": [
+    "7",
+    0
+   ],
+   "image_b": [
+    "23",
+    0
+   ]
+  },
+  "_meta": {
+   "title": "Before / after"
+  }
+ }
+}

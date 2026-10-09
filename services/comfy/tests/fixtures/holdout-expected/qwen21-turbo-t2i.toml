@@ -1,0 +1,12 @@
+# Qwen-Image 2.1 Turbo (2026-10-09): the base qwen21-t2i layout with Turbo's sampler
+# (ManualSigmas → SamplerCustomAdvanced). Node ids from build_turbo_workflows.py.
+task = "text-to-image"
+outputs = ["16"]
+[want]
+prompt = "8.prompt"
+seed = "11.noise_seed"             # RandomNoise, not a KSampler
+aspect = "7.aspect_ratio"
+megapixels = "7.megapixels"
+[maybe]
+cfg = "12.cfg"                     # CFGGuider
+negative = "8.negative_prompt"

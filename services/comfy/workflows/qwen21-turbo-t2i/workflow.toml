@@ -1,0 +1,30 @@
+name = "Qwen-Image 2.1 Turbo — text to image"
+task = "text-to-image"
+description = "Qwen-Image 2.1 Turbo (official 8-step distill): text to image, strong at text inside the image (signs, posters, labels) and complex scenes, about 5x faster than qwen21-t2i"
+tags = ["photo", "text", "fast"]
+# memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
+
+[inputs.prompt]          # TextEncodeQwenImage21 "Prompt"
+node = "8"
+field = "prompt"
+
+[inputs.seed]          # RandomNoise "Seed"
+node = "11"
+field = "noise_seed"
+default = -1
+
+[inputs.cfg]          # CFGGuider "CFG (1 = official)"
+node = "12"
+field = "cfg"
+
+[inputs.aspect]          # ResolutionSelector "Output size (4.0 MP = native 2048x2048)"
+node = "7"
+field = "aspect_ratio"
+
+[inputs.megapixels]          # ResolutionSelector "Output size (4.0 MP = native 2048x2048)"
+node = "7"
+field = "megapixels"
+
+[outputs.image]
+node = "16"
+kind = "image"

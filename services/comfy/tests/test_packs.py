@@ -224,3 +224,26 @@ def test_set_overrides_fields_before_check_and_run(lib, tmp_path):
     (d / "workflow.toml").write_text(ZIT_TOML + '\n[set]\n"999.x" = 1\n')
     lib.packs.scan()
     assert any(i.code == "set_unmapped" for i in lib.analysed(lib.packs.get("zimage"))[1])
+
+
+TURBO = {"qwen21-turbo-t2i": "text-to-image", "qwen21-turbo-edit-multi": "image-edit",
+         "qwen21-turbo-remove-bg": "remove-background"}
+TURBO_SIGMAS = [1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.0]
+
+
+@pytest.mark.parametrize("pid", sorted(TURBO))
+def test_qwen21_turbo_packs(lib, tmp_path, pid):
+    """The committed Qwen-Image 2.1 Turbo packs: their task's inputs are mapped, the checkpoint's
+    8-step schedule is in the graph, and only model files can be missing (the fixture catalog's
+    model lists don't have them)."""
+    shutil.copytree(Path(__file__).parents[1] / "workflows" / pid, tmp_path / "workflows" / pid)
+    lib.packs.scan()
+    p = lib.packs.get(pid)
+    assert p.task == TURBO[pid]
+    conv, issues = lib.analysed(p)
+    assert {i.code for i in issues} <= {"missing_model"}, [i.json() for i in issues]
+    sig = next(n for n in conv.graph.values() if n["class_type"] == "ManualSigmas")
+    assert [float(x) for x in sig["inputs"]["sigmas"].split(",")] == TURBO_SIGMAS
+    assert "steps" not in p.manifest.inputs                       # the schedule fixes the steps
+    loaders = {n["inputs"].get("unet_name") for n in conv.graph.values()}
+    assert {"qwen-image-2.1-turbo-Q8_0.gguf", "qwen-image-2.1-turbo-fp8.safetensors"} <= loaders

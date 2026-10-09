@@ -1,0 +1,13 @@
+# Qwen-Image 2.1 Turbo (2026-10-09): the base qwen21-edit-multi layout with Turbo's sampler.
+task = "image-edit"
+outputs = ["23"]
+[want]
+prompt = "13.prompt"
+image = "7.image"
+image_2 = "8.image"
+seed = "18.noise_seed"
+[maybe]
+cfg = "19.cfg"
+negative = "13.negative_prompt"
+aspect = "14.aspect_ratio"
+megapixels = "14.megapixels"

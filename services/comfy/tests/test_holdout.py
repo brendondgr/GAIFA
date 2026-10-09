@@ -22,7 +22,8 @@ from test_convert import comparable, diff
 
 FIX = Path(__file__).parent / "fixtures"
 CAT = NodeCatalog(json.loads((FIX / "object_info.json").read_text()))
-OWN = ["qwen21-t2i", "qwen21-edit-multi", "qwen21-remove-bg", "klein9b-t2i", "klein9b-edit-base", "klein9b-edit-distilled"]
+OWN = ["qwen21-t2i", "qwen21-edit-multi", "qwen21-remove-bg", "klein9b-t2i", "klein9b-edit-base", "klein9b-edit-distilled",
+       "qwen21-turbo-t2i", "qwen21-turbo-edit-multi", "qwen21-turbo-remove-bg"]   # Turbo: added 2026-10-09
 U, N = Path.home() / "Models/ComfyUI/user/default/workflows", Path.home() / "Models/ComfyUI-next/workflows"
 THIRD = {
     "scail2-basic": U / "Scail2-Wan2.1/Wan2.1_Scail2_basic.json",

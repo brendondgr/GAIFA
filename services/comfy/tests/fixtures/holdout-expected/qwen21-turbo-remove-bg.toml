@@ -1,0 +1,12 @@
+# Qwen-Image 2.1 Turbo (2026-10-09): the base qwen21-remove-bg layout with Turbo's sampler.
+task = "remove-background"
+outputs = ["18"]
+[want]
+image = "7.image"
+[maybe]
+prompt = "8.prompt"
+seed = "13.noise_seed"
+cfg = "14.cfg"
+negative = "8.negative_prompt"
+aspect = "9.aspect_ratio"
+megapixels = "9.megapixels"

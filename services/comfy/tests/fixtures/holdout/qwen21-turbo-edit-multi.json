@@ -1,0 +1,1328 @@
+{
+ "id": null,
+ "revision": 0,
+ "last_node_id": 25,
+ "last_link_id": 28,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "UnetLoaderGGUF",
+   "pos": [
+    0,
+    0
+   ],
+   "size": [
+    380,
+    60
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      1
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "UnetLoaderGGUF"
+   },
+   "widgets_values": [
+    "qwen-image-2.1-turbo-Q8_0.gguf"
+   ],
+   "title": "Diffusion \u00b7 Turbo Q8_0 GGUF (default)"
+  },
+  {
+   "id": 2,
+   "type": "UNETLoader",
+   "pos": [
+    0,
+    110
+   ],
+   "size": [
+    380,
+    90
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      2
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "UNETLoader"
+   },
+   "widgets_values": [
+    "qwen-image-2.1-turbo-fp8.safetensors",
+    "default"
+   ],
+   "title": "Diffusion \u00b7 Turbo FP8 (alternative)"
+  },
+  {
+   "id": 3,
+   "type": "ComfySwitchNode",
+   "pos": [
+    0,
+    250
+   ],
+   "size": [
+    380,
+    80
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "on_false",
+     "type": "MODEL",
+     "shape": 7,
+     "link": 1
+    },
+    {
+     "name": "on_true",
+     "type": "MODEL",
+     "shape": 7,
+     "link": 2
+    }
+   ],
+   "outputs": [
+    {
+     "name": "output",
+     "type": "MODEL",
+     "links": [
+      3
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ComfySwitchNode"
+   },
+   "widgets_values": [
+    false
+   ],
+   "title": "Use FP8 instead of Q8_0?  (false = Q8_0)",
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 4,
+   "type": "CLIPLoader",
+   "pos": [
+    0,
+    380
+   ],
+   "size": [
+    380,
+    110
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "CLIP",
+     "type": "CLIP",
+     "links": [
+      4
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CLIPLoader"
+   },
+   "widgets_values": [
+    "qwen3vl_8b_bf16.safetensors",
+    "qwen_image",
+    "default"
+   ],
+   "title": "Text encoder \u00b7 Qwen3-VL 8B BF16"
+  },
+  {
+   "id": 5,
+   "type": "VAELoader",
+   "pos": [
+    0,
+    540
+   ],
+   "size": [
+    380,
+    60
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "VAE",
+     "type": "VAE",
+     "links": [
+      5,
+      25
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAELoader"
+   },
+   "widgets_values": [
+    "qwen_image_2.1_vae_bf16.safetensors"
+   ],
+   "title": "VAE \u00b7 Qwen-Image 2.1 BF16"
+  },
+  {
+   "id": 6,
+   "type": "QwenImage21Cache",
+   "pos": [
+    0,
+    650
+   ],
+   "size": [
+    380,
+    82
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "name": "MODEL",
+     "type": "MODEL",
+     "links": [
+      16
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "QwenImage21Cache"
+   },
+   "widgets_values": [
+    "auto",
+    "default"
+   ],
+   "title": "Prefix KV cache (auto = VRAM then RAM)"
+  },
+  {
+   "id": 7,
+   "type": "LoadImage",
+   "pos": [
+    -700,
+    0
+   ],
+   "size": [
+    310,
+    370
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      6,
+      27
+     ]
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "portrait_model_denim.png",
+    "image"
+   ],
+   "title": "image_1 \u00b7 edit target"
+  },
+  {
+   "id": 8,
+   "type": "LoadImage",
+   "pos": [
+    -370,
+    0
+   ],
+   "size": [
+    310,
+    370
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      7
+     ]
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "clothing_light_blue_denim_shirt.png",
+    "image"
+   ],
+   "title": "image_2 \u00b7 reference"
+  },
+  {
+   "id": 9,
+   "type": "LoadImage",
+   "pos": [
+    -700,
+    400
+   ],
+   "size": [
+    310,
+    370
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 4,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      8
+     ]
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "portrait_model_denim.png",
+    "image"
+   ],
+   "title": "image_3 \u00b7 reference  (bypassed: Ctrl+B)"
+  },
+  {
+   "id": 10,
+   "type": "LoadImage",
+   "pos": [
+    -370,
+    400
+   ],
+   "size": [
+    310,
+    370
+   ],
+   "flags": {},
+   "order": 9,
+   "mode": 4,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      9
+     ]
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "portrait_model_denim.png",
+    "image"
+   ],
+   "title": "image_4 \u00b7 reference  (bypassed: Ctrl+B)"
+  },
+  {
+   "id": 11,
+   "type": "LoadImage",
+   "pos": [
+    -700,
+    800
+   ],
+   "size": [
+    310,
+    370
+   ],
+   "flags": {},
+   "order": 10,
+   "mode": 4,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      10
+     ]
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "portrait_model_denim.png",
+    "image"
+   ],
+   "title": "image_5 \u00b7 reference  (bypassed: Ctrl+B)"
+  },
+  {
+   "id": 12,
+   "type": "LoadImage",
+   "pos": [
+    -370,
+    800
+   ],
+   "size": [
+    310,
+    370
+   ],
+   "flags": {},
+   "order": 11,
+   "mode": 4,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      11
+     ]
+    },
+    {
+     "name": "MASK",
+     "type": "MASK",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "LoadImage"
+   },
+   "widgets_values": [
+    "portrait_model_denim.png",
+    "image"
+   ],
+   "title": "image_6 \u00b7 reference  (bypassed: Ctrl+B)"
+  },
+  {
+   "id": 13,
+   "type": "TextEncodeQwenImage21",
+   "pos": [
+    450,
+    0
+   ],
+   "size": [
+    500,
+    420
+   ],
+   "flags": {},
+   "order": 12,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "clip",
+     "type": "CLIP",
+     "link": 4
+    },
+    {
+     "name": "images.image_1",
+     "type": "IMAGE",
+     "shape": 7,
+     "link": 6
+    },
+    {
+     "name": "images.image_2",
+     "type": "IMAGE",
+     "shape": 7,
+     "link": 7
+    },
+    {
+     "name": "images.image_3",
+     "type": "IMAGE",
+     "shape": 7,
+     "link": 8
+    },
+    {
+     "name": "images.image_4",
+     "type": "IMAGE",
+     "shape": 7,
+     "link": 9
+    },
+    {
+     "name": "images.image_5",
+     "type": "IMAGE",
+     "shape": 7,
+     "link": 10
+    },
+    {
+     "name": "images.image_6",
+     "type": "IMAGE",
+     "shape": 7,
+     "link": 11
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "shape": 7,
+     "link": 5
+    }
+   ],
+   "outputs": [
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "links": [
+      17
+     ]
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "links": [
+      18
+     ]
+    },
+    {
+     "name": "latent",
+     "type": "LATENT",
+     "links": [
+      14
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "TextEncodeQwenImage21"
+   },
+   "widgets_values": [
+    "Keep the character and pose in <image1> unchanged, put this light blue denim shirt from <image2> on the character, preserve the original facial features, hair, body shape and pose, the denim shirt fits naturally on body, realistic denim fabric texture, natural clothing folds, keep the original background and original lighting, high fashion editorial photography, sharp details",
+    "",
+    1024
+   ],
+   "title": "Instruction (use <image1>, <image2>, \u2026)",
+   "color": "#232",
+   "bgcolor": "#353"
+  },
+  {
+   "id": 14,
+   "type": "ResolutionSelector",
+   "pos": [
+    450,
+    470
+   ],
+   "size": [
+    500,
+    190
+   ],
+   "flags": {},
+   "order": 13,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "width",
+     "type": "INT",
+     "links": [
+      12
+     ]
+    },
+    {
+     "name": "height",
+     "type": "INT",
+     "links": [
+      13
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ResolutionSelector"
+   },
+   "widgets_values": [
+    "1:1 (Square)",
+    1.0,
+    32
+   ],
+   "title": "Custom output size (only used when switch = true)"
+  },
+  {
+   "id": 15,
+   "type": "EmptyLatentImage",
+   "pos": [
+    450,
+    700
+   ],
+   "size": [
+    500,
+    106
+   ],
+   "flags": {},
+   "order": 14,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "width",
+     "type": "INT",
+     "widget": {
+      "name": "width"
+     },
+     "link": 12
+    },
+    {
+     "name": "height",
+     "type": "INT",
+     "widget": {
+      "name": "height"
+     },
+     "link": 13
+    }
+   ],
+   "outputs": [
+    {
+     "name": "LATENT",
+     "type": "LATENT",
+     "links": [
+      15
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "EmptyLatentImage"
+   },
+   "widgets_values": [
+    1024,
+    1024,
+    1
+   ]
+  },
+  {
+   "id": 16,
+   "type": "ComfySwitchNode",
+   "pos": [
+    450,
+    860
+   ],
+   "size": [
+    500,
+    80
+   ],
+   "flags": {},
+   "order": 15,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "on_false",
+     "type": "LATENT",
+     "shape": 7,
+     "link": 14
+    },
+    {
+     "name": "on_true",
+     "type": "LATENT",
+     "shape": 7,
+     "link": 15
+    }
+   ],
+   "outputs": [
+    {
+     "name": "output",
+     "type": "LATENT",
+     "links": [
+      23
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ComfySwitchNode"
+   },
+   "widgets_values": [
+    false
+   ],
+   "title": "Custom size?  (false = follow image_1)",
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 17,
+   "type": "ManualSigmas",
+   "pos": [
+    1000,
+    0
+   ],
+   "size": [
+    320,
+    80
+   ],
+   "flags": {},
+   "order": 16,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "SIGMAS",
+     "type": "SIGMAS",
+     "links": [
+      22
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "ManualSigmas"
+   },
+   "widgets_values": [
+    "1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.0"
+   ],
+   "title": "Turbo schedule (8 steps, do not edit)",
+   "color": "#432",
+   "bgcolor": "#653"
+  },
+  {
+   "id": 18,
+   "type": "RandomNoise",
+   "pos": [
+    1000,
+    130
+   ],
+   "size": [
+    320,
+    82
+   ],
+   "flags": {},
+   "order": 17,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "NOISE",
+     "type": "NOISE",
+     "links": [
+      19
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "RandomNoise"
+   },
+   "widgets_values": [
+    1,
+    "randomize"
+   ],
+   "title": "Seed"
+  },
+  {
+   "id": 19,
+   "type": "CFGGuider",
+   "pos": [
+    1000,
+    260
+   ],
+   "size": [
+    320,
+    98
+   ],
+   "flags": {},
+   "order": 18,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "model",
+     "type": "MODEL",
+     "link": 16
+    },
+    {
+     "name": "positive",
+     "type": "CONDITIONING",
+     "link": 17
+    },
+    {
+     "name": "negative",
+     "type": "CONDITIONING",
+     "link": 18
+    }
+   ],
+   "outputs": [
+    {
+     "name": "GUIDER",
+     "type": "GUIDER",
+     "links": [
+      20
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "CFGGuider"
+   },
+   "widgets_values": [
+    1.0
+   ],
+   "title": "CFG (1 = official)"
+  },
+  {
+   "id": 20,
+   "type": "KSamplerSelect",
+   "pos": [
+    1000,
+    400
+   ],
+   "size": [
+    320,
+    58
+   ],
+   "flags": {},
+   "order": 19,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [
+    {
+     "name": "SAMPLER",
+     "type": "SAMPLER",
+     "links": [
+      21
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "KSamplerSelect"
+   },
+   "widgets_values": [
+    "euler"
+   ]
+  },
+  {
+   "id": 21,
+   "type": "SamplerCustomAdvanced",
+   "pos": [
+    1000,
+    500
+   ],
+   "size": [
+    320,
+    120
+   ],
+   "flags": {},
+   "order": 20,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "noise",
+     "type": "NOISE",
+     "link": 19
+    },
+    {
+     "name": "guider",
+     "type": "GUIDER",
+     "link": 20
+    },
+    {
+     "name": "sampler",
+     "type": "SAMPLER",
+     "link": 21
+    },
+    {
+     "name": "sigmas",
+     "type": "SIGMAS",
+     "link": 22
+    },
+    {
+     "name": "latent_image",
+     "type": "LATENT",
+     "link": 23
+    }
+   ],
+   "outputs": [
+    {
+     "name": "output",
+     "type": "LATENT",
+     "links": [
+      24
+     ]
+    },
+    {
+     "name": "denoised_output",
+     "type": "LATENT",
+     "links": null
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SamplerCustomAdvanced"
+   },
+   "widgets_values": [],
+   "title": "Sampler"
+  },
+  {
+   "id": 22,
+   "type": "VAEDecode",
+   "pos": [
+    1000,
+    660
+   ],
+   "size": [
+    320,
+    46
+   ],
+   "flags": {},
+   "order": 21,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "samples",
+     "type": "LATENT",
+     "link": 24
+    },
+    {
+     "name": "vae",
+     "type": "VAE",
+     "link": 25
+    }
+   ],
+   "outputs": [
+    {
+     "name": "IMAGE",
+     "type": "IMAGE",
+     "links": [
+      26
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "VAEDecode"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 23,
+   "type": "SaveImageAdvanced",
+   "pos": [
+    1360,
+    0
+   ],
+   "size": [
+    740,
+    800
+   ],
+   "flags": {},
+   "order": 22,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "link": 26
+    }
+   ],
+   "outputs": [
+    {
+     "name": "images",
+     "type": "IMAGE",
+     "links": [
+      28
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "SaveImageAdvanced"
+   },
+   "widgets_values": [
+    "Qwen21Turbo/edit",
+    "png",
+    "8-bit",
+    "sRGB"
+   ]
+  },
+  {
+   "id": 24,
+   "type": "ImageCompare",
+   "pos": [
+    1360,
+    840
+   ],
+   "size": [
+    740,
+    400
+   ],
+   "flags": {},
+   "order": 23,
+   "mode": 0,
+   "inputs": [
+    {
+     "name": "image_a",
+     "type": "IMAGE",
+     "shape": 7,
+     "link": 27
+    },
+    {
+     "name": "image_b",
+     "type": "IMAGE",
+     "shape": 7,
+     "link": 28
+    }
+   ],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "ImageCompare"
+   },
+   "widgets_values": [],
+   "title": "Before / after"
+  },
+  {
+   "id": 25,
+   "type": "MarkdownNote",
+   "pos": [
+    -700,
+    1260
+   ],
+   "size": [
+    700,
+    400
+   ],
+   "flags": {},
+   "order": 24,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "MarkdownNote"
+   },
+   "widgets_values": [
+    "## Qwen-Image 2.1 Turbo \u00b7 Image + Text \u2192 Image (multi-reference)\n- **image_1 is the edit target**; image_2\u2026 are references. Refer to them in the prompt as `<image1>`, `<image2>`, \u2026 (up to **10**).\n- image_1\u20132 are active. image_3\u20136 are **bypassed** (purple): select one and press **Ctrl+B** to enable it, then pick a file. For 7\u201310, duplicate a LoadImage and connect it to the next `images.image_N` slot on the Instruction node.\n- **resolution** on the Instruction node = total pixel budget each ref is resized to (1024 official, up to 2048; 0 = keep own size).\n- Output follows **image_1's** size. Flip the *Custom size* switch to use ResolutionSelector instead (keep it close to image_1's aspect or the edit can drift).\n- Model switch (yellow, left): false = `Turbo Q8_0 GGUF`, true = `Turbo FP8`.\n\n**Sampling (Turbo):** the checkpoint's own 8-step schedule in *Turbo schedule* (ManualSigmas), euler, cfg **1**. Changing the steps means editing that list; Qwen hasn't evaluated other schedules. The negative prompt is ignored at cfg 1."
+   ],
+   "title": "Notes"
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   3,
+   0,
+   "MODEL"
+  ],
+  [
+   2,
+   2,
+   0,
+   3,
+   1,
+   "MODEL"
+  ],
+  [
+   3,
+   3,
+   0,
+   6,
+   0,
+   "MODEL"
+  ],
+  [
+   4,
+   4,
+   0,
+   13,
+   0,
+   "CLIP"
+  ],
+  [
+   5,
+   5,
+   0,
+   13,
+   7,
+   "VAE"
+  ],
+  [
+   6,
+   7,
+   0,
+   13,
+   1,
+   "IMAGE"
+  ],
+  [
+   7,
+   8,
+   0,
+   13,
+   2,
+   "IMAGE"
+  ],
+  [
+   8,
+   9,
+   0,
+   13,
+   3,
+   "IMAGE"
+  ],
+  [
+   9,
+   10,
+   0,
+   13,
+   4,
+   "IMAGE"
+  ],
+  [
+   10,
+   11,
+   0,
+   13,
+   5,
+   "IMAGE"
+  ],
+  [
+   11,
+   12,
+   0,
+   13,
+   6,
+   "IMAGE"
+  ],
+  [
+   12,
+   14,
+   0,
+   15,
+   0,
+   "INT"
+  ],
+  [
+   13,
+   14,
+   1,
+   15,
+   1,
+   "INT"
+  ],
+  [
+   14,
+   13,
+   2,
+   16,
+   0,
+   "LATENT"
+  ],
+  [
+   15,
+   15,
+   0,
+   16,
+   1,
+   "LATENT"
+  ],
+  [
+   16,
+   6,
+   0,
+   19,
+   0,
+   "MODEL"
+  ],
+  [
+   17,
+   13,
+   0,
+   19,
+   1,
+   "CONDITIONING"
+  ],
+  [
+   18,
+   13,
+   1,
+   19,
+   2,
+   "CONDITIONING"
+  ],
+  [
+   19,
+   18,
+   0,
+   21,
+   0,
+   "NOISE"
+  ],
+  [
+   20,
+   19,
+   0,
+   21,
+   1,
+   "GUIDER"
+  ],
+  [
+   21,
+   20,
+   0,
+   21,
+   2,
+   "SAMPLER"
+  ],
+  [
+   22,
+   17,
+   0,
+   21,
+   3,
+   "SIGMAS"
+  ],
+  [
+   23,
+   16,
+   0,
+   21,
+   4,
+   "LATENT"
+  ],
+  [
+   24,
+   21,
+   0,
+   22,
+   0,
+   "LATENT"
+  ],
+  [
+   25,
+   5,
+   0,
+   22,
+   1,
+   "VAE"
+  ],
+  [
+   26,
+   22,
+   0,
+   23,
+   0,
+   "IMAGE"
+  ],
+  [
+   27,
+   7,
+   0,
+   24,
+   0,
+   "IMAGE"
+  ],
+  [
+   28,
+   23,
+   0,
+   24,
+   1,
+   "IMAGE"
+  ]
+ ],
+ "groups": [
+  {
+   "id": 1,
+   "title": "1 \u00b7 Models (Turbo)",
+   "bounding": [
+    -10,
+    -50,
+    420,
+    800
+   ],
+   "color": "#3f789e",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 2,
+   "title": "Reference images",
+   "bounding": [
+    -710,
+    -50,
+    670,
+    1260
+   ],
+   "color": "#a1309b",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 3,
+   "title": "2 \u00b7 Instruction & size",
+   "bounding": [
+    440,
+    -50,
+    520,
+    1110
+   ],
+   "color": "#8A8",
+   "font_size": 24,
+   "flags": {}
+  },
+  {
+   "id": 4,
+   "title": "3 \u00b7 Sample (Turbo, 8 steps) & save",
+   "bounding": [
+    990,
+    -50,
+    1140,
+    1000
+   ],
+   "color": "#88A",
+   "font_size": 24,
+   "flags": {}
+  }
+ ],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.75,
+   "offset": [
+    60,
+    60
+   ]
+  }
+ },
+ "version": 0.4
+}

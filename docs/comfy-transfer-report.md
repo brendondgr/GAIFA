@@ -125,11 +125,16 @@
 | qwen21-t2i | **yes**: 236 s, peak 40.6 GB | A 3:2 photo through its resolution picker (1248×832) |
 | qwen21-edit-multi | **yes**: 608 s, peak 43.0 GB | Two AIHub outputs as `image` and `image_2` (`output:<id>`): the fox from one placed in front of the cabin from the other |
 | qwen21-remove-bg | **yes**: 367 s, peak 43.1 GB | The fox cut out, with real transparency |
+| qwen21-turbo-t2i (2026-10-09) | **yes**: 59 s cold, 42 s warm, peak 40.3 GB | The same 3:2 size (1248×832); a storefront with two signs of text, both spelled right. The FP8 side of the switch too (42 s), once its file was fixed (below) |
+| qwen21-turbo-edit-multi (2026-10-09) | **yes**: 204 s, peak 54.6 GB | An AIHub output as `image` and a result path as `image_2`: the cat from one placed at the shop door of the other, signs and light unchanged. The higher peak is the prefix KV cache using spare memory (`auto`) |
+| qwen21-turbo-remove-bg (2026-10-09) | **yes**: 118 s, peak 38.8 GB | The cat cut out (68% fully transparent, soft fur edges) |
 | klein9b-* (3) | no: 3 model files missing each | The official templates record their download URLs, so the review screen offers Download buttons. Downloading needs your go-ahead |
 | scail2-basic | no: 2 model files missing | `wan2.1_14B_SCAIL_2_fp8_scaled.safetensors`, and the LightX2V LoRA under a `Wan2.1/` subfolder (you have it without the subfolder: one `[set]` line) |
 | scail2-gguf | no: custom node `KikoPurgeVRAM` | Its models are all here; install that node (ComfyUI-Manager) and it should run |
 | zimg-v7-basic | no: Impact Pack, easy-use, Image Saver nodes | Named by the check |
 | tier 4 | not run | Judged on conversion. Two of them also carry prompts that name a real person in sexual content, which I won't run |
+
+**Turbo FP8 file (2026-10-09).** `abenzerps/Qwen-Image-2.1-Turbo-Quantized`'s `turbo-fp8` mixes two formats: the legacy `scaled_fp8` marker with the new `.weight_scale` names and no per-layer metadata. ComfyUI 0.37's `convert_old_quants` only maps the legacy `.scale_weight` names, so it ran the FP8 values unscaled and the image was noise. FP8 × scale matches the Q8_0 GGUF to 2.7% on sampled layers, so the weights are fine. `services/comfy/scripts/fix_fp8_quant_metadata.py` adds the metadata ComfyUI's own exports carry (header only), and `download_qwen_image_2.1_turbo.sh` applies it.
 
 ## Edits needed by hand
 

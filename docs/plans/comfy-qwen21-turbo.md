@@ -15,31 +15,35 @@ It touches the comfy mod only (architecture §11, plan Phase 11; pack format in 
 
 ## Steps
 
-- [ ] **T.1 Models: `services/comfy/scripts/download_qwen_image_2.1_turbo.sh`.**
+- [x] **T.1 Models: `services/comfy/scripts/download_qwen_image_2.1_turbo.sh`.**
   - **Script:** the same resumable pattern as `download_qwen_image_2.1.sh`, plus a sha256 check against the repo's `SHA256SUMS` before each rename. It writes to `data/models/comfyui/diffusion_models/`.
   - **Registry:** `aihub models scan --add` registers both files. Set their `source` to `abenzerps/Qwen-Image-2.1-Turbo-Quantized@main` (`huggingface`), then run `aihub models verify` on both.
   *Done when:* both files are on disk with matching sha256, and `aihub models show` lists them with their source, verified.
+  - *As built:* the upstream FP8 export can't run as published (ComfyUI runs it unscaled: noise; see [comfy-transfer-report.md](../comfy-transfer-report.md), Running them). `scripts/fix_fp8_quant_metadata.py` adds ComfyUI's per-layer FP8 metadata (header only, tensor data byte-identical), and the download script applies it. The registry records the fixed file's sha256 and notes the upstream one.
 
-- [ ] **T.2 Builder: `~/Models/ComfyUI-next/workflows/qwen-image-2.1/build_turbo_workflows.py`.**
+- [x] **T.2 Builder: `~/Models/ComfyUI-next/workflows/qwen-image-2.1/build_turbo_workflows.py`.**
   - It reuses `Graph`, `T` and `note` from `build_workflows.py` next to it, with Turbo loaders (`Diffusion · Turbo Q8_0 GGUF (default)` / `Diffusion · Turbo FP8 (alternative)` behind the same yellow switch). The sampler group becomes `ManualSigmas → RandomNoise / CFGGuider / KSamplerSelect → SamplerCustomAdvanced`. The prefix KV cache (`QwenImage21Cache`) goes in all three graphs, as the official templates have it. Save prefixes are `Qwen21Turbo/{t2i,edit,remove_bg}`.
   - **Output:** editor files in `~/Models/ComfyUI-next/workflows/user-original/Qwen-Image-2.1-Turbo/` and API graphs in `qwen-image-2.1/api/` (`01_qwen21-turbo_text-to-image`, `02_qwen21-turbo_image-edit_multi-reference`, `03_qwen21-turbo_remove-background`).
   *Done when:* the script writes six files, and each API graph is accepted by ComfyUI's `/prompt` validation (T.4).
+  - *As built:* `ImageCompare` is part of the API graph, as ComfyUI's editor writes it (`compare_view`), so the builder's graphs equal AIHub's conversion.
 
-- [ ] **T.3 Packs: `services/comfy/workflows/qwen21-turbo-{t2i,edit-multi,remove-bg}/`.**
+- [x] **T.3 Packs: `services/comfy/workflows/qwen21-turbo-{t2i,edit-multi,remove-bg}/`.**
   - `comfyui workflows new <id> --from <editor file>`, then `suggest --write`. Hand-edit `workflow.toml` to match the base packs: the same names and tasks (`text-to-image`, `image-edit`, `remove-background`), `prompt`, `seed` (→ `RandomNoise.noise_seed`, default -1), `cfg` (→ `CFGGuider.cfg`), `aspect`/`megapixels` (t2i), `image`/`image_2` (edit), `image` (remove-bg), and `outputs.image`. Add a `description` that tells the agent what Turbo is for.
   - **Agent guide:** `services/comfy/skills/choosing-a-workflow/SKILL.md` lists the Turbo packs: Turbo for quick text-in-image and edits, the base packs when quality matters more than time.
   *Done when:* `comfyui workflows check --all` reports the three packs `ready`, and `GET /api/s/comfy/v1/tools` offers them under `generate_image`, `edit_image` and `remove_background`.
 
-- [ ] **T.4 Live runs (loads models; the user asked for a working pipeline).**
+- [x] **T.4 Live runs (loads models; the user asked for a working pipeline).**
   - `POST /api/s/comfy/v1/run` once per pack with the Q8_0 default, then `GET /v1/jobs/<id>?wait=900`. For the edit, use two AIHub outputs as `image`/`image_2`. For remove-bg, use any photo output, and check that the PNG has an alpha channel.
   - Run t2i once on the FP8 side: queue its API graph straight to ComfyUI with `~/Models/ComfyUI-next/workflows/qwen-image-2.1/run_api.py api/01_qwen21-turbo_text-to-image.api.json 3.switch=true` (the pack itself keeps Q8_0).
   - Ground truth: load each editor file in ComfyUI's own frontend and export the API graph. It must equal `tests/fixtures/holdout/qwen21-turbo-*.api.json` (as plan 11.12 did for the base files).
   *Done when:* each run finishes with an image in `outputs/comfy/<date>/`. Record times and peaks next to the base packs' in [comfy-transfer-report.md](../comfy-transfer-report.md) (§ "Runs").
+  - *As built:* t2i 59 s cold / 42 s warm (base 236 s), edit 204 s (base 608 s), remove-bg 118 s (base 367 s); FP8 t2i 42 s after the fix. ComfyUI's editor (0.37.0, in the browser) exports exactly the three fixture graphs.
 
-- [ ] **T.5 Tests and docs.**
+- [x] **T.5 Tests and docs.**
   - `services/comfy/tests/`: the existing suites stay green. Add a pack test (`test_packs.py`) asserting the three Turbo manifests load, map the task's required inputs, and carry no `steps` input.
   - Docs: `docs/structure.md` (the new script, this plan, the three packs) and `services/comfy/README.md` if it lists packs.
   *Done when:* `uv run pytest` (hub) and `services/comfy/.venv/bin/python -m pytest` (mod) pass.
+  - *As built:* the Turbo workflows joined the held-out set in `test_holdout.py` (fixtures in `tests/fixtures/holdout/`, `ManualSigmas` added to the fixture node list); `test_packs.py::test_qwen21_turbo_packs`; `test_fix_fp8.py` for the fixer.
 
 Commits: one per step once its tests pass, `AIHub (comfy, Qwen 2.1 Turbo T.k): <sentence>`.
 

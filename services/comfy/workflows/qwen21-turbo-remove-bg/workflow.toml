@@ -1,6 +1,6 @@
 name = "Qwen-Image 2.1 Turbo — remove background"
 task = "remove-background"
-description = "Qwen-Image 2.1 Turbo (official 8-step distill): cut the subject out of an image as a transparent PNG; about 5x faster than qwen21-remove-bg"
+description = "Qwen-Image 2.1 Turbo (official 8-step distill): cut the subject out of an image as a transparent PNG; about 3x faster than qwen21-remove-bg"
 tags = ["transparent", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
 

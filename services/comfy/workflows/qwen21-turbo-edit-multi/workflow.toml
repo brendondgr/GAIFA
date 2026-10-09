@@ -1,6 +1,6 @@
 name = "Qwen-Image 2.1 Turbo — edit with references"
 task = "image-edit"
-description = "Qwen-Image 2.1 Turbo (official 8-step distill): edit image_1 as the instruction says, optionally using image_2 as a reference (<image1>, <image2> in the prompt); about 5x faster than qwen21-edit-multi"
+description = "Qwen-Image 2.1 Turbo (official 8-step distill): edit image_1 as the instruction says, optionally using image_2 as a reference (<image1>, <image2> in the prompt); about 3x faster than qwen21-edit-multi"
 tags = ["edit", "references", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
 

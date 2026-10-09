@@ -45,6 +45,13 @@ It touches the comfy mod only (architecture §11, plan Phase 11; pack format in 
   *Done when:* `uv run pytest` (hub) and `services/comfy/.venv/bin/python -m pytest` (mod) pass.
   - *As built:* the Turbo workflows joined the held-out set in `test_holdout.py` (fixtures in `tests/fixtures/holdout/`, `ManualSigmas` added to the fixture node list); `test_packs.py::test_qwen21_turbo_packs`; `test_fix_fp8.py` for the fixer.
 
+- [x] **T.6 Speed-ups for edit and remove-bg: `services/comfy/nodes/aihub_nodes/` (asked for 2026-10-09).**
+  - **Measure:** per-node timings over ComfyUI's websocket, for base → Turbo → each fix, with the same inputs and seed.
+  - **Fixes (the image doesn't change):** the Qwen-VL vision patch-embed as a matmul instead of ROCm's slow Conv3d (global, applied when ComfyUI loads the package); `AIHubTextEncodeQwenImage21`, which encodes once (the negative is unused at cfg 1; `encode_negative` turns it back on); `VAELoaderKJ` at bf16 in the two packs (ComfyUI keeps `--fp32-vae` for FLUX.2). `extra_model_paths.yaml` lists `nodes/` after `custom_nodes/`.
+  - **Trade-off, opt-in:** a `resolution` input and `[presets.fast]` (768) on both packs.
+  *Done when:* the packs check `ready`, ComfyUI's editor exports exactly the new fixture graphs, and the tables are in [comfy-transfer-report.md](../comfy-transfer-report.md) ("Speed-ups").
+  - *As built:* edit 191–220 s → 110 s (fast 40 s), remove-bg 118 s → 62 s (fast 29 s); the base packs got the matmul fix too (edit 531 → 429 s, remove-bg 367 → 270 s).
+
 Commits: one per step once its tests pass, `AIHub (comfy, Qwen 2.1 Turbo T.k): <sentence>`.
 
 ## Deliverables
@@ -55,5 +62,6 @@ Commits: one per step once its tests pass, `AIHub (comfy, Qwen 2.1 Turbo T.k): <
 | Registry entries | `qwen-image-2.1-turbo-q8-0`, `qwen-image-2.1-turbo-fp8` | `data/models/registry.json` |
 | Builder | Editor + API graphs for the three Turbo workflows | `~/Models/ComfyUI-next/workflows/qwen-image-2.1/build_turbo_workflows.py` |
 | Packs | Text to image, edit with references, remove background | `services/comfy/workflows/qwen21-turbo-*/` |
+| AIHub nodes | Patch-embed matmul fix, `AIHubTextEncodeQwenImage21` | `services/comfy/nodes/aihub_nodes/` |
 | Agent guide | When to pick Turbo or base | `services/comfy/skills/choosing-a-workflow/SKILL.md` |
 | Tests | Turbo manifests load and map their task's inputs | `services/comfy/tests/test_packs.py` |

@@ -247,3 +247,8 @@ def test_qwen21_turbo_packs(lib, tmp_path, pid):
     assert "steps" not in p.manifest.inputs                       # the schedule fixes the steps
     loaders = {n["inputs"].get("unet_name") for n in conv.graph.values()}
     assert {"qwen-image-2.1-turbo-Q8_0.gguf", "qwen-image-2.1-turbo-fp8.safetensors"} <= loaders
+    if pid != "qwen21-turbo-t2i":                                  # the speed-ups (report: Turbo speed-ups)
+        by_type = {n["class_type"]: n["inputs"] for n in conv.graph.values()}
+        assert by_type["AIHubTextEncodeQwenImage21"]["encode_negative"] is False   # read references once
+        assert by_type["VAELoaderKJ"]["weight_dtype"] == "bf16"
+        assert p.manifest.presets["fast"] == {"resolution": 768}

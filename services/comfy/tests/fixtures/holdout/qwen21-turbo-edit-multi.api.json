@@ -47,12 +47,14 @@
   }
  },
  "5": {
-  "class_type": "VAELoader",
+  "class_type": "VAELoaderKJ",
   "inputs": {
-   "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+   "vae_name": "qwen_image_2.1_vae_bf16.safetensors",
+   "device": "main_device",
+   "weight_dtype": "bf16"
   },
   "_meta": {
-   "title": "VAE \u00b7 Qwen-Image 2.1 BF16"
+   "title": "VAE \u00b7 Qwen-Image 2.1 BF16 (runs in bf16)"
   }
  },
  "6": {
@@ -88,11 +90,12 @@
   }
  },
  "13": {
-  "class_type": "TextEncodeQwenImage21",
+  "class_type": "AIHubTextEncodeQwenImage21",
   "inputs": {
    "prompt": "Keep the character and pose in <image1> unchanged, put this light blue denim shirt from <image2> on the character, preserve the original facial features, hair, body shape and pose, the denim shirt fits naturally on body, realistic denim fabric texture, natural clothing folds, keep the original background and original lighting, high fashion editorial photography, sharp details",
    "negative_prompt": "",
    "resolution": 1024,
+   "encode_negative": false,
    "clip": [
     "4",
     0

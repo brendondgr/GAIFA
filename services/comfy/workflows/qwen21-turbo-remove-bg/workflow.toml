@@ -1,10 +1,10 @@
 name = "Qwen-Image 2.1 Turbo — remove background"
 task = "remove-background"
-description = "Qwen-Image 2.1 Turbo (official 8-step distill): cut the subject out of an image as a transparent PNG; about 3x faster than qwen21-remove-bg"
+description = "Qwen-Image 2.1 Turbo (official 8-step distill): cut the subject out of an image as a transparent PNG; about 1 min (4x faster than qwen21-remove-bg), or 30 s with the fast preset (a smaller result)"
 tags = ["transparent", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
 
-[inputs.prompt]          # TextEncodeQwenImage21 "Instruction"
+[inputs.prompt]          # AIHubTextEncodeQwenImage21 "Instruction"
 node = "8"
 field = "prompt"
 
@@ -20,6 +20,15 @@ field = "cfg"
 [inputs.image]          # LoadImage "image_1 · edit target"
 node = "7"
 field = "image"
+
+[inputs.resolution]          # AIHubTextEncodeQwenImage21 "Instruction"
+node = "8"
+field = "resolution"
+label = "Working size"
+description = "Pixel budget the input images are read at, as N×N (default 0: the input's own size); smaller is faster but keeps less detail. The result follows image 1 at this size."
+
+[presets.fast]               # ~0.6 MP result, about a third of the time (measured: docs/comfy-transfer-report.md)
+resolution = 768
 
 [outputs.image]
 node = "18"

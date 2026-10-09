@@ -47,12 +47,14 @@
   }
  },
  "5": {
-  "class_type": "VAELoader",
+  "class_type": "VAELoaderKJ",
   "inputs": {
-   "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+   "vae_name": "qwen_image_2.1_vae_bf16.safetensors",
+   "device": "main_device",
+   "weight_dtype": "bf16"
   },
   "_meta": {
-   "title": "VAE \u00b7 Qwen-Image 2.1 BF16"
+   "title": "VAE \u00b7 Qwen-Image 2.1 BF16 (runs in bf16)"
   }
  },
  "6": {
@@ -79,11 +81,12 @@
   }
  },
  "8": {
-  "class_type": "TextEncodeQwenImage21",
+  "class_type": "AIHubTextEncodeQwenImage21",
   "inputs": {
    "prompt": "Remove the background, and output a PNG image",
    "negative_prompt": "",
    "resolution": 0,
+   "encode_negative": false,
    "clip": [
     "4",
     0

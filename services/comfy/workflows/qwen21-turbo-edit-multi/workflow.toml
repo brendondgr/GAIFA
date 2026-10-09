@@ -1,10 +1,10 @@
 name = "Qwen-Image 2.1 Turbo — edit with references"
 task = "image-edit"
-description = "Qwen-Image 2.1 Turbo (official 8-step distill): edit image_1 as the instruction says, optionally using image_2 as a reference (<image1>, <image2> in the prompt); about 3x faster than qwen21-edit-multi"
+description = "Qwen-Image 2.1 Turbo (official 8-step distill): edit image_1 as the instruction says, optionally using image_2 as a reference (<image1>, <image2> in the prompt); about 2 min (4x faster than qwen21-edit-multi), or 40 s with the fast preset (a smaller result)"
 tags = ["edit", "references", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
 
-[inputs.prompt]          # TextEncodeQwenImage21 "Instruction (use <image1>, <image2>, …)"
+[inputs.prompt]          # AIHubTextEncodeQwenImage21 "Instruction (use <image1>, <image2>, …)"
 node = "13"
 field = "prompt"
 
@@ -24,6 +24,15 @@ field = "image"
 [inputs.image_2]          # LoadImage "image_2 · reference"
 node = "8"
 field = "image"
+
+[inputs.resolution]          # AIHubTextEncodeQwenImage21 "Instruction"
+node = "13"
+field = "resolution"
+label = "Working size"
+description = "Pixel budget the input images are read at, as N×N (default 1024); smaller is faster but keeps less detail. The result follows image 1 at this size."
+
+[presets.fast]               # ~0.6 MP result, about a third of the time (measured: docs/comfy-transfer-report.md)
+resolution = 768
 
 [outputs.image]
 node = "23"

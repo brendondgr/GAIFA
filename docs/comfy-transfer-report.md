@@ -136,6 +136,43 @@
 
 **Turbo FP8 file (2026-10-09).** `abenzerps/Qwen-Image-2.1-Turbo-Quantized`'s `turbo-fp8` mixes two formats: the legacy `scaled_fp8` marker with the new `.weight_scale` names and no per-layer metadata. ComfyUI 0.37's `convert_old_quants` only maps the legacy `.scale_weight` names, so it ran the FP8 values unscaled and the image was noise. FP8 × scale matches the Q8_0 GGUF to 2.7% on sampled layers, so the weights are fine. `services/comfy/scripts/fix_fp8_quant_metadata.py` adds the metadata ComfyUI's own exports carry (header only), and `download_qwen_image_2.1_turbo.sh` applies it.
 
+## Speed-ups: Qwen-Image 2.1 edit and remove background (2026-10-09)
+
+The Turbo edit took 200 s for 8 steps, and the sampler was only 80 s of it. Per-node timings (ComfyUI's websocket `executing` events, one run each, the same inputs and seed, a unique prompt per run so no node is cached) found three costs that don't change the image:
+
+- **The text encoder read the references twice.** `TextEncodeQwenImage21` runs the prompt and every reference image through Qwen3-VL for the positive, then again for the negative. At cfg 1 the sampler never uses the negative. `AIHubTextEncodeQwenImage21` (`services/comfy/nodes/`, [workflows.md §9](workflows.md#9-aihubs-own-nodes)) encodes once.
+- **The vision patch-embed is a Conv3d that ROCm runs very slowly.** Its kernel equals its stride, so it is one matmul. It took 17.5 s of a 33 s encode of one 1024² image, and as a matmul the encode takes 14.5 s, with the output equal to 1e-5. The patch applies to every Qwen-VL text encoder, so the base packs get it too.
+- **The VAE ran in fp32.** ComfyUI starts with `--fp32-vae` for FLUX.2's small decoder. The Turbo edit and remove-bg packs load the Qwen VAE (a bf16 file) in bf16 through `VAELoaderKJ`. Decode went from 12 s to 2 s.
+
+Edit (two references at 1024², a 1248×832 result):
+
+| Stage | Text encode | Sampling | Decode | Total |
+|---|---|---|---|---|
+| Base `qwen21-edit-multi` (40 steps) | 94 s | 417 s | 13 s | **531 s** |
+| Base, with the matmul fix (automatic) | 42 s | 373 s | 12 s | **429 s** |
+| Turbo as it was | 91–117 s | 81–90 s | 12 s | **191–220 s** |
+| + matmul patch-embed | 42 s | 87 s | 12 s | **147 s** |
+| + encode once | 24 s | 84 s | 12 s | **120 s** |
+| + bf16 VAE (the pack now) | 20 s | 85 s | 2 s | **110 s** |
+| + `fast` preset (768: a 928×640 result) | 11 s | 28 s | 1 s | **40 s** |
+
+Remove background (a 1024² photo, kept at its size):
+
+| Stage | Text encode | Sampling | Decode | Total |
+|---|---|---|---|---|
+| Base `qwen21-remove-bg` (40 steps; the 2026-10-07 run, today's stalled) | — | — | — | **367 s** |
+| Base, with the matmul fix (automatic) | 21 s | 236 s | 13 s | **270 s** |
+| Turbo as it was | ~50 s | 42 s | 18 s | **118 s** |
+| + matmul patch-embed | 21 s | 49 s | 13 s | **83 s** |
+| + encode once | 12 s | 59 s | 13 s | **85 s** |
+| + bf16 VAE (the pack now) | 10 s | 48 s | 2 s | **62 s** |
+| + `fast` preset (768) | 5 s | 23 s | 1 s | **29 s** |
+
+- **Sampling varies about ±10 s between identical runs.** That's why "encode once" saves 9 s in the text encoder but shows nothing in the remove-bg total.
+- **The image doesn't change** from the first three fixes. Against the previous stage at the same seed: encode once differs by 0.38/255 on average (GPU run-to-run noise), and the bf16 VAE by 1.0/255 (1.7% of pixels by more than 8/255).
+- **The `fast` preset changes the result.** It reads the inputs and makes the result at 768² (~0.6 MP), so it's smaller and keeps less fine detail. Sampling falls to a third because attention grows faster than the token count. It's a preset on the Run form, and the default stays 1024. The agent's task tools take only shared inputs, so they don't offer it yet.
+- **One base remove-bg run stalled** inside a GPU kernel (GPU 100% busy at 45 W, past 20 min, and `/interrupt` couldn't stop it). It ended only when ComfyUI restarted. It didn't recur in the later runs.
+
 ## Edits needed by hand
 
 | Workflow | Lines of `workflow.toml` changed |

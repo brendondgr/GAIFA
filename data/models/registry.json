@@ -717,15 +717,15 @@
         {
           "path": "comfyui/diffusion_models/qwen-image-2.1-turbo-fp8.safetensors",
           "role": "weights",
-          "sha256": "024e1befc5f7557e250489839582166daf5994dc4449f01e7d12912cb300e21b",
-          "size_bytes": 7133546412,
-          "verified_at": "2026-10-09T17:21:54-04:00"
+          "sha256": "4c6b937575c459d6d425a88fe7f2fe386f58b60b5fe17c421578197446c78099",
+          "size_bytes": 7133562876,
+          "verified_at": "2026-10-09T17:34:35-04:00"
         }
       ],
       "format": "safetensors",
       "kind": "image",
       "name": "qwen-image-2.1-turbo-fp8",
-      "notes": "Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs",
+      "notes": "Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs. Upstream qwen-image-2.1-turbo-fp8.safetensors (sha256 024e1bef…) with ComfyUI per-layer FP8 metadata added by services/comfy/scripts/fix_fp8_quant_metadata.py (header only; without it ComfyUI runs the FP8 weights unscaled).",
       "path": "comfyui/diffusion_models/qwen-image-2.1-turbo-fp8.safetensors",
       "services": [],
       "source": {

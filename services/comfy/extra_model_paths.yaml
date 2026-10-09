@@ -28,4 +28,8 @@ comfyui:
     vae_approx: vae_approx
 aihub_mod:
     base_path: ./
-    custom_nodes: custom_nodes
+    # custom_nodes/: third-party packages (ComfyUI-Manager installs, gitignored).
+    # nodes/: AIHub's own nodes and fixes (tracked; nodes/aihub_nodes/__init__.py says what they do).
+    custom_nodes: |
+        custom_nodes
+        nodes

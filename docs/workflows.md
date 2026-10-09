@@ -180,3 +180,12 @@ For anything it can't follow, it names the node.
 3. otherwise the model files × 1.2
 
 If other mods have to be unloaded, the page asks first. ComfyUI starts on the first run (about 15 s), and stops after 10 minutes idle.
+
+## 9. AIHub's own nodes
+
+`services/comfy/nodes/aihub_nodes/` is a ComfyUI node package that AIHub owns and tracks in git. It loads through `extra_model_paths.yaml` next to `custom_nodes/`, which holds the third-party packages and is gitignored. It holds fixes and nodes the packs need, measured in [comfy-transfer-report.md](comfy-transfer-report.md):
+
+- **The Qwen-VL vision patch-embed runs as a matmul.** The Qwen2.5-VL, Qwen3-VL and Qwen3.5 vision towers embed patches with a Conv3d whose kernel equals its stride, which is one matrix multiply. ROCm runs that Conv3d about 100× slower, so it was half of every Qwen-Image 2.1 text encode with images. The patch applies when ComfyUI loads the package, and the result is the same to rounding.
+- **`AIHubTextEncodeQwenImage21`** is `TextEncodeQwenImage21` that reads the prompt and reference images once. The core node encodes them a second time for the negative, which the sampler never uses at cfg 1. Turn on `encode_negative` when a pack's cfg is above 1.
+
+Changes here take effect when ComfyUI restarts (`comfyui restart`, or unload and load comfy).

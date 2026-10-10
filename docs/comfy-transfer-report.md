@@ -169,8 +169,17 @@ Remove background (a 1024² photo, kept at its size):
 | + `fast` preset (768) | 5 s | 23 s | 1 s | **29 s** |
 
 - **Sampling varies about ±10 s between identical runs.** That's why "encode once" saves 9 s in the text encoder but shows nothing in the remove-bg total.
-- **The image doesn't change** from the first three fixes. Against the previous stage at the same seed: encode once differs by 0.38/255 on average (GPU run-to-run noise), and the bf16 VAE by 1.0/255 (1.7% of pixels by more than 8/255).
+- **The image doesn't change** from the first three fixes. With the same seed and an identical prompt, all of them together differ by 0.28/255 on average, with 0.02% of pixels off by more than 8/255 (text to image, below). The edit runs above carry a different tag in each prompt, so ComfyUI can't reuse a cached text encode, and the tag alone moves an image by 2.2–2.5/255. That is also why the edit stages differ from each other by 0.4–1.0/255.
 - **The `fast` preset changes the result.** It reads the inputs and makes the result at 768² (~0.6 MP), so it's smaller and keeps less fine detail. Sampling falls to a third because attention grows faster than the token count. It's a preset on the Run form, and the default stays 1024. The agent's task tools take only shared inputs, so they don't offer it yet.
+Text to image (1248×832, from 2026-10-09 evening). The same two fixes, measured as interleaved old/new runs; back-to-back runs drift by about 4 s as the GPU warms up:
+
+| Stage | Text encode | Sampling | Decode | Total |
+|---|---|---|---|---|
+| Turbo as it was | 1.3 s | 34 s | 12.5 s | **49 s** |
+| + encode once + bf16 VAE (the pack now) | 0.8 s | 34 s | 2.4 s | **39 s** |
+
+The matmul fix doesn't apply to text to image (there are no images to read), and there's no fast preset (no inputs to shrink).
+
 - **One base remove-bg run stalled** inside a GPU kernel (GPU 100% busy at 45 W, past 20 min, and `/interrupt` couldn't stop it). It ended only when ComfyUI restarted. It didn't recur in the later runs.
 
 ## Edits needed by hand

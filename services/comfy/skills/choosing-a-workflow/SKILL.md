@@ -8,7 +8,7 @@ description: Which image or video workflow to use, good prompts, aspect ratios a
 - `zimage-turbo` (default): fast photoreal images, 8 steps, about 20–40 s. Best for photos, products, people, animals.
 - `zimage-intorealism`: painterly, watercolor look. Use when the user asks for art, painting or watercolor.
 - `qwen21-t2i`: Qwen-Image 2.1: best at text inside the image (signs, posters, labels) and complex scenes; slower (1–2 min).
-- `qwen21-turbo-t2i`: Qwen-Image 2.1 Turbo: the same strengths as `qwen21-t2i` in 8 steps, about 45–60 s. Prefer it for text in the image and complex scenes; use `qwen21-t2i` only when the user asks for the best quality and time doesn't matter.
+- `qwen21-turbo-t2i`: Qwen-Image 2.1 Turbo: the same strengths as `qwen21-t2i` in 8 steps, about 40 s. Prefer it for text in the image and complex scenes; use `qwen21-t2i` only when the user asks for the best quality and time doesn't matter.
 - Prompts: one or two concrete sentences: subject, setting, light, style, camera. No negative prompt needed.
 - Aspect: 16:9 for landscapes and scenes, 9:16 for phone wallpapers and portraits of people, 1:1 for icons and objects.
 

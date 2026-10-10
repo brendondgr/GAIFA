@@ -50,7 +50,7 @@ It touches the comfy mod only (architecture §11, plan Phase 11; pack format in 
   - **Fixes (the image doesn't change):** the Qwen-VL vision patch-embed as a matmul instead of ROCm's slow Conv3d (global, applied when ComfyUI loads the package); `AIHubTextEncodeQwenImage21`, which encodes once (the negative is unused at cfg 1; `encode_negative` turns it back on); `VAELoaderKJ` at bf16 in the two packs (ComfyUI keeps `--fp32-vae` for FLUX.2). `extra_model_paths.yaml` lists `nodes/` after `custom_nodes/`.
   - **Trade-off, opt-in:** a `resolution` input and `[presets.fast]` (768) on both packs.
   *Done when:* the packs check `ready`, ComfyUI's editor exports exactly the new fixture graphs, and the tables are in [comfy-transfer-report.md](../comfy-transfer-report.md) ("Speed-ups").
-  - *As built:* edit 191–220 s → 110 s (fast 40 s), remove-bg 118 s → 62 s (fast 29 s); the base packs got the matmul fix too (edit 531 → 429 s, remove-bg 367 → 270 s).
+  - *As built:* edit 191–220 s → 110 s (fast 40 s), remove-bg 118 s → 62 s (fast 29 s), text to image 49 s → 39 s (encode once + bf16 VAE; asked for afterwards); the base packs got the matmul fix too (edit 531 → 429 s, remove-bg 367 → 270 s).
 
 Commits: one per step once its tests pass, `AIHub (comfy, Qwen 2.1 Turbo T.k): <sentence>`.
 

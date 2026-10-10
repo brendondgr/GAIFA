@@ -1,10 +1,10 @@
 name = "Qwen-Image 2.1 Turbo — text to image"
 task = "text-to-image"
-description = "Qwen-Image 2.1 Turbo (official 8-step distill): text to image, strong at text inside the image (signs, posters, labels) and complex scenes, about 4x faster than qwen21-t2i"
+description = "Qwen-Image 2.1 Turbo (official 8-step distill): text to image, strong at text inside the image (signs, posters, labels) and complex scenes; about 40 s, 5x faster than qwen21-t2i"
 tags = ["photo", "text", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
 
-[inputs.prompt]          # TextEncodeQwenImage21 "Prompt"
+[inputs.prompt]          # AIHubTextEncodeQwenImage21 "Prompt"
 node = "8"
 field = "prompt"
 

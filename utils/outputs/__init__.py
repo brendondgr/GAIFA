@@ -7,6 +7,7 @@
 - `watch.py`: `Watcher`, live updates via `watchfiles`, the startup rescan, trash purging
 - `trash.py`: deletes go to `outputs/.trash/<date>/`, purged after 30 days
 - `announce.py`: batched activity items for new outputs
+- `upload.py`: a file sent to `POST /api/outputs/upload` written as an output in `uploads/`
 """
 
 from utils.outputs.entries import KINDS

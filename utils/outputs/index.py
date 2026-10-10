@@ -227,6 +227,15 @@ class Outputs:
         self._queue_previews(described)
         return settling
 
+    async def ingest(self, rel: str) -> dict[str, Any]:
+        """Index the output at `rel` now (an upload just written) instead of waiting for the watcher."""
+        scope = str(PurePosixPath(rel).parent)
+        await self.sync(scope)
+        row = (await self._rows_under(scope)).get(rel)
+        if row is None:
+            raise OutputError(500, "upload_not_indexed", f'"{rel}" was saved but isn\'t an output')
+        return await self.get(row["id"])
+
     async def reconcile(self) -> int:
         """Startup: bring the whole index in line with the disk, in chunks, without an event per
         output. Open pages are told to refetch (`output_deleted` with id `*`) if anything changed."""

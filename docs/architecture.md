@@ -297,6 +297,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
   - archive: zip, tar, gz, 7z
   - anything else is `other`
 - **Without a sidecar:** the title is the name as words (minus the `HHMMSS-` prefix); the time is the date folder plus that prefix, else the file's mtime. A folder's main file is the first model3d, then video, image, audio file.
+- **Uploads:** files sent to `POST /api/outputs/upload` land in `{outputs}/uploads/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext>` with a sidecar (`title` = the original name, `source.service = "upload"`), so they are outputs of the service `uploads` like any other.
 - **Previews:** the hub makes them itself (a 640 px JPEG for images over 4 MP, a video poster frame at 1 s via ffmpeg) and stores them as hidden `.<name>.preview.jpg` files next to the output. A 3D job brings its own (`preview` in the sidecar, or `preview.png`).
 - **Deleting** an output from the UI moves it, with its sidecar and preview, to `outputs/.trash/<YYYY-MM-DD>/`; the hub empties trash days older than 30 days. Dotfiles and dot-folders are never indexed.
 
@@ -362,6 +363,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /` | `web/Hub.dc.html`, with `vendor/react*.js` and `/config.js` script tags added before `support.js` as it's served, so a fresh export works unchanged |
 | `GET /ui/services/{id}/{path}`, `GET /Mod_<id>.dc.html` | a mod's `ui/` folder (page modules), and its `Page.dc.html` under a name `dc-import` can find |
 | `GET /api/metrics`, `/api/metrics/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`, `/api/widgets`, `/api/widgets/{service}/{id}` | chart data; shapes in UI brief §11.7 |
+| `POST /api/outputs/upload?name=` | a file sent as the body (image, video or audio, ≤ 64 MB) saved to `outputs/uploads/<date>/` and indexed; returns the `Output` (Chat's Upload, plan chat-uploads U.4) |
 | `GET /api/outputs/{id}/file` | an output's main file (supports Range, for audio/video seeking) |
 | `GET /api/outputs/{id}/files/{path}` | a file inside a folder output |
 | `GET /api/outputs/{id}/preview` | thumbnail or poster |

@@ -35,7 +35,7 @@ It touches the comfy mod (architecture §11, [workflows.md](../workflows.md)), t
   - "quick", "fast", "rough", "preview" map to `fast`, "draft" or "thumbnail" to `draft`, and "final" or "high quality" to no preset. Small text needs no preset.
   *Done when:* a live chat turn ("a quick draft of …") shows an approval card with `preset: "fast"` or `"draft"` (U.6).
 
-- [ ] **U.4 Uploads: `POST /api/outputs/upload` in `utils/routes/outputs.py`; `utils/outputs/upload.py`.**
+- [x] **U.4 Uploads: `POST /api/outputs/upload` in `utils/routes/outputs.py`; `utils/outputs/upload.py`.**
   - `save_upload(paths, name, data) -> rel`: check the extension and size, slug the name, write `.part` then rename, and write the sidecar. The route calls `Outputs.sync("uploads/<date>")` and returns the new `Output`.
   - Errors use the envelope: `upload_type` (415), `upload_too_large` (413), `upload_empty` (400).
   - `web/api.js`: `uploadOutput(file)`. Docs: architecture §6 (hub routes), UI brief §6 (the method table), §4.7 (the `uploads` folder).

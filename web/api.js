@@ -18,7 +18,7 @@ export const METHOD_AREA = {
   getMemory: 'memory', planRoom: 'memory',
   listModels: 'models', getModel: 'models', saveModel: 'models', verifyModel: 'models', deleteModel: 'models',
   scanModels: 'models', addModel: 'models',
-  listOutputs: 'outputs', getOutput: 'outputs', deleteOutput: 'outputs',
+  listOutputs: 'outputs', getOutput: 'outputs', deleteOutput: 'outputs', uploadOutput: 'outputs',
   getSettings: 'settings', saveSettings: 'settings',
   getMetrics: 'metrics', listMetricSeries: 'metrics', getTimeline: 'metrics', getOutputStats: 'metrics',
   getActivityStats: 'metrics', getJobStats: 'metrics',
@@ -159,6 +159,8 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     listOutputs: (f = {}) => req('GET', `/api/outputs${qs(f)}`),
     getOutput: id => req('GET', `/api/outputs/${enc(id)}`),
     deleteOutput: id => req('DELETE', `/api/outputs/${enc(id)}`),
+    // A File or Blob (with .name) sent as the raw body: it becomes an output in outputs/uploads/.
+    uploadOutput: file => req('POST', `/api/outputs/upload${qs({ name: file.name || 'upload' })}`, { body: file, headers: { 'content-type': file.type || 'application/octet-stream' } }),
     getSettings: () => req('GET', '/api/settings'),
     saveSettings: s => req('PUT', '/api/settings', { json: s }),
     getMetrics: ({ series, range, step } = {}) => req('GET', `/api/metrics${qs({ series, range, step })}`),

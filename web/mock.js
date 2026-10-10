@@ -593,6 +593,14 @@ export function createMockApi() {
       const start = Number(f.cursor || 0), limit = Number(f.limit || 60), page = items.slice(start, start + limit);
       return { items: page.map(clone), next_cursor: start + limit < items.length ? String(start + limit) : null, totals: { count: items.length, size_bytes: items.reduce((a, o) => a + o.size_bytes, 0), by_kind: byKind, by_service: bySvc } }; },
     async getOutput(id) { await net(); const o = outputs.find(x => x.id === id); if (!o) throw err(404, 'output_not_found', `No output "${id}"`); return clone(o); },
+    async uploadOutput(file) {
+      await net(); const name = file.name || 'upload', ext = (name.split('.').pop() || '').toLowerCase();
+      const kind = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'].includes(ext) ? 'image' : ['mp4', 'webm', 'mov', 'mkv'].includes(ext) ? 'video' : ['wav', 'mp3', 'flac', 'ogg', 'opus', 'm4a', 'aac'].includes(ext) ? 'audio' : null;
+      if (!kind) throw err(415, 'upload_type', `"${name}" isn't an image, video or audio file`);
+      const ts = now(), path = `outputs/uploads/${ymd(ts)}/${hms(ts)}-${slug(name.replace(/\.[^.]*$/, ''))}.${ext}`, url = URL.createObjectURL(file);
+      const o = { id: 'o_' + Math.random().toString(36).slice(2, 12), service: 'uploads', kind, title: name, path, files: [{ path, kind, size_bytes: file.size }], url, preview: kind === 'image' ? url : null, size_bytes: file.size, created_ts: ts, meta: { source: { service: 'upload' } } };
+      outputs.unshift(o); emit({ type: 'output', output: clone(o) }); return clone(o);
+    },
     async deleteOutput(id) { await net(); const i = outputs.findIndex(x => x.id === id); if (i < 0) throw err(404, 'output_not_found', `No output "${id}"`); outputs.splice(i, 1); emit({ type: 'output_deleted', id }); return null; },
     async getSettings() { await net(); return clone(settings); },
     async saveSettings(patch) { await net();

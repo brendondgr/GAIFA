@@ -212,3 +212,12 @@ test('callService: Stop before any answer is `aborted`, not "hub down"', async (
   const api = createApi({ base: '', liveAreas: ['proxy'], mock: fakeMock(), fetch });
   await assert.rejects(api.callService('m', 'GET', '/x', { signal: ctl.signal }), e => e.status === 499 && e.code === 'aborted');
 });
+
+test('uploadOutput sends the raw file with its name and type', async () => {
+  let seen;
+  const http = createHttpApi('', { fetch: async (u, init) => { seen = { u, init }; return json(201, { id: 'o1', kind: 'image' }); } });
+  const file = new Blob(['png-bytes'], { type: 'image/png' }); file.name = 'My cat.png';
+  assert.deepEqual(await http.uploadOutput(file), { id: 'o1', kind: 'image' });
+  assert.equal(seen.u, '/api/outputs/upload?name=My%20cat.png');
+  assert.equal(seen.init.method, 'POST'); assert.equal(seen.init.body, file); assert.equal(seen.init.headers['content-type'], 'image/png');
+});

@@ -6,6 +6,7 @@ video can seek. They only ever serve files the index lists for that output.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,8 @@ from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import FileResponse
 
 from utils.api_models import Output, OutputPage
-from utils.outputs import Outputs
+from utils.outputs import OutputError, Outputs
+from utils.outputs.upload import MAX_BYTES, UploadError, save_upload
 
 router = APIRouter(tags=["outputs"])
 
@@ -50,6 +52,22 @@ async def list_outputs(
     limit: int = Query(60, ge=1, le=500),
 ) -> dict[str, Any]:
     return await _outs(request).list(service, kind, q, from_, to, cursor, limit)
+
+
+@router.post("/api/outputs/upload", status_code=201, summary="Upload a file (the raw body) as an output in outputs/uploads/",
+             response_model=Output, response_model_exclude_unset=True)
+async def upload_output(request: Request, name: str = Query(..., description="The file's name (its extension sets the kind)")) -> dict[str, Any]:
+    """An image, video or audio file of at most 64 MB, sent as the body. It becomes an ordinary
+    output (`output:<id>` works wherever an output does). Errors: `upload_type` (415),
+    `upload_too_large` (413), `upload_empty` (400)."""
+    if int(request.headers.get("content-length") or 0) > MAX_BYTES:
+        raise OutputError(413, "upload_too_large", f"uploads are at most {MAX_BYTES // 2**20} MB")
+    outs = _outs(request)
+    try:
+        rel = await asyncio.to_thread(save_upload, outs.dir, name, await request.body())
+    except UploadError as e:
+        raise OutputError(e.status, e.code, e.detail) from None
+    return await outs.ingest(rel)
 
 
 @router.get("/api/outputs/{output_id}", summary="One output", response_model=Output, response_model_exclude_unset=True)

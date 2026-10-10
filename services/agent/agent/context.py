@@ -24,9 +24,32 @@ KEEP_TURNS = 2
 MAX_IMAGES = 2
 
 
+IMAGE_TOKENS = 1100  # one picture from view_output (at most 1024 px): what a vision model spends on it
+
+
+def _without_images(obj: Any) -> tuple[Any, int]:
+    """`obj` with every image data URL taken out, and how many there were: an image costs a vision
+    model about IMAGE_TOKENS, not the length of its base64 (~50k "tokens" for a 1024 px JPEG)."""
+    n = 0
+
+    def drop(o: Any) -> Any:
+        nonlocal n
+        if isinstance(o, str) and o.startswith("data:image/"):
+            n += 1
+            return ""
+        if isinstance(o, dict):
+            return {k: drop(v) for k, v in o.items()}
+        if isinstance(o, list):
+            return [drop(v) for v in o]
+        return o
+
+    return drop(obj), n
+
+
 def est(obj: Any) -> int:
+    obj, images = _without_images(obj)
     text = obj if isinstance(obj, str) else json.dumps(obj, ensure_ascii=False, default=str)
-    return max(1, len(text) // CHARS_PER_TOKEN)
+    return max(1, len(text) // CHARS_PER_TOKEN + images * IMAGE_TOKENS)
 
 
 def cap_text(text: str, tokens: int = RESULT_CAP_TOKENS) -> tuple[str, bool]:

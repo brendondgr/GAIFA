@@ -146,3 +146,20 @@ def test_meter_uses_the_estimate_after_a_compaction():
            {"seq": 3, "type": "compact", "payload": {"stage": "clear", "cleared": [1]}}]
     m = ctx.meter(evs, 8000, {"messages": 1200, "instructions": 800})
     assert m["used"] == 2000 and m["estimated"] is True
+
+
+def test_images_cost_a_fixed_amount_not_their_base64():
+    """view_output pictures go to the model as data URLs; their base64 length isn't what they cost
+    (two 1024 px pictures counted ~100k "tokens" and ended the chat with context_full)."""
+    import base64
+    from agent import context as cx
+
+    url = "data:image/jpeg;base64," + base64.b64encode(b"x" * 150_000).decode()
+    msg = [{"role": "user", "content": [{"type": "text", "text": "(the image from view_output: cat)"},
+                                        {"type": "image_url", "image_url": {"url": url}}]}]
+    plain = [{"role": "user", "content": [{"type": "text", "text": "(the image from view_output: cat)"},
+                                          {"type": "image_url", "image_url": {"url": ""}}]}]
+    assert cx.est(msg) == cx.est(plain) + cx.IMAGE_TOKENS
+    assert cx.est(msg + msg) < 2 * (cx.IMAGE_TOKENS + 200)
+    assert cx.est({"image": {"url": url, "label": "x"}}) < cx.IMAGE_TOKENS + 50     # a stored tool result's picture too
+    assert cx.est("plain text " * 100) == len("plain text " * 100) // cx.CHARS_PER_TOKEN

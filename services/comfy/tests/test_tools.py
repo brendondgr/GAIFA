@@ -83,3 +83,12 @@ def test_task_tools_take_presets(env):  # noqa: F811
     assert job["state"] == "done" and job["inputs"]["width"] == 512 and job["inputs"]["height"] == 512
     r = c.post("/v1/tools/generate_image/call", json={"arguments": {"prompt": "a cat", "preset": "huge"}})
     assert r.status_code == 422 and "no preset 'huge'" in r.json()["detail"] and "fast" in r.json()["detail"]
+
+
+def test_a_task_can_describe_a_shared_input_its_own_way():
+    """remove_background's prompt is "what to keep", not text to make an image from (the agent left it out)."""
+    from comfy.tasks import Tasks
+
+    t = Tasks.load()
+    assert "What to keep" in t.get("remove-background").notes["prompt"]
+    assert t.get("text-to-image").notes == {} and t.inputs["prompt"]["description"] == "What to make, in plain words"

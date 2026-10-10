@@ -252,3 +252,19 @@ def test_a_preset_drives_derived_sizes(tmp_path):
     assert v["width"] > v["height"] and abs(v["width"] * v["height"] - 262_144) < 25_000
     v = resolve(pack, schema, {"prompt": "x"})                                      # no preset: the graph's own size
     assert (v["width"], v["height"]) == (1024, 1024)
+
+
+def test_a_template_wraps_a_short_value(tmp_path):
+    """Remove-background packs turn "the storefront" into their instruction (a bare name returned the photo unchanged)."""
+    d = tmp_path / "rmbg"
+    d.mkdir()
+    (d / "workflow.json").write_text("{}")
+    (d / "workflow.toml").write_text(ZIT.replace('[inputs.prompt]\nnode = "67"\nfield = "text"',
+                                                 '[inputs.prompt]\nnode = "67"\nfield = "text"\ntemplate = "Extract {} in <image1>. Output a PNG image."'))
+    pack = load_pack(d)
+    schema = {"properties": {"prompt": {"type": "string", "default": "Remove the background"}}}
+    assert resolve(pack, schema, {"prompt": " the storefront "})["prompt"] == "Extract the storefront in <image1>. Output a PNG image."
+    assert resolve(pack, schema, {})["prompt"] == "Remove the background"                        # the graph's own default: as it is
+    long = "Please remove the sky and the street but keep the whole shop front with its sign"
+    assert resolve(pack, schema, {"prompt": long})["prompt"] == long                             # an instruction: as it is
+    assert resolve(pack, schema, {"prompt": "Keep <image1>'s shop"})["prompt"] == "Keep <image1>'s shop"

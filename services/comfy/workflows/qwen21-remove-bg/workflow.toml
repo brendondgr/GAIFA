@@ -5,6 +5,7 @@ task = "remove-background"
 [inputs.prompt]          # TextEncodeQwenImage21 "Instruction"
 node = "8"
 field = "prompt"
+template = "Extract {} in <image1> and remove everything else. Output a PNG image."   # "the storefront" → this; a full instruction is used as it is
 
 [inputs.seed]          # KSampler "KSampler"
 node = "12"

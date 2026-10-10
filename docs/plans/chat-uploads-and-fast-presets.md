@@ -45,9 +45,15 @@ It touches the comfy mod (architecture §11, [workflows.md](../workflows.md)), t
   - An "Upload" button (a file picker, several files allowed), dropping files on the composer, and pasting images. Each file uploads and is added as an attachment chip with its preview, and a failed upload shows the error.
   *Done when:* `chat.test.mjs` covers the upload helper, and in the browser an uploaded image appears as a chip and in the sent message.
 
-- [ ] **U.6 Live check.**
+- [x] **U.6 Live check.**
   - In Chat: upload a photo, ask "make this a night scene, quick draft", and check the card shows `edit_image` with `image: output:<id>` and the preset. Approve it; the result appears. Then "remove the background of it" works on the same upload.
   *Done when:* both runs finish, recorded below.
+  - *As built (2026-10-10, local Gemma 4 26B):*
+    - **The quick edit worked as asked.** "Turn this into a snowy winter night. Just a quick one" with a dropped upload gave a card with `qwen21-turbo-edit-multi`, `image: output:<upload>` and `preset: fast`, and made a 928×640 result. Pasting an image works the same way.
+    - **Two pictures ended the chat (fixed).** The agent counted a `view_output` picture by its base64 length (~50k tokens), so the upload plus its result hit `context_full`. A picture now counts 1,100 tokens.
+    - **"Full quality" picked the base model (fixed).** The guide called the base packs "full quality". It now says that means no preset on the default, and the base packs are only for when the user names them.
+    - **A scene cut-out left out what to keep.** The model guesses the subject, and on a frame-filling storefront it kept only the window frames. A bare noun as the instruction returns the photo unchanged. So the remove-bg packs have a `template` on `prompt` ("the storefront" → "Extract the storefront in <image1> and remove everything else. Output a PNG image."), and `[tasks.remove-background.inputs]` tells the agent what `prompt` means there.
+    - **This model still often omits `prompt` for remove-bg.** The card shows the field with that hint, and typing "the storefront" there gave a clean cut-out in 69 s.
 
 Commits: one per step once its tests pass, `AIHub (chat/comfy U.k): <sentence>`.
 

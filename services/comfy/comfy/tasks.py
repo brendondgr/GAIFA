@@ -17,6 +17,7 @@ class Task:
     required: tuple[str, ...]
     output: str | None
     tool: str | None
+    notes: dict[str, str] = field(default_factory=dict)   # [tasks.<id>.inputs]: a shared input's description for this task's tool
 
 
 @dataclass
@@ -28,7 +29,7 @@ class Tasks:
     def load(cls, path: Path = DEFAULT) -> Tasks:
         raw = tomllib.loads(path.read_text())
         tasks = {k: Task(k, v.get("name", k), v.get("description", ""), tuple(v.get("required", [])),
-                         v.get("output"), v.get("tool")) for k, v in (raw.get("tasks") or {}).items()}
+                         v.get("output"), v.get("tool"), dict(v.get("inputs") or {})) for k, v in (raw.get("tasks") or {}).items()}
         return cls(tasks, raw.get("inputs") or {})
 
     def get(self, tid: str) -> Task | None:

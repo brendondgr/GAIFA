@@ -1,6 +1,7 @@
 # Tasks a workflow pack can implement (`task = "…"` in its workflow.toml), and the shared input
 # names packs use. The agent gets one tool per task that has a ready pack (`tool`), so any pack
-# that implements a task can stand in for another. Add a task by adding a table here.
+# that implements a task can stand in for another. Add a task by adding a table here; a task's
+# [tasks.<id>.inputs] table gives a shared input a description of its own in that task's tool.
 # Guide: docs/workflows.md.
 
 [tasks.text-to-image]
@@ -41,9 +42,12 @@ output = "image"
 [tasks.remove-background]
 name = "Remove background"
 tool = "remove_background"
-description = "Cut the subject out of an image, leaving a transparent background."
+description = "Cut the subject out of an image, leaving a transparent background. When the user names what to keep, or the image is a scene (a building, a room), pass prompt with just those words (\"the storefront\", \"the woman on the left\"): the workflow turns them into its instruction. Without a prompt the model guesses the subject."
 required = ["image"]
 output = "image"
+
+[tasks.remove-background.inputs]     # this tool's own description of a shared input
+prompt = "What to keep, in a few words (\"the storefront\", \"the woman on the left\"). Pass it whenever the user names what to keep or the picture is a scene; leave it out only for one obvious subject."
 
 [tasks.custom]
 name = "Custom"

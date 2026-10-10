@@ -17,6 +17,7 @@ from .nodes import NodeCatalog
 from .packs import Pack
 
 DERIVED = ("aspect", "megapixels", "seconds")
+TEMPLATE_WORDS = 8   # a value up to this many words, not naming <image…>, goes into its input's template; longer text is used as it is
 SEED_MAX = 2**32 - 1
 
 
@@ -96,6 +97,10 @@ def resolve(pack: Pack, schema: dict, values: dict[str, Any] | None, preset: str
             out.update(presets[preset])
             asked = {**presets[preset], **values}
     out.update({k: v for k, v in values.items() if k in props})
+    for k, m in (pack.manifest.inputs.items() if pack.manifest else ()):
+        v = values.get(k)
+        if m.template and isinstance(v, str) and v.strip() and "<image" not in v and len(v.split()) <= TEMPLATE_WORDS:
+            out[k] = m.template.replace("{}", v.strip())     # "the storefront" → the workflow's own instruction around it
     for k in schema.get("required", []):
         if out.get(k) in (None, "", []):
             errors.append(f"{k}: required")

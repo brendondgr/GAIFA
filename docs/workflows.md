@@ -77,7 +77,7 @@ height = 1216
 ```
 
 - **Types, defaults, ranges and choices come from ComfyUI's node list** and the graph's current values. An input only needs to state what differs.
-- **Input fields:** `node` or `title`, `field`, `label`, `description`, `type` (`string`, `integer`, `number`, `boolean`, `file`, `files`), `default`, `min`, `max`, `step`, `choices`, `multiline`, `required`, `hidden` (mapped, but not shown or offered to the agent) and `also`.
+- **Input fields:** `node` or `title`, `field`, `label`, `description`, `type` (`string`, `integer`, `number`, `boolean`, `file`, `files`), `default`, `min`, `max`, `step`, `choices`, `multiline`, `required`, `hidden` (mapped, but not shown or offered to the agent), `also`, and `template`. A `template` applies to string inputs: a value the caller gives of up to 8 words, not naming `<image…>`, fills its `{}`. For example, the remove-background packs turn "the storefront" into their whole instruction; longer text and the graph's own default are used as they are.
 - **Node ids inside subgraphs** are `outer:inner`, for example `"12:5"`.
 - **Unknown keys are errors**, so a typo is reported rather than ignored.
 - **Saving the form on the review screen rewrites `workflow.toml` without comments.** To keep comments, use "Edit as TOML" or edit the file directly.

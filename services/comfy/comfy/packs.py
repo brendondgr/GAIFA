@@ -52,6 +52,7 @@ class InputMap(_Strict):
     required: bool | None = None
     hidden: bool = False                # mapped, but not shown in the Run form or offered to the agent
     also: list[str] = []                # more "<node>.<field>" targets that get the same value
+    template: str | None = None         # a string input: a short value given by the caller fills "{}" (see resolve.TEMPLATE_WORDS)
 
     @model_validator(mode="after")
     def _where(self) -> InputMap:

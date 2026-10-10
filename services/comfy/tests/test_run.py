@@ -234,3 +234,21 @@ def test_switching_workflows_frees_the_last_ones_models(env, monkeypatch):
     up = c.post("/v1/uploads", files={"file": ("in.png", b"\x89PNG\r\n\x1a\n" + b"0" * 64, "image/png")}).json()
     run(c, {"workflow": "wan", "inputs": {"prompt": "moves", "image": up["value"]}})
     assert fake.freed == 1                                    # a different one: the old models go first
+
+
+def test_a_preset_drives_derived_sizes(tmp_path):
+    """A preset setting only megapixels sizes a width/height pack (the Turbo-style fast/draft presets)."""
+    d = tmp_path / "zimage"
+    d.mkdir()
+    (d / "workflow.json").write_text("{}")
+    (d / "workflow.toml").write_text(ZIT + '\n[presets.fast]\nmegapixels = 0.262144\n')
+    pack = load_pack(d)
+    schema = {"properties": {"prompt": {"type": "string"}, "width": {"type": "integer", "default": 1024},
+                             "height": {"type": "integer", "default": 1024}, "aspect": {"type": "string"},
+                             "megapixels": {"type": "number"}}, "required": ["prompt"]}
+    v = resolve(pack, schema, {"prompt": "x"}, preset="fast")
+    assert (v["width"], v["height"]) == (512, 512) and "megapixels" not in v
+    v = resolve(pack, schema, {"prompt": "x", "aspect": "16:9"}, preset="fast")      # the caller's aspect + the preset's size
+    assert v["width"] > v["height"] and abs(v["width"] * v["height"] - 262_144) < 25_000
+    v = resolve(pack, schema, {"prompt": "x"})                                      # no preset: the graph's own size
+    assert (v["width"], v["height"]) == (1024, 1024)

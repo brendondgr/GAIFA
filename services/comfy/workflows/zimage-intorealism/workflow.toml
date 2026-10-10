@@ -50,3 +50,9 @@ lora_strength = 0.4
 [presets.portrait]
 width = 832
 height = 1216
+
+[presets.fast]               # ~0.6 MP: quicker, smaller; small text can break (same names as the Qwen Turbo packs)
+megapixels = 0.6
+
+[presets.draft]              # ~0.35 MP: previews and lots of variations
+megapixels = 0.35

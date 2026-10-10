@@ -16,6 +16,13 @@ description: Which image or video workflow to use, good prompts, aspect ratios a
 
 **Remove background** (`comfy_remove_background`): a transparent PNG of the subject; a good step before turning an object into 3D or a sticker. `qwen21-turbo-remove-bg` (about 1 min) is the fast one; `qwen21-remove-bg` the full model (4–5 min).
 
+**Speed presets** (`preset` on `comfy_generate_image`, `comfy_edit_image` and `comfy_remove_background`; the Z-Image and Qwen 2.1 Turbo workflows have them, and a tool's description lists each workflow's presets):
+- No preset (the default): full size, about 1 MP. Use it unless the user asks for speed, and always when the image has small text (signs, labels, posters): small text breaks at smaller sizes.
+- `fast`: about 0.6 MP and roughly 2–3x quicker. Use it when the user says "quick", "fast", "rough", "try a few", "preview" or "just to see".
+- `draft`: about 0.35 MP and quicker still. Use it for "draft", "thumbnail", "tiny" or "lots of variations".
+- A preset makes a different, smaller picture, not a shrunk copy, so running a liked draft again at full size gives a new composition: say so if the user asks.
+- An upload or output the user attached shows as `output:<id>` in their message: pass it as `image`.
+
 **Video** (each run takes several minutes and a lot of memory; make one at a time):
 - `comfy_animate_image` (`wan21-i2v`): animate an existing image into a ~5 s 480p clip. The prompt describes the motion ("the fox turns its head and blinks"), not the scene.
 - `comfy_generate_video` (`wan21-t2v`): a ~5 s clip from text alone.

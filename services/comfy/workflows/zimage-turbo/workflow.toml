@@ -47,3 +47,9 @@ height = 832
 
 [set]
 "66.unet_name" = "z_image_turbo_fp8_e4m3fn.safetensors"   # the bf16 file this graph names isn't downloaded
+
+[presets.fast]               # ~0.6 MP: quicker, smaller; small text can break (same names as the Qwen Turbo packs)
+megapixels = 0.6
+
+[presets.draft]              # ~0.35 MP: previews and lots of variations
+megapixels = 0.35

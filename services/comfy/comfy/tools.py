@@ -1,8 +1,9 @@
 """Tools for the agent (plan 11.10), read by AIHub's tool catalog through `[agent] tools_source`.
 
 One tool per task that has a ready pack (`generate_image`, `animate_image`, …): its parameters are
-the task's shared inputs that those packs take, plus an optional `workflow` choosing among them;
-without it the task's default pack runs (else its only one). `list_workflows` and `run_workflow`
+the task's shared inputs that those packs take, plus an optional `workflow` choosing among them
+(without it the task's default pack runs, else its only one) and, when any of them has presets,
+an optional `preset` (`fast`, `draft`, … from the packs' `[presets.*]`). `list_workflows` and `run_workflow`
 reach any pack. A tool call becomes a run: `{"status": "running", "job_id": …}`, and the job's
 route (`GET /v1/jobs/{id}?wait=`) gives its outputs.
 """
@@ -18,7 +19,7 @@ CALL_OP = "POST /v1/tools/{name}/call"
 JOB = {"status": "GET /v1/jobs/{job_id}?wait=60", "cancel": "POST /v1/queue/{job_id}/cancel"}
 
 
-ASK = ("workflow", "aspect", "megapixels", "seconds")   # choices shown on the parameter card (plan 13.1)
+ASK = ("workflow", "preset", "aspect", "megapixels", "seconds")   # choices shown on the parameter card (plan 13.1)
 KIND = {"image": "image", "images": "image", "mask": "image", "video": "video"}
 EXAMPLES = {"generate_image": [{"prompt": "a red fox sitting in fresh snow, golden hour", "aspect": "16:9 (Widescreen)"}],
             "animate_image": [{"image": "output:<id of an image>", "prompt": "the fox turns its head and blinks"}],
@@ -70,8 +71,14 @@ def catalog(lib: Library, defaults: dict[str, str]) -> list[dict]:
         default = defaults.get(tid) or (packs[0].id if len(packs) == 1 else None)
         props["workflow"] = {"type": "string", "enum": sorted(p.id for p in packs),
                              "description": "Which workflow to use" + (f" (default: {default})" if default else "")}
+        presets = sorted({name for p in packs for name in p.manifest.presets})
+        if presets:
+            props["preset"] = {"type": "string", "enum": presets,
+                               "description": "A preset of the chosen workflow (its line below lists them): fast and draft "
+                                              "trade size and detail for speed. Leave it out for the full-quality default."}
         lines = [task.description, "Workflows:"] + [
             f"- {p.id}: {p.name}" + (f" — {p.manifest.description}" if p.manifest.description and p.manifest.description != p.name else "")
+            + (f" (presets: {', '.join(p.manifest.presets)})" if p.manifest.presets else "")
             + (" [default]" if p.id == default else "") for p in sorted(packs, key=lambda p: p.id != default)]
         lines.append("Returns a job; its outputs (files) come when it finishes.")
         req = [r for r in task.required if r in props]

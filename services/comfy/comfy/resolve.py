@@ -87,12 +87,14 @@ def resolve(pack: Pack, schema: dict, values: dict[str, Any] | None, preset: str
     props = schema.get("properties", {})
     errors = [f"{k}: not an input of {pack.id} (inputs: {', '.join(props)})" for k in values if k not in props]
     out: dict[str, Any] = {k: p["default"] for k, p in props.items() if "default" in p}
+    asked = dict(values)                          # what the caller or the preset set (derived inputs follow it)
     if preset:
         presets = pack.manifest.presets if pack.manifest else {}
         if preset not in presets:
             errors.append(f"preset {preset!r} doesn't exist (presets: {', '.join(presets) or 'none'})")
         else:
             out.update(presets[preset])
+            asked = {**presets[preset], **values}
     out.update({k: v for k, v in values.items() if k in props})
     for k in schema.get("required", []):
         if out.get(k) in (None, "", []):
@@ -104,7 +106,7 @@ def resolve(pack: Pack, schema: dict, values: dict[str, Any] | None, preset: str
         raise InputError("; ".join(errors), errors)
     if "seed" in props and (out.get("seed") is None or out.get("seed") == -1):
         out["seed"] = (rng or random).randint(0, SEED_MAX)
-    _derive(out, props, values, set(pack.manifest.inputs) if pack.manifest else set())
+    _derive(out, props, asked, set(pack.manifest.inputs) if pack.manifest else set())
     return out
 
 

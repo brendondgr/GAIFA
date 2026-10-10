@@ -25,12 +25,13 @@ It touches the comfy mod (architecture §11, [workflows.md](../workflows.md)), t
   - `[presets.fast]` and `[presets.draft]` on all three packs (t2i through the derived `megapixels`).
   *Done when:* `comfyui workflows check` reports the packs `ready`, and `test_packs.py::test_qwen21_turbo_packs` asserts both presets.
 
-- [ ] **U.2 Task tools take `preset`: `services/comfy/comfy/tools.py`, `api_run.py`.**
+- [x] **U.2 Task tools take `preset`: `services/comfy/comfy/tools.py`, `api_run.py`.**
   - `catalog()` adds `preset` (an enum of every preset among the task's ready packs) to each task tool, and each pack's line in the description lists its presets.
   - `call_tool` pops `preset` and passes it to `runner.submit`. An unknown preset for the picked pack is an `InputError` that names the presets it has.
   *Done when:* `tests/test_tools.py` covers the schema, a call with a preset, and an unknown preset.
+  - *As built:* the presets also went on `zimage-turbo` and `zimage-intorealism` (the text-to-image default), through `megapixels`. That found a bug: `resolve` ran the aspect/megapixels → width/height step only for the caller's values, so a preset that set `megapixels` did nothing on a width/height pack. It now follows the preset too (`test_run.py::test_a_preset_drives_derived_sizes`). `image-edit` and `remove-background` had no default pack, so a plain "edit this" needed a workflow named. Their defaults are now `qwen21-turbo-edit-multi` and `qwen21-turbo-remove-bg` (`PUT /v1/defaults`; runtime state in comfy.db).
 
-- [ ] **U.3 Plain-words requests: `services/comfy/skills/choosing-a-workflow/SKILL.md`.**
+- [x] **U.3 Plain-words requests: `services/comfy/skills/choosing-a-workflow/SKILL.md`.**
   - "quick", "fast", "rough", "preview" map to `fast`, "draft" or "thumbnail" to `draft`, and "final" or "high quality" to no preset. Small text needs no preset.
   *Done when:* a live chat turn ("a quick draft of …") shows an approval card with `preset: "fast"` or `"draft"` (U.6).
 

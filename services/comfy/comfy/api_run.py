@@ -138,10 +138,13 @@ async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
     task = next((t for t in lib.tasks.tasks.values() if t.tool == name), None)
     if task is None:
         raise HTTPException(404, f"no tool {name!r}")
+    preset = args.pop("preset", None)
     try:
         pack = pick(lib, task.id, args.pop("workflow", None), st.db.defaults())
     except ValueError as e:
         raise InputError(str(e)) from None
+    if preset and preset not in pack.manifest.presets:
+        raise InputError(f"{pack.id} has no preset {preset!r} (it has: {', '.join(pack.manifest.presets) or 'none'})")
     conv, _ = lib.analysed(pack)
     from .schema import input_schema
     sch = input_schema(pack, conv, lib.catalog, lib.tasks)
@@ -150,8 +153,8 @@ async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
     # A workflow that wants more reference images than the task tool offers (qwen21-edit-multi's
     # image_2): the main image stands in, so a plain edit still runs.
     filled = fill_references(sch.get("required", []), args)
-    r = await st.runner.submit(pack.id, {**{k: v for k, v in args.items() if k in takes}, **filled}, None, make_room)
-    out = {"status": "running", "job_id": r["id"], "workflow": pack.id}
+    r = await st.runner.submit(pack.id, {**{k: v for k, v in args.items() if k in takes}, **filled}, preset or None, make_room)
+    out = {"status": "running", "job_id": r["id"], "workflow": pack.id, **({"preset": preset} if preset else {})}
     if filled:
         out["filled"] = {k: "the main image" for k in filled}
     if ignored:

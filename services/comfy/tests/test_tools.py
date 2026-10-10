@@ -65,3 +65,21 @@ def test_missing_reference_images_reuse_the_main_one():
     assert fill_references(["image", "image_2", "prompt"], {"image": "output:abc", "prompt": "night"}) == {"image_2": "output:abc"}
     assert fill_references(["image", "image_2"], {"image": "a", "image_2": "b"}) == {}
     assert fill_references(["image_2"], {"prompt": "x"}) == {}
+
+
+def test_task_tools_take_presets(env):  # noqa: F811
+    c, fake, hub, s = env
+    before = names(c)["generate_image"]["function"]["parameters"]["properties"].get("preset", {}).get("enum", [])
+    assert "fast" not in before
+    toml = s.workflows / "zimage" / "workflow.toml"
+    toml.write_text(toml.read_text() + "\n[presets.fast]\nwidth = 512\nheight = 512\n")
+    time.sleep(0.05)
+    gi = names(c)["generate_image"]
+    assert gi["function"]["parameters"]["properties"]["preset"]["enum"] == sorted(before + ["fast"])
+    assert "fast)" in gi["function"]["description"] and "preset" in gi["ask"]
+    r = c.post("/v1/tools/generate_image/call", json={"arguments": {"prompt": "a cat", "preset": "fast"}}).json()
+    assert r["preset"] == "fast" and "ignored" not in r
+    job = c.get(f"/v1/jobs/{r['job_id']}", params={"wait": 10}).json()
+    assert job["state"] == "done" and job["inputs"]["width"] == 512 and job["inputs"]["height"] == 512
+    r = c.post("/v1/tools/generate_image/call", json={"arguments": {"prompt": "a cat", "preset": "huge"}})
+    assert r.status_code == 422 and "no preset 'huge'" in r.json()["detail"] and "fast" in r.json()["detail"]

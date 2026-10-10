@@ -34,6 +34,9 @@ description = "Pixel budget the input images are read at, as N×N (default 1024)
 [presets.fast]               # ~0.6 MP result, about a third of the time (measured: docs/comfy-transfer-report.md)
 resolution = 768
 
+[presets.draft]              # ~0.33 MP result: for previews only
+resolution = 576
+
 [outputs.image]
 node = "23"
 kind = "image"

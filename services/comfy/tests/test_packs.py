@@ -251,6 +251,6 @@ def test_qwen21_turbo_packs(lib, tmp_path, pid):
     assert by_type["AIHubTextEncodeQwenImage21"]["encode_negative"] is False   # encode once
     assert by_type["VAELoaderKJ"]["weight_dtype"] == "bf16"
     if pid == "qwen21-turbo-t2i":
-        assert not p.manifest.presets                                  # no fast preset: no inputs to shrink
+        assert p.manifest.presets == {"fast": {"megapixels": 0.6}, "draft": {"megapixels": 0.35}}
     else:
-        assert p.manifest.presets["fast"] == {"resolution": 768}
+        assert p.manifest.presets == {"fast": {"resolution": 768}, "draft": {"resolution": 576}}

@@ -25,6 +25,12 @@ field = "aspect_ratio"
 node = "7"
 field = "megapixels"
 
+[presets.fast]               # ~0.6 MP (e.g. 960x640): about 40% less time; small text can break (docs/comfy-transfer-report.md)
+megapixels = 0.6
+
+[presets.draft]              # ~0.35 MP (e.g. 736x480): about 60% less time; for previews only
+megapixels = 0.35
+
 [outputs.image]
 node = "16"
 kind = "image"

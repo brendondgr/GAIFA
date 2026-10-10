@@ -56,6 +56,7 @@ The existing apps come in with `git subtree add` (their history is kept), so mos
 | `test-plan.md` | The checks and edge cases for Phases 13–16, written before building them; results go in the overnight report |
 | `backend-plan.md` | The build plan: Phases 0–16 with steps, checks and deliverables; steps are ticked as they land |
 | `plans/comfy-qwen21-turbo.md` | Sub-plan: the Qwen-Image 2.1 Turbo packs (models, builder, packs, live runs, tests) |
+| `plans/chat-uploads-and-fast-presets.md` | Sub-plan: `fast`/`draft` presets the agent can use, and uploading images in Chat |
 | `design-brief-ui.md` | UI brief for Claude Design; §6 and §11.7 are the UI-facing API contract |
 | `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures |
 | `structure.md` | This file |

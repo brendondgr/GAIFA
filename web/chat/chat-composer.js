@@ -1,5 +1,6 @@
 // The composer (plan 14.1): a growing text box (Enter sends, Shift+Enter is a new line), attachment
-// chips from Outputs, the quick actions (registry: on 'composer'), tool-group toggles, Stop, and
+// chips from Outputs or from files uploaded here (the Upload button, dropping files on the box, or
+// pasting an image; each becomes an output in outputs/uploads/, plan chat-uploads U.5), the quick actions (registry: on 'composer'), tool-group toggles, Stop, and
 // slash commands (/compact, /clear, /model, /context and one per skill).
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, label11, COL } from './chat-ui.js';
@@ -19,6 +20,22 @@ export function slashMatches(draft, skills = []) {
   const q = m[1].toLowerCase();
   const all = [...COMMANDS, ...skills.map(s => ({ cmd: s.name, hint: s.description || `Use the ${s.name} skill`, arg: '<request>', skill: s }))];
   return all.filter(c => c.cmd.toLowerCase().startsWith(q)).slice(0, 8);
+}
+
+const MEDIA_EXT = /\.(png|jpe?g|webp|gif|bmp|avif|mp4|webm|mov|mkv|wav|mp3|flac|ogg|opus|m4a|aac)$/i;
+/** The files in a drop or paste (or a file picker) that can be uploaded: images, video and audio. */
+export function uploadable(list) {
+  return [...(list || [])].filter(f => f && (/^(image|video|audio)\//.test(f.type || '') || MEDIA_EXT.test(f.name || '')));
+}
+/** An uploaded output as an attachment chip. */
+export const toChip = o => ({ id: o.id, kind: o.kind, title: o.title, preview: o.preview || (o.kind === 'image' ? o.url : null) });
+/** Uploads each file: { chips } for the ones that worked, { errors } ("name: why") for the rest. */
+export async function uploadAll(api, files) {
+  const done = await Promise.allSettled(files.map(f => api.uploadOutput(f)));
+  return {
+    chips: done.filter(r => r.status === 'fulfilled').map(r => toChip(r.value)),
+    errors: done.flatMap((r, i) => r.status === 'rejected' ? [`${files[i].name || 'file'}: ${r.reason?.detail || r.reason?.message || 'upload failed'}`] : []),
+  };
 }
 
 function AttachPicker({ api, outputs, chosen, onToggle }) {
@@ -60,11 +77,23 @@ function ToolGroups({ index, settings, onChange }) {
 
 export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled }) {
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
-  const own = React.useRef(null), ref = inputRef || own;
+  const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null);
+  const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
+  const upload = async list => {
+    const files = uploadable(list);
+    if (!files.length) { if ([...(list || [])].length) setUpErr('Only images, video and audio can be uploaded.'); return; }
+    setUpErr(null); setUploading(n => n + files.length);
+    try {
+      const { chips, errors } = await uploadAll(api, files);
+      setAttachments(a => [...a, ...chips.filter(c => !a.some(x => x.id === c.id))]);
+      if (errors.length) setUpErr(errors.join(' · '));
+    } finally { setUploading(n => n - files.length); }
+  };
+  const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
   const matches = slashMatches(draft, skills);
   React.useLayoutEffect(() => { const el = ref.current; if (!el) return; el.style.height = ''; if (draft && el.scrollHeight > el.clientHeight) el.style.height = Math.min(el.scrollHeight + 2, 220) + 'px'; }, [draft]);
   React.useEffect(() => { setSel(0); }, [matches.length]);
-  const can = !disabled && (draft.trim() || attachments.length);
+  const can = !disabled && !uploading && (draft.trim() || attachments.length);
   const send = () => { if (can) onSend(draft, attachments); };
   const complete = c => { setDraft('/' + c.cmd + (c.arg ? ' ' : '')); ref.current?.focus(); };
   const onKey = e => {
@@ -84,15 +113,24 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
           style: { display: 'flex', alignItems: 'baseline', gap: 10, width: '100%', padding: '6px 9px', border: 0, borderRadius: 6, background: i === sel ? T.hov : 'transparent', color: T.tx, font: 'inherit', cursor: 'pointer', textAlign: 'left' } },
           h('span', { style: { fontFamily: MONO, fontSize: 12 } }, '/' + c.cmd, c.arg ? h('span', { style: { color: T.dim } }, ' ' + c.arg) : null),
           h('span', { style: { fontSize: 12, color: T.mut, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, c.skill ? 'skill · ' + c.hint : c.hint)))) : null,
-      h('div', { className: 'aichat-box', style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 8px 6px 10px', borderRadius: 10, border: '1px solid ' + T.bds, background: T.card } },
+      h('div', { className: 'aichat-box',
+        onDragOver: e => { if (hasFiles(e)) { e.preventDefault(); setOver(true); } }, onDragLeave: () => setOver(false),
+        onDrop: e => { if (!hasFiles(e)) return; e.preventDefault(); setOver(false); upload(e.dataTransfer.files); },
+        style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 8px 6px 10px', borderRadius: 10, border: `1px ${over ? 'dashed' : 'solid'} ${over ? T.cy : T.bds}`, background: over ? T.tcy : T.card } },
         attachments.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 5 } }, attachments.map(a => h('span', { key: a.id, style: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 4px 0 3px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd, fontSize: 11.5, maxWidth: 220 } },
           a.preview ? h('img', { src: a.preview, alt: '', style: { width: 18, height: 18, objectFit: 'cover', borderRadius: 3 } }) : h(Icon, { d: 'clip', size: 12 }),
           h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, (a.n ? `#${a.n} ` : '') + (a.title || a.id)),
           h('button', { type: 'button', 'aria-label': `Remove ${a.title || a.id}`, onClick: () => toggleAtt(a), style: { border: 0, background: 'none', padding: 2, color: T.mut, cursor: 'pointer', display: 'flex' } }, h(Icon, { d: 'x', size: 11 }))))) : null,
+        uploading ? h('span', { role: 'status', style: { fontSize: 11.5, color: T.mut } }, `Uploading ${uploading} file${uploading > 1 ? 's' : ''}…`) : null,
+        upErr ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, upErr) : null,
         h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => setDraft(e.target.value), onKeyDown: onKey, 'aria-label': 'Message',
+          onPaste: e => { const f = uploadable(e.clipboardData?.files); if (f.length) { e.preventDefault(); upload(f); } },
           placeholder: running ? 'Add a message (it’s read after the current step)…' : 'Message the agent, or / for commands',
           style: { width: '100%', minHeight: 22, maxHeight: 220, resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', minWidth: 0 } },
+          h('input', { ref: picker, type: 'file', multiple: true, accept: 'image/*,video/*,audio/*', hidden: true, 'aria-hidden': 'true',
+            onChange: e => { upload(e.target.files); e.target.value = ''; } }),
+          h(Btn, { kind: 'ghost', sm: true, icon: 'upload', title: 'Upload an image, video or audio file (or drop or paste it here)', disabled, onClick: () => picker.current?.click() }),
           h('span', { style: { position: 'relative' } },
             h(Btn, { kind: 'ghost', sm: true, icon: 'clip', title: 'Attach an output', onClick: () => setPop(pop === 'att' ? null : 'att') }),
             h(Popover, { open: pop === 'att', onClose: () => setPop(null), place: 'up-left', width: 340, label: 'Attach outputs' }, h(AttachPicker, { api, outputs, chosen: attachments, onToggle: toggleAtt }))),
@@ -105,5 +143,5 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
           h('span', { style: { flex: 1 } }),
           running ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: onStop, title: 'Stop the turn (and its running tool)' }) : null,
           h(Btn, { kind: 'pri', sm: true, icon: 'send', title: running ? 'Queue this message' : 'Send (Enter)', disabled: !can, onClick: send }))),
-      h('div', { style: { textAlign: 'center', fontSize: 11, color: T.dim, paddingTop: 5 } }, 'Enter sends · Shift+Enter new line · / commands')));
+      h('div', { style: { textAlign: 'center', fontSize: 11, color: T.dim, paddingTop: 5 } }, 'Enter sends · Shift+Enter new line · / commands · drop or paste images to upload')));
 }

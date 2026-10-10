@@ -41,7 +41,7 @@ It touches the comfy mod (architecture §11, [workflows.md](../workflows.md)), t
   - `web/api.js`: `uploadOutput(file)`. Docs: architecture §6 (hub routes), UI brief §6 (the method table), §4.7 (the `uploads` folder).
   *Done when:* `utils/tests/outputs/test_upload.py` (saved, indexed, sidecar title, the three errors), `api.test.mjs`, and the contract test pass.
 
-- [ ] **U.5 Chat composer: `web/chat/chat-composer.js`, `web/chat/chat.js`.**
+- [x] **U.5 Chat composer: `web/chat/chat-composer.js`, `web/chat/chat.js`.**
   - An "Upload" button (a file picker, several files allowed), dropping files on the composer, and pasting images. Each file uploads and is added as an attachment chip with its preview, and a failed upload shows the error.
   *Done when:* `chat.test.mjs` covers the upload helper, and in the browser an uploaded image appears as a chip and in the sent message.
 

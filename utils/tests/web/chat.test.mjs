@@ -224,3 +224,17 @@ test('mock tools: catalog, approvals and decisions', async () => {
   assert.equal((await m.callTool('comfy_generate_image', { prompt: 'x' }, { mode: 'auto' })).status, 'running');
   await assert.rejects(m.listTools({ names: 'nope' }), e => e.code === 'unknown_tool');
 });
+
+test('uploads from the composer: which files qualify, chips, and per-file errors', async () => {
+  const f = (name, type) => ({ name, type });
+  assert.deepEqual(composer.uploadable([f('a.png', 'image/png'), f('b.txt', 'text/plain'), f('c.MOV', ''), f('d.wav', 'audio/wav'), null]).map(x => x.name), ['a.png', 'c.MOV', 'd.wav']);
+  assert.deepEqual(composer.uploadable(undefined), []);
+  const api = { uploadOutput: async file => {
+    if (file.name === 'bad.png') throw Object.assign(new Error('x'), { detail: 'too large' });
+    return { id: 'o_' + file.name, kind: 'image', title: file.name, url: '/api/outputs/o/file', preview: null };
+  } };
+  const r = await composer.uploadAll(api, [f('cat.png', 'image/png'), f('bad.png', 'image/png')]);
+  assert.deepEqual(r.chips, [{ id: 'o_cat.png', kind: 'image', title: 'cat.png', preview: '/api/outputs/o/file' }]);
+  assert.deepEqual(r.errors, ['bad.png: too large']);
+  assert.deepEqual(composer.toChip({ id: 'o1', kind: 'audio', title: 't', url: '/u', preview: null }), { id: 'o1', kind: 'audio', title: 't', preview: null });
+});

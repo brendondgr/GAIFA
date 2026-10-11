@@ -46,6 +46,7 @@ name = "Z-Image Turbo"
 task = "text-to-image"               # from tasks.toml (§4); "custom" when none fits
 description = "Fast photoreal text to image"   # the agent reads this
 tags = ["photo", "fast"]
+# agent = false                      # keep it off the agent's tools (it still runs from the page and API)
 # memory_gb = 18                     # set only to override: each run measures its peak
 
 [inputs.prompt]                      # a shared name (§4) when one fits
@@ -79,6 +80,7 @@ height = 1216
 - **Types, defaults, ranges and choices come from ComfyUI's node list** and the graph's current values. An input only needs to state what differs.
 - **Input fields:** `node` or `title`, `field`, `label`, `description`, `type` (`string`, `integer`, `number`, `boolean`, `file`, `files`), `default`, `min`, `max`, `step`, `choices`, `multiline`, `required`, `hidden` (mapped, but not shown or offered to the agent), `also`, and `template`. A `template` applies to string inputs: a value the caller gives of up to 8 words, not naming `<image…>`, fills its `{}`. For example, the remove-background packs turn "the storefront" into their whole instruction; longer text and the graph's own default are used as they are.
 - **Node ids inside subgraphs** are `outer:inner`, for example `"12:5"`.
+- **`agent = false`** keeps a pack off the agent's tools (task tools, `list_workflows`, `run_workflow`); it stays on the page and the API. The Qwen-Image 2.1 base packs use it, so the agent always gets Turbo.
 - **Unknown keys are errors**, so a typo is reported rather than ignored.
 - **Saving the form on the review screen rewrites `workflow.toml` without comments.** To keep comments, use "Edit as TOML" or edit the file directly.
 
@@ -104,6 +106,7 @@ A pack's `task` says what it does. The agent gets **one tool per task** that has
 
 **Derived inputs.** You don't map these; the adapter turns them into fields the pack does map:
 - `aspect` + `megapixels` set `width` and `height`, in multiples of 16
+- `megapixels` alone sets `resolution`, a square working size (Qwen-Image 2.1's edit encoder): 1024·√MP, in multiples of 32 (1.0 MP = 1024×1024, as its size picker counts)
 - `seconds` sets `frames`, kept at 4k+1 when the graph's own frame count is (Wan)
 
 **File inputs** (`image`, `mask`, `video`) take any of these:

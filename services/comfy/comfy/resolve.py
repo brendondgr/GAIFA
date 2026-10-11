@@ -1,5 +1,5 @@
 """From a caller's inputs to a patched graph (plan 11.7): defaults, presets, validation, the
-derived inputs (aspect + megapixels → width/height, seconds → frames), random seeds, and setting
+derived inputs (aspect + megapixels → width/height, megapixels → a square resolution, seconds → frames), random seeds, and setting
 each value on its node field."""
 
 from __future__ import annotations
@@ -116,7 +116,8 @@ def resolve(pack: Pack, schema: dict, values: dict[str, Any] | None, preset: str
 
 
 def _derive(out: dict, props: dict, given: dict, mapped: set[str] = frozenset()) -> None:
-    """aspect + megapixels → width/height (multiples of 16), seconds → frames (kept 4k+1 when the
+    """aspect + megapixels → width/height (multiples of 16), megapixels alone → `resolution` (a square
+    working size, multiples of 32) for packs that map one, seconds → frames (kept 4k+1 when the
     workflow's own frame count is, as Wan's are). Only when the caller (or preset) asked, and only for
     names the pack doesn't map to a field itself (a resolution picker takes aspect + megapixels as they are)."""
     if "aspect" in mapped or "megapixels" in mapped:
@@ -131,6 +132,10 @@ def _derive(out: dict, props: dict, given: dict, mapped: set[str] = frozenset())
         mp = float(out.get("megapixels") or (w0 * h0) / 1e6)
         h = math.sqrt(mp * 1e6 * b / a)
         out["width"], out["height"] = _r16(h * a / b), _r16(h)
+    elif "resolution" in mapped and "width" not in mapped and given.get("megapixels"):
+        # Qwen-Image 2.1's encoder reads its images at about resolution × resolution (multiples of 32),
+        # and 1.0 MP = 1024 × 1024 as in its ResolutionSelector, so megapixels means the same in its packs.
+        out["resolution"] = max(32, int(round(1024 * math.sqrt(float(out["megapixels"])) / 32)) * 32)
     for k in ("aspect", "megapixels"):
         if k not in mapped:
             out.pop(k, None)

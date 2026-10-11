@@ -67,7 +67,7 @@ class Library:
         _, issues = self.analysed(p)
         m = p.manifest
         return {"id": p.id, "name": p.name, "task": p.task, "state": self.state(p, issues),
-                "description": m.description if m else "", "tags": m.tags if m else [],
+                "description": m.description if m else "", "tags": m.tags if m else [], "agent": m.agent if m else False,
                 "loose": p.dir is None, "preview": f"/v1/workflows/{p.id}/preview" if p.preview else None,
                 "issues": summary(issues)}
 

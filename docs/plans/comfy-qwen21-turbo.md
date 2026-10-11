@@ -52,6 +52,13 @@ It touches the comfy mod only (architecture §11, plan Phase 11; pack format in 
   *Done when:* the packs check `ready`, ComfyUI's editor exports exactly the new fixture graphs, and the tables are in [comfy-transfer-report.md](../comfy-transfer-report.md) ("Speed-ups").
   - *As built:* edit 191–220 s → 110 s (fast 40 s), remove-bg 118 s → 62 s (fast 29 s), text to image 49 s → 39 s (encode once + bf16 VAE; asked for afterwards); the base packs got the matmul fix too (edit 531 → 429 s, remove-bg 367 → 270 s).
 
+- [x] **T.7 Turbo only for the agent; megapixels on every Turbo pack (asked for 2026-10-11).**
+  - **Agent:** a manifest key `agent = false` keeps a pack off the agent's task tools, `list_workflows` and `run_workflow`; the page and API still run it. The three base packs set it, so the agent always gets Turbo; their weights stay on disk.
+  - **Megapixels:** text to image already maps `megapixels` (ResolutionSelector). For edit and remove-bg, `megapixels` is a derived input that sets the encoder's square working size: 1024·√MP in multiples of 32 (1.0 MP = 1024×1024, as the ResolutionSelector counts). The `fast`/`draft` presets become `megapixels = 0.56` / `0.32`, the same 768 / 576 working sizes as measured.
+  - **Agent guide:** `choosing-a-workflow` drops the base packs and says when to lower `megapixels` (prototyping) or leave it out (final).
+  *Done when:* the base packs check `ready` on the page with `agent: false`, `GET /v1/tools` offers only Turbo for Qwen with `megapixels` on all three tools, and a live remove-bg at 0.25 MP returns a 512×512 RGBA image.
+  - *As built:* `comfy/packs.py`, `tools.py`, `api_run.py`, `library.py` (`agent` in the workflow list), `schema.py` and `resolve.py`; tests in `test_tools.py`, `test_run.py`, `test_packs.py`. Live: remove-bg on the vase at 0.25 MP, 512×512 RGBA in 32.7 s (cold).
+
 Commits: one per step once its tests pass, `AIHub (comfy, Qwen 2.1 Turbo T.k): <sentence>`.
 
 ## Deliverables
@@ -63,5 +70,5 @@ Commits: one per step once its tests pass, `AIHub (comfy, Qwen 2.1 Turbo T.k): <
 | Builder | Editor + API graphs for the three Turbo workflows | `~/Models/ComfyUI-next/workflows/qwen-image-2.1/build_turbo_workflows.py` |
 | Packs | Text to image, edit with references, remove background | `services/comfy/workflows/qwen21-turbo-*/` |
 | AIHub nodes | Patch-embed matmul fix, `AIHubTextEncodeQwenImage21` | `services/comfy/nodes/aihub_nodes/` |
-| Agent guide | When to pick Turbo or base | `services/comfy/skills/choosing-a-workflow/SKILL.md` |
+| Agent guide | Turbo for Qwen; when to lower `megapixels` | `services/comfy/skills/choosing-a-workflow/SKILL.md` |
 | Tests | Turbo manifests load and map their task's inputs | `services/comfy/tests/test_packs.py` |

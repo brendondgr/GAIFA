@@ -1,5 +1,7 @@
 name = "Qwen-Image 2.1 — edit with references"
 task = "image-edit"
+description = "Qwen-Image 2.1 base model (40 steps, about 7 min). Kept for the page; the agent uses qwen21-turbo-edit-multi."
+agent = false             # base model: on the page only; the agent gets the Turbo pack
 # memory_gb = 39.5    # estimated from the model files; each run measures it, so set it only to override
 
 [inputs.prompt]          # TextEncodeQwenImage21 "Instruction (use <image1>, <image2>, …)"

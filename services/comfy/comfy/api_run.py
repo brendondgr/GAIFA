@@ -133,6 +133,9 @@ async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
     if name == "list_workflows":
         return {"workflows": list_workflows(lib)}
     if name == "run_workflow":
+        hidden = lib.packs.get(args.get("workflow", ""))
+        if hidden is not None and hidden.manifest and not hidden.manifest.agent:
+            raise InputError(f"{hidden.id} isn't offered to the agent")
         r = await st.runner.submit(args.get("workflow", ""), args.get("inputs") or {}, args.get("preset"), make_room)
         return {"status": "running", "job_id": r["id"], "workflow": r["workflow"]}
     task = next((t for t in lib.tasks.tasks.values() if t.tool == name), None)

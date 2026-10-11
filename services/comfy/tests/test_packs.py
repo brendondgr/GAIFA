@@ -15,6 +15,7 @@ from comfy.library import Library
 from comfy.nodes import NodeCatalog
 from comfy.packs import Packs, sync_comfy_view
 from comfy.server import create_app
+from comfy.schema import input_schema
 from comfy.tasks import Tasks
 
 FIX = Path(__file__).parent / "fixtures"
@@ -253,4 +254,15 @@ def test_qwen21_turbo_packs(lib, tmp_path, pid):
     if pid == "qwen21-turbo-t2i":
         assert p.manifest.presets == {"fast": {"megapixels": 0.6}, "draft": {"megapixels": 0.35}}
     else:
-        assert p.manifest.presets == {"fast": {"resolution": 768}, "draft": {"resolution": 576}}
+        assert p.manifest.presets == {"fast": {"megapixels": 0.56}, "draft": {"megapixels": 0.32}}   # 768 / 576 working size
+        props = input_schema(p, conv, lib.catalog, lib.tasks)["properties"]
+        assert {"megapixels", "resolution"} <= set(props)            # megapixels sets the working size
+
+
+@pytest.mark.parametrize("pid", ["qwen21-t2i", "qwen21-edit-multi", "qwen21-remove-bg"])
+def test_qwen21_base_packs_are_not_offered_to_the_agent(pid):
+    """The base model stays on the page; the agent uses the Turbo packs (asked for 2026-10-11)."""
+    import tomllib
+    from comfy.packs import Manifest
+    m = Manifest(**tomllib.loads((Path(__file__).parents[1] / "workflows" / pid / "workflow.toml").read_text()))
+    assert m.agent is False

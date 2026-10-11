@@ -92,3 +92,25 @@ def test_a_task_can_describe_a_shared_input_its_own_way():
     t = Tasks.load()
     assert "What to keep" in t.get("remove-background").notes["prompt"]
     assert t.get("text-to-image").notes == {} and t.inputs["prompt"]["description"] == "What to make, in plain words"
+
+
+def test_a_pack_can_be_kept_from_the_agent(env):  # noqa: F811
+    """`agent = false`: the page and API still run it; the task tools, list_workflows and run_workflow don't offer it."""
+    c, fake, hub, s = env
+    shutil.copytree(s.workflows / "zimage", s.workflows / "zimage-base")
+    toml = s.workflows / "zimage-base" / "workflow.toml"
+    toml.write_text("agent = false\n" + toml.read_text())
+    time.sleep(0.05)
+    assert names(c)["generate_image"]["function"]["parameters"]["properties"]["workflow"]["enum"] == ["zimage"]
+    assert "zimage-base" not in names(c)["run_workflow"]["function"]["parameters"]["properties"]["workflow"]["enum"]
+    assert [w["id"] for w in c.post("/v1/tools/list_workflows/call", json={"arguments": {}}).json()["workflows"]] == ["wan", "zimage"]
+    r = c.post("/v1/tools/generate_image/call", json={"arguments": {"prompt": "a cat", "workflow": "zimage-base"}})
+    assert r.status_code == 422 and "isn't a ready" in r.json()["detail"]
+    r = c.post("/v1/tools/run_workflow/call", json={"arguments": {"workflow": "zimage-base", "inputs": {"prompt": "x"}}})
+    assert r.status_code == 422 and "isn't offered to the agent" in r.json()["detail"]
+    r = c.post("/v1/tools/generate_image/call", json={"arguments": {"prompt": "a cat"}}).json()
+    assert r["workflow"] == "zimage"                          # the only pack the agent sees: no default needed
+    w = {x["id"]: x for x in c.get("/v1/workflows").json()["workflows"]}
+    assert w["zimage-base"]["agent"] is False and w["zimage"]["agent"] is True
+    r = c.post("/v1/run", json={"workflow": "zimage-base", "inputs": {"prompt": "on the page"}})
+    assert r.status_code == 202                               # the page and API still run it

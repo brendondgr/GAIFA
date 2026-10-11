@@ -79,6 +79,7 @@ class Manifest(_Strict):
     description: str = ""
     tags: list[str] = []
     memory_gb: float | None = Field(None, ge=0)
+    agent: bool = True                  # false: the page and API run it, the agent's tools don't offer it
     inputs: dict[str, InputMap] = {}
     outputs: dict[str, OutputMap] = {}
     presets: dict[str, dict[str, Any]] = {}

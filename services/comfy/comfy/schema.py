@@ -79,6 +79,10 @@ def input_schema(pack: Pack, conv: Converted | None, catalog: NodeCatalog, tasks
         props["aspect"] = {"type": "string", "title": "Aspect", "enum": a.get("choices") or ["1:1"], "description": a.get("description", "")}
         props["megapixels"] = {"type": "number", "title": "Megapixels", "minimum": 0.1, "maximum": 4, "default": 1.0,
                                "description": (tasks.inputs.get("megapixels") or {}).get("description", "")}
+    if "resolution" in names and not names & {"megapixels", "width"}:      # a square working size (Qwen-Image 2.1's encoder)
+        props["megapixels"] = {"type": "number", "title": "Megapixels", "minimum": 0.1, "maximum": 4,
+                               "description": "Result size in megapixels (1.0 = 1024×1024); sets the working size. "
+                                              "Smaller is faster and keeps less detail."}
     if "frames" in names and "seconds" not in names:
         props["seconds"] = {"type": "number", "title": "Seconds", "minimum": 0.5, "maximum": 30,
                             "description": (tasks.inputs.get("seconds") or {}).get("description", "")}

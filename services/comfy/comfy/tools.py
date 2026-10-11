@@ -4,7 +4,7 @@ One tool per task that has a ready pack (`generate_image`, `animate_image`, …)
 the task's shared inputs that those packs take, plus an optional `workflow` choosing among them
 (without it the task's default pack runs, else its only one) and, when any of them has presets,
 an optional `preset` (`fast`, `draft`, … from the packs' `[presets.*]`). `list_workflows` and `run_workflow`
-reach any pack. A tool call becomes a run: `{"status": "running", "job_id": …}`, and the job's
+reach any pack the agent may use (`agent = false` in a manifest hides one). A tool call becomes a run: `{"status": "running", "job_id": …}`, and the job's
 route (`GET /v1/jobs/{id}?wait=`) gives its outputs.
 """
 
@@ -39,8 +39,11 @@ def _fn(name: str, description: str, parameters: dict, job: bool = True, risk: s
 
 
 def ready_by_task(lib: Library) -> dict[str, list]:
+    """The ready packs the agent may use, by task."""
     out: dict[str, list] = {}
     for p in lib.packs.packs():
+        if p.manifest and not p.manifest.agent:
+            continue
         _, issues = lib.analysed(p)
         if lib.state(p, issues) == "ready":
             out.setdefault(p.task, []).append(p)

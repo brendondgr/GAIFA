@@ -268,3 +268,21 @@ def test_a_template_wraps_a_short_value(tmp_path):
     long = "Please remove the sky and the street but keep the whole shop front with its sign"
     assert resolve(pack, schema, {"prompt": long})["prompt"] == long                             # an instruction: as it is
     assert resolve(pack, schema, {"prompt": "Keep <image1>'s shop"})["prompt"] == "Keep <image1>'s shop"
+
+
+def test_megapixels_sets_a_square_resolution(tmp_path):
+    """Qwen-Image 2.1's edit encoder takes a working size N×N: megapixels sets it (1.0 MP = 1024×1024, multiples of 32)."""
+    d = tmp_path / "q"
+    d.mkdir()
+    (d / "workflow.json").write_text("{}")
+    (d / "workflow.toml").write_text('task = "image-edit"\n[inputs.prompt]\nnode = "13"\nfield = "prompt"\n'
+                                     '[inputs.resolution]\nnode = "13"\nfield = "resolution"\n'
+                                     '[presets.fast]\nmegapixels = 0.56\n[presets.draft]\nmegapixels = 0.32\n')
+    pack = load_pack(d)
+    schema = {"properties": {"prompt": {"type": "string"}, "resolution": {"type": "integer", "default": 1024},
+                             "megapixels": {"type": "number", "minimum": 0.1, "maximum": 4}}}
+    assert resolve(pack, schema, {"prompt": "x"}) == {"prompt": "x", "resolution": 1024}       # not asked: the graph's own
+    assert resolve(pack, schema, {"prompt": "x", "megapixels": 0.25})["resolution"] == 512
+    assert resolve(pack, schema, {"prompt": "x"}, preset="fast") == {"prompt": "x", "resolution": 768}
+    assert resolve(pack, schema, {"prompt": "x"}, preset="draft")["resolution"] == 576
+    assert resolve(pack, schema, {"prompt": "x", "megapixels": 2}, preset="fast")["resolution"] == 1440   # the caller wins

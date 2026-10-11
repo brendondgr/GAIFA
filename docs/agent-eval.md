@@ -5,7 +5,7 @@ Run on 6–7 October 2026. The full account, with every prompt, transcript notes
 ## How it was run
 
 - **Harness:** `services/agent/evals/` runs scripted conversations against the agent's HTTP API, answers its questions and parameter cards from each task's script, and grades outcomes: the right tool, the arguments it ran with, outputs exist, it asked when a choice was missing and didn't when everything was given, and it never named an output that doesn't exist.
-- **30 tasks in six groups:** single generations, chains, must ask, must not ask, refusals and safety, and context. Each task runs 3 times; **pass^3** counts a task only when all three runs pass.
+- **30 tasks in six groups** (32 since plan 17.10): single generations, chains, must ask, must not ask, refusals and safety, and context. Each task runs 3 times; **pass^3** counts a task only when all three runs pass.
 - **Dry runs:** generating tools made labelled stand-in outputs (`outputs/eval/`) instead of using the GPU, so 90 conversations per model fit in about 30 minutes. **Live runs** (`evals/live.py`) then made real outputs.
 - **Vision check** (`evals/vision.py`): both Gemma 4 31B (skynet) and Gemma 4 26B (local) read a test card correctly (shapes, colours, a number).
 
@@ -46,6 +46,18 @@ Run on 6–7 October 2026. The full account, with every prompt, transcript notes
 - **Compaction.** In a thread capped at 6k tokens, 5 clears and a model-written summary still answered a question about the first turn (`evals/compact_live.py`): pass.
 - **Sessions.** "LLM work", "3D work" and "Video work" were saved on the real mods, and switching between them peaked at 46 GB of a 118 GB limit; the 26B relaunched with its settings (`evals/sessions_live.py`).
 - **MCP.** Claude Code listed 41 AIHub tools and called two. Its `tts_speak` call became a denied approval, and nothing ran.
+
+**Image to 3D (plan 17.10, 2026-10-11).** Two cases joined the set, so it has 32 tasks:
+- `picture_object_to_3d`: a vase picture should go to TRELLIS.2.
+- `picture_character_to_3d`: a samurai picture should go to Hunyuan3D 2.1.
+
+`img_to_3d` and `one_shot_chain` now expect the generated picture itself to go to `make_3d`, rather than a description of it given to Cube3D.
+
+Dry runs with the 31B, 3 runs each, after the tool text was tightened:
+- Both picture cases: 2/3.
+- `one_shot_chain`: 2/3.
+
+The misses are the model describing the picture to Cube3D instead of passing it. Two misses are now fixed server-side and no longer fail: gen3d uses TRELLIS.2 when a picture comes without an engine, and accepts a bare output id.
 <!-- /RESULTS -->
 
 ## Gate

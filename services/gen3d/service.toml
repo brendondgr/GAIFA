@@ -3,7 +3,7 @@
 # variables (gen3d.env.example), with its own defaults.
 id = "gen3d"
 name = "3D Generate"
-description = "Text to 3D meshes, named parts and game rigs (Cube3D + CubePart)"
+description = "Text or a picture to 3D meshes, named parts and game rigs (Cube3D, CubePart, Hunyuan3D 2.1, TRELLIS.2, SAM 3D)"
 icon = "cube"
 version = "0.1.0"
 
@@ -66,7 +66,11 @@ hide = ["GET /", "GET /ui/*", "GET /v1/hub/*"]
 "GET /v1/jobs/{jid}/events" = "stream"
 
 [tools]
-make_3d = { op = "POST /v1/jobs", risk = "generate", ask = ["preset", "stages"], hide = ["chat_id"], job = true, job_status = "GET /v1/jobs/{jid}", job_cancel = "POST /v1/jobs/{jid}/cancel", description = """Make a 3D model (GLB) from a text description (Cube3D: text only, no image input; to follow an image, describe it in the prompt). Stages: shape, then optional parts (named parts), rig and a preview render. Presets: fast (~1 min), balanced, quality, lowpoly. `parent_id` continues from an earlier job's mesh.""", examples = [{ prompt = "a low-poly red fox sitting", stages = ["shape", "preview"], preset = "fast" }] }
+make_3d = { op = "POST /v1/jobs", risk = "generate", ask = ["engine", "preset", "stages"], hide = ["chat_id"], job = true, job_status = "GET /v1/jobs/{jid}", job_cancel = "POST /v1/jobs/{jid}/cancel", description = """Make an untextured 3D model (GLB), from text or from a picture.
+- From text: engine cube3d (the default) with `prompt`; optional named parts and a game rig. Presets: fast (~1 min), balanced, quality, lowpoly.
+- From a picture: pass `image` (output:<id> of an image) and always `engine`, chosen by what the picture shows: hunyuan21 for characters, cleanest surface (~1.5 min); trellis2 for detailed objects, most faithful (1.5–4 min; round objects take longer); sam3d_objects quickest (~1 min), rougher; sam3d_body for a person's body (no clothes) as a rigged mesh (~10 s). One object or person on a plain or transparent background works best: run remove_background first on a photo of a scene. Image engines use their fast preset unless you pass preset "base" (slower stock settings); trellis2 also has "draft" (~30–60 s, softer).
+- Fewer polygons: set target_faces in the engine's group, e.g. {"trellis2": {"target_faces": 50000}} (0 keeps the raw mesh, which can be millions of faces).
+Stages: shape (the mesh), then optional parts, rig, preview. `parent_id` continues from an earlier job's mesh.""", examples = [{ prompt = "a low-poly red fox sitting", stages = ["shape", "preview"], preset = "fast" }, { engine = "trellis2", image = "output:<id of a picture>", stages = ["shape", "preview"] }] }
 job_status = { op = "GET /v1/jobs/{jid}", description = "One job's state, stages, ETA and files" }
 list_jobs = { op = "GET /v1/jobs", description = "Recent jobs, newest first" }
 cancel_job = { op = "POST /v1/jobs/{jid}/cancel", description = "Cancel a queued or running job", confirm = true }

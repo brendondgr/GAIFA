@@ -966,8 +966,10 @@ Native API: `/v1/voices*`, `/v1/voices/design`, `/v1/speech`, `/v1/enhance`, `/v
 ### B4. 3D Generate (`gen3d`)
 
 - **Create**:
-  - prompt
-  - preset (Low-poly / Fast / Balanced / Quality)
+  - engine (a dropdown): Cube3D from text, or an image engine (Hunyuan3D 2.1, TRELLIS.2, SAM 3D Objects, SAM 3D Body; plan 17)
+  - for an image engine: the picture (Upload, which becomes an AIHub output, or Recent outputs), the engine's presets (Fast default, Base, TRELLIS.2 Draft) and every setting from `/v1/options` `engines`, face-budget shortcuts (Raw / 200k / 100k / 50k), its licence and where it runs
+  - prompt (Cube3D)
+  - preset (Low-poly / Fast / Balanced / Quality; Cube3D)
   - stage toggles (shape → parts → rig → preview)
   - part template (Chair, Character, Vehicle, Weapon, Creature)
   - face budgets
@@ -975,7 +977,8 @@ Native API: `/v1/voices*`, `/v1/voices/design`, `/v1/speech`, `/v1/enhance`, `/v
   - live ETA from `POST /v1/estimate`
   - or **upload a mesh** to run only parts/rig
 - **Jobs**: queue and history with per-stage progress over SSE (`/v1/jobs/{id}/events`), plus cancel, retry and delete. The job detail has:
-  - a `Viewer3D` with rig sliders
+  - the engine, preset, faces (and the raw mesh's), and the picture an image job started from
+  - a `Viewer3D` with rig sliders (the raw mesh is a second tab when a face budget reduced it)
   - the parts list with colors
   - follow-ups (split, rig, re-split, new seed)
   - zip download

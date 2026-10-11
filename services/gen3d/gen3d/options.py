@@ -77,14 +77,19 @@ class RigOptions(BaseModel):
 
 
 EngineId = Literal["cube3d", "hunyuan21", "trellis2", "sam3d_objects", "sam3d_body"]
+DEFAULT_IMAGE_ENGINE = "trellis2"
 IMAGE_REF = re.compile(r"^(output:[A-Za-z0-9_.:-]{1,120}|upload)$")
+BARE_OUTPUT = re.compile(r"^[0-9a-f]{12}$")              # the hub's output ids
 
 
 class JobRequest(BaseModel):
     prompt: str = Field("", max_length=1000, description="what to make (Cube3D's shape stage)")
-    engine: EngineId = Field("cube3d", description="what makes the mesh: cube3d from the prompt, or an image engine from `image`")
-    image: str | None = Field(None, description="the picture for an image engine: output:<id> (an AIHub output); "
-                                                "\"upload\" when it came with POST /v1/jobs/image")
+    engine: EngineId = Field("cube3d", description="what makes the mesh. cube3d: from `prompt`. With `image`, pick by what the "
+                                                   "picture shows: hunyuan21 for a character or creature, trellis2 for an object "
+                                                   "(the default with a picture), sam3d_objects for the quickest result, sam3d_body "
+                                                   "for a person's body as a rigged mesh")
+    image: str | None = Field(None, description="the picture for an image engine: output:<id> of an image (an AIHub output)",
+                              json_schema_extra={"format": "aihub-file", "x-kind": "image"})
     stages: list[Stage] = Field(default_factory=lambda: ["shape", "preview"])
     preset: str | None = Field(None, description="applied under explicit options: Cube3D lowpoly | fast | balanced | quality; "
                                                  "image engines fast (their default) | base, TRELLIS.2 also draft")
@@ -105,6 +110,16 @@ class JobRequest(BaseModel):
         if not v:
             raise ValueError("choose at least one stage")
         return [s for s in STAGE_ORDER if s in set(v)]  # dedupe + canonical order
+
+    @model_validator(mode="before")
+    @classmethod
+    def _engine_from_image(cls, raw):
+        """A picture without an engine: TRELLIS.2, the most faithful general one (lab, 2026-10-10)."""
+        if isinstance(raw, dict) and isinstance(raw.get("image"), str) and BARE_OUTPUT.match(raw["image"]):
+            raw = {**raw, "image": f"output:{raw['image']}"}          # an output id without its prefix
+        if isinstance(raw, dict) and raw.get("image") and not raw.get("engine"):
+            raw = {**raw, "engine": DEFAULT_IMAGE_ENGINE}
+        return raw
 
     @field_validator("image")
     @classmethod
@@ -155,7 +170,7 @@ PART_TEMPLATES: dict[str, list[str]] = {
 def apply_preset(raw: dict) -> dict:
     """Merge a preset under the explicit options in a raw request dict (explicit values win). An image
     engine without a preset gets its fast preset."""
-    engine = raw.get("engine") or "cube3d"
+    engine = raw.get("engine") or (DEFAULT_IMAGE_ENGINE if raw.get("image") else "cube3d")
     if engine in IMAGE_ENGINES:
         name = raw.get("preset") or DEFAULT_IMAGE_PRESET
         if name not in IMAGE_PRESETS[engine]:

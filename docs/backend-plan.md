@@ -1356,10 +1356,11 @@ Four image engines join Cube3D in the 3D Generate mod, all producing untextured 
   - Job cards show the input image next to the result; SAM 3D Body results get the rig viewer.
   *Done when:* in the browser, an image job runs from the page for each ready engine, and switching engines changes the settings shown.
   - *As built:* `ui/image.js` builds the engine's panel from `/v1/options` (presets, settings, face-budget shortcuts, licence, where it runs) with the shared `schemaForm`. The picture is an AIHub output: an upload goes through `POST /api/outputs/upload` first, so jobs always send `output:<id>`, and the job's title is that output's title. The engine is a dropdown (five labels don't fit a segmented control). An engine's first use starts with mesh + preview. The Jobs tab shows the engine, faces (and raw faces), the picture, and `mesh_raw.glb` as a second viewer tab. Checked in the browser: Hunyuan3D (82 s) and SAM 3D Body (19 s with ComfyUI's start) run from the page; TRELLIS.2 and SAM 3D Objects ran through the same `POST /v1/jobs` from the API. SAM 3D Body's armature isn't posed in the viewer (it shows the mesh).
-- [ ] **17.10 Agent and docs.**
+- [x] **17.10 Agent and docs.**
   - `service.toml` `make_3d`: `engine`, `image` and `preset` arguments, description naming when to pick which engine (characters: Hunyuan3D; detailed objects: TRELLIS.2; pose/body: SAM 3D Body; objects in a scene photo: SAM 3D Objects); `skills/making-3d/SKILL.md` gets the same guidance.
   - Docs: architecture §10 (gen3d row), `services/gen3d/README.md` (engines, presets, timings), `docs/structure.md` (new files), brief §5 (the page).
   *Done when:* the agent eval has a case that makes a mesh from an uploaded image with the right engine; the contract test passes.
+  - *As built:* the agent eval has two cases, `picture_object_to_3d` (TRELLIS.2) and `picture_character_to_3d` (Hunyuan3D), each 2/3 in dry runs with the 31B (docs/agent-eval.md). `make_3d` asks for `engine`, `preset` and `stages`, and its `image` is an AIHub file. gen3d also accepts a picture without an engine (TRELLIS.2) and a bare output id. The making-3d skill prefers an image engine when there is a picture.
 
 **Wire — Phase 17:** the 3D Generate page gains the engine picker, image input and per-engine settings; image jobs show progress, ETA and the 3D viewer like Cube3D jobs; Outputs lists their meshes.
 

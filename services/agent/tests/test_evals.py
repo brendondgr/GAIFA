@@ -30,6 +30,6 @@ async def test_harness_answers_and_grades(env):
     await h.close()
 
 
-def test_thirty_tasks_in_six_groups():
-    assert len(TASKS) == 30 and len({t.id for t in TASKS}) == 30
+def test_eval_tasks_in_six_groups():
+    assert len(TASKS) == 32 and len({t.id for t in TASKS}) == 32
     assert {t.group for t in TASKS} == {"single", "chain", "must-ask", "no-ask", "safety", "context"}

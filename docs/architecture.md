@@ -525,7 +525,7 @@ autostart = false
 | Mod | From | Port | Models | Databases | Changes inside the app |
 |---|---|---|---|---|---|
 | `tts` | `~/Projects/LocalTTS` | 5040 | `~/models/breeze-tts-2` → `data/models/tts/`; Kokoro and Whisper → `data/models/hf-cache` (copied); voices → `data/models/voices/` | — | status route, dated outputs + sidecars, `LOCALTTS_VOICES_DIR`, `save_dir` kept under outputs |
-| `gen3d` | `~/Projects/3DGenerate` | 5050 | `~/Models/3D/CubeArt/weights/*` → `data/models/3d/` | `gen3d.db` → `data/databases/` | `GEN3D_DB`, `GEN3D_OUTPUTS`, `GEN3D_WEIGHTS` (+ container mount), per-job folder column, `output.json`, status route |
+| `gen3d` | `~/Projects/3DGenerate` | 5050 | `~/Models/3D/CubeArt/weights/*` → `data/models/3d/` | `gen3d.db` → `data/databases/` | `GEN3D_DB`, `GEN3D_OUTPUTS`, `GEN3D_WEIGHTS` (+ container mount), per-job folder column, `output.json`, status route; image to 3D (plan 17): Hunyuan3D 2.1 and SAM 3D Objects in its own worker containers (one family at a time, memory acquired per engine), TRELLIS.2 and SAM 3D Body as `comfy` packs it runs through the hub |
 | `relay` | `~/Tools/DashLLM` | 4000 | — | `relay.db` (+ `-wal`, `-shm`) → `data/databases/` | status route (KPIs) |
 | `opencode` | DashLLM's `opencode.service` | 4096 | — | — | none: a manifest-only mod |
 | `lcpp` | `~/Models/LLMs` | 7710 | `models/*` → `data/models/llm/` | — (its JSON state stays in `services/lcpp/data/`) | `LCPP_MODELS_DIR`, catalog paths relative to it, downloads register in the hub, memory acquire, status route, `pidfd_open` fallback |

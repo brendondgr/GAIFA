@@ -6,6 +6,8 @@ A chat-style web UI and HTTP API for local 3D asset generation on **http://127.0
 - **CubePart** (Roblox): mesh → up to 8 separate, named part meshes
 - **Rig**: parts → a game-ready GLB with a motor joint and a telescoping slide per limb
 - **Preview**: a Blender 4-view render of the result
+- **From a picture** (plan 17): **Hunyuan3D 2.1** and **SAM 3D Objects** in gen3d's own worker,
+  **TRELLIS.2** and **SAM 3D Body** through AIHub's Images & Video mod (ComfyUI). See [Image to 3D](#image-to-3d).
 
 Jobs queue up and run one at a time on the GPU. Every job reports live progress, its place in
 the queue and **when it will be done**, and keeps its files on the server. It runs in the
@@ -218,6 +220,45 @@ Measured: a rigged 6-part character at 999 (shape) / 996 (parts) / 956 (rigged) 
 decimation itself takes 0.2–6 s. About 500 faces still reads well; around 250 shapes fall apart.
 Lowering `resolution_base` is not a substitute (it is a power of two: 1–2 would be a 2–4³ grid),
 but low values make decoding much faster: Cube3D at 5 still looks clean.
+
+## Image to 3D
+
+A job with `engine` set to an image engine makes its `shape` stage's mesh from one picture instead of a
+prompt; parts, rig and preview then work as for Cube3D. The picture is an AIHub output (`"image":
+"output:<id>"`, fetched from the hub) or a file sent to `POST /v1/jobs/image`. The job folder keeps it as
+`input.png`, plus the cut-out every engine reads, `input_rgba.png`: alpha from the picture, else
+everything that isn't near-white. A transparent or plain white background works best.
+
+| Engine | Best for | Fast preset (the default) | Base preset | Runs in |
+|---|---|---|---|---|
+| `hunyuan21` | characters: the cleanest, watertight surface | 30 steps + FlashVDM: ~85 s warm, 110 s cold | 50 steps: ~320 s | gen3d (`runtime/img3d`) |
+| `trellis2` | objects: the most faithful detail | shape 12 + refine 6: ~75 s character, ~235 s round object | 20 + 12 steps; `draft` = 512 only, ~30–55 s | comfy pack `trellis2-*` |
+| `sam3d_objects` | the quickest full shape, rougher | distilled: ~50 s warm (objects only: characters lose detail) | Meta's 25 + 25 steps | gen3d (`runtime/sam3do`) |
+| `sam3d_body` | a person's body (no clothes) as a rigged mesh | ~10 s | + hand refinement | comfy pack `sam3d-body` |
+
+TRELLIS.2's time follows the object's surface area: a round vase has 3x the tokens of a thin character,
+and its refine stage costs ~5x per step (`runtime/lab/RESULTS.md` §5).
+
+**Fewer polygons:** `target_faces` in the engine's options (0 = the raw mesh, which is the default) writes
+the reduced mesh as `mesh.glb` and keeps the raw one as `mesh_raw.glb`. Hunyuan3D and SAM 3D Objects
+use quadric decimation (fast-simplification, < 1 s; 50k faces keeps the shape). TRELLIS.2 uses its
+own remesh (512) + decimate (10–24 s, clean down to 50k); its raw mesh is too broken for a decimator
+alone. SAM 3D Body's mesh is fixed (36,874 faces, rigged).
+
+```bash
+# a picture already in AIHub's outputs, the fast preset, 50k faces
+curl -s localhost:5050/v1/jobs -H 'content-type: application/json' \
+  -d '{"engine": "trellis2", "image": "output:<id>", "trellis2": {"target_faces": 50000}}'
+# a picture from disk
+curl -s localhost:5050/v1/jobs/image -F image=@vase.png -F 'job={"engine": "hunyuan21", "preset": "base"}'
+```
+
+`GET /v1/options` lists every engine with its presets and settings (`engines`). The local engines run
+one container at a time with Cube3D's (`gen3d-worker-<family>-…`; switching stops the other) and ask
+AIHub for their memory first (Hunyuan3D 14 GB, SAM 3D Objects 22 GB). TRELLIS.2 and SAM 3D Body stop
+gen3d's worker, then run their pack in the comfy mod through the hub (`gen3d/comfy_engine.py`); comfy's
+copies of the meshes go to the hub's trash, so each job shows once on the Outputs page. The engines
+were measured on this machine first: `runtime/lab/` (gitignored; `RESULTS.md`, `report/`).
 
 ## How it works
 

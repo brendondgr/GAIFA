@@ -91,3 +91,9 @@ def test_catalogue_lists_engines_with_presets_and_settings():
     assert f["target_faces"]["default"] == 0 and 50_000 in f["target_faces"]["shortcuts"]
     assert "target_faces" not in {x["key"] for x in c["sam3d_body"]["fields"]}   # a fixed rigged mesh
     assert all(e["license"] for e in c.values())
+
+
+def test_a_picture_without_an_engine_uses_trellis2():
+    r = parse_request({"image": "output:o"})
+    assert r.engine == "trellis2" and r.preset == "fast"
+    assert parse_request({"engine": "hunyuan21", "image": "15c9f40a9a36"}).image == "output:15c9f40a9a36"   # a bare output id

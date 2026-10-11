@@ -87,3 +87,16 @@ def test_switching_engines_stops_the_other_worker(c):
     assert pool.workers["img3d"].up
     j2 = wait(c, c.post("/v1/jobs", json={"prompt": "fox", "stages": ["shape"]}).json()["id"])
     assert j2["status"] == "done" and pool.workers["cube"].up and not pool.workers["img3d"].up
+
+
+@pytest.mark.parametrize("engine", ["trellis2", "sam3d_body"])
+def test_delegated_engine_end_to_end(c, engine):
+    pool = app.state.runner.worker
+    wait(c, c.post("/v1/jobs", json={"prompt": "fox", "stages": ["shape"]}).json()["id"])
+    assert pool.up                                                 # a local worker holds memory...
+    r = c.post("/v1/jobs/image", files={"image": ("hero.png", png(), "image/png")},
+               data={"job": json.dumps({"engine": engine, "stages": ["shape", "preview"]})})
+    done = wait(c, r.json()["id"])
+    assert done["status"] == "done", done
+    assert not pool.up                                             # ...and is stopped before comfy runs
+    assert {"mesh.glb", "preview.png"} <= set(done["files"]) and done["result"]["shape"]["engine"] == engine

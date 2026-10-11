@@ -35,6 +35,8 @@ class Runner:
         self.store = store
         self.worker = worker                # a WorkerPool: one container per engine family, one at a time
         self.comfy = comfy                  # the delegated engines' runner (comfy_engine.ComfyEngine), or None
+        if comfy is not None:
+            comfy.reduce = self._reduce
         self.previewer = previewer          # async (job_dir, glb, png) -> None
         self.events = events
         self.eta = Estimator(store, scale=eta_scale)
@@ -228,6 +230,11 @@ class Runner:
         self.store.update_job(jid, result=res)
         self._set_stage(jid, stage, state="done", finished=time.time(), seconds=round(time.time() - started, 1),
                         sub=None, step=None, total=None, publish=True)
+
+    async def _reduce(self, mesh: Path, target: int, jdir: Path, on_event) -> dict:
+        """Reduce a delegated engine's mesh in the img3d worker (fast-simplification), for TRELLIS.2's draft."""
+        task = {"stage": "reduce", "family": "img3d", "mesh": str(mesh), "target": target, "job_dir": str(jdir)}
+        return await self.worker.run(task, on_event)
 
     async def delegate(self, req: JobRequest, jdir: Path, inputs: dict, on_event, cancel_check) -> dict:
         """TRELLIS.2 and SAM 3D Body: a run of their comfy pack through the hub (gen3d/comfy_engine.py)."""

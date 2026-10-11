@@ -68,3 +68,24 @@ def boxes_glb(boxes: list[dict]) -> bytes:
     total = 12 + 8 + len(js) + 8 + len(blob)
     return (struct.pack("<III", 0x46546C67, 2, total) + struct.pack("<II", len(js), 0x4E4F534A) + js
             + struct.pack("<II", len(blob), 0x004E4942) + blob)
+
+
+def count_faces(path) -> int | None:
+    """Triangles in a GLB, from its JSON chunk (indices / 3, or positions / 3 without indices)."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(20)
+            if head[:4] != b"glTF":
+                return None
+            n = struct.unpack("<I", head[12:16])[0]
+            doc = json.loads(f.read(n))
+    except (OSError, ValueError, struct.error):
+        return None
+    acc, total = doc.get("accessors") or [], 0
+    for mesh in doc.get("meshes") or []:
+        for prim in mesh.get("primitives") or []:
+            if prim.get("mode", 4) != 4:
+                continue
+            i = prim.get("indices")
+            total += (acc[i]["count"] if i is not None else acc[prim["attributes"]["POSITION"]]["count"]) // 3
+    return total

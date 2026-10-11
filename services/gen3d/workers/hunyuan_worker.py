@@ -29,7 +29,22 @@ def load(models: list[str]) -> list[str]:
     return ["hunyuan21"]
 
 
+def reduce(task: dict) -> tuple[dict, list[str]]:
+    """A mesh from elsewhere (TRELLIS.2's draft) reduced to `target` faces: fast-simplification only."""
+    import trimesh
+    subs = Subs()
+    subs.next("reduce")
+    mesh = trimesh.load(task["mesh"], force="mesh")
+    raw = len(mesh.faces)
+    mesh = reduce_mesh(mesh, task["target"])
+    mesh.export(Path(task["job_dir"]) / "mesh.glb")
+    subs.done()
+    return {"mesh": "mesh.glb", "raw_faces": raw, "faces": len(mesh.faces)}, ["hunyuan21"] if PIPE else []
+
+
 def run(task: dict) -> tuple[dict, list[str]]:
+    if task.get("stage") == "reduce":
+        return reduce(task)
     import torch
     from PIL import Image
     from hy3dshape.postprocessors import DegenerateFaceRemover, FloaterRemover

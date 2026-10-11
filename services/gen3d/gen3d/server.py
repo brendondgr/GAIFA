@@ -46,7 +46,13 @@ async def lifespan(app: FastAPI):
     store = Store()
     worker, previewer, scale = _make_worker()
     events = Broadcaster()
-    runner = Runner(store, worker, previewer, events, eta_scale=scale)
+    if settings.fake_worker:
+        from .worker_fake import FakeComfyEngine
+        comfy = FakeComfyEngine()
+    else:
+        from .comfy_engine import from_env
+        comfy = from_env()                  # TRELLIS.2 and SAM 3D Body: through the hub to the comfy mod
+    runner = Runner(store, worker, previewer, events, eta_scale=scale, comfy=comfy)
     app.state.store, app.state.runner, app.state.events = store, runner, events
     runner.start()
     if settings.preload:

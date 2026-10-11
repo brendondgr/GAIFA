@@ -164,3 +164,28 @@ async def fake_preview(jdir: Path, glb: Path, png: Path) -> None:
         shutil.copy(sm["preview"], png)
     else:
         png.write_bytes(_png(64, 64))
+
+
+class FakeComfyEngine:
+    """The delegated engines without AIHub: the same events and files, a box for a mesh."""
+
+    def __init__(self) -> None:
+        self.reduce = None
+        self._cancel = False
+
+    async def run(self, req: JobRequest, jdir: Path, inputs: dict, on_event, cancel_check) -> dict:
+        self._cancel = False
+        for sub, _feat, default, total in substages(req, "shape", set()):
+            t0 = time.time()
+            on_event({"event": "sub", "sub": sub, "total": total})
+            for i in range(1, 11):
+                await asyncio.sleep(default / SPEED / 10)
+                if cancel_check() or self._cancel:
+                    raise RuntimeError("canceled")
+                on_event({"event": "progress", "step": i * 10, "total": 100})
+            on_event({"event": "sub_done", "sub": sub, "seconds": time.time() - t0})
+        (jdir / "mesh.glb").write_bytes(boxes_glb([{"name": "mesh", "center": (0, 0.5, 0), "size": (0.6, 1.0, 0.6)}]))
+        return {"mesh": "mesh.glb", "faces": 12, "engine": req.engine, "comfy": {"workflow": "fake"}, "fake": True}
+
+    async def cancel(self) -> None:
+        self._cancel = True

@@ -20,6 +20,19 @@ class ImageError(ValueError):
     pass
 
 
+async def output_title(ref: str, hub_url: str | None = None) -> str | None:
+    """`output:<id>` → the output's title (for the job's title), or None."""
+    hub = (hub_url or os.environ.get("AIHUB_URL") or "").rstrip("/")
+    if not hub:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(f"{hub}/api/outputs/{ref.split(':', 1)[1]}")
+        return r.json().get("title") if r.status_code == 200 else None
+    except (httpx.HTTPError, ValueError):
+        return None
+
+
 async def fetch_output(ref: str, hub_url: str | None = None, timeout: float = 60) -> bytes:
     """`output:<id>` → the output's main file, from the hub (`GET /api/outputs/<id>/file`)."""
     hub = (hub_url or os.environ.get("AIHUB_URL") or "").rstrip("/")

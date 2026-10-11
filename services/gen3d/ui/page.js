@@ -4,6 +4,7 @@
 import { chartCard, chart, charts, rh } from '/mod-charts.js';
 import { requireRunning, callRoom, segmented, header, panel, columns, stat, store, fmtSecs, fmtAgo, MONO } from '/mod-kit.js';
 import { mountViewer } from '/viewer3d.js';
+import { ENGINE_OPTIONS, imagePanel } from './image.js';
 
 const STAGES = ['shape', 'parts', 'rig', 'preview'];
 const STAGE_LABEL = { shape: 'Shape', parts: 'Parts', rig: 'Rig', preview: 'Preview' };
@@ -44,8 +45,13 @@ function createTab(el, ctx, cleanups) {
   const { ui } = ctx, h = ui.h;
   const field = (...a) => { const f = ui.field(...a); f.style.flex = '1 1 160px'; return f; };
   const saved = store.get('gen3d.create', {});
-  const st = { preset: saved.preset || 'lowpoly', stages: saved.stages || ['shape', 'parts', 'rig', 'preview'], template: saved.template || 'Character' };
-  let opts = null, templates = {};
+  const st = { preset: saved.preset || 'lowpoly', stages: saved.stages || ['shape', 'parts', 'rig', 'preview'], template: saved.template || 'Character',
+    engine: saved.engine || 'cube3d', images: saved.images || {} };
+  let opts = null, templates = {}, img = null;
+  const engine = ui.select(ENGINE_OPTIONS.map(o => ({ value: o.value, label: o.pick })), { onchange: () => { st.engine = engine.value; renderEngine(); changed(); } });
+  engine.value = st.engine;
+  engine.setAttribute('aria-label', 'Engine');
+  const imgBox = h('div');
 
   const prompt = ui.textarea({ rows: 3, placeholder: 'e.g. low-poly cartoon fox sitting', value: saved.prompt || '' });
   prompt.setAttribute('aria-label', 'Prompt');
@@ -78,8 +84,14 @@ function createTab(el, ctx, cleanups) {
   }
 
   function body() {
-    const b = { prompt: prompt.value.trim(), stages: st.stages, preset: st.preset, chat_id: 'new' };
     const n = i => (i.value === '' ? undefined : Number(i.value));
+    if (img) {
+      const b = { ...img.body(), stages: st.stages, chat_id: 'new' };
+      if (st.stages.includes('parts')) b.parts = { parts: parts.value.split(',').map(x => x.trim()).filter(Boolean) };
+      if (n(fRig) !== undefined) b.rig = { target_faces: n(fRig) };
+      return b;
+    }
+    const b = { prompt: prompt.value.trim(), stages: st.stages, preset: st.preset, chat_id: 'new' };
     b.shape = { target_faces: n(fShape), seed: n(seed) };
     b.parts = { parts: parts.value.split(',').map(x => x.trim()).filter(Boolean), target_faces: n(fParts), seed: n(seed) };
     b.rig = { target_faces: n(fRig) };
@@ -89,7 +101,9 @@ function createTab(el, ctx, cleanups) {
 
   let etaTimer = 0;
   function changed() {
-    store.set('gen3d.create', { preset: st.preset, stages: st.stages, template: st.template, prompt: prompt.value, parts: parts.value });
+    if (img) st.images[st.engine] = img.state();
+    store.set('gen3d.create', { preset: st.preset, stages: st.stages, template: st.template, prompt: prompt.value, parts: parts.value,
+      engine: st.engine, images: st.images });
     clearTimeout(etaTimer);
     etaTimer = setTimeout(estimate, 350);
   }
@@ -98,7 +112,8 @@ function createTab(el, ctx, cleanups) {
 
   async function estimate() {
     const b = body();
-    if (st.stages.includes('shape') && !b.prompt) { eta.replaceChildren(ui.text('Describe what to make.', { muted: true, small: true })); return; }
+    if (img && !b.image) b.image = 'upload';                  // the time doesn't depend on which picture
+    if (!img && st.stages.includes('shape') && !b.prompt) { eta.replaceChildren(ui.text('Describe what to make.', { muted: true, small: true })); return; }
     try {
       const r = (await ctx.call('POST', '/v1/estimate', { json: b })).json;
       eta.replaceChildren(stat('ETA', fmtSecs(r.eta_s)), stat('Its own time', fmtSecs(r.own_s)), stat('Queue wait', fmtSecs(r.wait_s)),
@@ -112,7 +127,8 @@ function createTab(el, ctx, cleanups) {
 
   async function go() {
     const b = body();
-    if (st.stages.includes('shape') && !b.prompt) return ctx.toast('Describe what to make first', 'info');
+    if (img && st.stages.includes('shape') && !b.image) return ctx.toast('Choose a picture first: upload one or pick a recent output', 'info');
+    if (!img && st.stages.includes('shape') && !b.prompt) return ctx.toast('Describe what to make first', 'info');
     if (st.stages.includes('parts') && !b.parts.parts.length) return ctx.toast('Name at least one part, or untick Parts', 'info');
     submit.disabled = true; submit.textContent = 'Queueing…';
     try {
@@ -136,14 +152,32 @@ function createTab(el, ctx, cleanups) {
     } catch (e) { if (!e.cancelled) ctx.toast(errText(e), 'error'); } finally { upBtn.disabled = false; }
   }
 
+  const cubeOnly = h('div', { style: 'display:flex;flex-direction:column;gap:10px' },
+    h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, preset, presetNote), prompt);
+  const faceRow = h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;margin-top:8px' }, field('Shape faces', fShape), field('Parts faces (all together)', fParts), field('Rigged asset faces', fRig), field('Seed', seed));
+  function renderEngine() {
+    const e = opts?.engines?.find(x => x.id === st.engine);
+    const isImage = st.engine !== 'cube3d';
+    cubeOnly.style.display = isImage ? 'none' : 'flex';
+    imgBox.style.display = isImage ? 'block' : 'none';
+    for (const i of [fShape, seed]) i.parentElement.style.display = isImage ? 'none' : '';
+    stageBoxes[0].lab.lastChild.textContent = isImage ? 'Mesh from the picture' : 'Shape';
+    if (isImage && e && !st.images[st.engine]) {             // first use of an engine: the mesh and its preview
+      st.stages = ['shape', 'preview'];
+      stageBoxes.forEach(x => { x.cb.checked = st.stages.includes(x.s); });
+      partsRow.style.display = 'none';
+    }
+    img = isImage && e ? imagePanel(ctx, e, st.images[st.engine] || {}, changed) : null;
+    imgBox.replaceChildren(...(img ? [img.el] : isImage ? [ui.text('Loading the engines…', { muted: true, small: true })] : []));
+  }
   const form = panel(
-    header('Make a 3D asset', preset),
-    presetNote,
-    prompt,
+    header('Make a 3D asset'),
+    h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, h('span', { style: 'font-size:12px;color:var(--mut,#8A94A6)' }, 'Engine'), engine),
+    cubeOnly,
+    imgBox,
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, h('span', { style: 'font-size:12px;color:var(--mut,#8A94A6);margin-right:4px' }, 'Stages'), stageBoxes.map(x => x.lab)),
     partsRow,
-    h('details', {}, h('summary', { style: 'cursor:pointer;font-size:12px;color:var(--mut,#8A94A6)' }, 'Face budgets and seed'),
-      h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;margin-top:8px' }, field('Shape faces', fShape), field('Parts faces (all together)', fParts), field('Rigged asset faces', fRig), field('Seed', seed))),
+    h('details', {}, h('summary', { style: 'cursor:pointer;font-size:12px;color:var(--mut,#8A94A6)' }, 'Face budgets and seed'), faceRow),
     eta,
     h('div', { style: 'display:flex;gap:8px;justify-content:flex-end' }, submit));
   const up = panel(header('Or start from a mesh'), ui.text('Upload a .glb, .obj, .ply or .stl to split it into parts and rig it (the shape stage is skipped).', { muted: true, small: true }),
@@ -160,13 +194,14 @@ function createTab(el, ctx, cleanups) {
   cleanups.push(grid.cleanup);
   el.append(grid);
   partsRow.style.display = st.stages.includes('parts') ? 'flex' : 'none';
+  renderEngine();
 
   ctx.call('GET', '/v1/options').then(r => {
     opts = r.json; templates = opts.part_templates || {};
     template.replaceChildren(...Object.keys(templates).map(k => h('option', { value: k }, k)), h('option', { value: '' }, 'Custom'));
     template.value = templates[st.template] ? st.template : '';
     if (!parts.value && templates[st.template]) parts.value = templates[st.template].join(', ');
-    presetHelp(); estimate();
+    presetHelp(); renderEngine(); estimate();
   }).catch(e => ctx.toast(errText(e), 'error'));
 }
 
@@ -237,13 +272,20 @@ function jobsTab(el, ctx, cleanups) {
       header(j.title || j.id, ui.badge(j.status, TONE[j.status])),
       h('div', { style: 'display:flex;gap:16px;flex-wrap:wrap' }, stat('Job', j.id), stat('Started', j.started ? new Date(j.started * 1000).toLocaleString() : '—'),
         stat('Took', j.started && j.finished ? fmtSecs(j.finished - j.started) : j.eta ? `${fmtSecs(j.eta.eta_s)} left` : '—'),
-        stat('Preset', j.request?.preset || 'custom')),
+        stat('Engine', ENGINE_OPTIONS.find(o => o.value === (j.request?.engine || 'cube3d'))?.label || j.request?.engine),
+        stat('Preset', j.request?.preset || 'custom'),
+        j.result?.shape?.faces != null ? stat('Faces', j.result.shape.faces.toLocaleString() + (j.result.shape.raw_faces && j.result.shape.raw ? ` (raw ${j.result.shape.raw_faces.toLocaleString()})` : '')) : null),
       j.error ? ui.badge(j.error, 'red') : null,
       actions(j));
     gantt = ganttPanel(j);
     const view = h('div');
     const out = [head, gantt.el];
-    const glbs = ['rigged.glb', 'parts.glb', 'mesh.glb', ...(j.input_mesh ? [j.input_mesh] : [])].filter(f => (j.files || []).includes(f));
+    const glbs = ['rigged.glb', 'parts.glb', 'mesh.glb', 'mesh_raw.glb', ...(j.input_mesh ? [j.input_mesh] : [])].filter(f => (j.files || []).includes(f));
+    if ((j.files || []).includes('input.png')) {
+      const pic = h('img', { alt: 'The picture this mesh was made from', style: 'max-width:100%;max-height:220px;object-fit:contain;border-radius:8px;background:var(--inset,#131926)' });
+      ctx.call('GET', `/v1/jobs/${j.id}/files/input.png`).then(r => { pic.src = r.url; cleanups.push(() => URL.revokeObjectURL(r.url)); }).catch(() => {});
+      out.push(panel(header('Picture'), pic));
+    }
     if (glbs.length) {
       out.push(panel(header('Viewer'), view));
       mountViewer(view, {

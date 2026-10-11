@@ -21,7 +21,7 @@ from . import __version__
 from .config import settings
 from .engines import ENGINES
 from .events import Broadcaster
-from .images import MAX_BYTES as MAX_IMAGE, ImageError, fetch_output, prepare as prepare_image
+from .images import MAX_BYTES as MAX_IMAGE, ImageError, fetch_output, output_title, prepare as prepare_image
 from .options import PRESETS, JobRequest, catalogue, parse_request
 from .queue import Runner
 from .store import TERMINAL, Store, job_folder, new_id
@@ -240,6 +240,7 @@ async def create_job(request: Request, body: JobRequest):
             image = await fetch_output(req.image)
         except ImageError as exc:
             raise HTTPException(422, str(exc)) from exc
+        return _queue(request, raw, image=image, image_name=await output_title(req.image))
     return _queue(request, raw, image=image)
 
 

@@ -348,6 +348,32 @@
       },
       "tags": []
     },
+    "dino-v3-vit-l": {
+      "added": "2026-10-11T13:06:52-04:00",
+      "files": [
+        {
+          "path": "comfyui/clip_vision/dino_v3_vit_l.safetensors",
+          "role": "weights",
+          "sha256": "5cb785e458de7c460579082418af81f5c62380c181599344bdc60898c63468ee",
+          "size_bytes": 1212559776,
+          "verified_at": "2026-10-11T13:07:19-04:00"
+        }
+      ],
+      "format": "safetensors",
+      "kind": "vision",
+      "name": "DINOv3 ViT-L",
+      "notes": "TRELLIS.2's image conditioning (Comfy-Org repack; Meta's own repo is gated). Licence: DINOv3 Licence.",
+      "path": "comfyui/clip_vision/dino_v3_vit_l.safetensors",
+      "services": [
+        "comfy"
+      ],
+      "source": {
+        "repo": "Comfy-Org/TRELLIS.2",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
     "face-yolov9c": {
       "added": "2026-10-06T14:02:19-04:00",
       "files": [
@@ -409,6 +435,74 @@
         "vision",
         "speculative"
       ]
+    },
+    "hunyuan3d-2.1": {
+      "added": "2026-10-11T13:06:52-04:00",
+      "files": [
+        {
+          "path": "3d/Hunyuan3D-2.1/hunyuan3d-dit-v2-1/model.fp16.ckpt",
+          "role": "weights",
+          "sha256": "6b519fc7242f78e9b5f47ea4d55668fe3d944a2d27332f4ca68d29a6ff603f5e",
+          "size_bytes": 7366389768,
+          "verified_at": "2026-10-11T13:07:02-04:00"
+        },
+        {
+          "path": "3d/Hunyuan3D-2.1/hunyuan3d-vae-v2-1/model.fp16.ckpt",
+          "role": "weights",
+          "sha256": "5cbe97f25e6e7abd4bccc80ab07524ec0c86d24118486a9ba49bb5dfb070288a",
+          "size_bytes": 655648152,
+          "verified_at": "2026-10-11T13:07:02-04:00"
+        },
+        {
+          "path": "3d/Hunyuan3D-2.1/LICENSE",
+          "role": "other",
+          "sha256": "5bd08f93b2d280bb26ff3eed5d3996fe47a9698b5f7785163928668d7fd578c6",
+          "size_bytes": 17915,
+          "verified_at": "2026-10-11T13:07:02-04:00"
+        },
+        {
+          "path": "3d/Hunyuan3D-2.1/Notice.txt",
+          "role": "config",
+          "sha256": "ffccf6b539a82e6084d14ff064dadd22d33384d6164b07c0c5a3141810df0350",
+          "size_bytes": 16644,
+          "verified_at": "2026-10-11T13:07:02-04:00"
+        },
+        {
+          "path": "3d/Hunyuan3D-2.1/README.md",
+          "role": "config",
+          "sha256": "2905a706952c6a7716599cc76de44de82c650fd787d664b9cc013da3ef422679",
+          "size_bytes": 3998,
+          "verified_at": "2026-10-11T13:07:02-04:00"
+        },
+        {
+          "path": "3d/Hunyuan3D-2.1/hunyuan3d-dit-v2-1/config.yaml",
+          "role": "config",
+          "sha256": "a9e9b66f0163a9b827d730633ac88f47fcc8e3071dcbb9ee12d88ef7537c5c6e",
+          "size_bytes": 2078,
+          "verified_at": "2026-10-11T13:07:02-04:00"
+        },
+        {
+          "path": "3d/Hunyuan3D-2.1/hunyuan3d-vae-v2-1/config.yaml",
+          "role": "config",
+          "sha256": "2f778706feb2a7c25b41f88733b3986cef3dff85f95e747fef902173e548ad8e",
+          "size_bytes": 409,
+          "verified_at": "2026-10-11T13:07:02-04:00"
+        }
+      ],
+      "format": "ckpt",
+      "kind": "3d",
+      "name": "Hunyuan3D 2.1 (shape DiT + VAE)",
+      "notes": "gen3d engine hunyuan21 (shape only). Licence: Tencent Hunyuan 3D 2.1 Community Licence, which excludes the EU, UK and South Korea.",
+      "path": "3d/Hunyuan3D-2.1",
+      "services": [
+        "gen3d"
+      ],
+      "source": {
+        "repo": "tencent/Hunyuan3D-2.1",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
     },
     "kokoro-82m": {
       "added": "2026-10-06T01:27:38-04:00",
@@ -688,6 +782,58 @@
       "source": {
         "note": "GGUF general.organization: Openbmb, name: MiniCPM5 2.6B; downloaded before lcpp recorded sources.",
         "type": "local"
+      },
+      "tags": []
+    },
+    "moge-2-vitl-normal-fp16": {
+      "added": "2026-10-11T13:06:52-04:00",
+      "files": [
+        {
+          "path": "comfyui/geometry_estimation/moge_2_vitl_normal_fp16.safetensors",
+          "role": "weights",
+          "sha256": "cb1a692d03235671e959e81360d7b4d9f44aefadb1f852d6ca6aa17799d5e31f",
+          "size_bytes": 661859924,
+          "verified_at": "2026-10-11T13:07:21-04:00"
+        }
+      ],
+      "format": "safetensors",
+      "kind": "other",
+      "name": "MoGe 2 ViT-L normal (fp16)",
+      "notes": "Optional field-of-view estimate for SAM 3D Body. Licence: MIT.",
+      "path": "comfyui/geometry_estimation/moge_2_vitl_normal_fp16.safetensors",
+      "services": [
+        "comfy"
+      ],
+      "source": {
+        "repo": "Comfy-Org/MoGe",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
+    "moge-vitl": {
+      "added": "2026-10-11T13:06:52-04:00",
+      "files": [
+        {
+          "path": "3d/moge-vitl/model.pt",
+          "role": "weights",
+          "sha256": "da96b09a0485a3c45a5aa455e67743c8b4efc4dd8437c1f2aa93c2b4303d957f",
+          "size_bytes": 1256823446,
+          "verified_at": "2026-10-11T13:07:11-04:00"
+        }
+      ],
+      "format": "pt",
+      "kind": "3d",
+      "name": "MoGe v1 ViT-L",
+      "notes": "SAM 3D Objects' depth / point-map model. Licence: MIT.",
+      "path": "3d/moge-vitl",
+      "services": [
+        "gen3d"
+      ],
+      "source": {
+        "repo": "Ruicheng/moge-vitl",
+        "revision": "main",
+        "type": "huggingface"
       },
       "tags": []
     },
@@ -1042,6 +1188,163 @@
       },
       "tags": []
     },
+    "sam-3d-body-dinov3-bf16": {
+      "added": "2026-10-11T13:06:52-04:00",
+      "files": [
+        {
+          "path": "comfyui/detection/sam_3d_body_dinov3_bf16.safetensors",
+          "role": "weights",
+          "sha256": "59fa45200c504c5b56625004d7d3385daf48c616613e88099e43bf83b3e249cf",
+          "size_bytes": 2830737652,
+          "verified_at": "2026-10-11T13:07:20-04:00"
+        }
+      ],
+      "format": "safetensors",
+      "kind": "other",
+      "name": "SAM 3D Body (DINOv3, bf16)",
+      "notes": "ComfyUI-native SAM 3D Body; pack sam3d-body (gen3d engine sam3d_body). Comfy-Org repack (Meta's repo is gated). Licence: SAM Licence.",
+      "path": "comfyui/detection/sam_3d_body_dinov3_bf16.safetensors",
+      "services": [
+        "comfy"
+      ],
+      "source": {
+        "repo": "Comfy-Org/sam-3d-body",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
+    "sam-3d-objects": {
+      "added": "2026-10-11T13:06:52-04:00",
+      "files": [
+        {
+          "path": "3d/sam-3d-objects/checkpoints/slat_decoder_gs.ckpt",
+          "role": "weights",
+          "sha256": "f8077c36a06eaf890dd93cda1937411f793dea1eb80b3dd9329f2038ba84a111",
+          "size_bytes": 171476155,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/slat_decoder_mesh.ckpt",
+          "role": "weights",
+          "sha256": "85907b37b67d8ce5b099a96629bdcfbd873eb407dee6b3aa9a75deb15038db33",
+          "size_bytes": 363726862,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/slat_generator.ckpt",
+          "role": "weights",
+          "sha256": "91529bde8e7daa12d09618a66c319e3a5a6398db6b23b958cedcb1c3f28faabb",
+          "size_bytes": 4906537684,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/ss_decoder.ckpt",
+          "role": "weights",
+          "sha256": "6dac1cd7b7fda5a38e0614fadae441f1794f80e39ea2981f1ac8aff0a7e99340",
+          "size_bytes": 147609242,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/ss_generator.ckpt",
+          "role": "weights",
+          "sha256": "225f40479e4cff4f39d6fa14c55be3abad1475bf55b61af3bec1e19ed2f6c146",
+          "size_bytes": 6690136964,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/LICENSE",
+          "role": "other",
+          "sha256": "b3a5a0e2d973ab80e6610ccf1cffc40756050d0ace3cd4fec879b3ec290b2e9b",
+          "size_bytes": 8204,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/README.md",
+          "role": "config",
+          "sha256": "0181e7ad54cc11501d467b427f2bc3a0509245f0256b2b7a2f8b216b1e104944",
+          "size_bytes": 7708,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/pipeline.yaml",
+          "role": "config",
+          "sha256": "53c3d226b21df85c0bb3d16e6e4fa63abde0d6167525765eb929d02bfa9d358c",
+          "size_bytes": 3548,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/slat_decoder_gs.yaml",
+          "role": "config",
+          "sha256": "53f054e02a0c185f0a6885d30bb6ca0ec92efe0a98148688e7f05f7c26afe670",
+          "size_bytes": 576,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/slat_decoder_gs_4.yaml",
+          "role": "config",
+          "sha256": "3d1dfd4c56cdac56f30e0cf5eb310d4df973fe25c60ac0a462c86ca4e3bf8b48",
+          "size_bytes": 575,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/slat_decoder_mesh.yaml",
+          "role": "config",
+          "sha256": "8f46952764aa985c50109a56f0b4f07625cdb06457aaded74957d26f3520c69e",
+          "size_bytes": 300,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/slat_encoder.yaml",
+          "role": "config",
+          "sha256": "ca80da7f1395a2acef9c6cea30ec3ccc89321ef890c644860f316a4ef1e8ebdb",
+          "size_bytes": 268,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/slat_generator.yaml",
+          "role": "config",
+          "sha256": "53029fadff6fe34a0344381a16d64d65d0567d603484952712e8969319559c4e",
+          "size_bytes": 1986,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/ss_decoder.yaml",
+          "role": "config",
+          "sha256": "baacff269b664f84f7aa1896ebd66128065f6568cdb88d419d5c3d2ccb4193ae",
+          "size_bytes": 244,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/ss_encoder.yaml",
+          "role": "config",
+          "sha256": "d3df5e18b2cbe87697d319adce0fe7e4fb6266809ad9d2f8c502761739bc4a06",
+          "size_bytes": 231,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        },
+        {
+          "path": "3d/sam-3d-objects/checkpoints/ss_generator.yaml",
+          "role": "config",
+          "sha256": "3c265448bca7c057f94e3ef56adea3a895a10bcd9f15f992a41dd03fa35412cd",
+          "size_bytes": 5076,
+          "verified_at": "2026-10-11T13:07:10-04:00"
+        }
+      ],
+      "format": "ckpt",
+      "kind": "3d",
+      "name": "SAM 3D Objects (geometry checkpoints)",
+      "notes": "gen3d engine sam3d_objects (gated repo; access granted 2026-10-10). Licence: SAM Licence.",
+      "path": "3d/sam-3d-objects",
+      "services": [
+        "gen3d"
+      ],
+      "source": {
+        "repo": "facebook/sam-3d-objects",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
     "sam3.1-multiplex-fp16": {
       "added": "2026-10-06T14:02:18-04:00",
       "files": [
@@ -1103,6 +1406,58 @@
       ],
       "source": {
         "repo": "unsloth/SmolLM2-135M-Instruct-GGUF",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
+    "trellis-2-bf16": {
+      "added": "2026-10-11T13:06:52-04:00",
+      "files": [
+        {
+          "path": "comfyui/diffusion_models/trellis_2_bf16.safetensors",
+          "role": "weights",
+          "sha256": "bf8ebe29f2d73722ca8a17b7aa65ef07650eb26d04799ae600482058f96921b5",
+          "size_bytes": 10338297616,
+          "verified_at": "2026-10-11T13:07:17-04:00"
+        }
+      ],
+      "format": "safetensors",
+      "kind": "image",
+      "name": "TRELLIS.2 (bf16)",
+      "notes": "ComfyUI-native TRELLIS.2; packs trellis2-shape, trellis2-lowpoly, trellis2-draft (gen3d engine trellis2). Licence: MIT.",
+      "path": "comfyui/diffusion_models/trellis_2_bf16.safetensors",
+      "services": [
+        "comfy"
+      ],
+      "source": {
+        "repo": "Comfy-Org/TRELLIS.2",
+        "revision": "main",
+        "type": "huggingface"
+      },
+      "tags": []
+    },
+    "trellis-2-shape-vae-bf16": {
+      "added": "2026-10-11T13:06:52-04:00",
+      "files": [
+        {
+          "path": "comfyui/vae/trellis_2_shape_vae_bf16.safetensors",
+          "role": "weights",
+          "sha256": "de0cb4949a76c59ee5c091a995a69bcc8c51d5aeda939f0c641a50d2a72341f4",
+          "size_bytes": 1095844024,
+          "verified_at": "2026-10-11T13:07:18-04:00"
+        }
+      ],
+      "format": "safetensors",
+      "kind": "vae",
+      "name": "TRELLIS.2 shape VAE (bf16)",
+      "notes": "TRELLIS.2's shape decoder. Licence: MIT.",
+      "path": "comfyui/vae/trellis_2_shape_vae_bf16.safetensors",
+      "services": [
+        "comfy"
+      ],
+      "source": {
+        "repo": "Comfy-Org/TRELLIS.2",
         "revision": "main",
         "type": "huggingface"
       },

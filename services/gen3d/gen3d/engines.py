@@ -25,6 +25,7 @@ class Engine:
     code: tuple[str, ...] = ()          # under runtime/
     venv: str = ""                      # under runtime/
     packs: tuple[str, ...] = field(default_factory=tuple)
+    memory_gb: float = 0.0              # a local engine asks the hub for this before it loads (lab peak + margin)
 
 
 ENGINES: dict[str, Engine] = {e.id: e for e in (
@@ -33,7 +34,7 @@ ENGINES: dict[str, Engine] = {e.id: e for e in (
     Engine("hunyuan21", "Hunyuan3D 2.1", "image", "Characters: the cleanest, watertight surface",
            "Tencent Hunyuan 3D 2.1 Community Licence (excludes the EU, UK and South Korea)", local=True, worker="img3d",
            weights=("Hunyuan3D-2.1/hunyuan3d-dit-v2-1/model.fp16.ckpt", "Hunyuan3D-2.1/hunyuan3d-vae-v2-1/model.fp16.ckpt"),
-           code=("hunyuan3d-2.1/hy3dshape/hy3dshape",), venv="img3d"),
+           code=("hunyuan3d-2.1/hy3dshape/hy3dshape",), venv="img3d", memory_gb=14),
     Engine("trellis2", "TRELLIS.2", "image", "Objects: the most faithful detail (runs in Images & Video)", "MIT",
            local=False, weights=("diffusion_models/trellis_2_bf16.safetensors", "vae/trellis_2_shape_vae_bf16.safetensors",
                                  "clip_vision/dino_v3_vit_l.safetensors"),
@@ -43,7 +44,7 @@ ENGINES: dict[str, Engine] = {e.id: e for e in (
            weights=("sam-3d-objects/checkpoints/pipeline.yaml", "sam-3d-objects/checkpoints/ss_generator.ckpt",
                     "sam-3d-objects/checkpoints/slat_generator.ckpt", "sam-3d-objects/checkpoints/slat_decoder_mesh.ckpt",
                     "moge-vitl/model.pt"),
-           code=("sam3d-objects/sam3d_objects", "sam3do/dinov2/dinov2"), venv="sam3do"),
+           code=("sam3d-objects/sam3d_objects", "sam3do/dinov2/dinov2"), venv="sam3do", memory_gb=22),
     Engine("sam3d_body", "SAM 3D Body", "image", "A person's body (no clothes) as a rigged mesh (runs in Images & Video)",
            "SAM Licence", local=False,
            weights=("detection/sam_3d_body_dinov3_bf16.safetensors",), packs=("sam3d-body",)),

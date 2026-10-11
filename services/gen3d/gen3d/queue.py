@@ -213,6 +213,9 @@ class Runner:
                 result = await self.delegate(req, jdir, inputs, on_event, cancel_check=lambda: jid in self._cancel)
             else:
                 family = engine.worker if stage == "shape" else "cube"
+                if stage == "shape" and engine.memory_gb:
+                    from .hubclient import acquire
+                    await acquire(engine.memory_gb, f"{engine.label}: {req.title or jid}")
                 task = {"stage": stage, "family": family, "engine": req.engine, "job_dir": str(jdir),
                         "request": req.model_dump(), "inputs": inputs}
                 result = await self.worker.run(task, on_event, cancel_check=lambda: jid in self._cancel)

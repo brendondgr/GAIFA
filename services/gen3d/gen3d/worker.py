@@ -1,7 +1,10 @@
-"""The GPU worker: a `podman run -i` of the ROCm image running workers/cube_worker.py.
+"""The GPU workers: a `podman run -i` of the ROCm image running one worker script.
 
-Stopping the container is the unload: it hands back every byte of GPU memory. Cancelling a running
-job also stops it (a GPU call cannot be interrupted any other way); the next job starts a new one.
+Each engine family has its own venv and script (SPECS): `cube` (Cube3D + CubePart, workers/cube_worker.py),
+`img3d` (Hunyuan3D 2.1) and `sam3do` (SAM 3D Objects). Only one container runs at a time: the pool
+stops the running one before another starts. Stopping the container is the unload: it hands back
+every byte of GPU memory. Cancelling a running job also stops it (a GPU call cannot be interrupted
+any other way); the next job starts a new one.
 """
 
 from __future__ import annotations
@@ -24,8 +27,25 @@ class WorkerError(RuntimeError):
     pass
 
 
+def specs() -> dict[str, dict]:
+    """Per family: the venv, the script, its PYTHONPATH, extra environment and the cache folder."""
+    rt, workers = settings.runtime, ROOT / "workers"
+    ca = settings.cubeart
+    return {
+        "cube": {"venv": ca / ".venv", "script": workers / "cube_worker.py", "cache": ca / ".cache", "hf": ca / "hf_cache",
+                 "pythonpath": [ca / "cube" / "cubepart", ca / "cube", workers], "mount": ca, "env": {}},
+        "img3d": {"venv": rt / "img3d" / ".venv", "script": workers / "hunyuan_worker.py", "cache": rt / "img3d" / ".cache",
+                  "pythonpath": [rt / "hunyuan3d-2.1" / "hy3dshape", workers], "mount": rt,
+                  "env": {"GEN3D_RUNTIME": str(rt)}},
+        "sam3do": {"venv": rt / "sam3do" / ".venv", "script": workers / "sam3do_worker.py", "cache": rt / "sam3do" / ".cache",
+                   "pythonpath": [workers / "shims", rt / "sam3d-objects", workers], "mount": rt,
+                   "env": {"GEN3D_RUNTIME": str(rt), "LIDRA_SKIP_INIT": "true"}},
+    }
+
+
 class CubeWorker:
-    def __init__(self) -> None:
+    def __init__(self, family: str = "cube") -> None:
+        self.family = family
         self.proc: asyncio.subprocess.Process | None = None
         self.name: str | None = None
         self.state = "stopped"      # stopped | starting | ready | busy
@@ -40,35 +60,37 @@ class CubeWorker:
         return self.proc is not None and self.proc.returncode is None and self.state in ("ready", "busy")
 
     def status(self) -> dict:
-        return {"state": self.state, "loaded": sorted(self.loaded), "container": self.name,
+        return {"state": self.state, "loaded": sorted(self.loaded), "container": self.name, "family": self.family,
                 "device": self.info.get("device"), "torch": self.info.get("torch"),
                 "uptime_s": round(time.time() - self.started_at, 1) if self.started_at and self.up else None}
 
     def command(self) -> list[str]:
         # Mount real paths, never symlinks: a link that points outside its mount is broken inside
         # the container (AIHub architecture §12.3). The jobs folder is the only writable mount
-        # besides CubeArt's own caches.
+        # besides the family's code/venv/cache folder.
+        sp = specs()[self.family]
         ca, jobs, workers = str(settings.cubeart), str(settings.jobs_dir.resolve()), str(ROOT / "workers")
+        mount, cache = str(sp["mount"]), str(sp["cache"])
         weights = str(settings.weights.resolve())
         env = {
-            "GEN3D_CUBEART": ca, "GEN3D_WEIGHTS": weights, "HF_HUB_OFFLINE": "1", "HF_HOME": f"{ca}/hf_cache",
-            "XDG_CACHE_HOME": f"{ca}/.cache", "TORCHINDUCTOR_CACHE_DIR": f"{ca}/.cache/inductor",
-            "TRITON_CACHE_DIR": f"{ca}/.cache/triton", "MIOPEN_USER_DB_PATH": f"{ca}/.cache/miopen",
+            "GEN3D_CUBEART": ca, "GEN3D_WEIGHTS": weights, "HF_HUB_OFFLINE": "1", "HF_HOME": str(sp.get("hf") or f"{cache}/hf"),
+            "XDG_CACHE_HOME": cache, "TORCHINDUCTOR_CACHE_DIR": f"{cache}/inductor", "TORCH_HOME": f"{cache}/torch",
+            "TRITON_CACHE_DIR": f"{cache}/triton", "MIOPEN_USER_DB_PATH": f"{cache}/miopen", "TMPDIR": f"{cache}/tmp",
             "PYTORCH_HIP_ALLOC_CONF": "expandable_segments:True", "TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL": "1",
             # rocprofiler-sdk attaches to every process and polls its queues; nothing here profiles.
             "ROCPROFILER_REGISTER_ENABLED": "0",
-            "PYTHONPATH": f"{ca}/cube/cubepart:{ca}/cube:{workers}", "PYTHONUNBUFFERED": "1",
+            "PYTHONPATH": ":".join(str(p) for p in sp["pythonpath"]), "PYTHONUNBUFFERED": "1", **sp["env"],
         }
         cmd = [settings.podman, "run", "--rm", "-i", "--name", self.name, "--network", "none", "--ipc", "host",
                "--device", "/dev/kfd", "--device", "/dev/dri", "--group-add", "keep-groups",
                "--security-opt", "label=disable", "--security-opt", "seccomp=unconfined",
-               "-v", f"{ca}:{ca}", "-v", f"{jobs}:{jobs}", "-v", f"{workers}:{workers}:ro", "-w", workers]
-        if not weights.startswith(ca.rstrip("/") + "/"):
+               "-v", f"{mount}:{mount}", "-v", f"{jobs}:{jobs}", "-v", f"{workers}:{workers}:ro", "-w", workers]
+        if not weights.startswith(mount.rstrip("/") + "/"):
             cmd[cmd.index("-w"):cmd.index("-w")] = ["-v", f"{weights}:{weights}:ro"]
         for k, v in env.items():
             cmd += ["-e", f"{k}={v}"]
-        script = (f"unset HSA_OVERRIDE_GFX_VERSION; source {ca}/.venv/bin/activate && "
-                  f"exec python -u {workers}/cube_worker.py")
+        script = (f"unset HSA_OVERRIDE_GFX_VERSION; mkdir -p {cache}/tmp; source {sp['venv']}/bin/activate && "
+                  f"exec python -u {sp['script']}")
         return cmd + [settings.image, "bash", "-c", script]
 
     async def _cleanup_stale(self) -> None:
@@ -108,7 +130,7 @@ class CubeWorker:
         if self.up:
             return
         await self._cleanup_stale()
-        self.name = f"{NAME_PREFIX}{os.getpid()}-{next(_seq)}"
+        self.name = f"{NAME_PREFIX}{self.family}-{os.getpid()}-{next(_seq)}"
         self.state = "starting"
         t0 = time.time()
         if on_event:
@@ -208,3 +230,63 @@ class CubeWorker:
                 log.warning("worker container %s did not exit", self.name)
         self.state, self.loaded, self.started_at = "stopped", set(), None
         return True
+
+
+class WorkerPool:
+    """One worker container per engine family, at most one running: the runner talks to this as it did
+    to the single Cube3D worker. A run in another family stops the running container first, so its
+    memory is back before the next one loads."""
+
+    def __init__(self, make=CubeWorker) -> None:
+        self._make = make
+        self.workers: dict[str, object] = {}
+        self.active = "cube"
+        self._switch = asyncio.Lock()
+
+    def get(self, family: str):
+        if family not in self.workers:
+            self.workers[family] = self._make(family)
+        return self.workers[family]
+
+    @property
+    def current(self):
+        return self.get(self.active)
+
+    @property
+    def up(self) -> bool:
+        return any(w.up for w in self.workers.values())
+
+    @property
+    def loaded(self) -> set[str]:
+        return set().union(*(w.loaded for w in self.workers.values() if w.up)) if self.workers else set()
+
+    def status(self) -> dict:
+        w = next((w for w in self.workers.values() if w.up), None) or self.current
+        return w.status()
+
+    async def use(self, family: str):
+        """The family's worker, after stopping any other that is running."""
+        async with self._switch:
+            for name, w in self.workers.items():
+                if name != family and w.up:
+                    await w.stop(reason=f"switching to {family}")
+            self.active = family
+            return self.get(family)
+
+    async def run(self, task: dict, on_event, cancel_check=lambda: False) -> dict:
+        w = await self.use(task.get("family") or "cube")
+        return await w.run(task, on_event, cancel_check)
+
+    async def load(self, models: list[str]) -> None:
+        await (await self.use("cube")).load(models)
+
+    async def cancel(self) -> None:
+        for w in self.workers.values():
+            if w.up or w.state != "stopped":
+                await w.cancel()
+
+    async def stop(self, reason: str = "", graceful: bool = True) -> bool:
+        stopped = False
+        for w in self.workers.values():
+            stopped = await w.stop(reason=reason, graceful=graceful) or stopped
+        return stopped

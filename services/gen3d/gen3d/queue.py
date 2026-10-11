@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 from .config import settings
+from .engines import ENGINES
 from .eta import Estimator, substages
 from .events import Broadcaster
 from .options import JobRequest, parse_request
@@ -30,9 +31,10 @@ class Canceled(Exception):
 
 
 class Runner:
-    def __init__(self, store: Store, worker, previewer, events: Broadcaster, eta_scale: float = 1.0):
+    def __init__(self, store: Store, worker, previewer, events: Broadcaster, eta_scale: float = 1.0, comfy=None):
         self.store = store
-        self.worker = worker
+        self.worker = worker                # a WorkerPool: one container per engine family, one at a time
+        self.comfy = comfy                  # the delegated engines' runner (comfy_engine.ComfyEngine), or None
         self.previewer = previewer          # async (job_dir, glb, png) -> None
         self.events = events
         self.eta = Estimator(store, scale=eta_scale)
@@ -161,7 +163,9 @@ class Runner:
                     mesh = str(d / j["input_mesh"]); break
         parts = find("parts", "dir")
         newest = find("rig", "glb") or find("parts", "scene") or mesh
-        return {"mesh": mesh, "parts_dir": parts, "newest": newest}
+        image = next((str(d / "input_rgba.png") for _, d in chain if (d / "input_rgba.png").exists()), None)
+        return {"mesh": mesh, "parts_dir": parts, "newest": newest, "image": image,
+                "image_raw": image and str(Path(image).with_name("input.png"))}
 
     async def _run_stage(self, jid: str, stage: str, req: JobRequest) -> None:
         jdir = self.store.job_dir(jid)
@@ -172,6 +176,9 @@ class Runner:
             raise StageError("no parts to rig: add the parts stage or continue from a job that has parts")
         if stage == "preview" and not inputs["newest"]:
             raise StageError("nothing to preview yet")
+        engine = ENGINES[req.engine]
+        if stage == "shape" and engine.input == "image" and not inputs["image"]:
+            raise StageError("no picture for the image engine: give `image`, or retry from the job that had one")
 
         started = time.time()
         self._set_stage(jid, stage, state="running", started=started, sub=None, step=None, total=None)
@@ -199,8 +206,13 @@ class Runner:
                 await self.previewer(jdir, Path(inputs["newest"]), png)
                 on_event({"event": "sub_done", "sub": "preview", "seconds": time.time() - t0})
                 result = {"png": "preview.png"} if png.exists() else {"skipped": "Blender not available"}
+            elif stage == "shape" and not engine.local:
+                await self.worker.stop(reason=f"{engine.label} runs in the comfy mod")     # its memory, back first
+                result = await self.delegate(req, jdir, inputs, on_event, cancel_check=lambda: jid in self._cancel)
             else:
-                task = {"stage": stage, "job_dir": str(jdir), "request": req.model_dump(), "inputs": inputs}
+                family = engine.worker if stage == "shape" else "cube"
+                task = {"stage": stage, "family": family, "engine": req.engine, "job_dir": str(jdir),
+                        "request": req.model_dump(), "inputs": inputs}
                 result = await self.worker.run(task, on_event, cancel_check=lambda: jid in self._cancel)
         except Canceled:
             raise
@@ -216,6 +228,12 @@ class Runner:
         self.store.update_job(jid, result=res)
         self._set_stage(jid, stage, state="done", finished=time.time(), seconds=round(time.time() - started, 1),
                         sub=None, step=None, total=None, publish=True)
+
+    async def delegate(self, req: JobRequest, jdir: Path, inputs: dict, on_event, cancel_check) -> dict:
+        """TRELLIS.2 and SAM 3D Body: a run of their comfy pack through the hub (gen3d/comfy_engine.py)."""
+        if self.comfy is None:
+            raise StageError(f"{ENGINES[req.engine].label} runs in the comfy mod, which needs AIHub (AIHUB_URL)")
+        return await self.comfy.run(req, jdir, inputs, on_event, cancel_check)
 
     def _set_stage(self, jid: str, stage: str, publish: bool = False, **fields) -> None:
         job = self.store.get_job(jid)
@@ -241,6 +259,8 @@ class Runner:
             return self.store.get_job(jid)
         self._cancel.add(jid)
         await self.worker.cancel()  # stops the worker process: the only way to interrupt a GPU call
+        if self.comfy is not None:
+            await self.comfy.cancel()  # a delegated stage: cancel its comfy run
         for _ in range(100):  # the runner notices within a moment; answer with the final state
             job = self.store.get_job(jid)
             if job["status"] in TERMINAL:
@@ -271,7 +291,8 @@ class Runner:
                               "eta_s": round(offset + rem["eta_s"], 1), "own_s": rem["eta_s"],
                               "by_stage": rem["by_stage"], "done_at": now + offset + rem["eta_s"]}
             offset += rem["eta_s"]
-            loaded |= {s for s in job["stages"] if s in ("shape", "parts")}
+            loaded |= {("shape" if req.engine == "cube3d" else req.engine) if s == "shape" else s
+                       for s in job["stages"] if s in ("shape", "parts")}
             up = True
         return out
 

@@ -16,6 +16,8 @@ import time
 
 from .options import JobRequest
 
+LOCAL = ("cube3d", "hunyuan21", "sam3d_objects")     # engines whose shape stage runs in gen3d's worker
+
 # ---- defaults from the CubeArt benchmark suite ---------------------------------------------------
 
 GPT_TOKENS = 1024          # Cube3D always emits 1024 shape tokens
@@ -49,9 +51,59 @@ def _interp_log(table: dict[float, float], x: float) -> float:
     return math.exp(a + (b - a) * (x - lo) / (hi - lo))
 
 
+# ---- image engines (plan 17.7; lab 2026-10-10/11, services/gen3d/runtime/lab/RESULTS.md) -----------
+HY_LOAD_S, HY_COND_S, HY_STEP_S, HY_POST_S = 16.0, 0.4, 2.45, 3.0
+HY_DECODE_S = {(True, 256): 6.0, (True, 384): 11.0, (True, 512): 20.0,       # FlashVDM
+               (False, 256): 53.0, (False, 384): 191.0, (False, 512): 450.0}
+S3O_LOAD_S, S3O_POINTMAP_S, S3O_DECODE_S, S3O_POST_S = 25.0, 3.0, 6.4, 2.0
+S3O_STAGE_S = {(1, False): 1.3, (1, True): 0.8, (2, False): 1.4, (2, True): 0.9}   # per step: (stage, distilled)
+# TRELLIS.2 runs in comfy: one substage with comfy's progress in percent. The refine stage costs ~5 s per
+# step on a thin character and ~26 s on a round object (it follows the surface area, RESULTS.md §5);
+# the seed is the character, learned times take over per settings.
+TR_START_S, TR_STRUCT_S, TR_SHAPE_STEP_S, TR_DECODE_S, TR_LOWPOLY_S = 25.0, 20.0, 0.7, 10.0, 10.0
+TR_REFINE_STEP_S = {1024: 5.2, 1536: 16.0}
+BODY_S = 8.0
+
+
+def image_substages(req: JobRequest, loaded: set[str]) -> list[tuple[str, dict, float, int | None]]:
+    e = req.engine
+    if e == "hunyuan21":
+        o = req.hunyuan21
+        out = [] if "hunyuan21" in loaded else [("load.hunyuan21", {}, HY_LOAD_S, None)]
+        return out + [
+            ("hunyuan.conditioning", {}, HY_COND_S, None),
+            ("hunyuan.diffusion", {"steps": o.steps}, HY_STEP_S * o.steps, o.steps),
+            ("hunyuan.decode", {"flashvdm": o.flashvdm, "octree": o.octree}, HY_DECODE_S[(o.flashvdm, o.octree)], None),
+            ("hunyuan.post", {"target": bool(o.target_faces)}, HY_POST_S, None)]
+    if e == "sam3d_objects":
+        o = req.sam3d_objects
+        out = [] if "sam3d_objects" in loaded else [("load.sam3d_objects", {}, S3O_LOAD_S, None)]
+        return out + [
+            ("sam3do.pointmap", {}, S3O_POINTMAP_S, None),
+            ("sam3do.stage1", {"steps": o.ss_steps, "distill": o.distill}, S3O_STAGE_S[(1, o.distill)] * o.ss_steps, None),
+            ("sam3do.stage2", {"steps": o.slat_steps, "distill": o.distill}, S3O_STAGE_S[(2, o.distill)] * o.slat_steps, None),
+            ("sam3do.decode", {}, S3O_DECODE_S, None),
+            ("sam3do.post", {"target": bool(o.target_faces)}, S3O_POST_S, None)]
+    if e == "trellis2":
+        o = req.trellis2
+        secs = TR_START_S + TR_STRUCT_S + TR_SHAPE_STEP_S * o.shape_steps + TR_DECODE_S
+        if o.resolution > 512:
+            secs += TR_REFINE_STEP_S[o.resolution] * o.refine_steps
+        if o.target_faces:
+            secs += TR_LOWPOLY_S
+        feats = {"res": o.resolution, "shape": o.shape_steps, "refine": o.refine_steps if o.resolution > 512 else 0,
+                 "lowpoly": bool(o.target_faces)}
+        return [("trellis2.comfy", feats, secs, 100)]
+    if e == "sam3d_body":
+        return [("sam3d_body.comfy", {"hands": req.sam3d_body.hand_refinement}, BODY_S, 100)]
+    return []
+
+
 def substages(req: JobRequest, stage: str, loaded: set[str]) -> list[tuple[str, dict, float, int | None]]:
     """[(substage, features, default_seconds, total_steps_or_None)] for one stage of a request."""
     s, p = req.shape, req.parts
+    if stage == "shape" and req.engine != "cube3d":
+        return image_substages(req, loaded)
     if stage == "shape":
         out = []
         if "shape" not in loaded:
@@ -109,13 +161,14 @@ class Estimator:
         same job count as loaded for later stages."""
         loaded = set(loaded)
         out = []
-        if not worker_up and any(st in ("shape", "parts", "rig") for st in stages):
-            out.append({"stage": stages[0], "sub": "worker.start", "seconds": WORKER_START_S * self.scale})
+        local = [st for st in stages if st in ("parts", "rig") or (st == "shape" and req.engine in LOCAL)]
+        if not worker_up and local:
+            out.append({"stage": local[0], "sub": "worker.start", "seconds": WORKER_START_S * self.scale})
         for st in stages:
             for sub, feat, default, _ in substages(req, st, loaded):
                 out.append({"stage": st, "sub": sub, "seconds": round(self.duration(sub, feat, default), 1)})
             if st in ("shape", "parts"):
-                loaded.add(st)
+                loaded.add(st if st == "parts" or req.engine == "cube3d" else req.engine)
         return out
 
     def remaining(self, job: dict, req: JobRequest, loaded: set[str], worker_up: bool,

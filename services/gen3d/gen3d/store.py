@@ -223,17 +223,20 @@ def output_meta(job: dict, jdir: Path) -> dict:
         main = job["input_mesh"]
     peaks = [v.get("peak_gpu_gb") for v in res.values() if isinstance(v, dict) and v.get("peak_gpu_gb") is not None]
     shape, parts, rig = req.get("shape") or {}, req.get("parts") or {}, req.get("rig") or {}
+    engine = req.get("engine") or "cube3d"
+    eopts = (req.get(engine) or {}) if engine != "cube3d" else {}
     meta = {
         "title": job.get("title") or req.get("prompt") or job["id"],
         "kind": "model3d",
         "complete": job.get("status") == "done" and main is not None,
         "created_ts": job.get("created"),
         "prompt": req.get("prompt") or None,
-        "seed": shape.get("seed") if "shape" in (req.get("stages") or []) else None,
-        "params": {"preset": req.get("preset"), "stages": req.get("stages"),
-                   "budgets": {"shape": shape.get("target_faces"), "parts": parts.get("target_faces"),
-                               "rig": rig.get("target_faces")},
-                   "parts": parts.get("parts") or None},
+        "seed": (eopts.get("seed") if engine != "cube3d" else shape.get("seed")) if "shape" in (req.get("stages") or []) else None,
+        "params": {"engine": engine, "preset": req.get("preset"), "stages": req.get("stages"),
+                   "budgets": {"shape": eopts.get("target_faces") if engine != "cube3d" else shape.get("target_faces"),
+                               "parts": parts.get("target_faces"), "rig": rig.get("target_faces")},
+                   "parts": parts.get("parts") or None,
+                   **({"image": req.get("image"), engine: eopts} if engine != "cube3d" else {})},
         "source": {"service": "gen3d", "job_id": job["id"], "parent_id": job.get("parent_id")},
         "status": job.get("status"),
     }

@@ -37,14 +37,15 @@ def _samples() -> dict[str, Path] | None:
 
 
 class FakeWorker:
-    def __init__(self) -> None:
+    def __init__(self, family: str = "cube") -> None:
+        self.family = family
         self.up = False
         self.state = "stopped"
         self.loaded: set[str] = set()
         self._cancel = False
 
     def status(self) -> dict:
-        return {"state": self.state, "loaded": sorted(self.loaded), "fake": True, "pid": None}
+        return {"state": self.state, "loaded": sorted(self.loaded), "fake": True, "pid": None, "family": self.family}
 
     async def start(self) -> None:
         if not self.up:
@@ -87,6 +88,8 @@ class FakeWorker:
                 on_event({"event": "sub_done", "sub": sub, "seconds": time.time() - t0})
                 if sub.startswith("load."):
                     self.loaded.add(sub.split(".", 1)[1])
+            if stage == "shape" and req.engine != "cube3d":
+                self.loaded.add(req.engine)
             return self._outputs(stage, req, Path(task["job_dir"]), task["inputs"])
         finally:
             self.state = "ready" if self.up else "stopped"
@@ -102,6 +105,9 @@ class FakeWorker:
 
     def _outputs(self, stage: str, req: JobRequest, jdir: Path, inputs: dict) -> dict:
         sm = _samples()
+        if stage == "shape" and req.engine != "cube3d":
+            (jdir / "mesh.glb").write_bytes(boxes_glb([{"name": "mesh", "center": (0, 0.5, 0), "size": (0.8, 1.0, 0.8)}]))
+            return {"mesh": "mesh.glb", "faces": 12, "engine": req.engine, "fake": True}
         if stage == "shape":
             if sm:
                 shutil.copy(sm["mesh"], jdir / "mesh.glb")

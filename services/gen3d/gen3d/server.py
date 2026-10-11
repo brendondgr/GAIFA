@@ -19,7 +19,9 @@ from pydantic import BaseModel, ValidationError
 
 from . import __version__
 from .config import settings
+from .engines import ENGINES
 from .events import Broadcaster
+from .images import MAX_BYTES as MAX_IMAGE, ImageError, fetch_output, prepare as prepare_image
 from .options import PRESETS, JobRequest, catalogue, parse_request
 from .queue import Runner
 from .store import TERMINAL, Store, job_folder, new_id
@@ -30,12 +32,13 @@ MAX_UPLOAD = 300 * 1024 * 1024
 
 
 def _make_worker():
+    from .worker import WorkerPool
     if settings.fake_worker:
         from .worker_fake import SPEED, FakeWorker, fake_preview
-        return FakeWorker(), fake_preview, 1.0 / SPEED
+        return WorkerPool(make=FakeWorker), fake_preview, 1.0 / SPEED
     from .preview import render_preview
     from .worker import CubeWorker
-    return CubeWorker(), render_preview, 1.0
+    return WorkerPool(make=CubeWorker), render_preview, 1.0
 
 
 @contextlib.asynccontextmanager
@@ -167,11 +170,13 @@ async def unload(request: Request, force: bool = Query(False, description="also 
 
 # ---- jobs --------------------------------------------------------------------------------------
 
-def _title(req, parent: dict | None = None) -> str:
+def _title(req, parent: dict | None = None, image_name: str | None = None) -> str:
     if req.title:
         return req.title
     if req.prompt.strip():
         return req.prompt.strip()[:80]
+    if req.engine != "cube3d" and "shape" in req.stages:
+        return f"{ENGINES[req.engine].label} · {Path(image_name or req.image or 'picture').stem}"[:80]
     base = " + ".join(req.stages)
     return f"{base} · {parent['title']}"[:80] if parent and parent.get("title") else base
 
@@ -185,19 +190,27 @@ def _resolve_chat(store: Store, chat_id: str | None, title: str) -> str | None:
 
 
 def _queue(request: Request, raw: dict, jid: str | None = None, input_mesh: str | None = None,
-           folder: str | None = None) -> dict:
+           folder: str | None = None, image: bytes | None = None, image_name: str | None = None) -> dict:
     store, runner = _store(request), _runner(request)
     req = parse_request(raw)
     parent = store.get_job(req.parent_id) if req.parent_id else None
     if req.parent_id and not parent:
         raise HTTPException(404, f"no parent job {req.parent_id!r}")
-    title = _title(req, parent)
+    if req.image == "upload" and image is None and "shape" in req.stages and not parent:
+        raise HTTPException(422, "image \"upload\" needs the picture: send it to POST /v1/jobs/image")
+    title = _title(req, parent, image_name)
     chat_id = _resolve_chat(store, req.chat_id, title)
     req.chat_id = chat_id
     job = store.create_job(req.model_dump(), chat_id=chat_id, parent_id=req.parent_id, title=title,
                            stages=req.stages, jid=jid, folder=folder)
     if input_mesh:
         job = store.update_job(job["id"], input_mesh=input_mesh)
+    if image is not None:
+        try:
+            prepare_image(image, store.job_dir(job["id"]))
+        except ImageError as exc:
+            store.delete_job(job["id"])
+            raise HTTPException(422, str(exc)) from exc
     if chat_id and raw.get("chat_id") == "new":
         runner.events.publish("chat", store.get_chat(chat_id))
     runner.kick()
@@ -214,7 +227,36 @@ async def create_job(request: Request, body: JobRequest):
     raw = await request.json()
     if not isinstance(raw, dict):
         raise HTTPException(422, "body must be a JSON object")
-    return _queue(request, raw)
+    req = parse_request(raw)
+    image = None
+    if req.engine != "cube3d" and "shape" in req.stages and (req.image or "").startswith("output:"):
+        try:
+            image = await fetch_output(req.image)
+        except ImageError as exc:
+            raise HTTPException(422, str(exc)) from exc
+    return _queue(request, raw, image=image)
+
+
+@app.post("/v1/jobs/image", status_code=201)
+async def create_job_image(
+    request: Request,
+    image: UploadFile = File(..., description="the picture (PNG, JPEG, WebP; a transparent background is best)"),
+    job: str = Form('{"engine": "hunyuan21"}', description="JobRequest JSON for an image engine (image is set to the upload)"),
+):
+    """Queue an image-engine job with the picture in the request (multipart). The job folder keeps it as
+    input.png, and the cut-out every engine reads as input_rgba.png."""
+    try:
+        raw = json.loads(job)
+    except ValueError as exc:
+        raise HTTPException(422, f"job is not valid JSON: {exc}") from exc
+    if not isinstance(raw, dict) or (raw.get("engine") or "cube3d") == "cube3d":
+        raise HTTPException(422, "pick an image engine: hunyuan21, trellis2, sam3d_objects or sam3d_body")
+    raw["image"] = "upload"
+    raw.setdefault("stages", ["shape", "preview"])
+    data = await image.read()
+    if not data or len(data) > MAX_IMAGE:
+        raise HTTPException(400, "the picture is empty or larger than 64 MB")
+    return _queue(request, raw, image=data, image_name=image.filename)
 
 
 @app.post("/v1/jobs/upload", status_code=201)
@@ -279,9 +321,17 @@ async def retry_job(request: Request, jid: str, body: RetryBody | None = None):
     if body is None or body.new_seed:
         raw["shape"] = {**raw.get("shape", {}), "seed": int(raw.get("shape", {}).get("seed", 0)) + 1}
         raw["parts"] = {**raw.get("parts", {}), "seed": int(raw.get("parts", {}).get("seed", 0)) + 1}
-    raw["preset"] = None
-    if job.get("input_mesh"):  # an upload: point the retry at the original job for its mesh
+        eng = raw.get("engine") or "cube3d"
+        if eng != "cube3d" and "seed" in (raw.get(eng) or {}):
+            raw[eng] = {**raw[eng], "seed": int(raw[eng]["seed"]) + 1}
+    raw["preset"] = None if (raw.get("engine") or "cube3d") == "cube3d" else raw.get("preset")
+    if job.get("input_mesh") or raw.get("image") == "upload":  # an upload: the retry reads the original job's file
         raw["parent_id"] = jid
+    if (raw.get("image") or "").startswith("output:") and "shape" in (raw.get("stages") or []):
+        try:
+            return _queue(request, raw, image=await fetch_output(raw["image"]))
+        except ImageError as exc:
+            raise HTTPException(422, str(exc)) from exc
     return _queue(request, raw)
 
 

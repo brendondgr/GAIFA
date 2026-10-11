@@ -1328,7 +1328,7 @@ Four image engines join Cube3D in the 3D Generate mod, all producing untextured 
   - `gen3d/worker_fake.py` simulates every engine.
   *Done when:* `tests/test_api.py` runs a fake hunyuan job end to end; a real job on `results/samurai_front_rgba.png` with the fast preset finishes in ≤ 120 s cold and writes `mesh.glb` + `output.json`.
   - *As built:* `WorkerPool` holds one `CubeWorker(family)` per family (`cube`, `img3d`, `sam3do`; `worker.specs()`), and a run in another family stops the running container first. Workers share `workers/proto.py` (protocol, substages, `fast-simplification`). The picture is prepared at queue time (`gen3d/images.py`: `input.png` + the cut-out `input_rgba.png`) from `POST /v1/jobs/image` or an `output:<id>` fetched from the hub; retries and follow-ups read it from the parent job. Image-engine ETAs are seeded in `eta.py` now (17.7 checks them). Tests: `tests/test_images.py`. Real: samurai, fast, cold through the hub: 110 s wall (ETA said 111 s), 474,658 faces (lab 474,660), peak 12.3 GB.
-- [ ] **17.5 Comfy side: packs and fixes (`services/comfy/`).**
+- [x] **17.5 Comfy side: packs and fixes (`services/comfy/`).**
   - Commit the lab's two fixes: `extra_model_paths.yaml` gains `detection` and `geometry_estimation`; `nodes/aihub_nodes/__init__.py` gains `patch_sam3d_body` (hand-refinement dtype fix). Update docs/workflows.md §9.
   - Packs from the lab graphs (`workflow.api.json`, imported with `comfyui workflows new`), all `agent = false`, task `image-to-3d`, inputs `image` (an RGBA cut-out; the mask is its alpha) and every parameter in 17.3:
     - `trellis2-shape`: the cascade at 1024, raw mesh; `[presets.base]` (shape 20, refine 12) and `[presets.fast]` (shape 12, refine 6).
@@ -1337,6 +1337,7 @@ Four image engines join Cube3D in the 3D Generate mod, all producing untextured 
     - `sam3d-body`: the body mesh as a rigged GLB; `[presets.fast]` turns hand refinement off.
   - `tasks.toml` gains `image-to-3d` (needs `image`, makes a mesh, no agent tool); `service.toml` `[outputs] kinds` adds `model3d`.
   *Done when:* `comfyui workflows check` is clean for the four packs, and each runs from the Images & Video page into `outputs/comfy/`.
+  - *As built:* one picture per pack: `LoadImage` of the RGBA cut-out, and `InvertMask` of its mask (LoadImage's mask is 1 − alpha) for the crop. `seed` and `guidance` reach every sampler (`also`). The packs don't label their outputs, and comfy renames save prefixes, so gen3d tells the reduced mesh from the raw one by size. Live on the samurai through `/v1/run`: sam3d-body 8.1 s (36,874 faces), trellis2-draft 49.6 s, trellis2-lowpoly 95.9 s (raw 5.7 M + reduced 49,364 faces), trellis2-shape 89.1 s.
 - [ ] **17.6 Delegated engines: `gen3d/comfy_engine.py`.**
   - For `trellis2` and `sam3d_body`, the runner uploads `input_rgba.png` (`POST /api/s/comfy/v1/uploads`), posts the pack run to the hub, polls `GET /api/s/comfy/v1/jobs/<id>?wait=…`, maps comfy's 0–1 progress to the stage's `step`/`total`, and downloads the result (`GET /api/s/comfy/v1/files/<path>`) into the job folder. TRELLIS.2 picks `trellis2-lowpoly` when `target_faces` > 0, `trellis2-draft` for the draft preset (its reduction falls back to `fast-simplification` in gen3d, which stops near 130 k faces on TRELLIS meshes).
   - Cancel forwards to comfy; a comfy error becomes the stage's error.

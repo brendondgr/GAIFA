@@ -40,7 +40,7 @@ idle_unload_env = "COMFY_IDLE_UNLOAD_S"
 dirs = ["comfyui"]
 
 [outputs]
-kinds = ["image", "video"]
+kinds = ["image", "video", "model3d"]
 
 [ui]
 page = "ui/page.js"

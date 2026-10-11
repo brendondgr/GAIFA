@@ -1,0 +1,55 @@
+name = "TRELLIS.2 — image to 3D"
+task = "image-to-3d"
+description = "TRELLIS.2 (ComfyUI native, bf16): one picture to an untextured mesh, the cascade 512 → 1024. The raw mesh is millions of faces; trellis2-lowpoly also reduces it. gen3d's trellis2 engine runs this pack (plan 17)."
+tags = ["3d", "mesh"]
+agent = false                 # reached through gen3d's make_3d
+
+[inputs.image]                 # LoadImage: an RGBA cut-out; its alpha is the mask (InvertMask of LoadImage's mask)
+node = "122"
+field = "image"
+
+[inputs.seed]
+node = "3"
+field = "seed"
+also = ["18.seed", "23.seed"]
+default = 42
+
+[inputs.structure_steps]
+node = "3"
+field = "steps"
+label = "Structure steps"
+
+[inputs.shape_steps]
+node = "18"
+field = "steps"
+label = "Shape steps"
+
+[inputs.guidance]
+node = "3"
+field = "cfg"
+also = ["18.cfg", "23.cfg"]
+label = "Guidance"
+
+[inputs.refine_steps]
+node = "23"
+field = "steps"
+label = "Refine steps"
+description = "1024 refine steps: the slow one; its cost follows the object's surface area"
+
+[inputs.resolution]
+node = "94"
+field = "target_resolution"
+label = "Resolution"
+choices = [1024, 1536]
+
+[outputs.mesh]
+node = "200"
+kind = "mesh"
+
+[presets.fast]                # the defaults: shape 12 + refine 6 (lab: same look as refine 8)
+shape_steps = 12
+refine_steps = 6
+
+[presets.base]                # ComfyUI's template: shape 20 + refine 12
+shape_steps = 20
+refine_steps = 12

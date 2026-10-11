@@ -49,6 +49,12 @@ output = "image"
 [tasks.remove-background.inputs]     # this tool's own description of a shared input
 prompt = "What to keep, in a few words (\"the storefront\", \"the woman on the left\"). Pass it whenever the user names what to keep or the picture is a scene; leave it out only for one obvious subject."
 
+[tasks.image-to-3d]
+name = "Image to 3D"
+description = "Make an untextured 3D mesh from one picture. Run through 3D Generate (gen3d's make_3d), which owns the job, viewer and follow-ups; no agent tool here."
+required = ["image"]
+output = "mesh"
+
 [tasks.custom]
 name = "Custom"
 description = "Anything else: offered to the agent only through run_workflow."

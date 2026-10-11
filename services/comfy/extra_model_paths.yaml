@@ -10,9 +10,11 @@ comfyui:
     clip_vision: clip_vision
     configs: configs
     controlnet: controlnet
+    detection: detection
     diffusers: diffusers
     diffusion_models: diffusion_models
     embeddings: embeddings
+    geometry_estimation: geometry_estimation
     gligen: gligen
     hypernetworks: hypernetworks
     latent_upscale_models: latent_upscale_models

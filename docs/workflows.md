@@ -96,6 +96,7 @@ A pack's `task` says what it does. The agent gets **one tool per task** that has
 | `text-to-video` | `generate_video` | `prompt` | video |
 | `upscale` | `upscale_image` | `image` | image |
 | `remove-background` | `remove_background` | `image` | image |
+| `image-to-3d` | none: gen3d's `make_3d` runs these packs | `image` | mesh |
 | `custom` | only through `run_workflow` | — | — |
 
 **Shared names:**
@@ -190,5 +191,9 @@ If other mods have to be unloaded, the page asks first. ComfyUI starts on the fi
 
 - **The Qwen-VL vision patch-embed runs as a matmul.** The Qwen2.5-VL, Qwen3-VL and Qwen3.5 vision towers embed patches with a Conv3d whose kernel equals its stride, which is one matrix multiply. ROCm runs that Conv3d about 100× slower, so it was half of every Qwen-Image 2.1 text encode with images. The patch applies when ComfyUI loads the package, and the result is the same to rounding.
 - **`AIHubTextEncodeQwenImage21`** is `TextEncodeQwenImage21` that reads the prompt and reference images once. The core node encodes them a second time for the negative, which the sampler never uses at cfg 1. Turn on `encode_negative` when a pack's cfg is above 1.
+
+- **SAM 3D Body's hand refinement runs.** Its keypoint pass fed the float32 body estimate into fp16 decoder layers ("mat1 and mat2 must have the same dtype"); the estimate and prompts are cast to the image embeddings' dtype, as the first pass already does.
+
+`extra_model_paths.yaml` also lists `detection` (SAM 3D Body) and `geometry_estimation` (MoGe), the folders ComfyUI 0.37's SAM 3D Body and MoGe loaders read.
 
 Changes here take effect when ComfyUI restarts (`comfyui restart`, or unload and load comfy).

@@ -7,6 +7,9 @@
 - AIHubTextEncodeQwenImage21: TextEncodeQwenImage21 that can skip the negative encode. The core
   node runs the whole prompt + reference images through Qwen3-VL twice (positive and negative),
   but at CFG 1 (Qwen-Image 2.1 Turbo, and the base packs) the sampler never uses the negative.
+- SAM 3D Body hand refinement: the keypoint-prompt pass feeds the float32 MHR estimate into the
+  decoder's fp16 layers ("mat1 and mat2 must have the same dtype"); the estimate and prompts are
+  cast to the image embeddings' dtype, as the first decoder pass already does.
 
 Guide: docs/workflows.md; measurements: docs/comfy-transfer-report.md.
 """
@@ -123,6 +126,26 @@ class AIHubTextEncodeQwenImage21(TextEncodeQwenImage21):
         return io.NodeOutput(positive, negative, {"samples": latent})
 
 
+def patch_sam3d_body() -> bool:
+    try:
+        from comfy.ldm.sam3d_body.model.model import SAM3DBody
+    except ImportError:
+        return False                                    # this ComfyUI doesn't have it
+    orig = SAM3DBody.forward_decoder
+    if getattr(orig, "_aihub", False):
+        return True
+
+    def forward_decoder(self, branch, image_embeddings, keypoints=None, prev_estimate=None, condition_info=None, batch=None):
+        dt = image_embeddings.dtype
+        cast = lambda t: t.to(dt) if torch.is_tensor(t) and t.is_floating_point() else t
+        return orig(self, branch, image_embeddings, keypoints=cast(keypoints), prev_estimate=cast(prev_estimate),
+                    condition_info=cast(condition_info), batch=batch)
+
+    forward_decoder._aihub = True
+    SAM3DBody.forward_decoder = forward_decoder
+    return True
+
+
 class AIHubExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
@@ -132,4 +155,5 @@ class AIHubExtension(ComfyExtension):
 async def comfy_entrypoint() -> AIHubExtension:
     patched = patch_vision_embeds()
     logging.info("[aihub_nodes] vision patch-embed as matmul: %s", ", ".join(patched) or "nothing to patch")
+    logging.info("[aihub_nodes] SAM 3D Body decoder dtype fix: %s", "applied" if patch_sam3d_body() else "not needed")
     return AIHubExtension()

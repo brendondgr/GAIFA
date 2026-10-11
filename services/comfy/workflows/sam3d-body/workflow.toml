@@ -1,0 +1,30 @@
+name = "SAM 3D Body — image to body mesh"
+task = "image-to-3d"
+description = "SAM 3D Body (Meta, ComfyUI native): the person in the picture as a rigged body mesh (MHR: 18,439 vertices, 127 joints, 72 face blendshapes; the body only, no clothes). gen3d's sam3d_body engine runs this pack."
+tags = ["3d", "body", "rig"]
+agent = false                 # reached through gen3d's make_3d
+
+[inputs.image]
+node = "1"
+field = "image"
+
+[inputs.hand_refinement]
+node = "3"
+field = "run_hand_refinement"
+label = "Hand refinement"
+
+[inputs.fov]
+node = "3"
+field = "fov"
+label = "Field of view"
+description = "Camera field of view in degrees; 0 = estimate it"
+
+[outputs.mesh]
+node = "5"
+kind = "mesh"
+
+[presets.fast]                # body decoder only
+hand_refinement = false
+
+[presets.base]                # both hand decoders too (+0.4 s)
+hand_refinement = true

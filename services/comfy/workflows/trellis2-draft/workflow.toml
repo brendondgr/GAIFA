@@ -1,0 +1,35 @@
+name = "TRELLIS.2 — image to 3D, draft"
+task = "image-to-3d"
+description = "TRELLIS.2 at 512 only (no refine stage): ~16–55 s, softer with more pinholes. gen3d's trellis2 draft preset runs this pack."
+tags = ["3d", "mesh", "fast"]
+agent = false                 # reached through gen3d's make_3d
+
+[inputs.image]                 # LoadImage: an RGBA cut-out; its alpha is the mask (InvertMask of LoadImage's mask)
+node = "122"
+field = "image"
+
+[inputs.seed]
+node = "3"
+field = "seed"
+also = ["18.seed"]
+default = 42
+
+[inputs.structure_steps]
+node = "3"
+field = "steps"
+label = "Structure steps"
+
+[inputs.shape_steps]
+node = "18"
+field = "steps"
+label = "Shape steps"
+
+[inputs.guidance]
+node = "3"
+field = "cfg"
+also = ["18.cfg"]
+label = "Guidance"
+
+[outputs.mesh]
+node = "200"
+kind = "mesh"

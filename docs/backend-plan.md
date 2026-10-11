@@ -21,6 +21,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | B — Moving the apps in | 7–10 | One app per phase, each with its Part B page | One app at a time; each old app runs until its cutover step |
 | C — New capabilities | 11–13 | The ComfyUI mod, runtimes moved inside, the agent-ready API (tool catalog, approvals, model facts, MCP, the agent eval) | ComfyUI and the old venvs; nothing is deleted without approval |
 | D — Chat interface | 14–16 | Chat with our own Claude-Code-style agent, save states, everything inside the folder | No |
+| E — Image to 3D | 17 | Hunyuan3D 2.1, TRELLIS.2, SAM 3D Body and SAM 3D Objects as image engines in `gen3d` | gen3d and comfy; Cube3D keeps working |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -41,6 +42,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 14 | Chat and the agent | L | `chat`: the Chat page, Settings → Agent |
 | 15 | Save states: sessions | M | `sessions`: the Sessions panel |
 | 16 | Everything inside the folder | S–M | Logs read from `data/logs/` |
+| 17 | Image to 3D in `gen3d` | L | 3D Generate page: engine picker, image input, per-engine settings |
 
 # Stage A — Foundation
 
@@ -1282,6 +1284,91 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
 - [ ] `aihub doctor --inventory` lists only the allowlist. *(Two items wait on the user: opencode's `OPENCODE_PROJECT_DIR` and lcpp's CLI installed as a uv tool.)*
 - [x] Run on a fresh copy of the folder, `aihub doctor --inventory` names only allowlisted prerequisites. *(A fresh clone: only the machine's uv-tool lcpp CLI, which the folder doesn't need, and a tmpfs leftover.)*
 - [ ] Delivered: a self-contained AIHub.
+
+---
+
+# Stage E — Image to 3D
+
+## Phase 17 — Image to 3D in `gen3d`
+
+Four image engines join Cube3D in the 3D Generate mod, all producing untextured meshes (texturing and retopology happen outside AIHub). Measured on this machine on 2026-10-10 (lab: `services/gen3d/runtime/lab/`, write-up `lab/report/index.html`): **Hunyuan3D 2.1** runs from Tencent's code (shape only, pure PyTorch), **TRELLIS.2** and **SAM 3D Body** run as ComfyUI 0.37 native nodes, and **SAM 3D Objects** runs from Meta's code with a pure-PyTorch `spconv` replacement (real weights, samurai and vase: 49–77 s per image). Every engine gets a **base** and a **fast** preset with every model parameter exposed. Touches architecture §10 (the gen3d row), §4.7 (outputs), brief §5 (the page), and plan Phases 8 and 11.
+
+**Settled (user, 2026-10-11):**
+- **TRELLIS.2 and SAM 3D Body are delegated to the `comfy` mod** through the hub (`POST {AIHUB_URL}/api/s/comfy/v1/run` with `X-AIHub-Make-Room: 1`), so the ComfyUI install and its memory accounting stay in one place; gen3d still owns the job, queue, ETA and viewer. Their packs carry `agent = false`: the agent reaches them only through gen3d's `make_3d`.
+- Every engine defaults to its **fast** preset; base stays one click away. Every engine but SAM 3D Body gets a **`target_faces`** option (0 = keep the raw mesh). Evidence: `lab/RESULTS.md` §5–6 and the report's "Why the vase takes longer" and "Lower polygon counts".
+
+**Design (as planned 2026-10-11):**
+- **Image engines run the `shape` stage.** It reads the job's image instead of a prompt and writes `mesh.glb` (plus `mesh_raw.glb` when `target_faces` reduced it), so `parts`, `rig`, `preview`, the viewer, follow-ups and `output.json` work unchanged.
+- **Image input:** `image` in the request is an AIHub `output:<id>` (gen3d fetches `GET {AIHUB_URL}/api/outputs/<id>/file`), or a file sent to `POST /v1/jobs/image` (multipart `image` + `job` JSON, like `/v1/jobs/upload`). gen3d writes `input.png` and `input_rgba.png` into the job folder: alpha from the image, else everything that isn't near-white.
+- **Delegated stages stop gen3d's own worker first**, so the hub doesn't count gen3d's memory while comfy needs it. Known cost: a gen3d job still passes gen3d's `[memory]` trigger, which reserves gen3d's estimate when gen3d is unloaded.
+
+**Simple gaps (assumed):**
+- **Licences:** Hunyuan3D 2.1's licence excludes the EU, UK and South Korea; SAM 3D's are the SAM Licence; TRELLIS.2 is MIT. *Assumption:* recorded in the registry entries' `license` field and shown on the engine picker; nothing is enforced.
+
+- [x] **17.1 Runtimes: `services/gen3d/scripts/install-runtime.sh`.**
+  - **Hunyuan3D:** clone `Tencent-Hunyuan/Hunyuan3D-2.1` at `82920d6` into `runtime/hunyuan3d-2.1/`; venv `runtime/img3d/.venv` layered on CubeArt's venv and the image's `/opt/venv` (a `_layers.pth`), plus `timm` and `fast-simplification` (locks in `services/gen3d/locks/img3d.txt`).
+  - **SAM 3D Objects:** clone `facebookresearch/sam-3d-objects` at `f91db41` into `runtime/sam3d-objects/`; venv `runtime/sam3do/.venv` layered on img3d, with the lab's packages (`locks/sam3do.txt`: hydra-core, loguru, lightning, optree, roma, pymeshfix, igraph, xatlas, pyvista, fvcore, utils3d @3913c65, MoGe, pytorch3d 0.7.8 built CPU-only).
+  - **Shims become tracked code:** `services/gen3d/workers/shims/` (`spconv/pytorch`, `gsplat`, `kaolin`, `open3d`) with `tests/test_spconv_shim.py` (dense-Conv3d equivalence, from `runtime/shims/test_spconv_shim.py`).
+  - **Doctor:** `gen3d/doctor.py` reports each engine's runtime as ready or missing.
+  *Done when:* a fresh `install-runtime.sh` builds all three venvs and `gen3d doctor` lists cube3d, hunyuan21 and sam3d-objects as ready; `pytest tests/test_spconv_shim.py` passes.
+  - *As built:* the engine list is `gen3d/engines.py` (local or delegated, weights, code, venv, licence); the doctor reads it. The shim test needs torch, so it skips in the server venv and runs in the image (3 passed); `install-runtime.sh` ends by importing each runtime.
+- [ ] **17.2 Weights in the registry.** `aihub models scan --add` for `data/models/3d/Hunyuan3D-2.1` (dit only), `data/models/3d/sam-3d-objects`, `data/models/3d/moge-vitl`, and the comfy files: `comfyui/diffusion_models/trellis_2_bf16.safetensors`, `comfyui/vae/trellis_2_shape_vae_bf16.safetensors`, `comfyui/clip_vision/dino_v3_vit_l.safetensors`, `comfyui/detection/sam_3d_body_dinov3_bf16.safetensors`, `comfyui/geometry_estimation/moge_2_vitl_normal_fp16.safetensors`. Each entry carries `source` (HF repo + file) and `license`. Remove the unused `trellis_2_int8_convrot.safetensors` (5.25 GB; no faster, less faithful) with the user's approval.
+  *Done when:* `aihub models verify` passes for each, and `service.toml` `[models] dirs` covers them.
+- [ ] **17.3 Options: `gen3d/options.py`.**
+  - `JobRequest.engine`: `cube3d` (text, today's behavior) | `hunyuan21` | `trellis2` | `sam3d_objects` | `sam3d_body`; `image` required for every engine but cube3d.
+  - One options model per engine with every parameter, defaults and ranges from the lab (`lab/RESULTS.md`, report "Every setting"): Hunyuan3D (steps, guidance, octree, num_chunks, box_v, mc_level, flashvdm, topk, seed, floater/degenerate removal, max_faces); TRELLIS.2 (resolution 512/1024/1536, per-stage steps, cfg, rescale, interval, shift, seed, decimate target, remesh on/off); SAM 3D Objects (ss/slat steps, cfg strengths, rescale_t, intervals, seed, distillation); SAM 3D Body (hand refinement, fov or MoGe, export style glb/bvh, bone visuals).
+  - Presets per engine, **fast is the default**: Hunyuan3D fast (30 steps, FlashVDM, num_chunks 200 k); TRELLIS.2 fast (shape 12, **refine 6**: same look as refine 8, 24 % less on round objects) plus `draft` (512 only: 54 s on the vase, softer, more pinholes); SAM 3D Objects fast (distillation; F 0.879 on characters, so the page notes "objects"); SAM 3D Body fast (hand refinement off). `GET /v1/options` and `GET /v1/presets` list them per engine.
+  - `target_faces` (int, 0 = raw; default 0, page shortcuts 200 k / 100 k / 50 k): Hunyuan3D and SAM 3D Objects decimate in their worker with `fast-simplification` (0.2–0.7 s; Hunyuan3D 50 k mean error 0.007 % of the diagonal); TRELLIS.2 runs its built-in `RemeshMesh` (512, udf, drop inner shell) + `DecimateMesh` (10–24 s, clean to 50 k); the raw mesh is kept next to the reduced one. Hunyuan3D's `octree` 256 also halves faces at the source. SAM 3D Body has none (fixed rigged mesh).
+  *Done when:* `tests/test_options.py` covers each engine's validation, presets and the catalogue shape; old requests without `engine` still parse as cube3d.
+- [ ] **17.4 Workers: `gen3d/worker.py` runs one engine container at a time.**
+  - `Worker` takes an engine spec (venv, script, PYTHONPATH, mounts); switching engines stops the running container first (that is how memory is freed).
+  - `workers/hunyuan_worker.py`: the JSON-lines protocol of `cube_worker.py` (`load`, `run`, progress per diffusion step via the pipeline callback, subs `conditioning` / `diffusion` / `volume_decode` / `marching_cubes`); FlashVDM switched on through `vae.enable_flashvdm_decoder` (the pipeline's `enable_flashvdm` fails on 2.1); `HY3DGEN_MODELS` and `TMPDIR` inside the project.
+  - `gen3d/worker_fake.py` simulates every engine.
+  *Done when:* `tests/test_api.py` runs a fake hunyuan job end to end; a real job on `results/samurai_front_rgba.png` with the fast preset finishes in ≤ 120 s cold and writes `mesh.glb` + `output.json`.
+- [ ] **17.5 Comfy side: packs and fixes (`services/comfy/`).**
+  - Commit the lab's two fixes: `extra_model_paths.yaml` gains `detection` and `geometry_estimation`; `nodes/aihub_nodes/__init__.py` gains `patch_sam3d_body` (hand-refinement dtype fix). Update docs/workflows.md §9.
+  - Packs from the lab graphs (`workflow.api.json`, imported with `comfyui workflows new`), all `agent = false`, task `image-to-3d`, inputs `image` (an RGBA cut-out; the mask is its alpha) and every parameter in 17.3:
+    - `trellis2-shape`: the cascade at 1024, raw mesh; `[presets.base]` (shape 20, refine 12) and `[presets.fast]` (shape 12, refine 6).
+    - `trellis2-lowpoly`: the same plus `RemeshMesh` (512, udf, inner shell dropped) → `DecimateMesh` (`target_faces`), saving both meshes (`lab/graphs/trellis2_builtin_lowpoly.api.json`); never `DecimateMesh` on the raw mesh (it breaks thin parts).
+    - `trellis2-draft`: 512 only (no cascade).
+    - `sam3d-body`: the body mesh as a rigged GLB; `[presets.fast]` turns hand refinement off.
+  - `tasks.toml` gains `image-to-3d` (needs `image`, makes a mesh, no agent tool); `service.toml` `[outputs] kinds` adds `model3d`.
+  *Done when:* `comfyui workflows check` is clean for the four packs, and each runs from the Images & Video page into `outputs/comfy/`.
+- [ ] **17.6 Delegated engines: `gen3d/comfy_engine.py`.**
+  - For `trellis2` and `sam3d_body`, the runner uploads `input_rgba.png` (`POST /api/s/comfy/v1/uploads`), posts the pack run to the hub, polls `GET /api/s/comfy/v1/jobs/<id>?wait=…`, maps comfy's 0–1 progress to the stage's `step`/`total`, and downloads the result (`GET /api/s/comfy/v1/files/<path>`) into the job folder. TRELLIS.2 picks `trellis2-lowpoly` when `target_faces` > 0, `trellis2-draft` for the draft preset (its reduction falls back to `fast-simplification` in gen3d, which stops near 130 k faces on TRELLIS meshes).
+  - Cancel forwards to comfy; a comfy error becomes the stage's error.
+  *Done when:* tests with a fake hub (respx) cover success, progress, cancel and failure; a real TRELLIS.2 fast job on the vase finishes and shows in the gen3d viewer.
+- [ ] **17.7 Memory and ETA.**
+  - `[memory] estimate_gb` stays the largest local engine (Cube3D quality 52); each job acquires its engine's amount (`hunyuan21` 12, `sam3d_objects` 25, from the lab peaks + margin). Delegated engines don't acquire in gen3d; comfy does.
+  - `gen3d/eta.py` seeds per-engine stage times from the lab (Hunyuan3D fast: 73 s diffusion + 9–14 s decode; TRELLIS.2 fast: 73 s samurai, 220 s vase; SAM 3D Body 1 s), refined by finished jobs. TRELLIS.2's refine time follows its token count (≈ 5 s/step at 7.7 k tokens, 26 s/step at 23 k; attention grows with the square), known once the shape stage finishes, so its ETA is recomputed then.
+  *Done when:* `tests/test_eta.py` covers the new engines; the Memory page shows the right amount during a hunyuan job.
+- [ ] **17.8 SAM 3D Objects worker: `workers/sam3do_worker.py`.** Port `lab/sam3do_run.py`, which works with the real weights: the pipeline built from the checkpoint's yamls (patched copies), DINOv2 code from a local clone with `pretrained=false`, MoGe v1 from `data/models/3d/moge-vitl/model.pt`, the 4-Gaussian decoder off, `compile_model=false`, MIOpen off, mesh post-processing off. Needs a mask (from the image's alpha). Presets: base (Meta's config) and fast (`distill`, objects only: F 0.986 on the vase, 0.879 on the character).
+  *Done when:* a real job on the vase writes `mesh.glb` in ≤ 80 s warm, and the result matches the lab mesh (F-score ≥ 0.99 at the same seed).
+- [ ] **17.9 The page: `services/gen3d/ui/page.js`** (brief §5).
+  - Engine picker in the composer (text engines vs image engines, with each engine's licence note); an image drop zone / Upload button and "Use as input" from Outputs; the settings menu shows the chosen engine's options from `/v1/options`; preset buttons base / fast.
+  - Job cards show the input image next to the result; SAM 3D Body results get the rig viewer.
+  *Done when:* in the browser, an image job runs from the page for each ready engine, and switching engines changes the settings shown.
+- [ ] **17.10 Agent and docs.**
+  - `service.toml` `make_3d`: `engine`, `image` and `preset` arguments, description naming when to pick which engine (characters: Hunyuan3D; detailed objects: TRELLIS.2; pose/body: SAM 3D Body; objects in a scene photo: SAM 3D Objects); `skills/making-3d/SKILL.md` gets the same guidance.
+  - Docs: architecture §10 (gen3d row), `services/gen3d/README.md` (engines, presets, timings), `docs/structure.md` (new files), brief §5 (the page).
+  *Done when:* the agent eval has a case that makes a mesh from an uploaded image with the right engine; the contract test passes.
+
+**Wire — Phase 17:** the 3D Generate page gains the engine picker, image input and per-engine settings; image jobs show progress, ETA and the 3D viewer like Cube3D jobs; Outputs lists their meshes.
+
+**Checks & deliverables — Phase 17**
+- [ ] The same two lab images through every ready engine from the page, base and fast, within 15 % of the lab timings.
+- [ ] Cube3D jobs, presets and follow-ups (parts, rig) work unchanged; `pytest` in `services/gen3d` and the hub suite pass.
+- [ ] `aihub check gen3d` and `aihub check comfy` pass; memory accounting is right for local and delegated engines.
+- [ ] Delivered: `gen3d/options.py` engines, `gen3d/comfy_engine.py`, `workers/hunyuan_worker.py`, `workers/sam3do_worker.py`, `workers/shims/`, the `trellis2-shape` and `sam3d-body` packs, the updated page, tests.
+
+| Deliverable | Description | Location |
+| --- | --- | --- |
+| Engine options | per-engine parameters, base/fast presets | `services/gen3d/gen3d/options.py` |
+| Engine workers | Hunyuan3D and SAM 3D Objects in their own containers | `services/gen3d/workers/hunyuan_worker.py`, `sam3do_worker.py` |
+| Shims | pure-PyTorch spconv, import stand-ins | `services/gen3d/workers/shims/` |
+| Delegation | TRELLIS.2 and SAM 3D Body through the comfy mod | `services/gen3d/gen3d/comfy_engine.py` |
+| Packs | TRELLIS.2 shape, SAM 3D Body | `services/comfy/workflows/trellis2-shape/`, `sam3d-body/` |
+| Tests | options, fake engines, delegation (fake hub), spconv equivalence | `services/gen3d/tests/test_*.py` |
 
 ---
 

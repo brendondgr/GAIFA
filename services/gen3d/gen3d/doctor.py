@@ -28,6 +28,16 @@ def checks() -> list[tuple[str, bool, str]]:
                        "worker venv (.venv)": ".venv/bin/activate"}.items():
         p = settings.cubeart / rel
         out.append((label, p.exists(), str(p) + ("" if p.exists() else "  (scripts/install-runtime.sh)")))
+    from .engines import ENGINES, missing
+    for eid, e in ENGINES.items():
+        if eid == "cube3d":
+            continue
+        if e.local:
+            gone = missing(eid)
+            out.append((f"{e.label} (image engine)", not gone,
+                        "ready" if not gone else "missing " + ", ".join(gone) + "  (scripts/install-runtime.sh)"))
+        else:
+            out.append((f"{e.label} (image engine, optional)", True, "runs in the comfy mod: packs " + ", ".join(e.packs)))
     podman = shutil.which(settings.podman)
     out.append(("podman", bool(podman), podman or f"{settings.podman} not on PATH"))
     if podman:

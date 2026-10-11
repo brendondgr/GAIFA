@@ -29,6 +29,8 @@ class Settings:
     fake_worker: bool = field(default_factory=lambda: _flag("GEN3D_FAKE_WORKER"))
     # The models: weights/, .venv/ (layered on the image's torch) and cube/ (upstream clone).
     cubeart: Path = _path("GEN3D_CUBEART", str(ROOT / "runtime" / "CubeArt"))
+    # The image engines (plan 17): code clones and venvs next to CubeArt, built by scripts/install-runtime.sh.
+    runtime: Path = _path("GEN3D_RUNTIME", str(ROOT / "runtime"))
     image: str = os.environ.get("GEN3D_IMAGE", "docker.io/kyuz0/amd-strix-halo-comfyui:latest")
     podman: str = os.environ.get("GEN3D_PODMAN", "podman")
     blender: str = os.path.expanduser(os.environ.get("GEN3D_BLENDER", "blender"))

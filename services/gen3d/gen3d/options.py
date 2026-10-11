@@ -7,13 +7,21 @@ A job is a pipeline of stages, each optional:
              job's, or an uploaded one)
     rig      parts -> articulated GLB with joint/slide nodes per limb (needs parts)
     preview  Blender 4-view render of the newest result
+
+`engine` picks what makes the mesh in the shape stage: Cube3D from the prompt, or an image engine
+(Hunyuan3D 2.1, TRELLIS.2, SAM 3D Objects, SAM 3D Body) from `image` (plan 17; gen3d/image_options.py).
 """
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+from .engines import ENGINES, IMAGE_ENGINES
+from .image_options import (DEFAULT_IMAGE_PRESET, IMAGE_OPTIONS, IMAGE_PRESETS, Hunyuan21Options, Sam3dBodyOptions,
+                            Sam3dObjectsOptions, Trellis2Options, image_fields, preset_values)
 
 Stage = Literal["shape", "parts", "rig", "preview"]
 STAGE_ORDER: tuple[Stage, ...] = ("shape", "parts", "rig", "preview")
@@ -68,11 +76,23 @@ class RigOptions(BaseModel):
                                      description="face budget for the whole rigged asset (the limb split adds faces); null = no cap")
 
 
+EngineId = Literal["cube3d", "hunyuan21", "trellis2", "sam3d_objects", "sam3d_body"]
+IMAGE_REF = re.compile(r"^(output:[A-Za-z0-9_.:-]{1,120}|upload)$")
+
+
 class JobRequest(BaseModel):
-    prompt: str = Field("", max_length=1000, description="what to make (needed for the shape stage)")
+    prompt: str = Field("", max_length=1000, description="what to make (Cube3D's shape stage)")
+    engine: EngineId = Field("cube3d", description="what makes the mesh: cube3d from the prompt, or an image engine from `image`")
+    image: str | None = Field(None, description="the picture for an image engine: output:<id> (an AIHub output); "
+                                                "\"upload\" when it came with POST /v1/jobs/image")
     stages: list[Stage] = Field(default_factory=lambda: ["shape", "preview"])
-    preset: Literal["lowpoly", "fast", "balanced", "quality"] | None = Field(None, description="applied under explicit options")
+    preset: str | None = Field(None, description="applied under explicit options: Cube3D lowpoly | fast | balanced | quality; "
+                                                 "image engines fast (their default) | base, TRELLIS.2 also draft")
     shape: ShapeOptions = Field(default_factory=ShapeOptions)
+    hunyuan21: Hunyuan21Options = Field(default_factory=Hunyuan21Options)
+    trellis2: Trellis2Options = Field(default_factory=Trellis2Options)
+    sam3d_objects: Sam3dObjectsOptions = Field(default_factory=Sam3dObjectsOptions)
+    sam3d_body: Sam3dBodyOptions = Field(default_factory=Sam3dBodyOptions)
     parts: PartsOptions = Field(default_factory=PartsOptions)
     rig: RigOptions = Field(default_factory=RigOptions)
     chat_id: str | None = None
@@ -86,10 +106,22 @@ class JobRequest(BaseModel):
             raise ValueError("choose at least one stage")
         return [s for s in STAGE_ORDER if s in set(v)]  # dedupe + canonical order
 
+    @field_validator("image")
+    @classmethod
+    def _image(cls, v: str | None):
+        if v is not None and not IMAGE_REF.match(v):
+            raise ValueError("image must be output:<id> (an AIHub output) or a file sent to POST /v1/jobs/image")
+        return v
+
     @model_validator(mode="after")
     def _consistent(self):
-        if "shape" in self.stages and not self.prompt.strip():
+        names = PRESETS if self.engine == "cube3d" else IMAGE_PRESETS[self.engine]
+        if self.preset is not None and self.preset not in names:
+            raise ValueError(f"{self.engine} has no preset {self.preset!r} (it has: {', '.join(names)})")
+        if "shape" in self.stages and self.engine == "cube3d" and not self.prompt.strip():
             raise ValueError("the shape stage needs a prompt")
+        if "shape" in self.stages and self.engine != "cube3d" and not self.image:
+            raise ValueError(f"{ENGINES[self.engine].label} makes the mesh from a picture: give `image`")
         if "parts" in self.stages and not self.parts.parts:
             raise ValueError("the parts stage needs at least one part name")
         return self
@@ -121,7 +153,14 @@ PART_TEMPLATES: dict[str, list[str]] = {
 
 
 def apply_preset(raw: dict) -> dict:
-    """Merge a preset under the explicit options in a raw request dict (explicit values win)."""
+    """Merge a preset under the explicit options in a raw request dict (explicit values win). An image
+    engine without a preset gets its fast preset."""
+    engine = raw.get("engine") or "cube3d"
+    if engine in IMAGE_ENGINES:
+        name = raw.get("preset") or DEFAULT_IMAGE_PRESET
+        if name not in IMAGE_PRESETS[engine]:
+            return raw                                   # the validator names the engine's presets
+        return {**raw, "preset": name, engine: {**preset_values(engine, name), **(raw.get(engine) or {})}}
     name = raw.get("preset")
     if not name or name not in PRESETS:
         return raw
@@ -187,9 +226,26 @@ def catalogue() -> dict:
                    null_label="no cap"),
         ],
         "presets": PRESETS,
+        "engines": [engine_entry(eid) for eid in ENGINES],
         "part_templates": PART_TEMPLATES,
         "bbox_presets": {"Cube": [1, 1, 1], "Tall": [1, 2, 1], "Wide": [2, 1, 1], "Chair": [1, 1.4, 1],
                          "Flat": [2, 0.5, 2]},
         "max_parts": MAX_PARTS,
-        "defaults": JobRequest(prompt="x").model_dump(exclude={"prompt", "chat_id", "parent_id", "title", "preset"}),
+        "defaults": JobRequest(prompt="x").model_dump(exclude={"prompt", "chat_id", "parent_id", "title", "preset", "image",
+                                                               "engine"}),
     }
+
+
+def engine_entry(eid: str) -> dict:
+    """One engine for the picker: what it takes, its licence, readiness, presets and settings."""
+    from .engines import missing
+    e = ENGINES[eid]
+    out = {"id": eid, "label": e.label, "input": e.input, "help": e.help, "license": e.license,
+           "runs_in": "gen3d" if e.local else "comfy", "missing": missing(eid)}
+    if eid == "cube3d":
+        out.update(presets=list(PRESETS), default_preset=None)
+    else:
+        out.update(presets={k: {"label": v["label"], "help": v["help"], "values": v.get("values", {})}
+                            for k, v in IMAGE_PRESETS[eid].items()},
+                   default_preset=DEFAULT_IMAGE_PRESET, fields=image_fields(eid))
+    return out

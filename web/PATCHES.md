@@ -32,6 +32,7 @@
 | 15 | `Hub.dc.html` | `componentDidUpdate` no longer reads `prevState` (support.js passes only `prevProps`, so opening the palette threw on every update and its input wasn't focused) | Bug fix | 14.1 |
 | 16 | `Hub.dc.html` | The sidebar's MOCK button (mock scenarios, Shift+D) shows only in `?mock` or while some area is mocked | On the live hub it read as if the page were a mock | 16 |
 | 17 | `Hub.dc.html` | The output drawer's *Open in …* button shows only when the output's service is a mod (outputs under `outputs/eval/` offered "Open in eval", a page that doesn't exist) | Bug fix, found in the Firefox check | 16 |
+| 18 | `Hub.dc.html`, `favicon.svg` | The logo (a hub with four nodes) is `web/favicon.svg`, linked as the page icon with a `<title>`; the same mark replaces the sidebar's, and the header starts with the logo and "AIHub" (a link to Overview) before the page name. The browser tab follows the page (`docTitle()`, set in `componentDidUpdate`): "Logs · Speech · AIHub", "About · Settings · AIHub", an output's title, with waiting approvals as "(n)" and "AIHub (down)" when the hub is unreachable | The tab showed the URL and no icon, so AIHub couldn't be told apart in the browser | — |
 
 ## Revision 2 (step 6.5): what changed
 

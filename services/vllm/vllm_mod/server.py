@@ -9,6 +9,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from .downloads import Downloads
 from .engine import Engine, EngineError
 from .hubclient import Hub, NeedsRoom
 from .profiles import load_profiles
@@ -22,7 +23,12 @@ class LoadRequest(BaseModel):
     profile: str | None = Field(None, description="A profile id (default: the loaded one, else the last loaded)")
 
 
-def create_app(settings: Settings | None = None, engine: Engine | None = None) -> FastAPI:
+class DownloadRequest(BaseModel):
+    profile: str = Field(description="The profile whose model to download")
+
+
+def create_app(settings: Settings | None = None, engine: Engine | None = None,
+               downloads: Downloads | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
 
     @asynccontextmanager
@@ -32,7 +38,15 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         settings.state_dir.mkdir(parents=True, exist_ok=True)
         st = app.state
         st.settings = settings
-        st.engine = engine or Engine(settings, Hub(settings.hub_url))
+        hub = Hub(settings.hub_url)
+        st.engine = eng = engine or Engine(settings, hub)
+        st.downloads = dl = downloads or Downloads(settings, eng.hub)
+
+        async def ensure_files(p):
+            if not dl.local_commit(p):
+                eng.stage = "downloading"
+                await dl.ensure(p)
+        eng.before_start.append(ensure_files)
         await st.engine.adopt()
         try:
             yield
@@ -59,8 +73,22 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     def profiles(request: Request) -> dict:
         found, problems = load_profiles(request.app.state.settings.profiles_dir)
         eng: Engine = request.app.state.engine
-        return {"profiles": [p.model_dump() for p in found.values()], "problems": problems,
+        dl: Downloads = request.app.state.downloads
+        rows = [{**p.model_dump(), "downloaded": dl.local_commit(p), "local_bytes": dl.local_bytes(p),
+                 "download": dl.jobs[p.id].view() if p.id in dl.jobs else None} for p in found.values()]
+        return {"profiles": rows, "problems": problems,
                 "loaded": eng.profile.id if eng.profile else None, "last": eng.last_profile()}
+
+    @app.post("/v1/downloads", summary="Download a profile's model (without loading it)", status_code=202)
+    async def download(request: Request, body: DownloadRequest) -> dict:
+        found, _ = load_profiles(request.app.state.settings.profiles_dir)
+        if body.profile not in found:
+            raise EngineError(404, "not_found", f"no profile {body.profile!r}", {"profiles": list(found)})
+        return (await request.app.state.downloads.start(found[body.profile])).view()
+
+    @app.get("/v1/downloads", summary="Downloads in this run of the adapter")
+    def downloads_list(request: Request) -> dict:
+        return {"downloads": request.app.state.downloads.views()}
 
     @app.post("/v1/load", summary="Start vLLM with a profile (stops the running one first)")
     async def load(request: Request, body: LoadRequest | None = None,

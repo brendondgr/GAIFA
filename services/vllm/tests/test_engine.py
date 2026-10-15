@@ -163,8 +163,9 @@ def test_stages_only_move_forward():
     assert next_stage(s, "Loading weights took 0.1 s") == "capturing graphs"
 
 
-def test_routes(settings, make_engine, hub):
-    app = create_app(settings, engine=make_engine())
+def test_routes(settings, make_engine, make_downloads, hub):
+    eng = make_engine()
+    app = create_app(settings, engine=eng, downloads=make_downloads(eng))
     with TestClient(app) as c:
         r = c.post("/v1/load", json={"profile": "nope"})
         assert r.status_code == 404 and r.json()["code"] == "not_found" and "small" in r.json()["data"]["profiles"]

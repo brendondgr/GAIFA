@@ -89,3 +89,48 @@ async def _kill(e: Engine) -> None:
 
 def run(coro):
     return asyncio.run(coro)
+
+
+class FakeFetch:
+    """Stands in for snapshot_download: writes a blob and a snapshot like the HF cache, slowly enough
+    to watch progress; `fail` makes it raise."""
+
+    def __init__(self, size: int = 4000, chunks: int = 4, delay: float = 0.3):
+        self.size, self.chunks, self.delay = size, chunks, delay
+        self.calls: list[str] = []
+        self.fail: str | None = None
+
+    def __call__(self, repo: str, revision: str, cache_dir: Path) -> str:
+        import time
+        self.calls.append(repo)
+        if self.fail:
+            raise OSError(self.fail)
+        base = cache_dir / ("models--" + repo.replace("/", "--"))
+        (base / "blobs").mkdir(parents=True, exist_ok=True)
+        blob = base / "blobs" / "abc123"
+        with open(blob, "wb") as f:
+            for _ in range(self.chunks):
+                f.write(b"x" * (self.size // self.chunks))
+                f.flush()
+                time.sleep(self.delay / self.chunks)
+        snap = base / "snapshots" / "c0ffee"
+        snap.mkdir(parents=True, exist_ok=True)
+        for name in ("model.safetensors", "config.json", "tokenizer.json"):
+            link = snap / name
+            if not link.exists():
+                link.symlink_to(Path("../../blobs/abc123"))
+        return str(snap)
+
+
+@pytest.fixture
+def fetch() -> FakeFetch:
+    return FakeFetch()
+
+
+@pytest.fixture
+def make_downloads(settings, hub, fetch):
+    from vllm_mod.downloads import Downloads
+
+    def make(engine: Engine) -> Downloads:
+        return Downloads(settings, engine.hub, fetch=fetch, remote_size=lambda repo, rev: fetch.size)
+    return make

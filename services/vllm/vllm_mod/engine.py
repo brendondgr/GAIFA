@@ -21,7 +21,7 @@ from typing import Any
 import httpx
 
 from .containers import ContainerError, FakeContainers, Podman
-from .hubclient import Hub
+from .hubclient import Hub, NeedsRoom
 from .profiles import Profile, engine_command, load_profiles
 from .settings import Settings, gtt_total_bytes
 
@@ -149,9 +149,9 @@ class Engine:
             self.state, self.profile, self.stage = "unloaded", None, None
             self.last_error = str(e)
             done.set()
-            if isinstance(e, ContainerError):
-                raise EngineError(500, "start_failed", f"podman: {e}") from e
-            raise
+            if isinstance(e, (EngineError, NeedsRoom)):
+                raise
+            raise EngineError(500, "start_failed", f"podman: {e}" if isinstance(e, ContainerError) else str(e)) from e
         self._last_file.write_text(json.dumps({"profile": p.id}))
         self._watch(p, adopted=False)
         return done

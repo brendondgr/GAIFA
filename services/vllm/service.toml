@@ -1,0 +1,27 @@
+# vLLM (plan Phase 18): an adapter (port 5101) that serves one model profile at a time with vLLM, in
+# kyuz0's patched image for Strix Halo (gfx1151), on 127.0.0.1:7801. Fields: architecture §4.3.
+id = "vllm"
+name = "vLLM"
+description = "Serves Hugging Face models with vLLM, and publishes them to the relay"
+icon = "cpu"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "-m", "vllm_mod", "--port", "{port}"]
+port = 5101
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 60                 # stopping the mod stops the engine container first
+restart = "on-failure"
+after = ["relay"]
+install = "install.sh"
+
+[run.env]
+# Pinned: `:latest` moves. kyuz0/vllm-therock-gfx1151 built 2026-10-04 (vLLM 0.31.0+strix).
+VLLM_IMAGE = "docker.io/kyuz0/vllm-therock-gfx1151@sha256:8002236ea7526491cf9b0b6a543408fb0be2baacbba656effc132aba2e44dd1d"
+VLLM_ENGINE_PORT = "7801"
+VLLM_STATE_DIR = "{root}/data/state/vllm"
+HF_HOME = "{hf_home}"
+

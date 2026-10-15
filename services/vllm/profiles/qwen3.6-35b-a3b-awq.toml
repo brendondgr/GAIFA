@@ -1,0 +1,15 @@
+# Qwen3.6 35B-A3B, AWQ 4-bit (~20 GB of weights; ~3B parameters active per token). Flags from kyuz0's
+# models.py in the pinned image: AWQ needs eager mode on gfx1151; native tool calls and thinking.
+# memory_gb is measured in plan 18.7.
+name = "Qwen3.6 35B-A3B (AWQ 4-bit)"
+model = "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+served_name = "qwen3.6-35b-a3b"
+alias = "Qwen3.6-35B-A3B-vLLM"
+memory_gb = 40
+max_model_len = 65536
+max_num_seqs = 4
+attention_backend = "TRITON_ATTN"
+enforce_eager = true
+trust_remote_code = true
+tool_parser = "qwen3_coder"
+reasoning_parser = "qwen3"

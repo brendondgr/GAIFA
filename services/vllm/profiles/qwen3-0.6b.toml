@@ -1,0 +1,12 @@
+# The smoke-test model (plan 18, 2026-10-15): proves vLLM runs on the GPU in about 2 minutes.
+# 134 tok/s single stream; 0.1 of the GPU (12 GiB) leaves ~10.8 GiB of KV cache.
+name = "Qwen3 0.6B (smoke test)"
+model = "Qwen/Qwen3-0.6B"
+served_name = "qwen3-0.6b"
+alias = "Qwen3-0.6B-vLLM"
+memory_gb = 12
+max_model_len = 8192
+max_num_seqs = 4
+attention_backend = "TRITON_ATTN"
+reasoning_parser = "qwen3"
+tool_parser = "hermes"

@@ -25,3 +25,11 @@ VLLM_ENGINE_PORT = "7801"
 VLLM_STATE_DIR = "{root}/data/state/vllm"
 HF_HOME = "{hf_home}"
 
+
+[memory]
+# Each load acquires its profile's own memory_gb (+ the processes' overhead) from AIHub first.
+estimate_gb = 16
+load = "POST /v1/load"
+unload = "POST /v1/unload"
+containers = ["aihub-vllm-*"]
+idle_unload_s = 0                   # a reload takes minutes; unload by hand

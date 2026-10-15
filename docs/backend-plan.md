@@ -22,6 +22,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | C — New capabilities | 11–13 | The ComfyUI mod, runtimes moved inside, the agent-ready API (tool catalog, approvals, model facts, MCP, the agent eval) | ComfyUI and the old venvs; nothing is deleted without approval |
 | D — Chat interface | 14–16 | Chat with our own Claude-Code-style agent, save states, everything inside the folder | No |
 | E — Image to 3D | 17 | Hunyuan3D 2.1, TRELLIS.2, SAM 3D Body and SAM 3D Objects as image engines in `gen3d` | gen3d and comfy; Cube3D keeps working |
+| F — vLLM | 18 | A `vllm` mod: vLLM on this machine (Strix Halo, gfx1151) in kyuz0's container, published to the relay | relay (new registrations); lcpp untouched |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -43,6 +44,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 15 | Save states: sessions | M | `sessions`: the Sessions panel |
 | 16 | Everything inside the folder | S–M | Logs read from `data/logs/` |
 | 17 | Image to 3D in `gen3d` | L | 3D Generate page: engine picker, image input, per-engine settings |
+| 18 | New `vllm` mod (vLLM) | M–L | vLLM page (profiles, engine log, throughput); its models in the relay and Chat |
 
 # Stage A — Foundation
 
@@ -1378,6 +1380,85 @@ Four image engines join Cube3D in the 3D Generate mod, all producing untextured 
 | Delegation | TRELLIS.2 and SAM 3D Body through the comfy mod | `services/gen3d/gen3d/comfy_engine.py` |
 | Packs | TRELLIS.2 shape, SAM 3D Body | `services/comfy/workflows/trellis2-shape/`, `sam3d-body/` |
 | Tests | options, fake engines, delegation (fake hub), spconv equivalence | `services/gen3d/tests/test_*.py` |
+
+---
+
+# Stage F — vLLM
+
+## Phase 18 — New `vllm` mod (vLLM)
+
+vLLM serves Hugging Face models (safetensors, AWQ) with batching, prefix caching and native tool-call and reasoning parsers; llama.cpp (lcpp) stays the GGUF engine. Upstream vLLM doesn't support gfx1151, so the mod runs **kyuz0's patched image** `docker.io/kyuz0/vllm-therock-gfx1151` (ROCm from TheRock, vLLM `0.31.0+strix`), the same author as the ComfyUI image. The mod is a small FastAPI adapter that starts one vLLM container at a time, asks the hub for its memory first, downloads and registers models, and publishes the running model to the relay so Chat and the agent can use it. It follows the comfy and gen3d patterns (adapter + container, `containers` for memory) and lcpp's relay publishing. Touches architecture §2 (ports, mod ids), §10 (a new row), §7 (a new acquirer), and nothing in the hub's code.
+
+**Smoke test (2026-10-15, by hand, before planning):** image `sha256:8002236ea752…` (built 2026-10-04, 12.4 GB), `podman run --device /dev/kfd --device /dev/dri --group-add keep-groups --security-opt seccomp=unconfined --ipc=host`, `VLLM_ROCM_USE_AITER=0`, `--attention-backend TRITON_ATTN`, `Qwen/Qwen3-0.6B`, `--gpu-memory-utilization 0.1 --max-model-len 8192 --max-num-seqs 4`: healthy after 130 s cold (torch.compile 16 s, CUDA graphs 3 s, the rest imports and the download), 134 tok/s single stream, 13.8 GB GTT used. `0.1` of the GPU meant 12.06 GiB (KV 10.81 + weights 1.12 + graphs 0.13), so vLLM's total is the GTT size (`amdgpu.gttsize=131072`, 121.5 GiB). Host prerequisites are already in place: that kernel parameter, `ttm.pages_limit`, and the user in `video` and `render`.
+
+**Simple gaps (assumed):**
+- **One model at a time.** *Assumption:* the mod runs at most one vLLM container; loading another profile unloads the current one first. Several at once can come later (memory makes it rare).
+- **Image version.** *Assumption:* pinned by digest in `service.toml` (`VLLM_IMAGE`); `:latest` moves, and its README warns the `dev` tag regresses. Updating is a manual edit plus the 18.7 checks. The image is outside the project, which the Phase 12.4 allowlist already covers (podman images).
+- **Ports.** *Assumption:* the adapter on **5101** (5100 is `agent`), the vLLM server on **7801** (`VLLM_ENGINE_PORT`), outside the new-mod range so `aihub new` never picks it. The container uses `--network host` and vLLM binds `127.0.0.1`, so nothing is exposed and there's no port mapping (the smoke test's mapped port saw requests from the host's public address).
+- **Model files.** *Assumption:* vLLM's native Hugging Face cache, `HF_HOME={hf_home}` (`data/models/hf-cache`), registered like Kokoro and Whisper: `format: hf-dir`, `kind: llm`, `services: ["vllm"]`, with the repo and revision as `source`. Not `[models] dirs`, which would claim every model in the shared cache.
+- **Caches.** *Assumption:* Triton and vLLM's torch.compile caches go in `data/state/vllm/cache/` (runtime state, plan 16), so the second start of a profile skips compiling. Not in backups.
+- **Stopping.** *Assumption:* stopping the mod (SIGTERM) stops the engine, since stopping is how memory is freed; an adapter crash leaves the container running, and the next start adopts it by label.
+- **Never unloaded automatically.** *Assumption:* `vllm` joins `config.toml [memory] never_unload`, like lcpp: a reload takes minutes, and a chat between requests looks idle. Unload is by hand (page, agent tool, Stop).
+- **When unloaded,** the relay registration is removed, so the model leaves `/v1/models`; a client that calls it gets the relay's unknown-model error. Loading on demand from the relay is out of scope.
+- **Downloads.** The user approved Qwen3-0.6B (done) and Qwen3.6-35B-A3B AWQ 4-bit (~20 GB) for this phase on 2026-10-15. Any other model is downloaded only when the user loads its profile.
+
+- [ ] **18.1 Scaffold and profiles: `services/vllm/`.**
+  - `aihub new vllm --port 5101 --name "vLLM"`, then the package `vllm_mod/` (`settings.py`, `profiles.py`, `server.py`); `aihub-install.sh` makes the adapter venv (fastapi, uvicorn, httpx, pydantic, huggingface_hub) and runs `podman pull` of the pinned digest when it's missing.
+  - **`service.toml`:** `[run] command = [".venv/bin/python", "-m", "vllm_mod", "--port", "{port}"]`, `health = "/health"`, `status = "/v1/status"`, `after = ["relay"]`, `stop_timeout_s = 60`; `[run.env]` `VLLM_IMAGE` (the digest), `VLLM_ENGINE_PORT = "7801"`, `VLLM_STATE_DIR = "{root}/data/state/vllm"`, `HF_HOME = "{hf_home}"`; `[memory]` `load = "POST /v1/load"`, `unload = "POST /v1/unload"`, `containers = ["aihub-vllm-*"]`, `estimate_gb` = the default profile's, `idle_unload_s = 0`.
+  - **Profiles** are TOML files in `services/vllm/profiles/<id>.toml`, like workflow packs: `name`, `model` (HF repo), `revision`, `served_name`, `alias` (the relay alias), `memory_gb`, `max_model_len`, `max_num_seqs`, `attention_backend`, `enforce_eager`, `trust_remote_code`, `tool_parser`, `reasoning_parser`, `env = {…}`, `extra_args = […]`. Unknown keys are errors. `Profile` (pydantic) in `profiles.py`; `load_profiles(dir)` returns profiles plus per-file problems.
+  - **Seed profiles** from kyuz0's `models.py` in the pinned image: `qwen3-0.6b` (the smoke settings) and `qwen3.6-35b-a3b-awq` (`cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit`: `enforce_eager`, `trust_remote_code`, `--enable-auto-tool-choice --tool-call-parser qwen3_coder --reasoning-parser qwen3`, `max_model_len` 65536, `max_num_seqs` 4; `memory_gb` measured in 18.7).
+  - **`engine_command(profile, settings, gtt_total_bytes)`** builds the `podman run -d` line: name `aihub-vllm-<profile id>`, labels `aihub.mod=vllm` and `aihub.profile=<id>`, the smoke test's device, group and security flags, `--network host --ipc host`, mounts for `HF_HOME` and the cache dir, `VLLM_ROCM_USE_AITER=0`, `VLLM_ROCM_USE_AITER_LINEAR=0`, `TRITON_CACHE_DIR`, `VLLM_CACHE_ROOT`, the profile's `env`, then `vllm serve <model> --host 127.0.0.1 --port <engine port> --served-model-name <served_name> --gpu-memory-utilization <memory_gb × 10⁹ / gtt_total>` and the profile's flags. `gtt_total` comes from `/sys/class/drm/card*/device/mem_info_gtt_total`.
+  - Routes: `GET /health`, `GET /v1/profiles` (with which are downloaded), `GET /v1/status` (unloaded).
+  *Done when:* `services/vllm/tests/test_profiles.py` covers parsing, unknown keys, the seed profiles, and `engine_command` (utilization math, no port mapping, labels, mounts, flags); `aihub check vllm` passes.
+- [ ] **18.2 Engine lifecycle: `vllm_mod/engine.py`.**
+  - `Engine.load(profile_id=None)` (default: the last loaded, kept in `data/state/vllm/last.json`, so a session restore's plain load brings it back): unload anything else, ensure the model is downloaded (18.3), `POST {AIHUB_URL}/api/memory/acquire?make_room=1` for `memory_gb` + the process overhead measured in 18.7 (a `409` fails the load with the hub's message), `podman run -d`, then poll the engine's `/health` with `stages` read from its log (`downloading`, `loading weights`, `compiling`, `capturing graphs`, `ready`); the timeout is 20 min (a first compile).
+  - `Engine.unload()`: `podman stop -t 30`, then `podman rm -f`. SIGTERM to the adapter does the same before it exits.
+  - **Adoption:** on start, `podman ps --filter label=aihub.mod=vllm` adopts a running container (state from its `/health`) and removes exited ones.
+  - **Logs:** a follower runs `podman logs -f` on the container and writes its lines to the adapter's stdout with an `engine:` prefix, so they reach `data/logs/vllm.log` and the Logs tab. `GET /v1/engine/logs?tail=` returns the last lines.
+  - **Crashes:** a container that exits on its own sets `failed` with its last 30 log lines in `status.last_error`, and is removed.
+  - **Fake engine:** `VLLM_FAKE=1` runs `vllm_mod/fake_engine.py` (health, `/v1/models`, `/metrics`, a streaming `/v1/chat/completions`) as a subprocess instead of podman, for tests and `--demo-mods`.
+  - Routes: `POST /v1/load` (`{"profile": "<id>"}`, optional), `POST /v1/unload`.
+  *Done when:* `tests/test_engine.py` (fake engine, the hub faked with `httpx.MockTransport`) covers load, unload, switching profiles, adoption after an adapter restart, a crash, `409 needs_room`, and the startup timeout; the Load and Unload buttons on the generic page work against the fake.
+- [ ] **18.3 Downloads and the registry: `vllm_mod/downloads.py`.**
+  - Before a load, a model missing from the HF cache is fetched in the adapter with `huggingface_hub.snapshot_download` (only `*.safetensors`, `*.json`, tokenizer and template files), so download time never holds a memory grant. Progress (bytes done of the repo's total) is a status job; `POST /v1/downloads` (`{"profile"}`) starts one without loading.
+  - When it finishes, the adapter registers the model: `POST {AIHUB_URL}/api/models` with `path: "hf-cache/hub/models--<org>--<name>"`, `kind: "llm"`, `format: "hf-dir"`, `services: ["vllm"]`, `source: {type: "huggingface", repo, revision}` (the resolved commit). `409 model_exists` counts as done.
+  - The engine starts with `HF_HUB_OFFLINE=1` once the files are local, so a start never downloads inside the container.
+  *Done when:* `tests/test_downloads.py` (a patched `snapshot_download`, the fake hub) covers progress, registration, the already-registered case, and a failed download failing the load; the 0.6B from the smoke test is registered and shows "used by vllm" on the Models page.
+- [ ] **18.4 Publishing to the relay: `vllm_mod/relay.py`.**
+  - When the engine is ready: `PUT {relay}/admin/registrations/vllm:<engine port>` with `name` (profile id), `host`, `port`, `alias`, `available_models: [served_name]`, `server_type: "vllm"`, `owner: "vllm"`, `meta.manager_url` (`http://127.0.0.1:7000/#/s/vllm`). `DELETE` when an unload starts and again when the engine is gone; on adapter start, reconcile with `GET /admin/registrations?owner=vllm`. A relay that is down leaves the registration pending, with one retry loop and capped backoff (lcpp's design in `services/lcpp/src/lcpp/relay.py`, written again here: mods don't import each other).
+  - The relay's model facts (plan 13.3) read vLLM's `max_model_len` from `/v1/models` directly; check that `meta` shows the profile's context, tools and reasoning, and add a `facts_override` only if it doesn't.
+  *Done when:* `tests/test_relay.py` (a fake relay) covers register, unregister, relay down then back, and reconcile; with the 0.6B loaded, the relay's `/v1/models` lists it with `context_length` 8192, and a chat through `:4000` answers.
+- [ ] **18.5 Status, stats and tools.**
+  - `GET /v1/status` (architecture §4.6): `loaded` (the engine is ready), `busy` (vLLM's `num_requests_running` > 0), `idle_s`, `memory_estimate_gb` (the current or default profile), `stats` (Model, Tokens/s from the generation-token counter's rate, Requests, KV cache %), and `jobs` for downloads and starts (with stages).
+  - `vllm_mod/metrics.py` parses vLLM's Prometheus `/metrics`; the fixture is captured from the pinned image (`tests/fixtures/metrics-0.31.txt`).
+  - `[tools]`: `list_profiles` (read), `load_llm` (`POST /v1/load`, write, `ask = ["profile"]`), `unload_llm` (`POST /v1/unload`, `confirm = true`).
+  *Done when:* `tests/test_status.py` covers each state and the metrics parsing against the fixture; `aihub check vllm` validates the status shape and the tools; the tile shows tokens/s while a request runs.
+- [ ] **18.6 The page: `services/vllm/ui/page.js`** (brief §5; `/mod-kit.js`, `/mod-form.js`, `/mod-charts.js`).
+  - **Profiles tab:** a card per profile (model, downloaded or its size, memory, context, parsers) with Load / Unload / Download; the loaded one shows its stages while starting, then its endpoint, served name and relay alias. Editing a profile is a `schemaForm` from `GET /v1/profiles/schema`, saved with `PUT /v1/profiles/{id}` (`DELETE` to remove a profile; never its downloaded files, which stay on the Models page).
+  - **Engine tab:** the running command line, a live log tail (`GET /v1/engine/logs`, polled), and charts of tokens/s and KV cache % from the stat series.
+  *Done when:* in the browser, the 0.6B loads from the page with its stages, a profile edit round-trips to its TOML file, and the engine log streams.
+- [ ] **18.7 Live check and docs.**
+  - Load `qwen3.6-35b-a3b-awq` from the page (the ~20 GB download the user approved): record the cold start (download, compile) and the warm start (cached compile), single-stream tokens/s, 4 concurrent requests, and the hub's measured memory against `memory_gb`. Set the profile's `memory_gb` and the overhead in 18.2 from the measurement.
+  - Chat with it on the Chat page through the relay: an answer with thinking split out (`reasoning`), and a tool call (generate an image) parsed natively.
+  - Restart the adapter (`aihub restart vllm`: the engine stops, which is expected) and the hub (`aihub restart`: the engine keeps running and is still published); save a session with the model loaded, unload it, and restore the session.
+  - **Docs:** architecture §2 (mod ids and ports: `vllm` 5101, engine 7801) and §10 (a `vllm` row), `services/vllm/README.md` (profiles, the image, timings), `docs/structure.md`, `CLAUDE.md` status, the `aihub` skill's port list, `config.toml` (`never_unload`, `[services] order`).
+  *Done when:* each check above is done and its numbers are in the README; `uv run pytest` and `pytest` in `services/vllm` pass.
+
+**Wire — Phase 18:** the vLLM page (Profiles and Engine tabs) and its tile (model, tokens/s, KV cache); its model in the relay's endpoints and in Chat's model list while loaded; its memory on the Memory page; its downloads on the Models page.
+
+**Checks & deliverables — Phase 18**
+- [ ] `aihub check vllm` passes, and the generic tabs (API, Logs, Settings) work.
+- [ ] Loading vLLM when memory is short shows the Make-room plan; it is never unloaded automatically.
+- [ ] Deleting `services/vllm/` and running `aihub rescan` removes the mod; its registered models stay (with `services` pointing at a missing mod, like any orphan).
+- [ ] Delivered: `services/vllm/` (adapter, profiles, page, tests, README), the two seed profiles, the docs updates.
+
+| Deliverable | Description | Location |
+| --- | --- | --- |
+| Adapter | profiles, the engine container, downloads, relay publishing, status | `services/vllm/vllm_mod/` |
+| Profiles | one TOML per model setup | `services/vllm/profiles/*.toml` |
+| Page | Profiles and Engine tabs | `services/vllm/ui/page.js` |
+| Fake engine | vLLM's routes for tests and `--demo-mods` | `services/vllm/vllm_mod/fake_engine.py` |
+| Tests | profiles, engine lifecycle, downloads, relay, status (fake engine, fake hub, fake relay) | `services/vllm/tests/test_*.py` |
 
 ---
 

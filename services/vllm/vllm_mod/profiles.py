@@ -146,3 +146,32 @@ def engine_command(profile: Profile, settings: Settings, gtt_total: int) -> list
     for k, v in engine_env(profile, settings).items():
         cmd += ["-e", f"{k}={v}"]
     return cmd + [settings.image] + serve_args(profile, settings.engine_port, gtt_total)
+
+
+def schema() -> dict:
+    """The profile's JSON Schema for the page's form (without the id, which is the file name)."""
+    s = Profile.model_json_schema()
+    s["properties"].pop("id", None)
+    s["required"] = [r for r in s.get("required", []) if r != "id"]
+    return s
+
+
+def save_profile(folder: Path, p: Profile) -> Path:
+    """Write the profile's file. An existing file keeps its comments and key order (tomlkit); keys
+    that are now empty are removed. Written to a temp file, then renamed."""
+    import tomlkit
+
+    path = folder / f"{p.id}.toml"
+    doc = tomlkit.parse(path.read_text()) if path.exists() else tomlkit.document()
+    data = p.file_data()
+    for k in list(doc.keys()):
+        if k not in data:
+            del doc[k]
+    for k, v in data.items():
+        if k not in doc or doc[k] != v:
+            doc[k] = v
+    folder.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(tomlkit.dumps(doc))
+    tmp.replace(path)
+    return path

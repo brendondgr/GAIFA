@@ -70,3 +70,36 @@ def test_engine_command(tmp_path):
     assert "HF_HUB_OFFLINE=1" in envs and "X=1" in envs and "VLLM_ROCM_USE_AITER=0" in envs
     i = cmd.index("img@sha256:abc")
     assert cmd[i + 1:i + 3] == ["vllm", "serve"]
+
+
+def test_profile_routes(settings, make_engine, make_downloads):
+    from fastapi.testclient import TestClient
+
+    from vllm_mod.server import create_app
+
+    eng = make_engine()
+    (settings.profiles_dir / "small.toml").write_text("# keep me\n" + (settings.profiles_dir / "small.toml").read_text())
+    with TestClient(create_app(settings, engine=eng, downloads=make_downloads(eng))) as c:
+        sch = c.get("/v1/profiles/schema").json()
+        assert "id" not in sch["properties"] and "memory_gb" in sch["required"]
+        new = {"name": "New", "model": "org/new", "memory_gb": 8, "max_model_len": 2048, "tool_parser": ""}
+        r = c.put("/v1/profiles/new-one", json=new)
+        assert r.status_code == 200 and r.json()["profile"]["id"] == "new-one"
+        text = (settings.profiles_dir / "new-one.toml").read_text()
+        assert 'model = "org/new"' in text and "tool_parser" not in text
+        assert c.put("/v1/profiles/Bad Id", json=new).json()["code"] == "invalid_id"
+        r = c.put("/v1/profiles/x", json={**new, "memory_gb": -1})
+        assert r.status_code == 422 and "memory_gb" in r.json()["detail"]
+        row = next(p for p in c.get("/v1/profiles").json()["profiles"] if p["id"] == "small")
+        body = {k: v for k, v in row.items() if k not in ("downloaded", "local_bytes", "download")}
+        r = c.put("/v1/profiles/small", json={**body, "max_model_len": 1024, "alias": None})
+        text = (settings.profiles_dir / "small.toml").read_text()
+        assert text.startswith("# keep me") and "max_model_len = 1024" in text and "alias" not in text
+        assert c.post("/v1/load", json={"profile": "small"}).status_code == 200
+        r = c.put("/v1/profiles/small", json={**body, "max_model_len": 2048})
+        assert r.json()["note"] == "it applies at the next load"
+        assert c.delete("/v1/profiles/small").json()["code"] == "in_use"
+        c.post("/v1/unload")
+        assert c.delete("/v1/profiles/small").json() == {"deleted": "small"}
+        assert c.delete("/v1/profiles/small").status_code == 404
+        assert "small" not in [p["id"] for p in c.get("/v1/profiles").json()["profiles"]]

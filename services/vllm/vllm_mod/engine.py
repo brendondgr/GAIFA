@@ -72,6 +72,7 @@ class Engine:
         self.command: list[str] = []
         self.started_at: float | None = None
         self.ready_at: float | None = None
+        self.failed_at: float | None = None
         self.lines: deque[str] = deque(maxlen=500)
         self.before_start: list[Hook] = []      # downloads (18.3)
         self.on_ready: list[Hook] = []          # relay publishing (18.4)
@@ -236,7 +237,7 @@ class Engine:
         tail = "\n".join(list(self.lines)[-30:])
         self.last_error = f"{why}\n{tail}".strip()
         log.error("%s: %s", p.name, why)
-        self.state, self.stage, self.error = "failed", None, why
+        self.state, self.stage, self.error, self.failed_at = "failed", None, why, time.time()
         if was_ready:
             await self._hooks(self.on_stopping, p)
         with suppress(ContainerError):

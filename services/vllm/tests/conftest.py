@@ -34,7 +34,8 @@ def settings(tmp_path: Path, monkeypatch) -> Settings:
     for k in ("FAKE_VLLM_FAIL", "FAKE_VLLM_CRASH_S"):
         monkeypatch.delenv(k, raising=False)
     return Settings(port=free_port(), engine_port=free_port(), state_dir=tmp_path / "state", hf_home=tmp_path / "hf",
-                    profiles_dir=profiles, hub_url="http://hub", fake=True, start_timeout_s=20, overhead_gb=1)
+                    profiles_dir=profiles, hub_url="http://hub", fake=True, start_timeout_s=20, overhead_gb=1,
+                    relay_url="")       # never the live relay; tests that need one pass a fake
 
 
 class FakeHub:

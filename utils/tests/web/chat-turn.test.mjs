@@ -100,3 +100,44 @@ test('a replay (the same events again, and in two halves) gives the same turns',
   const shape = bs => JSON.stringify(bs.map(b => b.kind === 'turn' ? [b.key, rowTypes(b), b.answer?.text, b.outputs.map(o => o.n), b.summary] : b.item.key));
   assert.equal(shape(twice), shape(once));
 });
+
+const cs = await load('chat/chat-steps.js');
+
+test('step words: built-ins for the sample turn, running and done', () => {
+  const ctx = { outputs: [{ n: 1, output_id: 'o1', title: 'Samurai' }] };
+  assert.deepEqual(cs.stepText('comfy_generate_image', { args: { workflow: 'zimage-turbo', aspect: '1:1' } }), { label: 'Generating an image', icon: 'image', detail: 'Z-Image Turbo · 1:1', lookup: false });
+  assert.equal(cs.stepText('comfy_generate_image', { done: true }).label, 'Generated an image');
+  const m = cs.stepText('gen3d_make_3d', { args: { image: 'output:o1', engine: 'trellis2', preset: 'balanced' }, ctx, done: true });
+  assert.deepEqual([m.label, m.detail], ['Made a 3D model', 'TRELLIS.2 · from #1 · balanced']);
+  assert.deepEqual(cs.stepText('find_tools', { args: { query: 'image 3d' } }), { label: 'Looking up tools', icon: 'search', detail: '“image 3d”', lookup: true });
+  assert.equal(cs.stepText('load_tools', { args: { names: ['comfy_generate_image', 'gen3d_make_3d'] }, done: true }).label, 'Loaded 2 tools');
+  const s = cs.stepSentence('gen3d_make_3d', { args: { image: 'output:o1', engine: 'trellis2', preset: 'balanced', stages: ['shape', 'texture'] }, ctx });
+  assert.deepEqual(s.parts, ['Made from ', { ref: ctx.outputs[0] }, ' with ', { b: 'TRELLIS.2' }, ', balanced preset (shape, texture)', '.']);
+  const g = cs.stepSentence('comfy_generate_image', { args: { prompt: 'a fox', workflow: 'zimage-turbo', aspect: '1:1', seed: 81723 } });
+  assert.deepEqual([g.parts.filter(Boolean), g.quote], [['Generated with ', { b: 'Z-Image Turbo' }, ', square', ', seed 81723', ', from this prompt:'], 'a fox']);
+});
+
+test('step words: the fallback from the name and schema, schema labels, a registered override', () => {
+  const ctx = { tools: [{ name: 'storyboard_make_board', mod: 'storyboard', risk: 'generate', parameters: { properties: { style: { type: 'string', title: 'Art style', enum: ['ink', 'paint'], 'x-enum-labels': { ink: 'Ink wash' } }, image: { type: 'string' } } } }],
+    outputs: [{ n: 4, output_id: 'o4', title: 'Fox' }] };
+  assert.deepEqual([cs.stepText('storyboard_make_board', { ctx }).label, cs.stepText('storyboard_make_board', { ctx, done: true }).label], ['Making board', 'Made board']);
+  assert.equal(cs.stepText('vllm_engine_status', { done: true }).label, 'Checked engine status');
+  const f = cs.stepSentence('storyboard_make_board', { args: { style: 'ink', image: 'output:o4', prompt: 'three panels' }, ctx });
+  assert.deepEqual(f.parts, ['Made board with:']);
+  assert.deepEqual(f.fields, [['Art style', 'Ink wash'], ['Image', { ref: ctx.outputs[0] }]]);
+  assert.equal(f.quote, 'three panels');
+  assert.equal(cs.nameOf('trellis2'), 'TRELLIS.2');
+  const off = cs.registerStep('storyboard_make_board', { running: 'Drawing a storyboard', done: 'Drew a storyboard', icon: 'image', lookup: true });
+  assert.equal(cs.stepText('storyboard_make_board', { ctx, done: true }).label, 'Drew a storyboard');
+  assert.ok(ct.isLookup('storyboard_make_board'));
+  off();
+  assert.equal(cs.stepText('storyboard_make_board', { ctx }).label, 'Making board');
+});
+
+test('step words: errors in plain words, the code kept apart', () => {
+  const e = cs.errorText({ status: 'error', error: { code: 'invalid_arguments', detail: 'cube3D makes a model from text and can\'t use a picture.', fix: 'Use engine: "trellis2".' } });
+  assert.deepEqual(e, { text: 'Cube3D makes a model from text and can\'t use a picture.', fix: 'Use engine: "trellis2".', code: 'invalid_arguments' });
+  assert.equal(cs.errorText({ status: 'denied' }).text, 'You said no.');
+  assert.ok(ct.isLookup('comfy_job', [{ name: 'comfy_job', risk: 'read' }]));
+  assert.ok(!ct.isLookup('comfy_generate_image', [{ name: 'comfy_generate_image', risk: 'generate' }]));
+});

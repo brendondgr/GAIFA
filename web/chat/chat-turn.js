@@ -17,11 +17,12 @@
 // The agent's own lookups: drawn grey and not counted as work. `addLookup` extends it (chat-steps.js).
 const LOOKUPS = new Set(['find_tools', 'load_tools', 'read_skill', 'view_output', 'read_result', 'comfy_list_workflows']);
 export const addLookup = name => { LOOKUPS.add(name); };
+/** A lookup: a known one, or any catalog tool whose risk is `read` (a hub_ tool counts as one when the catalog isn't known). */
 export function isLookup(name, tools) {
   if (LOOKUPS.has(name)) return true;
-  if (!String(name).startsWith('hub_')) return false;
   const t = (tools || []).find(x => x.name === name);
-  return t ? t.risk === 'read' : true;
+  if (t) return t.risk === 'read';
+  return String(name).startsWith('hub_');
 }
 
 const STANDALONE = new Set(['compact']);      // drawn between turns, never inside one

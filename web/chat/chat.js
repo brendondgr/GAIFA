@@ -22,6 +22,7 @@ import { Composer } from './chat-composer.js';
 export { registerCard } from './chat-cards.js';
 export { registerAction, actionsFor } from './chat-actions.js';
 export { registerPreview } from './chat-results.js';
+export { registerStep } from './chat-steps.js';
 export { ParamCard } from './chat-forms.js';
 
 const R = () => globalThis.React;

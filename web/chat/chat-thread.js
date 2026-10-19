@@ -51,18 +51,18 @@ export function buildView(events, live = {}) {
         if (it.hidden) { it.hidden = false; items.push(it); }
         break;
       }
-      case 'decision': { const it = calls.get(p.id); if (it) it.decision = p; break; }
+      case 'decision': { const it = calls.get(p.id); if (it) { it.decision = p; it.decisionTs = ev.ts; } break; }
       case 'question': {
         const it = { key: 'q' + p.id, kind: 'question', ev, q: p, answer: null, result: null };
         questions.set(p.id, it); items.push(it);
         break;
       }
-      case 'answer': { const it = questions.get(p.id); if (it) it.answer = p; break; }
+      case 'answer': { const it = questions.get(p.id); if (it) { it.answer = p; it.answerTs = ev.ts; } break; }
       case 'tool_result': {
         const q = questions.get(p.id);
         if (q) { q.result = p; break; }
         const it = calls.get(p.id);
-        if (it) it.result = p;
+        if (it) { it.result = p; it.resultTs = ev.ts; }
         else items.push({ key: 'e' + ev.seq, kind: 'tool', ev, call: { id: p.id, name: p.name, arguments: {} }, result: p });
         if (Array.isArray(p.outputs) && p.outputs.length && !(it && it.hidden)) {
           p.outputs.forEach(o => outputs.push({ ...o, tool: p.name }));

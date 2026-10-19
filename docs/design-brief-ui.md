@@ -664,7 +664,7 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 
 ## 8. States checklist (each must be designed and reachable)
 
-- First load: skeleton, then data. AIHub down banner and its recovery.
+- First load: skeleton, then data. AIHub down banner and its recovery. A dropped event stream while the hub still answers is not "down": the UI checks with `GET /api/overview`, reopens the stream and refetches without the banner (Firefox drops quiet connections whenever a network interface changes); a failed check or a second drop within 10 s shows the banner.
 - Overview: alerts present and absent; every service state and load state; manifest-error tile; empty recent outputs.
 - Service page: custom page (Example), generic page (Transcribe), service stopped, service unreachable, starting, failed with log excerpt, service with a native UI link (Images & Video → ComfyUI).
 - API tab: JSON response, audio response, image response, stream response with Stop, error response (`upstream_error`), destructive confirm, multipart file upload form.

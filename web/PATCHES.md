@@ -33,6 +33,7 @@
 | 16 | `Hub.dc.html` | The sidebar's MOCK button (mock scenarios, Shift+D) shows only in `?mock` or while some area is mocked | On the live hub it read as if the page were a mock | 16 |
 | 17 | `Hub.dc.html` | The output drawer's *Open in …* button shows only when the output's service is a mod (outputs under `outputs/eval/` offered "Open in eval", a page that doesn't exist) | Bug fix, found in the Firefox check | 16 |
 | 18 | `Hub.dc.html`, `favicon.svg` | The logo (a hub with four nodes) is `web/favicon.svg`, linked as the page icon with a `<title>`; the same mark replaces the sidebar's, and the header starts with the logo and "AIHub" (a link to Overview) before the page name. The browser tab follows the page (`docTitle()`, set in `componentDidUpdate`): "Logs · Speech · AIHub", "About · Settings · AIHub", an output's title, with waiting approvals as "(n)" and "AIHub (down)" when the hub is unreachable | The tab showed the URL and no icon, so AIHub couldn't be told apart in the browser | — |
+| 19 | `Hub.dc.html` | `onStreamErr`: when `/api/events` errors, ask `getOverview()` first; if the hub answers, reopen the stream, refetch (overview, extras, approvals, the open service and its log stream) and show nothing. Only a failed check, or a second drop within 10 s, shows the "AIHub not responding" banner | Firefox closes quiet connections on any network interface change (here a Docker container restarting every ~65 s), so the banner flashed while the hub was fine | — |
 
 ## Revision 2 (step 6.5): what changed
 

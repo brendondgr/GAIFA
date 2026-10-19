@@ -1320,7 +1320,22 @@ class Component extends DCLogic {
   ovView() { const v = this.state.route.params.view; return ['dashboard', 'services', 'table', 'timeline'].includes(v) ? v : this.state.ovView; }
   setView(v) { lsSet('hub.ovView', v); this.setState({ ovView: v, tileMenu: null }); this.go('#/overview?view=' + v); }
   applyOverview(ov) { this.setState({ services: ov.services, memory: ov.memory, jobs: ov.jobs.filter(j => ['queued', 'running'].includes(j.state)), activity: ov.activity, alerts: ov.alerts, recent: ov.recent_outputs, system: ov.system }); }
-  onStreamErr = () => this.goDown();
+  // A dropped stream isn't a down hub: Firefox closes quiet connections whenever a network
+  // interface changes (a container starting, say). Ask the hub first; if it answers, reopen the
+  // streams and refetch without the banner. A second drop within 10 s goes to the banner's paced retry.
+  onStreamErr = () => {
+    this.sub?.close(); this.sub = null;
+    const t = Date.now(), again = t - (this.dropAt || 0) < 10000;
+    this.dropAt = t;
+    if (again) return this.goDown();
+    this.api.getOverview().then(ov => {
+      if (this.downTimer || this.sub) return;
+      this.applyOverview(ov); this.loadExtras(); this.loadApprovals();
+      this.sub = this.api.subscribe(this.onEvent, this.onStreamErr);
+      if (this.logSvc) this.openLogs(this.logSvc);
+      if (this.state.svc) this.refreshDetail();
+    }, () => this.goDown());
+  };
   goDown() {
     if (this.downTimer) return;
     this.sub?.close(); this.sub = null; this.closeLogs();

@@ -190,7 +190,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   };
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
   const ctx = {
-    api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running,
+    api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running, dock: true,
     answer: (qid, answers) => c.answer(tid, qid, answers),
     decide: (a, approve, args) => c.approval(tid, { approval_id: a.approval_id, approve, ...(approve ? { arguments: args } : { reason: 'Cancelled in the chat' }) }),
     cancel: () => c.cancel(tid).catch(fail),
@@ -227,9 +227,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
             h('span', { style: label11 }, 'Plan'), h('div', { style: { minWidth: 0, flex: 1 } }, h(TodoList, { items: view.todos, compact: true })))) : null,
         h('div', { ref: contentRef, style: { maxWidth: COL, margin: '0 auto', padding: '18px 16px 28px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } },
           empty && !toolForms.length ? h(EmptyState, { onPick: t => send(t), tools }) : null,
-          blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))),
-          toolForms.map(it => h(Card, { key: it.key, item: it, ctx })))),
+          blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))))),
       h(Composer, { draft, setDraft, attachments, setAttachments, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
+        dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
         settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }) })));
 }

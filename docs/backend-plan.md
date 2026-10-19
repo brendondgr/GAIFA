@@ -1534,7 +1534,7 @@ All of it lives in `web/chat/`. The agent's events (`services/agent/agent/store.
   - Its preview is capped at 300 px tall (a `maxHeight` option on the previews, default unchanged elsewhere). The 3D viewer opens at its own height.
   - Previews, actions and `registerPreview` are unchanged.
   *Done when:* in `?mock` the sample turn shows the strip (#1, #2) with #2 large and capped, clicking #1 swaps them, and the actions still open their parameter cards; a turn with one output shows no strip; a Node test covers the default selection.
-- [ ] **19.6 The dock: pending cards above the composer** (`web/chat/chat-composer.js`, a `dock` slot; `chat.js`).
+- [x] **19.6 The dock: pending cards above the composer** *As built:* the dock is `view.pending` plus button-opened parameter cards, newest first, "Waiting for you · N" above them when there are several; an answered question is a step row ("You chose Style: Photoreal · Aspect: 16:9"). Deciding from the header's Approvals popover isn't reachable in `?mock` (the mock popover lists the mock hub's approvals, not the chat's); on the live hub both read the same events. (`web/chat/chat-composer.js`, a `dock` slot; `chat.js`).
   - **What docks:** pending approvals (the real `ParamCard`), questions and button-opened parameter cards sit in the dock, newest first, with "1 of 2" when there are several. The dock is at most half the page tall and scrolls.
   - **In the thread:** the fold's header says "Waiting for you to approve below" (or "…to answer below"). The step row shows "needs you", then "Approved by you" / "Cancelled by you" in its sentence once decided.
   - Ctrl+Enter still runs. Deciding in the header's Approvals popover clears the dock too, since both read the same events.

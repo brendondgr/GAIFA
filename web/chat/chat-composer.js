@@ -1,7 +1,8 @@
 // The composer (plan 14.1): a growing text box (Enter sends, Shift+Enter is a new line), attachment
 // chips from Outputs or from files uploaded here (the Upload button, dropping files on the box, or
 // pasting an image; each becomes an output in outputs/uploads/, plan chat-uploads U.5), the quick actions (registry: on 'composer'), tool-group toggles, Stop, and
-// slash commands (/compact, /clear, /model, /context and one per skill).
+// slash commands (/compact, /clear, /model, /context and one per skill). Cards that wait for you (approvals,
+// questions, parameter cards a button opened) dock on top of it (`dock`, plan 19.6).
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, label11, COL } from './chat-ui.js';
 import { actionsFor } from './chat-actions.js';
@@ -75,7 +76,7 @@ function ToolGroups({ index, settings, onChange }) {
     }) : h('span', { style: { color: T.mut, fontSize: 12 } }, 'Loading the tool catalog…'));
 }
 
-export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled }) {
+export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock }) {
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
@@ -108,6 +109,8 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
   const toggleAtt = o => setAttachments(a => a.some(x => x.id === o.id) ? a.filter(x => x.id !== o.id) : [...a, o]);
   return h('div', { style: { flex: 'none', padding: '0 12px 12px', background: T.bg } },
     h('div', { style: { maxWidth: COL, margin: '0 auto', position: 'relative' } },
+      dock && dock.length ? h('div', { role: 'region', 'aria-label': 'Waiting for you', style: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8, maxHeight: '50vh', overflowY: 'auto', minWidth: 0 } },
+        dock.length > 1 ? h('div', { style: { ...label11, color: T.pu } }, `Waiting for you · ${dock.length}`) : null, dock) : null,
       matches.length ? h('div', { role: 'listbox', 'aria-label': 'Commands', style: { position: 'absolute', left: 0, right: 0, bottom: 'calc(100% + 6px)', zIndex: 30, background: T.card, border: '1px solid ' + T.bds, borderRadius: 9, boxShadow: '0 12px 30px rgba(0,0,0,.3)', padding: 4 } },
         matches.map((c, i) => h('button', { key: c.cmd, type: 'button', role: 'option', 'aria-selected': i === sel ? 'true' : 'false', onMouseDown: e => { e.preventDefault(); complete(c); },
           style: { display: 'flex', alignItems: 'baseline', gap: 10, width: '100%', padding: '6px 9px', border: 0, borderRadius: 6, background: i === sel ? T.hov : 'transparent', color: T.tx, font: 'inherit', cursor: 'pointer', textAlign: 'left' } },

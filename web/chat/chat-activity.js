@@ -155,7 +155,7 @@ function QuestionRow({ row }) {
   const it = row.item, qs = it.q?.questions || [], a = it.answer?.answers || {};
   if (!it.answer && !it.result) return h(QuietRow, { icon: 'chat', color: T.pu }, h('span', { style: { color: T.pu } }, `Asked you ${qs.length === 1 ? 'a question' : qs.length + ' questions'}`));
   if (!it.answer) return h(QuietRow, { icon: 'chat' }, 'Asked you a question; you wrote back instead');
-  const said = qs.map(q => `${q.header || q.question}: ${[].concat(a[q.question] ?? '—').join(', ')}`).join(' · ');
+  const said = qs.map(q => [q, [].concat(a[q.question] ?? []).filter(x => x !== '' && x != null)]).filter(([, v]) => v.length).map(([q, v]) => `${q.header || q.question}: ${v.join(', ')}`).join(' · ') || 'the defaults';
   return h(QuietRow, { icon: 'chat' }, 'You chose ', h('span', { style: { color: T.tx } }, said));
 }
 

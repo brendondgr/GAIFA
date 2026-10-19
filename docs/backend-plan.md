@@ -23,6 +23,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | D — Chat interface | 14–16 | Chat with our own Claude-Code-style agent, save states, everything inside the folder | No |
 | E — Image to 3D | 17 | Hunyuan3D 2.1, TRELLIS.2, SAM 3D Body and SAM 3D Objects as image engines in `gen3d` | gen3d and comfy; Cube3D keeps working |
 | F — vLLM | 18 | A `vllm` mod: vLLM on this machine (Strix Halo, gfx1151) in kyuz0's container, published to the relay | relay (new registrations); lcpp untouched |
+| G — Chat activity | 19 | The Chat page shows a turn's work as one compact fold of steps (thinking, tools, approvals), from the design study's picks | `web/chat/` only; the agent's events are unchanged |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -45,6 +46,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 16 | Everything inside the folder | S–M | Logs read from `data/logs/` |
 | 17 | Image to 3D in `gen3d` | L | 3D Generate page: engine picker, image input, per-engine settings |
 | 18 | New `vllm` mod (vLLM) | M–L | vLLM page (profiles, engine log, throughput); its models in the relay and Chat |
+| 19 | Chat activity: steps, not cards | M | `chat`: the thread view (activity fold, output strip, the dock above the composer) |
 
 # Stage A — Foundation
 
@@ -1464,6 +1466,108 @@ vLLM serves Hugging Face models (safetensors, AWQ) with batching, prefix caching
 | Page | Profiles and Engine tabs | `services/vllm/ui/page.js` |
 | Fake engine | vLLM's routes for tests and `--demo-mods` | `services/vllm/vllm_mod/fake_engine.py` |
 | Tests | profiles, engine lifecycle, downloads, relay, status (fake engine, fake hub, fake relay) | `services/vllm/tests/test_*.py` |
+
+---
+
+# Stage G — Chat activity
+
+## Phase 19 — Chat activity: steps, not cards
+
+Today the Chat page draws every agent event as its own card at the same level: thinking, each tool call, each result, notes. A five-step turn is 10–20 stacked cards, nothing shows while the model thinks (with Show thinking off), and the agent's own lookups look like real work. This phase redraws a turn the way Claude, ChatGPT and Gemini do: **one fold per turn** whose header always says what's happening now, a list of plain-language steps inside it, and the work's results, the answer, and anything that needs you outside it.
+
+The look was chosen on 2026-10-19 from a design study: `web/design/chat-activity.html` on the hub, built from the real chat kit and a real event log. Its **Your mix** section is the target. The picks:
+
+| Part | Pick | What it means |
+| --- | --- | --- |
+| 1. Activity block | **A, closed to start** | One fold per turn, **closed by default, including while it runs**. Its header is the live status ("Generating an image… 42% · 0:17"), then the summary ("Ran 2 tools · 2m 58s"). Opened, it lists the steps: thinking, the agent's short updates, tool calls. |
+| 2. Opening a step | **2b, one sentence** | "Generated with **Z-Image Turbo**, square, seed 81723, from this prompt:", the prompt quoted, the result as `#n` chips, then "Raw call" for the JSON. |
+| 3. Thinking | **3a + 3c** | A spinner (not the bulb), "Thinking…", the seconds counting up, and the last two lines of thought peeking under it. Afterwards: "Thought for 4s ›", which opens to the text. |
+| 4. Outputs | **4c, strip + one big** | A strip of `#n` thumbnails when a turn made more than one output; the picked one (by default the newest) as the result card, its preview **capped at about 300 px**. |
+| 5. Lookups, retries, notes | **5b, muted, in plain words** | Every step is a row; lookups are grey; an error is a sentence ("Couldn't make the 3D model: Cube3D can't use a picture"), with the code under Raw; the agent's notes are muted rows. |
+| 6. Approvals | **6c, docked on the composer** | A pending approval waits above the message box, like Claude Code's permission prompt; the fold's header says "Waiting for you to approve below". |
+
+All of it lives in `web/chat/`. The agent's events (`services/agent/agent/store.py`) already carry what's needed (a `step` id on thinking, text and tool calls; the call id on results; `ts` on every stored event), so nothing changes in the agent or the hub. Touches brief §11.13 and `web/PATCHES.md`; architecture §14 is unchanged.
+
+**Simple gaps (assumed):**
+- **Closed while running.** *Assumption:* the fold starts closed for every turn, the running one included; the header carries the live status and the thinking peek. What you open stays open for that turn until the page reloads (not saved).
+- **Show thinking.** *Assumption:* the setting is retired. Thinking is always one row in the steps (closed), and the peek shows only while it streams. Settings → Agent loses the toggle; `aihub.chat.showThinking` is ignored.
+- **Questions** (`ask_user`) dock above the composer like approvals, and so do parameter cards opened by a button or a quick action. Everything that waits for you sits in one place.
+- **Tool words** (running and done labels, the detail, the sentence) come from a UI registry with built-ins for the tools that exist today, and a generic fallback built from the catalog (the tool's title and its schema's property titles). A field in a mod's manifest for these words would touch the tool catalog, which the capability work (the other session: engine and workflow capabilities in tool schemas) owns. *Assumption:* not in this phase. Engine and workflow ids show as names through a small built-in map until the schemas carry labels; then the registry reads those labels.
+- **The design study** stays in `web/design/` while this phase is built (as the reference), and is removed in 19.7 once screenshots of the built page replace it. It imports the chat modules, so it would break as they change.
+- **Phase number.** *Assumption:* 19. If the capability work adds a phase first, renumber this one.
+
+**Out of scope (the capability session's work):** which engine or workflow the agent picks, tool schemas, the agent's prompt. Turning the image result's "Make 3D" from a prompt into a tool action (it was a prompt because gen3d was text-only) waits for that work's schema.
+
+- [ ] **19.1 The design study and the mock turn.**
+  - **Commit the study:** `web/design/chat-activity.html` with `activity-model.js`, `activity-kit.js`, `activity-options.js`, `activity-parts.js`, `activity-mix.js`, `chat-activity.js` (a page served by the hub, linked from nowhere). Add a `docs/structure.md` row.
+  - **The scripted mock agent** (`web/chat/chat-mock.js`) plays the study's sample turn on `?mock`: "Make me a samurai character, then turn it into a 3D model". It streams thinking deltas, calls `find_tools` and `load_tools`, streams a short update, generates an image with progress, asks for an approval for `gen3d_make_3d`, runs it with progress, streams the answer. Every state in the study is then reachable in the real page. Keep the existing scripted flows (question, parameter card, fork) for their tests.
+  - **Fix:** the live `thread` event carries the thread object itself as its payload (`loop.py`), but `chat.js` reads `e.payload?.thread`, which only the mock sends. Read both, so a model-made title shows as soon as it's made.
+  *Done when:* `/design/chat-activity.html` loads with no console errors; `utils/tests/web/chat.test.mjs` covers the new mock turn (its event types, in order, with a pause at the approval) and the title fix; `uv run pytest` passes.
+- [ ] **19.2 Turns and steps: `web/chat/chat-turn.js`** (pure, like `chat-thread.js`).
+  - **`groupTurns(view, { running, now })`** takes `buildView`'s items (tool calls with their approval, decision, result and progress already folded in) and returns turns: `{ key, user, steps: [{ id, thinking, narration, rows }], answer, outputs, pending, status, summary, elapsed }`.
+  - **Turn boundaries:** a `user` item starts a turn, and so does a tool call `by: "user"` (a result button or quick action: "You ran Upscale image"). A queued message starts the next turn. Compaction marks and errors outside a turn stay items of their own.
+  - **Steps** group by the `step` id on thinking, assistant and tool-call payloads. Rows are thinking, the agent's update text, tool calls, notes, `remember` ("Remembered: …"), `update_todos` ("Updated the plan"; the Plan bar stays) and questions.
+  - **The answer** is the last step's text when that step called no tools; text in a step with tools is an **update** row. Streaming deltas fill either one, as now.
+  - **Status** while running, in order: waiting for you (an approval or question) → the running tool that isn't a lookup (its label, percent, note) → a running lookup → writing the answer → thinking (from the thinking delta's `t0`, so the seconds count from when it started) → "Working" before anything has arrived.
+  - **Summary** when done: "Ran N tools" counting only tools that aren't lookups ("Looked something up", "Thought it through" otherwise), and the turn's time from the user event's `ts` to the last event's.
+  - **Lookups:** `find_tools`, `load_tools`, `read_skill`, `view_output`, `read_result`, `comfy_list_workflows`, and `hub_*` tools whose risk is `read`.
+  *Done when:* a new `utils/tests/web/chat-turn.test.mjs` (run from pytest like `chat.test.mjs`) covers the sample turn at each of the study's seven stages (status text, percent, summary, answer vs update), a button-started turn, a queued message, the retry turn from the study (error, note, retry), and a replay giving the same turns.
+- [ ] **19.3 Step words: `web/chat/chat-steps.js`.**
+  - **Registry:** `registerStep(toolName, { running, done, icon, detail(args, ctx), sentence(args, ctx), lookup })`. For example `comfy_generate_image` → "Generating an image" / "Generated an image", detail "Z-Image Turbo · 1:1", sentence as in Part 2.
+  - **Built-ins** for today's tools: the comfy tasks (generate, edit, animate, video, remove background, upscale, `run_workflow`), `gen3d_make_3d` ("Made from #1 with TRELLIS.2, balanced preset (shape, texture)."), tts speak, lcpp / vllm load and unload, the agent's lookups, `hub_*`.
+  - **Fallback for any other tool:** "Running <title>" / "Ran <title>", and a sentence from the schema's property titles, with `output:<id>` values shown as `#n` chips.
+  - **Errors in plain words:** the result's `error.detail` is the row's sentence and `fix` is under it. The code and the raw call are under "Raw call".
+  - Exported from `chat.js` next to the other registries (the modularity contract).
+  *Done when:* `chat-turn.test.mjs` also covers the built-in words for the sample turn, the fallback for a tool with no entry (from a catalog schema), a registered override, and an error row's sentence.
+- [ ] **19.4 The activity fold: `web/chat/chat-activity.js`.**
+  - **`ActivityFold({ turn, ctx })`:** the header button (spinner, the shimmering status, percent, elapsed counting up each second, chevron; then the tool icon, summary and time once done), closed by default; while thinking and closed, the two-line peek under the header.
+  - **Opened:** the step list with a left rule. Thinking rows (spinner, "Thinking…", live seconds and the peek while streaming; "Thought for 4s ›" after, opening to its Markdown, muted). Update rows (Markdown). Tool rows (status mark, label, grey detail, percent or time, "needs you" while waiting, chevron), lookups and notes grey. A running tool shows its progress bar under its row.
+  - **A tool row opens to its sentence (2b)** from 19.3, with the `#n` chips and "Raw call" (the arguments and the result envelope as JSON).
+  - **`registerCard('step:<tool>')`** replaces one tool's opened detail (the brief's card lookup, extended).
+  - **The thread** (`chat.js`) draws per turn: the user card, the fold, the output strip (19.5), the answer. The per-card Stop buttons go; Stop is the composer's.
+  - The "working" dots go: the header always says something while a turn runs.
+  - `ToolCard` and `ThinkingCard` leave `chat-cards.js`, and the Show thinking toggle leaves `chat-settings.js`.
+  - Keep files under ~500 lines: rows and the detail can live in `chat-steps.js`, and the fold in `chat-activity.js`.
+  *Done when:* in `?mock`, the sample turn plays through every state with the fold closed and the header correct at each, opening it shows the steps, and a step opens to its sentence; a reloaded finished chat shows each turn folded with its summary; `chat.test.mjs`'s card-registry test is updated for `step:<tool>`; `uv run pytest` passes.
+- [ ] **19.5 The output strip: `web/chat/chat-results.js`.**
+  - **`OutputStrip({ outputs, ctx })`** under the fold: 56 px `#n` thumbnails when the turn made more than one output, the selected one (by default the newest) as the existing result card.
+  - Its preview is capped at 300 px tall (a `maxHeight` option on the previews, default unchanged elsewhere). The 3D viewer opens at its own height.
+  - Previews, actions and `registerPreview` are unchanged.
+  *Done when:* in `?mock` the sample turn shows the strip (#1, #2) with #2 large and capped, clicking #1 swaps them, and the actions still open their parameter cards; a turn with one output shows no strip; a Node test covers the default selection.
+- [ ] **19.6 The dock: pending cards above the composer** (`web/chat/chat-composer.js`, a `dock` slot; `chat.js`).
+  - **What docks:** pending approvals (the real `ParamCard`), questions and button-opened parameter cards sit in the dock, newest first, with "1 of 2" when there are several. The dock is at most half the page tall and scrolls.
+  - **In the thread:** the fold's header says "Waiting for you to approve below" (or "…to answer below"). The step row shows "needs you", then "Approved by you" / "Cancelled by you" in its sentence once decided.
+  - Ctrl+Enter still runs. Deciding in the header's Approvals popover clears the dock too, since both read the same events.
+  - On narrow pages the dock goes full width above the box.
+  *Done when:* in `?mock`, the 3D approval docks, Run continues the turn and the card leaves the dock; a reload while it waits brings the docked card back; a question docks and its answer lands as a step row; deciding from the header popover clears the dock.
+- [ ] **19.7 Live check, docs and the reference.**
+  - **Live:** on the real agent, "make a samurai character, then turn it into a 3D model". Check every state against the study's Your mix, in both themes and at phone width (375 px). Also a turn with a failed call and a retry, and a turn started from a result button.
+  - **Screenshots** of the built page (each state, dark and light) in `docs/reference/chat-activity-2026-10/`, replacing the study. Then delete `web/design/`.
+  - **Docs:**
+    - brief §11.13 rewritten as built: the fold, step words and `registerStep`, the strip, the dock, Show thinking retired, `step:<tool>` in the card lookup;
+    - a `web/PATCHES.md` entry;
+    - `docs/structure.md` (the new `chat-turn.js`, `chat-steps.js`, `chat-activity.js`; `web/design/` removed; the reference folder);
+    - the `CLAUDE.md` status.
+  *Done when:* each live check passes and the screenshots are in; `uv run pytest` passes.
+
+**Wire — Phase 19:** the Chat page's thread view on the live agent: one fold per turn with a live header, plain step rows that open to a sentence, the output strip, and the dock above the composer. The Settings → Agent page without Show thinking.
+
+**Checks & deliverables — Phase 19**
+- [ ] While a turn runs, the header is never blank: from the moment you send to the answer, it names what's happening and counts the time.
+- [ ] A finished turn is one line ("Ran 2 tools · 2m 58s") plus its outputs and the answer; nothing about the work shows unless you open it.
+- [ ] Every step a turn took is reachable in two clicks (open the fold, open the step), and its raw call in three.
+- [ ] Old chats (made before this phase) draw correctly from their stored events.
+- [ ] Delivered: `web/chat/chat-turn.js`, `chat-steps.js`, `chat-activity.js`, the strip and the dock, the mock turn, `utils/tests/web/chat-turn.test.mjs`, the reference screenshots, the docs updates.
+
+| Deliverable | Description | Location |
+| --- | --- | --- |
+| Turn model | `buildView` items → turns, steps, status, summary (pure) | `web/chat/chat-turn.js` |
+| Step words | the `registerStep` registry, built-ins and fallback; rows and sentences | `web/chat/chat-steps.js` |
+| Activity fold | the per-turn fold and its step list | `web/chat/chat-activity.js` |
+| Strip and dock | the output strip; pending cards above the composer | `web/chat/chat-results.js`, `chat-composer.js` |
+| Mock turn | the study's sample turn on `?mock` | `web/chat/chat-mock.js` |
+| Tests | the turn model at every stage, step words, the mock turn, the registries | `utils/tests/web/chat-turn.test.mjs`, `chat.test.mjs` |
+| Reference | screenshots of the built page | `docs/reference/chat-activity-2026-10/` |
 
 ---
 

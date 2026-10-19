@@ -100,12 +100,14 @@ test('live deltas, progress and replays merge without duplicates', () => {
 test('the card registry falls back to the generic card and takes per-tool cards', () => {
   assert.equal(cards.cardFor({ kind: 'something_new' }), cards.GenericCard);
   assert.notEqual(cards.cardFor({ kind: 'user' }), cards.GenericCard);
-  for (const k of ['user', 'assistant', 'thinking', 'tool', 'approval', 'question', 'result', 'todos', 'memory', 'note', 'error', 'compact', 'toolform']) assert.ok(cards.hasCard(k), k);
-  const Mine = () => null, off = cards.registerCard('tool:gen3d_make_3d', Mine);
-  assert.equal(cards.cardFor({ kind: 'tool', call: { name: 'gen3d_make_3d' } }), Mine);
-  assert.notEqual(cards.cardFor({ kind: 'tool', call: { name: 'other' } }), Mine);
+  for (const k of ['user', 'assistant', 'approval', 'question', 'result', 'todos', 'memory', 'note', 'error', 'compact', 'toolform']) assert.ok(cards.hasCard(k), k);
+  assert.ok(!cards.hasCard('tool') && !cards.hasCard('thinking'), 'tool calls and thinking are rows in the activity fold (plan 19.4)');
+  const Mine = () => null, off = cards.registerCard('step:gen3d_make_3d', Mine);
+  assert.ok(cards.hasCard('step:gen3d_make_3d'));
+  assert.equal(cards.cardFor({ kind: 'step', call: { name: 'gen3d_make_3d' } }), Mine);
+  assert.notEqual(cards.cardFor({ kind: 'step', call: { name: 'other' } }), Mine);
   off();
-  assert.notEqual(cards.cardFor({ kind: 'tool', call: { name: 'gen3d_make_3d' } }), Mine);
+  assert.notEqual(cards.cardFor({ kind: 'step', call: { name: 'gen3d_make_3d' } }), Mine);
   assert.throws(() => cards.registerCard('x', 'not a component'));
 });
 

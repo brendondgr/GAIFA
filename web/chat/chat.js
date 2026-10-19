@@ -7,13 +7,15 @@
 //   registerAction({...})             a result button or a composer quick action
 //   registerPreview(kind, Component)  how a result of a new output kind is shown
 
-import { h, T, Icon, Btn, COL, usePref, SHOW_THINKING, useWidth, chipSt, label11 } from './chat-ui.js';
+import { h, T, Icon, Btn, COL, useWidth, chipSt, label11 } from './chat-ui.js';
 import { MD_CSS } from './chat-md.js';
 import { Card, CARD_CSS, TodoList } from './chat-cards.js';
 import './chat-forms.js';
 import './chat-results.js';
 import { runAction } from './chat-actions.js';
 import { buildView, applyTransient, settleLive, mergeEvents, todosOpen, threadOf } from './chat-thread.js';
+import { groupTurns } from './chat-turn.js';
+import { TurnView, ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, LIST_CSS } from './chat-list.js';
 import { ThreadHeader } from './chat-header.js';
@@ -29,9 +31,7 @@ const R = () => globalThis.React;
 const LIST_PAGE = 200;    // chats per page in the list (Show more adds a page)
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
 const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to AIHub” in Hope’s voice', 'What can you do?'];
-const PAGE_CSS = `.aichat-box:focus-within{border-color:var(--bdh,#3A4A63)!important}
-.aichat-dots span{display:inline-block;width:5px;height:5px;margin-right:3px;border-radius:9px;background:var(--mut,#8A94A6);animation:aichatpulse 1.2s ease-in-out infinite}
-.aichat-dots span:nth-child(2){animation-delay:.2s}.aichat-dots span:nth-child(3){animation-delay:.4s}`;
+const PAGE_CSS = `.aichat-box:focus-within{border-color:var(--bdh,#3A4A63)!important}`;
 
 let shared = null;
 /** One client per page load, shared by the Chat page and Settings → Agent. */
@@ -42,7 +42,7 @@ export function getChatClient(api) {
 function injectCss() {
   if (typeof document === 'undefined' || document.getElementById('aichat-css')) return;
   const s = document.createElement('style');
-  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + LIST_CSS + PAGE_CSS;
+  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + PAGE_CSS;
   document.head.appendChild(s);
 }
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
@@ -51,7 +51,6 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const React = R(), { useState, useEffect, useRef, useMemo, useLayoutEffect } = React;
   const c = getChatClient(api), tid = route?.parts?.[1] || null;
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
-  const [showThinking] = usePref(SHOW_THINKING, false);
   const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [archived, setArchived] = useState(false), [limit, setLimit] = useState(LIST_PAGE);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [thread, setThread] = useState(null), [events, setEvents] = useState([]), [live, setLive] = useState(EMPTY_LIVE), [running, setRunning] = useState(false), [conn, setConn] = useState('open'), [ready, setReady] = useState(false);
@@ -112,6 +111,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
 
   const view = useMemo(() => buildView(events, live), [events, live]);
   const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
+  const [now, setNow] = useState(() => Date.now() / 1000);   // ticks while a turn runs, so the fold's timers count
+  useEffect(() => { setNow(Date.now() / 1000); if (!running) return undefined; const t = setInterval(() => setNow(Date.now() / 1000), 1000); return () => clearInterval(t); }, [running]);
+  const blocks = useMemo(() => groupTurns(view, { running, now, tools }), [view, running, now, tools]);
   useLayoutEffect(() => {
     const el = scrollRef.current; if (!el) return undefined;
     if (first.current && events.length) { el.scrollTop = el.scrollHeight; first.current = false; return undefined; }
@@ -188,7 +190,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   };
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
   const ctx = {
-    api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, showThinking, running,
+    api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running,
     answer: (qid, answers) => c.answer(tid, qid, answers),
     decide: (a, approve, args) => c.approval(tid, { approval_id: a.approval_id, approve, ...(approve ? { arguments: args } : { reason: 'Cancelled in the chat' }) }),
     cancel: () => c.cancel(tid).catch(fail),
@@ -202,9 +204,6 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   // ---- render ----
   const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: v => { setQ(v); setLimit(LIST_PAGE); }, archived, onArchived: v => { setArchived(v); setLimit(LIST_PAGE); setListLoading(true); }, onMore: threads.length >= limit ? () => setLimit(n => n + LIST_PAGE) : null,
     onNew: () => { go('#/chat'); setDrawer(false); setTimeout(() => inputRef.current?.focus(), 50); }, onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null });
-  const items = view.items, last = items[items.length - 1];
-  const busyTool = items.some(i => (i.kind === 'tool' || i.kind === 'approval') && !i.result && (i.progress || i.run));
-  const working = running && !view.pending.length && !(last?.streaming) && !busyTool;
   const empty = !tid || (ready && !events.length && !running);
   const compacts = events.filter(e => e.type === 'compact').length;
   return h('div', { ref: rootRef, style: { display: 'flex', height: '100%', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.bg } },
@@ -228,9 +227,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
             h('span', { style: label11 }, 'Plan'), h('div', { style: { minWidth: 0, flex: 1 } }, h(TodoList, { items: view.todos, compact: true })))) : null,
         h('div', { ref: contentRef, style: { maxWidth: COL, margin: '0 auto', padding: '18px 16px 28px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } },
           empty && !toolForms.length ? h(EmptyState, { onPick: t => send(t), tools }) : null,
-          items.map(it => h(Card, { key: it.key, item: it, ctx })),
-          toolForms.map(it => h(Card, { key: it.key, item: it, ctx })),
-          working ? h('div', { className: 'aichat-dots', 'aria-label': 'Working', style: { padding: '2px 4px' } }, h('span'), h('span'), h('span')) : null)),
+          blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))),
+          toolForms.map(it => h(Card, { key: it.key, item: it, ctx })))),
       h(Composer, { draft, setDraft, attachments, setAttachments, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
         settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }) })));

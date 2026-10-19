@@ -110,7 +110,6 @@ export function usePref(k, d) {
   }, [k]);
   return [v, x => setPref(k, x)];
 }
-export const SHOW_THINKING = 'aihub.chat.showThinking';
 
 // ---------- a width hook (thread list → drawer under 760 px) ----------
 export function useWidth(initial = 1000) {

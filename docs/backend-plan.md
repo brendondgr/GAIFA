@@ -1519,7 +1519,7 @@ All of it lives in `web/chat/`. The agent's events (`services/agent/agent/store.
   - **Errors in plain words:** the result's `error.detail` is the row's sentence and `fix` is under it. The code and the raw call are under "Raw call".
   - Exported from `chat.js` next to the other registries (the modularity contract).
   *Done when:* `chat-turn.test.mjs` also covers the built-in words for the sample turn, the fallback for a tool with no entry (from a catalog schema), a registered override, and an error row's sentence.
-- [ ] **19.4 The activity fold: `web/chat/chat-activity.js`.**
+- [x] **19.4 The activity fold: `web/chat/chat-activity.js`.** *As built:* `TurnView` draws a turn (your message or "You ran …", the fold, errors, waiting cards, outputs, the answer); a turn waiting for you counts as live (the header says so); a failed step reads "Tried making a 3D model" with the error's sentence as its detail; the page ticks once a second while a turn runs.
   - **`ActivityFold({ turn, ctx })`:** the header button (spinner, the shimmering status, percent, elapsed counting up each second, chevron; then the tool icon, summary and time once done), closed by default; while thinking and closed, the two-line peek under the header.
   - **Opened:** the step list with a left rule. Thinking rows (spinner, "Thinking…", live seconds and the peek while streaming; "Thought for 4s ›" after, opening to its Markdown, muted). Update rows (Markdown). Tool rows (status mark, label, grey detail, percent or time, "needs you" while waiting, chevron), lookups and notes grey. A running tool shows its progress bar under its row.
   - **A tool row opens to its sentence (2b)** from 19.3, with the `#n` chips and "Raw call" (the arguments and the result envelope as JSON).

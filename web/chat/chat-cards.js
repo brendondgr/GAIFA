@@ -2,14 +2,15 @@
 // the card registered for its `kind`. A new event type or a product with its own look needs only:
 //
 //   registerCard('my_event', ({ item, ctx }) => h('div', null, item.ev.payload.text));
-//   registerCard('tool:gen3d_make_3d', MyToolCard);     // one tool's tool / parameter card
+//   registerCard('step:gen3d_make_3d', MyStepDetail);   // one tool's opened step in the activity fold (chat-activity.js)
+//   registerCard('approval:gen3d_make_3d', MyParamCard); // one tool's parameter card
 //   registerCard('result:gen3d_make_3d', MyResultCard); // one tool's result card
 //
 // Lookup: `<kind>:<tool name>` → `<kind>` → the generic card (a collapsed JSON view). Every card
 // renders inside an error boundary, so a broken or unknown card never breaks the thread.
 // Props: { item, ctx } — ctx is the page's context (see chat.js `cardCtx`).
 
-import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, shortArgs, toolLabel, fmtSecs } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Badge, cardSt, label11 } from './chat-ui.js';
 import { renderMarkdown } from './chat-md.js';
 import { todosOpen } from './chat-thread.js';
 
@@ -100,42 +101,7 @@ function AssistantCard({ item }) {
 }
 
 // ---------- thinking: one folded line per step, only with Show thinking on ----------
-function ThinkingCard({ item, ctx }) {
-  const React = R(), [open, setOpen] = React.useState(false), p = item.ev.payload;
-  if (!ctx.showThinking) return null;
-  const label = item.streaming ? 'Thinking…' : `Thought for ${p.seconds != null ? fmtSecs(p.seconds) : 'a moment'}`;
-  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 } },
-    h('button', { type: 'button', onClick: () => setOpen(!open), 'aria-expanded': open ? 'true' : 'false', style: { alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 22, padding: '0 4px', border: 0, borderRadius: 5, background: 'none', color: T.mut, font: 'inherit', fontSize: 12, cursor: 'pointer' } },
-      h(Icon, { d: 'bulb', size: 13, style: item.streaming ? { animation: 'aichatpulse 1.2s ease-in-out infinite' } : null }), label, h(Icon, { d: open ? 'chevD' : 'chevR', size: 12 })),
-    open ? h('div', { style: { padding: '6px 10px', borderLeft: '2px solid ' + T.bds, color: T.mut, fontSize: 12, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 320, overflow: 'auto' } }, p.text) : null);
-}
-
 // ---------- tool ----------
-export function toolStatus(item, running) {
-  if (item.result) return item.result.status || 'done';
-  if (item.progress || item.run) return 'running';
-  return running ? 'running' : 'waiting';
-}
-function ToolCard({ item, ctx }) {
-  const React = R(), [open, setOpen] = React.useState(false);
-  const c = item.call, r = item.result, st = toolStatus(item, ctx.running), [tone, word] = STATUS[st] || ['dim', st];
-  const pr = item.progress, pct = pr?.progress != null ? Math.round(pr.progress * 100) : null;
-  return h('div', { style: cardSt({ pad: '8px 10px', gap: 6 }) },
-    h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } },
-      h('span', { style: { color: T.pu, display: 'flex' } }, h(Icon, { d: 'tool', size: 14 })),
-      h('span', { style: { fontWeight: 600, whiteSpace: 'nowrap' } }, toolLabel(c.name, ctx.mods)),
-      h('span', { style: { fontFamily: MONO, fontSize: 11, color: T.dim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, c.name),
-      c.by === 'user' ? h(Badge, { tone: 'cyan', title: 'Started by a button, not by the model' }, 'you') : null,
-      h('span', { style: { flex: 1 } }),
-      h(Badge, { tone }, st === 'running' && pct != null ? `${word} ${pct}%` : word),
-      st === 'running' && ctx.cancel ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: ctx.cancel }) : null),
-    shortArgs(c.arguments) ? h('div', { title: shortArgs(c.arguments, 2000), style: { fontFamily: MONO, fontSize: 11.5, color: T.mut, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, shortArgs(c.arguments)) : null,
-    st === 'running' ? h(ProgressBar, { value: pr?.progress, note: [pr?.note, pr?.elapsed_s != null ? fmtSecs(pr.elapsed_s) : null].filter(Boolean).join(' · ') }) : null,
-    r?.error ? h(ErrorBox, { error: r.error }) : null,
-    h(Collapse, { label: 'Details', open, onToggle: () => setOpen(!open) },
-      h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, h('div', { style: label11 }, 'Arguments'), pre(json(c.arguments || {})),
-        r ? h('div', { style: label11 }, 'Result') : null, r ? pre(json(r.content ?? r), { max: 200 }) : null)));
-}
 export function ProgressBar({ value, note }) {
   const known = value != null;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 3 } },
@@ -204,8 +170,6 @@ export function GenericCard({ item, note }) {
 
 registerCard('user', UserCard);
 registerCard('assistant', AssistantCard);
-registerCard('thinking', ThinkingCard);
-registerCard('tool', ToolCard);
 registerCard('todos', TodosCard);
 registerCard('memory', MemoryCard);
 registerCard('note', NoteCard);

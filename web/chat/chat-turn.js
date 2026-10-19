@@ -93,6 +93,7 @@ function finish(turn, live, now) {
   }
   turn.outputs = toolRows.flatMap(r => (r.item.result?.outputs || []).map(o => ({ ...o, tool: r.name })));
   turn.pending = rows.filter(r => (r.type === 'tool' && r.status === 'waiting') || (r.type === 'question' && !r.item.answer && !r.item.result)).map(r => r.item);
+  if (turn.pending.length) turn.running = live = true;          // waiting for you is still a live turn
   turn.elapsed = Math.max(0, (live ? now : turn.end) - turn.start);
   turn.status = live ? status(turn, rows) : null;
   const work = toolRows.filter(r => !r.lookup).length, looks = toolRows.length - work;

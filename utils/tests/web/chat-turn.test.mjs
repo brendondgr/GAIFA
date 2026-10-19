@@ -49,6 +49,9 @@ test('the sample turn while running: answers stream as the answer, waiting rows,
   const ans = turnsAt(5)[0];
   assert.ok(ans.answer.streaming); assert.match(ans.answer.text, /^Here's your samurai/);
   const ap = turnsAt(3)[0];
+  const d3 = stageData(3), idle = ct.groupTurns(th.buildView(d3.events, d3.live), { running: false, now: d3.now })[0];
+  assert.equal(idle.status.kind, 'waiting', 'a turn waiting for you is live even when the thread isn\'t running');
+  assert.ok(idle.running);
   assert.equal(ap.pending.length, 1);
   assert.equal(ap.steps.at(-1).rows.at(-1).status, 'waiting');
   assert.equal(ap.answer, null, 'text in a step with tools is an update, not the answer');

@@ -1,8 +1,8 @@
 // Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, the memory index and its topics, the
-// models, skills, the ask modes and permissions, and "Show thinking" (this browser only:
-// localStorage `aihub.chat.showThinking`). Mounted by Hub.dc.html's Settings page.
+// models, skills, the ask modes and permissions. (Show thinking is retired: thinking is a row in
+// each turn's activity fold, plan 19.4.) Mounted by Hub.dc.html's Settings page.
 
-import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, usePref, SHOW_THINKING, fmtTokens } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens } from './chat-ui.js';
 import { getChatClient } from './chat.js';
 import { MODES } from './chat-header.js';
 
@@ -10,12 +10,6 @@ const R = () => globalThis.React;
 const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
 const row = (label, hint, control) => h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
   h('div', { style: { flex: '1 1 220px', minWidth: 0 } }, h('div', { style: { fontWeight: 500 } }, label), hint ? h('div', { style: { fontSize: 12, color: T.mut } }, hint) : null), control);
-
-function Switch({ on, onChange, label }) {
-  return h('button', { type: 'button', role: 'switch', 'aria-checked': on ? 'true' : 'false', 'aria-label': label, onClick: () => onChange(!on),
-    style: { position: 'relative', width: 34, height: 20, flex: 'none', borderRadius: 99, border: 0, padding: 0, cursor: 'pointer', background: on ? T.gr : T.bds, transition: 'background .15s' } },
-    h('span', { style: { position: 'absolute', top: 3, left: on ? 17 : 3, width: 14, height: 14, borderRadius: 99, background: '#fff', transition: 'left .15s' } }));
-}
 
 function Editor({ label, hint, value, onSave, rows = 10, placeholder }) {
   const React = R(), [text, setText] = React.useState(value ?? ''), [busy, setBusy] = React.useState(false);
@@ -34,7 +28,6 @@ function Editor({ label, hint, value, onSave, rows = 10, placeholder }) {
 export function AgentSettings({ api, toast = () => {} }) {
   const React = R(), c = getChatClient(api);
   const [s, setS] = React.useState(null), [models, setModels] = React.useState(null), [err, setErr] = React.useState(null);
-  const [think, setThink] = usePref(SHOW_THINKING, false);
   React.useEffect(() => {
     c.settings().then(setS).catch(setErr);
     c.models().then(setModels).catch(() => {});
@@ -47,7 +40,6 @@ export function AgentSettings({ api, toast = () => {} }) {
     c.live ? null : h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } }, h(Badge, { tone: 'purple' }, 'MOCK'), 'The scripted mock agent: changes last until the page reloads.'),
     err ? h('div', { role: 'alert', style: { padding: '10px 12px', borderRadius: 8, background: T.trd, color: T.rd } }, `The agent didn’t answer: ${err.detail || err.message}. Start the Agent mod, then reload.`) : null,
     section('Chat',
-      row('Show thinking', 'One folded line per step (“Thought for 6 s”) that opens in place. This browser only.', h(Switch, { on: !!think, onChange: setThink, label: 'Show thinking' })),
       row('Models', 'The model comes from the relay; each chat can pick its own in the header.',
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, fontFamily: MONO, fontSize: 12, textAlign: 'right' } },
           h('span', null, h('span', { style: { color: T.mut } }, 'default '), s ? s.model + window_(s.model) : '—'),

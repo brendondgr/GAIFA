@@ -138,5 +138,8 @@ export function mergeEvents(list, incoming) {
   return out;
 }
 
+/** A live `thread` event's thread: the agent sends the thread itself as the payload; older mocks wrapped it in `{thread}`. */
+export const threadOf = p => (p?.thread && typeof p.thread === 'object' ? p.thread : p?.id ? p : null);
+
 /** Is any item of a todo list still open? (the list stays pinned while it is). */
 export const todosOpen = items => Array.isArray(items) && items.some(i => i.state !== 'done');

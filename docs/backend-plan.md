@@ -1498,7 +1498,7 @@ All of it lives in `web/chat/`. The agent's events (`services/agent/agent/store.
 
 **Out of scope (the capability session's work):** which engine or workflow the agent picks, tool schemas, the agent's prompt. Turning the image result's "Make 3D" from a prompt into a tool action (it was a prompt because gen3d was text-only) waits for that work's schema.
 
-- [ ] **19.1 The design study and the mock turn.**
+- [x] **19.1 The design study and the mock turn.** *As built:* the mock catalog's `gen3d_make_3d` takes `image` and `engine` like the real one; the mock agent's chain turn starts on a message naming 3D with "then" or "into".
   - **Commit the study:** `web/design/chat-activity.html` with `activity-model.js`, `activity-kit.js`, `activity-options.js`, `activity-parts.js`, `activity-mix.js`, `chat-activity.js` (a page served by the hub, linked from nowhere). Add a `docs/structure.md` row.
   - **The scripted mock agent** (`web/chat/chat-mock.js`) plays the study's sample turn on `?mock`: "Make me a samurai character, then turn it into a 3D model". It streams thinking deltas, calls `find_tools` and `load_tools`, streams a short update, generates an image with progress, asks for an approval for `gen3d_make_3d`, runs it with progress, streams the answer. Every state in the study is then reachable in the real page. Keep the existing scripted flows (question, parameter card, fork) for their tests.
   - **Fix:** the live `thread` event carries the thread object itself as its payload (`loop.py`), but `chat.js` reads `e.payload?.thread`, which only the mock sends. Read both, so a model-made title shows as soon as it's made.

@@ -20,6 +20,13 @@ const QUESTIONS = [
     { label: 'Falling snow' }, { label: 'Golden hour' }, { label: 'Shallow depth of field' }] },
 ];
 const THINK = 'The user wants an image. The style and the aspect ratio are open choices that no tool default covers, so I should ask with ask_user before generating rather than guess. After that, comfy_generate_image shows a parameter card for the workflow and size.';
+const CHAIN = {
+  think: ['They want a character picture, then a 3D model made from it. I need the image tool and the 3D tool, so I\'ll find and load those first.',
+    'Tools are ready. For image-to-3D a single figure, full body, front view on a plain background works best, so I\'ll ask for exactly that.',
+    'The picture came out clean: full body, plain background, nothing cropped. **TRELLIS.2** is the most faithful engine for one object or figure; the balanced preset is enough here.',
+    'Both are done. Say what was made in a sentence and offer the likely next steps.'],
+  say: ['I\'ll make the picture first, as a full-body front view so it converts cleanly.', 'Now the 3D model. TRELLIS.2 keeps the most detail for a single figure.'],
+};
 const MD_REPLY = 'I can make **images**, **videos**, **3D models** and **speech**, and chain them: an image, then a 3D model of it, then a narration.\n\nTry:\n- *"make me an image of a fox in the snow"*\n- a quick action below the box (Image, Video, 3D, Speech)\n- `/compact` to summarize a long chat\n\n```\n/model gemma4-26B   switch this chat to the local model\n```';
 
 const now = () => Date.now() / 1000;
@@ -94,15 +101,39 @@ export function createMockClient(api, { speed = 1 } = {}) {
   }
 
   // ---- the script ----
-  async function say(t, run, text, think, seconds = 3) {
-    const step = rid('s_');
+  async function say(t, run, text, think, seconds = 3, step = rid('s_')) {
     if (think) {
-      for (const c of chunks(think)) { await run.sleep(14); transient(t, 'delta', { kind: 'thinking', text: c, step }); }
+      for (const c of chunks(think)) { await run.sleep(14 * (seconds > 3 ? 3 : 1)); transient(t, 'delta', { kind: 'thinking', text: c, step }); }
       emit(t, 'thinking', { text: think, seconds, step });
     }
-    for (const c of chunks(text)) { await run.sleep(22); transient(t, 'delta', { kind: 'text', text: c, step }); }
-    emit(t, 'assistant', { text, step, model: model(t) });
+    if (text) {
+      for (const c of chunks(text)) { await run.sleep(22); transient(t, 'delta', { kind: 'text', text: c, step }); }
+      emit(t, 'assistant', { text, step, model: model(t) });
+    }
     return step;
+  }
+  // The design study's sample turn (plan 19.1): look up tools, make a picture, ask to make it into 3D.
+  async function chainTurn(t, run, text) {
+    const s1 = await say(t, run, null, CHAIN.think[0], 4);
+    const lk = [['find_tools', { query: 'image 3d model' }, { tools: ['comfy_generate_image', 'comfy_edit_image', 'gen3d_make_3d'] }], ['load_tools', { names: ['comfy_generate_image', 'gen3d_make_3d'] }, { loaded: 2 }]]
+      .map(([name, args, result]) => { const id = rid('tc_'); emit(t, 'tool_call', { id, name, arguments: args, step: s1, by: 'model' }); return { id, name, result }; });
+    await run.sleep(500);
+    lk.forEach(x => emit(t, 'tool_result', { id: x.id, name: x.name, status: 'done', content: JSON.stringify({ status: 'done', result: x.result }) }));
+    const s2 = await say(t, run, CHAIN.say[0], CHAIN.think[1], 3);
+    const subject = /samurai/i.test(text) ? 'A young samurai in a navy kimono and grey hakama' : (text.replace(/,?\s*then.*$/i, '').replace(/^(please\s+)?(make|create|generate)\s+(me\s+)?(an?\s+)?/i, '') || 'A character');
+    const iargs = { prompt: `${subject}, full body, front view, plain white background, soft studio light`, workflow: 'zimage-turbo', aspect: '1:1' };
+    const ic = rid('tc_');
+    emit(t, 'tool_call', { id: ic, name: 'comfy_generate_image', arguments: iargs, step: s2, by: 'model' });
+    const img = await runTool(t, run, ic, 'comfy_generate_image', iargs);
+    const s3 = await say(t, run, CHAIN.say[1], CHAIN.think[2], 5);
+    const tool = await toolSchema('gen3d_make_3d'), cid = rid('tc_');
+    const args = { image: 'output:' + img.output_id, engine: 'trellis2', preset: 'balanced' };
+    emit(t, 'tool_call', { id: cid, name: 'gen3d_make_3d', arguments: args, step: s3, by: 'model' });
+    emit(t, 'approval', { id: cid, approval_id: rid('ap_'), tool: 'gen3d_make_3d', arguments: args, ask_fields: tool?.ask || ['engine', 'preset'],
+      schema: tool?.parameters || { type: 'object', properties: {} }, risk: 'generate', description: (tool?.description || '').slice(0, 600) });
+    t.pending = { kind: 'approval', id: cid };
+    usage(t);
+    return 'waiting';
   }
   async function runTool(t, run, cid, name, args) {
     const callId = rid('call_');
@@ -150,6 +181,13 @@ export function createMockClient(api, { speed = 1 } = {}) {
       return 'idle';
     }
     const out = await runTool(t, run, cid, ap.payload.tool, args || ap.payload.arguments);
+    if (ap.payload.tool === 'gen3d_make_3d') {
+      const src = String((args || ap.payload.arguments).image || '').slice(7), first = t.events.find(e => e.type === 'tool_result' && e.payload.outputs?.some(o => o.output_id === src));
+      const n = first ? first.payload.outputs.find(o => o.output_id === src).n : out.n - 1;
+      await say(t, run, `Here's your picture **#${n}** and the 3D model made from it **#${out.n}** (TRELLIS.2, balanced).\n\nNext, I can **add a rig** so it can be posed, make a **low-poly** version for a game, or **animate** the picture.`, CHAIN.think[3], 2);
+      usage(t);
+      return 'idle';
+    }
     emit(t, 'todos', { items: [{ text: 'Ask about style and shape', state: 'done' }, { text: 'Make the image', state: 'done' }, { text: 'Offer next steps', state: 'done' }] });
     await say(t, run, `Here it is (#${out.n}). Next, I can **animate** it, make a **3D model** from it, or **remove the background**. Use the buttons under the image, or just ask.`, null);
     usage(t);
@@ -162,6 +200,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       usage(t);
       return 'idle';
     }
+    if (/\b3d\b/i.test(text) && /then|and turn|into/i.test(text)) return chainTurn(t, run, text);
     if (/image|picture|photo|draw|fox|paint/i.test(text)) return imageTurn(t, run, text);
     await say(t, run, MD_REPLY, 'A general question: answer directly and point at what I can do. No tool call needed.', 2);
     usage(t);
@@ -253,7 +292,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       await net(); const t = T(tid), queued = !!t.run;
       if (!queued && t.pending) { emit(t, 'tool_result', { id: t.pending.id, name: t.pending.kind === 'question' ? 'ask_user' : 'comfy_generate_image', status: 'skipped', content: '{}', error: { code: 'skipped', detail: 'The user wrote a message instead of answering.' } }); t.pending = null; }
       const ev = emit(t, 'user', { text, ...(attachments.length ? { attachments } : {}), ...(queued ? { queued: true } : {}) });
-      if (!t.thread.title) { t.thread.title = text.slice(0, 48); transient(t, 'thread', { thread: pub(t) }); }
+      if (!t.thread.title) { t.thread.title = text.slice(0, 48); transient(t, 'thread', pub(t)); }
       if (queued) t.queue.push(text); else start(t, run => messageTurn(t, run, text));
       return ev;
     },

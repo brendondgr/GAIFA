@@ -238,3 +238,42 @@ test('uploads from the composer: which files qualify, chips, and per-file errors
   assert.deepEqual(r.errors, ['bad.png: too large']);
   assert.deepEqual(composer.toChip({ id: 'o1', kind: 'audio', title: 't', url: '/u', preview: null }), { id: 'o1', kind: 'audio', title: 't', preview: null });
 });
+
+test('the live thread event: the agent sends the thread itself, older mocks wrapped it', () => {
+  assert.deepEqual(th.threadOf({ id: 't1', title: 'Fox' }), { id: 't1', title: 'Fox' });
+  assert.deepEqual(th.threadOf({ thread: { id: 't1', title: 'Fox' } }), { id: 't1', title: 'Fox' });
+  assert.equal(th.threadOf({}), null);
+  assert.equal(th.threadOf(null), null);
+});
+
+test('the mock agent plays the design study turn: lookups, an image, a 3D approval, the answer (plan 19.1)', async () => {
+  const events = [], api = {
+    listOutputs: async ({ kind }) => ({ items: [{ id: 'o_' + kind, kind, title: kind + ' one', service: 'comfy', url: 'data:,x', preview: 'data:,p', meta: {} }] }),
+    ...tmock.createToolMocks({ emit: () => {}, net: async () => {}, err: (s, c, d) => Object.assign(new Error(d), { status: s, code: c, detail: d }), later: (ms, fn) => setTimeout(fn, 1), now: () => Date.now() / 1000 }),
+  };
+  const c = cmock.createMockClient(api, { speed: 400 });
+  const until = async (pred, what) => { for (let i = 0; i < 600; i++) { const e = events.find(pred); if (e) return e; await new Promise(r => setTimeout(r, 5)); } throw new Error('timed out waiting for ' + what); };
+  const t = await c.create({});
+  let ready = null; const isReady = new Promise(r => { ready = r; });
+  const s = c.stream(t.id, 0, { onEvent: e => events.push(e), onReady: () => ready() });
+  await isReady;
+  await c.send(t.id, 'Make me a samurai character, then turn it into a 3D model.');
+  const ap = await until(e => e.type === 'approval', 'the 3D approval');
+  assert.equal(ap.payload.tool, 'gen3d_make_3d');
+  assert.equal(ap.payload.arguments.engine, 'trellis2');
+  assert.equal(ap.payload.arguments.image, 'output:o_image');
+  const stored = events.filter(e => e.seq != null && !['state', 'usage'].includes(e.type)).map(e => e.type + (e.payload.name ? ':' + e.payload.name : ''));
+  assert.deepEqual(stored, ['user', 'thinking', 'tool_call:find_tools', 'tool_call:load_tools', 'tool_result:find_tools', 'tool_result:load_tools',
+    'thinking', 'assistant', 'tool_call:comfy_generate_image', 'call', 'tool_result:comfy_generate_image', 'thinking', 'assistant', 'tool_call:gen3d_make_3d', 'approval']);
+  const steps = events.filter(e => e.type === 'tool_call').map(e => e.payload.step);
+  assert.equal(steps[0], steps[1], 'the lookups share a step');
+  assert.ok(events.some(e => e.type === 'delta' && e.payload.kind === 'thinking'), 'thinking streams');
+  assert.ok(events.some(e => e.type === 'progress'), 'the image reports progress');
+  assert.ok(events.some(e => e.type === 'thread' && th.threadOf(e.payload)?.title), 'the title arrives live');
+  await c.approval(t.id, { approval_id: ap.payload.approval_id, approve: true, arguments: ap.payload.arguments });
+  const res = await until(e => e.type === 'tool_result' && e.payload.name === 'gen3d_make_3d', 'the 3D result');
+  assert.equal(res.payload.outputs[0].kind, 'model3d');
+  await until(e => e.type === 'state' && e.payload.state === 'idle', 'idle');
+  assert.match(events.filter(e => e.type === 'assistant').at(-1).payload.text, /#1.*#2/s);
+  s.close();
+});

@@ -58,6 +58,7 @@ The existing apps come in with `git subtree add` (their history is kept), so mos
 | `backend-plan.md` | The build plan: Phases 0–16 with steps, checks and deliverables; steps are ticked as they land |
 | `plans/comfy-qwen21-turbo.md` | Sub-plan: the Qwen-Image 2.1 Turbo packs (models, builder, packs, live runs, tests) |
 | `plans/chat-uploads-and-fast-presets.md` | Sub-plan: `fast`/`draft` presets the agent can use, and uploading images in Chat |
+| `plans/capabilities-and-learning.md` | Stage H, waiting to move into the master plan: Phases 20 (engines and workflows declare capabilities), 21 (records and preferences) and 22 (the learner, after Harness²) |
 | `design-brief-ui.md` | UI brief for Claude Design; §6 and §11.7 are the UI-facing API contract |
 | `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures |
 | `structure.md` | This file |
@@ -147,6 +148,7 @@ utils/tests/
 | `api-tool.js` | Ours: the API tab's tool runs (Wire 13): `ToolRun` (callTool → parameter card → decideApproval → progress → outputs) and `toolArgs` (form → flat arguments) |
 | `mock-tools.js` | Ours: the `tools` area on the mock (`createToolMocks`): a small catalog with risk levels, calls as fake jobs, approvals (one pending from an MCP client) |
 | `chat/` | Ours: the Chat page (plan 14.1; brief §11.13). `chat.js` the page (`ChatPage`, `getChatClient`; re-exports the registries), `chat-api.js` the agent client through `/api/s/agent` (SSE with reconnect `after=lastSeq`) or the mock, `chat-mock.js` the scripted mock agent, `chat-thread.js` events → card items (pure), `chat-cards.js` the **card registry** and the simple cards, `chat-forms.js` question and parameter cards (schemaForm, file pickers), `chat-results.js` the result card and the **preview registry**, `chat-actions.js` the **actions registry** (result buttons, quick actions, derived from the tool catalog), `chat-list.js` / `chat-header.js` / `chat-composer.js` the page parts, `chat-md.js` the safe Markdown renderer, `chat-ui.js` tokens, icons, buttons, popover, prefs, `chat-settings.js` Settings → Agent, `chat-approvals.js` the header's Approvals popover |
+| `design/` | Ours: the chat activity design study (plan 19.1), served at `/design/chat-activity.html` and linked from nowhere: five layouts, the smaller choices and **Your mix** (the picks Phase 19 builds), drawn from a real event log (`activity-model.js`) with the real chat kit. Removed in 19.7 |
 | `favicon.svg` | The AIHub logo: the browser tab's icon (the sidebar and header draw the same mark inline) |
 | `support.js` | Claude Design's runtime. Generated: **never edit** |
 | `vendor/` | three.js (`three/`, MIT, from 3DGenerate), React and ReactDOM 18.3.1 (UMD), `fonts.css` + `fonts/` (IBM Plex Sans, JetBrains Mono, OFL) |

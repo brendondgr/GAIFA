@@ -13,7 +13,7 @@ import { Card, CARD_CSS, TodoList } from './chat-cards.js';
 import './chat-forms.js';
 import './chat-results.js';
 import { runAction } from './chat-actions.js';
-import { buildView, applyTransient, settleLive, mergeEvents, todosOpen } from './chat-thread.js';
+import { buildView, applyTransient, settleLive, mergeEvents, todosOpen, threadOf } from './chat-thread.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, LIST_CSS } from './chat-list.js';
 import { ThreadHeader } from './chat-header.js';
@@ -84,7 +84,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     if (stored.length) setEvents(list => mergeEvents(list, stored));
     setLive(l => evs.reduce((acc, e) => (e.seq == null ? applyTransient(acc, e) : settleLive(acc, e)), l));
     for (const e of evs) {
-      if (e.type === 'thread' && e.payload?.thread) { const t = e.payload.thread; setThread(x => (x && x.id === t.id ? { ...x, ...t } : x)); setThreads(l => l.map(x => (x.id === t.id ? { ...x, ...t } : x))); }
+      if (e.type === 'thread' && threadOf(e.payload)) { const t = threadOf(e.payload); setThread(x => (x && x.id === t.id ? { ...x, ...t } : x)); setThreads(l => l.map(x => (x.id === t.id ? { ...x, ...t } : x))); }
       if (e.type === 'state' && e.seq != null) {
         const st = e.payload.state;
         setRunning(st === 'running'); setThread(x => (x ? { ...x, state: st } : x));

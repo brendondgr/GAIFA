@@ -1529,7 +1529,7 @@ All of it lives in `web/chat/`. The agent's events (`services/agent/agent/store.
   - `ToolCard` and `ThinkingCard` leave `chat-cards.js`, and the Show thinking toggle leaves `chat-settings.js`.
   - Keep files under ~500 lines: rows and the detail can live in `chat-steps.js`, and the fold in `chat-activity.js`.
   *Done when:* in `?mock`, the sample turn plays through every state with the fold closed and the header correct at each, opening it shows the steps, and a step opens to its sentence; a reloaded finished chat shows each turn folded with its summary; `chat.test.mjs`'s card-registry test is updated for `step:<tool>`; `uv run pytest` passes.
-- [ ] **19.5 The output strip: `web/chat/chat-results.js`.**
+- [x] **19.5 The output strip: `web/chat/chat-results.js`.** *As built:* `shownOutput` (pure) picks the large one; a tool's own `result:<tool>` card still wins over the built-in block.
   - **`OutputStrip({ outputs, ctx })`** under the fold: 56 px `#n` thumbnails when the turn made more than one output, the selected one (by default the newest) as the existing result card.
   - Its preview is capped at 300 px tall (a `maxHeight` option on the previews, default unchanged elsewhere). The 3D viewer opens at its own height.
   - Previews, actions and `registerPreview` are unchanged.

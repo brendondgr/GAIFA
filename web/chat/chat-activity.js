@@ -9,6 +9,7 @@ import { h, T, MONO, Icon, Badge } from './chat-ui.js';
 import { Card, ProgressBar, hasCard, cardFor } from './chat-cards.js';
 import { renderMarkdown } from './chat-md.js';
 import { stepText, stepSentence, errorText } from './chat-steps.js';
+import { OutputStrip } from './chat-results.js';
 
 const R = () => globalThis.React;
 
@@ -203,9 +204,8 @@ export function TurnView({ turn, ctx }) {
     h(ActivityFold, { key: 'f', turn, ctx }),
     ...turn.errors.map(it => h(Card, { key: it.key, item: it, ctx })),
     ...(ctx.dock ? [] : turn.pending.map(it => h(Card, { key: it.key, item: it, ctx }))),
-    turn.outputs.length ? h(ctx.Outputs || OutputsCard, { key: 'o', outputs: turn.outputs, ctx }) : null,
+    turn.outputs.length ? h(OutputStrip, { key: 'o', outputs: turn.outputs, ctx }) : null,
     turn.answer ? h(Card, { key: 'a', item: turn.answer.item, ctx }) : null,
   ];
   return h(R().Fragment, null, ...kids.filter(Boolean));
 }
-const OutputsCard = ({ outputs, ctx }) => h(Card, { item: { key: 'r', kind: 'result', result: { outputs }, call: {} }, ctx });

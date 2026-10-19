@@ -144,3 +144,13 @@ test('step words: errors in plain words, the code kept apart', () => {
   assert.ok(ct.isLookup('comfy_job', [{ name: 'comfy_job', risk: 'read' }]));
   assert.ok(!ct.isLookup('comfy_generate_image', [{ name: 'comfy_generate_image', risk: 'generate' }]));
 });
+
+test('the output strip shows the newest output big unless one is picked (plan 19.5)', async () => {
+  const res = await load('chat/chat-results.js');
+  const outs = [{ n: 1, output_id: 'a', kind: 'image' }, { n: 2, output_id: 'b', kind: 'model3d' }];
+  assert.equal(res.shownOutput(outs, null).n, 2);
+  assert.equal(res.shownOutput(outs, 'a:1').n, 1);
+  assert.equal(res.shownOutput(outs, 'gone:9').n, 2);
+  assert.equal(res.shownOutput([], null), null);
+  assert.equal(res.STRIP_CAP, 300);
+});

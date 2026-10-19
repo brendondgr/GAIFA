@@ -1540,7 +1540,7 @@ All of it lives in `web/chat/`. The agent's events (`services/agent/agent/store.
   - Ctrl+Enter still runs. Deciding in the header's Approvals popover clears the dock too, since both read the same events.
   - On narrow pages the dock goes full width above the box.
   *Done when:* in `?mock`, the 3D approval docks, Run continues the turn and the card leaves the dock; a reload while it waits brings the docked card back; a question docks and its answer lands as a step row; deciding from the header popover clears the dock.
-- [ ] **19.7 Live check, docs and the reference.**
+- [x] **19.7 Live check, docs and the reference.** *As built:* live on skynet, 2026-10-19: the turn ran lookups, an image (56 s), a failed 3D call (TRELLIS.2 without the picture: "Tried making a 3D model") and the retry (6 min), "Ran 3 tools · 9m 50s". Found and fixed on the way: steps now describe the arguments that ran (the card's, when you changed them); `schemaForm` list fields sent `"shape,preview"` as a string (a 422 on every approved `gen3d_make_3d` with stages); hub error prefixes ("refused it (HTTP 422): : Value error,") are dropped from step sentences; "Thought for 0s" reads "Thought for a moment". A button-started turn is checked in `chat-turn.test.mjs`, not live. Seen for the capability work: the agent chose Cube3D with a picture and left `image` out of its first 3D call.
   - **Live:** on the real agent, "make a samurai character, then turn it into a 3D model". Check every state against the study's Your mix, in both themes and at phone width (375 px). Also a turn with a failed call and a retry, and a turn started from a result button.
   - **Screenshots** of the built page (each state, dark and light) in `docs/reference/chat-activity-2026-10/`, replacing the study. Then delete `web/design/`.
   - **Docs:**
@@ -1553,11 +1553,11 @@ All of it lives in `web/chat/`. The agent's events (`services/agent/agent/store.
 **Wire — Phase 19:** the Chat page's thread view on the live agent: one fold per turn with a live header, plain step rows that open to a sentence, the output strip, and the dock above the composer. The Settings → Agent page without Show thinking.
 
 **Checks & deliverables — Phase 19**
-- [ ] While a turn runs, the header is never blank: from the moment you send to the answer, it names what's happening and counts the time.
-- [ ] A finished turn is one line ("Ran 2 tools · 2m 58s") plus its outputs and the answer; nothing about the work shows unless you open it.
-- [ ] Every step a turn took is reachable in two clicks (open the fold, open the step), and its raw call in three.
-- [ ] Old chats (made before this phase) draw correctly from their stored events.
-- [ ] Delivered: `web/chat/chat-turn.js`, `chat-steps.js`, `chat-activity.js`, the strip and the dock, the mock turn, `utils/tests/web/chat-turn.test.mjs`, the reference screenshots, the docs updates.
+- [x] While a turn runs, the header is never blank: from the moment you send to the answer, it names what's happening and counts the time.
+- [x] A finished turn is one line ("Ran 2 tools · 2m 58s") plus its outputs and the answer; nothing about the work shows unless you open it.
+- [x] Every step a turn took is reachable in two clicks (open the fold, open the step), and its raw call in three.
+- [x] Old chats (made before this phase) draw correctly from their stored events.
+- [x] Delivered: `web/chat/chat-turn.js`, `chat-steps.js`, `chat-activity.js`, the strip and the dock, the mock turn, `utils/tests/web/chat-turn.test.mjs`, the reference screenshots, the docs updates.
 
 | Deliverable | Description | Location |
 | --- | --- | --- |

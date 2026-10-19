@@ -146,6 +146,8 @@ export function stepSentence(name, { args = {}, ctx = null, done = true } = {}) 
 export function errorText(result) {
   const e = result?.error || {};
   const status = result?.status;
-  const text = e.detail || (status === 'denied' ? 'You said no.' : status === 'cancelled' ? 'Stopped.' : status === 'skipped' ? 'Skipped.' : 'It failed.');
-  return { text: String(text).replace(/^./, c => c.toUpperCase()), fix: e.fix || null, code: e.code || null };
+  const raw = e.detail || (status === 'denied' ? 'You said no.' : status === 'cancelled' ? 'Stopped.' : status === 'skipped' ? 'Skipped.' : 'It failed.');
+  // "3D Generate refused it (HTTP 422): : Value error, TRELLIS.2 …" → "TRELLIS.2 …" (the mod's own words)
+  const text = String(raw).replace(/^.*?\(HTTP \d{3}\):[\s:]*/, '').replace(/^(Value|Assertion|Type) error,\s*/i, '').trim() || String(raw);
+  return { text: text.replace(/^./, c => c.toUpperCase()), fix: e.fix || null, code: e.code || null };
 }

@@ -80,16 +80,17 @@ function control(ui, p, changed) {
     return { el: a, get: () => a.value || undefined, set: v => { a.value = v ?? ''; } };
   }
   const i = ui.input({ type: t === 'integer' || t === 'number' ? 'number' : 'text', oninput: changed,
-    placeholder: p.default != null ? String(p.default) : '' });
+    placeholder: p.default != null ? String(p.default) : t === 'array' ? 'comma-separated' + (p.items?.enum ? ': ' + p.items.enum.join(', ') : '') : '' });
   if (p.minimum != null) i.min = p.minimum;
   if (p.maximum != null) i.max = p.maximum;
   if (p['x-step']) i.step = p['x-step'];
   else if (t === 'number') i.step = 'any';
   if (t === 'integer' || t === 'number') i.style.fontFamily = MONO;
-  return { el: i, get: () => (i.value === '' ? undefined : cast(p, i.value)), set: v => { i.value = v ?? ''; } };
+  return { el: i, get: () => (i.value.trim() === '' ? undefined : cast(p, i.value)), set: v => { i.value = Array.isArray(v) ? v.join(', ') : v ?? ''; } };
 }
 
 function cast(p, v) {
+  if (p.type === 'array') return String(v).split(',').map(x => x.trim()).filter(Boolean).map(x => cast(p.items || {}, x));   // a list typed as "a, b"
   if (p.type === 'integer') return parseInt(v, 10);
   if (p.type === 'number') return parseFloat(v);
   return v;

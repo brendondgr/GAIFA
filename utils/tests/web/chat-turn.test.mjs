@@ -141,6 +141,8 @@ test('step words: errors in plain words, the code kept apart', () => {
   const e = cs.errorText({ status: 'error', error: { code: 'invalid_arguments', detail: 'cube3D makes a model from text and can\'t use a picture.', fix: 'Use engine: "trellis2".' } });
   assert.deepEqual(e, { text: 'Cube3D makes a model from text and can\'t use a picture.', fix: 'Use engine: "trellis2".', code: 'invalid_arguments' });
   assert.equal(cs.errorText({ status: 'denied' }).text, 'You said no.');
+  assert.equal(cs.errorText({ status: 'error', error: { detail: '3D Generate refused it (HTTP 422): : Value error, TRELLIS.2 makes the mesh from a picture: give `image`' } }).text,
+    'TRELLIS.2 makes the mesh from a picture: give `image`');
   assert.ok(ct.isLookup('comfy_job', [{ name: 'comfy_job', risk: 'read' }]));
   assert.ok(!ct.isLookup('comfy_generate_image', [{ name: 'comfy_generate_image', risk: 'generate' }]));
 });
@@ -153,4 +155,13 @@ test('the output strip shows the newest output big unless one is picked (plan 19
   assert.equal(res.shownOutput(outs, 'gone:9').n, 2);
   assert.equal(res.shownOutput([], null), null);
   assert.equal(res.STRIP_CAP, 300);
+});
+
+test('a step is described by the arguments that ran: the approved ones, else the model\'s', async () => {
+  const act = await load('chat/chat-activity.js');
+  assert.equal(act.argsOf({ call: { arguments: { engine: 'cube3d' } }, decision: { approve: true, arguments: { engine: 'trellis2' } } }).engine, 'trellis2');
+  assert.equal(act.argsOf({ call: { arguments: { engine: 'cube3d' } }, decision: { approve: false } }).engine, 'cube3d');
+  assert.equal(act.argsOf({ call: { arguments: { engine: 'cube3d' } } }).engine, 'cube3d');
+  assert.equal(act.statusText({ kind: 'waiting', question: true }).text, 'Waiting for your answer below');
+  assert.equal(act.fmtDur(178), '2m 58s');
 });

@@ -100,3 +100,14 @@ test('schemaForm: form.onchange gets the values object, never a DOM event', asyn
   sel.dispatch('change');
   assert.equal(got.length, 1);
 });
+
+test('schemaForm: a list field shows "a, b" and gives back an array', async () => {
+  const { schemaForm } = await import(pathToFileURL(path.join(root, 'web/mod-form.js')).href);
+  const form = schemaForm({ ui, api: {} }, { properties: { stages: { type: 'array', items: { type: 'string', enum: ['shape', 'texture', 'preview'] } }, ns: { type: 'array', items: { type: 'integer' } } } },
+    { values: { stages: ['shape', 'preview'] } });
+  const inputs = form.findAll ? form.findAll(e => e.tagName === 'INPUT') : null;
+  assert.deepEqual(form.values().stages, ['shape', 'preview'], 'a list given as a value round-trips as a list');
+  form.set({ ns: [1, 2] });
+  assert.deepEqual(form.values().ns, [1, 2]);
+  if (inputs) assert.ok(inputs.some(i => i.value === 'shape, preview'));
+});

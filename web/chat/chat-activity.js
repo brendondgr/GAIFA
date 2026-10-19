@@ -42,7 +42,9 @@ export function Mark({ status, size = 13 }) {
 }
 
 const stepCtx = ctx => ({ tools: ctx.tools, outputs: ctx.outputs, mods: ctx.mods });
-const toolWords = (row, ctx) => stepText(row.name, { args: row.item.call?.arguments || {}, done: row.status === 'done', ctx: stepCtx(ctx) });
+// The arguments that ran: the ones approved on the card (you may have changed them), else the model's.
+export const argsOf = it => (it.decision?.approve && it.decision.arguments) || it.call?.arguments || {};
+const toolWords = (row, ctx) => stepText(row.name, { args: argsOf(row.item), done: row.status === 'done', ctx: stepCtx(ctx) });
 
 /** The live header's words for a turn's status. */
 export function statusText(st, ctx) {
@@ -83,7 +85,7 @@ function ThinkRow({ row, open, onToggle }) {
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 } },
     h('button', { type: 'button', className: 'aichat-row', onClick: onToggle, 'aria-expanded': open ? 'true' : 'false', style: { ...rowBtn, color: T.mut } },
       live ? h(Spinner) : h('span', { style: { color: T.dim, display: 'flex', flex: 'none' } }, h(Icon, { d: 'check', size: 13, sw: 2 })),
-      live ? h('span', { className: 'aichat-shim', style: { fontWeight: 500 } }, 'Thinking…') : h('span', null, 'Thought for ' + (row.seconds ? fmtDur(row.seconds) : 'a moment')),
+      live ? h('span', { className: 'aichat-shim', style: { fontWeight: 500 } }, 'Thinking…') : h('span', null, 'Thought for ' + (row.seconds >= 1 ? fmtDur(row.seconds) : 'a moment')),
       live ? h(Time, { s: row.seconds }) : null, h('span', { style: { flex: 1 } }), h(Chev, { open })),
     open ? h('div', { style: { margin: '0 0 4px 21px', padding: '2px 10px', borderLeft: '2px solid ' + T.bds } }, h(Md, { text: row.text, muted: true, caret: live }))
       : live ? h(Peek, { text: row.text }) : null);
@@ -102,7 +104,7 @@ const pre = t => h('pre', { style: { margin: 0, padding: '8px 10px', borderRadiu
 
 /** What a tool row opens to: its sentence, the prompt quoted, the result, then "Raw call". */
 export function StepDetail({ row, ctx }) {
-  const React = R(), [raw, setRaw] = React.useState(false), it = row.item, args = it.call?.arguments || {}, r = it.result, sc = stepCtx(ctx);
+  const React = R(), [raw, setRaw] = React.useState(false), it = row.item, args = argsOf(it), r = it.result, sc = stepCtx(ctx);
   const s = stepSentence(row.name, { args, ctx: sc, done: row.status === 'done' });
   const outs = (r?.outputs || []).map(o => (ctx.outputs || []).find(x => x.output_id === o.output_id) || o);
   const failed = r && (r.error || (r.status && r.status !== 'done'));
@@ -114,6 +116,7 @@ export function StepDetail({ row, ctx }) {
         : row.status === 'waiting' ? h('span', { style: { color: T.pu } }, 'Waiting for you to approve.') : row.status === 'queued' ? h('span', { style: { color: T.mut } }, 'Next.')
           : row.status === 'running' ? h('span', { style: { color: T.mut } }, 'Running…') : h('span', { style: { color: T.mut } }, 'Stopped before it finished.');
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, minWidth: 0 } },
+    failed ? h('div', { style: { color: T.dim, fontSize: 11.5 } }, 'What it tried:') : null,
     h('div', { style: { lineHeight: 1.7 } }, s.parts.map(part)),
     s.quote ? h('div', { style: { padding: '2px 10px', borderLeft: '2px solid ' + T.bds, color: T.mut, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }, s.quote) : null,
     s.fields?.length ? h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(60px, max-content) 1fr', gap: '4px 12px', alignItems: 'baseline' } },
@@ -128,7 +131,7 @@ export function StepDetail({ row, ctx }) {
 
 function ToolRow({ row, ctx, open, onToggle }) {
   const w = toolWords(row, ctx), pct = row.progress?.progress, grey = row.lookup;
-  const failed = ['error', 'denied'].includes(row.status), r0 = stepText(row.name, { args: row.item.call?.arguments || {}, ctx: stepCtx(ctx) }).label;
+  const failed = ['error', 'denied'].includes(row.status), r0 = stepText(row.name, { args: argsOf(row.item), ctx: stepCtx(ctx) }).label;
   const label = failed ? 'Tried ' + r0.charAt(0).toLowerCase() + r0.slice(1) : w.label;
   const detail = failed ? errorText(row.item.result).text : w.detail;
   const Detail = hasCard('step:' + row.name) ? cardFor({ kind: 'step', call: row.item.call }) : StepDetail;
@@ -191,7 +194,7 @@ export function ActivityFold({ turn, ctx }) {
 
 /** "You ran Upscale image": the head of a turn a result button or quick action started. */
 export function ActionHead({ turn, ctx }) {
-  const w = stepText(turn.action.call?.name, { args: turn.action.call?.arguments || {}, ctx: stepCtx(ctx) });
+  const w = stepText(turn.action.call?.name, { args: argsOf(turn.action), ctx: stepCtx(ctx) });
   return h('div', { style: { display: 'flex', justifyContent: 'flex-end' } },
     h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 10, background: T.hov, border: '1px solid ' + T.bd, fontSize: 12.5, color: T.mut } },
       h(Icon, { d: w.icon || 'tool', size: 13 }), 'You ran ', h('span', { style: { color: T.tx } }, w.label.replace(/^(\w)/, c => c.toLowerCase()))));

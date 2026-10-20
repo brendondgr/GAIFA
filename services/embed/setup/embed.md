@@ -100,6 +100,8 @@ Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp
 
 **The library** (2026-10-20, against a dev hub with 32 outputs: two documents, 24 pictures, audio and video clips): all 32 indexed into 90 chunks in about 140 s once the GPU had been quiet, with one pause midway when something else used the GPU. Then the model unloaded. Much of that time is the 1 s look at the GPU after each batch. Indexing records the text path at 3.1 GB.
 
+**Search** (plan 28.3): `POST /v1/search` and the agent's tools `embed_library_search` and `embed_library_collections`. On the same hub, "the picture of the red car" ranks the drawn car first at 0.75, with the other pictures at or below 0.59. A search of everything first indexes pending outputs from the last day, for up to 10 s; a search within a chat or collection first indexes all of its outputs, for up to 120 s. Either can take seconds right after a large upload.
+
 ## What to look for
 
 - **Never fp16.** The model card says activations overflow fp16 (NaN, or quietly bad vectors). The backend picks bf16 when `torch.cuda.is_bf16_supported()` and fp32 otherwise.

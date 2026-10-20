@@ -15,10 +15,12 @@ mod: a 409 from the hub's memory acquire just waits.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
 import json
 import logging
 import os
+import re
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -38,6 +40,7 @@ log = logging.getLogger("embed")
 MAX_BYTES = {"image": 64_000_000, "audio": 512_000_000, "video": 2_000_000_000, "model3d": 64_000_000}
 LONG_AUDIO_S = 60
 API_KEEP_S = 60            # a search in the last minute keeps the model loaded after indexing
+GATED = contextvars.ContextVar("gated", default=True)    # False while a search indexes its own outputs (28.3)
 
 
 class Stop(Exception):
@@ -53,9 +56,15 @@ def signature(rec: dict[str, Any]) -> str:
     return hashlib.sha1(json.dumps(key, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
+FILE_NAME = re.compile(r"^[\w\-. ()]+\.[A-Za-z0-9]{1,5}$")
+
+
 def meta_text(rec: dict[str, Any]) -> str:
+    """The title and prompt as text. A title that is only a file name (`IMG_2041.png`, `sample.jpg`) with no
+    prompt says nothing about the output: no meta chunk, or it would match every query a little."""
     meta = rec.get("meta") or {}
-    parts = [str(rec.get("title") or "").strip()]
+    title = str(rec.get("title") or "").strip()
+    parts = [] if FILE_NAME.match(title) else [title]
     for k in ("prompt", "text", "description"):
         v = meta.get(k)
         if isinstance(v, str) and v.strip() and v.strip() not in parts:
@@ -232,12 +241,16 @@ class Library:
         await self._room({kind})
         batch = {"text": self.s.index_batch_text, "image": self.s.batch_media, "audio": 1, "video": 1}
         vecs = await asyncio.to_thread(self.enc.embed, [(kind, v) for v in values], 768, batch)
-        await self.sleep(self.s.index_gap_s)
-        if await asyncio.to_thread(self.gpu.busy_now):
-            raise Stop()
+        if GATED.get():
+            await self.sleep(self.s.index_gap_s)
+            if await asyncio.to_thread(self.gpu.busy_now):
+                raise Stop()
         return vecs
 
-    async def index_one(self, row: dict[str, Any]) -> None:
+    async def index_one(self, row: dict[str, Any], gate: bool = True) -> None:
+        """`gate=False`: someone is waiting for this output (a scoped search), so no look at the GPU between
+        batches. Each asyncio task has its own context, so background indexing keeps its gate."""
+        GATED.set(gate)
         rec = await self.hub.record(row["id"])
         kind = rec.get("kind")
         title = str(rec.get("title") or "")

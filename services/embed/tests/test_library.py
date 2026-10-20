@@ -56,15 +56,16 @@ def test_indexes_every_kind_on_create(settings, hub, tmp_path):
     lib = make(settings, hub)
     assert run(lib.reconcile()) == {"outputs": 6, "queued": 6, "removed": 0}
     assert run(lib.drain()) == 6
-    assert lib.store.counts()["done"] == 6 and lib.store.counts()["pending"] == 0
+    assert lib.store.counts()["done"] == 5 and lib.store.counts()["skipped"] == 1 and lib.store.counts()["pending"] == 0
     assert kinds(lib, "doc") == ["meta", "text"]
     assert kinds(lib, "img") == ["meta", "image"]
     assert kinds(lib, "aud") == ["meta", "audio", "audio", "audio", "audio"]    # whole + 0–30, 30–60, 60–70
     assert [(c["start_s"], c["end_s"]) for c in lib.store.chunks_of("aud")[2:]] == [(0, 30), (30, 60), (60, 70)]
     assert kinds(lib, "vid") == ["meta", "video"]
     assert kinds(lib, "mesh") == ["meta", "image"]                               # its preview
-    assert kinds(lib, "zip") == ["meta"]
-    assert lib.store.chunks_of("img")[0]["snippet"] == "car.png. a red car"
+    assert kinds(lib, "zip") == []                                  # a file name says nothing: skipped
+    assert lib.store.get("zip")["state"] == "skipped"
+    assert lib.store.chunks_of("img")[0]["snippet"] == "a red car"     # the prompt, without the file name
     assert lib.store.matrix().vectors.shape == (len(lib.store.matrix().ids), 768)
 
 

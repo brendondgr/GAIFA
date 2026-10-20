@@ -1,14 +1,29 @@
-"""The library's routes (plan 28.2): its state, re-indexing, and collections."""
+"""The library's routes: its state, re-indexing and collections (plan 28.2), and search (28.3)."""
 
 from __future__ import annotations
 
-from typing import Any
+import time
+from typing import Any, Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from .encoder import Encoder
+from .hubclient import HubError
 from .library import Library
+from .search import index_recent, index_scope, origin_thread, scope, search
+
+OutputKind = Literal["text", "document", "image", "audio", "video", "model3d", "archive", "other"]
+
+
+class SearchBody(BaseModel):
+    query: str = Field(min_length=1, max_length=2000, description="What to find, in words: a question, a description "
+                       "of a picture or a sound, a topic")
+    kind: OutputKind | None = Field(None, description="Only outputs of this kind")
+    collection: str | None = Field(None, description="Only this collection (its id or name, from library_collections)")
+    thread_only: bool = Field(False, description="Only the files attached in this chat")
+    limit: int = Field(8, ge=1, le=30, description="How many hits (at most two per output)")
 
 
 class CollectionBody(BaseModel):
@@ -29,8 +44,36 @@ def _missing(cid: str) -> JSONResponse:
                          "fix": "GET /v1/collections lists them"}, 404)
 
 
-def add_library_routes(app: FastAPI, lib: Library) -> None:
+def add_library_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
     store = lib.store
+
+    @app.post("/v1/search", summary="Search every output by meaning: text and documents (with page and line), "
+              "pictures, audio and video")
+    async def search_route(body: SearchBody, x_aihub_origin: str | None = Header(None)) -> Any:
+        """Hits are ranked by cosine score (higher is closer; ~0.5 is unrelated). Snippets are the files' own
+        words, so they come as untrusted data. A search within a collection or a chat indexes its outputs first."""
+        thread = origin_thread(x_aihub_origin) if body.thread_only else None
+        if body.thread_only and not thread:
+            return JSONResponse({"detail": "thread_only needs a chat: this call didn't come from one", "code": "no_thread",
+                                 "fix": "leave thread_only out, or pass collection"}, 422)
+        try:
+            ids = await scope(lib, lib.hub, body.collection, thread)
+            left = await index_scope(lib, ids) if ids else 0
+            if ids is None:
+                await index_recent(lib)
+            lib.last_api = time.time()
+            hits = await search(lib, enc, body.query, body.kind, ids, body.limit)
+        except HubError as e:
+            return JSONResponse(e.body(), e.status)
+        c = store.counts()
+        out: dict[str, Any] = {"results": hits, "searched": len(ids) if ids is not None else c["done"]}
+        if ids is not None and not ids:
+            out["note"] = "nothing to search: the chat has no attachments" if thread else "the collection is empty"
+            out["fix"] = "leave thread_only and collection out to search every output"
+        elif left or (ids is None and c["pending"]):
+            n = left if ids is not None else c["pending"]
+            out["note"] = f"{n} output(s) aren't indexed yet, so results may miss them"
+        return out
 
     @app.get("/v1/library", summary="The index: state (idle, waiting_for_gpu, indexing, no_room), counts, the GPU's idleness")
     def library() -> dict:
@@ -49,9 +92,19 @@ def add_library_routes(app: FastAPI, lib: Library) -> None:
         oid = (body.output_id or "").removeprefix("output:") if body else ""
         return {"queued": lib.reindex(oid or None)}
 
-    @app.get("/v1/collections", summary="Named sets of outputs to search within")
-    def collections() -> dict:
-        return {"collections": store.collections()}
+    @app.get("/v1/collections", summary="Named sets of outputs to search within, and this chat's attachments")
+    async def collections(x_aihub_origin: str | None = Header(None)) -> dict:
+        cols = [{"id": c["id"], "name": c["name"], "outputs": c["outputs"], "count": len(c["outputs"])}
+                for c in store.collections()]
+        thread = origin_thread(x_aihub_origin)
+        if thread:
+            try:
+                att = await lib.hub.thread_attachments(thread)
+            except HubError:
+                att = []
+            cols.insert(0, {"id": f"thread:{thread}", "name": "this chat's attachments", "outputs": att,
+                            "count": len(att), "implicit": True})
+        return {"collections": cols}
 
     @app.post("/v1/collections", status_code=201, summary="Make a collection")
     def make(body: CollectionBody) -> Any:

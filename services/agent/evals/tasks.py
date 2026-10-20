@@ -1,4 +1,4 @@
-"""The 48 eval tasks (plan 13.5; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 50 eval tasks (plan 13.5; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5; two library cases from plan 28.3, in library.py): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -445,3 +445,7 @@ TASKS: list[Task] = [
          [final_mentions("Biscuit"), final_mentions("7"), used_any("hub_read_document", "hub_search_document")],
          attach=upload_files(lambda: [("north-rock-inspection.pdf", lighthouse_report())]), note="plan 24.5: a 20-page PDF as a card, read with tools"),
 ]
+
+from .library import TASKS as LIBRARY_TASKS  # noqa: E402: plan 28.3's cases, kept in their own file
+
+TASKS += LIBRARY_TASKS

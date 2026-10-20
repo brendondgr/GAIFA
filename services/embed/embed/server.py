@@ -122,7 +122,7 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
                   description="EmbeddingGemma 2: text, code, images, audio and video in one 768-d space")
     app.state.library = lib
     if lib is not None:
-        add_library_routes(app, lib)
+        add_library_routes(app, lib, enc)
 
     async def make_room(kinds: set[str]) -> None:
         """Loading another encoder while loaded needs more memory: ask the hub for the difference. (A load from

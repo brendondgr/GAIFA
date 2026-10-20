@@ -8,7 +8,7 @@ POST /v1/embed  {"inputs": [{"text": "…", "title": "…"} | {"image": "output:
              →  {"vectors": [[…]], "inputs": [{kind, output?, seconds?, frames?, …}], "dim", "device", "dtype", "ms"}
 ```
 
-The library indexes every output in AIHub when the GPU is idle (`GET /v1/library`; collections at `/v1/collections`).
+The library indexes every output in AIHub when the GPU is idle (`GET /v1/library`; collections at `/v1/collections`), and `POST /v1/search` searches it by meaning: the agent's `embed_library_search` and `embed_library_collections`.
 
 Vectors are unit length (cosine = dot product), in input order. Media are AIHub outputs, read through the hub. A video's soundtrack can be embedded as `{"audio": <video output>}`. Also `POST /v1/load {"kinds": […]}`, `POST /v1/unload`, `GET /v1/info`, `GET /v1/status`.
 
@@ -22,7 +22,8 @@ Vectors are unit length (cosine = dot product), in input order. Media are AIHub 
 | `embed/store.py` | `embed.db`: indexed outputs, chunks with float16 vectors, collections; the vector matrix for search |
 | `embed/chunks.py` | ~800-token chunks with 100 of overlap, keeping offset, page and line |
 | `embed/gpu.py` | when the GPU is free: other processes' DRM engine time, or `gpu_busy_percent` |
-| `embed/api_library.py` | `/v1/library`, `/v1/library/reindex`, `/v1/collections` |
+| `embed/api_library.py` | `/v1/search`, `/v1/library`, `/v1/library/reindex`, `/v1/collections` |
+| `embed/search.py` | search: the query against every chunk, filters, a chat's or collection's scope indexed first |
 | `embed/hubclient.py` | outputs, memory acquire and the models registry over HTTP |
 | `locks/embed.txt` | the exact packages (ROCm torch for gfx1151) that `install.sh` installs |
 

@@ -294,8 +294,9 @@ class FakeBackend:
 
     @staticmethod
     def label(kind: str, x: Any) -> str:
-        if kind == "text":
-            return x.split(": ")[-1].strip().lower()          # the text after its prompt
+        if kind == "text":                                  # the last line, after its prompt
+            last = next((ln for ln in reversed(x.splitlines()) if ln.strip()), x)
+            return last.split(": ")[-1].strip().lower()
         if kind == "image":
             return (getattr(x, "info", {}) or {}).get("label") or str(x.size)
         if kind == "audio":

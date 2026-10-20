@@ -145,6 +145,7 @@ class Agent:
         cap = min(self.cfg.inline_tokens, int(await self.window(model, tid) * INLINE_SHARE))
         n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
         out: list[dict[str, Any]] = []
+        library: str | None | bool = False           # looked up once, only when a document is that long
         for oid in ids:
             try:
                 o = await self.hub.output(oid)
@@ -165,8 +166,20 @@ class Agent:
                 d["notes"] = w["notes"][:5]
             if d["inline"]:
                 d["text"] = w["text"]
+            if (w["pages"] or 0) > ctx.LIBRARY_PAGES:
+                if library is False:
+                    library = await self._library_tool()
+                if library:
+                    d["library"] = library
             out.append(d)
         return out
+
+    async def _library_tool(self) -> str | None:
+        """The embed mod's search tool, if it's in the catalog (deleting the mod removes the hint)."""
+        try:
+            return next((t["name"] for t in await self.hub.index() if t["name"] == ctx.LIBRARY_TOOL), None)
+        except Exception:  # noqa: BLE001: no hint then
+            return None
 
     async def answer(self, tid: str, question_id: str, answers: dict[str, Any]) -> dict[str, Any]:
         q = self._find(tid, "question", question_id)

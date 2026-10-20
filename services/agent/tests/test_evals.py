@@ -31,7 +31,7 @@ async def test_harness_answers_and_grades(env):
 
 
 def test_eval_tasks_in_eight_groups():
-    assert len(TASKS) == 48 and len({t.id for t in TASKS}) == 48
+    assert len(TASKS) == 50 and len({t.id for t in TASKS}) == 50
     assert {t.group for t in TASKS} == {"single", "chain", "capability", "preference", "must-ask", "no-ask", "safety", "context"}
 
 
@@ -89,3 +89,32 @@ def test_the_eval_report_has_the_cat_only_on_page_7():
     streams = re.findall(rb"stream\n(.*?)\nendstream", data, re.S)
     assert [i for i, s in enumerate(streams) if b"Biscuit" in s] == [6]
     assert io.BytesIO(data).getbuffer().nbytes > 20 * 1500
+
+
+def test_library_cases_grade_what_they_should():
+    """plan 28.3: the two library cases pass on a run that searched and answered, and fail on one that didn't."""
+    import json as _json
+
+    from evals.harness import Run
+    from evals.library import ANSWER_DOC, ANSWER_PAGE, STATIONS, TASKS as LIB, station_report
+
+    def ev(t, **p):
+        return {"type": t, "payload": p}
+    docs, car = {t.id: t for t in LIB}["library_ten_docs"], {t.id: t for t in LIB}["library_red_car"]
+    hits = {"results": [{"output": "output:abc", "title": "IMG_2041.png", "kind": "image", "score": 0.75},
+                        {"output": "output:def", "title": "IMG_2042.png", "kind": "image", "score": 0.6}]}
+    good = Run("library_red_car", "m", events=[
+        ev("tool_call", id="1", name="embed_library_search", arguments={"query": "red car"}, by="model"),
+        ev("tool_result", id="1", name="embed_library_search", status="done",
+           content=_json.dumps({"status": "done", "result": hits})),                # as the hub sends it
+        ev("assistant", text="It's IMG_2041.png (output:abc).")])
+    assert grade(car, good)["ok"]
+    bad = Run("library_red_car", "m", events=[ev("assistant", text="I couldn't find it.")])
+    assert not grade(car, bad)["ok"]
+    answer = Run("library_ten_docs", "m", events=[
+        ev("user", text="…", docs=[{"ref": f"#{i}", "id": f"d{i}"} for i in range(1, 11)]),
+        ev("tool_call", id="1", name="embed_library_search", arguments={"query": "pet", "thread_only": True}, by="model"),
+        ev("tool_result", id="1", name="embed_library_search", status="done", content="{}"),
+        ev("assistant", text=f"Yes: {STATIONS[ANSWER_DOC - 1]} keeps a ginger cat called Saffron (#{ANSWER_DOC} p.{ANSWER_PAGE}).")])
+    assert grade(docs, answer)["ok"]
+    assert b"Saffron" not in station_report(1) and len(station_report(ANSWER_DOC)) > 40_000

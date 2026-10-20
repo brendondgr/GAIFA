@@ -1834,12 +1834,12 @@ This phase adds one declaration per engine and pack. The hub turns it into check
 - Chat's step words show engine and pack names.
 
 **Checks & deliverables — Phase 20**
-- [ ] No engine or pack can be paired with inputs it can't use, from any caller (chat, MCP, the API tab): each try gets a `fix` naming the valid choices.
-- [ ] "Remove the person's hair" runs an instruction-edit pack at full quality by default; "a quick draft" picks a fast preset.
-- [ ] Image → 3D uses an image engine with the picture; text → 3D asks or follows your stated path.
-- [ ] The system prompt, both skills, the tool descriptions and the evals agree (no prose capability claims in the prompt).
+- [x] No engine or pack can be paired with inputs it can't use, from any caller (chat, MCP, the API tab): each try gets a `fix` naming the valid choices.
+- [x] "Remove the person's hair" runs an instruction-edit pack at full quality by default; "a quick draft" picks a fast preset. *(Dry runs: `local_edit`, `full_quality_default`, `quick_when_asked` 3/3; the real picture waits for the live runs.)*
+- [x] Image → 3D uses an image engine with the picture; text → 3D asks or follows your stated path. *(Dry runs; `text_to_3d_asks` 2/3.)*
+- [x] The system prompt, both skills, the tool descriptions and the evals agree (no prose capability claims in the prompt).
 - [ ] Live runs with real outputs (deferred from 20.5 while the GPU is kept free): "remove her hair" on a real portrait (look at the result), one image → 3D per engine family, text → 3D both ways; recorded in `docs/agent-eval.md`.
-- [ ] Delivered: `utils/tools/options.py`, `modcall.py`, the gen3d and comfy declarations, the skills, the new eval tasks, the card changes, the docs.
+- [x] Delivered: `utils/tools/options.py`, `modcall.py`, the gen3d and comfy declarations, the skills, the new eval tasks, the card changes, the docs.
 
 | Deliverable | Description | Location |
 | --- | --- | --- |

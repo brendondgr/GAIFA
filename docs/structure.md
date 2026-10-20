@@ -24,7 +24,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `bin/` | ✅ | `aihub` (bash wrapper → `utils/cli.py` with the hub venv) and `aihub.service.in` (unit template; `aihub install` fills in `@ROOT@`) |
 | `docs/` | ✅ | Design, plan, UI brief, this file, `reference/` UI exports |
 | `utils/` | ✅ | The hub's Python package (below) |
-| `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js` |
+| `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js`, `setup/env.md` (the setup doc a new mod starts from; docs/mods.md §9) |
 | `data/` | ✅ | Models, databases, logs, runtime state and the agent's files (below) |
 | `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…` (+ `.trash/`), ignored by git; indexed into `hub.db` |
 | `web/` | ✅ | The UI (below) |
@@ -49,18 +49,19 @@ The existing apps come in with `git subtree add` (their history is kept), so mos
 | File | Purpose |
 | :--- | :--- |
 | `architecture.md` | The agreed design: decisions, layout, mod contract, runtime, API, memory, registry, config, metrics, Stage D |
+| `setup/` | Setting up a new machine (plan Phase 23): `README.md` (start here: who it's for, the order, how the docs work, the generated index), `host.md` (kernel parameters, groups, packages, disk, accounts on a Strix Halo with Fedora), `hub.md` (clone, install, `aihub doctor`, the order to install the mods in); `models/` (one generated doc per registry entry, from 23.2). Each mod's environment docs are in `services/<id>/setup/` |
 | `workflows.md` | ComfyUI workflow packs: the folder, `workflow.toml`, tasks, editing, the CLI, problems and fixes (plan 11.11) |
 | `comfy-transfer-report.md` | Plan 11.12: the held-out ComfyUI workflows scored before and after fixes, what they found, and what's still a limit |
 | `agent-architecture.md` | The chat agent's design and the research behind it: Claude Code's structure, the literature, frameworks considered, and facts checked on this machine (plan Phases 13–14) |
 | `agent-eval.md` | Plan 13.5 and 14.12: the eval's and the live runs' results in short (the full account is the overnight report) |
 | `report/` | The overnight report (Phases 13–16): `report.tex` and its parts, `build.py` (turns `data/*.json` from the eval, live and test runs into `gen/` tables and thumbnails), `gen/` (tracked). Local only, gitignored: `data/` (the runs' records), `img/` (UI screenshots, live outputs) and the built `report.pdf` |
 | `test-plan.md` | The checks and edge cases for Phases 13–16, written before building them; results go in the overnight report |
-| `backend-plan.md` | The build plan: Phases 0–16 with steps, checks and deliverables; steps are ticked as they land |
+| `backend-plan.md` | The build plan: Phases 0–23 with steps, checks and deliverables; steps are ticked as they land |
 | `plans/comfy-qwen21-turbo.md` | Sub-plan: the Qwen-Image 2.1 Turbo packs (models, builder, packs, live runs, tests) |
 | `plans/chat-uploads-and-fast-presets.md` | Sub-plan: `fast`/`draft` presets the agent can use, and uploading images in Chat |
 | `plans/capabilities-and-learning.md` | A pointer: Stage H (Phases 20–22) was planned here and moved into the master plan in 20.1 |
 | `design-brief-ui.md` | UI brief for Claude Design; §6 and §11.7 are the UI-facing API contract |
-| `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures |
+| `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures, setup docs (§9) |
 | `structure.md` | This file |
 | `reference/ui-export-2026-10-04/` | Claude Design's Part A v1 export, the UI baseline (read-only reference) |
 | `reference/chat-activity-2026-10/` | Screenshots of the Chat page's activity fold as built in Phase 19 (live and mock: running, waiting with the dock, done, a step opened; dark and light; phone width), replacing the design study |

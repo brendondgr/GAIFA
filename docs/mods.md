@@ -198,3 +198,35 @@ After editing `page.js`, reload the browser tab. A page can also import `/mod-ki
 | `status: stats[0] needs a non-empty label` | fix the status body (§5, level 1) |
 | `widget calls: series[0] (Calls): 23 values for 24 points` | one value per point in `t` |
 | `page: no mount(el, ctx)` | the module must `export default { tabs, mount }` |
+
+## 9. Setup docs
+
+Every environment a mod needs (a venv with GPU wheels, a container image, a binary) gets a setup doc in the mod: `services/<id>/setup/<env>.md`. A mod whose only environment is the venv `install.sh` makes needs one short doc too. Copy `services/_template/setup/env.md`. Deleting the mod removes its docs. The guide that links them all is [docs/setup/](setup/README.md).
+
+The doc starts with a TOML block in an HTML comment (GitHub doesn't show it):
+
+```markdown
+<!-- aihub-setup
+id = "tts-breeze"
+title = "Breeze TTS 2 and Whisper"
+models = ["tts/breeze-tts-2", "hf-cache/hub/models--openai--whisper-large-v3-turbo"]
+scan = []
+-->
+```
+
+- `id`: unique across all mods; `<mod>` or `<mod>-<env>`.
+- `models`: globs relative to `data/models/` for the models this environment runs (`comfyui/**`). Every registered model must match at least one environment.
+- `scan`: files in the mod (globs relative to its folder, e.g. `workflows/*/workflow.json`) whose mentions of a model's file name or Hugging Face repo are listed in that model's doc as "referenced by".
+
+Then these sections, in this order. Leave a section out only when it has nothing to say:
+
+1. **What it is**: one paragraph: what runs here and which features need it.
+2. **Tested with**: the versions this machine runs, read from the machine: image digest, Python, torch and ROCm builds (from the lock files), upstream commits, binaries.
+3. **Prerequisites**: other environments, host packages ([host.md](setup/host.md)), accounts, licences.
+4. **Install**: commands in order, one per block, each followed by what it does, what it downloads and from where, how big and how long.
+5. **Configuration**: `.env` and `service.toml` keys, marked required or optional.
+6. **Check it works**: commands and the output to expect.
+7. **What to look for**: what's specific to `gfx1151`, known errors and their fixes, what breaks quietly.
+8. **Known gaps**: steps no script does yet.
+
+The models an environment runs are listed in their own docs, `docs/setup/models/<id>.md`, which `aihub docs` generates from the registry (plan Phase 23).

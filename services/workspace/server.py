@@ -9,6 +9,8 @@ Folders and levels: folders.py.
 
 from __future__ import annotations
 
+import collections
+import json
 import os
 import time
 from pathlib import Path
@@ -19,7 +21,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+import api_edit
 import reading
+from checkpoints import Checkpoints
 from folders import LEVELS, Caps, Folders, Refused
 
 Level = Literal["read", "edit", "run", "run_net"]
@@ -83,8 +87,37 @@ class Ctx:
         self.state, self.outputs, self.hub_url = state, outputs, hub_url
         self.aihub_root = aihub_root
         self.folders = Folders(state, Caps(aihub_root, models))
+        self.checkpoints = Checkpoints(state)
         self.started = time.time()
         self.counts = {"reads": 0, "edits": 0, "runs": 0}
+        self.activity: collections.deque[dict[str, Any]] = collections.deque(self._load_recent(), maxlen=500)
+
+    def _load_recent(self) -> list[dict[str, Any]]:
+        try:
+            lines = (self.state / "recent.jsonl").read_text().splitlines()[-500:]
+        except OSError:
+            return []
+        out = []
+        for ln in lines:
+            try:
+                out.append(json.loads(ln))
+            except ValueError:
+                continue
+        return out
+
+    def recent(self, kind: str, item: dict[str, Any]) -> None:
+        """Recent edits, runs and undos, for the Workspace page (kept in recent.jsonl, the last 2000)."""
+        row = {"kind": kind, "ts": time.time(), **item}
+        self.activity.append(row)
+        f = self.state / "recent.jsonl"
+        try:
+            f.parent.mkdir(parents=True, exist_ok=True)
+            with f.open("a") as fh:
+                fh.write(json.dumps(row) + "\n")
+            if f.stat().st_size > 2_000_000:
+                f.write_text("\n".join(f.read_text().splitlines()[-2000:]) + "\n")
+        except OSError:
+            pass
 
 
 def create_app(state: Path | None = None, aihub_root: Path | None = None, models: Path | None = None,
@@ -133,6 +166,13 @@ def create_app(state: Path | None = None, aihub_root: Path | None = None, models
         if not ctx.folders.remove(fid):
             raise Refused("unknown_folder", f"there is no workspace folder {fid!r}", "", 404)
         return {"removed": fid}
+
+    @app.get("/v1/recent", summary="Recent edits, runs and undos, newest first; ?thread= for one chat")
+    def recent(thread: str | None = None, limit: int = 100) -> dict[str, Any]:
+        rows = [r for r in reversed(ctx.activity) if not thread or r.get("thread") == thread]
+        return {"items": rows[:limit]}
+
+    api_edit.mount(app, ctx)
 
     @app.post("/v1/tree", summary="List a folder's files")
     def tree(body: TreeIn, request: Request) -> str:

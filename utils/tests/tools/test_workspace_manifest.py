@@ -30,3 +30,10 @@ def test_workspace_reading_tools():
         assert t.risk == "read" and t.grant_key == "arg:folder" and t.cap_kb, name
     assert m.tools["folders"].op == "GET /v1/folders" and m.tools["folders"].core
     assert (ROOT / "services" / "workspace" / "skills" / "workspace" / "SKILL.md").is_file()
+
+
+def test_workspace_editing_tools():
+    m = parse(ROOT / "services" / "workspace").manifest
+    assert m is not None
+    for name, risk in (("edit", "write"), ("write", "write"), ("move", "write"), ("delete", "destructive"), ("git_commit", "write")):
+        assert (m.tools[name].risk, m.tools[name].grant_key) == (risk, "arg:folder"), name

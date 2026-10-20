@@ -2128,7 +2128,7 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
     - **The gate** runs the eval tasks whose checks name the domain's tools plus a core set (`CORE`), 3 runs each, pinned to each version; for an always-on change it runs the full suite and also needs 80%.
     - **Pausing:** a real user message or a running real turn makes the next model call raise `Paused`, and the run stops there.
     - **For tests,** `Learner(gate=…, probe=…)` replace the gate and the probe.
-- [ ] **22.6 When it runs: `services/agent/agent/learn/schedule.py`.**
+- [x] **22.6 When it runs: `services/agent/agent/learn/schedule.py`.**
   - **Started in the agent's lifespan** next to the event watcher, and stopped in its `finally`.
   - **Triggers:**
     - nightly at `nightly_at`;
@@ -2139,6 +2139,13 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
   - **Off** when the hub's `[learning] enabled` is false (read through `GET /api/settings` on each trigger).
   - **Routes:** `GET /v1/learn/runs`, `GET /v1/learn/runs/{id}`, `POST /v1/learn/runs/{id}/cancel`. Status `jobs` show a run's stage.
   *Done when:* `tests/test_schedule.py` (a fake clock) covers each trigger, pausing on a user message, the single-run lock and learning off.
+  - *As built:*
+    - **Checks:** every 60 s.
+    - **Idle:** the trigger needs a user message newer than the last run, so a quiet machine doesn't run every hour.
+    - **After a restart,** the first nightly run is the next night.
+    - **Learn now:** `POST /v1/learn/run` (`{domains?}`).
+    - **Routes:** `GET /v1/learn/runs[/{id}]`, `POST /v1/learn/runs/{id}/cancel`, `GET /v1/learn/library`. A running run appears in the agent's status `jobs` with its stage.
+    - **A paused run** keeps its domain's evidence for the next run.
 - [ ] **22.7 Seeing the learner** (the Learning page; Chat adapted to the redesign).
   - **Learning page tabs:**
     - **Harness:** versions, each version's diff and notes, the gate's results, and activate for rollback;

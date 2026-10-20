@@ -158,6 +158,11 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                                                        for p in done["proposed"]]})
         agent.on_turn_end.append(mine_after)
         importer = asyncio.create_task(_import_memory(Knowledge(cfg.data, hub)))
+        from .learn.loop import Learner
+        from .learn.schedule import Schedule
+        app.state.learner = Learner(agent, base=f"{hub_url.rstrip('/')}/api/s/agent")       # plan 22.5–22.6
+        app.state.schedule = Schedule(agent, app.state.learner)
+        scheduler = asyncio.create_task(app.state.schedule.run_forever(stop))
         await agent.resume_all()
         try:
             yield
@@ -169,7 +174,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                 t.cancel()
             upkeep.cancel()
             importer.cancel()
-            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, return_exceptions=True)
+            scheduler.cancel()
+            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()
@@ -201,6 +207,10 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                 th = agent.store.thread(tid) or {}
                 jobs.append({"id": tid, "label": th.get("title") or "chat", "progress": None, "state": "running",
                              "route": f"#/chat/{tid}"})
+        run = getattr(request.app.state, "learner", None) and request.app.state.learner.running
+        if run:                                  # the learner's run, with its stage (plan 22.6)
+            jobs.append({"id": run["id"], "label": f"Learning: {run['stage']}", "progress": None, "state": "running",
+                         "route": "#/s/agent/runs"})
         return {"loaded": None, "busy": bool(jobs), "stats": [
             {"label": "Threads", "value": s["threads"]},
             {"label": "Messages today", "value": s["messages"], "reset": "daily"},
@@ -408,6 +418,43 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     @app.post("/v1/prefs/{pid}/{verb}", summary="Approve or reject a proposed preference (verb: approve | reject)")
     async def decide_pref(pid: str, verb: Literal["approve", "reject"], request: Request) -> dict:
         return await A(request).hub.decide_pref(pid, verb == "approve")
+
+    @app.post("/v1/learn/run", summary="Learn now: one improvement run over the domains with new chats (plan 22.6)")
+    async def learn_now(request: Request, body: dict | None = None) -> dict:
+        sch = request.app.state.schedule
+        if not (await sch.settings()).get("enabled", True):
+            raise HTTPException(409, "learning is turned off (Settings → Agent → Learning)")
+        started = sch.start("manual", (body or {}).get("domains"))
+        return {"started": started, "running": (request.app.state.learner.running or {}).get("id")}
+
+    @app.get("/v1/learn/runs", summary="The learner's runs, newest first, and the one running now")
+    def learn_runs(request: Request) -> dict:
+        lr = request.app.state.learner
+        return {"running": lr.running, "runs": lr.runs()}
+
+    @app.get("/v1/learn/runs/{rid}", summary="One run: its stages, candidates, replays, gate, decision and ledger")
+    def learn_run(rid: str, request: Request) -> dict:
+        lr = request.app.state.learner
+        if lr.running and lr.running["id"] == rid:
+            return lr.running
+        hit = next((r for r in lr.runs(200) if r["id"] == rid), None)
+        if hit is None:
+            raise HTTPException(404, f"no run {rid!r}")
+        return hit
+
+    @app.post("/v1/learn/runs/{rid}/cancel", summary="Stop the running learner run")
+    def learn_cancel(rid: str, request: Request) -> dict:
+        sch, lr = request.app.state.schedule, request.app.state.learner
+        if lr.running and lr.running["id"] == rid and sch.task and not sch.task.done():
+            sch.task.cancel()
+            return {"cancelled": rid}
+        raise HTTPException(409, f"run {rid!r} isn't running")
+
+    @app.get("/v1/learn/library", summary="The learner's lessons, by domain")
+    def learn_library(request: Request) -> dict:
+        from .learn.library import Library
+        from .learn.loop import DOMAINS
+        return {d: Library(A(request).cfg.data, d).listing() for d in DOMAINS}
 
     @app.post("/v1/learn/mine", summary="Run the miner now: propose preferences from card edits, answers and thumbs")
     async def mine_now(request: Request) -> dict:

@@ -25,6 +25,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | F — vLLM | 18 | A `vllm` mod: vLLM on this machine (Strix Halo, gfx1151) in kyuz0's container, published to the relay | relay (new registrations); lcpp untouched |
 | G — Chat activity | 19 | The Chat page shows a turn's work as one compact fold of steps (thinking, tools, approvals), from the design study's picks | `web/chat/` only; the agent's events are unchanged |
 | H — Capabilities and learning | 20–22 | Engines and workflows declare what they can do; complete tool records and preferences on every card; a learner that improves the agent's harness (after Harness²) | gen3d, comfy, the agent, the hub's tool calls; additive only |
+| I — Setup docs | 23 | A doc per environment (in its mod) and per model (generated from the registry, with hand-written sections), kept in sync by `aihub docs` and a test | No: docs, a CLI command and a registry change hook |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -51,6 +52,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 20 | Capabilities: engines and workflows say what they can do | M–L | the parameter card's choices follow the inputs; step words show engine and pack names |
 | 21 | Records and preferences | L | the Learning page, the preference badge, thumbs, the per-chat switch, `[learning]` in Settings |
 | 22 | The learner | L | the Learning page's Harness, Runs and Library tabs; Learn now |
+| 23 | Setup docs for every environment and model | M–L | — (docs, `aihub docs`, a registry hook) |
 
 # Stage A — Foundation
 
@@ -2210,6 +2212,112 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
 | Learner | replay, loop, prompts, library, schedule | `services/agent/agent/learn/` |
 | Library | lessons per domain, read by the next run | `data/agent/learn/library/` |
 | Tests | harness, hooks, replay, loop, library, schedule | `services/agent/tests/test_*.py` |
+
+---
+
+# Stage I — Setup docs
+
+Asked for on 2026-10-20. AIHub is public, but only this machine can install it: what each environment needs is spread over the README, the mods' READMEs (several still describe the old standalone installers), `.env.example` files and scripts, and 23 of the 54 models have no recorded source. The ask: in-depth documentation for setting up **every environment and every model**, each in its own document, saying where to get it, what to install, and what to look for, that **updates itself when a model is added**. The target reader has the same hardware (an AMD Strix Halo, gfx1151, on Linux): everything in the repo is tuned for it, so that reader should be able to reproduce the install from the docs alone.
+
+**Decisions (user, 2026-10-20):**
+- **Two kinds of document.** One doc **per environment** (a container, a venv, a binary: what it is, how to install it, how to check it), hand-written and kept **inside its mod** (`services/<id>/setup/<env>.md`), so deleting a mod removes its docs (mod contract rule 5). One doc **per model** (`docs/setup/models/<id>.md`), generated from the registry, with hand-written sections the generator never touches.
+- **Kept in sync by a generator and a test.** Every registry change regenerates the affected model docs; `aihub docs --check` and a test fail when a generated section is stale, a model has no environment, or a model has neither a source nor a hand-written "Where to get it".
+- **Docs describe today's install honestly.** A manual step (llama.cpp's binary, ComfyUI's custom nodes, the `opencode` binary, gen3d's weights) is documented as the exact commands, and listed as a known gap. Scripting those steps is the next phase, not this one.
+
+## Phase 23 — Setup docs for every environment and model
+
+The survey before planning (2026-10-20) found 13 environments and these gaps in what a fresh clone can do on its own:
+1. **lcpp:** nothing fetches `llama-server` (a Vulkan build, `llama-b11445`, unpacked from a ggml-org release by hand), and `aihub-install.sh` points to a `runtime/README.md` that doesn't exist.
+2. **gen3d:** the only weights downloader, `runtime/CubeArt/scripts/download_weights.sh`, is gitignored and recreated by nothing; Hunyuan3D 2.1, SAM 3D Objects (gated) and MoGe have none. The ROCm image is `:latest`, unpinned (shared with comfy).
+3. **comfy:** the custom nodes (`ComfyUI-GGUF`, `KJNodes`, `VideoHelperSuite`, `WanVideoWrapper`, `rgthree-comfy`) are installed by hand through ComfyUI-Manager; the repo must sit under `$HOME` (the toolbox shares it).
+4. **tts:** the Breeze install stops without `--accept-breeze-license`; `HF_HUB_OFFLINE=1` is forced while the installer downloads (to verify); `espeak-ng` and `ffmpeg` are system packages.
+5. **opencode:** the binary in `~/.opencode/bin` is installed by nothing, and the mod has no `.env.example`.
+6. **This machine only:** the relay's endpoints live in `data/databases/relay.db`; the agent's `AGENT_MODEL = "skynet"` is a remote box; the three voices are personal recordings.
+7. **`aihub doctor`** has no mod-specific checks; the mods have their own (`python -m gen3d.doctor`, `lcpp doctor`, `comfyui workflows check`, `engines/setup.sh --plan`).
+
+Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from the registry), `docs/mods.md`, the README's Quickstart, `CLAUDE.md`'s rules, and the `aihub`, `aihub-mod` and `comfy-workflow` skills.
+
+**Simple gaps (assumed):**
+- **Front matter.** *Assumption:* environment docs start with a TOML block between `+++` lines (read with `tomllib`, so the generator needs nothing outside the standard library): `id`, `title`, `models` (path globs relative to `data/models/`, e.g. `["comfyui/**"]`), `scan` (files in the mod, e.g. `["workflows/*/workflow.json"]`, whose mentions of a model's file name or `source.repo` are listed as "referenced by"). Nothing else is required; unknown keys are errors.
+- **Hand-written vs generated.** *Assumption:* a model doc's generated part sits between `<!-- generated by aihub docs: do not edit between these markers -->` and `<!-- end generated -->`; everything outside is kept byte for byte. A new doc gets empty hand sections: **Where to get it** (only when the source isn't recorded), **What to look for**, **Notes**.
+- **"Used by"** is the registry's computed list (explicit `services` plus `[models] dirs`, `store.py:263-279`), not the raw `services` field.
+- **Fetch commands.** *Assumption:* generated from `source`: for `huggingface`, `uvx --from huggingface_hub hf download <repo> [<files>] --revision <rev> --local-dir data/models/<dir>`, or with `HF_HOME=data/models/hf-cache` and no `--local-dir` for `hf-dir` entries; for `url`, `curl -L -o`; for `created`, "made on this machine" plus how to make one. `huggingface_hub` isn't a hub dependency, hence `uvx`.
+- **A removed model.** *Assumption:* its doc is deleted if its hand sections are empty; otherwise it's kept, marked "Not in the registry", and listed by `--check`.
+- **The hub writes tracked files at runtime** (`docs/setup/models/`, the index's generated table) when a mod registers a download. They're inside the project and show up as changes to commit. `[docs] regenerate = true` in `config.toml`; `false` leaves it to `aihub docs`.
+- **Voices.** *Assumption:* their docs say they're personal clips and how to make your own; nothing links or describes the recordings.
+- **Versions.** *Assumption:* each environment doc records what this machine runs today ("tested with": image digest, torch and ROCm versions from the locks, upstream commits, the llama.cpp build, the custom nodes' commits), read from the machine when the doc is written. Pinning the comfy/gen3d image in code is the next phase.
+
+**Needs a human answer:**
+- **Where the unsourced models came from** (23.6): some aren't on Hugging Face (Civitai checkpoints and LoRAs such as `ungloryhail-bf16`, `zit-intorealism-zitv60`, `zit-oilpainting`, `zit-watercolor`, `qwen2-1uncenv2`, `krea2filterbypass`, and the `gemma-4-26b-it` HauhauCS GGUF). Whatever can't be found is asked, model by model.
+- **The fresh-clone check** (23.8) makes a second clone in `data/state/fresh-clone/` and builds the CPU mods' venvs there (a few GB of wheels, no models). Needs an OK when it runs.
+
+- [ ] **23.1 The setup guide's frame: `docs/setup/`.**
+  - **`docs/setup/README.md`** (start here): who it's for (Strix Halo + Linux; other hardware is out of scope and says why), the order (host → hub → mods → models), how long and how much disk each part takes, and **how these docs work** (environment docs in the mods, generated model docs, `aihub docs`). Below the hand-written part, a generated index: environments (mod, title, models, total GB) and models by kind (name, size, environment, source recorded or not).
+  - **`docs/setup/host.md`:** the machine before AIHub. The Fedora version tested, the BIOS memory split, kernel parameters (`amdgpu.gttsize=131072`, `ttm.pages_limit`) and how to check them (`/proc/cmdline`, `mem_info_gtt_total`), the `video` and `render` groups, podman and toolbox, uv, git, Node and npm, `espeak-ng`, `ffmpeg`, optional Blender, `loginctl enable-linger`, disk (weights about 190 GB plus each image's size), a Hugging Face token for gated repos, and the licences you accept (Breeze TTS 2 is non-commercial). Each item is read from this machine, not from memory.
+  - **`docs/setup/hub.md`:** clone, `uv sync`, `bin/aihub install`, `aihub doctor` and what each of its lines means, `config.toml` basics, the order to install the mods in, and what `aihub install <id>` does and doesn't do (it runs the mod's installer only: no runtimes, images or models).
+  - **The environment doc format** in `docs/mods.md` (a new "Setup docs" section): the front matter, the sections every environment doc has (What it is · Prerequisites · Install, commands in order · Configuration, required and optional keys · What gets downloaded and where · Check it works, commands and expected output · What to look for: gfx1151 specifics, known errors and their fixes · Known gaps · Tested with), and `services/_template/setup/template.md` as the starting point.
+  *Done when:* the three docs and the template exist; every command in `host.md` and `hub.md` was run on this machine and its output matches what the doc says.
+
+- [ ] **23.2 The generator: `utils/setupdocs.py`, `aihub docs [--check]`.**
+  - Standard library only (`tomllib`, `json`, `fnmatch`), so `utils/cli.py` can call it without the hub running. Functions: `load_envs(root) -> list[Env]` (every `services/*/setup/*.md` plus `docs/setup/hub.md`; problems per file), `match(entry, envs) -> list[Env]`, `references(entry, envs) -> list[str]` (the `scan` files that mention it), `render_model(entry, used_by, envs, refs) -> str` (the generated block: kind, format, size, path, source with a link and revision, used by, environments as links, referenced by, a files table of path, role, size and sha256, and the fetch commands), `sync(root, ids=None, check=False) -> Report` (writes changed docs and the index; in check mode writes nothing and reports stale, missing and orphan docs).
+  - "Used by" is computed the registry's way from the manifests' `[models] dirs`, read from `service.toml` files; a shared helper with `utils/registry/store.py` rather than a copy, if it can stay standard library.
+  - **`aihub docs`** regenerates; **`aihub docs --check`** exits 1 on any problem and prints each one. If a split keeps files under 500 lines, `utils/setupdocs/` becomes a package (`envs.py`, `render.py`, `sync.py`).
+  *Done when:* `utils/tests/docs/test_setupdocs.py` (a fixture registry and fake mods with setup docs) covers rendering, hand text kept byte for byte, idempotence (a second run changes nothing), glob matching, `scan` references, each source type's fetch command, orphans with and without hand text, and bad front matter; `aihub docs` writes 54 model docs and the index from the real registry.
+
+- [ ] **23.3 Regenerate on every registry change.**
+  - `Registry` gets `subscribe(fn)` for change listeners in place of the single replaceable `changed` method; `RegistryWatcher`'s alert refresh (`utils/registry/alerts.py`) becomes one subscriber, the docs another. The docs subscriber runs `setupdocs.sync(root, ids)` in a worker thread, debounced (2 s), only when `config.toml [docs] regenerate` is true (default true; architecture §9).
+  - Covers every write: `POST /api/models` (including the comfy, vllm and lcpp downloads), `PUT`, `DELETE`, verify, and a hand edit of `registry.json` picked up by the watcher.
+  *Done when:* `utils/tests/models/test_docs_hook.py` covers add, update (only the generated part changes), delete (with and without hand text), several changes in a burst making one write, and `regenerate = false` making none; existing alert tests still pass.
+
+- [ ] **23.4 Environment docs: the hub-side and LLM mods.**
+  - `services/relay/setup/relay.md` (the backend venv, the Astro build and Node, `.env` keys, starting with no endpoints: they arrive from lcpp and vllm, or are added on the page), `services/opencode/setup/opencode.md` (installing the binary, `opencode auth login` or `OPENCODE_API_KEY`, the Basic credential `auth.sh` mints, `OPENCODE_PROJECT_DIR`; plus a new `services/opencode/.env.example`), `services/agent/setup/agent.md` (the venv; `AGENT_MODEL` and `AGENT_FALLBACK_MODEL` must name relay aliases that exist on your machine, with the lcpp and vllm aliases as the local choices), `services/lcpp/setup/llama-cpp.md` (the exact ggml-org release asset, unpacking under `runtime/llama.cpp/bin/llama-bNNNN`, the `current` link, `AMD_VULKAN_ICD=RADV`, `lcpp doctor`, adding a GGUF; plus the missing `runtime/README.md` that `aihub-install.sh` points to, or the pointer fixed to the new doc), `services/vllm/setup/vllm.md` (the pinned image, GTT and `--gpu-memory-utilization`, `engine_site/`, profiles, first start and compile cache).
+  - The mods' READMEs: install sections that describe the old standalone installers say so in one line and point to the setup doc.
+  *Done when:* each doc has every section from 23.1's format with this machine's "Tested with" values; every "Check it works" command was run here and matches; `aihub docs --check` lists no environment problems for these mods.
+
+- [ ] **23.5 Environment docs: the GPU mods.**
+  - `services/comfy/setup/comfyui.md`: the toolbox (`bin/comfyui start` creates it; its flags), the image digest in use today, ComfyUI's version inside it, the launch flags (`--disable-mmap --fp32-vae --enable-manager`), the repo under `$HOME`, **every custom node** with its repo and the commit installed here (read from `custom_nodes/*/.git`) and how to install them, `comfyui workflows check` and how to read `missing_node` / `missing_model`, the page's model downloads, `extra_model_paths.yaml`. `models = ["comfyui/**"]`, `scan = ["workflows/*/workflow.json"]`.
+  - `services/tts/setup/kokoro.md` and `breeze.md` (with Whisper): the locks and their torch/ROCm builds and indexes, `install-runtime.sh` and the licence flag, the `HF_HUB_OFFLINE` question checked and documented (or fixed if it's a bug, in its own commit), the MIOpen settings, `espeak-ng`, the `~/.config/tts-engines` and `~/.local/bin` launchers.
+  - `services/gen3d/setup/cubeart.md`, `img3d.md` (Hunyuan3D 2.1), `sam3do.md` (SAM 3D Objects: gated, the pytorch3d build, the shims, MIOpen off): `podman pull` first, `install-runtime.sh`, the pinned upstream commits, the weights each needs with fetch commands (the downloader isn't in git; known gap), `python -m gen3d.doctor`. TRELLIS.2 and SAM 3D Body run through comfy packs, and the gen3d docs point there instead of repeating it.
+  *Done when:* as 23.4, for these eight docs; every model path the GPU engines load (gen3d `engines.py`, tts `service.toml`) matches some environment's `models` glob.
+
+- [ ] **23.6 Model docs: sources and what to look for.**
+  - For each of the 23 models without a source: find it (Hugging Face, Civitai, the workflow's `properties.models` URLs, the download scripts), record it in the registry (`PUT /api/models/<id>` with `source`; `type = "url"` for Civitai and other direct links), or, when it can't be found, ask the user and write their answer in **Where to get it**.
+  - **What to look for** for every model, where there's something to say: a gated repo or licence, a conversion it needs (`scripts/fix_fp8_quant_metadata.py` for hybrid scaled-FP8 files), which quantization and why, memory, and which packs, engines or profiles break without it.
+  - Registry fixes found on the way: `qwen-image-config` is kind `other`, not `3d`.
+  - **The coverage checks turn on:** every model matches at least one environment; every model has a source or a non-empty Where to get it; every mod with models (`services` or `[models] dirs`) has at least one environment doc.
+  *Done when:* `utils/tests/docs/test_setup_docs_sync.py` runs `setupdocs.sync(check=True)` on the real repo with the coverage checks and passes; `aihub docs --check` is clean.
+
+- [ ] **23.7 Checksums in the docs.**
+  - `aihub models verify --all` (about 190 GB read; run in the background) records every file's sha256, so each model doc's files table shows the hash to check a download against. The docs regenerate from the verify writes (23.3).
+  *Done when:* every file in the registry has a `sha256` and a `verified_at`, any mismatches are reported to the user (not fixed silently), and the model docs show the hashes.
+
+- [ ] **23.8 A fresh reader and a fresh clone.**
+  - **A fresh reader:** an agent with no context follows `docs/setup/` from the start and lists every step that is ambiguous, assumes knowledge, or names a file, command or value that doesn't exist; each item is fixed or answered.
+  - **A fresh clone** (needs the user's OK): `git clone` of the pushed `main` into `data/state/fresh-clone/` (gitignored), then the CPU part as the docs say: `uv sync`, the hub on another port (`uv run python app.py --port 7078`, no systemd unit), the relay and agent installs, `aihub doctor` against it. The GPU environments are checked by comparing each doc's commands and versions with this machine, not by reinstalling them.
+  *Done when:* the reader's list is empty, the fresh clone's hub, relay and agent come up healthy from the docs alone, and the clone is removed afterwards.
+
+- [ ] **23.9 Rules, skills and docs in sync.**
+  - `CLAUDE.md`: a rule ("Adding a model or environment: `aihub docs`, write its hand sections, `aihub docs --check` passes, in the same commit"); the status line; `docs/setup/` in Layout. The README's Quickstart and Requirements point to `docs/setup/README.md`.
+  - Architecture §4 (`setup/` among a mod's optional extras), §8 (model docs from the registry), §9 (`[docs] regenerate`); `docs/mods.md`; `docs/structure.md`.
+  - Skills: `aihub` (the doc map row "setting up a machine"), `aihub-mod` (a new mod ships a setup doc; `aihub check` doesn't require one, the docs test does once the mod has models), `comfy-workflow` (a pack with new models: their hand sections), the `plan` skill unchanged.
+  *Done when:* `uv run pytest` passes, `aihub docs --check` is clean, and a grep finds no install instructions left that contradict `docs/setup/`.
+
+**Wire — Phase 23:** no UI area changes. (A "Setup doc" link on the Models page is a small follow-up once the docs exist.)
+
+**Checks & deliverables — Phase 23**
+- [ ] Registering a model (a comfy download, `aihub models scan --add`) writes its doc within seconds, and `aihub docs --check` flags it until its hand sections are written.
+- [ ] Deleting `services/<id>/` removes that mod's environment docs, and `aihub docs --check` names the models that lost their environment.
+- [ ] A fresh reader and a fresh clone (23.8) get the CPU part running from the docs alone.
+- [ ] Delivered: `docs/setup/` (README, host, hub, 54 model docs), 13 environment docs in the mods, `utils/setupdocs.py`, `aihub docs`, the registry change hook, the coverage test, the docs and skills updates.
+
+| Deliverable | Description | Location |
+| --- | --- | --- |
+| Setup guide | start here, the host, the hub, the generated index | `docs/setup/README.md`, `host.md`, `hub.md` |
+| Environment docs | one per container, venv or binary, kept in its mod | `services/<id>/setup/<env>.md` |
+| Model docs | one per registry entry, generated plus hand-written sections | `docs/setup/models/<id>.md` |
+| Generator | env docs, matching, rendering, check mode; `aihub docs` | `utils/setupdocs.py`, `utils/cli.py` |
+| Change hook | regenerate on every registry write | `utils/registry/store.py`, `utils/server.py` |
+| Tests | rendering and hand text, the hook, coverage on the real repo | `utils/tests/docs/test_setupdocs.py`, `test_setup_docs_sync.py`, `utils/tests/models/test_docs_hook.py` |
 
 ---
 

@@ -142,6 +142,15 @@ class Store:
                 self._c.execute(f"UPDATE threads SET {', '.join(sets)} WHERE id = ?", args)
         return self.thread(tid)
 
+    def prune_dry_runs(self, days: float = 30, now: float | None = None) -> int:
+        """Archived eval threads (`settings.dry_run`) older than `days` (plan 21.1); real chats are kept."""
+        cutoff = (now or time.time()) - days * 86400
+        with self._lock:
+            ids = [r[0] for r in self._c.execute(
+                "SELECT id FROM threads WHERE archived = 1 AND json_extract(settings, '$.dry_run') IS NOT NULL AND updated < ?",
+                (cutoff,)).fetchall()]
+        return sum(self.delete_thread(t) for t in ids)
+
     def delete_thread(self, tid: str) -> bool:
         with self._lock:
             self._c.execute("BEGIN")

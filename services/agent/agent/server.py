@@ -8,6 +8,7 @@ AGENT_MAX_STEPS, AIHUB_URL, AIHUB_PORT.
 from __future__ import annotations
 
 import asyncio
+import logging
 import json
 import os
 import time
@@ -82,6 +83,23 @@ def config_from_env() -> Config:
                   all_tools_models=tuple(m for m in os.environ.get("AGENT_ALL_TOOLS", "").split(",") if m))
 
 
+log = logging.getLogger("agent")
+
+async def _upkeep(store: Store, stop: asyncio.Event, every: float = 3600) -> None:
+    """Hourly: archived eval threads older than 30 days go (plan 21.1)."""
+    while not stop.is_set():
+        try:
+            n = store.prune_dry_runs()
+            if n:
+                log.info("pruned %d old eval threads", n)
+        except Exception:  # noqa: BLE001
+            log.exception("pruning eval threads")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=every)
+        except asyncio.TimeoutError:
+            pass
+
+
 def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str | None = None, llm_url: str | None = None) -> FastAPI:
     cfg = cfg or config_from_env()
     db = db or Path(os.environ.get("AGENT_DB") or "agent.db")
@@ -96,6 +114,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         app.state.agent = agent
         stop = asyncio.Event()
         watcher = asyncio.create_task(hub.follow_events(agent.hub_event, stop))
+        upkeep = asyncio.create_task(_upkeep(store, stop))
         await agent.resume_all()
         try:
             yield
@@ -105,7 +124,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             agent.shutting_down = True
             for t in list(agent.tasks.values()):
                 t.cancel()
-            await asyncio.gather(*agent.tasks.values(), watcher, return_exceptions=True)
+            upkeep.cancel()
+            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()

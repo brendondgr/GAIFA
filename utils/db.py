@@ -175,6 +175,25 @@ MIGRATIONS: list[str] = [
     );
     CREATE UNIQUE INDEX sessions_name ON sessions (name);
     """,
+    # 006: complete tool records (plan 21.1): how long a call took, which arguments the hub chose
+    # (`filled`: field → "default" | "pref:<id>" | "carried"), which the user changed on the card
+    # (`edited`), and the calls refused before they ran.
+    """
+    ALTER TABLE tool_calls ADD COLUMN duration_ms INTEGER;
+    ALTER TABLE tool_calls ADD COLUMN filled TEXT;
+    ALTER TABLE approvals ADD COLUMN filled TEXT;
+    ALTER TABLE approvals ADD COLUMN edited TEXT;
+    CREATE TABLE tool_refusals (
+        id         TEXT PRIMARY KEY,
+        tool       TEXT NOT NULL,
+        arguments  TEXT NOT NULL DEFAULT '{}',
+        origin     TEXT NOT NULL DEFAULT '{}',
+        code       TEXT NOT NULL,
+        detail     TEXT NOT NULL,
+        created_ts REAL NOT NULL
+    );
+    CREATE INDEX tool_refusals_created ON tool_refusals (created_ts);
+    """,
 ]
 
 _STOP = object()

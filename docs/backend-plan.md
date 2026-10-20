@@ -1858,7 +1858,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
 - brief §6.4 (`Settings`), §11.12, §11.13;
 - `docs/agent-eval.md`.
 
-- [ ] **21.1 Complete tool records: hub.db migration 006 (`utils/db.py`).**
+- [x] **21.1 Complete tool records: hub.db migration 006 (`utils/db.py`).**
   - **Migration 006:**
     - `tool_calls` gains `duration_ms` and `filled` (JSON: field → `default`|`pref:<id>`|`carried`).
     - `approvals` gains `filled` and `edited` (the fields you actually changed).
@@ -1868,6 +1868,13 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
   - **Metrics:** `utils/metrics/recorder.py` counts the bus `tool_call` events into `tools.calls.<mod>` and `tools.errors.<mod>` series.
   - **Retention:** rows with `origin.dry_run` older than 30 days are pruned by the recorder's hourly maintenance loop; real rows are kept. The agent prunes its archived dry-run threads (`settings.dry_run`) on the same schedule (`store.prune_dry_runs(days)`, run hourly from its lifespan).
   *Done when:* `utils/tests/tools/test_records.py` covers a refused call's row, `filled` and `edited` (including the all-checkboxes case), `duration_ms`, and the dry-run prune; `services/agent/tests/test_store.py` covers the thread prune; architecture §13's retention table is updated.
+  - *As built:*
+    - **`utils/tools/records.py`** holds `prune_dry_runs` and `usage(db, since)` (per tool: calls, errors, refusals, cards, edited, denied, mean time; for 21.7).
+    - **Refusals** cover unknown tools, invalid arguments and capability refusals, and calls denied by a rule. A card the user denies stays in `approvals` (state `denied`).
+    - **`filled`** comes from the approval onto the call, minus the fields the user edited.
+    - **Series** `tools.calls.<mod>` and `tools.errors.<mod>`: per 10 s tick, from the bus, real calls only.
+    - **Agent:** `Store.prune_dry_runs` runs from an hourly `_upkeep` task in its lifespan.
+    - **Tests:** `test_db.py` counts migrations instead of naming the version.
 - [ ] **21.2 Preferences: `utils/prefs.py`, `utils/routes/prefs.py`, migration 007.**
   - **The `prefs` table:**
     - `id`, `scope` (`tool`, `agent` or `thread`), `tool`, `field`, `value` (JSON);

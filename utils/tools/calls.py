@@ -35,7 +35,7 @@ from utils.tools import results
 from utils.tools.approvals import MODES, Approvals, decide
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.modcall import ToolError, dry_run, mod_error
-from utils.tools import options
+from utils.tools import edits, options
 from utils.tools.schema import coerce, validate
 
 if TYPE_CHECKING:
@@ -59,6 +59,7 @@ class Call:
     arguments: dict[str, Any]
     origin: dict[str, Any]
     approval_id: str | None = None
+    filled: dict[str, str] = field(default_factory=dict)   # field → "default" | "pref:<id>" | "carried" (21.1)
     state: str = "running"
     progress: float | None = None
     note: str | None = None
@@ -152,24 +153,31 @@ class Calls:
         tool = await self.catalog.get(name)
         if tool is None:
             close = await self.catalog.close_matches(name)
-            return {"status": "error", "tool": name, "error": {
+            out = {"status": "error", "tool": name, "error": {
                 "code": "unknown_tool", "detail": f"there is no tool {name!r}",
                 "fix": (f"did you mean {', '.join(close)}? " if close else "") + "find tools with find_tools or GET /api/tools?q="}}
+            await self._refused(name, arguments, origin, out["error"])
+            return out
         if mode not in MODES:
             mode = "ask"
         arguments = coerce(tool.parameters, arguments if arguments is not None else {})
         arguments, filled = options.fill_defaults(tool.parameters, arguments) if isinstance(arguments, dict) else (arguments, [])
+        how = {k: "default" for k in filled}
         problems = validate(tool.parameters, arguments) or options.problems(tool.parameters, arguments)
         if problems:
-            return self._invalid(tool, await self._elsewhere(tool, arguments, problems))
+            out = self._invalid(tool, await self._elsewhere(tool, arguments, problems))
+            await self._refused(tool.name, arguments, origin, out["error"])
+            return out
         verdict, why = decide(tool.name, tool.risk, self.hub.config, mode)
         if verdict == "deny":
-            return {"status": "denied", "tool": tool.name, "error": {"code": "denied", "detail": f"{tool.name}: {why}",
-                                                                    "fix": "don't retry it; tell the user it's not allowed, or ask them to change the setting"}}
+            out = {"status": "denied", "tool": tool.name, "error": {"code": "denied", "detail": f"{tool.name}: {why}",
+                                                                   "fix": "don't retry it; tell the user it's not allowed, or ask them to change the setting"}}
+            await self._refused(tool.name, arguments, origin, out["error"])
+            return out
         if verdict == "ask":
-            a = await self.approvals.create(tool.name, arguments, tool.ask, tool.risk, origin or {})
+            a = await self.approvals.create(tool.name, arguments, tool.ask, tool.risk, origin or {}, how)
             return self._needs(tool, a, filled)
-        return await self._launch(tool, arguments, origin or {}, None, wait)
+        return await self._launch(tool, arguments, origin or {}, None, wait, filled=how)
 
     async def decide(self, aid: str, approve: bool, arguments: dict[str, Any] | None = None,
                      reason: str | None = None, wait: float = DEFAULT_WAIT_S) -> dict[str, Any]:
@@ -197,9 +205,11 @@ class Calls:
         if problems:
             raise HubError(422, "invalid_arguments", problems[0]["detail"], {"problems": problems})
         call_id = _id()
-        if not await self.approvals.close(aid, "approved", final=args, call_id=call_id):
+        changed = edits.edited(tool.parameters, a["arguments"], args)
+        if not await self.approvals.close(aid, "approved", final=args, call_id=call_id, edited=changed):
             raise HubError(409, "already_decided", f"approval {aid} was decided meanwhile")
-        return await self._launch(tool, args, a["origin"], aid, wait, call_id)
+        filled = {k: v for k, v in (a.get("filled") or {}).items() if k not in changed}
+        return await self._launch(tool, args, a["origin"], aid, wait, call_id, filled=filled)
 
     async def status(self, call_id: str, wait: float = 0) -> dict[str, Any]:
         c = self.live.get(call_id)
@@ -291,11 +301,11 @@ class Calls:
         return out
 
     async def _launch(self, tool: ToolDef, args: dict[str, Any], origin: dict[str, Any], aid: str | None,
-                      wait: float, call_id: str | None = None) -> dict[str, Any]:
-        c = Call(call_id or _id(), tool, args, origin, aid)
+                      wait: float, call_id: str | None = None, filled: dict[str, str] | None = None) -> dict[str, Any]:
+        c = Call(call_id or _id(), tool, args, origin, aid, filled=dict(filled or {}))
         await self.hub.db.execute(
-            "INSERT INTO tool_calls (id, tool, arguments, origin, state, approval_id, created_ts) VALUES (?, ?, ?, ?, 'running', ?, ?)",
-            (c.id, tool.name, json.dumps(args), json.dumps(origin), aid, c.started))
+            "INSERT INTO tool_calls (id, tool, arguments, origin, state, approval_id, created_ts, filled) VALUES (?, ?, ?, ?, 'running', ?, ?, ?)",
+            (c.id, tool.name, json.dumps(args), json.dumps(origin), aid, c.started, json.dumps(c.filled) if c.filled else None))
         self.live[c.id] = c
         c.task = asyncio.create_task(self._run(c))
         self._publish(c)
@@ -312,8 +322,20 @@ class Calls:
         self.hub.bus.publish({"type": "tool_call", "call": ev})
 
     async def _store_end(self, call_id: str, state: str, payload: dict[str, Any]) -> None:
-        await self.hub.db.execute("UPDATE tool_calls SET state = ?, result = ?, finished_ts = ? WHERE id = ?",
-                                  (state, json.dumps(payload, default=str), time.time(), call_id))
+        now = time.time()
+        await self.hub.db.execute("UPDATE tool_calls SET state = ?, result = ?, finished_ts = ?, "
+                                  "duration_ms = CAST((? - created_ts) * 1000 AS INTEGER) WHERE id = ?",
+                                  (state, json.dumps(payload, default=str), now, now, call_id))
+
+    async def _refused(self, tool: str, arguments: Any, origin: dict[str, Any] | None, error: dict[str, Any]) -> None:
+        """A call refused before it ran (unknown tool, bad arguments, a choice that doesn't fit, a rule): kept for the records."""
+        try:
+            await self.hub.db.execute(
+                "INSERT INTO tool_refusals (id, tool, arguments, origin, code, detail, created_ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                ("ref_" + secrets.token_hex(6), tool, json.dumps(arguments, default=str)[:20000], json.dumps(origin or {}),
+                 error.get("code", "error"), str(error.get("detail", ""))[:2000], time.time()))
+        except Exception:  # noqa: BLE001: records never break a call
+            log.exception("recording a refused call")
 
     async def _run(self, c: Call, resume_job: str | None = None) -> None:
         try:

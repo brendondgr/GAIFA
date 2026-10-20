@@ -578,6 +578,7 @@ It also records **events** that charts need besides numbers:
 - `service_states` (every state change, for timelines and uptime)
 - `load_intervals` (loaded to unloaded)
 - `job_history` (start, end, final state, service, label, from `job` events)
+- `tools.calls.<mod>` and `tools.errors.<mod>`: finished tool calls per 10 s, from `tool_call` events (plan 21.1; dry runs don't count)
 
 Outputs and activity statistics are queried straight from their own tables.
 
@@ -589,6 +590,7 @@ Outputs and activity statistics are queried straight from their own tables.
 | `metrics_1m` | rollups: avg, min, max, sample count `n` | 14 d |
 | `metrics_1h` | rollups: avg (weighted by `n`), min, max, `n` | 400 d |
 | `service_states`, `load_intervals`, `job_history` | events for timelines and job stats | 400 d after they end |
+| `tool_calls`, `approvals`, `tool_refusals` (plan 21.1) | every tool attempt: arguments, what the hub filled, what the user edited, duration, result | real ones always; dry-run rows (the eval) 30 d |
 
 An hourly task (and one at startup) rolls up finished minutes and hours and prunes. Watermarks in `kv` mark what is rolled up, so a rollup never counts a sample twice, and a query reads rolled-up history from the coarse table and the rest from the finer ones. `GET /api/metrics` chooses the table from the range:
 - **≤ 6 h:** raw samples

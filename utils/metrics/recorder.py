@@ -70,6 +70,7 @@ class Recorder:
         self._jobs: dict[tuple[str, str], tuple[int, str, str]] = {}  # (service, job id) → (row id, state, label)
         self._reopenable: dict[tuple[str, str], int] = {}  # jobs closed at startup: reopened if seen again
         self._last_stat: dict[str, tuple[float, str]] = {}  # daily counters: (value, local date)
+        self._tools: dict[tuple[str, str], int] = {}       # (mod, "calls" | "errors") → finished this tick
         self._tasks: list[asyncio.Task[None]] = []
         self._sub: Any = None
         self.last_tick: int | None = None
@@ -185,7 +186,22 @@ class Recorder:
                         value = None  # the counter reset at midnight: break the line instead of a drop
                 out.append((info, value))
         out.append((STATIC["jobs.running"], float(running)))
+        tools, self._tools = self._tools, {}
+        for (mod, what), n in sorted(tools.items()):       # finished tool calls in this tick, per mod (plan 21.1)
+            out.append((SeriesInfo(f"tools.{what}.{mod}", f"{self._name(mod) if mod != 'hub' else 'AIHub'} tool {what}", "count",
+                                   service=None if mod == "hub" else mod), float(n)))
         return out
+
+    def tool_event(self, call: dict[str, Any]) -> None:
+        """A finished tool call (not a dry run) counts toward `tools.calls.<mod>` / `tools.errors.<mod>`."""
+        if call.get("status") not in ("done", "error", "cancelled") or (call.get("origin") or {}).get("dry_run"):
+            return
+        mod = str(call.get("tool") or "").split("_", 1)[0] or "hub"
+        svc = next((s for s in self.mgr.list() if (call.get("tool") or "").startswith(s.id.replace("-", "_") + "_")), None)
+        mod = svc.id if svc else mod
+        self._tools[(mod, "calls")] = self._tools.get((mod, "calls"), 0) + 1
+        if call.get("status") == "error":
+            self._tools[(mod, "errors")] = self._tools.get((mod, "errors"), 0) + 1
 
     def _name(self, sid: str) -> str:
         svc = self.mgr.services.get(sid)
@@ -223,6 +239,8 @@ class Recorder:
             await self.job(ev["job"])
         elif kind == "resync":
             await self.reconcile()
+        elif kind == "tool_call":
+            self.tool_event(ev.get("call") or {})
 
     async def reconcile(self) -> None:
         """Bring the open rows in line with every mod's current state (start, resync, removed mods)."""
@@ -308,3 +326,8 @@ class Recorder:
                 await self.store.rollup(self.clock())
             except Exception:  # noqa: BLE001
                 log.exception("metrics rollup")
+            try:
+                from utils.tools.records import prune_dry_runs
+                await prune_dry_runs(self.db, self.clock())
+            except Exception:  # noqa: BLE001
+                log.exception("pruning dry-run tool records")

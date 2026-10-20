@@ -90,6 +90,8 @@ class Approval(_Model):
     call_id: str | None = None
     created_ts: float
     decided_ts: float | None = None
+    filled: dict[str, str] | None = None
+    edited: list[str] | None = None
     schema_: dict[str, Any] | None = Field(None, alias="schema")
     description: str | None = None
 

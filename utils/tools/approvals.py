@@ -48,7 +48,7 @@ def _row(r: dict[str, Any] | None) -> dict[str, Any] | None:
     if r is None:
         return None
     out = dict(r)
-    for k in ("arguments", "final", "ask_fields", "origin"):
+    for k in ("arguments", "final", "ask_fields", "origin", "filled", "edited"):
         if out.get(k) is not None:
             out[k] = json.loads(out[k])
     return out
@@ -59,12 +59,12 @@ class Approvals:
         self.db, self.bus, self.config = db, bus, config
 
     async def create(self, tool: str, arguments: dict[str, Any], ask_fields: list[str], risk: str,
-                     origin: dict[str, Any]) -> dict[str, Any]:
+                     origin: dict[str, Any], filled: dict[str, str] | None = None) -> dict[str, Any]:
         aid = "ap_" + secrets.token_hex(6)
         now = time.time()
         await self.db.execute(
-            "INSERT INTO approvals (id, tool, arguments, ask_fields, risk, origin, state, created_ts) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)",
-            (aid, tool, json.dumps(arguments), json.dumps(ask_fields), risk, json.dumps(origin), now))
+            "INSERT INTO approvals (id, tool, arguments, ask_fields, risk, origin, state, created_ts, filled) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+            (aid, tool, json.dumps(arguments), json.dumps(ask_fields), risk, json.dumps(origin), now, json.dumps(filled) if filled else None))
         a = await self.get(aid)
         self.bus.publish({"type": "approval", "approval": a})
         return a  # type: ignore[return-value]
@@ -81,11 +81,12 @@ class Approvals:
         return [_row(r) for r in rows]  # type: ignore[misc]
 
     async def close(self, aid: str, state: str, final: dict[str, Any] | None = None, reason: str | None = None,
-                    call_id: str | None = None) -> bool:
-        """Pending → state, once. False when it was already decided."""
+                    call_id: str | None = None, edited: list[str] | None = None) -> bool:
+        """Pending → state, once. False when it was already decided. `edited`: the fields the user changed (21.1)."""
         n = await self.db.execute(
-            "UPDATE approvals SET state = ?, final = ?, reason = ?, call_id = ?, decided_ts = ? WHERE id = ? AND state = 'pending'",
-            (state, json.dumps(final) if final is not None else None, reason, call_id, time.time(), aid))
+            "UPDATE approvals SET state = ?, final = ?, reason = ?, call_id = ?, decided_ts = ?, edited = ? WHERE id = ? AND state = 'pending'",
+            (state, json.dumps(final) if final is not None else None, reason, call_id, time.time(),
+             json.dumps(edited) if edited is not None else None, aid))
         if n:
             self.bus.publish({"type": "approval", "approval": await self.get(aid)})
         return bool(n)

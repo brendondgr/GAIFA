@@ -1048,7 +1048,9 @@ interface Approval { id: string; tool: string; arguments: object;  // as the mod
                      final?: object;                                // as run (after edits)
                      ask_fields: string[]; risk: Risk; origin: object;
                      state: "pending" | "approved" | "denied" | "expired"; reason?: string; call_id?: string;
-                     created_ts: number; decided_ts?: number; schema?: JSONSchema; description?: string }
+                     created_ts: number; decided_ts?: number; schema?: JSONSchema; description?: string;
+                     filled?: { [field: string]: "default" | "carried" | string };   // what the hub chose: a default, a preference ("pref:<id>"), carried from this chat
+                     edited?: string[] }                                              // the fields the user changed on the card (plan 21.1)
 ```
 
 **Choices that depend on the inputs (`x-options`, plan 20.1).** Any `enum` property may carry `x-options`, one entry per value: `{label?, needs?: string[], excludes?: string[], default?: boolean, good_for?, speed?, kind?, allows?: {<param>: values[]}}`. A choice **fits** when every `needs` parameter is given and no `excludes` one is. A property with `"x-depends-on": "<param>"` takes only the values that its parent's chosen option `allows` (when it lists them); its own `x-options` may say `quality` (`full`, `fast`, `draft`) and `when` (e.g. "only when the user asks for a quick result").

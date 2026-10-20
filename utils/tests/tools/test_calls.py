@@ -273,6 +273,14 @@ async def test_dry_run_makes_a_stand_in(th):
     assert r["outputs"][0]["kind"] == "audio" and r["outputs"][0]["output_id"] != a["output_id"]
     r = (await th.client.post("/api/tools/fake_tools_get_item/call", json={"arguments": {"item_id": "x"}, "origin": {"dry_run": True}})).json()
     assert r["result"]["id"] == "x"     # reads still run
+    # plan 22.4: writes and destructive calls (a mod's and the hub's) are stand-ins: nothing changes
+    r = (await th.client.post("/api/tools/hub_start_service/call?wait=10", json={"arguments": {"id": "fake-tools"}, "mode": "auto",
+                                                                                  "origin": {"dry_run": True}})).json()
+    assert r["status"] == "done" and r["result"]["dry_run"] is True
+    r = (await th.client.post("/api/tools/hub_stop_service/call?wait=10", json={"arguments": {"id": "fake-tools"}, "mode": "auto",
+                                                                                 "origin": {"dry_run": True}})).json()
+    assert r["status"] in ("done", "needs_approval")
+    assert th.hub.services.get("fake-tools").state == "ready"
 
 
 async def test_calls_ask_the_memory_triggers_to_make_room(th):

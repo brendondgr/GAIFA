@@ -2081,7 +2081,7 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
     - **Hooks:** they fire as `note` events (`hook: …`); a refused call's error code is `hook_cap` or `hook_require_first`.
     - **Routes:** `GET /v1/harness`, `GET /v1/harness/versions`, `GET /v1/harness/versions/{n}/diff`, `POST /v1/harness/versions/{n}/activate`.
     - **Size:** `loop.py` is now 708 lines (under 800).
-- [ ] **22.3 Replays: `services/agent/agent/learn/replay.py`.**
+- [x] **22.3 Replays: `services/agent/agent/learn/replay.py`.**
   - **A real chat becomes a replay task:**
     - your messages verbatim;
     - question answers from the recorded answers;
@@ -2093,11 +2093,16 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
     - the same tools reach the same outputs.
   - **It runs in-process:** `create_app(Config(data=<candidate dir>), …)` with `httpx.ASGITransport` (as `tests/test_evals.py` does), against the real hub with `dry_run`, pinned to the candidate's harness.
   *Done when:* `tests/test_replay.py` turns a recorded thread fixture into a task and scores a base and a candidate harness differently on the pre-chosen check.
-- [ ] **22.4 Dry runs stub every non-read tool** (`utils/tools/modcall.py` `_dry_run`).
+  - *As built:*
+    - **Where replays run:** in the agent itself, as dry-run threads pinned to the candidate's harness version (`settings.harness`), through the eval harness, instead of a second in-process app. Candidates are ordinary harness versions that aren't active.
+    - **The card script:** it answers each tool's n-th card with the user's n-th recorded final arguments. Questions get the recorded answers.
+    - **Limit:** at most 8 messages per replay.
+- [x] **22.4 Dry runs stub every non-read tool** (`utils/tools/modcall.py` `_dry_run`).
   - With `origin.dry_run`, `write` and `destructive` tools return a stand-in success (`{"dry_run": true}`) instead of running; `generate` keeps its stand-in outputs; `read` tools run.
   - `hub_*` read tools stay real.
   - This changes the eval (dry runs stop starting services), so run the full suite and update any task that relied on a real start.
   *Done when:* `utils/tests/tools/test_calls.py` covers each risk in a dry run; the full dry-run suite still passes 80% pass^3 (in `docs/agent-eval.md`).
+  - *As built:* hub tools that write were already stand-ins since 21.6; mod tools with risk `write` or `destructive` now return `{dry_run: true, arguments}` too. The suite's re-run is in 22.8.
 - [ ] **22.5 The improvement loop: `services/agent/agent/learn/loop.py`, `learn/prompts.py`, `learn/library.py`.**
   - **Domains:** comfy, gen3d, tts, LLMs (lcpp, vllm, relay), hub. A domain runs when it has new real chats since its last run.
   - **One run** (k = 1 by default, `[learning] k`):

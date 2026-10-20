@@ -34,8 +34,11 @@ async def dry_run(hub: Hub, c: Any) -> bool:
     `outputs/eval/` instead of running (an image drawn from the prompt; a copy of the newest real
     video, audio or 3D model), titled from the arguments, so chains and cards are tested without
     the GPU."""
-    if not c.origin.get("dry_run") or c.tool.risk != "generate":
+    if not c.origin.get("dry_run") or c.tool.risk == "read":
         return False
+    if c.tool.risk != "generate":                 # write and destructive: a stand-in success, nothing changes (plan 22.4)
+        c.result = {"dry_run": True, "arguments": c.arguments}
+        return True
     kind = (c.tool.response if c.tool.response in ("audio", "image", "video", "model3d") else None) \
         or results.made_kind(c.tool.name) or "image"
     source = None

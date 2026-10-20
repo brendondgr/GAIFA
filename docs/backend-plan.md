@@ -2146,7 +2146,7 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
     - **Learn now:** `POST /v1/learn/run` (`{domains?}`).
     - **Routes:** `GET /v1/learn/runs[/{id}]`, `POST /v1/learn/runs/{id}/cancel`, `GET /v1/learn/library`. A running run appears in the agent's status `jobs` with its stage.
     - **A paused run** keeps its domain's evidence for the next run.
-- [ ] **22.7 Seeing the learner** (the Learning page; Chat adapted to the redesign).
+- [x] **22.7 Seeing the learner** (the Learning page; Chat adapted to the redesign).
   - **Learning page tabs:**
     - **Harness:** versions, each version's diff and notes, the gate's results, and activate for rollback;
     - **Runs:** each run's stages, decisions and ledger;
@@ -2154,6 +2154,14 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
   - **Review** gains prompt and guardrail proposals.
   - **In Chat,** a turn's Learning panel shows the harness version it ran on.
   *Done when:* in the browser, a run started with Learn now shows its stages, an adopted tool note appears under Harness with its diff, and rolling back changes the next turn's version.
+  - *As built:*
+    - **New tabs** on the agent's `ui/page.js`:
+      - **Harness:** every version except candidates, with Diff and Activate; on the base, "Roll back to the base".
+      - **Runs:** Learn now, each run's state, stage, model calls and per-area decision.
+      - **Library:** lessons by area.
+    - **Review** lists harness versions waiting for the user (`proposed`) with "Use this version".
+    - **Chat:** the turn's harness version is in its `usage` events rather than a separate panel.
+    - **Browser:** the Harness tab shows the base as active. The run is checked live in 22.8.
 - [ ] **22.8 Live check and docs.**
   - **Live**, on the real chats so far:
     - the miner's proposals (gen3d `fast` and no parts) are approved, then pre-filled;

@@ -114,6 +114,18 @@ COMPONENTS = {"schemas": {"ImageReq": {"type": "object", "title": "ImageReq", "p
 RENDERS: dict[str, dict] = {}
 
 
+# A tool whose engine choices declare what they need (plan 20.1).
+SHAPE = {"type": "object", "properties": {
+    "prompt": {"type": "string"}, "image": {"type": "string", "format": "aihub-file"},
+    "engine": {"type": "string", "enum": ["words", "picture", "body"], "x-options": {
+        "words": {"label": "From words", "needs": ["prompt"], "excludes": ["image"], "default": True, "good_for": "text only"},
+        "picture": {"label": "From a picture", "needs": ["image"], "default": True, "good_for": "objects", "allows": {"preset": ["base", "fast"]}},
+        "body": {"label": "Body", "needs": ["image"], "good_for": "a person's body", "allows": {"preset": ["base"]}}}},
+    "preset": {"type": "string", "enum": ["base", "fast", "draft"], "x-depends-on": "engine", "x-options": {
+        "fast": {"quality": "fast", "when": "only when the user asks for a quick result"}, "draft": {"quality": "draft"}}}},
+    "additionalProperties": False}
+
+
 def png(w: int = 4, h: int = 4) -> bytes:
     import zlib
     raw = b"".join(b"\x00" + b"\xff\x80\x00" * w for _ in range(h))
@@ -233,7 +245,15 @@ class Handler(BaseHTTPRequestHandler):
                      "op": "POST /v1/tools/paint/call", "job": {"status": "GET /v1/render/{job_id}", "cancel": "POST /v1/render/{job_id}/cancel"},
                      "risk": "generate", "ask": ["style"], "examples": [{"prompt": "a fox", "style": "ink"}]},
                     {"type": "function", "function": {"name": "styles", "description": "List styles.", "parameters": {"type": "object", "properties": {}}},
-                     "op": "POST /v1/tools/styles/call", "job": None, "risk": "read", "core": True}]})
+                     "op": "POST /v1/tools/styles/call", "job": None, "risk": "read", "core": True},
+                    {"type": "function", "function": {"name": "shape", "description": "Make a shape (x-options, plan 20.1).", "parameters": SHAPE},
+                     "op": "POST /v1/tools/shape/call", "job": None, "risk": "generate", "ask": ["engine", "preset"]},
+                    {"type": "function", "function": {"name": "sketch", "description": "Sketch (another style enum).", "parameters": {
+                        "type": "object", "properties": {"prompt": {"type": "string"}, "style": {"type": "string", "enum": ["pencil", "charcoal"]}}}},
+                     "op": "POST /v1/tools/shape/call", "job": None, "risk": "read"},
+                    {"type": "function", "function": {"name": "strict", "description": "Always refused, with the mod's own fix.",
+                                                      "parameters": {"type": "object", "properties": {}}},
+                     "op": "POST /v1/tools/strict/call", "job": None, "risk": "read"}]})
         if url.path == "/v1/redirect":
             self.send_response(307)
             self.send_header("Location", "/v1/status")
@@ -306,6 +326,11 @@ class Handler(BaseHTTPRequestHandler):
                                 "seconds": float(b.get("seconds") or 0.5), "fail": bool(b.get("fail")), "progress": 0.0,
                                 "style": b.get("style"), "image": b.get("image")}
                 return self.send(202, {"id": rid, "state": "running"} if url.path == "/v1/render" else {"status": "running", "job_id": rid})
+            if url.path == "/v1/tools/shape/call":
+                return self.send(200, {"ran": (self.body().get("arguments") or {})})
+            if url.path == "/v1/tools/strict/call":
+                self.body()
+                return self.send(422, {"detail": {"detail": "the picture needs a plain background", "fix": "run remove_background on it first"}})
             if url.path == "/v1/tools/styles/call":
                 self.body()
                 return self.send(200, {"styles": ["oil", "ink"]})

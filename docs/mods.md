@@ -168,6 +168,8 @@ After editing `page.js`, reload the browser tab. A page can also import `/mod-ki
   - `job = true` with `job_status = "GET /v1/jobs/{id}"` (and optionally `job_cancel`): the call returns a job id, and the hub follows the job until its `state`/`status` is done, failed or cancelled, then returns its outputs. A `progress` (0–1) or `stages` field becomes the card's progress bar.
   - **Results:** any path under `outputs/` in your JSON (absolute, `<mod>/<date>/…` or `<date>/…`) becomes an output reference (`output:<id>`) the agent can chain. For a binary response, send the saved file's path in an `X-AIHub-Output` header; otherwise the hub saves the bytes itself.
   - **File inputs:** a schema property with `format: "aihub-file"` (a JSON value) or `format: "binary"` (multipart) gets `x-kind` (image, video, audio, mesh), and takes `output:<id>`: JSON bodies get the string, multipart bodies get the file.
+  - **Choices that depend on the inputs:** put `x-options` on an `enum` property (in your pydantic model, `json_schema_extra={"x-options": {…}}`), one entry per value: `needs` / `excludes` (parameters that must or mustn't be given for it), `default` (used when the model leaves it out, among the choices that fit), `label`, `good_for`, `speed`, `kind`, and `allows: {"preset": […]}` for a property that says `"x-depends-on": "engine"`. The hub fills the default, refuses a choice that doesn't fit with a `fix` naming the ones that do, renders the choices into the description the model reads, and the parameter card lists only the ones that fit. `aihub check` reports unknown values, unknown parameters and two defaults that fit the same inputs. Shape: brief §11.12.
+  - **Your own fix:** a 4xx body with `fix` (at the top, under `data`, or in a dict `detail`: `{"detail": {"detail": "…", "fix": "…"}}`) reaches the model as the call's `fix`; `problems: [{field, detail, fix}]` too.
 
   A mod whose tools change while it runs (comfy's grow with its workflow packs) lists them from a route instead: `[agent] tools_source = "GET /v1/tools"`, returning `{"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST /v1/tools/<name>/call", "job": {"status": "GET /v1/jobs/{job_id}", "cancel": "…"} | null, "risk": …, "ask": […], "examples": […], "core": …}]}`. ComfyUI workflows are themselves modular: see [workflows.md](workflows.md).
 
@@ -192,6 +194,7 @@ After editing `page.js`, reload the browser tab. A page can also import `/mod-ki
 | `not healthy after 60s (/health HTTP 503)` | the app is slow or broken: `aihub logs <id>`; raise `start_timeout_s` if it is just slow |
 | `exited with status 1 while starting` | the traceback is in the check output and in `aihub logs <id>` |
 | `operations: not in the OpenAPI: [tools].x: POST /v1/x` | the route doesn't exist (or isn't in `/openapi.json`) |
+| `tools: x: engine: 2 defaults (a, b) fit when image is given` | give each input combination one `default` in `x-options` (§6, Tools) |
 | `status: stats[0] needs a non-empty label` | fix the status body (§5, level 1) |
 | `widget calls: series[0] (Calls): 23 values for 24 points` | one value per point in `t` |
 | `page: no mount(el, ctx)` | the module must `export default { tabs, mount }` |

@@ -1042,12 +1042,27 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            outputs?: ToolOutput[];
                            error?: { code: string; detail: string; fix?: string; problems?: object[] };
                            progress?: number; note?: string; job_id?: string; elapsed_s?: number;
-                           arguments?: object; ask_fields?: string[]; risk?: Risk; schema?: JSONSchema; description?: string }  // needs_approval
+                           arguments?: object; ask_fields?: string[]; risk?: Risk; schema?: JSONSchema; description?: string;
+                           filled?: string[] }                      // needs_approval; filled: arguments the hub chose (an x-options default)
 interface Approval { id: string; tool: string; arguments: object;  // as the model sent them
                      final?: object;                                // as run (after edits)
                      ask_fields: string[]; risk: Risk; origin: object;
                      state: "pending" | "approved" | "denied" | "expired"; reason?: string; call_id?: string;
                      created_ts: number; decided_ts?: number; schema?: JSONSchema; description?: string }
+```
+
+**Choices that depend on the inputs (`x-options`, plan 20.1).** Any `enum` property may carry `x-options`, one entry per value: `{label?, needs?: string[], excludes?: string[], default?: boolean, good_for?, speed?, kind?, allows?: {<param>: values[]}}`. A choice **fits** when every `needs` parameter is given and no `excludes` one is. A property with `"x-depends-on": "<param>"` takes only the values that its parent's chosen option `allows` (when it lists them); its own `x-options` may say `quality` (`full`, `fast`, `draft`) and `when` (e.g. "only when the user asks for a quick result").
+- **The hub** fills a missing choice with the `default` that fits (listed in `filled`) and refuses one that doesn't fit, before any card, as `invalid_arguments` with a `fix` naming the choices that do; edited card arguments are checked the same way (422, the approval stays pending).
+- **The card** lists only the choices that fit the current values (re-checked when a file input changes), labelled with `label` and with `good_for` as help, and a dependent field only its parent's `allows`.
+- **The model** reads `GET /api/tools?view=model`: each `x-options` rendered as lines in the property's description, the keys removed. `/api/tools` (default `view=full`), approvals and `needs_approval.schema` keep the metadata.
+- **MCP forms** list only the choices that fit, with `enumNames` from the labels.
+
+```json
+"engine": {"type": "string", "enum": ["cube3d", "trellis2"], "x-options": {
+  "cube3d":   {"label": "Cube3D", "needs": ["prompt"], "excludes": ["image"], "default": true, "good_for": "a mesh straight from text"},
+  "trellis2": {"label": "TRELLIS.2", "needs": ["image"], "default": true, "good_for": "objects", "allows": {"preset": ["base", "fast", "draft"]}}}},
+"preset": {"type": "string", "enum": ["base", "fast", "draft"], "x-depends-on": "engine",
+           "x-options": {"fast": {"quality": "fast", "when": "only when the user asks for a quick result"}}}
 ```
 
 **API tab (as built, Wire 13):** an operation that is an agent tool whose risk isn't `read` is sent as `callTool("<mod>_<tool>", args, {mode: "ask"})` (`web/api-tool.js`), so it asks first like any client: the chat's parameter card shows inline, Run / Cancel decide the approval, then the call's progress and its outputs (links to Outputs) show under the form. Read tools and operations with a file upload are still sent directly through the proxy.

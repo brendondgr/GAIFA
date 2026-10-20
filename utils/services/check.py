@@ -46,7 +46,7 @@ class Report:
         }
 
 
-async def run(mgr: ServiceManager, svc: Service, start: bool = False) -> dict[str, Any]:
+async def run(mgr: ServiceManager, svc: Service, start: bool = False, tools: Any = None) -> dict[str, Any]:
     r = Report()
     # 1. manifest
     if svc.errors:
@@ -181,7 +181,15 @@ async def run(mgr: ServiceManager, svc: Service, start: bool = False) -> dict[st
         problems = widget_problems(data, w.kind)
         r.add(name, "fail" if problems else "ok", "; ".join(problems) if problems else f"{w.kind} with {len(data.get('series', []))} series")
 
-    # 10. page
+    # 10. agent tools: their schemas and `x-options` (plan 20.1)
+    if tools is not None and (m.tools or m.agent.tools_source) and live:
+        from utils.tools.options import spec_problems
+
+        defs = await tools()
+        bad = [f"{t.name}: {p}" for t in defs for p in [*t.problems, *spec_problems(t.parameters)]]
+        r.add("tools", "fail" if bad else "ok", "; ".join(bad[:8]) if bad else f"{len(defs)} tools")
+
+    # 11. page
     if m.ui.page:
         r.add("page", *page_check(svc.mod.dir / m.ui.page))
     return r.as_dict()

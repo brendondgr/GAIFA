@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Query, Request
 
@@ -25,12 +25,13 @@ def _hub(request: Request) -> Any:
 
 @router.get("/api/tools", summary="The agent's tools with full schemas; ?names=a,b picks some, ?q=words searches (best 8)",
             response_model=list[Tool], response_model_exclude_none=True)
-async def list_tools(request: Request, names: str | None = None, q: str | None = None) -> list[dict[str, Any]]:
+async def list_tools(request: Request, names: str | None = None, q: str | None = None,
+                     view: Literal["full", "model"] = Query("full", description="model: x-options rendered into the descriptions (what a model reads)")) -> list[dict[str, Any]]:
     from utils.server import HubError
 
     cat = _hub(request).tools
     if q is not None:
-        return [t.public() for t in await cat.search(q)]
+        return [t.public(view=view) for t in await cat.search(q)]
     tools = await cat.tools()
     if names:
         want = [n.strip() for n in names.split(",") if n.strip()]
@@ -39,8 +40,8 @@ async def list_tools(request: Request, names: str | None = None, q: str | None =
         if missing:
             close = {n: await cat.close_matches(n) for n in missing}
             raise HubError(404, "unknown_tool", f"no tool {', '.join(missing)}", {"close": close})
-        return [by[n].public() for n in want]
-    return [t.public() for t in tools]
+        return [by[n].public(view=view) for n in want]
+    return [t.public(view=view) for t in tools]
 
 
 @router.get("/api/tools/index", summary="Every tool's name, mod, risk and one-line summary (the deferred list)",

@@ -143,7 +143,13 @@ async def list_operations(service_id: str, request: Request) -> list[dict[str, A
 @router.get("/api/services/{service_id}/check", summary="Self-test a mod: manifest, command, health, OpenAPI, status, widgets, page", response_model=CheckReport)
 async def check_service(service_id: str, request: Request, start: bool = False) -> dict[str, Any]:
     mgr = _mgr(request)
-    return await check.run(mgr, mgr.get(service_id), start=start)
+    svc = mgr.get(service_id)
+    cat = request.app.state.hub.tools
+    return await check.run(mgr, svc, start=start, tools=cat and (lambda: _mod_tools(cat, svc.id)))
+
+
+async def _mod_tools(cat: Any, sid: str) -> list[Any]:
+    return [t for t in await cat.tools() if t.mod == sid]
 
 
 @router.put("/api/services/{service_id}/config", summary="Save a mod's [services.<id>] settings in config.toml", response_model=SavedConfig)

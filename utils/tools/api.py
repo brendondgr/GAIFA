@@ -68,6 +68,7 @@ class ToolCallResult(_Model):
     risk: Risk | None = None
     schema_: dict[str, Any] | None = Field(None, alias="schema")
     description: str | None = None
+    filled: list[str] | None = None
 
 
 class CallRequest(_Model):

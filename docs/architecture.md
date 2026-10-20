@@ -617,6 +617,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
   - **Source:** the hub's catalog (`GET /api/tools`, Phase 13), called through `POST /api/tools/{name}/call`.
   - **Local tools:** `ask_user`, `update_todos`, `find_tools`, `load_tools`, `read_skill`, `view_output`, `read_result`, `remember`.
   - **Loading:** only the `core` tools are loaded. The rest are listed by group (name and one line), and their schemas are loaded on demand.
+  - **Capabilities (plan 20):** engines and workflows say what they take in their schemas (`x-options`: `needs`, `excludes`, `default`, `allows`; brief §11.12). The hub fills the default that fits the inputs, refuses a choice that doesn't with a `fix` naming the ones that do, and serves the model a copy with the choices written into the descriptions (`GET /api/tools?view=model`), so the prompt makes no capability claims of its own.
 - **Asking.** Choices are a fixed step rather than the model's judgement:
   - `ask_user` puts question cards in the thread
   - every `generate`/`write` call becomes a parameter card (a hub approval whose `ask` fields you can edit) unless the thread is in "Use defaults"

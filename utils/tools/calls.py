@@ -34,6 +34,8 @@ from utils.services import ServiceError
 from utils.tools import results
 from utils.tools.approvals import MODES, Approvals, decide
 from utils.tools.catalog import Catalog, ToolDef
+from utils.tools.modcall import ToolError, dry_run, mod_error
+from utils.tools import options
 from utils.tools.schema import coerce, validate
 
 if TYPE_CHECKING:
@@ -48,18 +50,6 @@ POLL_S = 2.0
 DEFAULT_WAIT_S = 1800.0
 OUTPUT_ID = re.compile(r"^[0-9a-f]{12}$")
 PLACEHOLDER = re.compile(r"\{[^}]+\}")
-
-
-class ToolError(Exception):
-    def __init__(self, code: str, detail: str, fix: str | None = None) -> None:
-        super().__init__(detail)
-        self.code, self.detail, self.fix = code, detail, fix
-
-    def body(self) -> dict[str, Any]:
-        out = {"code": self.code, "detail": self.detail}
-        if self.fix:
-            out["fix"] = self.fix
-        return out
 
 
 @dataclass
@@ -168,16 +158,17 @@ class Calls:
         if mode not in MODES:
             mode = "ask"
         arguments = coerce(tool.parameters, arguments if arguments is not None else {})
-        problems = validate(tool.parameters, arguments)
+        arguments, filled = options.fill_defaults(tool.parameters, arguments) if isinstance(arguments, dict) else (arguments, [])
+        problems = validate(tool.parameters, arguments) or options.problems(tool.parameters, arguments)
         if problems:
-            return self._invalid(tool, problems)
+            return self._invalid(tool, await self._elsewhere(tool, arguments, problems))
         verdict, why = decide(tool.name, tool.risk, self.hub.config, mode)
         if verdict == "deny":
             return {"status": "denied", "tool": tool.name, "error": {"code": "denied", "detail": f"{tool.name}: {why}",
                                                                     "fix": "don't retry it; tell the user it's not allowed, or ask them to change the setting"}}
         if verdict == "ask":
             a = await self.approvals.create(tool.name, arguments, tool.ask, tool.risk, origin or {})
-            return self._needs(tool, a)
+            return self._needs(tool, a, filled)
         return await self._launch(tool, arguments, origin or {}, None, wait)
 
     async def decide(self, aid: str, approve: bool, arguments: dict[str, Any] | None = None,
@@ -200,7 +191,9 @@ class Calls:
             await self.approvals.close(aid, "denied", reason="the tool is gone")
             raise HubError(404, "unknown_tool", f"{a['tool']} is no longer in the catalog")
         args = coerce(tool.parameters, arguments if arguments is not None else a["arguments"])
-        problems = validate(tool.parameters, args)
+        if isinstance(args, dict):
+            args, _ = options.fill_defaults(tool.parameters, args)
+        problems = validate(tool.parameters, args) or options.problems(tool.parameters, args)
         if problems:
             raise HubError(422, "invalid_arguments", problems[0]["detail"], {"problems": problems})
         call_id = _id()
@@ -273,9 +266,29 @@ class Calls:
         return {"status": "error", "tool": tool.name, "error": {"code": "invalid_arguments", "detail": detail, "fix": fix,
                                                                 "problems": problems[:10]}}
 
-    def _needs(self, tool: ToolDef, a: dict[str, Any]) -> dict[str, Any]:
-        return {"status": "needs_approval", "tool": tool.name, "approval_id": a["id"], "arguments": a["arguments"],
-                "ask_fields": tool.ask, "risk": tool.risk, "schema": tool.parameters, "description": tool.description}
+    def _needs(self, tool: ToolDef, a: dict[str, Any], filled: list[str] | None = None) -> dict[str, Any]:
+        out = {"status": "needs_approval", "tool": tool.name, "approval_id": a["id"], "arguments": a["arguments"],
+               "ask_fields": tool.ask, "risk": tool.risk, "schema": tool.parameters, "description": tool.description}
+        if filled:
+            out["filled"] = filled
+        return out
+
+    async def _elsewhere(self, tool: ToolDef, args: Any, problems: list[dict[str, str]]) -> list[dict[str, str]]:
+        """An enum value this tool refuses but another tool of the same mod takes for the same
+        parameter: say to call that tool (an edit workflow passed to the text-to-image tool)."""
+        if not isinstance(args, dict) or not tool.mod:
+            return problems
+        others = [t for t in await self.catalog.tools() if t.mod == tool.mod and t.name != tool.name]
+        out = []
+        for p in problems:
+            v, field = args.get(p.get("field", "")), p.get("field", "")
+            mine = (tool.parameters.get("properties") or {}).get(field) or {}
+            if isinstance(v, (str, int)) and "enum" in mine and v not in mine["enum"]:
+                hit = next((t for t in others if v in (((t.parameters.get("properties") or {}).get(field) or {}).get("enum") or [])), None)
+                if hit:
+                    p = {**p, "fix": f"{v!r} is a {field} of {hit.name}, not of {tool.name}: call {hit.name} instead"}
+            out.append(p)
+        return out
 
     async def _launch(self, tool: ToolDef, args: dict[str, Any], origin: dict[str, Any], aid: str | None,
                       wait: float, call_id: str | None = None) -> dict[str, Any]:
@@ -376,32 +389,8 @@ class Calls:
         mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         return (path.name, await asyncio.to_thread(path.read_bytes), mime)
 
-    async def _dry_run(self, c: Call) -> bool:
-        """`origin.dry_run` (the agent eval): a generating tool makes a stand-in output under
-        `outputs/eval/` instead of running (an image drawn from the prompt; a copy of the newest real
-        video, audio or 3D model), titled from the arguments, so chains and cards are tested without
-        the GPU."""
-        if not c.origin.get("dry_run") or c.tool.risk != "generate":
-            return False
-        kind = (c.tool.response if c.tool.response in ("audio", "image", "video", "model3d") else None) \
-            or results.made_kind(c.tool.name) or "image"
-        source = None
-        if kind != "image":
-            page = await self.hub.outputs.list(kind=kind, service=c.tool.mod, limit=1)
-            if not page["items"]:
-                page = await self.hub.outputs.list(kind=kind, limit=200)
-            source = next((o for o in page["items"] if o["service"] != "eval"), None)
-            if source is None:
-                raise ToolError("dry_run", f"dry run: no existing {kind} to stand in for {c.tool.name}")
-            source = (await self.hub.outputs.row(source["id"]))
-        rel = await asyncio.to_thread(results.stand_in, self.hub, kind, c.tool.name, c.arguments, source)
-        await asyncio.sleep(0.3)
-        c.outputs = await results.outputs_for(self.hub, [rel])
-        c.result = {"state": "done", "arguments": c.arguments}
-        return True
-
     async def _mod_call(self, c: Call, resume_job: str | None) -> None:
-        if await self._dry_run(c):
+        if await dry_run(self.hub, c):
             return
         tool, route = c.tool, c.tool.route
         if resume_job:
@@ -452,7 +441,7 @@ class Calls:
             svc.in_flight -= 1
             svc.last_request_ts = time.time()
         if r.status_code >= 400:
-            raise _mod_error(svc, r)
+            raise mod_error(svc, r)
         ctype = r.headers.get("content-type", "")
         if "json" in ctype or not r.content:
             data = r.json() if r.content else None
@@ -499,7 +488,7 @@ class Calls:
                 await asyncio.sleep(POLL_S)
             r = await self.client.request(method, svc.url + path + (f"?{q}" if q else ""), timeout=httpx.Timeout(120, connect=10))
             if r.status_code >= 400:
-                raise _mod_error(svc, r)
+                raise mod_error(svc, r)
             body = r.json()
             p = _progress(body)
             if p != last_progress:
@@ -531,21 +520,3 @@ def _job_summary(body: Any) -> Any:
         return body
     keep = ("id", "state", "status", "title", "label", "workflow", "error", "outputs", "files", "dir", "seconds", "peak_gb")
     return {k: body[k] for k in keep if k in body}
-
-
-def _mod_error(svc: Any, r: httpx.Response) -> ToolError:
-    detail: Any = None
-    try:
-        b = r.json()
-        detail = b.get("detail") if isinstance(b, dict) else b
-    except ValueError:
-        detail = r.text[:400]
-    if isinstance(detail, list):  # FastAPI validation errors
-        detail = "; ".join(f"{'.'.join(str(x) for x in d.get('loc', [])[1:])}: {d.get('msg')}" for d in detail if isinstance(d, dict))
-    if isinstance(detail, dict):
-        detail = json.dumps(detail)[:400]
-    if r.status_code >= 500:
-        return ToolError("upstream_error", f"{svc.mod.name} failed (HTTP {r.status_code}): {detail}"[:600],
-                         "check the mod's Logs tab; try again or change the inputs")
-    return ToolError("mod_error", f"{svc.mod.name} refused it (HTTP {r.status_code}): {detail}"[:600],
-                     "fix the arguments the message names, then call again")

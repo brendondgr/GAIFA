@@ -27,6 +27,8 @@ import secrets
 import time
 from typing import TYPE_CHECKING, Any
 
+from utils.tools import options
+
 if TYPE_CHECKING:
     from utils.server import Hub
     from utils.tools.mcp import Request
@@ -97,7 +99,10 @@ def form_schema(schema: dict[str, Any], ask: list[str], args: dict[str, Any]) ->
         if p.get("format") in FORMATS:
             out["format"] = p["format"]
         if typ == "string" and isinstance(p.get("enum"), list) and all(isinstance(e, str) for e in p["enum"]):
-            out["enum"] = p["enum"]
+            out["enum"] = options.choices(schema, k, args)       # only the choices that fit the inputs (plan 20.1)
+            o = options.options(p)
+            if o:
+                out["enumNames"] = [str((o.get(v) or {}).get("label") or v) for v in out["enum"]]
         default = args.get(k, p.get("default"))
         if default is not None:
             out["default"] = default

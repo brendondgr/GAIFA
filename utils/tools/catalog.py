@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
 from utils import operations
+from utils.tools import options
 from utils.tools.schema import Route, clean, flatten, mark_files
 
 if TYPE_CHECKING:
@@ -55,13 +56,14 @@ class ToolDef:
     handler: Callable[..., Any] | None = None  # hub tools
     problems: list[str] = field(default_factory=list)
 
-    def public(self, full: bool = True) -> dict[str, Any]:
+    def public(self, full: bool = True, view: str = "full") -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "mod": self.mod or "hub", "risk": self.risk, "core": self.core,
                                "summary": summary_line(self.description), "available": self.available}
         if self.why:
             out["why"] = self.why
         if full:
-            out.update({"description": self.description, "parameters": self.parameters, "ask": self.ask,
+            params = options.for_model(self.parameters) if view == "model" else self.parameters
+            out.update({"description": self.description, "parameters": params, "ask": self.ask,
                         "examples": self.examples, "job": self.job is not None, "source": self.source})
         return out
 
@@ -70,7 +72,7 @@ class ToolDef:
         desc = self.description
         if self.examples:
             desc += "\nExample arguments: " + "; ".join(json.dumps(e, separators=(",", ":")) for e in self.examples[:2])
-        return {"type": "function", "function": {"name": self.name, "description": desc, "parameters": self.parameters}}
+        return {"type": "function", "function": {"name": self.name, "description": desc, "parameters": options.for_model(self.parameters)}}
 
 
 def summary_line(desc: str) -> str:

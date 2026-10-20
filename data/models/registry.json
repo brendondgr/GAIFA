@@ -348,6 +348,201 @@
       },
       "tags": []
     },
+    "d3-lite-decision-3.0": {
+      "added": "2026-10-20T19:11:49-04:00",
+      "files": [
+        {
+          "path": "decide/d3-lite/LICENSE",
+          "role": "other",
+          "sha256": null,
+          "size_bytes": 11357,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/MODEL_MANIFEST.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 11428,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/NOTICE",
+          "role": "other",
+          "sha256": null,
+          "size_bytes": 106,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/README.md",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 17331,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/chat_template.jinja",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 7755,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 2884,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/d3_engine.py",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 4413,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/d3_fast.py",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 22331,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/d3_format.py",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 7008,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/d3_kernels.py",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 16129,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/d3_runtime.py",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 95505,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/d3_server.py",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 17705,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/decision_config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 5504,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/merges.txt",
+          "role": "tokenizer",
+          "sha256": null,
+          "size_bytes": 3353259,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/model-00001-of-00001.safetensors",
+          "role": "weights",
+          "sha256": null,
+          "size_bytes": 1706027688,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/model.safetensors.index.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 41066,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/modeling_d3.py",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 12079,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/pipeline_d3.py",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 2936,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/preprocessor_config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 390,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/readout.safetensors",
+          "role": "weights",
+          "sha256": null,
+          "size_bytes": 1044560,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/requirements.txt",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 723,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/tokenizer.json",
+          "role": "tokenizer",
+          "sha256": null,
+          "size_bytes": 12807982,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": null,
+          "size_bytes": 16709,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/video_preprocessor_config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 385,
+          "verified_at": null
+        },
+        {
+          "path": "decide/d3-lite/vocab.json",
+          "role": "tokenizer",
+          "sha256": null,
+          "size_bytes": 6722759,
+          "verified_at": null
+        }
+      ],
+      "format": "hf-dir",
+      "kind": "other",
+      "name": "d3-lite (Decision 3.0)",
+      "notes": "",
+      "path": "decide/d3-lite",
+      "services": [],
+      "source": {
+        "repo": "vllm-sr/d3-lite",
+        "revision": "03560c26f5199c3c04129a2ccb38960c913635e0",
+        "type": "huggingface"
+      },
+      "tags": [
+        "decision-model",
+        "classification"
+      ]
+    },
     "dino-v3-vit-l": {
       "added": "2026-10-11T13:06:52-04:00",
       "files": [

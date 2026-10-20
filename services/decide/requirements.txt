@@ -1,0 +1,15 @@
+# The server and the decision models, unpinned (the CPU install). On gfx1151 install.sh installs locks/decide.txt
+# instead: the exact ROCm builds of torch and torchvision this machine runs (the tts / embed line).
+fastapi
+uvicorn
+httpx
+numpy
+pillow
+huggingface_hub
+safetensors
+accelerate
+# d3-lite's card validates its remote code with transformers 5.17.0 (setup/decide.md)
+transformers==5.17.0
+opencv-python-headless
+torch
+torchvision

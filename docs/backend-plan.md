@@ -1962,7 +1962,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - **Proxied for the page:** the agent serves `GET /v1/prefs` and `POST /v1/prefs/{id}/approve|reject`.
     - **Test fixture:** `tests/fixtures/approvals-2026-10.json` holds the real approvals, settings only (no prompts), with hashed chat ids.
     - **Live on 2026-10-20:** the miner proposed gen3d `preset` = `fast` and `stages` = `["shape", "preview"]`, from 7 cards in 5 chats. Both wait as proposals.
-- [ ] **21.6 Evals for preferences: `services/agent/evals/tasks.py`.**
+- [x] **21.6 Evals for preferences: `services/agent/evals/tasks.py`.**
 
   | Task | Setup | Pass when |
   |---|---|---|
@@ -1974,6 +1974,10 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
 
   - The harness learns a `setup_prefs` hook and cleans them up after.
   *Done when:* the tasks pass in the fake-model test and at 80% pass^3 on `skynet`; the results are in `docs/agent-eval.md`.
+  - *As built:*
+    - **Seeding:** `Task.prefs` seeds preferences for the task's chat only (`scope: thread`, created after the thread), through the agent's new `POST/DELETE /v1/prefs`, and removes them after the run. Thread-scoped prose preferences show in that chat's prompt.
+    - **Dry runs:** hub tools that write return a stand-in in a dry run, so `hub_set_preference` in the eval changes nothing. Carried card edits work in dry runs; contradictions don't count there.
+    - **Results:** 46 × 3 on skynet gave 85% pass^3, and the 5 preference tasks 3/3 each after two check fixes (`docs/agent-eval.md`).
 - [ ] **21.7 Seeing and managing it** (UI; `web/chat/` adapted to the redesign; the agent's own page).
   - **The Learning page:** the agent mod's own page, `services/agent/ui/page.js` with `[ui] page` in its `service.toml` (brief §5; at `#/s/agent/learning`). Tabs:
     - **Preferences:** grouped by tool, each with its `when`, source, evidence links (to the chat and card), and edit or forget;

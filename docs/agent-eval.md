@@ -95,6 +95,26 @@ Both predate Phase 20.
 - asking once for text to 3D.
 
 **Live runs** with real outputs (the hair edit, image → 3D per engine family, text → 3D both ways) wait until the GPU is free.
+
+### Preferences (plan 21.6, 2026-10-20)
+
+Five `preference` tasks (46 in all). A task's preferences are seeded for its own chat only (`scope: thread`), because tasks run at once, and they're removed afterwards:
+- `pref_prefilled`: a seeded workflow preference fills the card;
+- `pref_stated`: "from now on…" calls `hub_set_preference`;
+- `carry_in_chat`: a card edit carries to the next card in the chat;
+- `explicit_beats_pref`: the user's words win over a preference;
+- `answer_learned`: a seeded answer stops the 3D question.
+
+| Run | Tasks × runs | pass@1 | pass^k | Mean time |
+|---|---|---|---|---|
+| MiniCPM-V 4.7, full set | 46 × 3 | 88.4% | 39/46 (85%) | 17 s |
+| the 5 preference tasks, after two check fixes | 5 × 3 | 100% | 5/5 | 13 s |
+
+The two fixes were in the checks, not the agent:
+- `pref_prefilled` read the event list wrongly;
+- `carry_in_chat`'s card script kept state across runs that ran at once. It now edits only the card whose prompt names the cat.
+
+`text_to_3d_asks` fell to 0/3 in this run: the model went straight to Cube3D without asking. The rule lives in `make_3d`'s description, which the model reads only once the tool is loaded.
 <!-- /RESULTS -->
 
 ## Gate

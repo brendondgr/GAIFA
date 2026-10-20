@@ -110,6 +110,7 @@ class Task:
     fork_turn: str | None = None
     compact_after_turn: int | None = None
     setup: Callable[[], Any] | None = None
+    prefs: list[dict[str, Any]] = field(default_factory=list)   # preferences seeded for this task, removed after (plan 21.6)
     timeout: float = 600
     note: str = ""
 
@@ -221,6 +222,7 @@ class Harness:
         if self.all_tools:
             settings["pinned"] = ["comfy", "tts", "gen3d", "lcpp", "relay"]
         tid = None
+        seeded: list[str] = []
         try:
             if task.setup:
                 r = task.setup()
@@ -237,6 +239,12 @@ class Harness:
             if tid is None:
                 raise RuntimeError("couldn't create a thread: " + self.glitches[-1])
             run.extra["thread"] = tid
+            for p in task.prefs:            # for this chat only (scope thread), so tasks running at once don't see them
+                r = await self.c.post("/v1/prefs", json={**p, "scope": "thread", "thread": tid})
+                if r.status_code < 400:
+                    seeded.append(r.json()["id"])
+                else:
+                    self.glitches.append(f"seed preference: HTTP {r.status_code}: {r.text[:200]}")
             for i, text in enumerate(task.turns, 1):
                 await self._drive(task, tid, text, deadline)
                 if i == len(task.turns):
@@ -265,6 +273,11 @@ class Harness:
                     run.events = await self._events(tid)
                 except Exception:  # noqa: BLE001
                     pass
+        for pid in seeded:
+            try:
+                await self.c.delete(f"/v1/prefs/{pid}")
+            except Exception:  # noqa: BLE001
+                pass
         if self.dry_run:  # dry-run threads go to Archived, out of the chat list (live ones stay as examples)
             for t in (tid, run.extra.get("fork")):
                 if t:

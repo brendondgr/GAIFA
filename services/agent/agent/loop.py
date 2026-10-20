@@ -478,7 +478,7 @@ class Agent:
         except Exception:  # noqa: BLE001
             services, memory = None, None
         summary, _, _ = ctx.summary_state(events)
-        prefs = await k.preferences(set(tools.full)) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
+        prefs = await k.preferences(set(tools.full), tid) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
         parts = {"agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.memory_index(), prefs) if x),
                  "skills": await k.skill_list(set(tools.disabled)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),

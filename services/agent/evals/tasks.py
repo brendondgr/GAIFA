@@ -1,4 +1,4 @@
-"""The 41 eval tasks (plan 13.5; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 46 eval tasks (plan 13.5; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -224,6 +224,25 @@ def _found(res: dict[str, Any]) -> list[dict[str, Any]]:
     return [i for i in items or [] if isinstance(i, dict) and "output_id" in i] if isinstance(items, list) else []
 
 
+def edit_if(word: str, **fields: Any):
+    """Edit only the cards whose prompt mentions `word`; approve the others as they come (a carry-over
+    test: tasks run at once and three times, so no state is kept between cards)."""
+    def card(a: dict[str, Any]):
+        if word not in str((a.get("arguments") or {}).get("prompt", "")).lower():
+            return True, None
+        keep = {k: v for k, v in fields.items() if k in (a.get("schema") or {}).get("properties", {})}
+        return True, keep or None
+    return card
+
+
+def filled_by_pref(name: str, key: str):
+    """The hub filled `key` from a preference on `name`'s card (plan 21.3)."""
+    def c(r: Run):
+        aps = [a for a in r.of("approval") if a.get("tool") == name]
+        return any(key in (a.get("filled") or []) for a in aps), f"filled={[a.get('filled') for a in aps][:2]}"
+    return (f"the hub filled {name}.{key}", c)
+
+
 def has_references(name: str):
     return (f"{name} got references", lambda r: (any(a.get("references") for a in r.final_args(name)), ""))
 
@@ -302,6 +321,24 @@ TASKS: list[Task] = [
     Task("edit_not_generate", "capability", ["Edit my picture titled 'Samurai figure (eval seed)': make the armor red."],
          [ran(EDIT), not_called(IMG), uses_picture(EDIT, "eval-samurai-2")],
          setup=seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)")),
+    # preferences (plan 21.6): seeded for the task's chat only
+    Task("pref_prefilled", "preference", ["Make an image of a lighthouse at dusk."],
+         [ran(IMG), arg_has(IMG, "workflow", "intorealism"), filled_by_pref(IMG, "workflow")],
+         prefs=[{"tool": IMG, "field": "workflow", "value": "zimage-intorealism", "source": "stated"}]),
+    Task("pref_stated", "preference", ["From now on, always use the fast preset for my 3D models."],
+         [ran("hub_set_preference"), arg_has("hub_set_preference", "tool", "gen3d_make_3d"),
+          arg_has("hub_set_preference", "field", "preset"), arg_has("hub_set_preference", "value", "fast"), not_ran(M3D)]),
+    Task("carry_in_chat", "preference", ["Make an image of a cat on a sofa.", "Now make one of a dog in a garden."],
+         [ran(IMG, 2), ("the second card has the first card's edit",
+                        lambda r: (len(r.final_args(IMG)) >= 2 and "intorealism" in str(r.final_args(IMG)[1].get("workflow")), f"{[a.get('workflow') for a in r.final_args(IMG)]}"))],
+         card=edit_if("cat", workflow="zimage-intorealism")),
+    Task("explicit_beats_pref", "preference", ["Make a photo of a red barn, using the zimage-turbo workflow."],
+         [ran(IMG), arg_has(IMG, "workflow", "zimage-turbo")],
+         prefs=[{"tool": IMG, "field": "workflow", "value": "zimage-intorealism", "source": "stated"}]),
+    Task("answer_learned", "preference", ["Make a 3D model of a teapot."],
+         [not_asked(), ran(M3D), no_picture()],
+         prefs=[{"value": "For a 3D model from text, the user always wants it made straight from the text with Cube3D: don't ask.",
+                 "source": "stated"}]),
     # 3. must ask
     Task("ask_draw_something", "must-ask", ["Can you draw something for me?"],
          [asked_before(IMG)], answer=typed("A hot air balloon over a desert")),

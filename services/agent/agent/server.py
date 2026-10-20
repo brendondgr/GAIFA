@@ -371,6 +371,14 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def list_prefs(request: Request, state: str | None = None, tool: str | None = None, scope: str | None = None) -> list:
         return await A(request).hub.prefs(state=state, tool=tool, scope=scope)
 
+    @app.post("/v1/prefs", summary="Save a preference in the hub (the eval seeds them; the page adds them)")
+    async def create_pref(body: dict, request: Request) -> dict:
+        return await A(request).hub.create_pref(body)
+
+    @app.delete("/v1/prefs/{pid}", summary="Forget a preference")
+    async def delete_pref(pid: str, request: Request) -> dict:
+        return await A(request).hub.delete_pref(pid)
+
     @app.post("/v1/prefs/{pid}/{verb}", summary="Approve or reject a proposed preference (verb: approve | reject)")
     async def decide_pref(pid: str, verb: Literal["approve", "reject"], request: Request) -> dict:
         return await A(request).hub.decide_pref(pid, verb == "approve")

@@ -108,9 +108,11 @@ class Prefs:
     async def _check(self, p: dict[str, Any]) -> None:
         if p["scope"] not in SCOPES or p["source"] not in SOURCES or p["state"] not in STATES:
             raise PrefError(422, "invalid_pref", f"scope, source and state must be one of {SCOPES}, {SOURCES}, {STATES}")
-        if p["scope"] == "agent":
+        if p["scope"] == "agent" or (p["scope"] == "thread" and not p.get("tool")):   # a sentence (for one chat: thread)
             if not isinstance(p.get("value"), str) or not p["value"].strip():
                 raise PrefError(422, "invalid_pref", "an agent preference is a sentence: give `value` as text")
+            if p["scope"] == "thread" and not p.get("thread"):
+                raise PrefError(422, "invalid_pref", "a thread preference needs `thread`")
             return
         if not p.get("tool") or not p.get("field"):
             raise PrefError(422, "invalid_pref", "a tool preference needs `tool` and `field`")
@@ -221,11 +223,11 @@ class Prefs:
                              filled: dict[str, str]) -> None:
         """A card was approved: carry its edits to this chat's next card of the tool, and count
         edits away from a preference's value against it."""
-        if not self.on or origin.get("no_learn") or origin.get("dry_run"):
+        if not self.on or origin.get("no_learn"):
             return
         for f in edited:
             how = filled.get(f) or ""
-            if how.startswith("pref:"):
+            if how.startswith("pref:") and not origin.get("dry_run"):     # an eval never counts against a preference
                 try:
                     p = await self.get(how[5:])
                 except PrefError:

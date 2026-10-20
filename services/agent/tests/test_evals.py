@@ -30,6 +30,17 @@ async def test_harness_answers_and_grades(env):
     await h.close()
 
 
-def test_eval_tasks_in_seven_groups():
-    assert len(TASKS) == 41 and len({t.id for t in TASKS}) == 41
-    assert {t.group for t in TASKS} == {"single", "chain", "capability", "must-ask", "no-ask", "safety", "context"}
+def test_eval_tasks_in_eight_groups():
+    assert len(TASKS) == 46 and len({t.id for t in TASKS}) == 46
+    assert {t.group for t in TASKS} == {"single", "chain", "capability", "preference", "must-ask", "no-ask", "safety", "context"}
+
+
+async def test_seeded_preferences_are_for_the_task_chat_and_removed(env):
+    """plan 21.6: a task's preferences are seeded for its chat only (tasks run at once), then removed."""
+    h = Harness("http://agent", "main", dry_run=True, transport=httpx.ASGITransport(app=env.app))
+    env.model.queue({"text": "ok"})
+    task = Task("p1", "preference", ["hi"], [], prefs=[{"value": "Answer in French.", "source": "stated"}])
+    run = await h.run(task)
+    assert "Answer in French." in env.model.received[-1]["messages"][0]["content"]
+    assert env.hub.prefs == []
+    await h.close()

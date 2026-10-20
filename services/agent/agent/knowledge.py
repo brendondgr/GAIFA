@@ -98,7 +98,7 @@ class Knowledge:
         except Exception:  # noqa: BLE001
             return None
 
-    async def preferences(self, loaded: set[str]) -> str:
+    async def preferences(self, loaded: set[str], thread: str | None = None) -> str:
         """The user's preferences for the prompt (plan 21.4): the agent-scoped ones (what `remember`
         saves), and tool preferences only for the tools loaded in this chat, so they cost nothing elsewhere."""
         if not self.hub:
@@ -109,7 +109,7 @@ class Knowledge:
             return ""
         lines = []
         for r in rows:
-            if r["scope"] == "agent":
+            if r["scope"] == "agent" or (r["scope"] == "thread" and not r.get("tool") and thread and r.get("thread") == thread):
                 lines.append(f"- {r['value']}")
             elif r["scope"] == "tool" and r.get("tool") in loaded:
                 cond = ", ".join(f"{k} {v}" if v in ("present", "absent") else f"{k}={v}" for k, v in (r.get("when") or {}).items())

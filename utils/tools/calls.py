@@ -348,7 +348,9 @@ class Calls:
 
     async def _run(self, c: Call, resume_job: str | None = None) -> None:
         try:
-            if c.tool.handler is not None:
+            if c.tool.handler is not None and c.origin.get("dry_run") and c.tool.risk != "read":
+                c.result = {"dry_run": True, "arguments": c.arguments}   # an eval never changes the hub (plan 21.6, 22.4)
+            elif c.tool.handler is not None:
                 c.result = await c.tool.handler(self.hub, c.arguments)
             else:
                 await self._mod_call(c, resume_job)

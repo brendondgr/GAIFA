@@ -98,6 +98,9 @@ class HubAPI:
     async def create_pref(self, body: dict[str, Any]) -> dict[str, Any]:
         return await self._json("POST", "/api/prefs", json=body)
 
+    async def delete_pref(self, pid: str) -> dict[str, Any]:
+        return await self._json("DELETE", f"/api/prefs/{pid}")
+
     async def update_pref(self, pid: str, patch: dict[str, Any]) -> dict[str, Any]:
         return await self._json("PATCH", f"/api/prefs/{pid}", json=patch)
 

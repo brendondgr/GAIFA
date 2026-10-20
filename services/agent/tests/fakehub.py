@@ -275,12 +275,17 @@ class FakeHub:
         async def new_pref(request: Request) -> dict:
             b = await request.json()
             p = {"id": f"pref_{len(self.prefs) + 1}", "scope": b.get("scope") or ("tool" if b.get("tool") else "agent"),
-                 "tool": b.get("tool"), "field": b.get("field"), "value": b.get("value"), "when": b.get("when") or {},
+                 "tool": b.get("tool"), "field": b.get("field"), "thread": b.get("thread"), "value": b.get("value"), "when": b.get("when") or {},
                  "cue": b.get("cue") or "", "source": b.get("source") or "stated",
                  "state": b.get("state") or ("proposed" if b.get("source") == "inferred" else "active"),
                  "evidence": b.get("evidence") or [], "seen": b.get("seen") or 1}
             self.prefs.append(p)
             return p
+
+        @app.delete("/api/prefs/{pid}")
+        def del_pref(pid: str) -> dict:
+            self.prefs[:] = [p for p in self.prefs if p["id"] != pid]
+            return {"id": pid, "deleted": True}
 
         @app.post("/api/prefs/{pid}/{verb}")
         def decide_pref(pid: str, verb: str) -> dict:

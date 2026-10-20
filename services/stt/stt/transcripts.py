@@ -58,11 +58,16 @@ def paragraphs(segments: list[Segment]) -> list[tuple[float, str]]:
     return [(start, " ".join(texts)) for start, texts in out]
 
 
+def body(segments: list[Segment]) -> str:
+    """The paragraphs, each led by its ``[mm:ss]``: what a reader (or the agent) cites."""
+    return "\n\n".join(f"[{stamp(start)}] {text}" for start, text in paragraphs(segments))
+
+
 def markdown(segments: list[Segment], *, title: str, duration: float, model: str, language: str | None) -> str:
     head = f"# {title}\n\n_Transcript: {stamp(duration)} of audio, {model}" + (f", language {language}" if language else "") + "._\n"
     if not segments:
         return head + "\n_(no speech found)_\n"
-    return head + "".join(f"\n[{stamp(start)}] {text}\n" for start, text in paragraphs(segments))
+    return head + "\n" + body(segments) + "\n"
 
 
 def srt(segments: list[Segment]) -> str:

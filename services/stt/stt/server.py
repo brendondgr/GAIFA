@@ -13,7 +13,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from . import catalog
 from .config import Settings
@@ -32,11 +32,19 @@ PRESET_HELP = ("fast = base, balanced = small (the default), accurate = large-v3
                "Ignored when `model` is given.")
 
 
+PRESET_OPTIONS = {
+    "fast": {"label": "Fast (base)", "speed": "fastest", "good_for": "a quick look; clear speech"},
+    "balanced": {"label": "Balanced (small)", "default": True, "good_for": "most recordings"},
+    "accurate": {"label": "Accurate (large-v3-turbo)", "good_for": "accents, jargon, noisy rooms"},
+    "best": {"label": "Best (large-v3)", "speed": "slowest", "good_for": "when every word matters"},
+}
+
+
 class TranscribeRequest(BaseModel):
-    output_id: str = Field(description="The recording: output:<id> of an audio or video output (video is "
-                                       "transcribed from its audio track)",
-                           json_schema_extra={"format": "aihub-file", "x-kind": "audio"})
-    preset: Preset | None = Field(None, description=PRESET_HELP)
+    audio: str = Field(description="The recording: output:<id> of an audio or video output (video is transcribed "
+                                   "from its audio track)", validation_alias=AliasChoices("audio", "output_id"),
+                       json_schema_extra={"format": "aihub-file", "x-kind": "audio"})
+    preset: Preset | None = Field(None, description=PRESET_HELP, json_schema_extra={"x-options": PRESET_OPTIONS})
     model: Model | None = Field(None, description="A model by name, instead of a preset")
     language: str | None = Field(None, description="ISO code such as en or de; left out, it is detected")
     prompt: str | None = Field(None, max_length=800, description="Names and terms to expect (biases spelling)")
@@ -91,7 +99,7 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
         recent = [j for j in jobs.list() if j.state not in ("queued", "running") and j.finished
                   and time.time() - j.finished < 600]
         return {
-            "loaded": engine.model if engine.ready else None,
+            "loaded": engine.ready,                 # true / false (architecture §4.6); which model: engine.model
             "busy": engine.busy or bool(live),
             "idle_s": round(time.monotonic() - engine.last_used, 1),
             "memory_estimate_gb": info.memory_gb if info else None,
@@ -131,13 +139,13 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
 
     @app.post("/v1/transcribe", status_code=202, summary="Transcribe an audio or video output (a job)")
     async def transcribe(body: TranscribeRequest) -> dict:
-        """Starts a job; poll `GET /v1/jobs/{id}`. Done → `result` = {text, language, duration, segments,
-        output, files}: the transcript is saved as one output (transcript.md with [mm:ss] marks, .srt, words.json)."""
-        if not re.fullmatch(r"(output:)?[A-Za-z0-9_.:-]{1,120}", body.output_id.strip()):
-            raise http_error(422, "output_id must be output:<id> of an audio or video output", "invalid_input")
+        """A job. When done it carries `transcript` (paragraphs led by [mm:ss]), `result` (text, language,
+        duration, segments) and `files`: the transcript saved as one output (transcript.md, .srt, words.json)."""
+        if not re.fullmatch(r"(output:)?[A-Za-z0-9_.:-]{1,120}", body.audio.strip()):
+            raise http_error(422, "audio must be output:<id> of an audio or video output", "invalid_input")
         job = jobs.submit(label=body.title or "audio", model=body.model, preset=body.preset, language=body.language,
                           prompt=body.prompt, timestamps=body.timestamps, save=body.save,
-                          source={"output_id": body.output_id.strip()})
+                          source={"output_id": body.audio.strip()})
         return job.view()
 
     @app.post("/v1/transcribe/upload", status_code=202, summary="Transcribe a file sent as the raw request body (a job)",

@@ -110,6 +110,7 @@ class Task:
     fork_turn: str | None = None
     compact_after_turn: int | None = None
     setup: Callable[[], Any] | None = None
+    attach: Callable[[str], Any] | None = None   # (hub URL) → output ids attached to the first turn (plan 29.3)
     prefs: list[dict[str, Any]] = field(default_factory=list)   # preferences seeded for this task, removed after (plan 21.6)
     timeout: float = 600
     note: str = ""
@@ -161,13 +162,19 @@ class Harness:
             await asyncio.sleep(0.5)
         raise TimeoutError("the turn didn't finish in time")
 
-    async def _drive(self, task: Task, tid: str, text: str, deadline: float) -> None:
+    def hub_url(self) -> str:
+        """The hub this agent runs under: the part of `base` before `/api/s/`, else AIHUB_URL."""
+        import os
+
+        return self.base.split("/api/s/")[0] if "/api/s/" in self.base else os.environ.get("AIHUB_URL", "http://127.0.0.1:7000")
+
+    async def _drive(self, task: Task, tid: str, text: str, deadline: float, attachments: list[str] | None = None) -> None:
         """Send one user turn and answer questions and cards until the turn is over."""
         if text == "/compact":
             r = await self.c.post(f"/v1/threads/{tid}/compact")
             r.raise_for_status()
             return
-        r = await self.c.post(f"/v1/threads/{tid}/messages", json={"text": text})
+        r = await self.c.post(f"/v1/threads/{tid}/messages", json={"text": text, **({"attachments": attachments} if attachments else {})})
         r.raise_for_status()
         handled: set[str] = set()
         for _ in range(40):
@@ -245,8 +252,13 @@ class Harness:
                     seeded.append(r.json()["id"])
                 else:
                     self.glitches.append(f"seed preference: HTTP {r.status_code}: {r.text[:200]}")
+            attached = None
+            if task.attach:
+                attached = task.attach(self.hub_url())
+                if asyncio.iscoroutine(attached):
+                    attached = await attached
             for i, text in enumerate(task.turns, 1):
-                await self._drive(task, tid, text, deadline)
+                await self._drive(task, tid, text, deadline, attached if i == 1 else None)
                 if i == len(task.turns):
                     await self._followup(task, tid, deadline)
                 if task.compact_after_turn == i:

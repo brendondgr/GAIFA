@@ -149,6 +149,17 @@ The two fixes were in the checks, not the agent:
 **At 0/3:**
 - `three_steps` and `text_to_3d_asks`, as before.
 - `picture_character_to_3d`: one run hit the fallback model `gemma4-26B`, which isn't loaded while the GPU is kept free; the others picked TRELLIS.2 or stopped after the search.
+
+### Transcription (plan 29.3, 2026-10-20)
+
+`transcribe_summary` (the 47th task): a 25 s seminar recording (`services/stt/tests/fixtures/seminar-speech-real.wav`, seeded in `outputs/eval/`) is **attached** to the message (`Task.attach`, new: it gets the hub's URL and returns output ids for the first turn), and the agent is asked to summarise it and say where each point is made. Transcription runs for real (`settings.dry_run = false`; `small` on the GPU takes about a second). Checks: `stt_transcribe` ran, the reply cites at least one `[mm:ss]`, and it names the claim.
+
+| Run | Tasks × runs | pass@1 | pass^k | Mean time |
+|---|---|---|---|---|
+| skynet, `output_id` as the parameter | 1 × 4 | 100% | 1/1 | 9 s |
+| skynet, the parameter renamed `audio` | 1 × 3 | 100% | 1/1 | 9 s |
+
+With `output_id` the model called `stt_transcribe(audio=…)` first in all four runs and needed the hub's fix; named `audio` (`output_id` still accepted), it called it right the first time in all three.
 <!-- /RESULTS -->
 
 ## Gate

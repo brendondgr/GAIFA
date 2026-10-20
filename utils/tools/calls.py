@@ -553,5 +553,6 @@ def _job_summary(body: Any) -> Any:
     """A finished job, without the bulky parts (stage timings, inputs echoed back)."""
     if not isinstance(body, dict):
         return body
-    keep = ("id", "state", "status", "title", "label", "workflow", "error", "outputs", "files", "dir", "seconds", "peak_gb")
+    keep = ("id", "state", "status", "title", "label", "workflow", "error", "outputs", "files", "dir", "seconds", "peak_gb",
+            "transcript")                 # stt's [mm:ss] paragraphs (plan 29.3); capped like any result
     return {k: body[k] for k in keep if k in body}

@@ -6,6 +6,7 @@
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, label11, COL } from './chat-ui.js';
 import { actionsFor } from './chat-actions.js';
+import { MicButton } from './chat-mic.js';
 
 const R = () => globalThis.React;
 export const COMMANDS = [
@@ -134,6 +135,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
           h('input', { ref: picker, type: 'file', multiple: true, accept: 'image/*,video/*,audio/*', hidden: true, 'aria-hidden': 'true',
             onChange: e => { upload(e.target.files); e.target.value = ''; } }),
           h(Btn, { kind: 'ghost', sm: true, icon: 'upload', title: 'Upload an image, video or audio file (or drop or paste it here)', disabled, onClick: () => picker.current?.click() }),
+          h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
           h('span', { style: { position: 'relative' } },
             h(Btn, { kind: 'ghost', sm: true, icon: 'clip', title: 'Attach an output', onClick: () => setPop(pop === 'att' ? null : 'att') }),
             h(Popover, { open: pop === 'att', onClose: () => setPop(null), place: 'up-left', width: 340, label: 'Attach outputs' }, h(AttachPicker, { api, outputs, chosen: attachments, onToggle: toggleAtt }))),

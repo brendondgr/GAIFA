@@ -74,7 +74,7 @@ def test_an_upload_becomes_a_folder_output_with_md_srt_and_words(client, setting
 
 
 def test_an_output_id_is_fetched_from_the_hub(client):
-    r = client.post("/v1/transcribe", json={"output_id": "output:abc123", "timestamps": "words"})
+    r = client.post("/v1/transcribe", json={"audio": "output:abc123", "timestamps": "words"})
     job = wait_job(client, r.json()["id"])
     assert job["state"] == "done" and job["label"] == "seminar-speech-real"
     assert job["result"]["segments"][0]["words"]
@@ -101,7 +101,8 @@ def test_timestamps_none_leaves_the_segments_out_and_save_false_writes_nothing(c
 def test_presets_and_models_pick_what_loads(client):
     assert upload(client, ALTERNATING, preset="fast")["model"] == "base"
     assert upload(client, ALTERNATING, model="large-v3", preset="fast")["model"] == "large-v3"
-    assert client.get("/v1/status").json()["loaded"] == "large-v3"
+    st = client.get("/v1/status").json()
+    assert st["loaded"] is True and st["engine"]["model"] == "large-v3"
     r = client.post("/v1/transcribe", json={"output_id": "output:abc123", "preset": "quick"})
     assert r.status_code == 422
 
@@ -131,7 +132,7 @@ def test_load_unload_and_models(client):
     assert models["default"] == "small" and models["presets"]["balanced"] == "small"
     assert next(m for m in models["models"] if m["name"] == "small")["loaded"] is True
     assert client.post("/v1/unload").json()["state"] == "unloaded"
-    assert client.get("/v1/status").json()["loaded"] is None
+    assert client.get("/v1/status").json()["loaded"] is False
 
 
 def test_status_has_the_hub_shape(client):

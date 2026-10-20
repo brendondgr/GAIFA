@@ -68,7 +68,7 @@ def test_the_live_stream_matches_the_file_route_on_real_speech(tmp_path):
     settings = Settings(port=0, outputs=tmp_path / "stt", models=MODELS, hub_url="", backend="faster-whisper",
                         device="auto", idle_unload_s=0)
     with TestClient(create_app(settings, hub=LocalHub({"seminar": SEMINAR}))) as client:
-        job = wait_job(client, client.post("/v1/transcribe", json={"output_id": "output:seminar"}).json()["id"], 120)
+        job = wait_job(client, client.post("/v1/transcribe", json={"audio": "output:seminar"}).json()["id"], 120)
         events, done = stream(client, decode(SEMINAR))
         client.post("/v1/unload")
     filed = job["result"]["text"]

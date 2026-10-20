@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import shutil
 import time
 import uuid
@@ -46,6 +47,7 @@ class Job:
     finished: float | None = None
     duration: float | None = None
     result: dict[str, Any] | None = None
+    transcript: str | None = None        # the [mm:ss] paragraphs, for the agent's tool result
     error: str | None = None
     cancel: bool = False
 
@@ -56,6 +58,9 @@ class Job:
                "duration": self.duration, "source": self.source, "error": self.error}
         if self.result is not None:
             out["result"] = self.result
+            out["transcript"] = self.transcript
+            if "output" in self.result:
+                out["files"] = self.result["files"]
         if self.started and self.finished and self.duration:
             out["rtf"] = round((self.finished - self.started) / self.duration, 4)
         return out
@@ -118,7 +123,8 @@ class Jobs:
                 except HubError as exc:
                     raise ValueError(str(exc)) from exc
                 if job.label in ("", "audio"):
-                    job.label = str(record.get("title") or job.label)[:80]
+                    job.label = re.sub(r"\.(wav|mp3|flac|ogg|opus|m4a|aac|mp4|webm|mov|mkv)$", "",
+                                       str(record.get("title") or job.label), flags=re.I)[:80]
             job.stage = "decoding"
             try:
                 samples = await asyncio.to_thread(decode, path)
@@ -155,6 +161,7 @@ class Jobs:
             res["files"] = {k: f"{rel}/{n}" for k, n in
                             (("markdown", "transcript.md"), ("srt", "transcript.srt"), ("words", "words.json"))}
         job.result = res
+        job.transcript = transcripts.body(segments) or "(no speech found)"
         self.done_today += 1
         self.audio_today += job.duration
         self._finish(job, "done")

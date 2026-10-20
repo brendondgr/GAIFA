@@ -158,7 +158,7 @@ class Local:
         m = REF.match(ref)
         if m:
             n = int(m.group(1))
-            for o in ctx.outputs(self.a.store.events(tid, types=("tool_result",))):
+            for o in ctx.outputs(self.a.store.events(tid, types=("tool_result", "user"))):
                 if o.get("n") == n:
                     return o["output_id"]
             return None

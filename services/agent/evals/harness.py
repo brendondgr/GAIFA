@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import time
 from collections.abc import Callable
@@ -111,6 +112,7 @@ class Task:
     compact_after_turn: int | None = None
     setup: Callable[[], Any] | None = None
     prefs: list[dict[str, Any]] = field(default_factory=list)   # preferences seeded for this task, removed after (plan 21.6)
+    attach: Callable[[], list[tuple[str, bytes]]] | None = None   # files uploaded to the hub and attached to the first turn (plan 24.5)
     timeout: float = 600
     note: str = ""
 
@@ -127,8 +129,9 @@ def approve_all(a: dict[str, Any]) -> tuple[bool, dict[str, Any] | None]:
 
 class Harness:
     def __init__(self, base: str, model: str, dry_run: bool = True, all_tools: bool = False,
-                 log: Callable[[str], None] = print, transport: Any = None) -> None:
+                 log: Callable[[str], None] = print, transport: Any = None, hub: str | None = None) -> None:
         self.base, self.model, self.dry_run, self.all_tools, self.log = base.rstrip("/"), model, dry_run, all_tools, log
+        self.hub = (hub or os.environ.get("AIHUB_URL") or "http://127.0.0.1:7000").rstrip("/")   # uploads for `attach`
         self.c = httpx.AsyncClient(base_url=self.base, timeout=httpx.Timeout(60, connect=10), trust_env=False, transport=transport)
         self.glitches: list[str] = []      # transient HTTP failures seen (and retried)
 
@@ -161,13 +164,22 @@ class Harness:
             await asyncio.sleep(0.5)
         raise TimeoutError("the turn didn't finish in time")
 
-    async def _drive(self, task: Task, tid: str, text: str, deadline: float) -> None:
+    async def _upload(self, files: list[tuple[str, bytes]]) -> list[str]:
+        async with httpx.AsyncClient(base_url=self.hub, timeout=60, trust_env=False) as hub:
+            out = []
+            for name, data in files:
+                r = await hub.post("/api/outputs/upload", params={"name": name}, content=data)
+                r.raise_for_status()
+                out.append(r.json()["id"])
+            return out
+
+    async def _drive(self, task: Task, tid: str, text: str, deadline: float, attachments: list[str] | None = None) -> None:
         """Send one user turn and answer questions and cards until the turn is over."""
         if text == "/compact":
             r = await self.c.post(f"/v1/threads/{tid}/compact")
             r.raise_for_status()
             return
-        r = await self.c.post(f"/v1/threads/{tid}/messages", json={"text": text})
+        r = await self.c.post(f"/v1/threads/{tid}/messages", json={"text": text, **({"attachments": attachments} if attachments else {})})
         r.raise_for_status()
         handled: set[str] = set()
         for _ in range(40):
@@ -245,8 +257,9 @@ class Harness:
                     seeded.append(r.json()["id"])
                 else:
                     self.glitches.append(f"seed preference: HTTP {r.status_code}: {r.text[:200]}")
+            files = await self._upload(task.attach()) if task.attach else None
             for i, text in enumerate(task.turns, 1):
-                await self._drive(task, tid, text, deadline)
+                await self._drive(task, tid, text, deadline, files if i == 1 else None)
                 if i == len(task.turns):
                     await self._followup(task, tid, deadline)
                 if task.compact_after_turn == i:
@@ -303,7 +316,7 @@ def grade(task: Task, run: Run) -> dict[str, Any]:
     if errors:
         results.append({"check": "no agent errors", "ok": False, "why": "; ".join(e.get("detail", "")[:120] for e in errors)})
     # never invents outputs: every #n in the replies exists
-    made = {o["n"] for o in run.outputs()}
+    made = {o["n"] for o in run.outputs()} | {int(str(d["ref"]).lstrip("#")) for u in run.of("user") for d in u.get("docs") or []}
     named = {int(n) for n in REF.findall(run.text())}
     bad = sorted(named - made)
     results.append({"check": "no invented outputs", "ok": not bad, "why": f"mentions #{bad} that don't exist" if bad else ""})

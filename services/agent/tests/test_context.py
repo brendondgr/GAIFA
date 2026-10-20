@@ -25,7 +25,7 @@ async def test_meter_follows_usage_plus_estimate(env):
     await env.send(tid, "question")
     m = (await env.client.get(f"/v1/threads/{tid}/context")).json()
     assert m["used"] == 1050 and m["estimated"] is False
-    assert set(m["breakdown"]) == {"instructions", "skills_memory", "tool_index", "outputs", "tools", "messages", "tool_results"}
+    assert set(m["breakdown"]) == {"instructions", "skills_memory", "tool_index", "outputs", "tools", "messages", "documents", "tool_results"}
     assert abs(sum(m["breakdown"].values()) - 1050) < 60
     env.agent.emit(tid, "user", {"text": "x" * 4000})     # added since the last usage: estimated
     m2 = (await env.client.get(f"/v1/threads/{tid}/context")).json()

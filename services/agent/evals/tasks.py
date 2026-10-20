@@ -1,4 +1,4 @@
-"""The 46 eval tasks (plan 13.5; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 47 eval tasks (plan 13.5; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .docs import lighthouse_report
 from .harness import Run, Task, first_option
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -99,6 +100,10 @@ def uses_output_of(name: str, key: str, source: str, events_attr: str | None = N
 
 def used(name: str):
     return (f"used {name}", lambda r: (bool(r.calls(name, by=None)), ""))
+
+
+def used_any(*names: str):
+    return (f"used {' or '.join(names)}", lambda r: (any(r.calls(n, by=None) for n in names), ""))
 
 
 def final_mentions(*words: str):
@@ -380,4 +385,7 @@ TASKS: list[Task] = [
     Task("long_thread", "context", ["Hi! My name is Sam.", "I like hiking.", "What's 17 times 23?", "Tell me a one-line joke.",
                                     "What's the capital of Canada?", "Name a color.", "What did I say my name was, and what do I like?"],
          [final_mentions("Sam"), final_mentions("hik")]),
+    Task("pdf_page7", "context", ["In the attached report, what is the name of the lighthouse keeper's cat, and on which page is it?"],
+         [final_mentions("Biscuit"), final_mentions("7"), used_any("hub_read_document", "hub_search_document")],
+         attach=lambda: [("north-rock-inspection.pdf", lighthouse_report())], note="plan 24.5: a 20-page PDF as a card, read with tools"),
 ]

@@ -307,6 +307,13 @@ class FakeHub:
                 raise HTTPException(404, "no output")
             return self.outputs[oid]
 
+        @app.post("/api/outputs/upload", status_code=201)
+        async def upload(name: str, request: Request) -> dict:
+            data = await request.body()
+            pdf = name.lower().endswith(".pdf")
+            oid = self.doc(name, text=f"(uploaded {len(data)} bytes)", kind="document" if pdf else "text", subtype="pdf" if pdf else "plain")
+            return self.outputs[oid]
+
         @app.get("/api/outputs/{oid}/text")
         def output_text(oid: str, offset: int = 0, limit: int = 12000, page: int | None = None, pages: str | None = None) -> dict:
             if oid not in self.texts:

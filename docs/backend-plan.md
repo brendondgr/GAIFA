@@ -2390,7 +2390,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
   - Every call through MCP gets the same tools (they're hub tools).
   *Done when:* `utils/tests/tools/test_document_tools.py` (schemas in the catalog, paging, search, refs) and `services/agent/tests/test_view_output.py` (a PDF page reaches the model as an image; a text output points to the read tool) pass.
 
-- [ ] **24.5 Attachments in the agent's context: `services/agent/agent/context.py`, `loop.py`, `prompts.py`.**
+- [x] **24.5 Attachments in the agent's context: `services/agent/agent/context.py`, `loop.py`, `prompts.py`.**
   - At `send`, each attachment is described once (`GET /api/outputs/{id}` and `/text`): the user event stores `docs: [{ref, id, name, kind, subtype, tokens, pages, lines, outline (first 30 headings), inline}]`, and for inline ones the text itself (so rebuilding a thread never refetches).
   - `rebuild` renders inline documents as `<untrusted source="#n name.pdf">…</untrusted>` after the user's text, and large ones as a card: name, kind, size in pages/lines/tokens, the outline, and "read it with hub_read_document or hub_search_document". Images attach as today.
   - The base prompt gains the untrusted-text rule and a line on citing: `#n p.14` for pages, `#n:88` for lines.

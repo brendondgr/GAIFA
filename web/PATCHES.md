@@ -39,6 +39,7 @@
 | 22 | `Hub.dc.html` | A top-level **Learning** nav item (and palette entry, icon `bulb`) opening the agent mod's Learning page `#/s/agent/learning` (its `ui/page.js`: Preferences, Review, Tool usage), shown while the agent mod is installed | Plan 21.7: the user asked for its own nav page | 21.7 |
 | 23 | `Hub.dc.html`, `views.js` | The Outputs page's kind filter and the kind colors and labels gain **Document** (`document`: pdf, docx, epub, pptx, xlsx, odt) | Plan 24.1: documents are a new output kind | 24.1 |
 | 24 | `mock.js` | `outputText`, `outputSearch` and `outputPageUrl` on the mock (text outputs read their excerpt; no pages) | Plan 24.3: the document calls work in `?mock` | 24.3 |
+| 25 | `chat/chat-header.js` | The context meter's breakdown gains **Documents** (inline attached documents, plan 24.5) | The agent's meter reports them apart from messages | 24.5 |
 
 ## Revision 2 (step 6.5): what changed
 

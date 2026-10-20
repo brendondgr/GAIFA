@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 MAX_SIDE = 1024
 REF = re.compile(r"^#?(\d+)$")
+TEXT_PEEK = 2000  # view_output on a text or document output: this many characters, then hub_read_document
 
 
 class Local:
@@ -178,6 +179,8 @@ class Local:
                 "dims": o.get("dims"), "duration_s": o.get("duration_s")}
         model = thread.get("model") or self.a.cfg.model
         meta = await self.a.llm.meta(model)
+        if o["kind"] in ("text", "document"):
+            return await self._view_text(tid, cid, oid, o, info, args.get("page"), meta.get("vision") is not False)
         visual = o["kind"] == "image" or (o["kind"] in ("video", "model3d") and o.get("preview"))
         if not visual or meta.get("vision") is False:
             why = "this model can't see images" if visual else f"a {o['kind']} has no picture to show"
@@ -189,6 +192,38 @@ class Local:
             return self.ok(tid, cid, "view_output", {"note": f"couldn't load the picture ({e}); here are its details", **info})
         return self.ok(tid, cid, "view_output", {"note": "the picture follows", **info}, image={"output_id": oid, "url": url,
                                                                                             "label": o["title"]})
+
+    async def _view_text(self, tid: str, cid: str, oid: str, o: dict[str, Any], info: dict[str, Any], page: Any,
+                         vision: bool) -> str:
+        """A text or document output: a PDF page as an image (`page`), else the start of its text (plan 24.4)."""
+        name = f"output:{oid} {o['title']}"
+        info = {k: v for k, v in info.items() if v is not None and k not in ("dims", "duration_s")} | {"subtype": o.get("subtype")}
+        if page is not None:
+            n = int(page)
+            if o.get("subtype") != "pdf":
+                return self.err(tid, cid, "view_output", "no_page", f"{name} is not a PDF, so it has no pages",
+                                "read it with hub_read_document")
+            if not vision:
+                w = await self.a.hub.output_text(oid, page=n, limit=6000)
+                return self.ok(tid, cid, "view_output", "This model can't see images; here is the page's text.\n"
+                               + ctx.untrusted(f"{name} p.{n}", w["text"]))
+            try:
+                data = await self.a.hub.output_page(oid, n)
+            except Exception as e:  # noqa: BLE001: no_page and the like
+                return self.err(tid, cid, "view_output", getattr(e, "code", "no_page"), str(e), "check the page number")
+            return self.ok(tid, cid, "view_output", {"note": f"page {n} of the PDF follows as an image", **info},
+                           image={"output_id": oid, "url": to_data_url(data), "label": f"{o['title']} p.{n}"})
+        try:
+            w = await self.a.hub.output_text(oid, limit=TEXT_PEEK)
+        except Exception as e:  # noqa: BLE001
+            return self.ok(tid, cid, "view_output", {"note": f"couldn't read its text ({e})", **info})
+        size = f"{w['pages']} pages, " if w["pages"] else f"{w['lines']} lines, "
+        head = (f"{name} ({o.get('subtype') or o['kind']}, {size}~{w['tokens']:,} tokens). The first {len(w['text']):,} "
+                f"characters follow; read the rest with hub_read_document(ref, offset={w['next_offset']})" if w["next_offset"] is not None
+                else f"{name} ({o.get('subtype') or o['kind']}, {size}~{w['tokens']:,} tokens), all of it:")
+        if w["scanned"]:
+            head += f". Pages without text (scanned): {', '.join(map(str, w['scanned'][:20]))}; view_output(ref, page=N) shows one"
+        return self.ok(tid, cid, "view_output", head + "\n" + ctx.untrusted(name, w["text"]))
 
     def images(self, events: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
         return {e["seq"]: e["payload"]["image"] for e in events if e["type"] == "tool_result" and e["payload"].get("image")}

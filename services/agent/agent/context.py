@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 CHARS_PER_TOKEN = 4
@@ -50,6 +51,14 @@ def est(obj: Any) -> int:
     obj, images = _without_images(obj)
     text = obj if isinstance(obj, str) else json.dumps(obj, ensure_ascii=False, default=str)
     return max(1, len(text) // CHARS_PER_TOKEN + images * IMAGE_TOKENS)
+
+
+_CLOSE = re.compile(r"</\s*untrusted", re.I)
+
+
+def untrusted(source: str, text: str) -> str:
+    """Text that came from a file, a page or a transcript (plan 24.5): data, never instructions."""
+    return f'<untrusted source="{source.replace(chr(34), chr(39))}">\n{_CLOSE.sub("</ untrusted", text)}\n</untrusted>'
 
 
 def cap_text(text: str, tokens: int = RESULT_CAP_TOKENS) -> tuple[str, bool]:

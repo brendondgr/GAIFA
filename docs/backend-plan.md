@@ -2384,7 +2384,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
   - Architecture §6 and the brief's §6 / §11.7 list the three routes; `web/api.js` gains `outputText`, `outputSearch`, `outputPageUrl`.
   *Done when:* `utils/tests/outputs/test_text_routes.py` covers paging (offset, page, ranges), search (words, phrase, regex, timeout), the page image, the errors; the `api.js` Node tests and the contract test cover the new calls.
 
-- [ ] **24.4 Reading tools: `utils/tools/hub_tools.py`, `services/agent/agent/local.py`.**
+- [x] **24.4 Reading tools: `utils/tools/hub_tools.py`, `services/agent/agent/local.py`.**
   - Hub tools (risk `read`, `core`): **`hub_read_document(ref, offset?, pages?, limit?)`** (the text route; the result is wrapped as untrusted and ends with "next: offset N" when there's more) and **`hub_search_document(ref, query, limit?)`** (the search route, hits with page and line). `ref` takes `#n`, `output:<id>` or a bare id, resolved the way `view_output` resolves.
   - `view_output` gains `page` for PDFs (the page image, so a vision model sees figures, tables and scanned pages); for text kinds it returns the first 2000 chars and points to `hub_read_document`.
   - Every call through MCP gets the same tools (they're hub tools).

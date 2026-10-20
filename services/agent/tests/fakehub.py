@@ -3,7 +3,8 @@ schemas, calls with permissions and approvals, jobs, outputs, skills and the eve
 
 Tools: hub_list_services (core, read), fake_get (read), fake_make_image (generate, asks aspect),
 fake_render (generate job, `seconds`), fake_wipe (destructive), fake_fail (read, errors),
-gen3d_make_3d (generate job), tts_speak (generate).
+gen3d_make_3d (generate job), tts_speak (generate), hub_read_document and hub_search_document (core,
+read; plan 24.4) over documents added with `doc()`, which also answer `/text` and `/page/{n}.png`.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import time
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGP4z8AARAwQBQA/5Qf8oNBe9QAAAABJRU5ErkJggg==")
 
@@ -49,6 +50,10 @@ TOOLS = [
       job=True, ask=["engine"], desc="Make a 3D model from text or a picture"),
     T("tts_speak", "tts", "generate", {"text": {"type": "string"}, "name": {"type": "string"}}, ["text"], ask=["name"],
       desc="Speak text aloud"),
+    T("hub_read_document", "hub", "read", {"ref": {"type": "string"}, "offset": {"type": "integer"}, "pages": {"type": "string"},
+                                           "limit": {"type": "integer"}}, ["ref"], core=True, desc="Read a document's text"),
+    T("hub_search_document", "hub", "read", {"ref": {"type": "string"}, "query": {"type": "string"}}, ["ref", "query"], core=True,
+      desc="Search a document's text"),
 ]
 
 
@@ -73,6 +78,8 @@ class FakeHub:
         self.skills = {("fake", "drawing"): {"description": "How to pick image settings", "body": "Use 16:9 for landscapes."}}
         self.app = self._app()
         self.n = 0
+        self.page_views: list[tuple[str, int]] = []
+        self.texts: dict[str, dict[str, Any]] = {}     # documents (plan 24): oid → {text, pages: [(start, end)], outline}
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -87,6 +94,42 @@ class FakeHub:
         self.outputs[oid] = o
         return {"output_id": oid, "ref": f"output:{oid}", "kind": kind, "title": title, "url": o["url"],
                 "preview": o["preview"], "summary": title, "prompt": prompt}
+
+    def doc(self, title: str, pages: list[str] | None = None, text: str | None = None, kind: str = "document",
+            subtype: str = "pdf", outline: list[dict[str, Any]] | None = None) -> str:
+        """A text or document output, as the hub extracts it: PDF pages start `--- page N ---`. Returns its id."""
+        self.n += 1
+        oid = hashlib.sha1(f"{title}{self.n}".encode()).hexdigest()[:12]
+        spans, parts, at = [], [], 0
+        for i, p in enumerate(pages or []):
+            chunk = ("\f" if i else "") + f"--- page {i + 1} ---\n" + p
+            spans.append((at, at + len(chunk)))
+            parts.append(chunk)
+            at += len(chunk)
+        body = "".join(parts) if pages else (text or "")
+        self.texts[oid] = {"text": body, "pages": spans, "outline": outline or []}
+        self.outputs[oid] = {"id": oid, "service": "uploads", "kind": kind, "subtype": subtype, "title": title,
+                             "url": f"/api/outputs/{oid}/file", "preview": None, "meta": {}, "files": [], "created_ts": time.time(),
+                             "size_bytes": len(body), "path": f"outputs/uploads/{oid}-{title}"}
+        return oid
+
+    def window(self, oid: str, offset: int = 0, limit: int = 12000, page: int | None = None, pages: str | None = None) -> dict[str, Any]:
+        d = self.texts[oid]
+        text, spans = d["text"], d["pages"]
+        spec = pages or (str(page) if page else None)
+        start, stop = offset, len(text)
+        if spec:
+            a, _, b = spec.partition("-")
+            a, b = int(a), int(b or a)
+            if not spans or b > len(spans) or a < 1:
+                raise HTTPException(404, {"code": "no_page", "detail": f"No page {spec}"})
+            start, stop = spans[a - 1][0], spans[b - 1][1]
+        end = min(stop, start + limit)
+        page_of = next((i + 1 for i, (s, e) in enumerate(spans) if s <= start < e), None)
+        scanned = [i + 1 for i, (s, e) in enumerate(spans) if len(text[s:e].split("---\n", 1)[-1].strip()) < 20]
+        return {"text": text[start:end], "offset": start, "next_offset": end if end < len(text) else None, "total_chars": len(text),
+                "tokens": (len(text) + 3) // 4, "pages": len(spans), "lines": text.count("\n") + 1, "page_of_offset": page_of,
+                "outline": d["outline"], "scanned": scanned, "truncated": False, "notes": []}
 
     async def _execute(self, cid: str, name: str, args: dict[str, Any], mode: str) -> dict[str, Any]:
         self.calls.append({"name": name, "arguments": args, "mode": mode, "call_id": cid})
@@ -103,6 +146,23 @@ class FakeHub:
             kind = "video" if name == "fake_render" else "model3d"
             return {"status": "done", "call_id": cid, "tool": name, "result": {"state": "done"},
                     "outputs": [self._output(kind, args["prompt"], args["prompt"])]}
+        if name in ("hub_read_document", "hub_search_document"):
+            oid = str(args.get("ref", "")).removeprefix("output:")
+            if oid not in self.texts:
+                return {"status": "error", "call_id": cid, "tool": name, "error": {"code": "unknown_output", "detail": f"{args.get('ref')!r}?"}}
+            if name == "hub_search_document":
+                q = str(args["query"]).lower()
+                text = self.texts[oid]["text"]
+                hits = [f"[line {i + 1}] {line}" for i, line in enumerate(text.split("\n")) if all(w in line.lower() for w in q.split())]
+                return {"status": "done", "call_id": cid, "tool": name, "result": f"{len(hits)} hit(s):\n<untrusted source=\"output:{oid}\">\n"
+                        + "\n".join(hits) + "\n</untrusted>"}
+            try:
+                w = self.window(oid, int(args.get("offset") or 0), int(args.get("limit") or 12000), pages=args.get("pages"))
+            except HTTPException as e:
+                return {"status": "error", "call_id": cid, "tool": name, "error": e.detail}
+            nxt = f"next: offset {w['next_offset']}" if w["next_offset"] is not None else "end of the document"
+            return {"status": "done", "call_id": cid, "tool": name,
+                    "result": f"output:{oid}\n<untrusted source=\"output:{oid}\">\n{w['text']}\n</untrusted>\n{nxt}"}
         if name == "hub_list_services":
             return {"status": "done", "call_id": cid, "tool": name, "result": {"services": [{"id": "fake", "state": "ready"}]}}
         return {"status": "done", "call_id": cid, "tool": name, "result": {"ok": True, **args}}
@@ -246,6 +306,20 @@ class FakeHub:
             if oid not in self.outputs:
                 raise HTTPException(404, "no output")
             return self.outputs[oid]
+
+        @app.get("/api/outputs/{oid}/text")
+        def output_text(oid: str, offset: int = 0, limit: int = 12000, page: int | None = None, pages: str | None = None) -> dict:
+            if oid not in self.texts:
+                raise HTTPException(409 if oid in self.outputs else 404, "no text")
+            return self.window(oid, offset, limit, page, pages)
+
+        @app.get("/api/outputs/{oid}/page/{n}.png")
+        def output_page(oid: str, n: int, width: int = 1200) -> Response:
+            d = self.texts.get(oid)
+            if d is None or not 1 <= n <= len(d["pages"]):
+                return JSONResponse({"code": "no_page", "detail": f"No page {n}"}, 404)   # the hub's error envelope
+            self.page_views.append((oid, n))
+            return Response(PNG, media_type="image/png")
 
         @app.get("/api/outputs/{oid}/file")
         @app.get("/api/outputs/{oid}/preview")

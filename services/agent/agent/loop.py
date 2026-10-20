@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -312,6 +313,13 @@ class Agent:
         step = calls[-1]["payload"].get("step")
         return [e for e in calls if e["payload"].get("step") == step]
 
+    def _refs(self, tid: str, args: dict[str, Any]) -> dict[str, Any]:
+        """A hub tool's `ref` given as this chat's `#n` → `output:<id>` (the hub doesn't know the chat's numbers)."""
+        ref = args.get("ref")
+        if isinstance(ref, str) and re.fullmatch(r"\s*#\d+\s*", ref) and (oid := self.local.resolve_ref(tid, ref)):
+            return {**args, "ref": f"output:{oid}"}
+        return args
+
     def _unresolved(self, tid: str) -> list[dict[str, Any]]:
         done = {e["payload"]["id"] for e in self.store.events(tid, types=("tool_result",))}
         return [e for e in self._last_step(tid) if e["payload"]["id"] not in done]
@@ -330,7 +338,12 @@ class Agent:
                                for o in outs]
         if res.get("error"):
             body["error"] = res["error"]
-        content = res["content"] if isinstance(res.get("content"), str) else json.dumps(body, ensure_ascii=False, default=str)
+        if isinstance(res.get("content"), str):
+            content = res["content"]
+        elif isinstance(res.get("result"), str) and not outs and not res.get("error"):
+            content = res["result"]   # a text answer (hub_read_document): as it is, not as an escaped JSON string
+        else:
+            content = json.dumps(body, ensure_ascii=False, default=str)
         hint, cap = self.hooks_of(tid).after(name, res.get("status") or "done", (res.get("error") or {}).get("code"))
         if cap and len(content) > cap * 4:                 # a trim hook (plan 22.2): about 4 characters a token
             content = content[: cap * 4] + " … (trimmed by a harness hook; read_result has the rest)"
@@ -419,7 +432,8 @@ class Agent:
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
             if (thread.get("settings") or {}).get("no_learn"):
                 origin["no_learn"] = True   # this chat opted out of learning (plan 21.4)
-            res = await self.hub.call(name, args or {}, origin, mode, wait=2)
+            args = self._refs(tid, args or {})
+            res = await self.hub.call(name, args, origin, mode, wait=2)
             if res.get("status") == "needs_approval":
                 self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": name,
                                             "arguments": res.get("arguments"), "ask_fields": res.get("ask_fields") or [],

@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 
 from .harness import Harness, Run, Task, dump, first_option, grade
-from .tasks import aspect_is, engine_is, final_mentions, kinds, ran, typed, uses_output_of
+from .tasks import aspect_is, engine_is, final_mentions, got_picture, kinds, no_picture, not_called, preset_in, ran, seed_picture, typed, uses_output_of
 
 IMG, I2V, M3D, SPEAK, EDIT, BG = "comfy_generate_image", "comfy_animate_image", "gen3d_make_3d", "tts_speak", "comfy_edit_image", "comfy_remove_background"
 
@@ -62,6 +62,22 @@ LIVE: list[Task] = [
          [ran(EDIT), ("fork edits the first image", lambda r: uses_output_of(EDIT, "image", IMG, "fork_events")[1](r)),
           ("original unchanged", lambda r: (r.original_before == r.events[: len(r.original_before)], ""))],
          fork_after_turn=1, fork_turn="Edit it: make the fox an owl.", answer=first_option, timeout=1800),
+    # capabilities with real outputs (plan 20.5): a local edit, one image → 3D per engine family, text → 3D both ways
+    Task("L11_local_edit", "live", ["Remove the red headband from my picture titled 'Samurai figure (eval seed)'."],
+         [ran(EDIT), not_called(IMG), preset_in(EDIT, None), real("image")], setup=seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)"), answer=first_option, timeout=1200),
+    Task("L12_object_to_3d", "live", ["Make a 3D model of my picture titled 'Glass vase (eval seed)'."],
+         [ran(M3D), engine_is("trellis2"), got_picture(), real("model3d")], setup=seed_picture("eval-vase-2", "services/gen3d/runtime/lab/input/vase_rgba.png", "Glass vase (eval seed)"), card=fast3d, answer=first_option, timeout=1500),
+    Task("L13_character_to_3d", "live", ["Turn the character in my picture titled 'Samurai figure (eval seed)' into a 3D model."],
+         [ran(M3D), engine_is("hunyuan21"), got_picture(), real("model3d")], setup=seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)"), card=fast3d, answer=first_option, timeout=1500),
+    Task("L14_body_to_3d", "live", ["Make a rigged 3D body mesh of the person in my picture titled 'Samurai figure (eval seed)'."],
+         [ran(M3D), engine_is("sam3d_body"), got_picture(), real("model3d")], setup=seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)"), card=fast3d, answer=first_option, timeout=1500),
+    Task("L15_quick_objects_3d", "live", ["Give me a quick, rough 3D shape of my picture titled 'Glass vase (eval seed)' using SAM 3D Objects."],
+         [ran(M3D), engine_is("sam3d_objects"), got_picture(), real("model3d")], setup=seed_picture("eval-vase-2", "services/gen3d/runtime/lab/input/vase_rgba.png", "Glass vase (eval seed)"), card=fast3d, answer=first_option, timeout=1500),
+    Task("L16_text_to_3d_cube", "live", ["Make a quick 3D model of a fox straight from the text, no picture."],
+         [ran(M3D), engine_is("cube3d"), no_picture(), real("model3d")], card=fast3d, answer=first_option, timeout=1500),
+    Task("L17_text_to_3d_picture_first", "live", ["Make a 3D model of a ceramic teapot: make a picture of it first, then turn that picture into 3D."],
+         [ran(IMG), ran(M3D), uses_output_of(M3D, "image", IMG), engine_is("trellis2", "hunyuan21", "sam3d_objects"), real("image", "model3d")],
+         card=fast3d, answer=first_option, timeout=2400),
     Task("L10_must_ask", "live", ["Make a 3D model and split it into parts."],
          [("asked before making it", lambda r: (r.asked() or "?" in r.final(), ""))], answer=typed("A wooden chair"),
          card=fast3d, timeout=1200),

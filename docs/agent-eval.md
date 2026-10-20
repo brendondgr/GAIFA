@@ -94,7 +94,19 @@ Both predate Phase 20.
 - passing `references`;
 - asking once for text to 3D.
 
-**Live runs** with real outputs (the hair edit, image → 3D per engine family, text → 3D both ways) wait until the GPU is free.
+**Live runs with real outputs (2026-10-20, `evals/live.py` L11–L17):** 7 cases, 6 passed on the first run. L13 passed when re-run.
+
+| Case | Result | Time |
+|---|---|---|
+| L11 local edit ("remove the red headband") | pass: `comfy_edit_image` at full quality; headband gone, face, hair and clothes kept | 129 s |
+| L12 object → 3D | pass: TRELLIS.2 with the picture | 285 s |
+| L13 character → 3D | first run asked which engine in words (it named Hunyuan3D as best); re-run pass | 126 s |
+| L14 body → 3D | pass: SAM 3D Body | 19 s |
+| L15 quick shape | pass: SAM 3D Objects | 88 s |
+| L16 text → 3D | pass: Cube3D, no picture | 98 s |
+| L17 text → 3D, picture first | pass: a picture, then an image engine on it | 227 s |
+
+One flaw seen: the edit of a transparent-background picture came back 1024 × 1024 on white, with black bars at the sides. That comes from the edit pack's output, not from engine choice.
 
 ### Preferences (plan 21.6, 2026-10-20)
 

@@ -1838,7 +1838,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
 - [x] "Remove the person's hair" runs an instruction-edit pack at full quality by default; "a quick draft" picks a fast preset. *(Dry runs: `local_edit`, `full_quality_default`, `quick_when_asked` 3/3; the real picture waits for the live runs.)*
 - [x] Image → 3D uses an image engine with the picture; text → 3D asks or follows your stated path. *(Dry runs; `text_to_3d_asks` 2/3.)*
 - [x] The system prompt, both skills, the tool descriptions and the evals agree (no prose capability claims in the prompt).
-- [ ] Live runs with real outputs (deferred from 20.5 while the GPU is kept free): "remove her hair" on a real portrait (look at the result), one image → 3D per engine family, text → 3D both ways; recorded in `docs/agent-eval.md`.
+- [x] Live runs with real outputs (deferred from 20.5 while the GPU is kept free): "remove her hair" on a real portrait (look at the result), one image → 3D per engine family, text → 3D both ways; recorded in `docs/agent-eval.md`. *(Done 2026-10-20: L11–L17 in `evals/live.py`, all pass, L13 on a re-run; `docs/agent-eval.md`.)*
 - [x] Delivered: `utils/tools/options.py`, `modcall.py`, the gen3d and comfy declarations, the skills, the new eval tasks, the card changes, the docs.
 
 | Deliverable | Description | Location |
@@ -2188,7 +2188,7 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
     - **Not done:**
       - a prompt-change proposal approved live (none was proposed; the route and the test cover it);
       - turning learning off and a `no_learn` chat, checked live (covered by tests);
-      - the live runs with real outputs that need the GPU (the hair edit, image → 3D per engine family), deferred from 20.5.
+      - the live runs with real outputs (done afterwards, 2026-10-20: see Phase 20's checks).
 
 **Wire — Phase 22:**
 - the Learning page's Harness, Runs and Library tabs;

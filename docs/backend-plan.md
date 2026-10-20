@@ -1906,7 +1906,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - **Never blocking:** a failed `after_decision` is logged, and the call still runs.
     - **Bus:** `pref` events carry each change.
     - **Tests:** the prefs tests reuse the tools tests' `th` hub and `fake-tools`; 9 tests, plus `test_learning_switch_applies_at_once` in the settings tests.
-- [ ] **21.4 The agent's side: stated preferences, prose memory, feedback, turn records.**
+- [x] **21.4 The agent's side: stated preferences, prose memory, feedback, turn records.**
   - **`hub_set_preference`** (`utils/tools/hub_tools.py`, risk `write`, in the default `allow` list): the agent saves what you state ("always use fast for 3D") as an active `stated` preference, and the reply says so. The prompt (`prompts.py` BASE) gets one line: "When the user states a lasting preference for a tool's setting, save it with hub_set_preference."
   - **`remember`** (`local.py`) writes an `agent`-scoped preference through the hub instead of appending to `MEMORY.md`.
     - `knowledge.memory_index()` renders active agent-scoped preferences, plus tool preferences for loaded tool groups only, under "Your preferences".
@@ -1926,6 +1926,15 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
   - a new `tests/test_records.py` covers a turn row, tokens and timing;
   - `tests/test_feedback.py` covers both targets and `no_learn`;
   - `utils/tests/tools/test_hub_tools.py` covers `hub_set_preference`.
+  - *As built:*
+    - **Thumbs on outputs** live in a hub table `output_feedback` (migration 008; the newest rating per output counts) rather than in columns on `outputs`, so the `Output` contract is unchanged.
+    - **Hub tools:** `hub_set_preference` and `hub_list_preferences`.
+    - **`remember` falls back** to the old memory file when the hub refuses (for example, learning off).
+    - **The prompt:** tool preferences show under the memory section only for loaded tools, and not at all in a `no_learn` chat.
+    - **Routes:** `GET /v1/threads/{tid}/turns`.
+    - **Usage events** gain `seconds` and `ttft_s`, and their stored `tokens` are filled.
+    - **Memory import:** the old files are imported once, after start, and left in place with a `.imported` marker.
+    - **Where the tests live:** the hub tool and feedback tests are in `utils/tests/prefs/test_hub_tools.py`.
 - [ ] **21.5 The miner: `services/agent/agent/learn/mine.py`** (deterministic, no LLM).
   - **Reads** (over HTTP):
     - the hub's approvals with `edited`, denials with reasons and refusals;

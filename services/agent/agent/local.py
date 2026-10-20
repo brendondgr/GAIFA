@@ -137,9 +137,16 @@ class Local:
         if (thread.get("settings") or {}).get("dry_run"):     # an eval thread: never touch the real memory
             self.a.emit(tid, "memory", {"text": text, "topic": args.get("topic"), "dry_run": True})
             return self.ok(tid, cid, "remember", "Saved to memory.")
-        topic = Knowledge(self.a.cfg.data, self.a.hub).remember(text, args.get("topic"))
-        self.a.emit(tid, "memory", {"text": text, "topic": topic})
-        return self.ok(tid, cid, "remember", f"Saved to memory{f' ({topic})' if topic else ''}.")
+        topic = args.get("topic")
+        try:                                   # a preference in the hub, for every chat (plan 21.4)
+            p = await self.a.hub.create_pref({"value": text, "cue": topic or "", "source": "stated",
+                                              "evidence": [{"kind": "thread", "ref": tid}]})
+        except Exception as e:  # noqa: BLE001: learning off, or the hub away: keep the old file
+            Knowledge(self.a.cfg.data, self.a.hub).remember(text, topic)
+            self.a.emit(tid, "memory", {"text": text, "topic": topic, "file": True})
+            return self.ok(tid, cid, "remember", f"Saved to memory ({type(e).__name__}: kept in the memory file).")
+        self.a.emit(tid, "memory", {"text": text, "topic": topic, "pref_id": p.get("id")})
+        return self.ok(tid, cid, "remember", "Saved: it's one of the user's preferences now.")
 
     # ---- outputs -----------------------------------------------------------------------------
 

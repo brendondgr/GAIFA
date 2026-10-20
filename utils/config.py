@@ -115,7 +115,7 @@ class PermissionsCfg(_Strict):
     """Tool permissions (plan 13.2): name globs checked deny → ask → allow, then the default by risk."""
     deny: list[str] = []
     ask: list[str] = []
-    allow: list[str] = ["hub_start_service"]
+    allow: list[str] = ["hub_start_service", "hub_set_preference"]
 
 
 class AgentCfg(_Strict):

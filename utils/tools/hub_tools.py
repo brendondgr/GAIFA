@@ -116,6 +116,27 @@ async def job_status(hub: Hub, args: dict[str, Any]) -> Any:
     return await hub.calls.status(args["call_id"], wait=float(args.get("wait") or 0))
 
 
+async def set_preference(hub: Hub, args: dict[str, Any]) -> Any:
+    """A preference the user stated (plan 21.4): saved active, applied to that tool's cards from now on."""
+    from utils.prefs import PrefError
+    from utils.tools.modcall import ToolError
+
+    body = {"source": "stated", "state": "active", "value": args.get("value"), "cue": args.get("cue") or ""}
+    if args.get("tool"):
+        body.update(tool=args["tool"], field=args.get("field"), when=args.get("when") or {})
+    try:
+        p = await hub.prefs.create(body)
+    except PrefError as e:
+        raise ToolError(e.code, e.detail, "check the tool's parameters (load it first) and use one of its allowed values") from None
+    return {"saved": {k: p[k] for k in ("id", "scope", "tool", "field", "value", "when")}}
+
+
+async def list_preferences(hub: Hub, args: dict[str, Any]) -> Any:
+    rows = await hub.prefs.list(state="active", tool=args.get("tool"))
+    return {"preferences": [{k: r[k] for k in ("id", "scope", "tool", "field", "value", "when", "source")} for r in rows
+                            if r["scope"] != "thread"][:50]}
+
+
 def tools() -> list[ToolDef]:
     def t(name: str, desc: str, params: dict[str, Any], fn: Any, risk: str = "read") -> ToolDef:
         return ToolDef(f"hub_{name}", None, name, desc, params, risk=risk, core=True, source="hub", handler=fn)
@@ -146,6 +167,16 @@ def tools() -> list[ToolDef]:
           "memory manager). dry_run shows the steps only.",
           _obj({"name": {"type": "string", "description": "The session's name or id"}, "dry_run": {"type": "boolean", "default": False}},
                ["name"]), restore_session, "write"),
+        t("set_preference", "Save a lasting preference the user states (\"always use the fast preset for 3D\", \"I prefer 16:9\"): "
+          "for a tool's setting give tool, field and value (one of that parameter's allowed values); for anything else give "
+          "only value, as a short sentence. It applies to that tool's cards from now on, marked as the user's preference.",
+          _obj({"tool": {"type": "string", "description": "The tool, e.g. gen3d_make_3d"},
+                "field": {"type": "string", "description": "The parameter, e.g. preset"},
+                "value": {"description": "The value, or a sentence when there is no tool"},
+                "when": {"type": "object", "description": "Optional: other arguments it depends on, e.g. {\"image\": \"present\"}"},
+                "cue": {"type": "string", "description": "When it applies, in a few words"}}, ["value"]), set_preference, "write"),
+        t("list_preferences", "The user's saved preferences (active), optionally for one tool.",
+          _obj({"tool": {"type": "string"}}), list_preferences),
         t("job_status", "The state of an earlier tool call that is still running (by its call_id), with its result when done.",
           _obj({"call_id": {"type": "string"}, "wait": {"type": "number", "minimum": 0, "maximum": 600,
                                                          "description": "Seconds to wait for it to finish"}}, ["call_id"]),

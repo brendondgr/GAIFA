@@ -10,6 +10,7 @@ Event types (payload fields):
     tool_result     {id, name, status, content, outputs?, call_id?, error?}
     question        {id, questions}                      (an ask_user call waiting for answers)
     answer          {id, answers}
+    feedback        {value: up|down, note, output_id? | seq?}   (thumbs, plan 21.4)
     approval        {id, approval_id, tool, arguments, ask_fields, schema, risk, description, filled?}   (filled: the hub chose these, plan 20.4)
     decision        {id, approval_id, approve, arguments?, reason?}
     todos           {items: [{text, state}]}
@@ -76,6 +77,8 @@ class Store:
         self._c.execute("PRAGMA busy_timeout=5000")
         self._lock = threading.RLock()   # one connection, shared by FastAPI's worker threads: every use goes through it
         self._c.executescript(SCHEMA)
+        from .records import SCHEMA as TURNS            # plan 21.4: one row per turn
+        self._c.executescript(TURNS)
 
     def close(self) -> None:
         with self._lock:

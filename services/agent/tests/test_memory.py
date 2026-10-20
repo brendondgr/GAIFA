@@ -43,11 +43,36 @@ async def test_remember_writes_memory_and_shows_it(env):
     tid = await env.thread()
     await env.send(tid, "remember I like 16:9 and my voice is Brendon")
     assert [p["text"] for p in env.payloads(tid, "memory")] == ["likes 16:9 images", "voice is Brendon"]
-    mem = (await env.client.get("/v1/settings")).json()
-    assert "likes 16:9 images" in mem["memory"] and "[Voices](voices.md)" in mem["memory"] and mem["topics"] == ["voices"]
+    # plan 21.4: remember saves a preference in the hub (every chat, and MCP clients, see it)
+    assert [(p["value"], p["cue"], p["scope"]) for p in env.hub.prefs] == [("likes 16:9 images", "", "agent"), ("voice is Brendon", "Voices", "agent")]
     await env.send(tid, "next")
-    assert "likes 16:9 images" in env.model.received[-1]["messages"][0]["content"]
-    await env.client.put("/v1/settings", json={"memory": "- prefers square images\n"})
+    assert "- likes 16:9 images" in env.model.received[-1]["messages"][0]["content"]
+    await env.client.put("/v1/settings", json={"memory": "- prefers square images\n"})      # Settings → Agent still edits the file
     await env.send(tid, "and now")
     s = env.model.received[-1]["messages"][0]["content"]
-    assert "prefers square images" in s and "likes 16:9" not in s
+    assert "prefers square images" in s and "likes 16:9" in s
+
+
+async def test_tool_preferences_show_only_for_loaded_tools_and_not_when_opted_out(env):
+    env.hub.prefs.append({"id": "pref_9", "scope": "tool", "tool": "fake_make_image", "field": "aspect", "value": "16:9",
+                          "when": {}, "cue": "", "source": "stated", "state": "active", "evidence": [], "seen": 1})
+    tid = await env.thread()
+    await env.send(tid, "hi")
+    assert "fake_make_image: aspect" not in env.model.received[-1]["messages"][0]["content"]       # not loaded
+    tid2 = await env.thread(settings={"pinned": ["fake"]})
+    await env.send(tid2, "hi")
+    assert "- fake_make_image: aspect = '16:9' (the hub fills it in)" in env.model.received[-1]["messages"][0]["content"]
+    tid3 = await env.thread(settings={"pinned": ["fake"], "no_learn": True})
+    await env.send(tid3, "hi")
+    assert "fake_make_image: aspect" not in env.model.received[-1]["messages"][0]["content"]
+
+
+async def test_old_memory_files_are_imported_once(env, tmp_path):
+    from agent.knowledge import Knowledge
+    mem = env.agent.cfg.data / "memory"
+    mem.mkdir(parents=True, exist_ok=True)
+    (mem / "MEMORY.md").write_text("- likes cats (2026-10-01)\n- [Voices](voices.md): the voices\n")
+    (mem / "voices.md").write_text("- Brendon is my voice (2026-10-02)\n")
+    k = Knowledge(env.agent.cfg.data, env.agent.hub)
+    assert await k.import_memory() == 2 and await k.import_memory() == 0
+    assert [(p["value"], p["cue"]) for p in env.hub.prefs] == [("likes cats", ""), ("Brendon is my voice", "voices")]

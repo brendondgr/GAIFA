@@ -66,7 +66,9 @@ class FakeHub:
         self.running: dict[str, dict[str, Any]] = {}
         self.outputs: dict[str, dict[str, Any]] = {}
         self.cancelled: list[str] = []
-        self.views: list[str] = []                    # the `view` each GET /api/tools asked for
+        self.views: list[str] = []
+        self.prefs: list[dict[str, Any]] = []         # /api/prefs (plan 21.4)
+        self.feedback: list[dict[str, Any]] = []      # /api/outputs/{id}/feedback                    # the `view` each GET /api/tools asked for
         self.subs: set[asyncio.Queue[dict[str, Any]]] = set()
         self.skills = {("fake", "drawing"): {"description": "How to pick image settings", "body": "Use 16:9 for landscapes."}}
         self.app = self._app()
@@ -259,6 +261,38 @@ class FakeHub:
         @app.get("/api/memory")
         def memory() -> dict:
             return {"total_bytes": 128e9, "available_bytes": 90e9}
+
+        @app.get("/api/prefs")
+        def prefs(state: str | None = None, tool: str | None = None, scope: str | None = None) -> list:
+            return [p for p in self.prefs if (not state or p["state"] == state) and (not tool or p.get("tool") == tool)
+                    and (not scope or p["scope"] == scope)]
+
+        @app.post("/api/prefs")
+        async def new_pref(request: Request) -> dict:
+            b = await request.json()
+            p = {"id": f"pref_{len(self.prefs) + 1}", "scope": b.get("scope") or ("tool" if b.get("tool") else "agent"),
+                 "tool": b.get("tool"), "field": b.get("field"), "value": b.get("value"), "when": b.get("when") or {},
+                 "cue": b.get("cue") or "", "source": b.get("source") or "stated",
+                 "state": b.get("state") or ("proposed" if b.get("source") == "inferred" else "active"),
+                 "evidence": b.get("evidence") or [], "seen": b.get("seen") or 1}
+            self.prefs.append(p)
+            return p
+
+        @app.post("/api/prefs/{pid}/{verb}")
+        def decide_pref(pid: str, verb: str) -> dict:
+            p = next(x for x in self.prefs if x["id"] == pid)
+            p["state"] = "active" if verb == "approve" else "rejected"
+            return p
+
+        @app.post("/api/outputs/{oid}/feedback")
+        async def out_feedback(oid: str, request: Request) -> dict:
+            b = await request.json()
+            self.feedback.append({"output_id": oid, **b})
+            return {"output_id": oid, "value": b["value"], "note": b.get("note", ""), "ts": time.time()}
+
+        @app.get("/api/settings")
+        def settings() -> dict:
+            return {"learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60}}
 
         @app.get("/api/skills")
         def skills() -> list:

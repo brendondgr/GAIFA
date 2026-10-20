@@ -74,6 +74,11 @@ class Busy(Exception):
     pass
 
 
+
+def thread_settings(store: Any, tid: str) -> dict[str, Any]:
+    t = store.thread(tid)
+    return (t or {}).get("settings") or {}
+
 class Agent:
     def __init__(self, cfg: Config, store: Store, hub: HubAPI, llm: LLM) -> None:
         from .local import Local
@@ -88,8 +93,8 @@ class Agent:
 
     # ---- events ------------------------------------------------------------------------------
 
-    def emit(self, tid: str, type_: str, payload: dict[str, Any]) -> dict[str, Any]:
-        ev = self.store.append(tid, type_, payload)
+    def emit(self, tid: str, type_: str, payload: dict[str, Any], tokens: int = 0) -> dict[str, Any]:
+        ev = self.store.append(tid, type_, payload, tokens)
         self.live.publish(tid, ev)
         return ev
 
@@ -401,6 +406,8 @@ class Agent:
             origin = {"service": "agent", "thread": tid, "tool_call_id": cid}
             if (thread.get("settings") or {}).get("dry_run"):
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
+            if (thread.get("settings") or {}).get("no_learn"):
+                origin["no_learn"] = True   # this chat opted out of learning (plan 21.4)
             res = await self.hub.call(name, args or {}, origin, mode, wait=2)
             if res.get("status") == "needs_approval":
                 self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": name,
@@ -471,7 +478,9 @@ class Agent:
         except Exception:  # noqa: BLE001
             services, memory = None, None
         summary, _, _ = ctx.summary_state(events)
-        parts = {"agent_md": k.agent_md(), "memory": k.memory_index(), "skills": await k.skill_list(set(tools.disabled)),
+        prefs = await k.preferences(set(tools.full)) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
+        parts = {"agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.memory_index(), prefs) if x),
+                 "skills": await k.skill_list(set(tools.disabled)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
                  "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "
@@ -528,7 +537,11 @@ class Agent:
             msgs.append({"role": "user", "content": WRAP_UP})
             self.emit(tid, "note", {"text": "the model kept repeating a call; asked it to answer without tools", "level": "warn"})
 
+        t0, first = time.monotonic(), []                         # the call's time and time to first token (plan 21.4)
+
         async def delta(kind: str, text: str) -> None:
+            if not first:
+                first.append(time.monotonic() - t0)
             self.transient(tid, "delta", {"kind": kind, "text": text, "step": step})
 
         known = tools.visible() | {t["name"] for t in tools.index}
@@ -580,7 +593,9 @@ class Agent:
                 payload["leaked"] = True
             self.emit(tid, "tool_call", payload)
         window = await self.window(model, tid)
-        self.emit(tid, "usage", {**reply.usage, "model": model, "window": window})
+        timing = {"seconds": round(time.monotonic() - t0, 2), **({"ttft_s": round(first[0], 2)} if first else {})}
+        self.emit(tid, "usage", {**reply.usage, "model": model, "window": window, **timing},
+                  tokens=int(reply.usage.get("total_tokens") or 0))
         events = self.store.events(tid)
         self.transient(tid, "context", ctx.meter(events, window, sizes) | {"model": model})
         return reply, model

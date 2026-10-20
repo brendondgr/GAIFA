@@ -66,6 +66,13 @@ class Action(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+class Feedback(BaseModel):
+    value: Literal["up", "down"]
+    output_id: str | None = None        # thumbs on an output…
+    seq: int | None = None              # …or on a reply (its assistant event)
+    note: str = ""
+
+
 class Fork(BaseModel):
     seq: int = Field(ge=0)
 
@@ -84,6 +91,18 @@ def config_from_env() -> Config:
 
 
 log = logging.getLogger("agent")
+
+async def _import_memory(k: Any) -> None:
+    """Once, a little after start (the hub may still be starting): the old memory files → preferences."""
+    for _ in range(10):
+        try:
+            n = await k.import_memory()
+            if n:
+                log.info("imported %d memory lines as preferences", n)
+            return
+        except Exception:  # noqa: BLE001
+            await asyncio.sleep(30)
+
 
 async def _upkeep(store: Store, stop: asyncio.Event, every: float = 3600) -> None:
     """Hourly: archived eval threads older than 30 days go (plan 21.1)."""
@@ -115,6 +134,13 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         stop = asyncio.Event()
         watcher = asyncio.create_task(hub.follow_events(agent.hub_event, stop))
         upkeep = asyncio.create_task(_upkeep(store, stop))
+        from . import records
+        from .knowledge import Knowledge
+
+        async def turn_record(tid: str) -> None:
+            await asyncio.to_thread(records.record, store, tid)
+        agent.on_turn_end.append(turn_record)
+        importer = asyncio.create_task(_import_memory(Knowledge(cfg.data, hub)))
         await agent.resume_all()
         try:
             yield
@@ -125,7 +151,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             for t in list(agent.tasks.values()):
                 t.cancel()
             upkeep.cancel()
-            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, return_exceptions=True)
+            importer.cancel()
+            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()
@@ -305,6 +332,30 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         thread_or_404(agent, tid)
         await agent.cancel(tid)
         return {"cancelled": tid, "state": (agent.store.thread(tid) or {}).get("state")}
+
+    @app.post("/v1/threads/{tid}/feedback", summary="Thumbs up or down on an output or a reply (plan 21.4)")
+    async def feedback(tid: str, body: Feedback, request: Request) -> dict:
+        agent = A(request)
+        thread = thread_or_404(agent, tid)
+        if not body.output_id and body.seq is None:
+            raise HTTPException(422, "give output_id or seq")
+        payload = {"value": body.value, "note": body.note[:500],
+                   **({"output_id": body.output_id.removeprefix("output:")} if body.output_id else {"seq": body.seq})}
+        ev = agent.emit(tid, "feedback", payload)
+        if body.output_id and not (thread.get("settings") or {}).get("dry_run"):
+            try:
+                await agent.hub.output_feedback(payload["output_id"], body.value, body.note[:500],
+                                                {"service": "agent", "thread": tid, **({"no_learn": True} if (thread.get("settings") or {}).get("no_learn") else {})})
+            except Exception as e:  # noqa: BLE001: the chat's own record stays
+                log.warning("output feedback to the hub: %s", e)
+        return {"seq": ev["seq"], **payload}
+
+    @app.get("/v1/threads/{tid}/turns", summary="The thread's turn records (plan 21.4)")
+    async def thread_turns(tid: str, request: Request) -> list:
+        from . import records
+        agent = A(request)
+        thread_or_404(agent, tid)
+        return records.turns(agent.store, tid)
 
     @app.post("/v1/threads/{tid}/compact", summary="Compact the thread now (/compact)")
     async def compact(tid: str, request: Request) -> dict:

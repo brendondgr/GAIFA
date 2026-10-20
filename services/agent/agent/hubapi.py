@@ -90,6 +90,23 @@ class HubAPI:
         return await self._json("POST", f"/api/approvals/{aid}", params={"wait": 0},
                                 json={"approve": approve, "arguments": arguments, "reason": reason})
 
+    # ---- preferences and feedback (plan 21.4) -------------------------------------------------
+
+    async def prefs(self, **query: Any) -> list[dict[str, Any]]:
+        return await self._json("GET", "/api/prefs", params={k: v for k, v in query.items() if v})
+
+    async def create_pref(self, body: dict[str, Any]) -> dict[str, Any]:
+        return await self._json("POST", "/api/prefs", json=body)
+
+    async def decide_pref(self, pid: str, approve: bool) -> dict[str, Any]:
+        return await self._json("POST", f"/api/prefs/{pid}/{'approve' if approve else 'reject'}")
+
+    async def output_feedback(self, oid: str, value: str, note: str, origin: dict[str, Any]) -> dict[str, Any]:
+        return await self._json("POST", f"/api/outputs/{oid}/feedback", json={"value": value, "note": note, "origin": origin})
+
+    async def settings(self) -> dict[str, Any]:
+        return await self._json("GET", "/api/settings")
+
     # ---- outputs, services, skills -----------------------------------------------------------
 
     async def output(self, oid: str) -> dict[str, Any]:

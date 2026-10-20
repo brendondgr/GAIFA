@@ -98,6 +98,43 @@ class Knowledge:
         except Exception:  # noqa: BLE001
             return None
 
+    async def preferences(self, loaded: set[str]) -> str:
+        """The user's preferences for the prompt (plan 21.4): the agent-scoped ones (what `remember`
+        saves), and tool preferences only for the tools loaded in this chat, so they cost nothing elsewhere."""
+        if not self.hub:
+            return ""
+        try:
+            rows = await self.hub.prefs(state="active")
+        except Exception:  # noqa: BLE001: the prompt never fails over preferences
+            return ""
+        lines = []
+        for r in rows:
+            if r["scope"] == "agent":
+                lines.append(f"- {r['value']}")
+            elif r["scope"] == "tool" and r.get("tool") in loaded:
+                cond = ", ".join(f"{k} {v}" if v in ("present", "absent") else f"{k}={v}" for k, v in (r.get("when") or {}).items())
+                lines.append(f"- {r['tool']}: {r['field']} = {r['value']!r}" + (f" (when {cond})" if cond else "")
+                             + (f": {r['cue']}" if r.get("cue") else "") + " (the hub fills it in)")
+        return "\n".join(lines[:60])
+
+    async def import_memory(self) -> int:
+        """Once: lines of the old memory files become agent preferences (plan 21.4). The files stay."""
+        mem = self.data / "memory"
+        mark = mem / ".imported"
+        if not self.hub or mark.exists() or not mem.is_dir():
+            return 0
+        n = 0
+        for f in sorted(mem.glob("*.md")):
+            for line in f.read_text().splitlines():
+                text = re.sub(r"\s*\(\d{4}-\d{2}-\d{2}\)\s*$", "", line.lstrip("- ").strip())
+                if not text or text.startswith("[") and "](" in text:      # index lines point at topic files
+                    continue
+                await self.hub.create_pref({"value": text, "cue": f.stem if f.name != "MEMORY.md" else "",
+                                            "evidence": [{"kind": "memory", "ref": f.name}]})
+                n += 1
+        mark.write_text(time.strftime("%Y-%m-%d %H:%M"))
+        return n
+
     def remember(self, text: str, topic: str | None = None) -> str | None:
         mem = self.data / "memory"
         mem.mkdir(parents=True, exist_ok=True)

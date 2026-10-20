@@ -219,6 +219,18 @@ MIGRATIONS: list[str] = [
     CREATE INDEX prefs_tool ON prefs (tool, state);
     CREATE INDEX prefs_state ON prefs (state, updated_ts);
     """,
+    # 008: thumbs on outputs (plan 21.4): the newest rating per output counts.
+    """
+    CREATE TABLE output_feedback (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        output_id  TEXT NOT NULL,
+        value      TEXT NOT NULL CHECK (value IN ('up', 'down')),
+        note       TEXT NOT NULL DEFAULT '',
+        origin     TEXT NOT NULL DEFAULT '{}',
+        ts         REAL NOT NULL
+    );
+    CREATE INDEX output_feedback_output ON output_feedback (output_id, ts);
+    """,
 ]
 
 _STOP = object()

@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import FileResponse
+
+from pydantic import BaseModel, ConfigDict
 
 from utils.api_models import Output, OutputPage
 from utils.outputs import OutputError, Outputs
@@ -73,6 +75,37 @@ async def upload_output(request: Request, name: str = Query(..., description="Th
 @router.get("/api/outputs/{output_id}", summary="One output", response_model=Output, response_model_exclude_unset=True)
 async def get_output(output_id: str, request: Request) -> dict[str, Any]:
     return await _outs(request).get(output_id)
+
+
+class _F(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class FeedbackIn(_F):
+    value: Literal["up", "down"]
+    note: str = ""
+    origin: dict[str, Any] = {}
+
+
+class Feedback(_F):
+    output_id: str
+    value: Literal["up", "down"]
+    note: str
+    ts: float
+
+
+@router.post("/api/outputs/{output_id}/feedback", summary="Thumbs up or down on an output (plan 21.4); the newest counts",
+             response_model=Feedback)
+async def output_feedback(output_id: str, body: FeedbackIn, request: Request) -> dict[str, Any]:
+    import json
+    import time
+
+    oid = output_id.removeprefix("output:")
+    await _outs(request).get(oid)                      # 404 output_not_found for an unknown id
+    now = time.time()
+    await request.app.state.hub.db.execute("INSERT INTO output_feedback (output_id, value, note, origin, ts) VALUES (?, ?, ?, ?, ?)",
+                                           (oid, body.value, body.note[:500], json.dumps(body.origin), now))
+    return {"output_id": oid, "value": body.value, "note": body.note[:500], "ts": now}
 
 
 @router.delete("/api/outputs/{output_id}", status_code=204, summary="Move an output (its files, sidecar and preview) to outputs/.trash")

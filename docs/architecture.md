@@ -538,6 +538,12 @@ nightly_at = "03:00"     # the learner's nightly run; it also runs after idle_mi
 idle_min = 60
 infer_after = 2          # an inferred preference is proposed after this many times, in as many chats
 fade_days = 60           # inferred preferences unused this long fade out; stated ones never do
+
+[speech_input]           # plan 29.4: dictation in Chat (the stt mod); Settings → Agent → Speech input, or the mic's menu
+mics = ["Samson GoMic Analog Stereo", "ThinkPad USB-C Dock Audio Mono"]   # labels, most preferred first; the first present is used
+language = ""            # an ISO code, or "" to detect
+preset = "balanced"      # fast | balanced | accurate | best
+mode = "both"            # both (click or hold) | toggle | hold
 ```
 
 ## 10. The existing apps as mods

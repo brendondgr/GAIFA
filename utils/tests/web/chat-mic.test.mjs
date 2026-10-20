@@ -1,9 +1,11 @@
-// Plan 29.3: the composer's dictation (web/chat/chat-mic.js): the 16 kHz resampler the AudioWorklet
+// Plans 29.3–29.4: the composer's dictation (web/chat/chat-mic.js): the 16 kHz resampler the AudioWorklet
 // runs, int16 framing, and the message protocol with the stt mod's WS /v1/stream (driven with a fake
 // socket, microphone and AudioContext).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Resampler, toInt16, startMessage, initial, reduce, dictated, joinDraft, streamUrl, dictate, RATE } from '../../../web/chat/chat-mic.js';
+import { Resampler, toInt16, startMessage, initial, reduce, dictated, joinDraft, streamUrl, dictate, RATE,
+  pickMic, nextMic, openMic, onRelease, levelOf, normLabel, BROWSER_DEFAULT, HOLD_MS } from '../../../web/chat/chat-mic.js';
+import { micRows } from '../../../web/chat/chat-speech-input.js';
 
 const sine = (rate, hz, secs) => Float32Array.from({ length: Math.round(rate * secs) }, (_, i) => Math.sin(2 * Math.PI * hz * i / rate));
 const crossings = a => { let n = 0; for (let i = 1; i < a.length; i++) if ((a[i - 1] < 0) !== (a[i] < 0)) n++; return n; };
@@ -82,7 +84,7 @@ test('dictate(): start → frames once ready → stop → done, and the micropho
   globalThis.AudioContext = class { constructor() { this.audioWorklet = { addModule: async () => {} }; } createMediaStreamSource() { return { connect() {}, disconnect() {} }; } close() { this.closed = true; return Promise.resolve(); } };
   let node;
   globalThis.AudioWorkletNode = class { constructor(_, name) { this.name = name; this.port = {}; node = this; } disconnect() {} };
-  const media = { getUserMedia: async () => ({ getTracks: () => tracks }) };
+  const media = { getUserMedia: async () => ({ getTracks: () => tracks }), enumerateDevices: async () => [] };
   const states = [];
   const d = await dictate({ media, url: 'ws://x/api/s/stt/v1/stream', onState: s => states.push(s) });
   const ws = sockets[0];
@@ -108,10 +110,107 @@ test('dictate(): start → frames once ready → stop → done, and the micropho
 test('dictate(): a refused stream reports why', async () => {
   const sockets = [];
   globalThis.WebSocket = class { constructor() { this.readyState = 1; sockets.push(this); } send() {} close() {} };
-  const media = { getUserMedia: async () => ({ getTracks: () => [] }) };
+  const media = { getUserMedia: async () => ({ getTracks: () => [] }), enumerateDevices: async () => [] };
   const states = [];
   const d = await dictate({ media, onState: s => states.push(s), url: 'ws://x' });
   sockets[0].onclose({ code: 4503, reason: 'Speech to Text is not running' });
   assert.equal(states.at(-1).error, 'Speech to Text is not running');
   assert.equal((await d.stop()).error, 'Speech to Text is not running');
+});
+
+// ---- plan 29.4: which microphone ---------------------------------------------------------------------
+
+const mic = (id, label) => ({ kind: 'audioinput', deviceId: id, label, groupId: 'g' });
+const YETI = mic('y1', 'Blue Yeti Nano Analog Stereo'), CAM = mic('c1', 'C920 HD Pro Webcam'), LAP = mic('l1', 'Family 17h HD Audio Controller Digital Microphone');
+const PREFS = ['Blue Yeti Nano Analog Stereo', 'C920 HD Pro Webcam', 'Family 17h HD Audio Controller Digital Microphone'];
+
+test('the first preferred microphone present is picked, matched by label', () => {
+  assert.deepEqual(pickMic([LAP, CAM, YETI], PREFS), { deviceId: 'y1', label: YETI.label, rank: 0 });
+  assert.equal(pickMic([LAP, CAM], PREFS).deviceId, 'c1');
+  assert.equal(pickMic([mic('default', 'Default - Blue Yeti Nano Analog Stereo'), mic('z9', 'blue yeti nano analog stereo')], PREFS).deviceId, 'z9');
+  assert.equal(pickMic([mic('o1', 'Other')], PREFS), null);
+  assert.equal(pickMic([YETI, { kind: 'audiooutput', deviceId: 's', label: 'C920 HD Pro Webcam' }], ['C920 HD Pro Webcam']), null);
+  assert.equal(normLabel('Communications - Headset '), 'headset');
+});
+
+test('unplugging falls back to the next present, then the browser default; plugging in a higher one takes over', () => {
+  const cur = pickMic([YETI, CAM, LAP], PREFS);
+  assert.equal(nextMic([YETI, CAM, LAP], PREFS, cur), undefined);                 // nothing changed: keep
+  const fall = nextMic([CAM, LAP], PREFS, cur);                                     // the Yeti is unplugged
+  assert.equal(fall.deviceId, 'c1');
+  assert.equal(nextMic([CAM, LAP, mic('x', 'USB headset')], PREFS, fall), undefined);   // an unlisted mic doesn't take over
+  assert.equal(nextMic([LAP, CAM, YETI], PREFS, fall).deviceId, 'y1');              // the Yeti is back and ranks higher
+  assert.equal(nextMic([LAP], PREFS, { ...LAP, rank: 2 }), undefined);
+  assert.equal(nextMic([], PREFS, fall), BROWSER_DEFAULT);                          // nothing listed left
+  assert.equal(nextMic([CAM], PREFS, null).deviceId, 'c1');                         // on the default: a listed one takes over
+  assert.equal(nextMic([CAM], PREFS, fall, true).deviceId, 'c1');                   // the track ended: open it again
+});
+
+function fakeMedia(devices) {
+  const listeners = [], opened = [];
+  const media = {
+    devices,
+    async enumerateDevices() { return this.devices; },
+    async getUserMedia(c) {
+      const id = c.audio?.deviceId?.exact ?? null;
+      if (id && !this.devices.some(d => d.deviceId === id)) { const e = new Error('gone'); e.name = 'OverconstrainedError'; throw e; }
+      const track = { id, stopped: false, stop() { this.stopped = true; }, addEventListener() {} };
+      opened.push(track);
+      return { getTracks: () => [track], getAudioTracks: () => [track] };
+    },
+    addEventListener(t, f) { if (t === 'devicechange') listeners.push(f); },
+    removeEventListener(t, f) { const i = listeners.indexOf(f); if (i >= 0) listeners.splice(i, 1); },
+    async change(devs) { this.devices = devs; for (const f of [...listeners]) await f(); await new Promise(r => setTimeout(r, 5)); },
+    listeners, opened,
+  };
+  return media;
+}
+
+test('openMic follows plugs and unplugs and tells each switch', async () => {
+  const media = fakeMedia([LAP, CAM, YETI]);
+  const switched = [];
+  const m = await openMic({ media, mics: PREFS, onSwitch: (s, x) => switched.push(x.label) });
+  assert.equal(m.mic.deviceId, 'y1');
+  await media.change([LAP, CAM]);                                   // unplug the Yeti
+  assert.equal(m.mic.deviceId, 'c1');
+  assert.ok(media.opened.find(t => t.id === 'y1').stopped);
+  await media.change([LAP, CAM, YETI]);                             // plug it back: it takes over
+  assert.equal(m.mic.deviceId, 'y1');
+  await media.change([LAP]);                                         // both preferred gone at once
+  assert.equal(m.mic.deviceId, 'l1');
+  assert.deepEqual(switched, [CAM.label, YETI.label, LAP.label]);
+  m.stop();
+  assert.equal(media.listeners.length, 0);
+  assert.ok(media.opened.every(t => t.stopped));
+});
+
+test('before access is granted the labels are empty: it opens the default, then picks again', async () => {
+  const media = fakeMedia([mic('y1', ''), mic('c1', '')]);
+  const real = media.getUserMedia.bind(media);
+  media.getUserMedia = async c => { media.devices = [CAM, YETI]; return real(c); };   // granting reveals the names
+  const m = await openMic({ media, mics: ['C920 HD Pro Webcam'] });
+  assert.equal(m.mic.deviceId, 'c1');
+  assert.deepEqual(media.opened.map(t => t.id), [null, 'c1']);
+  assert.ok(media.opened[0].stopped);
+});
+
+test('the button: hold to talk, toggle, or either', () => {
+  assert.equal(onRelease('hold', true, 50), 'stop');
+  assert.equal(onRelease('toggle', true, 5000), 'keep');
+  assert.equal(onRelease('toggle', false, 10), 'stop');
+  assert.equal(onRelease('both', true, HOLD_MS - 100), 'keep');
+  assert.equal(onRelease('both', true, HOLD_MS + 100), 'stop');
+  assert.equal(onRelease('both', false, 10), 'stop');
+});
+
+test('the level meter: silence is 0, full scale is 1, −30 dB is about halfway', () => {
+  assert.equal(levelOf(new Float32Array(100)), 0);
+  assert.equal(levelOf(new Float32Array(100).fill(1)), 1);
+  assert.ok(Math.abs(levelOf(new Float32Array(100).fill(10 ** (-30 / 20))) - 0.5) < 0.01);
+});
+
+test('the settings list: ranked labels first (unplugged ones kept), then the unranked present', () => {
+  assert.deepEqual(micRows([CAM, LAP], PREFS.slice(0, 2)), [
+    { label: YETI.label, rank: 0, present: false }, { label: CAM.label, rank: 1, present: true },
+    { label: LAP.label, rank: null, present: true }]);
 });

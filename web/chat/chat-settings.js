@@ -1,12 +1,13 @@
 // Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, the memory index and its topics, the
 // models, skills, the ask modes and permissions with the grants (plan 25.2: what was allowed in a
-// chat or always, with revoke). (Show thinking is retired: thinking is a row in each turn's
+// chat or always, with revoke), and Speech input (plan 29.4, chat-speech-input.js). (Show thinking is retired: thinking is a row in each turn's
 // activity fold, plan 19.4.) Mounted by Hub.dc.html's Settings page.
 
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens, fmtAgo } from './chat-ui.js';
 import { getChatClient } from './chat.js';
 import { MODES } from './chat-header.js';
 import { RISK_TONE, grantText } from './chat-risk.js';
+import { SpeechInputSection } from './chat-speech-input.js';
 
 const R = () => globalThis.React;
 const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
@@ -59,6 +60,7 @@ export function AgentSettings({ api, toast = () => {} }) {
       ...(s?.skills || []).map(k => h('div', { key: k.id, style: { display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 12.5 } },
         h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 90 } }, '/' + k.name), h('span', { style: { flex: 1, color: T.mut } }, k.description), h(Badge, null, k.source)))),
     h(LearningSection, { api, toast }),
+    h(SpeechInputSection, { api, toast }),   // plan 29.4: only while the stt mod is up
     section('Permissions',
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, MODES.map(([k, l, d]) => h('div', { key: k, style: { display: 'flex', gap: 10, fontSize: 12.5, alignItems: 'baseline' } },
         h('span', { style: { minWidth: 130, fontWeight: 500 } }, l), h('span', { style: { color: T.mut } }, d)))),

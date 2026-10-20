@@ -5,7 +5,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from utils.config import mic_labels
 
 ServiceState = Literal["stopped", "starting", "ready", "degraded", "stopping", "failed"]
 LoadState = Literal["unloaded", "loading", "loaded", "unloading", "n/a"]
@@ -616,12 +618,23 @@ class LearningSettings(_Model):
     fade_days: int = Field(ge=1)
 
 
+class SpeechInputSettings(_Model):
+    """Plan 29.4: dictation in Chat."""
+    mics: list[str] = Field(description="Microphone labels, most preferred first; the first one present is used")
+    language: str = Field(pattern=r"^([a-z]{2,3})?$", description="ISO code, or empty to detect")
+    preset: Literal["fast", "balanced", "accurate", "best"]
+    mode: Literal["both", "toggle", "hold"] = Field(description="Click to start and stop, hold to talk, or either")
+
+    _labels = field_validator("mics")(lambda cls, v: mic_labels(v))
+
+
 class Settings(_Model):
     hub: HubSettings
     memory: MemorySettings
     services: ServicesSettings
     ui: UiSettings
     learning: LearningSettings
+    speech_input: SpeechInputSettings
 
 
 class SettingsPatch(_Model):
@@ -632,6 +645,7 @@ class SettingsPatch(_Model):
     services: dict[str, Any] | None = None
     ui: dict[str, Any] | None = None
     learning: dict[str, Any] | None = None
+    speech_input: dict[str, Any] | None = None
 
 
 class SavedSettings(_Model):

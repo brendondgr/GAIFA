@@ -1,0 +1,49 @@
+# Speech to Text: faster-whisper (CTranslate2) in its own worker process, a toned-down port of the
+# TranscriberPrototype (plan Phase 29). Fields: architecture §4.3. Setup: setup/stt.md.
+id = "stt"
+name = "Speech to Text"
+description = "Transcribe audio and video with Whisper (faster-whisper): files to transcripts, and live dictation"
+icon = "wave"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]
+port = 5105
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 20
+restart = "on-failure"
+install = "install.sh"
+
+[run.env]
+STT_DEVICE = "auto"                # auto | cpu | cuda
+HF_HUB_OFFLINE = "0"               # weights download into {models}/stt, never ~/.cache
+
+[memory]
+estimate_gb = 1.5                  # small at float16 on the GPU, measured ~1.2 GB; large-v3 needs ~5
+load = "POST /v1/load"
+unload = "POST /v1/unload"
+triggers = ["POST /v1/transcribe", "POST /v1/transcribe/upload", "POST /v1/load"]
+idle_unload_s = 300
+idle_unload_env = "STT_IDLE_UNLOAD_S"
+
+[models]
+dirs = ["stt"]
+
+[outputs]
+kinds = ["text"]
+
+[ui]
+page = "ui/page.js"
+
+[api]
+hide = ["GET /v1/jobs"]
+
+[tools]
+transcribe = { op = "POST /v1/transcribe", risk = "generate", ask = ["preset"], hide = ["save", "timestamps"], job = true, job_status = "GET /v1/jobs/{jid}", job_cancel = "POST /v1/jobs/{jid}/cancel", description = """Transcribe speech in an audio or video output (video: its sound track). Pass `audio` = output:<id> (or #n). The result's `transcript` is the text in paragraphs, each led by its time as [mm:ss]: quote those times when you cite what was said. The transcript is also saved as a text output (transcript.md, with .srt subtitles and words.json). `preset`: balanced (the default) suits most recordings; accurate for accents, jargon or a noisy room; fast for a quick look. Give `language` (en, de, …) when you know it, and names or terms in `prompt` to get their spelling right.""", examples = [{ audio = "output:<id of a recording>" }, { audio = "#2", preset = "accurate", language = "en", prompt = "Kubernetes, Grafana" }] }
+list_models = { op = "GET /v1/models", description = "The speech-to-text models: which are downloaded and loaded, and the presets" }
+
+[agent]
+skills = "skills"            # skills/<name>/SKILL.md for the chat agent (plan 14.9)

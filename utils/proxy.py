@@ -4,16 +4,24 @@ Bodies stream both ways, so uploads, audio and server-sent events pass through
 without being buffered. The mod's responses, errors included, are returned
 unchanged; the hub only answers itself (with the error envelope) when the mod
 isn't running (503 `service_not_running`) or can't be reached (502 `upstream_error`).
+
+WebSockets pass through too (plan 29.2, the stt mod's live stream): text and binary
+messages both ways until either side closes. A page from another origin is refused
+at the handshake (HTTP 403). Otherwise the hub accepts and closes with a code the
+browser can read: 4404 no such mod, 4503 not running, 4502 it didn't accept. The connection counts as a request in flight, so the mod isn't idle-unloaded.
 """
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
@@ -151,3 +159,69 @@ async def forward(mgr: ServiceManager, request: Request, service_id: str) -> Str
 @router.api_route("/api/s/{service_id}/{path:path}", methods=METHODS, include_in_schema=False)
 async def proxy(request: Request, service_id: str, path: str = "") -> StreamingResponse:
     return await forward(request.app.state.hub.services, request, service_id)
+
+
+def _loopback_origin(origin: str | None) -> bool:
+    """No Origin (not a browser page), or a page served from this machine."""
+    if not origin:
+        return True
+    host = urlsplit(origin).hostname or ""
+    return host in ("localhost", "::1") or host.startswith("127.") or host.endswith(".localhost")
+
+
+@router.websocket("/api/s/{service_id}/{path:path}")
+async def proxy_ws(ws: WebSocket, service_id: str, path: str = "") -> None:
+    import websockets
+
+    if not _loopback_origin(ws.headers.get("origin")):
+        await ws.close(code=1008)                # before accept: the handshake gets HTTP 403
+        return
+    mgr = ws.app.state.hub.services
+    try:
+        svc = mgr.get(service_id)
+    except ServiceError:
+        await ws.accept()
+        await ws.close(code=4404, reason=f"no mod {service_id}")
+        return
+    if not svc.up:
+        await ws.accept()
+        await ws.close(code=4503, reason=f"{svc.mod.name} is not running")
+        return
+    query = ws.scope.get("query_string", b"").decode("latin-1")
+    url = "ws" + svc.url[len("http"):] + "/" + path + (f"?{query}" if query else "")
+    try:
+        upstream = await websockets.connect(url, max_size=None, open_timeout=5, proxy=None,
+                                            additional_headers={"X-Forwarded-Prefix": f"/api/s/{service_id}"})
+    except (OSError, websockets.WebSocketException, TimeoutError) as e:
+        await ws.accept()
+        await ws.close(code=4502, reason=f"{svc.mod.name} didn't accept the connection ({type(e).__name__})"[:120])
+        return
+    await ws.accept()
+    svc.in_flight += 1
+    svc.last_request_ts = time.time()
+
+    async def up() -> None:
+        while True:
+            msg = await ws.receive()
+            if msg["type"] == "websocket.disconnect":
+                return
+            await upstream.send(msg["bytes"] if msg.get("bytes") is not None else msg.get("text") or "")
+
+    async def down() -> None:
+        async for msg in upstream:
+            await ws.send_bytes(msg) if isinstance(msg, bytes) else await ws.send_text(msg)
+
+    tasks = [asyncio.create_task(up()), asyncio.create_task(down())]
+    try:
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        for t in tasks:
+            t.cancel()
+        with contextlib.suppress(Exception):
+            await asyncio.gather(*tasks, return_exceptions=True)
+        code, reason = upstream.close_code or 1000, upstream.close_reason or ""
+        await upstream.close()
+        with contextlib.suppress(RuntimeError, WebSocketDisconnect):
+            await ws.close(code=code if code != 1005 else 1000, reason=reason)
+        svc.in_flight -= 1
+        svc.last_request_ts = time.time()

@@ -1,4 +1,4 @@
-"""The 46 eval tasks (plan 13.5; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 47 eval tasks (plan 13.5; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -179,6 +179,41 @@ def seed_picture(name: str, src: str, title: str):
     return setup
 
 
+def seed_recording(name: str, src: str, title: str):
+    """An audio output to attach (plan 29.3): copied into outputs/eval/ once, then found by its title
+    through the hub; returns its id for the first turn's attachments."""
+    async def attach(hub: str) -> list[str]:
+        import asyncio
+
+        import httpx
+
+        if not list((ROOT / "outputs" / "eval").glob(f"*/*-{name}.wav")):
+            d = ROOT / "outputs" / "eval" / time.strftime("%Y-%m-%d")
+            d.mkdir(parents=True, exist_ok=True)
+            f = d / f"{time.strftime('%H%M%S')}-{name}.wav"
+            f.write_bytes((ROOT / src).read_bytes())
+            f.with_name(f.name + ".json").write_text(json.dumps({"title": title, "kind": "audio"}))
+        async with httpx.AsyncClient(base_url=hub, timeout=15, trust_env=False) as c:
+            for _ in range(40):
+                items = (await c.get("/api/outputs", params={"q": title, "kind": "audio", "limit": 5})).json().get("items") or []
+                ids = [o["id"] for o in items if o.get("title") == title]
+                if ids:
+                    return ids[:1]
+                await asyncio.sleep(0.5)
+        raise RuntimeError(f"the seeded recording {title!r} never appeared in the outputs")
+    return attach
+
+
+def cites_times(n: int = 1):
+    """The reply cites at least `n` [mm:ss] (or [h:mm:ss]) marks."""
+    import re
+
+    def c(r: Run):
+        found = re.findall(r"\[(?:\d+:)?\d{1,2}:\d{2}\]", r.text())
+        return len(found) >= n, f"{found[:4]}"
+    return (f"reply cites {n}+ [mm:ss]", c)
+
+
 def engine_is(*values: str):
     """The engine gen3d used (the agent's choice, or the hub's default for the inputs); Cube3D with a
     picture always fails (it can't use one, plan 20.5)."""
@@ -258,6 +293,11 @@ TASKS: list[Task] = [
          [ran(IMG), arg_has(IMG, "prompt", "fox"), aspect_is(IMG, "16:9"), not_asked(), kinds("image")]),
     Task("img_needs_subject", "single", ["Make me an image."],
          [asked_before(IMG), ran(IMG), arg_has(IMG, "prompt", "lighthouse")], answer=typed("A lighthouse on a cliff at night")),
+    Task("transcribe_summary", "chain", ["Summarise this recording in two or three sentences, and cite where each point is said."],
+         [ran("stt_transcribe"), cites_times(1), final_mentions("subspace", "uncertainty", "commut", "adjoint")],
+         settings={"dry_run": False}, attach=seed_recording("eval-seminar", "services/stt/tests/fixtures/seminar-speech-real.wav",
+                                                           "Seminar recording (eval seed)"),
+         note="plan 29.3: an attached recording; transcription runs for real (small, about a second)"),
     Task("speech_named", "single", ["Say 'Good morning, everyone' in the af_heart voice."],
          [ran(SPEAK), arg_has(SPEAK, "text", "good morning"), arg_has(SPEAK, "name", "af_heart"), not_asked(), kinds("audio")]),
     Task("model3d", "single", ["Make a 3D model of a low-poly treasure chest straight from the text."],

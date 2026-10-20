@@ -46,7 +46,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
-| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102. | clients such as video-maker keep working |
+| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `embed` 5104, `stt` 5105. | clients such as video-maker keep working |
 
 ## 3. Directory layout
 
@@ -69,7 +69,7 @@ AIHub/
 │   ├── manifest.py          service.toml schema, validation, placeholders
 │   ├── services.py          finds mods, runs their state machines, polls health and status
 │   ├── backends/            systemd.py (real), subprocess.py (tests and --dev)
-│   ├── proxy.py             /api/s/<id>/* passthrough (streaming, SSE, uploads)
+│   ├── proxy.py             /api/s/<id>/* passthrough (streaming, SSE, uploads, WebSockets)
 │   ├── operations.py        mod OpenAPI → Operation[]
 │   ├── memory/              memory sampling, plans to make room, reservations, triggers, acquire
 │   ├── proc.py              meminfo, AMD GPU sysfs/fdinfo, per-process memory (from lcpp)
@@ -87,7 +87,7 @@ AIHub/
 │   │   ├── registry.json    the only tracked file under data/
 │   │   ├── llm/             <Name>/*.gguf (+ mmproj-*, mtp-*, split parts)
 │   │   ├── tts/             breeze-tts-2/, …
-│   │   ├── stt/             (Whisper, when not in hf-cache)
+│   │   ├── stt/             <model>/ (faster-whisper: small/, large-v3-turbo/, …)
 │   │   ├── voices/          <slug>/reference.wav + voice.json
 │   │   ├── 3d/              cube3d-v0.5/, cubepart/, Qwen3-VL-4B-Instruct/, clip-vit-large-patch14/
 │   │   ├── comfyui/         ComfyUI's own layout: diffusion_models/, text_encoders/, vae/, loras/, unet/, …
@@ -341,6 +341,7 @@ aihub-lcpp.service                   lcppd                    :7710
 aihub-tts.service                    LocalTTS                 :5040  (+ engine worker subprocesses)
 aihub-gen3d.service                  gen3d                    :5050  (+ podman worker container)
 aihub-comfy.service                  comfy adapter            :5070  (+ ComfyUI in the strix-halo toolbox :8199)
+aihub-stt.service                    stt (faster-whisper)     :5105  (+ its model's worker process)
 ```
 
 `Ctrl+C` on `python app.py` stops only the hub; mods keep running. `aihub stop all` stops everything.
@@ -394,7 +395,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `memory-high` | warn | memory is over 92% used | it drops under 90% |
 | `outputs-watch` | error | the outputs watcher stopped | it recovers |
 
-**Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-AIHub-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all.
+**Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-AIHub-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all. **WebSockets** pass through the same path (plan 29.2): messages both ways until either side closes, the mod's close code included. A page from another origin is refused at the handshake (403); otherwise a missing, stopped or unreachable mod is reported as a close code the browser can read (4404, 4503, 4502). An open socket counts as a request in flight.
 
 ## 7. Memory manager
 

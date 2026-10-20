@@ -31,8 +31,27 @@ async def test_harness_answers_and_grades(env):
 
 
 def test_eval_tasks_in_eight_groups():
-    assert len(TASKS) == 46 and len({t.id for t in TASKS}) == 46
+    assert len(TASKS) == 47 and len({t.id for t in TASKS}) == 47
     assert {t.group for t in TASKS} == {"single", "chain", "capability", "preference", "must-ask", "no-ask", "safety", "context"}
+
+
+async def test_attachments_go_with_the_first_turn_only(env, monkeypatch):
+    """plan 29.3: `attach` gets the hub's URL and returns output ids for the first message."""
+    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:7000")
+    assert Harness("http://127.0.0.1:7000/api/s/agent", "m").hub_url() == "http://127.0.0.1:7000"
+    h = Harness("http://agent", "main", dry_run=True, transport=httpx.ASGITransport(app=env.app))
+    env.model.queue({"text": "ok"}, {"text": "ok again"})
+    seen = []
+
+    async def attach(hub):
+        seen.append(hub)
+        return ["rec1"]
+
+    run = await h.run(Task("a1", "chain", ["summarise it", "thanks"], [], attach=attach))
+    users = [e["payload"] for e in run.events if e["type"] == "user"]
+    assert seen == ["http://127.0.0.1:7000"]
+    assert users[0].get("attachments") == ["rec1"] and "attachments" not in users[1]
+    await h.close()
 
 
 async def test_seeded_preferences_are_for_the_task_chat_and_removed(env):

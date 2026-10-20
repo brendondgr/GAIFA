@@ -18,6 +18,7 @@ dependencies = [
     { name = "tomlkit" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "watchfiles" },
+    { name = "websockets" },
 ]
 
 [package.dev-dependencies]
@@ -36,6 +37,7 @@ requires-dist = [
     { name = "tomlkit" },
     { name = "uvicorn", extras = ["standard"] },
     { name = "watchfiles" },
+    { name = "websockets" },
 ]
 
 [package.metadata.requires-dev]

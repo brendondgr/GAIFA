@@ -1,0 +1,12 @@
+# The server and the encoder, unpinned (the CPU install). On gfx1151 install.sh installs locks/embed.txt
+# instead: the exact ROCm builds of torch and torchvision this machine runs (the same line as tts's Breeze).
+fastapi
+uvicorn
+httpx
+numpy
+pillow
+huggingface_hub
+sentence-transformers>=6.1.0
+transformers>=5.18.0
+torch
+torchvision

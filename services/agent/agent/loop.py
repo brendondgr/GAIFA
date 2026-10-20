@@ -471,7 +471,7 @@ class Agent:
         except Exception:  # noqa: BLE001
             services, memory = None, None
         summary, _, _ = ctx.summary_state(events)
-        parts = {"agent_md": k.agent_md(), "memory": k.memory_index(), "skills": await k.skill_list(),
+        parts = {"agent_md": k.agent_md(), "memory": k.memory_index(), "skills": await k.skill_list(set(tools.disabled)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
                  "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "

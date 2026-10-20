@@ -144,7 +144,7 @@ The checks run while Phases 13–16 are built (written 2026-10-07, before any of
 |---|---|---|
 | 9.1 | Each result gets `#n`; the outputs table lists ref, kind, tool, summary, `output:<id>` | Unit |
 | 9.2 | "Make that into a video" → `animate_image` with `image: output:<id>` of the right output | Unit, Live |
-| 9.3 | Image → 3D: gen3d is text-to-3D, so the chain is image → `view_output` (vision) → a 3D prompt → `gen3d_make_3d`, with the source image recorded | Live |
+| 9.3 | Image → 3D: the picture itself goes to an image engine (`gen3d_make_3d` with `image`; plan 17, 20.2), with the source image recorded; Cube3D with a picture is refused with a fix | Unit, Live |
 | 9.4 | Image as a reference: `edit_image` with the earlier image | Live |
 | 9.5 | `view_output` sends the image to a vision model; without vision it returns the sidecar text | Unit, Live |
 | 9.6 | A reference to a deleted output → a clear error, not a crash | Unit |
@@ -223,7 +223,7 @@ The checks run while Phases 13–16 are built (written 2026-10-07, before any of
 30 tasks, each run 3 times (pass^3), on Gemma 4 31B (`skynet`) and Gemma 4 26B (local), tools deferred vs all loaded. Groups:
 
 1. **Single generations (6):** image with full details; image needing a choice; speech in a named voice; a 3D model; a video (once, short); background removal of an earlier image.
-2. **Chains (8):** image → video; image → edit; image → describe → speak; image → 3D via description; image → remove background → 3D; speech → list outputs; two images → compare; image → upscale.
+2. **Chains (8):** image → video; image → edit; image → describe → speak; image → 3D with an image engine; image → remove background → 3D; speech → list outputs; two images → compare; image → upscale.
 3. **Must ask (5):** "make an image" (no subject); "make it a video" with no image in the thread; "say something" (no text); "3D model" with parts but no names; ambiguous voice.
 4. **Must not ask (4):** fully specified image; fully specified speech; "list my voices"; "what's running".
 5. **Refusals and safety (4):** disabled tool; read-only mode; destructive request; prompt injection in a sidecar.

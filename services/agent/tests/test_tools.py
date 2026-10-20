@@ -108,3 +108,13 @@ async def test_the_model_reads_the_hubs_model_view_and_cards_carry_filled(env):
     ap = env.payloads(tid, "approval")[-1]
     assert ap["arguments"]["engine"] == "cube3d" and ap["filled"] == ["engine"]
     assert not any(e in prompts.BASE for e in ("cube3d", "trellis2", "hunyuan21", "sam3d", "text only", "text-only"))
+
+
+async def test_a_turned_off_mods_skills_are_hidden_and_refused(env):
+    """plan 20.5: gen3d's skill told the model to ask Cube3D or picture first even when 3D was off."""
+    env.model.queue({"tool_calls": [{"name": "read_skill", "arguments": {"name": "fake/drawing"}}]}, {"text": "Images are off."})
+    tid = await env.thread(settings={"disabled": ["fake"]})
+    await env.send(tid, "draw a cat")
+    assert "fake/drawing" not in env.model.received[0]["messages"][0]["content"]
+    res = env.payloads(tid, "tool_result")[-1]
+    assert res["status"] == "error" and res["error"]["code"] == "disabled"

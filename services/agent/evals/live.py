@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 
 from .harness import Harness, Run, Task, dump, first_option, grade
-from .tasks import aspect_is, final_mentions, kinds, ran, typed, uses_output_of
+from .tasks import aspect_is, engine_is, final_mentions, kinds, ran, typed, uses_output_of
 
 IMG, I2V, M3D, SPEAK, EDIT, BG = "comfy_generate_image", "comfy_animate_image", "gen3d_make_3d", "tts_speak", "comfy_edit_image", "comfy_remove_background"
 
@@ -44,8 +44,8 @@ LIVE: list[Task] = [
     Task("L1_fox", "live", ["Make me an image of a fox."], [ran(IMG), kinds("image"), real("image"), offers_next()],
          answer=first_option, timeout=900),
     Task("L2_image_to_3d", "live", ["Make an image of a cute robot toy, then turn it into a 3D model."],
-         [ran(IMG), ran(M3D), kinds("image", "model3d"), real("image", "model3d"), ("3D prompt describes the robot",
-          lambda r: (any("robot" in str(a.get("prompt", "")).lower() for a in r.final_args(M3D)), ""))],
+         [ran(IMG), ran(M3D), kinds("image", "model3d"), real("image", "model3d"), uses_output_of(M3D, "image", IMG),
+          engine_is("trellis2", "hunyuan21", "sam3d_objects")],
          card=fast3d, answer=first_option, timeout=1500),
     Task("L3_image_to_video", "live", ["Make a 16:9 image of a sailboat on a calm lake at sunset.",
                                        "Now animate it: the boat drifts slowly and the water ripples."],

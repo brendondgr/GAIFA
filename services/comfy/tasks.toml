@@ -7,7 +7,7 @@
 [tasks.text-to-image]
 name = "Text to image"
 tool = "generate_image"
-description = "Make an image from a text description."
+description = "Make a new image from a text description. To change an existing image (make it winter, add or remove something), use edit_image instead."
 required = ["prompt"]
 output = "image"
 

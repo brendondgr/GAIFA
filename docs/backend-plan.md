@@ -1210,7 +1210,7 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
     - if a compaction can't bring usage under 70% (one huge item), it stops and says so instead of looping
   - **System prompt order:** base prompt, `AGENT.md`, the memory index, the skill list, the deferred tool index, the environment (date, running and loaded mods, free memory), the thread's outputs table.
   *Done when:* `services/agent/tests/test_context.py` covers the window from `meta` and from the setting, the meter values, result capping and `read_result`, both compaction stages, the thrash guard, and the prompt order.
-- [x] **14.8 Chaining outputs: references and `view_output`.** *As built:* gen3d is text-only (Cube3D), so image → 3D goes through `view_output` (the model looks at the image) and a 3D prompt; both models see images (13.5's vision check).
+- [x] **14.8 Chaining outputs: references and `view_output`.** *As built:* gen3d is text-only (Cube3D), so image → 3D goes through `view_output` (the model looks at the image) and a 3D prompt; both models see images (13.5's vision check). *Superseded:* plan 17 added image engines, and 20.2–20.4 made the engines say what they take; the picture now goes to an image engine.
   - **References:** every result in a thread gets a short reference (`#1`, `#2`…). A small **outputs table** in the system prompt lists them: ref, kind, tool, a short summary and `output:<id>`. "Make that fox into a 3D model" resolves to `{"$file": "output:<id>"}`.
   - **File inputs** offer the thread's outputs of a matching kind (`x-kind`) on parameter cards. Result-card buttons fill them in.
   - **`view_output(ref)`** sends an image (or a video's poster frame) to the model when its endpoint has `vision` (13.3), so it can describe an image, write from it, or check a result. Otherwise it returns the output's sidecar (prompt, settings).
@@ -1248,7 +1248,7 @@ A chat that works the way Claude Code does: one loop, tools that load on demand,
 - Settings → Agent: `AGENT.md`, memory, permissions, ask mode, Show thinking, models
 
 **Checks & deliverables — Phase 14**
-- [x] "Make me an image of a fox, then turn it into a 3D model": it asks or shows the parameter cards, both outputs appear in the thread and on the Outputs page, the 3D job used the fox image, and the Relay page shows the agent's traffic. *(Live L2 with a robot: image → `view_output` → a 3D prompt describing it → GLB; the eval's `img_to_3d` and `one_shot_chain`; gen3d is text-only, so "used the image" means it was described.)*
+- [x] "Make me an image of a fox, then turn it into a 3D model": it asks or shows the parameter cards, both outputs appear in the thread and on the Outputs page, the 3D job used the fox image, and the Relay page shows the agent's traffic. *(Live L2 with a robot: image → `view_output` → a 3D prompt describing it → GLB; the eval's `img_to_3d` and `one_shot_chain`; gen3d is text-only, so "used the image" means it was described. *Superseded by 20.4–20.5:* the picture goes to an image engine.)*
 - [x] A pending question and a pending approval both survive restarts of the hub and the agent. *(Live `evals/restart_live.py`; a graceful agent restart also resumes a running turn.)*
 - [x] The context meter matches the relay's reported usage, and compaction keeps the thread working past 85%. *(Live: within 1.1% of the 31B's prompt tokens; `evals/compact_live.py`: 5 clears and a summary, the first turn still answered.)*
 - [x] A fork from an earlier message creates a separate thread, and the original is unchanged. *(Tests; the eval's `fork` 3/3 checks the original byte for byte.)*
@@ -1762,7 +1762,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
   - **The fake hub** (`tests/fakehub.py:42`) gains the image engines and `x-options`.
   *Done when:* `services/agent/tests/test_tools.py` covers the model view and the `filled` field; a test checks that the system prompt has no engine or workflow capability claims (no engine ids in `BASE`); `pytest` in `services/agent` passes.
   - *As built:* the gen3d line became two general rules, with no engine ids. The first: a tool's choices say what each takes, so follow them, and with only text for 3D, ask once. The second: leave `preset` out for full quality, and use fast or draft only when asked. `hubapi.tools()` and `search()` send `view=model`; the parameter card still gets the full schema from `needs_approval`. The fake hub fills `x-options` defaults like the hub and serves a model view without them. 81 agent tests.
-- [ ] **20.5 Evals that check capabilities: `services/agent/evals/`.**
+- [x] **20.5 Evals that check capabilities: `services/agent/evals/`.**
   - **Fixes:**
     - `engine_is` (`tasks.py:181-186`) fails cube3d with an image;
     - live `L2_image_to_3d` (`live.py:46-49`) checks that the picture was passed to an image engine, not that the prompt describes it.
@@ -1787,13 +1787,24 @@ This phase adds one declaration per engine and pack. The hub turns it into check
     - one image → 3D per engine family;
     - text → 3D both ways.
   *Done when:* `tests/test_evals.py` covers the new checks against the fake model; a full dry-run suite on `skynet` passes the 80% pass^3 gate (results in `docs/agent-eval.md`); the live runs are recorded there with their outputs.
-- [ ] **20.6 Stale text and the other docs.**
+  - *As built:*
+    - **Model and tasks.** `skynet` was MiniCPM-V 4.7 35B that day. Nine `capability` tasks were added (41 in all; `img_to_3d_object` and `img_to_3d_character` were already `picture_object_to_3d` / `picture_character_to_3d`). `model3d` now says "straight from the text".
+    - **Results.** The final dry-run suite is 92.7% pass@1 and 35/41 (85%) at pass^3, which passes the gate (`docs/agent-eval.md`).
+    - **Fixes the eval drove:**
+      - seed pictures are made once across days, under new titles;
+      - text-to-image's description and the prompt say to edit an existing picture, not generate one;
+      - comfy's `run_workflow` refuses a pack that a task tool covers;
+      - the rule to ask about the 3D method moved from the always-on prompt into gen3d's `make_3d` description;
+      - a turned-off mod's skills are left out of the skill list, and `read_skill` refuses them.
+    - **Deferred:** the live runs with real outputs, because the user kept the GPU free for TTS tests on 2026-10-19. They're a Phase 20 check below.
+- [x] **20.6 Stale text and the other docs.**
   - **Correct:**
     - `docs/test-plan.md:147,226`;
     - brief §11.13 (`:1097`, "gen3d is text-only");
     - a "superseded by 20.4" note on `docs/backend-plan.md` 14.8 (`:1207`, `:1245`) rather than rewriting history.
   - **Update:** architecture §14.1; `docs/structure.md` (`utils/tools/options.py`, `modcall.py`); the `CLAUDE.md` status.
   *Done when:* `grep -rn "text only\|text-only" docs services/agent` finds no stale claim about gen3d; `uv run pytest` passes.
+  - *As built:* test-plan 9.3 and the chains line, brief §11.13's built-in actions, and "superseded" notes on 14.8 and the Stage D check. Architecture §14.1 and `docs/structure.md` were updated in 20.1.
 - [ ] **20.7 The card follows the capabilities** (`web/chat/`, adapted to the Chat redesign; `web/mod-form.js`).
   - **The engine and workflow dropdowns:**
     - list only the `x-options` choices whose `needs`/`excludes` fit the card's current values, labelled with `label` and with `good_for` as help;
@@ -1818,6 +1829,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
 - [ ] "Remove the person's hair" runs an instruction-edit pack at full quality by default; "a quick draft" picks a fast preset.
 - [ ] Image → 3D uses an image engine with the picture; text → 3D asks or follows your stated path.
 - [ ] The system prompt, both skills, the tool descriptions and the evals agree (no prose capability claims in the prompt).
+- [ ] Live runs with real outputs (deferred from 20.5 while the GPU is kept free): "remove her hair" on a real portrait (look at the result), one image → 3D per engine family, text → 3D both ways; recorded in `docs/agent-eval.md`.
 - [ ] Delivered: `utils/tools/options.py`, `modcall.py`, the gen3d and comfy declarations, the skills, the new eval tasks, the card changes, the docs.
 
 | Deliverable | Description | Location |

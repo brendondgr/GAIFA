@@ -44,11 +44,16 @@ def test_task_tools_follow_packs(env):  # noqa: F811
 
 
 def test_list_and_run_workflow_tools(env):  # noqa: F811
-    c, *_ = env
+    c, fake, hub, s = env
     ws = c.post("/v1/tools/list_workflows/call", json={"arguments": {}}).json()["workflows"]
     assert [w["id"] for w in ws] == ["wan", "zimage"] and "prompt" in ws[1]["inputs"]
+    r = c.post("/v1/tools/run_workflow/call", json={"arguments": {"workflow": "zimage", "inputs": {"prompt": "x"}}})
+    assert r.status_code == 422 and "call generate_image with workflow='zimage'" in r.json()["detail"]   # plan 20.5: its task tool runs it
+    toml = s.workflows / "zimage" / "workflow.toml"
+    toml.write_text(toml.read_text().replace('task = "text-to-image"', 'task = "custom"'))
+    time.sleep(0.05)
     r = c.post("/v1/tools/run_workflow/call", json={"arguments": {"workflow": "zimage", "inputs": {"prompt": "x"}}}).json()
-    assert r["status"] == "running"
+    assert r["status"] == "running"                       # a custom pack has no task tool: run_workflow is its way in
     assert c.post("/v1/tools/nope/call", json={"arguments": {}}).status_code == 404
 
 

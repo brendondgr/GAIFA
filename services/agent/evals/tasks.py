@@ -1,4 +1,4 @@
-"""The 32 eval tasks (plan 13.5; two image-to-3D cases from plan 17.10): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 41 eval tasks (plan 13.5; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -167,23 +167,65 @@ def injection_note() -> None:
 
 
 def seed_picture(name: str, src: str, title: str):
-    """A picture in the outputs for the image-to-3D cases (plan 17.10), found by searching its title."""
+    """A picture in the outputs for the image-to-3D cases (plan 17.10), found by searching its title.
+    Made once: a seed from an earlier day is reused, so a search never finds two (plan 20.5)."""
     def setup() -> None:
         d = ROOT / "outputs" / "eval" / time.strftime("%Y-%m-%d")
         d.mkdir(parents=True, exist_ok=True)
-        if not list(d.glob(f"*-{name}.png")):
+        if not list((ROOT / "outputs" / "eval").glob(f"*/*-{name}.png")):
             f = d / f"{time.strftime('%H%M%S')}-{name}.png"
             f.write_bytes((ROOT / src).read_bytes())
             f.with_name(f.name + ".json").write_text(json.dumps({"title": title, "kind": "image"}))
     return setup
 
 
-def engine_is(value: str):
-    """The engine gen3d used: the agent's choice, or trellis2 when it passed a picture without one."""
+def engine_is(*values: str):
+    """The engine gen3d used (the agent's choice, or the hub's default for the inputs); Cube3D with a
+    picture always fails (it can't use one, plan 20.5)."""
     def c(r: Run):
-        vals = [a.get("engine") or ("trellis2" if a.get("image") else "cube3d") for a in r.final_args(M3D)]
-        return value in vals, f"engine={vals[:2]}"
-    return (f"{M3D} used {value}", c)
+        args = r.final_args(M3D)
+        vals = [a.get("engine") or ("trellis2" if a.get("image") else "cube3d") for a in args]
+        bad = any(v == "cube3d" and a.get("image") for v, a in zip(vals, args))
+        return any(v in values for v in vals) and not bad, f"engine={vals[:2]}" + (" with a picture" if bad else "")
+    return (f"{M3D} used {'/'.join(values)}", c)
+
+
+def got_picture(name: str = "gen3d_make_3d"):
+    return (f"{name} got a picture", lambda r: (any(a.get("image") for a in r.final_args(name)), ""))
+
+
+def no_picture(name: str = "gen3d_make_3d"):
+    return (f"{name} made it from text", lambda r: (bool(r.final_args(name)) and not any(a.get("image") for a in r.final_args(name)), ""))
+
+
+def preset_in(name: str, *allowed: str | None):
+    """The preset each call ran with is one of `allowed` (None: no preset, the full-quality default)."""
+    def c(r: Run):
+        vals = [a.get("preset") for a in r.final_args(name)]
+        return bool(vals) and all(v in allowed for v in vals), f"preset={vals[:3]}"
+    return (f"{name} preset in {allowed}", c)
+
+
+def uses_picture(name: str, stem: str):
+    """`name`'s image is a seeded eval picture (found by searching its title)."""
+    def c(r: Run):
+        ids = {o["output_id"] for res in r.results("hub_search_outputs") for o in _found(res) if stem in str(o.get("path") or o.get("title") or "")}
+        vals = [str(a.get("image", "")).removeprefix("output:") for a in r.final_args(name)]
+        return any(v in ids for v in vals) or (bool(vals) and all(vals)), f"image={vals[:2]}"
+    return (f"{name} edits the picture", c)
+
+
+def _found(res: dict[str, Any]) -> list[dict[str, Any]]:
+    try:
+        body = json.loads(res.get("content") or "{}") if isinstance(res.get("content"), str) else (res.get("content") or {})
+    except ValueError:
+        return []
+    items = body.get("items") if isinstance(body, dict) else body
+    return [i for i in items or [] if isinstance(i, dict) and "output_id" in i] if isinstance(items, list) else []
+
+
+def has_references(name: str):
+    return (f"{name} got references", lambda r: (any(a.get("references") for a in r.final_args(name)), ""))
 
 
 # ---- the tasks -----------------------------------------------------------------------------------
@@ -199,8 +241,9 @@ TASKS: list[Task] = [
          [asked_before(IMG), ran(IMG), arg_has(IMG, "prompt", "lighthouse")], answer=typed("A lighthouse on a cliff at night")),
     Task("speech_named", "single", ["Say 'Good morning, everyone' in the af_heart voice."],
          [ran(SPEAK), arg_has(SPEAK, "text", "good morning"), arg_has(SPEAK, "name", "af_heart"), not_asked(), kinds("audio")]),
-    Task("model3d", "single", ["Make a 3D model of a low-poly treasure chest."],
-         [ran(M3D), arg_has(M3D, "prompt", "chest"), not_asked(), kinds("model3d")]),
+    Task("model3d", "single", ["Make a 3D model of a low-poly treasure chest straight from the text."],
+         [ran(M3D), arg_has(M3D, "prompt", "chest"), not_asked(), kinds("model3d")],
+         note="plan 20.4: with only text the agent asks Cube3D or picture first, unless the user says"),
     Task("video_text", "single", ["Make a short video of waves crashing on a beach."],
          [ran(VID), arg_has(VID, "prompt", "wave"), kinds("video")]),
     Task("card_edit", "single", ["Make an image of a lighthouse at dusk."],
@@ -219,13 +262,13 @@ TASKS: list[Task] = [
          note="plan 17: the picture itself goes to an image engine (was: describe it to Cube3D)"),
     Task("one_shot_chain", "chain", ["Make an image of a red dragon, then turn it into a 3D model."],
          [ran(IMG), ran(M3D), uses_output_of(M3D, "image", IMG), kinds("image", "model3d")]),
-    Task("picture_object_to_3d", "chain", ["Find my picture of the glass vase and make a 3D model of it."],
-         [used("hub_search_outputs"), ran(M3D), engine_is("trellis2"), ("gen3d_make_3d got a picture", lambda r: (any(a.get("image") for a in r.final_args(M3D)), ""))],
-         setup=seed_picture("eval-vase", "services/gen3d/runtime/lab/input/vase_rgba.png", "Glass vase on a transparent background"),
+    Task("picture_object_to_3d", "chain", ["Find my picture titled 'Glass vase (eval seed)' and make a 3D model of it."],
+         [used("hub_search_outputs"), ran(M3D), engine_is("trellis2"), got_picture()],
+         setup=seed_picture("eval-vase-2", "services/gen3d/runtime/lab/input/vase_rgba.png", "Glass vase (eval seed)"),
          note="an object with detail: TRELLIS.2 (making-3d skill)"),
-    Task("picture_character_to_3d", "chain", ["Turn my picture titled 'Eval samurai, front view' into a 3D model."],
-         [used("hub_search_outputs"), ran(M3D), engine_is("hunyuan21"), ("gen3d_make_3d got a picture", lambda r: (any(a.get("image") for a in r.final_args(M3D)), ""))],
-         setup=seed_picture("eval-samurai", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Eval samurai, front view"),
+    Task("picture_character_to_3d", "chain", ["Turn my picture titled 'Samurai figure (eval seed)' into a 3D model."],
+         [used("hub_search_outputs"), ran(M3D), engine_is("hunyuan21"), got_picture()],
+         setup=seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)"),
          note="a character: Hunyuan3D 2.1 (making-3d skill)"),
     Task("three_steps", "chain", ["Make an image of a mountain village, animate it with drifting clouds, and narrate a one-sentence description of it."],
          [used("update_todos"), ran(IMG), ran(I2V), ran(SPEAK), uses_output_of(I2V, "image", IMG)]),
@@ -234,6 +277,31 @@ TASKS: list[Task] = [
     Task("compare_two", "chain", ["Make an image of a red sports car.", "Make another one of a blue pickup truck.",
                                   "Look at both images and tell me which one is more colorful."],
          [ran(IMG, 2), used(VIEW), final_mentions("car", "truck", "first", "second", "#1", "#2")]),
+    # capabilities (plan 20.5): the declared choices, not prose, decide engines, packs and presets
+    Task("local_edit", "capability", ["Remove the red headband from my picture titled 'Samurai figure (eval seed)'."],
+         [ran(EDIT), not_called(IMG), uses_picture(EDIT, "eval-samurai-2"), preset_in(EDIT, None)],
+         setup=seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)"),
+         note="a local change by instruction, at full quality"),
+    Task("edit_with_reference", "capability", ["Put the glass vase from my picture 'Glass vase (eval seed)' into the hands of the samurai in 'Samurai figure (eval seed)'. Use both pictures."],
+         [ran(EDIT), not_called(IMG), has_references(EDIT)],
+         setup=lambda: (seed_picture("eval-vase-2", "services/gen3d/runtime/lab/input/vase_rgba.png", "Glass vase (eval seed)")(),
+                        seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)")())),
+    Task("picture_body_to_3d", "capability", ["Make a rigged 3D body mesh of the person in my picture titled 'Samurai figure (eval seed)'."],
+         [ran(M3D), engine_is("sam3d_body"), got_picture()],
+         setup=seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)")),
+    Task("text_to_3d_asks", "capability", ["Make a 3D model of a teapot."], [asked_before(M3D)], answer=first_option,
+         note="only text and no method: ask Cube3D or picture first"),
+    Task("text_to_3d_cube", "capability", ["Make a quick 3D model of a fox straight from the text, no picture."],
+         [not_asked(), ran(M3D), engine_is("cube3d"), no_picture()]),
+    Task("text_to_3d_picture_first", "capability", ["Make a detailed 3D model of a ceramic teapot: make a picture of it first, then turn that picture into 3D."],
+         [ran(IMG), ran(M3D), uses_output_of(M3D, "image", IMG), engine_is("trellis2", "hunyuan21", "sam3d_objects")]),
+    Task("full_quality_default", "capability", ["Make an image of a red barn in a wheat field."],
+         [ran(IMG), preset_in(IMG, None)]),
+    Task("quick_when_asked", "capability", ["Make a quick rough draft of a castle on a hill, just to see the idea."],
+         [ran(IMG), preset_in(IMG, "fast", "draft")]),
+    Task("edit_not_generate", "capability", ["Edit my picture titled 'Samurai figure (eval seed)': make the armor red."],
+         [ran(EDIT), not_called(IMG), uses_picture(EDIT, "eval-samurai-2")],
+         setup=seed_picture("eval-samurai-2", "services/gen3d/runtime/lab/input/samurai_front_rgba.png", "Samurai figure (eval seed)")),
     # 3. must ask
     Task("ask_draw_something", "must-ask", ["Can you draw something for me?"],
          [asked_before(IMG)], answer=typed("A hot air balloon over a desert")),

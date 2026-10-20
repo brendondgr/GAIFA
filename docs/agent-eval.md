@@ -58,8 +58,45 @@ Dry runs with the 31B, 3 runs each, after the tool text was tightened:
 - `one_shot_chain`: 2/3.
 
 The misses are the model describing the picture to Cube3D instead of passing it. Two misses are now fixed server-side and no longer fail: gen3d uses TRELLIS.2 when a picture comes without an engine, and accepts a bare output id.
+
+### Capabilities (plan 20.5, 2026-10-19)
+
+On 2026-10-19 `skynet` served **MiniCPM-V 4.7 35B** (vLLM, on the remote machine), not the Gemma 4 31B above, so these numbers aren't comparable with the earlier rows. The set is now **41 tasks in seven groups**: nine `capability` tasks join the 32. They cover:
+- a local edit;
+- an edit with a reference picture;
+- a body to 3D;
+- text to 3D three ways (asks, Cube3D, picture first);
+- full quality by default, and a quick preset when asked;
+- an edit that must not regenerate.
+
+Dry runs, 3 each, at concurrency 16 (the local GPU stayed free for the user's TTS tests):
+
+| Run | Tasks × runs | pass@1 | pass^k | Mean time |
+|---|---|---|---|---|
+| MiniCPM-V 4.7, first run | 41 × 3 | 80.5% | 29/41 (71%) | 19 s |
+| after fixing the seeds and the rules below | 41 × 3 | 90.2% | 35/41 (85%) | 17 s |
+| final (turned-off mods' skills hidden) | 41 × 3 | 92.7% | 35/41 (85%) | 17 s |
+
+**What the first run found:**
+- **Duplicate seed pictures** from earlier days (two "Eval samurai, front view"), so the agent rightly asked which one. Seeds are now made once, across days, with new titles.
+- **A task that asked for something the picture doesn't have** (a helmet).
+- **"Make it winter" made a new picture.** The text-to-image tool now says to use edit_image for changes, and the prompt says to edit an existing picture rather than generate one.
+- **`run_workflow` was used for an edit.** comfy now refuses a pack that a task tool covers, naming that tool.
+- **The rule to ask about the 3D method was always on,** so it fired with gen3d turned off. It moved into gen3d's `make_3d` description, and a turned-off mod's skills are hidden and refused.
+
+**Still failing at 3/3:**
+- `three_steps` 0/3: no `update_todos`.
+- `read_my_paragraph` 1/3: the model asks for the text in plain words, as the prompt says, but the check wants a question card.
+Both predate Phase 20.
+
+**The 2/3 cases:**
+- picking `sam3d_body` and `intorealism` from the words;
+- passing `references`;
+- asking once for text to 3D.
+
+**Live runs** with real outputs (the hair edit, image → 3D per engine family, text → 3D both ways) wait until the GPU is free.
 <!-- /RESULTS -->
 
 ## Gate
 
-Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.**
+Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

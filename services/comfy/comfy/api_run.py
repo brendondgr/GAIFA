@@ -133,9 +133,14 @@ async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
     if name == "list_workflows":
         return {"workflows": list_workflows(lib)}
     if name == "run_workflow":
+        lib.packs.scan()
         hidden = lib.packs.get(args.get("workflow", ""))
         if hidden is not None and hidden.manifest and not hidden.manifest.agent:
             raise InputError(f"{hidden.id} isn't offered to the agent")
+        covered = lib.tasks.get(hidden.task) if hidden is not None and hidden.manifest else None
+        if covered is not None and covered.tool:          # plan 20.5: a task tool runs it, with its checks and card
+            raise InputError(f"{hidden.id} is {'an' if hidden.task[0] in 'aeiou' else 'a'} {hidden.task} workflow: call {covered.tool} "
+                             f"with workflow={hidden.id!r} instead of run_workflow")
         r = await st.runner.submit(args.get("workflow", ""), args.get("inputs") or {}, args.get("preset"), make_room)
         return {"status": "running", "job_id": r["id"], "workflow": r["workflow"]}
     task = next((t for t in lib.tasks.tasks.values() if t.tool == name), None)

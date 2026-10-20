@@ -121,6 +121,10 @@ class Local:
     async def t_read_skill(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         k = Knowledge(self.a.cfg.data, self.a.hub)
         name = str(args.get("name") or "")
+        mod = name.split("/", 1)[0] if "/" in name else next((s["source"] for s in await k.skills() if s["name"] == name), None)
+        if mod in tools.disabled:                      # a turned-off mod's skill is about tools this chat can't use
+            return self.err(tid, cid, "read_skill", "disabled", f"the {mod} tools are turned off in this chat",
+                            "tell the user it's turned off; they can turn it back on in the composer")
         body = await k.read(name)
         if body is None:
             return self.err(tid, cid, "read_skill", "not_found", f"no skill {name!r}", "the skill list is in your instructions")

@@ -78,3 +78,17 @@ async def test_harness_skills_and_tool_notes_reach_the_model(env):
     assert env.payloads(tid, "tool_result")[-1]["content"].strip() == "Warm light."
     fn = next(t for t in env.model.received[-1]["tools"] if t["function"]["name"] == "fake_get")
     assert fn["function"]["description"].endswith("Ids are lowercase.")
+
+
+def test_tool_notes_must_agree_with_todays_schema():
+    """22.8: the first live run adopted notes that said gen3d_make_3d needs `image` and that
+    comfy_generate_image takes `workflow_id`; both contradicted the tools' schemas."""
+    schemas = {"gen3d_make_3d": {"properties": {"prompt": {}, "image": {}, "engine": {}}, "required": []},
+               "comfy_generate_image": {"properties": {"prompt": {}, "workflow": {}}, "required": ["prompt"]}}
+    tree = {"systemprompt.md": "x",
+            "tools/gen3d_make_3d.md": "**Required parameter**: `image` - without it the call fails.",
+            "tools/comfy_generate_image.md": 'Correct call: `comfy_generate_image {"prompt": "a cat", "workflow_id": "z"}`'}
+    found = " | ".join(validate(tree, schemas))
+    assert "says `image` is required" in found and "workflow_id, which the tool doesn't take" in found
+    ok = {"systemprompt.md": "x", "tools/comfy_generate_image.md": 'Example: {"prompt": "a cat", "workflow": "z"}; `prompt` is required.'}
+    assert validate(ok, schemas) == []

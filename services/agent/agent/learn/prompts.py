@@ -30,7 +30,12 @@ procedure with a recognisable trigger; ALWAYS-ON text last, and only for a short
 to every chat. Every word of always-on text is paid for on every call.
 
 Field preferences (a tool's setting the user wants, like a preset) are NOT harness edits: the hub
-already learns them from card edits. Don't write "use preset X" into the harness."""
+already learns them from card edits. Don't write "use preset X" into the harness.
+
+A tool note must agree with that tool's schema as it is NOW (listed under the harness): use only its
+parameter names, never call a parameter required unless the schema requires it, and don't describe
+choices (engines, workflows) the schema already explains. Chats can be older than today's tools, so
+check every failure against the current schema before you act on it."""
 
 REFLECT = """You are reviewing how an AI agent did in recent chats with ONE user, in one area ({domain}).
 For each chat below, list what went wrong or right, each tied to a moment: a tool error and its fix,

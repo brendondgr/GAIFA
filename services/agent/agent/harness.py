@@ -103,7 +103,7 @@ class Harness:
 
     def create(self, files: dict[str, str], removed: list[str] | None = None, parent: int | None = None, notes: str = "",
                adopted_by: str = "auto", gate: dict[str, Any] | None = None, activate: bool = False,
-               tools: set[str] | None = None) -> int:
+               tools: set[str] | dict[str, Any] | None = None) -> int:
         """A new version: `files` (changed or added), `removed`, on top of `parent` (default: the active one)."""
         parent = self.current() if parent is None else parent
         tree = {**{k: v for k, v in self.tree(parent).items() if k not in (removed or [])}, **files}
@@ -147,11 +147,38 @@ class Harness:
         return "".join(out)
 
 
-def validate(tree: dict[str, str], tools: set[str] | None = None) -> list[str]:
-    """Problems that make a harness unusable (the learner's proposals are checked before any replay)."""
+def note_problems(rel: str, text: str, schema: dict[str, Any]) -> list[str]:
+    """A tool note checked against that tool's schema as it is now (plan 22.8): the arguments in its
+    examples must be the tool's, and it may only call a parameter required when the schema does."""
+    props = set((schema.get("properties") or {}))
+    required = set(schema.get("required") or [])
+    out = []
+    for m in re.finditer(r"\{[^{}]*\}", text):
+        try:
+            obj = json.loads(m.group(0))
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            bad = sorted(k for k in obj if k not in props)
+            if bad and props:
+                out.append(f"{rel}: the example uses {', '.join(bad)}, which the tool doesn't take (it takes: {', '.join(sorted(props))})")
+    for m in re.finditer(r"[Rr]equired(?: parameter)?[*:\s]+`([a-z_][a-z0-9_]*)`", text):
+        if m.group(1) not in required:
+            out.append(f"{rel}: says `{m.group(1)}` is required, but the tool doesn't require it")
+    return out
+
+
+def validate(tree: dict[str, str], tools: set[str] | dict[str, Any] | None = None) -> list[str]:
+    """Problems that make a harness unusable (the learner's proposals are checked before any replay).
+    `tools`: the tool names, or {name: parameters schema} to check tool notes against the schemas."""
     from . import hooks
 
+    schemas = tools if isinstance(tools, dict) else {}
+    tools = set(tools) if tools is not None else None
     out = []
+    for rel, text in tree.items():
+        if rel.startswith("tools/") and schemas.get(rel[6:-3]):
+            out += note_problems(rel, text, schemas[rel[6:-3]])
     always = sum(len(tree.get(f) or "") for f in ALWAYS_ON)
     if always > ALWAYS_ON_MAX:
         out.append(f"always-on text is {always} characters (at most {ALWAYS_ON_MAX}): move detail into a skill or a tool note")

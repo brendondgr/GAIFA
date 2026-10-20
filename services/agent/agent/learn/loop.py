@@ -181,6 +181,9 @@ class Learner:
             rec["state"] = "done"
         except Paused as p:
             rec["state"], rec["paused_at"] = "paused", str(p)
+        except asyncio.CancelledError:
+            rec["state"] = "cancelled"
+            raise
         except Exception as e:  # noqa: BLE001
             log.exception("learner run")
             rec["state"], rec["error"] = "error", f"{type(e).__name__}: {e}"[:400]
@@ -200,6 +203,12 @@ class Learner:
         harness_text = "\n\n".join(f"### {rel}\n{text.strip() or '(empty)'}" for rel, text in sorted(tree.items()))[:12000]
         lib = Library(self.agent.cfg.data, domain)
         tools = await self._tool_names()
+        schemas = await self._schemas(domain, tools)
+        if schemas:
+            tools = {**{t: {} for t in tools}, **schemas}          # tool notes are checked against today's schemas
+        harness_text = (harness_text + "\n\n# THE DOMAIN'S TOOLS AS THEY ARE NOW (chats may be older than these: a failure that "
+                        "today's schema already prevents needs no edit, and a note must never contradict them)\n"
+                        + "\n".join(f"### {n}\n{json.dumps(s)[:1500]}" for n, s in schemas.items()))[:20000]
 
         rec["stage"] = f"{domain}: reflect"
         reflection = await self.ask(rec, f"{domain}:reflect", P.REFLECT.format(domain=domain, evidence=evidence, evidence_rule=P.EVIDENCE_IS_DATA))
@@ -329,6 +338,14 @@ class Learner:
         ok = after >= before and (not full or after >= 0.8)
         return {"ok": ok, "tasks": len(tasks), "runs": self.gate_runs, "full": full, "current": round(before, 3), "candidate": round(after, 3),
                 "why": "" if ok else f"pass^{self.gate_runs} {after:.0%} against {before:.0%} for the current harness" + (" (full suite needs 80%)" if full else "")}
+
+    async def _schemas(self, domain: str, names: set[str]) -> dict[str, Any]:
+        """The domain's tools' parameters as the model reads them (the hub's model view)."""
+        want = sorted(n for n in names if n.startswith(DOMAINS[domain]))[:12]
+        try:
+            return {t["name"]: t.get("parameters") or {} for t in await self.agent.hub.tools(want)} if want else {}
+        except Exception:  # noqa: BLE001
+            return {}
 
     async def _tool_names(self) -> set[str]:
         try:

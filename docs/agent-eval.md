@@ -117,7 +117,7 @@ Five `preference` tasks (46 in all). A task's preferences are seeded for its own
 - `explicit_beats_pref`: the user's words win over a preference;
 - `answer_learned`: a seeded answer stops the 3D question.
 
-**Documents (plan 24.5).** `pdf_page7` (group `context`, 47 tasks in all) attaches a 20-page PDF (`evals/docs.py`, about 9,600 tokens, so it arrives as a card) and asks for a name that is only on page 7; it passes when the reply names it and the page and the agent used `hub_read_document` or `hub_search_document`. The harness uploads a task's `attach` files to the hub (`AIHUB_URL`) and sends them with the first turn.
+**Documents (plan 24.5).** `pdf_page7` (group `context`, 47 tasks in all) attaches a 20-page PDF (`evals/docs.py`, about 9,600 tokens, so it arrives as a card) and asks for a name that is only on page 7; it passes when the reply names it and the page and the agent used `hub_read_document` or `hub_search_document`. The harness uploads a task's `attach` files to the hub (`AIHUB_URL`) and sends them with the first turn. Live on 2026-10-20 (`skynet`, a test hub with this agent): 3/3, each with one or two `hub_search_document` calls.
 
 | Run | Tasks × runs | pass@1 | pass^k | Mean time |
 |---|---|---|---|---|

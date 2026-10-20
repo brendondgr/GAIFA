@@ -63,11 +63,17 @@ def save_upload(outputs: Path, name: str, data: bytes, now: float | None = None)
     ext = "." + ext_of(name) if "." in name else ""
     base = f"{t:%H%M%S}-{_slug(name[: len(name) - len(ext)] if ext else name)}"
     target, n = day / f"{base}{ext}", 1
-    while target.exists() or target.with_name(target.name + ".json").exists():
+    while True:   # claim the name by creating its sidecar exclusively: two uploads at once never share one
+        side = target.with_name(target.name + ".json")
+        if not target.exists():
+            try:
+                with side.open("x") as f:
+                    f.write(json.dumps({"title": name, "kind": kind, "source": {"service": "upload"}}))
+                break
+            except FileExistsError:
+                pass
         n += 1
         target = day / f"{base}-{n}{ext}"
-    side = target.with_name(target.name + ".json")
-    side.write_text(json.dumps({"title": name, "kind": kind, "source": {"service": "upload"}}))
     part = target.with_name(target.name + ".part")
     part.write_bytes(data)
     part.replace(target)

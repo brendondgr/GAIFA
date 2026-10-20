@@ -86,3 +86,13 @@ async def test_html_is_served_as_plain_text_and_env_example_keeps_its_extension(
     assert (await client.get(o["url"])).headers["content-type"].startswith("text/plain")
     o = (await client.post("/api/outputs/upload", params={"name": ".env.example"}, content=b"KEY=1\n")).json()
     assert o["path"].endswith(".env.example") and o["subtype"] == "config:env"
+
+
+def test_uploads_of_one_name_at_once_get_their_own_files(tmp_path):
+    """Three uploads of the same name in the same second, at the same time (the eval's runs): no clash."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(8) as ex:
+        rels = list(ex.map(lambda i: upload.save_upload(tmp_path, "report.pdf", b"%PDF-" + bytes([i]), now=1_790_000_000), range(8)))
+    assert len(set(rels)) == 8
+    assert sorted((tmp_path / r).read_bytes()[-1] for r in rels) == list(range(8))

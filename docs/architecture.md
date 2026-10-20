@@ -369,10 +369,13 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /` | `web/Hub.dc.html`, with `vendor/react*.js` and `/config.js` script tags added before `support.js` as it's served, so a fresh export works unchanged |
 | `GET /ui/services/{id}/{path}`, `GET /Mod_<id>.dc.html` | a mod's `ui/` folder (page modules), and its `Page.dc.html` under a name `dc-import` can find |
 | `GET /api/metrics`, `/api/metrics/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`, `/api/widgets`, `/api/widgets/{service}/{id}` | chart data; shapes in UI brief §11.7 |
-| `POST /api/outputs/upload?name=` | a file sent as the body (image, video or audio, ≤ 64 MB) saved to `outputs/uploads/<date>/` and indexed; returns the `Output` (Chat's Upload, plan chat-uploads U.4) |
+| `POST /api/outputs/upload?name=` | a file sent as the body (image, video, audio, text or document, ≤ 64 MB) saved to `outputs/uploads/<date>/` and indexed; returns the `Output` (Chat's Upload, plan chat-uploads U.4) |
 | `GET /api/outputs/{id}/file` | an output's main file (supports Range, for audio/video seeking) |
 | `GET /api/outputs/{id}/files/{path}` | a file inside a folder output |
 | `GET /api/outputs/{id}/preview` | thumbnail or poster |
+| `GET /api/outputs/{id}/text?offset=&limit=&page=&pages=` | a window of a text or document output's extracted text, with its outline, page count and scanned pages (plan 24.3; `not_text` 409, `no_page` 404) |
+| `GET /api/outputs/{id}/search?q=&limit=` | hits in that text: words in one line or paragraph, a `"phrase"`, or a `/regex/` run in a separate Python with a 1 s limit (`search_timeout`) |
+| `GET /api/outputs/{id}/page/{n}.png?width=` | page `n` of a PDF, rendered by `pypdfium2`, cached under `outputs/.previews/<id>/` |
 | `GET /api/events/recent?limit=` | recent activity, current alerts and running jobs (the activity, alerts and jobs parts of `GET /api/overview`, with a larger `limit`) |
 | `GET /api/services/{id}/check[?start=1]` | the mod self-test behind `aihub check`: `{ok, checks: [{name, status: ok\|fail\|warn\|skip, ok, detail}]}` |
 | `GET /api/doctor` | the checks behind `aihub doctor` and Settings → About → Doctor (plan 12.4): models on disk, manifests, paths outside the project (allowlist: `/usr`, `~/.config/tts-engines`, `~/.local/bin`, podman images; Stage D items are notes), ports, units, disk, offline mods. Shape: UI brief §11.7 `Doctor` |

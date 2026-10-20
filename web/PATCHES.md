@@ -38,6 +38,7 @@
 | 21 | `mod-options.js` (new), `mod-form.js`, `chat/chat-forms.js`, `chat/chat-steps.js`, `chat/chat-actions.js` | **Choices that follow the inputs** (plan 20.7): an enum with `x-options` lists only the values that fit the other values (the card's file inputs too, through `schemaForm`'s `context`), labelled with `label`, `good_for` and `speed` as help, "default (<label>)" for the default that fits; a property with `x-depends-on` lists only what its parent's option `allows`; the card says which fields the hub chose (`filled`); step words read `x-options` labels; the image result's **Make 3D** opens `gen3d_make_3d` with the picture instead of sending a prompt | The engine and workflow dropdowns listed every choice whatever the inputs (brief §11.12) | 20.7 |
 | 22 | `Hub.dc.html` | A top-level **Learning** nav item (and palette entry, icon `bulb`) opening the agent mod's Learning page `#/s/agent/learning` (its `ui/page.js`: Preferences, Review, Tool usage), shown while the agent mod is installed | Plan 21.7: the user asked for its own nav page | 21.7 |
 | 23 | `Hub.dc.html`, `views.js` | The Outputs page's kind filter and the kind colors and labels gain **Document** (`document`: pdf, docx, epub, pptx, xlsx, odt) | Plan 24.1: documents are a new output kind | 24.1 |
+| 24 | `mock.js` | `outputText`, `outputSearch` and `outputPageUrl` on the mock (text outputs read their excerpt; no pages) | Plan 24.3: the document calls work in `?mock` | 24.3 |
 
 ## Revision 2 (step 6.5): what changed
 

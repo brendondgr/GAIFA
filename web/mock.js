@@ -601,6 +601,15 @@ export function createMockApi() {
       const o = { id: 'o_' + Math.random().toString(36).slice(2, 12), service: 'uploads', kind, title: name, path, files: [{ path, kind, size_bytes: file.size }], url, preview: kind === 'image' ? url : null, size_bytes: file.size, created_ts: ts, meta: { source: { service: 'upload' } } };
       outputs.unshift(o); emit({ type: 'output', output: clone(o) }); return clone(o);
     },
+    // Plan 24.3: text outputs read their excerpt (the mock has no documents with pages).
+    async outputText(id, { offset = 0, limit = 12000 } = {}) { await net(); const o = outputs.find(x => x.id === id); if (!o) throw err(404, 'output_not_found', `No output "${id}"`);
+      if (!['text', 'document'].includes(o.kind)) throw err(409, 'not_text', `Output "${id}" is ${o.kind}, which has no text to read`);
+      const t = o.meta?.text || o.meta?.excerpt || '', s = t.slice(offset, offset + limit);
+      return { text: s, offset, next_offset: offset + s.length < t.length ? offset + s.length : null, total_chars: t.length, tokens: Math.ceil(t.length / 4), pages: 0, lines: t ? t.split('\n').length : 0, page_of_offset: null, outline: [], scanned: [], truncated: false, notes: [] }; },
+    async outputSearch(id, q, { limit = 20 } = {}) { const { text } = await this.outputText(id, { limit: 48000 }); const words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean), lines = text.split('\n'), hits = [];
+      let off = 0; lines.forEach((l, i) => { if (words.length && words.every(w => l.toLowerCase().includes(w))) hits.push({ line: i + 1, offset: off, text: lines.slice(Math.max(0, i - 1), i + 2).join('\n') }); off += l.length + 1; });
+      return { hits: hits.slice(0, limit), total: hits.length }; },
+    outputPageUrl(id) { return outputs.find(x => x.id === id)?.preview || ''; },
     async deleteOutput(id) { await net(); const i = outputs.findIndex(x => x.id === id); if (i < 0) throw err(404, 'output_not_found', `No output "${id}"`); outputs.splice(i, 1); emit({ type: 'output_deleted', id }); return null; },
     async getSettings() { await net(); return clone(settings); },
     async saveSettings(patch) { await net();

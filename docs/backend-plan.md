@@ -2376,7 +2376,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
   - `pypdfium2` added to `pyproject.toml`.
   *Done when:* `utils/tests/outputs/test_text.py` covers each reader with fixtures in `utils/tests/fixtures/docs/` (PDF with bookmarks, a scanned-page PDF made from an image, docx with headings and a table, epub, ipynb, HTML with a script), page offsets, outline, cache reuse and invalidation, deletion, and the 4 M truncation.
 
-- [ ] **24.3 Document routes: `utils/routes/outputs.py`.**
+- [x] **24.3 Document routes: `utils/routes/outputs.py`.**
   - `GET /api/outputs/{id}/text?offset=&limit=&page=&pages=` → `{text, offset, next_offset | null, total_chars, tokens, pages, page_of_offset, outline, scanned, truncated}` (`limit` default 12000 chars, max 48000; `page`/`pages` like `3` or `3-5`).
   - `GET /api/outputs/{id}/search?q=&limit=` → `{hits: [{page?, line, offset, text (the line with ±1 line of context)}], total}`: case-insensitive words, all must appear within one line or paragraph; a `"quoted phrase"` matches exactly; `/regex/` allowed and timed out after 1 s.
   - `GET /api/outputs/{id}/page/{n}.png?width=` (PDF pages, rendered by `pypdfium2`, cached under `.previews`).

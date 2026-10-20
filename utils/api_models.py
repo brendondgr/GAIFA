@@ -270,6 +270,41 @@ class OutputPage(_Model):
     totals: OutputTotals
 
 
+class OutlineItem(_Model):
+    level: int
+    title: str
+    offset: int
+    line: int
+    page: int | None = None
+
+
+class OutputText(_Model):
+    text: str
+    offset: int
+    next_offset: int | None = Field(description="Where the next read starts; null at the end")
+    total_chars: int
+    tokens: int = Field(description="The whole text's token estimate (chars / 4)")
+    pages: int = Field(description="Page count (PDFs); 0 for text without pages")
+    lines: int
+    page_of_offset: int | None
+    outline: list[OutlineItem]
+    scanned: list[int] = Field(description="PDF pages with almost no text (scans): look at them with the page image")
+    truncated: bool = Field(description="The text was cut at 4 M characters")
+    notes: list[str]
+
+
+class SearchHit(_Model):
+    page: int | None = None
+    line: int
+    offset: int
+    text: str = Field(description="The line with one line of context on each side")
+
+
+class OutputSearch(_Model):
+    hits: list[SearchHit]
+    total: int
+
+
 # ---- memory (Phase 5) ----
 
 

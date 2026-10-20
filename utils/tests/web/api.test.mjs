@@ -221,3 +221,18 @@ test('uploadOutput sends the raw file with its name and type', async () => {
   assert.equal(seen.u, '/api/outputs/upload?name=My%20cat.png');
   assert.equal(seen.init.method, 'POST'); assert.equal(seen.init.body, file); assert.equal(seen.init.headers['content-type'], 'image/png');
 });
+
+test('document calls: text windows, search, the page image URL (plan 24.3)', async () => {
+  const fetch = fakeFetch(() => json(200, {}));
+  const http = createHttpApi('http://h', { fetch });
+  await http.outputText('o1', { offset: 12000, limit: 500 });
+  await http.outputText('o1', { pages: '3-5' });
+  await http.outputSearch('o1', '"exact phrase"', { limit: 5 });
+  assert.deepEqual(fetch.calls.map(c => `${c.method} ${c.url}`), [
+    'GET http://h/api/outputs/o1/text?offset=12000&limit=500',
+    'GET http://h/api/outputs/o1/text?pages=3-5',
+    'GET http://h/api/outputs/o1/search?q=%22exact%20phrase%22&limit=5',
+  ]);
+  assert.equal(http.outputPageUrl('o1', 7, { width: 800 }), 'http://h/api/outputs/o1/page/7.png?width=800');
+  assert.equal(fetch.calls.length, 3);  // the URL builder sends nothing
+});

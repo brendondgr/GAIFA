@@ -377,6 +377,9 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
 | `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
 | `uploadOutput(file)` | `POST /api/outputs/upload?name=` (the file as the body) | `Output` (`201`): an image, video, audio, text or document file (plan 24.1); `upload_type` 415, `upload_encoding` 415 (a text file that isn't UTF-8, or UTF-16 with a BOM), `upload_too_large` 413 (64 MB), `upload_empty` 400 |
+| `outputText(id, {offset, limit, page, pages})` | `GET /api/outputs/{id}/text?offset=&limit=&page=&pages=` | `OutputText` (plan 24.3; text and documents): `limit` 12000 chars by default, at most 48000; `page`/`pages` (`3` or `3-5`) start at that page and stop at the range's end; `next_offset` continues through the document. `not_text` 409 for other kinds, `no_page` 404 |
+| `outputSearch(id, q, {limit})` | `GET /api/outputs/{id}/search?q=&limit=` | `OutputSearch`: words (any case, all within one line, else one paragraph), a `"quoted phrase"`, or `/regex/` (`/regex/i` ignores case; `search_timeout` 422 past 1 s); `limit` 20, at most 200 |
+| `outputPageUrl(id, n, {width})` | `GET /api/outputs/{id}/page/{n}.png?width=` (a URL, not a request) | A PDF page as a PNG (`width` 1200 px by default, 64–2400), cached under `outputs/.previews/<id>/`; `no_page` 404 |
 | `getSettings()` | `GET /api/settings` | `Settings` (`services.order` and `memory.priority` list every installed mod: the configured ids first, then the rest in sidebar order) |
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
@@ -385,7 +388,7 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 
 ### 6.3 Error codes to handle
 
-`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `output_not_deletable` (the output resolves outside `outputs/`, e.g. through a symlinked folder), `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `widget_not_found`, `widget_invalid` (a mod's widget data doesn't match `WidgetData`), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
+`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `output_not_deletable` (the output resolves outside `outputs/`, e.g. through a symlinked folder), `upload_encoding` (a text upload that isn't UTF-8 or UTF-16 with a BOM), `not_text` (409: reading the text of an output that has none), `no_page` (404: a page the document doesn't have), `search_timeout` (422: a `/regex/` search over 1 s), `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `widget_not_found`, `widget_invalid` (a mod's widget data doesn't match `WidgetData`), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
 
 ### 6.4 Types
 
@@ -530,6 +533,19 @@ interface OutputPage {
             by_kind: Record<OutputKind, number>;      // counts with every filter except kind
             by_service: Record<string, number> };     // counts with every filter except service
 }
+
+interface OutlineItem { level: number; title: string; offset: number; line: number; page?: number }   // plan 24.2
+interface OutputText {                       // plan 24.3: a window of an output's extracted text
+  text: string; offset: number; next_offset: number | null;   // null at the end
+  total_chars: number; tokens: number;       // tokens: the whole text's estimate (chars / 4)
+  pages: number; lines: number;              // pages: 0 for text without pages
+  page_of_offset: number | null; outline: OutlineItem[];
+  scanned: number[];                         // PDF pages with almost no text: look at their page image
+  truncated: boolean;                        // the text was cut at 4 M characters
+  notes: string[];
+}
+interface SearchHit { page?: number; line: number; offset: number; text: string }   // text: the line with ±1 line of context
+interface OutputSearch { hits: SearchHit[]; total: number }
 
 interface Activity { id: string; ts: number; service: string | null;
                      level: "info" | "warn" | "error"; text: string; route?: string }

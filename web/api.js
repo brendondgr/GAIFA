@@ -19,6 +19,7 @@ export const METHOD_AREA = {
   listModels: 'models', getModel: 'models', saveModel: 'models', verifyModel: 'models', deleteModel: 'models',
   scanModels: 'models', addModel: 'models',
   listOutputs: 'outputs', getOutput: 'outputs', deleteOutput: 'outputs', uploadOutput: 'outputs',
+  outputText: 'outputs', outputSearch: 'outputs', outputPageUrl: 'outputs',
   getSettings: 'settings', saveSettings: 'settings',
   getMetrics: 'metrics', listMetricSeries: 'metrics', getTimeline: 'metrics', getOutputStats: 'metrics',
   getActivityStats: 'metrics', getJobStats: 'metrics',
@@ -161,6 +162,11 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     deleteOutput: id => req('DELETE', `/api/outputs/${enc(id)}`),
     // A File or Blob (with .name) sent as the raw body: it becomes an output in outputs/uploads/.
     uploadOutput: file => req('POST', `/api/outputs/upload${qs({ name: file.name || 'upload' })}`, { body: file, headers: { 'content-type': file.type || 'application/octet-stream' } }),
+    // Plan 24.3: a window of an output's text ({offset, limit} or {page} / {pages: '3-5'}), a search in it
+    // (words, "a phrase" or /regex/), and a PDF page as an image URL (not a request).
+    outputText: (id, { offset, limit, page, pages } = {}) => req('GET', `/api/outputs/${enc(id)}/text${qs({ offset, limit, page, pages })}`),
+    outputSearch: (id, q, { limit } = {}) => req('GET', `/api/outputs/${enc(id)}/search${qs({ q, limit })}`),
+    outputPageUrl: (id, n, { width } = {}) => url(`/api/outputs/${enc(id)}/page/${n}.png${qs({ width })}`),
     getSettings: () => req('GET', '/api/settings'),
     saveSettings: s => req('PUT', '/api/settings', { json: s }),
     getMetrics: ({ series, range, step } = {}) => req('GET', `/api/metrics${qs({ series, range, step })}`),

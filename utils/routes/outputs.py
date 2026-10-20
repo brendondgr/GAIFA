@@ -15,8 +15,8 @@ from fastapi.responses import FileResponse
 
 from pydantic import BaseModel, ConfigDict
 
-from utils.api_models import Output, OutputPage
-from utils.outputs import OutputError, Outputs
+from utils.api_models import Output, OutputPage, OutputSearch, OutputText
+from utils.outputs import OutputError, Outputs, reading, text
 from utils.outputs.entries import kind_of
 from utils.outputs.upload import MAX_BYTES, UploadError, save_upload
 
@@ -124,6 +124,45 @@ async def output_feedback(output_id: str, body: FeedbackIn, request: Request) ->
 async def delete_output(output_id: str, request: Request) -> Response:
     await _outs(request).delete(output_id)
     return Response(status_code=204)
+
+
+@router.get("/api/outputs/{output_id}/text", summary="An output's text, a window at a time (text and documents)",
+            response_model=OutputText, response_model_exclude_unset=True)
+async def output_text(
+    output_id: str, request: Request,
+    offset: int = Query(0, ge=0, description="Character offset to start at"),
+    limit: int = Query(reading.LIMIT, ge=1, le=reading.MAX_LIMIT, description="Characters to return"),
+    page: int | None = Query(None, ge=1, description="Start at this page (PDFs)"),
+    pages: str | None = Query(None, description='A page or a range, like "3" or "3-5" (PDFs)'),
+) -> dict[str, Any]:
+    """Errors: `not_text` (409) for kinds without text, `no_page` (404) for a page the document
+    doesn't have."""
+    ex = await _outs(request).text(output_id.removeprefix("output:"))
+    spec = pages or (str(page) if page else None)
+    return await asyncio.to_thread(reading.window, ex, offset, limit, spec)
+
+
+@router.get("/api/outputs/{output_id}/search", summary="Find words, a \"phrase\" or a /regex/ in an output's text",
+            response_model=OutputSearch, response_model_exclude_unset=True)
+async def output_search(output_id: str, request: Request, q: str = Query(..., description='Words (all in one line or paragraph), a "quoted phrase", or /regex/ (/regex/i ignores case)'),
+                        limit: int = Query(reading.SEARCH_LIMIT, ge=1, le=200)) -> dict[str, Any]:
+    """Errors: `not_text` (409), `search_timeout` (422, a regex that ran over 1 s), `invalid_request` (422)."""
+    ex = await _outs(request).text(output_id.removeprefix("output:"))
+    return await asyncio.to_thread(reading.search, ex, q, limit)
+
+
+@router.get("/api/outputs/{output_id}/page/{n}.png", summary="Page n of a PDF output as a PNG",
+            response_class=FileResponse, responses={200: {"content": {"image/png": {}}, "description": "The page, rendered"}})
+async def output_page(output_id: str, n: int, request: Request, width: int = Query(reading.PAGE_WIDTH, ge=64, le=2400)) -> FileResponse:
+    """Errors: `not_text` (409) for outputs that aren't PDFs, `no_page` (404)."""
+    outs = _outs(request)
+    oid = output_id.removeprefix("output:")
+    row = await outs.row(oid)
+    if row["kind"] != "document" or not (row["main"] or "").lower().endswith(".pdf"):
+        raise OutputError(409, "not_text", f'Output "{oid}" is not a PDF; only PDFs have page images')
+    src = await outs.file(oid)
+    out = outs.dir / text.PAGES_DIR / oid / f"p{n}-w{width}.png"
+    return _send(await asyncio.to_thread(reading.page_png, src, n, width, out))
 
 
 @router.get("/api/outputs/{output_id}/file", summary="An output's main file (supports Range)",

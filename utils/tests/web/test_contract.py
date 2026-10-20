@@ -23,6 +23,7 @@ BRIEF = (REPO / "docs" / "design-brief-ui.md").read_text()
 _CALL = re.compile(r"""(?:req|send)\(\s*'([A-Z]+)'\s*,\s*[`'"]([^`'"]+)[`'"]""")
 _STREAM = re.compile(r"""stream\(\s*[`'"]([^`'"]+)[`'"]""")
 _ANY = re.compile(r"""send\(\s*method\s*,\s*`([^`]+)`""")
+_URL = re.compile(r"""=>\s*url\(\s*`([^`]+)`""")  # URL builders (outputPageUrl): plain GETs
 
 
 def _norm(path: str) -> str:
@@ -40,6 +41,7 @@ def js_routes() -> set[tuple[str, str]]:
     out = {(m, _norm(p)) for m, p in _CALL.findall(body)}
     out |= {("GET", _norm(p)) for p in _STREAM.findall(body)}
     out |= {("ANY", _norm(p)) for p in _ANY.findall(body)}
+    out |= {("GET", _norm(p)) for p in _URL.findall(body)}
     return out
 
 
@@ -49,6 +51,8 @@ def test_js_parser_sees_every_method():
     assert ("DELETE", "/api/models/{}") in routes and ("PUT", "/api/settings") in routes
     # the proxy call is `send(method, `/api/s/${enc(id)}${p}${qs(query)}`)`: any method
     assert ("ANY", "/api/s/{}{}") in routes
+    # plan 24.3: the document calls, and the page image URL builder
+    assert {("GET", "/api/outputs/{}/text"), ("GET", "/api/outputs/{}/search"), ("GET", "/api/outputs/{}/page/{}.png")} <= routes
     names = set(re.findall(r"^\s{4}(?:async\s+)?(\w+)(?::|\()", API_JS[API_JS.index("return {", API_JS.index("export function createHttpApi")):API_JS.index("export function createApi")], re.M))
     assert len(routes) >= len(names) - 2  # every method has a route (callService and subscribe included)
 
@@ -76,6 +80,7 @@ MODELS: dict[str, type[BaseModel]] = {
     "Stat": am.Stat, "ServiceSummary": am.ServiceSummary, "ServiceDetail": am.ServiceDetail, "ServiceConfig": am.ServiceConfig,
     "Operation": am.Operation, "Memory": am.SystemMemory, "MakeRoomPlan": am.MakeRoomPlan, "Model": am.Model,
     "Discovered": am.Discovered, "Totals": am.ModelTotals, "Disk": am.Disk, "Output": am.Output, "OutputPage": am.OutputPage,
+    "OutputText": am.OutputText, "OutputSearch": am.OutputSearch, "OutlineItem": am.OutlineItem, "SearchHit": am.SearchHit,
     "Activity": am.Activity, "Alert": am.Alert, "Job": am.Job, "System": am.SystemInfo, "Overview": am.Overview,
     "Settings": am.Settings, "LogLine": am.LogLine, "Metrics": am.Metrics, "SeriesInfo": am.SeriesInfo,
     "Timeline": am.Timeline, "OutputBucket": am.OutputBucket, "WidgetInfo": am.WidgetInfo, "WidgetData": am.WidgetData,

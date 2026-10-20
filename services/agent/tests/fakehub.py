@@ -39,10 +39,22 @@ TOOLS = [
       desc="Render a video job"),
     T("fake_wipe", "fake", "destructive", {"id": {"type": "string"}}, ["id"], desc="Delete an item"),
     T("fake_fail", "fake", "read", {}, desc="Always fails"),
-    T("gen3d_make_3d", "gen3d", "generate", {"prompt": {"type": "string"}}, ["prompt"], job=True, desc="Make a 3D model from text"),
+    T("gen3d_make_3d", "gen3d", "generate", {
+        "prompt": {"type": "string"}, "image": {"type": "string", "format": "aihub-file", "x-kind": "image"},
+        "engine": {"type": "string", "enum": ["cube3d", "trellis2", "hunyuan21", "sam3d_body"], "x-options": {   # plan 20.4
+            "cube3d": {"label": "Cube3D", "excludes": ["image"], "default": True, "good_for": "a mesh from text"},
+            "trellis2": {"label": "TRELLIS.2", "needs": ["image"], "default": True, "good_for": "objects"},
+            "hunyuan21": {"label": "Hunyuan3D 2.1", "needs": ["image"], "good_for": "characters"},
+            "sam3d_body": {"label": "SAM 3D Body", "needs": ["image"], "good_for": "a person's body"}}}},
+      job=True, ask=["engine"], desc="Make a 3D model from text or a picture"),
     T("tts_speak", "tts", "generate", {"text": {"type": "string"}, "name": {"type": "string"}}, ["text"], ask=["name"],
       desc="Speak text aloud"),
 ]
+
+
+def _model_view(t: dict[str, Any]) -> dict[str, Any]:
+    props = {k: {kk: vv for kk, vv in p.items() if kk != "x-options"} for k, p in t["parameters"]["properties"].items()}
+    return {**t, "parameters": {**t["parameters"], "properties": props}}
 
 
 class FakeHub:
@@ -54,6 +66,7 @@ class FakeHub:
         self.running: dict[str, dict[str, Any]] = {}
         self.outputs: dict[str, dict[str, Any]] = {}
         self.cancelled: list[str] = []
+        self.views: list[str] = []                    # the `view` each GET /api/tools asked for
         self.subs: set[asyncio.Queue[dict[str, Any]]] = set()
         self.skills = {("fake", "drawing"): {"description": "How to pick image settings", "body": "Use 16:9 for landscapes."}}
         self.app = self._app()
@@ -126,7 +139,13 @@ class FakeHub:
             return [{k: t[k] for k in ("name", "mod", "risk", "core", "summary", "available")} for t in self.tools.values()]
 
         @app.get("/api/tools")
-        def tools(names: str | None = None, q: str | None = None) -> list:
+        def tools(names: str | None = None, q: str | None = None, view: str = "full") -> list:
+            self.views.append(view)
+            if view == "model":                        # the hub writes x-options into the descriptions; here they're just dropped
+                return [_model_view(t) for t in tools_full(names, q)]
+            return tools_full(names, q)
+
+        def tools_full(names: str | None, q: str | None) -> list:
             if q is not None:
                 words = q.lower().split()
                 return [t for t in self.tools.values() if any(w in (t["name"] + t["description"]).lower() for w in words)][:8]
@@ -146,6 +165,15 @@ class FakeHub:
             t = self.tools.get(name)
             if t is None:
                 return {"status": "error", "tool": name, "error": {"code": "unknown_tool", "detail": f"no tool {name}"}}
+            filled = []
+            for k, p in t["parameters"]["properties"].items():     # x-options defaults, as the hub fills them (plan 20.1)
+                o = p.get("x-options") or {}
+                if k not in args and o:
+                    pick = next((v for v, x in o.items() if x.get("default") and all(n in args for n in x.get("needs", []))
+                                 and not any(n in args for n in x.get("excludes", []))), None)
+                    if pick:
+                        args = {**args, k: pick}
+                        filled.append(k)
             missing = [r for r in t["parameters"]["required"] if r not in args]
             if missing:
                 return {"status": "error", "tool": name, "error": {"code": "invalid_arguments", "detail": f"{missing[0]} is required",
@@ -159,7 +187,7 @@ class FakeHub:
                      "state": "pending", "created_ts": time.time(), "call_id": None, "final": None}
                 self.approvals[aid] = a
                 self.publish({"type": "approval", "approval": a})
-                return {"status": "needs_approval", "tool": name, "approval_id": aid, "arguments": args, "ask_fields": t["ask"],
+                return {**({"filled": filled} if filled else {}), "status": "needs_approval", "tool": name, "approval_id": aid, "arguments": args, "ask_fields": t["ask"],
                         "risk": risk, "schema": t["parameters"], "description": t["description"]}
             return await self._wait(self._start(name, args, mode), wait)
 

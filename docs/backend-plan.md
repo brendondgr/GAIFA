@@ -1753,7 +1753,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
     - **Verified offline.** The real catalog was built against the cached `object_info.json` (comfy stopped; the GPU was kept free during the user's TTS tests): every tool passes the hub's `spec_problems`, and `edit_image` offers `qwen21-turbo-edit-multi` as the instruction default with one reference.
     - **Still to run:** `aihub check comfy` and the kv list need comfy running, so they wait for 20.5's live check.
     - **Tests:** 128 comfy tests.
-- [ ] **20.4 The agent follows the declarations: `services/agent/agent/`.**
+- [x] **20.4 The agent follows the declarations: `services/agent/agent/`.**
   - **`prompts.py`:**
     - the gen3d line (19) becomes a pointer with no capability claims ("For 3D, the engine's options say whether it takes text or a picture; when you have only text, ask whether to use Cube3D or make a picture first");
     - the next-step offers keep "make a 3D model" with no "describe it" instruction;
@@ -1761,6 +1761,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
   - **`hubapi.py`/`tools.py`:** tools are fetched with `view=model`. `filled` fields reach the `approval` event as a new optional field (additive).
   - **The fake hub** (`tests/fakehub.py:42`) gains the image engines and `x-options`.
   *Done when:* `services/agent/tests/test_tools.py` covers the model view and the `filled` field; a test checks that the system prompt has no engine or workflow capability claims (no engine ids in `BASE`); `pytest` in `services/agent` passes.
+  - *As built:* the gen3d line became two general rules, with no engine ids. The first: a tool's choices say what each takes, so follow them, and with only text for 3D, ask once. The second: leave `preset` out for full quality, and use fast or draft only when asked. `hubapi.tools()` and `search()` send `view=model`; the parameter card still gets the full schema from `needs_approval`. The fake hub fills `x-options` defaults like the hub and serves a model view without them. 81 agent tests.
 - [ ] **20.5 Evals that check capabilities: `services/agent/evals/`.**
   - **Fixes:**
     - `engine_is` (`tasks.py:181-186`) fails cube3d with an image;

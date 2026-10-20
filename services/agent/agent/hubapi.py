@@ -51,21 +51,21 @@ class HubAPI:
         want = [n for n in names if n not in self._full or now - self._full[n][0] > 30]
         if want:
             try:
-                for t in await self._json("GET", "/api/tools", params={"names": ",".join(want)}):
+                for t in await self._json("GET", "/api/tools", params={"names": ",".join(want), "view": "model"}):
                     self._full[t["name"]] = (now, t)
             except HubCallError as e:
                 if e.code != "unknown_tool":
                     raise
                 for n in want:   # one at a time, skipping the unknown ones
                     try:
-                        for t in await self._json("GET", "/api/tools", params={"names": n}):
+                        for t in await self._json("GET", "/api/tools", params={"names": n, "view": "model"}):
                             self._full[t["name"]] = (now, t)
                     except HubCallError:
                         self._full.pop(n, None)
         return [self._full[n][1] for n in names if n in self._full]
 
     async def search(self, q: str) -> list[dict[str, Any]]:
-        return await self._json("GET", "/api/tools", params={"q": q})
+        return await self._json("GET", "/api/tools", params={"q": q, "view": "model"})
 
     async def call(self, name: str, arguments: dict[str, Any], origin: dict[str, Any], mode: str, wait: float = 20) -> dict[str, Any]:
         try:

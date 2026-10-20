@@ -406,7 +406,8 @@ class Agent:
                 self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": name,
                                             "arguments": res.get("arguments"), "ask_fields": res.get("ask_fields") or [],
                                             "schema": res.get("schema"), "risk": res.get("risk"),
-                                            "description": (res.get("description") or "")[:600]})
+                                            "description": (res.get("description") or "")[:600],
+                                            **({"filled": res["filled"]} if res.get("filled") else {})})
                 return "waiting"
             if res.get("status") != "running":
                 self._result(tid, cid, name, res)

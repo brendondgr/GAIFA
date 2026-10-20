@@ -10,7 +10,7 @@ Event types (payload fields):
     tool_result     {id, name, status, content, outputs?, call_id?, error?}
     question        {id, questions}                      (an ask_user call waiting for answers)
     answer          {id, answers}
-    approval        {id, approval_id, tool, arguments, ask_fields, schema, risk, description}
+    approval        {id, approval_id, tool, arguments, ask_fields, schema, risk, description, filled?}   (filled: the hub chose these, plan 20.4)
     decision        {id, approval_id, approve, arguments?, reason?}
     todos           {items: [{text, state}]}
     memory          {text, topic}

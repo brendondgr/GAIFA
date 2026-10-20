@@ -91,3 +91,20 @@ async def test_a_disabled_mod_cant_be_started_from_the_chat(env):
     res = env.payloads(tid, "tool_result")[0]
     assert res["status"] == "denied" and res["error"]["code"] == "disabled" and "gen3d" in res["error"]["detail"]
     assert not [a for a in env.hub.attempts if a["name"] == "hub_start_service"]
+
+
+async def test_the_model_reads_the_hubs_model_view_and_cards_carry_filled(env):
+    """plan 20.4: schemas come with ?view=model (x-options written into the descriptions); the hub's
+    filled defaults reach the approval event; the prompt makes no capability claims of its own."""
+    from agent import prompts
+
+    env.model.queue({"tool_calls": [{"name": "load_tools", "arguments": {"names": ["gen3d_make_3d"]}}]},
+                    {"tool_calls": [{"name": "gen3d_make_3d", "arguments": {"prompt": "a fox"}}]})
+    tid = await env.thread()
+    await env.send(tid, "make a 3D fox")
+    assert "model" in env.hub.views and "full" not in env.hub.views
+    fn = next(t for t in env.model.received[-1]["tools"] if t["function"]["name"] == "gen3d_make_3d")
+    assert "x-options" not in fn["function"]["parameters"]["properties"]["engine"]
+    ap = env.payloads(tid, "approval")[-1]
+    assert ap["arguments"]["engine"] == "cube3d" and ap["filled"] == ["engine"]
+    assert not any(e in prompts.BASE for e in ("cube3d", "trellis2", "hunyuan21", "sam3d", "text only", "text-only"))

@@ -224,6 +224,7 @@ class ToolSpec(_Strict):
     description: str = ""
     confirm: bool = False         # the same as risk = "destructive"
     risk: Risk | None = None      # default: read for GET, destructive for DELETE or confirm, else write (plan 13.1)
+    grant_key: str | None = None  # plan 25.2: what one "allow" covers ("url:host", "arg:<name>", "const:<word>")
     ask: list[str] = []           # inputs the user chooses: editable on the parameter card
     examples: list[dict[str, Any]] = []
     core: bool = False            # always loaded in the chat (plan 14.6)

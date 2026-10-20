@@ -46,7 +46,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
-| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199. | clients such as video-maker keep working |
+| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102. | clients such as video-maker keep working |
 
 ## 3. Directory layout
 
@@ -540,6 +540,7 @@ fade_days = 60           # inferred preferences unused this long fade out; state
 | `opencode` | DashLLM's `opencode.service` | 4096 | — | — | none: a manifest-only mod |
 | `lcpp` | `~/Models/LLMs` | 7710 | `models/*` → `data/models/llm/` | — (its JSON state stays in `services/lcpp/data/`) | `LCPP_MODELS_DIR`, catalog paths relative to it, downloads register in the hub, memory acquire, status route, `pidfd_open` fallback |
 | `comfy` | `~/Models/ComfyUI*` + `~/.local/bin/comfyui` | 5070 (ComfyUI 8199) | `~/Models/ComfyUI/models/*` → `data/models/comfyui/` | — | new adapter mod (§11) |
+| `web` | new (plan Phase 26); searches through the SearXNG on 8080 that runs outside AIHub (`SEARXNG_URL`) | 5102 | — | — | new mod: `POST /v1/search`, `POST /v1/fetch` (pages → markdown `text` outputs, PDFs → `document` outputs, with sidecars); fetches only public http(s) addresses, checked after DNS and on every redirect, 10 MB / 20 s, `robots.txt`; tools `web_search` and `web_fetch` (risk `network`) |
 
 **Moves are instant:** every source path and AIHub are on the same btrfs subvolume (`/home`), so `mv` is a rename, not a copy. Old paths keep a symlink until everything that uses them has been updated.
 

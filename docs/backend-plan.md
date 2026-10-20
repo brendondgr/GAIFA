@@ -2457,7 +2457,7 @@ Today a call is decided by `deny` → thread mode → `ask` → `allow` lists �
 
 ## Phase 26 — New `web` mod: search and read the web
 
-- [ ] **26.1 The mod: `services/web/` (port 5102).**
+- [x] **26.1 The mod: `services/web/` (port 5102).**
   - `aihub new web`, a small Python server (httpx; `trafilatura` or `readability-lxml` + `markdownify` for page → markdown; pick one and say why in the README). `SEARXNG_URL` in `.env.example`; health returns 200 when the server is up and `status` says whether SearXNG answers.
   - Routes: `POST /v1/search {query, categories?, time_range?, language?, limit≤20}` → results `{title, url, snippet, engine, published?}`; `POST /v1/fetch {url, max_chars?}` → the page as markdown, saved as a `text` output (`outputs/web/<date>/<HHMMSS>-<host>-<slug>.md`, sidecar with the URL, title and fetch time), returning the output and its first `max_chars`. PDFs at a URL are saved as `document` outputs, so Phase 24's tools read them.
   - Fetch rules: http/https only; no loopback, private, link-local or `.local` addresses (checked after DNS, and on every redirect); 10 MB and 20 s caps; a plain user agent naming AIHub; `robots.txt` honoured.
@@ -2468,6 +2468,7 @@ Today a call is decided by `deny` → thread mode → `ask` → `allow` lists �
   - `search` (risk `network`, `grant_key = "const:search"` so one "allow in this chat" covers searching) and `fetch` (risk `network`, `grant_key = "url:host"`). Fetched text reaches the model as untrusted (Phase 24.5's wrapping, applied by the agent to every `web_*` result).
   - A skill `services/web/skills/researching/SKILL.md`: search, open the 2–4 best results, cite each claim with its output ref and URL, say when sources disagree.
   *Done when:* the tools appear in `/api/tools` with their risks; an agent eval task (with a fake web mod) answers a question from two fetched pages and cites both.
+  *Built (2026-10-20):* the two `[tools]` entries and the skill; `utils/manifest.py` and `utils/tools/api.py` accept `network`, `execute` and `grant_key` ahead of Phase 25 (until 25.1, `network` asks like `write`; `grant_key` is recorded, not used); `aihub check web` lists both tools and `/api/tools` shows them with risk `network`. **Left:** the eval task with a fake web mod.
 
 **Wire — Phase 26:** the web mod's card on the Overview (SearXNG up or not); its outputs on the Outputs page under "web".
 

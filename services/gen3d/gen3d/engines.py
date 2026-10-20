@@ -26,28 +26,29 @@ class Engine:
     venv: str = ""                      # under runtime/
     packs: tuple[str, ...] = field(default_factory=tuple)
     memory_gb: float = 0.0              # a local engine asks the hub for this before it loads (lab peak + margin)
+    speed: str = ""                     # for the agent and the card (x-options, plan 20.2)
 
 
 ENGINES: dict[str, Engine] = {e.id: e for e in (
     Engine("cube3d", "Cube3D", "text", "Text to mesh, then optional named parts and a game rig", "Cube3D Research-Only RAIL-MS",
-           local=True, worker="cube"),
+           local=True, worker="cube", speed="about 1–1.5 min"),
     Engine("hunyuan21", "Hunyuan3D 2.1", "image", "Characters: the cleanest, watertight surface",
            "Tencent Hunyuan 3D 2.1 Community Licence (excludes the EU, UK and South Korea)", local=True, worker="img3d",
            weights=("Hunyuan3D-2.1/hunyuan3d-dit-v2-1/model.fp16.ckpt", "Hunyuan3D-2.1/hunyuan3d-vae-v2-1/model.fp16.ckpt"),
-           code=("hunyuan3d-2.1/hy3dshape/hy3dshape",), venv="img3d", memory_gb=14),
+           code=("hunyuan3d-2.1/hy3dshape/hy3dshape",), venv="img3d", memory_gb=14, speed="about 1.5 min"),
     Engine("trellis2", "TRELLIS.2", "image", "Objects: the most faithful detail", "MIT",
            local=False, weights=("diffusion_models/trellis_2_bf16.safetensors", "vae/trellis_2_shape_vae_bf16.safetensors",
                                  "clip_vision/dino_v3_vit_l.safetensors"),
-           packs=("trellis2-shape", "trellis2-lowpoly", "trellis2-draft")),
+           packs=("trellis2-shape", "trellis2-lowpoly", "trellis2-draft"), speed="1.5–4 min; round objects take longer"),
     Engine("sam3d_objects", "SAM 3D Objects", "image", "Quickest full shape; rougher surface", "SAM Licence",
            local=True, worker="sam3do",
            weights=("sam-3d-objects/checkpoints/pipeline.yaml", "sam-3d-objects/checkpoints/ss_generator.ckpt",
                     "sam-3d-objects/checkpoints/slat_generator.ckpt", "sam-3d-objects/checkpoints/slat_decoder_mesh.ckpt",
                     "moge-vitl/model.pt"),
-           code=("sam3d-objects/sam3d_objects", "sam3do/dinov2/dinov2"), venv="sam3do", memory_gb=22),
+           code=("sam3d-objects/sam3d_objects", "sam3do/dinov2/dinov2"), venv="sam3do", memory_gb=22, speed="about 1 min"),
     Engine("sam3d_body", "SAM 3D Body", "image", "A person's body (no clothes) as a rigged mesh",
            "SAM Licence", local=False,
-           weights=("detection/sam_3d_body_dinov3_bf16.safetensors",), packs=("sam3d-body",)),
+           weights=("detection/sam_3d_body_dinov3_bf16.safetensors",), packs=("sam3d-body",), speed="about 10 s"),
 )}
 IMAGE_ENGINES = tuple(k for k, e in ENGINES.items() if e.input == "image")
 SHIMS = ROOT / "workers" / "shims"

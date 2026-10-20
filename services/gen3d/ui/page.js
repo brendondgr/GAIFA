@@ -157,7 +157,7 @@ function createTab(el, ctx, cleanups) {
   const faceRow = h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;margin-top:8px' }, field('Shape faces', fShape), field('Parts faces (all together)', fParts), field('Rigged asset faces', fRig), field('Seed', seed));
   function renderEngine() {
     const e = opts?.engines?.find(x => x.id === st.engine);
-    const isImage = st.engine !== 'cube3d';
+    const isImage = e ? e.input === 'image' : st.engine !== 'cube3d';   // what the engine takes, from /v1/options (plan 20.2)
     cubeOnly.style.display = isImage ? 'none' : 'flex';
     imgBox.style.display = isImage ? 'block' : 'none';
     for (const i of [fShape, seed]) i.parentElement.style.display = isImage ? 'none' : '';
@@ -198,6 +198,11 @@ function createTab(el, ctx, cleanups) {
 
   ctx.call('GET', '/v1/options').then(r => {
     opts = r.json; templates = opts.part_templates || {};
+    if (opts.engines?.length) {                              // the engine list as gen3d declares it: what each takes and is good for
+      engine.replaceChildren(...opts.engines.map(x => h('option', { value: x.id }, `${x.label}: ${x.input === 'image' ? 'picture' : 'text'} → mesh (${x.help})`)));
+      engine.value = opts.engines.some(x => x.id === st.engine) ? st.engine : opts.engines[0].id;
+      st.engine = engine.value;
+    }
     template.replaceChildren(...Object.keys(templates).map(k => h('option', { value: k }, k)), h('option', { value: '' }, 'Custom'));
     template.value = templates[st.template] ? st.template : '';
     if (!parts.value && templates[st.template]) parts.value = templates[st.template].join(', ');

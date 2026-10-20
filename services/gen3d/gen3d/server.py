@@ -12,6 +12,7 @@ import zipfile
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,7 +23,7 @@ from .config import settings
 from .engines import ENGINES
 from .events import Broadcaster
 from .images import MAX_BYTES as MAX_IMAGE, ImageError, fetch_output, output_title, prepare as prepare_image
-from .options import PRESETS, JobRequest, catalogue, parse_request
+from .options import PRESETS, JobRequest, Refusal, catalogue, parse_request
 from .queue import Runner
 from .store import TERMINAL, Store, job_folder, new_id
 
@@ -83,9 +84,23 @@ async def _revalidate_ui(request, call_next):
     return response
 
 
+def _invalid(errors: list[dict]) -> JSONResponse:
+    """422 with each error, plus the `fix` of a Refusal (options.py), which the hub passes to the agent."""
+    fixes = [e["ctx"]["error"].fix for e in errors if isinstance((e.get("ctx") or {}).get("error"), Refusal)]
+    body: dict = {"detail": [{"loc": list(e["loc"]), "msg": str(e["msg"]).removeprefix("Value error, ")} for e in errors]}
+    if fixes:
+        body["fix"] = "; ".join(fixes)
+    return JSONResponse(body, status_code=422)
+
+
 @app.exception_handler(ValidationError)
 async def _validation(_, exc: ValidationError):
-    return JSONResponse({"detail": [{"loc": e["loc"], "msg": e["msg"]} for e in exc.errors()]}, status_code=422)
+    return _invalid(exc.errors())
+
+
+@app.exception_handler(RequestValidationError)
+async def _request_validation(_, exc: RequestValidationError):
+    return _invalid(list(exc.errors()))
 
 
 def _store(request: Request) -> Store:

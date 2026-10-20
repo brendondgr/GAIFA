@@ -113,3 +113,11 @@ def test_estimate_and_chats_crud(c):
     wait(c, c.post("/v1/jobs", json={"prompt": "x", "stages": ["shape"], "chat_id": chat["id"]}).json()["id"])
     d = c.delete(f"/v1/chats/{chat['id']}").json()
     assert len(d["jobs"]) == 1 and c.get(f"/v1/chats/{chat['id']}").status_code == 404
+
+
+def test_a_refusal_carries_its_fix(c):
+    """plan 20.2: the hub passes a 422's `fix` to the agent, so a wrong engine says what to use."""
+    r = c.post("/v1/jobs", json={"engine": "cube3d", "prompt": "a fox", "image": "output:abcdef012345"})
+    assert r.status_code == 422
+    body = r.json()
+    assert "can't use a picture" in body["detail"][0]["msg"] and "trellis2" in body["fix"]

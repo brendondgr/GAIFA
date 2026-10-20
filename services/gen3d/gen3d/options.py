@@ -82,17 +82,51 @@ IMAGE_REF = re.compile(r"^(output:[A-Za-z0-9_.:-]{1,120}|upload)$")
 BARE_OUTPUT = re.compile(r"^[0-9a-f]{12}$")              # the hub's output ids
 
 
+class Refusal(ValueError):
+    """A request that can't run as asked, with what to do instead (sent as the 422's `fix`)."""
+
+    def __init__(self, detail: str, fix: str) -> None:
+        super().__init__(detail)
+        self.fix = fix
+
+
+PresetId = Literal["lowpoly", "fast", "balanced", "quality", "base", "draft"]
+PRESET_LABELS = {"lowpoly": "Low-poly", "fast": "Fast", "balanced": "Balanced", "quality": "Quality", "base": "Base", "draft": "Draft"}
+
+
+def engine_options(schema: dict) -> None:
+    """`x-options` for `engine` (plan 20.2): which engines take text and which a picture, the default
+    for each, and their presets. Built from ENGINES when the schema is made."""
+    opts = {}
+    for eid, e in ENGINES.items():
+        o: dict = {"label": e.label, "good_for": e.help, "speed": e.speed,
+                   "allows": {"preset": list(PRESETS) if e.input == "text" else list(IMAGE_PRESETS[eid])}}
+        if e.input == "text":
+            o.update(excludes=["image"], default=True)
+        else:
+            o["needs"] = ["image"]
+            if eid == DEFAULT_IMAGE_ENGINE:
+                o["default"] = True
+        opts[eid] = o
+    schema["x-options"] = opts
+
+
+def preset_options(schema: dict) -> None:
+    schema["x-depends-on"] = "engine"
+    schema["x-options"] = {k: {"label": v} for k, v in PRESET_LABELS.items()}
+
+
 class JobRequest(BaseModel):
     prompt: str = Field("", max_length=1000, description="what to make (Cube3D's shape stage)")
-    engine: EngineId = Field("cube3d", description="what makes the mesh. cube3d: from `prompt`. With `image`, pick by what the "
-                                                   "picture shows: hunyuan21 for a character or creature, trellis2 for an object "
-                                                   "(the default with a picture), sam3d_objects for the quickest result, sam3d_body "
-                                                   "for a person's body as a rigged mesh")
+    engine: EngineId | None = Field(None, description="what makes the mesh: Cube3D from `prompt`, or an image engine from `image` "
+                                                      "(pick by what the picture shows). Left out: cube3d, or trellis2 with a picture",
+                                    json_schema_extra=engine_options)
     image: str | None = Field(None, description="the picture for an image engine: output:<id> of an image (an AIHub output)",
                               json_schema_extra={"format": "aihub-file", "x-kind": "image"})
     stages: list[Stage] = Field(default_factory=lambda: ["shape", "preview"])
-    preset: str | None = Field(None, description="applied under explicit options: Cube3D lowpoly | fast | balanced | quality; "
-                                                 "image engines fast (their default) | base, TRELLIS.2 also draft")
+    preset: PresetId | None = Field(None, description="applied under explicit options; each engine has its own presets "
+                                                      "(image engines use fast unless you pass base)",
+                                    json_schema_extra=preset_options)
     shape: ShapeOptions = Field(default_factory=ShapeOptions)
     hunyuan21: Hunyuan21Options = Field(default_factory=Hunyuan21Options)
     trellis2: Trellis2Options = Field(default_factory=Trellis2Options)
@@ -117,8 +151,8 @@ class JobRequest(BaseModel):
         """A picture without an engine: TRELLIS.2, the most faithful general one (lab, 2026-10-10)."""
         if isinstance(raw, dict) and isinstance(raw.get("image"), str) and BARE_OUTPUT.match(raw["image"]):
             raw = {**raw, "image": f"output:{raw['image']}"}          # an output id without its prefix
-        if isinstance(raw, dict) and raw.get("image") and not raw.get("engine"):
-            raw = {**raw, "engine": DEFAULT_IMAGE_ENGINE}
+        if isinstance(raw, dict) and not raw.get("engine"):
+            raw = {**raw, "engine": DEFAULT_IMAGE_ENGINE if raw.get("image") else "cube3d"}
         return raw
 
     @field_validator("image")
@@ -130,13 +164,20 @@ class JobRequest(BaseModel):
 
     @model_validator(mode="after")
     def _consistent(self):
-        names = PRESETS if self.engine == "cube3d" else IMAGE_PRESETS[self.engine]
+        engine = self.engine = self.engine or "cube3d"
+        names = PRESETS if engine == "cube3d" else IMAGE_PRESETS[engine]
         if self.preset is not None and self.preset not in names:
-            raise ValueError(f"{self.engine} has no preset {self.preset!r} (it has: {', '.join(names)})")
-        if "shape" in self.stages and self.engine == "cube3d" and not self.prompt.strip():
-            raise ValueError("the shape stage needs a prompt")
-        if "shape" in self.stages and self.engine != "cube3d" and not self.image:
-            raise ValueError(f"{ENGINES[self.engine].label} makes the mesh from a picture: give `image`")
+            raise Refusal(f"{engine} has no preset {self.preset!r}", f"use one of: {', '.join(names)}")
+        if engine == "cube3d" and self.image:
+            raise Refusal("Cube3D makes a mesh from text and can't use a picture",
+                          "for a picture use an image engine: " + "; ".join(f"{k} ({ENGINES[k].help})" for k in IMAGE_ENGINES)
+                          + "; or leave out `image` to make it from the prompt")
+        if "shape" in self.stages and engine == "cube3d" and not self.prompt.strip():
+            raise Refusal("the shape stage needs a prompt", "add `prompt`: what to make")
+        if "shape" in self.stages and engine != "cube3d" and not self.image:
+            raise Refusal(f"{ENGINES[engine].label} makes the mesh from a picture: give `image`",
+                          "pass `image` (output:<id> of a picture); with only text, use cube3d, or make a picture first with "
+                          "comfy_generate_image (one object on a plain background) and pass it as `image`")
         if "parts" in self.stages and not self.parts.parts:
             raise ValueError("the parts stage needs at least one part name")
         return self

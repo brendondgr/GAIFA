@@ -67,8 +67,9 @@ hide = ["GET /", "GET /ui/*", "GET /v1/hub/*"]
 
 [tools]
 make_3d = { op = "POST /v1/jobs", risk = "generate", ask = ["engine", "preset", "stages"], hide = ["chat_id"], job = true, job_status = "GET /v1/jobs/{jid}", job_cancel = "POST /v1/jobs/{jid}/cancel", description = """Make an untextured 3D model (GLB), from text or from a picture.
-- From text: engine cube3d (the default) with `prompt`; optional named parts and a game rig. Presets: fast (~1 min), balanced, quality, lowpoly.
-- From a picture: pass `image` (output:<id> of an image) and always `engine`, chosen by what the picture shows: hunyuan21 for characters, cleanest surface (~1.5 min); trellis2 for detailed objects, most faithful (1.5–4 min; round objects take longer); sam3d_objects quickest (~1 min), rougher; sam3d_body for a person's body (no clothes) as a rigged mesh (~10 s). One object or person on a plain or transparent background works best: run remove_background first on a photo of a scene. Image engines use their fast preset unless you pass preset "base" (slower stock settings); trellis2 also has "draft" (~30–60 s, softer).
+- `engine` says which engines take text and which need a picture: Cube3D makes a mesh from `prompt` (named parts and a game rig optional); the image engines make it from `image` (output:<id> of a picture), chosen by what the picture shows. Left out: cube3d, or trellis2 with a picture.
+- With only text, either use Cube3D or make a picture first (comfy_generate_image: one object on a plain background) and pass it as `image`. A photo of a scene: run remove_background first.
+- `preset` depends on the engine (image engines use fast unless you pass base).
 - Fewer polygons: set target_faces in the engine's group, e.g. {"trellis2": {"target_faces": 50000}} (0 keeps the raw mesh, which can be millions of faces).
 Stages: shape (the mesh), then optional parts, rig, preview. `parent_id` continues from an earlier job's mesh.""", examples = [{ prompt = "a low-poly red fox sitting", stages = ["shape", "preview"], preset = "fast" }, { engine = "trellis2", image = "output:<id of a picture>", stages = ["shape", "preview"] }] }
 job_status = { op = "GET /v1/jobs/{jid}", description = "One job's state, stages, ETA and files" }

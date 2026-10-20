@@ -1697,7 +1697,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
   - `test_mcp.py` covers the filtered form;
   - the contract test passes with the brief updated.
   - *As built:* dependent values are `allows: {<param>: [...]}` on the parent's option (generic, not `presets`). `options.choices()` is what the MCP form and the card filter with; `spec_problems()` is the `tools` check in `aihub check` (also reporting each tool's catalog problems). The hub fills a default after `coerce` and before `validate`, so a filled value is validated too. `ToolError` moved to `modcall.py` with an optional `problems`. The model view is also what `ToolDef.function()` sends to MCP clients. Tests: 11 in `test_options.py` (the `fake-tools` mod gained `shape`, `sketch` and `strict`).
-- [ ] **20.2 gen3d declares its engines: `services/gen3d/gen3d/`.**
+- [x] **20.2 gen3d declares its engines: `services/gen3d/gen3d/`.**
   - **`engines.py`:** `Engine` gains `good_for` (one phrase); its presets (from `image_options.IMAGE_PRESETS` or Cube3D's `PRESETS`) become `allows: {preset: […]}`. `input` stays the source for `needs`/`excludes`.
   - **`options.py`:**
     - `engine` loses its `cube3d` default and gets `x-options` built from `ENGINES`: cube3d defaults without an image, trellis2 with one.
@@ -1711,6 +1711,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
     - no `image_2`;
     - no claims the schema already makes.
   *Done when:* `services/gen3d/tests/test_options.py` covers the `x-options` per engine, both defaults, both refusals with their fix, and the presets per engine; `test_api.py` covers a refused cube3d plus image (422 with `fix`); `aihub check gen3d` passes; the page still runs each engine.
+  - *As built:* the `x-options` are built from `ENGINES` when the schema is made (`json_schema_extra` callables `engine_options`, `preset_options`); `Engine` gained `speed`, and `help` is the `good_for`. Cube3D only `excludes` `image` (no `needs: prompt`), so a follow-up job with `parent_id` and no prompt still fits. `preset` is now an enum (the union) with `x-depends-on: engine`. A request without an engine becomes cube3d or trellis2 in the before-validator. Refusals are `options.Refusal(detail, fix)`; gen3d's 422 handlers (also for FastAPI's body validation) add `fix`. The page relabels its engine picker from `/v1/options` and decides text versus picture from each engine's `input`. 73 gen3d tests; `aihub check gen3d` passes.
 - [ ] **20.3 comfy packs declare theirs: `services/comfy/comfy/`.**
   - **`workflow.toml`** (`packs.py`, `extra="forbid"`) gains:
     - **`edit`**, the edit style, required for `image-edit` packs: one of `instruction`, `restyle`, `inpaint`, `refine`. Remove-background stays its own task.

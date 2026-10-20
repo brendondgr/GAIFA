@@ -97,3 +97,50 @@ def test_a_picture_without_an_engine_uses_trellis2():
     r = parse_request({"image": "output:o"})
     assert r.engine == "trellis2" and r.preset == "fast"
     assert parse_request({"engine": "hunyuan21", "image": "15c9f40a9a36"}).image == "output:15c9f40a9a36"   # a bare output id
+
+
+# ---- capabilities in the schema (plan 20.2) --------------------------------------------------
+
+def _x_options():
+    from gen3d.options import JobRequest
+    props = JobRequest.model_json_schema()["properties"]
+    return props["engine"]["x-options"], props["preset"]
+
+
+def test_engine_options_say_what_each_engine_takes():
+    from gen3d.engines import ENGINES, IMAGE_ENGINES
+    from gen3d.image_options import IMAGE_PRESETS
+    from gen3d.options import PRESETS
+    o, preset = _x_options()
+    assert set(o) == set(ENGINES)
+    assert o["cube3d"]["excludes"] == ["image"] and o["cube3d"]["default"] and "needs" not in o["cube3d"]
+    assert o["cube3d"]["allows"]["preset"] == list(PRESETS)
+    for eid in IMAGE_ENGINES:
+        assert o[eid]["needs"] == ["image"] and o[eid]["allows"]["preset"] == list(IMAGE_PRESETS[eid]) and o[eid]["label"]
+    assert [k for k, v in o.items() if v.get("default")] == ["cube3d", "trellis2"]     # one per input combination
+    assert preset["x-depends-on"] == "engine" and set(preset["anyOf"][0]["enum"]) >= {"fast", "base", "draft", "balanced"}
+
+
+def test_cube3d_with_a_picture_is_refused_with_the_image_engines():
+    from gen3d.options import Refusal
+    with pytest.raises(ValidationError) as e:
+        parse_request({"engine": "cube3d", "prompt": "a fox", "image": "output:abc"})
+    err = e.value.errors()[0]["ctx"]["error"]
+    assert isinstance(err, Refusal) and "can't use a picture" in str(err) and "trellis2" in err.fix and "hunyuan21" in err.fix
+
+
+def test_an_image_engine_without_a_picture_says_to_make_one_first():
+    with pytest.raises(ValidationError) as e:
+        parse_request({"engine": "trellis2", "prompt": "a fox"})
+    err = e.value.errors()[0]["ctx"]["error"]
+    assert "give `image`" in str(err) and "comfy_generate_image" in err.fix and "cube3d" in err.fix
+
+
+def test_a_wrong_preset_names_the_engines_presets():
+    with pytest.raises(ValidationError) as e:
+        parse_request({"engine": "hunyuan21", "image": "output:abc", "preset": "draft"})
+    assert e.value.errors()[0]["ctx"]["error"].fix == "use one of: fast, base"
+
+
+def test_no_engine_is_cube3d_without_a_picture():
+    assert parse_request({"prompt": "a fox"}).engine == "cube3d"

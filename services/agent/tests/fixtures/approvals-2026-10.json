@@ -1,0 +1,1032 @@
+[
+ {
+  "id": "ap_42a89d6628ab",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_6e7c0231"
+  }
+ },
+ {
+  "id": "ap_e17b80e7737c",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_8b077db3"
+  }
+ },
+ {
+  "id": "ap_984ec2e11380",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_8b077db3"
+  }
+ },
+ {
+  "id": "ap_44f35c0dace9",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "aspect": "16:9 (Widescreen)"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_fc6d0e57"
+  }
+ },
+ {
+  "id": "ap_4b7307ad4929",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "aspect": "16:9 (Widescreen)"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_e2bbad09"
+  }
+ },
+ {
+  "id": "ap_fd2bb0696eda",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_47ad2fb7"
+  }
+ },
+ {
+  "id": "ap_92affd1bd2ec",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "aspect": "1:1",
+   "workflow": "zimage-turbo"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_afeef3a7"
+  }
+ },
+ {
+  "id": "ap_a2abf892591b",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "stages"
+  ],
+  "final": {
+   "preset": "fast",
+   "stages": [
+    "shape",
+    "preview"
+   ]
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_afeef3a7"
+  }
+ },
+ {
+  "id": "ap_39a3db1222d3",
+  "tool": "hub_unload_service",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_afeef3a7"
+  }
+ },
+ {
+  "id": "ap_a19acfa80487",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "stages"
+  ],
+  "final": {
+   "preset": "fast",
+   "stages": [
+    "shape",
+    "preview"
+   ]
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_afeef3a7"
+  }
+ },
+ {
+  "id": "ap_0366ae40d06f",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "aspect": "16:9"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_2b12ba01"
+  }
+ },
+ {
+  "id": "ap_77e5909d6843",
+  "tool": "comfy_animate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_2b12ba01"
+  }
+ },
+ {
+  "id": "ap_6b4e4c93c46f",
+  "tool": "comfy_animate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_2b12ba01"
+  }
+ },
+ {
+  "id": "ap_7aeded102caf",
+  "tool": "hub_unload_service",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_2b12ba01"
+  }
+ },
+ {
+  "id": "ap_0d9d4f74a243",
+  "tool": "comfy_animate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_2b12ba01"
+  }
+ },
+ {
+  "id": "ap_e572ec400f2a",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_3e5e9af1"
+  }
+ },
+ {
+  "id": "ap_2ab05d2a021f",
+  "tool": "tts_speak",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_3e5e9af1"
+  }
+ },
+ {
+  "id": "ap_57a61d23fba7",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_c78efa84"
+  }
+ },
+ {
+  "id": "ap_346514f5c4c2",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_c78efa84"
+  }
+ },
+ {
+  "id": "ap_67ef8ab024de",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_c78efa84"
+  }
+ },
+ {
+  "id": "ap_bc92ed7d38ad",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_77d24064"
+  }
+ },
+ {
+  "id": "ap_0486d315e5a1",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_77d24064"
+  }
+ },
+ {
+  "id": "ap_67b43ab474ba",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_b9bb6af2"
+  }
+ },
+ {
+  "id": "ap_624c36fe3af2",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_b9bb6af2"
+  }
+ },
+ {
+  "id": "ap_9f11f1acdf2c",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "stages"
+  ],
+  "final": {
+   "preset": "fast",
+   "stages": [
+    "shape",
+    "preview"
+   ]
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_9825a652"
+  }
+ },
+ {
+  "id": "ap_7ef1321fc579",
+  "tool": "hub_unload_service",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_9825a652"
+  }
+ },
+ {
+  "id": "ap_8ff05c4991d7",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "stages"
+  ],
+  "final": {
+   "preset": "fast",
+   "stages": [
+    "shape",
+    "preview"
+   ]
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_9825a652"
+  }
+ },
+ {
+  "id": "ap_801ac1fa39d6",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_7d61d723"
+  }
+ },
+ {
+  "id": "ap_09623d69ab91",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_7d61d723"
+  }
+ },
+ {
+  "id": "ap_590362ddb2a5",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_14b1d22c"
+  }
+ },
+ {
+  "id": "ap_979788a1d939",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_b39dea77"
+  }
+ },
+ {
+  "id": "ap_10880f91fa3d",
+  "tool": "hub_unload_service",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_b39dea77"
+  }
+ },
+ {
+  "id": "ap_4a2b5ee4c42c",
+  "tool": "hub_stop_service",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_b39dea77"
+  }
+ },
+ {
+  "id": "ap_2e31adbe4af3",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_b39dea77"
+  }
+ },
+ {
+  "id": "ap_40e1becf3057",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_4148727a"
+  }
+ },
+ {
+  "id": "ap_fa37623cc692",
+  "tool": "hub_unload_service",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_4148727a"
+  }
+ },
+ {
+  "id": "ap_5ed5502aae7b",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_fbb77098"
+  }
+ },
+ {
+  "id": "ap_25ce41cc7187",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "stages"
+  ],
+  "final": {
+   "preset": "fast",
+   "stages": [
+    "shape",
+    "preview"
+   ]
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_6b88f6a7"
+  }
+ },
+ {
+  "id": "ap_eeab73bae96b",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_a1c4840c"
+  }
+ },
+ {
+  "id": "ap_9b775c536187",
+  "tool": "hub_unload_service",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_a1c4840c"
+  }
+ },
+ {
+  "id": "ap_a955fbf5010e",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "aspect": "16:9"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_a1c4840c"
+  }
+ },
+ {
+  "id": "ap_c59a571a0f19",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_a1c4840c"
+  }
+ },
+ {
+  "id": "ap_b4d83562ab0b",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_f43cf642"
+  }
+ },
+ {
+  "id": "ap_071790fa41d8",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "stages"
+  ],
+  "final": {
+   "preset": "fast",
+   "stages": [
+    "shape",
+    "preview"
+   ]
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_341edb58"
+  }
+ },
+ {
+  "id": "ap_1e476500415d",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_1228bc6b"
+  }
+ },
+ {
+  "id": "ap_c3436bfb5c01",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_1228bc6b"
+  }
+ },
+ {
+  "id": "ap_d33d39e44321",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_aad95468"
+  }
+ },
+ {
+  "id": "ap_2d7a3706013d",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "stages"
+  ],
+  "final": {
+   "preset": "fast",
+   "stages": [
+    "shape",
+    "preview"
+   ]
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_fa2fce59"
+  }
+ },
+ {
+  "id": "ap_ee1b869174e6",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_2158920a"
+  }
+ },
+ {
+  "id": "ap_50b632a2821b",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_7b509a28"
+  }
+ },
+ {
+  "id": "ap_a9de2315dba0",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_f0f03022"
+  }
+ },
+ {
+  "id": "ap_5f2b8e64be5d",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_c8488f64"
+  }
+ },
+ {
+  "id": "ap_09a6c9ee572c",
+  "tool": "tts_speak",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_c8488f64"
+  }
+ },
+ {
+  "id": "ap_76a80972a69a",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "aspect": "16:9"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_38bcf013"
+  }
+ },
+ {
+  "id": "ap_a61d549543d8",
+  "tool": "comfy_animate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_38bcf013"
+  }
+ },
+ {
+  "id": "ap_0282f52910de",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_ea5cf627"
+  }
+ },
+ {
+  "id": "ap_d6758dcb27a5",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_ea5cf627"
+  }
+ },
+ {
+  "id": "ap_3ec7d70df25e",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_b89147fb"
+  }
+ },
+ {
+  "id": "ap_8a3d32479b97",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_b89147fb"
+  }
+ },
+ {
+  "id": "ap_064768b70c6d",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_9855585d"
+  }
+ },
+ {
+  "id": "ap_80a9b290a72a",
+  "tool": "tts_speak",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "engine": "breeze"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_49af0c58"
+  }
+ },
+ {
+  "id": "ap_ab46f14b6321",
+  "tool": "tts_speak",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "engine": "breeze"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_49af0c58"
+  }
+ },
+ {
+  "id": "ap_5246e5094be8",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "workflow": "qwen21-turbo-edit-multi",
+   "preset": "fast"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_5b88cebf"
+  }
+ },
+ {
+  "id": "ap_710af98e8ad3",
+  "tool": "comfy_remove_background",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_7acbfe31"
+  }
+ },
+ {
+  "id": "ap_6b9949366ad3",
+  "tool": "comfy_remove_background",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_1c79bbe6"
+  }
+ },
+ {
+  "id": "ap_3f26db7edb40",
+  "tool": "comfy_remove_background",
+  "state": "approved",
+  "edited": [],
+  "final": {},
+  "origin": {
+   "service": "agent",
+   "thread": "t_01daf13e"
+  }
+ },
+ {
+  "id": "ap_d82e2a666b0d",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [
+   "workflow"
+  ],
+  "final": {
+   "workflow": "qwen21-turbo-edit-multi",
+   "preset": "fast"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_c12159b3"
+  }
+ },
+ {
+  "id": "ap_6f5bd4704f85",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "workflow"
+  ],
+  "final": {
+   "workflow": "qwen21-turbo-edit-multi",
+   "preset": "draft"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_c12159b3"
+  }
+ },
+ {
+  "id": "ap_aeb216e60c3d",
+  "tool": "comfy_edit_image",
+  "state": "approved",
+  "edited": [
+   "preset",
+   "workflow"
+  ],
+  "final": {
+   "workflow": "qwen21-turbo-edit-multi",
+   "preset": "fast"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_c12159b3"
+  }
+ },
+ {
+  "id": "ap_add80d4c4943",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "preset"
+  ],
+  "final": {
+   "preset": "balanced"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_c12159b3"
+  }
+ },
+ {
+  "id": "ap_79d49e4a53e0",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [
+   "megapixels",
+   "workflow"
+  ],
+  "final": {
+   "workflow": "qwen21-turbo-t2i",
+   "preset": "fast",
+   "aspect": "1:1",
+   "megapixels": 0.5
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_3a6df03d"
+  }
+ },
+ {
+  "id": "ap_b3856f8d755d",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [
+   "megapixels",
+   "workflow"
+  ],
+  "final": {
+   "workflow": "qwen21-turbo-t2i",
+   "preset": "fast",
+   "aspect": "1:1",
+   "megapixels": 0.5
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_3a6df03d"
+  }
+ },
+ {
+  "id": "ap_80e31211205e",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [
+   "megapixels",
+   "workflow"
+  ],
+  "final": {
+   "workflow": "qwen21-turbo-t2i",
+   "preset": "fast",
+   "aspect": "1:1",
+   "megapixels": 0.5
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_3a6df03d"
+  }
+ },
+ {
+  "id": "ap_b145af98bdc2",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [
+   "megapixels",
+   "workflow"
+  ],
+  "final": {
+   "workflow": "qwen21-turbo-t2i",
+   "preset": "fast",
+   "aspect": "1:1",
+   "megapixels": 0.5
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_3a6df03d"
+  }
+ },
+ {
+  "id": "ap_5f0aa8b47aaa",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [
+   "megapixels",
+   "workflow"
+  ],
+  "final": {
+   "workflow": "qwen21-turbo-t2i",
+   "preset": "fast",
+   "aspect": "1:1",
+   "megapixels": 0.5
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_3a6df03d"
+  }
+ },
+ {
+  "id": "ap_b0eb899d3367",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "engine"
+  ],
+  "final": {
+   "engine": "hunyuan21",
+   "preset": "fast"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_3a6df03d"
+  }
+ },
+ {
+  "id": "ap_4ccfae3d83f0",
+  "tool": "comfy_generate_image",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "aspect": "16:9"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_89c9cef9"
+  }
+ },
+ {
+  "id": "ap_67a8acc40411",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [
+   "engine"
+  ],
+  "final": {
+   "engine": "trellis2"
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_89c9cef9"
+  }
+ },
+ {
+  "id": "ap_fce8901603dd",
+  "tool": "gen3d_make_3d",
+  "state": "approved",
+  "edited": [],
+  "final": {
+   "engine": "trellis2",
+   "stages": [
+    "shape",
+    "preview"
+   ]
+  },
+  "origin": {
+   "service": "agent",
+   "thread": "t_89c9cef9"
+  }
+ }
+]

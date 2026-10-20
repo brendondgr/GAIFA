@@ -11,6 +11,7 @@ Event types (payload fields):
     question        {id, questions}                      (an ask_user call waiting for answers)
     answer          {id, answers}
     feedback        {value: up|down, note, output_id? | seq?}   (thumbs, plan 21.4)
+    proposal        {prefs: [{id, scope, tool, field, value, when, cue}]}   (the miner's proposals, plan 21.5)
     approval        {id, approval_id, tool, arguments, ask_fields, schema, risk, description, filled?}   (filled: the hub chose these, plan 20.4)
     decision        {id, approval_id, approve, arguments?, reason?}
     todos           {items: [{text, state}]}
@@ -144,6 +145,16 @@ class Store:
             with self._lock:
                 self._c.execute(f"UPDATE threads SET {', '.join(sets)} WHERE id = ?", args)
         return self.thread(tid)
+
+    def events_by_type(self, types: list[str], since: float = 0) -> list[dict[str, Any]]:
+        """Events of these types in every real chat (not eval dry runs, not chats that opted out of
+        learning), oldest first, each with its thread id (plan 21.5)."""
+        marks = ", ".join("?" * len(types))
+        rows = self._all(f"SELECT e.thread_id, e.seq, e.ts, e.type, e.payload FROM events e JOIN threads t ON t.id = e.thread_id "
+                         f"WHERE e.type IN ({marks}) AND e.ts >= ? AND json_extract(t.settings, '$.dry_run') IS NULL "
+                         f"AND COALESCE(json_extract(t.settings, '$.no_learn'), 0) = 0 ORDER BY e.ts", [*types, since])
+        return [{"thread_id": r["thread_id"], "seq": r["seq"], "ts": r["ts"], "type": r["type"], "payload": json.loads(r["payload"])}
+                for r in rows]
 
     def prune_dry_runs(self, days: float = 30, now: float | None = None) -> int:
         """Archived eval threads (`settings.dry_run`) older than `days` (plan 21.1); real chats are kept."""

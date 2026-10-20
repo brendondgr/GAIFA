@@ -262,6 +262,10 @@ class FakeHub:
         def memory() -> dict:
             return {"total_bytes": 128e9, "available_bytes": 90e9}
 
+        @app.get("/api/approvals")
+        def list_approvals(state: str = "pending", limit: int = 100) -> list:
+            return [a for a in self.approvals.values() if state == "all" or a["state"] == state][:limit]
+
         @app.get("/api/prefs")
         def prefs(state: str | None = None, tool: str | None = None, scope: str | None = None) -> list:
             return [p for p in self.prefs if (not state or p["state"] == state) and (not tool or p.get("tool") == tool)

@@ -8,6 +8,7 @@ backed by real data.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -227,6 +228,16 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.calls = Calls(hub, hub.tools, hub.approvals)
             stack.push_async_callback(hub.calls.close)
             await hub.calls.resume()
+
+            async def _backfill() -> None:          # plan 21.5: old cards' edits, once the mods' tools are known
+                from utils.tools.records import backfill_edited
+                await asyncio.sleep(20)
+                try:
+                    await backfill_edited(hub)
+                except Exception:  # noqa: BLE001
+                    log.exception("backfilling approvals.edited")
+            backfill = asyncio.create_task(_backfill())
+            stack.callback(backfill.cancel)
             # 10. sessions: auto-save, the unclean-shutdown flag, restore at boot (if set).
             from utils.sessions import Sessions
 

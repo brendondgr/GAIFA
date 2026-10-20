@@ -56,3 +56,13 @@ def test_tool_events_become_series(th):
     rec.tool_event({"status": "running", "tool": "fake_tools_get_item", "origin": {}})
     names = {i.name: v for i, v in rec.samples(int(time.time())) if i.name.startswith("tools.")}
     assert names == {"tools.calls.fake-tools": 2.0, "tools.errors.fake-tools": 1.0}
+
+
+async def test_old_approvals_get_edited_backfilled(th):
+    db = th.hub.db
+    await db.execute("INSERT INTO approvals (id, tool, arguments, final, ask_fields, risk, origin, state, created_ts) "
+                     "VALUES ('ap_old', 'fake_tools_make_image', ?, ?, '[]', 'generate', '{}', 'approved', 1)",
+                     (json.dumps({"prompt": "x"}), json.dumps({"prompt": "x", "aspect": "16:9"})))
+    assert await records.backfill_edited(th.hub) >= 1
+    assert json.loads((await db.fetchone("SELECT edited FROM approvals WHERE id = 'ap_old'"))["edited"]) == ["aspect"]
+    assert await records.backfill_edited(th.hub) == 0

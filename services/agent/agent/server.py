@@ -140,6 +140,23 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         async def turn_record(tid: str) -> None:
             await asyncio.to_thread(records.record, store, tid)
         agent.on_turn_end.append(turn_record)
+        from .learn import mine
+        last_mine = [0.0]
+
+        async def mine_after(tid: str) -> None:              # plan 21.5: cheap, at most once a minute
+            t = agent.store.thread(tid) or {}
+            if (t.get("settings") or {}).get("dry_run") or time.time() - last_mine[0] < 60:
+                return
+            last_mine[0] = time.time()
+            try:
+                done = await mine.run(hub, store)
+            except Exception:  # noqa: BLE001: learning never breaks a turn
+                log.exception("the miner")
+                return
+            if done.get("proposed"):
+                agent.emit(tid, "proposal", {"prefs": [{k: p.get(k) for k in ("id", "scope", "tool", "field", "value", "when", "cue")}
+                                                       for p in done["proposed"]]})
+        agent.on_turn_end.append(mine_after)
         importer = asyncio.create_task(_import_memory(Knowledge(cfg.data, hub)))
         await agent.resume_all()
         try:
@@ -349,6 +366,21 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             except Exception as e:  # noqa: BLE001: the chat's own record stays
                 log.warning("output feedback to the hub: %s", e)
         return {"seq": ev["seq"], **payload}
+
+    @app.get("/v1/prefs", summary="The user's preferences, from the hub (for the Learning page)")
+    async def list_prefs(request: Request, state: str | None = None, tool: str | None = None, scope: str | None = None) -> list:
+        return await A(request).hub.prefs(state=state, tool=tool, scope=scope)
+
+    @app.post("/v1/prefs/{pid}/{verb}", summary="Approve or reject a proposed preference (verb: approve | reject)")
+    async def decide_pref(pid: str, verb: Literal["approve", "reject"], request: Request) -> dict:
+        return await A(request).hub.decide_pref(pid, verb == "approve")
+
+    @app.post("/v1/learn/mine", summary="Run the miner now: propose preferences from card edits, answers and thumbs")
+    async def mine_now(request: Request) -> dict:
+        from .learn import mine
+        agent = A(request)
+        done = await mine.run(agent.hub, agent.store)
+        return {k: [p.get("id") for p in v] if isinstance(v, list) else v for k, v in done.items()}
 
     @app.get("/v1/threads/{tid}/turns", summary="The thread's turn records (plan 21.4)")
     async def thread_turns(tid: str, request: Request) -> list:

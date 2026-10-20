@@ -98,6 +98,12 @@ class HubAPI:
     async def create_pref(self, body: dict[str, Any]) -> dict[str, Any]:
         return await self._json("POST", "/api/prefs", json=body)
 
+    async def update_pref(self, pid: str, patch: dict[str, Any]) -> dict[str, Any]:
+        return await self._json("PATCH", f"/api/prefs/{pid}", json=patch)
+
+    async def approvals(self, state: str = "all", limit: int = 1000) -> list[dict[str, Any]]:
+        return await self._json("GET", "/api/approvals", params={"state": state, "limit": limit})
+
     async def decide_pref(self, pid: str, approve: bool) -> dict[str, Any]:
         return await self._json("POST", f"/api/prefs/{pid}/{'approve' if approve else 'reject'}")
 

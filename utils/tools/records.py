@@ -39,3 +39,21 @@ async def usage(db: Any, since: float) -> list[dict[str, Any]]:
                                (since,)):
         row(r["tool"]).update(cards=r["n"], denied=r["d"] or 0, edited=r["ed"] or 0)
     return sorted(out.values(), key=lambda x: -(x["calls"] + x["cards"]))
+
+
+async def backfill_edited(hub: Any) -> int:
+    """Once per row: approvals decided before migration 006 get `edited` from their arguments and
+    final arguments, so the miner (plan 21.5) learns from the cards the user changed before it existed."""
+    import json
+
+    from utils.tools.edits import edited
+
+    rows = await hub.db.fetchall("SELECT id, tool, arguments, final FROM approvals WHERE state = 'approved' AND final IS NOT NULL "
+                                 "AND edited IS NULL")
+    n = 0
+    for r in rows:
+        tool = await hub.tools.get(r["tool"]) if hub.tools else None
+        ed = edited(tool.parameters if tool else {}, json.loads(r["arguments"]), json.loads(r["final"]))
+        await hub.db.execute("UPDATE approvals SET edited = ? WHERE id = ?", (json.dumps(ed), r["id"]))
+        n += 1
+    return n

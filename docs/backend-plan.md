@@ -1935,7 +1935,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - **Usage events** gain `seconds` and `ttft_s`, and their stored `tokens` are filled.
     - **Memory import:** the old files are imported once, after start, and left in place with a `.imported` marker.
     - **Where the tests live:** the hub tool and feedback tests are in `utils/tests/prefs/test_hub_tools.py`.
-- [ ] **21.5 The miner: `services/agent/agent/learn/mine.py`** (deterministic, no LLM).
+- [x] **21.5 The miner: `services/agent/agent/learn/mine.py`** (deterministic, no LLM).
   - **Reads** (over HTTP):
     - the hub's approvals with `edited`, denials with reasons and refusals;
     - the agent's `answer`, `feedback` and `decision` events;
@@ -1953,6 +1953,15 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
   - `tests/test_mine.py` covers the threshold, `when` derivation, contradiction, question answers, thumbs and fading on recorded fixtures;
   - a fixture copied from today's real approvals proposes **gen3d `preset` = `fast`** and **`stages` = `[shape, preview]`** (7 of 8 real cards);
   - dry-run and `no_learn` evidence is ignored.
+  - *As built:*
+    - **When it runs:** at a turn's end, at most once a minute, and from `POST /v1/learn/mine`.
+    - **What counts against a value:** contradictions are the other values picked for the same field, and a value needs more than twice its contradictions.
+    - **Thumbs:** up twice in two chats (and never down) proposes that workflow, engine or preset. Down twice proposes an agent note to prefer another.
+    - **Answers** become an agent-scoped preference.
+    - **Old cards:** approvals from before migration 006 get `edited` backfilled once at hub start (`records.backfill_edited`), so the miner learns from them.
+    - **Proxied for the page:** the agent serves `GET /v1/prefs` and `POST /v1/prefs/{id}/approve|reject`.
+    - **Test fixture:** `tests/fixtures/approvals-2026-10.json` holds the real approvals, settings only (no prompts), with hashed chat ids.
+    - **Live on 2026-10-20:** the miner proposed gen3d `preset` = `fast` and `stages` = `["shape", "preview"]`, from 7 cards in 5 chats. Both wait as proposals.
 - [ ] **21.6 Evals for preferences: `services/agent/evals/tasks.py`.**
 
   | Task | Setup | Pass when |

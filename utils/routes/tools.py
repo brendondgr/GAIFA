@@ -3,7 +3,8 @@
 - `GET /api/tools[?names=a,b][?q=words]`, `GET /api/tools/index`
 - `POST /api/tools/{name}/call {arguments, origin, mode}?wait=` → `ToolCallResult`
 - `GET /api/tools/calls/{id}?wait=`, `GET /api/tools/calls/{id}/result?offset=&limit=`, `POST …/cancel`
-- `GET /api/approvals[?state=]`, `GET /api/approvals/{id}`, `POST /api/approvals/{id} {approve, arguments?}`
+- `GET /api/approvals[?state=]`, `GET /api/approvals/{id}`, `POST /api/approvals/{id} {approve, arguments?, remember?, confirm?}`
+- `GET /api/grants[?thread=][?tool=]`, `DELETE /api/grants/{id}`, `DELETE /api/grants?thread=` (plan 25.2)
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict
 
-from utils.tools.api import Approval, CallRequest, Decision, ResultPage, Tool, ToolCallResult, ToolIndexItem
+from utils.tools.api import Approval, CallRequest, Decision, Grant, ResultPage, Tool, ToolCallResult, ToolIndexItem
 
 router = APIRouter(tags=["tools"])
 WAIT_MAX = 3600
@@ -92,6 +93,8 @@ async def _with_schema(hub: Any, a: dict[str, Any]) -> dict[str, Any]:
     t = await hub.tools.get(a["tool"])
     if t is not None:
         a["schema"], a["description"] = t.parameters, t.description
+        if t.grant_key:
+            a["grant_key"] = t.grant_key
     return a
 
 
@@ -137,8 +140,35 @@ async def get_approval(approval_id: str, request: Request) -> dict[str, Any]:
     return await _with_schema(hub, a)
 
 
-@router.post("/api/approvals/{approval_id}", summary="Approve (optionally with edited arguments, which are what runs) or deny",
-             response_model=ToolCallResult, response_model_exclude_none=True)
+@router.post("/api/approvals/{approval_id}", summary="Approve (optionally with edited arguments, which are what runs; "
+             "remember: thread | always also writes a grant) or deny", response_model=ToolCallResult, response_model_exclude_none=True)
 async def decide_approval(approval_id: str, body: Decision, request: Request,
                           wait: float = Query(0, ge=0, le=WAIT_MAX, description="Seconds to wait for the result")) -> dict[str, Any]:
-    return await _hub(request).calls.decide(approval_id, body.approve, body.arguments, body.reason, wait)
+    return await _hub(request).calls.decide(approval_id, body.approve, body.arguments, body.reason, wait,
+                                            body.remember, body.confirm, body.grant_hours)
+
+
+class GrantsDeleted(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    deleted: int
+
+
+@router.get("/api/grants", summary="Grants: tools the user allowed in a chat or always (plan 25.2), newest first; ?thread=, ?tool=",
+            response_model=list[Grant], response_model_exclude_none=True)
+async def list_grants(request: Request, thread: str | None = None, tool: str | None = None) -> list[dict[str, Any]]:
+    return await _hub(request).grants.list(thread, tool)
+
+
+@router.delete("/api/grants/{grant_id}", summary="Revoke a grant: its calls ask again", response_model=GrantsDeleted)
+async def revoke_grant(grant_id: str, request: Request) -> dict[str, Any]:
+    from utils.server import HubError
+
+    if not await _hub(request).grants.revoke(grant_id):
+        raise HubError(404, "not_found", f"no grant {grant_id!r}")
+    return {"deleted": 1}
+
+
+@router.delete("/api/grants", summary="Revoke a chat's grants (?thread=, required): the agent calls it when it deletes a chat",
+               response_model=GrantsDeleted)
+async def revoke_thread_grants(request: Request, thread: str = Query(..., min_length=1)) -> dict[str, Any]:
+    return {"deleted": await _hub(request).grants.end_thread(thread)}

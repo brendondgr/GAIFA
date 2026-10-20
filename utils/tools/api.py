@@ -1,5 +1,5 @@
-"""Response models for the `tools` area (plan 13.1–13.2): brief §11.7 `Tool`, `ToolIndexItem`,
-`ToolCallResult`, `Approval`."""
+"""Response models for the `tools` area (plan 13.1–13.2, 25.2): brief §11.7 `Tool`, `ToolIndexItem`,
+`ToolCallResult`, `Approval`, `Grant`."""
 
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ class Tool(ToolIndexItem):
     examples: list[dict[str, Any]]
     job: bool
     source: Literal["manifest", "tools_source", "hub"]
+    grant_key: str | None = None
 
 
 class ToolOutput(_Model):
@@ -49,6 +50,21 @@ class ToolErrorBody(_Model):
     detail: str
     fix: str | None = None
     problems: list[dict[str, str]] | None = None
+
+
+class Grant(_Model):
+    id: str
+    tool: str = Field(description="A tool name glob")
+    key: str | None = Field(None, description="What it covers: a host, a folder, a constant; null: every call of the tool")
+    kind: str | None = Field(None, description="The tool's grant_key: url:host, arg:<name>, const:<x>")
+    risk: str | None = None
+    scope: Literal["thread", "always"]
+    thread: str | None = None
+    created_ts: float
+    expires_ts: float | None = None
+    note: str = ""
+    used: int = 0
+    last_used_ts: float | None = None
 
 
 class ToolCallResult(_Model):
@@ -70,6 +86,8 @@ class ToolCallResult(_Model):
     description: str | None = None
     filled: list[str] | None = None
     filled_by: dict[str, str] | None = None
+    grant_key: str | None = None
+    grant: Grant | None = None
 
 
 class CallRequest(_Model):
@@ -95,12 +113,16 @@ class Approval(_Model):
     edited: list[str] | None = None
     schema_: dict[str, Any] | None = Field(None, alias="schema")
     description: str | None = None
+    grant_key: str | None = None
 
 
 class Decision(_Model):
     approve: bool
     arguments: dict[str, Any] | None = Field(None, description="Edited arguments (the parameter card); they are what runs")
     reason: str | None = None
+    remember: Literal["once", "thread", "always"] = Field("once", description="thread / always: also allow calls like this one (a grant)")
+    confirm: bool = Field(False, description="The second confirm an `always` grant for execute and destructive tools needs")
+    grant_hours: float | None = Field(None, gt=0, description="The grant expires after this many hours (default: never)")
 
 
 class ResultPage(_Model):

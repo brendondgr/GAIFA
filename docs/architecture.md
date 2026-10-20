@@ -199,13 +199,14 @@ hide = ["GET /ui/{path}"]              # globs on "METHOD /path", e.g. "* /admin
 [tools]                             # the agent's tools (plan 13.1): <mod>_<name>, schema from the OpenAPI
 speak = { op = "POST /v1/speech", description = "Speak text in a saved voice", risk = "generate", ask = ["name"], hide = ["stream"] }
 delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
+# fetch = { op = "POST /v1/fetch", risk = "network", grant_key = "url:host" }   # grant_key: url:host | arg:<name> | const:<x> (§14.7)
 # risk: read | write | generate | network | execute | destructive (default: read for GET, destructive for DELETE/confirm, else write; §14.7)
 # ask = [...] inputs the user chooses (parameter card) · examples = [{...}] · core = true (always loaded)
 # hide = [...] / fixed = {...}: parameters kept from the model / always sent
 # job = true + job_status = "GET /v1/jobs/{id}" (+ job_cancel): the hub follows the job to its outputs
 
 [agent]                             # optional: tools the mod lists at runtime (comfy: one per task)
-tools_source = "GET /v1/tools"      # → {"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST …", "job": {…}|null, "risk", "ask", "examples", "core"}]}
+tools_source = "GET /v1/tools"      # → {"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST …", "job": {…}|null, "risk", "ask", "examples", "core", "grant_key"}]}
 skills = "skills"                   # optional: skills/<name>/SKILL.md for the agent (plan 14.9)
 ```
 
@@ -374,7 +375,8 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `POST /api/memory/acquire[?make_room=1]` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[], plan}` or `409 needs_room {plan}`. `make_room=1` (or `X-AIHub-Make-Room: 1`, or `auto_make_room`) unloads first; the grant is reserved for 120 s |
 | `GET /api/tools[?q=][?names=]`, `GET /api/tools/index` | the agent's tool catalog (plan 13.1): every mod's `[tools]` and `tools_source` functions plus the hub's own `hub_*` tools, with risk, `ask` fields, examples and `core`; a stopped mod's tools stay listed (`available: false`; a call starts it) |
 | `POST /api/tools/{name}/call {arguments, origin, mode}?wait=`, `GET /api/tools/calls/{id}[/result]`, `POST …/cancel` | a tool call (plan 13.2): validated (errors name the field and the fix), checked in §14.7's order (deny list → thread mode → the mod's own limits → grants → ask/allow lists → risk default), run as a hub task (jobs followed to the end; outputs mapped to `output:<id>`; JSON capped at 8 KB). Shapes: UI brief §11.12 |
-| `GET /api/approvals`, `GET/POST /api/approvals/{id} {approve, arguments?}` | approvals (plan 13.2): a call that must ask is stored in `approvals` (hub.db) and runs nothing; the decision may carry edited arguments, which are validated and are what runs |
+| `GET /api/approvals`, `GET/POST /api/approvals/{id} {approve, arguments?, remember?, confirm?, grant_hours?}` | approvals (plan 13.2): a call that must ask is stored in `approvals` (hub.db) and runs nothing; the decision may carry edited arguments, which are validated and are what runs; `remember: thread \| always` also writes a grant (plan 25.2, §14.7) |
+| `GET /api/grants[?thread=][?tool=]`, `DELETE /api/grants/{id}`, `DELETE /api/grants?thread=` | grants (plan 25.2, §14.7): what the user allowed in a chat or always, with revoke; the agent ends a chat's grants when it deletes the chat |
 | `GET/POST /api/sessions`, `PUT/DELETE /api/sessions/{id}`, `POST /api/sessions/{id}/restore?dry_run=1`, `GET /api/sessions/state` | sessions (plan Phase 15): named snapshots, the restore plan (steps and memory) and its run through the memory manager; `state` reports an unclean last shutdown |
 | `GET /api/skills`, `GET /api/skills/{mod}/{name}` | the mods' agent skills (plan 14.9) |
 | `GET/POST /api/prefs`, `PATCH/DELETE /api/prefs/{id}`, `POST /api/prefs/{id}/approve\|reject` | preferences (plan 21.2, §14.5): saved only when they fit the tool's schema and choices; applied to every caller's card |
@@ -715,6 +717,9 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   4. a **grant** that covers the call allows it;
   5. the **ask** list, then the **allow** list (`execute` ignores the allow list: only a grant skips its card);
   6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `auto` mode ("Use defaults"); `network`, `execute` and `destructive` ask in every mode.
+- **Grants** (`utils/tools/grants.py`, table `grants`, migration 009): one answer that covers more than one call. Deciding an approval with `remember: "thread"` ("Allow in this chat") or `"always"` writes a grant `{tool, key, scope, thread, expires_ts}`; `once` (the default) writes none. `always` for `execute` and `destructive` needs a second confirm (`confirm: true`, else 422 `confirm_needed`); `thread` needs a call from a chat (else 422 `no_thread`).
+  - **Keys.** A tool may declare `grant_key` in `[tools]` (or its `tools_source` item): `url:host` takes the host of its `url` argument (exact: `api.github.com` is not `github.com`), `arg:<name>` takes that argument as is (a folder), `const:<x>` is always `x` (every search). A grant covers a call of its tool whose key equals the grant's; a tool without a grant key gets grants that cover every call.
+  - **Who.** A `thread` grant covers calls whose `origin.thread` is that chat; MCP and API calls have no thread, so only `always` grants apply to them. A call run by a grant carries `origin.grant`. `GET /api/grants` lists the live ones (Settings → Agent → Permissions, with revoke); expired ones are dropped; `thread` grants end when the agent deletes the chat (`DELETE /api/grants?thread=`).
 
 ### 14.4 Everything inside the folder
 - **Logs.** Each mod's output is also written to `data/logs/<id>.log`, rotated. journald stays as a second copy, and the Logs tab reads the file.

@@ -2435,7 +2435,7 @@ Today a call is decided by `deny` → thread mode → `ask` → `allow` lists �
   - The order is fixed and documented in architecture §14: **deny list → thread mode → a mod's own limits (e.g. a workspace's level, Phase 27) → grants → ask/allow lists → risk default.**
   *Done when:* `utils/tests/tools/test_decide.py` covers every risk in every mode with and without list entries.
 
-- [ ] **25.2 Grants: hub.db migration, `utils/tools/grants.py`, `/api/grants`.**
+- [x] **25.2 Grants: hub.db migration, `utils/tools/grants.py`, `/api/grants`.**
   - Table `grants {id, tool (glob), key (null, a domain, a workspace id), scope ("thread" | "always"), thread, created_ts, expires_ts, note}`.
   - A tool may name its **grant key** in `[tools]` (`grant_key = "url:host"` takes the host of the `url` argument; `grant_key = "arg:folder"` takes an argument as is), so "allow for this chat" can mean "this domain" or "this folder", not every call.
   - Deciding an approval takes `remember: "once" | "thread" | "always"`; `thread` and `always` write a grant. `always` grants for `execute` and `destructive` need a second confirm on the card.

@@ -1024,15 +1024,19 @@ The `tools` area. The chat (Stage D) and outside clients (MCP) use the same call
 | `callTool(name, args, {mode?, origin?, wait?})` | `POST /api/tools/{name}/call?wait=` |
 | `getToolCall(id, {wait?})`, `cancelToolCall(id)` | `GET /api/tools/calls/{id}`, `POST /api/tools/calls/{id}/cancel` |
 | `listApprovals({state?})`, `getApproval(id)` | `GET /api/approvals` (pending; `state=all`), `GET /api/approvals/{id}` |
-| `decideApproval(id, {approve, args?, reason?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs |
+| `decideApproval(id, {approve, args?, reason?, remember?, confirm?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs; `remember: "once" \| "thread" \| "always"` (plan 25.2) also writes a grant (`thread` needs a call from a chat, else 422 `no_thread`; `always` for `execute`/`destructive` needs `confirm: true`, else 422 `confirm_needed`); the result carries the `grant` |
+| `listGrants({thread?, tool?})`, `revokeGrant(id)` | `GET /api/grants`, `DELETE /api/grants/{id}` (plan 25.2); `DELETE /api/grants?thread=` ends a chat's grants |
 
-Also `GET /api/tools/calls/{id}/result?offset=&limit=` pages a capped result. **Events:** `{type: "approval", approval: Approval}` when one is created or decided; `{type: "tool_call", call: ToolCallResult & {origin}}` as a call starts, makes progress and ends.
+Also `GET /api/tools/calls/{id}/result?offset=&limit=` pages a capped result. **Events:** `{type: "approval", approval: Approval}` when one is created or decided; `{type: "tool_call", call: ToolCallResult & {origin}}` as a call starts, makes progress and ends (`origin.grant`: the grant that let it run without a card); `{type: "grant", grant: Grant}` when one is written and `{type: "grant_deleted", id}` when one is revoked or ends.
+
+**Grants (plan 25.2).** A tool may declare a `grant_key`: `url:host` (the host of its `url` argument), `arg:<name>` (that argument as is) or `const:<x>`. A grant covers calls of its tool whose key matches (a null key covers every call); a `thread` grant only calls from that chat, an `always` grant every caller (MCP and the API included). The card shows the key ("on github.com", "in ~/Projects/foo") next to the risk.
 
 ```ts
 type Risk = "read" | "write" | "generate" | "network" | "execute" | "destructive";   // plan 25.1
 interface ToolIndexItem { name: string; mod: string;                // "hub" for the hub's own tools
                           risk: Risk; core: boolean; summary: string; available: boolean; why?: string }
 interface Tool extends ToolIndexItem { description: string;
+                          grant_key?: string;                       // "url:host" | "arg:<name>" | "const:<x>" (plan 25.2)
                           parameters: JSONSchema;                   // one flat object; file inputs carry "x-kind": image|video|audio|mesh|file
                           ask: string[];                            // inputs the user chooses: editable on the parameter card
                           examples: object[]; job: boolean; source: "manifest" | "tools_source" | "hub" }
@@ -1046,14 +1050,21 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            progress?: number; note?: string; job_id?: string; elapsed_s?: number;
                            arguments?: object; ask_fields?: string[]; risk?: Risk; schema?: JSONSchema; description?: string;
                            filled?: string[];                       // needs_approval; filled: arguments the hub chose
-                           filled_by?: { [field: string]: "default" | "carried" | string } }   // how: an x-options default, carried in this chat, or "pref:<id>" (plan 21.7)
+                           filled_by?: { [field: string]: "default" | "carried" | string };  // how, an x-options default, carried in this chat, or a preference ("pref" + its id, plan 21.7)
+                           grant_key?: string;                      // needs_approval, the tool's grant key kind (plan 25.2)
+                           grant?: Grant }                          // a decision with remember: thread | always
+interface Grant { id: string; tool: string;                         // a name glob
+                  key?: string;                                     // a host, a folder, a constant (absent = every call of the tool)
+                  kind?: string; risk?: Risk; scope: "thread" | "always"; thread?: string;
+                  created_ts: number; expires_ts?: number; note: string; used: number; last_used_ts?: number }
 interface Approval { id: string; tool: string; arguments: object;  // as the model sent them
                      final?: object;                                // as run (after edits)
                      ask_fields: string[]; risk: Risk; origin: object;
                      state: "pending" | "approved" | "denied" | "expired"; reason?: string; call_id?: string;
                      created_ts: number; decided_ts?: number; schema?: JSONSchema; description?: string;
                      filled?: { [field: string]: "default" | "carried" | string };   // what the hub chose: a default, a preference ("pref:<id>"), carried from this chat
-                     edited?: string[] }                                              // the fields the user changed on the card (plan 21.1)
+                     edited?: string[];                                               // the fields the user changed on the card (plan 21.1)
+                     grant_key?: string }                                             // the tool's grant key kind (plan 25.2)
 ```
 
 **Choices that depend on the inputs (`x-options`, plan 20.1).** Any `enum` property may carry `x-options`, one entry per value: `{label?, needs?: string[], excludes?: string[], default?: boolean, good_for?, speed?, kind?, allows?: {<param>: values[]}}`. A choice **fits** when every `needs` parameter is given and no `excludes` one is. A property with `"x-depends-on": "<param>"` takes only the values that its parent's chosen option `allows` (when it lists them); its own `x-options` may say `quality` (`full`, `fast`, `draft`) and `when` (e.g. "only when the user asks for a quick result").

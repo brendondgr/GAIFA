@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from utils import operations
 from utils.tools import options
+from utils.tools.grants import GRANT_KEY
+from utils.tools.grants import problems as grant_problems
 from utils.tools.schema import Route, clean, flatten, mark_files
 
 if TYPE_CHECKING:
@@ -58,6 +60,7 @@ class ToolDef:
     why: str | None = None
     handler: Callable[..., Any] | None = None  # hub tools
     problems: list[str] = field(default_factory=list)
+    grant_key: str | None = None     # plan 25.2: what "allow in this chat" covers (utils/tools/grants.py)
 
     def public(self, full: bool = True, view: str = "full") -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "mod": self.mod or "hub", "risk": self.risk, "core": self.core,
@@ -68,6 +71,8 @@ class ToolDef:
             params = options.for_model(self.parameters) if view == "model" else self.parameters
             out.update({"description": self.description, "parameters": params, "ask": self.ask,
                         "examples": self.examples, "job": self.job is not None, "source": self.source})
+            if self.grant_key:
+                out["grant_key"] = self.grant_key
         return out
 
     def function(self) -> dict[str, Any]:
@@ -204,9 +209,10 @@ class Catalog:
             job = _job_ops(spec.job_status, spec.job_cancel) if spec.job else None
             if job:
                 desc += "\nRuns as a job: the call returns when it has finished, with its outputs."
+            problems += grant_problems(spec.grant_key, params)
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=list(spec.examples), core=spec.core, route=route, response=op["response"],
-                               job=job, problems=problems))
+                               job=job, problems=problems, grant_key=spec.grant_key))
         if svc.m.agent.tools_source:
             out += await self._source(svc)
         return out
@@ -237,9 +243,11 @@ class Catalog:
             if job:
                 desc += "\nRuns as a job: the call returns when it has finished, with its outputs."
             ask = [a for a in it.get("ask") or [] if a in params.get("properties", {})]
+            gk = it.get("grant_key") if isinstance(it.get("grant_key"), str) and GRANT_KEY.match(it["grant_key"]) else None
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=[e for e in it.get("examples") or [] if isinstance(e, dict)],
-                               core=bool(it.get("core")), source="tools_source", route=route, job=job))
+                               core=bool(it.get("core")), source="tools_source", route=route, job=job,
+                               problems=grant_problems(gk, params), grant_key=gk))
         return out
 
     # ---- persistence (a stopped mod keeps its tools listed) ----------------------------------
@@ -270,13 +278,13 @@ class Catalog:
                 out.append(ToolDef(r["name"], svc.id, r.get("tool") or r["name"], r.get("description", ""), r.get("parameters") or {},
                                    risk=r.get("risk", "write"), ask=r.get("ask") or [], examples=r.get("examples") or [],
                                    core=bool(r.get("core")), source=r.get("source", "manifest"), route=route,
-                                   response=r.get("response", "json"), job=r.get("job_ops")))
+                                   response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key")))
             return out
         assert svc.m
         return [ToolDef(tool_name(svc.id, n), svc.id, n, s.description or s.op, {"type": "object"},
                         risk=s.risk or default_risk(s.op.split(" ", 1)[0], s.confirm), ask=list(s.ask),
                         examples=list(s.examples), core=s.core,
-                        job=_job_ops(s.job_status, s.job_cancel) if s.job else None)
+                        job=_job_ops(s.job_status, s.job_cancel) if s.job else None, grant_key=s.grant_key)
                 for n, s in svc.m.tools.items()]
 
     # ---- lookups -----------------------------------------------------------------------------

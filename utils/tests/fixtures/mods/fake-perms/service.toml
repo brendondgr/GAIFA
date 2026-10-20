@@ -14,8 +14,8 @@ stop_timeout_s = 5
 restart = "no"
 
 [tools]
-search = { op = "POST /v1/search", description = "Search the web", risk = "network" }
-fetch = { op = "POST /v1/fetch", description = "Fetch a web page", risk = "network" }
-python = { op = "POST /v1/python", description = "Run Python in the sandbox", risk = "execute" }
-run = { op = "POST /v1/run", description = "Run a command in a folder", risk = "execute" }
+search = { op = "POST /v1/search", description = "Search the web", risk = "network", grant_key = "const:search" }
+fetch = { op = "POST /v1/fetch", description = "Fetch a web page", risk = "network", grant_key = "url:host" }
+python = { op = "POST /v1/python", description = "Run Python in the sandbox", risk = "execute", grant_key = "const:python" }
+run = { op = "POST /v1/run", description = "Run a command in a folder", risk = "execute", grant_key = "arg:folder" }
 wipe = { op = "DELETE /v1/jobs/{jid}", description = "Delete a job", confirm = true }

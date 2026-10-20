@@ -93,6 +93,23 @@ async def test_parameter_card_edited_then_run(env):
     assert env.payloads(tid, "assistant")[-1]["text"] == "Here's your fox (#1)."
 
 
+async def test_allow_in_this_chat_reaches_the_hub_and_ends_with_the_chat(env):
+    """Plan 25.2: the card's "Allow in this chat" is `remember: thread` on the hub's approval, the decision
+    names the grant, and deleting the chat ends its grants."""
+    tid = await env.thread()
+    env.model.queue({"tool_calls": [{"name": "fake_make_image", "arguments": {"prompt": "a fox"}}]}, {"text": "Done (#1)."})
+    await env.send(tid, "a fox image")
+    ap = env.payloads(tid, "approval")[-1]
+    r = await env.client.post(f"/v1/threads/{tid}/approval", json={"approval_id": ap["approval_id"], "approve": True, "remember": "thread"})
+    assert r.status_code == 202
+    await env.settle(tid)
+    assert env.hub.decisions[-1]["remember"] == "thread" and env.hub.decisions[-1]["confirm"] is False
+    d = env.payloads(tid, "decision")[-1]
+    assert d["remember"] == "thread" and d["grant"] == "gr_" + ap["approval_id"]
+    assert (await env.client.delete(f"/v1/threads/{tid}")).status_code == 200
+    assert env.hub.ended_grants == [tid]
+
+
 async def test_denied_card(env):
     tid = await env.thread()
     env.model.queue({"tool_calls": [{"name": "fake_make_image", "arguments": {"prompt": "a fox"}}]},

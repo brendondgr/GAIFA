@@ -232,6 +232,16 @@ class ToolSpec(_Strict):
     job: bool = False             # the call returns a job id; the agent API waits for the job (plan 13.2)
     job_status: Op | None = None  # "GET /v1/jobs/{id}": `{id}` (or any one placeholder) is the job id
     job_cancel: Op | None = None
+    grant_key: str | None = None  # plan 25.2: "url:host", "arg:<name>", "const:<word>"; read by the grants (Phase 25)
+
+    @field_validator("grant_key")
+    @classmethod
+    def _grant_key(cls, v: str | None) -> str | None:
+        from utils.tools.grants import GRANT_KEY
+
+        if v is not None and not GRANT_KEY.match(v):
+            raise ValueError(f"grant_key {v!r} must be \"url:host\", \"arg:<parameter>\" or \"const:<word>\"")
+        return v
 
     @model_validator(mode="after")
     def _job(self) -> ToolSpec:

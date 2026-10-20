@@ -2,7 +2,7 @@
 
 Every call answers with one shape, `{status, tool, …}`:
 
-- `needs_approval`: `{approval_id, arguments, ask_fields, schema, risk, description}`; nothing ran
+- `needs_approval`: `{approval_id, arguments, ask_fields, schema, risk, description, grant_key?}`; nothing ran
 - `denied`: `{error: {code, detail, fix}}`
 - `running`: `{call_id, progress, job_id}`: still going after `wait` seconds (`GET /api/tools/calls/{id}`)
 - `done`: `{call_id, result, outputs}`; `outputs` are `{output_id, ref, url, kind, title, summary}`
@@ -172,7 +172,8 @@ class Calls:
             out = self._invalid(tool, await self._elsewhere(tool, arguments, problems))
             await self._refused(tool.name, arguments, origin, out["error"])
             return out
-        verdict, why = decide(tool.name, tool.risk, self.hub.config, mode)
+        grant = await self.hub.grants.match(tool, arguments, origin) if self.hub.grants is not None else None
+        verdict, why = decide(tool.name, tool.risk, self.hub.config, mode, grant)
         if verdict == "deny":
             out = {"status": "denied", "tool": tool.name, "error": {"code": "denied", "detail": f"{tool.name}: {why}",
                                                                    "fix": "don't retry it; tell the user it's not allowed, or ask them to change the setting"}}
@@ -181,10 +182,14 @@ class Calls:
         if verdict == "ask":
             a = await self.approvals.create(tool.name, arguments, tool.ask, tool.risk, origin or {}, how)
             return self._needs(tool, a, filled, how)
+        if grant is not None:
+            origin = {**(origin or {}), "grant": grant["id"]}      # the records and the chat say which grant ran it
         return await self._launch(tool, arguments, origin or {}, None, wait, filled=how)
 
     async def decide(self, aid: str, approve: bool, arguments: dict[str, Any] | None = None,
-                     reason: str | None = None, wait: float = DEFAULT_WAIT_S) -> dict[str, Any]:
+                     reason: str | None = None, wait: float = DEFAULT_WAIT_S, remember: str = "once",
+                     confirm: bool = False, grant_hours: float | None = None) -> dict[str, Any]:
+        """`remember` (plan 25.2): `thread` or `always` also writes a grant for calls like this one."""
         from utils.server import HubError
 
         a = await self.approvals.get(aid)
@@ -208,17 +213,21 @@ class Calls:
         problems = validate(tool.parameters, args) or options.problems(tool.parameters, args)
         if problems:
             raise HubError(422, "invalid_arguments", problems[0]["detail"], {"problems": problems})
+        spec = self.hub.grants.check(tool, args, a["origin"], remember, confirm) if self.hub.grants is not None else None
         call_id = _id()
         changed = edits.edited(tool.parameters, a["arguments"], args)
         if not await self.approvals.close(aid, "approved", final=args, call_id=call_id, edited=changed):
             raise HubError(409, "already_decided", f"approval {aid} was decided meanwhile")
+        grant = await self.hub.grants.add(**spec, expires_ts=time.time() + grant_hours * 3600 if grant_hours else None,
+                                          note=f"from approval {aid}") if spec else None
         filled = {k: v for k, v in (a.get("filled") or {}).items() if k not in changed}
         if self.hub.prefs is not None:
             try:
                 await self.hub.prefs.after_decision(tool, {**(a.get("origin") or {}), "approval_id": aid}, args, changed, a.get("filled") or {})
             except Exception:  # noqa: BLE001: learning never blocks a call
                 log.exception("preferences after approval %s", aid)
-        return await self._launch(tool, args, a["origin"], aid, wait, call_id, filled=filled)
+        out = await self._launch(tool, args, a["origin"], aid, wait, call_id, filled=filled)
+        return {**out, "grant": grant} if grant else out
 
     async def status(self, call_id: str, wait: float = 0) -> dict[str, Any]:
         c = self.live.get(call_id)
@@ -289,6 +298,8 @@ class Calls:
                how: dict[str, str] | None = None) -> dict[str, Any]:
         out = {"status": "needs_approval", "tool": tool.name, "approval_id": a["id"], "arguments": a["arguments"],
                "ask_fields": tool.ask, "risk": tool.risk, "schema": tool.parameters, "description": tool.description}
+        if tool.grant_key:
+            out["grant_key"] = tool.grant_key
         if filled:
             out["filled"] = filled
             out["filled_by"] = {k: v for k, v in (how or {}).items() if k in filled}   # "default" | "pref:<id>" | "carried" (21.7)

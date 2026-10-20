@@ -231,6 +231,26 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX output_feedback_output ON output_feedback (output_id, ts);
     """,
+    # 009: grants (plan 25.2): utils/tools/grants.py. `tool` is a name glob; `key` null covers every
+    # call of it; `kind` is the tool's grant_key ("url:host", "arg:folder"); `thread` for scope thread.
+    """
+    CREATE TABLE grants (
+        id           TEXT PRIMARY KEY,
+        tool         TEXT NOT NULL,
+        key          TEXT,
+        kind         TEXT,
+        risk         TEXT,
+        scope        TEXT NOT NULL CHECK (scope IN ('thread', 'always')),
+        thread       TEXT,
+        created_ts   REAL NOT NULL,
+        expires_ts   REAL,
+        note         TEXT NOT NULL DEFAULT '',
+        used         INTEGER NOT NULL DEFAULT 0,
+        last_used_ts REAL,
+        CHECK (scope = 'always' OR thread IS NOT NULL)
+    );
+    CREATE INDEX grants_thread ON grants (thread);
+    """,
 ]
 
 _STOP = object()

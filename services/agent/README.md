@@ -29,7 +29,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 - `GET/POST /v1/threads`, `GET/PATCH/DELETE /v1/threads/{id}` (mode `ask` | `auto` | `read_only`; settings `pinned`, `disabled`, `loaded`, `dry_run`)
 - `POST /v1/threads/{id}/messages {text, attachments}`: starts a turn, or queues the message during one
 - `GET /v1/threads/{id}/events?after=`, `GET /v1/threads/{id}/stream?after=` (SSE: events, then live deltas, progress and the context meter)
-- `POST /v1/threads/{id}/answer {question_id, answers}`, `/approval {approval_id, approve, arguments?}`, `/action {tool, arguments}`, `/fork {seq}`, `/cancel`, `/compact`; `GET /v1/threads/{id}/context`
+- `POST /v1/threads/{id}/answer {question_id, answers}`, `/approval {approval_id, approve, arguments?, remember?, confirm?}` (remember: once | thread | always, the hub's grants, plan 25.2; deleting a thread ends its grants), `/action {tool, arguments}`, `/fork {seq}`, `/cancel`, `/compact`; `GET /v1/threads/{id}/context`
 - `GET /v1/models`, `GET/PUT /v1/settings` (AGENT.md, memory)
 - Learning (Phases 21–22):
   - `POST /v1/threads/{id}/feedback {value, output_id | seq}`, `GET /v1/threads/{id}/turns`;

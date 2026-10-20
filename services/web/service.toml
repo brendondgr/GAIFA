@@ -1,0 +1,22 @@
+# Web: search the web through SearXNG and read pages as outputs (plan Phase 26).
+# Fields: docs/mods.md and architecture §4.3. SearXNG runs outside AIHub (setup/web.md).
+id = "web"
+name = "Web"
+description = "Web search through SearXNG; pages saved as outputs"
+icon = "search"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]
+port = 5102
+health = "/health"                 # 200 while this server is up
+status = "/v1/status"              # says whether SearXNG answers
+openapi = "/openapi.json"
+env_file = ".env"                  # SEARXNG_URL (see .env.example); default http://127.0.0.1:8080
+start_timeout_s = 30
+stop_timeout_s = 10
+restart = "on-failure"
+install = "install.sh"
+
+[outputs]                          # outputs/web/<date>/<HHMMSS>-<host>-<slug>.md, and .pdf documents
+kinds = ["text"]                   # gains "document" with plan 24.1 (the PDFs carry kind "document" in their sidecar)

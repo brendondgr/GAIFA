@@ -2458,7 +2458,7 @@ Today a call is decided by `deny` → thread mode → `ask` → `allow` lists �
 
 ## Phase 26 — New `web` mod: search and read the web
 
-- [ ] **26.1 The mod: `services/web/` (port 5102).**
+- [x] **26.1 The mod: `services/web/` (port 5102).**
   - `aihub new web`, a small Python server (httpx; `trafilatura` or `readability-lxml` + `markdownify` for page → markdown; pick one and say why in the README). `SEARXNG_URL` in `.env.example`; health returns 200 when the server is up and `status` says whether SearXNG answers.
   - Routes: `POST /v1/search {query, categories?, time_range?, language?, limit≤20}` → results `{title, url, snippet, engine, published?}`; `POST /v1/fetch {url, max_chars?}` → the page as markdown, saved as a `text` output (`outputs/web/<date>/<HHMMSS>-<host>-<slug>.md`, sidecar with the URL, title and fetch time), returning the output and its first `max_chars`. PDFs at a URL are saved as `document` outputs, so Phase 24's tools read them.
   - Fetch rules: http/https only; no loopback, private, link-local or `.local` addresses (checked after DNS, and on every redirect); 10 MB and 20 s caps; a plain user agent naming AIHub; `robots.txt` honoured.

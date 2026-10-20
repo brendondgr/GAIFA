@@ -46,7 +46,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
-| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199. | clients such as video-maker keep working |
+| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199 (`stt` 5105). | clients such as video-maker keep working |
 
 ## 3. Directory layout
 
@@ -87,7 +87,7 @@ AIHub/
 │   │   ├── registry.json    the only tracked file under data/
 │   │   ├── llm/             <Name>/*.gguf (+ mmproj-*, mtp-*, split parts)
 │   │   ├── tts/             breeze-tts-2/, …
-│   │   ├── stt/             (Whisper, when not in hf-cache)
+│   │   ├── stt/             <model>/ (faster-whisper: small/, large-v3-turbo/, …)
 │   │   ├── voices/          <slug>/reference.wav + voice.json
 │   │   ├── 3d/              cube3d-v0.5/, cubepart/, Qwen3-VL-4B-Instruct/, clip-vit-large-patch14/
 │   │   ├── comfyui/         ComfyUI's own layout: diffusion_models/, text_encoders/, vae/, loras/, unet/, …
@@ -340,6 +340,7 @@ aihub-lcpp.service                   lcppd                    :7710
 aihub-tts.service                    LocalTTS                 :5040  (+ engine worker subprocesses)
 aihub-gen3d.service                  gen3d                    :5050  (+ podman worker container)
 aihub-comfy.service                  comfy adapter            :5070  (+ ComfyUI in the strix-halo toolbox :8199)
+aihub-stt.service                    stt (faster-whisper)     :5105  (+ its model's worker process)
 ```
 
 `Ctrl+C` on `python app.py` stops only the hub; mods keep running. `aihub stop all` stops everything.

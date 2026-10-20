@@ -2556,13 +2556,14 @@ A toned-down port of the TranscriberPrototype ("Loud Radish", `/home/bdgr/Projec
 - **Weights** download to `data/models/stt/` (`download_root`), never `~/.cache`; the five already in `~/.cache/huggingface/hub/` may be copied in (reading outside the root is fine) and registered.
 - **The ROCm CTranslate2 wheel** (`ctranslate2-4.8.1`, from the CTranslate2 GitHub releases) is kept at `services/stt/runtime/wheels/` (gitignored, fetched by the installer) and reinstalled over the PyPI one after `uv sync`, as the prototype does.
 
-- [ ] **29.1 The mod and file transcription: `services/stt/` (port 5105).**
+- [x] **29.1 The mod and file transcription: `services/stt/` (port 5105).**
   - `aihub new stt`; its own venv (Python 3.12+, faster-whisper, onnxruntime for Silero VAD, soxr, numpy); `[memory]` with load/unload; models in the registry.
   - The engine runs in an isolated worker (the prototype's `isolated.py`): a GPU fault restarts it, and repeated faults fall back to the CPU and say so in `status`.
   - `POST /v1/transcribe {output_id | file (raw body), model?, preset?, language?, prompt?, timestamps: "none"|"segments"|"words"}` → a job; done → `{text, language, duration, segments[{start, end, text, words?}]}`, saved as outputs: `<name>.md` (text with `[mm:ss]` paragraph marks), `.srt`, and `.json` (words) under `outputs/stt/<date>/`. Pause-aligned chunks (`batch.py`), VAD on, the hallucination filter on.
   - `GET /v1/models` (name, size, downloaded, loaded, recommended device/precision), `POST /v1/load`, `POST /v1/unload`.
   - Video outputs are transcribed from their audio track (ffmpeg).
   *Done when:* `services/stt/tests/` (the prototype's fixture WAVs; the mock backend for unit tests; marked GPU tests) cover each preset's mapping, the unsafe int8 guard, the worker restart and CPU fallback, output files, video input, and a live GPU run of `small` on `seminar-speech-real.wav` with its real-time factor recorded; `aihub check stt` passes.
+  *Built (2026-10-20):* the transcript is **one folder output** (`outputs/stt/<date>/<HHMMSS>-<slug>/`: `transcript.md` the main file, `transcript.srt`, `words.json`, `output.json`), because the index reads `<stem>.json` beside `<stem>.md` as that file's sidecar. The file route is two operations: `POST /v1/transcribe` (JSON, `output_id`) and `POST /v1/transcribe/upload` (the raw body, options in the query). Weights live in `data/models/stt/<name>/` (five copied from `~/.cache`, verified against Hugging Face's sha256, registered). `small` on the GPU (float16): 25.3 s of audio in 0.72–1.0 s, **real-time factor 0.029–0.040**, load 1.4 s. `contract.py` came from git (`git show HEAD:…`), as planned.
 
 - [ ] **29.2 Live transcription: `WS /v1/stream`.**
   - The client sends `start {model?, language?}` then 16 kHz mono PCM frames (int16 or float32); the server sends `committed` (final segments) and `hypothesis` (the replaceable tail) events, the prototype's LocalAgreement policy, and `stop` flushes and returns the whole text (optionally saved as an output).

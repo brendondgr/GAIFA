@@ -135,6 +135,21 @@ class HubAPI:
             raise HubCallError(r.status_code, "not_found", f"output {oid}: HTTP {r.status_code}")
         return r.content, r.headers.get("content-type", "")
 
+    async def output_text(self, oid: str, **params: Any) -> dict[str, Any]:
+        """A window of a text or document output's text (plan 24.3): offset, limit, page, pages."""
+        return await self._json("GET", f"/api/outputs/{oid}/text", params={k: v for k, v in params.items() if v is not None})
+
+    async def output_page(self, oid: str, n: int, width: int = 1024) -> bytes:
+        """Page n of a PDF output as a PNG."""
+        r = await self.client.get(f"/api/outputs/{oid}/page/{n}.png", params={"width": width})
+        if r.status_code >= 400:
+            try:
+                body = r.json()
+            except ValueError:
+                body = {}
+            raise HubCallError(r.status_code, body.get("code") or "not_found", body.get("detail") or f"page {n}: HTTP {r.status_code}")
+        return r.content
+
     async def output_file(self, oid: str, path: str) -> tuple[bytes, str]:
         r = await self.client.get(f"/api/outputs/{oid}/files/{path}")
         if r.status_code >= 400:

@@ -198,6 +198,12 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     branch: it => forkAt(it.ev.seq - 1, it.ev.payload.text),
     copy: text => navigator.clipboard?.writeText(text).then(() => toast('Copied', 'success'), () => {}),
     openOutput, runAction: (a, o) => runAction(a, o, { openTool, attach, sendPrompt: t => send(t) }),
+    // plan 24.7: a citation in a reply (#n p.14, #n:88, output:<id> …) opens the viewer there
+    openCite: ({ ref, page, line }) => {
+      const id = String(ref).startsWith('output:') ? String(ref).slice(7) : view.outputs.find(o => o.n === +String(ref).replace('#', ''))?.output_id;
+      if (!id) { toast(`${ref} isn't an output in this chat`, 'error'); return; }
+      openOutput?.(id, page ? { page: +page } : line ? { line: +line } : null);
+    },
     runTool: async (item, args) => { const id = await ensureThread(); await c.action(id, item.tool.name, args); setToolForms(f => f.filter(x => x.key !== item.key)); },
     closeTool: item => setToolForms(f => f.filter(x => x.key !== item.key)),
     feedback: tid && c.feedback ? body => c.feedback(tid, body) : null,         // plan 21.7
@@ -232,7 +238,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
         h('div', { ref: contentRef, style: { maxWidth: COL, margin: '0 auto', padding: '18px 16px 28px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } },
           empty && !toolForms.length ? h(EmptyState, { onPick: t => send(t), tools }) : null,
           blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))))),
-      h(Composer, { draft, setDraft, attachments, setAttachments, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
+      h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
         dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
         settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }) })));

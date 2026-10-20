@@ -12,6 +12,7 @@ dependencies = [
     "watchfiles",
     "pillow",
     "websockets",           # the proxy passes mod WebSockets through (plan 29.2)
+    "pypdfium2>=5.14.0",
 ]
 
 [dependency-groups]

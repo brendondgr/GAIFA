@@ -27,6 +27,7 @@ export function buildView(events, live = {}) {
       case 'user': {
         const it = { key: 'e' + ev.seq, kind: 'user', ev, queued: !!p.queued };
         items.push(it);
+        (p.docs || []).forEach(d => outputs.push({ n: +String(d.ref).replace('#', ''), output_id: d.id, kind: d.kind, title: d.name, tool: 'attached' }));  // plan 24.5
         if (p.queued) queued.push(it);
         break;
       }

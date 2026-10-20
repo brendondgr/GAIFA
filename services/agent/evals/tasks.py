@@ -1,4 +1,4 @@
-"""The 47 eval tasks (plan 13.5; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 48 eval tasks (plan 13.5; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .docs import lighthouse_report
 from .harness import Run, Task, first_option
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -101,6 +102,10 @@ def used(name: str):
     return (f"used {name}", lambda r: (bool(r.calls(name, by=None)), ""))
 
 
+def used_any(*names: str):
+    return (f"used {' or '.join(names)}", lambda r: (any(r.calls(n, by=None) for n in names), ""))
+
+
 def final_mentions(*words: str):
     def c(r: Run):
         t = r.text().lower()
@@ -177,6 +182,22 @@ def seed_picture(name: str, src: str, title: str):
             f.write_bytes((ROOT / src).read_bytes())
             f.with_name(f.name + ".json").write_text(json.dumps({"title": title, "kind": "image"}))
     return setup
+
+
+def upload_files(make):
+    """Files to upload to the hub and attach (plan 24.5): `make()` gives (name, bytes) pairs; each goes
+    to `POST /api/outputs/upload` and its output id rides on the first turn."""
+    async def attach(hub: str) -> list[str]:
+        import httpx
+
+        async with httpx.AsyncClient(base_url=hub, timeout=60, trust_env=False) as c:
+            out = []
+            for name, data in make():
+                r = await c.post("/api/outputs/upload", params={"name": name}, content=data)
+                r.raise_for_status()
+                out.append(r.json()["id"])
+            return out
+    return attach
 
 
 def seed_recording(name: str, src: str, title: str):
@@ -420,4 +441,7 @@ TASKS: list[Task] = [
     Task("long_thread", "context", ["Hi! My name is Sam.", "I like hiking.", "What's 17 times 23?", "Tell me a one-line joke.",
                                     "What's the capital of Canada?", "Name a color.", "What did I say my name was, and what do I like?"],
          [final_mentions("Sam"), final_mentions("hik")]),
+    Task("pdf_page7", "context", ["In the attached report, what is the name of the lighthouse keeper's cat, and on which page is it?"],
+         [final_mentions("Biscuit"), final_mentions("7"), used_any("hub_read_document", "hub_search_document")],
+         attach=upload_files(lambda: [("north-rock-inspection.pdf", lighthouse_report())]), note="plan 24.5: a 20-page PDF as a card, read with tools"),
 ]

@@ -59,6 +59,7 @@ class ToolDef:
     available: bool = True
     why: str | None = None
     handler: Callable[..., Any] | None = None  # hub tools
+    cap_bytes: int | None = None     # results kept whole up to this size (default results.CAP_BYTES; plan 24.4)
     problems: list[str] = field(default_factory=list)
     grant_key: str | None = None     # plan 25.2: what "allow in this chat" covers (utils/tools/grants.py)
 

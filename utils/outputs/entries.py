@@ -34,20 +34,53 @@ DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 MAX_DEPTH = 8
 MAX_FILES = 2000  # files listed for one folder output
 
+# Text files by family (plan 24.1); each extension's subtype is the family, or `<family>:<x>`.
+TEXT_FAMILIES: dict[str, dict[str, str | None]] = {
+    "markdown": dict.fromkeys(("md", "markdown")),
+    "plain": dict.fromkeys(("txt", "log", "rst")),
+    "code": {"py": "python", "js": "javascript", "mjs": "javascript", "ts": "typescript", "tsx": "tsx", "jsx": "jsx",
+             "rs": "rust", "go": "go", "c": "c", "h": "c", "cpp": "cpp", "hpp": "cpp", "cc": "cpp", "java": "java",
+             "kt": "kotlin", "swift": "swift", "rb": "ruby", "php": "php", "lua": "lua", "sh": "shell", "bash": "shell",
+             "zsh": "shell", "fish": "fish", "ps1": "powershell", "sql": "sql", "r": "r", "jl": "julia", "cs": "csharp"},
+    "config": {"toml": "toml", "yaml": "yaml", "yml": "yaml", "ini": "ini", "cfg": "ini", "conf": "ini", "env.example": "env", "xml": "xml"},
+    "web": {"html": "html", "htm": "html", "css": "css", "scss": "scss"},
+    "data": {"json": "json", "jsonl": "jsonl", "csv": "csv", "tsv": "tsv"},
+    "subtitles": dict.fromkeys(("srt", "vtt")),
+    "notebook": dict.fromkeys(("ipynb",)),
+}
+DOCUMENT_EXTS = ("pdf", "docx", "epub", "pptx", "xlsx", "odt")
+SUBTYPE_BY_EXT: dict[str, str] = {
+    **{e: (f"{fam}:{x}" if x else fam) for fam, exts in TEXT_FAMILIES.items() for e, x in exts.items()},
+    **{e: e for e in DOCUMENT_EXTS},
+}
 KIND_BY_EXT = {
     **dict.fromkeys(("wav", "mp3", "flac", "ogg", "opus", "m4a", "aac"), "audio"),
     **dict.fromkeys(("png", "jpg", "jpeg", "webp", "gif", "bmp", "avif"), "image"),
     **dict.fromkeys(("mp4", "webm", "mov", "mkv"), "video"),
     **dict.fromkeys(("glb", "gltf", "obj", "ply", "stl", "fbx"), "model3d"),
-    **dict.fromkeys(("txt", "md", "json", "srt", "vtt", "csv"), "text"),
+    **dict.fromkeys((e for exts in TEXT_FAMILIES.values() for e in exts), "text"),
+    **dict.fromkeys(DOCUMENT_EXTS, "document"),
     **dict.fromkeys(("zip", "tar", "gz", "7z"), "archive"),
 }
-KINDS = ("audio", "image", "video", "model3d", "text", "archive", "other")
+KINDS = ("audio", "image", "video", "model3d", "text", "document", "archive", "other")
 MAIN_PRIORITY = ("model3d", "video", "image", "audio")
 
 
+def ext_of(name: str) -> str:
+    """The extension that sets the kind, lower case, without the dot ("env.example" is one)."""
+    low = name.lower()
+    if low.endswith("env.example"):
+        return "env.example"
+    return low.rsplit(".", 1)[-1] if "." in low else ""
+
+
 def kind_of(name: str) -> str:
-    return KIND_BY_EXT.get(name.rsplit(".", 1)[-1].lower() if "." in name else "", "other")
+    return KIND_BY_EXT.get(ext_of(name), "other")
+
+
+def subtype_of(name: str) -> str | None:
+    """`markdown`, `code:python`, `data:csv`, `notebook`, `pdf`, … for text and documents, else None."""
+    return SUBTYPE_BY_EXT.get(ext_of(name))
 
 
 def day_of(name: str) -> date | None:

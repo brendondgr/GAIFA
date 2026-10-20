@@ -3,7 +3,8 @@ which the index ignores (it's a dot-folder), and day folders older than 30 days 
 purged. To get something back, move it out of the trash to where it was; the watcher
 indexes it again.
 
-A file output takes its sidecars and its cached preview along. When the same path was
+A file output takes its sidecars and its cached preview along; its cached text and page
+images (plan 24.2, 24.3) are deleted. When the same path was
 trashed twice on one day, the second goes to `<day>/2/<path>`, and so on.
 """
 
@@ -14,6 +15,8 @@ import shutil
 from datetime import date, timedelta
 from pathlib import Path
 
+from utils.outputs import text
+from utils.outputs.describe import output_id
 from utils.outputs.entries import day_of
 from utils.outputs.media import cache_path
 
@@ -47,6 +50,7 @@ def move(outputs: Path, rel: str, is_dir: bool, today: date | None = None) -> Pa
         dest = base / p.relative_to(outputs)
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(p, dest)  # a rename on the same filesystem
+    text.forget(outputs, output_id(rel))
     return base / rel
 
 

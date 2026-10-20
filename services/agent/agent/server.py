@@ -89,6 +89,7 @@ def config_from_env() -> Config:
     return Config(model=os.environ.get("AGENT_MODEL", "skynet"), fallback=os.environ.get("AGENT_FALLBACK_MODEL") or None,
                   max_steps=int(os.environ.get("AGENT_MAX_STEPS", "25")), data=data,
                   default_window=int(os.environ.get("AGENT_DEFAULT_WINDOW", "32768")),
+                  inline_tokens=int(os.environ.get("AGENT_INLINE_TOKENS", "6000")),
                   all_tools_models=tuple(m for m in os.environ.get("AGENT_ALL_TOOLS", "").split(",") if m))
 
 

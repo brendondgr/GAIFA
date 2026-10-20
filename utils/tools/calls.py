@@ -82,7 +82,7 @@ class Call:
                 out["job_id"] = self.job_id
             out["elapsed_s"] = round(time.time() - self.started, 1)
         elif self.state == "done":
-            out["result"] = results.cap(self.result, self.id)
+            out["result"] = results.cap(self.result, self.id, self.tool.cap_bytes or results.CAP_BYTES)
             out["outputs"] = self.outputs
         elif self.state == "error":
             out["error"] = self.error
@@ -244,7 +244,8 @@ class Calls:
         stored = json.loads(row["result"]) if row["result"] else {}
         out = {"status": row["state"], "call_id": call_id, "tool": row["tool"]}
         if row["state"] == "done":
-            out["result"] = results.cap(stored.get("result"), call_id)
+            tool = await self.catalog.get(row["tool"]) if row["tool"] and row["tool"].startswith("hub_") else None
+            out["result"] = results.cap(stored.get("result"), call_id, (tool.cap_bytes if tool else None) or results.CAP_BYTES)
             out["outputs"] = stored.get("outputs") or []
         elif row["state"] == "error":
             out["error"] = stored.get("error")

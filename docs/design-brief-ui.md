@@ -376,7 +376,10 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `listOutputs(filter)` | `GET /api/outputs?service=&kind=&q=&from=&to=&cursor=&limit=` | `OutputPage` (`service` and `kind` are comma-separated lists; `q` matches every word; `limit` 1–500, default 60) |
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
 | `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
-| `uploadOutput(file)` | `POST /api/outputs/upload?name=` (the file as the body) | `Output` (`201`); `upload_type` 415, `upload_too_large` 413 (64 MB), `upload_empty` 400 |
+| `uploadOutput(file)` | `POST /api/outputs/upload?name=` (the file as the body) | `Output` (`201`): an image, video, audio, text or document file (plan 24.1); `upload_type` 415, `upload_encoding` 415 (a text file that isn't UTF-8, or UTF-16 with a BOM), `upload_too_large` 413 (64 MB), `upload_empty` 400 |
+| `outputText(id, {offset, limit, page, pages})` | `GET /api/outputs/{id}/text?offset=&limit=&page=&pages=` | `OutputText` (plan 24.3; text and documents): `limit` 12000 chars by default, at most 48000; `page`/`pages` (`3` or `3-5`) start at that page and stop at the range's end; `next_offset` continues through the document. `not_text` 409 for other kinds, `no_page` 404 |
+| `outputSearch(id, q, {limit})` | `GET /api/outputs/{id}/search?q=&limit=` | `OutputSearch`: words (any case, all within one line, else one paragraph), a `"quoted phrase"`, or `/regex/` (`/regex/i` ignores case; `search_timeout` 422 past 1 s); `limit` 20, at most 200 |
+| `outputPageUrl(id, n, {width})` | `GET /api/outputs/{id}/page/{n}.png?width=` (a URL, not a request) | A PDF page as a PNG (`width` 1200 px by default, 64–2400), cached under `outputs/.previews/<id>/`; `no_page` 404 |
 | `getSettings()` | `GET /api/settings` | `Settings` (`services.order` and `memory.priority` list every installed mod: the configured ids first, then the rest in sidebar order) |
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
@@ -385,7 +388,7 @@ File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used direc
 
 ### 6.3 Error codes to handle
 
-`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `output_not_deletable` (the output resolves outside `outputs/`, e.g. through a symlinked folder), `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `widget_not_found`, `widget_invalid` (a mod's widget data doesn't match `WidgetData`), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
+`service_not_found`, `service_not_running`, `service_failed`, `service_disabled` (start on a disabled mod), `external_service` (start/stop on a `kind = "external"` mod), `manifest_invalid`, `port_in_use`, `needs_room`, `not_unloadable`, `model_not_found`, `model_in_use`, `model_exists` (adding a model whose id or files are already registered), `model_files_missing` (verify on a model with no files on disk), `registry_invalid` (registry.json can't be read; changes are refused until it is fixed), `output_not_found`, `output_not_deletable` (the output resolves outside `outputs/`, e.g. through a symlinked folder), `upload_encoding` (a text upload that isn't UTF-8 or UTF-16 with a BOM), `not_text` (409: reading the text of an output that has none), `no_page` (404: a page the document doesn't have), `search_timeout` (422: a `/regex/` search over 1 s), `invalid_config` (422: a settings save that would break config.toml, e.g. a port clash; nothing is written), `upstream_error` (the service itself returned an error; `detail` carries its message), `widget_not_found`, `widget_invalid` (a mod's widget data doesn't match `WidgetData`), `hub_error`. Generic HTTP errors use `not_found` (404), `method_not_allowed` (405) and `invalid_request` (422, a request body or query that fails validation; `data.errors` lists `{loc, msg}`).
 
 ### 6.4 Types
 
@@ -503,11 +506,13 @@ interface Discovered { path: string; size_bytes: number; suggested_kind: ModelKi
 interface Totals { size_bytes: number; count: number; by_kind: Record<string, { count: number; size_bytes: number }> }
 interface Disk { free_bytes: number; total_bytes: number }
 
-type OutputKind = "audio" | "image" | "video" | "model3d" | "text" | "archive" | "other";
+type OutputKind = "audio" | "image" | "video" | "model3d" | "text" | "document" | "archive" | "other";
 interface Output {
   id: string;
   service: string;
   kind: OutputKind;
+  subtype?: string;              // text and documents (plan 24.1): "markdown", "plain", "code:python", "config:toml", "web:html",
+                                 // "data:csv", "subtitles", "notebook", "pdf", "docx", "epub", "pptx", "xlsx", "odt"
   title: string;
   path: string;                  // "outputs/tts/2026-10-04/143012-good-morning.wav" (file or folder)
   files: { path: string; kind: OutputKind; size_bytes: number; role?: string }[];
@@ -528,6 +533,19 @@ interface OutputPage {
             by_kind: Record<OutputKind, number>;      // counts with every filter except kind
             by_service: Record<string, number> };     // counts with every filter except service
 }
+
+interface OutlineItem { level: number; title: string; offset: number; line: number; page?: number }   // plan 24.2
+interface OutputText {                       // plan 24.3: a window of an output's extracted text
+  text: string; offset: number; next_offset: number | null;   // null at the end
+  total_chars: number; tokens: number;       // tokens: the whole text's estimate (chars / 4)
+  pages: number; lines: number;              // pages: 0 for text without pages
+  page_of_offset: number | null; outline: OutlineItem[];
+  scanned: number[];                         // PDF pages with almost no text: look at their page image
+  truncated: boolean;                        // the text was cut at 4 M characters
+  notes: string[];
+}
+interface SearchHit { page?: number; line: number; offset: number; text: string }   // text: the line with ±1 line of context
+interface OutputSearch { hits: SearchHit[]; total: number }
 
 interface Activity { id: string; ts: number; service: string | null;
                      level: "info" | "warn" | "error"; text: string; route?: string }
@@ -1113,7 +1131,8 @@ Built by hand in `web/chat/` (plain ES modules on the page's React, like the das
   - **The output strip** (`chat-results.js`): the turn's outputs as 56 px `#n` thumbnails when there's more than one; the picked one (the newest by default) as the result card, its preview capped at 300 px.
   - **Dictation (plan 29.3):** a microphone button next to Upload, shown only while the `stt` mod is up. Click to start and stop, or hold to talk; the microphone goes through an AudioWorklet that resamples to 16 kHz, and int16 frames go to `WS /api/s/stt/v1/stream`. Committed text and the live tail are written into the box after what was already typed; Stop flushes the rest. A refused microphone or a closed stream shows its reason beside the button (`web/chat/chat-mic.js`).
   - **The dock:** pending approvals, questions and parameter cards opened by a button sit above the composer, newest first ("Waiting for you · 2" when several), at most half the page tall. Nothing that waits for you sits in the thread.
-- **Composer:** a growing text box (Enter sends, Shift+Enter is a new line, a message sent during a turn is queued and marked), attachment chips (a picker of this chat's and recent outputs), tool-group toggles (Auto / Pinned / Off per mod → the thread's `settings.pinned` / `disabled`), the quick actions, Stop, and slash commands with a suggestion list: `/compact`, `/clear`, `/model <id>`, `/context`, and `/<skill>` (sends "Use the <id> skill: …").
+- **Citations and the viewer (plan 24.7):** in the agent's replies `#n p.14`, `#n pp.3-5`, `#n page 2`, `#n:88`, `#n line 88` and the same after `output:<id>` become links (`a.aichat-cite` with `data-cite`, `data-page` or `data-line`; never inside code); clicking one opens the Outputs drawer (wider for documents) on the **viewer**: text and code with line numbers and a highlighter (keywords, strings, comments), markdown rendered or as source, a PDF page by page as the page image with its text beside it (prev / next, the outline as "Jump to…", scanned pages marked), and a search box (the hub's search: words, "a phrase", /regex/) whose hits jump to their page or line. The agent sees inline text and `hub_read_document` windows with numbered lines, so it can cite them.
+- **Composer:** a growing text box (Enter sends, Shift+Enter is a new line, a message sent during a turn is queued and marked), attachment chips (a picker of this chat's and recent outputs; files uploaded with the Upload button, dropped or pasted: images, video, audio, text, code and documents, plan 24.6; each chip shows a kind icon, the name and, for text and documents, the pages or lines, and a text or document chip opens the output), long pastes as files (over 2000 characters or 40 lines a paste is uploaded as `pasted-<HHMMSS>.md`, or `.py`, `.json`, … when the whole paste is one fenced block with a language or parses as JSON; Ctrl+Shift+V pastes it into the box as text), tool-group toggles (Auto / Pinned / Off per mod → the thread's `settings.pinned` / `disabled`), the quick actions, Stop, and slash commands with a suggestion list: `/compact`, `/clear`, `/model <id>`, `/context`, and `/<skill>` (sends "Use the <id> skill: …").
 - **Reconnect:** the stream is `GET /v1/threads/{id}/stream?after=<last seq>`; on an error it reopens after 0.8–10 s from the last seq it saw, and replays are de-duplicated by seq. Pending question and parameter cards are rebuilt from the event log, so they survive a reload or a restart.
 - **Rewind / branch:** hovering a message shows Branch from here: `POST /fork {seq: previous}`, then the new chat opens with that message in the box to edit.
 - **Header Approvals** (Phase 13 Wire): a shield button with a purple count; the popover lists every pending approval (chat, MCP, API) as a compact parameter card. **API tab:** tool badges show the risk (`tool · generate`).

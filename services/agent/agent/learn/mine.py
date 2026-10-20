@@ -6,6 +6,9 @@ never used):
 - **question answers**: the same question answered the same way;
 - **thumbs**: ratings of outputs, counted for the workflow, engine and preset that made them.
 
+Free-text fields (a prompt, text or an instruction) are never inferred, and nothing here reads a
+document, a web page or a transcript: the miner sees card fields, answers and ratings (plan 24.8).
+
 A value the user picked `infer_after` times (2) in as many chats, with nothing against it, becomes an
 `inferred`, `proposed` preference (the hub derives where it applies from the tool's choices). The
 user approves it. Inferred preferences unused for `fade_days` fade out; stated ones never do.
@@ -22,6 +25,7 @@ from typing import Any
 log = logging.getLogger("agent.learn")
 DAY = 86400
 RATED = ("workflow", "engine", "preset")
+FREE_TEXT = ("prompt", "negative_prompt", "text", "instruction", "instructions", "message", "query", "content", "system")  # never inferred (plan 24.8)
 
 
 def _chat(origin: dict[str, Any]) -> str | None:
@@ -51,7 +55,7 @@ def card_edits(approvals: list[dict[str, Any]]) -> dict[tuple[str, str, str], di
             continue
         final = a.get("final") or {}
         for f in a["edited"]:
-            if f not in final:
+            if f not in final or f in FREE_TEXT:
                 continue
             k = (a["tool"], f, _key(final[f]))
             row = out.setdefault(k, {"tool": a["tool"], "field": f, "value": final[f], "chats": set(), "approvals": [], "against": 0})

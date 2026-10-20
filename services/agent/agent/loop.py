@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -38,6 +39,9 @@ WRAP_UP = ("(A note from the app, not from the user: you have repeated the same 
            "Tools are off for this reply. Answer the user in plain text: what you did, what blocked you, and what they can do.)")
 
 
+INLINE_SHARE = 0.15  # an inline document takes at most this share of the model's window (plan 24.5)
+
+
 @dataclass
 class Config:
     model: str = "skynet"
@@ -46,6 +50,7 @@ class Config:
     default_window: int = 32768
     data: Any = None   # Path of data/agent
     all_tools_models: tuple[str, ...] = ()
+    inline_tokens: int = 6000   # an attached document up to this size (and 15 % of the window) goes into the message
 
 
 @dataclass
@@ -123,14 +128,45 @@ class Agent:
         queued = self.running(tid)
         if not queued and thread["state"] == "waiting":
             await self._dismiss_pending(tid, "The user wrote a message instead of answering.")
+        docs = await self._describe(tid, thread, attachments) if attachments else []
         ev = self.emit(tid, "user", {"text": text, **({"attachments": attachments} if attachments else {}),
-                                     **({"queued": True} if queued else {})})
+                                     **({"docs": docs} if docs else {}), **({"queued": True} if queued else {})})
         if not thread["title"]:
             self.store.update_thread(tid, title=_title_from(text))
             asyncio.create_task(self._title(tid, text))
         if not queued:
             self.start(tid)
         return ev
+
+    async def _describe(self, tid: str, thread: dict[str, Any], ids: list[str]) -> list[dict[str, Any]]:
+        """Plan 24.5: each attached text or document, described once (so a rebuild never refetches):
+        its #n, size and outline, and its text when it fits `inline_tokens` and 15 % of the window."""
+        model = thread.get("model") or self.cfg.model
+        cap = min(self.cfg.inline_tokens, int(await self.window(model, tid) * INLINE_SHARE))
+        n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
+        out: list[dict[str, Any]] = []
+        for oid in ids:
+            try:
+                o = await self.hub.output(oid)
+                if o.get("kind") not in ("text", "document"):
+                    continue
+                w = await self.hub.output_text(oid, limit=min(48000, max(200, cap * ctx.CHARS_PER_TOKEN)))
+            except Exception as e:  # noqa: BLE001: it stays a plain attachment
+                log.info("describing attachment %s: %s", oid, e)
+                continue
+            d: dict[str, Any] = {"ref": f"#{n0 + len(out) + 1}", "id": oid, "name": o.get("title") or oid, "kind": o["kind"],
+                                 "subtype": o.get("subtype"), "tokens": w["tokens"], "pages": w["pages"], "lines": w["lines"],
+                                 "outline": [{k: x[k] for k in ("level", "title", "page", "line") if x.get(k) is not None}
+                                             for x in w["outline"][:30]],
+                                 "inline": bool(w["text"]) and w["next_offset"] is None and w["tokens"] <= cap}
+            if w.get("scanned"):
+                d["scanned"] = w["scanned"][:50]
+            if w.get("notes"):
+                d["notes"] = w["notes"][:5]
+            if d["inline"]:
+                d["text"] = w["text"]
+            out.append(d)
+        return out
 
     async def answer(self, tid: str, question_id: str, answers: dict[str, Any]) -> dict[str, Any]:
         q = self._find(tid, "question", question_id)
@@ -314,13 +350,20 @@ class Agent:
         step = calls[-1]["payload"].get("step")
         return [e for e in calls if e["payload"].get("step") == step]
 
+    def _refs(self, tid: str, args: dict[str, Any]) -> dict[str, Any]:
+        """A hub tool's `ref` given as this chat's `#n` → `output:<id>` (the hub doesn't know the chat's numbers)."""
+        ref = args.get("ref")
+        if isinstance(ref, str) and re.fullmatch(r"\s*#\d+\s*", ref) and (oid := self.local.resolve_ref(tid, ref)):
+            return {**args, "ref": f"output:{oid}"}
+        return args
+
     def _unresolved(self, tid: str) -> list[dict[str, Any]]:
         done = {e["payload"]["id"] for e in self.store.events(tid, types=("tool_result",))}
         return [e for e in self._last_step(tid) if e["payload"]["id"] not in done]
 
     def _result(self, tid: str, call: str, name: str, res: dict[str, Any]) -> dict[str, Any]:
         """A hub-shaped result → a tool_result event (outputs numbered #n in the thread)."""
-        n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result",))))
+        n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
         outs = []
         for i, o in enumerate(res.get("outputs") or []):
             outs.append({"n": n0 + i + 1, **{k: o.get(k) for k in ("output_id", "kind", "title", "summary", "url", "preview", "prompt")}})
@@ -332,7 +375,12 @@ class Agent:
                                for o in outs]
         if res.get("error"):
             body["error"] = res["error"]
-        content = res["content"] if isinstance(res.get("content"), str) else json.dumps(body, ensure_ascii=False, default=str)
+        if isinstance(res.get("content"), str):
+            content = res["content"]
+        elif isinstance(res.get("result"), str) and not outs and not res.get("error"):
+            content = res["result"]   # a text answer (hub_read_document): as it is, not as an escaped JSON string
+        else:
+            content = json.dumps(body, ensure_ascii=False, default=str)
         hint, cap = self.hooks_of(tid).after(name, res.get("status") or "done", (res.get("error") or {}).get("code"))
         if cap and len(content) > cap * 4:                 # a trim hook (plan 22.2): about 4 characters a token
             content = content[: cap * 4] + " … (trimmed by a harness hook; read_result has the rest)"
@@ -421,7 +469,8 @@ class Agent:
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
             if (thread.get("settings") or {}).get("no_learn"):
                 origin["no_learn"] = True   # this chat opted out of learning (plan 21.4)
-            res = await self.hub.call(name, args or {}, origin, mode, wait=2)
+            args = self._refs(tid, args or {})
+            res = await self.hub.call(name, args, origin, mode, wait=2)
             if res.get("status") == "needs_approval":
                 self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": name,
                                             "arguments": res.get("arguments"), "ask_fields": res.get("ask_fields") or [],
@@ -560,7 +609,8 @@ class Agent:
         msgs, _ = ctx.rebuild(events, images)
         results = sum(ctx.est(m["content"]) for m in msgs if m["role"] == "tool")
         sizes["tools"] = ctx.est(tools.functions())
-        sizes["messages"] = ctx.est(msgs) - results
+        sizes["documents"] = ctx.doc_tokens(msgs)
+        sizes["messages"] = ctx.est(msgs) - results - sizes["documents"]
         sizes["tool_results"] = results
         return [{"role": "system", "content": system}, *msgs], sizes
 

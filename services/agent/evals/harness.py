@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import time
 from collections.abc import Callable
@@ -128,8 +129,9 @@ def approve_all(a: dict[str, Any]) -> tuple[bool, dict[str, Any] | None]:
 
 class Harness:
     def __init__(self, base: str, model: str, dry_run: bool = True, all_tools: bool = False,
-                 log: Callable[[str], None] = print, transport: Any = None) -> None:
+                 log: Callable[[str], None] = print, transport: Any = None, hub: str | None = None) -> None:
         self.base, self.model, self.dry_run, self.all_tools, self.log = base.rstrip("/"), model, dry_run, all_tools, log
+        self._hub = hub.rstrip("/") if hub else None   # the hub `attach` talks to; else derived by hub_url()
         self.c = httpx.AsyncClient(base_url=self.base, timeout=httpx.Timeout(60, connect=10), trust_env=False, transport=transport)
         self.glitches: list[str] = []      # transient HTTP failures seen (and retried)
 
@@ -163,9 +165,11 @@ class Harness:
         raise TimeoutError("the turn didn't finish in time")
 
     def hub_url(self) -> str:
-        """The hub this agent runs under: the part of `base` before `/api/s/`, else AIHUB_URL."""
+        """The hub this agent runs under: the one given, else the part of `base` before `/api/s/`, else AIHUB_URL."""
         import os
 
+        if self._hub:
+            return self._hub
         return self.base.split("/api/s/")[0] if "/api/s/" in self.base else os.environ.get("AIHUB_URL", "http://127.0.0.1:7000")
 
     async def _drive(self, task: Task, tid: str, text: str, deadline: float, attachments: list[str] | None = None) -> None:
@@ -315,7 +319,7 @@ def grade(task: Task, run: Run) -> dict[str, Any]:
     if errors:
         results.append({"check": "no agent errors", "ok": False, "why": "; ".join(e.get("detail", "")[:120] for e in errors)})
     # never invents outputs: every #n in the replies exists
-    made = {o["n"] for o in run.outputs()}
+    made = {o["n"] for o in run.outputs()} | {int(str(d["ref"]).lstrip("#")) for u in run.of("user") for d in u.get("docs") or []}
     named = {int(n) for n in REF.findall(run.text())}
     bad = sorted(named - made)
     results.append({"check": "no invented outputs", "ok": not bad, "why": f"mentions #{bad} that don't exist" if bad else ""})

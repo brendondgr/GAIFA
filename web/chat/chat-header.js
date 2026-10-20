@@ -5,8 +5,8 @@ import { h, T, MONO, Icon, Btn, Popover, inputSt, fmtTokens, label11 } from './c
 
 const R = () => globalThis.React;
 export const MODES = [['ask', 'Ask about choices', 'Parameter cards for anything that generates, writes, uses the internet, runs code or deletes'], ['auto', 'Use defaults', 'Runs with the defaults; only tools that use the internet, run code or delete ask'], ['read_only', 'Read only', 'Only tools that read can run']];
-const PARTS = [['instructions', 'Instructions'], ['skills_memory', 'Skills & memory'], ['tool_index', 'Tool index'], ['tools', 'Loaded tools'], ['outputs', 'Outputs table'], ['messages', 'Messages'], ['tool_results', 'Tool results']];
-const PART_COLOR = ['var(--s6,#79C0FF)', 'var(--s3,#BC8CFF)', 'var(--s7,#D2A8FF)', 'var(--s1,#58C4DD)', 'var(--s8,#E3B341)', 'var(--s4,#3FB950)', 'var(--s2,#FFB224)'];
+const PARTS = [['instructions', 'Instructions'], ['skills_memory', 'Skills & memory'], ['tool_index', 'Tool index'], ['tools', 'Loaded tools'], ['outputs', 'Outputs table'], ['messages', 'Messages'], ['documents', 'Documents'], ['tool_results', 'Tool results']];
+const PART_COLOR = ['var(--s6,#79C0FF)', 'var(--s3,#BC8CFF)', 'var(--s7,#D2A8FF)', 'var(--s1,#58C4DD)', 'var(--s8,#E3B341)', 'var(--s4,#3FB950)', 'var(--s2,#FFB224)', 'var(--s5,#F78166)'];
 const selSt = { ...inputSt, height: 28, paddingRight: 6, fontSize: 12, cursor: 'pointer', maxWidth: 210 };
 
 export const modelLabel = m => `${m.id}${m.meta?.context_length ? ' · ' + fmtTokens(m.meta.context_length) : ''}${m.health && m.health !== 'healthy' ? ` (${m.health})` : ''}`;

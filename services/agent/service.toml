@@ -12,7 +12,7 @@ port = 5100
 health = "/health"
 status = "/v1/status"
 openapi = "/openapi.json"
-env = { AGENT_DB = "{databases}/agent.db", AGENT_DATA = "{root}/data/agent", AGENT_LLM_URL = "http://127.0.0.1:4000/v1", AGENT_MODEL = "skynet", AGENT_FALLBACK_MODEL = "gemma4-26B", AGENT_MAX_STEPS = "25" }
+env = { AGENT_DB = "{databases}/agent.db", AGENT_DATA = "{root}/data/agent", AGENT_LLM_URL = "http://127.0.0.1:4000/v1", AGENT_MODEL = "skynet", AGENT_FALLBACK_MODEL = "gemma4-26B", AGENT_MAX_STEPS = "25", AGENT_INLINE_TOKENS = "6000" }
 start_timeout_s = 20
 stop_timeout_s = 15
 restart = "on-failure"

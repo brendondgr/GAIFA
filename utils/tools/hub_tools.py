@@ -1,4 +1,5 @@
-"""The hub's own tools (plan 13.1), all `core`: mods, memory, outputs, models and calls.
+"""The hub's own tools (plan 13.1), all `core`: mods, memory, outputs, models and calls; the
+reading tools (plan 24.4) are in `doc_tools.py`.
 
 Each handler takes `(hub, args)` and returns JSON. Results name things (mod names, titles) rather
 than only ids, and stay small: the agent pages with `limit`.
@@ -8,7 +9,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from utils.outputs.entries import KINDS
 from utils.services import loading
+from utils.tools import doc_tools
 from utils.tools.catalog import ToolDef
 
 if TYPE_CHECKING:
@@ -138,10 +141,10 @@ async def list_preferences(hub: Hub, args: dict[str, Any]) -> Any:
 
 
 def tools() -> list[ToolDef]:
-    def t(name: str, desc: str, params: dict[str, Any], fn: Any, risk: str = "read") -> ToolDef:
-        return ToolDef(f"hub_{name}", None, name, desc, params, risk=risk, core=True, source="hub", handler=fn)
+    def t(name: str, desc: str, params: dict[str, Any], fn: Any, risk: str = "read", cap: int | None = None) -> ToolDef:
+        return ToolDef(f"hub_{name}", None, name, desc, params, risk=risk, core=True, source="hub", handler=fn, cap_bytes=cap)
 
-    kinds = {"type": "string", "enum": ["audio", "image", "video", "model3d", "text", "archive", "other"]}
+    kinds = {"type": "string", "enum": list(KINDS)}
     return [
         t("list_services", "List AIHub's mods (speech, 3D, images & video, LLMs…) with their state, whether their models "
           "are loaded, and running jobs.", _obj({}), list_services),
@@ -152,11 +155,13 @@ def tools() -> list[ToolDef]:
         t("unload_service", "Unload a mod's models from memory, keeping it running.", _obj({"id": SERVICE}, ["id"]),
           unload_service, "write"),
         t("memory_status", "Memory now: total, used and free (GB), and what each mod holds.", _obj({}), memory_status),
-        t("search_outputs", "Find earlier outputs (images, videos, audio, 3D models) by words, kind or mod, newest first.",
+        t("search_outputs", "Find earlier outputs (images, videos, audio, 3D models, text, documents) by words, kind or mod, newest first.",
           _obj({"q": {"type": "string", "description": "Words in the title or prompt"}, "kind": kinds, "service": SERVICE,
                 "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10}}), search_outputs),
         t("get_output", "One output's details: title, kind, prompt, settings and files.",
           _obj({"id": {"type": "string", "description": "The output id, or output:<id>"}}, ["id"]), get_output),
+        *(t(name, desc, _obj(props, ["ref", "query"] if name == "search_document" else ["ref"]), fn, cap=doc_tools.CAP_BYTES)
+          for name, desc, props, fn in doc_tools.specs()),
         t("list_models", "The models on disk (registry): kind, size, status and which mods use them.",
           _obj({"kind": {"type": "string"}, "q": {"type": "string"},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 30}}), list_models),

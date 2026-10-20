@@ -8,6 +8,7 @@
 - `trash.py`: deletes go to `outputs/.trash/<date>/`, purged after 30 days
 - `announce.py`: batched activity items for new outputs
 - `upload.py`: a file sent to `POST /api/outputs/upload` written as an output in `uploads/`
+- `text.py`, `readers.py`: the text of text and document outputs (plan 24.2), cached in `.text/`
 """
 
 from utils.outputs.entries import KINDS

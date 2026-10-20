@@ -4,6 +4,7 @@ import { createHistory, withSeries } from './mock-history.js';
 import { createModMocks } from './mock-mods.js';
 import { createToolMocks } from './mock-tools.js';
 import { createSessionMocks } from './mock-sessions.js';
+import { TEXT_EXT, DOC_EXT } from './chat/chat-files.js';
 const GB = 1e9, MB = 1e6;
 export class ApiError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
@@ -595,12 +596,25 @@ export function createMockApi() {
     async getOutput(id) { await net(); const o = outputs.find(x => x.id === id); if (!o) throw err(404, 'output_not_found', `No output "${id}"`); return clone(o); },
     async uploadOutput(file) {
       await net(); const name = file.name || 'upload', ext = (name.split('.').pop() || '').toLowerCase();
-      const kind = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'].includes(ext) ? 'image' : ['mp4', 'webm', 'mov', 'mkv'].includes(ext) ? 'video' : ['wav', 'mp3', 'flac', 'ogg', 'opus', 'm4a', 'aac'].includes(ext) ? 'audio' : null;
-      if (!kind) throw err(415, 'upload_type', `"${name}" isn't an image, video or audio file`);
+      const kind = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'].includes(ext) ? 'image' : ['mp4', 'webm', 'mov', 'mkv'].includes(ext) ? 'video' : ['wav', 'mp3', 'flac', 'ogg', 'opus', 'm4a', 'aac'].includes(ext) ? 'audio'
+        : DOC_EXT.includes(ext) ? 'document' : TEXT_EXT.includes(ext) ? 'text' : null;   // plan 24.6: text and documents too
+      if (!kind) throw err(415, 'upload_type', `"${name}" isn't an image, video, audio, text or document file`);
+      const text = kind === 'text' && file.text ? await file.text() : kind === 'document' ? `(${name}: the mock can't read documents; the hub extracts their text)` : null;
       const ts = now(), path = `outputs/uploads/${ymd(ts)}/${hms(ts)}-${slug(name.replace(/\.[^.]*$/, ''))}.${ext}`, url = URL.createObjectURL(file);
-      const o = { id: 'o_' + Math.random().toString(36).slice(2, 12), service: 'uploads', kind, title: name, path, files: [{ path, kind, size_bytes: file.size }], url, preview: kind === 'image' ? url : null, size_bytes: file.size, created_ts: ts, meta: { source: { service: 'upload' } } };
+      const o = { id: 'o_' + Math.random().toString(36).slice(2, 12), service: 'uploads', kind, title: name, path, files: [{ path, kind, size_bytes: file.size }], url, preview: kind === 'image' ? url : null, size_bytes: file.size, created_ts: ts,
+        ...(kind === 'text' || kind === 'document' ? { subtype: ext === 'md' ? 'markdown' : ext === 'pdf' || kind === 'document' ? ext : ext === 'py' ? 'code:python' : 'plain' } : {}),
+        meta: { source: { service: 'upload' }, ...(text != null ? { text, excerpt: text.slice(0, 400) } : {}) } };
       outputs.unshift(o); emit({ type: 'output', output: clone(o) }); return clone(o);
     },
+    // Plan 24.3: text outputs read their excerpt (the mock has no documents with pages).
+    async outputText(id, { offset = 0, limit = 12000 } = {}) { await net(); const o = outputs.find(x => x.id === id); if (!o) throw err(404, 'output_not_found', `No output "${id}"`);
+      if (!['text', 'document'].includes(o.kind)) throw err(409, 'not_text', `Output "${id}" is ${o.kind}, which has no text to read`);
+      const t = o.meta?.text || o.meta?.excerpt || '', s = t.slice(offset, offset + limit);
+      return { text: s, offset, next_offset: offset + s.length < t.length ? offset + s.length : null, total_chars: t.length, tokens: Math.ceil(t.length / 4), pages: 0, lines: t ? t.split('\n').length : 0, page_of_offset: null, outline: [], scanned: [], truncated: false, notes: [] }; },
+    async outputSearch(id, q, { limit = 20 } = {}) { const { text } = await this.outputText(id, { limit: 48000 }); const words = String(q || '').toLowerCase().split(/\s+/).filter(Boolean), lines = text.split('\n'), hits = [];
+      let off = 0; lines.forEach((l, i) => { if (words.length && words.every(w => l.toLowerCase().includes(w))) hits.push({ line: i + 1, offset: off, text: lines.slice(Math.max(0, i - 1), i + 2).join('\n') }); off += l.length + 1; });
+      return { hits: hits.slice(0, limit), total: hits.length }; },
+    outputPageUrl(id) { return outputs.find(x => x.id === id)?.preview || ''; },
     async deleteOutput(id) { await net(); const i = outputs.findIndex(x => x.id === id); if (i < 0) throw err(404, 'output_not_found', `No output "${id}"`); outputs.splice(i, 1); emit({ type: 'output_deleted', id }); return null; },
     async getSettings() { await net(); return clone(settings); },
     async saveSettings(patch) { await net();

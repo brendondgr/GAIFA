@@ -46,6 +46,13 @@ async def test_proposed_then_approved_or_rejected(th):
     assert (await th.client.get("/api/prefs/nope/approve")).status_code in (404, 405)
 
 
+async def test_free_text_is_never_inferred(th):
+    """plan 24.8: a prompt (or any free-text field) can be stated, never inferred."""
+    r = await post(th, tool="fake_tools_make_image", field="prompt", value="the quarterly report says…", source="inferred")
+    assert r.status_code == 422 and r.json()["code"] == "free_text"
+    assert (await post(th, tool="fake_tools_make_image", field="prompt", value="a fox")).status_code == 200   # stated: fine
+
+
 async def test_learning_off_refuses_writes(th):
     th.hub.config.learning.enabled = False
     try:

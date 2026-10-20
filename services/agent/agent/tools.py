@@ -49,8 +49,11 @@ LOCAL: list[dict[str, Any]] = [
      "parameters": {"type": "object", "properties": {"name": {"type": "string", "description": "e.g. comfy/choosing-a-workflow"}},
                     "required": ["name"]}},
     {"name": "view_output", "description": "Look at an output (an image, or a video's or 3D model's preview) so you can describe "
-     "it, write from it or check it. `ref` is #n or output:<id>.",
-     "parameters": {"type": "object", "properties": {"ref": {"type": "string"}}, "required": ["ref"]}},
+     "it, write from it or check it; `page` shows a PDF's page as an image (figures, tables, scanned pages). For text and "
+     "documents it gives the start of the text: read the rest with hub_read_document. `ref` is #n or output:<id>.",
+     "parameters": {"type": "object", "properties": {"ref": {"type": "string"},
+                                                    "page": {"type": "integer", "minimum": 1, "description": "A PDF's page (1-based)"}},
+                    "required": ["ref"]}},
     {"name": "read_result", "description": "Read more of an earlier tool result that was cut or cleared: `seq` is the number "
      "in its note.",
      "parameters": {"type": "object", "properties": {"seq": {"type": "integer"}, "offset": {"type": "integer", "default": 0},

@@ -31,7 +31,7 @@ async def test_harness_answers_and_grades(env):
 
 
 def test_eval_tasks_in_eight_groups():
-    assert len(TASKS) == 47 and len({t.id for t in TASKS}) == 47
+    assert len(TASKS) == 48 and len({t.id for t in TASKS}) == 48
     assert {t.group for t in TASKS} == {"single", "chain", "capability", "preference", "must-ask", "no-ask", "safety", "context"}
 
 
@@ -63,3 +63,29 @@ async def test_seeded_preferences_are_for_the_task_chat_and_removed(env):
     assert "Answer in French." in env.model.received[-1]["messages"][0]["content"]
     assert env.hub.prefs == []
     await h.close()
+
+
+async def test_attach_uploads_to_the_hub_and_attaches_to_the_first_turn(env):
+    """plan 24.5: the pdf_page7 task's file goes to the hub's upload route and rides on the first message."""
+    task = next(t for t in TASKS if t.id == "pdf_page7")
+    h = Harness("http://agent", "main", dry_run=True, transport=httpx.ASGITransport(app=env.app), hub=env.hub_url)
+    env.model.queue({"tool_calls": [{"name": "hub_search_document", "arguments": {"ref": "#1", "query": "cat"}}]},
+                    {"text": "The cat is called Biscuit (#1 p.7)."})
+    run = await h.run(task)
+    [user] = run.of("user")
+    assert user["docs"][0]["name"] == "north-rock-inspection.pdf" and user["attachments"] == [user["docs"][0]["id"]]
+    row = grade(task, run)
+    assert row["ok"], row["checks"]
+    await h.close()
+
+
+def test_the_eval_report_has_the_cat_only_on_page_7():
+    import io
+    import re
+
+    from evals.docs import TOPICS, lighthouse_report
+    data = lighthouse_report()
+    assert data.startswith(b"%PDF-1.4") and data.count(b"/Type /Page ") == len(TOPICS) == 20
+    streams = re.findall(rb"stream\n(.*?)\nendstream", data, re.S)
+    assert [i for i, s in enumerate(streams) if b"Biscuit" in s] == [6]
+    assert io.BytesIO(data).getbuffer().nbytes > 20 * 1500

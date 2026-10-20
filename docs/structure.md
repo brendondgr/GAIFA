@@ -31,7 +31,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 
 ## `services/` (the mods)
 
-The existing apps come in with `git subtree add` (their history is kept), so most of each folder is the app's own code. These are the parts added for AIHub; `comfy`, `agent`, `vllm` and `embed` are new:
+The existing apps come in with `git subtree add` (their history is kept), so most of each folder is the app's own code. These are the parts added for AIHub; `comfy`, `agent`, `vllm`, `web` and `embed` are new:
 
 | Mod | From | Added for AIHub |
 | :--- | :--- | :--- |

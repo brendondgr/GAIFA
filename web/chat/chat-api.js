@@ -82,7 +82,7 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     remove: tid => req('DELETE', T(tid)),
     events: (tid, after = 0) => req('GET', `${T(tid)}/events?after=${after}`),
     stream,
-    send: (tid, text, attachments = []) => req('POST', `${T(tid)}/messages`, { text, attachments }),
+    send: (tid, text, attachments = [], doc_modes = {}) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes).length ? { doc_modes } : {}) }),
     answer: (tid, question_id, answers) => req('POST', `${T(tid)}/answer`, { question_id, answers }),
     approval: (tid, body) => req('POST', `${T(tid)}/approval`, body),
     action: (tid, tool, args = {}) => req('POST', `${T(tid)}/action`, { tool, arguments: args }),

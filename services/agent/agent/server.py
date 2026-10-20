@@ -21,6 +21,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
+from . import docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -47,6 +48,8 @@ class ThreadPatch(BaseModel):
 class Message(BaseModel):
     text: str = Field(min_length=1, max_length=100_000)
     attachments: list[str] = Field(default_factory=list, description="output ids")
+    doc_modes: dict[str, Literal["auto", "whole", "card"]] = Field(default_factory=dict,
+                                                                   description="per attached document: whole, card, or auto (plan 24.9)")
 
 
 class Answer(BaseModel):
@@ -79,9 +82,15 @@ class Fork(BaseModel):
     seq: int = Field(ge=0)
 
 
+class DocSettings(BaseModel):
+    inline_tokens: int | Literal["window"] | None = Field(None, description='Whole documents up to this many tokens, or "window"')
+    reply_reserve: int | None = Field(None, ge=0, description="Tokens kept free for the reply and tools")
+
+
 class AgentFiles(BaseModel):
     agent_md: str | None = None
     memory: str | None = None
+    documents: DocSettings | None = None
 
 
 def config_from_env() -> Config:
@@ -90,6 +99,7 @@ def config_from_env() -> Config:
                   max_steps=int(os.environ.get("AGENT_MAX_STEPS", "25")), data=data,
                   default_window=int(os.environ.get("AGENT_DEFAULT_WINDOW", "32768")),
                   inline_tokens=int(os.environ.get("AGENT_INLINE_TOKENS", "6000")),
+                  reply_reserve=int(os.environ.get("AGENT_REPLY_RESERVE", "4096")),
                   all_tools_models=tuple(m for m in os.environ.get("AGENT_ALL_TOOLS", "").split(",") if m))
 
 
@@ -344,7 +354,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def send(tid: str, body: Message, request: Request) -> dict:
         agent = A(request)
         thread_or_404(agent, tid)
-        return await agent.send(tid, body.text, body.attachments)
+        return await agent.send(tid, body.text, body.attachments, body.doc_modes)
 
     @app.post("/v1/threads/{tid}/answer", status_code=202, summary="Answer an ask_user question card")
     async def answer(tid: str, body: Answer, request: Request) -> dict:
@@ -534,12 +544,17 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         agent = A(request)
         k = Knowledge(agent.cfg.data, agent.hub)
         return {**k.files(), "skills": await k.skills(), "model": agent.cfg.model, "fallback": agent.cfg.fallback,
-                "max_steps": agent.cfg.max_steps, "modes": list(MODES)}
+                "max_steps": agent.cfg.max_steps, "modes": list(MODES), "documents": docs.load(agent.cfg.data, agent.cfg)}
 
-    @app.put("/v1/settings", summary="Save AGENT.md and/or the memory index")
+    @app.put("/v1/settings", summary="Save AGENT.md, the memory index and/or the document settings")
     async def put_settings(body: AgentFiles, request: Request) -> dict:
         agent = A(request)
         Knowledge(agent.cfg.data, agent.hub).save(body.agent_md, body.memory)
+        if body.documents is not None:
+            try:
+                docs.save(agent.cfg.data, agent.cfg, body.documents.model_dump(exclude_none=True))
+            except docs.SettingsError as e:
+                raise HTTPException(422, str(e)) from None
         return await get_settings(request)
 
     return app

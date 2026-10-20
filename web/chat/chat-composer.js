@@ -74,6 +74,18 @@ function ToolGroups({ index, settings, onChange }) {
     }) : h('span', { style: { color: T.mut, fontSize: 12 } }, 'Loading the tool catalog…'));
 }
 
+// Whole / Card on a document chip (plan 24.9): Whole sends all of it if it fits the window after the
+// reply reserve, Card sends its card; neither is "auto" (whole up to Settings → Agent's size). The last
+// choice is the chat's default (its settings.doc_mode).
+function DocMode({ a, mode, onPick }) {
+  const b = (m, label, title) => h('button', { type: 'button', 'aria-pressed': mode === m ? 'true' : 'false', title, 'data-docmode': m,
+    onClick: () => onPick(mode === m ? 'auto' : m),
+    style: { border: 0, borderRadius: 3, padding: '0 4px', height: 16, font: 'inherit', fontSize: 10, cursor: 'pointer', background: mode === m ? T.tcy : 'transparent', color: mode === m ? T.cy : T.dim } }, label);
+  return h('span', { role: 'group', 'aria-label': `Send ${a.title || a.id} whole or as a card`, style: { display: 'inline-flex', gap: 1, padding: 1, borderRadius: 4, border: '1px solid ' + T.bd } },
+    b('whole', 'Whole', 'Send all of it, if it fits the model’s window after the reply reserve (else a card, and a note says how much didn’t fit)'),
+    b('card', 'Card', 'Send only its card (name, size, outline): the agent reads it in parts'));
+}
+
 export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen }) {
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
@@ -129,12 +141,14 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
         onDragOver: e => { if (hasFiles(e)) { e.preventDefault(); setOver(true); } }, onDragLeave: () => setOver(false),
         onDrop: e => { if (!hasFiles(e)) return; e.preventDefault(); setOver(false); upload(e.dataTransfer.files); },
         style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 8px 6px 10px', borderRadius: 10, border: `1px ${over ? 'dashed' : 'solid'} ${over ? T.cy : T.bds}`, background: over ? T.tcy : T.card } },
-        attachments.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 5 } }, attachments.map(a => h('span', { key: a.id, 'data-chip': a.kind, style: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 4px 0 3px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd, fontSize: 11.5, maxWidth: 260 } },
+        attachments.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 5 } }, attachments.map(a => h('span', { key: a.id, 'data-chip': a.kind, style: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 4px 0 3px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd, fontSize: 11.5, maxWidth: 340 } },
           a.preview ? h('img', { src: a.preview, alt: '', style: { width: 18, height: 18, objectFit: 'cover', borderRadius: 3 } }) : h(Icon, { d: chipIcon(a), size: 12 }),
           (a.kind === 'text' || a.kind === 'document') && onOpen
             ? h('button', { type: 'button', title: `Open ${a.title || a.id}`, onClick: () => onOpen(a.id), style: { border: 0, background: 'none', padding: 0, color: T.tx, font: 'inherit', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, (a.n ? `#${a.n} ` : '') + (a.title || a.id))
             : h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, (a.n ? `#${a.n} ` : '') + (a.title || a.id)),
           chipSize(a) ? h('span', { style: { color: T.dim, fontFamily: MONO, fontSize: 10.5, whiteSpace: 'nowrap' } }, chipSize(a)) : null,
+          a.kind === 'text' || a.kind === 'document' ? h(DocMode, { a, mode: a.mode || settings?.doc_mode || 'auto', onPick: m => {   // plan 24.9
+            setAttachments(l => l.map(x => (x.id === a.id ? { ...x, mode: m } : x))); onSettings?.({ doc_mode: m }); } }) : null,
           h('button', { type: 'button', 'aria-label': `Remove ${a.title || a.id}`, onClick: () => toggleAtt(a), style: { border: 0, background: 'none', padding: 2, color: T.mut, cursor: 'pointer', display: 'flex' } }, h(Icon, { d: 'x', size: 11 }))))) : null,
         uploading ? h('span', { role: 'status', style: { fontSize: 11.5, color: T.mut } }, `Uploading ${uploading} file${uploading > 1 ? 's' : ''}…`) : null,
         upErr ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, upErr) : null,

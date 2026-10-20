@@ -54,7 +54,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       { name: 'comfy', description: 'Choosing a ComfyUI workflow and its settings per task', source: 'comfy', id: 'comfy/comfy' },
       { name: 'tts', description: 'Voices and delivery direction', source: 'tts', id: 'tts/tts' },
       { name: 'gen3d', description: 'Presets, parts and rigs for 3D models', source: 'gen3d', id: 'gen3d/gen3d' }],
-    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['ask', 'auto', 'read_only'] };
+    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['ask', 'auto', 'read_only'], documents: { inline_tokens: 6000, reply_reserve: 4096 } };
 
   function newThread(o = {}) {
     const ts = now(), th = { id: rid('t_'), title: o.title || '', model: o.model || null, mode: o.mode || 'ask', state: 'idle', settings: o.settings || {}, created: ts, updated: ts, archived: false, parent_id: o.parent_id || null, fork_seq: o.fork_seq ?? null };
@@ -194,15 +194,16 @@ export function createMockClient(api, { speed = 1 } = {}) {
     return 'idle';
   }
   // Plan 24.6: attached text and documents, numbered like outputs and read with hub_read_document.
-  async function describe(t, ids) {
+  async function describe(t, ids, modes = {}) {
     let n = t.events.reduce((a, e) => a + (e.type === 'tool_result' ? (e.payload.outputs || []).length : e.type === 'user' ? (e.payload.docs || []).length : 0), 0);
     const docs = [];
     for (const id of ids) {
       const o = await api.getOutput?.(id).catch(() => null);
       if (!o || !['text', 'document'].includes(o.kind)) continue;
       const w = await api.outputText?.(id, { limit: 24000 }).catch(() => null);
-      const inline = !!w && w.next_offset == null && w.tokens <= 6000;
-      docs.push({ ref: '#' + (++n), id, name: o.title, kind: o.kind, subtype: o.subtype, tokens: w?.tokens || 0, pages: w?.pages || 0, lines: w?.lines || 0, outline: [], inline, ...(inline ? { text: w.text } : {}) });
+      const mode = modes[id] || t.thread.settings?.doc_mode || 'auto', lim = settings.documents.inline_tokens === 'window' ? 1e9 : settings.documents.inline_tokens;   // plan 24.9
+      const inline = !!w && w.next_offset == null && mode !== 'card' && (mode === 'whole' || w.tokens <= lim);
+      docs.push({ ref: '#' + (++n), id, name: o.title, kind: o.kind, subtype: o.subtype, tokens: w?.tokens || 0, pages: w?.pages || 0, lines: w?.lines || 0, outline: [], mode, inline, ...(inline ? { text: w.text } : {}) });
     }
     return docs;
   }
@@ -318,10 +319,10 @@ export function createMockClient(api, { speed = 1 } = {}) {
       }, 40));
       return { close() { closed = true; threads.get(tid)?.subs.delete(f); }, get lastSeq() { return last; } };
     },
-    async send(tid, text, attachments = []) {
+    async send(tid, text, attachments = [], docModes = {}) {
       await net(); const t = T(tid), queued = !!t.run;
       if (!queued && t.pending) { emit(t, 'tool_result', { id: t.pending.id, name: t.pending.kind === 'question' ? 'ask_user' : 'comfy_generate_image', status: 'skipped', content: '{}', error: { code: 'skipped', detail: 'The user wrote a message instead of answering.' } }); t.pending = null; }
-      const docs = attachments.length ? await describe(t, attachments) : [];
+      const docs = attachments.length ? await describe(t, attachments, docModes) : [];
       const ev = emit(t, 'user', { text, ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}) });
       if (!t.thread.title) { t.thread.title = text.slice(0, 48); transient(t, 'thread', pub(t)); }
       if (queued) t.queue.push(text); else start(t, run => messageTurn(t, run, text, docs));
@@ -384,6 +385,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
     async settings() { await net(); return structuredClone(settings); },
     async feedback(tid, body) { await net(); return { seq: 0, ...body }; },          // plan 21.7: the mock keeps no learning
     async decidePref(pid, approve) { await net(); return { id: pid, state: approve ? 'active' : 'rejected' }; },
-    async saveSettings(body) { await net(); if (body.agent_md != null) settings.agent_md = body.agent_md; if (body.memory != null) settings.memory = body.memory; return structuredClone(settings); },
+    async saveSettings(body) { await net(); if (body.agent_md != null) settings.agent_md = body.agent_md; if (body.memory != null) settings.memory = body.memory;
+      if (body.documents) settings.documents = { ...settings.documents, ...body.documents }; return structuredClone(settings); },
   };
 }

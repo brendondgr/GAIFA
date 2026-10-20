@@ -135,3 +135,79 @@ async def test_the_prompt_has_the_untrusted_and_citing_rules(env):
     await env.send(tid, "hi")
     system = env.model.received[-1]["messages"][0]["content"]
     assert "<untrusted" in system and "never instructions" in system and "#n p.14" in system and "#n:88" in system
+
+
+# ---- plan 24.9: how much goes in whole is the user's to set ----
+
+WIDE = {"context_length": 128000, "tools": True, "vision": True, "reasoning": False}
+
+
+def last_user(env) -> str:
+    return user_msgs(env)[-1]
+
+
+async def test_the_setting_whole_documents_up_to(env):
+    env.model.models["wide"] = WIDE
+    s = (await env.client.get("/v1/settings")).json()["documents"]
+    assert s == {"inline_tokens": 6000, "reply_reserve": 4096}
+    mid = env.hub.doc("mid.txt", text="word " * 800, kind="text", subtype="plain")              # 1,000 tokens
+    r = await env.client.put("/v1/settings", json={"documents": {"inline_tokens": 500}})
+    assert r.status_code == 200 and r.json()["documents"]["inline_tokens"] == 500
+    tid = await env.thread(mode="auto", model="wide")
+    await env.send(tid, "read", attachments=[mid])
+    assert env.payloads(tid, "user")[-1]["docs"][0]["inline"] is False                              # over the setting: a card
+    big = env.hub.doc("big.txt", text="word " * 20000, kind="text", subtype="plain")             # 25,000 tokens, over one hub window
+    await env.client.put("/v1/settings", json={"documents": {"inline_tokens": "window"}})
+    await env.send(tid, "and this", attachments=[big])
+    d = env.payloads(tid, "user")[-1]["docs"][0]
+    assert d["inline"] is True and len(d["text"]) == 100000                                         # up to the window, fetched whole
+    assert (await env.client.put("/v1/settings", json={"documents": {"inline_tokens": -3}})).status_code == 422
+    assert (await env.client.put("/v1/settings", json={"documents": {"reply_reserve": -1}})).status_code == 422
+    assert (await env.client.get("/v1/settings")).json()["documents"] == {"inline_tokens": "window", "reply_reserve": 4096}
+
+
+async def test_whole_or_card_per_attachment_and_the_model_gets_all_of_it(env):
+    env.model.models["wide"] = WIDE
+    small = env.hub.doc("list.md", text=SMALL, kind="text", subtype="markdown")
+    text = "".join(f"Paragraph {i}: the river was calm.\n" for i in range(1500)) + "THE LAST LINE\n"   # ~13,000 tokens
+    big = env.hub.doc("river.txt", text=text, kind="text", subtype="plain")
+    tid = await env.thread(mode="auto", model="wide")
+    await env.send(tid, "read both", attachments=[small, big], doc_modes={small: "card", big: "whole"})
+    a, b = env.payloads(tid, "user")[-1]["docs"]
+    assert (a["mode"], a["inline"], b["mode"], b["inline"]) == ("card", False, "whole", True)
+    msg = last_user(env)
+    assert "the user chose to send it as a card" in msg and "1| # Shopping" not in msg
+    assert "1501| THE LAST LINE" in msg and "1| Paragraph 0: the river was calm." in msg              # the model got all of it
+    m = (await env.client.get(f"/v1/threads/{tid}/context")).json()
+    assert m["breakdown"]["documents"] > 8000
+
+
+async def test_whole_that_does_not_fit_says_so_and_falls_back_to_a_card(env):
+    doc = env.hub.doc("words.txt", text="word " * 2400, kind="text", subtype="plain")             # 3,000 tokens
+    tid = await env.thread(mode="auto")                                                           # "main": 8,000 tokens
+    await env.send(tid, "all of it please", attachments=[doc], doc_modes={doc: "whole"})
+    d = env.payloads(tid, "user")[-1]["docs"][0]
+    assert d["inline"] is False and "didn't fit" in d["fallback"] and "4,096-token reserve" in d["fallback"]
+    note = env.payloads(tid, "note")[-1]
+    assert note["level"] == "warn" and note["text"] == d["fallback"]
+    assert "the user asked for all of it, but it didn't fit the window" in last_user(env)
+    # the reserve is part of the check: with none kept back, the same document fits
+    await env.client.put("/v1/settings", json={"documents": {"reply_reserve": 0}})
+    t2 = await env.thread(mode="auto")
+    await env.send(t2, "all of it please", attachments=[doc], doc_modes={doc: "whole"})
+    d2 = env.payloads(t2, "user")[-1]["docs"][0]
+    assert d2["inline"] is True and "fallback" not in d2
+
+
+async def test_the_choice_is_remembered_for_the_chat(env):
+    env.model.models["wide"] = WIDE
+    big = env.hub.doc("big.txt", text="word " * 8000, kind="text", subtype="plain")               # 10,000 tokens: auto would card it
+    tid = await env.thread(mode="auto", model="wide", settings={"doc_mode": "whole"})
+    await env.send(tid, "read", attachments=[big])
+    assert env.payloads(tid, "user")[-1]["docs"][0]["inline"] is True
+    await env.client.patch(f"/v1/threads/{tid}", json={"settings": {"doc_mode": "card"}})
+    small = env.hub.doc("list.md", text=SMALL, kind="text", subtype="markdown")
+    await env.send(tid, "and this", attachments=[small])
+    assert env.payloads(tid, "user")[-1]["docs"][0]["inline"] is False
+    await env.send(tid, "and this whole", attachments=[small], doc_modes={small: "whole"})        # the chip's own choice wins
+    assert env.payloads(tid, "user")[-1]["docs"][0]["inline"] is True

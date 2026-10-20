@@ -55,4 +55,4 @@ Every version can be rolled back there, and the base stays in git.
 
 ## Settings (`service.toml` `[run].env`)
 
-`AGENT_MODEL` (default `skynet`: Gemma 4 31B through the relay), `AGENT_FALLBACK_MODEL` (`gemma4-26B`, local), `AGENT_MAX_STEPS` (25), `AGENT_INLINE_TOKENS` (6000: an attached document up to this size, and 15 % of the window, goes into the message whole; plan 24.5), `AGENT_DB`, `AGENT_DATA`, `AGENT_LLM_URL`.
+`AGENT_MODEL` (default `skynet`: Gemma 4 31B through the relay), `AGENT_FALLBACK_MODEL` (`gemma4-26B`, local), `AGENT_MAX_STEPS` (25), `AGENT_INLINE_TOKENS` (6000: an attached document up to this size goes into the message whole; plan 24.5) and `AGENT_REPLY_RESERVE` (4096: tokens kept free for the reply), the defaults for Settings → Agent → Documents (saved in `data/agent/documents.json`; plan 24.9), `AGENT_DB`, `AGENT_DATA`, `AGENT_LLM_URL`.

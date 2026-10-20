@@ -2527,11 +2527,12 @@ Bypass is offered only for folders where you've ticked "allow Bypass" on the Wor
 - **The container.** Rootless podman, the folder mounted read-write **at the same absolute path** (so a project's `.venv` and paths keep working when its interpreter is inside the folder), `~/.cache/uv`, `~/.cache/pip` and `~/.npm` read-only, the rest of `$HOME` absent, no network unless Run + network, which is **full internet** (decided 2026-10-20) and covered by tests like every other level. Projects whose toolchain isn't in the image fail with "not in the sandbox; run on your machine?" (which then asks).
 - **Commits.** `workspace_git_commit` asks every time (all modes except Bypass); `push` and anything touching a remote is risk `network` + `destructive` and always asks.
 
-- [ ] **27.1 The mod, folders and levels: `services/workspace/` (port 5103).**
+- [x] **27.1 The mod, folders and levels: `services/workspace/` (port 5103).**
   - `aihub new workspace`. Folders `{id, path, level: read|edit|run|run_net, allow_bypass}` in `data/state/workspace/folders.json`, set on the mod's page; new folders start at Read. Paths are resolved (symlinks too) and must stay inside; the hard-limit globs and skip rules (`.git/objects`, `node_modules`, `.venv`, binaries, files over 2 MB unless named).
   - The AIHub root and `data/models/` are capped at Read.
   - The rule change in `CLAUDE.md`, architecture §2/§12 and the `aihub` skill's invariants: "nothing written outside the project root, except folders the user set to Edit or above."
   *Done when:* `services/workspace/tests/test_folders.py` covers each level, escapes (`..`, symlinks out, absolute paths), the secret globs, the skip rules, and the AIHub cap.
+  *As built:* the secret globs match any part of the path (so `secrets/db.txt` too); a folder that *contains* AIHub keeps its level, but no write may land inside AIHub or `data/models/` (`protected`); `/` and `$HOME` can't be workspaces. Routes `GET/POST /v1/folders`, `PATCH/DELETE /v1/folders/{id}`.
 
 - [ ] **27.2 Reading tools.** `workspace_folders`, `workspace_tree`, `workspace_read` (line numbers, paging), `workspace_search` (ripgrep or Python), `workspace_git` (status, log, diff, show; read-only). Risk `read`, `grant_key = "arg:folder"`, results wrapped as untrusted.
   *Done when:* tests over a fixture repo made in a tmp dir cover each tool and its limits.

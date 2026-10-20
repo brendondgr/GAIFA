@@ -44,9 +44,10 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Mod UIs | Optional `services/<id>/ui/page.js` or `ui/Page.dc.html`, plus optional dashboard widgets (`[[ui.widgets]]`). Without them, a mod still gets a full generic page, and its numeric stats are charted automatically. | adding a mod needs no UI work |
 | Chat, agent, save states | **Built last** (backend-plan Stage D): the agent is a mod with **its own loop, modelled on Claude Code** (no agent framework): tools load on demand, it asks for choices with question and parameter cards, threads are an append-only event log in SQLite; sessions can be saved and restored; logs and runtime state move inside the folder | requested: do these once everything else is built. Research: [agent-architecture.md](agent-architecture.md). A framework (LangGraph) was the earlier plan; a hand-written loop gives the control a local model needs (thinking fields, leaked tool calls, tool loading) |
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
+| Writing outside the folder | Nothing is written outside the project root, except the allowlist (plan 12.4) and **workspace folders the user set to Edit or above** (plan Phase 27). The AIHub folder and `data/models/` are capped at Read. | requested 2026-10-20: the agent edits your projects in place, and only where you raised the folder's level |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
-| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `embed` 5104, `stt` 5105. | clients such as video-maker keep working |
+| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `workspace` 5103, `embed` 5104, `stt` 5105. | clients such as video-maker keep working |
 
 ## 3. Directory layout
 
@@ -581,6 +582,7 @@ fade_days = 60           # inferred preferences unused this long fade out; state
 10. **Some UIs use absolute paths:** mods' own UIs keep working on their own ports and are linked as "native UI". AIHub's UI never loads them inside its own pages.
 11. **The UI runtime is Claude Design's generated `support.js` (React 18).** Don't edit it. Any change a new export needs goes in `web/PATCHES.md`, and the brief asks Claude Design to fold those changes in on its next pass.
 12. **Metric storage grows over time.** Rollups and retention (§13) keep `hub.db` small: roughly 30 series × 10 s for 48 h is about 0.5 M rows, pruned hourly.
+13. **Workspace folders are written in place** (plan Phase 27). Only folders at Edit or above, never the AIHub folder or `data/models/`, and never through a symlink out of the folder (`services/workspace/folders.py`).
 
 ## 13. Metrics and charts
 

@@ -1,0 +1,19 @@
+# Workspace: folders on this machine the agent reads, edits in place and runs code in (plan Phase 27).
+# Fields: docs/mods.md and architecture §4.3. Levels per folder: read · edit · run · run_net.
+id = "workspace"
+name = "Workspace"
+description = "Folders the agent reads, edits in place and runs code in, with a level per folder"
+icon = "folder"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]
+port = 5103
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { WORKSPACE_STATE = "{root}/data/state/workspace" }   # folders.json, checkpoints, run records
+start_timeout_s = 30
+stop_timeout_s = 10
+restart = "on-failure"
+install = "install.sh"

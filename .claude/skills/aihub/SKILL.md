@@ -41,7 +41,7 @@ The docs are the source of truth. Read the section you need before acting; don't
 - **Loopback only.** The hub refuses a non-loopback `hub.host`.
 - **Mods talk to the hub only over HTTP.** No hub imports in mods, no mod imports in the hub. Adding a mod never needs a hub code change.
 - **No import-time side effects.** Everything starts in `create_app()`'s lifespan, in the §5 order.
-- **Nothing written outside the project root**, except the Phase 12.4 allowlist.
+- **Nothing written outside the project root**, except the Phase 12.4 allowlist and folders the user set to Edit or above (the `workspace` mod, plan Phase 27). The AIHub folder and `data/models/` stay at Read.
 - **`web/support.js` is generated; never edit it.** Any change to an export goes in `web/PATCHES.md`.
 - **Errors use the envelope** `{detail, code, data?}`; proxied mod responses pass through unchanged.
 - **Mod ids and ports are fixed** (architecture §2): `relay` 4000, `opencode` 4096, `lcpp` 7710, `tts` 5040, `gen3d` 5050, `comfy` 5070; new mods 5100–5199.

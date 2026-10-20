@@ -26,7 +26,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | G — Chat activity | 19 | The Chat page shows a turn's work as one compact fold of steps (thinking, tools, approvals), from the design study's picks | `web/chat/` only; the agent's events are unchanged |
 | H — Capabilities and learning | 20–22 | Engines and workflows declare what they can do; complete tool records and preferences on every card; a learner that improves the agent's harness (after Harness²) | gen3d, comfy, the agent, the hub's tool calls; additive only |
 | I — Setup docs | 23 | A doc per environment (in its mod) and per model (generated from the registry, with hand-written sections), kept in sync by `aihub docs` and a test | No: docs, a CLI command and a registry change hook |
-| J — The agent reads, searches and works | 24–30 | Documents, text and code in Chat; permission tiers and grants; web search (SearXNG); folders and a sandbox; search by meaning (EmbeddingGemma 2); speech to text; personal memory | Chat, the approvals and the outputs index (additive); four new mods |
+| J — The agent reads, searches and works | 24–29 | Documents, text and code in Chat; permission tiers and grants; web search (SearXNG); folders and a sandbox; search by meaning (EmbeddingGemma 2); speech to text | Chat, the approvals and the outputs index (additive); four new mods |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -60,7 +60,6 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 27 | New `workspace` mod (folders and a sandbox) | L | the Workspace page; execute cards |
 | 28 | New `embed` mod and the library | M–L | search by meaning on the Outputs page |
 | 29 | New `stt` mod (speech to text) | M–L | the stt page; the mic button in Chat |
-| 30 | Personal memory | M | the Memory tab on the Learning page |
 
 # Stage A — Foundation
 
@@ -2332,7 +2331,7 @@ Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from th
 
 # Stage J — The agent reads, searches and works
 
-Asked for on 2026-10-20. Chat takes only images, video and audio today (`utils/outputs/upload.py` `ALLOWED`, `web/chat/chat-composer.js` `uploadable`), and the agent sees an attachment as `(attached: output:<id>)` (`services/agent/agent/context.py`), with `view_output` its only way to look at one. The user wants the chat to become an agent: read documents, text and code; search the web; read folders on this machine and run code in a controlled place, with levels of permission; find things across everything by meaning; transcribe speech; and remember things about the user.
+Asked for on 2026-10-20. Chat takes only images, video and audio today (`utils/outputs/upload.py` `ALLOWED`, `web/chat/chat-composer.js` `uploadable`), and the agent sees an attachment as `(attached: output:<id>)` (`services/agent/agent/context.py`), with `view_output` its only way to look at one. The user wants the chat to become an agent: read documents, text and code; search the web; read folders on this machine and run code in a controlled place, with levels of permission; find things across everything by meaning; and transcribe speech.
 
 The approach keeps the shape that already works: **every file is an output**, and every new ability is a **tool** with a risk level, so the approvals, the parameter cards, MCP clients and the learner treat it like any other. New abilities that hold a runtime or a model are **mods** (deleting the folder removes the ability); the hub gains only what belongs to outputs and permissions.
 
@@ -2344,7 +2343,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
 - Embeddings with **EmbeddingGemma 2** (`google/embeddinggemma-2`: Apache 2.0, ~740M parameters with a 270M text-only path, text, code, images, video and audio in one space, 768-d with Matryoshka 512/256/128, 8k context, sentence-transformers; run in bf16 or fp32, never fp16).
 - A sandboxed Python whose files land in outputs; workspace folders read through tools; a hierarchy of permissions with "run this code: yes or no".
 - A speech-to-text mod: a toned-down port of `/home/bdgr/Projects/TranscriberPrototype/`, the small or balanced model when the caller doesn't say.
-- **Document contents never become learned preferences or memories.**
+- **Document contents never become learned preferences.**
 
 **Simple gaps (assumed):**
 - **PDF library.** *Assumption:* `pypdfium2` (Apache-2.0/BSD; text with page boundaries and page rendering in one wheel) as the hub's one new dependency. Not PyMuPDF (AGPL). `pdftotext` is on this host but isn't a dependency the docs can promise.
@@ -2356,7 +2355,6 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
 
 **Needs a human answer:**
 - **Writing into workspace folders.** The rule "nothing written outside the project root" stands in this plan: workspaces are read and run (in a sandbox with the folder mounted read-only), and every file the agent writes lands in `outputs/`. A `write` level that edits files in place outside the root would change that rule. *Needs a human answer* before anything like it is planned.
-- **Personal memory (Phase 30)** is planned from the user's question ("do we have memory built in?"). Its review flow (proposed memories wait for a yes, or are saved at once) is asked at the start of that phase.
 
 ---
 
@@ -2411,7 +2409,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
   *Done when:* `utils/tests/web/test_citations.mjs` parses the citation forms; a browser check clicks a citation in a reply and lands on the page.
 
 - [ ] **24.8 What learns from chats doesn't read documents: `services/agent/agent/learn/`, `utils/prefs.py`.**
-  - The miner, the learner's transcripts (Phase 22) and anything that proposes preferences or memories see a document as its card only (`(document #n: name, 12 pages)`), never its text; the same for web pages (Phase 26) and transcripts (Phase 29).
+  - The miner, the learner's transcripts (Phase 22) and anything that proposes preferences see a document as its card only (`(document #n: name, 12 pages)`), never its text; the same for web pages (Phase 26) and transcripts (Phase 29).
   - A preference whose value is free text (a `prompt`, `text` or `instruction` field) is never inferred.
   *Done when:* `services/agent/tests/test_learn_privacy.py` runs the miner and the learner's transcript builder over a thread with an inline document and a fetched page and finds none of their text in what they produce.
 
@@ -2581,38 +2579,6 @@ A toned-down port of the TranscriberPrototype ("Loud Radish", `/home/bdgr/Projec
 - [ ] Deleting `services/stt/` removes the mic button and the tool; nothing else changes.
 - [ ] Delivered: `services/stt/` (server, worker, engine, streaming, tools, page, tests, setup doc), its models in the registry.
 
-## Phase 30 — Personal memory
-
-**What exists today (checked 2026-10-20):** the agent's `remember` tool saves a fact as an `agent`-scope preference (`utils/prefs.py`), and those preferences plus `data/agent/memory/MEMORY.md` go into every prompt (`services/agent/agent/loop.py` around line 523). Topic files are read with `read_skill("memory:<topic>")`. The miner (Phase 21) infers only tool arguments. So the frame exists, but it saves only when the user says "remember", and on this machine it holds **no** facts about the user today (`/api/prefs` has none of scope `agent`; `MEMORY.md` is empty).
-
-**Needs a human answer at the start of this phase:** proposed memories wait for a yes on the Learning page (like inferred preferences), or are saved at once with an undo in the chat.
-
-- [ ] **30.1 Memories as their own records: `utils/memories.py`, `/api/memories`.**
-  - Table `memories {id, text, category ("about you" | "likes" | "dislikes" | "projects" | "people" | "how you work"), source ("stated" | "proposed"), state, evidence [{thread, seq}], created_ts, used_ts, uses}`; `remember` writes here (agent-scope preferences migrate in, keeping ids as aliases).
-  - `GET/POST/PUT/DELETE /api/memories`; `[learning] enabled = false` stops reading and writing them.
-  *Done when:* `utils/tests/memories/test_memories.py` covers CRUD, the migration, and the switch.
-
-- [ ] **30.2 Proposals from the user's own words: `services/agent/agent/learn/memories.py`.**
-  - After a chat goes quiet (10 min) the agent's model reads **only the user's typed messages** (never attachments, web pages, transcripts or tool results; 24.8's rule) and proposes at most three memories with the message they came from. Duplicates and contradictions of existing memories update those instead.
-  - Never proposed: health, finances, credentials, other people's private details, anything from a `no_learn` chat.
-  *Done when:* tests with recorded chats cover what is and isn't proposed, dedup, contradiction, and the excluded categories.
-
-- [ ] **30.3 Recall: `services/agent/agent/prompts.py`.**
-  - Up to 40 memories go into the prompt as today; above that, the 20 most used plus those most similar to the current message (through the embed mod when it's up; by shared words otherwise).
-  - The agent says "from memory: …" when a memory changes what it does.
-  *Done when:* tests cover the cut-off, similarity picking with a fake embed mod, and the fallback.
-
-- [ ] **30.4 The Memory tab on the Learning page.**
-  - Every memory by category, its source and evidence (a link to the message), edit, forget, and "forget everything".
-  *Done when:* a browser check edits and forgets a memory and the next chat's prompt shows the change.
-
-**Wire — Phase 30:** the Memory tab; "Saved to memory" in a turn's steps links to it.
-
-**Checks & deliverables — Phase 30**
-- [ ] Live: say "I'm vegetarian and I prefer short answers" in one chat; in a new chat, "suggest a dinner" respects both and says it's from memory.
-- [ ] A chat with an attached document containing personal details proposes nothing from it.
-- [ ] Delivered: `utils/memories.py`, routes, the proposer, recall, the tab; architecture §14.
-
 | Deliverable | Description | Location |
 | --- | --- | --- |
 | Kinds and text | new kinds, extraction, cache, routes | `utils/outputs/entries.py`, `text.py`, `utils/routes/outputs.py` |
@@ -2624,7 +2590,6 @@ A toned-down port of the TranscriberPrototype ("Loud Radish", `/home/bdgr/Projec
 | `workspace` mod | folders with levels, read tools, the podman sandbox | `services/workspace/` |
 | `embed` mod | EmbeddingGemma 2, the library index, search tools | `services/embed/` |
 | `stt` mod | speech to text | `services/stt/` |
-| Memory | memories, proposals, recall, the tab | `utils/memories.py`, `services/agent/agent/learn/memories.py` |
 | Tests | per step, named in each `Done when` | `utils/tests/…`, `services/<id>/tests/` |
 
 ---

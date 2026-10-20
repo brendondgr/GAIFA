@@ -107,7 +107,7 @@ async def test_the_model_reads_the_hubs_model_view_and_cards_carry_filled(env):
     assert "x-options" not in fn["function"]["parameters"]["properties"]["engine"]
     ap = env.payloads(tid, "approval")[-1]
     assert ap["arguments"]["engine"] == "cube3d" and ap["filled"] == ["engine"]
-    assert not any(e in prompts.BASE for e in ("cube3d", "trellis2", "hunyuan21", "sam3d", "text only", "text-only"))
+    assert not any(e in prompts.base_text() for e in ("cube3d", "trellis2", "hunyuan21", "sam3d", "text only", "text-only"))
 
 
 async def test_a_turned_off_mods_skills_are_hidden_and_refused(env):

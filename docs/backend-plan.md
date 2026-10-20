@@ -2041,7 +2041,7 @@ The agent's instructions become versioned files. The learner (inside the agent m
 
 The base harness stays in git, so a rollback is a pointer move and nothing that works today is lost. It touches architecture §14 (a new §14.6), `docs/agent-architecture.md` (a decision row), the agent README and `docs/agent-eval.md`.
 
-- [ ] **22.1 The harness as versioned files: `services/agent/agent/harness.py`.**
+- [x] **22.1 The harness as versioned files: `services/agent/agent/harness.py`.**
   - **Base, in git:** `services/agent/harness/`:
     - `systemprompt.md` (today's `BASE`, moved out of `prompts.py`);
     - `guardrails.md` (empty);
@@ -2064,7 +2064,7 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
     - `GET /v1/harness/versions/{n}/diff`;
     - `POST /v1/harness/versions/{n}/activate` (rollback or forward).
   *Done when:* `tests/test_harness.py` covers the merge, validation failures, pinning, activate and rollback; with no overlay, the system prompt is **byte-identical** to today's (a snapshot test).
-- [ ] **22.2 Declarative hooks and tool notes: `services/agent/agent/hooks.py`.**
+- [x] **22.2 Declarative hooks and tool notes: `services/agent/agent/hooks.py`.**
   - **`hooks.toml` verbs** (no code runs; unknown verbs are validation errors):
     - `hint_after_error {tool, code, text}` appends text to the result the model sees;
     - `cap {tool, per_turn, fix}` refuses calls past N in one turn;
@@ -2074,6 +2074,13 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
   - **Tool notes** (`tools/<tool>.md`) are appended to the tool's description in `tools.function()`.
   - **`guardrails.md`** goes after `systemprompt.md` in `prompts.build`.
   *Done when:* `tests/test_hooks.py` covers each verb, an invalid file, and hooks off; `tests/test_tools.py` covers a note in the description.
+  - *As built (22.1–22.2):*
+    - **The base prompt** moved to `services/agent/harness/systemprompt.md`; `prompts.base_text()` reads it, and `prompts.build()` takes `base` and `guardrails`. A test pins the prompt byte for byte against `tests/fixtures/base-prompt-2026-10-20.txt`.
+    - **Skill trigger lines** (Harness²'s rule) aren't needed here: the prompt's skill list already names every harness skill.
+    - **Pinning:** `Agent.harness_of(tid)` gives a chat's pinned or the active version; `usage` events carry it as `harness`.
+    - **Hooks:** they fire as `note` events (`hook: …`); a refused call's error code is `hook_cap` or `hook_require_first`.
+    - **Routes:** `GET /v1/harness`, `GET /v1/harness/versions`, `GET /v1/harness/versions/{n}/diff`, `POST /v1/harness/versions/{n}/activate`.
+    - **Size:** `loop.py` is now 708 lines (under 800).
 - [ ] **22.3 Replays: `services/agent/agent/learn/replay.py`.**
   - **A real chat becomes a replay task:**
     - your messages verbatim;

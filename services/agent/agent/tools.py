@@ -64,8 +64,10 @@ LOCAL_NAMES = {t["name"] for t in LOCAL}
 READ_ONLY_LOCAL = LOCAL_NAMES - {"remember"}
 
 
-def function(t: dict[str, Any]) -> dict[str, Any]:
+def function(t: dict[str, Any], note: str | None = None) -> dict[str, Any]:
     desc = t.get("description", "")
+    if note and note.strip():
+        desc += "\n" + note.strip()            # the harness's tools/<name>.md (plan 22.2)
     if t.get("examples"):
         import json
 
@@ -88,6 +90,7 @@ class ToolSet:
         self.disabled: set[str] = set(settings.get("disabled") or [])
         self.index: list[dict[str, Any]] = []
         self.full: dict[str, dict[str, Any]] = {}
+        self.notes: dict[str, str] = {}              # tool → the harness's note (plan 22.2)
 
     async def refresh(self) -> None:
         try:
@@ -105,7 +108,7 @@ class ToolSet:
         return set(self.full) | LOCAL_NAMES
 
     def functions(self) -> list[dict[str, Any]]:
-        return [function(t) for t in LOCAL] + [function(t) for t in self.full.values()]
+        return [function(t, self.notes.get(t["name"])) for t in LOCAL] + [function(t, self.notes.get(t["name"])) for t in self.full.values()]
 
     def deferred(self) -> list[dict[str, Any]]:
         return [t for t in self.index if t["name"] not in self.full and t["mod"] not in self.disabled]

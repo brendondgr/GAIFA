@@ -416,6 +416,43 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         done = await mine.run(agent.hub, agent.store)
         return {k: [p.get("id") for p in v] if isinstance(v, list) else v for k, v in done.items()}
 
+    # ---- the harness (plan 22.1) ----------------------------------------------------------------
+    def H(request: Request) -> Any:
+        from .harness import Harness
+        return Harness(A(request).cfg.data)
+
+    @app.get("/v1/harness", summary="The active harness version and its files (systemprompt, guardrails, hooks, tool notes, skills)")
+    def harness_now(request: Request) -> dict:
+        h = H(request)
+        n = h.current()
+        return {"current": n, "files": h.tree(n), "versions": h.versions()}
+
+    @app.get("/v1/harness/versions", summary="Every harness version: parent, who adopted it, the composer's notes, the gate's results")
+    def harness_versions(request: Request) -> list:
+        return H(request).versions()
+
+    @app.get("/v1/harness/versions/{n}/diff", summary="What version n changes against ?against= (default: its parent), as a unified diff")
+    def harness_diff(n: int, request: Request, against: int | None = None) -> dict:
+        from .harness import HarnessError
+        h = H(request)
+        try:
+            base = against if against is not None else (h.meta(n).get("parent") or 0)
+            return {"n": n, "against": base, "diff": h.diff(base, n)}
+        except HarnessError as e:
+            raise HTTPException(404, str(e)) from None
+
+    @app.post("/v1/harness/versions/{n}/activate", summary="Make version n the active harness (0 = the base): forward or rollback")
+    def harness_activate(n: int, request: Request) -> dict:
+        from .harness import HarnessError
+        h = H(request)
+        try:
+            h.activate(n)
+        except HarnessError as e:
+            raise HTTPException(404, str(e)) from None
+        if n and h.meta(n).get("adopted_by") == "proposed":
+            h.set_meta(n, adopted_by="user")
+        return {"current": h.current()}
+
     @app.get("/v1/threads/{tid}/turns", summary="The thread's turn records (plan 21.4)")
     async def thread_turns(tid: str, request: Request) -> list:
         from . import records

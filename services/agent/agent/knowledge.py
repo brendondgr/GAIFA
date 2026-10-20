@@ -40,9 +40,17 @@ def slug(s: str) -> str:
 
 
 class Knowledge:
-    def __init__(self, data: Path | None, hub: HubAPI | None) -> None:
+    def __init__(self, data: Path | None, hub: HubAPI | None, tree: dict[str, str] | None = None) -> None:
         self.data = Path(data) if data else Path("data/agent")
         self.hub = hub
+        self._tree = tree               # the chat's harness files (plan 22.1); None: the active version
+
+    @property
+    def tree(self) -> dict[str, str]:
+        if self._tree is None:
+            from .harness import Harness
+            self._tree = Harness(self.data).tree()
+        return self._tree
 
     def _head(self, p: Path) -> str:
         try:
@@ -57,7 +65,8 @@ class Knowledge:
         return self._head(self.data / "memory" / "MEMORY.md")
 
     def user_skills(self) -> list[dict[str, str]]:
-        out = []
+        from .harness import skills as harness_skills
+        out = harness_skills(self.tree)                 # the harness's skills (plan 22.1), then data/agent/skills/
         for f in sorted((self.data / "skills").glob("*/SKILL.md")):
             meta, _ = frontmatter(f.read_text())
             out.append({"name": meta.get("name") or f.parent.name, "description": meta.get("description", ""),
@@ -89,6 +98,10 @@ class Knowledge:
         if not NAME.match(n) or not NAME.match(src):
             return None
         if src == "user":
+            from .harness import skill_body
+            body = skill_body(self.tree, n)
+            if body is not None:
+                return body
             p = self.data / "skills" / n / "SKILL.md"
             return frontmatter(p.read_text())[1] if p.is_file() else None
         if not self.hub:

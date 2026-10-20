@@ -331,6 +331,12 @@ class Agent:
         if res.get("error"):
             body["error"] = res["error"]
         content = res["content"] if isinstance(res.get("content"), str) else json.dumps(body, ensure_ascii=False, default=str)
+        hint, cap = self.hooks_of(tid).after(name, res.get("status") or "done", (res.get("error") or {}).get("code"))
+        if cap and len(content) > cap * 4:                 # a trim hook (plan 22.2): about 4 characters a token
+            content = content[: cap * 4] + " … (trimmed by a harness hook; read_result has the rest)"
+        if hint:
+            content += "\nNote: " + hint
+            self.emit(tid, "note", {"text": f"hook: added a hint to {name}'s error", "level": "info"})
         payload = {"id": call, "name": name, "status": res.get("status") or "done", "content": content}
         for k in ("call_id", "error", "image", "data"):
             if res.get(k) is not None:
@@ -371,6 +377,11 @@ class Agent:
             self._result(tid, cid, name, {"status": "error", "error": {
                 "code": "invalid_arguments", "detail": p["bad_arguments"],
                 "fix": "send the arguments as one JSON object matching the schema" + (f": {json.dumps(schema)[:1500]}" if schema else "")}})
+            return "ok"
+        stop = self.hooks_of(tid).before(name, args if isinstance(args, dict) else {}, self._turn_calls(tid, cid))
+        if stop:                                    # a harness hook refused it (plan 22.2)
+            self.emit(tid, "note", {"text": f"hook: {stop['detail']}", "level": "info"})
+            self._result(tid, cid, name, {"status": "error", "error": stop})
             return "ok"
         if self._repeated(tid, e) >= 3:
             self._result(tid, cid, name, {"status": "error", "error": {
@@ -445,6 +456,12 @@ class Agent:
                 self.transient(tid, "progress", {"id": cid, "progress": st.get("progress"), "note": st.get("note"),
                                                  "elapsed_s": st.get("elapsed_s"), "job_id": st.get("job_id")})
 
+    def _turn_calls(self, tid: str, cid: str) -> list[str]:
+        """Tool names called so far in this turn (since the last user message), not counting `cid`."""
+        evs = self.store.events(tid)
+        last = max((e["seq"] for e in evs if e["type"] == "user"), default=0)
+        return [e["payload"]["name"] for e in evs if e["seq"] > last and e["type"] == "tool_call" and e["payload"].get("id") != cid]
+
     def _repeated(self, tid: str, e: dict[str, Any]) -> int:
         """How many calls of this tool with these arguments since the last user message (this one included)."""
         evs = self.store.events(tid)
@@ -468,10 +485,34 @@ class Agent:
 
     # ---- the model ---------------------------------------------------------------------------
 
+    def harness_of(self, tid: str) -> tuple[int, dict[str, str]]:
+        """The harness version this chat runs (its `settings.harness` pin, else the active one) and its files."""
+        from .harness import Harness, HarnessError
+
+        h = Harness(self.cfg.data)
+        pin = (thread_settings(self.store, tid) or {}).get("harness")
+        try:
+            n = int(pin) if pin is not None else h.current()
+            return n, h.tree(n)
+        except (HarnessError, ValueError):
+            return 0, h.tree(0)
+
+    def hooks_of(self, tid: str) -> Any:
+        import tomllib
+
+        from .hooks import Hooks
+        _, tree = self.harness_of(tid)
+        try:
+            return Hooks(tomllib.loads(tree.get("hooks.toml") or ""))
+        except tomllib.TOMLDecodeError:
+            return Hooks(None)
+
     async def system_prompt(self, tid: str, tools: ToolSet, model: str) -> tuple[str, dict[str, int]]:
         from .knowledge import Knowledge
 
-        k = Knowledge(self.cfg.data, self.hub)
+        hv, tree = self.harness_of(tid)
+        tools.notes = {rel[6:-3]: text for rel, text in tree.items() if rel.startswith("tools/")}
+        k = Knowledge(self.cfg.data, self.hub, tree)
         events = self.store.events(tid)
         meta = await self.llm.meta(model)
         try:
@@ -480,7 +521,8 @@ class Agent:
             services, memory = None, None
         summary, _, _ = ctx.summary_state(events)
         prefs = await k.preferences(set(tools.full), tid) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
-        parts = {"agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.memory_index(), prefs) if x),
+        parts = {"base": tree.get("systemprompt.md", ""), "guardrails": tree.get("guardrails.md", ""),
+                 "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.memory_index(), prefs) if x),
                  "skills": await k.skill_list(set(tools.disabled)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
                  "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
@@ -488,7 +530,7 @@ class Agent:
                     "the user can turn them back on in the composer)" if tools.disabled else "")
                  + ("\nThis chat is read-only: only tools that read can run." if (self.store.thread(tid) or {}).get("mode") == "read_only" else ""),
                  "outputs": prompts.outputs_table(ctx.outputs(events)), "summary": summary}
-        sizes = {"instructions": ctx.est(prompts.BASE + parts["agent_md"] + parts["env"]),
+        sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),
                  "tool_index": ctx.est(parts["tools"]), "outputs": ctx.est(parts["outputs"] + parts["summary"])}
         return prompts.build(parts), sizes
@@ -595,7 +637,7 @@ class Agent:
             self.emit(tid, "tool_call", payload)
         window = await self.window(model, tid)
         timing = {"seconds": round(time.monotonic() - t0, 2), **({"ttft_s": round(first[0], 2)} if first else {})}
-        self.emit(tid, "usage", {**reply.usage, "model": model, "window": window, **timing},
+        self.emit(tid, "usage", {**reply.usage, "model": model, "window": window, **timing, "harness": self.harness_of(tid)[0]},
                   tokens=int(reply.usage.get("total_tokens") or 0))
         events = self.store.events(tid)
         self.transient(tid, "context", ctx.meter(events, window, sizes) | {"model": model})

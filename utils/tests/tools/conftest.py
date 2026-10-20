@@ -1,5 +1,6 @@
 """The `tools` area against `fake-tools` (manifest tools of every risk, a job, file inputs,
-binary results, a tools_source) under the subprocess backend."""
+binary results, a tools_source) and `fake-perms` (network and execute tools, plan 25) under the
+subprocess backend."""
 
 from __future__ import annotations
 
@@ -46,14 +47,26 @@ def tools_cfg(root) -> config.Config:
     return config.load(root / "config.toml")
 
 
-@pytest.fixture
-async def th(services_dir, root, make_app, tools_cfg):
-    services = services_dir("fake-tools")
-    toml = services / "fake-tools" / "service.toml"
+async def _hub_with(mod: str, services_dir, make_app, cfg):
+    services = services_dir(mod)
+    toml = services / mod / "service.toml"
     toml.write_text(re.sub(r"(?m)^port = \d+", f"port = {free_port()}", toml.read_text()))
-    app = make_app(tools_cfg, port=7000, autostart=True)
+    app = make_app(cfg, port=7000, autostart=True)
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
         async with httpx.AsyncClient(transport=transport, base_url="http://hub", timeout=60) as c:
-            await wait_ready(c, "fake-tools")
-            yield ToolsHub(app, c, root)
+            await wait_ready(c, mod)
+            yield ToolsHub(app, c, services.parent)
+
+
+@pytest.fixture
+async def th(services_dir, root, make_app, tools_cfg):
+    async for h in _hub_with("fake-tools", services_dir, make_app, tools_cfg):
+        yield h
+
+
+@pytest.fixture
+async def ph(services_dir, root, make_app, tools_cfg):
+    """`fake-perms`: network and execute tools (plan 25)."""
+    async for h in _hub_with("fake-perms", services_dir, make_app, tools_cfg):
+        yield h

@@ -160,7 +160,7 @@ After editing `page.js`, reload the browser tab. A page can also import `/mod-ki
   - Or let the user find it: `aihub models scan --add`, or **Scan for new files** on the Models page.
 - **Tools** (the agent's, plan Phase 13): `[tools] speak = { op = "POST /v1/speech", description = "…", risk = "generate", ask = ["name"] }` exposes an operation as the tool `<mod>_<name>` (a `-` in the id becomes `_`). Its parameters are the operation's path and query parameters plus its JSON or multipart body, merged into one schema from your OpenAPI. Fields:
   - `description`: written for the model: what it does, what to pass, what comes back (else the OpenAPI summary).
-  - `risk`: `read` (runs without asking), `write`, `generate` or `destructive` (each shows the user a parameter card first, unless the thread is in "Use defaults"; `destructive` always asks). Default: `read` for GET, `destructive` for DELETE or `confirm = true`, else `write`.
+  - `risk`: `read` (runs without asking), `write`, `generate`, `network` (reaches the internet), `execute` (runs code or commands) or `destructive`. Each but `read` shows the user a parameter card first; "Use defaults" skips it only for `write` and `generate`. Default: `read` for GET, `destructive` for DELETE or `confirm = true`, else `write`. The full order (deny list, mode, your own limits, grants, lists, risk) is architecture §14.7.
   - `ask = ["voice", …]`: the inputs the user should choose; they're editable on the card even when the model filled them in.
   - `examples = [{…}]`: one or two example argument sets (they raise accuracy on complex parameters).
   - `core = true`: always loaded in the chat; other tools are listed by name and loaded on demand.

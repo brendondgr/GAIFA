@@ -216,7 +216,7 @@ class ApiSpec(_Strict):
         return v
 
 
-Risk = Literal["read", "write", "generate", "destructive"]
+Risk = Literal["read", "write", "generate", "network", "execute", "destructive"]
 
 
 class ToolSpec(_Strict):

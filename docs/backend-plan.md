@@ -2429,7 +2429,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
 
 Today a call is decided by `deny` → thread mode → `ask` → `allow` lists → risk default (`utils/tools/approvals.py` `decide`), and an approval card allows one call. This phase adds the levels the user asked for ("you want to execute this code, yes or no") and lets one answer cover more than one call.
 
-- [ ] **25.1 Two new risks: `utils/tools/catalog.py`, `approvals.py`.**
+- [x] **25.1 Two new risks: `utils/tools/catalog.py`, `approvals.py`.**
   - Risk levels become `read`, `write`, `generate`, **`network`** (reaches the internet), **`execute`** (runs code or commands), `destructive`. Mods declare them in `[tools]` like the others.
   - Defaults: `read` runs; `network` asks; `execute` always asks, also in `auto` mode, unless a grant (25.2) covers it; `auto` mode still skips the card only for `write` and `generate`; `read_only` mode denies everything but `read`.
   - The order is fixed and documented in architecture §14: **deny list → thread mode → a mod's own limits (e.g. a workspace's level, Phase 27) → grants → ask/allow lists → risk default.**

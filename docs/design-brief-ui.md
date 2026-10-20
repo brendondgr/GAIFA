@@ -1029,7 +1029,7 @@ The `tools` area. The chat (Stage D) and outside clients (MCP) use the same call
 Also `GET /api/tools/calls/{id}/result?offset=&limit=` pages a capped result. **Events:** `{type: "approval", approval: Approval}` when one is created or decided; `{type: "tool_call", call: ToolCallResult & {origin}}` as a call starts, makes progress and ends.
 
 ```ts
-type Risk = "read" | "write" | "generate" | "destructive";
+type Risk = "read" | "write" | "generate" | "network" | "execute" | "destructive";   // plan 25.1
 interface ToolIndexItem { name: string; mod: string;                // "hub" for the hub's own tools
                           risk: Risk; core: boolean; summary: string; available: boolean; why?: string }
 interface Tool extends ToolIndexItem { description: string;

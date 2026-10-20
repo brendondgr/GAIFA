@@ -5,7 +5,9 @@ functions, and the hub's own tools, as OpenAI-style functions with risk levels.
 - **Schemas** come from the mod's OpenAPI (`flatten`), read once per process start. The last
   good list of each mod is kept in `hub.db` (`kv`), so a stopped mod's tools stay listed, marked
   `available: false` with the reason (a call starts the mod first).
-- **Risk** defaults: `read` for GET, `destructive` for DELETE or `confirm = true`, else `write`.
+- **Risk** (plan 25.1): `read`, `write`, `generate`, `network` (reaches the internet), `execute`
+  (runs code or commands) or `destructive`. Default: `read` for GET, `destructive` for DELETE or
+  `confirm = true`, else `write`.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("aihub.tools")
 KV_PREFIX = "tools:"
+RISKS = ("read", "write", "generate", "network", "execute", "destructive")   # plan 25.1
 SEARCH_LIMIT = 8
 WORD = re.compile(r"[a-z0-9]+")
 STOP = {"a", "an", "the", "of", "to", "and", "or", "for", "in", "on", "with", "my", "me", "make", "please", "from", "into", "it", "this", "that"}
@@ -228,7 +231,7 @@ class Catalog:
             route = Route(m, p, body="json" if m != "GET" else None, wrap="arguments" if m != "GET" else None)
             if m == "GET":
                 route.params = {k: "query" for k in params.get("properties", {})}
-            risk = it.get("risk") if it.get("risk") in ("read", "write", "generate", "destructive") else (
+            risk = it.get("risk") if it.get("risk") in RISKS else (
                 "generate" if job else default_risk(m, False))
             desc = str(fn.get("description") or name)
             if job:

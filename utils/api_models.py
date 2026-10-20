@@ -572,11 +572,20 @@ class UiSettings(_Model):
     dashboard: DashboardLayout
 
 
+class LearningSettings(_Model):
+    enabled: bool
+    nightly_at: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    idle_min: int = Field(ge=5)
+    infer_after: int = Field(ge=1)
+    fade_days: int = Field(ge=1)
+
+
 class Settings(_Model):
     hub: HubSettings
     memory: MemorySettings
     services: ServicesSettings
     ui: UiSettings
+    learning: LearningSettings
 
 
 class SettingsPatch(_Model):
@@ -586,6 +595,7 @@ class SettingsPatch(_Model):
     memory: dict[str, Any] | None = None
     services: dict[str, Any] | None = None
     ui: dict[str, Any] | None = None
+    learning: dict[str, Any] | None = None
 
 
 class SavedSettings(_Model):

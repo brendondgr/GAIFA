@@ -33,6 +33,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "memory": {"reserve_gb": 12, "auto_make_room": False, "never_unload": ["lcpp"], "priority": ["comfy", "tts", "gen3d", "fake-ok"]},
             "services": {"order": ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode", "fake-ok"], "enabled": {"fake-ok": True}, "autostart": {"fake-ok": True}},
             "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}}},
+            "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
         }
         before = _file(served)
         s["hub"]["port"] = served.hub.config.hub.port
@@ -123,3 +124,18 @@ async def test_saved_port_does_not_change_the_running_port(make_app, root):
             r = await c.put("/api/settings", json={"hub": {"port": 7123}})
             assert r.json()["restart_required"] is True
             assert hub.port == start and (await c.get("/api/system")).json()["hub"]["port"] == start
+
+
+
+async def test_learning_switch_applies_at_once(rig, serve):
+    """plan 21.2: Settings → Learning: off stops preferences everywhere; back to the default removes the key."""
+    served = await _hub(rig, serve)
+    async with httpx.AsyncClient(base_url=served.url) as c:
+        r = await c.put("/api/settings", json={"learning": {"enabled": False, "nightly_at": "04:30"}})
+        assert r.status_code == 200 and r.json()["settings"]["learning"]["enabled"] is False
+        assert served.hub.config.learning.enabled is False and served.hub.config.learning.nightly_at == "04:30"
+        assert tomllib.loads(_file(served))["learning"] == {"enabled": False, "nightly_at": "04:30"}
+        r = await c.put("/api/settings", json={"learning": {"nightly_at": "25:00"}})
+        assert r.status_code == 422
+        await c.put("/api/settings", json={"learning": {"enabled": True, "nightly_at": "03:00"}})
+        assert "learning" not in tomllib.loads(_file(served))

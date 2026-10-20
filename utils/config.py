@@ -129,6 +129,15 @@ class SessionsCfg(_Strict):
     autosave_s: int = Field(300, ge=0)   # 0 = no auto-save
 
 
+class LearningCfg(_Strict):
+    """Plan 21–22: preferences on the cards and the learner. Off: nothing is filled or learned."""
+    enabled: bool = True
+    nightly_at: str = Field("03:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    idle_min: int = Field(60, ge=5)
+    infer_after: int = Field(2, ge=1)       # an inferred preference needs this many times, in as many chats
+    fade_days: int = Field(60, ge=1)
+
+
 class Config(_Strict):
     hub: HubCfg = HubCfg()
     paths: PathsCfg = PathsCfg()
@@ -138,6 +147,7 @@ class Config(_Strict):
     services: ServicesCfg = ServicesCfg()
     agent: AgentCfg = AgentCfg()
     sessions: SessionsCfg = SessionsCfg()
+    learning: LearningCfg = LearningCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

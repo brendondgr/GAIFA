@@ -554,6 +554,8 @@ interface Settings {
   services: { order: string[]; enabled: Record<string, boolean>; autostart: Record<string, boolean> };
   ui: { theme: "system" | "light" | "dark"; density: "comfortable" | "compact";   // compact is the default
         dashboard: { order: string[]; hidden: string[]; ranges: Record<string, string> } };   // Customize (§11.5), saved in config.toml
+  learning: { enabled: boolean;   // plan 21: preferences on the cards and the learner; off = nothing filled or learned
+              nightly_at: string; idle_min: number; infer_after: number; fade_days: number };
 }
 
 type HubEvent =
@@ -1066,6 +1068,20 @@ interface Approval { id: string; tool: string; arguments: object;  // as the mod
 "preset": {"type": "string", "enum": ["base", "fast", "draft"], "x-depends-on": "engine",
            "x-options": {"fast": {"quality": "fast", "when": "only when the user asks for a quick result"}}}
 ```
+
+**Preferences (plan 21.2–21.3).** `GET/POST /api/prefs`, `PATCH/DELETE /api/prefs/{id}`, `POST /api/prefs/{id}/approve|reject`:
+
+```ts
+interface Pref { id: string; scope: "tool" | "agent" | "thread"; tool?: string; field?: string; thread?: string;
+                 value: any;                               // the argument's value, or a sentence for scope "agent"
+                 when: { [param: string]: "present" | "absent" | any };   // where it applies (derived from x-options)
+                 cue: string; source: "stated" | "inferred" | "carried";
+                 state: "proposed" | "active" | "retired" | "rejected"; confidence: number;
+                 evidence: { kind: string; ref: string }[]; seen: number; contradicted: number; note: string;
+                 created_ts: number; updated_ts: number; last_used_ts?: number }
+```
+
+An approval's `filled` names which preference filled each field (`pref:<id>`), so the card can badge it "from your preferences". Bus events: `{type: "pref", pref: Pref | {id, deleted: true}}`.
 
 **API tab (as built, Wire 13):** an operation that is an agent tool whose risk isn't `read` is sent as `callTool("<mod>_<tool>", args, {mode: "ask"})` (`web/api-tool.js`), so it asks first like any client: the chat's parameter card shows inline, Run / Cancel decide the approval, then the call's progress and its outputs (links to Outputs) show under the form. Read tools and operations with a file upload are still sent directly through the proxy.
 

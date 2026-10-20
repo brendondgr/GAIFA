@@ -163,6 +163,10 @@ class Calls:
         arguments = coerce(tool.parameters, arguments if arguments is not None else {})
         arguments, filled = options.fill_defaults(tool.parameters, arguments) if isinstance(arguments, dict) else (arguments, [])
         how = {k: "default" for k in filled}
+        if self.hub.prefs is not None and isinstance(arguments, dict):          # the user's preferences (plan 21.3)
+            arguments, mine = await self.hub.prefs.apply(tool, arguments, origin, filled)
+            how.update(mine)
+            filled = [*[k for k in filled if k not in mine], *mine]
         problems = validate(tool.parameters, arguments) or options.problems(tool.parameters, arguments)
         if problems:
             out = self._invalid(tool, await self._elsewhere(tool, arguments, problems))
@@ -209,6 +213,11 @@ class Calls:
         if not await self.approvals.close(aid, "approved", final=args, call_id=call_id, edited=changed):
             raise HubError(409, "already_decided", f"approval {aid} was decided meanwhile")
         filled = {k: v for k, v in (a.get("filled") or {}).items() if k not in changed}
+        if self.hub.prefs is not None:
+            try:
+                await self.hub.prefs.after_decision(tool, {**(a.get("origin") or {}), "approval_id": aid}, args, changed, a.get("filled") or {})
+            except Exception:  # noqa: BLE001: learning never blocks a call
+                log.exception("preferences after approval %s", aid)
         return await self._launch(tool, args, a["origin"], aid, wait, call_id, filled=filled)
 
     async def status(self, call_id: str, wait: float = 0) -> dict[str, Any]:

@@ -1875,7 +1875,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - **Series** `tools.calls.<mod>` and `tools.errors.<mod>`: per 10 s tick, from the bus, real calls only.
     - **Agent:** `Store.prune_dry_runs` runs from an hourly `_upkeep` task in its lifespan.
     - **Tests:** `test_db.py` counts migrations instead of naming the version.
-- [ ] **21.2 Preferences: `utils/prefs.py`, `utils/routes/prefs.py`, migration 007.**
+- [x] **21.2 Preferences: `utils/prefs.py`, `utils/routes/prefs.py`, migration 007.**
   - **The `prefs` table:**
     - `id`, `scope` (`tool`, `agent` or `thread`), `tool`, `field`, `value` (JSON);
     - `when` (JSON conditions on the other arguments, e.g. `{"image": "present"}` or `{"engine": "trellis2"}`), `cue` (words: when it applies);
@@ -1890,7 +1890,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - each with a response model and summary (contract test).
   - **Settings:** `[learning]` in `utils/config.py` (`enabled = true`, `nightly_at = "03:00"`, `idle_min = 60`, `infer_after = 2`, `fade_days = 60`), in `utils/settings.py` `view()`/`save()`, `api_models.Settings`/`SettingsPatch`, and brief §6.4. `hub.config.learning` is read on each use, never copied.
   *Done when:* `utils/tests/prefs/test_prefs.py` covers CRUD, validation against a tool's `x-options`, states and the approve/reject routes; `utils/tests/settings/test_settings.py` covers `[learning]`; the contract test passes.
-- [ ] **21.3 Preferences fill the card: `utils/prefs.py` `apply()` in `Calls.call`.**
+- [x] **21.3 Preferences fill the card: `utils/prefs.py` `apply()` in `Calls.call`.**
   - **Order:** `coerce` → capability defaults (20.1) → `prefs.apply(tool, args, origin)` → checks.
     - A preference fills only fields that are absent or still at the capability default (an explicit model value wins).
     - Thread-scoped (`carried`) preferences apply only to calls whose `origin.thread` matches.
@@ -1900,6 +1900,12 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
   - **Every caller gets it:** chat, MCP (origin `client`), buttons, the API tab.
   - **`[learning] enabled = false`** stops `apply()` and every write here.
   *Done when:* `utils/tests/prefs/test_apply.py` covers fill vs explicit, the `when` match, carry-over in one thread and not another, contradiction, MCP callers, and learning off.
+  - *As built:*
+    - **Derived `when`:** a preference saved without `when` gets it from its value's `x-options` (needs → `present`, excludes → `absent`). Saving the same preference again bumps `seen` instead of adding a row; a stated save activates it.
+    - **What the hub fills:** a preference beats the capability default, and the order is this chat's carried values, then stated, then inferred.
+    - **Never blocking:** a failed `after_decision` is logged, and the call still runs.
+    - **Bus:** `pref` events carry each change.
+    - **Tests:** the prefs tests reuse the tools tests' `th` hub and `fake-tools`; 9 tests, plus `test_learning_switch_applies_at_once` in the settings tests.
 - [ ] **21.4 The agent's side: stated preferences, prose memory, feedback, turn records.**
   - **`hub_set_preference`** (`utils/tools/hub_tools.py`, risk `write`, in the default `allow` list): the agent saves what you state ("always use fast for 3D") as an active `stated` preference, and the reply says so. The prompt (`prompts.py` BASE) gets one line: "When the user states a lasting preference for a tool's setting, save it with hub_set_preference."
   - **`remember`** (`local.py`) writes an `agent`-scoped preference through the hub instead of appending to `MEMORY.md`.

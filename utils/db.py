@@ -194,6 +194,31 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX tool_refusals_created ON tool_refusals (created_ts);
     """,
+    # 007: preferences (plan 21.2): utils/prefs.py.
+    """
+    CREATE TABLE prefs (
+        id           TEXT PRIMARY KEY,
+        scope        TEXT NOT NULL CHECK (scope IN ('tool', 'agent', 'thread')),
+        tool         TEXT,
+        field        TEXT,
+        thread       TEXT,
+        value        TEXT NOT NULL,
+        "when"       TEXT NOT NULL DEFAULT '{}',
+        cue          TEXT NOT NULL DEFAULT '',
+        source       TEXT NOT NULL CHECK (source IN ('stated', 'inferred', 'carried')),
+        state        TEXT NOT NULL CHECK (state IN ('proposed', 'active', 'retired', 'rejected')),
+        confidence   REAL NOT NULL DEFAULT 1,
+        evidence     TEXT NOT NULL DEFAULT '[]',
+        seen         INTEGER NOT NULL DEFAULT 1,
+        contradicted INTEGER NOT NULL DEFAULT 0,
+        note         TEXT NOT NULL DEFAULT '',
+        created_ts   REAL NOT NULL,
+        updated_ts   REAL NOT NULL,
+        last_used_ts REAL
+    );
+    CREATE INDEX prefs_tool ON prefs (tool, state);
+    CREATE INDEX prefs_state ON prefs (state, updated_ts);
+    """,
 ]
 
 _STOP = object()

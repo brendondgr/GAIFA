@@ -377,6 +377,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/approvals`, `GET/POST /api/approvals/{id} {approve, arguments?}` | approvals (plan 13.2): a call that must ask is stored in `approvals` (hub.db) and runs nothing; the decision may carry edited arguments, which are validated and are what runs |
 | `GET/POST /api/sessions`, `PUT/DELETE /api/sessions/{id}`, `POST /api/sessions/{id}/restore?dry_run=1`, `GET /api/sessions/state` | sessions (plan Phase 15): named snapshots, the restore plan (steps and memory) and its run through the memory manager; `state` reports an unclean last shutdown |
 | `GET /api/skills`, `GET /api/skills/{mod}/{name}` | the mods' agent skills (plan 14.9) |
+| `GET/POST /api/prefs`, `PATCH/DELETE /api/prefs/{id}`, `POST /api/prefs/{id}/approve\|reject` | preferences (plan 21.2, §14.5): saved only when they fit the tool's schema and choices; applied to every caller's card |
 | `GET /api/doctor/inventory` | every path outside the project that anything uses, with its reason (plan 16.3) |
 | `POST /mcp` | the agent's tools over MCP (plan 13.4; streamable HTTP, stateless, JSON responses; 2026-07-28 per-request `_meta` plus the 2025 `initialize` era). Annotations from `risk`; `ask` calls return `input_required` (an elicitation form of the ask fields) to clients that declare elicitation, else an explanation with `_meta["aihub/approval"]`; the MCP-only tool `aihub_wait_approval` waits for a decision (never approves). `GET`/`DELETE` → 405; a non-loopback `Origin` → 403. Claude Code: `claude mcp add --transport http aihub http://127.0.0.1:7000/mcp` |
 
@@ -518,6 +519,13 @@ idle_unload_s = 600
 [services.comfy]
 enabled = true
 autostart = false
+
+[learning]               # plan 21–22: preferences on the cards, and the learner; Settings → Learning
+enabled = true
+nightly_at = "03:00"     # the learner's nightly run; it also runs after idle_min minutes without a chat
+idle_min = 60
+infer_after = 2          # an inferred preference is proposed after this many times, in as many chats
+fade_days = 60           # inferred preferences unused this long fade out; stated ones never do
 ```
 
 ## 10. The existing apps as mods
@@ -668,6 +676,17 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   - Optionally, the last session is restored at boot. At each start the previous run's auto-saved "Last session" is copied to "Before restart", which the auto-save never overwrites; the boot restore and the unclean-shutdown offer use that copy (before this, an auto-save five minutes after a reboot replaced the setup worth restoring).
   - Named setups ("LLM work", "3D work") can be switched with one action.
 - **Backups.** `aihub backup` (Phase 12.5) also covers `agent.db` and the session snapshots.
+
+### 14.5 Records and preferences (plan Phase 21)
+- **Records.** Every tool attempt from every caller is in `hub.db`:
+  - `tool_calls` (duration, what the hub `filled`);
+  - `approvals` (what was `filled`, what the user `edited`);
+  - `tool_refusals` (calls refused before they ran).
+- **Preferences** (`utils/prefs.py`, `/api/prefs`) are hub data, so chat, MCP clients and buttons all get them:
+  - A tool preference sets one argument, under `when` conditions. A choice that needs a picture applies only with one; that is derived from its `x-options`.
+  - **On a call,** after the capability defaults (§14.1), active preferences fill arguments the caller left out or left at the default. An explicit value wins, and so does a card edit. Each filled field is marked `pref:<id>` or `carried`.
+  - **After an approval,** the fields the user edited are carried to that chat's next card of the tool. An edit away from a preference's value counts against it: two contradictions retire an inferred preference.
+  - **Off switches:** `[learning] enabled = false` or a chat's `no_learn` origin stop all of it.
 
 ### 14.4 Everything inside the folder
 - **Logs.** Each mod's output is also written to `data/logs/<id>.log`, rotated. journald stays as a second copy, and the Logs tab reads the file.

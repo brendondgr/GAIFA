@@ -88,6 +88,7 @@ class Hub:
     approvals: Any = None   # tools.approvals.Approvals
     calls: Any = None       # tools.calls.Calls
     sessions: Any = None    # sessions.Sessions
+    prefs: Any = None       # prefs.Prefs (plan 21.2)
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -126,7 +127,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, services, sessions, settings, skills, system, tools, web, widgets
+    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, prefs, services, sessions, settings, skills, system, tools, web, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -220,6 +221,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.tools.add_hub_tools(hub_tools.tools())
             hub.services.on_ready.append(hub.tools.refresh_mod)
             hub.approvals = Approvals(hub.db, hub.bus, hub.config)
+            from utils.prefs import Prefs
+
+            hub.prefs = Prefs(hub)
             hub.calls = Calls(hub, hub.tools, hub.approvals)
             stack.push_async_callback(hub.calls.close)
             await hub.calls.resume()
@@ -261,9 +265,10 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(tools.router)
     app.include_router(skills.router)
     app.include_router(sessions.router)
+    app.include_router(prefs.router)
     app.include_router(mcp.router)  # /mcp: the tools over MCP (13.4)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings", "tools", "sessions"):
+                 "overview", "settings", "tools", "sessions", "prefs"):
         hub.mark_live(area)
 
     app.include_router(web.router)

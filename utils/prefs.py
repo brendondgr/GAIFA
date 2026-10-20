@@ -12,6 +12,8 @@ A preference sets one argument of one tool (`scope = "tool"`), or is a prose fac
 - `apply()` fills only arguments the caller left out or left at the capability default: an explicit
   value wins, and so does every card edit. Each filled field is recorded (`pref:<id>`).
 - `[learning] enabled = false` stops applying and every write here.
+- An `inferred` preference never sets a free-text field (`prompt`, `text`, an instruction…: plan 24.8),
+  so nothing the user typed or attached becomes a learned value.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ if TYPE_CHECKING:
 SCOPES = ("tool", "agent", "thread")
 SOURCES = ("stated", "inferred", "carried")
 STATES = ("proposed", "active", "retired", "rejected")
+FREE_TEXT = ("prompt", "negative_prompt", "text", "instruction", "instructions", "message", "query", "content", "system")
 JSON_COLS = ("value", "when", "evidence")
 
 
@@ -116,6 +119,8 @@ class Prefs:
             return
         if not p.get("tool") or not p.get("field"):
             raise PrefError(422, "invalid_pref", "a tool preference needs `tool` and `field`")
+        if p["source"] == "inferred" and p["field"] in FREE_TEXT:
+            raise PrefError(422, "free_text", f"{p['field']} is free text: it's never inferred, only stated by the user")
         if p["scope"] == "thread" and not p.get("thread"):
             raise PrefError(422, "invalid_pref", "a thread preference needs `thread`")
         tool = await self.hub.tools.get(p["tool"]) if self.hub.tools else None

@@ -2410,7 +2410,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
   - In the agent's replies, `#n p.14` and `#n:88` (and `output:<id>` forms) become links that open the viewer at that page or line.
   *Done when:* `utils/tests/web/test_citations.mjs` parses the citation forms; a browser check clicks a citation in a reply and lands on the page.
 
-- [ ] **24.8 What learns from chats doesn't read documents: `services/agent/agent/learn/`, `utils/prefs.py`.**
+- [x] **24.8 What learns from chats doesn't read documents: `services/agent/agent/learn/`, `utils/prefs.py`.**
   - The miner, the learner's transcripts (Phase 22) and anything that proposes preferences or memories see a document as its card only (`(document #n: name, 12 pages)`), never its text; the same for web pages (Phase 26) and transcripts (Phase 29).
   - A preference whose value is free text (a `prompt`, `text` or `instruction` field) is never inferred.
   *Done when:* `services/agent/tests/test_learn_privacy.py` runs the miner and the learner's transcript builder over a thread with an inline document and a fetched page and finds none of their text in what they produce.

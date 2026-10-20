@@ -57,14 +57,21 @@ def _json(text: str) -> dict[str, Any] | None:
     return None
 
 
+def doc_card(d: dict[str, Any]) -> str:
+    """An attached document as the learner sees it (plan 24.8): its card, never its text."""
+    size = f"{d['pages']} pages" if d.get("pages") else f"{d.get('lines') or 0} lines"
+    return f"(document {d.get('ref')}: {d.get('name')}, {size})"
+
+
 def render(events: list[dict[str, Any]], cap: int = 3500) -> str:
-    """A chat as a short trajectory for the prompts."""
+    """A chat as a short trajectory for the prompts. Documents appear as their cards and tool results
+    as their status (plan 24.8): no text from a file, a web page or a transcript reaches the learner."""
     out: list[str] = []
     cards: dict[str, dict[str, Any]] = {}
     for e in events:
         t, p = e["type"], e.get("payload") or {}
         if t == "user":
-            out.append(f"USER: {str(p.get('text', ''))[:400]}")
+            out.append(f"USER: {str(p.get('text', ''))[:400]}" + "".join(" " + doc_card(d) for d in p.get("docs") or []))
         elif t == "assistant" and p.get("text"):
             out.append(f"AGENT: {p['text'][:300]}")
         elif t == "tool_call":

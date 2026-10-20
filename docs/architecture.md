@@ -699,6 +699,7 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   - **On a call,** after the capability defaults (§14.1), active preferences fill arguments the caller left out or left at the default. An explicit value wins, and so does a card edit. Each filled field is marked `pref:<id>` or `carried`.
   - **After an approval,** the fields the user edited are carried to that chat's next card of the tool. An edit away from a preference's value counts against it: two contradictions retire an inferred preference.
   - **Off switches:** `[learning] enabled = false` or a chat's `no_learn` origin stop all of it.
+  - **Never learned (plan 24.8):** document contents never become preferences or memories. The miner skips free-text fields (`prompt`, `text`, an instruction…) and the hub refuses an `inferred` preference on one (`free_text`); the learner's transcripts show an attached document as its card (`(document #n: name, 12 pages)`) and a tool result (a read document, a fetched page, a transcript) as its status only.
 
 ### 14.6 The learner (plan Phase 22)
 - **The harness is files.**

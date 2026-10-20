@@ -1,4 +1,4 @@
-"""The stt mod's HTTP routes (plan Phase 29)."""
+"""The stt mod's HTTP routes (plan Phase 29); the live stream is in ``live.py``."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from .config import Settings
 from .engine import Engine
 from .hub import Hub
 from .jobs import TMP, Jobs
+from .live import mount as mount_live
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,8 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
         if job is None:
             raise http_error(404, f"no job {jid!r}", "not_found")
         return job.view()
+
+    mount_live(app, engine)
 
     @app.exception_handler(catalog.UnknownModel)
     async def unknown_model(_: Request, exc: catalog.UnknownModel) -> JSONResponse:

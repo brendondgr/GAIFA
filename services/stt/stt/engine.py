@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 
 from . import catalog
-from .asr.contract import AsrResult
+from .asr.contract import AsrCapabilities, AsrResult
 from .asr.isolated import IsolatedAsrBackend
 from .asr.lifecycle import AsrLifecycle
 from .config import AsrConfig, Settings
@@ -87,6 +87,11 @@ class Engine:
     @property
     def suppressed(self) -> int:
         return self._lifecycle.suppressed if self._lifecycle else 0
+
+    @property
+    def capabilities(self) -> AsrCapabilities:
+        backend = self._lifecycle.backend if self._lifecycle else None
+        return backend.capabilities if backend is not None else AsrCapabilities()
 
     @property
     def model_id(self) -> str:

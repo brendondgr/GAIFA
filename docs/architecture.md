@@ -69,7 +69,7 @@ AIHub/
 │   ├── manifest.py          service.toml schema, validation, placeholders
 │   ├── services.py          finds mods, runs their state machines, polls health and status
 │   ├── backends/            systemd.py (real), subprocess.py (tests and --dev)
-│   ├── proxy.py             /api/s/<id>/* passthrough (streaming, SSE, uploads)
+│   ├── proxy.py             /api/s/<id>/* passthrough (streaming, SSE, uploads, WebSockets)
 │   ├── operations.py        mod OpenAPI → Operation[]
 │   ├── memory/              memory sampling, plans to make room, reservations, triggers, acquire
 │   ├── proc.py              meminfo, AMD GPU sysfs/fdinfo, per-process memory (from lcpp)
@@ -393,7 +393,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `memory-high` | warn | memory is over 92% used | it drops under 90% |
 | `outputs-watch` | error | the outputs watcher stopped | it recovers |
 
-**Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-AIHub-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all.
+**Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-AIHub-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all. **WebSockets** pass through the same path (plan 29.2): messages both ways until either side closes, the mod's close code included. A page from another origin is refused at the handshake (403); otherwise a missing, stopped or unreachable mod is reported as a close code the browser can read (4404, 4503, 4502). An open socket counts as a request in flight.
 
 ## 7. Memory manager
 

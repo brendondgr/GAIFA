@@ -9,7 +9,8 @@
   stored checksums, never stored: `ok`, `missing`, `partial`, `unverified`,
   `checksum_mismatch` or `verifying` (brief §6.4 `Model`).
 - **Deleting files** only touches the model's recorded files inside `data/models`,
-  then removes the folders that became empty.
+  then removes the folders that became empty. A repo in the shared Hugging Face cache
+  is deleted whole through huggingface_hub (hf_cache.py), like `hf cache rm`.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from pydantic import ValidationError
 
 from utils.paths import Paths, write_atomic
 from utils.registry import alerts as registry_alerts
+from utils.registry import hf_cache
 from utils.registry.model import ID_RE, VERSION, Entry, FileEntry, Patch, RegistryError, first_error, iso_ts
 
 if TYPE_CHECKING:
@@ -346,10 +348,17 @@ class Registry:
 
     def _delete_files(self, e: Entry) -> list[str]:
         """Delete the recorded files (a symlink's target too, when it lies inside the model's own
-        folder, e.g. hf-cache blobs), then the folders left empty. Returns what failed."""
+        folder, e.g. per-repo hf-cache blobs), then the folders left empty. A repo in the shared
+        Hugging Face cache goes through huggingface_hub instead (hf_cache.py), which frees the
+        shared blobs no other repo uses. Returns what failed."""
         root = self.paths.models.resolve()
         own = self.abs(e.path)
         own_real = own.resolve() if own.is_dir() else None
+        if own_real and hf_cache.is_repo(e.path) and not own.is_symlink() and own_real.is_relative_to(root):
+            failed = hf_cache.delete_repo(own_real)
+            if failed is not None:
+                _prune_up(own_real.parent, root)
+                return failed
         failed: list[str] = []
         parents: set[Path] = set()
         for f in e.files:

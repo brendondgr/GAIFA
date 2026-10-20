@@ -16,6 +16,7 @@ Why the Stage D agent (plan Phases 13–14, architecture §14) is one hand-writt
 | Instructions | `AGENT.md`, skills loaded only when needed, a memory index | Claude Code's CLAUDE.md, skills and auto memory |
 | Model | Gemma 4 31B via the relay's `skynet` endpoint (131,072 tokens), local Gemma 4 26B as the fallback | *Vendor* τ²-bench Retail: Gemma 4 31B 86.4%, 26B A4B 85.5%; Gemma 3 27B 6.6%. Thinking adds 6–10 BFCL points (Qwen3 report) |
 | Evaluation | 30 real tasks, each run 3 times (pass^3), graded on outcomes | τ-bench: consistency is where models fail. Anthropic's eval guidance |
+| Learning (2026-10-19, plans 21–22) | Preferences as hub data filled into cards (from what you say, card edits seen twice in two chats, carried within a chat); the harness as versioned files improved by a learner after Harness² (two scoped editors, replays as probes, a composer, the eval as gate, a library), on the same model as the chat | Harness² ([arXiv 2610.14224](https://arxiv.org/abs/2610.14224)): one contrastive step gave the largest gain, scoping and the library helped, editing without execution evidence hurt; card edits give AIHub the label the paper lacks |
 
 ## 2. How Claude Code is built
 

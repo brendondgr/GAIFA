@@ -2162,7 +2162,7 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
     - **Review** lists harness versions waiting for the user (`proposed`) with "Use this version".
     - **Chat:** the turn's harness version is in its `usage` events rather than a separate panel.
     - **Browser:** the Harness tab shows the base as active. The run is checked live in 22.8.
-- [ ] **22.8 Live check and docs.**
+- [x] **22.8 Live check and docs.**
   - **Live**, on the real chats so far:
     - the miner's proposals (gen3d `fast` and no parts) are approved, then pre-filled;
     - one Learn now run per domain with chats, its decisions read by hand, and one adopted change checked by a new chat;
@@ -2179,6 +2179,16 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
     - `docs/agent-eval.md`;
     - the `CLAUDE.md` status.
   *Done when:* each live check passes and is written up; `uv run pytest` and `pytest` in `services/agent` pass.
+  - *As built (2026-10-20):*
+    - **The miner's proposals:** gen3d `fast` and `[shape, preview]` are waiting in Review. Approving them is the user's.
+    - **Two Learn now runs** (`docs/agent-eval.md`):
+      - the first adopted a wrong gen3d note, which was rolled back and led to the schema check on tool notes;
+      - the second adopted a correct `tts_speak` note (version 11, active), the gate rejected gen3d and hub candidates, and the schema check refused a proposal twice.
+    - **Rollback** to version 3 worked live. The full suite on v11 is 85% pass^3.
+    - **Not done:**
+      - a prompt-change proposal approved live (none was proposed; the route and the test cover it);
+      - turning learning off and a `no_learn` chat, checked live (covered by tests);
+      - the live runs with real outputs that need the GPU (the hair edit, image → 3D per engine family), deferred from 20.5.
 
 **Wire — Phase 22:**
 - the Learning page's Harness, Runs and Library tabs;
@@ -2188,10 +2198,10 @@ The base harness stays in git, so a rollback is a pointer move and nothing that 
 - the run's stage in the agent's status.
 
 **Checks & deliverables — Phase 22**
-- [ ] With learning on, a night's run adopts only changes that passed the gate, and every change has its evidence and can be rolled back.
-- [ ] With no learned versions, the agent behaves exactly as before (byte-identical prompt, the same eval results).
-- [ ] A run never competes with you: it pauses when you chat.
-- [ ] Delivered: `services/agent/harness/`, `agent/harness.py`, `agent/hooks.py`, `agent/learn/` (`mine`, `replay`, `loop`, `prompts`, `library`, `schedule`), the dry-run change, the Learning page tabs, the tests, the docs.
+- [x] With learning on, a night's run adopts only changes that passed the gate, and every change has its evidence and can be rolled back.
+- [x] With no learned versions, the agent behaves exactly as before (byte-identical prompt, the same eval results).
+- [x] A run never competes with you: it pauses when you chat.
+- [x] Delivered: `services/agent/harness/`, `agent/harness.py`, `agent/hooks.py`, `agent/learn/` (`mine`, `replay`, `loop`, `prompts`, `library`, `schedule`), the dry-run change, the Learning page tabs, the tests, the docs.
 
 | Deliverable | Description | Location |
 | --- | --- | --- |

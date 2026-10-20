@@ -688,6 +688,24 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   - **After an approval,** the fields the user edited are carried to that chat's next card of the tool. An edit away from a preference's value counts against it: two contradictions retire an inferred preference.
   - **Off switches:** `[learning] enabled = false` or a chat's `no_learn` origin stop all of it.
 
+### 14.6 The learner (plan Phase 22)
+- **The harness is files.**
+  - The base is in git, in `services/agent/harness/`: `systemprompt.md`, `guardrails.md`, `hooks.toml`, `tools/<tool>.md` notes and `skills/`.
+  - Learned versions are overlays in `data/agent/harness/versions/<n>/` with a `current` pointer, so a rollback is moving the pointer.
+  - A chat can pin a version (`settings.harness`), and each turn records the one it used.
+- **Hooks** are declarative and four verbs only (hint after an error, cap, require a step first, trim). No model-written code runs in the loop.
+- **The loop (after Harness², arXiv 2610.14224), in the agent mod and on the chat's own model:**
+  1. reflect on an area's new chats;
+  2. propose two scoped candidates, INV (how the agent works) and PREF (what you want);
+  3. probe them by replaying chats as dry runs pinned to each candidate, scored from the record: the share of your card edits the candidate now pre-chooses, no repeated denials, no new errors;
+  4. compose;
+  5. gate on the eval (the area's tasks plus a core set; the full suite for always-on changes);
+  6. adopt;
+  7. keep one lesson per round in that area's library, which only the improver reads.
+- **Who adopts what:** tool notes, skills and hooks are adopted automatically once the gate passes; prompt and guardrail changes wait for the user.
+- **When it runs:** nightly, after `[learning] idle_min` without a chat, or on Learn now. It pauses while you chat.
+- **Dry runs change nothing:** generating tools make stand-ins, and write and destructive tools return a stand-in success.
+
 ### 14.4 Everything inside the folder
 - **Logs.** Each mod's output is also written to `data/logs/<id>.log`, rotated. journald stays as a second copy, and the Logs tab reads the file.
 - **Runtime state.** lcpp's instance records move from `$XDG_RUNTIME_DIR/lcpp` to `data/state/lcpp` via `LCPP_STATE_DIR`. Instances are still systemd units, so after a reboot they come back through session restore, not by adoption.

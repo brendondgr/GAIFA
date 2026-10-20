@@ -115,6 +115,28 @@ The two fixes were in the checks, not the agent:
 - `carry_in_chat`'s card script kept state across runs that ran at once. It now edits only the card whose prompt names the cat.
 
 `text_to_3d_asks` fell to 0/3 in this run: the model went straight to Cube3D without asking. The rule lives in `make_3d`'s description, which the model reads only once the tool is loaded.
+
+### The learner's first runs (plan 22.8, 2026-10-20)
+
+**Run 1** (comfy, gen3d; stopped by hand):
+- **comfy** adopted version 3, a note that the tool is `comfy_remove_background`. The model had called `comfy:remove_background` four times.
+- **gen3d** adopted version 5, with notes saying `gen3d_make_3d` needs an image and `comfy_generate_image` takes `workflow_id`. Both are wrong for today's tools: its evidence predated Phase 20, and the editor never saw the current schemas. The gate passed it at 89.5% against 89.5%.
+- It was rolled back to version 3 and marked rejected. The fix: tool notes are now checked against today's schemas, and the editors see those schemas.
+
+**Run 2** (gen3d, tts, hub; 621 s, 18 model calls):
+- **gen3d:** the gate failed (84% against 89%), so it kept version 3.
+- **tts:** adopted version 11, a note that `tts_speak` takes `name`, not `voice`. A real error in a chat. The schema check refused a PREF proposal that used `voice` twice.
+- **hub:** the gate failed (90% against 100%).
+
+**Afterwards,** the full set on harness version 11, with every write a stand-in in dry runs:
+
+| Run | Tasks × runs | pass@1 | pass^k | Mean time |
+|---|---|---|---|---|
+| MiniCPM-V 4.7, harness v11 | 46 × 3 | 89.9% | 39/46 (85%) | 16 s |
+
+**At 0/3:**
+- `three_steps` and `text_to_3d_asks`, as before.
+- `picture_character_to_3d`: one run hit the fallback model `gemma4-26B`, which isn't loaded while the GPU is kept free; the others picked TRELLIS.2 or stopped after the search.
 <!-- /RESULTS -->
 
 ## Gate

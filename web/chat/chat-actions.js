@@ -87,8 +87,8 @@ const ref = o => (o?.n ? `#${o.n}` : 'that output');
 registerAction({ id: 'image.animate', on: 'image', label: 'Animate', icon: 'video', tool: 'comfy_animate_image', args: o => ({ image: fileRef(o) }), order: 10 });
 registerAction({ id: 'image.edit', on: 'image', label: 'Edit', icon: 'wand', tool: 'comfy_edit_image', args: o => ({ image: fileRef(o) }), order: 20 });
 registerAction({ id: 'image.removebg', on: 'image', label: 'Remove background', icon: 'scissors', tool: 'comfy_remove_background', args: o => ({ image: fileRef(o) }), order: 30 });
-// gen3d makes 3D from text only, so this one asks the agent (which describes the image first).
-registerAction({ id: 'image.make3d', on: 'image', label: 'Make 3D', icon: 'cube', needs: 'gen3d_make_3d', prompt: o => `Make a 3D model of ${ref(o)}`, order: 40 });
+// gen3d's image engines take the picture itself (plan 20.7): the card offers only the engines that fit.
+registerAction({ id: 'image.make3d', on: 'image', label: 'Make 3D', icon: 'cube', tool: 'gen3d_make_3d', args: o => ({ image: fileRef(o) }), order: 40 });
 registerAction({ id: 'image.describe', on: 'image', label: 'Describe', icon: 'eye', prompt: o => `Describe ${ref(o)}`, order: 60 });
 registerAction({ id: 'image.reference', on: 'image', label: 'Use as reference', icon: 'clip', attach: true, order: 70 });
 registerAction({ id: 'video.describe', on: 'video', label: 'Describe', icon: 'eye', prompt: o => `Describe ${ref(o)}`, order: 60 });

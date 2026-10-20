@@ -140,6 +140,7 @@ utils/tests/
 | `mod-ui.js` | Ours: `ctx.ui`, themed DOM helpers for page modules |
 | `mod-kit.js` | Ours: shared pieces for the built-in mods' pages (Part B): `requireRunning`, `callRoom` (answers `needs_room` with a confirm, then retries with make-room), `segmented`, `panel`, `header`, `columns`, `stat`, `store`, formatting |
 | `mod-form.js` | Ours: `schemaForm(ctx, schema, o)`: a form built from a JSON Schema (text, numbers with ranges, enums, booleans, files that upload or pick a recent output), for any mod page (plan 11.11) |
+| `mod-options.js` | Ours: choices that follow the inputs (plan 20.7): `choices`, `defaultOf`, `labelOf`, `helpOf` over a schema's `x-options` (brief §11.12); `schemaForm` uses them, so the parameter card and mod pages list only what fits |
 | `mock-comfy.js` | Ours: the comfy mod's API on the mock (packs, runs, imports, review, downloads, charts) |
 | `viewer3d.js` | Ours: `mountViewer(el, {files, url, rig})`, the Viewer3D (orbit, file tabs, wireframe, part visibility, rig sliders), adapted from gen3d's viewer; three.js r16x is vendored in `vendor/three/` (its addons import it relatively, so no import map) |
 | `mock-mods.js` | Ours: the built-in mods' native APIs on the mock (`createModMocks(m)`, moved out of `mock.js`): tts, gen3d (jobs with stages, live events, box GLBs), relay (DashLLM's `{dimensions, source}` stats, endpoints, tunnels), lcpp (instances, catalog, preflight, chat stream, downloads, relay, settings), comfy, transcribe |

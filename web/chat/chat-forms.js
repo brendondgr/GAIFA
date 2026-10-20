@@ -6,6 +6,7 @@
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, shortArgs, toolLabel } from './chat-ui.js';
 import { registerCard, ErrorBox, ProgressBar, STATUS } from './chat-cards.js';
 import { schemaForm } from '../mod-form.js';
+import { labelOf } from '../mod-options.js';
 import { createUi } from '../mod-ui.js';
 
 const R = () => globalThis.React;
@@ -19,12 +20,14 @@ const pick = (schema, names) => {
 export const outputIdOf = v => { const s = v && typeof v === 'object' ? v.$file : v; return typeof s === 'string' && s.startsWith('output:') ? s.slice(7) : null; };
 
 // ---------- schemaForm inside React ----------
-export function SchemaFormHost({ schema, values, order, api, onChange, formKey }) {
-  const React = R(), ref = React.useRef(null), cb = React.useRef(onChange);
-  cb.current = onChange;
+export function SchemaFormHost({ schema, values, order, api, onChange, formKey, context, formRef }) {
+  const React = R(), ref = React.useRef(null), cb = React.useRef(onChange), cx = React.useRef(context);
+  cb.current = onChange; cx.current = context;
   React.useEffect(() => {
     const el = ref.current; if (!el) return undefined;
-    const f = schemaForm({ ui: createUi(), api }, schema, { values: values || {}, order: order || [] });
+    // context: the card's other values (file inputs, the other form), so x-options choices fit them (plan 20.7)
+    const f = schemaForm({ ui: createUi(), api }, schema, { values: values || {}, order: order || [], context: () => cx.current?.() });
+    if (formRef) formRef.current = f;
     // `onchange` on schemaForm's element is a DOM property, so native change events bubbling from its
     // inputs call it too (with the Event): always hand on the form's values.
     f.onchange = v => cb.current?.(v && typeof v === 'object' && !(typeof Event !== 'undefined' && v instanceof Event) ? v : f.values());
@@ -79,7 +82,10 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
   const main = [...new Set([...missing, ...(spec.ask_fields || []).filter(k => props[k] && !files.includes(k))])];
   const rest = Object.keys(props).filter(k => !files.includes(k) && !main.includes(k));
   const [fileVals, setFileVals] = React.useState(() => Object.fromEntries(files.map(k => [k, args[k] ?? null])));
-  const vals = React.useRef({ main: {}, rest: {} });
+  const vals = React.useRef({ main: {}, rest: {} }), forms = { main: React.useRef(null), rest: React.useRef(null) };
+  const others = () => ({ ...args, ...vals.current.rest, ...vals.current.main, ...Object.fromEntries(Object.entries(fileVals).filter(([, v]) => !empty(v))) });
+  React.useEffect(() => { forms.main.current?.refilter?.(); forms.rest.current?.refilter?.(); }, [JSON.stringify(fileVals)]);
+  const filledNote = (spec.filled || []).filter(k => props[k]).map(k => `${k}: ${labelOf(props[k], args[k])}`).join(', ');
   const [err, setErr] = React.useState(null), [busy, setBusy] = React.useState(false);
   const key = spec.tool + JSON.stringify(Object.keys(props));
   const head = h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' } },
@@ -114,10 +120,11 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
     spec.description && !compact ? h('div', { style: { fontSize: 12, color: T.mut, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, spec.description.split('\n')[0]) : null,
     shortArgs(given) ? h('div', { title: shortArgs(given, 2000), style: { fontFamily: MONO, fontSize: 11.5, color: T.mut, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, shortArgs(given)) : null,
     files.map(k => h(FilePicker, { key: k, name: k, prop: props[k], required: req.includes(k), value: fileVals[k], outputs, api, onChange: v => setFileVals(s => ({ ...s, [k]: v })) })),
-    main.length ? h(SchemaFormHost, { formKey: key + ':main', schema: pick(schema, main), values: args, order: main, api, onChange: v => { vals.current.main = v; } }) : null,
+    filledNote ? h('div', { style: { fontSize: 11.5, color: T.mut } }, 'Chosen for these inputs: ' + filledNote) : null,
+    main.length ? h(SchemaFormHost, { formKey: key + ':main', schema: pick(schema, main), values: args, order: main, api, context: others, formRef: forms.main, onChange: v => { vals.current.main = v; } }) : null,
     rest.length ? h('details', { style: { borderTop: '1px solid ' + T.bd, paddingTop: 8 } },
       h('summary', { style: { cursor: 'pointer', fontSize: 12, color: T.mut } }, `All settings (${rest.length})`),
-      h('div', { style: { paddingTop: 8 } }, h(SchemaFormHost, { formKey: key + ':rest', schema: pick(schema, rest), values: args, order: rest, api, onChange: v => { vals.current.rest = v; } }))) : null,
+      h('div', { style: { paddingTop: 8 } }, h(SchemaFormHost, { formKey: key + ':rest', schema: pick(schema, rest), values: args, order: rest, api, context: others, formRef: forms.rest, onChange: v => { vals.current.rest = v; } }))) : null,
     err ? h(ErrorBox, { error: err }) : null,
     h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
       h(Btn, { kind: 'pri', icon: 'play', label: busy ? 'Working…' : runLabel, disabled: busy, onClick: run }),

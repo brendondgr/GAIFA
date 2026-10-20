@@ -111,3 +111,40 @@ test('schemaForm: a list field shows "a, b" and gives back an array', async () =
   assert.deepEqual(form.values().ns, [1, 2]);
   if (inputs) assert.ok(inputs.some(i => i.value === 'shape, preview'));
 });
+
+const SHAPE = { properties: {
+  prompt: { type: 'string' }, image: { type: 'string', format: 'aihub-file', 'x-kind': 'image' },
+  engine: { type: 'string', enum: ['cube3d', 'trellis2', 'sam3d_body'], 'x-options': {
+    cube3d: { label: 'Cube3D', excludes: ['image'], default: true, good_for: 'from text', allows: { preset: ['fast', 'balanced'] } },
+    trellis2: { label: 'TRELLIS.2', needs: ['image'], default: true, good_for: 'objects', speed: '2 min', allows: { preset: ['fast', 'base'] } },
+    sam3d_body: { label: 'SAM 3D Body', needs: ['image'], allows: { preset: ['base'] } } } },
+  preset: { type: 'string', enum: ['fast', 'balanced', 'base'], 'x-depends-on': 'engine' } } };
+
+test('mod-options: choices, defaults and labels follow the inputs (plan 20.7)', async () => {
+  const o = await import(pathToFileURL(path.join(root, 'web/mod-options.js')).href);
+  assert.deepEqual(o.choices(SHAPE, 'engine', { prompt: 'a fox' }), ['cube3d']);
+  assert.deepEqual(o.choices(SHAPE, 'engine', { image: { $file: 'output:abc' } }), ['trellis2', 'sam3d_body']);
+  assert.equal(o.defaultOf(SHAPE, 'engine', { image: 'output:abc' }), 'trellis2');
+  assert.equal(o.defaultOf(SHAPE, 'engine', {}), 'cube3d');
+  assert.deepEqual(o.choices(SHAPE, 'preset', { image: 'output:abc', engine: 'sam3d_body' }), ['base']);
+  assert.deepEqual(o.choices(SHAPE, 'preset', { image: 'output:abc' }), ['fast', 'base'], 'no engine yet: the default engine\'s presets');
+  assert.equal(o.labelOf(SHAPE.properties.engine, 'trellis2'), 'TRELLIS.2');
+  assert.equal(o.helpOf(SHAPE.properties.engine, 'trellis2'), 'objects · 2 min');
+});
+
+test('schemaForm: an x-options dropdown lists only what fits, and re-checks when the inputs change', async () => {
+  const { schemaForm } = await import(pathToFileURL(path.join(root, 'web/mod-form.js')).href);
+  let outside = {};
+  const form = schemaForm({ ui, api: {} }, { properties: { engine: SHAPE.properties.engine, preset: SHAPE.properties.preset, image: SHAPE.properties.image } },
+    { values: {}, context: () => outside });
+  const [eng, pre] = [0, 1].map(i => form.find(e => e.tagName === 'SELECT' && (i === 0 ? e.children.some(c => c.textContent === 'Cube3D') || e.children.some(c => c.textContent === 'TRELLIS.2') : e.children.some(c => c.textContent === 'balanced' || c.textContent === 'base'))));
+  const labels = s => s.children.map(c => c.textContent);
+  assert.deepEqual(labels(eng), ['default (Cube3D)', 'Cube3D']);
+  outside = { image: { $file: 'output:abc' } };              // the card's file input got a picture
+  form.refilter();
+  assert.deepEqual(labels(eng), ['default (TRELLIS.2)', 'TRELLIS.2', 'SAM 3D Body']);
+  assert.deepEqual(labels(pre), ['—', 'fast', 'base']);
+  eng.value = 'sam3d_body';
+  eng.dispatch('change');
+  assert.deepEqual(labels(pre), ['—', 'base']);
+});

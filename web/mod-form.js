@@ -7,6 +7,7 @@
 //   el.append(form);  form.values() → {name: value}  form.set({name: value})  form.onchange = fn
 
 import { h } from './mod-ui.js';
+import { choices, defaultOf, helpOf, labelOf, optionsOf } from './mod-options.js';
 
 const MONO = "'JetBrains Mono',ui-monospace,monospace";
 const isFile = p => p && (p.format === 'aihub-file' || (p.type === 'array' && p.items?.format === 'aihub-file'));
@@ -29,7 +30,10 @@ export function schemaForm(ctx, schema, o = {}) {
   // property, so native `change` events bubbling from the inputs never call fn with an Event.
   let onChange = null;
   Object.defineProperty(el, 'onchange', { configurable: true, enumerable: true, get: () => onChange, set: fn => { onChange = typeof fn === 'function' ? fn : null; } });
-  const changed = () => onChange?.(el.values());
+  const changed = () => { el.refilter(); onChange?.(el.values()); };
+  // Enum fields with `x-options` (plan 20.7) list only the choices that fit the other values:
+  // this form's own plus `o.context()` (e.g. the card's file inputs, which live outside the form).
+  const ctxVals = () => ({ ...(o.context ? o.context() || {} : {}), ...el.values() });
 
   for (const name of names) {
     const p = props[name];
@@ -52,6 +56,14 @@ export function schemaForm(ctx, schema, o = {}) {
     }
     return out;
   };
+  el.refilter = () => {
+    const vals = ctxVals();
+    for (const [k, f] of Object.entries(fields)) {
+      if (!f.choose) continue;
+      const allowed = choices({ properties: props }, k, vals);
+      f.choose(allowed, defaultOf({ properties: props }, k, vals));
+    }
+  };
   el.set = vals => { for (const [k, v] of Object.entries(vals || {})) fields[k]?.set(v); changed(); };
   el.set(o.values || {});
   el.focusFirst = () => { const f = Object.values(fields)[0]; f?.el.querySelector?.('textarea,input,select')?.focus?.() ?? f?.el.focus?.(); };
@@ -66,9 +78,23 @@ function rank(name, order = []) {
 function control(ui, p, changed) {
   const t = p.type;
   if (p.enum) {
-    const s = ui.select([{ value: '', label: p.default != null ? `default (${p.default})` : '—' }, ...p.enum.map(v => ({ value: String(v), label: String(v) }))],
+    const s = ui.select([{ value: '', label: p.default != null ? `default (${p.default})` : '—' }, ...p.enum.map(v => ({ value: String(v), label: labelOf(p, v) }))],
       { onchange: changed });
-    return { el: s, get: () => s.value === '' ? undefined : cast(p, s.value), set: v => { s.value = v == null ? '' : String(v); } };
+    const f = { el: s, get: () => s.value === '' ? undefined : cast(p, s.value), set: v => { s.value = v == null ? '' : String(v); } };
+    if (optionsOf(p) || p['x-depends-on']) {
+      let shown = null;
+      f.choose = (allowed, dflt) => {                 // rebuild only when the list changes; drop a value that no longer fits
+        const sig = JSON.stringify([allowed, dflt]);
+        if (sig === shown) return;
+        shown = sig;
+        const keep = s.value;
+        const empty = dflt != null ? `default (${labelOf(p, dflt)})` : p.default != null ? `default (${p.default})` : '—';
+        s.replaceChildren(h('option', { value: '' }, empty), ...allowed.map(v => h('option', { value: String(v), title: helpOf(p, v) }, labelOf(p, v))));
+        s.value = allowed.map(String).includes(keep) ? keep : '';
+        s.title = helpOf(p, s.value || dflt || '');
+      };
+    }
+    return f;
   }
   if (t === 'boolean') {
     const c = h('input', { type: 'checkbox', onchange: changed });

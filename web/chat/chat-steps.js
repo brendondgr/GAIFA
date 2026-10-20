@@ -25,8 +25,8 @@ export function registerStep(name, words) {
 export const stepFor = name => steps.get(name) || null;
 
 // ---------- values in plain words ----------
-// Engine and workflow ids → names. The schema's own labels win (`x-enum-labels` {value: label} or
-// `oneOf` [{const, title}]) once the tools carry them; until then this map.
+// Engine and workflow ids → names. The schema's own labels win (`x-options` {value: {label}}, plan 20.7;
+// `x-enum-labels` or `oneOf` [{const, title}]); this map covers tools that carry none.
 const NAMES = { 'zimage-turbo': 'Z-Image Turbo', 'zimage-intorealism': 'Z-Image IntoRealism', 'qwen21-turbo-t2i': 'Qwen-Image 2.1 Turbo', 'qwen21-t2i': 'Qwen-Image 2.1',
   'qwen21-turbo-edit-multi': 'Qwen-Image 2.1 Edit Turbo', 'qwen21-turbo-remove-bg': 'Qwen-Image 2.1 background removal', 'qwen-edit': 'Qwen-Image-Edit 2511', 'flux2-klein-edit': 'FLUX.2 Klein Edit',
   'wan21-i2v': 'Wan 2.1 image-to-video', 'wan21-t2v': 'Wan 2.1 text-to-video', trellis2: 'TRELLIS.2', hunyuan21: 'Hunyuan3D 2.1', sam3d_objects: 'SAM 3D Objects', sam3d_body: 'SAM 3D Body', cube3d: 'Cube3D' };
@@ -35,6 +35,8 @@ const schemaOf = (name, ctx) => (ctx?.tools || []).find(t => t.name === name)?.p
 /** A value's name: the schema's label for it, a known engine or workflow, or the value. */
 export function nameOf(value, { tool, key, ctx } = {}) {
   const p = schemaOf(tool, ctx)?.properties?.[key];
+  const xo = p?.['x-options']?.[value]?.label;          // the tool's own label for this choice (plan 20.7)
+  if (xo) return String(xo);
   const xl = p?.['x-enum-labels'];
   if (xl && !Array.isArray(xl) && xl[value] != null) return String(xl[value]);
   if (Array.isArray(xl) && Array.isArray(p.enum)) { const i = p.enum.indexOf(value); if (i >= 0 && xl[i] != null) return String(xl[i]); }

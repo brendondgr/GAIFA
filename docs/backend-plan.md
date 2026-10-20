@@ -1805,7 +1805,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
   - **Update:** architecture §14.1; `docs/structure.md` (`utils/tools/options.py`, `modcall.py`); the `CLAUDE.md` status.
   *Done when:* `grep -rn "text only\|text-only" docs services/agent` finds no stale claim about gen3d; `uv run pytest` passes.
   - *As built:* test-plan 9.3 and the chains line, brief §11.13's built-in actions, and "superseded" notes on 14.8 and the Stage D check. Architecture §14.1 and `docs/structure.md` were updated in 20.1.
-- [ ] **20.7 The card follows the capabilities** (`web/chat/`, adapted to the Chat redesign; `web/mod-form.js`).
+- [x] **20.7 The card follows the capabilities** (`web/chat/`, adapted to the Chat redesign; `web/mod-form.js`).
   - **The engine and workflow dropdowns:**
     - list only the `x-options` choices whose `needs`/`excludes` fit the card's current values, labelled with `label` and with `good_for` as help;
     - re-filter when a file input is set or cleared;
@@ -1816,6 +1816,15 @@ This phase adds one declaration per engine and pack. The hub turns it into check
   - The image result's "Make 3D" becomes a tool action (`gen3d_make_3d` with `image`), which Phase 19 left waiting for this schema.
   - Docs: brief §11.13 and `web/PATCHES.md`.
   *Done when:* a Node test (`utils/tests/web/`) covers the option filtering and the dependent presets; in the browser, a make_3d card with a picture offers only image engines and without one only Cube3D, and an edit card shows only edit packs; `uv run pytest` passes.
+  - *As built:*
+    - **`web/mod-options.js`** holds the card's side of the fit rules: `choices`, `defaultOf`, `labelOf`, `helpOf`. A dependent field with no parent value uses the parent's default.
+    - **`schemaForm`** re-filters its `x-options` dropdowns on every change, and when asked through `refilter()`. Its `context` option hands it values from outside the form, which `ParamCard` uses for its file inputs and its other form.
+    - **Not built:** the chip picker for an array of enum and the object fieldset. Lists already round-trip as text since 19.7, so they stay that way.
+    - **Browser check** (live hub, `#/chat`; no card was run):
+      - the composer's 3D card offered only Cube3D (presets Low-poly, Fast, Balanced, Quality);
+      - after picking a picture it offered the four image engines with "default (TRELLIS.2)", each with its `good_for` and speed as help, and their presets (Fast, Base, Draft);
+      - the Edit image card offered only the instruction-edit pack, with full quality as the default.
+    - **Tests:** two Node tests in `modpage.test.mjs`.
 
 **Wire — Phase 20:**
 - the parameter card's engine and workflow dropdowns follow the inputs;

@@ -2661,8 +2661,9 @@ The Auto mode (27.4) needs something to decide, call by call, whether a command 
   *Done when:* `services/decide/tests/` (a fake model for unit tests; marked GPU tests) cover each question type, batching, the pinned-revision check refusing an unknown revision, unload; `aihub check decide` passes; a live check answers ten labelled questions with latency recorded on this machine.
   *Built 2026-10-20:* d3-lite at `03560c26` (code read and hashed, `setup/decide.md`); the model in a worker; 20 unit tests and 4 GPU tests pass; `aihub check decide --start` passes on a second hub; 10/10 labelled questions at a median 63 ms, 5.1 GB loaded; `decide_ask` answered through `/api/tools/decide_ask/call`.
 
-- [ ] **30.2 The rules: `utils/tools/judge_rules.py`.** `classify(call, folder) -> "allow" | "ask" | "unsure"` with the lists above, and a reason.
+- [x] **30.2 The rules: `utils/tools/judge_rules.py`.** `classify(call, folder) -> "allow" | "ask" | "unsure"` with the lists above, and a reason.
   *Done when:* `utils/tests/tools/test_judge_rules.py` covers every rule, compound commands (`a && b`, pipes, `$(…)`, redirections), and wrappers (`env`, `bash -c`, `xargs`).
+  *Built 2026-10-20:* the command rules in `judge_commands.py` and the splitter in `shell.py`; edits, `web_fetch` and GPU jobs (`estimate`) too; 233 cases.
 
 - [ ] **30.3 The judge: `utils/tools/judge.py`.** Builds the input from the allowed inputs only, calls the `decide` mod or the relay (by `[agent.judge] backend`), parses the verdict, fails closed; every verdict is recorded with the call (the tool record from Phase 21) so you can see why something ran.
   *Done when:* `utils/tests/tools/test_judge.py` (a fake relay) covers the prompt's contents (no file text, no tool results), timeout, malformed answers, and the record.

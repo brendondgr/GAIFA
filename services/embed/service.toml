@@ -1,0 +1,36 @@
+# Embeddings (plan Phase 28): EmbeddingGemma 2 puts text, code, images, audio and video into one 768-d space,
+# for search by meaning. Fields: architecture §4.3; how it was built: docs/mods.md, setup/embed.md.
+id = "embed"
+name = "Embeddings"
+description = "EmbeddingGemma 2: text, code, images, audio and video in one space, for search by meaning"
+icon = "search"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "-m", "embed"]
+port = 5104
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 30
+restart = "on-failure"
+install = "install.sh"
+
+[run.env]
+EMBED_MODEL_DIR = "{models}/embed/embeddinggemma-2"
+EMBED_STATE_DIR = "{root}/data/state/embed"
+EMBED_DEVICE = "auto"               # auto | cuda | cpu (fp32; bf16 on the GPU, never fp16)
+HF_HOME = "{hf_home}"
+HF_HUB_OFFLINE = "1"
+
+[memory]
+estimate_gb = 3.0                   # text path, measured; status reports the peak per loaded encoder set
+load = "POST /v1/load"
+unload = "POST /v1/unload"
+triggers = ["POST /v1/embed"]
+idle_unload_s = 300
+idle_unload_env = "EMBED_IDLE_UNLOAD_S"
+
+[models]
+dirs = ["embed"]

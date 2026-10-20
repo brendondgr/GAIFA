@@ -374,6 +374,124 @@
       },
       "tags": []
     },
+    "embeddinggemma-2": {
+      "added": "2026-10-20T17:36:19-04:00",
+      "files": [
+        {
+          "path": "embed/embeddinggemma-2/README.md",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 21730,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/chat_template.jinja",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 1016,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 4455,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/config_sentence_transformers.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 1565,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/model.safetensors",
+          "role": "weights",
+          "sha256": null,
+          "size_bytes": 1488915288,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/modules.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 413,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/preprocessor_config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 511,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/processor_config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 1788,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/sentence_bert_config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 747,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/tokenizer.json",
+          "role": "tokenizer",
+          "sha256": null,
+          "size_bytes": 32170510,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/tokenizer.model",
+          "role": "tokenizer",
+          "sha256": null,
+          "size_bytes": 4689013,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/tokenizer_config.json",
+          "role": "tokenizer",
+          "sha256": null,
+          "size_bytes": 1599,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/1_Pooling/config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 90,
+          "verified_at": null
+        },
+        {
+          "path": "embed/embeddinggemma-2/2_Normalize/config.json",
+          "role": "config",
+          "sha256": null,
+          "size_bytes": 97,
+          "verified_at": null
+        }
+      ],
+      "format": "hf-dir",
+      "kind": "text-encoder",
+      "name": "EmbeddingGemma 2",
+      "notes": "",
+      "path": "embed/embeddinggemma-2",
+      "services": [],
+      "source": {
+        "repo": "google/embeddinggemma-2",
+        "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+        "type": "huggingface"
+      },
+      "tags": [
+        "embedding",
+        "multimodal"
+      ]
+    },
     "face-yolov9c": {
       "added": "2026-10-06T14:02:19-04:00",
       "files": [

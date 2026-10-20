@@ -85,6 +85,8 @@ DOCS_HOSTS = {"docs.python.org", "developer.mozilla.org", "pypi.org", "en.wikipe
 PY_DANGER_RE = re.compile(r"\b(shutil\.rmtree|os\.(remove|unlink|rmdir|removedirs|system|popen|exec\w*|spawn\w*|kill)"
                           r"|subprocess|pty\.spawn|ctypes|socket\.|__import__\(['\"](os|subprocess)|send2trash"
                           r"|\.unlink\(|\.rmdir\(|eval\(|exec\()")
+RUN_REMOTE_RE = re.compile(r"\b(curl|wget|fetch)\b[^|\n]*\|\s*(sudo\s+)?(ba|z|da|k)?sh\b|base64\s+(-d|--decode)[^|\n]*\|"
+                           r"\s*(ba)?sh\b|\b(eval|exec)\s*\(\s*(requests|urllib|httpx|base64|atob|fetch)", re.I)
 PY_NET_RE = re.compile(r"\b(requests|httpx|urllib|aiohttp|http\.client|ftplib|smtplib|paramiko)\b")
 
 
@@ -150,6 +152,8 @@ def edit_rule(tool: str, args: dict[str, Any], ctx: Ctx) -> Verdict:
     text = "\n".join(str(args.get(k) or "") for k in ("new", "content", "message"))
     if SECRET_RE.search(text):
         found.append(ask("the change contains what looks like a password, token or key", "credentials"))
+    if RUN_REMOTE_RE.search(text):
+        found.append(unsure("the change adds code that downloads and runs something", "edit-run-remote"))
     if tool == "workspace_delete":
         found.append(unsure("deletes a file (undo restores it)", "delete"))
     if not found:

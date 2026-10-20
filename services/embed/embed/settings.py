@@ -26,6 +26,15 @@ class Settings:
     video_max_frames: int = 32        # the processor's own cap; longer videos are sampled below 1 fps
     batch_text: int = 32
     batch_media: int = 4
+    # the library (plan 28.2)
+    databases: Path = HERE / "data"
+    index: bool = True                # follow the hub's outputs and index them
+    idle_source: str = "engine"       # engine (other processes' DRM engine time) | busy_percent (gpu_busy_percent)
+    idle_busy_pct: float = 10.0       # the GPU counts as idle under this busy percentage…
+    idle_seconds: float = 300.0       # …held for this long, before indexing starts
+    index_audio_max_s: float = 3600.0 # longer audio is indexed up to here (30 s windows)
+    index_gap_s: float = 1.0          # pause between batches, then a fresh look at the GPU
+    index_batch_text: int = 8         # chunks of ~800 tokens a batch (32 of them peaked at 7.5 GB)
 
     @classmethod
     def from_env(cls, port: int | None = None) -> "Settings":
@@ -42,4 +51,12 @@ class Settings:
             audio_max_s=float(e.get("EMBED_AUDIO_MAX_S", d.audio_max_s)),
             batch_text=int(e.get("EMBED_BATCH_TEXT", d.batch_text)),
             batch_media=int(e.get("EMBED_BATCH_MEDIA", d.batch_media)),
+            databases=Path(e.get("AIHUB_DATABASES", d.databases)),
+            index=e.get("EMBED_INDEX", "1") not in ("", "0", "false", "no"),
+            idle_source=e.get("EMBED_IDLE_SOURCE", d.idle_source),
+            idle_busy_pct=float(e.get("EMBED_IDLE_BUSY_PCT", d.idle_busy_pct)),
+            idle_seconds=float(e.get("EMBED_IDLE_SECONDS", d.idle_seconds)),
+            index_audio_max_s=float(e.get("EMBED_INDEX_AUDIO_MAX_S", d.index_audio_max_s)),
+            index_gap_s=float(e.get("EMBED_INDEX_GAP_S", d.index_gap_s)),
+            index_batch_text=int(e.get("EMBED_INDEX_BATCH_TEXT", d.index_batch_text)),
         )

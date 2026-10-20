@@ -51,17 +51,59 @@ def mp4(tmp: Path, seconds: int, name: str = "v.mp4") -> bytes:
 
 
 class FakeHub:
-    """Outputs by id (`add`), memory acquire (`room = False` answers 409 needs_room), model registration."""
+    """Outputs by id (`add`; text outputs answer the text route with windows and pages), memory acquire
+    (`room = False` answers 409 needs_room), model registration, and chat threads' events."""
 
     def __init__(self):
         self.outputs: dict[str, tuple[dict, bytes]] = {}
+        self.texts: dict[str, tuple[str, list[int]]] = {}
+        self.previews: dict[str, bytes] = {}
+        self.threads: dict[str, list[dict]] = {}
         self.acquires: list[dict] = []
         self.models: list[dict] = []
         self.room = True
+        self.window = 48_000
+        self.clock = 1_000_000.0
 
-    def add(self, oid: str, kind: str, data: bytes) -> str:
-        self.outputs[oid] = ({"id": oid, "kind": kind, "size_bytes": len(data), "service": "test"}, data)
+    def add(self, oid: str, kind: str, data: bytes = b"", title: str | None = None, meta: dict | None = None,
+            text: str | None = None, pages: list[str] | None = None, preview: bytes | None = None) -> str:
+        if pages is not None:
+            starts, acc = [], ""
+            for p in pages:
+                starts.append(len(acc))
+                acc += p
+            self.texts[oid] = (acc, starts)
+            data = acc.encode()
+        elif text is not None:
+            self.texts[oid] = (text, [])
+            data = text.encode()
+        self.clock += 1
+        rec = {"id": oid, "kind": kind, "size_bytes": len(data), "service": "test", "title": title or oid,
+               "files": [{"path": f"outputs/test/{oid}", "kind": kind, "size_bytes": len(data)}],
+               "preview": f"/api/outputs/{oid}/preview?v=1" if preview else None, "created_ts": self.clock,
+               "meta": meta or {}}
+        if preview:
+            self.previews[oid] = preview
+        self.outputs[oid] = (rec, data)
         return f"output:{oid}"
+
+    def remove(self, oid: str) -> None:
+        self.outputs.pop(oid, None)
+        self.texts.pop(oid, None)
+
+    def _text(self, oid: str, params) -> httpx.Response:
+        if oid not in self.texts:
+            return httpx.Response(409, json={"detail": "no text", "code": "not_text"})
+        text, starts = self.texts[oid]
+        limit = min(int(params.get("limit", 12_000)), self.window)
+        if params.get("pages"):
+            p = int(params["pages"])
+            start = starts[p - 1]
+        else:
+            start = min(int(params.get("offset", 0)), len(text))
+        end = min(len(text), start + limit)
+        return httpx.Response(200, json={"text": text[start:end], "offset": start, "next_offset": end if end < len(text) else None,
+                                         "total_chars": len(text), "pages": len(starts), "lines": text.count("\n") + 1})
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -75,12 +117,29 @@ class FakeHub:
         if path == "/api/models":
             self.models.append(json.loads(request.content))
             return httpx.Response(201, json={"id": "embeddinggemma-2"})
+        if path == "/api/outputs":
+            items = sorted((r for r, _ in self.outputs.values()), key=lambda r: -r["created_ts"])
+            start = int(request.url.params.get("cursor") or 0)
+            limit = int(request.url.params.get("limit") or 60)
+            nxt = start + limit if start + limit < len(items) else None
+            return httpx.Response(200, json={"items": items[start:start + limit], "next_cursor": str(nxt) if nxt else None})
+        if path.startswith("/api/s/agent/v1/threads/"):
+            tid = path.split("/")[6]
+            if tid not in self.threads:
+                return httpx.Response(404, json={"detail": "no thread", "code": "not_found"})
+            return httpx.Response(200, json=self.threads[tid])
         if path.startswith("/api/outputs/"):
             oid, _, rest = path.removeprefix("/api/outputs/").partition("/")
             if oid not in self.outputs:
                 return httpx.Response(404, json={"detail": "no such output", "code": "not_found"})
             rec, data = self.outputs[oid]
-            return httpx.Response(200, content=data) if rest == "file" else httpx.Response(200, json=rec)
+            if rest == "file":
+                return httpx.Response(200, content=data)
+            if rest == "preview":
+                return httpx.Response(200, content=self.previews[oid]) if oid in self.previews else httpx.Response(404)
+            if rest == "text":
+                return self._text(oid, request.url.params)
+            return httpx.Response(200, json=rec)
         return httpx.Response(404, json={"detail": "not here", "code": "not_found"})
 
 
@@ -90,7 +149,7 @@ def settings(tmp_path: Path) -> Settings:
     model.mkdir(parents=True)
     (model / "model.safetensors").write_bytes(b"fake")
     return Settings(port=0, model_dir=model, state_dir=tmp_path / "state", hub_url="http://hub", idle_unload_s=0,
-                    batch_text=32, batch_media=4)
+                    batch_text=32, batch_media=4, databases=tmp_path / "db", index=False, index_gap_s=0)
 
 
 @pytest.fixture

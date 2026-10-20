@@ -57,6 +57,10 @@ The same packages unpinned, with PyTorch's CPU wheels. The model then runs in fp
 | `EMBED_DEVICE` | `service.toml` / `config.toml [services.embed].env` | no | `auto` (default: the GPU when torch sees one), `cuda`, `cpu` |
 | `EMBED_IDLE_UNLOAD_S` | the mod's Settings tab (`idle_unload_s`) | no | unload after this many idle seconds; default 300, 0 = never |
 | `EMBED_MAX_INPUTS`, `EMBED_AUDIO_MAX_S`, `EMBED_BATCH_TEXT`, `EMBED_BATCH_MEDIA` | `config.toml` env | no | 256 inputs a call; audio cut at 320 s (25 tokens a second fills the 8k context); batches of 32 texts and 4 images |
+| `EMBED_INDEX` | `service.toml` | no | `1` (default): the library follows the hub's outputs and indexes them into `data/databases/embed.db`; `0` turns it off |
+| `EMBED_IDLE_SOURCE` | `service.toml` | no | how the library tells the GPU is free: `engine` (default; other processes' DRM engine time from `/proc/*/fdinfo`) or `busy_percent` (`gpu_busy_percent`; see What to look for) |
+| `EMBED_IDLE_BUSY_PCT`, `EMBED_IDLE_SECONDS` | `service.toml` | no | indexing starts once the GPU has stayed under 10 % for 300 s, and stops between batches when it isn't |
+| `EMBED_INDEX_BATCH_TEXT`, `EMBED_INDEX_GAP_S`, `EMBED_INDEX_AUDIO_MAX_S` | `config.toml` env | no | 8 chunks a batch; 1 s between batches before the next look at the GPU; audio indexed up to an hour |
 
 ## Check it works
 
@@ -94,6 +98,8 @@ The live check (2026-10-20, through the hub, three real pictures from `services/
 
 Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp32, `EMBED_DEVICE=cpu`) the rankings are the same but it's slow: 64 texts in 30 s, about 22 s an image.
 
+**The library** (2026-10-20, against a dev hub with 32 outputs: two documents, 24 pictures, audio and video clips): all 32 indexed into 90 chunks in about 140 s once the GPU had been quiet, with one pause midway when something else used the GPU. Then the model unloaded. Much of that time is the 1 s look at the GPU after each batch. Indexing records the text path at 3.1 GB.
+
 ## What to look for
 
 - **Never fp16.** The model card says activations overflow fp16 (NaN, or quietly bad vectors). The backend picks bf16 when `torch.cuda.is_bf16_supported()` and fp32 otherwise.
@@ -103,6 +109,8 @@ Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp
 - **Matryoshka:** a slice of a unit vector isn't one, so the mod normalizes again after truncating (sentence-transformers' `truncate_dim` with `normalize_embeddings` normalizes *before* truncating). Queries and documents must use the same `dim`.
 - **Prompts:** text with `task: "query"` gets `task: search result | query: `, documents get `title: {title or none} | text: `. Media take no prompt.
 - **Video** is decoded at 1 fps and scaled to fit 768 px. A video longer than 32 s is sampled evenly down to 32 frames (the processor's own cap). An mp4 often keeps its index at the end, so ffmpeg reads a temporary copy in `data/state/embed/tmp/`, never a pipe.
+- **`gpu_busy_percent` is noisy on gfx1151.** With nothing running it reads 13–17 % and jumps to 80–90 % about every 15 s, while the DRM engine counters of every process add up to 3.5 % (measured 2026-10-20). "Under 10 % for 5 minutes" never holds on it, so the default source is `engine`: the busiest engine's share of time across every process except the embed mod's own. `GET /v1/library` shows the reading (`gpu.busy_pct`) and how long it's been quiet.
+- **Indexing never evicts another mod.** It asks the hub for memory without making room; a `409 needs_room` leaves the library in `no_room` until the next quiet period. A search still loads the model the usual way, and the [memory] triggers make room for it.
 - **Weights through a symlink** are refused by the hub's registry (`doesn't exist in data/models`): keep them as a real folder.
 
 ## Known gaps

@@ -126,6 +126,9 @@ class GemmaBackend:
     def encode(self, kind: str, items: list[Any], batch_size: int) -> np.ndarray:
         inputs = items if kind == "text" else [{kind: x} for x in items]
         out = self.model.encode(inputs, batch_size=batch_size, convert_to_numpy=True, show_progress_bar=False)
+        if self.device == "cuda":                       # long inputs leave GBs of activations in torch's cache
+            import torch
+            torch.cuda.empty_cache()
         return np.asarray(out, dtype=np.float32).reshape(len(items), -1)
 
     def footprint_bytes(self) -> int:

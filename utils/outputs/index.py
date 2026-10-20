@@ -21,7 +21,7 @@ from typing import Any
 
 from utils.db import Database
 from utils.events import EventBus
-from utils.outputs import media, trash
+from utils.outputs import media, text, trash
 from utils.outputs.describe import describe
 from utils.outputs.entries import KINDS, kind_of, subtype_of, walk
 from utils.paths import Paths
@@ -68,7 +68,7 @@ class Outputs:
         self._preview_jobs = asyncio.Semaphore(PREVIEW_JOBS)
         self._preview_locks: dict[str, asyncio.Lock] = {}
         self._preview_failed: dict[str, str] = {}  # id → sig that failed; retried when the file changes
-        self._warm: asyncio.Queue[str] = asyncio.Queue()
+        self._warm: asyncio.Queue[tuple[str, str]] = asyncio.Queue()  # ("preview" | "text", id)
         self._warm_task: asyncio.Task[None] | None = None
 
     # lifecycle --------------------------------------------------------------
@@ -226,6 +226,8 @@ class Outputs:
                     self.announcer.add(v)
             for r in removed:
                 self.bus.publish({"type": "output_deleted", "id": r["id"]})
+        for r in removed:
+            text.forget(self.dir, r["id"])
         self._queue_previews(described)
         return settling
 
@@ -331,14 +333,30 @@ class Outputs:
     def _queue_previews(self, rows: list[dict[str, Any]]) -> None:
         for r in rows:
             if r["preview"] and PurePosixPath(r["preview"]).name.startswith("."):
-                self._warm.put_nowait(r["id"])
+                self._warm.put_nowait(("preview", r["id"]))
+            if r["kind"] in text.TEXT_KINDS and r["main"]:
+                self._warm.put_nowait(("text", r["id"]))
+
+    # text (plan 24.2) --------------------------------------------------------
+
+    async def text(self, oid: str) -> text.Extract:
+        """The output's extracted text (cached in `.text/<id>.json`). `not_text` (409) for other kinds."""
+        row = await self.row(oid)
+        if row["kind"] not in text.TEXT_KINDS:
+            raise OutputError(409, "not_text", f'Output "{oid}" is {row["kind"]}, which has no text to read')
+        src = self._safe(row["main"], oid)
+        lock = self._preview_locks.setdefault("text:" + oid, asyncio.Lock())
+        async with lock:
+            ex = await asyncio.to_thread(text.cached, self.dir, oid, row["main"], row["kind"], subtype_of(src.name))
+        self._preview_locks.pop("text:" + oid, None)
+        return ex
 
     async def _warm_loop(self) -> None:
-        """Make previews ahead of the first request, one at a time."""
+        """Make previews and extract text ahead of the first request, one at a time."""
         while True:
-            oid = await self._warm.get()
+            what, oid = await self._warm.get()
             try:
-                await self.preview(oid)
+                await (self.preview(oid) if what == "preview" else self.text(oid))
             except OutputError:
                 pass
             except Exception:  # noqa: BLE001: keep warming the rest

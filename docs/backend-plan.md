@@ -2369,7 +2369,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
   - Architecture §4.7 and the `Output.kind` enum in the brief §6 / §11.7 and `web/api.js` gain `document`; the Outputs page's kind filter shows it.
   *Done when:* `utils/tests/outputs/test_kinds.py` maps every listed extension; `utils/tests/outputs/test_upload.py` accepts one fixture of each kind (a 2-page PDF, a docx, an epub, a notebook, a CSV, a Python file, a markdown file), refuses a binary named `.txt`, and the contract test passes with the new enum.
 
-- [ ] **24.2 Text extraction: `utils/outputs/text.py`.**
+- [x] **24.2 Text extraction: `utils/outputs/text.py`.**
   - `extract(path, kind, subtype) -> Extract` with `text` (markdown-ish plain text), `pages` (list of `(start, end)` character offsets; PDFs, slides), `lines` (count), `outline` (headings: markdown `#`, PDF bookmarks or bold-line guesses, docx heading styles, notebook markdown cells), `tokens` (chars / 4, the agent's own estimate), `scanned` (PDF pages with almost no text), `truncated` (above `MAX_CHARS`, 4 M).
   - Readers: PDF via `pypdfium2` (a `\f` and `--- page N ---` marker between pages); docx and odt (`zipfile` + `xml.etree`, headings and tables as markdown); epub (spine order, HTML → text with `html.parser`); ipynb (cells as fenced blocks, outputs as text, images dropped with a note); HTML (`html.parser`, scripts and styles dropped); everything else read as text. `pptx`/`xlsx` give `text = ""` and a note that the workspace sandbox reads them.
   - Cached at `{outputs}/.text/<id>.json` (a dot-folder, so the index skips it, like previews), written when the index first describes the output or on demand, invalidated by the output's mtime; deleted with the output (`utils/outputs/trash.py`).

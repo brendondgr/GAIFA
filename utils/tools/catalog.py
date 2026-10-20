@@ -213,7 +213,8 @@ class Catalog:
             problems += grant_problems(spec.grant_key, params)
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=list(spec.examples), core=spec.core, route=route, response=op["response"],
-                               job=job, problems=problems, grant_key=spec.grant_key))
+                               job=job, problems=problems, grant_key=spec.grant_key,
+                               cap_bytes=spec.cap_kb * 1024 if spec.cap_kb else None))
         if svc.m.agent.tools_source:
             out += await self._source(svc)
         return out
@@ -258,7 +259,7 @@ class Catalog:
         if db is None:
             return
         rows = [{**t.public(), "route": t.route.__dict__ if t.route else None, "response": t.response,
-                 "job_ops": t.job, "tool": t.tool} for t in tools]
+                 "job_ops": t.job, "tool": t.tool, "cap_bytes": t.cap_bytes} for t in tools]
         await db.execute("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                          (KV_PREFIX + sid, json.dumps({"ts": time.time(), "tools": rows})))
 
@@ -279,7 +280,8 @@ class Catalog:
                 out.append(ToolDef(r["name"], svc.id, r.get("tool") or r["name"], r.get("description", ""), r.get("parameters") or {},
                                    risk=r.get("risk", "write"), ask=r.get("ask") or [], examples=r.get("examples") or [],
                                    core=bool(r.get("core")), source=r.get("source", "manifest"), route=route,
-                                   response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key")))
+                                   response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key"),
+                                   cap_bytes=r.get("cap_bytes")))
             return out
         assert svc.m
         return [ToolDef(tool_name(svc.id, n), svc.id, n, s.description or s.op, {"type": "object"},

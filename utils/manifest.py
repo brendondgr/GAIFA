@@ -233,7 +233,7 @@ class ToolSpec(_Strict):
     job: bool = False             # the call returns a job id; the agent API waits for the job (plan 13.2)
     job_status: Op | None = None  # "GET /v1/jobs/{id}": `{id}` (or any one placeholder) is the job id
     job_cancel: Op | None = None
-    grant_key: str | None = None  # plan 25.2: "url:host", "arg:<name>", "const:<word>"; read by the grants (Phase 25)
+    cap_kb: int | None = Field(None, ge=1, le=256)  # results kept whole up to this many KB (default 8; plan 27.2)
 
     @field_validator("grant_key")
     @classmethod

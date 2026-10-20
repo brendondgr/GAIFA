@@ -244,7 +244,7 @@ class Calls:
         stored = json.loads(row["result"]) if row["result"] else {}
         out = {"status": row["state"], "call_id": call_id, "tool": row["tool"]}
         if row["state"] == "done":
-            tool = await self.catalog.get(row["tool"]) if row["tool"] and row["tool"].startswith("hub_") else None
+            tool = await self.catalog.get(row["tool"]) if row["tool"] else None
             out["result"] = results.cap(stored.get("result"), call_id, (tool.cap_bytes if tool else None) or results.CAP_BYTES)
             out["outputs"] = stored.get("outputs") or []
         elif row["state"] == "error":

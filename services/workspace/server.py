@@ -19,6 +19,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+import reading
 from folders import LEVELS, Caps, Folders, Refused
 
 Level = Literal["read", "edit", "run", "run_net"]
@@ -36,6 +37,43 @@ class FolderPatch(BaseModel):
     level: Level | None = None
     allow_bypass: bool | None = None
     name: str | None = Field(None, max_length=64)
+
+
+class TreeIn(BaseModel):
+    folder: str = Field(description="The workspace folder: its id (from workspace_folders), name or path")
+    path: str | None = Field(None, description="A subfolder, relative to the folder (default: the whole folder)")
+    depth: int = Field(3, ge=1, le=8, description="How many levels down to list")
+    limit: int = Field(300, ge=1, le=2000, description="At most this many entries")
+
+
+class ReadIn(BaseModel):
+    folder: str = Field(description="The workspace folder: its id, name or path")
+    path: str = Field(min_length=1, description="The file, relative to the folder")
+    offset: int = Field(1, ge=1, description="The first line to return (1-based)")
+    limit: int = Field(400, ge=1, le=2000, description="How many lines")
+
+
+class SearchIn(BaseModel):
+    folder: str = Field(description="The workspace folder: its id, name or path")
+    query: str = Field(min_length=1, max_length=500, description="Text to find (or a regular expression with regex=true)")
+    regex: bool = Field(False, description="Treat query as a regular expression")
+    glob: str | None = Field(None, max_length=200, description="Only files matching this glob, e.g. *.py or src/**/*.ts")
+    path: str | None = Field(None, description="Only under this subfolder")
+    limit: int = Field(100, ge=1, le=500, description="At most this many matching lines")
+
+
+class GitIn(BaseModel):
+    folder: str = Field(description="The workspace folder: its id, name or path")
+    command: Literal["status", "log", "diff", "show", "branch"] = Field(description="A read-only git command")
+    rev: str | None = Field(None, max_length=200, description="log/diff/show: a commit, branch or range (HEAD~3..HEAD); diff without it: the working tree")
+    path: str | None = Field(None, max_length=1000, description="Only this file or folder")
+    limit: int = Field(20, ge=1, le=200, description="log: how many commits")
+
+
+def named_of(request: Request) -> list[str]:
+    """The secret-looking files the user named in their message (the agent puts them in the origin)."""
+    m = reading.origin_of(request.headers.get("x-aihub-origin")).get("named")
+    return [str(x) for x in m][:20] if isinstance(m, list) else []
 
 
 class Ctx:
@@ -95,6 +133,33 @@ def create_app(state: Path | None = None, aihub_root: Path | None = None, models
         if not ctx.folders.remove(fid):
             raise Refused("unknown_folder", f"there is no workspace folder {fid!r}", "", 404)
         return {"removed": fid}
+
+    @app.post("/v1/tree", summary="List a folder's files")
+    def tree(body: TreeIn, request: Request) -> str:
+        f = ctx.folders.get(body.folder)
+        ctx.counts["reads"] += 1
+        return reading.tree(ctx.folders, f, body.path, body.depth, body.limit, named_of(request))
+
+    @app.post("/v1/read", summary="Read a file with line numbers")
+    def read(body: ReadIn, request: Request) -> str:
+        f = ctx.folders.get(body.folder)
+        ctx.counts["reads"] += 1
+        return reading.read(ctx.folders, f, body.path, body.offset, body.limit, named_of(request))
+
+    @app.post("/v1/search", summary="Search a folder's files")
+    def search(body: SearchIn, request: Request) -> str:
+        f = ctx.folders.get(body.folder)
+        ctx.counts["reads"] += 1
+        return reading.search(ctx.folders, f, body.query, body.regex, body.glob, body.path, body.limit, named_of(request))
+
+    @app.post("/v1/git", summary="Read-only git: status, log, diff, show, branch")
+    def git(body: GitIn, request: Request) -> str:
+        f = ctx.folders.get(body.folder)
+        if body.path:
+            ctx.folders.resolve(f, body.path, named=named_of(request))
+        root, _ = ctx.folders.resolve(f, ".")
+        ctx.counts["reads"] += 1
+        return reading.git_read(f, root, body.command, body.rev, body.path, body.limit)
 
     return app
 

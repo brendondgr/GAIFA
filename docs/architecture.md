@@ -201,6 +201,7 @@ hide = ["GET /ui/{path}"]              # globs on "METHOD /path", e.g. "* /admin
 speak = { op = "POST /v1/speech", description = "Speak text in a saved voice", risk = "generate", ask = ["name"], hide = ["stream"] }
 delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
 # fetch = { op = "POST /v1/fetch", risk = "network", grant_key = "url:host" }   # grant_key: url:host | arg:<name> | const:<x> (§14.7)
+# read = { op = "POST /v1/read", risk = "read", cap_kb = 64 }   # results kept whole up to 64 KB (default 8)
 # risk: read | write | generate | network | execute | destructive (default: read for GET, destructive for DELETE/confirm, else write; §14.7)
 # ask = [...] inputs the user chooses (parameter card) · examples = [{...}] · core = true (always loaded)
 # hide = [...] / fixed = {...}: parameters kept from the model / always sent

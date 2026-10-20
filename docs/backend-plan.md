@@ -2427,13 +2427,13 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
 
 Today a call is decided by `deny` → thread mode → `ask` → `allow` lists → risk default (`utils/tools/approvals.py` `decide`), and an approval card allows one call. This phase adds the levels the user asked for ("you want to execute this code, yes or no") and lets one answer cover more than one call.
 
-- [ ] **25.1 Two new risks: `utils/tools/catalog.py`, `approvals.py`.**
+- [x] **25.1 Two new risks: `utils/tools/catalog.py`, `approvals.py`.**
   - Risk levels become `read`, `write`, `generate`, **`network`** (reaches the internet), **`execute`** (runs code or commands), `destructive`. Mods declare them in `[tools]` like the others.
   - Defaults: `read` runs; `network` asks; `execute` always asks, also in `auto` mode, unless a grant (25.2) covers it; `auto` mode still skips the card only for `write` and `generate`; `read_only` mode denies everything but `read`.
   - The order is fixed and documented in architecture §14: **deny list → thread mode → a mod's own limits (e.g. a workspace's level, Phase 27) → grants → ask/allow lists → risk default.**
   *Done when:* `utils/tests/tools/test_decide.py` covers every risk in every mode with and without list entries.
 
-- [ ] **25.2 Grants: hub.db migration, `utils/tools/grants.py`, `/api/grants`.**
+- [x] **25.2 Grants: hub.db migration, `utils/tools/grants.py`, `/api/grants`.**
   - Table `grants {id, tool (glob), key (null, a domain, a workspace id), scope ("thread" | "always"), thread, created_ts, expires_ts, note}`.
   - A tool may name its **grant key** in `[tools]` (`grant_key = "url:host"` takes the host of the `url` argument; `grant_key = "arg:folder"` takes an argument as is), so "allow for this chat" can mean "this domain" or "this folder", not every call.
   - Deciding an approval takes `remember: "once" | "thread" | "always"`; `thread` and `always` write a grant. `always` grants for `execute` and `destructive` need a second confirm on the card.
@@ -2441,16 +2441,17 @@ Today a call is decided by `deny` → thread mode → `ask` → `allow` lists �
   - Architecture §6 and §14, the brief §6 / §11.7.
   *Done when:* `utils/tests/tools/test_grants.py` covers keys from arguments, thread vs always, expiry, revoke, a grant for one domain not covering another, the second confirm, and MCP calls (no thread: only `always` grants apply).
 
-- [ ] **25.3 The card: `web/chat/chat-approvals.js`, `web/approvals` popover.**
+- [x] **25.3 The card: `web/chat/chat-approvals.js`, `web/approvals` popover.**
   - The approval card shows the risk with its word and colour (network and execute new), the grant key ("on github.com", "in ~/Projects/foo"), and the three buttons: **Allow once · Allow in this chat · Always allow** (the last behind a confirm for execute and destructive). Deny keeps its reason box.
   - For `execute`, the card shows the code or command in full, monospaced, scrollable, editable like any argument.
   *Done when:* `utils/tests/web/test_approvals.mjs` covers the buttons per risk; a browser check approves "in this chat" and the next call to the same domain runs without a card.
+  *As built:* the test is `utils/tests/web/approvals.test.mjs` (the runner picks up `*.test.mjs`); it renders `ParamCard` with a stand-in React. The browser check ran on a second hub with `fake-perms` and calls carrying a chat origin, decided in the Approvals popover (the agent mod can't run in a worktree without its venv); the chat's own card was checked on the mock agent.
 
 **Wire — Phase 25:** approval cards and the popover show the new risks and buttons; Settings → Agent lists grants.
 
 **Checks & deliverables — Phase 25**
-- [ ] With a fake mod declaring a `network` and an `execute` tool: every mode × every button behaves as 25.1–25.2 say, in Chat and through MCP.
-- [ ] Delivered: two risks, grants (table, module, routes), the card; architecture §14, the brief, `docs/mods.md` (`risk`, `grant_key`).
+- [x] With a fake mod declaring a `network` and an `execute` tool: every mode × every button behaves as 25.1–25.2 say, in Chat and through MCP. *As built:* `test_grants.py::test_every_mode_and_button_in_chat_and_over_mcp` against `fake-perms` (calls from a chat, another chat and MCP after each button), plus the browser check of 25.3.
+- [x] Delivered: two risks, grants (table, module, routes), the card; architecture §14, the brief, `docs/mods.md` (`risk`, `grant_key`).
 
 ---
 

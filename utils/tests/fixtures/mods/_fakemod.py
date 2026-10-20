@@ -1,7 +1,7 @@
 """Fake mods for tests and `app.py --demo-mods`. Standard library only, like any
 mod could be: the hub sees nothing but HTTP.
 
-    python3 _fakemod.py ok|slow|crash|mem      (port from FAKE_PORT, outputs from FAKE_OUTPUTS)
+    python3 _fakemod.py ok|slow|crash|mem|tools|perms      (port from FAKE_PORT, outputs from FAKE_OUTPUTS)
 
 ok     health, status, openapi, echo, audio, SSE, jobs and a route that writes an output
 slow   like ok, but /health answers 503 for the first FAKE_SLOW_S (3) seconds
@@ -9,6 +9,8 @@ crash  like ok, but the process exits with status 1 after FAKE_CRASH_S (1) secon
 mem    like ok, plus /v1/load allocates FAKE_MEM_MB (64) MB and /v1/unload frees it
 tools  like ok, plus routes for agent tools (plan 13): items, an image output, speech with a saved
        path, a render job (GET /v1/render/{rid}, cancel), multipart upload, and GET /v1/tools
+perms  like ok, plus network and execute tools (plan 25): POST /v1/search, /v1/fetch, /v1/python
+       and /v1/run echo what they were sent as {"ran": <route>, "arguments": {...}}
 
 POST /v1/upload reads the body in chunks and returns its size and sha256 (for big uploads).
 GET /v1/events?n=3&gap=0.05 streams n server-sent events, gap seconds apart.
@@ -72,6 +74,8 @@ def openapi() -> dict:
     }
     if MODE == "tools":
         paths.update(tool_paths())
+    if MODE == "perms":
+        paths.update(perm_paths())
     if MODE == "mem":
         paths["/v1/load"] = {"post": op("Allocate memory")}
         paths["/v1/unload"] = {"post": op("Free memory")}
@@ -102,6 +106,20 @@ def tool_paths() -> dict:
         "/v1/big": ok("A large JSON result", method="get"),
         "/v1/tools": ok("Runtime tools", method="get"),
         "/v1/tools/{name}/call": ok("Call a runtime tool", {"type": "object"}, [{"name": "name", "in": "path", "required": True, "schema": {"type": "string"}}]),
+    }
+
+
+def perm_paths() -> dict:
+    def body(props: dict, required: list[str]) -> dict:
+        return {"post": {"summary": "", "requestBody": {"required": True, "content": {"application/json": {"schema": {
+            "type": "object", "properties": props, "required": required}}}}, "responses": {"200": {"content": {"application/json": {"schema": {}}}}}}}
+
+    s = {"type": "string"}
+    return {
+        "/v1/search": body({"query": s}, ["query"]),
+        "/v1/fetch": body({"url": s, "max_chars": {"type": "integer", "default": 2000}}, ["url"]),
+        "/v1/python": body({"code": {**s, "description": "the Python to run"}, "folder": s}, ["code"]),
+        "/v1/run": body({"folder": s, "command": {**s, "description": "a shell command"}}, ["folder", "command"]),
     }
 
 
@@ -294,6 +312,8 @@ class Handler(BaseHTTPRequestHandler):
             jid = f"j_{len(JOBS) + 1}"
             JOBS[jid] = {"id": jid, "label": b.get("label") or jid, "start": time.time(), "seconds": float(b.get("seconds") or 1)}
             return self.send(202, {"id": jid})
+        if MODE == "perms" and url.path in ("/v1/search", "/v1/fetch", "/v1/python", "/v1/run"):
+            return self.send(200, {"ran": url.path.rsplit("/", 1)[1], "arguments": self.body()})
         if MODE == "tools":
             if url.path == "/v1/images":
                 b = self.body()
@@ -421,7 +441,7 @@ def status() -> dict:
 
 
 def main() -> None:
-    if MODE not in {"ok", "slow", "crash", "mem", "tools"}:
+    if MODE not in {"ok", "slow", "crash", "mem", "tools", "perms"}:
         sys.exit(f"unknown mode {MODE!r}")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     server.daemon_threads = True

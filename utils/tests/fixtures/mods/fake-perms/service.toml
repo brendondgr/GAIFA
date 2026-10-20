@@ -1,0 +1,21 @@
+# Test fixture: a mod with network and execute tools (plan 25): searching and fetching (network),
+# running code and commands (execute), deleting (destructive).
+id = "fake-perms"
+name = "Fake Permissions"
+description = "network and execute tools"
+
+[run]
+command = ["python3", "../_fakemod.py", "perms"]
+port = 5196
+health = "/health"
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+start_timeout_s = 15
+stop_timeout_s = 5
+restart = "no"
+
+[tools]
+search = { op = "POST /v1/search", description = "Search the web", risk = "network", grant_key = "const:search" }
+fetch = { op = "POST /v1/fetch", description = "Fetch a web page", risk = "network", grant_key = "url:host" }
+python = { op = "POST /v1/python", description = "Run Python in the sandbox", risk = "execute", grant_key = "const:python" }
+run = { op = "POST /v1/run", description = "Run a command in a folder", risk = "execute", grant_key = "arg:folder" }
+wipe = { op = "DELETE /v1/jobs/{jid}", description = "Delete a job", confirm = true }

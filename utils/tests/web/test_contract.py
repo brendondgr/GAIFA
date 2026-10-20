@@ -81,7 +81,7 @@ MODELS: dict[str, type[BaseModel]] = {
     "Timeline": am.Timeline, "OutputBucket": am.OutputBucket, "WidgetInfo": am.WidgetInfo, "WidgetData": am.WidgetData,
     "Doctor": am.Doctor, "DoctorCheck": am.DoctorCheck,
     "ToolIndexItem": ta.ToolIndexItem, "Tool": ta.Tool, "ToolOutput": ta.ToolOutput, "ToolCallResult": ta.ToolCallResult,
-    "Approval": ta.Approval,
+    "Approval": ta.Approval, "Grant": ta.Grant,
     "Session": rs.Session, "SessionStep": rs.SessionStep, "SessionMemory": rs.SessionMemory, "SessionRestore": rs.Restore,
     "SessionState": rs.SessionState,
 }

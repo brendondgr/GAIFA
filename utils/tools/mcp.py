@@ -246,7 +246,8 @@ class McpServer:
         schema = schema if schema.get("type") == "object" else {"type": "object", **schema}
         entry: dict[str, Any] = {"name": name, "description": description, "inputSchema": schema,
                                  "annotations": {"title": title, "readOnlyHint": risk == "read",
-                                                 "destructiveHint": risk == "destructive", "openWorldHint": False}}
+                                                 "destructiveHint": risk in ("destructive", "execute"),
+                                                 "openWorldHint": risk == "network"}}
         if req.modern or req.at_least("2025-06-18"):
             entry["title"] = title
         return entry

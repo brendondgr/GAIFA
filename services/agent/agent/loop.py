@@ -145,24 +145,26 @@ class Agent:
         return ev
 
     async def approval(self, tid: str, approval_id: str, approve: bool, arguments: dict[str, Any] | None = None,
-                       reason: str | None = None) -> dict[str, Any]:
+                       reason: str | None = None, remember: str = "once", confirm: bool = False) -> dict[str, Any]:
         ap = next((e for e in self.store.events(tid, types=("approval",)) if e["payload"]["approval_id"] == approval_id), None)
         if ap is None:
             raise KeyError(approval_id)
         self._deciding.add(approval_id)      # the hub's approval event mustn't record it a second time
         try:
-            res = await self.hub.decide(approval_id, approve, arguments, reason)   # HubCallError (422, 409) goes to the caller
+            res = await self.hub.decide(approval_id, approve, arguments, reason, remember, confirm)   # HubCallError (422, 409) goes to the caller
         except BaseException:
             self._deciding.discard(approval_id)
             raise
-        ev = self._decided(tid, ap["payload"]["id"], approval_id, approve, arguments, reason, res)
+        ev = self._decided(tid, ap["payload"]["id"], approval_id, approve, arguments, reason, res, remember)
         self.start(tid)
         return ev
 
     def _decided(self, tid: str, call: str, aid: str, approve: bool, arguments: Any, reason: str | None,
-                 res: dict[str, Any]) -> dict[str, Any]:
+                 res: dict[str, Any], remember: str = "once") -> dict[str, Any]:
+        grant = (res.get("grant") or {}).get("id")
         ev = self.emit(tid, "decision", {"id": call, "approval_id": aid, "approve": approve, "arguments": arguments,
-                                         "reason": reason, "call_id": res.get("call_id"), "status": res.get("status")})
+                                         "reason": reason, "call_id": res.get("call_id"), "status": res.get("status"),
+                                         **({"remember": remember, "grant": grant} if grant else {})})
         if not approve:
             tc = self._find(tid, "tool_call", call)
             self._result(tid, call, tc["payload"]["name"] if tc else "?", res)
@@ -424,6 +426,7 @@ class Agent:
                 self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": name,
                                             "arguments": res.get("arguments"), "ask_fields": res.get("ask_fields") or [],
                                             "schema": res.get("schema"), "risk": res.get("risk"),
+                                            **({"grant_key": res["grant_key"]} if res.get("grant_key") else {}),
                                             "description": (res.get("description") or "")[:600],
                                             **({"filled": res["filled"]} if res.get("filled") else {}),
                                             **({"filled_by": res["filled_by"]} if res.get("filled_by") else {})})

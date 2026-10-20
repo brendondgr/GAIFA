@@ -66,6 +66,8 @@ class FakeHub:
         self.running: dict[str, dict[str, Any]] = {}
         self.outputs: dict[str, dict[str, Any]] = {}
         self.cancelled: list[str] = []
+        self.decisions: list[dict[str, Any]] = []     # every POST /api/approvals/{id} body
+        self.ended_grants: list[str] = []             # DELETE /api/grants?thread= (plan 25.2)
         self.views: list[str] = []
         self.prefs: list[dict[str, Any]] = []         # /api/prefs (plan 21.4)
         self.feedback: list[dict[str, Any]] = []      # /api/outputs/{id}/feedback                    # the `view` each GET /api/tools asked for
@@ -222,6 +224,7 @@ class FakeHub:
         @app.post("/api/approvals/{aid}")
         async def decide(aid: str, request: Request, wait: float = 0) -> Any:
             body = await request.json()
+            self.decisions.append(body)
             a = self.approvals.get(aid)
             if a is None:
                 raise HTTPException(404, "no approval")
@@ -239,7 +242,15 @@ class FakeHub:
             st = self._start(a["tool"], args, "approved")
             a.update(state="approved", final=args, call_id=st["call_id"])
             self.publish({"type": "approval", "approval": a})
-            return await self._wait(st, wait)
+            out = await self._wait(st, wait)
+            if body.get("remember") in ("thread", "always"):
+                out = {**out, "grant": {"id": "gr_" + aid, "scope": body["remember"]}}
+            return out
+
+        @app.delete("/api/grants")
+        def end_grants(thread: str) -> dict:
+            self.ended_grants.append(thread)
+            return {"deleted": 1}
 
         @app.get("/api/outputs/{oid}")
         def output(oid: str) -> dict:

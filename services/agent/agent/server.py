@@ -59,6 +59,8 @@ class ApprovalDecision(BaseModel):
     approve: bool
     arguments: dict[str, Any] | None = None
     reason: str | None = None
+    remember: Literal["once", "thread", "always"] = Field("once", description="thread / always: the hub also allows calls like this one (plan 25.2)")
+    confirm: bool = Field(False, description="the second confirm an always grant for execute and destructive tools needs")
 
 
 class Action(BaseModel):
@@ -296,6 +298,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         thread_or_404(agent, tid)
         await agent.cancel(tid)
         agent.store.delete_thread(tid)
+        await agent.hub.end_grants(tid)      # "allow in this chat" ends with the chat (plan 25.2)
         return {"deleted": tid}
 
     @app.get("/v1/threads/{tid}/events", summary="The thread's events after a seq (replay after a reload)")
@@ -358,7 +361,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         agent = A(request)
         thread_or_404(agent, tid)
         try:
-            return await agent.approval(tid, body.approval_id, body.approve, body.arguments, body.reason)
+            return await agent.approval(tid, body.approval_id, body.approve, body.arguments, body.reason,
+                                        body.remember, body.confirm)
         except KeyError:
             raise HTTPException(404, f"no approval {body.approval_id!r} in this thread") from None
         except HubCallError as e:

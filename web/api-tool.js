@@ -6,6 +6,7 @@
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11 } from './chat/chat-ui.js';
 import { ProgressBar, ErrorBox, pre } from './chat/chat-cards.js';
 import { ParamCard } from './chat/chat-forms.js';
+import { approvalButtons } from './chat/chat-risk.js';
 
 const R = () => globalThis.React;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -46,8 +47,8 @@ export function ToolRun({ api, name, args, onClose, toast = () => {} }) {
       .catch(e => setSt({ phase: 'error', error: { code: e.code, detail: e.detail || String(e), fix: e.data?.problems?.map(p => p.fix).filter(Boolean).join('; ') } }));
     return () => { alive.current = false; };
   }, []);
-  const decide = async (approve, a) => {
-    const r = await api.decideApproval(st.res.approval_id, approve ? { approve: true, args: a, wait: 1 } : { approve: false, reason: 'Denied in the API tab' });
+  const decide = async (approve, a, o = {}) => {
+    const r = await api.decideApproval(st.res.approval_id, approve ? { approve: true, args: a, remember: o.remember, confirm: o.confirm, wait: 1 } : { approve: false, reason: o.reason || 'Denied in the API tab' });
     if (!approve) { setSt({ phase: 'denied', res: r }); return; }
     toast(`Running ${name}…`);
     follow(r);
@@ -61,9 +62,9 @@ export function ToolRun({ api, name, args, onClose, toast = () => {} }) {
   return h('section', { 'aria-label': 'Tool call', 'aria-live': 'polite', style: cardSt({ pad: '12px 14px', gap: 10, style: { borderRadius: 10 } }) }, head,
     st.phase === 'calling' ? h('div', { style: { fontSize: 12.5, color: T.mut } }, 'Asking AIHub…') : null,
     st.phase === 'approval' ? h(R().Fragment, null,
-      h('div', { style: { fontSize: 12.5, color: T.mut } }, `This is the agent tool ${name} (risk: ${r.risk}), so it asks first, like it would for the chat or an MCP client. Check the settings, then Run.`),
-      h(ParamCard, { spec: { tool: name, arguments: r.arguments || args, ask_fields: r.ask_fields || [], schema: r.schema, risk: r.risk, description: r.description }, api, outputs: [], mods: [name.split('_')[0]],
-        onRun: a => decide(true, a), onCancel: () => decide(false) })) : null,
+      h('div', { style: { fontSize: 12.5, color: T.mut } }, `This is the agent tool ${name} (risk: ${r.risk}), so it asks first, like it would for the chat or an MCP client. Check the settings, then allow it.`),
+      h(ParamCard, { spec: { tool: name, arguments: r.arguments || args, ask_fields: r.ask_fields || [], schema: r.schema, risk: r.risk, description: r.description, grant_key: r.grant_key }, api, outputs: [], mods: [name.split('_')[0]],
+        choices: approvalButtons(r.risk), cancelLabel: 'Deny', onRun: (a, o) => decide(true, a, o), onCancel: reason => decide(false, null, { reason }) })) : null,
     st.phase === 'running' ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
       h('div', { style: { flex: 1 } }, h(ProgressBar, { value: r.progress, note: [r.note, r.elapsed_s != null ? `${Math.round(r.elapsed_s)} s` : null].filter(Boolean).join(' · ') || 'running' })),
       h(Btn, { sm: true, icon: 'stop', label: 'Cancel', onClick: () => api.cancelToolCall(r.call_id).catch(() => {}) })) : null,

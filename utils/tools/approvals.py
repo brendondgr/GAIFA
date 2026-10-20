@@ -1,9 +1,15 @@
-"""Permissions and approvals (plan 13.2).
+"""Permissions and approvals (plan 13.2, 25.1).
 
-**Permissions:** `config.toml [agent.permissions]` holds `deny`, `ask` and `allow` lists of name
-globs, checked deny → ask → allow; then the default by risk (`read` runs, everything else asks).
-A call's **mode** narrows it further: `ask` (the default), `auto` (only `destructive` asks) or
-`read_only` (only `read` runs).
+**Deciding a call** follows one fixed order (architecture §14), the first that answers wins:
+
+1. the **deny** list of `config.toml [agent.permissions]` (name globs);
+2. the thread's **mode**: `read_only` denies everything but `read`;
+3. a **mod's own limits** (a workspace folder's level, Phase 27): the mod enforces them when the
+   call reaches it, so no grant, list entry or approval lifts them;
+4. a **grant** that covers the call (plan 25.2, `utils/tools/grants.py`) allows it;
+5. the **ask**, then **allow** list (`execute` ignores the allow list: only a grant skips its card);
+6. the **risk default**: `read` runs; in `auto` mode `write` and `generate` run; everything else
+   asks (`network`, `execute` and `destructive` ask in every mode).
 
 **Approvals:** a call that has to ask is stored in `approvals` and runs nothing. Deciding it
 (`POST /api/approvals/{id}`) may carry edited arguments: those are validated and are what runs.
@@ -26,20 +32,27 @@ if TYPE_CHECKING:
 MODES = ("ask", "auto", "read_only")
 
 
-def decide(name: str, risk: str, config: Config, mode: str = "ask") -> tuple[str, str]:
-    """("allow" | "ask" | "deny", why) for one call."""
+AUTO_RUNS = ("write", "generate")   # what `auto` mode runs without a card
+
+
+def decide(name: str, risk: str, config: Config, mode: str = "ask",
+           grant: dict[str, Any] | None = None) -> tuple[str, str]:
+    """("allow" | "ask" | "deny", why) for one call. `grant`: a grant that covers it (25.2)."""
     p = config.agent.permissions
     if any(fnmatch.fnmatchcase(name, g) for g in p.deny):
         return "deny", "denied by your permissions (Settings → Agent)"
     if mode == "read_only" and risk != "read":
         return "deny", "the thread is read-only: only tools that read can run"
+    if grant is not None:
+        return "allow", ("allowed in this chat" if grant.get("scope") == "thread" else "always allowed") + \
+            (f" for {grant['key']}" if grant.get("key") else "")
     if any(fnmatch.fnmatchcase(name, g) for g in p.ask):
         return "ask", "your permissions ask for this tool"
-    if any(fnmatch.fnmatchcase(name, g) for g in p.allow):
+    if risk != "execute" and any(fnmatch.fnmatchcase(name, g) for g in p.allow):
         return "allow", "allowed by your permissions"
     if risk == "read":
         return "allow", "reads only"
-    if mode == "auto" and risk != "destructive":
+    if mode == "auto" and risk in AUTO_RUNS:
         return "allow", "Use defaults: runs without asking"
     return "ask", f"{risk} tools ask first"
 

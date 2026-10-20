@@ -12,8 +12,8 @@ Event types (payload fields):
     answer          {id, answers}
     feedback        {value: up|down, note, output_id? | seq?}   (thumbs, plan 21.4)
     proposal        {prefs: [{id, scope, tool, field, value, when, cue}]}   (the miner's proposals, plan 21.5)
-    approval        {id, approval_id, tool, arguments, ask_fields, schema, risk, description, filled?}   (filled: the hub chose these, plan 20.4)
-    decision        {id, approval_id, approve, arguments?, reason?}
+    approval        {id, approval_id, tool, arguments, ask_fields, schema, risk, description, filled?, grant_key?}   (filled: the hub chose these, plan 20.4; grant_key: plan 25.2)
+    decision        {id, approval_id, approve, arguments?, reason?, remember?, grant?}   (remember + grant id: allowed in this chat or always, plan 25.2)
     todos           {items: [{text, state}]}
     memory          {text, topic}
     compact         {stage: "clear" | "summary", summary?, upto_seq?, cleared?: [seq]}

@@ -87,6 +87,7 @@ class Hub:
     widgets: Widgets | None = None
     tools: Any = None       # tools.catalog.Catalog
     approvals: Any = None   # tools.approvals.Approvals
+    grants: Any = None      # tools.grants.Grants (plan 25.2)
     calls: Any = None       # tools.calls.Calls
     sessions: Any = None    # sessions.Sessions
     prefs: Any = None       # prefs.Prefs (plan 21.2)
@@ -212,9 +213,10 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             await hub.metrics.start()
             stack.push_async_callback(hub.metrics.close)
             hub.widgets = Widgets(hub.services)
-            # 9. agent tools: the catalog, approvals and calls; calls following a job resume.
+            # 9. agent tools: the catalog, approvals, grants and calls; calls following a job resume.
             from utils.tools import hub_tools
             from utils.tools.approvals import Approvals
+            from utils.tools.grants import Grants
             from utils.tools.calls import Calls
             from utils.tools.catalog import Catalog
 
@@ -222,6 +224,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.tools.add_hub_tools(hub_tools.tools())
             hub.services.on_ready.append(hub.tools.refresh_mod)
             hub.approvals = Approvals(hub.db, hub.bus, hub.config)
+            hub.grants = Grants(hub.db, hub.bus)
             from utils.prefs import Prefs
 
             hub.prefs = Prefs(hub)

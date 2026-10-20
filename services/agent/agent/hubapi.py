@@ -86,9 +86,17 @@ class HubAPI:
     async def approval(self, aid: str) -> dict[str, Any]:
         return await self._json("GET", f"/api/approvals/{aid}")
 
-    async def decide(self, aid: str, approve: bool, arguments: dict[str, Any] | None, reason: str | None) -> dict[str, Any]:
+    async def decide(self, aid: str, approve: bool, arguments: dict[str, Any] | None, reason: str | None,
+                     remember: str = "once", confirm: bool = False) -> dict[str, Any]:
         return await self._json("POST", f"/api/approvals/{aid}", params={"wait": 0},
-                                json={"approve": approve, "arguments": arguments, "reason": reason})
+                                json={"approve": approve, "arguments": arguments, "reason": reason, "remember": remember, "confirm": confirm})
+
+    async def end_grants(self, tid: str) -> None:
+        """A deleted chat's "allow in this chat" grants end with it (plan 25.2); best effort."""
+        try:
+            await self._json("DELETE", "/api/grants", params={"thread": tid})
+        except Exception:  # noqa: BLE001: the chat is gone either way; a stale thread grant matches nothing
+            log.warning("ending the grants of thread %s", tid)
 
     # ---- preferences and feedback (plan 21.4) -------------------------------------------------
 

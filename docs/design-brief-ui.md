@@ -1024,15 +1024,19 @@ The `tools` area. The chat (Stage D) and outside clients (MCP) use the same call
 | `callTool(name, args, {mode?, origin?, wait?})` | `POST /api/tools/{name}/call?wait=` |
 | `getToolCall(id, {wait?})`, `cancelToolCall(id)` | `GET /api/tools/calls/{id}`, `POST /api/tools/calls/{id}/cancel` |
 | `listApprovals({state?})`, `getApproval(id)` | `GET /api/approvals` (pending; `state=all`), `GET /api/approvals/{id}` |
-| `decideApproval(id, {approve, args?, reason?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs |
+| `decideApproval(id, {approve, args?, reason?, remember?, confirm?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs; `remember: "once" \| "thread" \| "always"` (plan 25.2) also writes a grant (`thread` needs a call from a chat, else 422 `no_thread`; `always` for `execute`/`destructive` needs `confirm: true`, else 422 `confirm_needed`); the result carries the `grant` |
+| `listGrants({thread?, tool?})`, `revokeGrant(id)` | `GET /api/grants`, `DELETE /api/grants/{id}` (plan 25.2); `DELETE /api/grants?thread=` ends a chat's grants |
 
-Also `GET /api/tools/calls/{id}/result?offset=&limit=` pages a capped result. **Events:** `{type: "approval", approval: Approval}` when one is created or decided; `{type: "tool_call", call: ToolCallResult & {origin}}` as a call starts, makes progress and ends.
+Also `GET /api/tools/calls/{id}/result?offset=&limit=` pages a capped result. **Events:** `{type: "approval", approval: Approval}` when one is created or decided; `{type: "tool_call", call: ToolCallResult & {origin}}` as a call starts, makes progress and ends (`origin.grant`: the grant that let it run without a card); `{type: "grant", grant: Grant}` when one is written and `{type: "grant_deleted", id}` when one is revoked or ends.
+
+**Grants (plan 25.2).** A tool may declare a `grant_key`: `url:host` (the host of its `url` argument), `arg:<name>` (that argument as is) or `const:<x>`. A grant covers calls of its tool whose key matches (a null key covers every call); a `thread` grant only calls from that chat, an `always` grant every caller (MCP and the API included). The card shows the key ("on github.com", "in ~/Projects/foo") next to the risk.
 
 ```ts
-type Risk = "read" | "write" | "generate" | "destructive";
+type Risk = "read" | "write" | "generate" | "network" | "execute" | "destructive";   // plan 25.1
 interface ToolIndexItem { name: string; mod: string;                // "hub" for the hub's own tools
                           risk: Risk; core: boolean; summary: string; available: boolean; why?: string }
 interface Tool extends ToolIndexItem { description: string;
+                          grant_key?: string;                       // "url:host" | "arg:<name>" | "const:<x>" (plan 25.2)
                           parameters: JSONSchema;                   // one flat object; file inputs carry "x-kind": image|video|audio|mesh|file
                           ask: string[];                            // inputs the user chooses: editable on the parameter card
                           examples: object[]; job: boolean; source: "manifest" | "tools_source" | "hub" }
@@ -1046,14 +1050,21 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            progress?: number; note?: string; job_id?: string; elapsed_s?: number;
                            arguments?: object; ask_fields?: string[]; risk?: Risk; schema?: JSONSchema; description?: string;
                            filled?: string[];                       // needs_approval; filled: arguments the hub chose
-                           filled_by?: { [field: string]: "default" | "carried" | string } }   // how: an x-options default, carried in this chat, or "pref:<id>" (plan 21.7)
+                           filled_by?: { [field: string]: "default" | "carried" | string };  // how, an x-options default, carried in this chat, or a preference ("pref" + its id, plan 21.7)
+                           grant_key?: string;                      // needs_approval, the tool's grant key kind (plan 25.2)
+                           grant?: Grant }                          // a decision with remember: thread | always
+interface Grant { id: string; tool: string;                         // a name glob
+                  key?: string;                                     // a host, a folder, a constant (absent = every call of the tool)
+                  kind?: string; risk?: Risk; scope: "thread" | "always"; thread?: string;
+                  created_ts: number; expires_ts?: number; note: string; used: number; last_used_ts?: number }
 interface Approval { id: string; tool: string; arguments: object;  // as the model sent them
                      final?: object;                                // as run (after edits)
                      ask_fields: string[]; risk: Risk; origin: object;
                      state: "pending" | "approved" | "denied" | "expired"; reason?: string; call_id?: string;
                      created_ts: number; decided_ts?: number; schema?: JSONSchema; description?: string;
                      filled?: { [field: string]: "default" | "carried" | string };   // what the hub chose: a default, a preference ("pref:<id>"), carried from this chat
-                     edited?: string[] }                                              // the fields the user changed on the card (plan 21.1)
+                     edited?: string[];                                               // the fields the user changed on the card (plan 21.1)
+                     grant_key?: string }                                             // the tool's grant key kind (plan 25.2)
 ```
 
 **Choices that depend on the inputs (`x-options`, plan 20.1).** Any `enum` property may carry `x-options`, one entry per value: `{label?, needs?: string[], excludes?: string[], default?: boolean, good_for?, speed?, kind?, allows?: {<param>: values[]}}`. A choice **fits** when every `needs` parameter is given and no `excludes` one is. A property with `"x-depends-on": "<param>"` takes only the values that its parent's chosen option `allows` (when it lists them); its own `x-options` may say `quality` (`full`, `fast`, `draft`) and `when` (e.g. "only when the user asks for a quick result").
@@ -1104,7 +1115,13 @@ Built by hand in `web/chat/` (plain ES modules on the page's React, like the das
 - **Composer:** a growing text box (Enter sends, Shift+Enter is a new line, a message sent during a turn is queued and marked), attachment chips (a picker of this chat's and recent outputs), tool-group toggles (Auto / Pinned / Off per mod → the thread's `settings.pinned` / `disabled`), the quick actions, Stop, and slash commands with a suggestion list: `/compact`, `/clear`, `/model <id>`, `/context`, and `/<skill>` (sends "Use the <id> skill: …").
 - **Reconnect:** the stream is `GET /v1/threads/{id}/stream?after=<last seq>`; on an error it reopens after 0.8–10 s from the last seq it saw, and replays are de-duplicated by seq. Pending question and parameter cards are rebuilt from the event log, so they survive a reload or a restart.
 - **Rewind / branch:** hovering a message shows Branch from here: `POST /fork {seq: previous}`, then the new chat opens with that message in the box to edit.
-- **Header Approvals** (Phase 13 Wire): a shield button with a purple count; the popover lists every pending approval (chat, MCP, API) as a compact parameter card with Approve / Deny. **API tab:** tool badges show the risk (`tool · generate`).
+- **Header Approvals** (Phase 13 Wire): a shield button with a purple count; the popover lists every pending approval (chat, MCP, API) as a compact parameter card. **API tab:** tool badges show the risk (`tool · generate`).
+- **The approval card** (plan 25.3; `web/chat/chat-risk.js`, `ParamCard`'s `choices`), the same in the chat's dock, the popover and the API tab:
+  - the risk as a badge with its word and colour: `read` green, `write` and `generate` purple, `network` cyan (globe icon), `execute` amber (code icon, amber border), `destructive` red; next to it what a grant would cover ("on github.com", "in ~/Projects/foo", "every search call");
+  - **Allow once · Allow in this chat · Always allow**, then **Deny**. "Allow in this chat" shows only for a call from a chat (`origin.thread`); "Always allow…" on `execute` and `destructive` opens a second confirm ("Always let the agent run code with … in every chat and from MCP, without asking?") before it decides with `confirm: true`. Deny opens a reason box (optional; Enter denies, the agent reads the reason). Ctrl+Enter allows once;
+  - for `execute`, the code or command (a string argument named `code`, `command`, `script`, `cmd`, `source` or `shell`, or with `format: "code"` / `x-code`) shows whole in a monospaced, scrollable, editable box: what's in it is what runs;
+  - decided: the fold's row says "Approved by you, and allowed in this chat" (or "always allowed").
+- **Settings → Agent → Permissions** lists the grants (tool, risk, what it covers, "always" or a link to its chat, uses, age, expiry) with **Revoke** (plan 25.2).
 - **Settings → Agent:** the models, AGENT.md and MEMORY.md editors, topic files, skills, the modes and how permissions work.
 
 **Events → turns.** `chat-thread.js` `buildView(events, live)` folds the log into items, then `chat-turn.js` `groupTurns(view, {running, now, tools})` groups them into turns of steps by the `step` id the agent puts on thinking, text and tool calls; the last step's text is the answer when that step called no tools. `buildView` folds the log into items as follows. A `tool_call` becomes a **tool** item (its `call`, live `progress` and `tool_result` folded in), or an **approval** item when an `approval` event names it (with its `decision`); `ask_user` becomes a **question** item with its `answer`; a result with outputs adds a **result** item; `update_todos` and `remember` calls are hidden (their `todos` / `memory` events have cards); `usage`, `state`, `call`, `answer`, `decision` are folded. Every other event type is an item of its own kind. Live `delta` events show streaming text and thinking until the stored `assistant` / `thinking` event of that step replaces them.

@@ -304,14 +304,15 @@ export function createMockClient(api, { speed = 1 } = {}) {
       start(t, run => afterAnswer(t, run, answers));
       return ev;
     },
-    async approval(tid, { approval_id, approve, arguments: args, reason }) {
+    async approval(tid, { approval_id, approve, arguments: args, reason, remember = 'once' }) {
       await net(); const t = T(tid);
       const ap = t.events.find(e => e.type === 'approval' && e.payload.approval_id === approval_id);
       if (!ap) throw err(404, `no approval '${approval_id}' in this thread`, 'not_found');
       if (t.events.some(e => e.type === 'decision' && e.payload.approval_id === approval_id)) throw err(409, 'this approval was already decided', 'already_decided');
       const mp = args?.megapixels;
       if (approve && mp != null && (mp < 0.1 || mp > 4)) throw err(422, `megapixels: ${mp} is ${mp > 4 ? 'above the maximum 4' : 'below the minimum 0.1'}`, 'invalid_arguments', { problems: [{ field: 'megapixels', detail: 'out of range', fix: 'use 0.1 to 4' }] });
-      const ev = emit(t, 'decision', { id: ap.payload.id, approval_id, approve, arguments: args || null, reason: reason || null, call_id: approve ? rid('call_') : null, status: approve ? 'running' : 'denied' });
+      const ev = emit(t, 'decision', { id: ap.payload.id, approval_id, approve, arguments: args || null, reason: reason || null, call_id: approve ? rid('call_') : null, status: approve ? 'running' : 'denied',
+        ...(approve && remember !== 'once' ? { remember, grant: rid('gr_') } : {}) });
       t.pending = null;
       start(t, run => afterApproval(t, run, ap, approve, args));
       return ev;

@@ -1,10 +1,12 @@
 // Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, the memory index and its topics, the
-// models, skills, the ask modes and permissions. (Show thinking is retired: thinking is a row in
-// each turn's activity fold, plan 19.4.) Mounted by Hub.dc.html's Settings page.
+// models, skills, the ask modes and permissions with the grants (plan 25.2: what was allowed in a
+// chat or always, with revoke). (Show thinking is retired: thinking is a row in each turn's
+// activity fold, plan 19.4.) Mounted by Hub.dc.html's Settings page.
 
-import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens, fmtAgo } from './chat-ui.js';
 import { getChatClient } from './chat.js';
 import { MODES } from './chat-header.js';
+import { RISK_TONE, grantText } from './chat-risk.js';
 
 const R = () => globalThis.React;
 const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
@@ -62,7 +64,36 @@ export function AgentSettings({ api, toast = () => {} }) {
         h('span', { style: { minWidth: 130, fontWeight: 500 } }, l), h('span', { style: { color: T.mut } }, d)))),
       h('div', { style: { fontSize: 12, color: T.mut, display: 'flex', gap: 6, alignItems: 'flex-start' } }, h(Icon, { d: 'shield', size: 13, style: { marginTop: 2 } }),
         h('span', null, 'Each chat picks its mode in the header (new chats: Ask about choices). Per-tool rules are name globs in ', h('code', { style: { fontFamily: MONO } }, '[agent.permissions]'),
-          ' of config.toml, checked deny → ask → allow before the mode. Pending approvals from any client are in the header’s Approvals button.'))));
+          ' of config.toml. A call is decided by the deny list, then the chat’s mode, then a mod’s own limits, then your grants (below), then the ask and allow lists, then its risk: reading runs; writing and generating ask unless the chat uses defaults; using the internet, running code and deleting always ask. Pending approvals from any client are in the header’s Approvals button.')),
+      h(GrantsList, { api, toast })));
+}
+
+// Grants (plan 25.2): what a card's "Allow in this chat" or "Always allow" covers, newest first, with revoke.
+function GrantsList({ api, toast }) {
+  const React = R(), [gs, setGs] = React.useState(null), [err, setErr] = React.useState(null);
+  const load = () => api?.listGrants?.().then(setGs, e => setErr(e));
+  React.useEffect(() => { load(); }, []);
+  if (!api?.listGrants) return null;
+  const revoke = async g => {
+    try { await api.revokeGrant(g.id); setGs(l => l.filter(x => x.id !== g.id)); toast(`Revoked: ${g.tool} asks again`, 'success'); }
+    catch (e) { toast(e.detail || String(e), 'error'); }
+  };
+  const scope = g => (g.scope === 'always' ? h(Badge, { tone: 'accent', title: 'Every chat, MCP and the API' }, 'always')
+    : h('a', { href: '#/chat/' + encodeURIComponent(g.thread || ''), title: 'The chat it was allowed in', style: { fontSize: 11.5 } }, 'in a chat →'));
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid ' + T.bd, paddingTop: 10 } },
+    h('div', { style: { display: 'flex', alignItems: 'baseline', gap: 8 } }, h('span', { style: { fontWeight: 500 } }, 'Grants'),
+      h('span', { style: { fontSize: 12, color: T.mut } }, 'Calls you allowed in a chat or always: they run without a card. A chat’s grants end when the chat is deleted.')),
+    err ? h('span', { role: 'alert', style: { fontSize: 12, color: T.rd } }, `Couldn’t load the grants: ${err.detail || err.message}`) : null,
+    gs && !gs.length ? h('span', { style: { fontSize: 12.5, color: T.mut } }, 'None yet. Approval cards offer “Allow in this chat” and “Always allow”.') : null,
+    (gs || []).map(g => h('div', { key: g.id, style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5, padding: '6px 8px', borderRadius: 6, background: T.inset } },
+      h('span', { style: { fontFamily: MONO, fontSize: 12 } }, g.tool),
+      g.risk ? h(Badge, { tone: RISK_TONE[g.risk] || 'dim' }, g.risk) : null,
+      h('span', { style: { color: T.mut, minWidth: 0, overflowWrap: 'anywhere' } }, grantText(g.kind, g.key) || 'every call'),
+      scope(g),
+      h('span', { style: { flex: 1 } }),
+      h('span', { style: { fontSize: 11.5, color: T.dim } }, [`used ${g.used || 0}×`, fmtAgo(g.created_ts) === 'now' ? 'just now' : fmtAgo(g.created_ts) + ' ago',
+        g.expires_ts ? `ends ${new Date(g.expires_ts * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : null].filter(Boolean).join(' · ')),
+      h(Btn, { sm: true, kind: 'ghost', icon: 'x', label: 'Revoke', onClick: () => revoke(g) }))));
 }
 
 

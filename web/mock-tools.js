@@ -16,7 +16,7 @@ const P = {
 const wf = (ids, def) => ({ type: 'string', enum: ids, description: `Which workflow to use (default: ${def})` });
 const obj = (properties, required) => ({ type: 'object', properties, required, additionalProperties: false });
 
-// name, mod, risk, summary, parameters, ask, core
+// name, mod, risk, summary, parameters, ask, core, grant_key (plan 25.2)
 const TOOLS = [
   ['hub_list_services', 'hub', 'read', 'List AIHub\'s mods with their state and what they hold in memory', obj({}, []), [], true],
   ['hub_search_outputs', 'hub', 'read', 'Find earlier outputs (images, videos, audio, 3D models) by words', obj({ q: { type: 'string', description: 'Words to search for' }, kind: { type: 'string', enum: ['image', 'video', 'audio', 'model3d'] } }, []), [], true],
@@ -39,20 +39,26 @@ const TOOLS = [
   ['lcpp_start_llm', 'lcpp', 'write', 'Launch a model (asks AIHub for memory first)', obj({ model: { type: 'string', enum: ['gemma-4-26b-it', 'minicpm-5-2b'] }, ctx: { type: 'integer', minimum: 512, maximum: 262144 } }, ['model']), ['ctx']],
   ['lcpp_stop_llm', 'lcpp', 'destructive', 'Stop an instance', obj({ name: { type: 'string' } }, ['name']), ['name']],
   ['example_hello', 'example', 'read', 'Say hello', obj({ name: { type: 'string', description: 'Who to greet' } }, []), []],
+  ['web_fetch', 'web', 'network', 'Fetch a web page as markdown (saved to Outputs).', obj({ url: { type: 'string', description: 'The page (http or https)' }, max_chars: { type: 'integer', minimum: 100, maximum: 100000 } }, ['url']), [], false, 'url:host'],
+  ['workspace_python', 'workspace', 'execute', 'Run Python in the sandbox; files written to /out become outputs.', obj({ code: { type: 'string', description: 'The Python to run' } }, ['code']), [], false, 'const:python'],
 ];
 
 const KIND_OF = { comfy_generate_image: 'image', comfy_edit_image: 'image', comfy_remove_background: 'image', comfy_upscale_image: 'image', comfy_animate_image: 'video', comfy_generate_video: 'video', gen3d_make_3d: 'model3d', tts_speak: 'audio' };
 
 /** outputs(): mock.js's outputs, so a finished generate call returns one of them (optional). */
 export function createToolMocks({ emit, net, err, later, now, outputs = () => [] }) {
-  const tools = TOOLS.map(([name, mod, risk, summary, parameters, ask, core]) => ({ name, mod, risk, core: !!core, summary, available: true,
-    description: summary + (mod === 'comfy' ? '\nRuns as a job: the call returns when it has finished, with its outputs.' : ''), parameters, ask, examples: [], job: risk === 'generate', source: mod === 'hub' ? 'hub' : 'manifest' }));
+  const tools = TOOLS.map(([name, mod, risk, summary, parameters, ask, core, grantKey]) => ({ name, mod, risk, core: !!core, summary, available: true,
+    description: summary + (mod === 'comfy' ? '\nRuns as a job: the call returns when it has finished, with its outputs.' : ''), parameters, ask, examples: [], job: risk === 'generate', source: mod === 'hub' ? 'hub' : 'manifest',
+    ...(grantKey ? { grant_key: grantKey } : {}) }));
   const byName = new Map(tools.map(t => [t.name, t]));
   const index = t => ({ name: t.name, mod: t.mod, risk: t.risk, core: t.core, summary: t.summary, available: t.available });
-  const calls = new Map(), approvals = new Map();
+  const calls = new Map(), approvals = new Map(), grants = new Map();   // grants: plan 25.2
   const id = p => p + Math.random().toString(16).slice(2, 14);
   const unknown = name => err(404, 'unknown_tool', `No tool "${name}"`, { close: tools.map(t => t.name).filter(n => n.includes(String(name).split('_').pop())).slice(0, 3) });
-  const withSchema = a => { const t = byName.get(a.tool); return { ...structuredClone(a), schema: t?.parameters, description: t?.description }; };
+  const withSchema = a => { const t = byName.get(a.tool); return { ...structuredClone(a), schema: t?.parameters, description: t?.description, ...(t?.grant_key ? { grant_key: t.grant_key } : {}) }; };
+  const keyOf = (t, args) => (t.grant_key === 'url:host' ? (() => { try { return new URL(args.url).hostname; } catch { return null; } })()
+    : t.grant_key?.startsWith('arg:') ? (args[t.grant_key.slice(4)] ?? null) : t.grant_key?.startsWith('const:') ? t.grant_key.slice(6) : null);
+  const granted = (t, args, origin) => [...grants.values()].find(g => g.tool === t.name && (g.key == null || g.key === keyOf(t, args)) && (g.scope === 'always' || (origin?.thread && g.thread === origin.thread)));
   function check(t, args) {
     const problems = [];
     for (const r of t.parameters.required || []) if (args[r] == null || args[r] === '') problems.push({ field: r, detail: `${r} is required`, fix: `add ${r}` });
@@ -88,6 +94,10 @@ export function createToolMocks({ emit, net, err, later, now, outputs = () => []
   const seed = { id: 'ap_' + 'mock0001', tool: 'tts_speak', arguments: { text: 'Your render finished. The fox model is ready to rig.', voice: 'Hope' }, ask_fields: ['voice'],
     risk: 'generate', origin: { client: 'Claude Code', via: 'mcp' }, state: 'pending', created_ts: now() - 140 };
   approvals.set(seed.id, seed);
+  // …and code to run (plan 25.3: the execute card shows it whole).
+  const code = { id: 'ap_' + 'mock0002', tool: 'workspace_python', arguments: { code: 'import pandas as pd\ndf = pd.read_csv("/in/sales.csv")\nax = df.groupby("month")["total"].sum().plot.bar()\nax.figure.savefig("/out/sales.png", dpi=150)\nprint(df.describe())' },
+    ask_fields: [], risk: 'execute', origin: { client: 'Claude Code', via: 'mcp' }, state: 'pending', created_ts: now() - 40 };
+  approvals.set(code.id, code);
 
   return {
     async listTools({ q, names } = {}) {
@@ -107,12 +117,14 @@ export function createToolMocks({ emit, net, err, later, now, outputs = () => []
       const t = byName.get(name); if (!t) throw unknown(name);
       check(t, args);
       if (mode === 'read_only' && t.risk !== 'read') return { status: 'denied', tool: name, error: { code: 'denied', detail: 'the thread is read-only: only tools that read can run' } };
-      const asks = t.risk === 'destructive' || (t.risk !== 'read' && mode !== 'auto');
+      const g = granted(t, args, origin);
+      if (g) g.used++;
+      const asks = !g && (['network', 'execute', 'destructive'].includes(t.risk) || (t.risk !== 'read' && mode !== 'auto'));
       if (asks) {
         const a = { id: id('ap_'), tool: name, arguments: structuredClone(args), ask_fields: t.ask, risk: t.risk, origin, state: 'pending', created_ts: now() };
         approvals.set(a.id, a);
         emit({ type: 'approval', approval: structuredClone(a) });
-        return { status: 'needs_approval', tool: name, approval_id: a.id, arguments: args, ask_fields: t.ask, risk: t.risk, schema: t.parameters, description: t.description };
+        return { status: 'needs_approval', tool: name, approval_id: a.id, arguments: args, ask_fields: t.ask, risk: t.risk, schema: t.parameters, description: t.description, ...(t.grant_key ? { grant_key: t.grant_key } : {}) };
       }
       const c = run(t, args, origin);
       return { status: 'running', tool: name, call_id: c.call_id };
@@ -121,17 +133,28 @@ export function createToolMocks({ emit, net, err, later, now, outputs = () => []
     async cancelToolCall(cid) { await net(); const c = calls.get(cid); if (!c) throw err(404, 'not_found', `no call ${cid}`); if (c.status === 'running') { c.status = 'cancelled'; emit({ type: 'tool_call', call: structuredClone(c) }); } return structuredClone(c); },
     async listApprovals({ state } = {}) { await net(); return [...approvals.values()].filter(a => state === 'all' || a.state === 'pending').sort((a, b) => b.created_ts - a.created_ts).map(withSchema); },
     async getApproval(aid) { await net(); const a = approvals.get(aid); if (!a) throw err(404, 'not_found', `no approval ${aid}`); return withSchema(a); },
-    async decideApproval(aid, { approve, args, reason } = {}) {
+    async decideApproval(aid, { approve, args, reason, remember = 'once', confirm } = {}) {
       await net();
       const a = approvals.get(aid); if (!a) throw err(404, 'not_found', `no approval ${aid}`);
       if (a.state !== 'pending') throw err(409, 'already_decided', 'This approval was already decided');
       const t = byName.get(a.tool), final = { ...a.arguments, ...(args || {}) };
       if (approve && t) check(t, final);
+      let grant = null;
+      if (approve && t && remember !== 'once') {
+        if (remember === 'thread' && !a.origin?.thread) throw err(422, 'no_thread', "this call isn't from a chat, so it can't be allowed in this chat", { fix: 'allow it once, or always' });
+        if (remember === 'always' && ['execute', 'destructive'].includes(t.risk) && !confirm) throw err(422, 'confirm_needed', `always allowing a ${t.risk} tool needs a second confirm`);
+        grant = { id: id('gr_'), tool: t.name, key: keyOf(t, final), kind: t.grant_key || null, risk: t.risk, scope: remember, thread: remember === 'thread' ? a.origin.thread : null,
+          created_ts: now(), note: `from approval ${aid}`, used: 0 };
+        grants.set(grant.id, grant);
+        emit({ type: 'grant', grant: structuredClone(grant) });
+      }
       Object.assign(a, { state: approve ? 'approved' : 'denied', final, reason: reason || null, decided_ts: now() });
       let res = { status: 'denied', tool: a.tool, error: { code: 'denied_by_user', detail: reason || 'the user said no' } };
-      if (approve && t) { const c = run(t, final, a.origin); a.call_id = c.call_id; res = { status: 'running', tool: a.tool, call_id: c.call_id }; }
+      if (approve && t) { const c = run(t, final, a.origin); a.call_id = c.call_id; res = { status: 'running', tool: a.tool, call_id: c.call_id, ...(grant ? { grant: structuredClone(grant) } : {}) }; }
       emit({ type: 'approval', approval: structuredClone(a) });
       return res;
     },
+    async listGrants({ thread, tool } = {}) { await net(); return [...grants.values()].filter(g => (!thread || g.thread === thread) && (!tool || g.tool === tool)).sort((a, b) => b.created_ts - a.created_ts).map(g => structuredClone(g)); },
+    async revokeGrant(gid) { await net(); if (!grants.delete(gid)) throw err(404, 'not_found', `no grant ${gid}`); emit({ type: 'grant_deleted', id: gid }); return { deleted: 1 }; },
   };
 }

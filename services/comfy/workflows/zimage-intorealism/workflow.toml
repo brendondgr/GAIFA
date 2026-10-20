@@ -1,5 +1,6 @@
 name = "Z-Image IntoRealism + watercolor"
 task = "text-to-image"
+good_for = "painterly, watercolor-style pictures"
 description = "Z-Image Turbo fine-tune (IntoRealism v6) with a watercolor LoRA: painterly images"
 tags = ["watercolor", "style"]
 # memory_gb = 17.6    # estimated from the model files; each run measures it, so set it only to override
@@ -52,7 +53,9 @@ width = 832
 height = 1216
 
 [presets.fast]               # ~0.6 MP: quicker, smaller; small text can break (same names as the Qwen Turbo packs)
+quality = "fast"
 megapixels = 0.6
 
 [presets.draft]              # ~0.35 MP: previews and lots of variations
+quality = "draft"
 megapixels = 0.35

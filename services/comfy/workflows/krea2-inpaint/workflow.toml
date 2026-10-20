@@ -1,5 +1,6 @@
 name = "Krea 2 Turbo — image to image (masked add-an-object)"
 task = "image-edit"
+edit = "inpaint"
 
 [inputs.prompt]          # CLIPTextEncode "Positive prompt"
 node = "5"

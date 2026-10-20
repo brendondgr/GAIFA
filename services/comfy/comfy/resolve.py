@@ -94,8 +94,8 @@ def resolve(pack: Pack, schema: dict, values: dict[str, Any] | None, preset: str
         if preset not in presets:
             errors.append(f"preset {preset!r} doesn't exist (presets: {', '.join(presets) or 'none'})")
         else:
-            out.update(presets[preset])
-            asked = {**presets[preset], **values}
+            out.update(pack.manifest.preset_values(preset))
+            asked = {**pack.manifest.preset_values(preset), **values}
     out.update({k: v for k, v in values.items() if k in props})
     for k, m in (pack.manifest.inputs.items() if pack.manifest else ()):
         v = values.get(k)

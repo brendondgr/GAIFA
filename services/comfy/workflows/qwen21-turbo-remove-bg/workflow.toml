@@ -1,5 +1,7 @@
 name = "Qwen-Image 2.1 Turbo — remove background"
 task = "remove-background"
+good_for = "cutting the subject out as a transparent PNG"
+speed = "about 1 min"
 description = "Qwen-Image 2.1 Turbo (official 8-step distill): cut the subject out of an image as a transparent PNG; about 1 min, or 30 s with the fast preset; `megapixels` sets the result size (1.0 = 1024×1024; default: the input's own size)"
 tags = ["transparent", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
@@ -29,9 +31,11 @@ label = "Working size"
 description = "Pixel budget the input images are read at, as N×N (default 0: the input's own size); smaller is faster but keeps less detail. The result follows image 1 at this size."
 
 [presets.fast]               # 768 × 768 working size (~0.6 MP result), about a third of the time (docs/comfy-transfer-report.md)
+quality = "fast"
 megapixels = 0.56
 
 [presets.draft]              # 576 × 576 working size (~0.33 MP result): for previews only
+quality = "draft"
 megapixels = 0.32
 
 [outputs.image]

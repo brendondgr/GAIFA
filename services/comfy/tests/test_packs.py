@@ -252,9 +252,10 @@ def test_qwen21_turbo_packs(lib, tmp_path, pid):
     assert by_type["AIHubTextEncodeQwenImage21"]["encode_negative"] is False   # encode once
     assert by_type["VAELoaderKJ"]["weight_dtype"] == "bf16"
     if pid == "qwen21-turbo-t2i":
-        assert p.manifest.presets == {"fast": {"megapixels": 0.6}, "draft": {"megapixels": 0.35}}
+        assert {k: p.manifest.preset_values(k) for k in p.manifest.presets} == {"fast": {"megapixels": 0.6}, "draft": {"megapixels": 0.35}}
+        assert [p.manifest.preset_quality(k) for k in ("fast", "draft")] == ["fast", "draft"]
     else:
-        assert p.manifest.presets == {"fast": {"megapixels": 0.56}, "draft": {"megapixels": 0.32}}   # 768 / 576 working size
+        assert {k: p.manifest.preset_values(k) for k in p.manifest.presets} == {"fast": {"megapixels": 0.56}, "draft": {"megapixels": 0.32}}   # 768 / 576 working size
         props = input_schema(p, conv, lib.catalog, lib.tasks)["properties"]
         assert {"megapixels", "resolution"} <= set(props)            # megapixels sets the working size
 

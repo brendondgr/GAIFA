@@ -73,10 +73,18 @@ class OutputMap(_Strict):
         return self
 
 
+EDIT_STYLES = ("instruction", "restyle", "inpaint", "refine")
+PRESET_META = ("label", "quality")      # a preset's own words, never sent as inputs (plan 20.3)
+QUALITIES = ("full", "fast", "draft")
+
+
 class Manifest(_Strict):
     name: str = ""
     task: str = "custom"
     description: str = ""
+    edit: Literal["instruction", "restyle", "inpaint", "refine"] | None = None   # image-edit packs: what kind of edit
+    good_for: str = ""                  # one phrase for the agent and the card (x-options)
+    speed: str = ""                     # e.g. "about 2 min"
     tags: list[str] = []
     memory_gb: float | None = Field(None, ge=0)
     agent: bool = True                  # false: the page and API run it, the agent's tools don't offer it
@@ -104,10 +112,19 @@ class Manifest(_Strict):
     @model_validator(mode="after")
     def _preset_keys(self) -> Manifest:
         for p, vals in self.presets.items():
-            unknown = set(vals) - set(self.inputs) - {"aspect", "megapixels", "seconds"}
+            unknown = set(vals) - set(self.inputs) - {"aspect", "megapixels", "seconds"} - set(PRESET_META)
             if unknown:
                 raise ValueError(f"preset {p!r} sets inputs that don't exist: {', '.join(sorted(unknown))}")
+            if "quality" in vals and vals["quality"] not in QUALITIES:
+                raise ValueError(f"preset {p!r}: quality must be one of {', '.join(QUALITIES)}")
         return self
+
+    def preset_values(self, name: str) -> dict[str, Any]:
+        """A preset's input values, without its label and quality."""
+        return {k: v for k, v in (self.presets.get(name) or {}).items() if k not in PRESET_META}
+
+    def preset_quality(self, name: str) -> str:
+        return str((self.presets.get(name) or {}).get("quality") or "full")
 
 
 @dataclass

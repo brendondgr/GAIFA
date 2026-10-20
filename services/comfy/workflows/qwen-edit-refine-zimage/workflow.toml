@@ -1,5 +1,6 @@
 name = "Qwen-Edit-2511 Lightning → Z-Image Turbo refiner"
 task = "image-edit"
+edit = "refine"
 # memory_gb = 17.4    # estimated from the model files; each run measures it, so set it only to override
 
 [inputs.prompt]          # TextEncodeQwenImageEditPlus "① Instruction ← edit goes here"

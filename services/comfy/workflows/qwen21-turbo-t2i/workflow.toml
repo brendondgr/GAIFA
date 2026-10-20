@@ -1,5 +1,7 @@
 name = "Qwen-Image 2.1 Turbo — text to image"
 task = "text-to-image"
+good_for = "text inside the picture (signs, posters, labels) and complex scenes"
+speed = "about 40 s"
 description = "Qwen-Image 2.1 Turbo (official 8-step distill): text to image, strong at text inside the image (signs, posters, labels) and complex scenes; about 40 s; `megapixels` sets the size (1.0 = 1024×1024; fast 0.6, draft 0.35)"
 tags = ["photo", "text", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
@@ -26,9 +28,11 @@ node = "7"
 field = "megapixels"
 
 [presets.fast]               # ~0.6 MP (e.g. 960x640): about 40% less time; small text can break (docs/comfy-transfer-report.md)
+quality = "fast"
 megapixels = 0.6
 
 [presets.draft]              # ~0.35 MP (e.g. 736x480): about 60% less time; for previews only
+quality = "draft"
 megapixels = 0.35
 
 [outputs.image]

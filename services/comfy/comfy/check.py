@@ -185,6 +185,12 @@ def _check_manifest(pack: Pack, conv: Converted, catalog: NodeCatalog, tasks: Ta
         eid, why = locate(conv, om.node, om.title)
         if eid is None:
             out.append(Issue("error", "output_unmapped", f"output {name!r}: {why}"))
+    if m.task == "image-edit" and m.edit is None:
+        out.append(Issue("warning", "capability_missing", "an image-edit pack must say what kind of edit it is; the agent won't offer it until then",
+                         fix='Add edit = "instruction" | "restyle" | "inpaint" | "refine" to workflow.toml (docs/workflows.md, Capabilities).'))
+    if m.edit == "inpaint" and "mask" not in m.inputs:
+        out.append(Issue("error", "inpaint_needs_mask", "an inpaint pack needs a mapped `mask` input (white is the area to change)",
+                         fix="Map the graph's mask loader as [inputs.mask]; a mask drawn into the graph can't be chosen."))
     if task is not None:
         have = set(m.inputs) | ({"aspect"} if {"width", "height"} <= set(m.inputs) else set())
         for need in task.required:

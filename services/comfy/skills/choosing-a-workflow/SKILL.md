@@ -11,7 +11,7 @@ description: Which image or video workflow to use, good prompts, aspect ratios a
 - Prompts: one or two concrete sentences: subject, setting, light, style, camera. No negative prompt needed.
 - Aspect: 16:9 for landscapes and scenes, 9:16 for phone wallpapers and portraits of people, 1:1 for icons and objects.
 
-**Editing an image** (`comfy_edit_image`; `qwen21-turbo-edit-multi`, full quality without a preset): pass the image as `output:<id>` and say the change in plain words ("make it night", "add a red scarf"). Keeps the rest of the image. To use a second image as a reference, pass it as `image_2` and name them `<image1>`, `<image2>` in the prompt. The Turbo edit takes about 2 min.
+**Editing an image** (`comfy_edit_image`): pass the picture to change as `image` (`output:<id>`) and say the change in plain words ("make it night", "add a red scarf", "remove her hair"). The `workflow` choices say what kind of edit each pack makes (`instruction`: changes what the words say and keeps the rest, which covers local edits like hair, clothes or one object). For a second picture to use (a hat to put on her, a style to copy), pass it in `references` and name them `<image1>`, `<image2>` in the prompt. Never edit with `comfy_generate_image`: it makes a new picture from text.
 
 **Remove background** (`comfy_remove_background`): a transparent PNG of the subject; a good step before turning an object into 3D or a sticker. When the user names what to keep, or the picture is a scene (a building, a room, several things), pass `prompt` with just those words ("the storefront", "the woman on the left"): the workflow turns them into its instruction. Without a prompt the model guesses the subject, and on a picture the subject fills it can remove nearly everything.
 

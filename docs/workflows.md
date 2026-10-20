@@ -45,6 +45,9 @@ Every import becomes a **draft**. It is checked against your installed nodes and
 name = "Z-Image Turbo"
 task = "text-to-image"               # from tasks.toml (§4); "custom" when none fits
 description = "Fast photoreal text to image"   # the agent reads this
+good_for = "photoreal pictures, quickly"      # one phrase: the agent and the card read it (§3.1)
+# speed = "about 40 s"
+# edit = "instruction"               # image-edit packs only: instruction | restyle | inpaint | refine (§3.1)
 tags = ["photo", "fast"]
 # agent = false                      # keep it off the agent's tools (it still runs from the page and API)
 # memory_gb = 18                     # set only to override: each run measures its peak
@@ -73,6 +76,10 @@ node = "9"                           # a save node; kind is guessed (image, vide
 width = 832
 height = 1216
 
+[presets.fast]
+quality = "fast"                     # full (the default) | fast | draft: the agent uses fast and draft only when asked (§3.1)
+megapixels = 0.6
+
 [set]                                # fixed values, applied before every check and run
 "66.unet_name" = "z_image_turbo_fp8_e4m3fn.safetensors"
 ```
@@ -80,9 +87,25 @@ height = 1216
 - **Types, defaults, ranges and choices come from ComfyUI's node list** and the graph's current values. An input only needs to state what differs.
 - **Input fields:** `node` or `title`, `field`, `label`, `description`, `type` (`string`, `integer`, `number`, `boolean`, `file`, `files`), `default`, `min`, `max`, `step`, `choices`, `multiline`, `required`, `hidden` (mapped, but not shown or offered to the agent), `also`, and `template`. A `template` applies to string inputs: a value the caller gives of up to 8 words, not naming `<image…>`, fills its `{}`. For example, the remove-background packs turn "the storefront" into their whole instruction; longer text and the graph's own default are used as they are.
 - **Node ids inside subgraphs** are `outer:inner`, for example `"12:5"`.
+- **Pack fields:** `name`, `task`, `description`, `edit`, `good_for`, `speed`, `tags` (shown on the page only), `memory_gb`, `agent`, `inputs`, `outputs`, `presets` (input values plus `label` and `quality`), `set`.
 - **`agent = false`** keeps a pack off the agent's tools (task tools, `list_workflows`, `run_workflow`); it stays on the page and the API. The Qwen-Image 2.1 base packs use it, so the agent always gets Turbo.
 - **Unknown keys are errors**, so a typo is reported rather than ignored.
 - **Saving the form on the review screen rewrites `workflow.toml` without comments.** To keep comments, use "Edit as TOML" or edit the file directly.
+
+### 3.1 Capabilities
+
+What a pack can do is declared, so the agent, the hub's checks and the parameter card follow it instead of prose (plan 20.3). The task tool's `workflow` parameter carries `x-options` (brief §11.12): per pack its `label` (the name), `good_for`, `speed`, `kind` (the edit style), whether it's the task's default, and `allows.preset` (its presets).
+
+- **Declared in `workflow.toml`:**
+  - `edit` (required for `image-edit` packs): `instruction` (changes what the words say and keeps the rest, which covers local edits like hair or one object), `restyle` (the whole frame, img2img), `inpaint` (only a masked area: needs a mapped `mask` input), or `refine` (a second pass over an edit). An edit pack without it gets the warning `capability_missing` and isn't offered to the agent.
+  - `good_for` and `speed`: short phrases.
+  - In a preset: `quality` (`full`, `fast`, `draft`) and `label`. They are never sent as inputs. A `fast` or `draft` preset tells the agent to use it only when the user asks for something quick.
+- **Derived from the inputs:**
+  - **Reference pictures:** the pack's `image_2 … image_n` inputs. The task tool gets a `references` list (at most the largest count), filled into `image_2`, `image_3`, … in order. A pack without them `excludes` `references`.
+  - **A mask:** a mapped `mask` input makes the pack `need` it.
+- **Without `workflow`,** the default runs. That is the ★ for the task, or for the edit style (`defaults` key `image-edit:<style>`) when ready packs span more than one style. In that case `edit_image` also gets an `edit` parameter (default `instruction`) whose options `allow` only their style's packs.
+- **No preset means full quality.**
+- **A pack passed to the wrong task tool** is refused with the tool that runs it ("… is an image-edit workflow: call edit_image").
 
 ## 4. Tasks and shared input names
 

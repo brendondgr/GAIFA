@@ -1,5 +1,6 @@
 name = "Klein9b edit base"
 task = "image-edit"
+edit = "instruction"
 
 [inputs.prompt]          # CLIPTextEncode "CLIP Text Encode (Positive Prompt)"
 node = "75:74"

@@ -2,6 +2,7 @@ name = "Z-Image Turbo"
 description = "Fast photoreal text to image (Z-Image Turbo, 8 steps)"
 tags = ["photo", "fast"]
 task = "text-to-image"
+good_for = "photoreal pictures, quickly"
 # memory_gb = 10.1    # estimated from the model files; each run measures it, so set it only to override
 
 [inputs.prompt]          # CLIPTextEncode "CLIP Text Encode (Prompt)"
@@ -49,7 +50,9 @@ height = 832
 "66.unet_name" = "z_image_turbo_fp8_e4m3fn.safetensors"   # the bf16 file this graph names isn't downloaded
 
 [presets.fast]               # ~0.6 MP: quicker, smaller; small text can break (same names as the Qwen Turbo packs)
+quality = "fast"
 megapixels = 0.6
 
 [presets.draft]              # ~0.35 MP: previews and lots of variations
+quality = "draft"
 megapixels = 0.35

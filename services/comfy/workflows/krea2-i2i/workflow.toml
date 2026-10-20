@@ -1,5 +1,6 @@
 name = "Krea 2 Turbo — image to image (whole-frame denoise)"
 task = "image-edit"
+edit = "restyle"
 
 [inputs.prompt]          # CLIPTextEncode "Positive prompt"
 node = "5"

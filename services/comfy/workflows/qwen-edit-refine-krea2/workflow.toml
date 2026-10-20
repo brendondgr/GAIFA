@@ -1,5 +1,6 @@
 name = "Qwen-Edit-2511 Lightning → Krea 2 Turbo refiner"
 task = "image-edit"
+edit = "refine"
 
 [inputs.prompt]          # TextEncodeQwenImageEditPlus "① Instruction ← edit goes here"
 node = "11"

@@ -68,6 +68,10 @@ required = []
 type = "string"
 description = "What to make, in plain words"
 
+[inputs.references]
+type = "files"
+description = "Extra pictures the instruction refers to as <image2>, <image3>, … (a hat to put on her, a style to copy); the picture to change is `image`"
+
 [inputs.negative]
 type = "string"
 description = "What to avoid"

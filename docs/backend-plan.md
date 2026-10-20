@@ -1712,7 +1712,7 @@ This phase adds one declaration per engine and pack. The hub turns it into check
     - no claims the schema already makes.
   *Done when:* `services/gen3d/tests/test_options.py` covers the `x-options` per engine, both defaults, both refusals with their fix, and the presets per engine; `test_api.py` covers a refused cube3d plus image (422 with `fix`); `aihub check gen3d` passes; the page still runs each engine.
   - *As built:* the `x-options` are built from `ENGINES` when the schema is made (`json_schema_extra` callables `engine_options`, `preset_options`); `Engine` gained `speed`, and `help` is the `good_for`. Cube3D only `excludes` `image` (no `needs: prompt`), so a follow-up job with `parent_id` and no prompt still fits. `preset` is now an enum (the union) with `x-depends-on: engine`. A request without an engine becomes cube3d or trellis2 in the before-validator. Refusals are `options.Refusal(detail, fix)`; gen3d's 422 handlers (also for FastAPI's body validation) add `fix`. The page relabels its engine picker from `/v1/options` and decides text versus picture from each engine's `input`. 73 gen3d tests; `aihub check gen3d` passes.
-- [ ] **20.3 comfy packs declare theirs: `services/comfy/comfy/`.**
+- [x] **20.3 comfy packs declare theirs: `services/comfy/comfy/`.**
   - **`workflow.toml`** (`packs.py`, `extra="forbid"`) gains:
     - **`edit`**, the edit style, required for `image-edit` packs: one of `instruction`, `restyle`, `inpaint`, `refine`. Remove-background stays its own task.
     - **`good_for`**, one phrase.
@@ -1744,6 +1744,15 @@ This phase adds one declaration per engine and pack. The hub turns it into check
   - `test_packs.py` covers the new keys, the reserved preset keys, and `capability_missing`;
   - `aihub check comfy` passes;
   - the comfy tool list in `hub.db` kv shows the metadata.
+  - *As built:*
+    - **The base packs stay page-only.** `qwen21-edit-multi`, `qwen21-t2i` and `qwen21-remove-bg` keep `agent = false`, per the user's decision of 2026-10-11. On 2026-10-19 the user only said no new edit models were needed. They get `good_for` and `speed`, so turning them on later is one line.
+    - **The task tools' descriptions no longer list the packs.** The `workflow` choices carry that in `x-options`, and the hub renders them for the model.
+    - **A pack excludes `references` only on a tool that has the parameter.** The hub's new check caught the opposite on `generate_image` and `animate_image`.
+    - **Calls scan for new packs first:** `pick()` rescans, so a pack added since the tool list was read is found.
+    - **Fixed examples:** comfy's `EXAMPLES` aspect is now `16:9`, not `16:9 (Widescreen)`.
+    - **Verified offline.** The real catalog was built against the cached `object_info.json` (comfy stopped; the GPU was kept free during the user's TTS tests): every tool passes the hub's `spec_problems`, and `edit_image` offers `qwen21-turbo-edit-multi` as the instruction default with one reference.
+    - **Still to run:** `aihub check comfy` and the kv list need comfy running, so they wait for 20.5's live check.
+    - **Tests:** 128 comfy tests.
 - [ ] **20.4 The agent follows the declarations: `services/agent/agent/`.**
   - **`prompts.py`:**
     - the gen3d line (19) becomes a pointer with no capability claims ("For 3D, the engine's options say whether it takes text or a picture; when you have only text, ask whether to use Cube3D or make a picture first");

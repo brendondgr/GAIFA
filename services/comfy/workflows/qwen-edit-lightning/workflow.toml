@@ -1,5 +1,6 @@
 name = "Qwen-Image-Edit-2511 — instruction edit (Lightning fast path)"
 task = "image-edit"
+edit = "instruction"
 
 [inputs.prompt]          # TextEncodeQwenImageEditPlus "Instruction  ← the image enters here"
 node = "11"

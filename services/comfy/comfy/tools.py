@@ -10,6 +10,7 @@ route (`GET /v1/jobs/{id}?wait=`) gives its outputs.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .library import Library
@@ -20,8 +21,10 @@ JOB = {"status": "GET /v1/jobs/{job_id}?wait=60", "cancel": "POST /v1/queue/{job
 
 
 ASK = ("workflow", "preset", "aspect", "megapixels", "seconds")   # choices shown on the parameter card (plan 13.1)
-KIND = {"image": "image", "images": "image", "mask": "image", "video": "video"}
-EXAMPLES = {"generate_image": [{"prompt": "a red fox sitting in fresh snow, golden hour", "aspect": "16:9 (Widescreen)"}],
+KIND = {"image": "image", "images": "image", "mask": "image", "video": "video", "references": "image"}
+REF = re.compile(r"image_(\d+)")       # a pack's extra reference pictures: image_2, image_3, …
+QUICK = "only when the user asks for a quick, rough, draft or preview result"
+EXAMPLES = {"generate_image": [{"prompt": "a red fox sitting in fresh snow, golden hour", "aspect": "16:9"}],
             "animate_image": [{"image": "output:<id of an image>", "prompt": "the fox turns its head and blinks"}],
             "edit_image": [{"image": "output:<id>", "prompt": "make it night time"}]}
 
@@ -45,8 +48,65 @@ def ready_by_task(lib: Library) -> dict[str, list]:
         if p.manifest and not p.manifest.agent:
             continue
         _, issues = lib.analysed(p)
-        if lib.state(p, issues) == "ready":
+        if lib.state(p, issues) == "ready" and not (p.task == "image-edit" and p.manifest.edit is None):
             out.setdefault(p.task, []).append(p)
+    return out
+
+
+def references(p) -> int:
+    """How many extra reference pictures a pack takes (its image_2 … inputs)."""
+    return sum(1 for k in (p.manifest.inputs if p.manifest else {}) if REF.fullmatch(k) and int(REF.fullmatch(k).group(1)) >= 2)
+
+
+def default_for(task_id: str, packs: list, defaults: dict[str, str], style: str | None = None):
+    """The pack a call without `workflow` runs: the default for this edit style, then for the task, then the only one."""
+    ids = {p.id: p for p in packs}
+    for key in ([f"{task_id}:{style}"] if style else []) + [task_id]:
+        if defaults.get(key) in ids and (style is None or ids[defaults[key]].manifest.edit == style):
+            return ids[defaults[key]]
+    fitting = [p for p in packs if style is None or p.manifest.edit == style]
+    return fitting[0] if len(fitting) == 1 else None
+
+
+def _summary(p) -> str:
+    m = p.manifest
+    return m.good_for or (m.description.split(". ")[0].split(";")[0] if m.description and m.description != p.name else "")
+
+
+def workflow_options(packs: list, default, refs: bool = False) -> dict[str, dict]:
+    """`x-options` for a task tool's `workflow` (plan 20.3): what each pack is, takes and is good for."""
+    out = {}
+    for p in packs:
+        m = p.manifest
+        o: dict[str, Any] = {"label": p.name}
+        if _summary(p):
+            o["good_for"] = _summary(p)
+        if m.speed:
+            o["speed"] = m.speed
+        if m.edit:
+            o["kind"] = m.edit
+        if "mask" in m.inputs:
+            o["needs"] = ["mask"]
+        if refs and not references(p):          # the tool takes references, but this pack can't use them
+            o["excludes"] = ["references"]
+        if p is default:
+            o["default"] = True
+        o["allows"] = {"preset": list(m.presets)}
+        out[p.id] = o
+    return out
+
+
+def preset_options(packs: list) -> dict[str, dict]:
+    out: dict[str, dict] = {}
+    for p in packs:
+        for name, vals in p.manifest.presets.items():
+            if name in out:
+                continue
+            q = p.manifest.preset_quality(name)
+            o: dict[str, Any] = {"label": str(vals.get("label") or name.replace("_", " ").capitalize()), "quality": q}
+            if q != "full":
+                o["when"] = QUICK
+            out[name] = o
     return out
 
 
@@ -71,46 +131,68 @@ def catalog(lib: Library, defaults: dict[str, str]) -> list[dict]:
                     if k == "seed":
                         q["minimum"] = -1
                     props[k] = q
-        default = defaults.get(tid) or (packs[0].id if len(packs) == 1 else None)
+        styles = sorted({p.manifest.edit for p in packs if p.manifest.edit})
+        default = default_for(tid, packs, defaults, "instruction" if len(styles) > 1 else None)
+        refs = max((references(p) for p in packs), default=0)
+        if refs:
+            props["references"] = {"type": "array", "items": {"type": "string", "format": "aihub-file"}, "maxItems": refs,
+                                   "description": lib.tasks.inputs.get("references", {}).get("description", "Extra pictures")}
+        if len(styles) > 1:                     # more than one kind of edit is ready: the caller says which
+            props["edit"] = {"type": "string", "enum": styles, "description": "What kind of edit (default: instruction)",
+                             "x-options": {st: {"label": st.capitalize(), "default": st == "instruction",
+                                                "allows": {"workflow": sorted(p.id for p in packs if p.manifest.edit == st)}}
+                                           for st in styles}}
         props["workflow"] = {"type": "string", "enum": sorted(p.id for p in packs),
-                             "description": "Which workflow to use" + (f" (default: {default})" if default else "")}
+                             "description": "Which workflow to use", "x-options": workflow_options(packs, default, bool(refs))}
+        if len(styles) > 1:
+            props["workflow"]["x-depends-on"] = "edit"
         presets = sorted({name for p in packs for name in p.manifest.presets})
         if presets:
-            props["preset"] = {"type": "string", "enum": presets,
-                               "description": "A preset of the chosen workflow (its line below lists them): fast and draft "
-                                              "trade size and detail for speed. Leave it out for the full-quality default."}
-        lines = [task.description, "Workflows:"] + [
-            f"- {p.id}: {p.name}" + (f" — {p.manifest.description}" if p.manifest.description and p.manifest.description != p.name else "")
-            + (f" (presets: {', '.join(p.manifest.presets)})" if p.manifest.presets else "")
-            + (" [default]" if p.id == default else "") for p in sorted(packs, key=lambda p: p.id != default)]
-        lines.append("Returns a job; its outputs (files) come when it finishes.")
+            props["preset"] = {"type": "string", "enum": presets, "x-depends-on": "workflow", "x-options": preset_options(packs),
+                               "description": "Leave it out for full quality (the default). A quick preset only when the user asks "
+                                              "for a quick, rough, draft or preview result."}
+        lines = [task.description, "Returns a job; its outputs (files) come when it finishes."]
         req = [r for r in task.required if r in props]
         tools.append(_fn(task.tool, "\n".join(lines), {"type": "object", "properties": props, "required": req,
                                                      "additionalProperties": False}))
     all_ready = sorted(p.id for ps in by_task.values() for p in ps)
+    every = {p.id: p for ps in by_task.values() for p in ps}
     tools.append(_fn("list_workflows", "List the image and video workflows, with their tasks and inputs.",
                      {"type": "object", "properties": {}}, job=False, risk="read"))
     tools.append(_fn("run_workflow", "Run a workflow by id with its own inputs (see list_workflows). Only for workflows the "
                      "task tools don't cover: for images, edits, animation, video and background removal use generate_image, "
                      "edit_image, animate_image, generate_video and remove_background (they take a `workflow` too).",
                      {"type": "object", "properties": {
-                         "workflow": {"type": "string", "enum": all_ready},
+                         "workflow": {"type": "string", "enum": all_ready, "x-options": {
+                             pid: {"label": p.name, "kind": p.task, **({"good_for": _summary(p)} if _summary(p) else {})}
+                             for pid, p in every.items()}},
                          "inputs": {"type": "object", "description": "The workflow's inputs by name"},
                          "preset": {"type": "string", "description": "One of the workflow's presets"}},
                       "required": ["workflow"], "additionalProperties": False}))
     return tools
 
 
-def pick(lib: Library, task_id: str, workflow: str | None, defaults: dict[str, str]):
-    packs = ready_by_task(lib).get(task_id, [])
+def pick(lib: Library, task_id: str, workflow: str | None, defaults: dict[str, str], style: str | None = None):
+    lib.packs.scan()                            # a pack added since the tool list was read
+    by_task = ready_by_task(lib)
+    packs = by_task.get(task_id, [])
+    if style is None and len({p.manifest.edit for p in packs if p.manifest.edit}) > 1:
+        style = "instruction" if not workflow else None   # the `edit` parameter's default
     if workflow:
         p = next((p for p in packs if p.id == workflow), None)
         if p is None:
+            other = next((x for ps in by_task.values() for x in ps if x.id == workflow), None)
+            tool = lib.tasks.get(other.task).tool if other and lib.tasks.get(other.task) else None
+            if other and tool:                  # a pack of another task: say which tool runs it
+                raise ValueError(f"{workflow!r} is {'an' if other.task[0] in 'aeiou' else 'a'} {other.task} workflow, not {task_id}: call {tool} for it, or use one of: "
+                                 f"{', '.join(x.id for x in packs) or 'none'}")
             raise ValueError(f"{workflow!r} isn't a ready {task_id} workflow (have: {', '.join(x.id for x in packs) or 'none'})")
+        if style and p.manifest.edit != style:
+            raise ValueError(f"{workflow!r} is a {p.manifest.edit} edit, not {style}")
         return p
-    p = next((p for p in packs if p.id == defaults.get(task_id)), None) or (packs[0] if len(packs) == 1 else None)
+    p = default_for(task_id, packs, defaults, style)
     if p is None:
-        raise ValueError(f"choose a workflow for {task_id}: {', '.join(x.id for x in packs) or 'none is ready'}")
+        raise ValueError(f"choose a workflow for {task_id}: {', '.join(x.id for x in packs if not style or x.manifest.edit == style) or 'none is ready'}")
     return p
 
 
@@ -122,5 +204,6 @@ def list_workflows(lib: Library) -> list[dict]:
             sch = input_schema(p, conv, lib.catalog, lib.tasks)
             out.append({"id": p.id, "name": p.name, "task": p.task, "description": p.manifest.description,
                         "inputs": {k: v.get("type") for k, v in sch["properties"].items()},
-                        "required": sch.get("required", []), "presets": list(p.manifest.presets)})
+                        "required": sch.get("required", []), "presets": list(p.manifest.presets),
+                        **({"edit": p.manifest.edit} if p.manifest.edit else {}), **({"references": references(p)} if references(p) else {})})
     return sorted(out, key=lambda w: (w["task"], w["id"]))

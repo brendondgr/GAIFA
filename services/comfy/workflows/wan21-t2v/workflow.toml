@@ -1,5 +1,6 @@
 name = "Wan 2.1 — text to video"
 task = "text-to-video"
+good_for = "a ~5 s 480p clip from text"
 description = "A ~5 s 480p clip from text (Wan 2.1 14B, LightX2V 6 steps)"
 # memory_gb = 26.4    # estimated from the model files; each run measures it, so set it only to override
 

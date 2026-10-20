@@ -9,7 +9,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | File / folder | Status | Purpose |
 | :--- | :--- | :--- |
 | `README.md` | ✅ | The front page: what AIHub is, requirements, quickstart, commands, configuration, adding a mod |
-| `docs/assets/` | ✅ | Images for the README (Overview page, a chat that makes an image and then a 3D model) |
+| `docs/assets/` | ✅ | Images for the README (Overview page; chats: a picture then a 3D model, a parameter card, an edit; the Learning page) |
 | `CLAUDE.md` | ✅ | Short rules for agents, true today |
 | `.claude/skills/aihub/` | ✅ | Project skill: how to work on AIHub (doc map, invariants, step workflow) |
 | `.claude/skills/plan/` | ✅ | Project skill: how to write and amend plans in this repo's format |

@@ -3,7 +3,7 @@
 One local web app that runs and controls every AI service on a single machine: local LLMs,
 image and video generation, 3D models, speech, and a chat agent that chains them together.
 
-![The AIHub Overview page: memory used, services ready, outputs and LLM tokens today, memory over time, outputs per day and LLM traffic charts](docs/assets/overview.png)
+![The AIHub Overview page: memory used, services ready, outputs and LLM tokens today, memory over time and memory now by service, outputs per day, LLM traffic, an activity heatmap, jobs and model storage](docs/assets/overview.png)
 
 AIHub is a small FastAPI server (the *hub*) on `127.0.0.1:7000` in front of a set of **mods**.
 A mod is one AI service in its own folder under `services/`, running as its own process, with its
@@ -21,10 +21,11 @@ where the services' Python and ROCm stacks conflict and can't share one environm
 | LLM Relay (`relay`) | 4000 | An OpenAI-compatible endpoint in front of every LLM (local and remote), with routing and usage analytics |
 | LLM Launcher (`lcpp`) | 7710 | Starts and manages llama.cpp model servers and publishes them to the relay |
 | Speech (`tts`) | 5040 | Text to speech with Breeze TTS 2 and Kokoro, including voice cloning and voice design |
-| 3D Generate (`gen3d`) | 5050 | Text to 3D meshes, named parts and game rigs (Cube3D and CubePart) |
+| 3D Generate (`gen3d`) | 5050 | 3D models from a picture (TRELLIS.2, Hunyuan3D 2.1, SAM 3D for people and objects) or from text (Cube3D), plus named parts and game rigs |
 | Images & Video (`comfy`) | 5070 | ComfyUI workflows for text to image, image edits and video, as reusable workflow packs |
 | OpenCode (`opencode`) | 4096 | The OpenCode agent server, behind the relay |
-| Agent (`agent`) | 5100 | The chat agent: asks when a choice is missing, shows settings for approval, and chains outputs |
+| Agent (`agent`) | 5100 | The chat agent: asks when a choice is missing, shows settings for approval, chains outputs, and learns how you like things done |
+| vLLM (`vllm`) | 5101 | Serves Hugging Face models with vLLM, one profile at a time, and publishes them to the relay |
 
 Around the mods, the hub provides:
 
@@ -39,17 +40,37 @@ Around the mods, the hub provides:
 
 ### The chat agent
 
-![A chat in AIHub: the agent made an image of a robot toy, then a 3D model from it, shown as four views with View in 3D and Rig buttons, and offers next steps](docs/assets/chat-image-to-3d.png)
+![A chat in AIHub: asked for a 3D teapot, the agent made a picture first and then a 3D model from it with TRELLIS.2. The open activity fold lists each step and its time, a strip shows both outputs, and the 3D model card shows four views with a View in 3D button](docs/assets/chat-picture-to-3d.png)
 
 The Chat page talks to the agent mod, a Claude-Code-style loop written for AIHub. Ask for
-something ("make an image of a robot toy, then turn it into a 3D model") and it picks the tools, asks
-with a question card when a choice is missing, and shows a parameter card you approve or edit before
-anything runs on the GPU. Each result card has buttons for the obvious next step (animate, edit, make
-3D, remove background), and later turns can refer back to earlier outputs.
+something ("make a 3D model of a ceramic teapot, picture first") and it picks the tools and chains
+them, one output feeding the next. Each turn folds into one tidy line ("Ran 2 tools · 3m 47s") that
+opens into its steps, with the outputs in a strip underneath. Result cards have buttons for the
+obvious next step (animate, edit, make 3D, remove background, describe), and later turns can refer
+back to earlier outputs by number.
 
-On a 30-task scripted evaluation run three times, Gemma 4 31B passed 26 of 30 tasks every time (87%)
-and the local Gemma 4 26B passed 24 (80%). Details and the remaining failures:
-[docs/agent-eval.md](docs/agent-eval.md).
+<p>
+  <img src="docs/assets/chat-card.png" width="49%" alt="A parameter card docked above the composer: Generate image, with the prompt, the workflow chosen for these inputs (Z-Image Turbo), preset, a 16:9 aspect and megapixels, and Run and Cancel buttons">
+  <img src="docs/assets/chat-edit.png" width="49%" alt="A chat where the agent removed the red headband from a samurai figure: the edited picture with Animate, Edit, Remove background, Make 3D, Describe and Use as reference buttons, and thumbs on the reply">
+</p>
+
+Before anything runs on the GPU, a parameter card docks above the composer (left). The agent
+fills in what it can, picks a workflow or 3D engine that can actually do the job (picture to 3D,
+text to 3D, an edit with reference pictures), and you change anything before pressing Run. Image
+edits run at full quality unless you ask for a quick draft (right).
+
+![The Learning page's Harness tab: the agent's instruction versions, each with its date, the files it changed, its eval gate result (passed or failed against the current version), notes on why, and Diff and Activate buttons](docs/assets/learning.png)
+
+The agent learns from use. When you change the same setting on cards in two chats, it offers to
+remember it, and from then on cards come pre-filled and marked "from your preferences". Thumbs on
+replies and outputs count too. Overnight, or after an hour without a chat, it reviews recent chats,
+tries changes to its own instructions, replays your chats under them, and keeps only what passes
+its evaluation. The Learning page shows all of it, and any version can be rolled back with one
+click. Each chat has a switch to leave it out.
+
+On a 46-task scripted evaluation run three times on MiniCPM-V 4.7, the agent passed 85% of tasks
+every time, and live runs that really generate (a local edit, picture to 3D with each engine, text
+to 3D) all pass. Details and the remaining failures: [docs/agent-eval.md](docs/agent-eval.md).
 
 ## Requirements
 
@@ -123,6 +144,7 @@ flowchart LR
     gen3d["gen3d :5050"]
     comfy["comfy :5070<br/>ComfyUI"]
     opencode["opencode :4096"]
+    vllm["vllm :5101"] --> relay
   end
   agent -- "tool calls" --> Hub
 ```
@@ -177,16 +199,16 @@ uv run pytest                                          # the hub, including the 
 cd services/agent && .venv/bin/python -m pytest        # each mod has its own suite
 ```
 
-The hub's suite has 495 tests, and the mods' suites add 522 more. Fakes stand in for
+The hub's suite has 526 tests, and each mod has its own suite on top. Fakes stand in for
 real mods and models, so none of them need a GPU. The build plan, with every step and its checks,
 is [docs/backend-plan.md](docs/backend-plan.md). The UI is plain ES modules on React with no build
 step (`web/`), and [docs/design-brief-ui.md](docs/design-brief-ui.md) describes it.
 
 ## Status
 
-A personal project, in daily use on the machine it was built for. As of October 2026, all 16 phases
-of the plan are built: the hub, the seven mods, the tool catalog and MCP endpoint, the chat agent,
-sessions, and logs and runtime state kept inside the project folder. Known gaps:
+A personal project, in daily use on the machine it was built for. As of October 2026, the plan is built
+through Phase 22: the hub, the eight mods, the tool catalog and MCP endpoint, the chat agent and its
+learner, sessions, and logs and runtime state kept inside the project folder. Known gaps:
 
 - The GPU mods assume a Strix Halo with ROCm and the kyuz0 container image; other hardware would
   need its own images and model choices.

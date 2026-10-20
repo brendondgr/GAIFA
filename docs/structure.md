@@ -123,6 +123,7 @@ utils/tests/
 ├── settings/test_<behavior>.py ✅     GET/PUT /api/settings and GET /api/overview against fake-ok
 ├── sessions/test_sessions.py   ✅     save, switch and restore through the memory manager (fake-mem), auto-save at shutdown, the unclean flag, restore at boot, the tools
 ├── tools/test_skills.py        ✅     the mods' skills over /api/skills
+├── tools/test_network_risk.py  ✅     the `network` and `execute` risks and `grant_key` accepted in `[tools]`; the web mod's tools declare them
 ├── tools/test_<behavior>.py    ✅     the catalog (manifest + tools_source + hub tools, search, a stopped mod), calls (validation, permissions, approvals with edits, no bypass, capping, media, jobs, cancel, restart), `x-options` (defaults, refusals, the model view, the check, a mod's own fix, the sibling-tool hint) and MCP (both eras, approvals, the `mcp` SDK against a hub process) against fake-tools
 ├── metrics/test_<behavior>.py  ✅     rollups, retention, gaps, the recorder on fake services, the chart routes and widgets against fake-ok (conftest: an open hub.db, a fake clock)
 └── <area>/test_<behavior>.py          …

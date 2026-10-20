@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-Risk = Literal["read", "write", "generate", "destructive"]
+Risk = Literal["read", "write", "generate", "network", "execute", "destructive"]
 
 
 class _Model(BaseModel):

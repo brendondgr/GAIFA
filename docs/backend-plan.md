@@ -2469,6 +2469,7 @@ Today a call is decided by `deny` → thread mode → `ask` → `allow` lists �
   - `search` (risk `network`, `grant_key = "const:search"` so one "allow in this chat" covers searching) and `fetch` (risk `network`, `grant_key = "url:host"`). Fetched text reaches the model as untrusted (Phase 24.5's wrapping, applied by the agent to every `web_*` result).
   - A skill `services/web/skills/researching/SKILL.md`: search, open the 2–4 best results, cite each claim with its output ref and URL, say when sources disagree.
   *Done when:* the tools appear in `/api/tools` with their risks; an agent eval task (with a fake web mod) answers a question from two fetched pages and cites both.
+  *Built (2026-10-20):* the two `[tools]` entries and the skill; `utils/manifest.py` and `utils/tools/api.py` accept `network`, `execute` and `grant_key` ahead of Phase 25 (until 25.1, `network` asks like `write`; `grant_key` is recorded, not used); `aihub check web` lists both tools and `/api/tools` shows them with risk `network`. **Left:** the eval task with a fake web mod.
 
 **Wire — Phase 26:** the web mod's card on the Overview (SearXNG up or not); its outputs on the Outputs page under "web".
 

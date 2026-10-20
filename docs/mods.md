@@ -161,6 +161,7 @@ After editing `page.js`, reload the browser tab. A page can also import `/mod-ki
 - **Tools** (the agent's, plan Phase 13): `[tools] speak = { op = "POST /v1/speech", description = "…", risk = "generate", ask = ["name"] }` exposes an operation as the tool `<mod>_<name>` (a `-` in the id becomes `_`). Its parameters are the operation's path and query parameters plus its JSON or multipart body, merged into one schema from your OpenAPI. Fields:
   - `description`: written for the model: what it does, what to pass, what comes back (else the OpenAPI summary).
   - `risk`: `read` (runs without asking), `write`, `generate` or `destructive` (each shows the user a parameter card first, unless the thread is in "Use defaults"; `destructive` always asks). Default: `read` for GET, `destructive` for DELETE or `confirm = true`, else `write`.
+  - `risk = "network"` (reaches the internet) and `"execute"` (runs code) are accepted for plan Phase 25, and so is `grant_key` (what one "allow" covers: `"url:host"`, `"arg:<name>"`, `"const:<word>"`). Until Phase 25 decides them, both risks ask like `write`, and `grant_key` is recorded but not used.
   - `ask = ["voice", …]`: the inputs the user should choose; they're editable on the card even when the model filled them in.
   - `examples = [{…}]`: one or two example argument sets (they raise accuracy on complex parameters).
   - `core = true`: always loaded in the chat; other tools are listed by name and loaded on demand.

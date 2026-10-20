@@ -41,6 +41,7 @@
 | 24 | `mock.js` | `outputText`, `outputSearch` and `outputPageUrl` on the mock (text outputs read their excerpt; no pages) | Plan 24.3: the document calls work in `?mock` | 24.3 |
 | 25 | `chat/chat-header.js` | The context meter's breakdown gains **Documents** (inline attached documents, plan 24.5) | The agent's meter reports them apart from messages | 24.5 |
 | 26 | `chat/chat-composer.js`, `chat/chat-files.js` (new), `chat/chat-ui.js`, `chat/chat.js`, `chat/chat-mock.js`, `mock.js` | The composer takes text, code and documents (the picker's `accept`, drops, pastes; "drop or paste files"); a paste over 2000 characters or 40 lines is uploaded as `pasted-<HHMMSS>.<ext>` (Ctrl+Shift+V pastes it as text); chips show a kind icon (`doc`, `code`), the name and pages or lines, and a text or document chip opens the output; the mocks upload text and documents and the chat mock describes and reads them | Plan 24.6 | 24.6 |
+| 27 | `Hub.dc.html`, `outputs/viewer.js` (new), `chat/chat-md.js`, `chat/chat-cards.js`, `chat/chat.js`, `chat/chat-thread.js`, `chat/chat-mock.js` | The Outputs drawer shows text and document outputs in the **viewer** (`odr.isDoc`, `{{ odr.viewerEl }}`; the drawer is `min(1100px, 100vw)` wide for them, `odrSt`); `loadOutputDetail(id, at)` and the chat's `openOutput(id, at)` open it at `{page}` or `{line}`; citations in replies are links (`renderMarkdown`, `parseCitations`) that `ctx.openCite` resolves through the chat's `#n` (attached documents included) | Plan 24.7 | 24.7 |
 
 ## Revision 2 (step 6.5): what changed
 

@@ -92,11 +92,20 @@ def _size(d: dict[str, Any]) -> str:
     return f"{d.get('subtype') or d.get('kind')}, {size}, ~{int(d.get('tokens') or 0):,} tokens"
 
 
+def numbered(text: str, first: int = 1) -> str:
+    """Text with its line numbers (`  88| …`), so the model can cite `#n:88`."""
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    w = len(str(first + len(lines)))
+    return "\n".join(f"{first + i:>{w}}| {line}" for i, line in enumerate(lines))
+
+
 def doc_card(d: dict[str, Any], dropped: bool = False) -> str:
     """A document the message doesn't carry whole: what it is and how to read it."""
     why = "its text was dropped from this chat to save room" if dropped else "too long to include here"
     out = (f"(attached {d['ref']}: {d.get('name')}, {_size(d)}; {why}. Read it with hub_read_document or "
-           f"hub_search_document, ref \"{d['ref']}\".")
+           f"hub_search_document, ref \"{d['ref']}\"; cite it as {d['ref']} p.N for a page, {d['ref']}:N for a line.")
     if d.get("scanned"):
         out += f" Pages without text (scanned): {', '.join(map(str, d['scanned'][:20]))}; view_output(ref, page=N) shows one."
     if d.get("notes"):
@@ -111,7 +120,13 @@ def doc_card(d: dict[str, Any], dropped: bool = False) -> str:
 
 def doc_block(d: dict[str, Any], dropped: bool = False) -> str:
     if d.get("inline") and isinstance(d.get("text"), str) and not dropped:
-        return f"(attached {d['ref']}: {d.get('name')}, {_size(d)}; all of it follows)\n" + untrusted(f"{d['ref']} {d.get('name')}", d["text"])
+        if d.get("pages"):
+            how = f"cite it as {d['ref']} p.N"
+            body = d["text"]
+        else:
+            how = f"its lines are numbered; cite them as {d['ref']}:N"
+            body = numbered(d["text"])
+        return f"(attached {d['ref']}: {d.get('name')}, {_size(d)}; all of it follows, {how})\n" + untrusted(f"{d['ref']} {d.get('name')}", body)
     return doc_card(d, dropped=dropped)
 
 

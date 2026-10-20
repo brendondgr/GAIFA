@@ -108,7 +108,13 @@ export function Thumbs({ ctx, target, label = 'this' }) {
 function AssistantCard({ item, ctx }) {
   const React = R(), text = item.ev.payload.text || '';
   const html = React.useMemo(() => renderMarkdown(text), [text]);
-  const md = h('div', { className: 'aichat-md' + (item.streaming ? ' aichat-caret' : ''), style: { fontSize: 13, padding: '0 2px' }, dangerouslySetInnerHTML: { __html: html } });
+  const onClick = e => {   // plan 24.7: citation links open the viewer
+    const a = e.target?.closest?.('a[data-cite]');
+    if (!a) return;
+    e.preventDefault();
+    ctx?.openCite?.({ ref: a.dataset.cite, page: a.dataset.page, line: a.dataset.line });
+  };
+  const md = h('div', { className: 'aichat-md' + (item.streaming ? ' aichat-caret' : ''), style: { fontSize: 13, padding: '0 2px' }, onClick, dangerouslySetInnerHTML: { __html: html } });
   if (item.streaming || item.ev.seq == null || !ctx?.feedback || !text.trim()) return md;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2 } }, md,
     h('div', { style: { display: 'flex', opacity: 0.8 } }, h(Thumbs, { ctx, target: { seq: item.ev.seq }, label: 'this reply' })));

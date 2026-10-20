@@ -197,6 +197,12 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     branch: it => forkAt(it.ev.seq - 1, it.ev.payload.text),
     copy: text => navigator.clipboard?.writeText(text).then(() => toast('Copied', 'success'), () => {}),
     openOutput, runAction: (a, o) => runAction(a, o, { openTool, attach, sendPrompt: t => send(t) }),
+    // plan 24.7: a citation in a reply (#n p.14, #n:88, output:<id> …) opens the viewer there
+    openCite: ({ ref, page, line }) => {
+      const id = String(ref).startsWith('output:') ? String(ref).slice(7) : view.outputs.find(o => o.n === +String(ref).replace('#', ''))?.output_id;
+      if (!id) { toast(`${ref} isn't an output in this chat`, 'error'); return; }
+      openOutput?.(id, page ? { page: +page } : line ? { line: +line } : null);
+    },
     runTool: async (item, args) => { const id = await ensureThread(); await c.action(id, item.tool.name, args); setToolForms(f => f.filter(x => x.key !== item.key)); },
     closeTool: item => setToolForms(f => f.filter(x => x.key !== item.key)),
     feedback: tid && c.feedback ? body => c.feedback(tid, body) : null,         // plan 21.7

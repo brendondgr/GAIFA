@@ -217,7 +217,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       emit(t, 'tool_result', { id, name: 'hub_read_document', status: 'done', content: `output:${d.id} ${d.name}\n<untrusted source="output:${d.id} ${d.name}">\n${(w?.text || '').slice(0, 2000)}\n</untrusted>` });
     }
     const first = (d.text || '').split('\n').find(l => l.trim()) || d.name;
-    await say(t, run, `**${d.name}** (${d.pages ? d.pages + ' pages' : d.lines + ' lines'}) starts with "${first.replace(/^#+\s*/, '').slice(0, 80)}" (${d.ref}${d.pages ? ' p.1' : ':1'}). Ask me anything about it.`, null, 1);
+    await say(t, run, `**${d.name}** (${d.pages ? d.pages + ' pages' : d.lines + ' lines'}) starts with "${first.replace(/^#+\s*/, '').slice(0, 80)}" (${d.ref}${d.pages ? ' p.' + Math.min(2, d.pages) : ':1'}). Ask me anything about it.`, null, 1);
     usage(t);
     return 'idle';
   }

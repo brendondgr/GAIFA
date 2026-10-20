@@ -81,13 +81,21 @@ async def read_document(hub: Hub, args: dict[str, Any]) -> str:
         where += f", page {w['page_of_offset']}" + (f"–{last}" if last and last != w["page_of_offset"] else "") + f" of {w['pages']}"
     else:
         where += f", lines {ex.line_of(start)}–{ex.line_of(max(start, end - 1))} of {w['lines']}"
-    head = f'{_name(o)} ({o.get("subtype") or o["kind"]}, ~{w["tokens"]:,} tokens in all): {where}.'
+    cite = "cite a page as #n p.N" if w["pages"] else "lines are numbered; cite one as #n:N"
+    head = f'{_name(o)} ({o.get("subtype") or o["kind"]}, ~{w["tokens"]:,} tokens in all): {where}; {cite}.'
     parts = [head]
     if start == 0 and w["outline"]:
         lines = [("  " * (x["level"] - 1)) + f'{x["title"]} (' + (f'p.{x["page"]}' if x.get("page") else f'line {x["line"]}') + ")"
                  for x in w["outline"][:60]]
         parts.append(untrusted(f"{_name(o)} outline", "\n".join(lines)))
-    parts.append(untrusted(_name(o), w["text"]))
+    if w["pages"]:
+        parts.append(untrusted(_name(o), w["text"]))
+    else:  # numbered, so a line can be cited (#n:88)
+        lines = w["text"].split("\n")
+        if lines and lines[-1] == "":
+            lines.pop()
+        first, wd = ex.line_of(start), len(str(ex.line_of(start) + len(lines)))
+        parts.append(untrusted(_name(o), "\n".join(f"{first + i:>{wd}}| {ln}" for i, ln in enumerate(lines))))
     notes = list(w["notes"])
     if w["scanned"]:
         notes.append("pages without text (scanned): " + ", ".join(map(str, w["scanned"][:30]))

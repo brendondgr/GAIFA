@@ -24,7 +24,8 @@ async def test_a_small_document_goes_inline(env):
     assert doc["outline"] == [{"level": 1, "title": "Shopping", "line": 1}]
     msg = user_msgs(env)[-1]
     assert msg.startswith("how many lemons?\n\n(attached #1: list.md, markdown, 5 lines")
-    assert f'<untrusted source="#1 list.md">\n{SMALL}\n</untrusted>' in msg and "(attached:" not in msg
+    assert "its lines are numbered; cite them as #1:N" in msg and "(attached:" not in msg
+    assert '<untrusted source="#1 list.md">\n1| # Shopping\n2| \n3| - eggs\n4| - flour\n5| - 3 lemons\n</untrusted>' in msg
     system = env.model.received[-1]["messages"][0]["content"]
     assert f"#1 text via attached: list.md → output:{oid}" in system   # in the outputs table, so #1 resolves
 

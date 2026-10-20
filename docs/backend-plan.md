@@ -2405,7 +2405,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
   - `chat-mock.js` covers the new kinds so the page works without the backend.
   *Done when:* `utils/tests/web/test_chat_composer.mjs` covers `uploadable` with every new extension, the paste threshold and the fenced-language rule; a browser check uploads a PDF, a `.py` and a long paste and sees three chips.
 
-- [ ] **24.7 Viewer and citations: `web/chat/chat-md.js`, `web/outputs/` (the Outputs page's preview).**
+- [x] **24.7 Viewer and citations: `web/chat/chat-md.js`, `web/outputs/` (the Outputs page's preview).**
   - A text/PDF viewer for outputs: text and code with line numbers and a simple highlighter (keywords, strings, comments; no new library), markdown rendered, PDF pages as images from 24.3 with the page's text beside them, a search box using 24.3's search.
   - In the agent's replies, `#n p.14` and `#n:88` (and `output:<id>` forms) become links that open the viewer at that page or line.
   *Done when:* `utils/tests/web/test_citations.mjs` parses the citation forms; a browser check clicks a citation in a reply and lands on the page.

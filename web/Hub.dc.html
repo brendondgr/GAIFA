@@ -910,7 +910,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
 
 <sc-if value="{{ odr.show }}" hint-placeholder-val="{{ false }}">
   <div onClick="{{ odr.close }}" aria-hidden="true" style="position:fixed;inset:0;z-index:79;background:var(--ov,rgba(3,5,9,.62))"></div>
-  <aside role="dialog" aria-modal="true" aria-label="Output details" style="{{ drawerSt }}">
+  <aside role="dialog" aria-modal="true" aria-label="Output details" style="{{ odrSt }}">
     <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--bd,#1D2430)">
       <div style="flex:1;min-width:0"><div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ odr.title }}</div><div style="font-size:12px;color:var(--mut,#8A94A6)">{{ odr.sub }}</div></div>
       <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">{{ odr.pos }}</span>
@@ -919,6 +919,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
       <button onClick="{{ odr.close }}" aria-label="Close" style="width:30px;height:30px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--mut,#8A94A6);cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="{{ ic.x }}"></path></svg></button>
     </div>
     <div style="flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:16px">
+      <sc-if value="{{ odr.isDoc }}" hint-placeholder-val="{{ false }}"><div style="min-width:0">{{ odr.viewerEl }}</div></sc-if>
       <sc-if value="{{ odr.isImage }}" hint-placeholder-val="{{ false }}"><figure style="margin:0;display:flex;flex-direction:column;gap:6px"><div role="img" aria-label="{{ odr.title }}" style="{{ odr.imgSt }}"></div><figcaption style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">{{ odr.dims }}</figcaption></figure></sc-if>
       <sc-if value="{{ odr.isVideo }}" hint-placeholder-val="{{ false }}"><sc-if value="{{ odr.hasVideo }}" hint-placeholder-val="{{ false }}"><video src="{{ odr.url }}" poster="{{ odr.poster }}" controls="controls" preload="metadata" style="flex:none;display:block;width:100%;max-height:60vh;border-radius:8px;background:#000"></video></sc-if><sc-if value="{{ odr.mockVideo }}" hint-placeholder-val="{{ true }}"><div style="flex:none;position:relative;border-radius:8px;overflow:hidden;background:#000;aspect-ratio:832/480"><span aria-hidden="true" style="{{ odr.posterSt }}"></span><div style="position:absolute;inset:0;display:grid;place-items:center"><span style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:99px;background:rgba(11,14,20,.8);color:#E6EAF2;font-size:12.5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="{{ ic.play }}"></path></svg>Video player — mock has no video stream</span></div><span style="position:absolute;right:8px;bottom:8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(11,14,20,.8);color:#E6EAF2">{{ odr.dims }}</span></div></sc-if></sc-if>
       <sc-if value="{{ odr.is3d }}" hint-placeholder-val="{{ false }}"><div style="flex:none;position:relative;border-radius:8px;overflow:hidden;aspect-ratio:4/3;background:var(--inset,#131926)"><span role="img" aria-label="Preview render" style="{{ odr.posterSt }}"></span><span style="position:absolute;top:10px;left:10px;height:22px;padding:0 8px;display:inline-flex;align-items:center;border-radius:4px;font-size:11px;font-weight:600;background:rgba(11,14,20,.8);color:#BC8CFF">3D</span><span style="position:absolute;left:10px;bottom:10px;right:10px;font-size:12px;color:#E6EAF2;padding:6px 10px;border-radius:6px;background:rgba(11,14,20,.75)">Viewer3D placeholder — the three.js viewer is wired in later. Showing preview.png.</span></div></sc-if>
@@ -1191,8 +1192,9 @@ class Component extends DCLogic {
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
     this.pages = {}; this.modListeners = new Set();
     const imp = f => import(new URL(f, location.href).href);
-    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
-      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js')]);
+    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
+      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js')]);
+    this.Viewer = viewer;  // plan 24.7: the text and PDF viewer in the Outputs drawer
     this.C = charts; this.V = views; this.D = dash;  // revision 2 chart kit (charts.js, views.js, dashboard.js)
     this.Chat = chat; this.ChatSettings = chatSettings; this.ChatAp = chatAp; this.Sess = sess; this.ApiTool = apiTool;  // plan 14.1: the Chat page, Settings → Agent, the Approvals popover (web/chat/)
     this.histTimer = setInterval(() => { if (!document.hidden && this.state.ready && !this.state.hubDown) this.loadHist(); }, 60000);
@@ -1735,8 +1737,8 @@ class Component extends DCLogic {
     const showing = r.page === 'outputs' || (r.page === 'service' && r.parts[2] === 'outputs');
     if (showing && o.cursor && !o.loading && window.innerHeight + window.scrollY > document.documentElement.scrollHeight - 900) this.fetchOutputs(o, false);
   };
-  async loadOutputDetail(id) {
-    try { const o = await this.api.getOutput(id); this.upd('out', { detail: o, promptOpen: false }); }
+  async loadOutputDetail(id, at = null) {
+    try { const o = await this.api.getOutput(id); this.upd('out', { detail: o, promptOpen: false, at }); }
     catch (e) { this.err(e); this.upd('out', { detail: null }); }
   }
   openOutput(id) { if (this.state.route.page === 'outputs') location.hash = '#/outputs/' + id; else if (this.state.route.page === 'service') this.loadOutputDetail(id); else location.hash = '#/outputs/' + id; }
@@ -2210,6 +2212,7 @@ class Component extends DCLogic {
       const sv = this.svcMap[d.service], m = d.meta || {}, idx = o.items.findIndex(x => x.id === d.id);
       const liveUrl = /^\/api\//.test(d.url || ''), canDl = liveUrl || /^(blob:|data:)/.test(d.url);  // patch 8: the hub serves the file
       v.dr = { show: true, title: d.title, sub: `${sv?.name || d.service} · ${fday(d.created_ts)} ${fclock(d.created_ts)}`, isImage: d.kind === 'image', isAudio: d.kind === 'audio', is3d: d.kind === 'model3d', isVideo: d.kind === 'video', isOther: !['image', 'audio', 'model3d', 'video'].includes(d.kind),
+        isDoc: (d.kind === 'text' || d.kind === 'document') && !!this.Viewer, viewerEl: (d.kind === 'text' || d.kind === 'document') && this.Viewer ? React.createElement(this.Viewer.DocViewer, { key: d.id, api: this.api, output: d, at: o.at }) : null,
         url: d.url, imgSt: { width: '100%', aspectRatio: d.dims ? `${d.dims.w}/${d.dims.h}` : '1', maxHeight: '60vh', borderRadius: 8, background: `var(--inset,#131926) url("${d.url}") center / contain no-repeat` }, posterSt: { display: 'block', width: '100%', height: '100%', background: `url("${d.preview || ''}") center / cover`, opacity: d.kind === 'video' ? 0.85 : 1 }, dims: d.dims ? `${d.dims.w}×${d.dims.h}` : '', player: d.kind === 'audio' ? this.player('o:' + d.id, d.url, d.duration_s, d.path.split('/').pop()) : null,
         meta: [['Service', sv?.name || d.service], ['Model', m.model], ['Voice', m.voice], ['Seed', m.seed], ['Size', fb(d.size_bytes)], ['Dimensions', d.dims ? `${d.dims.w}×${d.dims.h}` : null], ['Duration', d.duration_s ? `${d.duration_s}s` : null], ['Created', new Date(d.created_ts * 1000).toLocaleString()]].filter(x => x[1] != null && x[1] !== '').map(([k, val]) => ({ k, v: String(val) })),
         hasPrompt: !!m.prompt, prompt: m.prompt || '', promptLong: (m.prompt || '').length > 140, promptOpen: o.promptOpen, promptSt: { margin: 0, fontSize: 13, lineHeight: 1.55, whiteSpace: 'pre-wrap', maxHeight: o.promptOpen ? 'none' : 66, overflow: 'hidden' }, togglePrompt: () => this.upd('out', x => ({ promptOpen: !x.promptOpen })), promptBtn: o.promptOpen ? 'Show less' : 'Show more',
@@ -2365,9 +2368,9 @@ class Component extends DCLogic {
       showOutputs: !!showOutputs, out: out || {}, odr: out?.dr || { show: false },
       md: pg.models ? this.vmModels(s, dn) : null,
       se: pg.settings ? this.vmSettings(s) : null,
-      chatEl: pg.chat && this.Chat ? React.createElement(this.Chat.ChatPage, { api: this.api, route: r, toast: (t, l) => this.toast(t, l), confirm: o => this.confirm(o), openOutput: id => this.loadOutputDetail(id), openSessions: () => this.openSessions(), go: hh => this.go(hh) }) : null,
+      chatEl: pg.chat && this.Chat ? React.createElement(this.Chat.ChatPage, { api: this.api, route: r, toast: (t, l) => this.toast(t, l), confirm: o => this.confirm(o), openOutput: (id, at) => this.loadOutputDetail(id, at), openSessions: () => this.openSessions(), go: hh => this.go(hh) }) : null,
       restoreEl: ready && this.Sess ? React.createElement(this.Sess.RestorePrompt, { api: this.api, onRestore: id => this.openSessions(id) }) : null,
-      ...this.vmOverlays(s, mob),
+      ...(ovl => ({ ...ovl, odrSt: out?.dr?.isDoc && !mob ? { ...ovl.drawerSt, width: 'min(1100px, 100vw)' } : ovl.drawerSt }))(this.vmOverlays(s, mob)),  // plan 24.7: room for a page and its text
       goHome: () => this.go('#/overview'),
     };
   }

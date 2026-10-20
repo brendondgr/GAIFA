@@ -20,10 +20,10 @@ async def test_a_small_document_goes_inline(env):
     await env.send(tid, "how many lemons?", attachments=[oid])
     [doc] = env.payloads(tid, "user")[-1]["docs"]
     assert doc["inline"] and doc["ref"] == "#1" and doc["id"] == oid and doc["text"] == SMALL
-    assert (doc["kind"], doc["subtype"], doc["name"], doc["lines"]) == ("text", "markdown", "list.md", 6)
+    assert (doc["kind"], doc["subtype"], doc["name"], doc["lines"]) == ("text", "markdown", "list.md", 5)
     assert doc["outline"] == [{"level": 1, "title": "Shopping", "line": 1}]
     msg = user_msgs(env)[-1]
-    assert msg.startswith("how many lemons?\n\n(attached #1: list.md, markdown, 6 lines")
+    assert msg.startswith("how many lemons?\n\n(attached #1: list.md, markdown, 5 lines")
     assert f'<untrusted source="#1 list.md">\n{SMALL}\n</untrusted>' in msg and "(attached:" not in msg
     system = env.model.received[-1]["messages"][0]["content"]
     assert f"#1 text via attached: list.md → output:{oid}" in system   # in the outputs table, so #1 resolves

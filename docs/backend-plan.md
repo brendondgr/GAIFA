@@ -2398,7 +2398,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
   - `agent.inline_tokens` in the mod's settings (default 6000); the 15 %-of-window cap is fixed.
   *Done when:* `services/agent/tests/test_attach_context.py` covers small inline, large card, the window cap with an 8k and a 128k model, compaction dropping old inline text, and the untrusted wrapping; an eval task in `services/agent/evals/tasks.py` asks a question answerable only from page 7 of a 20-page PDF and passes with the reading tools.
 
-- [ ] **24.6 The composer: `web/chat/chat-composer.js`, `chat-cards.js`.**
+- [x] **24.6 The composer: `web/chat/chat-composer.js`, `chat-cards.js`.**
   - `uploadable` and the file picker's `accept` take the new extensions; the hint reads "drop or paste files".
   - **Pasted text becomes a chip:** a paste over 2000 chars or 40 lines uploads as `pasted-<HHMMSS>.md` (or `.py`, `.json`, … when the whole paste is one fenced block with a language, or parses as JSON) and adds the chip; Ctrl+Shift+V pastes as plain text into the box.
   - Chips show a kind icon, the name, and pages/lines once known; a document chip opens the viewer (24.7).

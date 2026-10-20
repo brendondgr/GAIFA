@@ -231,7 +231,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
         h('div', { ref: contentRef, style: { maxWidth: COL, margin: '0 auto', padding: '18px 16px 28px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } },
           empty && !toolForms.length ? h(EmptyState, { onPick: t => send(t), tools }) : null,
           blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))))),
-      h(Composer, { draft, setDraft, attachments, setAttachments, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
+      h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
         dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
         settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }) })));

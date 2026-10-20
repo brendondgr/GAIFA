@@ -4,6 +4,7 @@ import { createHistory, withSeries } from './mock-history.js';
 import { createModMocks } from './mock-mods.js';
 import { createToolMocks } from './mock-tools.js';
 import { createSessionMocks } from './mock-sessions.js';
+import { TEXT_EXT, DOC_EXT } from './chat/chat-files.js';
 const GB = 1e9, MB = 1e6;
 export class ApiError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
@@ -595,10 +596,14 @@ export function createMockApi() {
     async getOutput(id) { await net(); const o = outputs.find(x => x.id === id); if (!o) throw err(404, 'output_not_found', `No output "${id}"`); return clone(o); },
     async uploadOutput(file) {
       await net(); const name = file.name || 'upload', ext = (name.split('.').pop() || '').toLowerCase();
-      const kind = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'].includes(ext) ? 'image' : ['mp4', 'webm', 'mov', 'mkv'].includes(ext) ? 'video' : ['wav', 'mp3', 'flac', 'ogg', 'opus', 'm4a', 'aac'].includes(ext) ? 'audio' : null;
-      if (!kind) throw err(415, 'upload_type', `"${name}" isn't an image, video or audio file`);
+      const kind = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif'].includes(ext) ? 'image' : ['mp4', 'webm', 'mov', 'mkv'].includes(ext) ? 'video' : ['wav', 'mp3', 'flac', 'ogg', 'opus', 'm4a', 'aac'].includes(ext) ? 'audio'
+        : DOC_EXT.includes(ext) ? 'document' : TEXT_EXT.includes(ext) ? 'text' : null;   // plan 24.6: text and documents too
+      if (!kind) throw err(415, 'upload_type', `"${name}" isn't an image, video, audio, text or document file`);
+      const text = kind === 'text' && file.text ? await file.text() : kind === 'document' ? `(${name}: the mock can't read documents; the hub extracts their text)` : null;
       const ts = now(), path = `outputs/uploads/${ymd(ts)}/${hms(ts)}-${slug(name.replace(/\.[^.]*$/, ''))}.${ext}`, url = URL.createObjectURL(file);
-      const o = { id: 'o_' + Math.random().toString(36).slice(2, 12), service: 'uploads', kind, title: name, path, files: [{ path, kind, size_bytes: file.size }], url, preview: kind === 'image' ? url : null, size_bytes: file.size, created_ts: ts, meta: { source: { service: 'upload' } } };
+      const o = { id: 'o_' + Math.random().toString(36).slice(2, 12), service: 'uploads', kind, title: name, path, files: [{ path, kind, size_bytes: file.size }], url, preview: kind === 'image' ? url : null, size_bytes: file.size, created_ts: ts,
+        ...(kind === 'text' || kind === 'document' ? { subtype: ext === 'md' ? 'markdown' : ext === 'pdf' || kind === 'document' ? ext : ext === 'py' ? 'code:python' : 'plain' } : {}),
+        meta: { source: { service: 'upload' }, ...(text != null ? { text, excerpt: text.slice(0, 400) } : {}) } };
       outputs.unshift(o); emit({ type: 'output', output: clone(o) }); return clone(o);
     },
     // Plan 24.3: text outputs read their excerpt (the mock has no documents with pages).

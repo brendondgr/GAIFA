@@ -40,6 +40,7 @@ export const ICONS = {
   download: 'M12 4v11M7 10l5 5 5-5M4 20h16', ext: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6', shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4',
   compress: 'M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7', pin: 'M12 17v5M5 17h14l-2-5V4H7v8z', chat: 'M4 5h16v11H9l-5 4z',
   refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7', ref: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  doc: 'M6 3h8l5 5v13H6zM14 3v5h5M9 13h7M9 17h7', code: 'M9 8l-4 4 4 4M15 8l4 4-4 4',
   slash: 'M15 4L9 20', copy: 'M9 9h11v11H9zM5 15V4h11', upscale: 'M4 14v6h6M20 10V4h-6M4 20l7-7M20 4l-7 7',
 };
 

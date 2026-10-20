@@ -29,7 +29,7 @@ log = logging.getLogger("aihub.outputs")
 MAX_CHARS = 4_000_000
 TEXT_DIR = ".text"
 PAGES_DIR = ".previews"  # PDF page images (plan 24.3): `.previews/<id>/`
-VERSION = 1  # bump when a reader changes what it writes, so old caches are rebuilt
+VERSION = 2  # bump when a reader changes what it writes, so old caches are rebuilt
 TEXT_KINDS = ("text", "document")
 
 
@@ -70,7 +70,7 @@ def extract(path: Path, kind: str, subtype: str | None) -> Extract:
         ex.text, ex.truncated = ex.text[:MAX_CHARS], True
         ex.pages = [(s, min(e, MAX_CHARS)) for s, e in ex.pages if s < MAX_CHARS]
         ex.notes.append(f"the text is cut at {MAX_CHARS:,} characters")
-    ex.lines = ex.text.count("\n") + 1 if ex.text else 0
+    ex.lines = ex.text.count("\n") + (0 if ex.text.endswith("\n") else 1) if ex.text else 0  # a final newline ends the last line
     ex.tokens = tokens_of(ex.text)
     for level, title, off in r.headings:
         if off <= len(ex.text) and title.strip():

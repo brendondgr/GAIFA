@@ -40,6 +40,7 @@
 | 23 | `Hub.dc.html`, `views.js` | The Outputs page's kind filter and the kind colors and labels gain **Document** (`document`: pdf, docx, epub, pptx, xlsx, odt) | Plan 24.1: documents are a new output kind | 24.1 |
 | 24 | `mock.js` | `outputText`, `outputSearch` and `outputPageUrl` on the mock (text outputs read their excerpt; no pages) | Plan 24.3: the document calls work in `?mock` | 24.3 |
 | 25 | `chat/chat-header.js` | The context meter's breakdown gains **Documents** (inline attached documents, plan 24.5) | The agent's meter reports them apart from messages | 24.5 |
+| 26 | `chat/chat-composer.js`, `chat/chat-files.js` (new), `chat/chat-ui.js`, `chat/chat.js`, `chat/chat-mock.js`, `mock.js` | The composer takes text, code and documents (the picker's `accept`, drops, pastes; "drop or paste files"); a paste over 2000 characters or 40 lines is uploaded as `pasted-<HHMMSS>.<ext>` (Ctrl+Shift+V pastes it as text); chips show a kind icon (`doc`, `code`), the name and pages or lines, and a text or document chip opens the output; the mocks upload text and documents and the chat mock describes and reads them | Plan 24.6 | 24.6 |
 
 ## Revision 2 (step 6.5): what changed
 

@@ -128,7 +128,7 @@ class FakeHub:
         page_of = next((i + 1 for i, (s, e) in enumerate(spans) if s <= start < e), None)
         scanned = [i + 1 for i, (s, e) in enumerate(spans) if len(text[s:e].split("---\n", 1)[-1].strip()) < 20]
         return {"text": text[start:end], "offset": start, "next_offset": end if end < len(text) else None, "total_chars": len(text),
-                "tokens": (len(text) + 3) // 4, "pages": len(spans), "lines": text.count("\n") + 1, "page_of_offset": page_of,
+                "tokens": (len(text) + 3) // 4, "pages": len(spans), "lines": text.count("\n") + (0 if text.endswith("\n") else 1) if text else 0, "page_of_offset": page_of,
                 "outline": d["outline"], "scanned": scanned, "truncated": False, "notes": []}
 
     async def _execute(self, cid: str, name: str, args: dict[str, Any], mode: str) -> dict[str, Any]:

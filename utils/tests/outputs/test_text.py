@@ -30,7 +30,7 @@ def test_pdf_pages_bookmarks_and_markers():
     assert "spring survey" in p1 and "42 herons" in p2 and "herons" not in p1
     assert [(o["title"], o["page"], o["level"]) for o in e.outline] == [("Introduction", 1, 1), ("Results", 2, 1)]
     assert e.page_of(e.text.index("42 herons")) == 2 and e.page_of(0) == 1
-    assert e.tokens == (len(e.text) + 3) // 4 and e.lines == e.text.count("\n") + 1
+    assert e.tokens == (len(e.text) + 3) // 4 and e.lines == e.text.count("\n") + 1  # no final newline
 
 
 def test_scanned_pdf_is_flagged():
@@ -88,7 +88,7 @@ def test_html_drops_scripts_and_styles():
 
 def test_plain_text_code_csv_and_markdown():
     assert ex("hello.py", "text").text.startswith('"""A tiny module."""') and ex("hello.py").outline == []
-    assert ex("people.csv").text == "name,age\nAda,36\nGrace,45\n" and ex("people.csv").lines == 4
+    assert ex("people.csv").text == "name,age\nAda,36\nGrace,45\n" and ex("people.csv").lines == 3
     md = ex("readme.md")
     assert [(o["level"], o["title"], o["line"]) for o in md.outline] == [(1, "Readme", 1), (2, "Install", 5), (2, "Use", 9)]
 

@@ -229,7 +229,7 @@ test('mock tools: catalog, approvals and decisions', async () => {
 
 test('uploads from the composer: which files qualify, chips, and per-file errors', async () => {
   const f = (name, type) => ({ name, type });
-  assert.deepEqual(composer.uploadable([f('a.png', 'image/png'), f('b.txt', 'text/plain'), f('c.MOV', ''), f('d.wav', 'audio/wav'), null]).map(x => x.name), ['a.png', 'c.MOV', 'd.wav']);
+  assert.deepEqual(composer.uploadable([f('a.png', 'image/png'), f('b.txt', 'text/plain'), f('c.MOV', ''), f('d.wav', 'audio/wav'), f('e.exe', ''), null]).map(x => x.name), ['a.png', 'b.txt', 'c.MOV', 'd.wav']);
   assert.deepEqual(composer.uploadable(undefined), []);
   const api = { uploadOutput: async file => {
     if (file.name === 'bad.png') throw Object.assign(new Error('x'), { detail: 'too large' });

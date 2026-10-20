@@ -193,7 +193,37 @@ export function createMockClient(api, { speed = 1 } = {}) {
     usage(t);
     return 'idle';
   }
-  async function messageTurn(t, run, text) {
+  // Plan 24.6: attached text and documents, numbered like outputs and read with hub_read_document.
+  async function describe(t, ids) {
+    let n = t.events.reduce((a, e) => a + (e.type === 'tool_result' ? (e.payload.outputs || []).length : e.type === 'user' ? (e.payload.docs || []).length : 0), 0);
+    const docs = [];
+    for (const id of ids) {
+      const o = await api.getOutput?.(id).catch(() => null);
+      if (!o || !['text', 'document'].includes(o.kind)) continue;
+      const w = await api.outputText?.(id, { limit: 24000 }).catch(() => null);
+      const inline = !!w && w.next_offset == null && w.tokens <= 6000;
+      docs.push({ ref: '#' + (++n), id, name: o.title, kind: o.kind, subtype: o.subtype, tokens: w?.tokens || 0, pages: w?.pages || 0, lines: w?.lines || 0, outline: [], inline, ...(inline ? { text: w.text } : {}) });
+    }
+    return docs;
+  }
+
+  async function docTurn(t, run, docs) {
+    const d = docs[0], s = await say(t, run, null, `The user attached ${d.name}. ${d.inline ? 'It is short and in the message, so I can answer from it.' : 'It is long: I should read it with hub_read_document.'}`, 2);
+    if (!d.inline) {
+      const id = rid('tc_');
+      emit(t, 'tool_call', { id, name: 'hub_read_document', arguments: { ref: d.ref }, step: s, by: 'model' });
+      await run.sleep(400);
+      const w = await api.outputText?.(d.id, { limit: 12000 }).catch(() => null);
+      emit(t, 'tool_result', { id, name: 'hub_read_document', status: 'done', content: `output:${d.id} ${d.name}\n<untrusted source="output:${d.id} ${d.name}">\n${(w?.text || '').slice(0, 2000)}\n</untrusted>` });
+    }
+    const first = (d.text || '').split('\n').find(l => l.trim()) || d.name;
+    await say(t, run, `**${d.name}** (${d.pages ? d.pages + ' pages' : d.lines + ' lines'}) starts with "${first.replace(/^#+\s*/, '').slice(0, 80)}" (${d.ref}${d.pages ? ' p.1' : ':1'}). Ask me anything about it.`, null, 1);
+    usage(t);
+    return 'idle';
+  }
+
+  async function messageTurn(t, run, text, docs = []) {
+    if (docs.length) return docTurn(t, run, docs);
     if (/remember|always|from now on/i.test(text)) {
       await say(t, run, 'Got it. I’ll keep that in mind in every chat.', 'The user stated a lasting preference; save it to memory with remember().', 2);
       emit(t, 'memory', { text: text.replace(/^(please\s+)?remember( that)?\s*/i, ''), topic: 'preferences' });
@@ -291,9 +321,10 @@ export function createMockClient(api, { speed = 1 } = {}) {
     async send(tid, text, attachments = []) {
       await net(); const t = T(tid), queued = !!t.run;
       if (!queued && t.pending) { emit(t, 'tool_result', { id: t.pending.id, name: t.pending.kind === 'question' ? 'ask_user' : 'comfy_generate_image', status: 'skipped', content: '{}', error: { code: 'skipped', detail: 'The user wrote a message instead of answering.' } }); t.pending = null; }
-      const ev = emit(t, 'user', { text, ...(attachments.length ? { attachments } : {}), ...(queued ? { queued: true } : {}) });
+      const docs = attachments.length ? await describe(t, attachments) : [];
+      const ev = emit(t, 'user', { text, ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}) });
       if (!t.thread.title) { t.thread.title = text.slice(0, 48); transient(t, 'thread', pub(t)); }
-      if (queued) t.queue.push(text); else start(t, run => messageTurn(t, run, text));
+      if (queued) t.queue.push(text); else start(t, run => messageTurn(t, run, text, docs));
       return ev;
     },
     async answer(tid, qid, answers) {

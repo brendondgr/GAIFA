@@ -154,3 +154,28 @@ async def test_mcp_calls_use_only_always_grants(ph):
     res = await mcp_call(ph, FETCH, {"url": "https://github.com/x"})
     assert "aihub/approval" not in (res.get("_meta") or {}) and not res.get("isError"), res
     assert "fetch" in res["content"][0]["text"]
+
+
+@pytest.mark.parametrize("tool,args", [(FETCH, {"url": "https://github.com/x"}), (RUN, {"folder": "~/p", "command": "ls"})])
+async def test_every_mode_and_button_in_chat_and_over_mcp(ph, tool, args):
+    """Phase 25's check: for a network and an execute tool, each mode × each button, then the next
+    call from the same chat, another chat and MCP."""
+    for mode in ("ask", "auto", "read_only"):
+        for remember in ("once", "thread", "always"):
+            thread = f"{mode}-{remember}"
+            r = await ph.call(tool, args, mode=mode, thread=thread, service="agent")
+            if mode == "read_only":
+                assert r["status"] == "denied"
+                continue
+            assert r["status"] == "needs_approval"
+            extra = {"confirm": True} if remember == "always" and tool == RUN else {}
+            out = await approve(ph, r, remember=remember, **extra)
+            assert out["status"] == "done" and bool(out.get("grant")) == (remember != "once")
+            same = await ph.call(tool, args, mode=mode, thread=thread, service="agent")
+            other = await ph.call(tool, args, mode=mode, thread="elsewhere", service="agent")
+            mcp = await mcp_call(ph, tool, args)
+            assert same["status"] == ("needs_approval" if remember == "once" else "done"), (mode, remember)
+            assert other["status"] == ("done" if remember == "always" else "needs_approval"), (mode, remember)
+            assert ("aihub/approval" in (mcp.get("_meta") or {})) == (remember != "always"), (mode, remember)
+            for g in (await ph.client.get("/api/grants")).json():
+                await ph.client.delete(f"/api/grants/{g['id']}")

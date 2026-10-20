@@ -3,8 +3,9 @@
 // mod-form.js's schemaForm (the same form the mod pages use); file inputs (`x-kind`) offer the
 // thread's earlier outputs of that kind. Written by us (web/PATCHES.md).
 
-import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, shortArgs, toolLabel } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, shortArgs, toolLabel, inputSt } from './chat-ui.js';
 import { registerCard, ErrorBox, ProgressBar, STATUS } from './chat-cards.js';
+import { RISK_TONE, RISK_WORD, grantKeyOf, grantText, codeFields, confirmText, rememberText, approvalButtons } from './chat-risk.js';
 import { schemaForm } from '../mod-form.js';
 import { labelOf } from '../mod-options.js';
 import { createUi } from '../mod-ui.js';
@@ -73,15 +74,20 @@ export function FilePicker({ name, prop, required, value, onChange, outputs, api
 }
 
 // ---------- the parameter card ----------
-// spec: {tool, arguments, ask_fields, schema, risk, description}. decided: {approve, arguments, reason} once done.
-export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, runLabel = 'Run', cancelLabel = 'Cancel', title, note, compact, after }) {
+// spec: {tool, arguments, ask_fields, schema, risk, description, grant_key?}. decided: {approve, arguments, reason, remember?} once done.
+// choices (an approval, plan 25.3): approvalButtons(risk, {thread}); onRun(args, {remember, confirm}) and onCancel(reason)
+// then get the chosen button and the deny reason; without choices it is one Run button (a tool form).
+export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, runLabel = 'Run', cancelLabel = 'Cancel', title, note, compact, after, choices }) {
   const React = R(), schema = spec.schema || { properties: {} }, props = schema.properties || {}, req = schema.required || [];
   const args = spec.arguments || {};
   const files = Object.keys(props).filter(k => props[k]?.['x-kind']);
-  const missing = req.filter(k => !files.includes(k) && empty(args[k]));
-  const main = [...new Set([...missing, ...(spec.ask_fields || []).filter(k => props[k] && !files.includes(k))])];
-  const rest = Object.keys(props).filter(k => !files.includes(k) && !main.includes(k));
+  const codes = codeFields(schema, spec.risk).filter(k => !files.includes(k));          // execute: the code, shown whole
+  const missing = req.filter(k => !files.includes(k) && !codes.includes(k) && empty(args[k]));
+  const main = [...new Set([...missing, ...(spec.ask_fields || []).filter(k => props[k] && !files.includes(k) && !codes.includes(k))])];
+  const rest = Object.keys(props).filter(k => !files.includes(k) && !codes.includes(k) && !main.includes(k));
   const [fileVals, setFileVals] = React.useState(() => Object.fromEntries(files.map(k => [k, args[k] ?? null])));
+  const [codeVals, setCodeVals] = React.useState(() => Object.fromEntries(codes.map(k => [k, args[k] == null ? '' : String(args[k])])));
+  const [ask2, setAsk2] = React.useState(null), [denying, setDenying] = React.useState(false), [why, setWhy] = React.useState('');
   const vals = React.useRef({ main: {}, rest: {} }), forms = { main: React.useRef(null), rest: React.useRef(null) };
   const others = () => ({ ...args, ...vals.current.rest, ...vals.current.main, ...Object.fromEntries(Object.entries(fileVals).filter(([, v]) => !empty(v))) });
   React.useEffect(() => { forms.main.current?.refilter?.(); forms.rest.current?.refilter?.(); }, [JSON.stringify(fileVals)]);
@@ -91,10 +97,12 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
   const prefNote = mine.map(k => shown(k) + (by[k] === 'carried' ? ' (as on your last card)' : '')).join(', ');
   const [err, setErr] = React.useState(null), [busy, setBusy] = React.useState(false);
   const key = spec.tool + JSON.stringify(Object.keys(props));
+  const cover = grantText(spec.grant_key, grantKeyOf(spec.grant_key, { ...args, ...codeVals }));   // "on github.com", "in ~/Projects/foo"
   const head = h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' } },
-    h('span', { style: { color: T.pu, display: 'flex' } }, h(Icon, { d: 'sliders', size: 14 })),
+    h('span', { style: { color: T.pu, display: 'flex' } }, h(Icon, { d: spec.risk === 'execute' ? 'code' : spec.risk === 'network' ? 'globe' : 'sliders', size: 14 })),
     h('span', { style: { fontWeight: 600 } }, title || toolLabel(spec.tool, mods)),
-    spec.risk ? h(Badge, { tone: spec.risk === 'destructive' ? 'red' : 'purple' }, spec.risk) : null,
+    spec.risk ? h(Badge, { tone: RISK_TONE[spec.risk] || 'purple', title: RISK_WORD[spec.risk] }, spec.risk) : null,
+    cover ? h('span', { title: 'What “Allow in this chat” and “Always allow” cover', style: { fontSize: 12, color: T.mut, overflowWrap: 'anywhere' } }, cover) : null,
     h('span', { style: { fontFamily: MONO, fontSize: 11, color: T.dim } }, spec.tool),
     h('span', { style: { flex: 1 } }),
     note ? h('span', { style: { fontSize: 11.5, color: T.mut } }, note) : null);
@@ -105,24 +113,44 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
       h('div', { style: { display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 12.5, color: ran ? T.tx : T.mut, minWidth: 0 } },
         h('span', { style: { color: ran ? T.gr : T.mut, display: 'flex', alignSelf: 'center' } }, h(Icon, { d: ran ? 'check' : 'x', size: 13, sw: 2.2 })),
         ran ? h('span', { style: { minWidth: 0, overflowWrap: 'anywhere' } }, 'Ran with ', h('span', { style: { fontFamily: MONO, fontSize: 11.5, color: T.mut } }, shortArgs(decided.arguments || args, 400) || 'the defaults'))
-          : h('span', null, 'Cancelled', decided.reason ? ` · ${decided.reason}` : '')), after || null);
+          : h('span', null, 'Cancelled', decided.reason ? ` · ${decided.reason}` : '')),
+      ran && rememberText(decided.remember) ? h('div', { style: { fontSize: 11.5, color: T.mut } }, rememberText(decided.remember) + (cover ? ' ' + cover : '') + ': calls like this run without asking (Settings → Agent to revoke)') : null,
+      after || null);
   }
 
-  const run = async () => {
+  const run = async choice => {
     const out = { ...vals.current.rest, ...vals.current.main };
     for (const k of files) if (!empty(fileVals[k])) out[k] = fileVals[k];
+    for (const k of codes) if (!empty(codeVals[k])) out[k] = codeVals[k];
     const need = req.filter(k => empty(out[k]));
     if (need.length) { setErr({ code: 'required', detail: `Fill in ${need.join(', ')} first.` }); return; }
     setBusy(true); setErr(null);
-    try { await onRun(out); } catch (e) { setErr({ code: e.code, detail: e.detail || e.message, fix: e.data?.problems?.map(p => p.fix).filter(Boolean).join('; ') }); }
+    try { await onRun(out, choice ? { remember: choice.remember, ...(choice.confirm ? { confirm: true } : {}) } : undefined); setAsk2(null); }
+    catch (e) { setErr({ code: e.code, detail: e.detail || e.message, fix: e.data?.fix || e.data?.problems?.map(p => p.fix).filter(Boolean).join('; ') }); }
     setBusy(false);
   };
-  const cancel = async () => { setBusy(true); try { await onCancel?.(); } catch (e) { setErr({ code: e.code, detail: e.detail || e.message }); } setBusy(false); };
-  const given = Object.fromEntries(Object.entries(args).filter(([k]) => !main.includes(k) && !files.includes(k)));
-  return h('div', { style: cardSt({ accent: T.bds, pad: compact ? '8px 10px' : '10px 12px', gap: 10 }), onKeyDown: e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); } } }, head,
+  const cancel = async reason => { setBusy(true); try { await onCancel?.(reason || undefined); } catch (e) { setErr({ code: e.code, detail: e.detail || e.message }); } setBusy(false); };
+  const choose = c => (c.confirm ? setAsk2(c) : run(c));
+  const footer = !choices ? [
+    h(Btn, { key: 'run', kind: 'pri', icon: 'play', label: busy ? 'Working…' : runLabel, disabled: busy, onClick: () => run() }),
+    onCancel ? h(Btn, { key: 'cancel', kind: 'ghost', label: cancelLabel, disabled: busy, onClick: () => cancel() }) : null]
+    : ask2 ? [h('span', { key: 'q', role: 'alert', style: { fontSize: 12.5, flex: '1 1 260px', minWidth: 0 } }, confirmText(spec.tool, spec.risk, cover)),
+      h(Btn, { key: 'yes', kind: 'pri', label: busy ? 'Working…' : 'Yes, always allow', disabled: busy, onClick: () => run(ask2) }),
+      h(Btn, { key: 'back', kind: 'ghost', label: 'Back', disabled: busy, onClick: () => setAsk2(null) })]
+    : denying ? [h('input', { key: 'why', autoFocus: true, value: why, placeholder: 'Why not? (optional; the agent reads it)', 'aria-label': 'Reason for denying', disabled: busy,
+        onChange: e => setWhy(e.target.value), onKeyDown: e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); cancel(why.trim()); } if (e.key === 'Escape') setDenying(false); },
+        style: { ...inputSt, flex: '1 1 220px' } }),
+      h(Btn, { key: 'deny', label: busy ? 'Working…' : 'Deny', disabled: busy, onClick: () => cancel(why.trim()) }),
+      h(Btn, { key: 'back', kind: 'ghost', label: 'Back', disabled: busy, onClick: () => setDenying(false) })]
+    : [...choices.map((c, i) => h(Btn, { key: c.remember, kind: i === 0 ? 'pri' : 'sec', icon: i === 0 ? 'play' : undefined, label: busy && i === 0 ? 'Working…' : c.label + (c.confirm ? '…' : ''),
+        disabled: busy, title: c.remember === 'once' ? 'Run this call' : `Also run calls like this ${cover || ''} without asking${c.remember === 'thread' ? ', in this chat' : ', everywhere'}`, onClick: () => choose(c) })),
+      onCancel ? h(Btn, { key: 'deny', kind: 'ghost', label: cancelLabel, disabled: busy, onClick: () => setDenying(true) }) : null];
+  const given = Object.fromEntries(Object.entries(args).filter(([k]) => !main.includes(k) && !files.includes(k) && !codes.includes(k)));
+  return h('div', { style: cardSt({ accent: spec.risk === 'execute' ? T.acct : T.bds, pad: compact ? '8px 10px' : '10px 12px', gap: 10 }), onKeyDown: e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(choices?.[0]); } } }, head,
     spec.description && !compact ? h('div', { style: { fontSize: 12, color: T.mut, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, spec.description.split('\n')[0]) : null,
     shortArgs(given) ? h('div', { title: shortArgs(given, 2000), style: { fontFamily: MONO, fontSize: 11.5, color: T.mut, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, shortArgs(given)) : null,
     files.map(k => h(FilePicker, { key: k, name: k, prop: props[k], required: req.includes(k), value: fileVals[k], outputs, api, onChange: v => setFileVals(s => ({ ...s, [k]: v })) })),
+    codes.map(k => h(CodeBox, { key: 'code:' + k, name: k, prop: props[k], value: codeVals[k], disabled: !!busy, onChange: v => setCodeVals(s => ({ ...s, [k]: v })) })),
     prefNote ? h('div', { title: 'Learned from what you chose before (Learning page). Change it here and it learns again.', style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.pu } },
       h(Icon, { d: 'bulb', size: 12 }), 'From your preferences: ' + prefNote) : null,
     filledNote ? h('div', { style: { fontSize: 11.5, color: T.mut } }, 'Chosen for these inputs: ' + filledNote) : null,
@@ -131,24 +159,34 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
       h('summary', { style: { cursor: 'pointer', fontSize: 12, color: T.mut } }, `All settings (${rest.length})`),
       h('div', { style: { paddingTop: 8 } }, h(SchemaFormHost, { formKey: key + ':rest', schema: pick(schema, rest), values: args, order: rest, api, context: others, formRef: forms.rest, onChange: v => { vals.current.rest = v; } }))) : null,
     err ? h(ErrorBox, { error: err }) : null,
-    h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
-      h(Btn, { kind: 'pri', icon: 'play', label: busy ? 'Working…' : runLabel, disabled: busy, onClick: run }),
-      onCancel ? h(Btn, { kind: 'ghost', label: cancelLabel, disabled: busy, onClick: cancel }) : null,
-      h('span', { style: { fontSize: 11.5, color: T.dim, marginLeft: 'auto' } }, 'Ctrl+Enter runs')));
+    h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } }, ...footer,
+      ask2 || denying ? null : h('span', { style: { fontSize: 11.5, color: T.dim, marginLeft: 'auto' } }, choices ? 'Ctrl+Enter allows once' : 'Ctrl+Enter runs')));
+}
+
+// An execute tool's code or command (plan 25.3): whole, monospaced, scrollable and editable; what's here is what runs.
+function CodeBox({ name, prop, value, onChange, disabled }) {
+  const lines = String(value || '').split('\n').length;
+  return h('label', { style: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 } },
+    h('span', { style: { display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12 } }, h('span', { style: { fontWeight: 500 } }, prop?.title || name),
+      h('span', { style: { color: T.mut, fontSize: 11.5 } }, prop?.description || 'runs as shown'), h('span', { style: { marginLeft: 'auto', fontFamily: MONO, fontSize: 11, color: T.dim } }, `${lines} line${lines === 1 ? '' : 's'}`)),
+    h('textarea', { value, disabled, spellCheck: false, 'aria-label': (prop?.title || name) + ' (runs as shown)', rows: Math.min(18, Math.max(3, lines + 1)), onChange: e => onChange(e.target.value),
+      style: { width: '100%', maxHeight: 360, overflow: 'auto', padding: '8px 10px', borderRadius: 7, border: '1px solid ' + T.bds, background: T.sb, color: T.tx,
+        fontFamily: MONO, fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre', resize: 'vertical', outline: 'none', tabSize: 4 } }));
 }
 
 // The thread's approval items: the model's call, waiting for Run / Cancel.
 function ApprovalCard({ item, ctx }) {
   const a = item.approval, d = item.decision;
-  const decided = d ? { approve: d.approve, arguments: d.arguments || a.arguments, reason: d.reason } : item.result && !d ? { approve: false, reason: item.result.error?.detail } : null;
+  const decided = d ? { approve: d.approve, arguments: d.arguments || a.arguments, reason: d.reason, remember: d.remember } : item.result && !d ? { approve: false, reason: item.result.error?.detail } : null;
   // once approved: the run's live progress (and Stop), or how it ended
   const running = d?.approve && !item.result, r = item.result, pr = item.progress;
   const after = running ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
     h('div', { style: { flex: 1, minWidth: 0 } }, h(ProgressBar, { value: pr?.progress, note: [pr?.note, pr?.progress != null ? Math.round(pr.progress * 100) + '%' : null].filter(Boolean).join(' · ') || 'starting' })),
     ctx.cancel ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: ctx.cancel }) : null)
     : r?.error && d?.approve ? h(ErrorBox, { error: r.error }) : r && d?.approve && r.status !== 'done' ? h(Badge, { tone: (STATUS[r.status] || ['dim'])[0] }, (STATUS[r.status] || [0, r.status])[1]) : null;
-  return h(ParamCard, { spec: a, outputs: ctx.outputs, api: ctx.api, mods: ctx.mods, decided, after,
-    onRun: args => ctx.decide(a, true, args), onCancel: () => ctx.decide(a, false) });
+  return h(ParamCard, { spec: a, outputs: ctx.outputs, api: ctx.api, mods: ctx.mods, decided, after, cancelLabel: 'Deny',
+    choices: approvalButtons(a.risk, { thread: true }),
+    onRun: (args, c) => ctx.decide(a, true, args, c), onCancel: reason => ctx.decide(a, false, null, { reason }) });
 }
 
 // ---------- the question card (ask_user) ----------

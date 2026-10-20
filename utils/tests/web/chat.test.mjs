@@ -215,7 +215,7 @@ test('mock tools: catalog, approvals and decisions', async () => {
   const emitted = [], m = tmock.createToolMocks({ emit: e => emitted.push(e), net: async () => {}, err: (s, c, d, data) => Object.assign(new Error(d), { status: s, code: c, detail: d, data }), later: (ms, fn) => setTimeout(fn, 1), now: () => 1000 });
   const ix = await m.getToolIndex();
   assert.ok(ix.find(t => t.name === 'tts_speak').risk === 'generate');
-  assert.equal((await m.listApprovals()).length, 1);
+  assert.equal((await m.listApprovals()).length, 2);   // an MCP card and an execute card (plan 25.3)
   const r = await m.callTool('comfy_generate_image', { prompt: 'fox' }, { mode: 'ask' });
   assert.equal(r.status, 'needs_approval');
   await assert.rejects(m.decideApproval(r.approval_id, { approve: true, args: { megapixels: 9 } }), e => e.code === 'invalid_arguments');

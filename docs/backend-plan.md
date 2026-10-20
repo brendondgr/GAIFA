@@ -2443,16 +2443,17 @@ Today a call is decided by `deny` → thread mode → `ask` → `allow` lists �
   - Architecture §6 and §14, the brief §6 / §11.7.
   *Done when:* `utils/tests/tools/test_grants.py` covers keys from arguments, thread vs always, expiry, revoke, a grant for one domain not covering another, the second confirm, and MCP calls (no thread: only `always` grants apply).
 
-- [ ] **25.3 The card: `web/chat/chat-approvals.js`, `web/approvals` popover.**
+- [x] **25.3 The card: `web/chat/chat-approvals.js`, `web/approvals` popover.**
   - The approval card shows the risk with its word and colour (network and execute new), the grant key ("on github.com", "in ~/Projects/foo"), and the three buttons: **Allow once · Allow in this chat · Always allow** (the last behind a confirm for execute and destructive). Deny keeps its reason box.
   - For `execute`, the card shows the code or command in full, monospaced, scrollable, editable like any argument.
   *Done when:* `utils/tests/web/test_approvals.mjs` covers the buttons per risk; a browser check approves "in this chat" and the next call to the same domain runs without a card.
+  *As built:* the test is `utils/tests/web/approvals.test.mjs` (the runner picks up `*.test.mjs`); it renders `ParamCard` with a stand-in React. The browser check ran on a second hub with `fake-perms` and calls carrying a chat origin, decided in the Approvals popover (the agent mod can't run in a worktree without its venv); the chat's own card was checked on the mock agent.
 
 **Wire — Phase 25:** approval cards and the popover show the new risks and buttons; Settings → Agent lists grants.
 
 **Checks & deliverables — Phase 25**
-- [ ] With a fake mod declaring a `network` and an `execute` tool: every mode × every button behaves as 25.1–25.2 say, in Chat and through MCP.
-- [ ] Delivered: two risks, grants (table, module, routes), the card; architecture §14, the brief, `docs/mods.md` (`risk`, `grant_key`).
+- [x] With a fake mod declaring a `network` and an `execute` tool: every mode × every button behaves as 25.1–25.2 say, in Chat and through MCP. *As built:* `test_grants.py::test_every_mode_and_button_in_chat_and_over_mcp` against `fake-perms` (calls from a chat, another chat and MCP after each button), plus the browser check of 25.3.
+- [x] Delivered: two risks, grants (table, module, routes), the card; architecture §14, the brief, `docs/mods.md` (`risk`, `grant_key`).
 
 ---
 

@@ -24,7 +24,7 @@ export const METHOD_AREA = {
   getActivityStats: 'metrics', getJobStats: 'metrics',
   listWidgets: 'widgets', getWidget: 'widgets',
   listTools: 'tools', getToolIndex: 'tools', callTool: 'tools', getToolCall: 'tools', cancelToolCall: 'tools',
-  listApprovals: 'tools', getApproval: 'tools', decideApproval: 'tools',
+  listApprovals: 'tools', getApproval: 'tools', decideApproval: 'tools', listGrants: 'tools', revokeGrant: 'tools',
   listSessions: 'sessions', saveSession: 'sessions', renameSession: 'sessions', deleteSession: 'sessions',
   restoreSession: 'sessions', getSessionState: 'sessions',
 };
@@ -33,7 +33,7 @@ export const METHOD_AREA = {
 export const EVENT_AREA = {
   service: 'services', memory: 'memory', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
-  approval: 'tools', tool_call: 'tools',
+  approval: 'tools', tool_call: 'tools', grant: 'tools', grant_deleted: 'tools',
   session: 'sessions', session_step: 'sessions',
 };
 
@@ -178,7 +178,10 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     cancelToolCall: id => req('POST', `/api/tools/calls/${enc(id)}/cancel`),
     listApprovals: ({ state } = {}) => req('GET', `/api/approvals${qs({ state })}`),
     getApproval: id => req('GET', `/api/approvals/${enc(id)}`),
-    decideApproval: (id, { approve, args, reason, wait } = {}) => req('POST', `/api/approvals/${enc(id)}${qs({ wait })}`, { json: { approve, arguments: args, reason } }),
+    // remember: once | thread | always (plan 25.2); confirm: the second confirm an always grant for execute/destructive needs
+    decideApproval: (id, { approve, args, reason, remember, confirm, wait } = {}) => req('POST', `/api/approvals/${enc(id)}${qs({ wait })}`, { json: { approve, arguments: args, reason, remember, confirm } }),
+    listGrants: ({ thread, tool } = {}) => req('GET', `/api/grants${qs({ thread, tool })}`),
+    revokeGrant: id => req('DELETE', `/api/grants/${enc(id)}`),
     listSessions: () => req('GET', '/api/sessions'),
     saveSession: name => req('POST', '/api/sessions', { json: { name } }),
     renameSession: (id, name) => req('PUT', `/api/sessions/${enc(id)}`, { json: { name } }),

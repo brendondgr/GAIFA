@@ -192,7 +192,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const ctx = {
     api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running, dock: true,
     answer: (qid, answers) => c.answer(tid, qid, answers),
-    decide: (a, approve, args) => c.approval(tid, { approval_id: a.approval_id, approve, ...(approve ? { arguments: args } : { reason: 'Cancelled in the chat' }) }),
+    // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying
+    decide: (a, approve, args, o = {}) => c.approval(tid, { approval_id: a.approval_id, approve, ...(approve ? { arguments: args, remember: o.remember || 'once', ...(o.confirm ? { confirm: true } : {}) } : { reason: o.reason || 'Denied in the chat' }) }),
     cancel: () => c.cancel(tid).catch(fail),
     branch: it => forkAt(it.ev.seq - 1, it.ev.payload.text),
     copy: text => navigator.clipboard?.writeText(text).then(() => toast('Copied', 'success'), () => {}),

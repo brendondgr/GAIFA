@@ -22,10 +22,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import api_edit
+import api_run
 import limits
 import reading
 from checkpoints import Checkpoints
 from folders import LEVELS, Caps, Folders, Refused
+from sandbox import Sandbox
 
 Level = Literal["read", "edit", "run", "run_net"]
 
@@ -95,6 +97,7 @@ class Ctx:
         self.aihub_root = aihub_root
         self.folders = Folders(state, Caps(aihub_root, models))
         self.checkpoints = Checkpoints(state)
+        self.sandbox = Sandbox(state)
         self.started = time.time()
         self.counts = {"reads": 0, "edits": 0, "runs": 0}
         self.activity: collections.deque[dict[str, Any]] = collections.deque(self._load_recent(), maxlen=500)
@@ -180,6 +183,7 @@ def create_app(state: Path | None = None, aihub_root: Path | None = None, models
         return {"items": rows[:limit]}
 
     api_edit.mount(app, ctx)
+    api_run.mount(app, ctx)
 
     @app.post("/v1/limits", summary="The hub's preflight: what a call would do (action, folder, level, preview) or why it's refused")
     def preflight(body: LimitsIn) -> dict[str, Any]:

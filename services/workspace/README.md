@@ -40,6 +40,17 @@ Listings and searches skip `.git`, `node_modules`, `.venv`, caches and build fol
 | `POST /v1/checkpoints/{thread}/{turn}/undo` | every file back as it was before the turn; 409 `changed_since` with diffs when a file changed outside the agent |
 | `GET /v1/recent?thread=` | recent edits, runs and undos |
 
+## The sandbox
+
+Commands and Python run in `localhost/aihub-workspace-sandbox:1` (rootless podman, `sandbox.py`): only Python 3.12, uv, Node LTS, git, ripgrep, build-essential and the data libraries. Your user inside, the folder at its own absolute path (read-write from Run), the rest of `$HOME` an empty tmpfs (the uv, pip and npm caches are overlays: read, never written back), a read-only root, no network unless the folder is at Run + network and the call asks for it (then full internet), 8 GB of memory and 1024 processes at most, 120 s by default (600 s at most). Every run is a record in `data/state/workspace/runs/` (`<id>.json` with the last 32 KB of output, `.out` and `.err` with the first 1 MB).
+
+| Route | What it does |
+|---|---|
+| `GET /v1/sandbox` | the image: built or not, id, size, a build in progress and its log |
+| `POST /v1/sandbox/build` | build it (minutes) |
+| `GET /v1/runs?thread=`, `GET /v1/runs/{id}` | run records |
+| `POST /v1/runs/{id}/cancel` | stop a run |
+
 ## Checkpoints
 
 Before any change, the file's bytes (or "didn't exist") go to `data/state/workspace/checkpoints/<thread>/<turn>/` (`entries.json`, `NNN.bin` before, `NNN.after` as the agent left it). The thread and turn come from the call's `X-AIHub-Origin`; a call from outside a chat is its own turn (`_direct`). Undo restores a whole turn, newest change first, and restores nothing if any file changed since. Kept 14 days or 2 GB, oldest turns first. Commits aren't checkpointed (git keeps them). A chat's first change in a folder reports a dirty working tree (`dirty_before`), so the agent knows which changes were the user's.

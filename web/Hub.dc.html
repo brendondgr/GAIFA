@@ -1092,6 +1092,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
 <script type="text/x-dc" data-dc-script>
 const GB = 1e9;
 const ICON = {
+  bulb: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z',
   grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z', chat: 'M4 5h16v11H9l-5 4z',
   relay: 'M4 7h12M12 3l4 4-4 4M20 17H8M12 13l-4 4 4 4', cpu: 'M7 7h10v10H7zM10 10h4v4h-4zM9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4',
   wave: 'M3 12h1M7 8v8M11 4v16M15 8v8M19 10v4', cube: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9',
@@ -1798,7 +1799,7 @@ class Component extends DCLogic {
   }
   palItems() {
     const out = [], nav = h => () => { this.setState({ palette: null }); this.go(h); }, run = fn => () => { this.setState({ palette: null }); fn(); };
-    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['Models', '#/models', ICON.layers], ['Outputs', '#/outputs', ICON.folder], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
+    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['Learning', '#/s/agent/learning', ICON.bulb], ['Models', '#/models', ICON.layers], ['Outputs', '#/outputs', ICON.folder], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
     this.state.services.forEach(sv => {
       const d = ICON[sv.icon] || ICON.puzzle;
       out.push({ label: sv.name, sub: `Service · ${sv.state}`, d, run: nav('#/s/' + sv.id) });
@@ -1943,7 +1944,8 @@ class Component extends DCLogic {
     const sb = {
       style: mob ? { ...sbBase, position: 'fixed', top: 0, bottom: 0, left: 0, width: 268, transform: s.navOpen ? 'none' : 'translateX(-105%)', transition: 'transform .2s ease', boxShadow: s.navOpen ? '0 0 60px rgba(0,0,0,.5)' : 'none', visibility: s.navOpen ? 'visible' : 'hidden' } : { ...sbBase, position: 'sticky', top: 0, height: '100vh', width: s.density === 'compact' ? 208 : 232, flex: 'none' },
       backdrop: mob && s.navOpen, close: () => this.setState({ navOpen: false }),
-      top: [{ href: '#/overview', label: 'Overview', d: ICON.grid, on: r.page === 'overview' }, { href: '#/chat', label: 'Chat', d: ICON.chat, on: r.page === 'chat' }],
+      top: [{ href: '#/overview', label: 'Overview', d: ICON.grid, on: r.page === 'overview' }, { href: '#/chat', label: 'Chat', d: ICON.chat, on: r.page === 'chat' },
+            ...(this.svcMap.agent ? [{ href: '#/s/agent/learning', label: 'Learning', d: ICON.bulb, on: r.page === 'service' && r.parts[1] === 'agent' }] : [])],
       svcs: s.services.map(sv => { const [t, p] = STATE[sv.state] || ['dim', false]; const on = r.page === 'service' && r.parts[1] === sv.id; return { href: '#/s/' + sv.id, label: sv.name, d: ICON[sv.icon] || ICON.puzzle, on, sr: `, ${sv.manifest_errors.length ? 'manifest error' : sv.state}`, dot: this.dot(TONE[t][0], p) }; }),
       lib: [{ href: '#/models', label: 'Models', d: ICON.layers, on: r.page === 'models' }, { href: '#/outputs', label: 'Outputs', d: ICON.folder, on: r.page === 'outputs' }],
       bottom: [{ href: '#/settings', label: 'Settings', d: ICON.gear, on: r.page === 'settings' }],

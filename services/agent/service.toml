@@ -19,6 +19,17 @@ restart = "on-failure"
 after = ["relay"]
 install = "install.sh"
 
+[ui]
+page = "ui/page.js"          # the Learning page (plan 21.7): preferences, review, tool usage
+
+[[ui.widgets]]
+id = "corrections"
+title = "Card corrections per day"
+kind = "bar"
+source = "GET /v1/widgets/corrections"
+ranges = ["7d", "30d"]
+span = 4
+
 [[ui.widgets]]
 id = "messages"
 title = "Chat messages per day"

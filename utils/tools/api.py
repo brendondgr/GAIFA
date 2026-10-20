@@ -69,6 +69,7 @@ class ToolCallResult(_Model):
     schema_: dict[str, Any] | None = Field(None, alias="schema")
     description: str | None = None
     filled: list[str] | None = None
+    filled_by: dict[str, str] | None = None
 
 
 class CallRequest(_Model):

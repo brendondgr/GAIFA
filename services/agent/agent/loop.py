@@ -414,7 +414,8 @@ class Agent:
                                             "arguments": res.get("arguments"), "ask_fields": res.get("ask_fields") or [],
                                             "schema": res.get("schema"), "risk": res.get("risk"),
                                             "description": (res.get("description") or "")[:600],
-                                            **({"filled": res["filled"]} if res.get("filled") else {})})
+                                            **({"filled": res["filled"]} if res.get("filled") else {}),
+                                            **({"filled_by": res["filled_by"]} if res.get("filled_by") else {})})
                 return "waiting"
             if res.get("status") != "running":
                 self._result(tid, cid, name, res)

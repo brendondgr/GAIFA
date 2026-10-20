@@ -12,6 +12,7 @@ import json
 from typing import Any, Literal
 
 from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel, ConfigDict
 
 from utils.tools.api import Approval, CallRequest, Decision, ResultPage, Tool, ToolCallResult, ToolIndexItem
 
@@ -92,6 +93,28 @@ async def _with_schema(hub: Any, a: dict[str, Any]) -> dict[str, Any]:
     if t is not None:
         a["schema"], a["description"] = t.parameters, t.description
     return a
+
+
+class ToolUsage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tool: str
+    calls: int
+    errors: int
+    refused: int
+    cards: int
+    edited: int
+    denied: int
+    mean_ms: int | None = None
+
+
+@router.get("/api/tools/usage", summary="Per tool over the last ?days= (30): calls, errors, refusals, cards, cards the user changed, "
+            "denials and the mean time; real calls only (plan 21.7)", response_model=list[ToolUsage])
+async def tool_usage(request: Request, days: float = Query(30, gt=0, le=400)) -> list[dict[str, Any]]:
+    import time
+
+    from utils.tools.records import usage
+
+    return await usage(_hub(request).db, time.time() - days * 86400)
 
 
 @router.get("/api/approvals", summary="Approvals: pending by default; ?state=all for every one",

@@ -218,6 +218,32 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                 counts[i] += n
         return {"unit": "messages", "t": t, "series": [{"name": "Messages", "values": counts}]}
 
+    @app.get("/v1/widgets/corrections", summary="Cards the user changed per day, and cards shown (dashboard widget, plan 21.7)")
+    def widget_corrections(request: Request, rng: str = Query("7d", alias="range")) -> dict:
+        days = 30 if rng == "30d" else 7
+        end = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1)) + 86400
+        t = [int(end - (days - i) * 86400) for i in range(days)]
+        edits, cards = [0] * days, [0] * days
+        st = A(request).store
+        with st._lock:
+            rows = st._c.execute("SELECT t.started, t.edits, (SELECT count(*) FROM events e WHERE e.thread_id = t.thread_id AND e.type = 'approval' "
+                                 "AND e.ts >= t.started AND e.ts <= COALESCE(t.ended, t.started)) FROM turns t JOIN threads th ON th.id = t.thread_id "
+                                 "WHERE t.started >= ? AND json_extract(th.settings, '$.dry_run') IS NULL", (t[0],)).fetchall()
+        for started, ed, n in rows:
+            i = int((started - t[0]) // 86400)
+            if 0 <= i < days:
+                edits[i] += ed or 0
+                cards[i] += n or 0
+        return {"unit": "cards", "t": t, "series": [{"name": "Changed by you", "values": edits}, {"name": "Cards", "values": cards}]}
+
+    @app.get("/v1/learn/usage", summary="Per-tool usage from the hub (calls, errors, cards, cards you changed), for the Learning page")
+    async def learn_usage(request: Request, days: float = 30) -> list:
+        return await A(request).hub._json("GET", "/api/tools/usage", params={"days": days})
+
+    @app.patch("/v1/prefs/{pid}", summary="Change a preference")
+    async def patch_pref(pid: str, body: dict, request: Request) -> dict:
+        return await A(request).hub.update_pref(pid, body)
+
     @app.get("/v1/models", summary="Models from the relay with their facts (window, tools, vision), and the defaults")
     async def models(request: Request) -> dict:
         agent = A(request)

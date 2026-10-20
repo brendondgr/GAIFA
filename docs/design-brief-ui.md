@@ -1045,7 +1045,8 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            error?: { code: string; detail: string; fix?: string; problems?: object[] };
                            progress?: number; note?: string; job_id?: string; elapsed_s?: number;
                            arguments?: object; ask_fields?: string[]; risk?: Risk; schema?: JSONSchema; description?: string;
-                           filled?: string[] }                      // needs_approval; filled: arguments the hub chose (an x-options default)
+                           filled?: string[];                       // needs_approval; filled: arguments the hub chose
+                           filled_by?: { [field: string]: "default" | "carried" | string } }   // how: an x-options default, carried in this chat, or "pref:<id>" (plan 21.7)
 interface Approval { id: string; tool: string; arguments: object;  // as the model sent them
                      final?: object;                                // as run (after edits)
                      ask_fields: string[]; risk: Risk; origin: object;
@@ -1135,6 +1136,14 @@ registerPreview('pointcloud', ({ output, ctx }) => h(MyViewer, { src: output.url
 - **Actions** have `on` (an output kind or `composer`) and one of `tool` (opens a parameter card prefilled by `args(output)`, then `POST /v1/threads/{id}/action`: no model call), `prompt(output)` (sends a message), `attach` (adds the output to the composer) or `run(output, ctx)`. An action whose `tool` (or `needs`) isn't in the catalog is hidden. **Actions are also derived:** any catalog tool (not the hub's, not destructive) with a file input whose `x-kind` fits the output's kind becomes a button with no UI code (live: Clone voice on audio; in the mock also Upscale image), deduplicated against the registered ones.
 - **Built-in actions:** image → Animate, Edit, Remove background (tools), Describe (a prompt); Make 3D opens `gen3d_make_3d` with the picture (plan 20.7: the card offers only the engines that take one), Use as reference (attach); video → Describe; model3d → Rig; composer → Image, Video, 3D, Speech, Edit image.
 
+
+**Learning in Chat (plan 21.7).**
+- **The badge:** a parameter card's fields that the hub filled from a preference (`filled_by` = `pref:<id>` or `carried`) show as "From your preferences: …" above the form, in purple with the bulb. Capability defaults show as "Chosen for these inputs: …".
+- **Thumbs:** up and down on each output (next to Open in Outputs) and under each finished reply. They call `POST /v1/threads/{tid}/feedback` (`Thumbs` in `chat-cards.js`).
+- **The per-chat switch:** the header's bulb (Learning or Not learning) sets the thread's `settings.no_learn`.
+- **Proposals:** the miner's `proposal` events are cards with **Use it** and **Not now** (`POST /v1/prefs/{id}/approve|reject`); `feedback` events draw nothing.
+- **Settings → Agent** gains a **Learning** section: the hub's `[learning]` switch, thresholds and nightly time, and a link to the Learning page.
+- **The Learning page** is the agent mod's own `ui/page.js` at `#/s/agent/learning` (Preferences, Review, Tool usage), reached from the top-level **Learning** nav item (PATCHES #22).
 ### 11.14 Sessions (plan Phase 15, Wire 15)
 
 The `sessions` area: named setups (which mods run, which are loaded, lcpp's LLM instances) that can be saved and restored. An auto-saved "Last session" is kept by the hub, and at each start it copies the previous one to "Before restart" (both `auto`).

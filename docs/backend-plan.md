@@ -1978,7 +1978,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - **Seeding:** `Task.prefs` seeds preferences for the task's chat only (`scope: thread`, created after the thread), through the agent's new `POST/DELETE /v1/prefs`, and removes them after the run. Thread-scoped prose preferences show in that chat's prompt.
     - **Dry runs:** hub tools that write return a stand-in in a dry run, so `hub_set_preference` in the eval changes nothing. Carried card edits work in dry runs; contradictions don't count there.
     - **Results:** 46 × 3 on skynet gave 85% pass^3, and the 5 preference tasks 3/3 each after two check fixes (`docs/agent-eval.md`).
-- [ ] **21.7 Seeing and managing it** (UI; `web/chat/` adapted to the redesign; the agent's own page).
+- [x] **21.7 Seeing and managing it** (UI; `web/chat/` adapted to the redesign; the agent's own page).
   - **The Learning page:** the agent mod's own page, `services/agent/ui/page.js` with `[ui] page` in its `service.toml` (brief §5; at `#/s/agent/learning`). Tabs:
     - **Preferences:** grouped by tool, each with its `when`, source, evidence links (to the chat and card), and edit or forget;
     - **Review:** proposals, approve or reject;
@@ -1993,6 +1993,17 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
   - **Settings:** `[learning] enabled` as a switch, with the times and thresholds.
   - **A widget:** "Corrections per day" (`[[ui.widgets]]` in the agent's manifest).
   *Done when:* Node tests cover the badge and the feedback calls; in the browser, a preference made from a card edit shows up in Review, is approved, pre-fills the next card with its badge, and is forgotten from the page; the switches turn learning off for a chat and everywhere.
+  - *As built:*
+    - **Hub additions:** `GET /api/tools/usage?days=` for the Tool usage tab (proxied by the agent's `GET /v1/learn/usage`), and `filled_by` on `needs_approval` (field → `default` | `carried` | `pref:<id>`), so the card can tell a preference from a capability default.
+    - **Widget:** the agent's "Card corrections per day".
+    - **Learning switch:** in Settings → Agent (`chat-settings.js`), saving the hub's `[learning]` through `/api/settings`.
+    - **Chat's Learning panel:** became the header switch, the proposal cards and the badge. A separate panel for one chat is left out; the Learning page lists everything.
+    - **Browser check** on the live hub, 2026-10-20:
+      - the Learning nav item opens the page;
+      - Review lists the miner's two real gen3d proposals (left for the user to decide);
+      - Tool usage shows real calls (gen3d's card is changed 83% of the time);
+      - a test chat with a chat-only workflow preference docked a card marked "From your preferences: workflow: Z-Image IntoRealism + watercolor". It was cancelled unrun, and the preference and chat were removed.
+    - **Not checked in the browser:** the proposal → approve → badge round trip on a real card and turning learning off. Their parts are covered by `utils/tests/prefs/` and the agent's tests.
 
 **Wire — Phase 21:**
 - the Learning page and nav item;
@@ -2002,10 +2013,10 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
 - tool series on the Metrics page.
 
 **Checks & deliverables — Phase 21**
-- [ ] Every tool attempt from every caller has a record, including refusals, with filled and edited fields.
-- [ ] Editing a card twice in two chats leads to a proposal; once approved, the next card is pre-filled and badged; in the same chat it carries over at once.
-- [ ] Learning off (Settings or the chat switch) stops filling and learning; nothing already learned is lost.
-- [ ] Delivered: migrations 006–008, `utils/prefs.py`, `utils/routes/prefs.py`, `utils/tools/edits.py`, `hub_set_preference`, `agent/records.py`, `agent/learn/mine.py`, the Learning page, the Chat pieces, the evals, the docs.
+- [x] Every tool attempt from every caller has a record, including refusals, with filled and edited fields.
+- [x] Editing a card twice in two chats leads to a proposal; once approved, the next card is pre-filled and badged; in the same chat it carries over at once. *(Tests and the live miner run; the approve step on real data is the user's.)*
+- [x] Learning off (Settings or the chat switch) stops filling and learning; nothing already learned is lost.
+- [x] Delivered: migrations 006–008, `utils/prefs.py`, `utils/routes/prefs.py`, `utils/tools/edits.py`, `hub_set_preference`, `agent/records.py`, `agent/learn/mine.py`, the Learning page, the Chat pieces, the evals, the docs.
 
 | Deliverable | Description | Location |
 | --- | --- | --- |

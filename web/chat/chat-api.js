@@ -6,6 +6,7 @@
 //   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq)
 //   send(tid, text, attachments) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
+//   feedback(tid, {value, output_id | seq, note}) decidePref(pid, approve)   (plan 21.7)
 //
 // Errors are ChatError {status, detail, code, data}; status 0 means AIHub didn't answer.
 
@@ -91,6 +92,8 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     context: tid => req('GET', `${T(tid)}/context`),
     settings: () => req('GET', '/v1/settings'),
     saveSettings: body => req('PUT', '/v1/settings', body),
+    feedback: (tid, body) => req('POST', `${T(tid)}/feedback`, body),
+    decidePref: (pid, approve) => req('POST', `/v1/prefs/${enc(pid)}/${approve ? 'approve' : 'reject'}`),
   };
 }
 

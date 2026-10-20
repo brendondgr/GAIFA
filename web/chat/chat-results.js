@@ -6,7 +6,7 @@
 // Built in: image, video, audio, model3d (preview image, then the three.js viewer on demand).
 
 import { h, T, MONO, Icon, Btn, Badge, cardSt } from './chat-ui.js';
-import { registerCard, hasCard, Card } from './chat-cards.js';
+import { registerCard, hasCard, Card, Thumbs } from './chat-cards.js';
 import { actionsFor } from './chat-actions.js';
 
 const R = () => globalThis.React;
@@ -84,6 +84,7 @@ function OutputBlock({ output, ctx, cap }) {
       h('span', { title: output.title, style: { fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, output.title || output.summary || output.kind),
       h(Badge, null, KIND_LABEL[output.kind] || output.kind),
       h('span', { style: { flex: 1 } }),
+      h(Thumbs, { ctx, target: { output_id: output.output_id }, label: 'this result' }),
       ctx.openOutput ? h(Btn, { kind: 'ghost', sm: true, icon: 'ext', title: 'Open in Outputs', onClick: () => ctx.openOutput(output.output_id) }) : null,
       output.url && ctx.live ? h('a', { href: output.url, download: '', title: 'Download', 'aria-label': 'Download', style: { display: 'grid', placeItems: 'center', width: 26, height: 26, borderRadius: 6, color: T.mut } }, h(Icon, { d: 'download', size: 13 })) : null),
     h(P, { output, ctx, cap }),

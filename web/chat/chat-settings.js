@@ -56,10 +56,32 @@ export function AgentSettings({ api, toast = () => {} }) {
       s && !s.skills?.length ? h('span', { style: { color: T.mut, fontSize: 12.5 } }, 'No skills yet: mods ship them in services/<id>/skills/, yours go in data/agent/skills/.') : null,
       ...(s?.skills || []).map(k => h('div', { key: k.id, style: { display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 12.5 } },
         h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 90 } }, '/' + k.name), h('span', { style: { flex: 1, color: T.mut } }, k.description), h(Badge, null, k.source)))),
+    h(LearningSection, { api, toast }),
     section('Permissions',
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, MODES.map(([k, l, d]) => h('div', { key: k, style: { display: 'flex', gap: 10, fontSize: 12.5, alignItems: 'baseline' } },
         h('span', { style: { minWidth: 130, fontWeight: 500 } }, l), h('span', { style: { color: T.mut } }, d)))),
       h('div', { style: { fontSize: 12, color: T.mut, display: 'flex', gap: 6, alignItems: 'flex-start' } }, h(Icon, { d: 'shield', size: 13, style: { marginTop: 2 } }),
         h('span', null, 'Each chat picks its mode in the header (new chats: Ask about choices). Per-tool rules are name globs in ', h('code', { style: { fontFamily: MONO } }, '[agent.permissions]'),
           ' of config.toml, checked deny → ask → allow before the mode. Pending approvals from any client are in the header’s Approvals button.'))));
+}
+
+
+// Learning (plan 21.7): the hub's [learning] settings; the Learning page lists what was learned.
+function LearningSection({ api, toast }) {
+  const React = R(), [l, setL] = React.useState(null);
+  React.useEffect(() => { api?.getSettings?.().then(x => setL(x?.learning || null)).catch(() => {}); }, []);
+  if (!l) return null;
+  const save = async patch => {
+    try { const r = await api.saveSettings({ learning: { ...l, ...patch } }); setL(r.settings.learning); toast('Saved', 'success'); }
+    catch (e) { toast(e.detail || String(e), 'error'); }
+  };
+  const num = (k, min) => h('input', { type: 'number', min, value: l[k], style: { width: 70 }, onChange: e => save({ [k]: Number(e.target.value) }) });
+  return section('Learning',
+    row('Learn from chats', 'Card edits, answers and thumbs become preferences that fill your cards; each chat can turn it off in its header. The Learning page lists them.',
+      h('label', { style: { display: 'flex', alignItems: 'center', gap: 6 } }, h('input', { type: 'checkbox', checked: !!l.enabled, onChange: e => save({ enabled: e.target.checked }) }), l.enabled ? 'On' : 'Off')),
+    row('Propose after', 'An inferred preference is proposed once you chose it this many times, in as many chats.', num('infer_after', 1)),
+    row('Fade after (days)', 'Inferred preferences unused this long are retired; ones you stated never fade.', num('fade_days', 1)),
+    row('Nightly run', 'When the learner improves its instructions (plan 22), plus after an hour without a chat.',
+      h('input', { type: 'time', value: l.nightly_at, onChange: e => e.target.value && save({ nightly_at: e.target.value }) })),
+    h('a', { href: '#/s/agent/learning', style: { fontSize: 12.5 } }, 'Open the Learning page →'));
 }

@@ -199,6 +199,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     openOutput, runAction: (a, o) => runAction(a, o, { openTool, attach, sendPrompt: t => send(t) }),
     runTool: async (item, args) => { const id = await ensureThread(); await c.action(id, item.tool.name, args); setToolForms(f => f.filter(x => x.key !== item.key)); },
     closeTool: item => setToolForms(f => f.filter(x => x.key !== item.key)),
+    feedback: tid && c.feedback ? body => c.feedback(tid, body) : null,         // plan 21.7
+    decidePref: c.decidePref ? (pid, ok) => c.decidePref(pid, ok).then(r => { toast(ok ? 'Saved: it fills your cards from now on' : 'Not used', 'success'); return r; }, e => { fail(e); throw e; }) : null,
   };
 
   // ---- render ----
@@ -214,6 +216,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     h('section', { 'aria-label': 'Chat', style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
       h(ThreadHeader, { thread, models, model: thread?.model || fresh.model || models?.default, mode: thread?.mode || fresh.mode, onModel: setModel, onMode: setMode,
         onRename: title => rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
+        learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,
         running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: narrow ? () => setDrawer(true) : null, narrow: (narrow ? width : width - 248) < 700 }),
       down ? h('div', { role: 'alert', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 14px', background: T.trd, borderBottom: '1px solid ' + T.rd, fontSize: 12.5 } },
         h('span', { style: { color: T.rd, display: 'flex' } }, h(Icon, { d: 'alert', size: 15 })),

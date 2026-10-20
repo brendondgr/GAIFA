@@ -180,7 +180,7 @@ class Calls:
             return out
         if verdict == "ask":
             a = await self.approvals.create(tool.name, arguments, tool.ask, tool.risk, origin or {}, how)
-            return self._needs(tool, a, filled)
+            return self._needs(tool, a, filled, how)
         return await self._launch(tool, arguments, origin or {}, None, wait, filled=how)
 
     async def decide(self, aid: str, approve: bool, arguments: dict[str, Any] | None = None,
@@ -285,11 +285,13 @@ class Calls:
         return {"status": "error", "tool": tool.name, "error": {"code": "invalid_arguments", "detail": detail, "fix": fix,
                                                                 "problems": problems[:10]}}
 
-    def _needs(self, tool: ToolDef, a: dict[str, Any], filled: list[str] | None = None) -> dict[str, Any]:
+    def _needs(self, tool: ToolDef, a: dict[str, Any], filled: list[str] | None = None,
+               how: dict[str, str] | None = None) -> dict[str, Any]:
         out = {"status": "needs_approval", "tool": tool.name, "approval_id": a["id"], "arguments": a["arguments"],
                "ask_fields": tool.ask, "risk": tool.risk, "schema": tool.parameters, "description": tool.description}
         if filled:
             out["filled"] = filled
+            out["filled_by"] = {k: v for k, v in (how or {}).items() if k in filled}   # "default" | "pref:<id>" | "carried" (21.7)
         return out
 
     async def _elsewhere(self, tool: ToolDef, args: Any, problems: list[dict[str, str]]) -> list[dict[str, str]]:

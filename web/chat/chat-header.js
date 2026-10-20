@@ -65,7 +65,7 @@ function Title({ title, onRename }) {
   title || 'New chat');
 }
 
-export function ThreadHeader({ thread, models, model, mode, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow }) {
+export function ThreadHeader({ thread, models, model, mode, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn }) {
   const React = R(), [more, setMore] = React.useState(false);
   const st = running ? ['running', T.acc] : state === 'waiting' ? ['waiting for you', T.pu] : null;
   const controls = [h(ModelSelect, { key: 'm', models, value: model, onChange: onModel }), h(ModeSelect, { key: 'a', value: mode, onChange: onMode })];
@@ -80,5 +80,8 @@ export function ThreadHeader({ thread, models, model, mode, onModel, onMode, onR
       h(Popover, { open: more, onClose: () => setMore(false), width: 260, label: 'Model and mode' }, h('span', { style: label11 }, 'Model'), controls[0], h('span', { style: label11 }, 'Mode'), controls[1]))
       : controls,
     thread || meter ? h(ContextMeter, { meter, open: meterOpen, onOpen: () => setMeterOpen(true), onClose: () => setMeterOpen(false), onCompact: thread ? onCompact : null, compacts, running, compact: narrow }) : null,
+    onLearn ? h(Btn, { kind: 'ghost', sm: true, icon: 'bulb', 'aria-pressed': learn ? 'true' : 'false',   // plan 21.7: this chat teaches the agent, or not
+      title: learn ? 'Learning from this chat: your choices here become preferences. Click to stop.' : 'Not learning from this chat. Click to learn from it again.',
+      label: narrow ? undefined : learn ? 'Learning' : 'Not learning', onClick: () => onLearn(!learn), style: learn ? undefined : { opacity: 0.6 } }) : null,
     thread && onBranch ? h(Btn, { kind: 'ghost', sm: true, icon: 'branch', title: 'Branch: copy this chat into a new one', label: narrow ? undefined : 'Branch', onClick: onBranch }) : null);
 }

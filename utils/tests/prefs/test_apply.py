@@ -64,3 +64,15 @@ async def test_mcp_callers_and_learning_off(th):
         assert "aspect" not in r["arguments"]
     finally:
         th.hub.config.learning.enabled = True
+
+
+async def test_filled_by_and_usage(th):
+    """21.7: the card can tell a preference from a capability default; the usage route counts real calls."""
+    p = await pref(th, tool="fake_tools_shape", field="engine", value="body")
+    r = await th.call("fake_tools_shape", {"image": "output:000000000000"})
+    assert r["filled_by"] == {"engine": f"pref:{p['id']}"}
+    r = await th.call("fake_tools_shape", {"prompt": "a fox"})
+    assert r["filled_by"] == {"engine": "default"}
+    await th.call("fake_tools_get_item", {"item_id": "x"})
+    use = {u["tool"]: u for u in (await th.client.get("/api/tools/usage?days=1")).json()}
+    assert use["fake_tools_get_item"]["calls"] == 1 and use["fake_tools_shape"]["cards"] == 2

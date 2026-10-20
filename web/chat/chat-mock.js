@@ -350,6 +350,8 @@ export function createMockClient(api, { speed = 1 } = {}) {
     },
     async context(tid) { await net(); return meter(T(tid)); },
     async settings() { await net(); return structuredClone(settings); },
+    async feedback(tid, body) { await net(); return { seq: 0, ...body }; },          // plan 21.7: the mock keeps no learning
+    async decidePref(pid, approve) { await net(); return { id: pid, state: approve ? 'active' : 'rejected' }; },
     async saveSettings(body) { await net(); if (body.agent_md != null) settings.agent_md = body.agent_md; if (body.memory != null) settings.memory = body.memory; return structuredClone(settings); },
   };
 }

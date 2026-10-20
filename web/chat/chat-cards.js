@@ -94,11 +94,42 @@ function AttachmentChip({ id, ctx }) {
 }
 
 // ---------- assistant ----------
-function AssistantCard({ item }) {
+// ---------- thumbs (plan 21.7): up or down on an output or a reply; the agent learns from them ----------
+export function Thumbs({ ctx, target, label = 'this' }) {
+  const React = R(), [got, setGot] = React.useState(null);
+  if (!ctx?.feedback || (!target.output_id && target.seq == null)) return null;
+  const send = value => ctx.feedback({ ...target, value }).then(() => setGot(value), () => {});
+  const b = (v, title) => h('button', { type: 'button', onClick: () => send(v), title, 'aria-label': title, 'aria-pressed': got === v ? 'true' : 'false',
+    style: { display: 'grid', placeItems: 'center', width: 24, height: 24, border: 0, borderRadius: 5, cursor: 'pointer', background: got === v ? T.tpu : 'none', color: got === v ? T.pu : T.dim } },
+  h(Icon, { d: v, size: 13 }));
+  return h('span', { style: { display: 'inline-flex', gap: 2 } }, b('up', `Good: more like ${label}`), b('down', `Not good: less like ${label}`));
+}
+
+function AssistantCard({ item, ctx }) {
   const React = R(), text = item.ev.payload.text || '';
   const html = React.useMemo(() => renderMarkdown(text), [text]);
-  return h('div', { className: 'aichat-md' + (item.streaming ? ' aichat-caret' : ''), style: { fontSize: 13, padding: '0 2px' }, dangerouslySetInnerHTML: { __html: html } });
+  const md = h('div', { className: 'aichat-md' + (item.streaming ? ' aichat-caret' : ''), style: { fontSize: 13, padding: '0 2px' }, dangerouslySetInnerHTML: { __html: html } });
+  if (item.streaming || item.ev.seq == null || !ctx?.feedback || !text.trim()) return md;
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2 } }, md,
+    h('div', { style: { display: 'flex', opacity: 0.8 } }, h(Thumbs, { ctx, target: { seq: item.ev.seq }, label: 'this reply' })));
 }
+
+// ---------- a proposal from the miner (plan 21.5, 21.7): a preference it noticed, to approve here ----------
+function ProposalCard({ item, ctx }) {
+  const React = R(), [done, setDone] = React.useState({});
+  const prefs = item.ev.payload.prefs || [];
+  const what = p => (p.tool ? `${p.tool.replace(/_/g, ' ')}: ${p.field} = ${typeof p.value === 'string' ? p.value : JSON.stringify(p.value)}` : String(p.value));
+  const decide = (p, ok) => ctx.decidePref?.(p.id, ok).then(() => setDone(d => ({ ...d, [p.id]: ok ? 'active' : 'rejected' })), () => {});
+  return h('div', { style: cardSt({ pad: '8px 10px', gap: 6 }) },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: T.mut } }, h(Icon, { d: 'bulb', size: 13 }), 'I noticed what you usually choose. Use it from now on?'),
+    prefs.map(p => h('div', { key: p.id, style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5 } },
+      h('span', { style: { flex: 1, minWidth: 160, overflowWrap: 'anywhere' } }, what(p), p.cue ? h('span', { style: { color: T.dim } }, ` · ${p.cue}`) : null),
+      done[p.id] ? h('span', { style: { color: T.mut } }, done[p.id] === 'active' ? 'Saved: it fills your cards now' : 'Not used')
+        : [h(Btn, { key: 'y', sm: true, kind: 'pri', label: 'Use it', onClick: () => decide(p, true) }),
+           h(Btn, { key: 'n', sm: true, kind: 'ghost', label: 'Not now', onClick: () => decide(p, false) })])));
+}
+registerCard('proposal', ProposalCard);
+registerCard('feedback', () => null);       // thumbs show on what they rate, not as a row of their own
 
 // ---------- thinking: one folded line per step, only with Show thinking on ----------
 // ---------- tool ----------

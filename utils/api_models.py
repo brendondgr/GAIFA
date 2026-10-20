@@ -225,7 +225,7 @@ class ModelList(_Model):
 
 # ---- outputs (Phase 4) ----
 
-OutputKind = Literal["audio", "image", "video", "model3d", "text", "archive", "other"]
+OutputKind = Literal["audio", "image", "video", "model3d", "text", "document", "archive", "other"]
 
 
 class OutputFile(_Model):
@@ -244,6 +244,7 @@ class Output(_Model):
     id: str
     service: str
     kind: OutputKind
+    subtype: str | None = Field(None, description='Text and documents: "markdown", "plain", "code:python", "config:toml", "web:html", "data:csv", "subtitles", "notebook", "pdf", "docx", …')
     title: str
     path: str = Field(description='"outputs/tts/2026-10-04/143012-good-morning.wav" (a file or a folder)')
     files: list[OutputFile]

@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict
 
 from utils.api_models import Output, OutputPage
 from utils.outputs import OutputError, Outputs
+from utils.outputs.entries import kind_of
 from utils.outputs.upload import MAX_BYTES, UploadError, save_upload
 
 router = APIRouter(tags=["outputs"])
@@ -30,7 +31,17 @@ MEDIA_TYPES = {
     ".glb": "model/gltf-binary", ".gltf": "model/gltf+json", ".obj": "model/obj", ".stl": "model/stl", ".ply": "application/octet-stream",
     ".txt": "text/plain; charset=utf-8", ".md": "text/markdown; charset=utf-8", ".json": "application/json",
     ".srt": "text/plain; charset=utf-8", ".vtt": "text/vtt", ".csv": "text/csv; charset=utf-8", ".zip": "application/zip",
+    ".pdf": "application/pdf", ".epub": "application/epub+zip", ".odt": "application/vnd.oasis.opendocument.text",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
+
+
+def _media_type(p: Path) -> str:
+    """Any other text file (code, HTML, notebooks, …) is served as plain text, so an uploaded page
+    never runs as a page on the hub's origin."""
+    return MEDIA_TYPES.get(p.suffix.lower()) or ("text/plain; charset=utf-8" if kind_of(p.name) == "text" else "application/octet-stream")
 
 
 def _outs(request: Request) -> Outputs:
@@ -38,15 +49,15 @@ def _outs(request: Request) -> Outputs:
 
 
 def _send(p: Path, cache: str = "no-cache") -> FileResponse:
-    return FileResponse(p, media_type=MEDIA_TYPES.get(p.suffix.lower(), "application/octet-stream"),
-                        filename=p.name, content_disposition_type="inline", headers={"Cache-Control": cache})
+    return FileResponse(p, media_type=_media_type(p), filename=p.name, content_disposition_type="inline",
+                        headers={"Cache-Control": cache, "X-Content-Type-Options": "nosniff"})
 
 
 @router.get("/api/outputs", summary="Outputs, newest first, with totals (cursor paging)", response_model=OutputPage, response_model_exclude_unset=True)
 async def list_outputs(
     request: Request,
     service: str | None = Query(None, description="Comma-separated service ids"),
-    kind: str | None = Query(None, description="Comma-separated: audio, image, video, model3d, text, archive, other"),
+    kind: str | None = Query(None, description="Comma-separated: audio, image, video, model3d, text, document, archive, other"),
     q: str | None = Query(None, description="Words to find in the title, prompt or file name"),
     from_: float | None = Query(None, alias="from", description="Created at or after (unix seconds)"),
     to: float | None = Query(None, description="Created at or before (unix seconds)"),
@@ -59,9 +70,10 @@ async def list_outputs(
 @router.post("/api/outputs/upload", status_code=201, summary="Upload a file (the raw body) as an output in outputs/uploads/",
              response_model=Output, response_model_exclude_unset=True)
 async def upload_output(request: Request, name: str = Query(..., description="The file's name (its extension sets the kind)")) -> dict[str, Any]:
-    """An image, video or audio file of at most 64 MB, sent as the body. It becomes an ordinary
-    output (`output:<id>` works wherever an output does). Errors: `upload_type` (415),
-    `upload_too_large` (413), `upload_empty` (400)."""
+    """An image, video, audio, text or document file of at most 64 MB, sent as the body. It becomes
+    an ordinary output (`output:<id>` works wherever an output does). Errors: `upload_type` (415),
+    `upload_encoding` (415, text that isn't UTF-8 or UTF-16 with a BOM), `upload_too_large` (413),
+    `upload_empty` (400)."""
     if int(request.headers.get("content-length") or 0) > MAX_BYTES:
         raise OutputError(413, "upload_too_large", f"uploads are at most {MAX_BYTES // 2**20} MB")
     outs = _outs(request)

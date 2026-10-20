@@ -1124,7 +1124,7 @@ const LOAD = { unloaded: ['dim', false], loading: ['accent', true], loaded: ['cy
 const mstatLabel = (m, label) => m.status === 'verifying' && m.progress != null ? `verifying ${Math.round(m.progress * 100)}%` : label;
 const MSTAT = { ok: ['green', 'ok'], missing: ['red', 'missing'], partial: ['accent', 'partial'], unverified: ['dim', 'unverified'], checksum_mismatch: ['red', 'checksum mismatch'], verifying: ['accent', 'verifying'] };
 const KINDS = [['llm', 'LLM'], ['tts', 'TTS'], ['stt', 'STT'], ['voice', 'Voice'], ['3d', '3D'], ['image', 'Image'], ['video', 'Video'], ['text-encoder', 'Text encoder'], ['vae', 'VAE'], ['lora', 'LoRA'], ['vision', 'Vision'], ['upscale', 'Upscale'], ['other', 'Other']];
-const OKINDS = [['audio', 'Audio'], ['image', 'Image'], ['video', 'Video'], ['model3d', '3D'], ['text', 'Text'], ['other', 'Other']];
+const OKINDS = [['audio', 'Audio'], ['image', 'Image'], ['video', 'Video'], ['model3d', '3D'], ['text', 'Text'], ['document', 'Document'], ['other', 'Other']];
 const METHOD = { GET: 'cyan', POST: 'green', PUT: 'accent', PATCH: 'accent', DELETE: 'red' };
 const BUILTIN_TABS = new Set(['overview', 'outputs', 'api', 'logs', 'settings']);  // a page module's tabs can't reuse these ids (PATCHES #6)
 const LIGHT = { '--bg': '#F5F6F8', '--sb': '#EEF0F3', '--card': '#FFFFFF', '--inset': '#F1F3F6', '--hov': '#E9ECF1', '--row': '#F4F6F9', '--bd': '#E0E4EA', '--bds': '#C9D0DA', '--bdh': '#A6B0BF',

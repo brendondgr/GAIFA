@@ -2362,7 +2362,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
 
 ## Phase 24 — Documents, text and code in Chat
 
-- [ ] **24.1 New kinds and uploads: `utils/outputs/entries.py`, `utils/outputs/upload.py`.**
+- [x] **24.1 New kinds and uploads: `utils/outputs/entries.py`, `utils/outputs/upload.py`.**
   - `KIND_BY_EXT` gains, as `text`: `markdown` (`md`, `markdown`), plain (`txt`, `log`, `rst`), code (`py`, `js`, `mjs`, `ts`, `tsx`, `jsx`, `rs`, `go`, `c`, `h`, `cpp`, `hpp`, `cc`, `java`, `kt`, `swift`, `rb`, `php`, `lua`, `sh`, `bash`, `zsh`, `fish`, `ps1`, `sql`, `r`, `jl`, `cs`), config (`toml`, `yaml`, `yml`, `ini`, `cfg`, `conf`, `env.example`, `xml`), web (`html`, `htm`, `css`, `scss`), data (`json`, `jsonl`, `csv`, `tsv`), subtitles (`srt`, `vtt`), notebooks (`ipynb`), and a new kind **`document`**: `pdf`, `docx`, `epub`, `pptx`, `xlsx`, `odt`. `KINDS` gains `document`.
   - A `subtype` on text outputs (`markdown`, `code:<language>`, `data:csv`, `notebook`, …) from the extension, for the chip icon, the viewer's highlighting and the card.
   - `ALLOWED` becomes image, video, audio, text, document; the 415 message lists them. Text files are checked as UTF-8 (or UTF-16 with a BOM); anything else is refused as "not a text file" (`upload_encoding`).

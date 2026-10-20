@@ -23,7 +23,7 @@ from utils.db import Database
 from utils.events import EventBus
 from utils.outputs import media, trash
 from utils.outputs.describe import describe
-from utils.outputs.entries import KINDS, kind_of, walk
+from utils.outputs.entries import KINDS, kind_of, subtype_of, walk
 from utils.paths import Paths
 
 log = logging.getLogger("aihub.outputs")
@@ -96,6 +96,8 @@ class Outputs:
             "size_bytes": row["size_bytes"], "created_ts": row["created_ts"],
             "meta": json.loads(row["meta"]) if isinstance(row["meta"], str) else row["meta"],
         }
+        if row["kind"] in ("text", "document") and row["main"] and (sub := subtype_of(row["main"])):
+            v["subtype"] = sub
         if row["duration_s"] is not None:
             v["duration_s"] = row["duration_s"]
         if row["width"] and row["height"]:

@@ -293,11 +293,16 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
   - image: png, jpg, jpeg, webp, gif, bmp, avif
   - video: mp4, webm, mov, mkv
   - model3d: glb, gltf, obj, ply, stl, fbx
-  - text: txt, md, json, srt, vtt, csv
+  - text (plan 24.1), with a `subtype` from the extension:
+    - `markdown`: md, markdown · `plain`: txt, log, rst · `subtitles`: srt, vtt · `notebook`: ipynb
+    - `code:<language>`: py, js, mjs, ts, tsx, jsx, rs, go, c, h, cpp, hpp, cc, java, kt, swift, rb, php, lua, sh, bash, zsh, fish, ps1, sql, r, jl, cs
+    - `config:<format>`: toml, yaml, yml, ini, cfg, conf, env.example, xml · `web:<format>`: html, htm, css, scss · `data:<format>`: json, jsonl, csv, tsv
+  - document: pdf, docx, epub, pptx, xlsx, odt (the subtype is the extension)
   - archive: zip, tar, gz, 7z
   - anything else is `other`
+  - `Output.subtype` is set for text and documents. Text files are served as `text/plain` (an uploaded HTML page never runs on the hub's origin), every file with `X-Content-Type-Options: nosniff`.
 - **Without a sidecar:** the title is the name as words (minus the `HHMMSS-` prefix); the time is the date folder plus that prefix, else the file's mtime. A folder's main file is the first model3d, then video, image, audio file.
-- **Uploads:** files sent to `POST /api/outputs/upload` land in `{outputs}/uploads/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext>` with a sidecar (`title` = the original name, `source.service = "upload"`), so they are outputs of the service `uploads` like any other.
+- **Uploads:** images, video, audio, text and documents (plan 24.1; a text file must be UTF-8, or UTF-16 with a BOM, else `upload_encoding`) sent to `POST /api/outputs/upload` land in `{outputs}/uploads/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext>` with a sidecar (`title` = the original name, `source.service = "upload"`), so they are outputs of the service `uploads` like any other.
 - **Previews:** the hub makes them itself (a 640 px JPEG for images over 4 MP, a video poster frame at 1 s via ffmpeg) and stores them as hidden `.<name>.preview.jpg` files next to the output. A 3D job brings its own (`preview` in the sidecar, or `preview.png`).
 - **Deleting** an output from the UI moves it, with its sidecar and preview, to `outputs/.trash/<YYYY-MM-DD>/`; the hub empties trash days older than 30 days. Dotfiles and dot-folders are never indexed.
 

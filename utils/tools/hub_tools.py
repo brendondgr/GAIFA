@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from utils.outputs.entries import KINDS
 from utils.services import loading
 from utils.tools.catalog import ToolDef
 
@@ -141,7 +142,7 @@ def tools() -> list[ToolDef]:
     def t(name: str, desc: str, params: dict[str, Any], fn: Any, risk: str = "read") -> ToolDef:
         return ToolDef(f"hub_{name}", None, name, desc, params, risk=risk, core=True, source="hub", handler=fn)
 
-    kinds = {"type": "string", "enum": ["audio", "image", "video", "model3d", "text", "archive", "other"]}
+    kinds = {"type": "string", "enum": list(KINDS)}
     return [
         t("list_services", "List AIHub's mods (speech, 3D, images & video, LLMs…) with their state, whether their models "
           "are loaded, and running jobs.", _obj({}), list_services),
@@ -152,7 +153,7 @@ def tools() -> list[ToolDef]:
         t("unload_service", "Unload a mod's models from memory, keeping it running.", _obj({"id": SERVICE}, ["id"]),
           unload_service, "write"),
         t("memory_status", "Memory now: total, used and free (GB), and what each mod holds.", _obj({}), memory_status),
-        t("search_outputs", "Find earlier outputs (images, videos, audio, 3D models) by words, kind or mod, newest first.",
+        t("search_outputs", "Find earlier outputs (images, videos, audio, 3D models, text, documents) by words, kind or mod, newest first.",
           _obj({"q": {"type": "string", "description": "Words in the title or prompt"}, "kind": kinds, "service": SERVICE,
                 "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10}}), search_outputs),
         t("get_output", "One output's details: title, kind, prompt, settings and files.",

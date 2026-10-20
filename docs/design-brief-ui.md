@@ -376,7 +376,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `listOutputs(filter)` | `GET /api/outputs?service=&kind=&q=&from=&to=&cursor=&limit=` | `OutputPage` (`service` and `kind` are comma-separated lists; `q` matches every word; `limit` 1–500, default 60) |
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
 | `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
-| `uploadOutput(file)` | `POST /api/outputs/upload?name=` (the file as the body) | `Output` (`201`); `upload_type` 415, `upload_too_large` 413 (64 MB), `upload_empty` 400 |
+| `uploadOutput(file)` | `POST /api/outputs/upload?name=` (the file as the body) | `Output` (`201`): an image, video, audio, text or document file (plan 24.1); `upload_type` 415, `upload_encoding` 415 (a text file that isn't UTF-8, or UTF-16 with a BOM), `upload_too_large` 413 (64 MB), `upload_empty` 400 |
 | `getSettings()` | `GET /api/settings` | `Settings` (`services.order` and `memory.priority` list every installed mod: the configured ids first, then the rest in sidebar order) |
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
@@ -503,11 +503,13 @@ interface Discovered { path: string; size_bytes: number; suggested_kind: ModelKi
 interface Totals { size_bytes: number; count: number; by_kind: Record<string, { count: number; size_bytes: number }> }
 interface Disk { free_bytes: number; total_bytes: number }
 
-type OutputKind = "audio" | "image" | "video" | "model3d" | "text" | "archive" | "other";
+type OutputKind = "audio" | "image" | "video" | "model3d" | "text" | "document" | "archive" | "other";
 interface Output {
   id: string;
   service: string;
   kind: OutputKind;
+  subtype?: string;              // text and documents (plan 24.1): "markdown", "plain", "code:python", "config:toml", "web:html",
+                                 // "data:csv", "subtitles", "notebook", "pdf", "docx", "epub", "pptx", "xlsx", "odt"
   title: string;
   path: string;                  // "outputs/tts/2026-10-04/143012-good-morning.wav" (file or folder)
   files: { path: string; kind: OutputKind; size_bytes: number; role?: string }[];

@@ -8,8 +8,8 @@ import { AreaChart, LineChart, BarChart, Sparkline, Timeline, Treemap } from './
 
 const R = () => globalThis.React;
 export const svcColor = (services, id) => { const i = services.findIndex(s => s.id === id); return i < 0 ? OTHER : SERIES[i % SERIES.length]; };
-export const KIND_COLOR = { audio: SERIES[1], image: SERIES[0], video: SERIES[4], model3d: SERIES[2], text: SERIES[3], archive: SERIES[5], other: OTHER };
-export const KIND_LABEL = { audio: 'Audio', image: 'Image', video: 'Video', model3d: '3D', text: 'Text', archive: 'Archive', other: 'Other' };
+export const KIND_COLOR = { audio: SERIES[1], image: SERIES[0], video: SERIES[4], model3d: SERIES[2], text: SERIES[3], document: SERIES[7], archive: SERIES[5], other: OTHER };
+export const KIND_LABEL = { audio: 'Audio', image: 'Image', video: 'Video', model3d: '3D', text: 'Text', document: 'Document', archive: 'Archive', other: 'Other' };
 const errText = e => e?.detail || e?.message || String(e);
 
 // Fetch with loading/error state; refetch when `deps` change, and every `every` ms while the tab

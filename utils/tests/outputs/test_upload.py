@@ -5,9 +5,11 @@ from __future__ import annotations
 import io
 import json
 
+import pytest
 from PIL import Image
 
 from utils.outputs import upload
+from utils.tests.conftest import FIXTURES
 
 
 def png(w: int = 8, h: int = 6) -> bytes:
@@ -42,3 +44,45 @@ async def test_upload_errors_use_the_envelope(app, client, monkeypatch):
     r = await client.post("/api/outputs/upload", params={"name": "big.png"}, content=png())
     assert r.status_code == 413 and r.json()["code"] == "upload_too_large"
     assert not (app.state.hub.outputs.dir / "uploads").exists() or not any((app.state.hub.outputs.dir / "uploads").rglob("big*"))
+
+
+# ---- plan 24.1: text and documents ----
+
+DOCS = FIXTURES / "docs"
+
+
+@pytest.mark.parametrize("name,kind,subtype", [
+    ("report.pdf", "document", "pdf"), ("notes.docx", "document", "docx"), ("book.epub", "document", "epub"),
+    ("analysis.ipynb", "text", "notebook"), ("people.csv", "text", "data:csv"), ("hello.py", "text", "code:python"),
+    ("readme.md", "text", "markdown"),
+])
+async def test_documents_and_text_upload(client, name, kind, subtype):
+    data = (DOCS / name).read_bytes()
+    r = await client.post("/api/outputs/upload", params={"name": name}, content=data)
+    assert r.status_code == 201, r.text
+    o = r.json()
+    assert (o["kind"], o["subtype"]) == (kind, subtype)
+    assert o["path"].endswith("." + name.rsplit(".", 1)[1])
+    f = await client.get(o["url"])
+    assert f.content == data and f.headers["x-content-type-options"] == "nosniff"
+    listed = (await client.get("/api/outputs", params={"kind": kind})).json()
+    assert o["id"] in [x["id"] for x in listed["items"]]
+
+
+async def test_text_must_be_utf8_or_utf16_with_a_bom(client):
+    r = await client.post("/api/outputs/upload", params={"name": "notes.txt"}, content=png())
+    assert r.status_code == 415 and r.json()["code"] == "upload_encoding"
+    r = await client.post("/api/outputs/upload", params={"name": "nul.txt"}, content=b"abc\x00def")
+    assert r.json()["code"] == "upload_encoding"
+    r = await client.post("/api/outputs/upload", params={"name": "wide.txt"}, content="hello".encode("utf-16-le"))
+    assert r.status_code == 415  # UTF-16 without a BOM
+    r = await client.post("/api/outputs/upload", params={"name": "wide.txt"}, content=b"\xff\xfe" + "hé".encode("utf-16-le"))
+    assert r.status_code == 201 and r.json()["kind"] == "text"
+
+
+async def test_html_is_served_as_plain_text_and_env_example_keeps_its_extension(client):
+    o = (await client.post("/api/outputs/upload", params={"name": "garden.html"}, content=(DOCS / "garden.html").read_bytes())).json()
+    assert o["subtype"] == "web:html"
+    assert (await client.get(o["url"])).headers["content-type"].startswith("text/plain")
+    o = (await client.post("/api/outputs/upload", params={"name": ".env.example"}, content=b"KEY=1\n")).json()
+    assert o["path"].endswith(".env.example") and o["subtype"] == "config:env"

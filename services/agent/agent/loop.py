@@ -27,12 +27,11 @@ from . import context as ctx
 from . import prompts
 from .hubapi import HubAPI
 from .llm import LLM, LLMError, Reply
-from .store import Store, new_id
+from .store import Store, mode_of, new_id
 from .tools import LOCAL_NAMES, ToolSet
 
 log = logging.getLogger("agent.loop")
 POLL_S = 15
-HUB_MODE = {"ask": "ask", "auto": "auto", "read_only": "read_only"}
 SERVICE_TOOLS = {"hub_start_service", "hub_stop_service", "hub_unload_service"}   # their `id` is a mod
 # Sent (not stored) when a turn only repeats itself; that model call gets tool_choice "none".
 WRAP_UP = ("(A note from the app, not from the user: you have repeated the same tool call and its result won't change. "
@@ -454,7 +453,7 @@ class Agent:
                 tools.load([name])
                 await tools.refresh()
                 self._save_loaded(tid, tools)
-            mode = "auto" if p.get("by") == "user" else HUB_MODE.get(thread.get("mode") or "ask", "ask")
+            mode = "accept_edits" if p.get("by") == "user" else mode_of(thread.get("mode"))
             meta = tools.by_name(name)
             off = meta["mod"] if meta and meta["mod"] in tools.disabled else None
             if name in SERVICE_TOOLS and str((args or {}).get("id")) in tools.disabled:
@@ -464,7 +463,11 @@ class Agent:
                     "code": "disabled", "detail": f"the {off} tools are turned off in this chat",
                     "fix": "don't use them; tell the user, who can turn the group back on in the composer"}})
                 return "ok"
-            origin = {"service": "agent", "thread": tid, "tool_call_id": cid}
+            turn, said = self._turn_of(tid)
+            origin = {"service": "agent", "thread": tid, "tool_call_id": cid, "turn": turn}
+            named = ctx.named_files(said)
+            if named:
+                origin["named"] = named     # secret-looking files the user named: the workspace mod opens only these
             if (thread.get("settings") or {}).get("dry_run"):
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
             if (thread.get("settings") or {}).get("no_learn"):
@@ -476,6 +479,8 @@ class Agent:
                                             "arguments": res.get("arguments"), "ask_fields": res.get("ask_fields") or [],
                                             "schema": res.get("schema"), "risk": res.get("risk"),
                                             **({"grant_key": res["grant_key"]} if res.get("grant_key") else {}),
+                                            **({"limits": res["limits"]} if res.get("limits") else {}),
+                                            **({"why": res["why"]} if res.get("why") else {}),
                                             "description": (res.get("description") or "")[:600],
                                             **({"filled": res["filled"]} if res.get("filled") else {}),
                                             **({"filled_by": res["filled_by"]} if res.get("filled_by") else {})})
@@ -507,6 +512,12 @@ class Agent:
                 last = key
                 self.transient(tid, "progress", {"id": cid, "progress": st.get("progress"), "note": st.get("note"),
                                                  "elapsed_s": st.get("elapsed_s"), "job_id": st.get("job_id")})
+
+    def _turn_of(self, tid: str) -> tuple[int, str]:
+        """This turn's number (the seq of its user message: checkpoints and undo are per turn) and what the user said."""
+        evs = self.store.events(tid, types=("user",))
+        last = evs[-1] if evs else None
+        return (last["seq"] if last else 0), str((last or {}).get("payload", {}).get("text") or "")
 
     def _turn_calls(self, tid: str, cid: str) -> list[str]:
         """Tool names called so far in this turn (since the last user message), not counting `cid`."""
@@ -580,7 +591,7 @@ class Agent:
                  "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "
                     "the user can turn them back on in the composer)" if tools.disabled else "")
-                 + ("\nThis chat is read-only: only tools that read can run." if (self.store.thread(tid) or {}).get("mode") == "read_only" else ""),
+                 + prompts.mode_note(mode_of((self.store.thread(tid) or {}).get("mode"))),
                  "outputs": prompts.outputs_table(ctx.outputs(events)), "summary": summary}
         sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),

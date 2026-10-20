@@ -11,6 +11,7 @@ tools  like ok, plus routes for agent tools (plan 13): items, an image output, s
        path, a render job (GET /v1/render/{rid}, cancel), multipart upload, and GET /v1/tools
 perms  like ok, plus network and execute tools (plan 25): POST /v1/search, /v1/fetch, /v1/python
        and /v1/run echo what they were sent as {"ran": <route>, "arguments": {...}}
+ws     like ok, plus a workspace mod in miniature with its preflight /v1/limits (plan 27.4; _fakews.py)
 
 POST /v1/upload reads the body in chunks and returns its size and sha256 (for big uploads).
 GET /v1/events?n=3&gap=0.05 streams n server-sent events, gap seconds apart.
@@ -76,6 +77,10 @@ def openapi() -> dict:
         paths.update(tool_paths())
     if MODE == "perms":
         paths.update(perm_paths())
+    if MODE == "ws":
+        import _fakews
+
+        paths.update(_fakews.paths())
     if MODE == "mem":
         paths["/v1/load"] = {"post": op("Allocate memory")}
         paths["/v1/unload"] = {"post": op("Free memory")}
@@ -312,6 +317,12 @@ class Handler(BaseHTTPRequestHandler):
             jid = f"j_{len(JOBS) + 1}"
             JOBS[jid] = {"id": jid, "label": b.get("label") or jid, "start": time.time(), "seconds": float(b.get("seconds") or 1)}
             return self.send(202, {"id": jid})
+        if MODE == "ws":
+            import _fakews
+
+            out = _fakews.handle(url.path, self.body())
+            if out is not None:
+                return self.send(200, out)
         if MODE == "perms" and url.path in ("/v1/search", "/v1/fetch", "/v1/python", "/v1/run"):
             return self.send(200, {"ran": url.path.rsplit("/", 1)[1], "arguments": self.body()})
         if MODE == "tools":
@@ -441,7 +452,7 @@ def status() -> dict:
 
 
 def main() -> None:
-    if MODE not in {"ok", "slow", "crash", "mem", "tools", "perms"}:
+    if MODE not in {"ok", "slow", "crash", "mem", "tools", "perms", "ws"}:
         sys.exit(f"unknown mode {MODE!r}")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     server.daemon_threads = True

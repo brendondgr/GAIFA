@@ -32,14 +32,14 @@ PING_S = 15.0
 class NewThread(BaseModel):
     title: str = ""
     model: str | None = None
-    mode: Literal["ask", "auto", "read_only"] = "ask"
+    mode: Literal["plan", "manual", "accept_edits", "auto", "bypass", "ask", "read_only"] = "manual"   # old names map over
     settings: dict[str, Any] = Field(default_factory=dict, description="pinned / disabled groups (mod ids)")
 
 
 class ThreadPatch(BaseModel):
     title: str | None = None
     model: str | None = None
-    mode: Literal["ask", "auto", "read_only"] | None = None
+    mode: Literal["plan", "manual", "accept_edits", "auto", "bypass", "ask", "read_only"] | None = None
     archived: bool | None = None
     settings: dict[str, Any] | None = None
 

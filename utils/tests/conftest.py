@@ -162,7 +162,8 @@ def services_dir(root):
     """Copy fake mods into the temp root's `services/`: `services_dir("fake-ok", ...)`."""
 
     def copy(*ids: str) -> Path:
-        shutil.copy(FAKE_MODS / "_fakemod.py", root / "services" / "_fakemod.py")
+        for helper in FAKE_MODS.glob("_*.py"):          # _fakemod.py and its parts (_fakews.py)
+            shutil.copy(helper, root / "services" / helper.name)
         for i in ids:
             shutil.copytree(FAKE_MODS / i, root / "services" / i)
         return root / "services"

@@ -70,3 +70,10 @@ async def ph(services_dir, root, make_app, tools_cfg):
     """`fake-perms`: network and execute tools (plan 25)."""
     async for h in _hub_with("fake-perms", services_dir, make_app, tools_cfg):
         yield h
+
+
+@pytest.fixture
+async def wh(services_dir, root, make_app, tools_cfg):
+    """`fake-ws`: a workspace mod in miniature with a preflight (plan 27.4)."""
+    async for h in _hub_with("fake-ws", services_dir, make_app, tools_cfg):
+        yield h

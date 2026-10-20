@@ -1039,7 +1039,7 @@ The `tools` area. The chat (Stage D) and outside clients (MCP) use the same call
 |---|---|
 | `listTools({q?, names?})` | `GET /api/tools` (`q`: best 8 by keywords; `names`: these, 404 `unknown_tool` with `data.close`) |
 | `getToolIndex()` | `GET /api/tools/index` |
-| `callTool(name, args, {mode?, origin?, wait?})` | `POST /api/tools/{name}/call?wait=` |
+| `callTool(name, args, {mode?, origin?, wait?})` | `POST /api/tools/{name}/call?wait=` (`mode`: plan · manual · accept_edits · auto · bypass; old ask, read_only accepted, plan 27.4) |
 | `getToolCall(id, {wait?})`, `cancelToolCall(id)` | `GET /api/tools/calls/{id}`, `POST /api/tools/calls/{id}/cancel` |
 | `listApprovals({state?})`, `getApproval(id)` | `GET /api/approvals` (pending; `state=all`), `GET /api/approvals/{id}` |
 | `decideApproval(id, {approve, args?, reason?, remember?, confirm?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs; `remember: "once" \| "thread" \| "always"` (plan 25.2) also writes a grant (`thread` needs a call from a chat, else 422 `no_thread`; `always` for `execute`/`destructive` needs `confirm: true`, else 422 `confirm_needed`); the result carries the `grant` |
@@ -1070,7 +1070,14 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            filled?: string[];                       // needs_approval; filled: arguments the hub chose
                            filled_by?: { [field: string]: "default" | "carried" | string };  // how, an x-options default, carried in this chat, or a preference ("pref" + its id, plan 21.7)
                            grant_key?: string;                      // needs_approval, the tool's grant key kind (plan 25.2)
-                           grant?: Grant }                          // a decision with remember: thread | always
+                           grant?: Grant;                           // a decision with remember: thread | always
+                           why?: string;                            // needs_approval: why it asks (the mode, a list, the risk; plan 27.4)
+                           limits?: CallLimits }                    // needs_approval for a tool with a preflight (a workspace call, plan 27.4)
+interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote";
+                       folder?: string; level?: string; allow_bypass?: boolean; path?: string;
+                       key?: string;                                // what "allow in this chat" covers: the folder, and a command's first word
+                       once?: boolean;                              // asks every time: only "Allow once" (host runs, commits, git remotes)
+                       preview?: { summary?: string; diff?: string; command?: string; where?: "sandbox" | "host"; network?: boolean; cwd?: string; note?: string } }
 interface Grant { id: string; tool: string;                         // a name glob
                   key?: string;                                     // a host, a folder, a constant (absent = every call of the tool)
                   kind?: string; risk?: Risk; scope: "thread" | "always"; thread?: string;
@@ -1123,7 +1130,7 @@ Built by hand in `web/chat/` (plain ES modules on the page's React, like the das
 
 **The page**
 - **Thread list** (248 px; a drawer under 760 px of page width): search, New chat, and per chat Rename / Archive / Delete (with a confirm), an Archived toggle (the heading then reads "Archived chats"), 200 chats at a time with *Show more*, a dot for running (amber) or waiting (purple) chats.
-- **Header:** the title (click to rename), the running / waiting state, the model picker (`skynet · 131k`, from the agent's `/v1/models`), the ask mode (Ask about choices / Use defaults / Read only), the **context meter** (`8.6k / 131k` with a bar; a popover with the breakdown, the 70% and 85% compaction marks and Compact now), and Branch (copy the chat). Under 700 px the model and mode move into a popover.
+- **Header:** the title (click to rename), the running / waiting state, the model picker (`skynet · 131k`, from the agent's `/v1/models`), the mode (Plan / Manual / Accept edits / Auto / Bypass, plan 27.4: Bypass is listed only when the workspace folders this chat used allow it, or before it used one, when one does), the **context meter** (`8.6k / 131k` with a bar; a popover with the breakdown, the 70% and 85% compaction marks and Compact now), and Branch (copy the chat). Under 700 px the model and mode move into a popover.
 - **Thread (Phase 19):** a 760 px column of **turns**. A turn is your message (or "You ran …" for a result button or quick action), its **activity fold**, any agent errors, the **output strip** and the answer. A sticky **Plan** bar shows while any todo isn't done. The view stays at the bottom while you are there (new events, images loading, forms mounting).
   - **The activity fold** (`chat-activity.js`) is closed by default, the running turn included. Its header is the live status: a spinner, "Thinking…" with the seconds counting and the last two lines of thought peeking under it, "Generating an image… 42%" with the step's note, "Writing…", or "Waiting for you to approve below" / "Waiting for your answer below" (a purple shield), with the turn's time on the right. Once done it reads "Ran 2 tools · 2m 58s" (lookups aren't counted; "Looked something up" or "Thought it through" otherwise). A turn with no steps (a plain reply) has no fold.
   - **Opened**, the fold lists the steps with a rule on the left: thinking ("Thought for 4s ›", opening to the text), the agent's updates (its text in a step that called tools), tool calls (a status mark, the step's words and grey detail, percent or time, "needs you" or "next"; a progress bar under the running one), lookups and notes in grey, "You chose …" for an answered question, "Remembered: …", "Made a plan of N steps". A failed call reads "Tried making a 3D model" with the error's sentence as its detail. Steps are described by the arguments that ran (the ones approved on the card, which you may have changed), not the model's.

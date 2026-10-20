@@ -62,6 +62,7 @@ class ToolDef:
     cap_bytes: int | None = None     # results kept whole up to this size (default results.CAP_BYTES; plan 24.4)
     problems: list[str] = field(default_factory=list)
     grant_key: str | None = None     # plan 25.2: what "allow in this chat" covers (utils/tools/grants.py)
+    limits: str | None = None        # plan 27.4: the mod's preflight op ("POST /v1/limits"), asked before deciding
 
     def public(self, full: bool = True, view: str = "full") -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "mod": self.mod or "hub", "risk": self.risk, "core": self.core,
@@ -217,6 +218,8 @@ class Catalog:
                                cap_bytes=spec.cap_kb * 1024 if spec.cap_kb else None))
         if svc.m.agent.tools_source:
             out += await self._source(svc)
+        for t in out:
+            t.limits = svc.m.agent.limits
         return out
 
     async def _source(self, svc: Service) -> list[ToolDef]:
@@ -259,7 +262,7 @@ class Catalog:
         if db is None:
             return
         rows = [{**t.public(), "route": t.route.__dict__ if t.route else None, "response": t.response,
-                 "job_ops": t.job, "tool": t.tool, "cap_bytes": t.cap_bytes} for t in tools]
+                 "job_ops": t.job, "tool": t.tool, "cap_bytes": t.cap_bytes, "limits": t.limits} for t in tools]
         await db.execute("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                          (KV_PREFIX + sid, json.dumps({"ts": time.time(), "tools": rows})))
 
@@ -281,13 +284,14 @@ class Catalog:
                                    risk=r.get("risk", "write"), ask=r.get("ask") or [], examples=r.get("examples") or [],
                                    core=bool(r.get("core")), source=r.get("source", "manifest"), route=route,
                                    response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key"),
-                                   cap_bytes=r.get("cap_bytes")))
+                                   cap_bytes=r.get("cap_bytes"), limits=svc.m.agent.limits if svc.m else r.get("limits")))
             return out
         assert svc.m
         return [ToolDef(tool_name(svc.id, n), svc.id, n, s.description or s.op, {"type": "object"},
                         risk=s.risk or default_risk(s.op.split(" ", 1)[0], s.confirm), ask=list(s.ask),
                         examples=list(s.examples), core=s.core,
-                        job=_job_ops(s.job_status, s.job_cancel) if s.job else None, grant_key=s.grant_key)
+                        job=_job_ops(s.job_status, s.job_cancel) if s.job else None, grant_key=s.grant_key,
+                        cap_bytes=s.cap_kb * 1024 if s.cap_kb else None, limits=svc.m.agent.limits)
                 for n, s in svc.m.tools.items()]
 
     # ---- lookups -----------------------------------------------------------------------------

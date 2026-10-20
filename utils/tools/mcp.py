@@ -11,7 +11,7 @@ Streamable HTTP, stateless, single `application/json` responses (no SSE, no sess
   supported), `notifications/initialized` (202), `ping`, `tools/list`, `tools/call`.
 
 **Tools** are the catalog's (annotations from `risk`) plus the MCP-only `aihub_wait_approval`. Every
-call goes through `hub.calls.call(..., origin={"service": "mcp", "client": …}, mode="ask")`, so the
+call goes through `hub.calls.call(..., origin={"service": "mcp", "client": …}, mode="manual")`, so the
 permissions and approvals apply exactly as for the chat. An `ask` call runs nothing until the user
 decides (`mcp_approval.py`): a modern client that can show forms gets an `input_required` result
 whose `elicitation/create` form is the parameter card; every other client gets a result explaining
@@ -264,7 +264,7 @@ class McpServer:
             return await self.approver.wait_tool(req, args)
         if req.modern and req.params.get("requestState") is not None:
             return await self.approver.resume(req, name, args)
-        out = await hub.calls.call(name, args, origin={"service": "mcp", "client": req.client}, mode="ask",
+        out = await hub.calls.call(name, args, origin={"service": "mcp", "client": req.client}, mode="manual",
                                    wait=mcp_approval.CALL_WAIT_S)
         if out.get("status") == "needs_approval":
             return await self.approver.needs(req, out, args)

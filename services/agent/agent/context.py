@@ -58,6 +58,20 @@ def est(obj: Any) -> int:
 
 
 _CLOSE = re.compile(r"</\s*untrusted", re.I)
+_SECRET = re.compile(r"(?:^|/)(?:\.env|[^/\s]*\.pem|id_[^/\s]*|[^/\s]*credential[^/\s]*|secrets[^/\s]*)$", re.I)
+_PATHISH = re.compile(r"[`'\"]?([\w./~-]+)[`'\"]?")
+
+
+def named_files(text: str) -> list[str]:
+    """The secret-looking files (`.env`, keys, credentials) the user named in their message: the
+    workspace mod opens such a file only when its name is here (plan 27.1). Built from the user's own
+    words, never from the model's."""
+    out: list[str] = []
+    for m in _PATHISH.finditer(text or ""):
+        w = m.group(1).rstrip(".,;:")
+        if _SECRET.search(w) and w not in out:
+            out.append(w)
+    return out[:20]
 
 
 def untrusted(source: str, text: str) -> str:

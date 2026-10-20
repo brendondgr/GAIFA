@@ -728,13 +728,24 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
 
 ### 14.7 Permissions: risks, the order, grants (plan Phase 25)
 - **Risks.** Every tool has one: `read`, `write`, `generate`, `network` (reaches the internet), `execute` (runs code or commands) or `destructive`. A mod declares it in `[tools]` (`risk = …`) or its `tools_source`.
+- **Modes** (plan 27.4, after Claude Code's): `plan` (reads only), `manual` (everything that changes something asks), `accept_edits` (edits and generations apply; commands, the internet and deletes ask), `auto` (as Accept edits, with a judge for commands, plan Phase 30; until it exists they ask) and `bypass` (edits and sandbox commands run; only in workspace folders that allow it). The old names map over: `ask` → `manual`, `read_only` → `plan`; `auto` is the Auto mode (the agent migrated stored `auto` threads, which meant "Use defaults", to `accept_edits`).
 - **The order** in which a call is decided is fixed (`utils/tools/approvals.py` `decide`); the first that answers wins:
   1. the **deny** list of `[agent.permissions]`;
-  2. the thread's **mode**: `read_only` denies everything but `read`;
-  3. a **mod's own limits** (a workspace folder's level, Phase 27): the mod enforces them when the call reaches it, so nothing below lifts them;
-  4. a **grant** that covers the call allows it;
+  2. a **mod's limits**: a mod with `[agent] limits` (the workspace mod) answers a preflight before each call: what it would do (`action`), the folder's level and Bypass, a diff or the command, and a refusal for hard limits (paths out of the folder, secrets, `.git/`, `sudo`, the AIHub folder above Read) or a level too low ("needs the folder at Run"). A refusal ends the call in every mode; the mod checks again when the call arrives; a preflight that fails refuses;
+  3. the thread's **mode**: with limits, the cell of the table below for the call's action (Bypass in a folder that doesn't allow it counts as Accept edits); without, `plan` denies everything but `read`;
+  4. a **grant** that covers the call allows it, keyed by the mod's `key` when it gives one (a folder and a command's first word); never for actions that ask every time (`host`, `remote`, `commit`);
   5. the **ask** list, then the **allow** list (`execute` ignores the allow list: only a grant skips its card);
-  6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `auto` mode ("Use defaults"); `network`, `execute` and `destructive` ask in every mode.
+  6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `accept_edits`, `auto` and `bypass`; `network` asks (in `auto` the judge decides); `execute` and `destructive` ask in every mode.
+
+  | Mode | read | edit | delete | commit | command (sandbox) | network (sandbox + internet) | host (your machine) | remote (git push, …) |
+  |---|---|---|---|---|---|---|---|---|
+  | plan | run | refused | refused | refused | refused | refused | refused | refused |
+  | manual | run | ask | ask | ask | ask | ask | ask | ask |
+  | accept_edits | run | run | ask | ask | ask | ask | ask | ask |
+  | auto | run | run | judge | ask | judge | judge | ask | ask |
+  | bypass | run | run | run | run | run | run | ask | ask |
+
+  "judge" is Phase 30's seam: `decide` answers `"judge"` and the caller awaits `approvals.judge()`, which fails closed ("ask") until the judge exists.
 - **Grants** (`utils/tools/grants.py`, table `grants`, migration 009): one answer that covers more than one call. Deciding an approval with `remember: "thread"` ("Allow in this chat") or `"always"` writes a grant `{tool, key, scope, thread, expires_ts}`; `once` (the default) writes none. `always` for `execute` and `destructive` needs a second confirm (`confirm: true`, else 422 `confirm_needed`); `thread` needs a call from a chat (else 422 `no_thread`).
   - **Keys.** A tool may declare `grant_key` in `[tools]` (or its `tools_source` item): `url:host` takes the host of its `url` argument (exact: `api.github.com` is not `github.com`), `arg:<name>` takes that argument as is (a folder), `const:<x>` is always `x` (every search). A grant covers a call of its tool whose key equals the grant's; a tool without a grant key gets grants that cover every call.
   - **Who.** A `thread` grant covers calls whose `origin.thread` is that chat; MCP and API calls have no thread, so only `always` grants apply to them. A call run by a grant carries `origin.grant`. `GET /api/grants` lists the live ones (Settings → Agent → Permissions, with revoke); expired ones are dropped; `thread` grants end when the agent deletes the chat (`DELETE /api/grants?thread=`).

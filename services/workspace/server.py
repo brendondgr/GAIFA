@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import api_edit
+import limits
 import reading
 from checkpoints import Checkpoints
 from folders import LEVELS, Caps, Folders, Refused
@@ -78,6 +79,12 @@ def named_of(request: Request) -> list[str]:
     """The secret-looking files the user named in their message (the agent puts them in the origin)."""
     m = reading.origin_of(request.headers.get("x-aihub-origin")).get("named")
     return [str(x) for x in m][:20] if isinstance(m, list) else []
+
+
+class LimitsIn(BaseModel):
+    tool: str = Field(description="The tool's name inside this mod (read, edit, run, …)")
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    origin: dict[str, Any] = Field(default_factory=dict)
 
 
 class Ctx:
@@ -173,6 +180,10 @@ def create_app(state: Path | None = None, aihub_root: Path | None = None, models
         return {"items": rows[:limit]}
 
     api_edit.mount(app, ctx)
+
+    @app.post("/v1/limits", summary="The hub's preflight: what a call would do (action, folder, level, preview) or why it's refused")
+    def preflight(body: LimitsIn) -> dict[str, Any]:
+        return limits.classify(ctx.folders, body.tool, body.arguments, body.origin)
 
     @app.post("/v1/tree", summary="List a folder's files")
     def tree(body: TreeIn, request: Request) -> str:

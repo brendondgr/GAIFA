@@ -18,7 +18,7 @@ import { groupTurns } from './chat-turn.js';
 import { TurnView, ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, LIST_CSS } from './chat-list.js';
-import { ThreadHeader } from './chat-header.js';
+import { ThreadHeader, bypassAllowed } from './chat-header.js';
 import { Composer } from './chat-composer.js';
 
 export { registerCard } from './chat-cards.js';
@@ -56,7 +56,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [thread, setThread] = useState(null), [events, setEvents] = useState([]), [live, setLive] = useState(EMPTY_LIVE), [running, setRunning] = useState(false), [conn, setConn] = useState('open'), [ready, setReady] = useState(false);
   const [drafts, setDrafts] = useState({}), [attachments, setAttachments] = useState([]), [toolForms, setToolForms] = useState([]);
   const [meterOpen, setMeterOpen] = useState(false), [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
-  const [fresh, setFresh] = useState({ model: null, mode: 'ask', settings: {} });   // a chat not created yet
+  const [fresh, setFresh] = useState({ model: null, mode: 'manual', settings: {} });   // a chat not created yet
+  const [folders, setFolders] = useState(null);   // the workspace mod's folders, for Bypass (plan 27.4)
   const scrollRef = useRef(null), contentRef = useRef(null), stick = useRef(true), first = useRef(true), inputRef = useRef(null), loadRef = useRef(null), queue = useRef([]), flushT = useRef(0);
   const dkey = tid || 'new', draft = drafts[dkey] || '';
   const setDraft = v => setDrafts(d => ({ ...d, [dkey]: typeof v === 'function' ? v(d[dkey] || '') : v }));
@@ -74,6 +75,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     c.models().then(setModels).catch(fail);
     c.settings().then(setSettings).catch(() => {});
     api.listTools().then(setTools).catch(() => setTools([]));
+    api.callService?.('workspace', 'GET', '/v1/folders').then(r => setFolders(r.json?.folders || [])).catch(() => setFolders([]));
   }, []);
 
   const flush = () => {
@@ -221,7 +223,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       h('div', { onClick: () => setDrawer(false), 'aria-hidden': true, style: { position: 'absolute', inset: 0, zIndex: 40, background: T.ov } }),
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
     h('section', { 'aria-label': 'Chat', style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
-      h(ThreadHeader, { thread, models, model: thread?.model || fresh.model || models?.default, mode: thread?.mode || fresh.mode, onModel: setModel, onMode: setMode,
+      h(ThreadHeader, { thread, models, model: thread?.model || fresh.model || models?.default, mode: thread?.mode || fresh.mode, bypass: bypassAllowed(folders, events), onModel: setModel, onMode: setMode,
         onRename: title => rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
         learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,
         running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: narrow ? () => setDrawer(true) : null, narrow: (narrow ? width : width - 248) < 700 }),

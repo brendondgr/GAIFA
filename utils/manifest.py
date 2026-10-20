@@ -256,6 +256,7 @@ class AgentSpec(_Strict):
     and the mod's skills folder (plan 14.9)."""
     tools_source: Op | None = None
     skills: str | None = None     # a folder inside the mod: skills/<name>/SKILL.md
+    limits: Op | None = None      # plan 27.4: "POST /v1/limits", the preflight the hub asks before deciding a call
 
     @field_validator("skills")
     @classmethod

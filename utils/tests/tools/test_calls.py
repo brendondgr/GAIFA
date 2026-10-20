@@ -87,7 +87,7 @@ async def test_denied_approval_runs_nothing(th):
 
 async def test_modes_and_denies(th, tools_cfg):
     r = await th.call("fake_tools_make_image", {"prompt": "x"}, mode="read_only")
-    assert r["status"] == "denied" and "read-only" in r["error"]["detail"]
+    assert r["status"] == "denied" and "Plan mode" in r["error"]["detail"]
     r = await th.call("fake_tools_make_image", {"prompt": "x"}, mode="auto")
     assert r["status"] == "done" and r["outputs"][0]["kind"] == "image"
     r = await th.call("fake_tools_wipe", {"jid": "j_9"}, mode="auto")

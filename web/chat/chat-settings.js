@@ -63,7 +63,7 @@ export function AgentSettings({ api, toast = () => {} }) {
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, MODES.map(([k, l, d]) => h('div', { key: k, style: { display: 'flex', gap: 10, fontSize: 12.5, alignItems: 'baseline' } },
         h('span', { style: { minWidth: 130, fontWeight: 500 } }, l), h('span', { style: { color: T.mut } }, d)))),
       h('div', { style: { fontSize: 12, color: T.mut, display: 'flex', gap: 6, alignItems: 'flex-start' } }, h(Icon, { d: 'shield', size: 13, style: { marginTop: 2 } }),
-        h('span', null, 'Each chat picks its mode in the header (new chats: Ask about choices). Per-tool rules are name globs in ', h('code', { style: { fontFamily: MONO } }, '[agent.permissions]'),
+        h('span', null, 'Each chat picks its mode in the header (new chats: Manual; a workspace folder’s level caps what any mode allows). Per-tool rules are name globs in ', h('code', { style: { fontFamily: MONO } }, '[agent.permissions]'),
           ' of config.toml. A call is decided by the deny list, then the chat’s mode, then a mod’s own limits, then your grants (below), then the ask and allow lists, then its risk: reading runs; writing and generating ask unless the chat uses defaults; using the internet, running code and deleting always ask. Pending approvals from any client are in the header’s Approvals button.')),
       h(GrantsList, { api, toast })));
 }

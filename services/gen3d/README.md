@@ -315,7 +315,7 @@ exact packages in `locks/cubeart.txt`):
 
 `python -m gen3d.doctor` (run by `install.sh`) checks all of it, plus podman, the image and Blender.
 Nothing in this repo modifies them; `workers/rig.py` and `scripts/render_blender.py` are vendored
-copies of CubeArt's scripts.
+copies of CubeArt's scripts (the preview script since changed: see Preview renders).
 
 ## Install / reinstall
 
@@ -343,8 +343,26 @@ Edit `~/.config/gen3d/gen3d.env`, then `gen3d restart`:
 | `GEN3D_CUBEART` | `runtime/CubeArt` | weights, venv and upstream code |
 | `GEN3D_IMAGE` | `docker.io/kyuz0/amd-strix-halo-comfyui:latest` | the ROCm image the worker runs in |
 | `GEN3D_BLENDER` | `blender` | empty disables previews |
+| `GEN3D_PREVIEW_DEVICE` | `gpu` | `cpu` renders previews with Mesa's software rasterizer (llvmpipe) instead of the GPU; see below |
+| `GEN3D_PREVIEW_MAX_FACES` | 300000 | meshes above this are simplified for the preview only (the saved mesh is untouched); 0 = never |
+| `GEN3D_PREVIEW_TIMEOUT_S` | 180 | a preview render that runs longer is killed and the stage fails |
 | `GEN3D_KEEP_ALIVE_S` | 330 | HTTP keep-alive; keep it above the browser's |
 | `GEN3D_FAKE_WORKER` / `GEN3D_FAKE_SPEED` | empty / 20 | simulate the GPU, N× faster than real |
+
+### Preview renders
+
+`scripts/render_blender.py` draws the 4-view sheet with Blender's Workbench at 384 px a view (768 px
+sheet; at most 512 a view), flat shading, no shadows or cavity. Workbench draws through OpenGL, so
+**it uses the GPU even with `blender -b`** (`GEN3D_PREVIEW_DEVICE=gpu`, the default). With `cpu`,
+Blender starts with `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe --gpu-backend opengl`, and the
+script refuses to render unless the GL context is llvmpipe/softpipe, so it never falls back to the GPU.
+Meshes over `GEN3D_PREVIEW_MAX_FACES` are simplified in memory by vertex clustering (a Weld modifier at
+diagonal/2000, /1000, /500, /250, the first that fits; /250 is about a pixel of a tile). Timings on
+llvmpipe here (32 threads): a cube 1.3 s, 400k triangles 3.7 s, 1.3M 3.2 s, a 24.7M-triangle TRELLIS
+mesh (370 MB) 54 s, down to 263k triangles (149 s without the clustering).
+Blender runs with `--factory-startup --disable-autoexec` and imports only `.glb`, `.obj` and `.ply`;
+a GLB whose buffers or images point at outside files (anything but `data:` URIs) is refused, as are
+`.gltf`, `.stl` and `.off` uploads (split them with the parts stage first; its output is previewed).
 
 ## Troubleshooting
 

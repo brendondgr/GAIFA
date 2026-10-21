@@ -700,6 +700,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - **Small debts on the way:** stop calling the private `runner._publish_job`, and add `lowpoly` to the CLI presets.
   - **Tests:** extend the existing 25 (fake worker) to cover the folder layout and `output.json`.
 - [x] **8.3 `services/gen3d/service.toml`.** *As built:* also `GEN3D_BLENDER = "~/.local/bin/blender"`, retry as a memory trigger, and the "Job time per stage" widget from 8.7.
+  *Preview, overnight 2026-10-21:* the 02:11 GPU ring timeout was Blender drawing a broken 24.7M-triangle TRELLIS mesh with shadows and cavity on. Now: Workbench without shadows or cavity; meshes over `GEN3D_PREVIEW_MAX_FACES` (300k) are simplified by vertex clustering for the picture only (that mesh: 263k, 54 s on the CPU); `--factory-startup --disable-autoexec`; only GLB/OBJ/PLY, and no GLB that points at outside files; `GEN3D_PREVIEW_DEVICE=cpu` renders on Mesa llvmpipe and refuses to fall back to the GPU (default `gpu`); `GEN3D_PREVIEW_TIMEOUT_S` (180) kills a stuck render.
   - **run:** `.venv/bin/python -m gen3d`, port 5050.
   - **env:**
     - `GEN3D_HOST`, `GEN3D_PORT`, `GEN3D_NO_SYSTEMD=1`

@@ -150,6 +150,9 @@ class ModelsSpec(_Strict):
         return v
 
 
+LOGO_TYPES = (".svg", ".png", ".webp")
+
+
 class OutputsSpec(_Strict):
     kinds: list[OutputKind] = []
 
@@ -173,7 +176,20 @@ class WidgetSpec(_Strict):
 class UiSpec(_Strict):
     page: str | None = None
     native: str | None = None
+    logo: str | None = None   # plan 33.1: unset = ui/logo.svg when that file exists
     widgets: list[WidgetSpec] = []
+
+    @field_validator("logo")
+    @classmethod
+    def _logo(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        p = Path(v)
+        if p.is_absolute() or ".." in p.parts or p.parts[:1] != ("ui",) or len(p.parts) < 2:
+            raise ValueError(f"{v!r} must be a file inside the mod's ui/ folder")
+        if p.suffix.lower() not in LOGO_TYPES:
+            raise ValueError(f"{v!r} must be an .svg, .png or .webp image")
+        return v
 
     @field_validator("page")
     @classmethod

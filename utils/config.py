@@ -76,10 +76,20 @@ class DashboardCfg(_Strict):
     ranges: dict[str, str] = {}
 
 
+class NavCfg(_Strict):
+    """`[ui.nav]`: the sidebar's choices (plan 33.2): the thin rail, how services are shown, which are left out."""
+
+    collapsed: bool = False
+    services: Literal["list", "button", "counts"] = "list"
+    hidden: list[str] = []          # mod ids left out of the sidebar's list (new mods show)
+    folded: bool = False            # the list folded under its SERVICES header
+
+
 class UiCfg(_Strict):
     theme: Literal["system", "light", "dark"] = "system"
     density: Literal["comfortable", "compact"] = "compact"
     dashboard: DashboardCfg = DashboardCfg()
+    nav: NavCfg = NavCfg()
 
 
 class ServiceOverride(_Strict):

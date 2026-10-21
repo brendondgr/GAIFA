@@ -29,6 +29,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | J — The agent reads, searches and works | 24–30 | Documents, text and code in Chat; permission tiers and grants; web search (SearXNG); workspaces with edits in place, a sandbox and chat modes; search by meaning (EmbeddingGemma 2); speech to text; an Auto mode with a local judge | Chat, the approvals and the outputs index (additive); four new mods |
 | K — One GPU job at a time | 31 | A hub-wide GPU slot that mods take around their GPU work: a queue, groups for LLM engines, leases that expire, the queue in the UI | comfy, gen3d, tts, stt, decide, embed and the relay (each takes the slot); nothing is removed |
 | L — Replies you can act on | 32 | Under a reply, the pages it read (with their icons) and Copy in three ways; Select → Reply with the quote as markdown | Chat, the agent's send API, the web mod (a favicon route); additive |
+| M — Navigation | 33 | The sidebar in three groups, services shown as a list, a button or counts, a thin rail with state colours, a logo per mod, a Services page | the UI shell, `[ui.nav]`, a `[ui] logo` per mod; additive |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -65,6 +66,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 30 | Auto mode: a small local judge, and a `decide` mod for decision models | M–L | Auto in the mode picker; judged calls with their reasons; the decide page |
 | 31 | The GPU queue: one generative GPU job at a time | L | the header's GPU section, the Overview widget, waiting rows in Chat and on mod pages |
 | 32 | The reply bar and Select → Reply | M | `chat`: Sources, Copy and thumbs under a reply; the Reply button on a selection, the quote chip and the quote on a message |
+| 33 | The sidebar: groups, a thin rail and service logos | M | the sidebar (groups, the rail, the Services menu), the Services page, a logo per mod |
 
 # Stage A — Foundation
 
@@ -2885,6 +2887,51 @@ Asked for 2026-10-21, after Perplexity's reply bar and Claude's Select → Reply
 **Checks & deliverables — Phase 32**
 - [x] Delivered: `web/chat/chat-replybar.js`, `chat-sources.js`, `chat-copy.js`, `chat-quote.js`, `chat-mock-web.js`, `services/web/favicons.py`, the agent's `quote`, the tests.
 - [ ] Live with you: a researched answer copies in each of the three ways, and a quoted follow-up is answered about the quoted part.
+
+---
+
+## Phase 33 — The sidebar: groups, a thin rail and service logos
+
+The sidebar lists every mod under SERVICES (brief §3), so with 14 mods it scrolls, and several mods share an icon (three `search`, two `wave`, two `cpu`, two `chat`). This phase splits it into three groups (Overview, Chat and Outputs at the top; the services in the middle; Learning, Models and Settings at the bottom), lets the user choose which services it lists and how (a list, one button, or one button with counts), folds the list, and collapses the whole sidebar to a thin rail that still shows each service's state by colour. Every mod gets its own logo. Asked for by the user 2026-10-21 (OpenCode's logo supplied). Touches brief §3 and §6 (`ServiceSummary.logo_url`, `Settings.ui.nav`), architecture §4.3 (`[ui] logo`) and §9 (`[ui.nav]`).
+
+**Gaps, with the assumptions taken:**
+- **Logos for ComfyUI, SearXNG, vLLM and llama.cpp:** only OpenCode's was supplied. *Assumption:* the others get original marks in one style (a tinted rounded square with a white glyph); an official file can replace any of them by dropping it in `services/<id>/ui/logo.svg`.
+- **What counts as active, inactive, failed:** *Assumption:* active = `ready`, `degraded`, `starting` (pulsing); inactive = `stopped`, `stopping`; failed = `failed` or a mod with manifest errors.
+- **Where the choices are kept:** *Assumption:* `config.toml [ui.nav]` (they follow you between browsers, like the dashboard layout), mirrored in `localStorage` (`hub.nav`) so the first paint is right before the settings load.
+- **Phones:** the sidebar stays the slide-in drawer, always expanded; the rail is for desktop (≥ 1024 px).
+
+- [x] **33.1 Service logos: `[ui] logo`, `ServiceSummary.logo_url`, a logo in every mod.**
+  - **Manifest:** `UiSpec.logo` (`utils/manifest.py`), a file inside the mod's `ui/` folder ending `.svg`, `.png` or `.webp`; unset means `ui/logo.svg` when that file exists.
+  - **API:** `logo_url` on the summary (`utils/services/views.py`, `utils/api_models.py`): `/ui/services/<id>/<file>` (served by the existing `mod_ui` route), or `null`.
+  - **Logos:** `services/<id>/ui/logo.svg` for every mod (OpenCode's own mark on a dark tile); `_template` has none, so a new mod shows the UI's fallback: a monogram on a colour taken from its id.
+  - **Docs:** architecture §4.2–4.3 (`[ui] logo`), brief §6 `ServiceSummary.logo_url`, docs/mods.md.
+  *Done when:* `utils/tests/services/test_logo.py` (the default file, `[ui] logo` naming another, no file → `null`, a path outside `ui/` or another type is a manifest error; every mod in `services/` but `_template` has a logo and no two are the same file).
+
+- [x] **33.2 `[ui.nav]`: the sidebar's choices in Settings.**
+  - **Config:** `NavCfg` under `UiCfg` (`utils/config.py`): `collapsed: bool = false`, `services: "list" | "button" | "counts" = "list"`, `hidden: list[str] = []` (mod ids left out of the list; new mods show), `folded: bool = false`.
+  - **Settings:** `Settings.ui.nav` in `utils/settings.py` and `utils/api_models.py`, saved like `ui.dashboard` (the table replaced; all defaults → the table removed).
+  - **Docs:** architecture §9, brief §6 `Settings.ui.nav`.
+  *Done when:* `utils/tests/settings/test_settings_nav.py` (defaults in `GET /api/settings`; a `PUT` writes `[ui.nav]` and reads back; back to defaults removes the table; a bad `services` value is `422 invalid_config` with `data.field`).
+
+- [x] **33.3 The sidebar module: `web/nav/sidebar.js`, `web/nav/nav-model.js`.**
+  - **Groups:** top: Overview, Chat, Outputs; Services; bottom (pushed down): Learning (while the agent mod is installed), Models, Settings; the footer as now (hub dot, version, MOCK).
+  - **Services, by `nav.services`:** `list`: a SERVICES header that folds the list (caret, `nav.folded`), the visible mods (logo, name, state dot), then **See all** (always); `button`: one Services item like the others; `counts`: the same item with green / grey / red counts. Hovering the header or item shows a gear: a menu with *Show as* (List · Button · Button with counts) and a checkbox per mod (*Show all*, *Hide all*).
+  - **Rail:** a collapse button beside the logo; collapsed, the sidebar is 56 px: icons with tooltips, each listed mod's logo with a status dot (green active, grey inactive, red failed), and in the button modes the Services icon over a three-colour bar of the counts. The expand button sits under the logo.
+  - **Logos:** `web/nav/logo.js` `ServiceLogo` (the mod's `logo_url`, else the monogram) with the status dot; used by the sidebar and 33.4.
+  - **Hub.dc.html:** the `<aside>`'s nav becomes `{{ sb.navEl }}`; `vmShell` passes services, route, `nav`, and `setNav` (shown at once, saved to `[ui.nav]` after 0.5 s, `localStorage` `hub.nav`); `loadExtras` reads `ui.nav`. PATCHES.md row.
+  *Done when:* `utils/tests/web/nav.test.mjs` (state buckets; the visible list with hidden ids, removed mods and new mods; the counts; the monogram's colour is stable per id and differs for the installed ids; the groups and Learning only with the agent mod); a browser check (33's Checks).
+
+- [x] **33.4 The Services page `#/services`: `web/nav/services-page.js`.**
+  - **Page:** a title with the counts, filter chips (All · Active · Inactive · Failed), a search box, and a card per mod: logo, name, id, description, state badge, memory, port, Open, Start or Stop, and an *In sidebar* switch; above the cards, *Sidebar shows* (List · Button · Button with counts). Hidden mods are listed too.
+  - **Hub.dc.html:** route `services` (`pg.services`, the header title, the tab title), mounted as `{{ svcsEl }}`; the palette gets the page and **Toggle sidebar**.
+  - **Docs:** brief §3 (the sidebar, the rail, the Services page, the route), structure.
+  *Done when:* `nav.test.mjs` covers the filters and search; a browser check.
+
+**Wire — Phase 33:** the sidebar and the Services page, on the live `services` and `settings` areas (and in `?mock`).
+
+**Checks & deliverables — Phase 33**
+- [ ] *Checked 2026-10-21 on a second hub (port 7077, this repo's mods not started, fake mods running and crashing): the three groups, the gear menu (modes, per-mod checkboxes, quick toggles), Counts, the rail in list and counts modes with state colours, collapse kept after a reload from `[ui.nav]` alone, fold, the Services page's switches, light theme, the phone drawer.* On the installed hub: collapse and expand (kept after a reload and in another browser), the rail's colours match the mods' states, hide and show mods from the gear menu and from the Services page, the three modes, fold the list, See all, light theme, the phone drawer.
+- [x] Delivered: `web/nav/sidebar.js`, `nav-model.js`, `logo.js`, `services-page.js`, a `ui/logo.svg` per mod, `[ui] logo`, `logo_url`, `[ui.nav]`, the tests.
 
 ---
 

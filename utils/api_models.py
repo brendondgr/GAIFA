@@ -59,6 +59,7 @@ class ServiceSummary(_Model):
     stats: list[Stat]
     has_page: bool
     page_url: str | None
+    logo_url: str | None = Field(description="The mod's logo (`[ui] logo`, else `ui/logo.svg`), or null: the UI draws a monogram")
     has_outputs: bool
     native_ui: str | None
     enabled: bool
@@ -609,10 +610,19 @@ class DashboardLayout(_Model):
     ranges: dict[str, str] = Field({}, description="Widget key → its chosen range")
 
 
+class NavSettings(_Model):
+    """`[ui.nav]`: the sidebar (plan 33.2)."""
+    collapsed: bool = Field(False, description="The sidebar is the thin rail")
+    services: Literal["list", "button", "counts"] = Field("list", description="Services as a list, one button, or a button with counts")
+    hidden: list[str] = Field([], description="Mod ids left out of the sidebar's list")
+    folded: bool = Field(False, description="The list is folded under its header")
+
+
 class UiSettings(_Model):
     theme: Literal["system", "light", "dark"]
     density: Literal["comfortable", "compact"]
     dashboard: DashboardLayout
+    nav: NavSettings = NavSettings()
 
 
 class LearningSettings(_Model):

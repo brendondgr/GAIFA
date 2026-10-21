@@ -97,6 +97,8 @@ The source returns `WidgetData`: `{"unit": "calls", "t": [unix…], "series": [{
 - Use `rows: [{…}]` for `table`.
 - Each series has one value per point. `aihub check` validates all of this; the Overview dashboard draws widgets from Phase 6.
 
+**A logo.** Put a 24×24 SVG at `ui/logo.svg` (or name another `.svg`, `.png` or `.webp` in `ui/` with `[ui] logo`). The sidebar, the Services page, the Overview tiles and the service header show it, with the mod's state as a dot in the thin rail; a mod without one gets a monogram. Every installed mod has its own (`utils/tests/services/test_logo.py` checks that no two are the same file); `aihub new` copies none.
+
 **Level 3: your own tabs.** `[ui] page = "ui/page.js"`:
 ```js
 export default {

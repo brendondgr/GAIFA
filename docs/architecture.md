@@ -182,6 +182,7 @@ kinds = ["audio"]
 [ui]
 page = "ui/page.js"                 # optional custom page (or "ui/Page.dc.html")
 native = "/ui/"                     # optional: the mod's own UI, linked from its page header
+logo = "ui/logo.svg"                # optional (plan 33.1): .svg, .png or .webp inside ui/; unset = ui/logo.svg if it exists
 
 [[ui.widgets]]                      # optional: charts for the Overview dashboard
 id = "clips"
@@ -220,7 +221,7 @@ skills = "skills"                   # optional: skills/<name>/SKILL.md for the a
 - `command` is a list, or a string split like a shell would. The executable resolves against the mod folder when it contains a `/` (`.venv/bin/python`); a bare name (`python3`) is looked up on `PATH`. Other arguments starting with `./` or `../` also resolve against the mod folder; the rest are passed as written (relative to `cwd`).
 - Numbers and booleans in `env` become strings (`2` → `"2"`, `false` → `"false"`).
 - Operations (`[memory]`, `[[ui.widgets]].source`, `[tools]`, `[api.responses]` keys) are written `"METHOD /path"`.
-- `[ui].page` must be inside the mod's `ui/` folder.
+- `[ui].page` must be inside the mod's `ui/` folder, and so must `[ui].logo` (an `.svg`, `.png` or `.webp`). The summary's `logo_url` is `/ui/services/<id>/<file>`, or null when the file is missing.
 - Two mods can't share a port, and no mod may use the hub's port.
 - Mods not mentioned in `config.toml` are enabled and autostart.
 
@@ -523,6 +524,12 @@ density = "compact"         # or "comfortable"
 order = ["kpi", "memory-time", "memory-now"]
 hidden = ["heatmap"]
 ranges = { memory-time = "6h" }
+
+[ui.nav]                    # the sidebar (plan 33.2, written by the UI; only what differs from the defaults)
+collapsed = true            # the thin rail
+services = "counts"         # "list" (default), "button" or "counts"
+hidden = ["fake-ok"]        # mods left out of the sidebar's list
+folded = false              # the list folded under its header
 
 [services]
 order = ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode"]

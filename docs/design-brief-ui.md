@@ -146,6 +146,19 @@ Keep lcpp's set (Button, Badge, Chip, StatusDot, Toggle, Segmented, Field, Memor
 6. **Settings**
 7. Footer: AIHub status dot + version, and a `MOCK` badge in mock mode.
 
+**As built (plan 33, 2026-10-21; `web/nav/`):** the sidebar has three groups. **Overview**, **Chat**, **Outputs** sit on top; the services are in the middle; **Learning** (while the agent mod is installed), **Models** and **Settings** are at the bottom. The top and bottom groups stay put and only the services scroll. The services show in one of three ways (`Settings.ui.nav.services`):
+- `list`: a **SERVICES** header that folds the list (its counts show while folded), one item per listed mod (its logo, name and a state dot), then **See all**, always.
+- `button`: one **Services** item, like the others.
+- `counts`: the same item with how many are active (green), inactive (grey) and failed (red).
+
+Hovering the header or the item shows a gear. Its menu picks the way they show and has a checkbox per mod (*Show all*, *Hide all*); hidden mods are left out of the list only, and new mods show. Active means `ready`, `degraded` or `starting`; inactive means `stopped` or `stopping`; failed means `failed` or a manifest error. Starting and stopping pulse.
+
+A button beside the logo **collapses** the sidebar to a 56 px rail: icons with tooltips, each listed mod's logo with its state dot, and in the button modes (or folded) the Services icon over a three-colour bar of the counts. The expand button sits under the logo.
+
+Every mod has a logo (`ServiceSummary.logo_url`); one without gets a monogram on a colour from its id. Logos also replace the icons on the Overview tiles and the service page header. Phones keep the drawer, always expanded. The choices are saved in `config.toml [ui.nav]` about 0.5 s after a change and kept in this browser (`localStorage` `hub.nav`) for the first paint.
+
+**See all** opens the **Services page** `#/services`. It has the counts, filter chips (All · Active · Inactive · Failed), a search, *Sidebar shows* (List · Button · Button with counts), and a card per mod (listed or not): logo, name, id, state, description, port, memory, version, Open, Start or Stop, and an *In sidebar* switch. The header Search has the page and **Collapse / Expand the sidebar**.
+
 **Persistent header** (every view):
 - **Memory meter**: unified memory used / total (this machine shares one memory pool between CPU and GPU). It turns amber above 80% and red above 92%. Clicking it opens a popover with the `MemoryBar` broken down by service.
 - **Running jobs chip** ("2 running"), shown only when a service reports jobs. Clicking opens a popover listing them with progress and links.
@@ -155,7 +168,7 @@ Keep lcpp's set (Button, Badge, Chip, StatusDot, Toggle, Segmented, Field, Memor
 **Toasts** sit bottom-right (bottom-center on phones). Errors stay until dismissed; successes auto-hide after 4 s.
 
 **Hash routes** (reload keeps your place; Back works):
-`#/overview`, `#/s/<serviceId>`, `#/s/<serviceId>/<tabId>`, `#/models`, `#/models/<modelId>`, `#/outputs`, `#/outputs/<outputId>`, `#/settings`, `#/settings/<section>`.
+`#/overview`, `#/services`, `#/s/<serviceId>`, `#/s/<serviceId>/<tabId>`, `#/models`, `#/models/<modelId>`, `#/outputs`, `#/outputs/<outputId>`, `#/settings`, `#/settings/<section>`.
 
 ---
 
@@ -420,6 +433,7 @@ interface ServiceSummary {
   stats: Stat[];                 // ≤ 4
   has_page: boolean;
   page_url: string | null;       // where the shell loads the page: /ui/services/<id>/page.js or /Mod_<id>.dc.html
+  logo_url: string | null;       // plan 33.1: the mod's logo ([ui] logo, else ui/logo.svg), or null: the UI draws a monogram
   has_outputs: boolean;
   native_ui: string | null;      // URL of the service's own UI, if any
   enabled: boolean;
@@ -576,7 +590,8 @@ interface Settings {
   memory: { reserve_gb: number; auto_make_room: boolean; never_unload: string[]; priority: string[] };
   services: { order: string[]; enabled: Record<string, boolean>; autostart: Record<string, boolean> };
   ui: { theme: "system" | "light" | "dark"; density: "comfortable" | "compact";   // compact is the default
-        dashboard: { order: string[]; hidden: string[]; ranges: Record<string, string> } };   // Customize (§11.5), saved in config.toml
+        dashboard: { order: string[]; hidden: string[]; ranges: Record<string, string> };   // Customize (§11.5), saved in config.toml
+        nav: { collapsed: boolean; services: "list" | "button" | "counts"; hidden: string[]; folded: boolean } };   // the sidebar (plan 33.2), [ui.nav]; send it whole
   learning: { enabled: boolean;   // plan 21: preferences on the cards and the learner; off = nothing filled or learned
               nightly_at: string; idle_min: number; infer_after: number; fade_days: number };
   speech_input: { mics: string[];   // plan 29.4: microphone labels, most preferred first; the first one present is used

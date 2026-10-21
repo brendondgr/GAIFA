@@ -36,51 +36,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
 </style>
 </helmet>
 <div style="{{ rootSt }}">
-<aside aria-label="Main navigation" style="{{ sb.style }}">
-  <div style="display:flex;align-items:center;gap:10px;padding:16px 16px 14px">
-    <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="#FFB224"></rect><g stroke="#1A1200" stroke-width="2.2" stroke-linecap="round"><path d="M16 16 9.5 9.5M16 16l6.5-6.5M16 16l-6.5 6.5M16 16l6.5 6.5"></path></g><g fill="#1A1200"><circle cx="16" cy="16" r="4.6"></circle><circle cx="8.6" cy="8.6" r="2.7"></circle><circle cx="23.4" cy="8.6" r="2.7"></circle><circle cx="8.6" cy="23.4" r="2.7"></circle><circle cx="23.4" cy="23.4" r="2.7"></circle></g><circle cx="16" cy="16" r="1.8" fill="#FFB224"></circle></svg>
-    <span style="font-weight:600;font-size:15px;letter-spacing:-.01em">AIHub</span>
-    <span style="flex:1"></span>
-    <sc-if value="{{ mob }}" hint-placeholder-val="{{ false }}">
-      <button onClick="{{ sb.close }}" aria-label="Close navigation" style="width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--mut,#8A94A6);cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="{{ ic.x }}"></path></svg></button>
-    </sc-if>
-  </div>
-  <nav style="display:flex;flex-direction:column;gap:2px;padding:0 8px 12px">
-    <sc-for list="{{ sb.top }}" as="n" hint-placeholder-count="1">
-      <a href="{{ n.href }}" aria-current="{{ n.cur }}" style="{{ n.st }}" style-hover="background:var(--hov,#161C28);color:var(--tx,#E6EAF2);text-decoration:none">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ n.d }}"></path></svg>
-        <span>{{ n.label }}</span>
-      </a>
-    </sc-for>
-    <div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6);padding:18px 10px 6px">Services</div>
-    <sc-for list="{{ sb.svcs }}" as="n" hint-placeholder-count="6">
-      <a href="{{ n.href }}" aria-current="{{ n.cur }}" style="{{ n.st }}" style-hover="background:var(--hov,#161C28);color:var(--tx,#E6EAF2);text-decoration:none">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ n.d }}"></path></svg>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ n.label }}<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">{{ n.sr }}</span></span>
-        {{ n.dot }}
-      </a>
-    </sc-for>
-    <div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6);padding:18px 10px 6px">Library</div>
-    <sc-for list="{{ sb.lib }}" as="n" hint-placeholder-count="2">
-      <a href="{{ n.href }}" aria-current="{{ n.cur }}" style="{{ n.st }}" style-hover="background:var(--hov,#161C28);color:var(--tx,#E6EAF2);text-decoration:none">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ n.d }}"></path></svg>
-        <span>{{ n.label }}</span>
-      </a>
-    </sc-for>
-    <div style="height:14px"></div>
-    <sc-for list="{{ sb.bottom }}" as="n" hint-placeholder-count="1">
-      <a href="{{ n.href }}" aria-current="{{ n.cur }}" style="{{ n.st }}" style-hover="background:var(--hov,#161C28);color:var(--tx,#E6EAF2);text-decoration:none">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ n.d }}"></path></svg>
-        <span>{{ n.label }}</span>
-      </a>
-    </sc-for>
-  </nav>
-  <div style="margin-top:auto;padding:12px 16px;border-top:1px solid var(--bd,#1D2430);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut,#8A94A6)">
-    {{ sb.hubDot }}<span>{{ sb.hubLabel }}</span><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px">{{ sb.version }}</span>
-    <span style="flex:1"></span>
-<sc-if value="{{ sb.showMock }}" hint-placeholder-val="{{ true }}">    <button onClick="{{ openMock }}" title="Mock scenarios (Shift+D)" style="height:20px;padding:0 7px;border-radius:4px;border:1px solid var(--pu,#BC8CFF);background:var(--tpu,rgba(188,140,255,.13));color:var(--pu,#BC8CFF);font-size:10.5px;font-weight:600;letter-spacing:.06em;cursor:pointer">MOCK</button></sc-if>
-  </div>
-</aside>
+<aside aria-label="Main navigation" style="{{ sb.style }}">{{ sb.navEl }}</aside>
 <sc-if value="{{ sb.backdrop }}" hint-placeholder-val="{{ false }}">
   <div onClick="{{ sb.close }}" aria-hidden="true" style="position:fixed;inset:0;z-index:55;background:var(--ov,rgba(3,5,9,.62))"></div>
 </sc-if>
@@ -179,7 +135,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
             <sc-for list="{{ ov.tiles }}" as="t" hint-placeholder-count="6">
               <article class="hubtile" style="{{ t.cardSt }}">
                 <div style="display:flex;align-items:center;gap:8px;min-width:0">
-                  <span style="{{ t.icoSt }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ t.d }}"></path></svg></span>
+                  {{ t.logoEl }}
                   <a href="{{ t.href }}" style="flex:1;min-width:0;font-weight:600;font-size:13px;color:var(--tx,#E6EAF2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.name }}</a>
                   <span class="hubacts" style="display:inline-flex;gap:4px;flex:none">
                     <sc-for list="{{ t.actions }}" as="a" hint-placeholder-count="2"><button onClick="{{ a.on }}" disabled="{{ a.dis }}" title="{{ a.label }}" aria-label="{{ a.aria }}" style="{{ a.st }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ a.d }}"></path></svg>{{ a.text }}</button></sc-for>
@@ -307,7 +263,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
       <sc-if value="{{ sv.ok }}" hint-placeholder-val="{{ false }}">
         <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
           <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px">
-            <span style="width:46px;height:46px;flex:none;border-radius:10px;background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);display:grid;place-items:center;color:var(--tx,#E6EAF2)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ sv.d }}"></path></svg></span>
+            {{ sv.logoEl }}
             <div style="flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:6px">
               <h1 style="{{ h1St }}">{{ sv.name }}</h1>
               <p style="margin:0;color:var(--mut,#8A94A6);text-wrap:pretty">{{ sv.desc }}</p>
@@ -866,6 +822,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
     <sc-if value="{{ pg.chat }}" hint-placeholder-val="{{ false }}">
       <div style="flex:1;min-height:0;display:flex;flex-direction:column">{{ chatEl }}</div>
     </sc-if>
+    <sc-if value="{{ pg.services }}" hint-placeholder-val="{{ false }}">{{ svcsEl }}</sc-if>
   </main>
 </div>
 <sc-if value="{{ pop.any }}" hint-placeholder-val="{{ false }}">
@@ -1177,6 +1134,7 @@ class Component extends DCLogic {
     jopen: {}, speed: 1,
     // revision 2: Overview views, dashboard layout (Settings.ui.dashboard), metric history for sparklines
     ovView: lsGet('hub.ovView', 'dashboard'), dash: { order: [], hidden: [], ranges: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
+    nav: (() => { try { return JSON.parse(lsGet('hub.nav', 'null')); } catch { return null; } })(),  // plan 33: Settings.ui.nav, this browser's copy first
     tlRange: lsGet('hub.tlRange', '24h'), tlTable: false, svcRange: lsGet('hub.svcRange', '24h'), tileMenu: null, outTick: 0,
     approvals: [], apLoaded: false, toolIx: null, sessions: [],  // sessions: the palette's "Switch to …" (Wire 15)  // Phase 13 Wire: the header's Approvals popover; the API tab's tool risk levels
   };
@@ -1196,6 +1154,7 @@ class Component extends DCLogic {
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
     this.pages = {}; this.modListeners = new Set();
     const imp = f => import(new URL(f, location.href).href);
+    Promise.all([imp('nav/sidebar.js'), imp('nav/services-page.js')]).then(([a, b]) => { this.Nav = a; this.SvcsPage = b; this.forceUpdate(); });  // plan 33: the sidebar and the Services page
     const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning, hidden, palMeaning] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
       imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js'), imp('outputs/meaning.js'), imp('outputs/hidden.js'), imp('palette-meaning.js')]);
     this.Viewer = viewer;  // plan 24.7: the text and PDF viewer in the Outputs drawer
@@ -1237,7 +1196,7 @@ class Component extends DCLogic {
       parts.push(d?.name || r.parts[1] || 'Service');
     } else if (r.page === 'settings') { if (r.parts[1]) parts.push(cap(r.parts[1])); parts.push('Settings'); }
     else if (r.page === 'outputs' && r.parts[1]) parts.push((s.out?.detail?.id === r.parts[1] && s.out.detail.title) || (s.out?.items || []).find(o => o.id === r.parts[1])?.title || 'Output', 'Outputs');
-    else parts.push({ overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs' }[r.page] || cap(r.page));
+    else parts.push({ overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', services: 'Services' }[r.page] || cap(r.page));
     const n = s.approvals?.length || 0;
     return (n ? `(${n}) ` : '') + [...parts, s.hubDown ? 'AIHub (down)' : 'AIHub'].join(' · ');
   }
@@ -1295,6 +1254,7 @@ class Component extends DCLogic {
     this.api.getSettings().then(st => {
       const u = st.ui || {};
       this.setState({ dash: { order: [], hidden: [], ranges: {}, ...(u.dashboard || {}) } });
+      if (u.nav && !this.navT) { this.setState({ nav: u.nav }); lsSet('hub.nav', JSON.stringify(u.nav)); }
       if (lsGet('hub.density', null) == null && u.density) this.setState({ density: u.density });  // this browser hasn't chosen: use the saved one
       if (lsGet('hub.theme', null) == null && u.theme && u.theme !== this.state.theme) { this.setState({ theme: u.theme }); this.applyTheme(u.theme); }
     }).catch(() => {});
@@ -1324,6 +1284,19 @@ class Component extends DCLogic {
         const r = await this.api.saveSettings({ ui: { dashboard: next } }), saved = r.settings.ui.dashboard;
         this.setState(st => st.st.orig ? { st: { ...st.st, orig: { ...st.st.orig, ui: { ...st.st.orig.ui, dashboard: saved } }, draft: { ...st.st.draft, ui: { ...st.st.draft.ui, dashboard: saved } } } } : null);
       } catch (e) { this.err(e); }
+    }, 500);
+  };
+  // Plan 33: the sidebar's choices: shown at once, kept in this browser, saved to config.toml ([ui.nav]) shortly after.
+  // `next` is the whole nav or a function of the latest one (two quick toggles both count).
+  setNav = next => {
+    if (typeof next === 'function') next = next(this.navNow || this.state.nav);
+    this.navNow = next; this.setState({ nav: next }); lsSet('hub.nav', JSON.stringify(next));
+    clearTimeout(this.navT);
+    this.navT = setTimeout(async () => {
+      try {
+        const r = await this.api.saveSettings({ ui: { nav: next } }), saved = r.settings.ui.nav;
+        this.setState(st => st.st.orig ? { st: { ...st.st, orig: { ...st.st.orig, ui: { ...st.st.orig.ui, nav: saved } }, draft: { ...st.st.draft, ui: { ...st.st.draft.ui, nav: saved } } } } : null);
+      } catch (e) { this.err(e); } finally { this.navT = null; this.navNow = null; }
     }, 500);
   };
   bumpOutputs() { clearTimeout(this.outT); this.outT = setTimeout(() => this.setState(s => ({ outTick: s.outTick + 1 })), 2000); }
@@ -1812,7 +1785,8 @@ class Component extends DCLogic {
   }
   palItems() {
     const out = [], nav = h => () => { this.setState({ palette: null }); this.go(h); }, run = fn => () => { this.setState({ palette: null }); fn(); };
-    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['Learning', '#/s/agent/learning', ICON.bulb], ['Models', '#/models', ICON.layers], ['Outputs', '#/outputs', ICON.folder], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
+    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['Outputs', '#/outputs', ICON.folder], ['Services', '#/services', ICON.puzzle], ['Learning', '#/s/agent/learning', ICON.bulb], ['Models', '#/models', ICON.layers], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
+    if (this.state.vw >= 1024) { const n = this.state.nav || {}; out.push({ label: n.collapsed ? 'Expand the sidebar' : 'Collapse the sidebar', sub: 'Action', d: ICON.menu, run: run(() => this.setNav({ collapsed: false, services: 'list', hidden: [], folded: false, ...n, collapsed: !n.collapsed })) }); }  // plan 33
     this.state.services.forEach(sv => {
       const d = ICON[sv.icon] || ICON.puzzle;
       out.push({ label: sv.name, sub: `Service · ${sv.state}`, d, run: nav('#/s/' + sv.id) });
@@ -1916,7 +1890,7 @@ class Component extends DCLogic {
   tileVM(sv, compact = true) {
     const err = sv.manifest_errors.length > 0, h = React.createElement, C = this.C, idx = this.svcMap[sv.id]?.idx ?? 0, open = this.state.tileMenu === sv.id;
     const stats = sv.stats.slice(0, 4), hist = this.state.hist24?.series || {};
-    return { id: sv.id, name: sv.name, d: ICON[sv.icon] || ICON.puzzle, href: '#/s/' + sv.id,
+    return { id: sv.id, name: sv.name, d: ICON[sv.icon] || ICON.puzzle, href: '#/s/' + sv.id, logoEl: this.Nav ? h(this.Nav.ServiceLogo, { sv, size: compact ? 26 : 32 }) : null,  // plan 33.1
       sb: this.stateBadge(sv.state), hasErr: err, ok: !err, err: sv.manifest_errors[0] || '', errHref: `#/s/${sv.id}/settings`,
       line: [sv.port ? ':' + sv.port : 'no port', sv.kind === 'external' ? 'external' : null, sv.load !== 'n/a' ? sv.load : null, this.memText(sv), this.idleText(sv)].filter(Boolean).join(' · '),
       hasLastErr: !err && !!sv.last_error && sv.state === 'failed', lastErr: sv.last_error,
@@ -1962,20 +1936,17 @@ class Component extends DCLogic {
 
   vmShell(s, mob) {
     const r = s.route, m = s.memory, pct = m ? m.used_bytes / m.total_bytes : 0, tone = pct > 0.92 ? 'red' : pct > 0.8 ? 'accent' : 'cyan';
-    const sbBase = { display: 'flex', flexDirection: 'column', background: 'var(--sb,#0D1119)', borderRight: '1px solid var(--bd,#1D2430)', overflowY: 'auto', zIndex: 60 };
+    const sbBase = { display: 'flex', flexDirection: 'column', background: 'var(--sb,#0D1119)', borderRight: '1px solid var(--bd,#1D2430)', overflow: 'hidden', zIndex: 60 }, rail = !mob && !!s.nav?.collapsed;
     const sb = {
-      style: mob ? { ...sbBase, position: 'fixed', top: 0, bottom: 0, left: 0, width: 268, transform: s.navOpen ? 'none' : 'translateX(-105%)', transition: 'transform .2s ease', boxShadow: s.navOpen ? '0 0 60px rgba(0,0,0,.5)' : 'none', visibility: s.navOpen ? 'visible' : 'hidden' } : { ...sbBase, position: 'sticky', top: 0, height: '100vh', width: s.density === 'compact' ? 208 : 232, flex: 'none' },
+      style: mob ? { ...sbBase, position: 'fixed', top: 0, bottom: 0, left: 0, width: 268, transform: s.navOpen ? 'none' : 'translateX(-105%)', transition: 'transform .2s ease', boxShadow: s.navOpen ? '0 0 60px rgba(0,0,0,.5)' : 'none', visibility: s.navOpen ? 'visible' : 'hidden' } : { ...sbBase, position: 'sticky', top: 0, height: '100vh', width: rail ? this.Nav?.RAIL_W || 56 : s.density === 'compact' ? 208 : 232, flex: 'none', transition: 'width .15s ease' },
       backdrop: mob && s.navOpen, close: () => this.setState({ navOpen: false }),
-      top: [{ href: '#/overview', label: 'Overview', d: ICON.grid, on: r.page === 'overview' }, { href: '#/chat', label: 'Chat', d: ICON.chat, on: r.page === 'chat' },
-            ...(this.svcMap.agent ? [{ href: '#/s/agent/learning', label: 'Learning', d: ICON.bulb, on: r.page === 'service' && r.parts[1] === 'agent' }] : [])],
-      svcs: s.services.map(sv => { const [t, p] = STATE[sv.state] || ['dim', false]; const on = r.page === 'service' && r.parts[1] === sv.id; return { href: '#/s/' + sv.id, label: sv.name, d: ICON[sv.icon] || ICON.puzzle, on, sr: `, ${sv.manifest_errors.length ? 'manifest error' : sv.state}`, dot: this.dot(TONE[t][0], p) }; }),
-      lib: [{ href: '#/models', label: 'Models', d: ICON.layers, on: r.page === 'models' }, { href: '#/outputs', label: 'Outputs', d: ICON.folder, on: r.page === 'outputs' }],
-      bottom: [{ href: '#/settings', label: 'Settings', d: ICON.gear, on: r.page === 'settings' }],
-      hubDot: this.dot(s.hubDown ? TONE.red[0] : TONE.green[0], false), hubLabel: s.hubDown ? 'AIHub down' : 'AIHub', showMock: new URLSearchParams(location.search).has('mock') || !['system', 'services', 'models', 'outputs', 'memory', 'settings', 'metrics', 'tools', 'sessions'].every(a => this.api?.isLive(a)), version: 'v' + (s.system?.hub?.version || '0.1.0'),
+      // plan 33: web/nav/sidebar.js draws the groups, the services (list, button or counts), the rail and the footer
+      navEl: this.Nav ? React.createElement(this.Nav.Sidebar, { services: s.services, route: r, nav: s.nav, setNav: this.setNav, icons: ICON, mob, close: () => this.setState({ navOpen: false }), go: h => this.go(h),
+        hubDown: s.hubDown, version: 'v' + (s.system?.hub?.version || '0.1.0'), openMock: () => this.setState({ dialog: { kind: 'mock' } }),
+        showMock: !!this.api && (new URLSearchParams(location.search).has('mock') || !['system', 'services', 'models', 'outputs', 'memory', 'settings', 'metrics', 'tools', 'sessions'].every(a => this.api.isLive(a))) }) : null,
     };
-    [...sb.top, ...sb.svcs, ...sb.lib, ...sb.bottom].forEach(n => { n.st = navSt(n.on); n.cur = n.on ? 'page' : undefined; if (!n.dot) n.dot = null; if (!n.sr) n.sr = ''; });
     const running = s.jobs.filter(j => j.state === 'running' || j.state === 'queued');
-    const titles = { overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', settings: 'Settings', service: this.svcMap[r.parts[1]]?.name || 'Service' };
+    const titles = { overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', settings: 'Settings', services: 'Services', service: this.svcMap[r.parts[1]]?.name || 'Service' };
     const hd = {
       st: { position: 'sticky', top: 0, zIndex: 40, height: s.density === 'compact' ? 44 : 52, display: 'flex', alignItems: 'center', gap: 8, padding: '0 clamp(10px,2vw,20px)', background: 'var(--bg,#0B0E14)', borderBottom: '1px solid var(--bd,#1D2430)' },
       title: titles[r.page] || '', hasTitle: !!titles[r.page], memText: m ? `${(m.used_bytes / GB).toFixed(1)} / ${(m.total_bytes / GB).toFixed(1)} GB` : '— GB',
@@ -2029,7 +2000,7 @@ class Component extends DCLogic {
     if (sv.err) return { notFound: true, errTitle: sv.err.code === 'service_not_found' ? `No service "${sv.id}"` : 'Could not load this service', errText: sv.err.detail || '' };
     const d = { ...sv.detail, ...(this.svcMap[sv.id] || {}) }, mf = d.manifest_errors.length > 0;
     const tabs = this.tabsFor(d), tab = tabs.some(t => t.id === r.parts[2]) ? r.parts[2] : tabs[0].id;
-    const v = { ok: true, id: d.id, name: d.name, desc: d.description, d: ICON[d.icon] || ICON.puzzle, sb: this.stateBadge(mf ? 'failed' : d.state), hasLoad: d.load !== 'n/a', lb: this.loadBadge(d.load),
+    const v = { ok: true, id: d.id, name: d.name, desc: d.description, d: ICON[d.icon] || ICON.puzzle, logoEl: this.Nav ? React.createElement(this.Nav.ServiceLogo, { sv: d, size: 46 }) : null, sb: this.stateBadge(mf ? 'failed' : d.state), hasLoad: d.load !== 'n/a', lb: this.loadBadge(d.load),
       port: d.port ? `127.0.0.1:${d.port}` : 'no port', copyPort: () => this.copy(d.url, 'Base URL copied'), version: d.version ? 'v' + d.version : 'no version', mem: this.memText(d), kind: d.kind,
       memSpark: this.C ? React.createElement(this.C.Sparkline, { values: s.hist1?.series?.['mem.svc.' + d.id] || [], color: SERIES[(this.svcMap[d.id]?.idx ?? 0) % SERIES.length], height: 16, label: `${d.name} memory, last hour`, unit: 'bytes' }) : null,
       actions: this.svcActions(d, false), canRestart: !mf && !['stopped', 'stopping'].includes(d.state), restart: () => this.restart(d), restartSt: btn('sec'),
@@ -2380,8 +2351,8 @@ class Component extends DCLogic {
     const compact = s.density === 'compact';
     const dn = { td: { padding: compact ? '6px 10px' : '10px 12px', borderTop: '1px solid var(--bd,#1D2430)', verticalAlign: 'middle' }, th: { padding: compact ? '6px 10px' : '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--mut,#8A94A6)', whiteSpace: 'nowrap', background: 'var(--card,#11151D)' }, gap: compact ? 12 : 16 };
     const page = r.page, ready = s.ready;
-    const pg = { overview: ready && page === 'overview', service: ready && page === 'service', models: ready && page === 'models', outputs: ready && page === 'outputs', settings: ready && page === 'settings', chat: ready && page === 'chat',
-      unknown: ready && !['overview', 'service', 'models', 'outputs', 'settings', 'chat'].includes(page) };
+    const pg = { overview: ready && page === 'overview', service: ready && page === 'service', models: ready && page === 'models', outputs: ready && page === 'outputs', settings: ready && page === 'settings', chat: ready && page === 'chat', services: ready && page === 'services',
+      unknown: ready && !['overview', 'service', 'models', 'outputs', 'settings', 'chat', 'services'].includes(page) };
     const sv = pg.service ? this.vmService(s) : null;
     const showOutputs = pg.outputs || (pg.service && !!sv?.ok && r.parts[2] === 'outputs' && !!s.svc?.detail?.has_outputs);
     const { sb, hd } = this.vmShell(s, mob);
@@ -2401,6 +2372,7 @@ class Component extends DCLogic {
       md: pg.models ? this.vmModels(s, dn) : null,
       se: pg.settings ? this.vmSettings(s) : null,
       chatEl: pg.chat && this.Chat ? React.createElement(this.Chat.ChatPage, { api: this.api, route: r, toast: (t, l) => this.toast(t, l), confirm: o => this.confirm(o), openOutput: (id, at) => this.loadOutputDetail(id, at), openSessions: () => this.openSessions(), go: hh => this.go(hh) }) : null,
+      svcsEl: pg.services && this.SvcsPage ? React.createElement(this.SvcsPage.ServicesPage, { services: s.services, nav: s.nav, setNav: this.setNav, start: id => this.start(id), stop: sv => this.stop(sv), h1St: shell.h1St }) : null,  // plan 33.4
       restoreEl: ready && this.Sess ? React.createElement(this.Sess.RestorePrompt, { api: this.api, onRestore: id => this.openSessions(id) }) : null,
       ...(ovl => ({ ...ovl, odrSt: out?.dr?.isDoc && !mob ? { ...ovl.drawerSt, width: 'min(1100px, 100vw)' } : ovl.drawerSt }))(this.vmOverlays(s, mob)),  // plan 24.7: room for a page and its text
       goHome: () => this.go('#/overview'),

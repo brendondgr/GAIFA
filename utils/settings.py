@@ -37,7 +37,8 @@ def view(hub: Hub) -> dict[str, Any]:
         "services": {"order": rest(cfg.services.order),
                      "enabled": {s.id: s.eff.enabled for s in svcs},
                      "autostart": {s.id: s.eff.autostart for s in svcs}},
-        "ui": {"theme": cfg.ui.theme, "density": cfg.ui.density, "dashboard": cfg.ui.dashboard.model_dump()},
+        "ui": {"theme": cfg.ui.theme, "density": cfg.ui.density, "dashboard": cfg.ui.dashboard.model_dump(),
+               "nav": cfg.ui.nav.model_dump()},
         "learning": cfg.learning.model_dump(),
         "speech_input": cfg.speech_input.model_dump(),
         "judge": cfg.agent.judge.model_dump(),      # config.toml [agent.judge] (plan 30.3)
@@ -128,6 +129,9 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     if new["ui"]["dashboard"] != before["ui"]["dashboard"]:
         layout = {k: v for k, v in new["ui"]["dashboard"].items() if v}
         changes.setdefault("ui", {})["dashboard"] = config_mod.Replace(layout or None)
+    if new["ui"]["nav"] != before["ui"]["nav"]:   # plan 33.2: only what differs from the defaults is written
+        nav = {k: v for k, v in new["ui"]["nav"].items() if v != getattr(d.ui.nav, k)}
+        changes.setdefault("ui", {})["nav"] = config_mod.Replace(nav or None)
     for sid in known:
         for key in ("enabled", "autostart"):
             if sid in new["services"][key] and new["services"][key][sid] != before["services"][key].get(sid):

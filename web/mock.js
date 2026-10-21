@@ -275,7 +275,7 @@ export function createMockApi() {
     hub: { port: 7000 },
     memory: { reserve_gb: 12, auto_make_room: false, never_unload: ['lcpp'], priority: ['tts', 'comfy', 'gen3d', 'example', 'relay', 'lcpp'] },
     services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) },
-    ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} } },
+    ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} }, nav: { collapsed: false, services: 'list', hidden: [], folded: false } },
     learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
     speech_input: { mics: [], language: '', preset: 'balanced', mode: 'both' },
     judge: { backend: 'relay', model: 'minicpm-5-2B', url: 'http://127.0.0.1:4000', threshold: 0.95, timeout_s: 3, allow_commands: [], ask_commands: [] },
@@ -310,7 +310,7 @@ export function createMockApi() {
   function summary(s) {
     return { id: s.id, name: s.name, description: s.description, icon: s.icon, version: s.version, kind: s.kind, port: s.config?.port ?? s.port, url: `http://127.0.0.1:${s.config?.port ?? s.port}`,
       state: s.state, state_since: s.state_since, load: s.load, idle_s: s.load === 'n/a' ? null : s.idle_s, memory: { used_bytes: s.used, estimate_bytes: s.estimate, peak_bytes: s.peak },
-      stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
+      stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, logo_url: ['relay', 'lcpp', 'tts', 'gen3d', 'comfy', 'opencode'].includes(s.id) ? `/ui/services/${s.id}/logo.svg` : null, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
       last_error: s.last_error, manifest_errors: [...s.manifest_errors] };
   }
   function detail(s) {

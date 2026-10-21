@@ -32,7 +32,8 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             # installed mods missing from the lists follow the configured ids
             "memory": {"reserve_gb": 12, "auto_make_room": False, "never_unload": ["lcpp"], "priority": ["comfy", "tts", "gen3d", "fake-ok"]},
             "services": {"order": ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode", "fake-ok"], "enabled": {"fake-ok": True}, "autostart": {"fake-ok": True}},
-            "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}}},
+            "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}},
+                   "nav": {"collapsed": False, "services": "list", "hidden": [], "folded": False}},
             "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
             "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
             "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.95, "timeout_s": 3.0,

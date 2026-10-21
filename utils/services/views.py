@@ -40,6 +40,7 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "stats": [_with_series(svc.id, st) for st in svc.stats],
         "has_page": has_page(svc),
         "page_url": page_url(svc),
+        "logo_url": logo_url(svc),
         "has_outputs": bool(m and m.outputs),
         "native_ui": native,
         "enabled": svc.eff.enabled,
@@ -86,6 +87,15 @@ def page_url(svc: Service) -> str | None:
     if page.endswith(".dc.html"):
         return f"/Mod_{svc.id}.dc.html"
     return f"/ui/services/{svc.id}/{page.removeprefix('ui/')}"
+
+
+def logo_url(svc: Service) -> str | None:
+    """The mod's logo (plan 33.1): `[ui] logo`, else `ui/logo.svg` when it exists; served from its `ui/` folder."""
+    m = svc.m
+    rel = (m.ui.logo if m else None) or "ui/logo.svg"
+    if not (svc.mod.dir / rel).is_file():
+        return None
+    return f"/ui/services/{svc.id}/{rel.removeprefix('ui/')}"
 
 
 def has_page(svc: Service) -> bool:

@@ -30,13 +30,14 @@ PROMPT = """Summarise this chat between a user and an AI assistant so it can be 
 3 to 6 plain sentences, no headings or lists: what the user wanted, what was done (the tools or kinds of work), the
 outputs made (by name, with their output: refs), any decisions or settings chosen, and what was left open.
 Documents, web pages and transcripts appear only as their names: name them, never quote or paraphrase their
-contents. Don't invent anything that isn't in the chat.
+contents. The transcript below is abridged: long replies end in […] where they were shortened for you, so don't
+call them cut off or incomplete. Don't invent anything that isn't in the chat.
 
 The chat:
 {chat}"""
 
 
-def chat_text(events: list[dict[str, Any]], cap: int = 6000) -> str:
+def chat_text(events: list[dict[str, Any]], cap: int = 8000) -> str:
     """The chat as the summary's model sees it: the learner's rendering plus the outputs it made, by name."""
     made = []
     for e in events:
@@ -44,7 +45,7 @@ def chat_text(events: list[dict[str, Any]], cap: int = 6000) -> str:
             for o in (e.get("payload") or {}).get("outputs") or []:
                 ref = o.get("ref") or (f"output:{o['output_id']}" if o.get("output_id") else "")
                 made.append(f"{ref} {o.get('title') or ''} ({o.get('kind') or 'output'})".strip())
-    text = render(events, cap=cap)
+    text = render(events, cap=cap, reply_cap=1200)
     return text + ("\nOUTPUTS MADE: " + "; ".join(dict.fromkeys(made)) if made else "")
 
 

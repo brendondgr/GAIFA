@@ -1,5 +1,6 @@
 // The Chat page's thread list (plan 14.1): search, new chat, rename, archive, delete (with a
-// confirm), and the archived toggle. A drawer on narrow screens (chat.js decides).
+// confirm), and the archived toggle. A drawer on narrow screens (chat.js decides). While the embed
+// mod is up, "By meaning" searches the chats' summaries instead of their titles (plan 28.5).
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, inputSt, fmtAgo, label11 } from './chat-ui.js';
 
@@ -29,13 +30,45 @@ function Item({ t, active, onOpen, onRename, onArchive, onDelete }) {
           h(Icon, { d: ic, size: 13 }), label)))));
 }
 
+/** True while the embed mod is up (plan 28.5's "by meaning"); checked on mount and every 20 s. */
+export function useEmbedUp(api) {
+  const React = R(), [up, setUp] = React.useState(false);
+  React.useEffect(() => {
+    let live = true;
+    const check = () => api?.getService?.('embed').then(s => live && setUp(['ready', 'degraded'].includes(s.state))).catch(() => live && setUp(false));
+    check();
+    const t = setInterval(check, 20000);
+    return () => { live = false; clearInterval(t); };
+  }, [api]);
+  return up;
+}
+
+/** Chats found by meaning (plan 28.5): title, date, score and the summary that matched, best first. */
+function MeaningList({ found, activeId, onOpen }) {
+  if (found.busy && !found.rows.length) return h('div', { role: 'status', style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } }, 'Searching by meaning…');
+  if (found.err) return h('div', { role: 'alert', style: { padding: '12px 10px', color: T.rd, fontSize: 12 } }, `Search by meaning failed: ${found.err}`);
+  if (!found.rows.length) return h('div', { style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } },
+    'No chat matches by meaning. Only chats that have been quiet a while have summaries.');
+  return h('ol', { 'aria-label': 'Chats found by meaning', style: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 2, opacity: found.busy ? 0.6 : 1 } },
+    found.rows.map(r => h('li', { key: r.thread_id },
+      h('a', { href: r.link || '#/chat/' + encodeURIComponent(r.thread_id), onClick: onOpen, 'aria-current': r.thread_id === activeId ? 'page' : undefined, className: 'aichat-item',
+        style: { display: 'flex', flexDirection: 'column', gap: 2, padding: '6px 10px', borderRadius: 6, textDecoration: 'none', color: T.tx, background: r.thread_id === activeId ? T.hov : 'transparent' } },
+        h('span', { style: { display: 'flex', gap: 6, alignItems: 'baseline' } },
+          h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 } }, r.title || 'Chat'),
+          h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: T.dim, flex: 'none' } }, r.date || ''),
+          h('span', { title: 'Cosine score: higher is closer', style: { fontFamily: MONO, fontSize: 10.5, color: T.cy || T.mut, flex: 'none' } }, (r.score ?? 0).toFixed(2))),
+        h('span', { style: { fontSize: 11.5, color: T.mut, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, r.summary)))));
+}
+
 export const LIST_CSS = `
 .aichat-item .aichat-more{opacity:0}.aichat-item:hover .aichat-more,.aichat-item:focus-within .aichat-more,.aichat-item .aichat-more[aria-expanded="true"]{opacity:1}
 .aichat-item:hover{background:var(--hov,#161C28)}
 @media (hover:none){.aichat-item .aichat-more{opacity:1}}
 `;
 
-export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions }) {
+export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
+  canMeaning, meaning, onMeaning, found }) {
+  const showMeaning = canMeaning && meaning && !!q.trim();
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 10px 8px 12px' } },
       h('span', { style: { ...label11, flex: 1 } }, archived ? 'Archived chats' : 'Chats'),
@@ -46,7 +79,10 @@ export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArc
         h('span', { style: { color: T.mut, display: 'flex' } }, h(Icon, { d: 'search', size: 13 })),
         h('input', { value: q, onChange: e => onQ(e.target.value), placeholder: 'Search chats', 'aria-label': 'Search chats',
           style: { flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5 } }),
-        q ? h('button', { type: 'button', 'aria-label': 'Clear search', onClick: () => onQ(''), style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 0, display: 'flex' } }, h(Icon, { d: 'x', size: 12 })) : null)),
+        q ? h('button', { type: 'button', 'aria-label': 'Clear search', onClick: () => onQ(''), style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 0, display: 'flex' } }, h(Icon, { d: 'x', size: 12 })) : null),
+      canMeaning ? h('button', { type: 'button', 'aria-pressed': meaning ? 'true' : 'false', onClick: () => onMeaning(!meaning),
+        title: 'Find chats by what they were about, not their titles (the Embeddings mod)', style: { ...chipSt(meaning, { sm: true }), marginTop: 6 } }, 'By meaning') : null),
+    showMeaning ? h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, h(MeaningList, { found, activeId, onOpen: () => onOpen?.() })) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },
       !threads.length ? h('div', { style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } },
         loading ? 'Loading…' : q ? `No chats match “${q}”.` : archived ? 'No archived chats.' : 'No chats yet. Start one →') : null,

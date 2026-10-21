@@ -82,6 +82,9 @@ class FakeHub:
         self.n = 0
         self.page_views: list[tuple[str, int]] = []
         self.texts: dict[str, dict[str, Any]] = {}     # documents (plan 24): oid → {text, pages: [(start, end)], outline}
+        self.chats: dict[str, dict[str, Any]] = {}     # the embed mod's `chats` (plan 28.5): tid → {title, summary, …}
+        self.chat_deletes: list[str] = []
+        self.embed_up = True
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -405,6 +408,32 @@ class FakeHub:
             if s is None:
                 raise HTTPException(404, "no skill")
             return {"mod": mod, "name": name, **s}
+
+        # the embed mod's chats collection (plan 28.5), proxied as /api/s/embed/…: ranked by shared words
+        @app.put("/api/s/embed/v1/chats/{tid}")
+        async def put_chat(tid: str, request: Request) -> Any:
+            if not self.embed_up:
+                return JSONResponse({"detail": "no such service", "code": "not_found"}, 404)
+            self.chats[tid] = await request.json()
+            return {"thread_id": tid, "state": "pending"}
+
+        @app.delete("/api/s/embed/v1/chats/{tid}")
+        def delete_chat(tid: str) -> Any:
+            self.chat_deletes.append(tid)
+            if self.chats.pop(tid, None) is None:
+                return JSONResponse({"detail": "not found", "code": "not_found"}, 404)
+            return {"deleted": tid}
+
+        @app.post("/api/s/embed/v1/chats/search")
+        async def search_chats(request: Request) -> Any:
+            if not self.embed_up:
+                return JSONResponse({"detail": "no such service", "code": "not_found"}, 404)
+            body = await request.json()
+            words = set(body["query"].lower().split())
+            scored = sorted(((len(words & set(c["summary"].lower().split())) / max(1, len(words)), tid, c)
+                             for tid, c in self.chats.items()), key=lambda x: -x[0])
+            return {"results": [{"thread_id": tid, "title": c.get("title"), "summary": c["summary"], "score": round(sc, 3)}
+                                for sc, tid, c in scored if sc > 0][: body.get("limit", 8)], "pending": 0}
 
         @app.get("/api/events")
         async def events(request: Request) -> StreamingResponse:

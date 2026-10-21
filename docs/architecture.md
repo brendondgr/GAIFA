@@ -46,7 +46,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
-| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `embed` 5104, `stt` 5105. | clients such as video-maker keep working |
+| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `embed` 5104, `stt` 5105, `searxng` 5106. | clients such as video-maker keep working |
 
 ## 3. Directory layout
 
@@ -551,6 +551,7 @@ fade_days = 60           # inferred preferences unused this long fade out; state
 | `lcpp` | `~/Models/LLMs` | 7710 | `models/*` → `data/models/llm/` | — (its JSON state stays in `services/lcpp/data/`) | `LCPP_MODELS_DIR`, catalog paths relative to it, downloads register in the hub, memory acquire, status route, `pidfd_open` fallback |
 | `comfy` | `~/Models/ComfyUI*` + `~/.local/bin/comfyui` | 5070 (ComfyUI 8199) | `~/Models/ComfyUI/models/*` → `data/models/comfyui/` | — | new adapter mod (§11) |
 | `web` | new (plan Phase 26); searches through the SearXNG on 8080 that runs outside AIHub (`SEARXNG_URL`) | 5102 | — | — | new mod: `POST /v1/search`, `POST /v1/fetch` (pages → markdown `text` outputs, PDFs → `document` outputs, with sidecars); fetches only public http(s) addresses, checked after DNS and on every redirect, 10 MB / 20 s, `robots.txt`; tools `web_search` and `web_fetch` (risk `network`) |
+| `searxng` | new (plan 26.3); SearXNG itself runs in Docker outside AIHub | 5106 | — | — | new mod: finds SearXNG (`SEARXNG_URL`, a probe of 8080 and 8888, a `searxng/*` container), publishes its URL for `web` (`GET /v1/endpoint`), watches `/healthz`, its engines (`/config`, `/stats/errors`) and a test search, and changes engines, timeouts, safe search, the default language and the JSON format: each change backs up `settings.yml`, writes it through the container, restarts it and checks a search, rolling back when the check fails. Its only writes outside the root are that `settings.yml` and its backups (§14.4) |
 
 **Moves are instant:** every source path and AIHub are on the same btrfs subvolume (`/home`), so `mv` is a rename, not a copy. Old paths keep a symlink until everything that uses them has been updated.
 
@@ -740,5 +741,5 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
 ### 14.4 Everything inside the folder
 - **Logs.** Each mod's output is also written to `data/logs/<id>.log`, rotated. journald stays as a second copy, and the Logs tab reads the file.
 - **Runtime state.** lcpp's instance records move from `$XDG_RUNTIME_DIR/lcpp` to `data/state/lcpp` via `LCPP_STATE_DIR`. Instances are still systemd units, so after a reboot they come back through session restore, not by adoption.
-- **What's left outside.** `aihub doctor` then reports only the allowlist: the systemd unit file, podman images, system tools (ffmpeg, blender, podman), and the `~/.local/bin` wrappers.
+- **What's left outside.** `aihub doctor` then reports only the allowlist: the systemd unit file, podman images, system tools (ffmpeg, blender, podman), and the `~/.local/bin` wrappers. One mod writes outside the root: `searxng` changes SearXNG's `settings.yml` and keeps its backups next to it (plan 26.3).
 - **As built (plan 16):** a shipper per mod follows the backend into `data/logs/<id>.log` (rotated 10 MB × 5) and the hub logs to `data/logs/aihub.log`; the Logs tab and `aihub logs` read the files. lcpp runs with `LCPP_STATE_DIR=data/state/lcpp` and forgets records from before the last boot. `aihub doctor --inventory` lists every outside path with its reason.

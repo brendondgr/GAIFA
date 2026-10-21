@@ -107,3 +107,15 @@ def test_render_shows_edits_denials_and_answers():
           {"type": "answer", "payload": {"answers": {"Which?": "This"}}}]
     text = render(ev)
     assert "USER CHANGED THE CARD of t: preset: 'base' → 'fast'" in text and "USER DENIED t2: no" in text and "Which? → This" in text
+
+
+def test_eval_and_opted_out_chats_never_teach_it(env):
+    """Overnight 2026-10-21: the learner picked chats by their tool calls only, so eval dry runs and chats
+    switched to "don't learn" fed it too (the miner already skipped them)."""
+    st = env.agent.store
+    ids = {}
+    for name, settings in (("real", {}), ("eval", {"dry_run": True}), ("optout", {"no_learn": True})):
+        tid = st.create_thread(title=name, settings=settings)["id"]
+        st.append(tid, "tool_call", {"id": "c", "name": "gen3d_make_3d", "arguments": {"prompt": "fox"}})
+        ids[name] = tid
+    assert learner(env).chats("gen3d", 0) == [ids["real"]]

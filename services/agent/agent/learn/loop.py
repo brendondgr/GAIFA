@@ -143,9 +143,16 @@ class Learner:
         pre = DOMAINS[domain]
         rows = st.events_by_type(["tool_call"], since)
         seen: list[str] = []
+        skip: dict[str, bool] = {}
         for e in reversed(rows):                                  # newest first
-            if e["thread_id"] not in seen and str(e["payload"].get("name", "")).startswith(pre):
-                seen.append(e["thread_id"])
+            tid = e["thread_id"]
+            if tid in seen or not str(e["payload"].get("name", "")).startswith(pre):
+                continue
+            if tid not in skip:                                   # eval dry runs and chats that opted out never teach it
+                s = (st.thread(tid) or {}).get("settings") or {}
+                skip[tid] = bool(s.get("dry_run") or s.get("no_learn"))
+            if not skip[tid]:
+                seen.append(tid)
         return seen[: self.max_chats]
 
     def user_active(self, since: float) -> bool:

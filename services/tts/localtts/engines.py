@@ -8,6 +8,7 @@ reliably do.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -153,10 +154,13 @@ class Engine:
                 raise EngineError(f"{self.name}: worker died mid-request ({exc})") from exc
             except BaseException:
                 # Client went away mid-stream (e.g. Cancel in the UI): the worker is still
-                # emitting audio for this request. Read it off before the next request rather
-                # than restarting the worker, which would cost a full model load.
+                # emitting audio for this request. Tell it to stop after its current chunk, and
+                # read off what it already sent before the next request rather than restarting
+                # the worker, which would cost a full model load.
                 if self.alive:
                     self._stale = True
+                    with contextlib.suppress(OSError, RuntimeError):   # pipe gone: the drain restarts it
+                        self.proc.stdin.write((json.dumps({"op": "cancel", "request_id": params.get("request_id")}) + "\n").encode())
                 raise
             finally:
                 if self.alive:

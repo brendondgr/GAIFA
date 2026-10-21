@@ -640,6 +640,7 @@ The live mods at this point are the fake mods (`python app.py --dev --demo-mods`
   - **ui:** `native = "/ui/"`.
   - **api.responses:** speech routes and voice audio → `audio`.
   - **tools:** `speak`, `list_voices`, `design_voice`, `clone_voice`, `delete_voice` (confirm).
+  - **Limits** (overnight 2026-10-21): reference uploads 50 MB and 3–60 s (decoding stops at 61 s); ffmpeg opens only listed input formats (no playlists or concat lists, which read other local files); `/v1/align` 500 MB a request, 30 min a clip; `design_voice` instruction ≤1,000 characters, sample_text ≤600, cfg_scale in (0, 10], and its sample must be 3–60 s; a dropped request is cancelled in the worker.
 - [x] **7.4 Move models and voices** (old service stopped). *As built (2026-10-06):* Whisper copied as `refs/` + dereferenced `snapshots/` only (no duplicate blob store); Kokoro's model and all 28 English voices downloaded into `data/models/hf-cache`; registered as `breeze-tts-2`, `kokoro-82m`, `whisper-large-v3-turbo`, `voice-arabella`, `voice-brendon`, `voice-hope`.
   - `mv ~/models/breeze-tts-2 data/models/tts/`, and leave a symlink back.
   - Fetch the rest of Kokoro's voices (only 6 of 28 are cached) into the new cache: `HF_HOME=data/models/hf-cache` with the kokoro venv's `hf download hexgrad/Kokoro-82M`.

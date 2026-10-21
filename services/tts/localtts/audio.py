@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 import shutil
 
@@ -32,19 +33,50 @@ def encode(pcm: bytes, sample_rate: int, fmt: str) -> bytes:
     return buf.getvalue()
 
 
-async def to_reference_wav(src: str, dst: str, sample_rate: int = 24_000) -> None:
-    """Any audio ffmpeg can read -> mono 16-bit WAV at the model rate."""
+# Demuxers ffmpeg may use for an upload: audio and A/V containers that read only their own
+# bytes. Playlists and concat lists (hls, concat, m3u...) are left out: an uploaded .m3u8 naming
+# a local path made ffmpeg read that other file into the "reference".
+DEMUXERS = "wav,w64,flac,mp3,ogg,mov,matroska,aac,aiff,caf,amr,asf,ac3,eac3,wv,ape,au,avi"
+DECODE_TIMEOUT_S = 60.0
+
+
+class TooLong(ValueError):
+    """The audio runs past the caller's limit (decoding stopped there)."""
+
+
+async def to_reference_wav(src: str, dst: str, sample_rate: int = 24_000, max_s: float = 60.0) -> None:
+    """Any audio ffmpeg can read -> mono 16-bit WAV at the model rate, at most `max_s` seconds.
+
+    Decoding stops just past `max_s` (a small FLAC of hours of silence otherwise unpacks to
+    hundreds of MB) and raises TooLong; other failures raise ValueError.
+    """
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
         raise RuntimeError("ffmpeg not found on PATH")
     proc = await asyncio.create_subprocess_exec(
-        ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", src,
+        ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+        "-protocol_whitelist", "file", "-format_whitelist", DEMUXERS, "-i", src,
+        "-t", f"{max_s + 1:g}", "-vn", "-sn", "-dn",
         "-ac", "1", "-ar", str(sample_rate), "-sample_fmt", "s16", dst,
         stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
     )
-    _, err = await proc.communicate()
+    try:
+        _, err = await asyncio.wait_for(proc.communicate(), DECODE_TIMEOUT_S)
+    except BaseException as exc:   # timed out, or the request was cancelled: don't leave ffmpeg running
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+        await asyncio.shield(proc.wait())
+        if isinstance(exc, TimeoutError):
+            raise ValueError(f"decoding the audio took over {DECODE_TIMEOUT_S:.0f}s") from None
+        raise
     if proc.returncode != 0:
-        raise ValueError(f"could not decode the audio: {err.decode().strip()[-400:]}")
+        msg = err.decode(errors="replace").strip()
+        if "not on whitelist" in msg:
+            raise ValueError("not an audio file ffmpeg will open here (playlists and concat lists "
+                             "are refused); send WAV, FLAC, MP3, OGG/Opus, M4A/MP4, WebM or similar")
+        raise ValueError(f"could not decode the audio: {msg[-400:]}")
+    if duration_s(dst) > max_s:
+        raise TooLong(f"the audio is over {max_s:.0f}s")
 
 
 def duration_s(path: str) -> float:

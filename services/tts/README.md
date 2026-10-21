@@ -108,8 +108,10 @@ curl -F name=Brendon -F audio=@me.wav -F "transcript=Exactly what I say in the c
 curl -F name=Brendon -F audio=@me.m4a http://127.0.0.1:5040/v1/voices
 ```
 
-Any format ffmpeg reads; 3 to 60 s accepted, **10 to 25 s of clean speech** is the sweet
-spot. Add `-F overwrite=true` to replace an existing voice.
+Audio or video files (WAV, FLAC, MP3, OGG/Opus, M4A/MP4, WebM, AIFF, CAF, WMA and similar;
+playlists and concat lists such as `.m3u8` are refused), up to 50 MB (413 above that).
+3 to 60 s accepted (422 outside it; decoding stops at 61 s), **10 to 25 s of clean speech**
+is the sweet spot. Add `-F overwrite=true` to replace an existing voice.
 
 ```bash
 curl http://127.0.0.1:5040/v1/voices                         # list
@@ -123,6 +125,10 @@ curl http://127.0.0.1:5040/v1/voices/design -H 'content-type: application/json' 
      -d '{"name": "Narrator", "instruction": "A calm, deep documentary narrator."}'
 ```
 
+A designed voice takes an `instruction` up to 1,000 characters, an optional `sample_text`
+(what it says in the kept sample) up to 600, and `cfg_scale` above 0 and up to 10 (default 4).
+The sample becomes the voice's reference, so it must come out 3 to 60 s long (422 otherwise).
+
 ## Generate
 
 `POST /v1/speech` with JSON:
@@ -132,7 +138,7 @@ curl http://127.0.0.1:5040/v1/voices/design -H 'content-type: application/json' 
 | `text` | required | anything up to 20k characters; long text is split at sentences for Breeze |
 | `name` (or `voice`) | none | saved voice or Kokoro voice, see above |
 | `engine` | `auto` | `breeze` / `kokoro` to force one |
-| `instruction` | none | Breeze: voice description (design) or delivery (direction). Tags like `(sigh)` `(laughs)` also work inside `text` |
+| `instruction` | none | up to 1,000 characters. Breeze: voice description (design) or delivery (direction). Tags like `(sigh)` `(laughs)` also work inside `text` |
 | `cfg_scale` | 1, or 4 with an instruction | Breeze guidance strength |
 | `seed` | 42 | Breeze sampling seed |
 | `speed` | 1.0 | Kokoro only |
@@ -198,14 +204,17 @@ curl -X DELETE http://127.0.0.1:5040/v1/outputs/<file>    # permanent (no trash)
 | warm speed | RTF ~1.5 (1 s of audio takes ~1.5 s) | RTF ~0.5 |
 | GPU memory while loaded | ~8.5 GiB | small (82M-parameter model) |
 
-One request at a time per engine; Breeze and Kokoro can run side by side.
+One request at a time per engine; Breeze and Kokoro can run side by side. When a client
+goes away mid-request (Cancel in the UI), the worker is told to stop after its current chunk
+rather than finishing the text.
 
 ### Word timings for existing clips
 
 `POST /v1/align` (multipart): `items` = JSON `[{"id", "text"}]` plus one file `audio_<id>`
 per item → `{"items": {id: {duration, sample_rate, words}}}`. Whisper runs once for the
 batch and matches its words back to your text, so the timings carry your exact words and
-punctuation. video-maker uses this for captions and cue timing.
+punctuation. video-maker uses this for captions and cue timing. Each clip may run up to
+30 minutes (422 above that), and the whole request up to 500 MB (413).
 
 ## How it works
 

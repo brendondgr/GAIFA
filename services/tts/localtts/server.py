@@ -20,14 +20,19 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from pydantic import AliasChoices, BaseModel, Field
 
-from . import __version__, audio, enhance, outputs, voices
+from . import __version__, audio, enhance, outputs, uploads, voices
 from .config import settings
 from .engines import ENGINES, EngineError, align_clips, transcribe
 
 log = logging.getLogger("localtts")
 
 MAX_TEXT = 20_000
+MAX_INSTRUCTION = 1_000       # a voice description or delivery note
+MAX_DESIGN_SAMPLE = 600       # what a designed voice says (~40 s of speech); its clip must pass the 3-60 s check
 MIN_REF_S, MAX_REF_S, WARN_REF_S = 3.0, 60.0, 30.0
+MAX_ALIGN_S = 1_800.0         # one clip sent to /v1/align
+# Request bodies with uploads, capped before they are read (the multipart parser spools files to disk).
+MAX_UPLOAD_BYTES = {"/v1/voices": 50 << 20, "/v1/align": 500 << 20}
 DESIGN_SAMPLE = ("Hello, and welcome. This is a short sample of my voice, recorded so that "
                  "I sound the same every time you hear me.")
 Format = Literal["wav", "flac", "mp3", "ogg", "pcm"]
@@ -71,6 +76,8 @@ app.add_middleware(
     expose_headers=["X-LocalTTS-Engine", "X-LocalTTS-Voice", "X-LocalTTS-Saved", "X-LocalTTS-Path",
                     "X-Audio-Duration", "X-RTF", "X-Generation-Seconds", "X-Sample-Rate"],
 )
+
+app.add_middleware(uploads.LimitUploads, caps=MAX_UPLOAD_BYTES)
 app.mount("/ui", StaticFiles(directory=Path(__file__).parent / "web", html=True), name="ui")
 
 
@@ -182,22 +189,16 @@ async def add_voice(
     overwrite: bool = Form(False),
 ):
     name = _claim_name(name, overwrite)
-    payload = await audio_file.read()
-    if not payload:
-        raise HTTPException(400, "the audio upload is empty")
     # Staged next to the voices (same filesystem) so the final move is an atomic rename.
     with tempfile.TemporaryDirectory(prefix=".upload-", dir=settings.voices_dir) as tmp:
-        raw = Path(tmp) / ("upload" + (Path(audio_file.filename or "").suffix or ".bin"))
-        raw.write_bytes(payload)
+        raw = Path(tmp) / ("upload" + uploads.suffix(audio_file.filename))
+        if not await uploads.copy_to(audio_file, raw):
+            raise HTTPException(400, "the audio upload is empty")
         ref = Path(tmp) / "reference.wav"
-        try:
-            await audio.to_reference_wav(str(raw), str(ref))
-        except ValueError as exc:
-            raise HTTPException(400, str(exc)) from exc
+        await _decode_reference(raw, ref, MAX_REF_S)
         dur = audio.duration_s(str(ref))
-        if not MIN_REF_S <= dur <= MAX_REF_S:
-            raise HTTPException(400, f"reference is {dur:.1f}s; use {MIN_REF_S:.0f}-{MAX_REF_S:.0f}s "
-                                     f"(10-25s of clean speech works best)")
+        if dur < MIN_REF_S:
+            raise HTTPException(422, _ref_length_error(f"{dur:.1f}s"))
         transcript = transcript.strip()
         auto = not transcript
         if auto:
@@ -221,6 +222,20 @@ async def add_voice(
         out["note"] = "transcript written by Whisper; check it, since clone quality depends on it " \
                       "(fix with PATCH /v1/voices/{name})"
     return out
+
+
+def _ref_length_error(got: str) -> str:
+    return f"reference is {got}; use {MIN_REF_S:.0f}-{MAX_REF_S:.0f}s (10-25s of clean speech works best)"
+
+
+async def _decode_reference(raw: Path, wav: Path, max_s: float, item: str | None = None) -> None:
+    """Upload -> WAV for a voice reference (or an /v1/align `item`), as 4xx errors."""
+    try:
+        await audio.to_reference_wav(str(raw), str(wav), max_s=max_s)
+    except audio.TooLong as exc:
+        raise HTTPException(422, f"{item}: {exc}" if item else _ref_length_error(f"over {max_s:.0f}s")) from exc
+    except ValueError as exc:
+        raise HTTPException(400, f"{item}: {exc}" if item else str(exc)) from exc
 
 
 class VoicePatch(BaseModel):
@@ -254,10 +269,11 @@ def delete_voice(name: str):
 
 class DesignRequest(BaseModel):
     name: str
-    instruction: str = Field(..., description="natural-language description of the voice")
-    sample_text: str = DESIGN_SAMPLE
+    instruction: str = Field(..., max_length=MAX_INSTRUCTION, description="natural-language description of the voice")
+    sample_text: str = Field(DESIGN_SAMPLE, max_length=MAX_DESIGN_SAMPLE,
+                             description="what the voice says in its saved sample (3-60 s of speech)")
     seed: int = 42
-    cfg_scale: float = 4.0
+    cfg_scale: float = Field(4.0, gt=0, le=10, description="Breeze guidance")
     overwrite: bool = False
 
 
@@ -265,8 +281,14 @@ class DesignRequest(BaseModel):
 async def design_voice(body: DesignRequest):
     """Invent a voice from a description, then keep it as a named voice so it stays consistent."""
     name = _claim_name(body.name, body.overwrite)
+    if not body.sample_text.strip() or not body.instruction.strip():
+        raise HTTPException(400, "instruction and sample_text cannot be empty")
     pcm, stats = await _collect(ENGINES["breeze"], dict(
         text=body.sample_text, instruction=body.instruction, cfg_scale=body.cfg_scale, seed=body.seed))
+    # The sample becomes a clone reference: hold it to the same 3-60 s as an uploaded one.
+    if not MIN_REF_S <= (stats.get("audio_s") or 0) <= MAX_REF_S:
+        raise HTTPException(422, f"the designed sample is {stats.get('audio_s') or 0:.1f}s; a voice needs "
+                                 f"{MIN_REF_S:.0f}-{MAX_REF_S:.0f}s, so make sample_text shorter or longer")
     voices.delete(name)
     voice = voices.Voice(name=name, transcript=body.sample_text, duration_s=round(stats["audio_s"], 2),
                          created=voices.now(), source="design", instruction=body.instruction)
@@ -283,7 +305,7 @@ class SpeechRequest(BaseModel):
     name: str | None = Field(None, validation_alias=AliasChoices("name", "voice"),
                              description="custom voice name, a Kokoro voice (af_heart...), or omit")
     engine: Literal["auto", "breeze", "kokoro"] = "auto"
-    instruction: str | None = Field(None, validation_alias=AliasChoices("instruction", "instructions"),
+    instruction: str | None = Field(None, max_length=MAX_INSTRUCTION, validation_alias=AliasChoices("instruction", "instructions"),
                                     description="Breeze: describe the voice (design) or the delivery (direction)")
     cfg_scale: float | None = Field(None, gt=0, le=10, description="Breeze guidance; default 1, or 4 with an instruction")
     seed: int = 42
@@ -467,7 +489,7 @@ class OpenAISpeech(BaseModel):
     model: str = "auto"
     input: str
     voice: str | None = None
-    instructions: str | None = None
+    instructions: str | None = Field(None, max_length=MAX_INSTRUCTION)
     response_format: Format = "mp3"
     speed: float = 1.0
     no_save: bool = False
@@ -506,12 +528,9 @@ async def align(request: Request):
             if f is None or not hasattr(f, "read") or not str(it.get("text", "")).strip():
                 raise HTTPException(400, f"item {it.get('id')!r} needs text and a file field audio_{it.get('id')}")
             raw = Path(tmp) / f"{n}.upload"
-            raw.write_bytes(await f.read())
+            await uploads.copy_to(f, raw)
             wav = Path(tmp) / f"{n}.wav"
-            try:
-                await audio.to_reference_wav(str(raw), str(wav))
-            except ValueError as exc:
-                raise HTTPException(400, f"item {it['id']!r}: {exc}") from exc
+            await _decode_reference(raw, wav, MAX_ALIGN_S, f"item {it['id']!r}")
             job.append({"id": it["id"], "text": it["text"], "path": str(wav), "language": it.get("language", "en")})
         job_file = Path(tmp) / "job.json"
         job_file.write_text(json.dumps(job))

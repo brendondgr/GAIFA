@@ -3,6 +3,8 @@
 Each worker runs in its engine's own venv and talks over stdin/stdout:
 
   server -> worker   one JSON object per line: {"op": "generate" | "transcribe" | "ping", ...}
+                     or {"op": "cancel", "request_id": ...}, which a generate checks between
+                     chunks (`cancelled(request_id)`): it stops and sends `done` with cancelled=true.
   worker -> server   one JSON object per line, where a {"event": "chunk", "nbytes": N}
                      line is followed by exactly N bytes of 16-bit little-endian mono PCM.
 
@@ -16,12 +18,15 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import sys
+import threading
 import traceback
 
 import numpy as np
 
 _out = None
+_cancelled: str | None = None   # request_id of the last cancel received
 
 
 def claim_stdout() -> None:
@@ -48,12 +53,34 @@ def log(*parts) -> None:
     print("[worker]", *parts, file=sys.stderr, flush=True)
 
 
-def serve(handlers: dict) -> None:
-    """Answer requests until stdin closes. One request at a time."""
+def cancelled(request_id: str) -> bool:
+    """True once the server has cancelled this request (its client went away)."""
+    return _cancelled is not None and _cancelled == request_id
+
+
+def _read_requests(requests: queue.Queue) -> None:
+    """stdin reader thread: cancels take effect at once; everything else waits its turn."""
+    global _cancelled
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
+        try:
+            req = json.loads(line)
+        except ValueError:
+            req = None
+        if isinstance(req, dict) and req.get("op") == "cancel":
+            _cancelled = req.get("request_id")
+            continue
+        requests.put(line)
+    requests.put(None)
+
+
+def serve(handlers: dict) -> None:
+    """Answer requests until stdin closes. One request at a time."""
+    requests: queue.Queue = queue.Queue()
+    threading.Thread(target=_read_requests, args=(requests,), daemon=True).start()
+    while (line := requests.get()) is not None:
         try:
             req = json.loads(line)
             op = req.pop("op")

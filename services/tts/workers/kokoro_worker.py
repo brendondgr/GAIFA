@@ -45,8 +45,11 @@ class Kokoro:
         if lang not in ("a", "b"):
             raise ValueError(f"unsupported Kokoro voice {voice!r} (only a*/b* English voices)")
         t_start = time.perf_counter()
-        ttfa, samples, words = None, 0, []
+        ttfa, samples, words, stopped = None, 0, [], False
         for r in self.pipeline(lang)(text, voice=voice, speed=speed):
+            if _proto.cancelled(request_id):   # the client went away: stop, don't finish the text
+                stopped = True
+                break
             if r.audio is None:
                 continue
             audio = r.audio.detach().cpu().numpy().astype(np.float32)
@@ -66,7 +69,7 @@ class Kokoro:
         audio_s = samples / SAMPLE_RATE
         _proto.send("done", audio_s=round(audio_s, 3), gen_s=round(gen_s, 3),
                     rtf=round(gen_s / audio_s, 3) if audio_s else None,
-                    ttfa_ms=round(ttfa * 1000, 1) if ttfa is not None else None, words=words)
+                    ttfa_ms=round(ttfa * 1000, 1) if ttfa is not None else None, words=words, cancelled=stopped)
 
 
 def main() -> None:

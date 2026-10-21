@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import time
+from contextlib import closing
 from dataclasses import replace
 from pathlib import Path
 
@@ -103,7 +104,10 @@ class Breeze:
         t_start = time.perf_counter()
         ttfa, samples = None, 0
         segments = split_text(text)
+        stopped = False
         for n, segment in enumerate(segments):
+            if stopped:
+                break
             request = {"id": f"{request_id}-{n}", "text": segment, "speaker": "S0"}
             if instruction:
                 request["instruction"] = instruction
@@ -121,20 +125,25 @@ class Breeze:
                 _proto.send_audio(gap)
                 samples += len(gap)
             set_all_seeds(seed)
-            for chunk in self.runtime.iter_audio_chunks(inputs, request_id=request["id"], seed=seed):
-                audio = np.asarray(chunk.audio, dtype=np.float32)
-                if not np.isfinite(audio).all():
-                    raise RuntimeError("model produced NaN/inf audio")
-                if ttfa is None:
-                    ttfa = time.perf_counter() - t_start
-                _proto.send_audio(audio)
-                samples += len(audio)
+            # closing() ends the runtime's generator at once on a cancel (its finally closes the codec request).
+            with closing(self.runtime.iter_audio_chunks(inputs, request_id=request["id"], seed=seed)) as chunks:
+                for chunk in chunks:
+                    audio = np.asarray(chunk.audio, dtype=np.float32)
+                    if not np.isfinite(audio).all():
+                        raise RuntimeError("model produced NaN/inf audio")
+                    if ttfa is None:
+                        ttfa = time.perf_counter() - t_start
+                    _proto.send_audio(audio)
+                    samples += len(audio)
+                    if _proto.cancelled(request_id):   # the client went away: stop, don't finish the text
+                        stopped = True
+                        break
         gen_s = time.perf_counter() - t_start
         audio_s = samples / self.sample_rate
         _proto.send("done", audio_s=round(audio_s, 3), gen_s=round(gen_s, 3),
                     rtf=round(gen_s / audio_s, 3) if audio_s else None,
                     ttfa_ms=round(ttfa * 1000, 1) if ttfa is not None else None,
-                    segments=len(segments), cfg_scale=cfg_scale)
+                    segments=len(segments), cfg_scale=cfg_scale, cancelled=stopped)
 
 
 def main() -> None:

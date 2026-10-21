@@ -8,7 +8,7 @@
 | Format | gguf |
 | Size | 18.2 GB in 3 files |
 | Where it goes | `data/models/llm/Gemma4-26B` |
-| Source | not recorded: GGUF general.name: Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced; downloaded before lcpp recorded sources. Set the Hugging Face repo here if known. |
+| Source | Hugging Face [HauhauCS/Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-MTP](https://huggingface.co/HauhauCS/Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-MTP) |
 | Used by | `lcpp` |
 | Environment | [llama.cpp (LLM Launcher)](../../../services/lcpp/setup/llama-cpp.md) |
 | Referenced by | [`data/models.json`](../../../services/lcpp/data/models.json) |
@@ -18,9 +18,17 @@
 
 | File | Role | Size | SHA-256 |
 |---|---|---|---|
-| `llm/Gemma4-26B/Gemma4-26B-A4B-Q4KM.gguf` | model | 16.8 GB | `3c13133469e431312fffb8b1d9c85ae42199e6bb5746ea1da84e8ddf2097d73c` |
+| `llm/Gemma4-26B/Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf` | model | 16.8 GB | `3c13133469e431312fffb8b1d9c85ae42199e6bb5746ea1da84e8ddf2097d73c` |
 | `llm/Gemma4-26B/mmproj-Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-BF16.gguf` | mmproj | 1.2 GB | `b5346e5bfd906f5e16878c2d0b8243e948ca7410fa28ea35be9b0c54a0ac10b7` |
 | `llm/Gemma4-26B/mtp-gemma-4-26B-A4B-it.gguf` | draft | 252 MB | `62bd3af7f66c9308de9a5454233852f8c7324c93767e8dfb824ed45b9179864a` |
+
+### Get it
+
+From the project folder (`uvx` runs Hugging Face's CLI without installing it; gated repos need `hf auth login` first, see [host.md](../host.md#6-accounts-and-licences)):
+
+```bash
+uvx --from huggingface_hub hf download HauhauCS/Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-MTP Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf mmproj-Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-BF16.gguf mtp-gemma-4-26B-A4B-it.gguf --local-dir data/models/llm/Gemma4-26B
+```
 <!-- end generated -->
 
 ## Where to get it

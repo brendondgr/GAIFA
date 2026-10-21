@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | Id | `qwen-image-config` |
-| Kind | 3d |
+| Kind | other |
 | Format | other |
 | Size | 371 B in 1 file |
 | Where it goes | `data/models/3d/Qwen-Image` |

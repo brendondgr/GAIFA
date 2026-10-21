@@ -27,7 +27,7 @@ You can stop after any mod. Each environment doc says which features need it; ea
 | Environment | Mod | Models | Size |
 |---|---|---|---|
 | [Chat agent](../../services/agent/setup/agent.md) | `agent` | 0 | — |
-| [ComfyUI in the Strix Halo toolbox](../../services/comfy/setup/comfyui.md) | `comfy` | 15 | 64.4 GB |
+| [ComfyUI in the Strix Halo toolbox](../../services/comfy/setup/comfyui.md) | `comfy` | 12 | 63.8 GB |
 | [Decisions: d3-lite](../../services/decide/setup/decide.md) | `decide` | 1 | 1.7 GB |
 | [Embeddings: EmbeddingGemma 2](../../services/embed/setup/embed.md) | `embed` | 1 | 1.5 GB |
 | [CubeArt: Cube3D and CubePart (3D Generate)](../../services/gen3d/setup/cubeart.md) | `gen3d` | 5 | 28.8 GB |
@@ -44,7 +44,7 @@ You can stop after any mod. Each environment doc says which features need it; ea
 | [Web (SearXNG search and page fetching)](../../services/web/setup/web.md) | `web` | 0 | — |
 | [Workspace (folders, edits in place, the sandbox)](../../services/workspace/setup/workspace.md) | `workspace` | 0 | — |
 
-**Models** (38, 151.4 GB in all):
+**Models** (35, 150.9 GB in all):
 
 | Model | Kind | Size | Environment | Source |
 |---|---|---|---|---|
@@ -52,20 +52,17 @@ You can stop after any mod. Each environment doc says which features need it; ea
 | [CubePart (part splitting)](models/cubepart.md) | 3d | 9.9 GB | CubeArt: Cube3D and CubePart (3D Generate) | recorded |
 | [Hunyuan3D 2.1 (shape DiT + VAE)](models/hunyuan3d-2.1.md) | 3d | 8.0 GB | Hunyuan3D 2.1 (3D Generate) | recorded |
 | [MoGe v1 ViT-L](models/moge-vitl.md) | 3d | 1.3 GB | SAM 3D Objects (3D Generate) | recorded |
-| [Qwen-Image transformer config (CubePart)](models/qwen-image-config.md) | 3d | 371 B | CubeArt: Cube3D and CubePart (3D Generate) | recorded |
 | [SAM 3D Objects (geometry checkpoints)](models/sam-3d-objects.md) | 3d | 12.3 GB | SAM 3D Objects (3D Generate) | recorded |
 | [qwen-image-2.1-turbo-fp8](models/qwen-image-2.1-turbo-fp8.md) | image | 7.1 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [qwen-image-2.1-turbo-Q8_0](models/qwen-image-2.1-turbo-q8-0.md) | image | 7.6 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [qwen-image-2.1-UC-fp8](models/qwen-image-2.1-uc-fp8.md) | image | 7.1 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [qwen-image-2.1-UC-Q8_0](models/qwen-image-2.1-uc-q8-0.md) | image | 7.6 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [TRELLIS.2 (bf16)](models/trellis-2-bf16.md) | image | 10.3 GB | ComfyUI in the Strix Halo toolbox | recorded |
-| [Gemma 4 26B-A4B it (Q4_K_M, QAT, HauhauCS balanced)](models/gemma-4-26b-it.md) | llm | 18.2 GB | llama.cpp (LLM Launcher) | **not recorded** |
+| [Gemma 4 26B-A4B it (Q4_K_M, QAT, HauhauCS balanced)](models/gemma-4-26b-it.md) | llm | 18.2 GB | llama.cpp (LLM Launcher) | recorded |
 | [smollm2-135m-instruct](models/smollm2-135m-instruct.md) | llm | 105 MB | llama.cpp (LLM Launcher) | recorded |
-| [chroma-flash-heun_r32-fp32](models/chroma-flash-heun-r32-fp32.md) | lora | 450 MB | ComfyUI in the Strix Halo toolbox | **not recorded** |
-| [krea2filterbypass](models/krea2filterbypass.md) | lora | 160 B | ComfyUI in the Strix Halo toolbox | **not recorded** |
-| [qwen2-1uncenV2](models/qwen2-1uncenv2.md) | lora | 80 MB | ComfyUI in the Strix Halo toolbox | **not recorded** |
 | [d3-lite (Decision 3.0)](models/d3-lite-decision-3.0.md) | other | 1.7 GB | Decisions: d3-lite | recorded |
 | [MoGe 2 ViT-L normal (fp16)](models/moge-2-vitl-normal-fp16.md) | other | 662 MB | ComfyUI in the Strix Halo toolbox | recorded |
+| [Qwen-Image transformer config (CubePart)](models/qwen-image-config.md) | other | 371 B | CubeArt: Cube3D and CubePart (3D Generate) | recorded |
 | [SAM 3D Body (DINOv3, bf16)](models/sam-3d-body-dinov3-bf16.md) | other | 2.8 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [Whisper base (faster-whisper)](models/whisper-base-faster-whisper.md) | stt | 148 MB | Speech to Text (faster-whisper) | recorded |
 | [Whisper large-v3 (faster-whisper)](models/whisper-large-v3-faster-whisper.md) | stt | 3.1 GB | Speech to Text (faster-whisper) | recorded |
@@ -79,7 +76,7 @@ You can stop after any mod. Each environment doc says which features need it; ea
 | [qwen3vl_8b_bf16](models/qwen3vl-8b-bf16.md) | text-encoder | 17.5 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [Breeze TTS 2](models/breeze-tts-2.md) | tts | 7.7 GB | Breeze TTS 2 and Whisper (Speech) | recorded |
 | [Kokoro 82M](models/kokoro-82m.md) | tts | 342 MB | Kokoro-82M (Speech) | recorded |
-| [4x_foolhardy_Remacri](models/4x-foolhardy-remacri.md) | upscale | 67 MB | ComfyUI in the Strix Halo toolbox | **not recorded** |
+| [4x_foolhardy_Remacri](models/4x-foolhardy-remacri.md) | upscale | 67 MB | ComfyUI in the Strix Halo toolbox | recorded |
 | [qwen_image_2.1_vae_bf16](models/qwen-image-2.1-vae-bf16.md) | vae | 676 MB | ComfyUI in the Strix Halo toolbox | recorded |
 | [TRELLIS.2 shape VAE (bf16)](models/trellis-2-shape-vae-bf16.md) | vae | 1.1 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [DINOv3 ViT-L](models/dino-v3-vit-l.md) | vision | 1.2 GB | ComfyUI in the Strix Halo toolbox | recorded |

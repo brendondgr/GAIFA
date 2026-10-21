@@ -14,10 +14,14 @@
       "format": "safetensors",
       "kind": "upscale",
       "name": "4x_foolhardy_Remacri",
-      "notes": "",
+      "notes": "Licence: CC-BY-NC-SA-4.0 (FoolhardyVEVO). The fp32 safetensors; OzzyGT/4xRemacri is an fp16 copy at half the size.",
       "path": "comfyui/upscale_models/4x_foolhardy_Remacri.safetensors",
       "services": [],
-      "source": null,
+      "source": {
+        "repo": "LyliaEngine/4x_foolhardy_Remacri",
+        "revision": "main",
+        "type": "huggingface"
+      },
       "tags": []
     },
     "breeze-tts-2": {
@@ -148,26 +152,6 @@
         "repo": "BreezeBlue/breeze-tts-2",
         "type": "huggingface"
       },
-      "tags": []
-    },
-    "chroma-flash-heun-r32-fp32": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/loras/chroma-flash-heun_r32-fp32.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 450069160,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "lora",
-      "name": "chroma-flash-heun_r32-fp32",
-      "notes": "",
-      "path": "comfyui/loras/chroma-flash-heun_r32-fp32.safetensors",
-      "services": [],
-      "source": null,
       "tags": []
     },
     "clip-vit-large-patch14": {
@@ -648,28 +632,28 @@
       ]
     },
     "gemma-4-26b-it": {
-      "added": "2026-10-06T02:22:21-04:00",
+      "added": "2026-10-21T13:28:00-04:00",
       "files": [
         {
-          "path": "llm/Gemma4-26B/Gemma4-26B-A4B-Q4KM.gguf",
+          "path": "llm/Gemma4-26B/Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf",
           "role": "model",
           "sha256": "3c13133469e431312fffb8b1d9c85ae42199e6bb5746ea1da84e8ddf2097d73c",
           "size_bytes": 16796015520,
-          "verified_at": "2026-10-06T02:22:33-04:00"
+          "verified_at": null
         },
         {
           "path": "llm/Gemma4-26B/mmproj-Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-BF16.gguf",
           "role": "mmproj",
           "sha256": "b5346e5bfd906f5e16878c2d0b8243e948ca7410fa28ea35be9b0c54a0ac10b7",
           "size_bytes": 1194827776,
-          "verified_at": "2026-10-06T02:22:33-04:00"
+          "verified_at": null
         },
         {
           "path": "llm/Gemma4-26B/mtp-gemma-4-26B-A4B-it.gguf",
           "role": "draft",
           "sha256": "62bd3af7f66c9308de9a5454233852f8c7324c93767e8dfb824ed45b9179864a",
           "size_bytes": 251937728,
-          "verified_at": "2026-10-06T02:22:33-04:00"
+          "verified_at": null
         }
       ],
       "format": "gguf",
@@ -681,8 +665,9 @@
         "lcpp"
       ],
       "source": {
-        "note": "GGUF general.name: Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced; downloaded before lcpp recorded sources. Set the Hugging Face repo here if known.",
-        "type": "local"
+        "repo": "HauhauCS/Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-MTP",
+        "revision": "main",
+        "type": "huggingface"
       },
       "tags": [
         "vision",
@@ -993,26 +978,6 @@
       },
       "tags": []
     },
-    "krea2filterbypass": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/loras/krea2filterbypass.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 160,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "lora",
-      "name": "krea2filterbypass",
-      "notes": "160 bytes: probably not a real LoRA (a failed download?)",
-      "path": "comfyui/loras/krea2filterbypass.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
     "moge-2-vitl-normal-fp16": {
       "added": "2026-10-11T13:06:52-04:00",
       "files": [
@@ -1079,7 +1044,7 @@
       "format": "safetensors",
       "kind": "image",
       "name": "qwen-image-2.1-turbo-fp8",
-      "notes": "Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs. Upstream qwen-image-2.1-turbo-fp8.safetensors (sha256 024e1bef\u2026) with ComfyUI per-layer FP8 metadata added by services/comfy/scripts/fix_fp8_quant_metadata.py (header only; without it ComfyUI runs the FP8 weights unscaled).",
+      "notes": "Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs. Upstream qwen-image-2.1-turbo-fp8.safetensors (sha256 024e1bef…) with ComfyUI per-layer FP8 metadata added by services/comfy/scripts/fix_fp8_quant_metadata.py (header only; without it ComfyUI runs the FP8 weights unscaled).",
       "path": "comfyui/diffusion_models/qwen-image-2.1-turbo-fp8.safetensors",
       "services": [],
       "source": {
@@ -1197,7 +1162,7 @@
         }
       ],
       "format": "other",
-      "kind": "3d",
+      "kind": "other",
       "name": "Qwen-Image transformer config (CubePart)",
       "notes": "Only transformer/config.json; CubePart reads its architecture.",
       "path": "3d/Qwen-Image",
@@ -1208,26 +1173,6 @@
         "repo": "Qwen/Qwen-Image",
         "type": "huggingface"
       },
-      "tags": []
-    },
-    "qwen2-1uncenv2": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/loras/qwen2-1uncenV2.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 79744352,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "lora",
-      "name": "qwen2-1uncenV2",
-      "notes": "",
-      "path": "comfyui/loras/qwen2-1uncenV2.safetensors",
-      "services": [],
-      "source": null,
       "tags": []
     },
     "qwen3-vl-4b-instruct": {

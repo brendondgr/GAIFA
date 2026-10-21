@@ -8,15 +8,28 @@
 | Format | safetensors |
 | Size | 67 MB in 1 file |
 | Where it goes | `data/models/comfyui/upscale_models/4x_foolhardy_Remacri.safetensors` |
-| Source | not recorded |
+| Source | Hugging Face [LyliaEngine/4x_foolhardy_Remacri](https://huggingface.co/LyliaEngine/4x_foolhardy_Remacri) |
 | Used by | `comfy` |
 | Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
+| Registry notes | Licence: CC-BY-NC-SA-4.0 (FoolhardyVEVO). The fp32 safetensors; OzzyGT/4xRemacri is an fp16 copy at half the size. |
 
 ### Files
 
 | File | Role | Size | SHA-256 |
 |---|---|---|---|
 | `comfyui/upscale_models/4x_foolhardy_Remacri.safetensors` | weights | 67 MB | not recorded |
+
+### Get it
+
+From the project folder (`uvx` runs Hugging Face's CLI without installing it; gated repos need `hf auth login` first, see [host.md](../host.md#6-accounts-and-licences)):
+
+```bash
+uvx --from huggingface_hub hf download LyliaEngine/4x_foolhardy_Remacri --include "*4x_foolhardy_Remacri.safetensors" --local-dir data/state/downloads/4x-foolhardy-remacri
+```
+
+```bash
+mkdir -p "data/models/comfyui/upscale_models" && find data/state/downloads/4x-foolhardy-remacri -name "4x_foolhardy_Remacri.safetensors" -exec mv {} "data/models/comfyui/upscale_models/4x_foolhardy_Remacri.safetensors" \; && rm -r data/state/downloads/4x-foolhardy-remacri
+```
 <!-- end generated -->
 
 ## Where to get it

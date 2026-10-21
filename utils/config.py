@@ -170,6 +170,12 @@ class SpeechInputCfg(_Strict):
     _labels = field_validator("mics")(lambda cls, v: mic_labels(v))
 
 
+class DocsCfg(_Strict):
+    """Plan 23.3: the setup docs follow the registry. Off: only `aihub docs` writes them."""
+    regenerate: bool = True
+
+
+
 class Config(_Strict):
     hub: HubCfg = HubCfg()
     paths: PathsCfg = PathsCfg()
@@ -181,6 +187,7 @@ class Config(_Strict):
     sessions: SessionsCfg = SessionsCfg()
     learning: LearningCfg = LearningCfg()
     speech_input: SpeechInputCfg = SpeechInputCfg()
+    docs: DocsCfg = DocsCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

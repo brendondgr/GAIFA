@@ -78,7 +78,7 @@ class Watcher:
         self.reg = reg
         self.every = every
         self._task: asyncio.Task[None] | None = None
-        reg.changed = lambda: refresh(reg)  # type: ignore[method-assign]
+        reg.subscribe(lambda _model_id: refresh(reg))
 
     def start(self) -> None:
         self.reg.refresh()

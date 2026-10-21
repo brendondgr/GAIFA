@@ -3,6 +3,7 @@ task = "image-to-video"
 good_for = "a ~5 s 480p clip from a still"
 description = "Animate a still image into a ~5 s 480p clip (Wan 2.1 14B, LightX2V 6 steps)"
 # memory_gb = 30.5    # estimated from the model files; each run measures it, so set it only to override
+agent = false                        # its models were deleted on 2026-10-20 to free disk space
 
 [inputs.prompt]          # CLIPTextEncode "Positive prompt"
 node = "7"

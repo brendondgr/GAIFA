@@ -165,7 +165,7 @@ class Verifier:
                 await reg.activity.add(f"Couldn't verify all of {e.name}: {'; '.join(failed)}", level="warn", route=f"#/models/{model_id}")
             else:
                 await reg.activity.add(f"Verified {e.name}", route=f"#/models/{model_id}")
-        reg.changed()
+        reg.changed(model_id)
 
 
 def _hash_all(todo: list[tuple[str, Path, int]], done: list[int], stop: threading.Event) -> dict[str, tuple[str | None, int | None, str | None]]:

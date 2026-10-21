@@ -19,7 +19,7 @@ import logging
 import os
 import shutil
 import stat as stat_mod
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -58,6 +58,7 @@ class Registry:
         self.verifier: Any = None  # verify.Verifier, set when it starts
         self.last_status: dict[str, str] | None = None  # alerts.py: statuses at the last look
         self._stamp: tuple[int, int] | None = None
+        self._listeners: list[Callable[[str | None], None]] = []  # subscribe(): alerts, setup docs
 
     # ---- storage -------------------------------------------------------------
 
@@ -107,9 +108,11 @@ class Registry:
         log.error("%s", why)
 
     def refresh(self) -> None:
-        """Reload when registry.json changed on disk since it was last read or written."""
+        """Reload when registry.json changed on disk since it was last read or written (a hand
+        edit, another process); the listeners hear about it like any other change."""
         if self._file_stamp() != self._stamp:
             self.load()
+            self.changed()
 
     def save(self) -> None:
         if self.readonly:
@@ -310,7 +313,7 @@ class Registry:
         self.entries[model_id] = new
         self.save()
         self.publish(model_id)
-        self.changed()
+        self.changed(model_id)
         return self.view(model_id)
 
     async def delete(self, model_id: str, files: bool = False) -> None:
@@ -336,13 +339,22 @@ class Registry:
             self.bus.publish({"type": "model_deleted", "id": model_id})
         if self.activity:
             await self.activity.add(f"Removed {e.name} from the registry" + (" and deleted its files" if files else ""), route="#/models")
-        self.changed()
+        self.changed(model_id)
 
     def on_delete(self, model_id: str) -> None:
         """Hook: verify.py cancels a pending or running verification."""
 
-    def changed(self) -> None:
-        """Hook: alerts.py recomputes the registry alerts."""
+    def subscribe(self, fn: Callable[[str | None], None]) -> None:
+        """Call `fn(model_id)` after every change: an add, edit, delete or verify (that model's id),
+        or a reload of registry.json (None: anything may have changed)."""
+        self._listeners.append(fn)
+
+    def changed(self, model_id: str | None = None) -> None:
+        for fn in list(self._listeners):
+            try:
+                fn(model_id)
+            except Exception:  # noqa: BLE001: one listener's failure mustn't break a registry write
+                log.exception("registry listener")
 
     def _delete_files(self, e: Entry) -> list[str]:
         """Delete the recorded files (a symlink's target too, when it lies inside the model's own

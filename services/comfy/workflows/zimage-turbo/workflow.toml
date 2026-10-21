@@ -4,6 +4,7 @@ tags = ["photo", "fast"]
 task = "text-to-image"
 good_for = "photoreal pictures, quickly"
 # memory_gb = 10.1    # estimated from the model files; each run measures it, so set it only to override
+agent = false                        # its models were deleted on 2026-10-20 to free disk space
 
 [inputs.prompt]          # CLIPTextEncode "CLIP Text Encode (Prompt)"
 node = "67"

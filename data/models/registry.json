@@ -20,26 +20,6 @@
       "source": null,
       "tags": []
     },
-    "ae": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/vae/ae.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 335304388,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "vae",
-      "name": "ae",
-      "notes": "",
-      "path": "comfyui/vae/ae.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
     "breeze-tts-2": {
       "added": "2026-10-06T01:27:38-04:00",
       "files": [
@@ -186,26 +166,6 @@
       "name": "chroma-flash-heun_r32-fp32",
       "notes": "",
       "path": "comfyui/loras/chroma-flash-heun_r32-fp32.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "clip-vision-h": {
-      "added": "2026-10-06T14:02:18-04:00",
-      "files": [
-        {
-          "path": "comfyui/clip_vision/clip_vision_h.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 1264219396,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "vision",
-      "name": "clip_vision_h",
-      "notes": "",
-      "path": "comfyui/clip_vision/clip_vision_h.safetensors",
       "services": [],
       "source": null,
       "tags": []
@@ -687,26 +647,6 @@
         "multimodal"
       ]
     },
-    "face-yolov9c": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/ultralytics/bbox/face_yolov9c.pt",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 51648019,
-          "verified_at": null
-        }
-      ],
-      "format": "pt",
-      "kind": "other",
-      "name": "face_yolov9c",
-      "notes": "",
-      "path": "comfyui/ultralytics/bbox/face_yolov9c.pt",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
     "gemma-4-26b-it": {
       "added": "2026-10-06T02:22:21-04:00",
       "files": [
@@ -1073,31 +1013,6 @@
       "source": null,
       "tags": []
     },
-    "minicpm-5-2b": {
-      "added": "2026-10-06T02:22:21-04:00",
-      "files": [
-        {
-          "path": "llm/MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf",
-          "role": "model",
-          "sha256": "c5415f8989bf88a8288f1b55a3cc371af53c07b0faa220a63bd7a990cfaba078",
-          "size_bytes": 2679710688,
-          "verified_at": "2026-10-06T02:22:34-04:00"
-        }
-      ],
-      "format": "gguf",
-      "kind": "llm",
-      "name": "MiniCPM5 2.6B (Q8_0)",
-      "notes": "",
-      "path": "llm/MiniCPM5-2B",
-      "services": [
-        "lcpp"
-      ],
-      "source": {
-        "note": "GGUF general.organization: Openbmb, name: MiniCPM5 2.6B; downloaded before lcpp recorded sources.",
-        "type": "local"
-      },
-      "tags": []
-    },
     "moge-2-vitl-normal-fp16": {
       "added": "2026-10-11T13:06:52-04:00",
       "files": [
@@ -1150,26 +1065,6 @@
       },
       "tags": []
     },
-    "qwen-3-4b": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/text_encoders/qwen_3_4b.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 8044982048,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "text-encoder",
-      "name": "qwen_3_4b",
-      "notes": "",
-      "path": "comfyui/text_encoders/qwen_3_4b.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
     "qwen-image-2.1-turbo-fp8": {
       "added": "2026-10-09T17:21:44-04:00",
       "files": [
@@ -1184,7 +1079,7 @@
       "format": "safetensors",
       "kind": "image",
       "name": "qwen-image-2.1-turbo-fp8",
-      "notes": "Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs. Upstream qwen-image-2.1-turbo-fp8.safetensors (sha256 024e1bef…) with ComfyUI per-layer FP8 metadata added by services/comfy/scripts/fix_fp8_quant_metadata.py (header only; without it ComfyUI runs the FP8 weights unscaled).",
+      "notes": "Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs. Upstream qwen-image-2.1-turbo-fp8.safetensors (sha256 024e1bef\u2026) with ComfyUI per-layer FP8 metadata added by services/comfy/scripts/fix_fp8_quant_metadata.py (header only; without it ComfyUI runs the FP8 weights unscaled).",
       "path": "comfyui/diffusion_models/qwen-image-2.1-turbo-fp8.safetensors",
       "services": [],
       "source": {
@@ -1437,46 +1332,6 @@
       },
       "tags": []
     },
-    "qwen3.8-flash-next-iq3s": {
-      "added": "2026-10-06T13:19:22-04:00",
-      "files": [
-        {
-          "path": "llm/Qwen3.8-Flash-Next/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
-          "role": "weights",
-          "sha256": "4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3",
-          "size_bytes": 54817524224,
-          "verified_at": null
-        },
-        {
-          "path": "llm/Qwen3.8-Flash-Next/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf",
-          "role": "sidecar",
-          "sha256": "316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113",
-          "size_bytes": 28800138432,
-          "verified_at": null
-        },
-        {
-          "path": "llm/Qwen3.8-Flash-Next/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
-          "role": "sidecar",
-          "sha256": "b1a82259702816a5330d7bd7607cd9676b11780e79ff7348c21103ff3ce49bd0",
-          "size_bytes": 907543008,
-          "verified_at": null
-        }
-      ],
-      "format": "gguf",
-      "kind": "llm",
-      "name": "qwen3.8-flash-next-iq3s",
-      "notes": "",
-      "path": "llm/Qwen3.8-Flash-Next",
-      "services": [
-        "lcpp"
-      ],
-      "source": {
-        "repo": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF",
-        "revision": "main",
-        "type": "huggingface"
-      },
-      "tags": []
-    },
     "qwen3vl-8b-bf16": {
       "added": "2026-10-06T14:02:19-04:00",
       "files": [
@@ -1658,46 +1513,6 @@
       },
       "tags": []
     },
-    "sam3.1-multiplex-fp16": {
-      "added": "2026-10-06T14:02:18-04:00",
-      "files": [
-        {
-          "path": "comfyui/checkpoints/sam3.1_multiplex_fp16.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 1745546848,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "other",
-      "name": "sam3.1_multiplex_fp16",
-      "notes": "SAM 3.1 segmentation (masks), not a generator",
-      "path": "comfyui/checkpoints/sam3.1_multiplex_fp16.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "scail-2-q80": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/unet/SCAIL-2-Q80.gguf",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 17666268832,
-          "verified_at": null
-        }
-      ],
-      "format": "gguf",
-      "kind": "video",
-      "name": "SCAIL-2-Q80",
-      "notes": "",
-      "path": "comfyui/unet/SCAIL-2-Q80.gguf",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
     "smollm2-135m-instruct": {
       "added": "2026-10-06T02:28:38-04:00",
       "files": [
@@ -1774,66 +1589,6 @@
         "revision": "main",
         "type": "huggingface"
       },
-      "tags": []
-    },
-    "umt5-xxl-enc-fp8-e4m3fn": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/text_encoders/umt5-xxl-enc-fp8_e4m3fn.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 6731333792,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "text-encoder",
-      "name": "umt5-xxl-enc-fp8_e4m3fn",
-      "notes": "",
-      "path": "comfyui/text_encoders/umt5-xxl-enc-fp8_e4m3fn.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "umt5-xxl-fp8-e4m3fn-scaled": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 6735906897,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "text-encoder",
-      "name": "umt5_xxl_fp8_e4m3fn_scaled",
-      "notes": "",
-      "path": "comfyui/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "ungloryhail-bf16": {
-      "added": "2026-10-06T14:02:18-04:00",
-      "files": [
-        {
-          "path": "comfyui/diffusion_models/ungloryhail_bf16.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 9193379092,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "image",
-      "name": "ungloryhail_bf16",
-      "notes": "",
-      "path": "comfyui/diffusion_models/ungloryhail_bf16.safetensors",
-      "services": [],
-      "source": null,
       "tags": []
     },
     "voice-arabella": {
@@ -1930,126 +1685,6 @@
         "note": "uploaded reference clip",
         "type": "created"
       },
-      "tags": []
-    },
-    "wan-2.1-vae": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/vae/wan_2.1_vae.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 253815318,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "vae",
-      "name": "wan_2.1_vae",
-      "notes": "",
-      "path": "comfyui/vae/wan_2.1_vae.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "wan2-1-vae-fp32": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/vae/Wan2_1_VAE_fp32.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 507591244,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "vae",
-      "name": "Wan2_1_VAE_fp32",
-      "notes": "",
-      "path": "comfyui/vae/Wan2_1_VAE_fp32.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "wan2.1-i2v-480p-14b-fp8-e4m3fn": {
-      "added": "2026-10-06T14:02:18-04:00",
-      "files": [
-        {
-          "path": "comfyui/diffusion_models/wan2.1_i2v_480p_14B_fp8_e4m3fn.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 16397245448,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "video",
-      "name": "wan2.1_i2v_480p_14B_fp8_e4m3fn",
-      "notes": "",
-      "path": "comfyui/diffusion_models/wan2.1_i2v_480p_14B_fp8_e4m3fn.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "wan2.1-scail-2-dpo-lora-bf16": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/loras/wan2.1_SCAIL_2_DPO_lora_bf16.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 1226936552,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "lora",
-      "name": "wan2.1_SCAIL_2_DPO_lora_bf16",
-      "notes": "",
-      "path": "comfyui/loras/wan2.1_SCAIL_2_DPO_lora_bf16.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "wan2.1-t2v-14b-fp8-e4m3fn": {
-      "added": "2026-10-06T14:02:18-04:00",
-      "files": [
-        {
-          "path": "comfyui/diffusion_models/wan2.1_t2v_14B_fp8_e4m3fn.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 14289605920,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "video",
-      "name": "wan2.1_t2v_14B_fp8_e4m3fn",
-      "notes": "",
-      "path": "comfyui/diffusion_models/wan2.1_t2v_14B_fp8_e4m3fn.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "wan21-i2v-14b-lightx2v-cfg-step-distill-lora-rank64": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/loras/Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 739472104,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "lora",
-      "name": "Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64",
-      "notes": "",
-      "path": "comfyui/loras/Wan21_I2V_14B_lightx2v_cfg_step_distill_lora_rank64.safetensors",
-      "services": [],
-      "source": null,
       "tags": []
     },
     "whisper-base-faster-whisper": {
@@ -2391,86 +2026,6 @@
         "revision": "d90ca5fe260221311c53c58e660288d3deb8d356",
         "type": "huggingface"
       },
-      "tags": []
-    },
-    "z-image-turbo-fp8-e4m3fn": {
-      "added": "2026-10-06T14:02:18-04:00",
-      "files": [
-        {
-          "path": "comfyui/diffusion_models/z_image_turbo_fp8_e4m3fn.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 6154958896,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "image",
-      "name": "z_image_turbo_fp8_e4m3fn",
-      "notes": "",
-      "path": "comfyui/diffusion_models/z_image_turbo_fp8_e4m3fn.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "zit-intorealism-zitv60": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/diffusion_models/zit_intorealism_zitV60.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 6154968720,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "image",
-      "name": "zit_intorealism_zitV60",
-      "notes": "",
-      "path": "comfyui/diffusion_models/zit_intorealism_zitV60.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "zit-oilpainting": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/loras/zit_oilpainting.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 184375364,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "lora",
-      "name": "zit_oilpainting",
-      "notes": "",
-      "path": "comfyui/loras/zit_oilpainting.safetensors",
-      "services": [],
-      "source": null,
-      "tags": []
-    },
-    "zit-watercolor": {
-      "added": "2026-10-06T14:02:19-04:00",
-      "files": [
-        {
-          "path": "comfyui/loras/zit_watercolor.safetensors",
-          "role": "weights",
-          "sha256": null,
-          "size_bytes": 170129432,
-          "verified_at": null
-        }
-      ],
-      "format": "safetensors",
-      "kind": "lora",
-      "name": "zit_watercolor",
-      "notes": "",
-      "path": "comfyui/loras/zit_watercolor.safetensors",
-      "services": [],
-      "source": null,
       "tags": []
     }
   },

@@ -209,32 +209,58 @@ After editing `page.js`, reload the browser tab. A page can also import `/mod-ki
 
 ## 9. Setup docs
 
-Every environment a mod needs (a venv with GPU wheels, a container image, a binary) gets a setup doc in the mod: `services/<id>/setup/<env>.md`. A mod whose only environment is the venv `install.sh` makes needs one short doc too. Copy `services/_template/setup/env.md`. Deleting the mod removes its docs. The guide that links them all is [docs/setup/](setup/README.md).
+Every environment a mod needs (a venv with GPU wheels, a container image, a binary) gets a setup doc in the mod: `services/<id>/setup/<env>.md`. A mod whose only environment is the venv `install.sh` makes needs one short doc too. Copy `services/_template/setup/env.md`. Deleting the mod removes its docs. The guide that links them all is [docs/setup/](setup/README.md), and `aihub setup` reads them to install the mods a person picks (plan 23.9).
 
-The doc starts with a TOML block in an HTML comment (GitHub doesn't show it):
+A setup doc is about **the mod**, not one machine's models: say what kind of model it runs and how to add any of them; this machine's models are examples, never requirements.
+
+The doc starts with a TOML block in an HTML comment (GitHub doesn't show it). Only `id` and `title` are required; `aihub setup` lists a doc only when it has a `summary`:
 
 ```markdown
 <!-- aihub-setup
-id = "tts-breeze"
-title = "Breeze TTS 2 and Whisper"
-models = ["tts/breeze-tts-2", "hf-cache/hub/models--openai--whisper-large-v3-turbo"]
+id = "tts-kokoro"
+title = "Kokoro-82M (Speech)"
+models = ["hf-cache/hub/models--hexgrad--Kokoro-82M"]
 scan = []
+summary = "Speech: fast English voices"     # one line, shown when choosing mods
+gpu = true                                  # needs the GPU (and so host.md's GPU parts)
+disk_gb = 14                                # the environment alone; models are extra
+needs = ["podman", "espeak-ng"]             # host commands that must exist
+after = ["tts"]                             # setup ids to do first
+check = "aihub check tts"                   # proves it works
+
+[[steps]]                                   # run in order, with bash, in the mod's folder
+run = "scripts/install-runtime.sh"
+what = "builds the engine venvs from locks/ (about 14 GB, 10 min)"
+ask = ""                                    # a yes/no question first, such as a licence
+
+[[suggest]]                                 # optional starter models (1–3)
+name = "Kokoro 82M"
+repo = "hexgrad/Kokoro-82M"                 # a Hugging Face repo, downloaded into dest…
+revision = "f3ff3571791e39611d31c381e3a41a3af07b4987"
+files = []                                  # empty: the whole repo
+dest = "hf-cache"                           # "hf-cache", or a folder under data/models/
+size_gb = 0.34
+good_for = "fast English voices"
+licence = "Apache-2.0"
+required = true                             # the engine can't run without it
+gated = false                               # true: accept the repo's terms on Hugging Face first
 -->
 ```
 
 - `id`: unique across all mods; `<mod>` or `<mod>-<env>`.
-- `models`: globs relative to `data/models/` for the models this environment runs (`comfyui/**`). Every registered model must match at least one environment.
-- `scan`: files in the mod (globs relative to its folder, e.g. `workflows/*/workflow.json`) whose mentions of a model's file name or Hugging Face repo are listed in that model's doc as "referenced by".
+- `models`: globs relative to `data/models/` for the models this environment runs (`comfyui/**`); the local model inventory (`aihub docs`) uses them to say which setup doc runs a model.
+- `scan`: tracked files in the mod (globs relative to its folder, e.g. `workflows/*/workflow.json`) whose mentions of a model's file name or Hugging Face repo are listed in its inventory doc as "referenced by".
+- `[[suggest]]` can name a mod route instead of a repo, for mods with their own downloader: `op = "POST /v1/load"` and `body = { preset = "balanced" }` (no `dest`, `files` or `revision`). Mark weights an engine can't run without `required = true`; everything else is optional, and the default is to download nothing.
+- Unknown keys are errors, at the top and inside `[[steps]]` and `[[suggest]]`; `aihub docs --check` reports them.
 
 Then these sections, in this order. Leave a section out only when it has nothing to say:
 
 1. **What it is**: one paragraph: what runs here and which features need it.
-2. **Tested with**: the versions this machine runs, read from the machine: image digest, Python, torch and ROCm builds (from the lock files), upstream commits, binaries.
+2. **Tested with**: the versions this machine runs, read from the machine: image digest, Python, torch and ROCm builds (from the lock files), upstream commits, binaries. A reference for when something breaks, not a requirement.
 3. **Prerequisites**: other environments, host packages ([host.md](setup/host.md)), accounts, licences.
 4. **Install**: commands in order, one per block, each followed by what it does, what it downloads and from where, how big and how long.
-5. **Configuration**: `.env` and `service.toml` keys, marked required or optional.
-6. **Check it works**: commands and the output to expect.
-7. **What to look for**: what's specific to `gfx1151`, known errors and their fixes, what breaks quietly.
-8. **Known gaps**: steps no script does yet.
-
-The models an environment runs are listed in their own docs, `docs/setup/models/<id>.md`, which `aihub docs` generates from the registry (plan Phase 23).
+5. **Choosing models**: what kind of model the mod runs, where the files go, and how to add your own (the mod's page, its downloader, or a command); the suggestions with their sizes and licences; weights an engine needs, if any.
+6. **Configuration**: `.env` and `service.toml` keys, marked required or optional.
+7. **Check it works**: commands and the output to expect.
+8. **What to look for**: what's specific to `gfx1151`, known errors and their fixes, what breaks quietly.
+9. **Known gaps**: steps no script does yet.

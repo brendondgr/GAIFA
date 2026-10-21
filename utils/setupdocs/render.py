@@ -132,13 +132,19 @@ def mods_index(envs: list[Env], readme: Path) -> str:
     if not envs:
         out.append("*No setup docs yet: they go in `services/<id>/setup/` (mods.md §9).*")
     else:
-        out += ["| Mod | Setup docs |", "|---|---|"]
+        out += ["| Mod | What it gives you | GPU | Disk | Setup docs |", "|---|---|---|---|---|"]
         by_mod: dict[str, list[Env]] = {}
         for v in envs:
             by_mod.setdefault(v.mod, []).append(v)
         for mod in sorted(by_mod):
-            docs = ", ".join(f"[{v.title}]({link(readme, v.path)})" for v in sorted(by_mod[mod], key=lambda v: v.id))
-            out.append(f"| `{mod}` | {docs} |")
+            vs = sorted(by_mod[mod], key=lambda v: v.id)
+            summary = " · ".join(v.setup.summary for v in vs if v.setup.summary) or "—"
+            gpus = [v.setup.gpu for v in vs if v.setup.gpu is not None]
+            gpu = "—" if not gpus else "yes" if any(gpus) else "no"
+            disks = [v.setup.disk_gb for v in vs if v.setup.disk_gb is not None]
+            disk = gb(sum(disks) * 1e9) if disks else "—"
+            docs = ", ".join(f"[{v.title}]({link(readme, v.path)})" for v in vs)
+            out.append(f"| `{mod}` | {summary} | {gpu} | {disk} | {docs} |")
     out.append(END)
     return "\n".join(out)
 

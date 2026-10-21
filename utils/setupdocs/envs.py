@@ -1,4 +1,5 @@
-"""Environment docs: `services/<id>/setup/<env>.md` and their `<!-- aihub-setup … -->` block (docs/mods.md §9)."""
+"""Setup docs: `services/<id>/setup/<env>.md` and their `<!-- aihub-setup … -->` block (docs/mods.md §9;
+the version-2 keys are in block.py)."""
 
 from __future__ import annotations
 
@@ -9,8 +10,10 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .block import TOP as KEYS
+from .block import Setup, read
+
 HEAD = re.compile(r"\A\s*<!--\s*aihub-setup\s*\n(.*?)\n\s*-->", re.S)
-KEYS = {"id", "title", "models", "scan"}
 
 
 @dataclass
@@ -21,6 +24,7 @@ class Env:
     path: Path                      # the doc, absolute
     models: list[str] = field(default_factory=list)
     scan: list[str] = field(default_factory=list)
+    setup: Setup = field(default_factory=Setup)   # the version-2 keys: what `aihub setup` reads
 
 
 def mod_dirs(root: Path) -> list[Path]:
@@ -54,9 +58,13 @@ def parse(path: Path, mod: str) -> tuple[Env | None, str | None]:
         v = data.get(key, [])
         if not isinstance(v, list) or not all(isinstance(s, str) and s.strip() for s in v):
             return None, f"`{key}` must be a list of strings"
+    setup, problem = read(data)
+    if problem:
+        return None, problem
+    assert setup is not None
     return Env(id=data["id"], title=data["title"], mod=mod, path=path,
                models=[s.strip().strip("/") for s in data.get("models", [])],
-               scan=[s.strip() for s in data.get("scan", [])]), None
+               scan=[s.strip() for s in data.get("scan", [])], setup=setup), None
 
 
 def load_envs(root: Path) -> tuple[list[Env], dict[str, str]]:

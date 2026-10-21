@@ -2319,7 +2319,7 @@ Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from th
   *Done when:* `docs/setup/models/` is gone from git, `aihub docs` writes the inventory under `data/state/`, the hub suite passes with the updated tests, and `aihub docs --check --strict` is clean.
   - *As built:* the 35 model docs moved to `data/state/setup/models/` (with an index, `README.md`), and their download command links `docs/setup/host.md` from there. Check mode compares only `docs/setup/README.md`; the inventory's gaps (a model no setup doc runs, one without a source) are printed as notes. `--strict` fails on a mod without a setup doc, and every mod has one. The text that pointed to model docs (the setup README, `host.md`, `hub.md`) now says models are each person's choice per mod; `host.md`'s disk table no longer gives this machine's total as what you need. Done before the revision, in `f9d4e46`: three unused LoRAs deleted, Remacri's and Gemma 4's sources recorded, Gemma's GGUF renamed to the repo's file name (and in lcpp's catalog), `qwen-image-config` made kind `other`.
 
-- [ ] **23.7 What a setup doc declares: the `aihub-setup` block, version 2.**
+- [x] **23.7 What a setup doc declares: the `aihub-setup` block, version 2.**
   - New keys, parsed and validated in `utils/setupdocs/envs.py` (unknown keys stay errors):
     ```toml
     summary = "Speech: Kokoro voices"      # one line, shown when choosing mods
@@ -2342,6 +2342,7 @@ Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from th
   - `[[suggest]]` may instead name a mod route that downloads and registers it (`op = "POST /v1/load"`, `body = {…}`), for mods with their own downloader (stt, embed, lcpp, vllm, comfy).
   - `docs/mods.md` §9 and `services/_template/setup/env.md` describe the block; a doc without the new keys still parses (they're optional), but the wizard lists only docs with a `summary`.
   *Done when:* `utils/tests/docs/test_setupdocs.py` covers every key, bad values, `[[steps]]` and `[[suggest]]` (repo or op, not both), and `aihub docs --check` is clean on the repo.
+  - *As built:* the keys are in `utils/setupdocs/block.py` (`Setup`, `Step`, `Suggest`, `read`), attached to each `Env` as `env.setup`; a `repo` needs `dest` inside `data/models/`, an `op` takes `body` and nothing of the repo's. The mods index gains What it gives you, GPU and Disk columns (shown as — until 23.8 fills the blocks in). `docs/mods.md` §9 shows the whole block and adds a **Choosing models** section to the order; the template's block has a summary, a check and its install step, and a test parses it once `aihub new` fills it in. Tests: `utils/tests/docs/test_setup_block.py` (21).
 
 - [ ] **23.8 Every setup doc is about the mod, not this machine's models.**
   - Each doc gets a **Choosing models** section: what kind of model the mod runs (any GGUF for llama.cpp, any workflow pack and its models for ComfyUI, any Hugging Face repo for vLLM, …), where the files go, and how to add your own (the mod's page, its downloader, or a command), with this machine's models only as examples. Mods whose engines need fixed weights (gen3d's engines, Kokoro, Breeze, the embed and decide mods) say so and list them as `required` suggestions.

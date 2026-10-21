@@ -68,7 +68,7 @@ export function setAllHidden(nav, services, hide) {
 export function groups(route, services) {
   const r = route || { page: 'overview', parts: [] }, has = id => (services || []).some(s => s.id === id);
   const learning = r.page === 'service' && r.parts[1] === 'agent' && r.parts[2] === 'learning';
-  const item = (key, label, href, icon, on) => ({ key, label, href, icon, on: !!on });
+  const item = (key, label, href, icon, on) => ({ key, label, href, icon, on: !!on, hint: HINTS[key] });
   return {
     top: [item('overview', 'Overview', '#/overview', 'grid', r.page === 'overview'), item('chat', 'Chat', '#/chat', 'chat', r.page === 'chat'),
       item('outputs', 'Outputs', '#/outputs', 'folder', r.page === 'outputs')],
@@ -76,6 +76,17 @@ export function groups(route, services) {
       item('models', 'Models', '#/models', 'layers', r.page === 'models'), item('settings', 'Settings', '#/settings', 'gear', r.page === 'settings')],
   };
 }
+/** What each fixed item is, for its tooltip. */
+export const HINTS = {
+  overview: 'The dashboard: memory, services and activity', chat: 'Talk to the agent', outputs: 'Everything the services made',
+  learning: 'What the agent has learned from you', models: 'The models on this machine', settings: "AIHub's settings",
+};
+/** A service's state in words, for its tooltip ("Ready · Active"). */
+export function stateWords(sv) {
+  const st = sv?.manifest_errors?.length ? 'manifest error' : sv?.state || 'unknown';
+  return `${st[0].toUpperCase()}${st.slice(1)} · ${BUCKETS[bucket(sv)].label}`;
+}
+
 /** Whether a service's item is the current page (the agent's Learning tab belongs to Learning). */
 export function serviceOn(route, id) {
   return route?.page === 'service' && route.parts[1] === id && !(id === 'agent' && route.parts[2] === 'learning');

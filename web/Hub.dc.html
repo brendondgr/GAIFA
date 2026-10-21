@@ -46,12 +46,9 @@ button:disabled{cursor:not-allowed;opacity:.5}
     <sc-if value="{{ mob }}" hint-placeholder-val="{{ false }}">
       <button onClick="{{ hd.onMenu }}" aria-label="Open navigation" style="width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:6px;background:transparent;color:var(--tx,#E6EAF2);cursor:pointer;flex:none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="{{ ic.menu }}"></path></svg></button>
     </sc-if>
-    <a href="#/overview" aria-label="AIHub, go to Overview" title="AIHub" style="display:flex;align-items:center;gap:7px;flex:none;color:var(--tx,#E6EAF2);text-decoration:none" style-hover="text-decoration:none">
-      <svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="#FFB224"></rect><g stroke="#1A1200" stroke-width="2.2" stroke-linecap="round"><path d="M16 16 9.5 9.5M16 16l6.5-6.5M16 16l-6.5 6.5M16 16l6.5 6.5"></path></g><g fill="#1A1200"><circle cx="16" cy="16" r="4.6"></circle><circle cx="8.6" cy="8.6" r="2.7"></circle><circle cx="23.4" cy="8.6" r="2.7"></circle><circle cx="8.6" cy="23.4" r="2.7"></circle><circle cx="23.4" cy="23.4" r="2.7"></circle></g><circle cx="16" cy="16" r="1.8" fill="#FFB224"></circle></svg>
-      <span style="font-weight:600;font-size:13.5px;letter-spacing:-.01em">AIHub</span>
-    </a>
-    <sc-if value="{{ hd.hasTitle }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="color:var(--bds,#2A3547);font-size:14px;flex:none">/</span></sc-if>
-    <span style="font-size:13px;font-weight:600;color:var(--mut,#8A94A6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">{{ hd.title }}</span>
+    {{ hd.iconEl }}
+    <span style="font-size:14px;font-weight:600;color:var(--tx,#E6EAF2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:none;max-width:45%">{{ hd.title }}</span>
+    <sc-if value="{{ hd.hasSub }}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="color:var(--bds,#2A3547);font-size:14px;flex:none">/</span><span style="font-size:13px;font-weight:500;color:var(--mut,#8A94A6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">{{ hd.sub }}</span></sc-if>
     <span style="flex:1"></span>
     <button onClick="{{ hd.onMem }}" aria-label="{{ hd.memAria }}" title="Unified memory" style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--card,#11151D);cursor:pointer;color:var(--mut,#8A94A6);flex:none" style-hover="border-color:var(--bdh,#3A4A63)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.memory }}"></path></svg>
@@ -1939,6 +1936,17 @@ class Component extends DCLogic {
     return { lines: out.slice(0, 800), copy: () => this.copy(JSON.stringify(value, null, 2), 'JSON copied') };
   }
 
+  // Plan 33.5: what the header names after the page: a mod's tab, a Settings section; and the page's icon or the mod's logo.
+  hdPlace(r) {
+    const h = React.createElement, d = r.page === 'service' ? this.svcMap?.[r.parts[1]] : null;
+    let sub = '';
+    if (d) { const tabs = this.tabsFor(d), t = tabs.find(x => x.id === r.parts[2]) || tabs[0]; sub = t && tabs.length > 1 ? t.label : ''; }
+    else if (r.page === 'settings' && r.parts[1]) sub = cap(r.parts[1]);
+    const ic = { overview: ICON.grid, chat: ICON.chat, outputs: ICON.folder, models: ICON.layers, settings: ICON.gear, services: this.Nav?.ICONS.apps || ICON.puzzle }[r.page];
+    const iconEl = d && this.Nav ? h(this.Nav.ServiceLogo, { sv: d, size: 20 })
+      : ic ? h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, style: { flex: 'none', color: 'var(--mut,#8A94A6)' } }, h('path', { d: ic })) : null;
+    return { iconEl, sub, hasSub: !!sub };
+  }
   vmShell(s, mob) {
     const r = s.route, m = s.memory, pct = m ? m.used_bytes / m.total_bytes : 0, tone = pct > 0.92 ? 'red' : pct > 0.8 ? 'accent' : 'cyan';
     const sbBase = { display: 'flex', flexDirection: 'column', background: 'var(--sb,#0D1119)', borderRight: '1px solid var(--bd,#1D2430)', overflow: 'hidden', zIndex: 60 }, rail = !mob && !!s.nav?.collapsed;
@@ -1954,7 +1962,7 @@ class Component extends DCLogic {
     const titles = { overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', settings: 'Settings', services: 'Services', service: this.svcMap[r.parts[1]]?.name || 'Service' };
     const hd = {
       st: { position: 'sticky', top: 0, zIndex: 40, height: s.density === 'compact' ? 44 : 52, display: 'flex', alignItems: 'center', gap: 8, padding: '0 clamp(10px,2vw,20px)', background: 'var(--bg,#0B0E14)', borderBottom: '1px solid var(--bd,#1D2430)' },
-      title: titles[r.page] || '', hasTitle: !!titles[r.page], memText: m ? `${(m.used_bytes / GB).toFixed(1)} / ${(m.total_bytes / GB).toFixed(1)} GB` : '— GB',
+      title: titles[r.page] || '', ...this.hdPlace(r), memText: m ? `${(m.used_bytes / GB).toFixed(1)} / ${(m.total_bytes / GB).toFixed(1)} GB` : '— GB',
       memBar: { display: 'block', height: '100%', width: (pct * 100).toFixed(1) + '%', background: TONE[tone][0], borderRadius: 9, transition: 'width .6s ease' },
       memTextSt: { fontFamily: MONO, fontSize: 12, color: tone === 'cyan' ? 'var(--tx,#E6EAF2)' : TONE[tone][0], whiteSpace: 'nowrap' },
       memAria: `Memory: ${m ? (m.used_bytes / GB).toFixed(1) : '?'} of ${m ? (m.total_bytes / GB).toFixed(1) : '?'} GB used (${Math.round(pct * 100)}%)${pct > 0.8 ? ', high' : ''}. Show breakdown`,

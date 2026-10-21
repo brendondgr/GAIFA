@@ -3,7 +3,7 @@
 // footer. Collapsed, it is a 56 px rail of icons where each service's logo carries its state colour.
 // Hovering the services shows a gear: a menu to pick how they show and which are listed. Hub.dc.html
 // mounts it in its <aside> (`{{ sb.navEl }}`); the choices are Settings.ui.nav (nav-model.js).
-import { BUCKETS, MODES, counts, countsText, groups, serviceOn, setAllHidden, setHidden, visible, normNav, bucket } from './nav-model.js';
+import { BUCKETS, MODES, counts, countsText, groups, serviceOn, setAllHidden, setHidden, visible, normNav, bucket, stateWords } from './nav-model.js';
 import { ServiceLogo, StateDot } from './logo.js';
 export { ServiceLogo };  // the Overview tiles and the service page header (Hub.dc.html)
 
@@ -25,6 +25,7 @@ const CSS = `
 .hubnav-sec:hover .hubnav-gear,.hubnav-sec:focus-within .hubnav-gear,.hubnav-gear[aria-expanded=true]{opacity:1}
 @media (hover:none){.hubnav-gear{opacity:1}}
 .hubnav-row:hover{background:var(--hov,#161C28)}
+@keyframes hubnav-tip{from{opacity:0;transform:translate(-4px,-50%)}to{opacity:1;transform:translate(0,-50%)}}
 `;
 function ensureCss() {
   if (typeof document === 'undefined' || document.getElementById('hubnav-css')) return;
@@ -44,7 +45,7 @@ const Mark = ({ size }) => {
 /** Three pills: green active, grey inactive, red failed (zero ones faded). */
 export function CountPills({ c, small }) {
   const h = R().createElement;
-  return h('span', { style: { display: 'inline-flex', gap: small ? 5 : 6, alignItems: 'center', fontFamily: MONO, fontSize: small ? 10.5 : 11, flex: 'none' }, title: countsText(c), 'aria-label': countsText(c) },
+  return h('span', { style: { display: 'inline-flex', gap: small ? 5 : 6, alignItems: 'center', fontFamily: MONO, fontSize: small ? 10.5 : 11, flex: 'none' }, 'aria-label': countsText(c) },
     ...['active', 'inactive', 'failed'].map(k => h('span', { key: k, style: { display: 'inline-flex', alignItems: 'center', gap: 3, opacity: c[k] ? 1 : 0.4, color: c[k] ? 'var(--tx,#E6EAF2)' : 'var(--mut,#8A94A6)' } },
       h('span', { style: { width: 6, height: 6, borderRadius: 99, background: BUCKETS[k].color } }), c[k])));
 }
@@ -94,8 +95,16 @@ export function Sidebar(p) {
   const React = R(), h = React.createElement;
   ensureCss();
   const { services = [], route, icons: I = {}, mob } = p, nav = normNav(p.nav), rail = nav.collapsed && !mob;
-  const [menu, setMenu] = React.useState(null);
-  React.useEffect(() => setMenu(null), [route?.hash, rail]);
+  const [menu, setMenu] = React.useState(null), [tip, setTip] = React.useState(null), tipT = React.useRef(0);
+  React.useEffect(() => { setMenu(null); setTip(null); }, [route?.hash, rail]);
+  React.useEffect(() => () => clearTimeout(tipT.current), []);
+  // Custom tooltips (plan 33.5): to the right of the item, quick in the rail, after a pause when expanded; keyboard focus shows them at once.
+  const tipOff = () => { clearTimeout(tipT.current); setTip(null); };
+  const tipOn = (text, sub, dot) => mob ? {} : {
+    onMouseEnter: e => { const r = e.currentTarget.getBoundingClientRect(); clearTimeout(tipT.current); tipT.current = setTimeout(() => setTip({ text, sub, dot, x: r.right + 10, y: r.top + r.height / 2 }), rail ? 60 : 450); },
+    onFocus: e => { if (!e.currentTarget.matches?.(':focus-visible')) return; const r = e.currentTarget.getBoundingClientRect(); clearTimeout(tipT.current); setTip({ text, sub, dot, x: r.right + 10, y: r.top + r.height / 2 }); },
+    onMouseLeave: tipOff, onBlur: tipOff, onMouseDown: tipOff,
+  };
   const set = next => p.setNav(typeof next === 'function' ? n => normNav(next(normNav(n))) : normNav(next)), ic = k => I[k] || ICONS[k] || I.puzzle;
   const g = groups(route, services), listed = visible(services, nav), c = counts(services), onSvcs = route?.page === 'services';
   const openMenu = e => {
@@ -104,27 +113,28 @@ export function Sidebar(p) {
     const left = Math.max(8, Math.min(r.right + 8, vw - W - 8));
     setMenu(r.top > vh * 0.55 ? { left, bottom: Math.max(12, vh - r.bottom) } : { left, top: Math.max(12, r.top - 8) });
   };
-  const gear = () => h('button', { className: 'hubnav-ib hubnav-gear', onClick: openMenu, 'aria-label': 'Choose the services in the sidebar', title: 'Choose the services in the sidebar', 'aria-haspopup': 'dialog', 'aria-expanded': !!menu }, h(Icon, { d: I.gear, size: 14 }));
+  const gear = () => h('button', { className: 'hubnav-ib hubnav-gear', onClick: openMenu, 'aria-label': 'Choose the services in the sidebar', ...tipOn('Choose the services', 'How they show, and which the list has'), 'aria-haspopup': 'dialog', 'aria-expanded': !!menu }, h(Icon, { d: I.gear, size: 14 }));
   const cur = on => on ? 'page' : undefined;
   const fixed = n => rail
-    ? h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), title: n.label, 'aria-label': n.label }, h(Icon, { d: ic(n.icon) }))
-    : h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on) }, h(Icon, { d: ic(n.icon) }), h('span', null, n.label));
+    ? h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), 'aria-label': n.label, ...tipOn(n.label, n.hint) }, h(Icon, { d: ic(n.icon) }))
+    : h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), ...tipOn(n.label, n.hint) }, h(Icon, { d: ic(n.icon) }), h('span', null, n.label));
   const svcTitle = sv => `${sv.name} · ${sv.manifest_errors?.length ? 'manifest error' : sv.state}`;
+  const svcTip = sv => tipOn(sv.name, `${stateWords(sv)}${sv.description ? ' — ' + sv.description : ''}`, BUCKETS[bucket(sv)].color);
   const svcItem = sv => rail
-    ? h('a', { key: sv.id, href: '#/s/' + sv.id, className: 'hubnav-a', 'aria-current': cur(serviceOn(route, sv.id)), title: svcTitle(sv), 'aria-label': svcTitle(sv) }, h(ServiceLogo, { sv, size: 20, dot: true }))
-    : h('a', { key: sv.id, href: '#/s/' + sv.id, className: 'hubnav-a', 'aria-current': cur(serviceOn(route, sv.id)) },
+    ? h('a', { key: sv.id, href: '#/s/' + sv.id, className: 'hubnav-a', 'aria-current': cur(serviceOn(route, sv.id)), 'aria-label': svcTitle(sv), ...svcTip(sv) }, h(ServiceLogo, { sv, size: 20, dot: true }))
+    : h('a', { key: sv.id, href: '#/s/' + sv.id, className: 'hubnav-a', 'aria-current': cur(serviceOn(route, sv.id)), ...svcTip(sv) },
       h(ServiceLogo, { sv, size: 16 }),
       h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, sv.name,
         h('span', { style: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' } }, `, ${BUCKETS[bucket(sv)].label.toLowerCase()}`)),
       h(StateDot, { sv }));
   const seeAll = () => rail
-    ? h('a', { key: 'all', href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), title: `See all services (${c.total})`, 'aria-label': 'See all services' }, h(Icon, { d: ICONS.apps }))
-    : h('a', { key: 'all', href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs) }, h(Icon, { d: ICONS.apps }), h('span', { style: { flex: 1 } }, 'See all'),
+    ? h('a', { key: 'all', href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), 'aria-label': 'See all services', ...tipOn('See all services', countsText(c)) }, h(Icon, { d: ICONS.apps }))
+    : h('a', { key: 'all', href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), ...tipOn('See all services', countsText(c)) }, h(Icon, { d: ICONS.apps }), h('span', { style: { flex: 1 } }, 'See all'),
       h('span', { style: { fontFamily: MONO, fontSize: 11, color: 'var(--dim,#737D90)' } }, c.total));
   const svcButton = withCounts => rail
-    ? h('a', { key: 'svcs', href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), title: `Services · ${countsText(c)}`, 'aria-label': `Services, ${countsText(c)}`, style: { flexDirection: 'column' } }, h(Icon, { d: ICONS.apps }), h(CountBar, { c }))
+    ? h('a', { key: 'svcs', href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), 'aria-label': `Services, ${countsText(c)}`, ...tipOn('Services', countsText(c)), style: { flexDirection: 'column' } }, h(Icon, { d: ICONS.apps }), h(CountBar, { c }))
     : h('div', { key: 'svcs', className: 'hubnav-sec', style: { position: 'relative' } },
-      h('a', { href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), style: { paddingRight: 32 } }, h(Icon, { d: ICONS.apps }), h('span', { style: { flex: 1 } }, 'Services'),
+      h('a', { href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), ...tipOn('Services', countsText(c)), style: { paddingRight: 32 } }, h(Icon, { d: ICONS.apps }), h('span', { style: { flex: 1 } }, 'Services'),
         withCounts ? h(CountPills, { c, small: true }) : null),
       h('span', { style: { position: 'absolute', right: 4, top: 4 } }, gear()));
 
@@ -135,7 +145,7 @@ export function Sidebar(p) {
       ...(asList ? [...listed.map(svcItem), seeAll()] : [svcButton(true)])];
   } else if (nav.services === 'list') {
     svcs = [h('div', { key: 'hd', className: 'hubnav-sec', style: { display: 'flex', alignItems: 'center', gap: 4, padding: '14px 4px 4px 10px', flex: 'none' } },
-      h('button', { onClick: () => set(n => ({ ...n, folded: !n.folded })), 'aria-expanded': !nav.folded, title: nav.folded ? 'Show the services' : 'Fold the services', style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, border: 0, background: 'transparent', cursor: 'pointer', padding: '3px 0', fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--mut,#8A94A6)' } },
+      h('button', { onClick: () => set(n => ({ ...n, folded: !n.folded })), 'aria-expanded': !nav.folded, ...tipOn(nav.folded ? 'Show the services' : 'Fold the services', countsText(c)), style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, border: 0, background: 'transparent', cursor: 'pointer', padding: '3px 0', fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--mut,#8A94A6)' } },
         'Services', h('span', { style: { display: 'flex', transform: nav.folded ? 'rotate(-90deg)' : 'none', transition: 'transform .12s' } }, h(Icon, { d: I.chevD, size: 12 })),
         h('span', { style: { flex: 1 } }), nav.folded ? h(CountPills, { c, small: true }) : null),
       gear()),
@@ -144,16 +154,16 @@ export function Sidebar(p) {
 
   const head = rail
     ? h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '14px 0 10px', flex: 'none' } },
-      h('a', { href: '#/overview', title: 'AIHub', 'aria-label': 'AIHub, go to Overview', style: { display: 'flex' } }, h(Mark, { size: 26 })),
-      h('button', { className: 'hubnav-ib', onClick: () => set(n => ({ ...n, collapsed: false })), title: 'Expand the sidebar', 'aria-label': 'Expand the sidebar', style: { width: 32, height: 28 } }, h(Icon, { d: ICONS.expand })))
+      h('a', { href: '#/overview', 'aria-label': 'AIHub, go to Overview', ...tipOn('AIHub', 'Go to Overview'), style: { display: 'flex' } }, h(Mark, { size: 26 })),
+      h('button', { className: 'hubnav-ib', onClick: () => { tipOff(); set(n => ({ ...n, collapsed: false })); }, 'aria-label': 'Expand the sidebar', ...tipOn('Expand the sidebar', 'Names and the services list'), style: { width: 32, height: 28 } }, h(Icon, { d: ICONS.expand })))
     : h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '16px 12px 14px 16px', flex: 'none' } },
       h(Mark, { size: 26 }), h('span', { style: { fontWeight: 600, fontSize: 15, letterSpacing: '-.01em' } }, 'AIHub'), h('span', { style: { flex: 1 } }),
       mob ? h('button', { className: 'hubnav-ib', onClick: p.close, 'aria-label': 'Close navigation', style: { width: 32, height: 32 } }, h(Icon, { d: I.x }))
-        : h('button', { className: 'hubnav-ib', onClick: () => set(n => ({ ...n, collapsed: true })), title: 'Collapse the sidebar', 'aria-label': 'Collapse the sidebar', style: { width: 28, height: 28 } }, h(Icon, { d: ICONS.collapse })));
+        : h('button', { className: 'hubnav-ib', onClick: () => { tipOff(); set(n => ({ ...n, collapsed: true })); }, 'aria-label': 'Collapse the sidebar', ...tipOn('Collapse the sidebar', 'A thin rail of icons, with each service’s state'), style: { width: 28, height: 28 } }, h(Icon, { d: ICONS.collapse })));
   const hubDot = h('span', { 'aria-hidden': true, style: { width: 7, height: 7, borderRadius: 99, flex: 'none', background: p.hubDown ? 'var(--rd,#F85149)' : 'var(--gr,#3FB950)' } });
-  const mockBtn = p.showMock ? h('button', { onClick: p.openMock, title: 'Mock scenarios (Shift+D)', style: { height: 20, padding: rail ? '0 4px' : '0 7px', borderRadius: 4, border: '1px solid var(--pu,#BC8CFF)', background: 'var(--tpu,rgba(188,140,255,.13))', color: 'var(--pu,#BC8CFF)', fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', cursor: 'pointer' } }, rail ? 'M' : 'MOCK') : null;
+  const mockBtn = p.showMock ? h('button', { onClick: p.openMock, 'aria-label': 'Mock scenarios', ...tipOn('Mock scenarios', 'Shift+D'), style: { height: 20, padding: rail ? '0 4px' : '0 7px', borderRadius: 4, border: '1px solid var(--pu,#BC8CFF)', background: 'var(--tpu,rgba(188,140,255,.13))', color: 'var(--pu,#BC8CFF)', fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', cursor: 'pointer' } }, rail ? 'M' : 'MOCK') : null;
   const foot = rail
-    ? h('div', { title: `${p.hubDown ? 'AIHub down' : 'AIHub'} ${p.version || ''}`, style: { padding: '12px 0', borderTop: '1px solid var(--bd,#1D2430)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 'none' } }, hubDot, mockBtn)
+    ? h('div', { tabIndex: 0, 'aria-label': `${p.hubDown ? 'AIHub down' : 'AIHub'} ${p.version || ''}`, ...tipOn(`AIHub ${p.version || ''}`, p.hubDown ? 'Not responding' : 'Running'), style: { padding: '12px 0', borderTop: '1px solid var(--bd,#1D2430)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 'none' } }, hubDot, mockBtn)
     : h('div', { style: { padding: '12px 16px', borderTop: '1px solid var(--bd,#1D2430)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--mut,#8A94A6)', flex: 'none' } },
       hubDot, h('span', null, p.hubDown ? 'AIHub down' : 'AIHub'), h('span', { style: { fontFamily: MONO, fontSize: 11.5 } }, p.version), h('span', { style: { flex: 1 } }), mockBtn);
 
@@ -162,9 +172,12 @@ export function Sidebar(p) {
     // the top and bottom groups stay put; only the services between them scroll
     h('nav', { 'aria-label': 'Pages and services', style: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: rail ? '0 0 10px' : '0 8px 10px' } },
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, flex: 'none' } }, ...g.top.map(fixed)),
-      h('div', { className: 'hubnav-scroll', style: { flex: '0 1 auto', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 2, margin: rail ? 0 : '0 -8px', padding: rail ? '0 0 4px' : '0 8px 4px', scrollbarWidth: rail ? 'none' : 'thin' } }, ...svcs),
+      h('div', { className: 'hubnav-scroll', onScroll: tipOff, style: { flex: '0 1 auto', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', gap: 2, margin: rail ? 0 : '0 -8px', padding: rail ? '0 0 4px' : '0 8px 4px', scrollbarWidth: rail ? 'none' : 'thin' } }, ...svcs),
       h('div', { style: { flex: 1, minHeight: 10 } }),
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, flex: 'none', paddingTop: 6, borderTop: '1px solid var(--bd,#1D2430)' } }, ...g.bottom.map(fixed))),
     foot,
-    menu ? h(ServicesMenu, { at: menu, nav, setNav: set, services, close: () => setMenu(null), go: p.go }) : null);
+    menu ? h(ServicesMenu, { at: menu, nav, setNav: set, services, close: () => setMenu(null), go: p.go }) : null,
+    tip && !menu ? h('div', { role: 'tooltip', style: { position: 'fixed', left: tip.x, top: tip.y, transform: 'translateY(-50%)', zIndex: 95, pointerEvents: 'none', maxWidth: 280, padding: '7px 10px', borderRadius: 7, background: 'var(--card,#11151D)', border: '1px solid var(--bds,#2A3547)', boxShadow: '0 8px 28px rgba(0,0,0,.35)', fontSize: 12, lineHeight: 1.4, color: 'var(--tx,#E6EAF2)', animation: 'hubnav-tip .12s ease-out' } },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, whiteSpace: 'nowrap' } }, tip.dot ? h('span', { style: { width: 7, height: 7, borderRadius: 99, background: tip.dot, flex: 'none' } }) : null, tip.text),
+      tip.sub ? h('div', { style: { color: 'var(--mut,#8A94A6)', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, tip.sub) : null) : null);
 }

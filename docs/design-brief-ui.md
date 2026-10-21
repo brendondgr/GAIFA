@@ -155,11 +155,12 @@ Hovering the header or the item shows a gear. Its menu picks the way they show a
 
 A button beside the logo **collapses** the sidebar to a 56 px rail: icons with tooltips, each listed mod's logo with its state dot, and in the button modes (or folded) the Services icon over a three-colour bar of the counts. The expand button sits under the logo.
 
-Every mod has a logo (`ServiceSummary.logo_url`); one without gets a monogram on a colour from its id. Logos also replace the icons on the Overview tiles and the service page header. Phones keep the drawer, always expanded. The choices are saved in `config.toml [ui.nav]` about 0.5 s after a change and kept in this browser (`localStorage` `hub.nav`) for the first paint.
+Every mod has a logo (`ServiceSummary.logo_url`); one without gets a monogram on a colour from its id. Logos also replace the icons on the Overview tiles and the service page header. Every item has a custom tooltip to its right (in the rail and expanded): the page and what it is, a mod's name, state ("Ready · Active") and description, the counts on Services and See all. Phones keep the drawer, always expanded, without tooltips. The choices are saved in `config.toml [ui.nav]` about 0.5 s after a change and kept in this browser (`localStorage` `hub.nav`) for the first paint.
 
 **See all** opens the **Services page** `#/services`. It has the counts, filter chips (All · Active · Inactive · Failed), a search, *Sidebar shows* (List · Button · Button with counts), and a card per mod (listed or not): logo, name, id, state, description, port, memory, version, Open, Start or Stop, and an *In sidebar* switch. The header Search has the page and **Collapse / Expand the sidebar**.
 
 **Persistent header** (every view):
+- **Where you are** (plan 33.5): the page's icon (a mod's logo on its page) and its name, then `/` and the tab or Settings section ("Speech / Voices"). The AIHub mark and name are only in the sidebar.
 - **Memory meter**: unified memory used / total (this machine shares one memory pool between CPU and GPU). It turns amber above 80% and red above 92%. Clicking it opens a popover with the `MemoryBar` broken down by service.
 - **Running jobs chip** ("2 running"), shown only when a service reports jobs. Clicking opens a popover listing them with progress and links.
 - **Activity bell**: an unread count, and a popover with the last 30 activity items.

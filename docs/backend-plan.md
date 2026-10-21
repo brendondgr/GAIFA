@@ -2940,6 +2940,11 @@ The sidebar lists every mod under SERVICES (brief §3), so with 14 mods it scrol
   - **Docs:** brief §3 (the sidebar, the rail, the Services page, the route), structure.
   *Done when:* `nav.test.mjs` covers the filters and search; a browser check.
 
+- [x] **33.5 Custom tooltips and a header that names the page (asked for by the user 2026-10-21, after 33.4).**
+  - **Tooltips:** every sidebar item, in the rail and expanded, shows a tooltip to its right instead of the browser's: the page and what it is (`HINTS` in `nav-model.js`), a mod's name with its state dot, `stateWords` ("Ready · Active") and description, the counts on Services and See all, and the collapse, expand, fold and gear buttons. Quick in the rail (60 ms), after a pause when expanded (450 ms); keyboard focus shows it at once; none on touch screens.
+  - **Header:** no AIHub mark or name (the sidebar has them); the page's icon (a mod's logo on its page), the page in bold, then `/` and the tab or Settings section ("Images & Video / Workflows", "Settings / Memory"). `hdPlace(r)` in `Hub.dc.html`.
+  *Done when:* `nav.test.mjs` (every fixed item has its words; the state words); a browser check of both in the rail and expanded, and the header on each page.
+
 **Wire — Phase 33:** the sidebar and the Services page, on the live `services` and `settings` areas (and in `?mock`).
 
 **Checks & deliverables — Phase 33**

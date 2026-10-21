@@ -92,3 +92,11 @@ test('every installed mod but the template has its own logo file', () => {
   const files = dirs.map(d => fs.readFileSync(path.join(root, 'services', d, 'ui', 'logo.svg'), 'utf8'));
   assert.equal(new Set(files).size, dirs.length);
 });
+
+test('tooltips: every fixed item has its words, and a service its state (33.5)', () => {
+  const g = n.groups({ page: 'overview', parts: ['overview'] }, SVCS);
+  for (const it of [...g.top, ...g.bottom]) assert.ok(it.hint && it.hint === n.HINTS[it.key], it.key);
+  assert.equal(n.stateWords(SVCS[0]), 'Ready · Active');
+  assert.equal(n.stateWords(SVCS[4]), 'Stopping · Inactive');
+  assert.equal(n.stateWords(SVCS[6]), 'Manifest error · Failed');
+});

@@ -20,6 +20,7 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 COPY --from=uv /uv /uvx /usr/local/bin/
 COPY requirements.lock /tmp/requirements.lock
 RUN uv pip install --system --no-cache -r /tmp/requirements.lock && rm /tmp/requirements.lock
-# uv uses this Python, never downloads one; pip and npm keep caches in $HOME (a tmpfs at run time)
-ENV UV_PYTHON=/usr/local/bin/python3.12 UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy \
+# uv finds this Python 3.12 on PATH and never downloads one (no UV_PYTHON: it would make `uv pip`
+# install into /usr/local instead of the project's .venv); caches live in $HOME (a tmpfs at run time)
+ENV UV_PYTHON_PREFERENCE=only-system UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy \
     PIP_DISABLE_PIP_VERSION_CHECK=1 MPLBACKEND=Agg PYTHONUNBUFFERED=1

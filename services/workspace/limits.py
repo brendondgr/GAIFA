@@ -29,6 +29,7 @@ REMOTE_GIT = {"push", "pull", "fetch", "clone", "ls-remote", "remote", "submodul
 WRAPPERS = {"env", "time", "nice", "nohup", "command", "exec"}
 RUNNERS = {("uv", "run"), ("poetry", "run"), ("pdm", "run"), ("pipenv", "run"), ("pnpm", "exec"), ("npm", "exec"),
            ("yarn", "run"), ("hatch", "run"), ("rye", "run")}
+SETUP = {"source", ".", "cd", "pushd", "export", "set", "unset", "alias"}   # set the scene; the program comes after
 ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
@@ -55,9 +56,12 @@ def words(command: str) -> list[list[str]]:
 
 
 def first_word(command: str) -> str:
-    """What "allow `pytest` in this chat" is keyed by: the program, past env assignments,
-    wrappers (env, time) and runners (`uv run`, `python -m`, `npx`)."""
-    cmds = words(command)
+    """What "allow `pytest` in this chat" is keyed by: the program, past setup commands
+    (`source .venv/bin/activate &&`, `cd tests &&`), env assignments, wrappers (env, time) and
+    runners (`uv run`, `python -m`, `npx`)."""
+    cmds = [c for c in words(command) if c]
+    while len(cmds) > 1 and os.path.basename(cmds[0][0]) in SETUP:
+        cmds = cmds[1:]
     if not cmds:
         return ""
     w = list(cmds[0])

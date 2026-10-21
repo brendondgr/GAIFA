@@ -14,14 +14,14 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 Two environments:
 
 1. **The mod's venv** (FastAPI, uvicorn, httpx). It keeps the folders you add as workspaces, each at a level (Read · Edit · Run · Run + network), in `data/state/workspace/folders.json`. Git and ripgrep on the host serve the reading tools.
-2. **The sandbox image** `localhost/aihub-workspace-sandbox:1` (rootless podman), where commands and Python run: only Python 3.12, uv, Node LTS, git, ripgrep, build-essential and the data libraries (numpy, pandas, matplotlib, openpyxl, python-pptx, python-docx, pypdfium2), from `sandbox/Containerfile` and `sandbox/requirements.lock`.
+2. **The sandbox image** `localhost/aihub-workspace-sandbox:2` (rootless podman), where commands and Python run: only Python 3.12, uv, Node LTS, git, ripgrep, build-essential and the data libraries (numpy, pandas, matplotlib, openpyxl, python-pptx, python-docx, pypdfium2), from `sandbox/Containerfile` and `sandbox/requirements.lock`.
 
 ## Tested with
 
 Read from this machine on 2026-10-20:
 
 - **The venv:** Python 3.14.6 (uv-managed), fastapi 0.156.3, uvicorn 0.54.0, httpx 0.28.1; on the host git 2.56.0, ripgrep 15.2.0, podman 5.8.9 (rootless, pasta networking, cgroups v2 with memory and pids delegated) on Fedora 44.
-- **The image** (built 2026-10-20, id `63cd1d44ed3b`, digest `sha256:5693ef42fe51cebc47783f124a6c5df83860081d7b92aa309c2b68bda64c3dd8`, 1.06 GB): Python 3.12.15, uv 0.13.4, Node v24.22.0 with npm 11.19.1, git 2.39.5, ripgrep 13.0.0, gcc 12.2.0 (Debian 12), numpy 2.5.4, pandas 3.0.6, matplotlib 3.11.2, openpyxl 3.1.5, python-pptx 1.0.2, python-docx 1.2.0, pypdfium2 5.14.0 (the rest in `requirements.lock`).
+- **The image** (version 2, built 2026-10-20, id `d8a8c5248a4f`, digest `sha256:f52b6ddbfb5eae3fb479e2bc4a0fbb8e27af0630083655daf4e1b2be805fc369`, 1.06 GB; version 1 set `UV_PYTHON`, which made `uv pip install` aim at the read-only system Python instead of the project's `.venv`): Python 3.12.15, uv 0.13.4, Node v24.22.0 with npm 11.19.1, git 2.39.5, ripgrep 13.0.0, gcc 12.2.0 (Debian 12), numpy 2.5.4, pandas 3.0.6, matplotlib 3.11.2, openpyxl 3.1.5, python-pptx 1.0.2, python-docx 1.2.0, pypdfium2 5.14.0 (the rest in `requirements.lock`).
 - **Base images,** pinned by digest in the Containerfile: `python:3.12-slim-bookworm@sha256:34386ef0…07258`, `node:24-bookworm-slim@sha256:a5f4366e…daee5`, `ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421…0262b`.
 
 ## Prerequisites
@@ -39,7 +39,7 @@ aihub install workspace
 Makes `.venv/` in this folder from `requirements-dev.txt`. Then build the sandbox image, from the Workspace page (Sandbox → Build) or by hand:
 
 ```bash
-podman build -t localhost/aihub-workspace-sandbox:1 -f services/workspace/sandbox/Containerfile services/workspace/sandbox
+podman build -t localhost/aihub-workspace-sandbox:2 -f services/workspace/sandbox/Containerfile services/workspace/sandbox
 ```
 
 To change the data libraries: edit `sandbox/requirements.in`, recompile `requirements.lock` (the command is at its top), bump `VERSION` in `sandbox.py`, rebuild.

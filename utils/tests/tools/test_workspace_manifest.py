@@ -42,5 +42,5 @@ def test_workspace_editing_tools():
 def test_workspace_running_tools():
     m = parse(ROOT / "services" / "workspace").manifest
     assert m is not None and m.agent.limits == "POST /v1/limits"
-    assert (m.tools["run"].risk, m.tools["run"].grant_key) == ("execute", "arg:folder")
+    assert (m.tools["run"].risk, m.tools["run"].grant_key, m.tools["run"].core) == ("execute", "arg:folder", True)
     assert m.tools["python"].risk == "execute" and m.tools["python"].grant_key is None   # the preflight's key: "python"

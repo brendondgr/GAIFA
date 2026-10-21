@@ -66,13 +66,15 @@ export function rememberText(remember) {
   return remember === 'thread' ? 'Allowed in this chat' : remember === 'always' ? 'Always allowed' : null;
 }
 
-/** The arguments of an `execute` tool that hold its code or command: shown whole, monospaced, editable. */
-export function codeFields(schema, risk) {
-  if (risk !== 'execute') return [];
+/** The arguments shown whole, monospaced and editable in a text box: an `execute` tool's code or
+ * command, and any text argument of any tool that spans lines (an edit's `old` and `new`, a file's
+ * `content`), which a one-line field would flatten (plan 27.7). */
+export function codeFields(schema, risk, args = {}) {
   const props = schema?.properties || {};
   return Object.keys(props).filter(k => {
     const p = props[k] || {};
     if (p.type && p.type !== 'string') return false;
-    return p.format === 'code' || p['x-code'] || CODE_NAMES.includes(k);
+    if (typeof args?.[k] === 'string' && args[k].includes('\n')) return true;
+    return risk === 'execute' && (p.format === 'code' || p['x-code'] || CODE_NAMES.includes(k));
   });
 }

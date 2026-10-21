@@ -75,6 +75,8 @@ def test_runs(client, proj):
     ("pytest -q", "pytest"), ("uv run pytest", "pytest"), ("python -m pytest tests", "pytest"), ("python3.12 -m pytest", "pytest"),
     ("FOO=1 env pytest", "pytest"), (".venv/bin/pytest -x", "pytest"), ("npx vitest run", "vitest"), ("npm test", "npm"),
     ("time make -j4 && make test", "make"), ("ls -la", "ls"), ("", ""),
+    ("source .venv/bin/activate && pytest -q", "pytest"), (". .venv/bin/activate; python -m pytest", "pytest"),
+    ("cd tests && npx jest", "jest"), ("export CI=1 && npm test", "npm"), ("cd src", "cd"),
 ])
 def test_first_word(cmd, word):
     assert first_word(cmd) == word

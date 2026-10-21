@@ -103,3 +103,14 @@ test('a turn whose workspace edits carry `undo` offers Undo this turn (plan 27.7
   assert.deepEqual(undoOf([{ item: { result: { status: 'done', content: 'plain text with "undo"' } } }]), []);
   assert.deepEqual(undoOf([res('done', { undo: 'http://elsewhere/undo' })]), []);
 });
+
+test('multi-line text arguments stay whole on the card (an edit\'s old and new)', () => {
+  const schema = { properties: { folder: { type: 'string' }, path: { type: 'string' }, old: { type: 'string' }, new: { type: 'string' }, replace_all: { type: 'boolean' } } };
+  const args = { folder: 'p', path: 'a.py', old: 'def f():\n    return 1', new: 'x' };
+  assert.deepEqual(risk.codeFields(schema, 'write', args), ['old']);
+  assert.deepEqual(risk.codeFields(schema, 'write', {}), []);
+  const t = card({ tool: 'workspace_edit', risk: 'write', arguments: args, schema, limits: { action: 'edit', folder: 'p', key: 'p', preview: { diff: '--- a/a.py\n' } } });
+  const boxes = all(t, n => n.type === 'textarea');
+  assert.equal(boxes.length, 1);
+  assert.equal(boxes[0].props.value, 'def f():\n    return 1');
+});

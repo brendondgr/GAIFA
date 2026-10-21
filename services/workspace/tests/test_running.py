@@ -100,7 +100,7 @@ def test_levels_and_refusals(wc, proj):
 
 def test_run_with_network_installs_a_package(wc, proj):
     wc.patch("/v1/folders/proj", json={"level": "run_net"})
-    r = post(wc, "/v1/run", folder="proj", command="uv venv -q .venv && uv pip install -q --python .venv/bin/python six && .venv/bin/python -c 'import six; print(six.__version__)'",
+    r = post(wc, "/v1/run", folder="proj", command="uv venv -q && uv pip install -q six && .venv/bin/python -c 'import six; print(six.__version__)'",   # plain uv pip: into .venv
              network=True, timeout_s=300).json()
     assert r["exit_code"] == 0 and r["network"], r
     assert (proj / ".venv").is_dir()

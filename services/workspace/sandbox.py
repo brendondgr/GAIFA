@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
-VERSION = "1"
+VERSION = "2"                  # bump with every change to sandbox/Containerfile or requirements.lock
 IMAGE = f"localhost/aihub-workspace-sandbox:{VERSION}"
 DEFAULT_TIMEOUT, MAX_TIMEOUT = 120, 600
 MEMORY, PIDS = "8g", 1024

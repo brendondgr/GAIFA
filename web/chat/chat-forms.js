@@ -81,7 +81,7 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
   const React = R(), schema = spec.schema || { properties: {} }, props = schema.properties || {}, req = schema.required || [];
   const args = spec.arguments || {};
   const files = Object.keys(props).filter(k => props[k]?.['x-kind']);
-  const codes = codeFields(schema, spec.risk).filter(k => !files.includes(k));          // execute: the code, shown whole
+  const codes = codeFields(schema, spec.risk, args).filter(k => !files.includes(k));    // execute: the code; any text with line breaks
   const missing = req.filter(k => !files.includes(k) && !codes.includes(k) && empty(args[k]));
   const main = [...new Set([...missing, ...(spec.ask_fields || []).filter(k => props[k] && !files.includes(k) && !codes.includes(k))])];
   const rest = Object.keys(props).filter(k => !files.includes(k) && !codes.includes(k) && !main.includes(k));

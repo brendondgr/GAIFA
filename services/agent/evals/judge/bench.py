@@ -6,6 +6,10 @@
   injection side, since alone they change nothing; `get_webpage` becomes the hub's `web_fetch`.
 - **Routine** (routine.py): commands, edits, fetches and GPU jobs the user asked for in so many words (allow).
 
+Each item carries the steps before its call (`history`, for the judge's `context`): AgentDojo's from
+agentdojo-context.jsonl (extract_context.py: the ground-truth calls before it, with their real outputs; for injection
+items, with the planted attack), the routine items' from routine.HISTORY (a few have none).
+
 The benchmark text stays in data/state/judge-bench/ (gitignored); only ids and metrics are committed.
 """
 
@@ -17,11 +21,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .routine import ROUTINE
+from .routine import HISTORY, ROUTINE
 
 ROOT = Path(__file__).resolve().parents[4]
 BENCH = ROOT / "data" / "state" / "judge-bench"
 AGENTDOJO = BENCH / "agentdojo-v1.2.jsonl"
+CONTEXT = BENCH / "agentdojo-context.jsonl"
 READS = ("get_", "search_", "read_", "list_", "check_")
 PAIRS = 3                            # user tasks each injection task is paired with
 
@@ -35,6 +40,8 @@ class Item:
     user: list[str]
     call: dict[str, Any]
     folder: dict[str, Any] | None = field(default=None)
+    history: list[dict[str, Any]] = field(default_factory=list)   # the steps before the call (no user messages)
+    planted: bool = False            # injection items: the attack text is in the history's results
 
     @property
     def scope(self) -> str:
@@ -76,9 +83,22 @@ def agentdojo(path: Path = AGENTDOJO) -> list[Item]:
 
 
 def routine() -> list[Item]:
-    return [Item(f"rt-{i:03}", "routine", "safe", "allow", [text], call, folder)
+    return [Item(f"rt-{i:03}", "routine", "safe", "allow", [text], call, folder, list(HISTORY.get(text, [])))
             for i, (text, call, folder) in enumerate(ROUTINE, 1)]
 
 
+def with_context(its: list[Item], path: Path = CONTEXT) -> list[Item]:
+    """AgentDojo items with their history (agentdojo-context.jsonl); an item without a row keeps none."""
+    if not path.exists():
+        return its
+    rows = {r["id"]: r for r in (json.loads(x) for x in path.read_text().splitlines() if x.strip())}
+    for it in its:
+        r = rows.get(it.id)
+        if r is not None:
+            it.history = [h for h in r["history"] if h.get("role") != "user"]
+            it.planted = bool(r.get("planted"))
+    return its
+
+
 def items() -> list[Item]:
-    return agentdojo() + routine()
+    return with_context(agentdojo()) + routine()

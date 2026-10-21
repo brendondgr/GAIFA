@@ -653,6 +653,9 @@ class JudgeSettings(_Model):
     url: str = Field(min_length=1, max_length=500, description="The relay, or the decide mod")
     threshold: float = Field(gt=0, le=1, description="decide: every answer must clear it")
     timeout_s: float = Field(gt=0, le=60, description="Slower than this → ask")
+    context: Literal["none", "trail", "full"] = Field("none", description="What it reads of the turn so far besides the "
+                                                      "user's words: the agent's earlier calls (trail), or also their "
+                                                      "results and its text, as untrusted data (full); judge_context.py")
     allow_commands: list[str] = Field([], description="Your rules: commands that run in Auto unless a fixed rule asks "
                                       "(`pytest *`; utils/tools/judge_user.py)")
     ask_commands: list[str] = Field([], description="Your rules: commands that always ask in Auto")

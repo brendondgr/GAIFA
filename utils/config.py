@@ -176,6 +176,7 @@ class JudgeCfg(_Strict):
     url: str = "http://127.0.0.1:4000"      # the relay, or the decide mod (http://127.0.0.1:7000/api/s/decide)
     threshold: float = Field(0.35, gt=0, le=1)   # decide: the lowest "safe" probability of its three questions must reach it (judge.DECIDE_CUTOFF)
     timeout_s: float = Field(3.0, gt=0)     # slower → ask
+    context: Literal["none", "trail", "full"] = "none"   # what it reads of the turn so far besides the user's words (judge_context.py)
     allow_commands: list[str] = []          # your rules (judge_user.py): these commands run in Auto, unless a rule asks
     ask_commands: list[str] = []            # … and these always ask
 

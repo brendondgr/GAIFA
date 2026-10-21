@@ -479,7 +479,8 @@ class Agent:
             if isinstance((thread.get("settings") or {}).get("environment"), str):
                 origin["environment"] = thread["settings"]["environment"]   # the chat's workspace folders (plan 34)
             if mode == "auto":
-                origin["said"] = self._said(tid)   # the Auto judge reads only the user's own words (plan 30.3)
+                origin["said"] = self._said(tid)   # the Auto judge reads the user's own words (plan 30.3)…
+                origin["narration"] = ctx.narration(self.store.events(tid))   # …and with context "full", this turn's text
             if hub_name == "web_fetch":            # links the user typed open without a card; the page is read for the question
                 origin["links"] = links.of_events(self.store.events(tid, types=("user",)))
                 if said:

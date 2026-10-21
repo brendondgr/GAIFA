@@ -456,7 +456,8 @@ class Calls:
         try:
             await self.hub.db.execute(
                 "INSERT INTO tool_refusals (id, tool, arguments, origin, code, detail, created_ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                ("ref_" + secrets.token_hex(6), tool, json.dumps(arguments, default=str)[:20000], json.dumps(origin or {}),
+                ("ref_" + secrets.token_hex(6), tool, json.dumps(arguments, default=str)[:20000],
+                 json.dumps(webread.private_out(origin) or {}),
                  error.get("code", "error"), str(error.get("detail", ""))[:2000], time.time()))
         except Exception:  # noqa: BLE001: records never break a call
             log.exception("recording a refused call")

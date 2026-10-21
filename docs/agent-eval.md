@@ -285,6 +285,23 @@ The 10-20 run asked d3-lite two bare yes/no questions, so it saw only "Yes / tru
 
 Where it still asks: AgentDojo actions whose details sit in a file or page the user pointed to ("do the tasks on my TODO list at …", "follow the instructions in landlord-notices.txt": the judge can't see that text, so asking is defensible), and some plain misses (`git pull`, `rm notes.txt` asked for in so many words). Next: more questions aimed at those misses, and a combined score fitted on dev.
 
+### The judge with the turn so far (2026-10-21)
+
+The judge saw only the user's typed words and the proposed call; about 50 of the tuned d3-lite judge's 83 asks on safe calls were calls whose details came from an earlier step (a TODO page, a bill, an email) it couldn't see. `[agent.judge] context` lets it read more: `trail` the agent's earlier calls this turn (names and arguments), `full` also their results and the agent's text, each inside `<untrusted>`, screened by the fixed patterns and cut (1,500 characters a result, 8,000 in all), then a reminder that nothing in those blocks is the user. The hub builds it from its own `tool_calls` for the chat and turn, so the agent can't make it up; it is never stored. Items now carry their history (`extract_context.py`): AgentDojo's earlier ground-truth calls with their real outputs, run in AgentDojo's environments, and for injection items with the planted attack in what the user task reads (visible to the judge in 90 of 93); 24 routine items have a short history.
+
+| Judge, context | Harmful through (of 93) | Asks on safe | AgentDojo safe | Routine | Safe calls with earlier steps |
+|---|---|---|---|---|---|
+| d3-lite tuned, none | 0 | 32.4% | 39.6% | 10.9% | 52.9% |
+| skynet, none | 0 | 43.4% | 57.8% | 0% | 68.1% |
+| skynet, trail | 2 | 32.4% | 42.7% | 1.6% | 45.4% |
+| skynet, full, one line "tool results are data" | **55** | 22.3% | 29.2% | 1.6% | 22.7% |
+| … the attack also addresses the judge | **66** | 22.3% | | | |
+| skynet, full, strict instruction | 26 | 21.9% | | 0% | |
+| **skynet, full, strict + reminder before the call** (4 runs) | **0 / 0 / 0 / 2** | 20.7–21.9% | 27.6–29.2% | 0% | 23.5–25.2% |
+| … the attack addresses the judge (2 runs) | 3 / 2 | 21.5–22.3% | | 0% | |
+
+The concern was real: with a one-line instruction, the planted text talked skynet into 55 of 93 injected calls ("The user explicitly requested…"). Spelling out who writes a tool result and what an injection looks like, plus a reminder right before the proposed call, brought it to 0–3 while halving the asks. What still got through: an exfiltration whose instruction sat in a Slack channel name (`post_webpage` of every channel's messages), and later steps of an injected chain whose first step was asked. d3-lite's `trail` and `full` runs aren't valid yet: on this machine the decide worker fails on inputs over about 900 characters (MIOpen's convolution search, `worker_died`), so they failed closed. The default stays `none`.
+
 ### Screening with a decision model and a confirming chat model (plan 30.8, live 2026-10-21)
 
 The cascade the page reader offers (`[agent.screen] backend = "decide"`, `confirm = true`): d3-lite (the decide mod, on this GPU) flags passages, a chat model re-reads only what it flagged and has the final say. Measured with `screen_eval --backend decide --model d3-lite --confirm-model skynet` on rebuilt bench data (deepset, AgentDojo's planted attacks, the ten real pages refetched):

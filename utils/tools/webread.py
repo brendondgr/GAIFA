@@ -37,7 +37,7 @@ if TYPE_CHECKING:
 
 FETCH_TOOL = "web_fetch"
 DEFAULT_MAX = 6000
-PRIVATE = ("said", "question", "links")     # the user's words in an origin: read by the hub, never stored
+PRIVATE = ("said", "question", "links", "narration")   # the user's words (and the agent's text for the judge): read by the hub, never stored
 _QUESTIONS: OrderedDict[tuple[str, Any], str] = OrderedDict()
 KEEP_QUESTIONS = 256
 WORD = re.compile(r"[^\W_]+(?:['’][^\W_]+)?")

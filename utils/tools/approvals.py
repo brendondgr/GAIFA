@@ -164,7 +164,11 @@ async def judge(hub: Any, tool: Any, arguments: dict[str, Any], origin: dict[str
     from utils.tools.judge import judge_call
 
     try:
-        j = await judge_call(hub.config, tool.name, arguments, origin, limits)
+        steps = None
+        if getattr(hub.config.agent.judge, "context", "none") != "none" and getattr(hub, "db", None) is not None:
+            from utils.tools.judge_context import load
+            steps = await load(hub.db, origin)     # the turn so far, from tool_calls: never stored with the call
+        j = await judge_call(hub.config, tool.name, arguments, origin, limits, steps)
     except Exception as e:  # noqa: BLE001: the judge never breaks a call; it asks
         return "ask", f"Auto: asked you (the judge failed: {type(e).__name__})", {"verdict": "ask", "source": "fail-closed"}
     verdict = "allow" if j.verdict == "allow" else "ask"

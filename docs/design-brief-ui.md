@@ -599,7 +599,8 @@ interface Settings {
                   language: string; preset: "fast" | "balanced" | "accurate" | "best"; mode: "both" | "toggle" | "hold" };
   judge: { backend: "relay" | "decide"; model: string;   // config.toml [agent.judge] (plan 30.3); picked in Settings → Agent
            url: string; threshold: number; timeout_s: number;
-           allow_commands: string[]; ask_commands: string[] };   // your command rules for Auto (`pytest *`; judge_user.py, plan 30.7)
+           allow_commands: string[]; ask_commands: string[];   // your command rules for Auto (`pytest *`; judge_user.py, plan 30.7)
+           context: "none" | "trail" | "full" };   // what the judge reads of the turn besides your words (judge_context.py, 2026-10-21)
   permissions: { deny: string[]; ask: string[]; allow: string[] };   // [agent.permissions]: tool-name globs (architecture §14.7)
   screen: { pages: boolean; documents: boolean; transcripts: boolean;   // [agent.screen] (plan 30.6)
             timeout_s: number; window_chars: number;

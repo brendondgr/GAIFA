@@ -384,6 +384,15 @@ def turn_starts(events: list[dict[str, Any]]) -> list[int]:
     return [e["seq"] for e in events if e["type"] == "user"]
 
 
+def narration(events: list[dict[str, Any]], n: int = 20, cap: int = 2000) -> list[dict[str, Any]]:
+    """The agent's own text since the user's last message, `[{ts, text}]` (the last `n`, each cut at `cap`): the Auto
+    judge reads it with `[agent.judge] context = "full"`, as data, merged with the calls the hub recorded."""
+    last = max((e["seq"] for e in events if e["type"] == "user"), default=0)
+    out = [{"ts": e["ts"], "text": str(e["payload"].get("text") or "")[:cap]} for e in events
+           if e["seq"] > last and e["type"] == "assistant" and str(e["payload"].get("text") or "").strip()]
+    return out[-n:]
+
+
 def clear_candidates(events: list[dict[str, Any]]) -> list[int]:
     """Tool results older than the last KEEP_TURNS user turns, not cleared yet, worth clearing."""
     starts = turn_starts(events)

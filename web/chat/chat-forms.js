@@ -161,7 +161,9 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
       h('summary', { style: { cursor: 'pointer', fontSize: 12, color: T.mut } }, `All settings (${rest.length})`),
       h('div', { style: { paddingTop: 8 } }, h(SchemaFormHost, { formKey: key + ':rest', schema: pick(schema, rest), values: args, order: rest, api, context: others, formRef: forms.rest, onChange: v => { vals.current.rest = v; } }))) : null,
     err ? h(ErrorBox, { error: err }) : null,
-    h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } }, ...footer,
+    // the buttons stay in view while a long card scrolls in the dock (sticky to the dock's bottom edge)
+    h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', position: 'sticky', bottom: -1, zIndex: 1,
+      background: T.card, paddingTop: 6, marginTop: -6 } }, ...footer,
       ask2 || denying ? null : h('span', { style: { fontSize: 11.5, color: T.dim, marginLeft: 'auto' } }, choices ? 'Ctrl+Enter allows once' : 'Ctrl+Enter runs')));
 }
 

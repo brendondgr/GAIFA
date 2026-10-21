@@ -220,7 +220,8 @@ class Harness:
         evs = await self._events(tid)
         last_user = max((e["seq"] for e in evs if e["type"] == "user"), default=0)
         after = [e for e in evs if e["seq"] > last_user]
-        asked = any(e["type"] == "assistant" and "?" in (e["payload"].get("text") or "") for e in after)
+        from .tasks import asks_in_words
+        asked = any(e["type"] == "assistant" and asks_in_words(e["payload"].get("text") or "") for e in after)
         acted = any(e["type"] == "tool_result" and e["payload"].get("status") == "done" and
                     e["payload"].get("name") not in ("read_skill", "load_tools", "find_tools", "ask_user", "tts_list_voices",
                                                      "hub_search_outputs", "hub_list_services") for e in after)

@@ -10,7 +10,8 @@
 | Where it goes | `data/models/llm/SmolLM2-135M-Instruct` |
 | Source | Hugging Face [unsloth/SmolLM2-135M-Instruct-GGUF](https://huggingface.co/unsloth/SmolLM2-135M-Instruct-GGUF) |
 | Used by | `lcpp` |
-| Environment | none yet |
+| Environment | [llama.cpp (LLM Launcher)](../../../services/lcpp/setup/llama-cpp.md) |
+| Referenced by | [`data/models.json`](../../../services/lcpp/data/models.json) |
 
 ### Files
 

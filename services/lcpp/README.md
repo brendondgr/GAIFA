@@ -18,6 +18,8 @@ Everything is bound to `127.0.0.1`. It is meant for this machine only.
 
 ## Install
 
+> **Under AIHub** this is the `lcpp` mod: `aihub install lcpp` makes its venv, and llama.cpp itself is unpacked by hand. Setup: [setup/llama-cpp.md](setup/llama-cpp.md). `scripts/install.sh` below is the old standalone installer.
+
 ```bash
 scripts/install.sh
 ```

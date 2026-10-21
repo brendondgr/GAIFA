@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import re
+import subprocess
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -98,6 +99,19 @@ def _token(s: str) -> re.Pattern[str]:
     return re.compile(r"(?<![\w.\-])" + re.escape(s) + r"(?![\w.\-])")   # "loras/x.safetensors" still names x
 
 
+def tracked(folder: Path) -> set[Path] | None:
+    """The files git tracks under `folder`, or None outside a git checkout (then every file counts).
+    Only tracked files are scanned, so a model doc reads the same in every clone: gitignored
+    third-party workflow packs, for one, exist only on the machine that imported them."""
+    try:
+        out = subprocess.run(["git", "-C", str(folder), "ls-files", "-z", "--", "."], capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return {(folder / p).resolve() for p in out.stdout.decode(errors="ignore").split("\0") if p}
+
+
 def references(names: list[str], envs: list[Env], root: Path) -> list[str]:
     """The `scan` files (paths from the root) that mention one of `names` as a whole token:
     a file name or an org/repo, never a substring of a longer name (`ae.safetensors` ≠ `vae.safetensors`)."""
@@ -107,9 +121,10 @@ def references(names: list[str], envs: list[Env], root: Path) -> list[str]:
     out: list[str] = []
     for env in envs:
         base = root / "services" / env.mod
+        keep = tracked(base) if env.scan else None
         for glob in env.scan:
             for f in sorted(base.glob(glob)):
-                if not f.is_file():
+                if not f.is_file() or (keep is not None and f.resolve() not in keep):
                     continue
                 try:
                     text = f.read_text(errors="ignore")

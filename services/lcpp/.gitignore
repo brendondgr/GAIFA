@@ -10,7 +10,7 @@ wheels/
 # Virtual environments
 .venv
 
-# llama.cpp binaries and downloads (see runtime/README.md)
+# llama.cpp binaries and downloads (see setup/llama-cpp.md)
 runtime/
 
 # Generated and machine-local configuration

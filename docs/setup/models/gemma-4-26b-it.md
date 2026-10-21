@@ -10,7 +10,8 @@
 | Where it goes | `data/models/llm/Gemma4-26B` |
 | Source | not recorded: GGUF general.name: Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced; downloaded before lcpp recorded sources. Set the Hugging Face repo here if known. |
 | Used by | `lcpp` |
-| Environment | none yet |
+| Environment | [llama.cpp (LLM Launcher)](../../../services/lcpp/setup/llama-cpp.md) |
+| Referenced by | [`data/models.json`](../../../services/lcpp/data/models.json) |
 | Registry notes | With its mmproj (vision) and MTP draft (speculative decoding). |
 
 ### Files

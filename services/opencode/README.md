@@ -5,3 +5,4 @@
 - `run.sh`: sources `.env`, loads or mints the Basic credential (`auth.sh`), and runs `opencode serve` in `OPENCODE_PROJECT_DIR`.
 - `.env` (gitignored): `OPENCODE_*` settings and provider keys (`OPENCODE_API_KEY`, …). The relay reads the same credential (its `.env`, or `OPENCODE_AUTH_FILE` = this folder's `opencode-auth.env`).
 - `opencode` itself is installed in `~/.opencode/bin` (outside AIHub; allowed by plan Phase 12.4).
+- Setup on a new machine: [setup/opencode.md](setup/opencode.md); the keys `.env` takes are in `.env.example`.

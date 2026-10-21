@@ -4,6 +4,7 @@ fetch commands, orphans, check mode and the CLI."""
 from __future__ import annotations
 
 import json
+import subprocess
 from argparse import Namespace
 from pathlib import Path
 
@@ -141,6 +142,17 @@ def test_references_match_whole_names_only(root: Path) -> None:
     setupdocs.sync(root)
     assert "Referenced by" in doc(root, "big")                     # "loras\\big.safetensors" names it
     assert "Referenced by" not in doc(root, "ae")                  # "wan_vae.safetensors" doesn't name ae.safetensors
+
+
+def test_references_skip_files_git_doesnt_track(root: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    mod = root / "services" / "img"
+    (mod / "workflows" / "b").mkdir()
+    (mod / "workflows" / "b" / "workflow.json").write_text(json.dumps({"widgets_values": ["ae.safetensors"]}))
+    subprocess.run(["git", "-C", str(root), "add", "services/img/workflows/a/workflow.json"], check=True)
+    setupdocs.sync(root)
+    assert "Referenced by" in doc(root, "big")                     # a/ is tracked
+    assert "Referenced by" not in doc(root, "ae")                  # b/ names ae, but git doesn't track it
 
 
 @pytest.mark.parametrize("source,files,path,expect", [

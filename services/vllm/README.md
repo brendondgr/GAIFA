@@ -2,6 +2,8 @@
 
 An AIHub mod (plan Phase 18) that serves Hugging Face models with [vLLM](https://github.com/vllm-project/vllm) on this machine, a Ryzen AI Max+ 395 (Strix Halo, gfx1151). Upstream vLLM doesn't support gfx1151, so vLLM runs in kyuz0's patched image, [`kyuz0/vllm-therock-gfx1151`](https://github.com/kyuz0/amd-strix-halo-vllm-toolboxes), pinned by digest in `service.toml` (`VLLM_IMAGE`). llama.cpp (the `lcpp` mod) stays the engine for GGUF files.
 
+**Parked since 2026-10-20:** its models were deleted to free disk space, `config.toml` has `[services.vllm] autostart = false`, and the profiles wait in `profiles/disabled/` (loading one downloads its model again). Setup, and bringing a profile back: [setup/vllm.md](setup/vllm.md).
+
 - **The adapter** (`vllm_mod/`, port 5101) is what AIHub runs. It starts one vLLM container at a time and stops it again.
 - **The engine** is `vllm serve` in a container named `aihub-vllm-<profile>`, listening on `127.0.0.1:7801` (`VLLM_ENGINE_PORT`, host network, nothing published).
 

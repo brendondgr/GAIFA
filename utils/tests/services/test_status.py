@@ -139,6 +139,25 @@ async def test_hub_load_states_hold_until_confirmed(rig):
     assert svc.load == "loaded"
 
 
+async def test_a_status_read_from_before_a_load_finished_doesnt_undo_it(rig):
+    """Overnight 2026-10-21: a poll that asked before the load answered came back after it with
+    loaded=false and set the mod back to "unloaded" until the next idle poll (10 s)."""
+    import time
+
+    from utils.services import loading
+
+    rig.add("fake-mem")
+    mgr = await rig.manager()
+    await mgr.start("fake-mem", wait=True)
+    svc = mgr.get("fake-mem")
+    asked = time.monotonic()
+    loading._set_load(svc, "loaded")                       # the load answers after the poll asked
+    status.apply(mgr, svc, status.validate({"loaded": False})[0], asked)
+    assert svc.load == "loaded"
+    status.apply(mgr, svc, status.validate({"loaded": False})[0], time.monotonic())   # a newer read wins
+    assert svc.load == "unloaded"
+
+
 async def test_without_status_route_load_is_na_or_hub_managed(rig):
     rig.add("fake-ok", edit={"status": '"/nothing"'})
     d = rig.add("fake-ok", as_id="plain")

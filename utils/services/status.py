@@ -133,10 +133,14 @@ def load_from(svc: Service, loaded: bool | None) -> str:
     return svc.load if svc.has_memory else "n/a"
 
 
-def apply(mgr: ServiceManager, svc: Service, st: dict[str, Any]) -> bool:
-    """Fold a normalized status into the service. Returns True when the UI should hear about it."""
+def apply(mgr: ServiceManager, svc: Service, st: dict[str, Any], asked_at: float | None = None) -> bool:
+    """Fold a normalized status into the service. Returns True when the UI should hear about it. `asked_at`
+    (time.monotonic() when the status was requested): if the hub set the load state after that, the report's
+    `loaded` is stale (it was read before the load or unload finished) and the hub's own state stays."""
     before = (svc.load, svc.busy, svc.stats, svc.memory_estimate_gb, _job_view(svc.jobs))
     new_load = load_from(svc, st["loaded"])
+    if asked_at is not None and svc.load_set_at > asked_at:
+        new_load = svc.load
     # A load/unload the hub started stays "loading"/"unloading" until the mod confirms the result.
     if svc.load == "loading" and new_load == "unloaded":
         new_load = "loading"
@@ -178,11 +182,12 @@ async def poll(mgr: ServiceManager, svc: Service, gen: int) -> None:
     """Poll while the service is up; every 2 s while loading, busy or running jobs, else every 10 s."""
     while gen == svc.gen:
         if svc.state == "ready":
+            asked_at = time.monotonic()
             st, _ = await fetch(mgr, svc)
             if gen != svc.gen:
                 return
             if st is not None:
                 svc.status_ts = time.time()
-                if apply(mgr, svc, st):
+                if apply(mgr, svc, st, asked_at):
                     mgr._publish(svc)
         await asyncio.sleep(interval(mgr, svc))

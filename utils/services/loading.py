@@ -36,6 +36,12 @@ def _require_up(svc: Service) -> None:
         raise ServiceError(503, "service_not_running", f"{svc.mod.name} is not running (state: {svc.state})", {"state": svc.state})
 
 
+def _set_load(svc: Service, value: str) -> None:
+    """The hub's own load state for `svc`, stamped so a status read that started earlier can't undo it."""
+    svc.load = value
+    svc.load_set_at = time.monotonic()
+
+
 async def load(mgr: ServiceManager, service_id: str, make_room: bool = False) -> Service:
     svc = mgr.get(service_id)
     method, path = _op(svc, "load")
@@ -45,7 +51,7 @@ async def load(mgr: ServiceManager, service_id: str, make_room: bool = False) ->
     mem = mgr.memory
     if mem is not None:
         await mem.precheck(svc.id, make_room)  # 409 needs_room, with the plan, for the Make-room dialog
-    svc.load = "loading"
+    _set_load(svc, "loading")
     mgr._publish(svc)
     mgr._spawn(svc, _load(mgr, svc, svc.gen, method, path, make_room))
     return svc
@@ -58,7 +64,7 @@ async def _load(mgr: ServiceManager, svc: Service, gen: int, method: str, path: 
             await mem.ensure_room(svc.id, make_room=make_room)
         except ServiceError as e:
             if gen == svc.gen:
-                svc.load = "unloaded"
+                _set_load(svc, "unloaded")
                 mgr._publish(svc)
                 await mgr.activity.add(f"Couldn't load {svc.mod.name}: {e.detail}", service=svc.id, level="error")
             return
@@ -75,7 +81,7 @@ async def unload(mgr: ServiceManager, service_id: str) -> Service:
     _require_up(svc)
     if svc.load in ("unloaded", "unloading"):
         return svc
-    svc.load = "unloading"
+    _set_load(svc, "unloading")
     mgr._publish(svc)
     mgr._spawn(svc, _call(mgr, svc, svc.gen, method, path, "unload"))
     return svc
@@ -89,7 +95,7 @@ async def unload_now(mgr: ServiceManager, svc: Service, note: str = "") -> bool:
         return False
     if not svc.up or svc.load != "loaded":
         return False
-    svc.load = "unloading"
+    _set_load(svc, "unloading")
     mgr._publish(svc)
     await _call(mgr, svc, svc.gen, method, path, "unload", note)
     return svc.load == "unloaded"
@@ -108,13 +114,13 @@ async def _call(mgr: ServiceManager, svc: Service, gen: int, method: str, path: 
     secs = time.monotonic() - t0
     verb = "Loaded" if which == "load" else "Unloaded"
     if ok:
-        svc.load = "loaded" if which == "load" else "unloaded"
+        _set_load(svc, "loaded" if which == "load" else "unloaded")
         if which == "unload" and mgr.memory is not None:
             mgr.memory.unloaded(svc.id)
         mgr._publish(svc)
         await mgr.activity.add(f"{verb} {svc.mod.name}{note} ({secs:.1f}s)", service=svc.id)
     else:
-        svc.load = before
+        _set_load(svc, before)
         mgr._publish(svc)
         await mgr.activity.add(f"{svc.mod.name}: {which} failed ({why})", service=svc.id, level="error", route=f"#/s/{svc.id}/logs")
 

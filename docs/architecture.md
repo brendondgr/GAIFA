@@ -548,6 +548,7 @@ pages = true             # fetched pages (web_fetch, and hub_read_document on we
 documents = false        # your uploads
 transcripts = false
 timeout_s = 30
+window_chars = 800       # passages per model call: 800 for a small judge (MiniCPM5 2B), 6000 for a large one
 
 [learning]               # plan 21–22: preferences on the cards, and the learner; Settings → Learning
 enabled = true

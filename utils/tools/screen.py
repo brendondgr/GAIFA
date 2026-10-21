@@ -48,7 +48,11 @@ SUSPECT = re.compile(
     r"|\b(ignorier|vergiss|missachte)\w*\b[^.\n]{0,40}\b(anweisungen|befehle|regeln|alles|vorherige\w*)\b"
     r"|\b(ignora|olvida)\w*\b[^.\n]{0,40}\b(instrucciones|anteriores|todo)\b",
     re.I | re.M)
-MAX_WINDOW = 6000                     # characters of numbered passages in one model call
+MAX_WINDOW = 800                      # default characters of numbered passages per model call ([agent.screen]
+                                      # window_chars): small models miss more in longer ones (MiniCPM5 2B: 19 of 35
+                                      # planted attacks at 6000, 29 at 800); larger ones flag less with more context
+MAX_PASSAGE = 6000                    # a longer passage is read up to here
+PARALLEL = 4                          # model calls at once for one text
 
 RUBRIC = """You check text taken from a web page or a file before an AI assistant reads it. The text is split into numbered passages.
 
@@ -109,21 +113,21 @@ def passages(text: str) -> list[tuple[int, int]]:
     return out
 
 
-def _chunks(texts: list[str]) -> list[list[int]]:
+def _chunks(texts: list[str], window: int = MAX_WINDOW) -> list[list[int]]:
     groups, cur, size = [], [], 0
     for i, t in enumerate(texts):
-        if cur and size + len(t) > MAX_WINDOW:
+        if cur and size + len(t) > window:
             groups.append(cur)
             cur, size = [], 0
         cur.append(i)
-        size += min(len(t), MAX_WINDOW) + 12
+        size += min(len(t), MAX_PASSAGE) + 12
     if cur:
         groups.append(cur)
     return groups
 
 
 async def _relay(texts: list[str], idx: list[int], cfg: JudgeConfig, client: httpx.AsyncClient) -> dict[int, str]:
-    body = "\n\n".join(f"[{n + 1}]\n{texts[n][:MAX_WINDOW]}" for n in idx)
+    body = "\n\n".join(f"[{n + 1}]\n{texts[n][:MAX_PASSAGE]}" for n in idx)
     req = {"model": cfg.model, "temperature": 0, "max_tokens": 400,
            "messages": [{"role": "system", "content": RUBRIC},
                         {"role": "user", "content": body + "\n\nReply with the JSON only."}],
@@ -151,7 +155,7 @@ async def _decide(texts: list[str], idx: list[int], cfg: JudgeConfig, client: ht
     out = {}
     for n in idx:
         r = await client.post(f"{cfg.url.rstrip('/')}/v1/decide", json={
-            "input": texts[n][:MAX_WINDOW], "model": cfg.model,
+            "input": texts[n][:MAX_PASSAGE], "model": cfg.model,
             "questions": [{"id": "aimed", "type": "yesno", "question": DECIDE_QUESTION}]})
         r.raise_for_status()
         p = float(r.json()["answers"]["aimed"]["probs"]["no"])
@@ -175,7 +179,7 @@ async def screen_for(config: Any, text: str, kind: str) -> Screened | None:
     sc = config.agent.screen
     if not getattr(sc, KINDS[kind]) or not text.strip():
         return None
-    return await screen(text, config_from(config.agent.judge), timeout_s=sc.timeout_s)
+    return await screen(text, config_from(config.agent.judge), timeout_s=sc.timeout_s, window=sc.window_chars)
 
 
 def report(s: Screened) -> dict[str, Any]:
@@ -185,7 +189,7 @@ def report(s: Screened) -> dict[str, Any]:
 
 
 async def screen(text: str, cfg: JudgeConfig | None = None, client: httpx.AsyncClient | None = None,
-                 use_model: bool = True, timeout_s: float = 30.0) -> Screened:
+                 use_model: bool = True, timeout_s: float = 30.0, window: int = MAX_WINDOW) -> Screened:
     import time
 
     t0 = time.perf_counter()
@@ -212,8 +216,14 @@ async def screen(text: str, cfg: JudgeConfig | None = None, client: httpx.AsyncC
         client = client or httpx.AsyncClient(timeout=httpx.Timeout(timeout_s + 1))
         try:
             ask = _decide if cfg.backend == "decide" else _relay
-            for group in _chunks([texts[n] for n in todo]):
-                flagged.update(await asyncio.wait_for(ask(texts, [todo[i] for i in group], cfg, client), timeout_s))
+            sem = asyncio.Semaphore(PARALLEL)
+
+            async def one(group: list[int]) -> dict[int, str]:
+                async with sem:
+                    return await ask(texts, [todo[i] for i in group], cfg, client)
+            parts = await asyncio.wait_for(asyncio.gather(*(one(g) for g in _chunks([texts[n] for n in todo], window))), timeout_s)
+            for part in parts:
+                flagged.update(part)
         except (asyncio.TimeoutError, httpx.HTTPError, ValueError, KeyError, TypeError):
             checked = "patterns"
         finally:

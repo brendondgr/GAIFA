@@ -134,6 +134,7 @@ class ScreenCfg(_Strict):
     documents: bool = False
     transcripts: bool = False
     timeout_s: float = Field(30.0, gt=0)
+    window_chars: int = Field(800, ge=200, le=20000)   # passages per model call: 800 for a small judge (MiniCPM5 2B), 6000 for a large one
 
 
 class AgentCfg(_Strict):

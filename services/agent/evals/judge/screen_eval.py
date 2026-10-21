@@ -26,7 +26,7 @@ from pathlib import Path
 import httpx
 
 from utils.tools.judge import JudgeConfig
-from utils.tools.screen import passages, screen
+from utils.tools.screen import MAX_WINDOW, passages, screen
 
 from .bench import AGENTDOJO, BENCH
 
@@ -56,6 +56,7 @@ def planted() -> list[tuple[str, str, int]]:
 
 async def run(a: argparse.Namespace) -> None:
     cfg = JudgeConfig(backend=a.backend, model=a.model, url=a.url, threshold=a.threshold)
+    window = a.window or MAX_WINDOW                     # characters of passages per model call
     deepset = [json.loads(line) for line in (BENCH / "deepset.jsonl").read_text().splitlines()]
     if a.limit:
         deepset = deepset[:: max(1, len(deepset) // a.limit)][: a.limit]
@@ -71,7 +72,7 @@ async def run(a: argparse.Namespace) -> None:
         async def one(item):
             kind, iid, text, extra = item
             async with sem:
-                s = await screen(text, cfg, client, use_model=not a.patterns_only, timeout_s=a.timeout)
+                s = await screen(text, cfg, client, use_model=not a.patterns_only, timeout_s=a.timeout, window=window)
             rows.append({"set": kind, "id": iid, **extra, "passages": len(passages(text)), "checked": s.checked,
                          "ms": s.ms, "flagged": [f.passage for f in s.findings], "by": [f.by for f in s.findings]})
             if len(rows) % 50 == 0:
@@ -126,6 +127,7 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0, help="a spread sample of this many deepset texts")
     ap.add_argument("--no-pages", action="store_true", help="skip the whole real pages (slow on a CPU model)")
     ap.add_argument("--deepset-only", action="store_true", help="only the deepset texts (a CPU model is slow on pages)")
+    ap.add_argument("--window", type=int, default=0, help="characters of passages per model call (default: screen.py's)")
     ap.add_argument("--patterns-only", action="store_true")
     ap.add_argument("--summary", action="store_true")
     a = ap.parse_args()

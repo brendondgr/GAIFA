@@ -47,3 +47,9 @@ autostart = false              # parked 2026-10-20: its models were deleted; pro
 
 [docs]
 regenerate = true              # plan 23.3: rewrite docs/setup/models/ when the registry changes; false leaves it to `aihub docs`
+
+[agent.judge]
+model = "gemma4-26B"
+
+[agent.screen]
+window_chars = 6000

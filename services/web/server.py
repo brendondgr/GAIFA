@@ -198,6 +198,8 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
         try:
             r.raise_for_status()
             data = r.json()
+            if not isinstance(data, dict):
+                raise ValueError(f"expected a JSON object, got {type(data).__name__}")
         except (httpx.HTTPError, ValueError) as e:
             return error(502, "searxng_failed", f"SearXNG failed: {e}", "try again with a different query")
         state["searches"] += 1
@@ -246,6 +248,9 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
         except TimeoutError:
             state["refused"] += 1
             return error(504, "timeout", f"{body.url} took longer than {safety.TIMEOUT_S:.0f} s", "try another source")
+        except httpx.InvalidURL as e:          # a URL or redirect httpx can't send (check_url refuses the known ones)
+            state["refused"] += 1
+            return error(422, "bad_url", f"{body.url} isn't a URL that can be fetched ({e})", "pass a full http:// or https:// URL")
         except httpx.HTTPError as e:
             return error(502, "fetch_failed", f"couldn't fetch {body.url} ({type(e).__name__}: {e})", "try another source")
         finally:

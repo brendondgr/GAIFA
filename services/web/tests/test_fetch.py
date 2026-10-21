@@ -116,3 +116,14 @@ def test_dry_run_reads_the_fake_web(site, make_client):
     assert miss.status_code == 502 and miss.json()["code"] == "http_error" and "fake web" in miss.json()["detail"]
     real = c.post("/v1/fetch", json={"url": "https://harbour-council.example/transport/ferry-fares"})   # not a dry run: the real rules
     assert real.status_code == 502 and real.json()["code"] == "dns_failed"
+
+
+def test_a_url_httpx_cant_send_is_refused_not_a_500(site, make_client):
+    """Overnight 2026-10-21: a URL or redirect with a control character passed the address check, then httpx
+    raised InvalidURL (not an HTTPError) and the route answered 500."""
+    site.routes["/bounce"] = (302, {"Location": "http://ex\x7fample.test/"}, b"")
+    c = make_client()
+    r = c.post("/v1/fetch", json={"url": "http://ex\x7fample.com/"})
+    assert r.status_code == 422 and r.json()["code"] == "bad_url"
+    r = c.post("/v1/fetch", json={"url": f"http://site.test:{site.port}/bounce"})   # httpx reports this one itself
+    assert r.status_code == 502 and r.json()["code"] == "fetch_failed", r.text

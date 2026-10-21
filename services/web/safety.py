@@ -58,6 +58,8 @@ def address_refused(ip: str) -> str | None:
 
 def check_url(url: str) -> tuple[str, str, int]:
     """(scheme, host, port) of a URL the rules allow by its text; raises Refused otherwise."""
+    if any(ord(c) < 33 or ord(c) == 127 for c in url):   # httpx refuses these later with an exception we'd 500 on
+        raise Refused("bad_url", f"{url!r} has spaces or control characters", "pass the URL as it appears, percent-encoded", 422)
     try:
         u = urlsplit(url)
         port = u.port

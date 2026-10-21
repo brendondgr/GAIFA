@@ -66,6 +66,25 @@ async def test_peaks_are_learned_while_loaded(memhub):
         assert plan["needs_bytes"] == 50 * GB
 
 
+async def test_an_old_peak_stops_counting_and_a_new_load_learns_a_fresh_one(memhub):
+    """Overnight 2026-10-21: peaks only grew, so a mod's worst load from weeks ago (tts 27 GB, comfy 74 GB)
+    kept blocking today's small loads. Past `[memory] peak_days` a peak stops counting."""
+    import time
+
+    async with memhub() as (app, c, src):
+        m = app.state.hub.memory
+        m.peaks["fake-mem"], m.peak_ts["fake-mem"] = 90 * GB, time.time() - 8 * 86400   # eight days old
+        svc = app.state.hub.services.get("fake-mem")
+        assert m.fresh_peak("fake-mem") == 0 and m.needs(svc) == (m.estimate(svc) or 0)
+        await c.post("/api/services/fake-mem/load")
+        await loaded(app, "fake-mem")
+        await m.sample()                                   # today's measurement replaces the stale 90 GB
+        today = m.used["fake-mem"]
+        assert 0 < today < 90 * GB and m.peaks["fake-mem"] == today and m.fresh_peak("fake-mem") == today
+        m.peak_ts["fake-mem"] = time.time() - 3 * 86400    # a recent peak still counts
+        assert m.needs(svc) == max(m.estimate(svc) or 0, today)
+
+
 async def test_high_memory_alert(memhub):
     async with memhub(start=False) as (app, c, src):
         hub = app.state.hub

@@ -420,7 +420,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 
 **Load rule:**
 - `available = MemAvailable − reserve`.
-- `needs = max(estimate, learned peak)`, or the `needs_bytes` the mod sent to acquire.
+- `needs = max(estimate, learned peak)`, or the `needs_bytes` the mod sent to acquire. A learned peak counts for `[memory] peak_days` (7) after it was measured; an older one is ignored and the next load measures a fresh one, so a mod's worst load from weeks ago (an engine or workflow since retired) doesn't block today's smaller ones.
 - If `needs ≤ available`, go ahead.
 - Otherwise build a **plan**:
   - **Candidates:** loaded mods with `auto_unload = true`, not in `never_unload`, and not busy (no in-flight proxied requests and `busy = false` in status).
@@ -507,6 +507,7 @@ reserve_gb = 12
 auto_make_room = false      # false: ask (Make-room dialog); true: unload idle mods automatically
 never_unload = ["lcpp"]     # stopping LLM instances is never automatic
 priority = ["comfy", "tts", "gen3d"]   # unloaded first → last
+peak_days = 7               # a learned peak older than this stops counting; the next load learns a fresh one
 
 [ports]
 new_mods = [5100, 5199]

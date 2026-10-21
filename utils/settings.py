@@ -101,7 +101,7 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     d = DEFAULTS
     defaults = {
         "hub": {"port": d.hub.port},
-        "memory": d.memory.model_dump(),
+        "memory": {k: v for k, v in d.memory.model_dump().items() if k in before["memory"]},   # the page's keys (not peak_days)
         "services": {"order": d.services.order},
         "ui": {"theme": d.ui.theme, "density": d.ui.density},
         "learning": d.learning.model_dump(),

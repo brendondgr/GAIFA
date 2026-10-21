@@ -72,6 +72,7 @@ class MemoryManager:
         self.gpu_busy: dict[str, float] = {}           # each mod's GPU busy % since the last sample (plan 28.2)
         self._engines: tuple[dict[str, dict[str, int]], float] | None = None
         self.peaks: dict[str, int] = {}
+        self.peak_ts: dict[str, float] = {}              # when each peak was measured (time.time())
         self.reservations: dict[str, Reservation] = {}
         self.snapshot: dict[str, Any] | None = None
         self._last_pub: tuple[float, dict[str, Any]] | None = None
@@ -85,8 +86,9 @@ class MemoryManager:
 
     async def start(self) -> None:
         if self.db:
-            rows = await self.db.fetchall("SELECT service, peak_bytes FROM service_peaks")
+            rows = await self.db.fetchall("SELECT service, peak_bytes, updated_ts FROM service_peaks")
             self.peaks = {r["service"]: r["peak_bytes"] for r in rows}
+            self.peak_ts = {r["service"]: r["updated_ts"] or 0.0 for r in rows}
         await self.sample()
         self._task = asyncio.create_task(self._loop(), name="aihub-memory")
 
@@ -132,8 +134,15 @@ class MemoryManager:
         gb = svc.memory_estimate_gb if svc.memory_estimate_gb is not None else (svc.m.memory.estimate_gb if svc.m and svc.m.memory else None)
         return round(gb * GB) if gb is not None else None
 
+    def fresh_peak(self, sid: str) -> int:
+        """The learned peak, while it is younger than `[memory] peak_days`: an old one (a workflow or engine
+        since retired) would otherwise ask for its worst moment forever."""
+        if time.time() - self.peak_ts.get(sid, time.time()) > self.cfg.peak_days * 86400:
+            return 0
+        return self.peaks.get(sid, 0)
+
     def needs(self, svc: Service) -> int:
-        return max(self.estimate(svc) or 0, self.peaks.get(svc.id, 0))
+        return max(self.estimate(svc) or 0, self.fresh_peak(svc.id))
 
     def view(self) -> dict[str, Any]:
         """The brief's `Memory`."""
@@ -178,10 +187,11 @@ class MemoryManager:
         """A loaded mod's highest measured use, kept in `service_peaks` (written when it grows by 1%+)."""
         for svc in self.mgr.list():
             used = self.used.get(svc.id, 0)
-            old = self.peaks.get(svc.id, 0)
+            old = self.fresh_peak(svc.id)            # a stale peak is replaced by today's, even a smaller one
             if svc.load != "loaded" or used <= old * (1 + MOVE_FRACTION):
                 continue
             self.peaks[svc.id] = used
+            self.peak_ts[svc.id] = time.time()
             if self.db:
                 await self.db.execute(
                     "INSERT INTO service_peaks (service, peak_bytes, updated_ts) VALUES (?, ?, ?) "

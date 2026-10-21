@@ -52,6 +52,7 @@ class MemoryCfg(_Strict):
     auto_make_room: bool = False
     never_unload: list[str] = ["lcpp"]
     priority: list[str] = ["comfy", "tts", "gen3d"]
+    peak_days: float = Field(7, gt=0)   # a learned peak older than this stops counting; the next load learns a fresh one
 
 
 class PortsCfg(_Strict):

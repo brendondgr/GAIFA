@@ -491,7 +491,7 @@ One GPU slot (`utils/gpu.py`, `[gpu] queue = true`, `lease_ttl_s = 60`). A mod w
   - the scanner suggests entries and you confirm them
   - mods can register what they download (`POST /api/models` with their source)
   - lcpp's Hugging Face downloader does this first
-- **Setup docs follow the registry** (plan 23): every change (an add, edit, delete or verify, or a reload of `registry.json` after a hand edit) reaches the registry's listeners (`Registry.subscribe`: the alerts and `utils/registry/docs_hook.py`), which rewrites that model's doc in `docs/setup/models/<id>.md` and the index in `docs/setup/README.md`, 2 s after the last change and off the event loop. The hub also does one full pass at start. The generated part sits between markers; hand-written sections are kept. `aihub docs [--check] [--strict]` does the same without the hub (`utils/setupdocs/`). Environment docs live in the mods, `services/<id>/setup/*.md` (docs/mods.md §9).
+- **The model inventory follows the registry** (plan 23.6): with `[docs] regenerate = true`, every change (an add, edit, delete or verify, or a reload of `registry.json` after a hand edit) reaches the registry's listeners (`Registry.subscribe`: the alerts and `utils/registry/docs_hook.py`), which rewrites that model's doc in `data/state/setup/models/<id>.md` (local, gitignored: which models to set up is each person's choice) 2 s after the last change, off the event loop. `aihub docs` does the same without the hub, and also writes the mods index in `docs/setup/README.md` (`utils/setupdocs/`). Setup docs live in the mods, `services/<id>/setup/*.md` (docs/mods.md §9).
 
 ## 9. `config.toml`
 
@@ -585,8 +585,8 @@ mics = ["Samson GoMic Analog Stereo", "ThinkPad USB-C Dock Audio Mono"]   # labe
 language = ""            # an ISO code, or "" to detect
 preset = "balanced"      # fast | balanced | accurate | best
 mode = "both"            # both (click or hold) | toggle | hold
-[docs]                   # plan 23.3; not on the Settings page
-regenerate = true        # rewrite docs/setup/models/ when the registry changes; false leaves it to `aihub docs`
+[docs]                   # plan 23.3/23.6; not on the Settings page
+regenerate = false       # true: keep this machine's model inventory (data/state/setup/models/, local) current as the registry changes
 ```
 
 ## 10. The existing apps as mods

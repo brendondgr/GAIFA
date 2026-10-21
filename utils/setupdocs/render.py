@@ -114,7 +114,7 @@ def model_block(mid: str, e: dict[str, Any], used_by: list[str], envs: list[Env]
         out.append(f"| `{f['path']}` | {f.get('role') or '—'} | {gb(int(f.get('size_bytes') or 0))} | {f'`{sha}`' if sha else 'not recorded'} |")
     cmds = fetch(e, mid)
     if cmds:
-        out += ["", "### Get it", "", "From the project folder (`uvx` runs Hugging Face's CLI without installing it; gated repos need `hf auth login` first, see [host.md](../host.md#6-accounts-and-licences)):", ""]
+        out += ["", "### Get it", "", f"From the project folder (`uvx` runs Hugging Face's CLI without installing it; gated repos need `hf auth login` first, see [host.md]({link(doc, root / 'docs/setup/host.md')}#6-accounts-and-licences)):", ""]
         for c in cmds:
             out += ["```bash", c, "```", ""]
         out.pop()
@@ -126,19 +126,31 @@ def orphan_block(mid: str) -> str:
     return "\n".join([START, f"# {mid}", "", f"**Not in the registry.** `{mid}` was removed from `data/models/registry.json`; this doc is kept because it has hand-written notes. Delete it when they're no longer useful.", END])
 
 
-def index_block(models: list[tuple[str, dict[str, Any], list[Env]]], envs: list[Env], readme: Path, models_dir: Path) -> str:
+def mods_index(envs: list[Env], readme: Path) -> str:
+    """The block in docs/setup/README.md: every mod and its setup docs. Tracked files only, no models."""
     out = [START]
-    if envs:
-        out += ["| Environment | Mod | Models | Size |", "|---|---|---|---|"]
-        for v in sorted(envs, key=lambda v: (v.mod, v.id)):
-            mine = [e for _, e, vs in models if v in vs]
-            out.append(f"| [{v.title}]({link(readme, v.path)}) | `{v.mod}` | {len(mine)} | {gb(sum(size(e) for e in mine))} |")
+    if not envs:
+        out.append("*No setup docs yet: they go in `services/<id>/setup/` (mods.md §9).*")
     else:
-        out.append("*No environment docs yet: they go in `services/<id>/setup/` (mods.md §9).*")
-    out += ["", f"**Models** ({len(models)}, {gb(sum(size(e) for _, e, _ in models))} in all):", ""]
-    out += ["| Model | Kind | Size | Environment | Source |", "|---|---|---|---|---|"]
-    for mid, e, vs in sorted(models, key=lambda t: (t[1].get("kind") or "", t[0])):
-        doc = link(readme, models_dir / f"{mid}.md")
-        out.append(f"| [{e.get('name') or mid}]({doc}) | {e.get('kind') or '—'} | {gb(size(e))} | {', '.join(v.title for v in vs) or 'none yet'} | {'recorded' if has_source(e) else '**not recorded**'} |")
+        out += ["| Mod | Setup docs |", "|---|---|"]
+        by_mod: dict[str, list[Env]] = {}
+        for v in envs:
+            by_mod.setdefault(v.mod, []).append(v)
+        for mod in sorted(by_mod):
+            docs = ", ".join(f"[{v.title}]({link(readme, v.path)})" for v in sorted(by_mod[mod], key=lambda v: v.id))
+            out.append(f"| `{mod}` | {docs} |")
     out.append(END)
     return "\n".join(out)
+
+
+def inventory_index(models: list[tuple[str, dict[str, Any], list[Env]]], index: Path) -> str:
+    """data/state/setup/models/README.md: this machine's models (local, gitignored)."""
+    out = ["# This machine's models", "",
+           "Written by `aihub docs` from `data/models/registry.json`. It lists the models on this machine, not what AIHub needs: "
+           "which models to set up is your choice, per mod (`aihub setup`, `docs/setup/`).", "",
+           f"{len(models)} models, {gb(sum(size(e) for _, e, _ in models))} in all.", "",
+           "| Model | Kind | Size | Environment | Source |", "|---|---|---|---|---|"]
+    for mid, e, vs in sorted(models, key=lambda t: (t[1].get("kind") or "", t[0])):
+        envs = ", ".join(f"[{v.title}]({link(index, v.path)})" for v in vs) or "none"
+        out.append(f"| [{e.get('name') or mid}]({mid}.md) | {e.get('kind') or '—'} | {gb(size(e))} | {envs} | {'recorded' if has_source(e) else 'not recorded'} |")
+    return "\n".join(out) + "\n"

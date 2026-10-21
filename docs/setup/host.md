@@ -117,7 +117,7 @@ loginctl enable-linger $USER
 
 | What | Size on this machine |
 |---|---|
-| Model weights (`data/models/`, every model in the registry) | **354 GB** (the registry's files; the folder holds about 374 GB with caches) |
+| Model weights (`data/models/`) | your choice: from a few GB (one small LLM) to hundreds (this machine holds about 150 GB) |
 | ComfyUI image `kyuz0/amd-strix-halo-comfyui` (Images & Video, 3D Generate) | 15.1 GB |
 | vLLM image `kyuz0/vllm-therock-gfx1151` | 12.4 GB |
 | Speech runtimes (`services/tts/runtime/`) | 14 GB |
@@ -125,7 +125,7 @@ loginctl enable-linger $USER
 | llama.cpp (`services/lcpp/runtime/`) | 262 MB |
 | The hub's and mods' own venvs | under 100 MB each |
 
-You don't need every model. Each model's doc in [models/](models/) gives its size and the environment that runs it. Put the clone on a disk with room: model weights live inside the project folder (`data/models/`), and podman keeps images in `~/.local/share/containers/`.
+Each mod's setup doc gives the sizes of the models it suggests. Put the clone on a disk with room: model weights live inside the project folder (`data/models/`), and podman keeps images in `~/.local/share/containers/`.
 
 **The clone must be under your home folder.** The ComfyUI toolbox shares `$HOME` with the host, and ComfyUI reads models and custom nodes from the project folder through that share.
 

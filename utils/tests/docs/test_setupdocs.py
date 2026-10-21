@@ -57,29 +57,36 @@ def write_registry(root: Path, models: dict) -> None:
     (root / "data" / "models" / "registry.json").write_text(json.dumps({"version": 1, "models": models}))
 
 
+INV = "data/state/setup/models"
+
+
 def doc(root: Path, mid: str) -> str:
-    return (root / "docs" / "setup" / "models" / f"{mid}.md").read_text()
+    return (root / INV / f"{mid}.md").read_text()
 
 
-def test_writes_a_doc_per_model_and_the_index(root: Path) -> None:
+def test_writes_the_mods_index_and_the_local_inventory(root: Path) -> None:
     report = setupdocs.sync(root)
-    assert sorted(report.written) == ["docs/setup/README.md", "docs/setup/models/ae.md", "docs/setup/models/big.md"]
+    assert sorted(report.written) == ["data/state/setup/models/README.md", "data/state/setup/models/ae.md", "data/state/setup/models/big.md", "docs/setup/README.md"]
     big = doc(root, "big")
     assert big.startswith(render.START + "\n# big.safetensors")
     assert "| Size | 2.5 GB in 1 file |" in big
     assert "| Used by | `img` |" in big
-    assert "[Image engine](../../../services/img/setup/img.md)" in big
+    assert "[Image engine](../../../../services/img/setup/img.md)" in big
     assert "[org/big](https://huggingface.co/org/big)" in big
+    assert "[host.md](../../../../docs/setup/host.md#6-accounts-and-licences)" in big
     assert big.endswith(render.END + "\n\n" + render.HAND_WITH_SOURCE)
     assert doc(root, "ae").endswith(render.HAND_NO_SOURCE)            # no source: a "Where to get it" to fill in
     readme = (root / "docs" / "setup" / "README.md").read_text()
     assert readme.startswith("# Setup\n\nHand text.\n\n") and readme.endswith("\n\nMore hand text.\n")
-    assert "[big.safetensors](models/big.md)" in readme and "| [Image engine](../../services/img/setup/img.md) | `img` | 2 | 5.0 GB |" in readme
+    assert "| `img` | [Image engine](../../services/img/setup/img.md) |" in readme
+    assert "big" not in readme                                        # the committed index names mods, never models
+    inventory = (root / INV / "README.md").read_text()
+    assert "[big.safetensors](big.md)" in inventory and "2 models, 5.0 GB in all." in inventory
 
 
 def test_hand_text_is_kept_and_a_second_run_changes_nothing(root: Path) -> None:
     setupdocs.sync(root)
-    path = root / "docs" / "setup" / "models" / "big.md"
+    path = root / INV / "big.md"
     path.write_text(path.read_text().replace("## What to look for\n", "## What to look for\n\nNeeds the fp8 fix.  \n"))
     write_registry(root, {"big": entry("comfyui/loras/big.safetensors", name="Big", source={"type": "huggingface", "repo": "org/big"})})
     setupdocs.sync(root)
@@ -89,32 +96,33 @@ def test_hand_text_is_kept_and_a_second_run_changes_nothing(root: Path) -> None:
     assert again.written == [] and setupdocs.sync(root, check=True).problems() == []
 
 
-def test_check_mode_writes_nothing_and_reports(root: Path) -> None:
+def test_check_mode_compares_only_the_committed_index(root: Path) -> None:
     report = setupdocs.sync(root, check=True)
-    assert report.missing == ["docs/setup/models/ae.md", "docs/setup/models/big.md"]
-    assert report.stale == ["docs/setup/README.md"]
-    assert not (root / "docs" / "setup" / "models").exists()
+    assert report.stale == ["docs/setup/README.md"] and report.missing == []
+    assert not (root / INV).exists()                                 # nothing written, the inventory untouched
     setupdocs.sync(root)
     write_registry(root, {"big": entry("comfyui/loras/big.safetensors", kind="lora", source={"type": "huggingface", "repo": "org/big"})})
+    assert setupdocs.sync(root, check=True).problems() == []         # a model change is the inventory's business
+    (root / "services" / "img" / "setup" / "more.md").write_text(ENV_DOC.replace('"img"', '"img-more"'))
     report = setupdocs.sync(root, check=True)
-    assert "docs/setup/models/big.md" in report.stale
-    assert any(p.startswith("stale: ") for p in report.problems())
+    assert report.stale == ["docs/setup/README.md"] and report.problems() == ["stale: docs/setup/README.md"]
 
 
 def test_orphans(root: Path) -> None:
     setupdocs.sync(root)
-    ae = root / "docs" / "setup" / "models" / "ae.md"
-    big = root / "docs" / "setup" / "models" / "big.md"
+    ae = root / INV / "ae.md"
+    big = root / INV / "big.md"
     big.write_text(big.read_text() + "\nKeep this.\n")
     write_registry(root, {})
-    assert sorted(setupdocs.sync(root, check=True).orphans) == ["docs/setup/models/ae.md", "docs/setup/models/big.md"]
+    assert setupdocs.sync(root, check=True).orphans == []            # the inventory isn't checked
     report = setupdocs.sync(root)
-    assert report.removed == ["docs/setup/models/ae.md"] and not ae.exists()     # nothing hand-written: deleted
-    assert report.orphans == ["docs/setup/models/big.md"]                         # hand-written: kept, marked
+    assert report.removed == [f"{INV}/ae.md"] and not ae.exists()    # nothing hand-written: deleted
+    assert report.orphans == [f"{INV}/big.md"]                       # hand-written: kept, marked
     assert "**Not in the registry.**" in big.read_text() and big.read_text().endswith("Keep this.\n")
+    assert report.problems() == []
 
 
-def test_matching_and_coverage(root: Path) -> None:
+def test_coverage_is_about_mods(root: Path) -> None:
     write_registry(root, {
         "big": entry("comfyui/loras/big.safetensors", source={"type": "huggingface", "repo": "org/big"}),
         "llm": entry("llm/x/x.gguf", kind="llm", services=["lcpp"]),
@@ -123,10 +131,10 @@ def test_matching_and_coverage(root: Path) -> None:
     lcpp.mkdir()
     (lcpp / "service.toml").write_text('id = "lcpp"\n[models]\ndirs = ["llm"]\n')
     report = setupdocs.sync(root)
-    assert report.uncovered == ["llm"] and report.unsourced == ["llm"] and report.uncovered_mods == ["lcpp"]
-    assert report.problems() == []                                               # gaps fail only with strict
-    assert len(report.problems(strict=True)) == 3
-    path = root / "docs" / "setup" / "models" / "llm.md"
+    assert report.uncovered == ["llm"] and report.unsourced == ["llm"]  # notes for the inventory
+    assert report.uncovered_mods == ["lcpp"]
+    assert report.problems() == [] and report.problems(strict=True) == ["mod lcpp has no setup doc (services/lcpp/setup/)"]
+    path = root / INV / "llm.md"
     path.write_text(path.read_text().replace("## Where to get it\n", "## Where to get it\n\nAsk on the forum.\n"))
     assert setupdocs.sync(root).unsourced == []
 
@@ -183,7 +191,7 @@ def test_bad_environment_docs(root: Path, text: str, problem: str) -> None:
     (root / "services" / "img" / "setup" / "bad.md").write_text(text)
     report = setupdocs.sync(root, check=True)
     assert problem in report.env_problems["services/img/setup/bad.md"]
-    assert any(p.startswith("environment doc services/img/setup/bad.md") for p in report.problems())
+    assert any(p.startswith("setup doc services/img/setup/bad.md") for p in report.problems())
 
 
 def test_duplicate_ids_and_the_template_is_skipped(root: Path) -> None:
@@ -197,7 +205,10 @@ def test_cli(root: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.Capture
     monkeypatch.setattr(cli, "ROOT", root)
     assert cli.cmd_docs(Namespace(check=True, strict=False)) == 1
     assert cli.cmd_docs(Namespace(check=False, strict=False)) == 0
-    assert "wrote docs/setup/models/big.md" in capsys.readouterr().out
+    assert "wrote data/state/setup/models/big.md" in capsys.readouterr().out
     assert cli.cmd_docs(Namespace(check=True, strict=False)) == 0
-    assert cli.cmd_docs(Namespace(check=True, strict=True)) == 1      # ae has no source
-    assert "no source and no 'Where to get it': ae" in capsys.readouterr().err
+    assert cli.cmd_docs(Namespace(check=True, strict=True)) == 0      # ae has no source: a note, not a failure
+    (root / "services" / "bare").mkdir()
+    (root / "services" / "bare" / "service.toml").write_text('id = "bare"\n')
+    assert cli.cmd_docs(Namespace(check=True, strict=True)) == 1      # a mod without a setup doc
+    assert "mod bare has no setup doc" in capsys.readouterr().err

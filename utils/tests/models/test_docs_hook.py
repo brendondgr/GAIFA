@@ -14,7 +14,7 @@ FAST = 0.05
 
 
 def _doc(models, mid):
-    return models.paths.root / "docs" / "setup" / "models" / f"{mid}.md"
+    return models.paths.root / "data" / "state" / "setup" / "models" / f"{mid}.md"
 
 
 async def _settle(hook: DocsHook) -> None:
@@ -53,7 +53,7 @@ async def test_a_burst_makes_one_write(reg, models):
         await add(reg, ModelInput(path=f"llm/{name}.gguf", name=name, kind="llm"))
     await _settle(hook)
     assert hook.runs == 1
-    assert len(list((models.paths.root / "docs" / "setup" / "models").glob("*.md"))) == 3
+    assert len(list((models.paths.root / "data" / "state" / "setup" / "models").glob("*.md"))) == 4   # three docs and the index
 
 
 async def test_off_means_no_writes(reg, models):
@@ -62,7 +62,7 @@ async def test_off_means_no_writes(reg, models):
     models.put("llm/x.gguf", 10)
     await add(reg, ModelInput(path="llm/x.gguf", name="x", kind="llm"))
     await asyncio.sleep(FAST * 4)
-    assert hook.runs == 0 and not (models.paths.root / "docs" / "setup" / "models").exists()
+    assert hook.runs == 0 and not (models.paths.root / "data" / "state" / "setup" / "models").exists()
 
 
 async def test_a_hand_edit_of_registry_json_is_picked_up(reg, models):

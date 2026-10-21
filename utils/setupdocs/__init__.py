@@ -1,7 +1,8 @@
-"""Setup docs (plan 23.2): one doc per registered model in `docs/setup/models/`, generated from the
-registry, plus the index in `docs/setup/README.md`. Standard library only, so `aihub docs` runs
-without the hub. The generated part sits between markers; everything outside them is hand-written
-and kept byte for byte. Environment docs (`services/<id>/setup/*.md`) are read, never written.
+"""Setup docs (plan 23): the mods index in `docs/setup/README.md` (committed), and a local inventory
+of this machine's models in `data/state/setup/models/` (gitignored: which models to set up is each
+person's choice, plan 23.6). Standard library only, so `aihub docs` runs without the hub. A model
+doc's generated part sits between markers; everything outside them is hand-written and kept byte
+for byte. Setup docs (`services/<id>/setup/*.md`) are read, never written.
 """
 
 from __future__ import annotations
@@ -19,29 +20,29 @@ from .envs import Env, load_envs, match, references, under
 
 __all__ = ["Report", "sync", "Env", "load_envs"]
 
+INVENTORY = Path("data") / "state" / "setup" / "models"   # local, gitignored
 BLOCK = re.compile(re.escape(render.START) + r".*?" + re.escape(render.END), re.S)
 
 
 @dataclass
 class Report:
     written: list[str] = field(default_factory=list)     # docs created or changed (or that would be, in check mode)
-    removed: list[str] = field(default_factory=list)     # orphan docs with no hand text, deleted
-    stale: list[str] = field(default_factory=list)       # check mode: generated part out of date
-    missing: list[str] = field(default_factory=list)     # check mode: a registered model without a doc
-    orphans: list[str] = field(default_factory=list)     # a doc whose model isn't registered (kept: it has hand text)
+    removed: list[str] = field(default_factory=list)     # inventory docs of removed models, no hand text: deleted
+    stale: list[str] = field(default_factory=list)       # check mode: a committed generated part is out of date
+    missing: list[str] = field(default_factory=list)     # check mode: a committed generated file is missing
+    orphans: list[str] = field(default_factory=list)     # inventory docs of removed models, kept for their hand text
     env_problems: dict[str, str] = field(default_factory=dict)
-    uncovered: list[str] = field(default_factory=list)   # models no environment's `models` glob matches
-    unsourced: list[str] = field(default_factory=list)   # models with no source and an empty "Where to get it"
-    uncovered_mods: list[str] = field(default_factory=list)  # mods that have models but no environment doc
+    uncovered: list[str] = field(default_factory=list)   # inventory note: models no setup doc's `models` glob matches
+    unsourced: list[str] = field(default_factory=list)   # inventory note: models with no recorded source
+    uncovered_mods: list[str] = field(default_factory=list)  # mods without a setup doc
 
     def problems(self, strict: bool = False) -> list[str]:
+        """What fails `aihub docs --check`: only what's committed (the mods index, the setup docs).
+        The inventory is local, so its gaps are notes, never failures."""
         out = [f"stale: {p}" for p in self.stale] + [f"missing: {p}" for p in self.missing]
-        out += [f"not in the registry: {p}" for p in self.orphans]
-        out += [f"environment doc {p}: {m}" for p, m in self.env_problems.items()]
+        out += [f"setup doc {p}: {m}" for p, m in self.env_problems.items()]
         if strict:
-            out += [f"no environment runs {m}" for m in self.uncovered]
-            out += [f"no source and no 'Where to get it': {m}" for m in self.unsourced]
-            out += [f"mod {m} has models but no setup doc" for m in self.uncovered_mods]
+            out += [f"mod {m} has no setup doc (services/{m}/setup/)" for m in self.uncovered_mods]
         return out
 
 
@@ -126,15 +127,15 @@ def _put(path: Path, text: str, check: bool, report: Report, rel: str) -> None:
 
 
 def sync(root: Path, ids: list[str] | None = None, check: bool = False) -> Report:
-    """Regenerate the model docs (all, or `ids`) and the index. In check mode nothing is written:
-    what would change is reported as stale or missing."""
+    """Regenerate the mods index and the local model inventory (all models, or `ids`). In check mode
+    nothing is written and only the committed index is compared: a change is reported as stale."""
     root = Path(root)
     report = Report()
     envs, report.env_problems = load_envs(root)
     models_dir_data = _models_dir(root)
     reg = _registry(models_dir_data)
     mods = _mod_dirs(root)
-    out_dir = root / "docs" / "setup" / "models"
+    out_dir = root / INVENTORY
     rows: list[tuple[str, dict[str, Any], list[Env]]] = []
     for mid, e in sorted(reg.items()):
         matched = match(e["path"], envs)
@@ -146,7 +147,7 @@ def sync(root: Path, ids: list[str] | None = None, check: bool = False) -> Repor
         old = doc.read_text() if doc.exists() else None
         if not render.has_source(e) and not where_to_get(old or ""):
             report.unsourced.append(mid)
-        if ids is not None and mid not in ids:
+        if check or (ids is not None and mid not in ids):
             continue
         block = render.model_block(mid, e, users, matched, references(names(e), envs, root), doc, root)
         if old is None:
@@ -158,27 +159,29 @@ def sync(root: Path, ids: list[str] | None = None, check: bool = False) -> Repor
         _put(doc, new, check, report, doc.relative_to(root).as_posix())
     have = {mid for mid, _, _ in rows}
     covered = {v.mod for v in envs}
-    report.uncovered_mods = sorted(m for m in mods if m not in covered and any(m in used_by(e, mods) for e in reg.values()))
-    if out_dir.is_dir():
+    report.uncovered_mods = sorted(m for m in mods if m not in covered)
+    if out_dir.is_dir() and not check:
         for doc in sorted(out_dir.glob("*.md")):
             mid = doc.stem
             if mid in have:
                 continue
             text = doc.read_text()
             rel = doc.relative_to(root).as_posix()
+            if mid == "README":
+                continue
             if _hand_empty(text):
-                if check:
-                    report.orphans.append(rel)
-                else:
-                    doc.unlink()
-                    report.removed.append(rel)
+                doc.unlink()
+                report.removed.append(rel)
             else:
                 report.orphans.append(rel)
                 if BLOCK.search(text):
                     _put(doc, BLOCK.sub(lambda _m: render.orphan_block(mid), text, count=1), check, report, rel)
+    if not check and rows:
+        index = out_dir / "README.md"
+        _put(index, render.inventory_index(rows, index), False, report, index.relative_to(root).as_posix())
     readme = root / "docs" / "setup" / "README.md"
     if readme.exists():
         text = readme.read_text()
         if BLOCK.search(text):
-            _put(readme, BLOCK.sub(lambda _m: render.index_block(rows, envs, readme, out_dir), text, count=1), check, report, readme.relative_to(root).as_posix())
+            _put(readme, BLOCK.sub(lambda _m: render.mods_index(envs, readme), text, count=1), check, report, readme.relative_to(root).as_posix())
     return report

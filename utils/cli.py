@@ -163,7 +163,8 @@ def cmd_models(args: argparse.Namespace) -> int:
 
 
 def cmd_docs(args: argparse.Namespace) -> int:
-    """utils/setupdocs/ (plan 23.2): the setup docs generated from the registry. Needs no hub."""
+    """utils/setupdocs/ (plan 23): the mods index in docs/setup/README.md and this machine's model
+    inventory in data/state/setup/models/ (local). Needs no hub."""
     try:
         from utils import setupdocs
     except ImportError:
@@ -176,10 +177,10 @@ def cmd_docs(args: argparse.Namespace) -> int:
     problems = report.problems(strict=args.strict)
     for p in problems:
         print(f"aihub docs: {p}", file=sys.stderr)
-    if not args.strict:
-        gaps = len(report.uncovered) + len(report.unsourced) + len(report.uncovered_mods)
-        if gaps:
-            print(f"{gaps} coverage gap(s): models without an environment or a source, mods without a setup doc (--strict lists them)")
+    if not args.strict and report.uncovered_mods:
+        print(f"{len(report.uncovered_mods)} mod(s) without a setup doc: {', '.join(report.uncovered_mods)} (--strict fails on them)")
+    if not args.check and (report.uncovered or report.unsourced):
+        print(f"inventory notes: {len(report.uncovered)} model(s) no setup doc runs, {len(report.unsourced)} without a recorded source (data/state/setup/models/README.md)")
     if not problems and not report.written and not report.removed:
         print("setup docs are up to date")
     return 1 if problems else 0
@@ -508,9 +509,9 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--start", action="store_true", help="start it first if it isn't running")
     p.set_defaults(fn=cmd_check)
-    p = sub.add_parser("docs", help="regenerate the setup docs from the registry (docs/setup/models/, the index)")
-    p.add_argument("--check", action="store_true", help="write nothing; exit 1 if a doc is stale, missing or orphaned")
-    p.add_argument("--strict", action="store_true", help="also fail on coverage gaps: a model with no environment or no source, a mod with models and no setup doc")
+    p = sub.add_parser("docs", help="regenerate the mods index (docs/setup/README.md) and this machine's model inventory (data/state/setup/models/)")
+    p.add_argument("--check", action="store_true", help="write nothing; exit 1 if the mods index is stale or a setup doc doesn't parse")
+    p.add_argument("--strict", action="store_true", help="also fail when a mod has no setup doc")
     p.set_defaults(fn=cmd_docs)
     p = sub.add_parser("models", help="the models registry: list | show <id> | scan [--add] | verify <id>… | --all")
     p.add_argument("action", choices=["list", "show", "scan", "verify"])

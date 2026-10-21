@@ -114,4 +114,4 @@ aihub check <id>
 - **The hub refuses to start with a non-loopback `hub.host`.** By design: AIHub has no authentication and listens only on `127.0.0.1`.
 - **Never run `git clean -x` or `git clean -X` in the clone.** Ignored files include every model weight, venv and runtime.
 
-Next: the mods, in the order above. Each model you download has its own doc in [models/](models/).
+Next: the mods you want, in the order above. Each mod's setup doc says which models it can run; the choice is yours.

@@ -267,8 +267,9 @@ class GpuCfg(_Strict):
 
 
 class DocsCfg(_Strict):
-    """Plan 23.3: the setup docs follow the registry. Off: only `aihub docs` writes them."""
-    regenerate: bool = True
+    """Plan 23.3/23.6: the local model inventory (data/state/setup/models/) follows the registry.
+    Off (the default): only `aihub docs` writes it."""
+    regenerate: bool = False
 
 
 

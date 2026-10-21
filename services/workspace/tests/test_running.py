@@ -84,6 +84,7 @@ def test_run_in_the_sandbox(wc, proj):
 
 def test_exit_codes_cwd_and_timeout(wc, proj):
     assert post(wc, "/v1/run", folder="proj", command="exit 3").json()["exit_code"] == 3
+    assert post(wc, "/v1/run", folder="proj", command="true").json()["stdout"] == "(no output)"
     assert post(wc, "/v1/run", folder="proj", command="pwd", cwd="pkg").json()["stdout"].split("\n")[1] == str(proj / "pkg")
     t = post(wc, "/v1/run", folder="proj", command="sleep 20", timeout_s=1).json()
     assert t["state"] == "timeout" and t["exit_code"] is None

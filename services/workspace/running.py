@@ -35,6 +35,8 @@ def _text(r: Run, label: str) -> dict[str, Any]:
         out["stdout"] = untrusted(f"{label} stdout", r.stdout)
     if r.stderr:
         out["stderr"] = untrusted(f"{label} stderr", r.stderr)
+    if not r.stdout and not r.stderr and r.state == "done":
+        out["stdout"] = "(no output)"            # said, so the model doesn't go looking for it elsewhere
     if r.truncated:
         out["truncated"] = f"output cut to its last 32 KB; the whole run is at GET /api/s/workspace/v1/runs/{r.id}"
     if r.note:

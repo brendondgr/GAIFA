@@ -130,7 +130,11 @@ class Learner:
     def runs(self, limit: int = 30) -> list[dict[str, Any]]:
         d = self.dir / "runs"
         files = sorted(d.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:limit] if d.is_dir() else []
-        return [json.loads(f.read_text()) for f in files]
+        out = [json.loads(f.read_text()) for f in files]
+        for r in out:                       # a record left "running" by an older agent that stopped mid-run
+            if r.get("state") == "running" and r["id"] != (self.running or {}).get("id"):
+                r["state"] = r["stage"] = "interrupted"
+        return out
 
     def _write(self, rec: dict[str, Any]) -> None:
         (self.dir / "runs").mkdir(parents=True, exist_ok=True)
@@ -203,6 +207,8 @@ class Learner:
             log.exception("learner run")
             rec["state"], rec["error"] = "error", f"{type(e).__name__}: {e}"[:400]
         finally:
+            if rec["state"] == "running":       # stopped by something else (the agent shutting down mid-run)
+                rec["state"] = "interrupted"
             rec["ended"] = time.time()
             rec["stage"] = rec["state"]
             self._write(rec)

@@ -119,3 +119,18 @@ def test_eval_and_opted_out_chats_never_teach_it(env):
         st.append(tid, "tool_call", {"id": "c", "name": "gen3d_make_3d", "arguments": {"prompt": "fox"}})
         ids[name] = tid
     assert learner(env).chats("gen3d", 0) == [ids["real"]]
+
+
+async def test_a_run_stopped_from_outside_is_interrupted_not_running(env):
+    """Overnight 2026-10-21: a run cut off when the agent stopped (its coroutine closed, no exception the run
+    catches) was saved as "running" and the Learning page showed it running for good."""
+    seed_chat(env)
+    lr = learner(env)
+    coro = lr.run(["gen3d"])
+    script(env)
+    coro.send(None)                     # starts, then waits on the model
+    coro.close()                        # GeneratorExit: what a shutdown does to an unfinished run
+    assert [r["state"] for r in lr.runs()] == ["interrupted"]
+    old = dict(lr.runs()[0], id="old", state="running", stage="running")   # a record an older agent left behind
+    (lr.dir / "runs" / "old.json").write_text(json.dumps(old))
+    assert {r["id"]: r["state"] for r in lr.runs()}["old"] == "interrupted"

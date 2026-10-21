@@ -17,15 +17,25 @@ from containers import BACKUP_RE, CliRuntime
 from searx import Searx
 
 
-def _dead() -> str:
-    s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return f"http://127.0.0.1:{port}"
+@pytest.fixture
+def dead():
+    """URLs nothing answers on. Each port stays bound (not listening) until the test ends, so a
+    connection is always refused: closing it at once let another process take it before the probe."""
+    held: list[socket.socket] = []
+
+    def make() -> str:
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        held.append(s)
+        return f"http://127.0.0.1:{s.getsockname()[1]}"
+
+    yield make
+    for s in held:
+        s.close()
 
 
-async def test_detect_env_probe_and_container(fake, folder):
+async def test_detect_env_probe_and_container(fake, folder, dead):
+    _dead = dead
     rt = FakeRuntime(folder, fake)
     a = Searx(rt, env_url=fake.url + "/")
     assert (await a.detect())["found_by"] == "SEARXNG_URL" and a.url == fake.url

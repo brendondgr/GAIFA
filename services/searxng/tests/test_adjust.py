@@ -62,10 +62,12 @@ def test_json_format_on(client, folder, fake):
     (folder / "settings.yml").write_text(SETTINGS.replace("    - json\n", ""))
     fake.reload()
     assert client.get("/v1/settings").json()["settings"]["json"] is False
+    before = len(fake.queries)
     r = client.post("/v1/settings", json={"json_format": True})
     assert r.status_code == 200 and r.json()["changed"], r.text
     assert _doc(folder)["search"]["formats"] == ["html", "json"] and fake.json
-    assert fake.queries[-1]["format"] == "json"                                  # the check searched as JSON
+    # the change's check searched as JSON; the app's own watch loop may query (as HTML) in between
+    assert any(q["format"] == "json" for q in fake.queries[before:])
 
 
 def test_a_change_that_breaks_searxng_is_rolled_back(client, folder, fake, runtime):

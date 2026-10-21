@@ -56,10 +56,13 @@ async def test_timeline_and_stats(rig, serve):
     served = await _hub(rig, serve, "fake-ok")
     hub = served.hub
     async with httpx.AsyncClient(base_url=served.url) as c:
-        await c.post("/api/s/fake-ok/v1/jobs", json={"label": "fox", "seconds": 0.3})
+        # The job outlasts several status polls (0.3 s idle in tests), and the recorder must see it running
+        # before it ends: a job first seen already done has no measurable duration (p50_s would be 0).
+        await c.post("/api/s/fake-ok/v1/jobs", json={"label": "fox", "seconds": 1.5})
         await c.post("/api/s/fake-ok/v1/outputs", json={"text": "hello there"})
         await hub.activity.add("fake-ok had a hiccup", service="fake-ok", level="warn")
         await hub.activity.add("fake-ok broke", service="fake-ok", level="error")
+        await until(lambda: hub.db.fetchall_sync("SELECT * FROM job_history WHERE end_ts IS NULL"), timeout=10)
         rows = lambda: hub.db.fetchall_sync("SELECT * FROM job_history WHERE end_ts IS NOT NULL")  # noqa: E731
         await until(lambda: rows(), timeout=10)
         await until(lambda: hub.db.fetchall_sync("SELECT * FROM outputs"), timeout=10)

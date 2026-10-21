@@ -51,7 +51,7 @@ class Searx:
         self.changes: deque[dict[str, Any]] = deque(maxlen=50)
         self.busy = False
         self.lock = asyncio.Lock()
-        self._last_query_ts = 0.0
+        self._last_query_ts: float | None = None   # None: no test query yet, so the first round runs one
         self._read_cache: str | None = None      # settings.yml as last read
 
     # ---- detect ------------------------------------------------------------------------------
@@ -168,7 +168,7 @@ class Searx:
         await self.read_settings()
         if self.health["up"]:
             await self.read_engines()
-            if time.monotonic() - self._last_query_ts >= self.query_s:
+            if self._last_query_ts is None or time.monotonic() - self._last_query_ts >= self.query_s:
                 self._last_query_ts = time.monotonic()
                 await self.query()
         self.history.append({"ts": time.time(), "up": self.health["up"], "ms": self.health.get("ms"),

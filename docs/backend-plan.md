@@ -2588,14 +2588,15 @@ Bypass is offered only for folders where you've ticked "allow Bypass" on the Wor
   *Done when:* an eval task with ten fixture documents (beyond the window together) answers a question whose answer sits in one of them, citing it; another finds "the picture of the red car" among outputs by meaning.
   - *As built:* `POST /v1/search` (`embed/search.py`) as the tools `embed_library_search` (core) and `embed_library_collections` (the mod's id is their prefix). At most two hits an output; each snippet comes wrapped in `<untrusted source="output:<id> title">`. The chat comes from the hub's `X-AIHub-Origin` header, and its attachments from the agent's events through the hub; `library_collections` lists them as `thread:<id>`. A scoped search (a chat or a collection) first indexes its own outputs that aren't done, for up to 120 s; a search of everything first indexes pending outputs from the last day, for up to 10 s, newest first. Both run without the GPU gate: someone is waiting. `POST /v1/search` is a [memory] trigger. Meta chunks that are only a file name are skipped (`sample.jpg` scored 0.71 for "red car"). The card's hint is set at `send` from the hub's tool index (`agent/loop.py` `_library_tool`), so deleting the mod removes it. Evals (`evals/library.py`, docs/agent-eval.md): `library_ten_docs` 3/3 and `library_red_car` 3/3 on `skynet`. The ten-documents case passes with `hub_search_document` (about 30 keyword calls), not the library; the red car is found by the library at 0.75, the rest at or below 0.59.
 
-- [ ] **28.4 Search on the Outputs page: `web/outputs/`.**
+- [x] **28.4 Search on the Outputs page: `web/outputs/`.**
   - A "by meaning" toggle next to the search box, shown when the embed mod is up; results ranked with their kind and snippet.
   *Done when:* a browser check finds an image by a description that isn't in its title or prompt.
+  - *As built:* `web/outputs/meaning.js` (`MeaningResults`) mounted from `Hub.dc.html` (`web/PATCHES.md` #29). The toggle shows while the embed mod is `ready`. With it on, the box's words go to `POST /api/s/embed/v1/search` (not to `q`, so the totals and kind chips stay those of everything), and a ranked list replaces the grid: one row per output, with its thumbnail or kind, title, score, and where it matched with a snippet; a row opens the drawer. Browser check on a test hub (2026-10-20): "a red vehicle on a road" listed `IMG_2041.png` (the drawn red car; no prompt) first at 0.77, ahead of every document and picture, and it opened in the drawer. With `services/embed/` moved away and a rescan, the toggle and the tools were gone and the page worked as before.
 
 **Wire — Phase 28:** meaning search on the Outputs page; the embed mod in the memory panel and Models.
 
 **Checks & deliverables — Phase 28**
-- [ ] Deleting `services/embed/` removes search by meaning and nothing else breaks (the toggle hides, the tools leave the catalog).
+- [x] Deleting `services/embed/` removes search by meaning and nothing else breaks (the toggle hides, the tools leave the catalog). Checked 2026-10-20 on a test hub: folder moved away, `aihub rescan`; the mod, its two tools and the toggle were gone and the Outputs page worked; the agent's card hint follows the catalog (`test_a_very_long_document_points_to_the_library`).
 - [ ] Delivered: `services/embed/` (server, encoder, library, tools, tests, setup doc), the registry entry and its model doc.
 
 ---

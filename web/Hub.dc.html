@@ -680,8 +680,9 @@ button:disabled{cursor:not-allowed;opacity:.5}
           <div role="group" aria-label="Date range" style="display:inline-flex;padding:2px;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--sb,#0D1119)"><sc-for list="{{ out.ranges }}" as="x" hint-placeholder-count="4"><button onClick="{{ x.on }}" aria-pressed="{{ x.pressed }}" style="{{ x.st }}">{{ x.label }}</button></sc-for><sc-if value="{{ out.hasDays }}" hint-placeholder-val="{{ false }}"><button onClick="{{ out.clearDays }}" aria-pressed="true" aria-label="{{ out.daysAria }}" title="Clear the dragged date range" style="{{ out.daysSt }}">{{ out.daysLabel }} ✕</button></sc-if></div>
           <div style="display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--sb,#0D1119);flex:1 1 200px;max-width:340px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true" style="color:var(--mut,#8A94A6);flex:none"><path d="{{ ic.search }}"></path></svg>
-            <input ref="{{ out.searchRef }}" value="{{ out.q }}" onChange="{{ out.onQ }}" placeholder="Search titles and prompts" aria-label="Search outputs" style="flex:1;min-width:0;border:0;background:transparent;height:30px;font-size:13px;outline:none">
+            <input ref="{{ out.searchRef }}" value="{{ out.q }}" onChange="{{ out.onQ }}" placeholder="{{ out.qph }}" aria-label="Search outputs" style="flex:1;min-width:0;border:0;background:transparent;height:30px;font-size:13px;outline:none">
           </div>
+          <sc-if value="{{ out.canMeaning }}" hint-placeholder-val="{{ false }}"><button onClick="{{ out.toggleMeaning }}" aria-pressed="{{ out.meaningPressed }}" title="Find outputs by what they show or say, not by their names (the embed mod)" style="{{ out.meaningSt }}">By meaning</button></sc-if>
           <sc-if value="{{ out.hasF }}" hint-placeholder-val="{{ false }}"><button onClick="{{ out.clear }}" style="height:32px;padding:0 10px;border:0;background:transparent;color:var(--cy,#58C4DD);font-size:12.5px;cursor:pointer">Clear</button></sc-if>
           <sc-if value="{{ out.embedded }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px">{{ out.total }}</span></sc-if>
         </div>
@@ -698,6 +699,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
             <sc-if value="{{ out.hasF }}" hint-placeholder-val="{{ false }}"><button onClick="{{ out.clear }}" style="margin-top:4px;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">Clear filters</button></sc-if>
           </div>
         </sc-if>
+        <sc-if value="{{ out.showMeaning }}" hint-placeholder-val="{{ false }}">{{ out.meaningEl }}</sc-if>
         <sc-if value="{{ out.grid }}" hint-placeholder-val="{{ false }}">
           <div style="display:flex;flex-direction:column;gap:18px">
             <sc-for list="{{ out.groups }}" as="g" hint-placeholder-count="2">
@@ -1167,7 +1169,7 @@ class Component extends DCLogic {
     services: [], memory: null, jobs: [], activity: [], alerts: [], recent: [], system: null, unread: 0,
     svc: null,
     mdl: { loaded: false, list: [], totals: null, disk: null, kinds: [], service: '', status: '', q: '', discovered: null, scanning: false, drawer: null, edit: null },
-    out: { loaded: false, items: [], cursor: null, totals: null, loading: false, view: 'grid', kinds: [], services: [], range: 'all', days: null, q: '', fixed: null, detail: null, promptOpen: false, fresh: {} },
+    out: { loaded: false, items: [], cursor: null, totals: null, loading: false, view: 'grid', kinds: [], services: [], range: 'all', days: null, q: '', fixed: null, detail: null, promptOpen: false, fresh: {}, meaning: false },
     st: { orig: null, draft: null, sys: null, err: null, saving: false, restart: false, doc: null },
     audio: { key: null, playing: false, t: 0, dur: 0 },
     jopen: {}, speed: 1,
@@ -1192,9 +1194,10 @@ class Component extends DCLogic {
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
     this.pages = {}; this.modListeners = new Set();
     const imp = f => import(new URL(f, location.href).href);
-    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
-      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js')]);
+    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
+      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js'), imp('outputs/meaning.js')]);
     this.Viewer = viewer;  // plan 24.7: the text and PDF viewer in the Outputs drawer
+    this.Meaning = meaning;  // plan 28.4: "By meaning" search on the Outputs page (the embed mod)
     this.C = charts; this.V = views; this.D = dash;  // revision 2 chart kit (charts.js, views.js, dashboard.js)
     this.Chat = chat; this.ChatSettings = chatSettings; this.ChatAp = chatAp; this.Sess = sess; this.ApiTool = apiTool;  // plan 14.1: the Chat page, Settings → Agent, the Approvals popover (web/chat/)
     this.histTimer = setInterval(() => { if (!document.hidden && this.state.ready && !this.state.hubDown) this.loadHist(); }, 60000);
@@ -1721,7 +1724,7 @@ class Component extends DCLogic {
     if (!reset && o.cursor) f.cursor = o.cursor;
     const svc = o.fixed || o.services.join(','); if (svc) f.service = svc;
     if (o.kinds.length) f.kind = o.kinds.join(',');
-    if (o.q) f.q = o.q;
+    if (o.q && !o.meaning) f.q = o.q;  // plan 28.4: with By meaning on, the words go to the embed mod instead
     const now = Date.now() / 1000;
     if (o.range === 'days' && o.days) { const [a, b] = o.days.map(k => new Date(k + 'T00:00:00').getTime() / 1000); f.from = a; f.to = b + 86399.999; } else if (o.range === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); f.from = d / 1000; } else if (o.range === '7d') f.from = now - 7 * 86400; else if (o.range === '30d') f.from = now - 30 * 86400;
     this.upd('out', { loading: true });
@@ -2191,12 +2194,18 @@ class Component extends DCLogic {
     v.kindChips = OKINDS.filter(([k]) => t.by_kind[k] || o.kinds.includes(k)).map(([k, l]) => { const on = o.kinds.includes(k); return { label: l, count: fnum(t.by_kind[k] || 0), st: chipSt(on), pressed: on ? 'true' : 'false', on: () => this.setOut({ kinds: on ? o.kinds.filter(x => x !== k) : [...o.kinds, k] }) }; });
     v.svcChips = embedded ? [] : Object.keys(t.by_service).concat(o.services.filter(x => !(x in t.by_service))).map(id => { const on = o.services.includes(id); return { label: this.svcMap[id]?.name || id, count: fnum(t.by_service[id] || 0), st: chipSt(on), pressed: on ? 'true' : 'false', on: () => this.setOut({ services: on ? o.services.filter(x => x !== id) : [...o.services, id] }) }; });
     v.hasSvcChips = v.svcChips.length > 0;
-    v.q = o.q; v.onQ = e => { const q = e.target.value; this.upd('out', { q }); clearTimeout(this.qT); this.qT = setTimeout(() => this.fetchOutputs({ ...this.state.out, q }, true), 250); };
+    // plan 28.4: "By meaning" (the embed mod's library) instead of titles and prompts, while the mod runs
+    v.canMeaning = !embedded && !!this.Meaning && this.Meaning.canSearch(s.services); const mean = v.canMeaning && o.meaning;
+    v.meaningPressed = mean ? 'true' : 'false'; v.meaningSt = { ...chipSt(mean), height: 32 }; v.qph = mean ? 'Describe what you’re looking for' : 'Search titles and prompts';
+    v.toggleMeaning = () => { const o2 = { ...this.state.out, meaning: !o.meaning }; this.setState({ out: o2 }); if (o2.q) this.fetchOutputs(o2, true); this.searchRef.current?.focus?.(); };
+    v.showMeaning = mean && !!o.q.trim(); v.meaningEl = v.showMeaning ? React.createElement(this.Meaning.MeaningResults, { api: this.api, query: o.q, kinds: o.kinds, onOpen: id => this.openOutput(id) }) : null;
+    v.q = o.q; v.onQ = e => { const q = e.target.value; this.upd('out', { q }); clearTimeout(this.qT); if (!mean) this.qT = setTimeout(() => this.fetchOutputs({ ...this.state.out, q }, true), 250); };
     v.searchRef = this.searchRef;
     const hasF = o.kinds.length || o.services.length || o.q || o.range !== 'all';
     v.empty = o.loaded && !o.items.length && !o.loading; v.emptyTitle = hasF ? 'No outputs match these filters' : 'No outputs yet'; v.emptyBody = hasF ? 'Try a wider date range or clear the filters.' : 'Anything a service produces lands here — clips, images, videos and 3D models.';
     v.hasF = !!hasF; v.clear = () => this.setOut({ kinds: [], services: [], q: '', range: 'all', days: null });
-    v.grid = o.loaded && o.view === 'grid' && o.items.length > 0; v.list = o.loaded && o.view === 'list' && o.items.length > 0;
+    v.grid = o.loaded && o.view === 'grid' && o.items.length > 0 && !v.showMeaning; v.list = o.loaded && o.view === 'list' && o.items.length > 0 && !v.showMeaning;
+    if (v.showMeaning) v.empty = false;
     if (v.grid) {
       const groups = []; let cur = null;
       o.items.forEach(x => { const l = fday(x.created_ts); if (!cur || cur.label !== l) { cur = { label: l, items: [] }; groups.push(cur); } cur.items.push(this.cardVM(x, o.fresh[x.id])); });
@@ -2204,8 +2213,8 @@ class Component extends DCLogic {
     }
     if (v.list) v.rows = o.items.map(x => { const sv = this.svcMap[x.id]; return { title: x.title, kind: (OKINDS.find(k => k[0] === x.kind) || [, x.kind])[1], svc: this.svcMap[x.service]?.name || x.service, when: `${fday(x.created_ts)} ${fhm(x.created_ts)}`, size: fb(x.size_bytes), thumbSt: { display: 'block', width: '100%', height: '100%', background: `url("${x.preview || ''}") center / cover` }, hasThumb: !!x.preview, noThumb: !x.preview, d: x.kind === 'audio' ? ICON.wave : x.kind === 'video' ? ICON.video : ICON.file, open: () => this.openOutput(x.id), onKey: e => { if (e.key === 'Enter') this.openOutput(x.id); }, rst: { cursor: 'pointer', background: o.fresh[x.id] ? 'var(--tacc,rgba(255,178,36,.13))' : 'transparent' }, td: dn.td, tdm: { ...dn.td, fontFamily: MONO, fontSize: 12, color: 'var(--mut,#8A94A6)', whiteSpace: 'nowrap' } }; });
     v.th = dn.th;
-    v.more = !!o.cursor; v.moreLabel = o.loading ? 'Loading…' : 'Load more'; v.loadMore = () => this.fetchOutputs(this.state.out, false); v.busy = o.loading;
-    v.shown = o.loaded ? `Showing ${fnum(o.items.length)} of ${fnum(t.count)}` : '';
+    v.more = !!o.cursor && !v.showMeaning; v.moreLabel = o.loading ? 'Loading…' : 'Load more'; v.loadMore = () => this.fetchOutputs(this.state.out, false); v.busy = o.loading;
+    v.shown = o.loaded && !v.showMeaning ? `Showing ${fnum(o.items.length)} of ${fnum(t.count)}` : '';
     // detail drawer
     const d = o.detail;
     if (d) {

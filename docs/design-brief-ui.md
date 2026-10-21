@@ -233,7 +233,7 @@ The real backend indexes `outputs/<service>/<YYYY-MM-DD>/…`. This page is the 
   - grid/list toggle
   - filter chips by kind (Audio, Image, Video, 3D, Text, Other) and by service, with counts
   - date range: Today / 7 days / 30 days / All / custom
-  - search over title and prompt
+  - search over title and prompt, and, while the `embed` mod runs, a **By meaning** toggle beside it (plan 28.4; `web/outputs/meaning.js`): the words describe what to find and go to the mod's `POST /v1/search`; the grid gives way to a ranked list, one row per output, with its thumbnail or kind, title, score, and where it matched (page and line, seconds) with a snippet; a row opens the drawer. The kind chips filter the list.
   - a total line: "412 items · 3.8 GB"
 - **Grid**: grouped by day with sticky day headers. Infinite scroll with cursor paging (60 per page).
   - `OutputCard` previews: images show a thumbnail; audio shows a waveform-style bar with an inline play button; 3D shows `preview.png` with a "3D" badge; video shows a poster with duration; text shows the first lines.

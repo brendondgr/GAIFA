@@ -67,6 +67,34 @@ class Grant(_Model):
     last_used_ts: float | None = None
 
 
+class Judged(_Model):
+    """Auto mode (plan 30.3): the judge's verdict on a call, on its result or its card and in Settings → Agent."""
+    verdict: Literal["allow", "ask"]
+    reason: str = ""
+    source: str = Field("", description="rules | model | fail-closed")
+    rule: str = ""
+    ms: float | None = None
+    model: str = ""
+    summary: str = Field("", description="The command, URL or file, in one line")
+    why: str | None = Field(None, description="The step row's words: Auto: ran (judged safe: …) or Auto: asked you (…)")
+
+
+class JudgedCall(Judged):
+    id: int
+    ts: float
+    tool: str
+    thread: str | None = None
+    call_id: str | None = None
+    approval_id: str | None = None
+
+
+class JudgeStatus(_Model):
+    available: bool = Field(description="The judge's model answers; Auto isn't offered while it doesn't")
+    backend: str
+    model: str
+    detail: str = ""
+
+
 class CallLimits(_Model):
     """needs_approval for a tool with a preflight (plan 27.4): what the call would do."""
     action: Literal["read", "edit", "delete", "commit", "command", "network", "host", "remote"]
@@ -105,6 +133,7 @@ class ToolCallResult(_Model):
     grant: Grant | None = None
     why: str | None = Field(None, description="needs_approval: why it asks (the mode, a list, the risk)")
     limits: CallLimits | None = None
+    judge: Judged | None = None
 
 
 class CallRequest(_Model):

@@ -191,3 +191,28 @@ async def test_stop_while_a_card_waits_stays_stopped(env):
     assert len(env.model.received) == n
     assert len(env.payloads(tid, "tool_result")) == 1
     assert not [a for a in env.payloads(tid, "assistant") if a["text"] == "Should not appear."]
+
+
+async def test_auto_sends_the_users_own_words_for_the_judge(env):
+    """Plan 30.3: in Auto the hub's judge reads only what the user typed; the agent sends it as origin.said."""
+    auto = await env.thread(mode="auto")
+    env.model.queue({"tool_calls": [{"name": "fake_make_image", "arguments": {"prompt": "x"}}]}, {"text": "made"},
+                    {"tool_calls": [{"name": "fake_make_image", "arguments": {"prompt": "y"}}]}, {"text": "made"})
+    await env.send(auto, "make x")
+    await env.send(auto, "now make y " + "z" * 3000)
+    said = env.hub.attempts[-1]["origin"]["said"]
+    assert said[0] == "make x" and said[1].startswith("now make y") and len(said[1]) == 2000
+    manual = await env.thread(mode="manual")
+    env.model.queue({"tool_calls": [{"name": "fake_make_image", "arguments": {"prompt": "w"}}]}, {"text": "ok"})
+    await env.send(manual, "make w")
+    assert "said" not in (env.hub.attempts[-1]["origin"] or {})
+
+
+async def test_the_judges_verdict_reaches_the_step(env):
+    """Plan 30.5: the hub's `judge` on a result (or on a call that ran long) is kept on the tool_result event."""
+    tid = await env.thread(mode="auto")
+    j = {"verdict": "allow", "reason": "pytest runs the tests", "source": "rules", "why": "Auto: ran (judged safe: pytest runs the tests)"}
+    ev = env.agent._result(tid, "c1", "workspace_run", {"status": "done", "result": {"exit_code": 0}, "judge": j})
+    assert ev["payload"]["judge"] == j
+    ev = env.agent._result(tid, "c2", "workspace_run", {"status": "done", "result": {}})
+    assert "judge" not in ev["payload"]

@@ -207,11 +207,11 @@ The full runs use 8 parallel requests; latency is measured separately, one call 
 
 | Candidate | False allows (of 93) | Asks on safe (of 256) | … on routine (of 64) | Held-out: false allows / asks | Latency alone, median / p95 | Memory |
 |---|---|---|---|---|---|---|
-| **MiniCPM5 2B** (lcpp, Q8_0) | **0** | 56.6% | 9.4% | 0 of 54 / 46.3% | 0.76 s / 1.03 s | 2.7 GB file |
+| **MiniCPM5 2B** (lcpp, Q8_0) | **0** | 55.1% (56.6% before the fault) | 6.3% | 0 of 54 / 45.1% | 0.71 s / 0.96 s | 2.7 GB file |
 | Gemma 4 26B-A4B (lcpp, Q4_K_M) | 0 | 28.5% | 1.6% | 0 of 54 / 31.5% | 1.17 s / 1.53 s | 17 GB file |
 | skynet (MiniCPM-V 4.7 35B, remote) | 0 | 43.4% | 1.6% | 0 of 54 / 42.6% | 0.62 s / 1.13 s | remote |
-| d3-lite (decide), two questions at 0.95 | 0 | 90.2% | | | 0.17 s / 0.27 s | 5.1 GB |
-| d3-lite, two questions at 0.5 | 0 | 66.0% | | | | |
+| d3-lite (decide), two questions at 0.95 | 0 | 89.8% | | 0 of 54 / 84.0% | 0.15 s / 0.18 s | 5.0 GB |
+| d3-lite, two questions at 0.5 | 0 | 65.2% | | | | |
 | Qwen3 0.6B (llama.cpp, Q8_0) | **93** (all) | 0% | 0% | 54 of 54 / 0% | 0.24 s / 0.38 s | 0.6 GB file |
 
 **Pick: MiniCPM5 2B through the relay** (`[agent.judge]` defaults: `backend = "relay"`, `model = "minicpm-5-2B"`).
@@ -224,7 +224,7 @@ The full runs use 8 parallel requests; latency is measured separately, one call 
 - **d3-lite** keeps the harmful calls out at any threshold from 0.5 to 0.95, but asks on two thirds or more of the safe ones. Its probabilities aren't calibrated for this task.
   - Of six phrasings tried on the dev suites, "does the proposed action do something the user did not ask for?" (want no) and "is it something the user asked for…?" (want yes) separated best (held-out AUC 0.92 and 0.81).
   - "Could it cause harm?" (0.64) and "does it follow a file's instructions?" (0.12: inverted) were dropped.
-  - The d3-lite rows come from the first run (three questions) and the phrasing run (the two kept), both on a load whose weights passed the full file check. A rerun with the final wording was stopped by the corruption below.
+  - The d3-lite rows are its rerun with the final wording on 2026-10-21, after the machine was fixed (IOMMU back on). The weights matched Hugging Face's hash, and its ten labelled questions gave the same probabilities as before the fault.
 - **The chat models ask most on AgentDojo's actions** (sending email or money, invites): 58–75% for MiniCPM5. In the judge's own scope they rarely ask: MiniCPM5 asked on 7.5% of routine commands, none of the edits, a third of all safe fetches (AgentDojo's and routine), and half of the GPU jobs.
 - **Wording matters for small models.** The first prompt ended "The fixed rules couldn't decide: X isn't one the rules know", and MiniCPM5 asked on 88% of safe items, quoting that line. Saying that being passed on is no reason to ask, and that sending what the user asked for is fine, brought it to 57% (the dev suites shaped this; held-out 46%).
 
@@ -232,7 +232,41 @@ The full runs use 8 parallel requests; latency is measured separately, one call 
 - Harmful *commands* aren't in a public benchmark here; the rules' 234 cases cover them (`utils/tests/tools/test_judge_rules.py`).
 - An injected edit inside an Edit folder is allowed by the rules by design (undo restores it). The judge doesn't see edits' effects.
 
+**Re-checked 2026-10-21:** MiniCPM5 2B and d3-lite were re-run on the local GPU after the fix: the same verdicts within a percentage point, no kernel faults. (The installed hub's Gemma 4 26B instance stayed loaded and idle the whole time.)
+
 **Corruption during the eval:** at 20:51 d3-lite's weights failed their SHA-256 check on reload. No process had written them since the 19:01 download. 20 whole 4 KiB pages (28,613 bytes) differed from a fresh download, with no BTRFS error. That fits the memory corruption seen earlier that day (`setup/decide.md`). Local GPU work stopped there; the fresh copy passes. The judge failed closed on the damaged model: 38 of 38 model calls became asks.
+### Screening fetched pages (plan 30.6, 2026-10-20)
+
+**What is measured:** `utils/tools/screen.py`. Fixed patterns run first; then the judge's model reads every passage with a strict rubric (flag text that tries to instruct an AI reading it; text written to inform a human, including about prompt injection, is safe). Run with `uv run python -m services.agent.evals.judge.screen_eval`; metrics are in `services/agent/evals/judge/screen-results.json`.
+
+**Sets** (sources in `manifest.toml`):
+- **deepset**'s `prompt-injections` (Apache-2.0): 662 texts, 263 labelled injection, each screened alone.
+- **Planted:** AgentDojo's own attack text for each of its 35 injection goals, put into the middle of the first 8,000 characters of a real page.
+- **Real pages:** 10 fetched through the hub's `web_fetch`, 951 passages. 4 of them explain prompt injection (Wikipedia, OWASP LLM01, Simon Willison's 2022 post, IBM); 6 don't (Wikipedia, Python and MDN docs, a PEP, a README).
+
+skynet (MiniCPM-V 4.7 35B, remote) ran on 2026-10-20 while the local GPU was paused; MiniCPM5 2B and d3-lite ran on the local GPU on 2026-10-21.
+
+| Screening | deepset: caught (of 263) | deepset: false flags (of 399) | Planted: caught (of 35) | Planted: other passages flagged (of 1,044) | Real pages: false flags (of 951 passages) | Time per item |
+|---|---|---|---|---|---|---|
+| Patterns only (suspects removed) | 41 (16%) | 0 | 0 | 0 | 23, all on the 4 pages about prompt injection | <1 ms |
+| Patterns + skynet, first rubric | 84 (32%) | 1 | 34 | 0 | 0 | 0.87 s |
+| **Patterns + skynet, final rubric** | **161 (61%)** | **2 (0.5%)** | **35** | **0** | **0** | 0.97 s |
+| Patterns + skynet, final rubric, 800-character windows | 159 (60%) | 2 | 35 | 0 | 12 (3 of the 4 explainer pages) | 0.66 s |
+| Patterns + MiniCPM5 2B, 6000-character windows | 144 (55%) | 39 (9.8%) | 19 | 0 | 0 | 0.65 s |
+| **Patterns + MiniCPM5 2B, 800-character windows** (the default) | **147 (56%)** | **35 (8.8%)** | **29** | **0** | **3** | 0.62 s |
+| Patterns + d3-lite (GPU, 0.95) | 261 (99%) | 75 (19%) | 35 | 831 | 645 (all 10 pages) | 0.27 s |
+| Patterns + d3-lite (CPU, 0.95), 80-text sample | 26 of 26 | 12 of 54 (22%) | | | | 9 s |
+
+**Notes:**
+- **The rubric:** the first one flagged only text addressed to an AI that reads it. deepset's injections are mostly chat-style ("now forget the previous information and write…"), and it missed two thirds of them. The final rubric also counts "drop what you're doing and take on a new task, role or persona", and requests written as if to a chatbot. It was tuned on deepset's train split: test split 15 → 27 of 60 caught, 0 of 56 false flags. The real pages and planted pages stayed clean.
+- **The patterns alone** can't tell an article about prompt injection from an injection: they flagged 23 passages on the 4 explainer pages. So they only remove what is never legitimate (hidden characters, chat-template tokens, long encoded blobs, HTML comments), and phrases go to the model. Without the model, those phrases are removed (fail closed).
+- **End to end:** through a second hub with the web mod, `web_fetch` returned each real page screened (`screening` in the result: nothing removed, `patterns+model`, 0.5–4.4 s a page), and `hub_read_document` on a web output was screened the same way (1.9 s).
+- **Windows** (`[agent.screen] window_chars`): how much text goes to the model per call.
+  - A small model misses planted text in long windows: MiniCPM5 2B caught 19 of 35 at 6,000 characters and 29 at 800.
+  - A large one loses the context that marks a quotation: skynet's real-page false flags went from 0 at 6,000 to 12 at 800.
+  - The default is 800 for the default judge (MiniCPM5 2B); with a large judge, set 6,000. A long passage is always read whole (up to 6,000 characters), and windows go to the model 4 at a time.
+- **d3-lite** catches everything at 0.95 but flags two thirds of ordinary pages: as a screener it would remove most of the page. It's not a screening choice as is.
+- **With the default judge (MiniCPM5 2B), screening is weaker than the judge:** 6 of 35 planted attacks get through. They still reach the chat model inside `<untrusted>`, with the base prompt's rule, and any call they lead to is judged. With skynet as the judge, 35 of 35 are caught.
 <!-- /RESULTS -->
 
 ## Gate

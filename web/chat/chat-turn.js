@@ -134,3 +134,10 @@ function status(turn, rows) {
   if (th) return { kind: 'thinking', row: th };
   return { kind: 'working' };
 }
+
+/** The Auto judge's verdict on a tool step (plan 30.5): on its result, its running call or its card; null if not judged. */
+export function judgeOf(it) {
+  const j = it?.result?.judge || it?.run?.judge || it?.approval?.judge || null;
+  if (!j) return null;
+  return { ...j, why: j.why || (j.verdict === 'allow' ? `Auto: ran (judged safe: ${j.reason})` : `Auto: asked you (${j.reason})`) };
+}

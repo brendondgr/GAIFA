@@ -25,7 +25,7 @@ export const METHOD_AREA = {
   getActivityStats: 'metrics', getJobStats: 'metrics',
   listWidgets: 'widgets', getWidget: 'widgets',
   listTools: 'tools', getToolIndex: 'tools', callTool: 'tools', getToolCall: 'tools', cancelToolCall: 'tools',
-  listApprovals: 'tools', getApproval: 'tools', decideApproval: 'tools', listGrants: 'tools', revokeGrant: 'tools',
+  listApprovals: 'tools', getApproval: 'tools', decideApproval: 'tools', listGrants: 'tools', revokeGrant: 'tools', listJudged: 'tools', getJudgeStatus: 'tools',
   listSessions: 'sessions', saveSession: 'sessions', renameSession: 'sessions', deleteSession: 'sessions',
   restoreSession: 'sessions', getSessionState: 'sessions',
 };
@@ -188,6 +188,8 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     decideApproval: (id, { approve, args, reason, remember, confirm, wait } = {}) => req('POST', `/api/approvals/${enc(id)}${qs({ wait })}`, { json: { approve, arguments: args, reason, remember, confirm } }),
     listGrants: ({ thread, tool } = {}) => req('GET', `/api/grants${qs({ thread, tool })}`),
     revokeGrant: id => req('DELETE', `/api/grants/${enc(id)}`),
+    listJudged: ({ thread, limit } = {}) => req('GET', `/api/judge/recent${qs({ thread, limit })}`),   // plan 30.3, 30.5
+    getJudgeStatus: () => req('GET', '/api/judge/status'),
     listSessions: () => req('GET', '/api/sessions'),
     saveSession: name => req('POST', '/api/sessions', { json: { name } }),
     renameSession: (id, name) => req('PUT', `/api/sessions/${enc(id)}`, { json: { name } }),

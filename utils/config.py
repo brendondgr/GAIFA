@@ -127,9 +127,20 @@ class JudgeCfg(_Strict):
     timeout_s: float = Field(3.0, gt=0)     # slower → ask
 
 
+class ScreenCfg(_Strict):
+    """Screening text for instructions aimed at an AI before the chat model reads it (plan 30.6, `utils/tools/screen.py`),
+    with the judge's model. Pages are screened; your own documents and transcripts only when turned on."""
+    pages: bool = True
+    documents: bool = False
+    transcripts: bool = False
+    timeout_s: float = Field(30.0, gt=0)
+    window_chars: int = Field(800, ge=200, le=20000)   # passages per model call: 800 for a small judge (MiniCPM5 2B), 6000 for a large one
+
+
 class AgentCfg(_Strict):
     permissions: PermissionsCfg = PermissionsCfg()
     judge: JudgeCfg = JudgeCfg()
+    screen: ScreenCfg = ScreenCfg()
     make_room: bool = True          # tool calls unload idle mods when a model needs room
     approval_ttl_h: float = Field(24, gt=0)
 

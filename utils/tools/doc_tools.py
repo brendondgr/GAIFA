@@ -74,7 +74,12 @@ async def read_document(hub: Hub, args: dict[str, Any]) -> str:
             limit //= 2
     except OutputError as e:
         raise ToolError(e.code, e.detail, "read by offset, or give pages within the document") from None
+    from utils.tools.screen import kind_of, screen_for
+
     start, end = w["offset"], w["offset"] + len(w["text"])
+    screened = await screen_for(hub.config, w["text"], kind_of(o))     # plan 30.6: same lines, so citations hold
+    if screened is not None:
+        w = {**w, "text": screened.text, "notes": list(w["notes"]) + ([screened.note()] if screened.note() else [])}
     where = f"characters {start:,}–{end:,} of {w['total_chars']:,}"
     if w["pages"]:
         last = ex.page_of(max(start, end - 1))

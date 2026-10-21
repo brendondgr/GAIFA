@@ -109,6 +109,8 @@ def score(rows: list[dict], threshold: float = 0.95) -> dict:
 def summary() -> None:
     out = {}
     for f in sorted(RESULTS.glob("*.jsonl")):
+        if f.name.startswith("screen-"):                # screen_eval's rows (plan 30.6) live here too
+            continue
         rows = [json.loads(line) for line in f.read_text().splitlines()]
         out[f.stem] = score(rows)
     SUMMARY.write_text(json.dumps(out, indent=1) + "\n")

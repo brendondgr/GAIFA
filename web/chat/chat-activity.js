@@ -10,6 +10,7 @@ import { Card, ProgressBar, hasCard, cardFor } from './chat-cards.js';
 import { renderMarkdown } from './chat-md.js';
 import { stepText, stepSentence, errorText } from './chat-steps.js';
 import { OutputStrip } from './chat-results.js';
+import { judgeOf } from './chat-turn.js';
 
 const R = () => globalThis.React;
 
@@ -136,6 +137,7 @@ function ToolRow({ row, ctx, open, onToggle }) {
   const label = failed ? 'Tried ' + r0.charAt(0).toLowerCase() + r0.slice(1) : w.label;
   const detail = failed ? errorText(row.item.result).text : w.detail;
   const Detail = hasCard('step:' + row.name) ? cardFor({ kind: 'step', call: row.item.call }) : StepDetail;
+  const judged = judgeOf(row.item);
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 } },
     h('button', { type: 'button', className: 'aichat-row', onClick: onToggle, 'aria-expanded': open ? 'true' : 'false', style: rowBtn },
       h(Mark, { status: row.status }),
@@ -147,6 +149,9 @@ function ToolRow({ row, ctx, open, onToggle }) {
       it_by(row) ? h(Badge, { tone: 'cyan', title: 'Started by a button, not by the model' }, 'you') : null,
       h(Chev, { open })),
     row.status === 'running' && !row.lookup ? h('div', { style: { padding: '0 0 2px 21px' } }, h(ProgressBar, { value: pct, note: row.progress?.note })) : null,
+    judged ? h('div', { title: judged.source === 'rules' ? 'Decided by the fixed rules' : judged.source === 'model' ? `Decided by the judge's model (${judged.model}, ${Math.round(judged.ms || 0)} ms)` : 'The judge failed, so it asked',
+      'aria-label': judged.why, style: { display: 'flex', alignItems: 'baseline', gap: 5, padding: '0 0 2px 21px', fontSize: 11.5, color: judged.verdict === 'allow' ? T.mut : T.pu, minWidth: 0 } },
+      h('span', { style: { display: 'flex', alignSelf: 'center', flex: 'none' } }, h(Icon, { d: 'shield', size: 11 })), h('span', { style: { minWidth: 0, overflowWrap: 'anywhere' } }, judged.why)) : null,
     open ? h('div', { style: { padding: '2px 0 6px 21px' } }, h(Detail, { row, item: row.item, ctx })) : null);
 }
 const it_by = row => row.item.call?.by === 'user';

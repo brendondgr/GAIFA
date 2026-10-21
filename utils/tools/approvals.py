@@ -137,9 +137,19 @@ def _granted(grant: dict[str, Any]) -> str:
 
 
 async def judge(hub: Any, tool: Any, arguments: dict[str, Any], origin: dict[str, Any] | None,
-                limits: dict[str, Any] | None, why: str) -> tuple[str, str]:
-    """Auto mode's judge (plan Phase 30 replaces this): ("allow" | "ask", why). Fails closed."""
-    return "ask", "Auto: no judge yet, so it asks"
+                limits: dict[str, Any] | None, why: str) -> tuple[str, str, dict[str, Any]]:
+    """Auto mode's judge (plan 30.3, `utils/tools/judge.py`): ("allow" | "ask", why, record). Never "deny"; fails
+    closed (anything unexpected asks)."""
+    from utils.tools.judge import judge_call
+
+    try:
+        j = await judge_call(hub.config, tool.name, arguments, origin, limits)
+    except Exception as e:  # noqa: BLE001: the judge never breaks a call; it asks
+        return "ask", f"Auto: asked you (the judge failed: {type(e).__name__})", {"verdict": "ask", "source": "fail-closed"}
+    verdict = "allow" if j.verdict == "allow" else "ask"
+    record = {"verdict": verdict, "reason": j.reason, "source": j.source, "rule": j.rule, "ms": j.ms, "model": j.model,
+              "summary": j.detail.get("summary", "")}
+    return verdict, (f"Auto: ran (judged safe: {j.reason})" if verdict == "allow" else f"Auto: asked you ({j.reason})"), record
 
 
 def _row(r: dict[str, Any] | None) -> dict[str, Any] | None:

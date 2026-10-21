@@ -9,7 +9,7 @@ export const MODES = [
   ['plan', 'Plan', 'Reads and explains; edits, commands and anything that changes something are refused'],
   ['manual', 'Manual', 'Everything that changes something asks first: edits show their diff, commands their command'],
   ['accept_edits', 'Accept edits', 'Edits and generations apply without asking (undo per turn); commands, the internet and deletes ask'],
-  ['auto', 'Auto', 'As Accept edits; commands ask until the judge (plan Phase 30) can decide them'],
+  ['auto', 'Auto', 'As Accept edits; a small local judge decides commands, fetches and deletes: it runs what you asked for, and asks when unsure'],
   ['bypass', 'Bypass', 'Edits and commands in the sandbox run without asking, only in folders that allow Bypass; your machine still asks']];
 const OLD_MODES = { ask: 'manual', read_only: 'plan' };
 export const modeOf = m => { const k = OLD_MODES[m] || m; return MODES.some(x => x[0] === k) ? k : 'manual'; };
@@ -28,10 +28,17 @@ export function ModelSelect({ models, value, onChange }) {
     list.map(m => h('option', { key: m.id, value: m.id }, modelLabel(m) + (m.id === models.default ? ' (default)' : ''))));
 }
 // bypass: offer Bypass (every workspace folder this chat uses allows it); a chat already in Bypass keeps it listed.
-export function ModeSelect({ value, onChange, bypass = false }) {
-  const cur = modeOf(value);
-  return h('select', { value: cur, onChange: e => onChange(e.target.value), 'aria-label': 'Mode', title: MODES.find(m => m[0] === cur)?.[2], style: selSt },
-    MODES.filter(([k]) => k !== 'bypass' || bypass || cur === 'bypass').map(([k, l]) => h('option', { key: k, value: k }, l)));
+// judge (plan 30.5): GET /api/judge/status; while its model doesn't answer, Auto is offered disabled with the reason
+// (a chat already in Auto keeps it: its calls ask until the judge is back).
+export function ModeSelect({ value, onChange, bypass = false, judge = null }) {
+  const cur = modeOf(value), down = judge && !judge.available;
+  const label = (k, l) => (k === 'auto' && down ? l + ' (judge unavailable)' : l);
+  const title = cur === 'auto' && down ? `The judge's model doesn't answer (${judge.detail || judge.model}): calls ask until it's back`
+    : MODES.find(m => m[0] === cur)?.[2];
+  return h('select', { value: cur, onChange: e => onChange(e.target.value), 'aria-label': 'Mode', title, style: selSt },
+    MODES.filter(([k]) => k !== 'bypass' || bypass || cur === 'bypass').map(([k, l]) => h('option', {
+      key: k, value: k, disabled: k === 'auto' && down && cur !== 'auto',
+      title: k === 'auto' && down ? `Not available: ${judge.detail || "the judge's model doesn't answer"}` : undefined }, label(k, l))));
 }
 
 /** Bypass is offered when the workspace folders this chat has used all allow it (or, before it used any, one does). */
@@ -84,10 +91,10 @@ function Title({ title, onRename }) {
   title || 'New chat');
 }
 
-export function ThreadHeader({ thread, models, model, mode, bypass, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn }) {
+export function ThreadHeader({ thread, models, model, mode, bypass, judge, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn }) {
   const React = R(), [more, setMore] = React.useState(false);
   const st = running ? ['running', T.acc] : state === 'waiting' ? ['waiting for you', T.pu] : null;
-  const controls = [h(ModelSelect, { key: 'm', models, value: model, onChange: onModel }), h(ModeSelect, { key: 'a', value: mode, onChange: onMode, bypass })];
+  const controls = [h(ModelSelect, { key: 'm', models, value: model, onChange: onModel }), h(ModeSelect, { key: 'a', value: mode, onChange: onMode, bypass, judge })];
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, height: 44, padding: '0 12px', borderBottom: '1px solid ' + T.bd, background: T.bg, flex: 'none', minWidth: 0 } },
     onMenu ? h(Btn, { kind: 'ghost', sm: true, icon: 'menu', title: 'Chats', onClick: onMenu }) : null,
     h(Title, { title: thread?.title, onRename: thread ? onRename : null }),

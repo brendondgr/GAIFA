@@ -63,6 +63,11 @@ def _isolated(tmp_path_factory, monkeypatch):
     (scratch / "services").mkdir()
     monkeypatch.setenv("AIHUB_ROOT", str(scratch))
     monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:1")
+    from utils.tools import judge as judge_mod      # the judge and screening never reach the real relay
+
+    real = judge_mod.config_from
+    monkeypatch.setattr(judge_mod, "config_from", lambda cfg: judge_mod.JudgeConfig(
+        **{**real(cfg).__dict__, "url": "http://127.0.0.1:1"}))
 
 
 @pytest.fixture

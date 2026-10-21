@@ -18,7 +18,7 @@ NEEDS = {"read": "read", "edit": "edit", "delete": "edit", "commit": "edit", "co
 TABLE = {  # action: plan, manual, accept_edits, auto, bypass
     "read":    ("run", "run", "run", "run", "run"),
     "edit":    ("refused", "ask", "run", "run", "run"),
-    "command": ("refused", "ask", "ask", "ask", "run"),       # auto: the judge decides; until Phase 30 it asks
+    "command": ("refused", "ask", "ask", "ask", "run"),       # auto: the judge decides (no model in tests: it asks)
     "network": ("refused", "ask", "ask", "ask", "run"),
     "host":    ("refused", "ask", "ask", "ask", "ask"),
 }
@@ -157,19 +157,21 @@ async def test_the_judges_seam(wh, monkeypatch):
 
     async def fake_judge(hub, tool, arguments, origin, limits, why):
         seen.update(tool=tool.name, action=limits["action"], why=why)
-        return "allow", "judged safe: a test runner"
+        return "allow", "Auto: ran (judged safe: a test runner)", {"verdict": "allow", "reason": "a test runner"}
 
     monkeypatch.setattr(approvals, "judge", fake_judge)
     monkeypatch.setattr("utils.tools.calls.judge", fake_judge)
     r = await wh.call("fake_ws_run", {"folder": "run", "command": "pytest"}, mode="auto")
     assert r["status"] == "done" and seen == {"tool": "fake_ws_run", "action": "command", "why": "Auto: the judge decides"}
+    assert r["judge"]["why"] == "Auto: ran (judged safe: a test runner)"
     seen.clear()
     r = await wh.call("fake_ws_run", {"folder": "run", "command": "make", "where": "host"}, mode="auto")
     assert r["status"] == "needs_approval" and seen == {}                  # host runs never reach the judge
 
 
 async def test_the_judge_fails_closed_by_default(wh):
-    assert await approvals.judge(None, None, {}, None, None, "") == ("ask", "Auto: no judge yet, so it asks")
+    verdict, why, record = await approvals.judge(None, None, {}, None, None, "")     # no hub: it can't judge, so it asks
+    assert verdict == "ask" and why.startswith("Auto: asked you (the judge failed") and record["source"] == "fail-closed"
 
 
 async def test_a_preflight_that_fails_refuses(wh):

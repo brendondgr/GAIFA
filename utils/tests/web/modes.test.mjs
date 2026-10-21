@@ -114,3 +114,39 @@ test('multi-line text arguments stay whole on the card (an edit\'s old and new)'
   assert.equal(boxes.length, 1);
   assert.equal(boxes[0].props.value, 'def f():\n    return 1');
 });
+
+// Plan 30.5: Auto isn't offered while the judge's model doesn't answer; a judged step says why it ran or asked;
+// Settings → Agent lists judged calls.
+test('Auto is disabled with the reason while the judge is unavailable', () => {
+  const down = { available: false, backend: 'relay', model: 'minicpm-5-2B', detail: "the relay doesn't list minicpm-5-2B" };
+  const opts = el => all(expand(el), n => n.type === 'option');
+  const auto = opts(header.ModeSelect({ value: 'manual', onChange() {}, judge: down })).find(o => o.props.value === 'auto');
+  assert.equal(auto.props.disabled, true);
+  assert.match(text(auto), /judge unavailable/);
+  assert.match(auto.props.title, /doesn't list minicpm-5-2B/);
+  const up = opts(header.ModeSelect({ value: 'manual', onChange() {}, judge: { ...down, available: true } })).find(o => o.props.value === 'auto');
+  assert.equal(up.props.disabled, false);
+  assert.equal(text(up), 'Auto');
+  const kept = opts(header.ModeSelect({ value: 'auto', onChange() {}, judge: down })).find(o => o.props.value === 'auto');
+  assert.equal(kept.props.disabled, false);                       // a chat already in Auto keeps it (its calls ask)
+  const sel = expand(header.ModeSelect({ value: 'auto', onChange() {}, judge: down }));
+  assert.match(sel.props.title, /calls ask until it's back/);
+});
+
+test('a judged step says why it ran or asked', async () => {
+  const { judgeOf } = await load('chat/chat-turn.js');
+  assert.equal(judgeOf({ result: { status: 'done' } }), null);
+  const ran = judgeOf({ result: { judge: { verdict: 'allow', reason: 'pytest runs the tests', source: 'rules' } } });
+  assert.equal(ran.why, 'Auto: ran (judged safe: pytest runs the tests)');
+  const asked = judgeOf({ approval: { judge: { verdict: 'ask', reason: 'not what you asked', why: 'Auto: asked you (not what you asked)' } } });
+  assert.equal(asked.why, 'Auto: asked you (not what you asked)');
+  assert.equal(judgeOf({ run: { judge: { verdict: 'allow', reason: 'r' } } }).verdict, 'allow');   // still running
+});
+
+test('Settings → Agent lists judged calls and the judge status', async () => {
+  const { JudgedList } = await load('chat/chat-judge.js');
+  const api = { listJudged: () => new Promise(() => {}), getJudgeStatus: () => new Promise(() => {}) };
+  const el = expand(JudgedList({ api }));
+  assert.match(text(el), /Judged calls/);
+  assert.equal(JudgedList({ api: {} }), null);                   // an old hub without the routes: nothing
+});

@@ -206,3 +206,13 @@ async def test_auto_sends_the_users_own_words_for_the_judge(env):
     env.model.queue({"tool_calls": [{"name": "fake_make_image", "arguments": {"prompt": "w"}}]}, {"text": "ok"})
     await env.send(manual, "make w")
     assert "said" not in (env.hub.attempts[-1]["origin"] or {})
+
+
+async def test_the_judges_verdict_reaches_the_step(env):
+    """Plan 30.5: the hub's `judge` on a result (or on a call that ran long) is kept on the tool_result event."""
+    tid = await env.thread(mode="auto")
+    j = {"verdict": "allow", "reason": "pytest runs the tests", "source": "rules", "why": "Auto: ran (judged safe: pytest runs the tests)"}
+    ev = env.agent._result(tid, "c1", "workspace_run", {"status": "done", "result": {"exit_code": 0}, "judge": j})
+    assert ev["payload"]["judge"] == j
+    ev = env.agent._result(tid, "c2", "workspace_run", {"status": "done", "result": {}})
+    assert "judge" not in ev["payload"]

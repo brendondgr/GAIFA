@@ -369,7 +369,7 @@ class Agent:
             content += "\nNote: " + hint
             self.emit(tid, "note", {"text": f"hook: added a hint to {name}'s error", "level": "info"})
         payload = {"id": call, "name": name, "status": res.get("status") or "done", "content": content}
-        for k in ("call_id", "error", "image", "data"):
+        for k in ("call_id", "error", "image", "data", "judge"):
             if res.get(k) is not None:
                 payload[k] = res[k]
         if outs:
@@ -428,6 +428,7 @@ class Agent:
             return "waiting"
         started = self._find(tid, "call", cid)
         call_id = (dec or {}).get("payload", {}).get("call_id") or (started or {}).get("payload", {}).get("call_id")
+        judged = ((started or {}).get("payload") or {}).get("judge")    # a resumed call keeps its Auto verdict
         if dec is not None and not dec["payload"]["approve"]:
             return "ok"   # the denial was recorded as the result already
         if call_id is None:
@@ -465,6 +466,7 @@ class Agent:
                                             **({"grant_key": res["grant_key"]} if res.get("grant_key") else {}),
                                             **({"limits": res["limits"]} if res.get("limits") else {}),
                                             **({"why": res["why"]} if res.get("why") else {}),
+                                            **({"judge": res["judge"]} if res.get("judge") else {}),
                                             "description": (res.get("description") or "")[:600],
                                             **({"filled": res["filled"]} if res.get("filled") else {}),
                                             **({"filled_by": res["filled_by"]} if res.get("filled_by") else {})})
@@ -473,8 +475,11 @@ class Agent:
                 self._result(tid, cid, name, res)
                 return "ok"
             call_id = res["call_id"]
-            self.emit(tid, "call", {"id": cid, "call_id": call_id})
+            judged = res.get("judge")                     # the Auto judge's verdict (plan 30.5): on the step row
+            self.emit(tid, "call", {"id": cid, "call_id": call_id, **({"judge": judged} if judged else {})})
         res = await self._wait_call(tid, cid, call_id)
+        if judged and not res.get("judge"):
+            res = {**res, "judge": judged}
         self._result(tid, cid, name, res)
         return "ok"
 

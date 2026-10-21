@@ -58,6 +58,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [meterOpen, setMeterOpen] = useState(false), [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
   const [fresh, setFresh] = useState({ model: null, mode: 'manual', settings: {} });   // a chat not created yet
   const [folders, setFolders] = useState(null);   // the workspace mod's folders, for Bypass (plan 27.4)
+  const [judge, setJudge] = useState(null);       // GET /api/judge/status: Auto is offered while its model answers (plan 30.5)
   const scrollRef = useRef(null), contentRef = useRef(null), stick = useRef(true), first = useRef(true), inputRef = useRef(null), loadRef = useRef(null), queue = useRef([]), flushT = useRef(0);
   const dkey = tid || 'new', draft = drafts[dkey] || '';
   const setDraft = v => setDrafts(d => ({ ...d, [dkey]: typeof v === 'function' ? v(d[dkey] || '') : v }));
@@ -76,6 +77,10 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     c.settings().then(setSettings).catch(() => {});
     api.listTools().then(setTools).catch(() => setTools([]));
     api.callService?.('workspace', 'GET', '/v1/folders').then(r => setFolders(r.json?.folders || [])).catch(() => setFolders([]));
+    const judged = () => api.getJudgeStatus?.().then(setJudge).catch(() => setJudge(null));
+    judged();
+    const jt = setInterval(judged, 60000);
+    return () => clearInterval(jt);
   }, []);
 
   const flush = () => {
@@ -236,7 +241,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       h('div', { onClick: () => setDrawer(false), 'aria-hidden': true, style: { position: 'absolute', inset: 0, zIndex: 40, background: T.ov } }),
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
     h('section', { 'aria-label': 'Chat', style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
-      h(ThreadHeader, { thread, models, model: thread?.model || fresh.model || models?.default, mode: thread?.mode || fresh.mode, bypass: bypassAllowed(folders, events), onModel: setModel, onMode: setMode,
+      h(ThreadHeader, { thread, models, model: thread?.model || fresh.model || models?.default, mode: thread?.mode || fresh.mode, bypass: bypassAllowed(folders, events), judge, onModel: setModel, onMode: setMode,
         onRename: title => rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
         learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,
         running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: narrow ? () => setDrawer(true) : null, narrow: (narrow ? width : width - 248) < 700 }),

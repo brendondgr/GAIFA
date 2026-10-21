@@ -4,7 +4,9 @@ schemas, calls with permissions and approvals, jobs, outputs, skills and the eve
 Tools: hub_list_services (core, read), fake_get (read), fake_make_image (generate, asks aspect),
 fake_render (generate job, `seconds`), fake_wipe (destructive), fake_fail (read, errors),
 gen3d_make_3d (generate job), tts_speak (generate), hub_read_document and hub_search_document (core,
-read; plan 24.4) over documents added with `doc()`, which also answer `/text` and `/page/{n}.png`.
+read; plan 24.4) over documents added with `doc()`, which also answer `/text` and `/page/{n}.png`, and
+hub_set_preference (core, write; in the allow list as in the hub's defaults, but it asks when the
+origin says the chat read untrusted text).
 """
 
 from __future__ import annotations
@@ -54,7 +56,10 @@ TOOLS = [
                                            "limit": {"type": "integer"}}, ["ref"], core=True, desc="Read a document's text"),
     T("hub_search_document", "hub", "read", {"ref": {"type": "string"}, "query": {"type": "string"}}, ["ref", "query"], core=True,
       desc="Search a document's text"),
+    T("hub_set_preference", "hub", "write", {"tool": {"type": "string"}, "field": {"type": "string"}, "value": {},
+                                             "cue": {"type": "string"}}, ["value"], core=True, desc="Save a lasting preference"),
 ]
+ALLOW = {"hub_set_preference"}       # the hub's default permissions.allow
 
 
 def _model_view(t: dict[str, Any]) -> dict[str, Any]:
@@ -85,6 +90,7 @@ class FakeHub:
         self.chats: dict[str, dict[str, Any]] = {}     # the embed mod's `chats` (plan 28.5): tid → {title, summary, …}
         self.chat_deletes: list[str] = []
         self.embed_up = True
+        self.learning = True                           # False: hub_set_preference answers learning_off
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -168,6 +174,16 @@ class FakeHub:
             nxt = f"next: offset {w['next_offset']}" if w["next_offset"] is not None else "end of the document"
             return {"status": "done", "call_id": cid, "tool": name,
                     "result": f"output:{oid}\n<untrusted source=\"output:{oid}\">\n{w['text']}\n</untrusted>\n{nxt}"}
+        if name == "hub_set_preference":
+            if not self.learning:
+                return {"status": "error", "call_id": cid, "tool": name,
+                        "error": {"code": "learning_off", "detail": "learning is turned off (Settings → Learning)"}}
+            p = {"id": f"pref_{len(self.prefs) + 1}", "scope": "tool" if args.get("tool") else "agent", "tool": args.get("tool"),
+                 "field": args.get("field"), "thread": None, "value": args["value"], "when": {}, "cue": args.get("cue") or "",
+                 "source": "stated", "state": "active", "evidence": [], "seen": 1}
+            self.prefs.append(p)
+            return {"status": "done", "call_id": cid, "tool": name,
+                    "result": {"saved": {k: p[k] for k in ("id", "scope", "tool", "field", "value", "when")}}}
         if name == "hub_list_services":
             return {"status": "done", "call_id": cid, "tool": name, "result": {"services": [{"id": "fake", "state": "ready"}]}}
         return {"status": "done", "call_id": cid, "tool": name, "result": {"ok": True, **args}}
@@ -248,7 +264,11 @@ class FakeHub:
             risk = t["risk"]
             if mode in ("plan", "read_only") and risk != "read":
                 return {"status": "denied", "tool": name, "error": {"code": "denied", "detail": "Plan mode: only tools that read can run"}}
-            if risk != "read" and not (mode in ("accept_edits", "auto", "bypass") and risk != "destructive"):
+            if name in ALLOW and (body.get("origin") or {}).get("untrusted"):
+                asks = True                  # a lasting preference from a chat that read untrusted text (the hub's rule)
+            else:
+                asks = name not in ALLOW and risk != "read" and not (mode in ("accept_edits", "auto", "bypass") and risk != "destructive")
+            if asks:
                 aid = f"ap_{len(self.approvals) + 1}"
                 a = {"id": aid, "tool": name, "arguments": args, "ask_fields": t["ask"], "risk": risk, "origin": body.get("origin") or {},
                      "state": "pending", "created_ts": time.time(), "call_id": None, "final": None}

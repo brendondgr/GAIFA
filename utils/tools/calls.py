@@ -35,6 +35,7 @@ from utils.services import ServiceError
 from utils.tools import results
 from utils.tools.approvals import Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
+from utils.tools.doc_tools import untrusted
 from utils.tools.modcall import ToolError, dry_run, mod_error
 from utils.tools import edits, options
 from utils.tools.schema import coerce, validate
@@ -175,7 +176,8 @@ class Calls:
         limits = await self._limits(tool, arguments, origin) if tool.limits else None
         grant = await self.hub.grants.match(tool, arguments, origin, (limits or {}).get("key")) \
             if self.hub.grants is not None and not (limits or {}).get("once") else None
-        verdict, why = decide(tool.name, tool.risk, self.hub.config, mode, grant, limits)
+        verdict, why = decide(tool.name, tool.risk, self.hub.config, mode, grant, limits,
+                              untrusted=bool((origin or {}).get("untrusted")))
         judged = None
         if verdict == "judge":                         # Auto mode (plan 30.3): allow or ask, with its reason
             verdict, why, judged = await judge(self.hub, tool, arguments, origin, limits, why)
@@ -225,6 +227,9 @@ class Calls:
         a = await self.approvals.get(aid)
         if a is None:
             raise HubError(404, "not_found", f"no approval {aid!r}")
+        if self.approvals.expired(a):                  # past its time-to-live, though no listing has closed it yet
+            await self.approvals.close(aid, "expired", reason="not decided in time")
+            a = await self.approvals.get(aid) or {**a, "state": "expired"}
         if a["state"] != "pending":
             raise HubError(409, "already_decided", f"approval {aid} is already {a['state']}",
                            {"state": a["state"], "call_id": a.get("call_id")})
@@ -461,14 +466,17 @@ class Calls:
             asyncio.get_running_loop().call_later(600, self.live.pop, c.id, None)
 
     async def _screen_page(self, c: Call) -> None:
-        """Plan 30.6: a fetched page's text is screened before the agent reads it; the output keeps the whole page."""
+        """Plan 30.6: a fetched page's text is screened before the agent reads it; the output keeps the whole page.
+        The web mod sends the text inside `<untrusted>` (data, never instructions): the page's own lines are
+        screened, then wrapped again as they came."""
         from utils.tools.screen import report, screen_for
 
         if not isinstance(c.result, dict) or not isinstance(c.result.get("content"), str):
             return
-        s = await screen_for(self.hub.config, c.result["content"], "page")
+        src, raw = unwrap(c.result["content"])
+        s = await screen_for(self.hub.config, raw, "page")
         if s is not None:
-            c.result["content"] = s.text
+            c.result["content"] = untrusted(src, s.text) if src is not None else s.text
             c.result["screening"] = report(s)
 
     async def _ensure_up(self, c: Call) -> Any:
@@ -652,4 +660,17 @@ def _job_summary(body: Any) -> Any:
         return body
     keep = ("id", "state", "status", "title", "label", "workflow", "error", "outputs", "files", "dir", "seconds", "peak_gb",
             "transcript")                 # stt's [mm:ss] paragraphs (plan 29.3); capped like any result
-    return {k: body[k] for k in keep if k in body}
+    out = {k: body[k] for k in keep if k in body}
+    if isinstance(out.get("transcript"), str) and out["transcript"]:      # what was said in a recording: data, never instructions
+        out["transcript"] = untrusted(f"transcript {out.get('label') or out.get('title') or out.get('id') or ''}".strip(),
+                                      out["transcript"])
+    return out
+
+
+_WRAPPED = re.compile(r'<untrusted source="([^"\n]*)">\n(.*)\n</untrusted>', re.S)
+
+
+def unwrap(text: str) -> tuple[str | None, str]:
+    """(source, inner text) of a text that is one `<untrusted>` block, else (None, text)."""
+    m = _WRAPPED.fullmatch(text)
+    return (m.group(1), m.group(2)) if m else (None, text)

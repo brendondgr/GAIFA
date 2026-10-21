@@ -5,6 +5,7 @@ the fetch rules refuse."""
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -116,3 +117,12 @@ def slow(seconds: float) -> Callable[[Handler], None]:
         time.sleep(seconds)
         h.reply(*html("Slow", "<p>late</p>"))
     return route
+
+
+def plain(s: str, source: str | None = None) -> str:
+    """The text inside one `<untrusted source=…>` block (asserting it is one, from `source` when given)."""
+    m = re.fullmatch(r'<untrusted source="([^"\n]*)">\n(.*)\n</untrusted>', s, re.S)
+    assert m, f"not wrapped as untrusted: {s[:200]!r}"
+    if source is not None:
+        assert m.group(1) == source, m.group(1)
+    return m.group(2)

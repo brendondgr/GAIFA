@@ -26,9 +26,16 @@ READ_MAX = 24_000
 _CLOSE = re.compile(r"</\s*untrusted", re.I)
 
 
+def label(text: Any, cap: int = 120) -> str:
+    """A title or name from outside put into the model's text: one line, no `<` or `>`, at most `cap` characters."""
+    s = re.sub(r"\s+", " ", str(text if text is not None else "")).replace("<", "‹").replace(">", "›").strip()
+    return s if len(s) <= cap else s[: cap - 1] + "…"
+
+
 def untrusted(source: str, text: str) -> str:
-    """`text` wrapped as untrusted; a closing tag inside it can't end the block early."""
-    src = source.replace('"', "'")
+    """`text` wrapped as untrusted; a closing tag inside it can't end the block early, and the source
+    (often a title) can't leave its attribute: one line, no quotes, `<` or `>`."""
+    src = label(source, 200).replace('"', "'")
     return f'<untrusted source="{src}">\n{_CLOSE.sub("</ untrusted", text)}\n</untrusted>'
 
 
@@ -56,7 +63,7 @@ async def _text(hub: Hub, oid: str):
 
 
 def _name(o: dict[str, Any]) -> str:
-    return f'output:{o["id"]} {o["title"]}'
+    return f'output:{o["id"]} {label(o["title"])}'
 
 
 async def read_document(hub: Hub, args: dict[str, Any]) -> str:

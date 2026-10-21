@@ -21,6 +21,10 @@ defaults" for every tool without limits.
 6. the **risk default**: `read` runs; in `accept_edits`, `auto` and `bypass` `write` and `generate`
    run; everything else asks (`network`, `execute` and `destructive` in every mode).
 
+One exception sits between 3 and 4: a tool in `ASK_AFTER_UNTRUSTED` (a lasting preference, which goes
+into every later chat's prompt) asks when the call's origin says its chat has read untrusted text
+(`origin.untrusted`: a page, a file, a transcript), whatever a grant, the allow list or the mode says.
+
 **The judge** (plan Phase 30): a cell (or, in Auto, a `network` tool without limits) may answer
 `"judge"`. `decide` stays pure; the caller then awaits `judge()`, which Phase 30 replaces. Until
 then it fails closed: "ask".
@@ -49,6 +53,7 @@ MODE_WORD = {"plan": "Plan", "manual": "Manual", "accept_edits": "Accept edits",
 EDITS_RUN = ("accept_edits", "auto", "bypass")    # modes where `write` and `generate` tools run without a card
 AUTO_RUNS = ("write", "generate")
 ACTIONS = ("read", "edit", "delete", "commit", "command", "network", "host", "remote")
+ASK_AFTER_UNTRUSTED = ("hub_set_preference",)     # never saved unseen by a chat that read a page, file or transcript
 
 # The mode × action table (plan Phase 27). "judge": Auto's judge decides (Phase 30); until then it asks.
 CELLS: dict[str, dict[str, str]] = {
@@ -74,10 +79,12 @@ def canonical(mode: str | None) -> str:
 
 
 def decide(name: str, risk: str, config: Config, mode: str = "manual",
-           grant: dict[str, Any] | None = None, limits: dict[str, Any] | None = None) -> tuple[str, str]:
+           grant: dict[str, Any] | None = None, limits: dict[str, Any] | None = None,
+           untrusted: bool = False) -> tuple[str, str]:
     """("allow" | "ask" | "deny" | "judge", why) for one call.
 
-    `grant`: a grant that covers it (25.2). `limits`: the mod's preflight (27.4), or None."""
+    `grant`: a grant that covers it (25.2). `limits`: the mod's preflight (27.4), or None. `untrusted`: the
+    calling chat has read text from a page, a file or a transcript (the origin's `untrusted`)."""
     p = config.agent.permissions
     mode = canonical(mode)
     if any(fnmatch.fnmatchcase(name, g) for g in p.deny):
@@ -86,6 +93,8 @@ def decide(name: str, risk: str, config: Config, mode: str = "manual",
         return _with_limits(name, risk, p, mode, grant, limits)
     if mode == "plan" and risk != "read":
         return "deny", "Plan mode: only tools that read can run"
+    if untrusted and name in ASK_AFTER_UNTRUSTED:
+        return "ask", "this chat has read a page, a file or a transcript: a lasting preference asks first"
     if grant is not None:
         return "allow", _granted(grant)
     if any(fnmatch.fnmatchcase(name, g) for g in p.ask):
@@ -201,6 +210,10 @@ class Approvals:
 
     async def set_call(self, aid: str, call_id: str) -> None:
         await self.db.execute("UPDATE approvals SET call_id = ? WHERE id = ?", (call_id, aid))
+
+    def expired(self, a: dict[str, Any]) -> bool:
+        """A pending approval past `agent.approval_ttl_h` (whether or not a listing has closed it yet)."""
+        return a.get("state") == "pending" and float(a.get("created_ts") or 0) < time.time() - self.config.agent.approval_ttl_h * 3600
 
     async def expire(self) -> int:
         cutoff = time.time() - self.config.agent.approval_ttl_h * 3600

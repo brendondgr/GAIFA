@@ -717,7 +717,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
 3. **Answering.** The answer (`/answer`), or the hub's approval with the edited arguments (`/approval`), is appended, and the same turn continues from the log. A card decided in the hub's Approvals popover continues the thread the same way; Stop dismisses a waiting card, and the hub's echo of that denial is ignored, so a stopped turn stays stopped. Stop also cancels a running hub call, whether it started directly or through a card.
 4. **Rewind and branch.** Fork copies the events up to a chosen point into a new thread.
 
-Both the event log and the hub's approval are on disk, so a reboot between steps 2 and 3 loses nothing.
+Both the event log and the hub's approval are on disk, so a reboot between steps 2 and 3 loses nothing. Deciding an approval past `agent.approval_ttl_h` closes it as `expired` and answers 409 `already_decided`. Each call reads the thread's mode when it's made, so switching to Plan mid-turn stops that turn's next change.
 
 ### 14.3 Save states
 - **Chats.** Threads, the step history behind **rewind and branch** (continue from any earlier checkpoint), and titles and search (agent mod's tables in `agent.db`).
@@ -738,6 +738,8 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   - **After an approval,** the fields the user edited are carried to that chat's next card of the tool. An edit away from a preference's value counts against it: two contradictions retire an inferred preference.
   - **Off switches:** `[learning] enabled = false` or a chat's `no_learn` origin stop all of it.
   - **Never learned (plan 24.8):** document contents never become preferences or memories. The miner skips free-text fields (`prompt`, `text`, an instruction…) and the hub refuses an `inferred` preference on one (`free_text`); the learner's transcripts show an attached document as its card (`(document #n: name, 12 pages)`) and a tool result (a read document, a fetched page, a transcript) as its status only.
+  - **`remember`** runs as `hub_set_preference` through the call path: Plan refuses it, it follows the chat's current mode, and a chat that read untrusted text gets a card.
+  - **Untrusted text** in tool results comes inside `<untrusted source=…>`: web_search titles, snippets and answers, web_fetch's title and content (screening reads the page's own lines inside the block), workspace edit and write diffs and the `old_not_found` hint, stt's transcript, and `chat_search` summaries. Names and titles in the model's text are one line, with `<`/`>` replaced and a length cap.
 
 ### 14.6 The learner (plan Phase 22)
 - **The harness is files.**
@@ -764,6 +766,7 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   1. the **deny** list of `[agent.permissions]`;
   2. a **mod's limits**: a mod with `[agent] limits` (the workspace mod) answers a preflight before each call: what it would do (`action`), the folder's level and Bypass, a diff or the command, and a refusal for hard limits (paths out of the folder, secrets, `.git/`, `sudo`, the AIHub folder above Read) or a level too low ("needs the folder at Run"). A refusal ends the call in every mode; the mod checks again when the call arrives; a preflight that fails refuses;
   3. the thread's **mode**: with limits, the cell of the table below for the call's action (Bypass in a folder that doesn't allow it counts as Accept edits); without, `plan` denies everything but `read`;
+  - *Between 3 and 4:* a lasting preference (`hub_set_preference`, and the agent's `remember`, which runs as it) asks when the call's `origin.untrusted` says its chat has read a page, a file or a transcript, whatever a grant, the allow list or the mode says (overnight 2026-10-21: an injected page could save a preference that went into every later chat's prompt).
   4. a **grant** that covers the call allows it, keyed by the mod's `key` when it gives one (the folder, its subfolder `cwd` and the exact command line, plus whether it has internet or runs on this machine; a compound command (`;`, `&&`, `||`, `|`, `&`, backticks, `$(`, newlines, redirections) has no key and is allowed one call at a time); never for actions that ask every time (`host`, `remote`, `commit`);
   5. the **ask** list, then the **allow** list (`execute` ignores the allow list: only a grant skips its card);
   6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `accept_edits`, `auto` and `bypass`; `network` asks (in `auto` the judge decides); `execute` and `destructive` ask in every mode.

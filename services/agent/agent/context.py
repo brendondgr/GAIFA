@@ -74,9 +74,35 @@ def named_files(text: str) -> list[str]:
     return out[:20]
 
 
+def label(text: Any, cap: int = 120) -> str:
+    """A name or title from outside (a file, a page, a chat) put into the model's text: one line, no
+    `<` or `>` (it can't open or close a tag), at most `cap` characters."""
+    s = re.sub(r"\s+", " ", str(text if text is not None else "")).replace("<", "‹").replace(">", "›").strip()
+    return s if len(s) <= cap else s[: cap - 1] + "…"
+
+
 def untrusted(source: str, text: str) -> str:
     """Text that came from a file, a page or a transcript (plan 24.5): data, never instructions."""
-    return f'<untrusted source="{source.replace(chr(34), chr(39))}">\n{_CLOSE.sub("</ untrusted", text)}\n</untrusted>'
+    return f'<untrusted source="{label(source, 200).replace(chr(34), chr(39))}">\n{_CLOSE.sub("</ untrusted", text)}\n</untrusted>'
+
+
+# Tools whose results carry text from outside (pages, files, transcripts, other chats).
+UNTRUSTED_TOOLS = ("web_", "workspace_", "embed_", "stt_", "hub_read_document", "hub_search_document", "view_output",
+                   "read_result", "chat_search")
+
+
+def read_untrusted(events: list[dict[str, Any]]) -> bool:
+    """Has this chat taken in text from a page, a file or a transcript (an attachment, a reading tool's result,
+    anything inside `<untrusted>`)? Then a lasting preference never saves without a card (plan 21.4)."""
+    for e in events:
+        p = e.get("payload") or {}
+        if e["type"] == "user" and (p.get("docs") or p.get("attachments")):
+            return True
+        if e["type"] == "tool_result":
+            c = p.get("content")
+            if str(p.get("name") or "").startswith(UNTRUSTED_TOOLS) or (isinstance(c, str) and "<untrusted source=" in c):
+                return True
+    return False
 
 
 def cap_text(text: str, tokens: int = RESULT_CAP_TOKENS) -> tuple[str, bool]:
@@ -101,6 +127,11 @@ def outputs(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def model_outputs(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`outputs()` as the model's outputs table shows them: titles and summaries made safe with `label()`."""
+    return [{**o, "title": label(o.get("title")), "summary": label(o.get("summary"))} for o in outputs(events)]
+
+
 def _size(d: dict[str, Any]) -> str:
     size = f"{d['pages']} pages" if d.get("pages") else f"{d.get('lines') or 0} lines"
     return f"{d.get('subtype') or d.get('kind')}, {size}, ~{int(d.get('tokens') or 0):,} tokens"
@@ -121,7 +152,7 @@ def doc_card(d: dict[str, Any], dropped: bool = False) -> str:
            else "the user chose to send it as a card" if d.get("mode") == "card"
            else "the user asked for all of it, but it didn't fit the window" if d.get("fallback")
            else "too long to include here")
-    out = f"(attached {d['ref']}: {d.get('name')}, {_size(d)}; {why}."
+    out = f"(attached {d['ref']}: {label(d.get('name'))}, {_size(d)}; {why}."
     if d.get("library"):                 # plan 28.3: over LIBRARY_PAGES pages, and the embed mod is there
         out += (f" Too large to read whole: search it by meaning with {d['library']} (thread_only=true), then read "
                 f"the pages it finds.")
@@ -133,7 +164,7 @@ def doc_card(d: dict[str, Any], dropped: bool = False) -> str:
         out += " Note: " + "; ".join(d["notes"])
     out += ")"
     if d.get("outline"):
-        lines = [("  " * (max(1, int(x.get("level") or 1)) - 1)) + str(x.get("title")) + (f" (p.{x['page']})" if x.get("page") else
+        lines = [("  " * (max(1, int(x.get("level") or 1)) - 1)) + label(x.get("title"), 200) + (f" (p.{x['page']})" if x.get("page") else
                  f" (line {x['line']})" if x.get("line") else "") for x in d["outline"]]
         out += "\nOutline:\n" + untrusted(f"{d['ref']} {d.get('name')} outline", "\n".join(lines))
     return out
@@ -153,7 +184,7 @@ def doc_block(d: dict[str, Any], dropped: bool = False) -> str:
         else:
             how = f"its lines are numbered; cite them as {d['ref']}:N"
             body = numbered(d["text"])
-        return (f"(attached {d['ref']}: {d.get('name')}, {_size(d)}; all of it follows, {how}. {DATA_NOTE})\n"
+        return (f"(attached {d['ref']}: {label(d.get('name'))}, {_size(d)}; all of it follows, {how}. {DATA_NOTE})\n"
                 + untrusted(f"{d['ref']} {d.get('name')}", body))
     return doc_card(d, dropped=dropped)
 

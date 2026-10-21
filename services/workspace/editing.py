@@ -15,7 +15,7 @@ from typing import Any
 
 from checkpoints import Checkpoints, diff, key, text_of, unlink_in, write_atomic
 from folders import Folder, Folders, Refused
-from reading import dirty, git, is_repo
+from reading import dirty, git, is_repo, untrusted
 
 MAX_WRITE = 4 * 1024 * 1024
 
@@ -40,8 +40,9 @@ def _text(p: Path, rel: str) -> str:
     return data.decode("utf-8", errors="surrogateescape")
 
 
-def _near(text: str, old: str) -> str:
-    """A hint for an `old` that wasn't found: the line most like its first line."""
+def _near(text: str, old: str, source: str = "file") -> str:
+    """A hint for an `old` that wasn't found: the line most like its first line (the file's own words,
+    so inside `<untrusted source=…>`)."""
     import difflib
 
     first = old.strip().split("\n")[0].strip()
@@ -50,7 +51,8 @@ def _near(text: str, old: str) -> str:
     if not best:
         return "read the file again and copy the text exactly, whitespace included"
     n = next(i for i, ln in enumerate(lines, 1) if ln.strip() == best[0])
-    return f"the closest line is {n}: {best[0][:120]!r}; read the file again and copy the text exactly, whitespace included"
+    return (f"the closest line is {n}: {untrusted(source, best[0][:120])}\n"
+            "read the file again and copy the text exactly, whitespace included")
 
 
 def plan(folders: Folders, tool: str, args: dict[str, Any], named: list[str] | None = None) -> Change:
@@ -68,7 +70,7 @@ def plan(folders: Folders, tool: str, args: dict[str, Any], named: list[str] | N
         text = _text(p, rel)
         count = text.count(old)
         if count == 0:
-            raise Refused("old_not_found", f"the text to replace isn't in {rel}", _near(text, old), 422)
+            raise Refused("old_not_found", f"the text to replace isn't in {rel}", _near(text, old, f"{f.id}:{rel}"), 422)
         if count > 1 and not args.get("replace_all"):
             raise Refused("old_not_unique", f"the text to replace appears {count} times in {rel}",
                           "include more of the surrounding lines so it's unique, or pass replace_all=true", 422)
@@ -160,7 +162,9 @@ def apply(folders: Folders, cps: Checkpoints, ch: Change, origin: dict[str, Any]
             cps.after(thread, turn, n, p)
     except OSError as e:
         raise Refused("write_failed", f"{type(e).__name__}: {e}"[:300], "", 500) from None
-    out.update({"diff": ch.diff[:20000] + ("\n… (diff cut at 20000 characters)" if len(ch.diff) > 20000 else ""),
+    # the diff quotes the file (a write over one quotes all it had): data for the model, never instructions
+    d = ch.diff[:20000] + ("\n… (diff cut at 20000 characters)" if len(ch.diff) > 20000 else "")
+    out.update({"diff": untrusted(f"workspace {ch.folder.id} diff", d),
                 "checkpoint": {"thread": thread, "turn": turn},
                 "undo": f"/api/s/workspace/v1/checkpoints/{thread}/{turn}/undo"})
     if was_dirty:

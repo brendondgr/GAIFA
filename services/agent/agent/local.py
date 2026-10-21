@@ -132,22 +132,29 @@ class Local:
         return self.ok(tid, cid, "read_skill", body)
 
     async def t_remember(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        """Only an empty text or an eval's thread ends here: the loop runs `remember` as the hub's
+        hub_set_preference, so the chat's mode and permissions decide it like any write (plan 21.4)."""
         text = str(args.get("text") or "").strip()
         if not text:
             return self.err(tid, cid, "remember", "invalid_arguments", "text is empty")
-        if (thread.get("settings") or {}).get("dry_run"):     # an eval thread: never touch the real memory
-            self.a.emit(tid, "memory", {"text": text, "topic": args.get("topic"), "dry_run": True})
-            return self.ok(tid, cid, "remember", "Saved to memory.")
-        topic = args.get("topic")
-        try:                                   # a preference in the hub, for every chat (plan 21.4)
-            p = await self.a.hub.create_pref({"value": text, "cue": topic or "", "source": "stated",
-                                              "evidence": [{"kind": "thread", "ref": tid}]})
-        except Exception as e:  # noqa: BLE001: learning off, or the hub away: keep the old file
-            Knowledge(self.a.cfg.data, self.a.hub).remember(text, topic)
-            self.a.emit(tid, "memory", {"text": text, "topic": topic, "file": True})
-            return self.ok(tid, cid, "remember", f"Saved to memory ({type(e).__name__}: kept in the memory file).")
-        self.a.emit(tid, "memory", {"text": text, "topic": topic, "pref_id": p.get("id")})
-        return self.ok(tid, cid, "remember", "Saved: it's one of the user's preferences now.")
+        if not (thread.get("settings") or {}).get("dry_run"):
+            return self.err(tid, cid, "remember", "unavailable", "remember runs through the hub", "try again")
+        self.a.emit(tid, "memory", {"text": text, "topic": args.get("topic"), "dry_run": True})   # an eval: never the real memory
+        return self.ok(tid, cid, "remember", "Saved to memory.")
+
+    def remembered(self, tid: str, res: dict[str, Any], args: dict[str, Any]) -> dict[str, Any]:
+        """`remember`'s result once the hub ran it as hub_set_preference (`args`: its value and cue): the chat's
+        `memory` event and a plain answer; when learning is off (the call was allowed), the memory file as before."""
+        saved = (res.get("result") or {}).get("saved") if isinstance(res.get("result"), dict) else None
+        if res.get("status") == "done":
+            self.a.emit(tid, "memory", {"text": (saved or {}).get("value", args.get("value")), "topic": args.get("cue") or None,
+                                        "pref_id": (saved or {}).get("id")})
+            return {**res, "content": "Saved: it's one of the user's preferences now."}
+        if (res.get("error") or {}).get("code") == "learning_off":
+            Knowledge(self.a.cfg.data, self.a.hub).remember(str(args.get("value")), args.get("cue") or None)
+            self.a.emit(tid, "memory", {"text": args.get("value"), "topic": args.get("cue") or None, "file": True})
+            return {"status": "done", "call_id": res.get("call_id"), "content": "Saved to memory (learning is off: kept in the memory file)."}
+        return res
 
     # ---- outputs -----------------------------------------------------------------------------
 
@@ -174,7 +181,7 @@ class Local:
             o = await self.a.hub.output(oid)
         except Exception:  # noqa: BLE001
             return self.err(tid, cid, "view_output", "unknown_output", f"output {oid} is gone (deleted?)")
-        info = {"title": o["title"], "kind": o["kind"], "meta": {k: v for k, v in (o.get("meta") or {}).items()
+        info = {"title": ctx.label(o["title"]), "kind": o["kind"], "meta": {k: v for k, v in (o.get("meta") or {}).items()
                                                                   if k in ("prompt", "model", "params", "seed", "voice", "source")},
                 "dims": o.get("dims"), "duration_s": o.get("duration_s")}
         model = thread.get("model") or self.a.cfg.model
@@ -191,12 +198,12 @@ class Local:
         except Exception as e:  # noqa: BLE001
             return self.ok(tid, cid, "view_output", {"note": f"couldn't load the picture ({e}); here are its details", **info})
         return self.ok(tid, cid, "view_output", {"note": "the picture follows", **info}, image={"output_id": oid, "url": url,
-                                                                                            "label": o["title"]})
+                                                                                            "label": ctx.label(o["title"])})
 
     async def _view_text(self, tid: str, cid: str, oid: str, o: dict[str, Any], info: dict[str, Any], page: Any,
                          vision: bool) -> str:
         """A text or document output: a PDF page as an image (`page`), else the start of its text (plan 24.4)."""
-        name = f"output:{oid} {o['title']}"
+        name = f"output:{oid} {ctx.label(o['title'])}"
         info = {k: v for k, v in info.items() if v is not None and k not in ("dims", "duration_s")} | {"subtype": o.get("subtype")}
         if page is not None:
             n = int(page)
@@ -212,7 +219,7 @@ class Local:
             except Exception as e:  # noqa: BLE001: no_page and the like
                 return self.err(tid, cid, "view_output", getattr(e, "code", "no_page"), str(e), "check the page number")
             return self.ok(tid, cid, "view_output", {"note": f"page {n} of the PDF follows as an image", **info},
-                           image={"output_id": oid, "url": to_data_url(data), "label": f"{o['title']} p.{n}"})
+                           image={"output_id": oid, "url": to_data_url(data), "label": f"{ctx.label(o['title'])} p.{n}"})
         try:
             w = await self.a.hub.output_text(oid, limit=TEXT_PEEK)
         except Exception as e:  # noqa: BLE001
@@ -239,6 +246,9 @@ class Local:
             return self.err(tid, cid, "chat_search", "unavailable", f"search by meaning needs the embed mod ({e})",
                             fix="tell the user chat search needs the Embeddings mod running")
         hits = [h for h in hits if h["thread_id"] != tid]                  # not the chat it's asked from
+        # a summary retells a chat that may have read pages or files: data, never instructions
+        hits = [{**h, "title": ctx.label(h.get("title")),
+                 "summary": ctx.untrusted(f"chat {h['thread_id']} summary", str(h.get("summary") or ""))} for h in hits]
         return self.ok(tid, cid, "chat_search", {"chats": hits} if hits else {"chats": [], "note": "no earlier chat matches"})
 
     async def t_read_result(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:

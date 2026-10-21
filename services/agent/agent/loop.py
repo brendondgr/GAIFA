@@ -129,6 +129,11 @@ class Agent:
         if not queued and thread["state"] == "waiting":
             await self._dismiss_pending(tid, "The user wrote a message instead of answering.")
         docs = await describe_docs(self, tid, thread, attachments, doc_modes) if attachments else []
+        # Numbered now, with no await before the event is written: a tool result that landed while the
+        # documents were described has taken its #n already (two outputs never share one).
+        n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
+        for i, d in enumerate(docs):
+            d["ref"] = f"#{n0 + i + 1}"
         ev = self.emit(tid, "user", {"text": text, **({"attachments": attachments} if attachments else {}),
                                      **({"docs": docs} if docs else {}), **({"queued": True} if queued else {})})
         for d in docs:
@@ -352,8 +357,8 @@ class Agent:
         if res.get("result") is not None:
             body["result"] = res["result"]
         if outs:
-            body["outputs"] = [{"ref": f"#{o['n']}", "output": f"output:{o['output_id']}", "kind": o["kind"], "summary": o["summary"]}
-                               for o in outs]
+            body["outputs"] = [{"ref": f"#{o['n']}", "output": f"output:{o['output_id']}", "kind": o["kind"],
+                                "summary": ctx.label(o["summary"])} for o in outs]
         if res.get("error"):
             body["error"] = res["error"]
         if isinstance(res.get("content"), str):
@@ -420,7 +425,15 @@ class Agent:
                 "times in this turn; its result won't change",
                 "fix": "use the result you already have and move on to the next step (load_tools if the tool you need isn't loaded)"}})
             return "ok"
-        if name in LOCAL_NAMES:
+        hub_name = name
+        if name == "remember":
+            text = str((args or {}).get("text") or "").strip()
+            if not text or (thread.get("settings") or {}).get("dry_run"):
+                return await self.local.run(tid, cid, name, args or {}, tools, thread)   # refused there, or an eval's stand-in
+            # A lasting preference goes into every later chat's prompt: the hub decides it as hub_set_preference,
+            # a `write` (Plan refuses it; a chat that read untrusted text gets a card; plan 21.4)
+            hub_name, args = "hub_set_preference", {"value": text, "cue": str((args or {}).get("topic") or "")}
+        elif name in LOCAL_NAMES:
             return await self.local.run(tid, cid, name, args or {}, tools, thread)
         # a hub tool: decided approval, a call already started, or a new call
         dec = self._find(tid, "decision", cid)
@@ -432,14 +445,15 @@ class Agent:
         if dec is not None and not dec["payload"]["approve"]:
             return "ok"   # the denial was recorded as the result already
         if call_id is None:
-            if name not in tools.full and tools.by_name(name):
+            if hub_name == name and name not in tools.full and tools.by_name(name):
                 tools.load([name])
                 await tools.refresh()
                 self._save_loaded(tid, tools)
+            thread = self.store.thread(tid) or thread     # the mode now: the user may have switched it during the turn
             mode = "accept_edits" if p.get("by") == "user" else mode_of(thread.get("mode"))
-            meta = tools.by_name(name)
+            meta = tools.by_name(hub_name)
             off = meta["mod"] if meta and meta["mod"] in tools.disabled else None
-            if name in SERVICE_TOOLS and str((args or {}).get("id")) in tools.disabled:
+            if hub_name in SERVICE_TOOLS and str((args or {}).get("id")) in tools.disabled:
                 off = str(args["id"])      # starting or stopping a turned-off mod is using it too
             if off:
                 self._result(tid, cid, name, {"status": "denied", "error": {
@@ -457,10 +471,12 @@ class Agent:
                 origin["said"] = self._said(tid)   # the Auto judge reads only the user's own words (plan 30.3)
             if (thread.get("settings") or {}).get("no_learn"):
                 origin["no_learn"] = True   # this chat opted out of learning (plan 21.4)
-            args = self._refs(tid, args or {}, (tools.full.get(name) or {}).get("parameters"))
-            res = await self.hub.call(name, args, origin, mode, wait=2)
+            if ctx.read_untrusted(self.store.events(tid)):
+                origin["untrusted"] = True  # the chat holds text from a page, file or transcript: a preference asks first
+            args = self._refs(tid, args or {}, (tools.full.get(hub_name) or {}).get("parameters"))
+            res = await self.hub.call(hub_name, args, origin, mode, wait=2)
             if res.get("status") == "needs_approval":
-                self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": name,
+                self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": hub_name,
                                             "arguments": res.get("arguments"), "ask_fields": res.get("ask_fields") or [],
                                             "schema": res.get("schema"), "risk": res.get("risk"),
                                             **({"grant_key": res["grant_key"]} if res.get("grant_key") else {}),
@@ -472,7 +488,7 @@ class Agent:
                                             **({"filled_by": res["filled_by"]} if res.get("filled_by") else {})})
                 return "waiting"
             if res.get("status") != "running":
-                self._result(tid, cid, name, res)
+                self._hub_result(tid, cid, name, res, args)
                 return "ok"
             call_id = res["call_id"]
             judged = res.get("judge")                     # the Auto judge's verdict (plan 30.5): on the step row
@@ -480,8 +496,12 @@ class Agent:
         res = await self._wait_call(tid, cid, call_id)
         if judged and not res.get("judge"):
             res = {**res, "judge": judged}
-        self._result(tid, cid, name, res)
+        self._hub_result(tid, cid, name, res, args)
         return "ok"
+
+    def _hub_result(self, tid: str, cid: str, name: str, res: dict[str, Any], args: dict[str, Any] | None) -> None:
+        """A hub call's result; `remember` (run as hub_set_preference) says what it saved (local.py)."""
+        self._result(tid, cid, name, self.local.remembered(tid, res, args or {}) if name == "remember" else res)
 
     async def _wait_call(self, tid: str, cid: str, call_id: str) -> dict[str, Any]:
         last = None
@@ -586,7 +606,7 @@ class Agent:
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "
                     "the user can turn them back on in the composer)" if tools.disabled else "")
                  + prompts.mode_note(mode_of((self.store.thread(tid) or {}).get("mode"))),
-                 "outputs": prompts.outputs_table(ctx.outputs(events)), "summary": summary}
+                 "outputs": prompts.outputs_table(ctx.model_outputs(events)), "summary": summary}
         sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),
                  "tool_index": ctx.est(parts["tools"]), "outputs": ctx.est(parts["outputs"] + parts["summary"])}
@@ -733,7 +753,7 @@ class Agent:
         prompt = [{"role": "system", "content": "You summarize chats." + (f"\nEarlier summary:\n{old_summary}" if old_summary else "")},
                   *msgs, {"role": "user", "content": prompts.SUMMARY_PROMPT}]
         reply = await self.llm.chat(model, prompt)
-        outs = prompts.outputs_table(ctx.outputs(events))
+        outs = prompts.outputs_table(ctx.model_outputs(events))
         summary = reply.text.strip() + (f"\n\nOutputs so far:\n{outs}" if outs else "")
         self.emit(tid, "compact", {"stage": "summary", "summary": summary, "upto_seq": cut, "before": before})
 

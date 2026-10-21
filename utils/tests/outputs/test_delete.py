@@ -1,4 +1,5 @@
-"""4.4 delete: an output goes to outputs/.trash with its sidecar and preview; the trash is purged after 30 days."""
+"""4.4 delete: an output goes to outputs/.trash with its sidecar and preview; the trash is purged after 30 days.
+`permanent=true` (eval and test outputs) skips the trash."""
 
 from __future__ import annotations
 
@@ -46,6 +47,18 @@ async def test_delete_a_folder_output_and_the_same_path_twice(app, client, hub_t
     assert (t / "gen3d/2026-10-04/j1-fox/parts/p.glb").exists()
     assert (t / "2/gen3d/2026-10-04/j1-fox/mesh.glb").stat().st_size == 7
     assert not (hub_tree.dir / "gen3d/2026-10-04/j1-fox").exists()
+
+
+async def test_permanent_delete_skips_the_trash(app, client, hub_tree):
+    f = hub_tree.png("eval/2026-10-04/120000-dry-fox.png", 300, 200)
+    f.with_name(f.name + ".json").write_text('{"title": "dry fox", "dry_run": true}')
+    hub_tree.folder("eval/2026-10-04/j1-dry-chair", {"mesh.glb": 9}, title="dry chair")
+    await index(app)
+    for oid in (await ids(client)).values():
+        assert (await client.delete(f"/api/outputs/{oid}", params={"permanent": "true"})).status_code == 204
+    assert not (hub_tree.dir / ".trash").exists()
+    assert list((hub_tree.dir / "eval/2026-10-04").iterdir()) == []
+    assert await ids(client) == {}
 
 
 async def test_stem_sidecar_shared_by_two_files_stays(app, client, hub_tree):

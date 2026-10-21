@@ -1876,7 +1876,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - `utils/tests/core/test_db.py`'s version numbers move to 6.
   - **`utils/tools/edits.py`:** `edited(schema, proposed, final) -> list[field]` normalises booleans, empties and absent values against the schema default (see the gaps). It is written in `Calls.decide`.
   - **Metrics:** `utils/metrics/recorder.py` counts the bus `tool_call` events into `tools.calls.<mod>` and `tools.errors.<mod>` series.
-  - **Retention:** rows with `origin.dry_run` older than 30 days are pruned by the recorder's hourly maintenance loop; real rows are kept. The agent prunes its archived dry-run threads (`settings.dry_run`) on the same schedule (`store.prune_dry_runs(days)`, run hourly from its lifespan).
+  - **Retention:** rows with `origin.dry_run` older than 30 days are pruned by the recorder's hourly maintenance loop; real rows are kept. The agent prunes its archived dry-run threads (`settings.dry_run`) on the same schedule (`store.prune_dry_runs(days)`, run hourly from its lifespan). Since 2026-10-20 the harness deletes each run's threads and outputs when it ends (architecture §14.6), so the prune is only a backstop.
   *Done when:* `utils/tests/tools/test_records.py` covers a refused call's row, `filled` and `edited` (including the all-checkboxes case), `duration_ms`, and the dry-run prune; `services/agent/tests/test_store.py` covers the thread prune; architecture §13's retention table is updated.
   - *As built:*
     - **`utils/tools/records.py`** holds `prune_dry_runs` and `usage(db, since)` (per tool: calls, errors, refusals, cards, edited, denied, mean time; for 21.7).

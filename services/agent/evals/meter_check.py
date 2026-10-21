@@ -1,7 +1,7 @@
 """`python -m evals.meter_check [model]`: the context meter against what the model reports.
 
 Before each turn, the meter's `used` (last usage + estimate of what was added) is compared with the
-`prompt_tokens` the model then reports for that turn's first call."""
+`prompt_tokens` the model then reports for that turn's first call. The chat is deleted afterwards."""
 
 from __future__ import annotations
 
@@ -11,6 +11,8 @@ import sys
 import time
 
 import httpx
+
+from .cleanup import forget_threads
 
 TURNS = ["Hi! In one sentence: what can you help me with?", "Tell me a two-line poem about foxes.",
          "What's running right now?", "Summarize our chat in one sentence."]
@@ -39,6 +41,7 @@ async def main(model: str) -> None:
         from pathlib import Path
         p = Path(__file__).resolve().parents[3] / "docs" / "report" / "data" / f"meter-{model}.json"
         p.write_text(json.dumps(out, indent=1))
+    await forget_threads([tid])                 # the chat goes; the report keeps the numbers
 
 
 if __name__ == "__main__":

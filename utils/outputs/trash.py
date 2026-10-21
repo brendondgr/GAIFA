@@ -4,7 +4,8 @@ purged. To get something back, move it out of the trash to where it was; the wat
 indexes it again.
 
 A file output takes its sidecars and its cached preview along. When the same path was
-trashed twice on one day, the second goes to `<day>/2/<path>`, and so on.
+trashed twice on one day, the second goes to `<day>/2/<path>`, and so on. `remove` skips
+the trash (eval and test outputs: `DELETE /api/outputs/{id}?permanent=true`).
 """
 
 from __future__ import annotations
@@ -48,6 +49,16 @@ def move(outputs: Path, rel: str, is_dir: bool, today: date | None = None) -> Pa
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(p, dest)  # a rename on the same filesystem
     return base / rel
+
+
+def remove(outputs: Path, rel: str, is_dir: bool) -> None:
+    """Delete `outputs/<rel>` (and its companions) for good, not into the trash."""
+    src = outputs / rel
+    for p in [src] + ([] if is_dir else _companions(src)):
+        if p.is_dir() and not p.is_symlink():
+            shutil.rmtree(p, ignore_errors=True)
+        else:
+            p.unlink(missing_ok=True)
 
 
 def purge(outputs: Path, keep_days: int = KEEP_DAYS, today: date | None = None) -> int:

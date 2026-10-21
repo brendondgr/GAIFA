@@ -708,7 +708,8 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   7. keep one lesson per round in that area's library, which only the improver reads.
 - **Who adopts what:** tool notes, skills and hooks are adopted automatically once the gate passes; prompt and guardrail changes wait for the user.
 - **When it runs:** nightly, after `[learning] idle_min` without a chat, or on Learn now. It pauses while you chat.
-- **Dry runs change nothing:** generating tools make stand-ins, and write and destructive tools return a stand-in success.
+- **Dry runs change nothing:** generating tools make stand-ins (a picture drawn from the prompt, a hard link to the newest real output of that kind, or a small stub when there is none), and write and destructive tools return a stand-in success.
+- **Eval and test runs leave nothing behind:** when a run ends, the harness deletes its chats (with their events and turn records) and the outputs it made, dry-run stand-ins and live results alike, for good (`DELETE /api/outputs/{id}?permanent=true`, not the trash); seeds a task wrote to `outputs/eval/` go when the harness closes; the one-off live checks (`compact_live`, `meter_check`, `restart_live`) delete theirs too (`evals/cleanup.py`). `--keep` leaves them to look at. Only chats and outputs a person made stay.
 
 ### 14.4 Everything inside the folder
 - **Logs.** Each mod's output is also written to `data/logs/<id>.log`, rotated. journald stays as a second copy, and the Logs tab reads the file.

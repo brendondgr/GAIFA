@@ -6,6 +6,7 @@ survive restarts of the hub and the agent (live, on the real stack).
 3. `aihub restart` (the hub) and `aihub restart agent`
 4. both threads are still waiting; the approval is still pending at the hub
 5. approve A and answer B → both finish with an image
+6. both chats and their images are deleted
 """
 
 from __future__ import annotations
@@ -17,6 +18,8 @@ import time
 from pathlib import Path
 
 import httpx
+
+from .cleanup import forget_threads
 
 A = "http://127.0.0.1:7000/api/s/agent"
 OUT = Path(__file__).resolve().parents[3] / "docs" / "report" / "data" / "restart-live.json"
@@ -53,6 +56,7 @@ async def main() -> None:
             log["why"] = "the setup didn't produce both a card and a question"
             OUT.write_text(json.dumps(log, indent=1))
             print(json.dumps(log, indent=1))
+            await forget_threads([a, b])
             return
     t0 = time.time()
     subprocess.run(["aihub", "restart"], capture_output=True, timeout=120)
@@ -95,6 +99,7 @@ async def main() -> None:
         log["threads"] = {"a": a, "b": b}
     OUT.write_text(json.dumps(log, indent=1))
     print(json.dumps(log, indent=1))
+    await forget_threads([a, b])                # the chats and their images go; the report keeps the log
 
 
 if __name__ == "__main__":

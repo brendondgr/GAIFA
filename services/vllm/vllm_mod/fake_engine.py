@@ -103,6 +103,7 @@ def main(argv: list[str] | None = None) -> None:
         print("RuntimeError: No HIP GPUs are available", flush=True)
         sys.exit(1)
     log("Loading weights took 0.11 seconds")
+    log("Model loading took 1.12 GiB memory and 0.2 seconds")
     log("Compiling a graph for compile range (1, 8192) takes 0.1 s")
     time.sleep(startup / 3)
     print("Capturing CUDA graphs (PIECEWISE):  50%|█████     | 2/4\rCapturing CUDA graphs (PIECEWISE): 100%|██████████| 4/4",

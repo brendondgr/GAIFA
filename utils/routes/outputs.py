@@ -108,9 +108,10 @@ async def output_feedback(output_id: str, body: FeedbackIn, request: Request) ->
     return {"output_id": oid, "value": body.value, "note": body.note[:500], "ts": now}
 
 
-@router.delete("/api/outputs/{output_id}", status_code=204, summary="Move an output (its files, sidecar and preview) to outputs/.trash")
-async def delete_output(output_id: str, request: Request) -> Response:
-    await _outs(request).delete(output_id)
+@router.delete("/api/outputs/{output_id}", status_code=204,
+               summary="Move an output (its files, sidecar and preview) to outputs/.trash; `permanent=true` deletes it for good")
+async def delete_output(output_id: str, request: Request, permanent: bool = False) -> Response:
+    await _outs(request).delete(output_id, permanent=permanent)
     return Response(status_code=204)
 
 

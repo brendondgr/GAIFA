@@ -2243,11 +2243,12 @@ Asked for on 2026-10-20. AIHub is public, but only this machine can install it: 
 - **Kept in sync by a generator and a test.** Every registry change regenerates the affected model docs; `aihub docs --check` and a test fail when a generated section is stale, a model has no environment, or a model has neither a source nor a hand-written "Where to get it".
 - **Docs describe today's install honestly.** A manual step (llama.cpp's binary, ComfyUI's custom nodes, the `opencode` binary, gen3d's weights) is documented as the exact commands, and listed as a known gap. Scripting those steps is the next phase, not this one.
 
-**Revised (user, 2026-10-21), after 23.5:** AIHub stays broad and open: setup is **per mod**, not per model, and nobody is handed this machine's models.
+**Revised (user, 2026-10-21), after 23.5 and again during 23.8:** AIHub stays broad and open: setup is **per mod**, not per model, and nobody is handed this machine's models.
 - **The guided setup is a wizard,** `aihub setup`: you say which mods you want, it installs their environments, asks which models you want for each, and checks them (23.9).
 - **Per-model docs become a local inventory** of your own models, out of git (23.6).
 - **Each mod suggests a few starter models, all optional;** engines that need fixed weights list those as required (23.7, 23.8).
 - The old 23.7 (checksums for every committed model doc) is dropped with them.
+- **An all-in-one setup that an agent can run for the person,** following the same process a person follows: `aihub setup` from a bare clone, with a JSON plan, answers and report for an agent, and a skill that points agents to it (23.9, 23.11). Root steps stay the person's.
 
 ## Phase 23 — Setup docs per mod, and `aihub setup`
 
@@ -2350,16 +2351,21 @@ Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from th
   - All 25 docs, including those the Stage J phases wrote (decide, embed, searxng, stt, web, workspace).
   *Done when:* every doc has a Choosing models section and a block the wizard can use, every `[[suggest]]` repo exists with the stated size (checked through the Hugging Face API, no downloads), and `aihub docs --check --strict` is clean.
 
-- [ ] **23.9 The wizard: `aihub setup`.**
-  - `utils/cli_setup.py`, standard library only, behind `aihub setup [<mod>…] [--dry-run] [--yes]`:
-    1. **Preflight:** the host checks from `host.md` (the kernel parameters, `video` and `render`, the IOMMU on, uv, podman, free disk), each with its fix; a GPU problem blocks only the GPU mods.
-    2. **Choose mods:** a numbered list (summary, GPU or not, disk), or the ids on the command line; what a choice needs comes along (`after`, `needs`), and the order follows `[services] order` and `after`.
-    3. **The plan:** every step and its size, then one confirmation (`--dry-run` stops here).
-    4. **Install:** the hub first if it isn't installed (`aihub install`), then each mod's `[[steps]]` with their output, stopping at a failure with the doc's link; `ask` steps ask first.
-    5. **Models:** for each mod, its suggestions (required ones preselected), your own (the doc's Choosing models link), or none; downloads through `uvx --from huggingface_hub hf download` or the mod's `op`, then registers them with the hub (`POST /api/models`) so they show on the Models page.
-    6. **Check:** each mod's `check`, then a summary of what's done, what failed and what's left.
-  - It never runs GPU work of its own; the mods' installers and checks are what run.
-  *Done when:* `utils/tests/core/test_cli_setup.py` (fake mods with setup docs, a fake hub) covers the preflight, choosing and ordering, `--dry-run`, a failing step, an `ask` declined, model choices with both download paths and the registration; on this machine `aihub setup --dry-run relay agent tts` prints the right plan.
+- [ ] **23.9 The setup, one process for a person and an agent: `aihub setup`.**
+  - **One procedure, two drivers** (user, 2026-10-21): a person runs `aihub setup` and answers its questions; an agent runs the same steps with `--plan --json`, an answers file and a JSON report, asking the person the same questions. Nothing is done one way only.
+  - `utils/cli_setup.py`, standard library only, so it runs from a bare clone: `bin/aihub setup` works before `uv sync` (the launcher falls back to `python3`) and does the hub itself as its first step.
+  - **The stages,** each also a subcommand an agent can run on its own:
+    1. **Hub:** `uv sync`, then `aihub install` when the hub isn't installed or running (`aihub setup hub`).
+    2. **Host:** the checks from `host.md` (the kernel parameters, `video` and `render`, the IOMMU on, uv, podman, toolbox, free disk), each with its fix (`aihub setup host`). Fixes that need root are **never run**: the wizard prints the exact `sudo` commands for the person to run, then checks again; a GPU problem blocks only the GPU mods.
+    3. **Choose:** a numbered list of mods (summary, GPU or not, disk), or ids on the command line; what a choice needs comes along (`after`, `needs`), in `[services] order` and `after` order.
+    4. **Plan:** every step, question and size, then one confirmation. `--plan` stops here; `--plan --json` prints it as data: `{mods, steps: [{mod, run, what, ask?}], questions: [{id, text, kind: "yes-no"|"models"}], suggestions: [{mod, name, size_gb, required, licence, gated}], disk_gb, host: [{check, ok, fix?, needs_root}]}`.
+    5. **Install:** each mod's `[[steps]]` with their output, stopping at a failure with the doc's link; `ask` steps need a yes.
+    6. **Models:** for each mod, its suggestions (required ones preselected), your own (the doc's Choosing models link), or none; downloads through `uvx --from huggingface_hub hf download` or the mod's `op`, then registers them (`POST /api/models`) so they show on the Models page.
+    7. **Check:** each mod's `check`, then a summary of what's done, what failed (with its doc), and what's left.
+  - **Answers without a terminal:** `--answers <file.json>` (`{"accept": ["<question id>"…], "models": {"<mod>": ["<suggestion name>"…]}}`) or `--accept <id>` and `--models <mod>=<name>,…`; `--yes` accepts the plan; a question with no answer stops the run with its id, so an agent never guesses. `--json` makes every stage print one JSON result, and the run ends with a report `{done, failed: [{mod, step, doc}], skipped, next}`.
+  - **Resuming:** state in `data/state/setup/run.json` (each step done or not), so running it again continues where it stopped; `--from-scratch` forgets it.
+  - It runs no GPU work of its own; the mods' installers and checks are what run.
+  *Done when:* `utils/tests/core/test_cli_setup.py` (fake mods with setup docs, a fake hub, a fake host) covers each stage, choosing and ordering, the plan as text and JSON, a failing step and resuming, an `ask` declined and an unanswered question in non-interactive mode, model choices with both download paths and the registration, root-only fixes printed and never run; on this machine `aihub setup --plan relay agent tts` and `--plan --json` print the right plan.
 
 - [ ] **23.10 A fresh reader and a fresh clone.**
   - **A fresh reader:** an agent with no context follows `docs/setup/` and `aihub setup --dry-run` for a few mod choices, and lists every step that is ambiguous, assumes knowledge, or names a file, command or value that doesn't exist; each item is fixed or answered.
@@ -2368,6 +2374,7 @@ Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from th
 
 - [ ] **23.11 Rules, skills and docs in sync.**
   - `CLAUDE.md`: a rule ("A new mod ships a setup doc with an `aihub-setup` block: summary, steps, check, suggestions"); the status line; `docs/setup/` in Layout. The README's Quickstart becomes `aihub setup`, and Requirements point to `docs/setup/host.md` (and drop the out-of-date "about 190 GB").
+  - **The agent's entry point:** a project skill `.claude/skills/aihub-setup/SKILL.md` and a "Setting up a new machine" section in `AGENTS.md` and `CLAUDE.md`: ask the person which mods and which models (the suggestions, their own, or none), show `aihub setup --plan`, run it with their answers, hand them any `sudo` commands, confirm every `check`, and on a failure read that mod's setup doc (What to look for, Known gaps). `docs/setup/README.md` opens with the same procedure for a person, step for step.
   - Architecture §4 (`setup/` among a mod's optional extras); `docs/mods.md`; `docs/structure.md`.
   - Skills: `aihub` (the doc map row "setting up a machine"), `aihub-mod` (a new mod ships a setup doc), `comfy-workflow` (a pack's models are the user's choice; the pack records their URLs).
   *Done when:* `uv run pytest` passes, `aihub docs --check --strict` is clean, and a grep finds no install instructions left that contradict `docs/setup/`.

@@ -4,6 +4,7 @@ good_for = "painterly, watercolor-style pictures"
 description = "Z-Image Turbo fine-tune (IntoRealism v6) with a watercolor LoRA: painterly images"
 tags = ["watercolor", "style"]
 # memory_gb = 17.6    # estimated from the model files; each run measures it, so set it only to override
+agent = false                        # its models were deleted on 2026-10-20 to free disk space
 
 [inputs.prompt]          # CLIPTextEncode "CLIP Text Encode (Prompt)"
 node = "67"

@@ -7,7 +7,7 @@ import pytest
 from vllm_mod.profiles import LABEL, Profile, engine_command, load_profiles, serve_args, utilization
 from vllm_mod.settings import Settings
 
-SEEDS = Path(__file__).resolve().parent.parent / "profiles"
+SEEDS = Path(__file__).resolve().parent.parent / "profiles" / "disabled"   # parked 2026-10-20: their models were deleted
 GTT = 130_446_385_152          # this machine's mem_info_gtt_total
 
 

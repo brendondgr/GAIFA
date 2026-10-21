@@ -40,3 +40,7 @@ idle_unload_s = 600
 [services.comfy]
 enabled = true
 autostart = false
+
+[services.vllm]
+enabled = true
+autostart = false              # parked 2026-10-20: its models were deleted; profiles in services/vllm/profiles/disabled/

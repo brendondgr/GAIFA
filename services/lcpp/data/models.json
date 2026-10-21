@@ -22,29 +22,9 @@
         "gpu-layers-draft": 999
       }
     },
-    "minicpm-5-2B": {
-      "nicknames": [
-        "MiniCPM5-2B"
-      ],
-      "path": "MiniCPM5-2B/MiniCPM5-2B-Q8_0.gguf",
-      "params": {
-        "ctx-size": 131072
-      }
-    },
     "smollm2-135m-instruct": {
       "nicknames": [],
       "path": "SmolLM2-135M-Instruct/SmolLM2-135M-Instruct-Q4_K_M.gguf"
-    },
-    "qwen3.8-flash-next-iq3s": {
-      "nicknames": [
-        "qwen3.8-flash"
-      ],
-      "path": "Qwen3.8-Flash-Next/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
-      "mmproj": "Qwen3.8-Flash-Next/mmproj-Qwen3.8-Flash-Next-BF16.gguf",
-      "params": {
-        "load-mode": "mmap",
-        "lazy-mode": "on"
-      }
     }
   }
 }

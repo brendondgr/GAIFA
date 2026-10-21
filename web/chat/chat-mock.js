@@ -4,6 +4,8 @@
 // and ends with a result card and its actions. Result buttons and quick actions run without a
 // model call, like POST /action. Outputs are mock.js's (api.listOutputs), so they open in Outputs.
 
+import { webTurn } from './chat-mock-web.js';
+
 const CANCEL = Symbol('cancelled');
 const MODELS = { default: 'skynet', fallback: 'gemma4-26B', models: [
   { id: 'skynet', meta: { context_length: 131072, tools: true, vision: false, reasoning: true }, endpoint: 'skynet', health: 'healthy' },
@@ -231,6 +233,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       usage(t);
       return 'idle';
     }
+    if (/^(please\s+)?(search|look up)\b|\b(the web|sources?)\b/i.test(text)) return webTurn(t, run, text, { emit, say, usage, rid });   // the reply bar's Sources
     if (/\b3d\b/i.test(text) && /then|and turn|into/i.test(text)) return chainTurn(t, run, text);
     if (/image|picture|photo|draw|fox|paint/i.test(text)) return imageTurn(t, run, text);
     await say(t, run, MD_REPLY, 'A general question: answer directly and point at what I can do. No tool call needed.', 2);
@@ -331,11 +334,13 @@ export function createMockClient(api, { speed = 1 } = {}) {
       }, 40));
       return { close() { closed = true; threads.get(tid)?.subs.delete(f); }, get lastSeq() { return last; } };
     },
-    async send(tid, text, attachments = [], docModes = {}) {
+    async send(tid, text, attachments = [], docModes = {}, quote = null) {
       await net(); const t = T(tid), queued = !!t.run;
       if (!queued && t.pending) { emit(t, 'tool_result', { id: t.pending.id, name: t.pending.kind === 'question' ? 'ask_user' : 'comfy_generate_image', status: 'skipped', content: '{}', error: { code: 'skipped', detail: 'The user wrote a message instead of answering.' } }); t.pending = null; }
+      if (quote && (!String(quote.text || '').trim() || quote.text.length > 8000)) throw err(422, 'quote: 1 to 8,000 characters');
+      if (quote?.seq != null && !t.events.some(e => e.seq === quote.seq && e.type === 'assistant')) throw err(422, `quote.seq ${quote.seq} isn't a reply in this chat`);
       const docs = attachments.length ? await describe(t, attachments, docModes) : [];
-      const ev = emit(t, 'user', { text, ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}) });
+      const ev = emit(t, 'user', { text, ...(quote ? { quote: { text: quote.text, ...(quote.seq != null ? { seq: quote.seq } : {}) } } : {}), ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}) });
       if (!t.thread.title) { t.thread.title = text.slice(0, 48); transient(t, 'thread', pub(t)); }
       if (queued) t.queue.push(text); else start(t, run => messageTurn(t, run, text, docs));
       return ev;

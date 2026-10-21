@@ -4,7 +4,7 @@
 //
 //   models() threads({q, archived, limit}) searchChats(q, limit) create(body) get(tid) patch(tid, p) remove(tid) events(tid, after)
 //   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq)
-//   send(tid, text, attachments) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
+//   send(tid, text, attachments, doc_modes, quote) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
 //   feedback(tid, {value, output_id | seq, note}) decidePref(pid, approve)   (plan 21.7)
 //
@@ -83,7 +83,9 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     remove: tid => req('DELETE', T(tid)),
     events: (tid, after = 0) => req('GET', `${T(tid)}/events?after=${after}`),
     stream,
-    send: (tid, text, attachments = [], doc_modes = {}) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes).length ? { doc_modes } : {}) }),
+    // quote: {text (markdown), seq?}: the part of an earlier reply this message answers (Select → Reply)
+    send: (tid, text, attachments = [], doc_modes = {}, quote = null) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),
+      ...(quote?.text ? { quote: { text: quote.text, ...(quote.seq != null ? { seq: quote.seq } : {}) } } : {}) }),
     answer: (tid, question_id, answers) => req('POST', `${T(tid)}/answer`, { question_id, answers }),
     approval: (tid, body) => req('POST', `${T(tid)}/approval`, body),
     action: (tid, tool, args = {}) => req('POST', `${T(tid)}/action`, { tool, arguments: args }),

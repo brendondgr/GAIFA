@@ -13,6 +13,8 @@
   one is in the user's message inside `<untrusted source="#n name">`; a large one is a card (size,
   outline, how to read it). Clearing drops an inline document's text once it is older than the
   last two user turns, leaving its card.
+- **Quotes** (Select → Reply): a user message that answers part of an earlier reply starts with
+  that part as a markdown blockquote and a one-line note, then the user's words.
 """
 
 from __future__ import annotations
@@ -72,6 +74,23 @@ def named_files(text: str) -> list[str]:
         if _SECRET.search(w) and w not in out:
             out.append(w)
     return out[:20]
+
+
+QUOTE_NOTE = "(I'm replying to this part of your earlier answer.)"
+
+
+def quoted(text: str) -> str:
+    """A quoted part of an earlier reply (Select → Reply) as a markdown blockquote: every line starts with `>`, so
+    nothing in it can stand outside the quote, and it can't close an `<untrusted>` block."""
+    lines = _CLOSE.sub("</ untrusted", str(text).replace("\r\n", "\n").replace("\r", "\n")).strip("\n").split("\n")
+    return "\n".join(f"> {line}" if line.strip() else ">" for line in lines)
+
+
+def with_quote(text: str, quote: Any) -> str:
+    """The user's words after the quote they answer, and a note saying what it is."""
+    if not isinstance(quote, dict) or not str(quote.get("text") or "").strip():
+        return text
+    return f"{quoted(quote['text'])}\n\n{QUOTE_NOTE}\n\n{text}"
 
 
 def label(text: Any, cap: int = 120) -> str:
@@ -285,7 +304,7 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
             continue
         if t == "user":
             flush()
-            text = p.get("text") or ""
+            text = with_quote(p.get("text") or "", p.get("quote"))
             docs = p.get("docs") or []
             rest = [a for a in p.get("attachments") or [] if a not in {d["id"] for d in docs}]
             if rest:

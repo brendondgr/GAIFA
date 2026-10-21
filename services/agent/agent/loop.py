@@ -121,7 +121,8 @@ class Agent:
         self.tasks[tid] = asyncio.create_task(self._turn(tid))
 
     async def send(self, tid: str, text: str, attachments: list[str] | None = None,
-                   doc_modes: dict[str, str] | None = None) -> dict[str, Any]:
+                   doc_modes: dict[str, str] | None = None, quote: dict[str, Any] | None = None) -> dict[str, Any]:
+        """`quote`: {text (markdown), seq?}, the part of an earlier reply this message answers (Select → Reply)."""
         thread = self.store.thread(tid)
         if thread is None:
             raise KeyError(tid)
@@ -134,7 +135,8 @@ class Agent:
         n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
         for i, d in enumerate(docs):
             d["ref"] = f"#{n0 + i + 1}"
-        ev = self.emit(tid, "user", {"text": text, **({"attachments": attachments} if attachments else {}),
+        ev = self.emit(tid, "user", {"text": text, **({"quote": quote} if quote else {}),
+                                     **({"attachments": attachments} if attachments else {}),
                                      **({"docs": docs} if docs else {}), **({"queued": True} if queued else {})})
         for d in docs:
             if d.get("fallback"):        # asked for whole, didn't fit (plan 24.9): say so in the chat

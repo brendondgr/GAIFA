@@ -28,6 +28,7 @@ from .loop import Agent, Busy, Config
 from .store import MODES, Store
 
 PING_S = 15.0
+QUOTE_MAX = 8000         # characters of a quoted reply (Select → Reply)
 
 
 class NewThread(BaseModel):
@@ -45,8 +46,14 @@ class ThreadPatch(BaseModel):
     settings: dict[str, Any] | None = None
 
 
+class Quote(BaseModel):
+    text: str = Field(min_length=1, max_length=QUOTE_MAX, description="the quoted part of an earlier reply, as markdown")
+    seq: int | None = Field(None, ge=1, description="the assistant event it came from")
+
+
 class Message(BaseModel):
     text: str = Field(min_length=1, max_length=100_000)
+    quote: Quote | None = Field(None, description="the part of an earlier reply this message answers (Select → Reply)")
     attachments: list[str] = Field(default_factory=list, description="output ids")
     doc_modes: dict[str, Literal["auto", "whole", "card"]] = Field(default_factory=dict,
                                                                    description="per attached document: whole, card, or auto (plan 24.9)")
@@ -362,7 +369,15 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def send(tid: str, body: Message, request: Request) -> dict:
         agent = A(request)
         thread_or_404(agent, tid)
-        return await agent.send(tid, body.text, body.attachments, body.doc_modes)
+        quote = None
+        if body.quote is not None:
+            if not body.quote.text.strip():
+                raise HTTPException(422, {"code": "invalid_quote", "detail": "the quote is empty"})
+            src = agent.store.event(tid, body.quote.seq) if body.quote.seq is not None else None
+            if body.quote.seq is not None and (src is None or src["type"] != "assistant"):
+                raise HTTPException(422, {"code": "invalid_quote", "detail": f"quote.seq {body.quote.seq} isn't a reply in this chat"})
+            quote = {"text": body.quote.text, **({"seq": body.quote.seq} if body.quote.seq is not None else {})}
+        return await agent.send(tid, body.text, body.attachments, body.doc_modes, quote=quote)
 
     @app.post("/v1/threads/{tid}/answer", status_code=202, summary="Answer an ask_user question card")
     async def answer(tid: str, body: Answer, request: Request) -> dict:

@@ -176,7 +176,7 @@ function StepList({ turn, ctx }) {
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 } }, rows.map(row => {
     const k = row.key, p = row.item.ev?.payload || {};
     if (row.type === 'thinking') return h(ThinkRow, { key: k, row, open: open.has(k), onToggle: () => toggle(k) });
-    if (row.type === 'update') return h('div', { key: k, style: { padding: '3px 0 3px 21px' } }, h(Md, { text: row.text, caret: row.streaming }));
+    if (row.type === 'update') return h('div', { key: k, 'data-quote-seq': row.item.ev?.seq ?? '', style: { padding: '3px 0 3px 21px' } }, h(Md, { text: row.text, caret: row.streaming }));
     if (row.type === 'tool') return h(ToolRow, { key: k, row, ctx, open: open.has(k), onToggle: () => toggle(k) });
     if (row.type === 'question') return h(QuestionRow, { key: k, row });
     if (row.type === 'note') return h(QuietRow, { key: k, icon: p.level === 'warn' || p.level === 'warning' ? 'alert' : 'info', color: p.level === 'warn' || p.level === 'warning' ? T.acct : null }, String(p.text || '').replace(/^./, c => c.toUpperCase()));
@@ -228,7 +228,8 @@ export function TurnView({ turn, ctx }) {
     ...turn.errors.map(it => h(Card, { key: it.key, item: it, ctx })),
     ...(ctx.dock ? [] : turn.pending.map(it => h(Card, { key: it.key, item: it, ctx }))),
     turn.outputs.length ? h(OutputStrip, { key: 'o', outputs: turn.outputs, ctx }) : null,
-    turn.answer ? h(Card, { key: 'a', item: turn.answer.item, ctx }) : null,
+    // data-quote-seq: Select → Reply quotes from here (chat-quote.js), and a quote's click scrolls back to it
+    turn.answer ? h('div', { key: 'a', 'data-quote-seq': turn.answer.item.ev?.seq ?? '', style: { minWidth: 0 } }, h(Card, { item: turn.answer.item, ctx: { ...ctx, turn } })) : null,   // turn: the reply bar's sources and steps (chat-replybar.js)
     turn.undo?.length && !turn.running && ctx.undo ? h(UndoTurn, { key: 'undo', paths: turn.undo, ctx }) : null,
   ];
   return h(R().Fragment, null, ...kids.filter(Boolean));

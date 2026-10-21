@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import time
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
@@ -19,11 +20,12 @@ from typing import Literal
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, Header
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Header, Query
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 import fakeweb
+import favicons
 import pages
 import safety
 
@@ -102,8 +104,11 @@ class FetchOut(BaseModel):
 
 
 def create_app(searxng_url: str | None = None, outputs: Path | None = None, guard: safety.Guard | None = None,
-               hub_url: str | None = None) -> FastAPI:
-    """`hub_url`: where to ask the searxng mod for its URL (default AIHUB_URL; tests pass their own)."""
+               hub_url: str | None = None, icons_dir: Path | None = None,
+               icon_origin: Callable[[str], str] | None = None) -> FastAPI:
+    """`hub_url`: where to ask the searxng mod for its URL (default AIHUB_URL; tests pass their own).
+    `icons_dir`: the favicon cache (default `data/state/web/favicons`); `icon_origin(host)`: where a host's
+    site is (default `https://<host>`; tests point it at their server)."""
     own = (searxng_url or os.environ.get("SEARXNG_URL") or DEFAULT_SEARXNG).rstrip("/")
     hub = (hub_url if hub_url is not None else ("" if searxng_url else os.environ.get("AIHUB_URL", ""))).rstrip("/")
     found = {"url": own, "source": "SEARXNG_URL", "at": 0.0}
@@ -118,6 +123,7 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
             fake.append(fakeweb.FakeWeb.load())
         return fake[0]
     clients: dict[str, httpx.AsyncClient] = {}
+    icons = favicons.Favicons(icons_dir or favicons.default_folder(), lambda: clients["web"], robots, icon_origin)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -288,6 +294,24 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
                         kind=page.kind, content_type=f.content_type, chars=len(page.text),
                         content=untrusted(f"web {f.url}", text) if text else "",
                         truncated=len(page.text) > body.max_chars, published=page.published, note=note)
+
+    @app.get("/v1/favicon", summary="A site's icon, for Chat's Sources",
+             responses={200: {"content": {"image/png": {}, "image/x-icon": {}}}, 404: {"description": "The site has no usable icon"},
+                        422: {"description": "Not a public DNS name"}})
+    async def favicon(host: str = Query(..., max_length=253, description="A host name such as en.wikipedia.org")):
+        """The site's `/favicon.ico`, else its home page's `<link rel="icon">`, fetched once under the fetch
+        rules and cached (favicons.py). ICO, PNG, GIF, JPEG or WebP only, at most 100 KB; never SVG."""
+        h = favicons.valid_host(host)
+        if not h:
+            return error(422, "bad_host", f"{host[:80]!r} isn't a public host name", "pass a DNS name such as example.org")
+        got = await icons.get(h)
+        if not got:
+            r = error(404, "no_favicon", f"{h} has no icon that can be served", "show a placeholder")
+            r.headers["Cache-Control"] = "public, max-age=86400"
+            return r
+        return Response(got[0], media_type=favicons.EXT_TYPES[got[1]], headers={
+            "X-Content-Type-Options": "nosniff", "Cache-Control": f"public, max-age={favicons.BROWSER_CACHE_S}",
+            "Content-Security-Policy": "default-src 'none'; sandbox"})
 
     return app
 

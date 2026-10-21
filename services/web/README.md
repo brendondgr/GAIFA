@@ -1,6 +1,6 @@
 # Web
 
-An AIHub mod (plan Phase 26): web search through a SearXNG on this machine, and pages fetched into Outputs so the chat agent can read and cite them. Setup: [setup/web.md](setup/web.md). The mod guide is [docs/mods.md](../../docs/mods.md).
+An AIHub mod (plan Phase 26): web search through a SearXNG on this machine, and pages fetched and saved as hidden outputs so the chat agent can read and cite them. Setup: [setup/web.md](setup/web.md). The mod guide is [docs/mods.md](../../docs/mods.md).
 
 | Route | What it does |
 |---|---|
@@ -8,6 +8,7 @@ An AIHub mod (plan Phase 26): web search through a SearXNG on this machine, and 
 | `GET /v1/status` | SearXNG up or down (with the reason and where its URL came from), searches, pages fetched, fetches refused |
 | `POST /v1/search` | `{query, categories?, time_range?, language?, limit ≤ 20}` → `{results: [{title, url, snippet, engine, published?}], answers, suggestions, unresponsive}` |
 | `POST /v1/fetch` | `{url, max_chars?}` → the page saved as an output, its final URL, title and first `max_chars` of markdown |
+| `GET /v1/favicon?host=<host>` | A site's icon for Chat's Sources (`favicons.py`): ICO, PNG, GIF, JPEG or WebP, with `nosniff` and a week's browser cache; 404 `no_favicon` when there is none, 422 `bad_host` for an IP, a local name or anything that isn't a DNS name |
 
 The agent's tools are `web_search` and `web_fetch`, both risk `network` (plan 25.1). `web_search` runs without asking: AIHub ships an `always` grant for it (hub.db migration 010), listed in Settings → Agent, where revoking it makes searches ask (`grant_key = "const:search"`, so one answer covers every search). `web_fetch` asks; its `grant_key = "url:host"`, so "allow in this chat" covers one site. The skill [skills/researching](skills/researching/SKILL.md) tells the agent how to research and cite.
 
@@ -17,11 +18,15 @@ The agent's tools are `web_search` and `web_fetch`, both risk `network` (plan 25
 
 **Which SearXNG.** The URL the [`searxng` mod](../searxng/README.md) publishes (`GET /api/s/searxng/v1/endpoint` through the hub, asked at most once a minute), else `SEARXNG_URL` (default `http://127.0.0.1:8080`).
 
+**Site icons** (`favicons.py`, for the Sources pill under a chat reply). The UI asks `/api/s/web/v1/favicon?host=<host>` for each source's host; nothing goes to a third-party icon service. The mod tries `https://<host>/favicon.ico`, then the `<link rel="icon">` (or `shortcut icon`, `apple-touch-icon`, never SVG or `data:`) of the site's home page, which it reads only when that site's `robots.txt` allows it (the `/favicon.ico` request itself skips robots.txt, as browsers do). Every request follows the fetch rules below (public addresses only, checked on every connection and redirect), with an 8 s limit for the whole lookup and 100 KB per icon. An icon is served only when it says it is an image (or `application/octet-stream`, or nothing) **and** its bytes start like an ICO, PNG, GIF, JPEG or WebP; its type comes from those bytes. SVG is refused (it can carry script), and the UI draws the host's first letter instead. Icons are cached in `data/state/web/favicons/<host>.<ext>` (misses as `<host>.miss`): hits for 30 days, misses for a day, at most 2000 files and 20 MB, oldest first. Privacy: showing a reply's sources makes this machine contact each shown site, at most once a month per site: `/favicon.ico`, and when that fails its `robots.txt`, home page and icon. That includes search results the agent didn't open (when the pill shows them, or **Also found** is opened), so those sites learn this machine's address.
+
 ## Outputs
+
+Every saved page is a **hidden** output (plan 30.9): its sidecar says `"hidden": true`, so the hub keeps it for `hub_read_document` / `hub_search_document`, the screening report and citations (by id, its file and text all work), but leaves it out of the Outputs page (unless **Saved web pages** is on), the pickers, the Overview, the agent's output search and the embed library: Outputs holds what the user made. `pages.hide_saved(outputs)` marks pages saved before this (a sidecar with no `hidden` key; one that says `false` is left alone), safe to run any number of times. `[outputs] hidden_keep_days` in `config.toml` moves hidden pages older than that to the outputs trash; `0`, the default, keeps them.
 
 - **Pages** become markdown: `outputs/web/<date>/<HHMMSS>-<host>-<slug>.md`, starting with the title, the source URL and the fetch time, then the page's main content. `htmlmd.py` puts back what trafilatura loses: a code block's language (`language-*`, `lang-*`, `highlight-source-*` classes) and blank lines, taken from the page's `<pre>`; layout tables without a header line (GitHub's comments) become paragraphs, wider ones get a header line. Plain text and JSON are kept as they are (JSON in a fenced block).
 - **PDFs** are saved as they came: `…/<HHMMSS>-<host>-<slug>.pdf` with `kind = "document"` in the sidecar, so the hub's document tools (plan 24.3–24.4) read them. (`[outputs] kinds` in `service.toml` says only `text`: the manifest doesn't accept `document` there yet.)
-- **Sidecar** `<file>.json`: `title`, `kind`, `url` (as asked), `final_url` (after redirects), `fetched_ts`, `fetched` (ISO time), `content_type`, `chars`, `published` and `site` when the page says, `source`.
+- **Sidecar** `<file>.json`: `title`, `kind`, `url` (as asked), `final_url` (after redirects), `fetched_ts`, `fetched` (ISO time), `content_type`, `chars`, `published` and `site` when the page says, `source`, `hidden: true`, and `dry_run: true` from the fake web.
 
 ## Fetch rules (`safety.py`)
 

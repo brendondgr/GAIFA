@@ -13,6 +13,8 @@
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11 } from './chat-ui.js';
 import { renderMarkdown } from './chat-md.js';
 import { todosOpen } from './chat-thread.js';
+import { QuoteBlock } from './chat-quote.js';
+import { ReplyBar } from './chat-replybar.js';
 
 const R = () => globalThis.React;
 const cards = new Map();
@@ -82,6 +84,7 @@ function UserCard({ item, ctx }) {
       ctx.branch ? h(Btn, { kind: 'ghost', sm: true, icon: 'branch', title: 'Branch from here: a new chat up to this message, with it in the box to edit', onClick: () => ctx.branch(item) }) : null,
       h(Btn, { kind: 'ghost', sm: true, icon: 'copy', title: 'Copy', onClick: () => ctx.copy?.(p.text) })),
     h('div', { style: { maxWidth: 'min(85%, 620px)', minWidth: 0, padding: '7px 11px', borderRadius: 10, background: T.hov, border: '1px solid ' + T.bd, display: 'flex', flexDirection: 'column', gap: 6 } },
+      p.quote ? h(QuoteBlock, { quote: p.quote, ctx }) : null,    // Select → Reply: the part of a reply this answers
       h('div', { style: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }, p.text),
       atts.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4 } }, atts.map(id => h(AttachmentChip, { key: id, id, ctx, doc: (p.docs || []).find(d => d.id === id) }))) : null,
       // plan 24.9: a document asked for whole that didn't fit says so here, where the user looks
@@ -120,9 +123,10 @@ function AssistantCard({ item, ctx }) {
     ctx?.openCite?.({ ref: a.dataset.cite, page: a.dataset.page, line: a.dataset.line });
   };
   const md = h('div', { className: 'aichat-md' + (item.streaming ? ' aichat-caret' : ''), style: { fontSize: 13, padding: '0 2px' }, onClick, dangerouslySetInnerHTML: { __html: html } });
-  if (item.streaming || item.ev.seq == null || !ctx?.feedback || !text.trim()) return md;
+  if (item.streaming || item.ev.seq == null || !text.trim() || ctx?.turn?.running) return md;
+  // the reply bar: Sources, Copy (three ways), thumbs (chat-replybar.js)
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2 } }, md,
-    h('div', { style: { display: 'flex', opacity: 0.8 } }, h(Thumbs, { ctx, target: { seq: item.ev.seq }, label: 'this reply' })));
+    h(ReplyBar, { text, ctx, thumbs: h(Thumbs, { ctx, target: { seq: item.ev.seq }, label: 'this reply' }) }));
 }
 
 // ---------- a proposal from the miner (plan 21.5, 21.7): a preference it noticed, to approve here ----------

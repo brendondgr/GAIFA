@@ -28,6 +28,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | I — Setup docs | 23 | A doc per environment (in its mod) and per model (generated from the registry, with hand-written sections), kept in sync by `aihub docs` and a test | No: docs, a CLI command and a registry change hook |
 | J — The agent reads, searches and works | 24–30 | Documents, text and code in Chat; permission tiers and grants; web search (SearXNG); workspaces with edits in place, a sandbox and chat modes; search by meaning (EmbeddingGemma 2); speech to text; an Auto mode with a local judge | Chat, the approvals and the outputs index (additive); four new mods |
 | K — One GPU job at a time | 31 | A hub-wide GPU slot that mods take around their GPU work: a queue, groups for LLM engines, leases that expire, the queue in the UI | comfy, gen3d, tts, stt, decide, embed and the relay (each takes the slot); nothing is removed |
+| L — Replies you can act on | 32 | Under a reply, the pages it read (with their icons) and Copy in three ways; Select → Reply with the quote as markdown | Chat, the agent's send API, the web mod (a favicon route); additive |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -63,6 +64,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 29 | New `stt` mod (speech to text) | M–L | the stt page; the mic button in Chat |
 | 30 | Auto mode: a small local judge, and a `decide` mod for decision models | M–L | Auto in the mode picker; judged calls with their reasons; the decide page |
 | 31 | The GPU queue: one generative GPU job at a time | L | the header's GPU section, the Overview widget, waiting rows in Chat and on mod pages |
+| 32 | The reply bar and Select → Reply | M | `chat`: Sources, Copy and thumbs under a reply; the Reply button on a selection, the quote chip and the quote on a message |
 
 # Stage A — Foundation
 
@@ -2854,6 +2856,30 @@ The user asked (2026-10-21) for work to **wait for the GPU**: a queue, so only o
 | Local LLMs | per-request leases | `services/relay/` (or `lcpp`, `vllm`) |
 | UI | the header's GPU section, the Overview widget, waiting rows | `web/` |
 | Tests | per step, named in each `Done when` | `utils/tests/gpu/`, `services/<id>/tests/` |
+
+---
+
+# Stage L — Replies you can act on
+
+Asked for 2026-10-21, after Perplexity's reply bar and Claude's Select → Reply: a reply shows the pages it read and copies in the way you want, and you can answer one part of it. Chat only (`web/chat/`), the agent's send API and the web mod's icons; nothing new is stored on the server for the sources.
+
+---
+
+## Phase 32 — The reply bar and Select → Reply
+
+- [x] **32.1 The reply bar: `chat-replybar.js`, `chat-sources.js`, `chat-copy.js`; the web mod's `GET /v1/favicon`.** Under a finished reply: the Sources pill (up to three site icons, the number of pages the turn read) and its popover (the queries, the pages read with host, title and snippet, then the search results it didn't open), Copy in three ways (Text only, Including citations, Including thinking and steps) with the default the way picked most in the last 24 hours, and the thumbs. Sources are derived from the turn's events. Site icons come through the web mod (`services/web/favicons.py`) under its fetch rules, sniffed, never SVG, cached in `data/state/web/favicons/`. Brief §11.13.
+  *Done when:* `utils/tests/web/chat-sources.test.mjs` (read vs found, dedupe and redirects, the count, a capped result, snippets, unsafe URLs, the three copy texts, the 24-hour default with injected time), `services/web/tests/test_favicon.py` (24: serving and caching, the type from the bytes, link icons without SVG, robots, refusals, private addresses and redirects to them, the cache's limits).
+  *Live 2026-10-21:* on the installed hub, the user's Torres del Paine chat shows "6 sources" with the sites' icons; the popover lists the queries, "Read 6 pages" and each page's title and snippet.
+
+- [x] **32.2 Select → Reply: `chat-quote.js`, the agent's `quote`.** Selecting part of a reply offers Reply; the quote (the selection turned back into markdown: `clipTree`, `htmlToMarkdown`) sits above the composer and goes with the message as `quote: {text, seq}`; the agent keeps it on the user event and gives it to the model as a blockquote and a note before the user's words (architecture §14.1); the user's message shows it, and a click scrolls to the reply. Brief §11.13.
+  *Done when:* `utils/tests/web/quote.test.mjs` (the round trip renderMarkdown → markdown over headings, lists, code with its language, aligned tables, links, citations and formatting; partial selections in a paragraph, table cells and code; the composer chip; the user card's quote; `send`'s `quote`), `services/agent/tests/test_quote.py` (stored, checked, the model input, nothing gets out of the blockquote, compaction and branch).
+  *Checked 2026-10-21:* in a browser on the mock (select, Reply, the chip, send, the quote on the user card, scroll back, Branch from here), and on the real agent with skynet (stored with `quote {text, seq}`, both 422 cases).
+
+**Wire — Phase 32:** the reply bar under every finished reply; Select → Reply in every chat.
+
+**Checks & deliverables — Phase 32**
+- [x] Delivered: `web/chat/chat-replybar.js`, `chat-sources.js`, `chat-copy.js`, `chat-quote.js`, `chat-mock-web.js`, `services/web/favicons.py`, the agent's `quote`, the tests.
+- [ ] Live with you: a researched answer copies in each of the three ways, and a quoted follow-up is answered about the quoted part.
 
 ---
 

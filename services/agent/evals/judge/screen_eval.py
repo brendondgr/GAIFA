@@ -4,6 +4,8 @@ injection):
 
     uv run python -m services.agent.evals.judge.screen_eval --name patterns --patterns-only
     uv run python -m services.agent.evals.judge.screen_eval --name skynet --backend relay --model auto --url http://localhost:9090
+    uv run python -m services.agent.evals.judge.screen_eval --name d3-lite+skynet --backend decide --model d3-lite \
+        --url http://127.0.0.1:7000/api/s/decide --confirm-model skynet      # the cascade (plan 30.8)
 
 Sets:
 - **deepset** (prompt-injections, Apache-2.0): each text screened alone; label 1 should be flagged, label 0 not.
@@ -26,7 +28,7 @@ from pathlib import Path
 import httpx
 
 from utils.tools.judge import JudgeConfig
-from utils.tools.screen import MAX_WINDOW, passages, screen
+from utils.tools.screen import MAX_WINDOW, ScreenConfig, passages, screen
 
 from .bench import AGENTDOJO, BENCH
 
@@ -56,6 +58,8 @@ def planted() -> list[tuple[str, str, int]]:
 
 async def run(a: argparse.Namespace) -> None:
     cfg = JudgeConfig(backend=a.backend, model=a.model, url=a.url, threshold=a.threshold)
+    if a.confirm_model:      # plan 30.8's cascade: a decision model flags, a chat model (relay) has the final say
+        cfg = ScreenConfig(**cfg.__dict__, confirm=JudgeConfig(backend="relay", model=a.confirm_model, url=a.confirm_url))
     window = a.window or MAX_WINDOW                     # characters of passages per model call
     deepset = [json.loads(line) for line in (BENCH / "deepset.jsonl").read_text().splitlines()]
     if a.limit:
@@ -129,6 +133,8 @@ def main() -> None:
     ap.add_argument("--deepset-only", action="store_true", help="only the deepset texts (a CPU model is slow on pages)")
     ap.add_argument("--window", type=int, default=0, help="characters of passages per model call (default: screen.py's)")
     ap.add_argument("--patterns-only", action="store_true")
+    ap.add_argument("--confirm-model", default="", help="with --backend decide: the chat model that re-reads what it flags")
+    ap.add_argument("--confirm-url", default="http://127.0.0.1:4000", help="the relay for --confirm-model")
     ap.add_argument("--summary", action="store_true")
     a = ap.parse_args()
     if a.summary:

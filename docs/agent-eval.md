@@ -267,6 +267,18 @@ skynet (MiniCPM-V 4.7 35B, remote) ran on 2026-10-20 while the local GPU was pau
   - The default is 800 for the default judge (MiniCPM5 2B); with a large judge, set 6,000. A long passage is always read whole (up to 6,000 characters), and windows go to the model 4 at a time.
 - **d3-lite** catches everything at 0.95 but flags two thirds of ordinary pages: as a screener it would remove most of the page. It's not a screening choice as is.
 - **With the default judge (MiniCPM5 2B), screening is weaker than the judge:** 6 of 35 planted attacks get through. They still reach the chat model inside `<untrusted>`, with the base prompt's rule, and any call they lead to is judged. With skynet as the judge, 35 of 35 are caught.
+### Screening with a decision model and a confirming chat model (plan 30.8, live 2026-10-21)
+
+The cascade the page reader offers (`[agent.screen] backend = "decide"`, `confirm = true`): d3-lite (the decide mod, on this GPU) flags passages, a chat model re-reads only what it flagged and has the final say. Measured with `screen_eval --backend decide --model d3-lite --confirm-model skynet` on rebuilt bench data (deepset, AgentDojo's planted attacks, the ten real pages refetched):
+
+| Setup | deepset caught | deepset false flags | planted caught | other passages flagged | real-page false flags | median per item |
+|---|---|---|---|---|---|---|
+| d3-lite + skynet (confirm) | 162 / 263 | 1 / 399 | 35 / 35 | 0 / 1,344 | 8 / 1,077 (2 pages about injection) | 280 ms |
+| skynet alone (2026-10-20) | 159 / 263 | 2 / 399 | 35 / 35 | 0 | 12 / 951 | 655 ms |
+| d3-lite alone (2026-10-20) | 261 / 263 | 75 / 399 | 35 / 35 | 831 | 645 / 951 | 269 ms |
+
+The cascade is as accurate as the chat model alone, and d3-lite's false flags are gone, but it isn't faster on whole pages (3.5–73 s each): d3-lite flags about two thirds of ordinary passages, so the chat model re-reads most of them anyway. Kept as an option; the default stays the judge's chat model. Note: on the day, the judge's model (gemma4-26B) wasn't loaded, so screening fell back to patterns (`checked: "patterns"`), which remove every passage with AI-aimed phrases, including on pages that only discuss prompt injection.
+
 ### Stage J on the installed hub (overnight 2026-10-21)
 
 **What was run:** the full eval (53 tasks) against the real hub after Stage J landed, with dry runs. skynet's upstream was MiniCPM-V 4.7 35B; the local run used Gemma 4 26B through lcpp. Nine tasks are skipped on this machine because the 2026-10-20 cleanup removed their models: Wan 2.1 video, and the Z-Image and IntoRealism checkpoints. A task now names what it needs (`needs=`), and a skipped task is reported with the reason and kept out of the pass rates.

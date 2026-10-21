@@ -406,6 +406,8 @@ class Calls:
                 c.result = await c.tool.handler(self.hub, c.arguments)
             else:
                 await self._mod_call(c, resume_job)
+                if c.tool.name == "web_fetch":
+                    await self._screen_page(c)
             c.state = "done"
         except asyncio.CancelledError:
             c.state = "cancelled"
@@ -433,6 +435,17 @@ class Calls:
             c.done.set()
             self._publish(c)
             asyncio.get_running_loop().call_later(600, self.live.pop, c.id, None)
+
+    async def _screen_page(self, c: Call) -> None:
+        """Plan 30.6: a fetched page's text is screened before the agent reads it; the output keeps the whole page."""
+        from utils.tools.screen import report, screen_for
+
+        if not isinstance(c.result, dict) or not isinstance(c.result.get("content"), str):
+            return
+        s = await screen_for(self.hub.config, c.result["content"], "page")
+        if s is not None:
+            c.result["content"] = s.text
+            c.result["screening"] = report(s)
 
     async def _ensure_up(self, c: Call) -> Any:
         mgr = self.hub.services

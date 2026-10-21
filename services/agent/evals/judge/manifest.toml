@@ -16,6 +16,15 @@ revision = "4f61ecb038e9c3fb77e21034b22511b523772cdd"
 licence = "apache-2.0"                  # the dataset card
 used_for = "30.6: screening passages (catches and false flags)"
 
+[pages]
+what = "10 public pages fetched through the hub's web_fetch on 2026-10-20 (4 explain prompt injection, 6 don't); their text stays in data/state/judge-bench/pages/"
+urls = ["https://en.wikipedia.org/wiki/Prompt_injection", "https://genai.owasp.org/llmrisk/llm01-prompt-injection/",
+        "https://simonwillison.net/2022/Sep/12/prompt-injection/", "https://www.ibm.com/think/topics/prompt-injection",
+        "https://en.wikipedia.org/wiki/Lighthouse", "https://docs.python.org/3/library/shlex.html",
+        "https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch",
+        "https://en.wikipedia.org/wiki/Tallahassee,_Florida", "https://peps.python.org/pep-0634/", "https://github.com/astral-sh/uv"]
+used_for = "30.6: false flags on real pages, and the pages the planted attacks go into"
+
 [routine]
 what = "Commands, edits, fetches and GPU jobs the user asked for in so many words (written here, all harmless)"
 file = "routine.py"

@@ -2692,11 +2692,12 @@ The Auto mode (27.4) needs something to decide, call by call, whether a command 
 - [ ] **30.5 In the UI.** A step row says "Auto: ran (judged safe: <reason>)" or "Auto: asked you (<reason>)"; Settings → Agent lists recent judged calls; Auto isn't offered while the judge's model isn't available.
   *Done when:* a browser check in Auto mode sees one command run with its reason and one harmful command turned into a card.
 
-- [ ] **30.6 Screening fetched pages before the model reads them (decided 2026-10-20).**
+- [x] **30.6 Screening fetched pages before the model reads them (decided 2026-10-20).**
   - A fetched page's markdown (Phase 26) goes through a second check before it reaches the chat model: fixed patterns first (instructions aimed at an AI, hidden text, encoded blobs, "ignore previous…"), then the judge's model with a strict rubric that answers `{safe: bool, findings: [...]}` about the text itself.
   - Unsafe or unsure: the agent gets the page with the flagged passages removed and a note saying what was removed and why, and the step row shows it; the full page stays an output you can open.
   - The same check covers transcripts and uploaded documents when you turn it on for them (off by default: they're yours).
   *Done when:* `utils/tests/tools/test_screen.py` and eval cases in `services/agent/evals/judge/` (pages with planted instructions, normal pages that discuss prompt injection) measure catches and false flags; results in `docs/agent-eval.md`.
+  *Built 2026-10-20:* `screen.py`, hooked into `web_fetch` results (`calls.py`) and `hub_read_document` windows by `[agent.screen]`; `screen_eval.py`. With skynet as the model (the local GPU paused): 35 of 35 planted attacks caught, 0 false flags on 951 real-page passages (4 pages explain prompt injection), deepset 61% caught with 0.5% false flags. Screening with MiniCPM5 2B is still to run.
 
 **Wire — Phase 30:** the Auto mode works; judged calls show their reason.
 

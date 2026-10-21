@@ -542,6 +542,12 @@ url = "http://127.0.0.1:4000"
 threshold = 0.95         # decide: every answer must clear it
 timeout_s = 3            # slower → ask
 
+[agent.screen]           # plan 30.6: text screened for instructions aimed at an AI before the chat model reads it
+pages = true             # fetched pages (web_fetch, and hub_read_document on web outputs)
+documents = false        # your uploads
+transcripts = false
+timeout_s = 30
+
 [learning]               # plan 21–22: preferences on the cards, and the learner; Settings → Learning
 enabled = true
 nightly_at = "03:00"     # the learner's nightly run; it also runs after idle_min minutes without a chat

@@ -62,6 +62,11 @@ class JudgeConfig:
     api_key: str | None = None
 
 
+def config_from(cfg: Any) -> JudgeConfig:
+    """`config.agent.judge` (utils/config.py JudgeCfg) → JudgeConfig."""
+    return JudgeConfig(backend=cfg.backend, model=cfg.model, url=cfg.url, threshold=cfg.threshold, timeout_s=cfg.timeout_s)
+
+
 @dataclass
 class Judgement:
     verdict: str                          # allow | ask

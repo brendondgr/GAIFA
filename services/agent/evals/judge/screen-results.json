@@ -1,0 +1,106 @@
+{
+ "d3-lite-cpu": {
+  "deepset": {
+   "injections": 26,
+   "caught": 26,
+   "catch_rate": 1.0,
+   "benign": 54,
+   "false_flags": 12,
+   "false_flag_rate": 0.2222
+  },
+  "planted": {
+   "pages": 0,
+   "caught": 0,
+   "catch_rate": null,
+   "other_passages": 0,
+   "false_flags": 0
+  },
+  "pages": {
+   "pages": 0,
+   "passages": 0,
+   "pages_with_a_false_flag": 0,
+   "false_flags": 0,
+   "discussing_injection_flagged": 0
+  },
+  "model_unanswered": 0,
+  "ms_median_per_item": 9053.3
+ },
+ "patterns": {
+  "deepset": {
+   "injections": 263,
+   "caught": 41,
+   "catch_rate": 0.1559,
+   "benign": 399,
+   "false_flags": 0,
+   "false_flag_rate": 0.0
+  },
+  "planted": {
+   "pages": 35,
+   "caught": 0,
+   "catch_rate": 0.0,
+   "other_passages": 1044,
+   "false_flags": 0
+  },
+  "pages": {
+   "pages": 10,
+   "passages": 951,
+   "pages_with_a_false_flag": 4,
+   "false_flags": 23,
+   "discussing_injection_flagged": 4
+  },
+  "model_unanswered": 707,
+  "ms_median_per_item": 0.0
+ },
+ "skynet-minicpmv47-35b": {
+  "deepset": {
+   "injections": 263,
+   "caught": 161,
+   "catch_rate": 0.6122,
+   "benign": 399,
+   "false_flags": 2,
+   "false_flag_rate": 0.005
+  },
+  "planted": {
+   "pages": 35,
+   "caught": 35,
+   "catch_rate": 1.0,
+   "other_passages": 1044,
+   "false_flags": 0
+  },
+  "pages": {
+   "pages": 10,
+   "passages": 951,
+   "pages_with_a_false_flag": 0,
+   "false_flags": 0,
+   "discussing_injection_flagged": 0
+  },
+  "model_unanswered": 1,
+  "ms_median_per_item": 973.3
+ },
+ "skynet-minicpmv47-35b.rubric1": {
+  "deepset": {
+   "injections": 263,
+   "caught": 84,
+   "catch_rate": 0.3194,
+   "benign": 399,
+   "false_flags": 1,
+   "false_flag_rate": 0.0025
+  },
+  "planted": {
+   "pages": 35,
+   "caught": 34,
+   "catch_rate": 0.9714,
+   "other_passages": 1044,
+   "false_flags": 0
+  },
+  "pages": {
+   "pages": 10,
+   "passages": 951,
+   "pages_with_a_false_flag": 0,
+   "false_flags": 0,
+   "discussing_injection_flagged": 0
+  },
+  "model_unanswered": 1,
+  "ms_median_per_item": 871.1
+ }
+}

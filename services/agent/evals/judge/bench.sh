@@ -11,4 +11,12 @@ uv pip install -q --python "$B/.venv/bin/python" agentdojo==0.1.35 pandas pyarro
 "$B/.venv/bin/python" -I "$HERE/extract_agentdojo.py" "$B/agentdojo-v1.2.jsonl"
 HF_HOME="$ROOT/data/models/hf-cache" "$B/.venv/bin/hf" download deepset/prompt-injections --repo-type dataset \
   --revision 4f61ecb038e9c3fb77e21034b22511b523772cdd --local-dir "$B/deepset-prompt-injections" >/dev/null
+"$B/.venv/bin/python" -I - "$B/deepset-prompt-injections/data" "$B/deepset.jsonl" <<'PY'
+import json, pathlib, sys
+import pandas as pd
+with open(sys.argv[2], "w") as f:
+    for p in sorted(pathlib.Path(sys.argv[1]).glob("*.parquet")):
+        for r in pd.read_parquet(p).itertuples():
+            f.write(json.dumps({"split": p.name.split("-")[0], "text": r.text, "label": int(r.label)}) + "\n")
+PY
 echo "judge bench ready in $B"

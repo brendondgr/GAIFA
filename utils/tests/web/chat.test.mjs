@@ -35,11 +35,34 @@ test('markdown escapes HTML and keeps only safe links', () => {
 test('markdown blocks and inline spans', () => {
   assert.equal(md.renderMarkdown('**bold** and *it* and `a<b`'), '<p><strong>bold</strong> and <em>it</em> and <code>a&lt;b</code></p>');
   assert.equal(md.renderMarkdown('- one\n- two\n\n1. a\n2. b'), '<ul><li>one</li><li>two</li></ul><ol><li>a</li><li>b</li></ol>');
-  assert.equal(md.renderMarkdown('```js\nconst x = "<b>";\n```'), '<pre data-lang="js"><code>const x = &quot;&lt;b&gt;&quot;;</code></pre>');
+  assert.equal(md.renderMarkdown('```js\nconst x = "<b>";\n```'), '<div class="aichat-code"><div class="aichat-code-bar"><span>js</span><button type="button" class="aichat-copy" title="Copy code">Copy</button></div>'
+    + '<pre data-lang="js"><code><span class="k">const</span> x = <span class="s">&quot;&lt;b&gt;&quot;</span>;</code></pre></div>');
   assert.equal(md.renderMarkdown('`**not bold**`'), '<p><code>**not bold**</code></p>');
   assert.equal(md.renderMarkdown('line one\nline two'), '<p>line one<br>line two</p>');
   assert.equal(md.renderMarkdown('## Title\n---'), '<h4>Title</h4><hr>');
-  assert.equal(md.renderMarkdown('```\nunclosed'), '<pre><code>unclosed</code></pre>');  // while streaming
+  assert.ok(md.renderMarkdown('```\nunclosed').endsWith('<pre><code>unclosed</code></pre></div>'));  // while streaming
+});
+
+test('markdown tables: cells, alignment, escaping, ragged rows, pipes in code', () => {
+  const t = md.renderMarkdown('Boots:\n\n| Kind | Weight | Dries |\n|:---|---:|:-:|\n| **Leather** | 1.4 kg | slow |\n| Synthetic <b> | 0.9 kg |\n| `a|b` | x \\| y | z | extra |\n\nAfter.');
+  assert.ok(t.startsWith('<p>Boots:</p><div class="aichat-table"><table><thead><tr><th>Kind</th><th style="text-align:right">Weight</th><th style="text-align:center">Dries</th></tr></thead><tbody>'), t);
+  assert.ok(t.includes('<tr><td><strong>Leather</strong></td><td style="text-align:right">1.4 kg</td><td style="text-align:center">slow</td></tr>'), t);
+  assert.ok(t.includes('<td>Synthetic &lt;b&gt;</td><td style="text-align:right">0.9 kg</td><td style="text-align:center"></td>'), t);   // short row padded
+  assert.ok(t.includes('<td><code>a|b</code></td><td style="text-align:right">x | y</td><td style="text-align:center">z</td></tr>'), t);   // extra cell dropped
+  assert.ok(t.endsWith('</tbody></table></div><p>After.</p>'), t);
+  assert.ok(!md.renderMarkdown('a | b\nnot a delimiter').includes('<table>'));
+  assert.equal(md.renderMarkdown('| only | head |\n|---|---|'), '<div class="aichat-table"><table><thead><tr><th>only</th><th>head</th></tr></thead></table></div>');
+  assert.equal(md.renderMarkdown('## T\n---'), '<h4>T</h4><hr>');   // a bare --- is still a rule
+});
+
+test('code blocks: tilde fences, info strings, aliases and an escaped language', () => {
+  const py = md.renderMarkdown('~~~py title="x.py"\ndef f(): return "<x>"  # hi\n~~~');
+  assert.ok(py.includes('<span>py</span>') && py.includes('<span class="k">def</span>') && py.includes('<span class="c"># hi</span>') && py.includes('&quot;&lt;x&gt;&quot;'), py);
+  const four = md.renderMarkdown('````md\n```js\nx\n```\n````');   // a longer fence holds a shorter one
+  assert.ok(four.includes('<code>```js\nx\n```</code>'), four);
+  const diff = md.renderMarkdown('```diff\n-old\n+new\n```');
+  assert.ok(diff.includes('<span class="d">-old</span>\n<span class="s">+new</span>'), diff);
+  assert.ok(md.renderMarkdown('```SQL\nSELECT 1\n```').includes('<span class="k">SELECT</span>'));
 });
 
 const ev = (seq, type, payload) => ({ thread_id: 't', seq, ts: seq, type, payload });

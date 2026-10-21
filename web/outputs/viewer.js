@@ -1,11 +1,12 @@
 // The text and PDF viewer for outputs (plan 24.7), shown in the Outputs drawer for text and document
-// outputs (on the Outputs page and over the chat). Text and code get line numbers and a small
-// highlighter (keywords, strings, comments; no library), markdown can be shown rendered, PDFs page by
-// page as images (plan 24.3's page route) with the page's text beside them, and a search box uses the
-// hub's search. `at` ({page} or {line}) opens it at a citation from the chat. The pure parts
-// (highlightLine, langOf, startAt) are tested in utils/tests/web/citations.test.mjs.
+// outputs (on the Outputs page and over the chat). Text and code get line numbers and the small
+// highlighter in chat/highlight.js (keywords, strings, comments; no library), markdown can be shown
+// rendered, PDFs page by page as images (plan 24.3's page route) with the page's text beside them, and a
+// search box uses the hub's search. `at` ({page} or {line}) opens it at a citation from the chat. The pure
+// parts (langOf, startAt, and highlightLine re-exported) are tested in utils/tests/web/citations.test.mjs.
 
-import { renderMarkdown, escapeHtml, MD_CSS } from '../chat/chat-md.js';
+import { renderMarkdown, MD_CSS, installCopy } from '../chat/chat-md.js';
+import { highlightLine } from '../chat/highlight.js';
 
 const R = () => globalThis.React;
 const h = (...a) => R().createElement(...a);
@@ -14,44 +15,14 @@ const C = { bd: 'var(--bd,#1D2430)', bds: 'var(--bds,#2A3547)', inset: 'var(--in
   tx: 'var(--tx,#E6EAF2)', cy: 'var(--cy,#58C4DD)', hl: 'var(--tacc,rgba(255,178,36,.16))' };
 const TEXT_WINDOW = 48000, MAX_WINDOWS = 20;
 
-// ---- the highlighter ------------------------------------------------------------------------------
+// ---- the highlighter (shared with the chat's code blocks) --------------------------------------
 
-const WORDS = {
-  python: 'and as assert async await break class continue def del elif else except False finally for from global if import in is lambda None nonlocal not or pass raise return self True try while with yield',
-  shell: 'case do done elif else esac exit export fi for function if in local return set then until while echo',
-  sql: 'select from where and or not insert into values update set delete create table index join left right inner outer on group by order having limit as null is in like distinct union',
-  rust: 'as async await break const continue crate else enum extern false fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use where while',
-  go: 'break case chan const continue default defer else fallthrough for func go goto if import interface map package range return select struct switch type var nil true false',
-  c: 'auto break case catch char class const continue default delete do double else enum extern false float for friend goto if inline int long namespace new nullptr private protected public return short signed sizeof static struct switch template this throw true try typedef typename union unsigned using virtual void volatile while bool',
-  js: 'async await break case catch class const continue debugger default delete do else export extends false finally for from function if import in instanceof let new null of return static super switch this throw true try typeof undefined var void while with yield interface type enum implements',
-};
-const FAMILY = { python: 'python', shell: 'shell', fish: 'shell', powershell: 'shell', sql: 'sql', rust: 'rust', go: 'go',
-  c: 'c', cpp: 'c', java: 'c', csharp: 'c', kotlin: 'c', swift: 'c', php: 'js', javascript: 'js', typescript: 'js', tsx: 'js', jsx: 'js', ruby: 'python', lua: 'python', r: 'python', julia: 'python',
-  toml: 'conf', yaml: 'conf', ini: 'conf', env: 'conf' };
-const HASH = new Set(['python', 'shell', 'conf']);
-const KW = Object.fromEntries(Object.entries(WORDS).map(([k, v]) => [k, new Set(v.split(' '))]));
+export { highlightLine };
 
 /** `code:python` → python; other subtypes → the language they name, or ''. */
 export function langOf(subtype) {
   const m = /^(?:code|config|web|data):(.+)$/.exec(subtype || '');
   return m ? m[1] : subtype === 'notebook' ? 'python' : '';
-}
-
-/** One line of code as HTML: every character escaped, keywords, strings, numbers and comments in spans. */
-export function highlightLine(line, lang) {
-  const fam = FAMILY[lang] || (lang ? 'c' : ''), kw = KW[fam];
-  if (!fam) return escapeHtml(line);
-  const comment = HASH.has(fam) ? '#.*' : fam === 'sql' ? '--.*' : '\\/\\/.*|\\/\\*.*?(?:\\*\\/|$)';
-  const rx = new RegExp(`(${comment})|("(?:[^"\\\\]|\\\\.)*"?|'(?:[^'\\\\]|\\\\.)*'?|\`[^\`]*\`?)|(\\b\\d[\\d_.xXa-fA-F]*\\b)|([A-Za-z_][\\w]*)`, 'g');
-  let out = '', last = 0;
-  for (const m of line.matchAll(rx)) {
-    out += escapeHtml(line.slice(last, m.index));
-    const t = escapeHtml(m[0]);
-    out += m[1] ? `<span class="c">${t}</span>` : m[2] ? `<span class="s">${t}</span>` : m[3] ? `<span class="n">${t}</span>`
-      : kw && kw.has(m[4]) ? `<span class="k">${t}</span>` : t;
-    last = m.index + m[0].length;
-  }
-  return out + escapeHtml(line.slice(last));
 }
 
 /** Where to open: a PDF at a page, anything else at a line. */
@@ -72,7 +43,9 @@ const btn = { height: 26, padding: '0 9px', borderRadius: 6, border: '1px solid 
 
 function useCss() {
   R().useEffect(() => {
-    if (typeof document === 'undefined' || document.getElementById('aiview-css')) return;
+    if (typeof document === 'undefined') return;
+    installCopy();
+    if (document.getElementById('aiview-css')) return;
     const s = document.createElement('style');
     s.id = 'aiview-css';
     s.textContent = VIEWER_CSS + MD_CSS;

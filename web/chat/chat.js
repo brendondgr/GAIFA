@@ -8,7 +8,7 @@
 //   registerPreview(kind, Component)  how a result of a new output kind is shown
 
 import { h, T, Icon, Btn, COL, useWidth, chipSt, label11 } from './chat-ui.js';
-import { MD_CSS } from './chat-md.js';
+import { MD_CSS, installCopy } from './chat-md.js';
 import { Card, CARD_CSS, TodoList } from './chat-cards.js';
 import './chat-forms.js';
 import './chat-results.js';
@@ -41,6 +41,7 @@ export function getChatClient(api) {
 }
 function injectCss() {
   if (typeof document === 'undefined' || document.getElementById('aichat-css')) return;
+  installCopy();
   const s = document.createElement('style');
   s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + PAGE_CSS;
   document.head.appendChild(s);

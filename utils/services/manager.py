@@ -238,7 +238,10 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         argv = self._command(svc)
         if svc.external or not argv:
             return True
-        exe = (svc.m.run.installed if svc.m and svc.m.run.installed else None) or argv[0]
+        return any(self._exists(svc, exe) for exe in (list(svc.m.run.installed) if svc.m and svc.m.run.installed else [argv[0]]))
+
+    @staticmethod
+    def _exists(svc: Service, exe: str) -> bool:
         if exe.startswith("~"):
             exe = str(Path(exe).expanduser())
         if "/" in exe:

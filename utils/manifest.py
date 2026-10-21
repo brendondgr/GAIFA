@@ -83,7 +83,12 @@ class RunSpec(_Strict):
     restart: Literal["no", "on-failure"] = "on-failure"
     after: list[str] = []
     install: str | None = None
-    installed: str | None = None   # what exists once the mod is set up (a path, ~/… or in the mod folder, or a command); default: the command's first word
+    installed: list[str] = []   # what exists once the mod is set up: paths (~/… or in the mod folder) or commands, any one; default: the command's first word
+
+    @field_validator("installed", mode="before")
+    @classmethod
+    def _one_or_more(cls, v: Any) -> Any:
+        return [v] if isinstance(v, str) else v
 
     @field_validator("command", mode="before")
     @classmethod

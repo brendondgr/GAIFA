@@ -16,7 +16,7 @@ env_file = ".env"
 start_timeout_s = 30
 stop_timeout_s = 30                  # an agent turn can run for minutes; don't cut it shorter
 restart = "on-failure"
-installed = "~/.opencode/bin/opencode"  # run.sh is tracked: the mod is set up once OpenCode's installer has run
+installed = ["~/.opencode/bin/opencode", "~/.local/bin/opencode", "opencode"]  # run.sh is tracked: set up once OpenCode is installed where run.sh looks
 
 [run.env]
 OPENCODE_PORT = "{port}"

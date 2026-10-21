@@ -231,6 +231,7 @@ async def test_a_mod_that_isnt_installed_isnt_autostarted(rig):
     rig.add("fake-ok", as_id="fresh", edit={"command": '[".venv/bin/python", "server.py"]'})   # no .venv yet
     rig.add("fake-ok", as_id="ready-one")
     rig.add("fake-ok", as_id="script", edit={"installed": '"~/.aihub-test-missing/bin/tool"'})   # a tracked command, its tool not installed
+    rig.add("fake-ok", as_id="either", edit={"installed": '["~/.aihub-test-missing/bin/tool", "sh"]'})   # any one of them
     mgr = await rig.manager(autostart=True)
     await until(lambda: mgr.get("ready-one").state == "ready")
     await asyncio.sleep(0.2)
@@ -238,6 +239,7 @@ async def test_a_mod_that_isnt_installed_isnt_autostarted(rig):
     assert fresh.state == "stopped" and fresh.last_error == "not installed: run `aihub setup fresh`"
     assert mgr.installed(fresh) is False and mgr.installed(mgr.get("ready-one")) is True
     assert mgr.get("script").state == "stopped" and mgr.installed(mgr.get("script")) is False
+    assert mgr.installed(mgr.get("either")) is True
 
 
 async def test_port_conflict_names_the_holder(rig):

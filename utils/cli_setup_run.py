@@ -295,12 +295,13 @@ def download(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespac
         except Exception as x:  # noqa: BLE001: the hub's error, or the mod's
             # Refused while an earlier run's download still goes on (a Ctrl-C): wait for it, and
             # the suggestion's skip_if says whether the model is there now.
-            running = {str(j.get("id")) for j in _jobs(runner, e.mod) if str(j.get("state", "")).lower() not in TERMINAL}
-            if not (running and s.skip_if):
+            if not s.skip_if:
                 raise Stop("failed", output=f"{s.op}: {getattr(x, 'detail', x)}") from None
-            say(args, f"    {s.op} refused ({getattr(x, 'detail', x)}); waiting for the download already running")
-            follow_jobs(runner, e.mod, before - running, args, s.name)
-            if runner.run(s.skip_if, root / "services" / e.mod, stream=False)[0]:
+            running = {str(j.get("id")) for j in _jobs(runner, e.mod) if str(j.get("state", "")).lower() not in TERMINAL}
+            if running:
+                say(args, f"    {s.op} refused ({getattr(x, 'detail', x)}); waiting for the download already running")
+                follow_jobs(runner, e.mod, before - running, args, s.name)
+            if runner.run(s.skip_if, root / "services" / e.mod, stream=False)[0]:   # or it finished just before
                 raise Stop("failed", output=f"{s.op}: {getattr(x, 'detail', x)}") from None
             return
         follow_jobs(runner, e.mod, before, args, s.name)
@@ -439,7 +440,6 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             report["next"].append(f"{e.id}: {', '.join(missing)} not chosen, and {e.title} can't run without it: its check fails until it's there ({doc_of(e, root)})")
         for s in chosen:
             key = f"{e.id}:{s.name}"
-            started = started or bool(s.start_op)
             if state["models"].get(key) == "done":
                 report["skipped"].append(f"{key}: done in an earlier run")
                 continue
@@ -455,6 +455,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
                 state["models"][key] = "downloaded"
                 save_state(root, state)
                 start(s, e, root, runner, args)
+                started = started or bool(s.start_op)   # launched this run: its model registers on the relay soon
             except Stop as x:
                 raise fail({"setup": e.id, "step": f"model:{s.name}", "output": x.data.get("output", ""), "doc": doc_of(e, root)}) from None
             state["models"][key] = "done"

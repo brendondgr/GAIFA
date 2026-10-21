@@ -240,6 +240,11 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
                 targets.insert(0, "hub")
         for target in targets:
             rc, out = runner.run("aihub restart" if target == "hub" else f"aihub restart {target}", root, stream=False)
+            if rc and target == "hub":
+                # A hub without its systemd unit (`aihub serve`, a test port) can't be restarted from here.
+                report["next"].append(f"{qid}: written to config.toml; restart the hub yourself"
+                                      + (f", then {' and '.join(t for t in targets if t != 'hub')}" if any(t != "hub" for t in targets) else "") + f" ({out.strip()[:200]})")
+                break
             if rc:
                 raise Stop("failed", setup=e.id, step=f"config:{c.key}", output=f"restarting {target} after setting {c.key}: {out}", doc=doc_of(e, root))
         started = started or "relay" in targets      # a restarted relay looks for its endpoints' models again
@@ -257,6 +262,8 @@ def verify(live: list[Any], root: Path, runner: Runner, report: dict[str, Any]) 
             value = get_value(root / "config.toml", c.key)
             if c.choices != "relay-models" or value is None:
                 continue
+            if c.key == "agent.judge.model" and get_value(root / "config.toml", "agent.judge.backend") == "decide":
+                continue                  # a decide model id, not one of the relay's
             models = relay_models(runner, root) if models is None else models
             running = applied(runner, c.key)
             ok = value in models and running in (None, value)

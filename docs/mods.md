@@ -49,10 +49,10 @@ start_timeout_s = 60                # how long health may take after launch
 stop_timeout_s = 30                 # SIGTERM → wait → SIGKILL
 restart = "on-failure"              # retries after 2/4/8 s, at most 3 per 5 min; or "no"
 after = ["relay"]                   # start after these (ordering only)
-# installed = "~/.opencode/bin/opencode"   # optional: what exists once it's set up (default: the command's first word)
+# installed = ["~/.opencode/bin/opencode", "opencode"]   # optional: what exists once it's set up, any one (default: the command's first word)
 ```
 
-- **Installed:** until a mod's command exists (its venv, binary), the hub shows it as "not installed" and doesn't autostart it. A mod whose command is a tracked script (opencode's `./run.sh`) names what its setup makes in `installed`.
+- **Installed:** until a mod's command exists (its venv, binary), the hub shows it as "not installed" and doesn't autostart it. A mod whose command is a tracked script (opencode's `./run.sh`) names what its setup makes in `installed` (a path, `~/…` or in the mod folder, or a command on the hub's `PATH`; a list means any one). A hub running older code rejects the key as unknown: `aihub restart` after pulling.
 
 - **Paths in `command`:** an executable containing `/` resolves against the mod folder (`.venv/bin/python`); a bare name (`python3`, `node`) comes from `PATH`. Arguments starting with `./` or `../` resolve against the mod folder; others are passed as written and are relative to `cwd`, which is the mod folder by default.
 - **Unknown keys are errors**, so a typo like `helth` is reported rather than ignored.

@@ -683,7 +683,9 @@ def test_a_refused_route_waits_for_the_download_already_running(root: Path, caps
     assert cli_setup.cmd_setup(a, Downloading(jobs=jobs), FakeProbe()) == 0
     assert "waiting for the download already running" in capsys.readouterr().err
     b = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"], from_scratch=True)
-    assert cli_setup.cmd_setup(b, Downloading(there_after=99), FakeProbe()) == 1   # refused with nothing running: a failed step
+    assert cli_setup.cmd_setup(b, Downloading(there_after=1), FakeProbe()) == 0    # nothing running, but it finished just before
+    capsys.readouterr()
+    assert cli_setup.cmd_setup(b, Downloading(there_after=99), FakeProbe()) == 1   # refused, and not there: a failed step
     assert "already being downloaded" in out(capsys)["report"]["failed"][0]["output"]
 
 
@@ -736,3 +738,18 @@ def test_the_plan_shows_a_folder_and_a_mods_setups(root: Path, capsys) -> None:
     p = out(capsys)
     assert [q["choices"] for q in p["questions"] if q["kind"] == "value"] == ["folder"]
     assert p["expanded"] == {"gen3d": ["gen3d", "gen3d-cube"]}             # a mod id that's also a setup id says so
+
+
+def test_a_hub_that_cant_be_restarted_leaves_a_next_item(agent_root: Path, capsys) -> None:
+    runner = RelayRunner(["m"], refuse={"/api/services/agent/config"}, fail={"aihub restart"})   # `aihub serve`: no unit
+    assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m"]), runner, FakeProbe()) == 0
+    assert any("restart the hub yourself, then agent" in n for n in out(capsys)["next"])
+    assert "aihub restart agent" not in [c for c, _, _ in runner.ran]
+
+
+def test_a_decide_judge_isnt_checked_against_the_relay(agent_root: Path, capsys) -> None:
+    (agent_root / "config.toml").write_text('[agent.judge]\nbackend = "decide"\nmodel = "d3-lite"\n')
+    runner = RelayRunner(["m"])
+    runner.judge = "d3-lite"
+    assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m"]), runner, FakeProbe()) == 0
+    assert out(capsys)["failed"] == []

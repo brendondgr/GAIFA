@@ -252,6 +252,7 @@ gated = false                               # true: accept the repo's terms on H
 - `scan`: tracked files in the mod (globs relative to its folder, e.g. `workflows/*/workflow.json`) whose mentions of a model's file name or Hugging Face repo are listed in its inventory doc as "referenced by".
 - `[[suggest]]` can name a mod route instead of a repo, for mods with their own downloader: `op = "POST /v1/load"` and `body = { preset = "balanced" }` (no `dest`, `files` or `revision`). Mark weights an engine can't run without `required = true`; everything else is optional, and the default is to download nothing.
 - Unknown keys are errors, at the top and inside `[[steps]]` and `[[suggest]]`; `aihub docs --check` reports them.
+- `aihub setup` runs `[[steps]]` and `check` in the mod's folder, asks every `ask` question and every model choice before it runs anything, and downloads the chosen `[[suggest]]` models after the steps (a step may fetch weights its installer needs offline first: the wizard's download then finds them and only registers them). A `repo` suggestion in `hf-cache` pinned to a commit also gets `refs/main` pointed at it, for engines that load by `main`.
 
 Then these sections, in this order. Leave a section out only when it has nothing to say:
 

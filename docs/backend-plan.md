@@ -30,7 +30,6 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | K — One GPU job at a time | 31 | A hub-wide GPU slot that mods take around their GPU work: a queue, groups for LLM engines, leases that expire, the queue in the UI | comfy, gen3d, tts, stt, decide, embed and the relay (each takes the slot); nothing is removed |
 | L — Replies you can act on | 32 | Under a reply, the pages it read (with their icons) and Copy in three ways; Select → Reply with the quote as markdown | Chat, the agent's send API, the web mod (a favicon route); additive |
 | M — Navigation | 33 | The sidebar in three groups, services shown as a list, a button or counts, a thin rail with state colours, a logo per mod, a Services page | the UI shell, `[ui.nav]`, a `[ui] logo` per mod; additive |
-| N — Other machines | 35–40 | AIHub beyond this machine: hardware detection, memory in pools (RAM and each GPU's VRAM), running without systemd, a variant per accelerator for every mod chosen by `aihub setup`, checked on Linux with NVIDIA and Windows (WSL2) with Intel; macOS by CI. Plan: [plans/portability.md](plans/portability.md) | Additive: this machine keeps its backends; every step's tests include its recorded hardware |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -69,12 +68,6 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 32 | The reply bar and Select → Reply | M | `chat`: Sources, Copy and thumbs under a reply; the Reply button on a selection, the quote chip and the quote on a message |
 | 34 | Environments: the folders a chat may use, and asking for more | M | the chat header's environment chip, the folder card, the Workspace page's Environments |
 | 33 | The sidebar: groups, a thin rail and service logos | M | the sidebar (groups, the rail, the Services menu), the Services page, a logo per mod |
-| 35 | Know the machine: hardware detection | M | the Hardware card in Settings → About |
-| 36 | Memory in pools: RAM and each GPU's VRAM | M–L | one memory bar per pool in the header and the Overview |
-| 37 | Running without systemd, Fedora or AMD | M | — |
-| 38 | Mods choose a backend: variants per accelerator | M | the variant badge and the unavailable state on mod cards |
-| 39 | The mods on other machines | L | — |
-| 40 | Checking on real machines | M | — |
 
 # Stage A — Foundation
 
@@ -2359,7 +2352,7 @@ Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from th
   *Done when:* every doc has a Choosing models section and a block the wizard can use, every `[[suggest]]` repo exists with the stated size (checked through the Hugging Face API, no downloads), and `aihub docs --check --strict` is clean.
   - *As built:* 17 docs (not 25: 11 in 23.4 and 23.5 plus the six Stage J wrote). Each block has a summary, `gpu`, `disk_gb` (this machine's venvs, runtimes and image share), `needs`, `after` where one depends on another, `[[steps]]` and a `check` (run in the mod's folder, like steps; gen3d's and tts's check their venvs and the doctor, since `aihub check tts` fails its clips widget until a clip exists). Suggestions, sizes and licences from the Hugging Face API: required weights for gen3d's three engines, Kokoro, Breeze (Whisper too: Breeze's installer always fetches it), embed and decide; optional ones for lcpp (Qwen3 8B, Gemma 4 26B-A4B), stt (two presets through `POST /v1/load`), comfy (Qwen-Image 2.1 Turbo, its encoder and VAE, TRELLIS.2) and vllm (its two profiles through `POST /v1/downloads`). Suggestions take an optional `kind` (`block.py`), the kind they're registered as. Kokoro loads by `main`, so its doc writes `refs/main` after a download pinned to a commit. Found: the Qwen-Image 2.1 packs need ComfyUI-GGUF (and the Turbo ones KJNodes), which the ComfyUI doc now says.
 
-- [ ] **23.9 The setup, one process for a person and an agent: `aihub setup`.**
+- [x] **23.9 The setup, one process for a person and an agent: `aihub setup`.**
   - **One procedure, two drivers** (user, 2026-10-21): a person runs `aihub setup` and answers its questions; an agent runs the same steps with `--plan --json`, an answers file and a JSON report, asking the person the same questions. Nothing is done one way only.
   - `utils/cli_setup.py`, standard library only, so it runs from a bare clone: `bin/aihub setup` works before `uv sync` (the launcher falls back to `python3`) and does the hub itself as its first step.
   - **The stages,** each also a subcommand an agent can run on its own:
@@ -2374,6 +2367,7 @@ Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from th
   - **Resuming:** state in `data/state/setup/run.json` (each step done or not), so running it again continues where it stopped; `--from-scratch` forgets it.
   - It runs no GPU work of its own; the mods' installers and checks are what run.
   *Done when:* `utils/tests/core/test_cli_setup.py` (fake mods with setup docs, a fake hub, a fake host) covers each stage, choosing and ordering, the plan as text and JSON, a failing step and resuming, an `ask` declined and an unanswered question in non-interactive mode, model choices with both download paths and the registration, root-only fixes printed and never run; on this machine `aihub setup --plan relay agent tts` and `--plan --json` print the right plan.
+  - *As built:* `utils/cli_setup.py` (the stages, the plan, answers, the run with resume, the report; 410 lines) and `utils/cli_setup_host.py` (the host checks, each with its fix and whether it needs root; a `Probe` tests replace). Every question (each step's `ask`, each setup's model choice) is asked before anything runs, so a declined licence costs nothing; steps and checks run in the mod's folder with the repo's `bin/` on `PATH`; a pinned `hf-cache` download gets `refs/main`. Non-interactive runs (`--json`, or no terminal) stop with exit 2 and the question's id, plus the whole plan when it's the plan itself. On this machine every host check passes (the IOMMU is on again), and `--plan relay agent tts` lists 9 steps, the Breeze licence and three required models (9.6 GB). Tests: `utils/tests/core/test_cli_setup.py` (14). Not run here for real: an install (the machine is set up already); 23.10's fresh clone does that.
 
 - [ ] **23.10 A fresh reader and a fresh clone.**
   - **A fresh reader:** an agent with no context follows `docs/setup/` and `aihub setup --dry-run` for a few mod choices, and lists every step that is ambiguous, assumes knowledge, or names a file, command or value that doesn't exist; each item is fixed or answered.

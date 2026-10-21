@@ -186,6 +186,24 @@ def cmd_docs(args: argparse.Namespace) -> int:
     return 1 if problems else 0
 
 
+def _setup() -> Any:
+    """utils/cli_setup.py (plan 23.9). Its arguments are part of `aihub --help`, so it's loaded the
+    way this file was: as a script (utils/ on sys.path, no `utils` package) or as the package (tests)."""
+    if __package__:
+        from utils import cli_setup
+    else:
+        here = str(Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)   # utils/ itself, as when bin/aihub runs this file: never the utils package
+        import cli_setup  # type: ignore[no-redef]
+    cli_setup.cli = sys.modules[__name__]
+    return cli_setup
+
+
+def cmd_setup(args: argparse.Namespace) -> int:
+    return _setup().cmd_setup(args)
+
+
 def cmd_backup(args: argparse.Namespace) -> int:
     """utils/cli_backup.py (plan 12.5), loaded only when a backup runs."""
     try:
@@ -509,6 +527,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--start", action="store_true", help="start it first if it isn't running")
     p.set_defaults(fn=cmd_check)
+    _setup().add_parser(sub)
+    sub.choices["setup"].set_defaults(fn=cmd_setup)
     p = sub.add_parser("docs", help="regenerate the mods index (docs/setup/README.md) and this machine's model inventory (data/state/setup/models/)")
     p.add_argument("--check", action="store_true", help="write nothing; exit 1 if the mods index is stale or a setup doc doesn't parse")
     p.add_argument("--strict", action="store_true", help="also fail when a mod has no setup doc")

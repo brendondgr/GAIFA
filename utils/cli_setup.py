@@ -128,7 +128,7 @@ def plan(envs: list[setupdocs.Env], checks: list[host_mod.Check], hub: list[str]
         for c in e.setup.config:
             qid = f"{e.id}/config:{c.key}"
             questions.append({"id": qid, "kind": "value", "text": c.text, "required": c.required, "after_install": True,
-                              "choices": "the relay's models, once it runs" if c.choices == "relay-models" else list(c.choices),
+                              "choices": "the relay's models, once it runs" if c.choices == "relay-models" else c.choices if c.choices == "folder" else list(c.choices),
                               "answer_with": f'--set "{qid}=<value>"'})
     gpu = any(e.setup.gpu for e in envs)
     env_gb, req_gb, images = sizes(envs)
@@ -200,7 +200,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             pick = input("Which? numbers or ids, comma-separated: ")
             targets = [ids[int(x) - 1] if x.strip().isdigit() else x.strip() for x in pick.split(",") if x.strip()]
         envs = resolve(targets, offered, root)
-        expanded = {t: [e.id for e in envs if e.mod == t] for t in targets if t not in offered and len([e for e in envs if e.mod == t]) > 1}
+        expanded = {t: [e.id for e in envs if e.mod == t] for t in targets if len([e for e in envs if e.mod == t]) > 1}   # a mod id means all its setups
         env_gb, req_gb, _ = sizes(envs)
         found = host_mod.checks(probe, root, {n for e in envs for n in e.setup.needs}, env_gb + req_gb)
         p = plan(envs, found, run_mod.hub_needs(code, runner), expanded)

@@ -29,6 +29,7 @@ body = { repo = "Qwen/Qwen3-8B-GGUF", revision = "7c41481f57cb95916b40956ab2f0b1
 size_gb = 5.03
 good_for = "an everyday chat model with tool calls and thinking, small enough to run beside other mods"
 licence = "Apache-2.0"
+skip_if = "grep -Eq '\"qwen3-8b\"[[:space:]]*:' data/models.json"
 start_op = "POST /api/instances"
 start_body = { model_id = "qwen3-8b" }
 next = "lcpp instances stop at a reboot: to bring back what was running, set [sessions] restore_on_boot = true in config.toml (Settings → Sessions), which restores the setup from before the restart, lcpp instances included; or launch it again on the LLM Launcher page"
@@ -40,6 +41,7 @@ body = { repo = "ggml-org/gemma-4-26B-A4B-it-GGUF", revision = "9cf8c8db0f83fb45
 size_gb = 28.13
 good_for = "a strong agent and judge model (mixture of experts, about 4B active), images in, an MTP draft"
 licence = "Apache-2.0"
+skip_if = "grep -Eq '\"gemma-4-26b-a4b-it\"[[:space:]]*:' data/models.json"
 start_op = "POST /api/instances"
 start_body = { model_id = "gemma-4-26b-a4b-it" }
 next = "lcpp instances stop at a reboot: to bring back what was running, set [sessions] restore_on_boot = true in config.toml (Settings → Sessions), which restores the setup from before the restart, lcpp instances included; or launch it again on the LLM Launcher page"
@@ -154,7 +156,7 @@ A download only adds the model to the catalog; nothing runs until you launch it 
 | `llama.server_params` | `data/lcpp.json` | optional | flags for every instance: `jinja`, `reasoning: auto`, `reasoning-format: deepseek`, `reasoning-budget: -1` |
 | `ports` | `data/lcpp.json` | optional | instances take ports 7071–7199 |
 | `relay` | `data/lcpp.json` | optional | `http://127.0.0.1:4000`, `auto_register: true` |
-| `defaults`, per-model `params` | `data/models.json` | optional | here: context 262144, q8_0 KV cache, all layers on the GPU, flash attention |
+| `defaults`, per-model `params` | `data/models.json` | optional | here: context 262144, q8_0 KV cache, all layers on the GPU, flash attention. A new catalog has none, so llama-server's own apply (b9692): the model's trained context, layers and flash attention on `auto`, an f16 KV cache, all fitted to free memory (`--fit on`). To set your own: `curl -X PUT http://127.0.0.1:7000/api/s/lcpp/api/models/defaults -H 'Content-Type: application/json' -d '{"ctx-size": 32768, "cache-type-k": "q8_0", "cache-type-v": "q8_0"}'`, or per launch on the page |
 
 The page's Settings view edits `data/lcpp.json`.
 

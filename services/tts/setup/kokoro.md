@@ -8,7 +8,7 @@ gpu = true
 disk_gb = 6.6
 needs = ["uv", "espeak-ng", "ffmpeg"]
 after = []
-check = "uv pip freeze --python runtime/venvs/kokoro/bin/python | diff -q - <(sort locks/kokoro.txt) && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
+check = "diff -q <(uv pip freeze --python runtime/venvs/kokoro/bin/python | LC_ALL=C sort) <(LC_ALL=C sort locks/kokoro.txt) && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
 
 [[steps]]
 run = "aihub install tts"
@@ -26,6 +26,7 @@ what = "builds runtime/venvs/kokoro from locks/kokoro.txt (about 6.5 GB of ROCm 
 name = "Kokoro 82M with the English voices"
 repo = "hexgrad/Kokoro-82M"
 revision = "f3ff3571791e39611d31c381e3a41a3af07b4987"
+skip_if = "test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/voices/bm_lewis.pt"
 files = ["config.json", "kokoro-v1_0.pth",
   "voices/af_alloy.pt", "voices/af_aoede.pt", "voices/af_bella.pt", "voices/af_heart.pt", "voices/af_jessica.pt",
   "voices/af_kore.pt", "voices/af_nicole.pt", "voices/af_nova.pt", "voices/af_river.pt", "voices/af_sarah.pt",

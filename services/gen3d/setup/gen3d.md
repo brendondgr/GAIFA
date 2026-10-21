@@ -39,7 +39,7 @@ The 3D Generate mod (`gen3d`, port 5050) has a server and GPU workers. The serve
 | SAM 3D Objects (one picture, the quickest) | [sam3do.md](sam3do.md) | here, `runtime/sam3do/` |
 | TRELLIS.2, SAM 3D Body | [ComfyUI](../../comfy/setup/comfyui.md) | ComfyUI packs in the comfy mod |
 
-**Licences:** `install-runtime.sh` always clones the code of all three local engines, each under its own licence (Roblox's Cube3D Research-Only RAIL-MS, Tencent's Hunyuan 3D 2.1 Community License, Meta's SAM Licence). Each applies when you use that engine; its setup quotes it and asks before downloading its weights. Choosing `gen3d` in `aihub setup` sets up this base only; add the engines by their setup ids (`gen3d-cubeart`, `gen3d-img3d`, `gen3d-sam3do`).
+**Licences:** `install-runtime.sh` always clones the code of all three local engines, each under its own licence (Roblox's Cube3D Research-Only RAIL-MS, Tencent's Hunyuan 3D 2.1 Community License, Meta's SAM Licence). Each applies when you use that engine; its setup quotes it and asks before downloading its weights. Choosing `gen3d` in `aihub setup` means the mod: this base and every engine, each asking its licence question first; a "no" skips only that engine (`--decline gen3d-cubeart/1`), so declining all three leaves the base, which with ComfyUI still runs TRELLIS.2 and SAM 3D Body. One engine alone is its setup id (`gen3d-cubeart`, `gen3d-img3d`, `gen3d-sam3do`), which brings the base along.
 
 ## Tested with
 

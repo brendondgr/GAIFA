@@ -38,13 +38,16 @@ def relay_models(runner: Runner, root: Path) -> list[str]:
 
 def add_provider(runner: Runner, p: dict[str, Any]) -> str:
     """A hosted provider (an OpenAI-compatible API) as a relay endpoint: services/relay/setup/relay.md."""
+    if not isinstance(p, dict) or not p.get("name") or not p.get("base_url"):
+        raise Stop("failed", output=f"a provider needs a name and a base_url (and a key and model names): {sorted(p) if isinstance(p, dict) else p!r}",
+                   doc="services/relay/setup/relay.md")
     body = {"name": p["name"], "base_url": p["base_url"], "protocol": "openai", "available_models": list(p.get("models", []))}
     if p.get("key"):
         body["upstream_key"] = p["key"]
     try:
         runner.call("POST", "/api/s/relay/admin/endpoints", body)
     except Exception as x:  # noqa: BLE001
-        raise Stop("failed", output=f"adding the provider {p['name']!r} to the relay: {getattr(x, 'detail', x)}") from None
+        raise Stop("failed", output=f"adding the provider {p['name']!r} to the relay: {getattr(x, 'detail', x)}", doc="services/relay/setup/relay.md") from None
     return p["name"]
 
 
@@ -183,68 +186,84 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
             say(args, f"\n==> relay: adding the provider {p.get('name')}")
             state["providers"].append(add_provider(runner, p))
             report["done"].append(f"relay: provider {p.get('name')}")
-    cfg = root / "config.toml"
-    for e in live:
-        for c in e.setup.config:
-            qid = f"{e.id}/config:{c.key}"
-            value = answers.values.get(qid, answers.values.get(c.key))
-            while True:
+    # Folders and lists first: setting one can bring the relay new models (OpenCode's folder starts
+    # it, then the relay finds Zen's), so the questions about the relay's models come last.
+    todo = [(e, c) for e in live for c in e.setup.config]
+    for e, c in sorted(todo, key=lambda ec: ec[1].choices == "relay-models"):
+        qid = f"{e.id}/config:{c.key}"
+        value = answers.values.get(qid, answers.values.get(c.key))
+        while True:
+            if c.choices == "relay-models":
+                choices = wait_models(runner, root, args, value, WAIT_STARTED_S if started else WAIT_S)
+            elif c.choices == "folder":
+                choices = []
+            else:
+                choices = list(c.choices)
+            if value is None and interactive(args):
+                value = _prompt(e, c, choices, runner)
+                if value == "":
+                    value = None
+                    continue
+            break
+        if value is None:
+            if c.required:
+                hint = ""
                 if c.choices == "relay-models":
-                    choices = wait_models(runner, root, args, value, WAIT_STARTED_S if started else WAIT_S)
+                    hint = ("; to add a hosted provider first: \"providers\" in --answers (services/relay/setup/relay.md)"
+                            + ("" if choices else "; the relay serves no chat model yet: set up lcpp with a model (setup launches it), add a hosted provider, or set up opencode"))
                 elif c.choices == "folder":
-                    choices = []
-                else:
-                    choices = list(c.choices)
-                if value is None and interactive(args):
-                    value = _prompt(e, c, choices, runner)
-                    if value == "":
-                        value = None
-                        continue
-                break
-            if value is None:
-                if c.required:
-                    hint = ""
-                    if c.choices == "relay-models":
-                        hint = ("; to add a hosted provider first: \"providers\" in --answers (services/relay/setup/relay.md)"
-                                + ("" if choices else "; the relay serves no chat model yet: set up lcpp with a model (setup launches it), add a hosted provider, or set up opencode"))
-                    elif c.choices == "folder":
-                        hint = " (an absolute folder outside AIHub; created if missing)"
-                    raise Stop("question", id=qid, kind="value", text=c.text, choices=choices if c.choices != "folder" else "folder",
-                               answer_with=f'--set "{qid}=<value>"' + hint)
-                report["next"].append(f"{qid}: not set ({c.text}); later: --set \"{qid}=<value>\", or Settings")
-                continue
-            if c.choices == "folder":
-                folder = Path(value).expanduser()
-                if not folder.is_absolute() or folder.resolve().is_relative_to(root.resolve()):
-                    raise Stop("unknown-value", id=qid, value=value, choices="an absolute folder outside AIHub", doc=doc_of(e, root))
-                folder.mkdir(parents=True, exist_ok=True)
-                value = str(folder.resolve())
-            elif choices and value not in choices:
-                raise Stop("unknown-value", id=qid, value=value, choices=choices, doc=doc_of(e, root))
-            if state["config"].get(qid) == value and applied(runner, c.key) == value:
-                report["skipped"].append(f"{qid}: already {value}")
-                continue
-            live_now = apply(runner, root, c.key, value)
-            if not live_now:
-                report["next"].append(f"{qid}: written to config.toml, but the hub didn't take it: run `aihub restart`, then restart {c.restart or 'the mod'}")
-            for target in c.restart.split():
-                rc, out = runner.run("aihub restart" if target == "hub" else f"aihub restart {target}", root, stream=False)
-                if rc:
-                    raise Stop("failed", output=f"restarting {target} after setting {c.key}: {out}")
-            state["config"][qid] = value
-            report["done"].append(f"{qid} = {value}")
+                    hint = " (an absolute folder outside AIHub; created if missing)"
+                raise Stop("question", id=qid, kind="value", text=c.text, choices=choices if c.choices != "folder" else "folder",
+                           answer_with=f'--set "{qid}=<value>"' + hint)
+            report["next"].append(f"{qid}: not set ({c.text}); later: --set \"{qid}=<value>\", or Settings")
+            continue
+        if c.choices == "folder":
+            folder = Path(value).expanduser()
+            if not folder.is_absolute() or folder.resolve().is_relative_to(root.resolve()):
+                raise Stop("unknown-value", id=qid, value=value, choices="an absolute folder outside AIHub", doc=doc_of(e, root))
+            folder.mkdir(parents=True, exist_ok=True)
+            value = str(folder.resolve())
+        elif choices and value not in choices:
+            raise Stop("unknown-value", id=qid, value=value, choices=choices, doc=doc_of(e, root))
+        if state["config"].get(qid) == value and applied(runner, c.key) == value:
+            report["skipped"].append(f"{qid}: already {value}")
+            continue
+        targets = c.restart.split()
+        if not apply(runner, root, c.key, value):
+            # In the file only: the hub reads it when it starts, so restart the hub before the mods
+            # (a mod restarted now would run with the hub's old value).
+            if not runner.hub_up():
+                report["next"].append(f"{qid}: written to config.toml while the hub is down; it applies when the hub starts"
+                                      + (f", then restart {' and '.join(t for t in targets if t != 'hub')}" if any(t != "hub" for t in targets) else ""))
+                targets = []
+            elif "hub" not in targets:
+                targets.insert(0, "hub")
+        for target in targets:
+            rc, out = runner.run("aihub restart" if target == "hub" else f"aihub restart {target}", root, stream=False)
+            if rc:
+                raise Stop("failed", setup=e.id, step=f"config:{c.key}", output=f"restarting {target} after setting {c.key}: {out}", doc=doc_of(e, root))
+        started = started or "relay" in targets      # a restarted relay looks for its endpoints' models again
+        state["config"][qid] = value
+        report["done"].append(f"{qid} = {value}")
 
 
 def verify(live: list[Any], root: Path, runner: Runner, report: dict[str, Any]) -> None:
-    """After the checks: a value chosen from the relay's models must still be one of them."""
+    """After the checks: a value chosen from the relay's models (one in config.toml: set by this run
+    or before; a skipped optional one is the code's default and isn't checked) must be what the hub
+    runs with, and still on the relay."""
     models: list[str] | None = None
     for e in live:
         for c in e.setup.config:
-            value = applied(runner, c.key) or get_value(root / "config.toml", c.key)   # what the hub runs with
+            value = get_value(root / "config.toml", c.key)
             if c.choices != "relay-models" or value is None:
                 continue
             models = relay_models(runner, root) if models is None else models
-            ok = value in models and applied(runner, c.key) in (None, value)
+            running = applied(runner, c.key)
+            ok = value in models and running in (None, value)
             report["checks"].append({"setup": e.id, "run": f"{c.key} on the relay", "ok": ok})
+            if running not in (None, value):
+                why = f"config.toml says {value!r}, but the hub runs with {running!r}: aihub restart, then restart {c.restart or 'the mod'}"
+            else:
+                why = f"{value!r} isn't a model the relay serves ({', '.join(models) or 'none'})"
             if not ok:
-                report["failed"].append({"setup": e.id, "step": f"config:{c.key}", "output": f"{value!r} isn't a model the relay serves ({', '.join(models) or 'none'})", "doc": doc_of(e, root)})
+                report["failed"].append({"setup": e.id, "step": f"config:{c.key}", "output": why, "doc": doc_of(e, root)})

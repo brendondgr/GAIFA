@@ -328,7 +328,8 @@ restart = "hub"'''
 
 
 class RelayRunner(FakeRunner):
-    """A relay with `models`, and a hub that remembers what's saved through it (env, judge)."""
+    """A relay with `models`, and a hub that remembers what's saved through it (env, judge) and
+    writes it to config.toml, as the real one does."""
 
     def __init__(self, models: list[str], **kw: Any) -> None:
         super().__init__(**kw)
@@ -344,11 +345,15 @@ class RelayRunner(FakeRunner):
             return {"data": [{"id": m} for m in self.models]}
         if method == "PUT" and path.endswith("/config"):
             self.calls.append((method, path, body))
-            self.env[path.split("/")[3]] = dict(body["env"])
+            mod = path.split("/")[3]
+            self.env[mod] = dict(body["env"])
+            for var, v in body["env"].items():
+                cli_setup_config.set_value(cli.ROOT / "config.toml", f"services.{mod}.env.{var}", v)
             return {}
         if method == "PUT" and path == "/api/settings":
             self.calls.append((method, path, body))
             self.judge = body["judge"]["model"]
+            cli_setup_config.set_value(cli.ROOT / "config.toml", "agent.judge.model", self.judge)
             return {}
         if method == "GET" and path == "/api/settings":
             return {"judge": {"model": self.judge}}
@@ -379,7 +384,7 @@ def test_set_writes_config_and_restarts(agent_root: Path, capsys) -> None:
     assert cli_setup.cmd_setup(a, runner, FakeProbe()) == 0
     r = out(capsys)
     assert ("PUT", "/api/services/agent/config", {"env": {"AGENT_MODEL": "qwen3-8b"}}) in runner.calls   # through the hub: applied at once
-    assert (agent_root / "config.toml").read_text() == '[services]\norder = ["relay", "tts", "agent"]\n'   # the hub writes the file, not us
+    assert 'AGENT_MODEL = "qwen3-8b"' in (agent_root / "config.toml").read_text()                     # written by the hub
     assert any(c == "aihub restart agent" for c, _, _ in runner.ran)
     assert "agent/config:services.agent.env.AGENT_MODEL = qwen3-8b" in r["done"]
     assert any("agent.judge.model" in n for n in r["next"])            # optional, left for later
@@ -547,14 +552,27 @@ def test_a_mod_id_means_all_its_setups_even_when_one_shares_its_id(root: Path) -
 
 def test_a_value_the_hub_wont_take_goes_into_the_file_and_a_rerun_applies_it(agent_root: Path, capsys) -> None:
     a = args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=qwen3-8b"])
-    assert cli_setup.cmd_setup(a, RelayRunner(["qwen3-8b"], refuse={"/api/services/agent/config"}), FakeProbe()) == 0
-    r = out(capsys)
+    refusing = RelayRunner(["qwen3-8b"], refuse={"/api/services/agent/config"})
+    assert cli_setup.cmd_setup(a, refusing, FakeProbe()) == 0
+    capsys.readouterr()
     assert '[services.agent.env]\nAGENT_MODEL = "qwen3-8b"' in (agent_root / "config.toml").read_text()
-    assert any("the hub didn't take it" in n for n in r["next"])
+    ran = [c for c, _, _ in refusing.ran]
+    assert ran.index("aihub restart") < ran.index("aihub restart agent")   # the hub reads the file, then the mod restarts with it
+    down = RelayRunner(["qwen3-8b"], refuse={"/api/services/agent/config"})
+    down.up = False
+    cli_setup_config.phase(cli_setup.resolve(["agent"], cli_setup.choices(agent_root)[0], agent_root), a, cli_setup.run_mod.read_answers(a),
+                           agent_root, down, report := {"done": [], "skipped": [], "next": []}, {})
+    assert any("while the hub is down" in n for n in report["next"]) and "aihub restart agent" not in [c for c, _, _ in down.ran]
     again = RelayRunner(["qwen3-8b"])
     assert cli_setup.cmd_setup(a, again, FakeProbe()) == 0                # not "already set": the hub runs without it
     assert again.env["agent"] == {"AGENT_MODEL": "qwen3-8b"}
 
+
+def test_a_skipped_optional_value_isnt_verified(agent_root: Path, capsys) -> None:
+    runner = RelayRunner(["m"])
+    runner.judge = "minicpm-5-2B"                                     # the code's default, not on the relay
+    assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m"]), runner, FakeProbe()) == 0
+    assert out(capsys)["failed"] == []
 
 def test_the_whole_env_table_is_sent_and_every_restart_runs_in_order(agent_root: Path, capsys) -> None:
     (agent_root / "config.toml").write_text('[services.agent.env]\nAGENT_FALLBACK_MODEL = "m2"\n')
@@ -619,3 +637,102 @@ def test_a_steps_next_joins_the_report(root: Path, capsys) -> None:
     doc.write_text(RELAY.replace('what = "the backend venv"', 'what = "the backend venv"\nnext = "install the packages by hand"'))
     assert cli_setup.cmd_setup(args("relay", yes=True), FakeRunner(), FakeProbe()) == 0
     assert "relay/1: install the packages by hand" in out(capsys)["next"]
+
+
+# ---- the fourth review (plan 23.14) ---------------------------------------------------------------
+
+def test_a_suggestions_skip_if_registers_without_downloading(root: Path, capsys) -> None:
+    doc = root / "services" / "tts" / "setup" / "env.md"
+    doc.write_text(TTS.replace('required = true', 'required = true\nskip_if = "test -f weights"'))
+    runner = FakeRunner()                                             # every command exits 0: it's there
+    assert cli_setup.cmd_setup(args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Kokoro 82M"]), runner, FakeProbe()) == 0
+    capsys.readouterr()
+    assert not any("hf download" in c for c, _, _ in runner.ran)
+    assert [b["path"] for m, p, b in runner.calls if p == "/api/models"] == ["hf-cache/hub/models--hexgrad--Kokoro-82M"]
+
+
+class Downloading(FakeRunner):
+    """A mod that refuses the download route because an earlier run's job is still going; the
+    model is in its catalog (the skip_if passes) once `there_after` looks."""
+
+    def __init__(self, there_after: int = 1, **kw: Any) -> None:
+        super().__init__(**kw)
+        self.looks = 0
+        self.there_after = there_after
+
+    def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True, echo: bool = False) -> tuple[int, str]:
+        if cmd == "grep -q w catalog.json":
+            self.ran.append((cmd, cwd.name, env))
+            self.looks += 1
+            return (0, "") if self.looks > self.there_after else (1, "")
+        return super().run(cmd, cwd, env, stream, echo)
+
+    def call(self, method: str, path: str, body: Any = None) -> Any:
+        if method == "POST" and path == "/api/s/tts/v1/load":
+            self.calls.append((method, path, body))
+            raise cli.ApiError(409, '"w" is already being downloaded', "lcpp_error")
+        return super().call(method, path, body)
+
+
+def test_a_refused_route_waits_for_the_download_already_running(root: Path, capsys) -> None:
+    doc = root / "services" / "tts" / "setup" / "env.md"
+    doc.write_text(TTS.replace('body = { preset = "small" }', 'body = { preset = "small" }\nskip_if = "grep -q w catalog.json"'))
+    jobs = [[{"id": "j0", "state": "running"}], [{"id": "j0", "state": "running"}], [{"id": "j0", "state": "running", "progress": 0.9}],
+            [{"id": "j0", "state": "done"}], [], []]
+    a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"])
+    assert cli_setup.cmd_setup(a, Downloading(jobs=jobs), FakeProbe()) == 0
+    assert "waiting for the download already running" in capsys.readouterr().err
+    b = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"], from_scratch=True)
+    assert cli_setup.cmd_setup(b, Downloading(there_after=99), FakeProbe()) == 1   # refused with nothing running: a failed step
+    assert "already being downloaded" in out(capsys)["report"]["failed"][0]["output"]
+
+
+def test_a_failed_launch_resumes_without_downloading_again(root: Path, capsys) -> None:
+    doc = root / "services" / "tts" / "setup" / "env.md"
+    doc.write_text(TTS.replace('body = { preset = "small" }', 'body = { preset = "small" }\nstart_op = "POST /api/instances"\nstart_body = { model_id = "w" }'))
+    a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"])
+    assert cli_setup.cmd_setup(a, FakeRunner(refuse={"/api/s/tts/api/instances"}), FakeProbe()) == 1
+    capsys.readouterr()
+    again = FakeRunner()
+    assert cli_setup.cmd_setup(args("tts", yes=True), again, FakeProbe()) == 0
+    posts = [p for m, p, _ in again.calls if m == "POST"]
+    assert "/api/s/tts/v1/load" not in posts and "/api/s/tts/api/instances" in posts
+
+
+def test_the_command_line_wins_over_the_answers_file(tmp_path: Path) -> None:
+    f = tmp_path / "a.json"
+    f.write_text(json.dumps({"decline": ["x/1"], "accept": ["y/1"]}))
+    a = cli_setup.run_mod.read_answers(args(answers=str(f), accept=["x/1"], decline=["y/1"]))
+    assert a.accept == {"x/1"} and a.decline == {"y/1"}
+
+
+def test_the_relays_models_are_asked_after_folders(agent_root: Path, tmp_path: Path, capsys) -> None:
+    doc = agent_root / "services" / "relay" / "setup" / "env.md"
+    doc.write_text(RELAY.replace('what = "the backend venv"', 'what = "the backend venv"\n\n[[config]]\nkey = "services.opencode.env.OPENCODE_PROJECT_DIR"\n'
+                                 'text = "Which folder?"\nchoices = "folder"\nrequired = true\nrestart = "opencode relay"'))
+    (agent_root / "config.toml").write_text('[services]\norder = ["agent", "relay"]\n')        # the agent's setup listed first
+    folder = tmp_path.parent / f"{tmp_path.name}-work"
+    runner = RelayRunner(["m"])
+    a = args("agent", "relay", yes=True, set=[f"services.opencode.env.OPENCODE_PROJECT_DIR={folder}", "services.agent.env.AGENT_MODEL=m"])
+    assert cli_setup.cmd_setup(a, runner, FakeProbe()) == 0
+    done = out(capsys)["done"]
+    assert done.index(f"relay/config:services.opencode.env.OPENCODE_PROJECT_DIR = {folder.resolve()}") < done.index("agent/config:services.agent.env.AGENT_MODEL = m")
+
+
+def test_a_required_model_left_out_is_reported(root: Path, capsys) -> None:
+    assert cli_setup.cmd_setup(args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"]), FakeRunner(), FakeProbe()) == 0
+    assert any("Kokoro 82M not chosen" in n for n in out(capsys)["next"])
+
+
+def test_the_plan_shows_a_folder_and_a_mods_setups(root: Path, capsys) -> None:
+    doc = root / "services" / "relay" / "setup" / "env.md"
+    doc.write_text(RELAY.replace('what = "the backend venv"', 'what = "the backend venv"\n\n[[config]]\nkey = "services.opencode.env.OPENCODE_PROJECT_DIR"\ntext = "Which folder?"\nchoices = "folder"'))
+    d = root / "services" / "gen3d" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "gen3d"\n')
+    (d / "gen3d.md").write_text(block("gen3d", "Base", summary='"3D base"', gpu="true"))
+    (d / "cube.md").write_text(block("gen3d-cube", "Cube", summary='"3D engine"', gpu="true", after='["gen3d"]'))
+    assert cli_setup.cmd_setup(args("relay", "gen3d", plan=True), FakeRunner(), FakeProbe()) == 0
+    p = out(capsys)
+    assert [q["choices"] for q in p["questions"] if q["kind"] == "value"] == ["folder"]
+    assert p["expanded"] == {"gen3d": ["gen3d", "gen3d-cube"]}             # a mod id that's also a setup id says so

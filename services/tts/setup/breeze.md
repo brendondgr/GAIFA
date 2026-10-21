@@ -8,10 +8,10 @@ gpu = true
 disk_gb = 7
 needs = ["uv", "git", "ffmpeg"]
 after = ["tts-kokoro"]
-check = "uv pip freeze --python runtime/venvs/breeze-tts/bin/python | diff -q - <(sort locks/breeze-tts.txt) && git -C runtime/breeze-tts apply --reverse --check \"$PWD/engines/breeze/patches/0001-rocm-port-and-dtype.patch\" && grep -q '\"breeze\"' ~/.config/tts-engines/engines.json"
+check = "diff -q <(uv pip freeze --python runtime/venvs/breeze-tts/bin/python | LC_ALL=C sort) <(LC_ALL=C sort locks/breeze-tts.txt) && git -C runtime/breeze-tts apply --reverse --check \"$PWD/engines/breeze/patches/0001-rocm-port-and-dtype.patch\" && grep -q '\"breeze\"' ~/.config/tts-engines/engines.json"
 
 [[steps]]
-run = "uvx --from huggingface_hub hf download BreezeBlue/Breeze-TTS-2 --local-dir ../../data/models/tts/breeze-tts-2"
+run = "uvx --from huggingface_hub hf download BreezeBlue/Breeze-TTS-2 --revision 3e28c5151381a722f1d8661b4118c298caa77aa4 --local-dir ../../data/models/tts/breeze-tts-2"
 what = "Breeze TTS 2's weights into data/models/tts/breeze-tts-2 (7.7 GB, the required suggestion below); needed before the installer, which runs offline"
 ask = "Breeze TTS 2's weights and everything it makes are licensed for research and non-commercial use only (https://huggingface.co/BreezeBlue/Breeze-TTS-2). Accept that licence and install Breeze? (This answer is also the installer's --accept-breeze-license below.)"
 
@@ -26,6 +26,8 @@ what = "re-checks Kokoro (its smoke test loads Kokoro on the GPU again), then bu
 [[suggest]]
 name = "Breeze TTS 2"
 repo = "BreezeBlue/Breeze-TTS-2"
+revision = "3e28c5151381a722f1d8661b4118c298caa77aa4"
+skip_if = "test -f ../../data/models/tts/breeze-tts-2/config.json"
 files = []
 dest = "tts/breeze-tts-2"
 kind = "tts"
@@ -68,7 +70,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 | Breeze packages | qwen-tts 0.1.1, transformers 4.57.3, accelerate 1.12.0, librosa 1.0.0, numpy 2.5.3, soundfile 0.14.0, huggingface-hub 0.36.2 |
 | Breeze source | https://github.com/breezeblue-ai/breeze-tts.git at `008f769016b0a24711becd7a4925030bc93f608c` (2026-09-10, `engines/breeze/UPSTREAM_COMMIT`), plus `engines/breeze/patches/0001-rocm-port-and-dtype.patch` (applied exactly) |
 | Engine record | `~/.config/tts-engines/engines.json`: backend `rocm`, device `cuda`, dtype `bf16`, fast stages `depth_decoder,backbone_decode`, licence accepted 2026-10-06 |
-| Models | `BreezeBlue/breeze-tts-2` in `data/models/tts/breeze-tts-2` (7.7 GB; no revision recorded); `openai/whisper-large-v3-turbo` at `41f01f3fe87f28c78e2fbf8b568835947dd65ed9` in `data/models/hf-cache/` (1.6 GB) |
+| Models | `BreezeBlue/breeze-tts-2` at `3e28c5151381a722f1d8661b4118c298caa77aa4` (read from the download's metadata; every file is from that commit) in `data/models/tts/breeze-tts-2` (7.7 GB); `openai/whisper-large-v3-turbo` at `41f01f3fe87f28c78e2fbf8b568835947dd65ed9` in `data/models/hf-cache/` (1.6 GB) |
 
 ## Prerequisites
 
@@ -79,7 +81,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 ## Install
 
 ```bash
-uvx --from huggingface_hub hf download BreezeBlue/Breeze-TTS-2 --local-dir data/models/tts/breeze-tts-2
+uvx --from huggingface_hub hf download BreezeBlue/Breeze-TTS-2 --revision 3e28c5151381a722f1d8661b4118c298caa77aa4 --local-dir data/models/tts/breeze-tts-2
 ```
 
 From the project folder: Breeze's weights, the whole repo (about 7.7 GB).
@@ -170,6 +172,6 @@ From the project folder. No output and exit 0 means the patch is applied as ship
 ## Known gaps
 
 - `aihub install tts` doesn't download Breeze's weights or Whisper; the block's steps do, ahead of the installer, which can't download them while it forces offline mode.
-- Breeze's weights have no revision recorded in the registry.
+- This machine's registry entry for Breeze's weights has no revision (it was registered before the pin); a new install records it.
 - Breeze's torch.compile cache (`~/.cache/localtts/inductor`, 56 MB here) and MIOpen's databases (`~/.config/miopen/`, `~/.cache/miopen/`) are outside the project and not on the allowlist.
 - The voices are personal and can't be reproduced; a new machine starts with none.

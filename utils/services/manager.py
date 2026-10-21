@@ -233,11 +233,14 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
 
     def installed(self, svc: Service) -> bool:
         """The mod's command exists (its venv, binary or script): it has been set up (plan 23.12).
-        Only the first word is checked, so `bash run.sh` counts as installed."""
+        Only the first word is checked, so `bash run.sh` counts as installed; a mod whose command is
+        a tracked script names what its setup makes instead (`[run] installed`)."""
         argv = self._command(svc)
         if svc.external or not argv:
             return True
-        exe = argv[0]
+        exe = (svc.m.run.installed if svc.m and svc.m.run.installed else None) or argv[0]
+        if exe.startswith("~"):
+            exe = str(Path(exe).expanduser())
         if "/" in exe:
             p = Path(exe)
             return (p if p.is_absolute() else svc.mod.dir / p).exists()

@@ -43,4 +43,4 @@ window_chars = 6000
 
 # The Auto judge's model, a name your relay serves (`aihub setup` asks; Settings → Agent):
 # [agent.judge]
-# model = ""
+# model = "<a model your relay serves>"

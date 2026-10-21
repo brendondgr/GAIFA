@@ -27,7 +27,6 @@ restart = "agent"
 [[config]]
 key = "agent.judge.model"
 text = "Which model should judge Auto mode's actions? (a small, quick one is fine; without one, Auto mode asks about everything)"
-restart = "hub"
 -->
 
 # Chat agent: setup

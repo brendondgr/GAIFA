@@ -49,7 +49,10 @@ start_timeout_s = 60                # how long health may take after launch
 stop_timeout_s = 30                 # SIGTERM → wait → SIGKILL
 restart = "on-failure"              # retries after 2/4/8 s, at most 3 per 5 min; or "no"
 after = ["relay"]                   # start after these (ordering only)
+# installed = "~/.opencode/bin/opencode"   # optional: what exists once it's set up (default: the command's first word)
 ```
+
+- **Installed:** until a mod's command exists (its venv, binary), the hub shows it as "not installed" and doesn't autostart it. A mod whose command is a tracked script (opencode's `./run.sh`) names what its setup makes in `installed`.
 
 - **Paths in `command`:** an executable containing `/` resolves against the mod folder (`.venv/bin/python`); a bare name (`python3`, `node`) comes from `PATH`. Arguments starting with `./` or `../` resolve against the mod folder; others are passed as written and are relative to `cwd`, which is the mod folder by default.
 - **Unknown keys are errors**, so a typo like `helth` is reported rather than ignored.
@@ -250,6 +253,7 @@ licence = "Apache-2.0"
 required = true                             # the engine can't run without it
 gated = false                               # true: accept the repo's terms on Hugging Face first
 next = ""                                   # what's left to do once it's chosen (it joins the report)
+skip_if = ""                                # a command: exit 0 means it's on disk already (a step fetched it): registered, not downloaded
 # start_op = "POST /api/instances"          # a mod route run after the download (launching it), with
 # start_body = { model_id = "qwen3-8b" }    # its body
 -->
@@ -258,8 +262,8 @@ next = ""                                   # what's left to do once it's chosen
 - `id`: unique across all mods; `<mod>` or `<mod>-<env>`.
 - `models`: globs relative to `data/models/` for the models this environment runs (`comfyui/**`); the local model inventory (`aihub docs`) uses them to say which setup doc runs a model.
 - `scan`: tracked files in the mod (globs relative to its folder, e.g. `workflows/*/workflow.json`) whose mentions of a model's file name or Hugging Face repo are listed in its inventory doc as "referenced by".
-- `[[suggest]]` can name a mod route instead of a repo, for mods with their own downloader: `op = "POST /v1/load"` and `body = { preset = "balanced" }` (no `dest`, `files` or `revision`). Mark weights an engine can't run without `required = true`; everything else is optional, and the default is to download nothing.
-- `[[config]]` asks for a setting after install, when its choices exist: `key` (`services.<id>.env.<VAR>` or `agent.judge.model`, written to `config.toml`), `text`, `choices` (`"relay-models"`, the relay's chat models then, without its `auto` router and OpenCode's `agent`; `"folder"`, an absolute folder outside AIHub, made if missing; or a list), `required`, `restart` (a mod id or `"hub"`). The agent's doc asks for its model this way; an agent answers with `--set "<id or key>=<value>"`, and can add a hosted provider first (`"providers"` in `--answers`).
+- `[[suggest]]` can name a mod route instead of a repo, for mods with their own downloader: `op = "POST /v1/load"` and `body = { preset = "balanced" }` (no `dest`, `files` or `revision`). Mark weights an engine can't run without `required = true`; everything else is optional, and the default is to download nothing. A route that refuses because an earlier run's download is still going (a Ctrl-C) is waited out, and the suggestion's `skip_if` then decides; give such suggestions one (lcpp's check its catalog).
+- `[[config]]` asks for a setting after install, when its choices exist: `key` (`services.<id>.env.<VAR>` or `agent.judge.model`, written to `config.toml`), `text`, `choices` (`"relay-models"`, the relay's chat models then, without its `auto` router and OpenCode's `agent`; `"folder"`, an absolute folder outside AIHub, made if missing; or a list), `required`, `restart` (mod ids, or `"hub"`, restarted in order once it's set; `"opencode relay"`). Values are saved through the hub, which applies them at once; the questions about the relay's models come after the others, since a folder or list value can bring the relay new models. The agent's doc asks for its model this way; an agent answers with `--set "<id or key>=<value>"`, and can add a hosted provider first (`"providers"` in `--answers`).
 - Unknown keys are errors, at the top and inside `[[steps]]`, `[[suggest]]` and `[[config]]`; `aihub docs --check` reports them.
 - `aihub setup` runs `[[steps]]` and `check` in the mod's folder, asks every `ask` question and every model choice before it runs anything (the hub stage included); a "no" skips that setup and every chosen setup whose `after` names it, and the report lists them. An `interactive` step runs in the terminal for a person; under `--json` the run stops with its command, the person runs it, and `--done <step id>` continues. A `[[suggest]]` with an `op` is followed until the job it starts ends (the mod's jobs in `GET /api/services/<id>`), and a failed job fails the step. The wizard downloads the chosen `[[suggest]]` models after the steps (a step may fetch weights its installer needs offline first: the wizard's download then finds them and only registers them). A `repo` suggestion in `hf-cache` pinned to a commit also gets `refs/main` pointed at it, for engines that load by `main`.
 

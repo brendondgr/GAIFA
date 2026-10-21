@@ -162,6 +162,7 @@ stop_timeout_s = 180
 restart = "on-failure"              # "no" | "on-failure"
 after = ["relay"]                   # start ordering only, not a hard requirement
 install = "install.sh"              # optional; run by `aihub new` / `aihub install <id>`
+installed = ".venv/bin/python"     # optional: what exists once the mod is set up (default: the command's first word); a mod whose command is a tracked script names its real dependency (opencode: "~/.opencode/bin/opencode"), so the hub doesn't autostart it before setup
 
 [memory]                            # only for mods that hold models in memory
 estimate_gb = 9.2

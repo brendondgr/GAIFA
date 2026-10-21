@@ -99,8 +99,9 @@ def read_answers(args: argparse.Namespace) -> Answers:
         a.values.update({k: str(v) for k, v in data.get("values", {}).items()})
         a.providers += list(data.get("providers", []))
         a.yes = a.yes or bool(data.get("yes"))
-    a.accept |= set(getattr(args, "accept", None) or [])
-    a.decline |= set(getattr(args, "decline", None) or [])
+    cli_accept, cli_decline = set(getattr(args, "accept", None) or []), set(getattr(args, "decline", None) or [])
+    a.accept = (a.accept - cli_decline) | cli_accept      # the command line wins over the answers file
+    a.decline = (a.decline - cli_accept) | cli_decline
     a.done |= set(getattr(args, "done", None) or [])
     for spec in getattr(args, "set", None) or []:
         key, _, value = spec.partition("=")
@@ -277,9 +278,12 @@ def follow_jobs(runner: Runner, mod: str, before: set[str], args: argparse.Names
     raise Stop("failed", output=f"{what}: still running after {JOB_TIMEOUT_S // 3600} h")
 
 
-def download(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespace) -> None:
+def download(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespace, fetch: bool = True) -> None:
     """One chosen model: through the mod's own route (followed until its job ends), or from Hugging
-    Face and then registered with the hub. Raises Stop("failed", …) with what went wrong."""
+    Face and then registered with the hub (fetch=False: it's on disk already, only registered).
+    Raises Stop("failed", …) with what went wrong."""
+    if s.op and not fetch:
+        return                            # the mod registered it when it downloaded it
     if s.op:
         rc, out = runner.run(f"aihub start {e.mod}", root, stream=False)
         if rc:
@@ -289,7 +293,16 @@ def download(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespac
         try:
             runner.call(method, f"/api/s/{e.mod}{path}", s.body or None)
         except Exception as x:  # noqa: BLE001: the hub's error, or the mod's
-            raise Stop("failed", output=f"{s.op}: {getattr(x, 'detail', x)}") from None
+            # Refused while an earlier run's download still goes on (a Ctrl-C): wait for it, and
+            # the suggestion's skip_if says whether the model is there now.
+            running = {str(j.get("id")) for j in _jobs(runner, e.mod) if str(j.get("state", "")).lower() not in TERMINAL}
+            if not (running and s.skip_if):
+                raise Stop("failed", output=f"{s.op}: {getattr(x, 'detail', x)}") from None
+            say(args, f"    {s.op} refused ({getattr(x, 'detail', x)}); waiting for the download already running")
+            follow_jobs(runner, e.mod, before - running, args, s.name)
+            if runner.run(s.skip_if, root / "services" / e.mod, stream=False)[0]:
+                raise Stop("failed", output=f"{s.op}: {getattr(x, 'detail', x)}") from None
+            return
         follow_jobs(runner, e.mod, before, args, s.name)
         return
     rev = f" --revision {s.revision}" if s.revision else ""
@@ -300,7 +313,7 @@ def download(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespac
         cmd, env, reg = f"uvx --from huggingface_hub hf download {s.repo}{files}{rev}", {"HF_HOME": str(root / "data/models/hf-cache"), **tok}, f"hf-cache/hub/models--{s.repo.replace('/', '--')}"
     else:
         cmd, env, reg = f'uvx --from huggingface_hub hf download {s.repo}{files}{rev} --local-dir "data/models/{s.dest}"', tok or None, s.dest
-    rc, out = runner.run(cmd, root, env=env, stream=not args.json, echo=args.json)
+    rc, out = runner.run(cmd, root, env=env, stream=not args.json, echo=args.json) if fetch else (0, "")
     if rc:
         raise Stop("failed", output=out)
     if s.dest == "hf-cache" and len(s.revision) == 40 and all(c in "0123456789abcdef" for c in s.revision):
@@ -421,16 +434,27 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         if e.setup.suggest and not chosen:
             report["next"].append(f"{e.id}: no models chosen; to add your own, see {doc_of(e, root)} (Choosing models)")
         report["next"] += [f"{e.id}: {s.name}: {s.next}" for s in chosen if s.next]
+        missing = [s.name for s in e.setup.suggest if s.required and s not in chosen]
+        if chosen and missing:
+            report["next"].append(f"{e.id}: {', '.join(missing)} not chosen, and {e.title} can't run without it: its check fails until it's there ({doc_of(e, root)})")
         for s in chosen:
             key = f"{e.id}:{s.name}"
+            started = started or bool(s.start_op)
             if state["models"].get(key) == "done":
                 report["skipped"].append(f"{key}: done in an earlier run")
                 continue
             say(args, f"\n==> {e.id}: model {s.name} ({s.size_gb:.2f} GB)")
             try:
-                download(s, e, root, runner, args)
+                if state["models"].get(key) == "downloaded":
+                    say(args, "    downloaded in an earlier run")
+                elif s.skip_if and runner.run(s.skip_if, root / "services" / e.mod, stream=False)[0] == 0:
+                    say(args, f"    already there ({s.skip_if})")
+                    download(s, e, root, runner, args, fetch=False)
+                else:
+                    download(s, e, root, runner, args)
+                state["models"][key] = "downloaded"
+                save_state(root, state)
                 start(s, e, root, runner, args)
-                started = started or bool(s.start_op)
             except Stop as x:
                 raise fail({"setup": e.id, "step": f"model:{s.name}", "output": x.data.get("output", ""), "doc": doc_of(e, root)}) from None
             state["models"][key] = "done"
@@ -445,7 +469,8 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
     except Stop as x:
         save_state(root, state)
         if x.reason == "failed":
-            raise fail({"setup": "config", "step": "config", "output": x.data.get("output", ""), "doc": "docs/setup/README.md"}) from None
+            raise fail({"setup": x.data.get("setup", "config"), "step": x.data.get("step", "config"), "output": x.data.get("output", ""),
+                        "doc": x.data.get("doc", "docs/setup/README.md")}) from None
         raise Stop(x.reason, **x.data, report=report) from None
     save_state(root, state)
     for c in p["checks"]:

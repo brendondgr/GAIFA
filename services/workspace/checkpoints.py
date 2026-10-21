@@ -11,16 +11,20 @@ the agent. Kept 14 days or 2 GB in all, oldest turns first.
 from __future__ import annotations
 
 import difflib
+import errno
 import hashlib
 import json
 import os
 import re
+import secrets
 import shutil
 import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
+
+from folders import Refused, inside
 
 KEEP_S = 14 * 86400
 KEEP_BYTES = 2 * 1024 ** 3
@@ -37,18 +41,85 @@ def sha(p: Path) -> str | None:
         return "dir"
 
 
-def write_atomic(p: Path, data: bytes, mode: int | None = None) -> None:
-    p.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=f".{p.name}.", suffix=".aihub")
+def write_atomic(p: Path, data: bytes, mode: int | None = None, root: Path | None = None) -> None:
+    """Write `p` through a temp file and a rename. `root` (a folder's real path): `p` must stay inside
+    it, so the write goes through `parent_fd` (see there)."""
+    if root is None:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=f".{p.name}.", suffix=".aihub")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+            if mode is not None:
+                os.chmod(tmp, mode)
+            os.replace(tmp, p)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+        return
+    d = parent_fd(root, p, create=True)
+    tmp = f".{p.name}.{secrets.token_hex(4)}.aihub"
     try:
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        if mode is not None:
-            os.chmod(tmp, mode)
-        os.replace(tmp, p)
-    except BaseException:
-        Path(tmp).unlink(missing_ok=True)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=d)
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+                if mode is not None:
+                    os.fchmod(f.fileno(), mode)
+            os.replace(tmp, p.name, src_dir_fd=d, dst_dir_fd=d)
+        except BaseException:
+            try:
+                os.unlink(tmp, dir_fd=d)
+            except FileNotFoundError:
+                pass
+            raise
+    finally:
+        os.close(d)
+
+
+def unlink_in(root: Path, p: Path) -> None:
+    """Delete `p` (a symlink itself, never what it points at) inside `root`, as `write_atomic`."""
+    d = parent_fd(root, p, create=False)
+    try:
+        os.unlink(p.name, dir_fd=d)
+    finally:
+        os.close(d)
+
+
+def parent_fd(root: Path, p: Path, create: bool) -> int:
+    """`p`'s folder, opened from `root` down one folder at a time without following a symlink: a folder
+    swapped for a symlink after the path was checked (a sandbox run at the same time, or since a
+    checkpoint) can't send a write outside `root`. `create`: make missing folders on the way."""
+    try:
+        parts = p.parent.relative_to(root).parts
+    except ValueError:
+        raise _outside(p, root) from None
+    d = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in parts:
+            if create:
+                try:
+                    os.mkdir(part, dir_fd=d)
+                except FileExistsError:
+                    pass
+            nxt = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=d)
+            os.close(d)
+            d = nxt
+    except OSError as e:
+        os.close(d)
+        if e.errno in (errno.ELOOP, errno.ENOTDIR) and _has_link(root, parts):
+            raise _outside(p, root) from None
         raise
+    return d
+
+
+def _has_link(root: Path, parts: tuple[str, ...]) -> bool:
+    return any(os.path.islink(root.joinpath(*parts[:i + 1])) for i in range(len(parts)))
+
+
+def _outside(p: Path, root: Path) -> Refused:
+    return Refused("symlink_out", f"{p} now leads outside the folder {root} (a folder on the way became a symlink)",
+                   "only files inside the folder can be changed")
 
 
 def diff(before: str, after: str, rel: str, rel_after: str | None = None, context: int = 3) -> str:
@@ -144,8 +215,9 @@ class Checkpoints:
 
     # ---- undo -------------------------------------------------------------------------------
 
-    def undo(self, thread: str, turn: str) -> dict[str, Any]:
-        """Restore a turn, newest change first. Refuses (with diffs) when a file changed since."""
+    def undo(self, thread: str, turn: str, root_of: Callable[[str], Path | None]) -> dict[str, Any]:
+        """Restore a turn, newest change first. Refuses (with diffs) when a file changed since, or when a
+        file now leads outside its folder (`root_of(folder id)`: the folder's real path, None when gone)."""
         with self._lock:
             meta = self.meta(thread, turn)
             entries = meta.get("entries") or []
@@ -156,11 +228,17 @@ class Checkpoints:
             latest: dict[str, str | None] = {}
             for e in entries:                       # the state the agent left each file in
                 latest[e["path"]] = e["sha_after"]
+            roots = {e["folder"]: root_of(e["folder"]) for e in entries}
             conflicts = []
             for path, want in latest.items():
+                e = next(x for x in reversed(entries) if x["path"] == path)
+                root = roots[e["folder"]]
+                if root is None or not inside(Path(os.path.realpath(path)), root):
+                    conflicts.append({"rel": e["rel"], "folder": e["folder"], "diff": "",
+                                      "detail": "its folder is gone" if root is None else "it now leads outside its folder"})
+                    continue
                 now = sha(Path(path))
                 if now != want:
-                    e = next(x for x in reversed(entries) if x["path"] == path)
                     conflicts.append({"rel": e["rel"], "folder": e["folder"],
                                       "detail": "deleted since" if now is None else "changed since the agent's edit",
                                       "diff": self._conflict_diff(thread, turn, entries, path)})
@@ -168,13 +246,18 @@ class Checkpoints:
                 return {"status": "conflict", "restored": [], "conflicts": conflicts,
                         "detail": f"{len(conflicts)} file(s) changed outside the agent since this turn; nothing was restored"}
             d = self._dir(thread, turn)
-            restored = []
+            restored, skipped = [], []
             for e in reversed(entries):
-                p = Path(e["path"])
-                if e["existed"]:
-                    write_atomic(p, (d / e["blob"]).read_bytes(), e.get("mode"))
-                elif p.is_file() or p.is_symlink():
-                    p.unlink()
+                p, root = Path(e["path"]), roots[e["folder"]]
+                assert root is not None
+                try:
+                    if e["existed"]:
+                        write_atomic(p, (d / e["blob"]).read_bytes(), e.get("mode"), root=root)
+                    elif p.is_file() or p.is_symlink():
+                        unlink_in(root, p)
+                except Refused as r:                # a folder became a symlink while undoing
+                    skipped.append({"rel": e["rel"], "folder": e["folder"], "detail": r.detail})
+                    continue
                 restored.append({"rel": e["rel"], "folder": e["folder"], "existed": e["existed"]})
             meta["undone_ts"] = time.time()
             self._save(thread, turn, meta)
@@ -183,7 +266,10 @@ class Checkpoints:
             if (r["folder"], r["rel"]) not in seen:
                 seen.add((r["folder"], r["rel"]))
                 out.append(r)
-        return {"status": "undone", "restored": out, "detail": f"restored {len(out)} file(s) as they were before this turn"}
+        res = {"status": "undone", "restored": out, "detail": f"restored {len(out)} file(s) as they were before this turn"}
+        if skipped:
+            res.update({"skipped": skipped, "detail": res["detail"] + f"; {len(skipped)} skipped (they lead outside their folder now)"})
+        return res
 
     def _conflict_diff(self, thread: str, turn: str, entries: list[dict[str, Any]], path: str) -> str:
         """What changed since the agent left the file: its state after the turn vs now."""

@@ -1092,7 +1092,7 @@ interface JudgeStatus { available: boolean; backend: string; model: string; deta
                        choices: string[] }   // models the backend offers that the judge could use (the picker in Settings → Agent)
 interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote";
                        folder?: string; level?: string; allow_bypass?: boolean; path?: string;
-                       key?: string;                                // what "allow in this chat" covers: the folder, and a command's first word
+                       key?: string;                                // what "allow in this chat" covers: the folder and the exact command
                        once?: boolean;                              // asks every time: only "Allow once" (host runs, commits, git remotes)
                        preview?: { summary?: string; diff?: string; command?: string; where?: "sandbox" | "host"; network?: boolean; cwd?: string; note?: string } }
 interface Grant { id: string; tool: string;                         // a name glob

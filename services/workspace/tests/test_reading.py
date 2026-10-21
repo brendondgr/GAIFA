@@ -140,3 +140,57 @@ def test_symlinked_folder_path(client, repo, tmp_path):
     f = client.post("/v1/folders", json={"path": str(link)}).json()
     assert f["path"] == str(repo)
     assert "pkg/" in post(client, "/v1/tree", folder=f["id"]).json()
+
+
+def test_a_repos_own_drivers_never_run_on_the_host(client, proj, tmp_path):
+    """A sandbox run (Run mounts .git read-write) or a clone can name filter, diff and merge drivers and
+    gpg in .git/config; git status, diff, show, log, dirty() and the commit never run them."""
+    client.patch("/v1/folders/proj", json={"level": "edit"})
+    marker = tmp_path / "ran"
+    evil = tmp_path / "evil.sh"
+    evil.write_text(f"#!/bin/sh\necho \"$0 $*\" >> {marker}\ncat\n")
+    evil.chmod(0o755)
+    (tmp_path / "inc.cfg").write_text(f"[filter \"inc\"]\n\tclean = {evil} inc\n")
+    for k, v in (("filter.x.clean", f"{evil} clean"), ("filter.x.smudge", f"{evil} smudge"), ("filter.x.required", "true"),
+                 ("filter.a=b.clean", f"{evil} eq"), ("filter.p.process", f"{evil} process"), ("diff.t.textconv", f"{evil} textconv"),
+                 ("diff.t.command", f"{evil} command"), ("merge.m.driver", f"{evil} merge"), ("gpg.program", str(evil)),
+                 ("log.showSignature", "true"), ("commit.gpgSign", "true"), ("include.path", str(tmp_path / "inc.cfg"))):
+        subprocess.run(["git", "config", k, v], cwd=proj, check=True)
+    (proj / ".gitattributes").write_text("*.py filter=x diff=t merge=m\n*.md filter=a=b\n*.txt filter=p\n*.cfg filter=inc\n")
+    for name in ("pkg/calc.py", "README.md", "notes.txt", "x.cfg"):
+        (proj / name).write_text("changed\n")
+    assert reading.dirty(proj)
+    for cmd, rev in (("status", None), ("diff", None), ("diff", "HEAD"), ("log", None), ("show", None)):
+        assert post(client, "/v1/git", folder="proj", command=cmd, rev=rev).status_code == 200, cmd
+    assert not marker.exists(), marker.read_text()
+    r = client.post("/v1/git/commit", json={"folder": "proj", "message": "m"}, headers={"X-AIHub-Origin": '{"thread": "t1"}'})
+    assert r.status_code == 200, r.text
+    assert post(client, "/v1/git", folder="proj", command="show").status_code == 200
+    assert not marker.exists(), marker.read_text()
+
+
+def test_git_read_never_shows_a_secret(client, proj):
+    """A committed .env (or key) can't come out of git: not as rev:path, a blob hash, a pathspec glob or
+    in a commit's patch; the user naming the file still shows it."""
+    (proj / ".env").write_text("TOKEN=hunter2\n")
+    (proj / "deploy").mkdir()
+    (proj / "deploy" / "id_ed25519").write_text("PRIVATE KEY\n")
+    subprocess.run(["git", "add", "-f", ".env", "deploy"], cwd=proj, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "oops"], cwd=proj, check=True)
+    blob = subprocess.run(["git", "rev-parse", "HEAD:.env"], cwd=proj, capture_output=True, text=True).stdout.strip()
+    subprocess.run(["git", "tag", "blobtag", blob], cwd=proj, check=True)
+    for rev in ("HEAD:.env", "HEAD:./.env", blob, blob[:10], "blobtag", "HEAD^{tree}", f"HEAD..{blob}"):
+        r = post(client, "/v1/git", folder="proj", command="show", rev=rev)
+        assert r.status_code == 422 and r.json()["code"] == "bad_rev", rev
+    for cmd, rev, path in (("show", "HEAD", None), ("diff", "HEAD~1", None), ("diff", "HEAD~1..HEAD", None),
+                           ("show", "HEAD", "*.env"), ("show", "HEAD", ":(glob)**/.env"), ("diff", "HEAD~1", "*id_*")):
+        r = post(client, "/v1/git", folder="proj", command=cmd, rev=rev, path=path)
+        assert "hunter2" not in r.text and "PRIVATE KEY" not in r.text, (cmd, rev, path, r.text)
+    (proj / ".env").write_text("TOKEN=changed\n")
+    st = post(client, "/v1/git", folder="proj", command="status").json()
+    assert ".env" not in st
+    named = post(client, "/v1/git", {"named": [".env"]}, folder="proj", command="show", rev="HEAD", path=".env").json()
+    assert "TOKEN=hunter2" in named
+    for ok in ("HEAD~1..HEAD", "main...HEAD", "HEAD^@", "HEAD^-", "HEAD@{0}", "main"):
+        assert post(client, "/v1/git", folder="proj", command="log", rev=ok).status_code == 200, ok
+    assert "oops" in post(client, "/v1/git", folder="proj", command="log").json()

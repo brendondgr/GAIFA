@@ -99,6 +99,20 @@ def test_levels_and_refusals(wc, proj):
     assert post(wc, "/v1/run", folder="proj", command="ls").json()["code"] == "level"
 
 
+def test_a_command_in_a_folder_holding_aihub_cannot_change_it(wc, aihub, tmp_path):
+    """A Run folder that contains the AIHub folder: the command writes the folder, not AIHub or its models."""
+    (tmp_path / "work").mkdir()
+    assert wc.post("/v1/folders", json={"path": str(tmp_path), "level": "run", "id": "outer"}).status_code == 200
+    cmd = (f"echo x > work/ok.txt; echo hacked > {aihub}/utils/proxy.py; touch {aihub}/data/models/llm/new; "
+           f"python -c \"open('{aihub}/utils/proxy.py','w')\"; echo done")
+    out = post(wc, "/v1/run", folder="outer", command=cmd).json()
+    assert "done" in out["stdout"] and "Read-only file system" in out["stderr"], out
+    assert (tmp_path / "work" / "ok.txt").read_text() == "x\n"
+    assert (aihub / "utils" / "proxy.py").read_text() == "def proxy():\n    pass\n"
+    assert not (aihub / "data" / "models" / "llm" / "new").exists()
+    py = post(wc, "/v1/python", folder="outer", code=f"open('{aihub}/utils/proxy.py', 'w').write('x')").json()
+    assert py["exit_code"] == 1 and (aihub / "utils" / "proxy.py").read_text() == "def proxy():\n    pass\n"
+
 def test_run_with_network_installs_a_package(wc, proj):
     wc.patch("/v1/folders/proj", json={"level": "run_net"})
     r = post(wc, "/v1/run", folder="proj", command="uv venv -q && uv pip install -q six && .venv/bin/python -c 'import six; print(six.__version__)'",   # plain uv pip: into .venv
@@ -131,6 +145,19 @@ def test_python_writes_outputs(wc, tmp_path):
     assert side["source"] == "workspace_python" and "savefig" in side["code"]
     assert not list((tmp_path / "state" / "python").iterdir())                    # the work folder is gone
 
+
+def test_a_symlink_the_code_leaves_never_copies_a_host_file(wc, tmp_path):
+    """Code in the sandbox can leave a symlink to any path on this machine; only real files in the work
+    folder become outputs, never what a link points at."""
+    host = tmp_path / "id_ed25519"
+    host.write_text("HOST PRIVATE KEY\n")
+    code = (f"import os\nos.symlink({str(host)!r}, 'key.txt')\nos.symlink({str(tmp_path)!r}, 'dir')\n"
+            f"os.symlink({str(host)!r}, os.path.join(os.environ['AIHUB_OUT'], 'k.txt'))\nopen('real.txt', 'w').write('ok')\n")
+    out = post(wc, "/v1/python", code=code).json()
+    assert out["exit_code"] == 0, out.get("stderr")
+    assert [Path(f).name.split("-", 1)[1] for f in out["files"]] == ["real.txt"]
+    saved = list((tmp_path / "outputs").rglob("*"))
+    assert not any(f.is_file() and "HOST PRIVATE KEY" in f.read_text(errors="replace") for f in saved)
 
 def test_python_without_files_and_bad_inputs(wc):
     r = post(wc, "/v1/python", code="print(6 * 7)").json()

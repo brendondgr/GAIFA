@@ -176,3 +176,47 @@ def test_pruning_keeps_14_days_and_2_gb(tmp_path, repo):
     assert cps.prune() == 1 and [t["turn"] for t in cps.turns()] != [] and "old" not in [t["turn"] for t in cps.turns()]
     assert cps.prune(keep_bytes=1) == 2 and cps.turns() == []
     assert cps.usage()["turns"] == 0
+
+
+def _swap_for_link(folder, outside):
+    """A sandbox run at the same time: a folder inside the workspace becomes a symlink out of it."""
+    folder.rename(folder.with_name(folder.name + "-old"))
+    outside.mkdir(exist_ok=True)
+    folder.symlink_to(outside)
+
+
+def test_a_folder_swapped_for_a_symlink_after_the_check_is_never_written_through(ctx, proj, tmp_path):
+    import editing
+    from folders import Refused
+
+    outside = tmp_path / "outside"
+    origin = {"thread": "t1", "turn": 9}
+    calls = [{"folder": "proj", "path": "pkg/calc.py", "old": "a - b", "new": "a + b"},
+             {"folder": "proj", "path": "pkg/new/made.txt", "content": "x"},
+             {"folder": "proj", "path": "pkg/calc.py"}]
+    for tool, args in zip(("edit", "write", "delete"), calls):
+        ch = editing.plan(ctx.folders, tool, args)
+        _swap_for_link(proj / "pkg", outside)
+        (outside / "calc.py").write_text("theirs\n")
+        with pytest.raises(Refused) as e:
+            editing.apply(ctx.folders, ctx.checkpoints, ch, origin)
+        assert e.value.code == "symlink_out", tool
+        assert (outside / "calc.py").read_text() == "theirs\n" and not (outside / "new").exists(), tool
+        (proj / "pkg").unlink()
+        (proj / "pkg-old").rename(proj / "pkg")
+    assert ctx.checkpoints.entries("t1", "9") == []
+
+
+def test_undo_never_restores_through_a_folder_that_became_a_symlink(client, proj, tmp_path):
+    outside = tmp_path / "outside"
+    assert post(client, "/v1/edit", turn=7, folder="proj", path="pkg/calc.py", old="a - b", new="a + b").status_code == 200
+    assert post(client, "/v1/delete", turn=7, folder="proj", path="pkg/__init__.py").status_code == 200
+    after = (proj / "pkg" / "calc.py").read_text()
+    _swap_for_link(proj / "pkg", outside)
+    (outside / "calc.py").write_text(after)                        # the same bytes, so it isn't "changed since"
+    r = client.post("/v1/checkpoints/t1/7/undo")
+    assert r.status_code == 409, r.text
+    conflicts = r.json()["data"]["conflicts"]
+    assert {c["rel"] for c in conflicts} == {"pkg/calc.py", "pkg/__init__.py"}
+    assert all(c["detail"] == "it now leads outside its folder" and c["diff"] == "" for c in conflicts)
+    assert (outside / "calc.py").read_text() == after and not (outside / "__init__.py").exists()

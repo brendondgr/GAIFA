@@ -1,6 +1,6 @@
 // Plan 27.4: the five chat modes in the header (Bypass only where the chat's workspace folders allow
 // it, old names shown as their new ones) and the workspace card: the diff, a host run's warning,
-// "asks every time" with only Allow once, and what a grant covers ("in itsdangerous, pytest commands").
+// "asks every time" with only Allow once, and what a grant covers ("in itsdangerous: pytest -q").
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -59,7 +59,7 @@ test('bypassAllowed: the folders this chat used, or any folder before it used on
 test('once-only calls get Allow once alone', () => {
   assert.deepEqual(risk.approvalButtons('execute', { thread: true, once: true }).map(b => b.remember), ['once']);
   assert.deepEqual(risk.approvalButtons('execute', { thread: true }).map(b => b.remember), ['once', 'thread', 'always']);
-  assert.equal(risk.limitsCover({ key: 'itsdangerous pytest' }), 'in itsdangerous, pytest commands');
+  assert.equal(risk.limitsCover({ key: 'itsdangerous pytest -q' }), 'in itsdangerous: pytest -q');
   assert.equal(risk.limitsCover({ key: 'itsdangerous' }), 'in itsdangerous');
   assert.equal(risk.limitsCover({}), null);
 });

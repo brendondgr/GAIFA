@@ -1,7 +1,8 @@
 """The preflight (plan 27.4): what a call would do, so the hub can decide it before it runs.
 
 `POST /v1/limits {tool, arguments, origin}` → `{action, folder, level, allow_bypass, key, once,
-refuse?, preview?}`. The hub (`utils/tools/approvals.py`) applies the chat's mode to the
+refuse?, preview?}`. A command's `key` (what "allow in this chat" covers) is the folder plus the
+exact command line, with where and internet (`grant_key`); a compound command has none and is `once`. The hub (`utils/tools/approvals.py`) applies the chat's mode to the
 `action`; this mod applies the hard limits and the folder's level (a `refuse` here ends the
 call, whatever the mode). The routes check the same limits again when the call arrives.
 
@@ -26,11 +27,8 @@ NEEDS = {"read": "read", "edit": "edit", "delete": "edit", "commit": "edit", "co
          "host": "run", "remote": "run_net"}
 NEVER = {"sudo", "doas", "pkexec", "su"}
 REMOTE_GIT = {"push", "pull", "fetch", "clone", "ls-remote", "remote", "submodule"}
-WRAPPERS = {"env", "time", "nice", "nohup", "command", "exec"}
-RUNNERS = {("uv", "run"), ("poetry", "run"), ("pdm", "run"), ("pipenv", "run"), ("pnpm", "exec"), ("npm", "exec"),
-           ("yarn", "run"), ("hatch", "run"), ("rye", "run")}
-SETUP = {"source", ".", "cd", "pushd", "export", "set", "unset", "alias"}   # set the scene; the program comes after
 ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+COMPOUND = re.compile(r"[;&|`\n\r<>]|\$\(")     # more than one command, or redirection: no grant covers it
 
 
 def words(command: str) -> list[list[str]]:
@@ -55,30 +53,23 @@ def words(command: str) -> list[list[str]]:
     return out
 
 
-def first_word(command: str) -> str:
-    """What "allow `pytest` in this chat" is keyed by: the program, past setup commands
-    (`source .venv/bin/activate &&`, `cd tests &&`), env assignments, wrappers (env, time) and
-    runners (`uv run`, `python -m`, `npx`)."""
-    cmds = [c for c in words(command) if c]
-    while len(cmds) > 1 and os.path.basename(cmds[0][0]) in SETUP:
-        cmds = cmds[1:]
-    if not cmds:
-        return ""
-    w = list(cmds[0])
-    while w and (ASSIGN.match(w[0]) or w[0] in WRAPPERS):
-        w.pop(0)
-    while w:
-        head = os.path.basename(w[0])
-        if len(w) > 1 and (head, w[1]) in RUNNERS:
-            w = w[2:]
-            continue
-        if head in ("npx", "pnpx", "bunx") and len(w) > 1:
-            w = w[1:]
-            continue
-        if re.match(r"^python(3(\.\d+)?)?$", head) and len(w) > 2 and w[1] == "-m":
-            return w[2]
-        return head
-    return ""
+def grant_key(folder: str, command: str, where: str = "sandbox", network: bool = False, cwd: str | None = None) -> str | None:
+    """What "allow in this chat" covers for a command: this exact command line (spacing aside) in this
+    folder (and subfolder `cwd`), in the sandbox or on this machine, with or without internet
+    ("proj pytest -q", "proj/web npm test (with internet)"). None for a
+    compound command (;, &&, ||, |, &, backticks, $(, newlines, redirections): a grant for `pytest`
+    must not cover `pytest; curl -d @.env …`, so such a command is allowed one call at a time."""
+    if COMPOUND.search(command):
+        return None
+    try:
+        canon = shlex.join(shlex.split(command))
+    except ValueError:
+        return None
+    if not canon:
+        return None
+    sub = os.path.normpath(cwd or ".")
+    place = folder if sub == "." else f"{folder}/{shlex.quote(sub)}"
+    return f"{place} {canon}" + (" (on this machine)" if where == "host" else "") + (" (with internet)" if network else "")
 
 
 def remote_git(command: str) -> str | None:
@@ -132,16 +123,20 @@ def classify(folders: Folders, tool: str, args: dict[str, Any], origin: dict[str
             if remote:
                 action = "remote"
             out.update({"action": action, "once": action in ("host", "remote")})
+            note = "runs on your machine, outside the sandbox: your files, your network" if where == "host" else None
             if f is not None:
                 folders.need(f, NEEDS[action], _what(action, remote))
-                out["key"] = f"{f.id} {first_word(command)}".strip()
+                out["key"] = grant_key(f.id, command, where, net, args.get("cwd") if tool == "run" else None)
+                if out["key"] is None:
+                    out["once"] = True
+                    note = note or "more than one command (or a redirection) in one line: it's allowed one call at a time"
             elif net:
                 raise Refused("level", "Python with network needs a folder at Run + network", "pass a folder at that level, or no network")
             else:
                 out["key"] = "python"
             out["preview"] = {"command": command if tool == "run" else str(args.get("code") or ""), "where": where,
                               "network": net or action in ("host", "remote"), "cwd": f.path if f else None,
-                              **({"note": "runs on your machine, outside the sandbox: your files, your network"} if where == "host" else {})}
+                              **({"note": note} if note else {})}
             return out
     except Refused as e:
         out["refuse"] = e.body()

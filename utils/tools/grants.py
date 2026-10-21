@@ -10,9 +10,9 @@ argument), `"arg:<name>"` (that argument as is) or `"const:<x>"` (always `x`, so
 every call of the tool, e.g. searching). A grant whose key is null covers every call of its tool.
 
 **A mod's own key** (plan 27.4): a mod with a preflight (`[agent] limits`) may name the key itself
-(`limits.key`, e.g. "itsdangerous pytest": the folder and the command's first word), which then
+(`limits.key`, e.g. "itsdangerous pytest -q": the folder and the exact command line), which then
 replaces the one read from the arguments. A preflight's `once` action (host runs, commits, git
-remotes) can't be remembered at all.
+remotes, and a compound command, which has no key) can't be remembered at all.
 
 **Who it covers.** A `thread` grant covers calls whose origin names that thread (the chat); an MCP
 or API call has no thread, so only `always` grants apply to it. `thread` grants end with their

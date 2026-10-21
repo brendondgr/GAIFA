@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -10,6 +12,7 @@ from pydantic import BaseModel, Field
 
 import editing
 import reading
+from folders import Refused
 
 
 class EditIn(BaseModel):
@@ -93,9 +96,15 @@ def mount(app: FastAPI, ctx: Any) -> None:
         return {"thread": thread, "turn": turn, "undone_ts": meta.get("undone_ts"),
                 "entries": [{k: e.get(k) for k in ("n", "folder", "rel", "tool", "ts", "existed", "size")} for e in meta.get("entries") or []]}
 
+    def root_of(fid: str) -> Path | None:
+        try:
+            return Path(os.path.realpath(ctx.folders.get(fid).path))
+        except Refused:
+            return None
+
     @app.post("/v1/checkpoints/{thread}/{turn}/undo", summary="Undo a turn: every file back as it was before it")
     def undo(thread: str, turn: str) -> Any:
-        out = ctx.checkpoints.undo(thread, turn)
+        out = ctx.checkpoints.undo(thread, turn, root_of)
         if out["status"] == "conflict":
             return JSONResponse({"detail": out["detail"], "code": "changed_since", "data": out,
                                  "fix": "look at the diffs; change the files back by hand, or keep them"}, status_code=409)

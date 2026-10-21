@@ -4,7 +4,8 @@
   build-essential and the data libraries; base images pinned by digest. Built as
   `localhost/aihub-workspace-sandbox:<VERSION>` from the Workspace page (`POST /v1/sandbox/build`).
 - **A run:** your user inside (`--userns=keep-id`), the folder mounted read-write **at the same
-  absolute path** (read-only below Run), `~/.cache/uv`, `~/.cache/pip` and `~/.npm` as overlays
+  absolute path** (read-only below Run; the AIHub folder and its models read-only inside it, when
+  the folder contains them), `~/.cache/uv`, `~/.cache/pip` and `~/.npm` as overlays
   (read from, never written back), the rest of `$HOME` a fresh tmpfs, a read-only root, no network
   unless asked for (Run + network: full internet), memory and process limits, a timeout (120 s by
   default, 600 s at most). SELinux labels are left alone (`label=disable`) rather than relabelling
@@ -25,6 +26,8 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+from folders import Refused
 
 HERE = Path(__file__).resolve().parent
 VERSION = "2"                  # bump with every change to sandbox/Containerfile or requirements.lock
@@ -199,7 +202,10 @@ class Sandbox:
             src = self.home / rel
             if src.is_dir():
                 args += ["-v", f"{src}:{src}:O"]
-        for path, mode in mounts:
+        for path, mode in sorted(mounts, key=lambda m: len(Path(m[0]).parts)):     # a folder before the read-only parts inside it
+            if any(c in str(path) for c in ":,\n"):
+                raise Refused("bad_mount_path", f"{path} has a ':' or ',' in its path, which the sandbox can't mount",
+                              "rename the folder, or run on the host with where=\"host\"", 422)
             args += ["-v", f"{path}:{path}:{'rw' if mode == 'rw' else 'ro'}"]
         caches = {"UV_CACHE_DIR": f"{home}/.cache/uv", "PIP_CACHE_DIR": f"{home}/.cache/pip", "npm_config_cache": f"{home}/.npm",
                   "XDG_CACHE_HOME": "/tmp/.cache", "XDG_CONFIG_HOME": "/tmp/.config", "MPLCONFIGDIR": "/tmp/.config/matplotlib"}

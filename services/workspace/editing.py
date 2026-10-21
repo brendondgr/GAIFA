@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from checkpoints import Checkpoints, diff, key, text_of, write_atomic
+from checkpoints import Checkpoints, diff, key, text_of, unlink_in, write_atomic
 from folders import Folder, Folders, Refused
 from reading import dirty, git, is_repo
 
@@ -112,11 +112,11 @@ def plan(folders: Folders, tool: str, args: dict[str, Any], named: list[str] | N
         msg = str(args.get("message") or "").strip()
         if not msg:
             raise Refused("no_message", "a commit needs a message", "", 422)
-        paths = [folders.resolve(f, x, named=named)[1] for x in (args.get("paths") or [])]
+        paths = [":(literal)" + folders.resolve(f, x, named=named)[1] for x in (args.get("paths") or [])]
         status = git(root, "status", "--porcelain", "--", *paths).stdout if paths else git(root, "status", "--porcelain").stdout
         if not status.strip():
             raise Refused("nothing_to_commit", "there are no changes to commit", "", 422)
-        stat = git(root, "diff", "HEAD", "--stat", "--no-ext-diff", "--", *paths, check=False).stdout
+        stat = git(root, "diff", "HEAD", "--stat", "--no-ext-diff", "--no-textconv", "--", *paths, check=False).stdout
         return Change(tool, f, stat, [], f"commit in {f.id}: {msg.splitlines()[0][:72]}",
                       {"message": msg, "paths": paths, "status": status})
     raise Refused("unknown_tool", f"no editing tool {tool!r}", "", 404)
@@ -139,7 +139,7 @@ def apply(folders: Folders, cps: Checkpoints, ch: Change, origin: dict[str, Any]
         git(root, "-c", "user.useConfigOnly=false", *args)
         head = git(root, "log", "-1", "--format=%h %s").stdout.strip()
         out.update({"commit": head.split(" ", 1)[0], "subject": head.split(" ", 1)[-1],
-                    "stat": git(root, "show", "--stat", "--format=", "HEAD").stdout[-3000:],
+                    "stat": git(root, "show", "--no-ext-diff", "--no-textconv", "--stat", "--format=", "HEAD").stdout[-3000:],
                     "note": "undo it with workspace_run `git reset --soft HEAD~1` if the user asks"})
         return out
     done = []
@@ -149,11 +149,11 @@ def apply(folders: Folders, cps: Checkpoints, ch: Change, origin: dict[str, Any]
             done.append(n)
             try:
                 if data is None:
-                    p.unlink()
+                    unlink_in(root, p)
                 else:
                     mode = p.stat().st_mode & 0o7777 if p.exists() else None
-                    write_atomic(p, data, mode)
-            except OSError:
+                    write_atomic(p, data, mode, root=root)
+            except (OSError, Refused):
                 cps.drop(thread, turn, n)
                 done.pop()
                 raise

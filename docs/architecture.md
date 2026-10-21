@@ -762,7 +762,7 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   1. the **deny** list of `[agent.permissions]`;
   2. a **mod's limits**: a mod with `[agent] limits` (the workspace mod) answers a preflight before each call: what it would do (`action`), the folder's level and Bypass, a diff or the command, and a refusal for hard limits (paths out of the folder, secrets, `.git/`, `sudo`, the AIHub folder above Read) or a level too low ("needs the folder at Run"). A refusal ends the call in every mode; the mod checks again when the call arrives; a preflight that fails refuses;
   3. the thread's **mode**: with limits, the cell of the table below for the call's action (Bypass in a folder that doesn't allow it counts as Accept edits); without, `plan` denies everything but `read`;
-  4. a **grant** that covers the call allows it, keyed by the mod's `key` when it gives one (a folder and a command's first word); never for actions that ask every time (`host`, `remote`, `commit`);
+  4. a **grant** that covers the call allows it, keyed by the mod's `key` when it gives one (the folder, its subfolder `cwd` and the exact command line, plus whether it has internet or runs on this machine; a compound command (`;`, `&&`, `||`, `|`, `&`, backticks, `$(`, newlines, redirections) has no key and is allowed one call at a time); never for actions that ask every time (`host`, `remote`, `commit`);
   5. the **ask** list, then the **allow** list (`execute` ignores the allow list: only a grant skips its card);
   6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `accept_edits`, `auto` and `bypass`; `network` asks (in `auto` the judge decides); `execute` and `destructive` ask in every mode.
 

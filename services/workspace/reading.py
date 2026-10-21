@@ -2,8 +2,10 @@
 
 Every answer that carries a folder's contents is wrapped as
 `<untrusted source="…">…</untrusted>`: the files are data, never instructions (plan Stage J).
-Git runs with external diff drivers, textconv, fsmonitor and pagers turned off, so reading a
-repository never runs code from it.
+Git runs with external diff drivers, textconv, fsmonitor, pagers, hooks, signing and submodules
+turned off, and with every filter, diff and merge driver the repository's own config names (a
+sandbox run or a clone can write `.git/config`) emptied, so git never runs code from a folder.
+`git_read` never shows secret files, a blob by hash or `rev:path`.
 """
 
 from __future__ import annotations
@@ -16,11 +18,15 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from folders import MAX_BYTES, SKIP_DIRS, Folder, Folders, Refused, is_binary, is_secret, was_named
+from folders import MAX_BYTES, SECRET_GLOBS, SKIP_DIRS, Folder, Folders, Refused, is_binary, is_secret, was_named
 
 _CLOSE = re.compile(r"</\s*untrusted", re.I)
 GIT_SAFE = ["-c", "core.fsmonitor=false", "-c", "diff.external=", "-c", "core.pager=cat", "-c", "core.hooksPath=/dev/null",
-            "-c", "color.ui=false", "-c", "safe.directory=*"]
+            "-c", "color.ui=false", "-c", "safe.directory=*", "-c", "log.showSignature=false", "-c", "commit.gpgSign=false",
+            "-c", "tag.gpgSign=false", "-c", "gpg.program=false", "-c", "gpg.ssh.program=false", "-c", "gpg.x509.program=false",
+            "-c", "diff.ignoreSubmodules=all", "-c", "submodule.recurse=false", "-c", "status.submoduleSummary=false",
+            "-c", "gc.auto=0", "-c", "maintenance.auto=false"]
+DRIVERS = r"^(filter|diff|merge)\..*\.(clean|smudge|process|textconv|command|driver)$"
 GIT_READ = ("status", "log", "diff", "show", "branch")
 MAX_LINE = 2000
 
@@ -37,9 +43,28 @@ def git_env() -> dict[str, str]:
     return env
 
 
+def drivers_off(cwd: Path) -> dict[str, str]:
+    """The repo's own filter, diff and merge drivers, emptied (as GIT_CONFIG_* so a name with `=` in it
+    still works). Read without running anything; the user's global ones (git-lfs) are kept."""
+    r = subprocess.run(["git", *GIT_SAFE, "config", "--show-scope", "--name-only", "-z", "--get-regexp", DRIVERS], cwd=cwd,
+                       capture_output=True, text=True, timeout=10, env=git_env(), errors="replace")
+    parts = r.stdout.split("\0")
+    keys: list[tuple[str, str]] = []
+    for scope, name in zip(parts[0::2], parts[1::2]):
+        if scope == "global" or not name:
+            continue
+        keys.append((name, ""))
+        if name.lower().startswith("filter."):
+            keys.append((name.rsplit(".", 1)[0] + ".required", "false"))
+    env = {"GIT_CONFIG_COUNT": str(len(keys))}
+    for i, (k, v) in enumerate(keys):
+        env.update({f"GIT_CONFIG_KEY_{i}": k, f"GIT_CONFIG_VALUE_{i}": v})
+    return env
+
+
 def git(cwd: Path, *args: str, timeout: float = 20, check: bool = True) -> subprocess.CompletedProcess[str]:
     r = subprocess.run(["git", *GIT_SAFE, *args], cwd=cwd, capture_output=True, text=True, timeout=timeout,
-                       env=git_env(), errors="replace")
+                       env={**git_env(), **drivers_off(cwd)}, errors="replace")
     if check and r.returncode != 0:
         raise Refused("git_failed", (r.stderr or r.stdout).strip()[:600] or f"git {args[0]} failed", "", 422)
     return r
@@ -191,17 +216,18 @@ def _py_search(root: Path, base: Path, query: str, regex: bool, glob: str | None
     return out
 
 
-def git_read(f: Folder, root: Path, command: str, rev: str | None, path: str | None, limit: int) -> str:
+def git_read(f: Folder, root: Path, command: str, rev: str | None, relp: str | None, limit: int) -> str:
+    """`relp`: a path the caller resolved inside the folder (folders.resolve), matched literally."""
     if command not in GIT_READ:
         raise Refused("not_read_only", f"git {command} isn't one of the read-only commands ({', '.join(GIT_READ)})",
                       "commit with workspace_git_commit; other git commands run with workspace_run", 422)
     if not is_repo(root):
         raise Refused("not_a_repo", f"{f.id} isn't a git repository", "", 422)
-    if rev and (rev.startswith("-") or not re.match(r"^[\w./~^@{}:+-]{1,200}$", rev)):
-        raise Refused("bad_rev", f"{rev!r} isn't a revision", "pass a commit, branch or range such as HEAD~3..HEAD", 422)
-    tail = ["--", path] if path else []
+    if rev:
+        _check_rev(root, rev)
+    tail = ["--", *_pathspecs(relp, secrets=command != "log")]
     if command == "status":
-        args = ["status", "--short", "--branch", *tail]
+        args = ["status", "--short", "--branch", "--ignore-submodules=all", *tail]
     elif command == "log":
         args = ["log", f"-n{limit}", "--date=short", "--format=%h %ad %an  %s", *([rev] if rev else []), *tail]
     elif command == "diff":
@@ -215,6 +241,27 @@ def git_read(f: Folder, root: Path, command: str, rev: str | None, path: str | N
     cut = len(lines) > 1500
     text = "\n".join(lines[:1500]) + ("\n… (cut at 1500 lines: pass a path or a narrower revision)" if cut else "")
     return f"git {command} in {f.id}\n" + untrusted(f"workspace {f.id} git {command}", text or "(nothing)")
+
+
+def _check_rev(root: Path, rev: str) -> None:
+    """Commits and ranges of commits only: no `rev:path`, no blob or tree by hash."""
+    bad = Refused("bad_rev", f"{rev!r} isn't a commit or a range of commits",
+                  "pass a commit, branch or range such as HEAD~3..HEAD (read files with workspace_read)", 422)
+    if rev.startswith("-") or ":" in rev or not re.match(r"^[\w./~^@{}+-]{1,200}$", rev):
+        raise bad
+    for side in re.split(r"\.\.\.?", rev):
+        side = re.sub(r"\^(@|-\d*)$", "", side)
+        if side and git(root, "rev-parse", "--verify", "--quiet", "--end-of-options", side + "^{commit}", check=False).returncode:
+            raise bad
+
+
+def _pathspecs(relp: str | None, secrets: bool = True) -> list[str]:
+    """The caller's path, literally (no globs or pathspec magic), and secret files left out (unless the
+    path is one: the user named it)."""
+    out = [f":(literal){relp}"] if relp and relp != "." else []
+    if secrets and not (relp and is_secret(relp)):
+        out += [x for g in SECRET_GLOBS for x in (f":(exclude,glob,icase)**/{g}", f":(exclude,glob,icase)**/{g}/**")]
+    return out
 
 
 def dirty(root: Path) -> list[str]:

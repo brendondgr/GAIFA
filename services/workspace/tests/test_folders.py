@@ -156,3 +156,22 @@ def test_folders_are_found_by_id_path_or_name(ctx, repo):
     with pytest.raises(Refused) as e:
         ctx.folders.get("nope")
     assert e.value.code == "unknown_folder" and "proj" in e.value.detail
+
+
+def test_a_folder_holding_aihub_mounts_it_read_only_in_the_sandbox(ctx, aihub, tmp_path):
+    """The caps stop the edit tools; a sandbox command can write anywhere it's mounted, so the AIHub
+    folder and its models inside a Run folder are mounted read-only on top of it."""
+    import running
+    from sandbox import Run
+
+    outer = tmp_path
+    mounts = running.mounts_for(ctx.folders, outer)
+    assert mounts == [(outer, "rw"), (aihub / "data" / "models", "ro"), (aihub, "ro")]
+    argv = ctx.sandbox.argv(Run("run_x", "true", "sandbox", str(outer)), outer, list(reversed(mounts)), {})
+    vs = [argv[i + 1] for i, a in enumerate(argv) if a == "-v" and not argv[i + 1].endswith(":O")]     # not the caches
+    assert vs == [f"{outer}:{outer}:rw", f"{aihub}:{aihub}:ro", f"{aihub}/data/models:{aihub}/data/models:ro"]
+    assert running.mounts_for(ctx.folders, tmp_path / "proj") == [(tmp_path / "proj", "rw")]
+    for bad in ("a:b", "a,b"):
+        with pytest.raises(Refused) as e:
+            ctx.sandbox.argv(Run("run_x", "true", "sandbox", None), outer, [(outer / bad, "rw")], {})
+        assert e.value.code == "bad_mount_path"

@@ -62,7 +62,7 @@ Expect `all checks passed`, and the tests green; `tests/test_sandbox.py` (marked
 ## What to look for
 
 - A folder you add shows **Read** until you raise it on the Workspace page. The AIHub folder and `data/models/` can't go above Read.
-- **How a run is shaped:** `podman run --rm --userns=keep-id --security-opt label=disable --read-only --memory=8g --pids-limit=1024 --network=none|pasta`, a tmpfs at `/tmp` and at `$HOME`, `~/.cache/uv`, `~/.cache/pip` and `~/.npm` as overlays (`:O`, read but never written back), the folder at its own path (`rw` from Run, else `ro`). `label=disable` because relabelling your folder for SELinux would change its files' labels.
+- **How a run is shaped:** `podman run --rm --userns=keep-id --security-opt label=disable --read-only --memory=8g --pids-limit=1024 --network=none|pasta`, a tmpfs at `/tmp` and at `$HOME`, `~/.cache/uv`, `~/.cache/pip` and `~/.npm` as overlays (`:O`, read but never written back), the folder at its own path (`rw` from Run, else `ro`), with the AIHub folder and `data/models/` mounted `ro` on top when the folder contains them; a folder whose path has a `:` or `,` can't be mounted (`bad_mount_path`). `label=disable` because relabelling your folder for SELinux would change its files' labels.
 - **"Read-only file system"** in a run: the folder is below Run. **Exit 127, "not found":** the program isn't in the image; the run's note suggests installing it into the folder (Run + network) or running on your machine (`where = "host"`, which always asks).
 - A project `.venv` made **on the host** points at the host's Python and won't run in the sandbox; make one inside the sandbox (`uv venv` / `uv sync` at Run + network) and it keeps working, because the folder is at the same path.
 

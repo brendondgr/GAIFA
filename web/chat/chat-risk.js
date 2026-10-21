@@ -22,12 +22,12 @@ export function grantKeyOf(kind, args = {}) {
   return null;
 }
 
-/** What a mod's own grant key covers (plan 27.4): "itsdangerous pytest" → "in itsdangerous, pytest commands". */
+/** What a mod's own grant key covers (plan 27.4): "itsdangerous pytest -q" → "in itsdangerous: pytest -q" (that exact command). */
 export function limitsCover(limits) {
   const k = limits?.key;
   if (!k) return null;
   const [folder, ...rest] = String(k).split(' ');
-  return rest.length ? `in ${folder}, ${rest.join(' ')} commands` : `in ${folder}`;
+  return rest.length ? `in ${folder}: ${rest.join(' ')}` : `in ${folder}`;
 }
 
 // What a call with limits does, in words, for the card (plan 27.4).

@@ -210,11 +210,10 @@ def create_app(state: Path | None = None, aihub_root: Path | None = None, models
     @app.post("/v1/git", summary="Read-only git: status, log, diff, show, branch")
     def git(body: GitIn, request: Request) -> str:
         f = ctx.folders.get(body.folder)
-        if body.path:
-            ctx.folders.resolve(f, body.path, named=named_of(request))
+        relp = ctx.folders.resolve(f, body.path, named=named_of(request))[1] if body.path else None
         root, _ = ctx.folders.resolve(f, ".")
         ctx.counts["reads"] += 1
-        return reading.git_read(f, root, body.command, body.rev, body.path, body.limit)
+        return reading.git_read(f, root, body.command, body.rev, relp, body.limit)
 
     return app
 

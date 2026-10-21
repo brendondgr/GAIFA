@@ -11,15 +11,17 @@ An AIHub mod (plan Phase 27): folders on this machine that the chat agent reads,
 | **Run** (`run`) | also run commands in the sandbox (no network) |
 | **Run + network** (`run_net`) | the sandbox with full internet |
 
-The AIHub folder (and anything inside it) and `data/models/` never go above Read. A folder that *contains* AIHub keeps its level for its other files, but nothing inside AIHub is ever written.
+The AIHub folder (and anything inside it) and `data/models/` never go above Read. A folder that *contains* AIHub keeps its level for its other files, but nothing inside AIHub is ever written: the edit tools refuse it, and the sandbox mounts AIHub and the models read-only inside such a folder.
 
 ## Hard limits
 
 Nothing lifts these (`folders.py`):
-- paths outside the folder, or through a symlink that leads out of it;
+- paths outside the folder, or through a symlink that leads out of it (checked again as each write lands: the folders on the way are opened one at a time without following a symlink, so a folder a sandbox run swaps for a symlink can't send a write out);
 - secret files (`.env`, `*.pem`, `id_*`, `*credential*`, `secrets*`, as any part of the path), unless the user names the file in their message;
 - `.git/` is written only by the git tools;
-- reading files over 2 MB (unless named) or binary files.
+- reading files over 2 MB (unless named) or binary files;
+- git never runs a program from the folder: hooks, fsmonitor, external diffs, textconv, signing and submodules are off, and every filter, diff and merge driver the repository's own config names is emptied (the user's global ones, such as git-lfs, are kept);
+- read-only git takes commits and ranges of commits only (no `rev:path`, no blob by hash), matches `path` literally, and never shows secret files in status, diff or show unless the user named one as `path`.
 
 Listings and searches skip `.git`, `node_modules`, `.venv`, caches and build folders.
 
@@ -55,14 +57,14 @@ Commands and Python run in `localhost/aihub-workspace-sandbox:2` (rootless podma
 | `GET /v1/runs?thread=`, `GET /v1/runs/{id}` | run records |
 | `POST /v1/runs/{id}/cancel` | stop a run |
 | `POST /v1/run` | `workspace_run`: `{folder, command, where: sandbox \| host, network?, cwd?, timeout_s?}` → `{run, state, exit_code, seconds, where, network, stdout, stderr, note?}` (output inside `<untrusted>`; `stdout` is `(no output)` when the command printed nothing); Run for the sandbox and the host, Run + network for `network` and git remotes |
-| `POST /v1/python` | `workspace_python`: `{code, inputs?, folder?, network?, timeout_s?}`; inputs (outputs) are fetched from the hub into `inputs/` (`$AIHUB_INPUTS`); without a folder every file the code writes becomes an output in `outputs/workspace/<date>/<HHMMSS>-<name>` with a sidecar (the run and the code); with a folder, files in `$AIHUB_OUT` do |
-| `POST /v1/limits` | the hub's preflight before each call (plan 27.4): `{action, folder, level, allow_bypass, key, once, preview, refuse?}` |
+| `POST /v1/python` | `workspace_python`: `{code, inputs?, folder?, network?, timeout_s?}`; inputs (outputs) are fetched from the hub into `inputs/` (`$AIHUB_INPUTS`); without a folder every file the code writes becomes an output in `outputs/workspace/<date>/<HHMMSS>-<name>` with a sidecar (the run and the code); with a folder, files in `$AIHUB_OUT` do. Only regular files become outputs: a symlink the code leaves is skipped |
+| `POST /v1/limits` | the hub's preflight before each call (plan 27.4): `{action, folder, level, allow_bypass, key, once, preview, refuse?}`. A command's `key`, what "allow in this chat" covers, is the folder (and `cwd`) plus the exact command line, with " (with internet)" or " (on this machine)": `proj pytest -q`. A compound command (`;`, `&&`, `\|\|`, `\|`, `&`, backticks, `$(`, newlines, redirections) has no key and is `once` |
 
 A call that goes away (the hub cancelled it) stops its run. Host runs (`where = "host"`) run `bash -c` in the folder on your machine, with your files and network, and are only reached after you allowed that one call: no grant covers them.
 
 ## Checkpoints
 
-Before any change, the file's bytes (or "didn't exist") go to `data/state/workspace/checkpoints/<thread>/<turn>/` (`entries.json`, `NNN.bin` before, `NNN.after` as the agent left it). The thread and turn come from the call's `X-AIHub-Origin`; a call from outside a chat is its own turn (`_direct`). Undo restores a whole turn, newest change first, and restores nothing if any file changed since. Kept 14 days or 2 GB, oldest turns first. Commits aren't checkpointed (git keeps them). A chat's first change in a folder reports a dirty working tree (`dirty_before`), so the agent knows which changes were the user's.
+Before any change, the file's bytes (or "didn't exist") go to `data/state/workspace/checkpoints/<thread>/<turn>/` (`entries.json`, `NNN.bin` before, `NNN.after` as the agent left it). The thread and turn come from the call's `X-AIHub-Origin`; a call from outside a chat is its own turn (`_direct`). Undo restores a whole turn, newest change first, and restores nothing if any file changed since or now leads outside its folder (a folder on the way became a symlink: 409 with "it now leads outside its folder" and no diff). Kept 14 days or 2 GB, oldest turns first. Commits aren't checkpointed (git keeps them). A chat's first change in a folder reports a dirty working tree (`dirty_before`), so the agent knows which changes were the user's.
 
 ## Working on it
 

@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import time
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,7 @@ from typing import Any
 import httpx
 
 import limits
-from folders import Folders, Refused
+from folders import Folders, Refused, inside
 from reading import untrusted
 from sandbox import DEFAULT_TIMEOUT, MAX_TIMEOUT, Run, Sandbox, SandboxMissing, new_id
 
@@ -52,6 +53,13 @@ def _timeout(v: Any) -> int:
     return max(1, min(MAX_TIMEOUT, t))
 
 
+def mounts_for(folders: Folders, root: Path) -> list[tuple[Path, str]]:
+    """The folder read-write, and the AIHub folder and its models read-only on top when the folder
+    contains them (the caps only stop the edit tools; a command could write anywhere it's mounted)."""
+    ro = [(p, "ro") for p, _ in folders.caps.roots if p != root and inside(p, root) and p.exists()]
+    return [(root, "rw"), *ro]
+
+
 async def run_command(folders: Folders, sb: Sandbox, args: dict[str, Any], origin: dict[str, Any], disconnected: Any) -> dict[str, Any]:
     f = folders.get(str(args.get("folder") or ""))
     command = str(args.get("command") or "")
@@ -74,7 +82,7 @@ async def run_command(folders: Folders, sb: Sandbox, args: dict[str, Any], origi
         if where == "host":
             r = await sb.run_host(r, cwd, disconnected)
         else:
-            r = await sb.run(r, cwd, [(root, "rw")], disconnected=disconnected)
+            r = await sb.run(r, cwd, mounts_for(folders, root), disconnected=disconnected)
     except SandboxMissing as e:
         raise Refused("sandbox_missing", str(e), "ask the user to build the sandbox image on the Workspace page (Sandbox → Build)", 503) from None
     return _text(r, f"{f.id}: {command[:60]}")
@@ -101,6 +109,22 @@ async def _fetch_input(hub: str, ref: str, dest: Path) -> Path:
     return p
 
 
+def _plain_file(p: Path, work: Path) -> bool:
+    """A regular file really inside the work folder: the code could leave a symlink to any file on
+    this machine (~/.ssh/id_ed25519), which must never be copied out as an output."""
+    return not p.is_symlink() and p.is_file() and inside(Path(os.path.realpath(p)), Path(os.path.realpath(work)))
+
+
+def _copy_nofollow(src: Path, dest: Path) -> None:
+    """Copy `src` only if it is still a regular file and not a symlink (O_NOFOLLOW)."""
+    fd = os.open(src, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as fin:
+        if not stat.S_ISREG(os.fstat(fin.fileno()).st_mode):
+            raise OSError(f"{src.name} isn't a regular file")
+        with dest.open("wb") as fout:
+            shutil.copyfileobj(fin, fout)
+
+
 def _save_outputs(work: Path, before: set[str], outputs: Path, code: str, run: Run) -> list[str]:
     """New files in the work folder → outputs/workspace/<date>/<HHMMSS>-<name> (+ sidecar)."""
     day = outputs / time.strftime("%Y-%m-%d")
@@ -108,7 +132,7 @@ def _save_outputs(work: Path, before: set[str], outputs: Path, code: str, run: R
     saved: list[str] = []
     for p in sorted(work.rglob("*")):
         rel = str(p.relative_to(work))
-        if not p.is_file() or rel in before or rel.startswith(("inputs/", ".")) or rel == "main.py" or "/." in rel:
+        if not _plain_file(p, work) or rel in before or rel.startswith(("inputs/", ".")) or rel == "main.py" or "/." in rel:
             continue
         if len(saved) >= MAX_FILES:
             break
@@ -119,7 +143,11 @@ def _save_outputs(work: Path, before: set[str], outputs: Path, code: str, run: R
             dest = day / f"{stamp}-{n}-{SLUG.sub('-', rel.replace('/', '-'))[:120]}"
             n += 1
         part = dest.with_name(dest.name + ".part")
-        shutil.copyfile(p, part)
+        try:
+            _copy_nofollow(p, part)
+        except OSError:
+            part.unlink(missing_ok=True)
+            continue
         os.replace(part, dest)
         side = {"title": rel, "source": "workspace_python", "run": run.id, "code": code[:4000], "thread": run.thread}
         dest.with_name(dest.name + ".json").write_text(json.dumps(side, indent=1))
@@ -150,7 +178,7 @@ async def run_python(folders: Folders, sb: Sandbox, state: Path, outputs: Path, 
         cwd = work
         if f is not None:
             root, _ = folders.resolve(f, ".")
-            mounts.append((root, "rw"))
+            mounts += mounts_for(folders, root)
             cwd = root
         env = {"AIHUB_INPUTS": str(work / "inputs"), "AIHUB_OUT": str(work / "out")}
         r = Run(rid, f"python {work / 'main.py'}", "sandbox", str(cwd), network=net, folder=f.id if f else None,

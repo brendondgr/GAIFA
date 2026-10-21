@@ -2,7 +2,7 @@
 
 Folder names carry their level: `read`, `edit`, `run`, `run_net`, and a `-bypass` suffix allows
 Bypass (`run_net-bypass`). `POST /v1/limits` answers what the real workspace mod's preflight does:
-the action, the level, Bypass, the grant key (folder + the command's first word), `once` for host
+the action, the level, Bypass, the grant key (the folder + the command; the real mod uses the exact command line), `once` for host
 runs, commits and git remotes, a preview, and a refusal when the level is too low or the command
 uses sudo. The tool routes echo what they were sent.
 """

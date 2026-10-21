@@ -77,6 +77,20 @@ def audio(data: bytes, max_s: float, tmp_dir: Path) -> Prepared:
     return Prepared("audio", {"array": a.copy(), "sampling_rate": SAMPLE_RATE}, info)
 
 
+def windows(p: Prepared, size_s: float = 30, min_s: float = 5) -> list[tuple[float, float, Prepared]]:
+    """Long audio in `size_s` slices for the library (plan 28.2); a tail shorter than `min_s` joins the last one."""
+    a = p.value["array"]
+    step, n = int(size_s * SAMPLE_RATE), a.size
+    starts = list(range(0, n, step))
+    if len(starts) > 1 and n - starts[-1] < min_s * SAMPLE_RATE:
+        starts.pop()
+    out = []
+    for i, s in enumerate(starts):
+        e = n if i == len(starts) - 1 else s + step
+        out.append((s / SAMPLE_RATE, e / SAMPLE_RATE, Prepared("audio", {"array": a[s:e].copy(), "sampling_rate": SAMPLE_RATE})))
+    return out
+
+
 def duration(src: str) -> float | None:
     try:
         out = subprocess.run(["ffprobe", "-v", "error", "-print_format", "json", "-show_format", src],

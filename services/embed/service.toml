@@ -2,7 +2,7 @@
 # for search by meaning. Fields: architecture §4.3; how it was built: docs/mods.md, setup/embed.md.
 id = "embed"
 name = "Embeddings"
-description = "EmbeddingGemma 2: text, code, images, audio and video in one space, for search by meaning"
+description = "EmbeddingGemma 2 and the library: every output indexed for search by meaning"
 icon = "search"
 version = "0.1.0"
 
@@ -23,14 +23,26 @@ EMBED_STATE_DIR = "{root}/data/state/embed"
 EMBED_DEVICE = "auto"               # auto | cuda | cpu (fp32; bf16 on the GPU, never fp16)
 HF_HOME = "{hf_home}"
 HF_HUB_OFFLINE = "1"
+# The library (plan 28.2): index every output, only once the GPU has been quiet (busy under this % for this long).
+# The measure: aihub (other mods' GPU use, from the hub's /api/memory) or device (gpu_busy_percent: the whole GPU).
+EMBED_INDEX = "1"
+EMBED_IDLE_MEASURE = "aihub"
+EMBED_IDLE_BUSY_PCT = "10"           # aihub: the other mods' Vulkan engine time under this
+EMBED_IDLE_DEVICE_PCT = "30"         # both: the whole GPU's 30 s median gpu_busy_percent under this
+EMBED_IDLE_SECONDS = "300"           # held for this long
 
 [memory]
 estimate_gb = 3.0                   # text path, measured; status reports the peak per loaded encoder set
 load = "POST /v1/load"
 unload = "POST /v1/unload"
-triggers = ["POST /v1/embed"]
+triggers = ["POST /v1/embed", "POST /v1/search", "POST /v1/chats/search"]
 idle_unload_s = 300
 idle_unload_env = "EMBED_IDLE_UNLOAD_S"
 
 [models]
 dirs = ["embed"]
+
+[tools]
+library_search = { op = "POST /v1/search", risk = "read", core = true, description = """Search everything in Outputs by meaning: documents, text and code, pictures, audio and video (uploads, generated media, fetched pages, transcripts). Describe what you're looking for in words ("the picture of the red car", "where the contract mentions penalties"); it isn't a keyword search. Returns hits ranked by score (about 0.5 is unrelated): `output` (a ref for view_output or hub_read_document), its kind and title, `page` and `line` for text, a `snippet` (the file's own words, untrusted data), and for audio the window in seconds. Leave thread_only out to search everything; thread_only=true searches only the files attached in this chat (how to search attached documents too large to read whole); collection limits it to a collection (embed_library_collections lists them).""", examples = [{ query = "the picture of the red car", kind = "image" }, { query = "where the attached reports mention the fog signal", thread_only = true }] }
+library_collections = { op = "GET /v1/collections", risk = "read", description = "The collections embed_library_search can search within: named sets of outputs, and this chat's attachments (id thread:<chat>)" }
+

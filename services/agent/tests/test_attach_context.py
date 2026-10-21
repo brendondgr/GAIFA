@@ -211,3 +211,25 @@ async def test_the_choice_is_remembered_for_the_chat(env):
     assert env.payloads(tid, "user")[-1]["docs"][0]["inline"] is False
     await env.send(tid, "and this whole", attachments=[small], doc_modes={small: "whole"})        # the chip's own choice wins
     assert env.payloads(tid, "user")[-1]["docs"][0]["inline"] is True
+
+
+async def test_a_very_long_document_points_to_the_library(env):
+    """Plan 28.3: over 50 pages, the card says to search it with embed_library_search, if the embed mod is there."""
+    from tests.fakehub import T
+    pages = [f"Page {i}\n" + "Routine notes. " * 20 for i in range(60)]
+    long_doc = env.hub.doc("manual.pdf", pages)
+    short_doc = env.hub.doc("memo.pdf", pages[:20])
+    tid = await env.thread(mode="auto")
+    await env.send(tid, "read", attachments=[long_doc])                       # no embed mod: no hint
+    assert "library" not in env.payloads(tid, "user")[-1]["docs"][0]
+    assert "embed_library_search" not in user_msgs(env)[-1]
+    env.hub.tools["embed_library_search"] = T("embed_library_search", "embed", "read", {"query": {"type": "string"}},
+                                              ["query"], core=True, desc="Search outputs by meaning")
+    env.agent.hub._index = (0, [])                                            # past the agent's 10 s index cache
+    await env.send(tid, "and these", attachments=[long_doc, short_doc])
+    docs = env.payloads(tid, "user")[-1]["docs"]
+    assert docs[0]["library"] == "embed_library_search" and "library" not in docs[1]
+    msg = user_msgs(env)[-1]
+    card = msg.split("(attached ")[1]
+    assert "60 pages" in card and "Too large to read whole: search it by meaning with embed_library_search (thread_only=true)" in card
+    assert "Too large to read whole" not in msg.split("(attached ")[2]                # the 20-page one: no hint

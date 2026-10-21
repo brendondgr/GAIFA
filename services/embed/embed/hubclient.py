@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import os
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 import httpx
@@ -69,6 +72,97 @@ class Hub:
             raise HubError(502, f"the hub answered {e.response.status_code} for output {oid}", "hub_error") from e
         except httpx.HTTPError as e:
             raise HubError(503, f"AIHub not reachable ({e})", "hub_unreachable") from e
+
+    # ---- the library's reads (plan 28.2) ---------------------------------------------------
+
+    async def _get(self, path: str, params: dict | None = None, read: float = 120) -> httpx.Response:
+        if not self.url:
+            raise HubError(503, "no hub (AIHUB_URL is unset)", "hub_unreachable")
+        try:
+            async with self._client(read=read) as c:
+                r = await c.get(path, params=params)
+        except httpx.HTTPError as e:
+            raise HubError(503, f"AIHub not reachable ({e})", "hub_unreachable") from e
+        if r.status_code == 404:
+            raise HubError(404, f"not found: {path}", "not_found")
+        if r.status_code >= 400:
+            try:
+                b = r.json()
+            except ValueError:
+                b = {}
+            raise HubError(502 if r.status_code >= 500 else r.status_code, b.get("detail") or f"HTTP {r.status_code} for {path}",
+                           b.get("code") or "hub_error")
+        return r
+
+    async def record(self, oid: str) -> dict[str, Any]:
+        return (await self._get(f"/api/outputs/{oid}")).json()
+
+    async def outputs(self, page: int = 500) -> AsyncIterator[dict[str, Any]]:
+        """Every output, newest first (`GET /api/outputs`, cursor paging)."""
+        cursor = None
+        while True:
+            body = (await self._get("/api/outputs", {"limit": page, **({"cursor": cursor} if cursor else {})})).json()
+            for rec in body.get("items") or []:
+                yield rec
+            cursor = body.get("next_cursor")
+            if not cursor:
+                return
+
+    async def text(self, oid: str, offset: int = 0, limit: int = 48_000, pages: str | None = None) -> dict[str, Any]:
+        """A window of an output's text (`GET /api/outputs/{id}/text`, plan 24.3)."""
+        params: dict[str, Any] = {"offset": offset, "limit": limit, **({"pages": pages} if pages else {})}
+        return (await self._get(f"/api/outputs/{oid}/text", params)).json()
+
+    async def file(self, oid: str, preview: bool = False) -> bytes:
+        return (await self._get(f"/api/outputs/{oid}/{'preview' if preview else 'file'}", read=300)).content
+
+    async def thread_attachments(self, tid: str) -> list[str]:
+        """The outputs attached in a chat: the agent's `user` events (through the hub's proxy)."""
+        try:
+            evs = (await self._get(f"/api/s/agent/v1/threads/{tid}/events")).json()
+        except HubError as e:
+            if e.status == 404:
+                raise HubError(404, f"no chat {tid!r} (or the agent mod isn't installed)", "no_thread",
+                               fix="leave thread_only out to search everything") from e
+            raise
+        out: list[str] = []
+        for e in evs:
+            if e.get("type") == "user":
+                out += [a for a in (e.get("payload") or {}).get("attachments") or [] if a not in out]
+        return out
+
+    async def follow(self, on_event: Callable[[dict[str, Any]], Awaitable[None]],
+                     on_connect: Callable[[], Awaitable[None]], stop: asyncio.Event) -> None:
+        """Follow `/api/events`, reconnecting with a back-off; `on_connect` runs on every (re)connect, since
+        events can be missed while disconnected."""
+        delay = 1.0
+        while not stop.is_set() and self.url:
+            try:
+                async with httpx.AsyncClient(base_url=self.url, timeout=httpx.Timeout(None, connect=5),
+                                             transport=self.transport) as c:
+                    async with c.stream("GET", "/api/events") as r:
+                        if r.status_code == 200:
+                            delay = 1.0
+                            await on_connect()
+                            async for line in r.aiter_lines():
+                                if stop.is_set():
+                                    return
+                                if line.startswith("data:"):
+                                    try:
+                                        ev = json.loads(line[5:].strip())
+                                    except ValueError:
+                                        continue
+                                    try:
+                                        await on_event(ev)
+                                    except Exception:      # noqa: BLE001: one bad event never ends the follower
+                                        log.exception("hub event handler")
+            except (httpx.HTTPError, OSError, HubError) as e:
+                log.debug("events: %s", e)
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=delay)
+            except TimeoutError:
+                pass
+            delay = min(delay * 2, 30)
 
     async def acquire(self, gb: float, reason: str) -> None:
         """Ask for memory before loading another encoder; a 409 needs_room is passed on unchanged."""

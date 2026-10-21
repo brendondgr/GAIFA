@@ -49,6 +49,7 @@ class Config:
     all_tools_models: tuple[str, ...] = ()
     inline_tokens: int = 6000   # an attached document up to this size goes in whole (Settings → Agent can change it; docs.py)
     reply_reserve: int = 4096   # tokens kept free for the reply and tools when documents go in whole (plan 24.9)
+    summary_idle_min: float = 30   # a chat quiet this long gets its summary for search (plan 28.5)
 
 
 @dataclass

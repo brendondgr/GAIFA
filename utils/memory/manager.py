@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from utils import proc
 from utils.memory.planner import GB, Candidate, describe, fmt_gb, make_plan, why_not
 from utils.memory.source import ProcSource, Source
 from utils.services.model import ServiceError
@@ -68,6 +69,8 @@ class MemoryManager:
         self.sys: dict[str, int] = {"total_bytes": 0, "used_bytes": 0, "available_bytes": 0}
         self.gpu: dict[str, Any] | None = None
         self.used: dict[str, int] = {}
+        self.gpu_busy: dict[str, float] = {}           # each mod's GPU busy % since the last sample (plan 28.2)
+        self._engines: tuple[dict[str, dict[str, int]], float] | None = None
         self.peaks: dict[str, int] = {}
         self.reservations: dict[str, Reservation] = {}
         self.snapshot: dict[str, Any] | None = None
@@ -105,6 +108,7 @@ class MemoryManager:
     async def sample(self, publish: bool = True) -> dict[str, Any]:
         pids = await self.source.collect(self.mgr)
         self.sys, self.gpu, self.used = await asyncio.to_thread(self.source.read, pids)
+        await self._sample_engines(pids)
         await self._learn_peaks()
         mem = self.view()
         self.snapshot = mem
@@ -113,6 +117,16 @@ class MemoryManager:
             self._last_pub = (time.monotonic(), mem)
         self._alert(mem)
         return mem
+
+    async def _sample_engines(self, pids: dict[str, list[int]]) -> None:
+        """Each mod's GPU busy percentage since the last sample (`gpu_busy_pct`), when the source reads engines."""
+        read = getattr(self.source, "engines", None)
+        if read is None:
+            return
+        now, eng = time.monotonic(), await asyncio.to_thread(read, pids)
+        prev, t = self._engines or ({}, now)
+        self.gpu_busy = {sid: proc.busy_pct(prev[sid], e, now - t) for sid, e in eng.items() if sid in prev and now > t}
+        self._engines = (eng, now)
 
     def estimate(self, svc: Service) -> int | None:
         gb = svc.memory_estimate_gb if svc.memory_estimate_gb is not None else (svc.m.memory.estimate_gb if svc.m and svc.m.memory else None)
@@ -128,8 +142,11 @@ class MemoryManager:
             used = self.used.get(svc.id, 0)
             if not (svc.has_memory or used):
                 continue
-            rows.append({"id": svc.id, "used_bytes": used, "estimate_bytes": self.estimate(svc), "load": svc.load,
-                         "idle_s": svc.idle_s, "auto_unload": svc.eff.auto_unload, "priority": svc.eff.priority})
+            row = {"id": svc.id, "used_bytes": used, "estimate_bytes": self.estimate(svc), "load": svc.load,
+                   "idle_s": svc.idle_s, "auto_unload": svc.eff.auto_unload, "priority": svc.eff.priority}
+            if svc.id in self.gpu_busy:
+                row["gpu_busy_pct"] = self.gpu_busy[svc.id]
+            rows.append(row)
         return {
             "total_bytes": self.sys["total_bytes"], "used_bytes": self.sys["used_bytes"],
             "available_bytes": self.sys["available_bytes"], "reserve_bytes": round(self.cfg.reserve_gb * GB),

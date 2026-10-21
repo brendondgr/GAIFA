@@ -1,4 +1,4 @@
-"""The 51 eval tasks (plan 13.5; two workspace cases from plan 27.6, in workspace.py; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5; a web research case from plan 26.2): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 53 eval tasks (plan 13.5; two workspace cases from plan 27.6, in workspace.py; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5; a web research case from plan 26.2; two library cases from plan 28.3, in library.py): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -473,3 +473,7 @@ TASKS: list[Task] = [
 from .workspace import TASKS as _WORKSPACE  # noqa: E402  (plan 27.6)
 
 TASKS += _WORKSPACE
+
+from .library import TASKS as LIBRARY_TASKS  # noqa: E402: plan 28.3's cases, kept in their own file
+
+TASKS += LIBRARY_TASKS

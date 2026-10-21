@@ -6,6 +6,7 @@ inject a fake with the same two methods.
   for an external mod without units or containers, whoever listens on its port.
 - `read(pids)`: blocking, run in a thread: meminfo, the GPU, and each mod's footprint.
 - `available()`: blocking and cheap: MemAvailable now (make-room waits poll it).
+- `engines(pids)` (optional): each mod's GPU engine busy nanoseconds, for `gpu_busy_pct` (plan 28.2).
 """
 
 from __future__ import annotations
@@ -85,6 +86,10 @@ class ProcSource:
 
     def read(self, pids: dict[str, list[int]]) -> tuple[dict[str, int], dict[str, Any] | None, dict[str, int]]:
         return proc.meminfo(), proc.gpu(), {sid: proc.footprint(p) for sid, p in pids.items()}
+
+    def engines(self, pids: dict[str, list[int]]) -> dict[str, dict[str, int]]:
+        """Optional (a source without it reports no `gpu_busy_pct`): each mod's GPU engine nanoseconds."""
+        return {sid: proc.engine_ns(p) for sid, p in pids.items()}
 
     def available(self) -> int:
         return proc.meminfo()["available_bytes"]

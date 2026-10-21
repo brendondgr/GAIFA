@@ -98,13 +98,17 @@ class GemmaBackend:
         self.dtype = "float32"
 
     def load(self, parts: frozenset[str]) -> None:
+        if self.want == "cpu":                              # keep ROCm off the GPU: even torch.cuda.is_available()
+            os.environ["HIP_VISIBLE_DEVICES"] = "-1"        # opens /dev/kfd. Set before torch is imported (in the
+            os.environ["ROCR_VISIBLE_DEVICES"] = "-1"       # worker process, so only it is affected)
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""
         import torch                                        # imported on first load: health answers at once
         from sentence_transformers import SentenceTransformer
 
         if not (self.model_dir / "model.safetensors").is_file():
             raise FileNotFoundError(f"no weights in {self.model_dir}")
         self.unload()
-        gpu = torch.cuda.is_available() and self.want in ("auto", "cuda")
+        gpu = self.want != "cpu" and torch.cuda.is_available()
         if self.want == "cuda" and not gpu:
             raise RuntimeError("EMBED_DEVICE=cuda but torch sees no GPU")
         dtype = torch.bfloat16 if gpu and torch.cuda.is_bf16_supported() else torch.float32
@@ -119,13 +123,16 @@ class GemmaBackend:
             return
         self.model = None
         gc.collect()
-        import torch
-        if torch.cuda.is_available():
+        if self.device == "cuda":
+            import torch
             torch.cuda.empty_cache()
 
     def encode(self, kind: str, items: list[Any], batch_size: int) -> np.ndarray:
         inputs = items if kind == "text" else [{kind: x} for x in items]
         out = self.model.encode(inputs, batch_size=batch_size, convert_to_numpy=True, show_progress_bar=False)
+        if self.device == "cuda":                       # long inputs leave GBs of activations in torch's cache
+            import torch
+            torch.cuda.empty_cache()
         return np.asarray(out, dtype=np.float32).reshape(len(items), -1)
 
     def footprint_bytes(self) -> int:
@@ -257,8 +264,9 @@ class Encoder:
 
 
 class FakeBackend:
-    """Deterministic vectors from a hash of the input, for tests: the same input always gives the same vector,
-    and a text that names an image's `label` points the same way as that image."""
+    """Deterministic vectors for tests, a bag of words: each word hashes to a fixed unit vector and a text is their
+    normalized sum, so cosine follows the words two inputs share. The prompt is left out, so "red car" as a query,
+    a chunk saying "red car" and an image labelled "red car" (a PNG text chunk) point the same way."""
 
     device = "cpu"
     dtype = "float32"
@@ -276,9 +284,15 @@ class FakeBackend:
         self.parts = None
 
     @staticmethod
-    def vector(seed: str) -> np.ndarray:
-        rng = np.random.default_rng(int(hashlib.sha256(seed.encode()).hexdigest()[:8], 16))
+    def _word(w: str) -> np.ndarray:
+        rng = np.random.default_rng(int(hashlib.sha256(w.encode()).hexdigest()[:8], 16))
         v = rng.standard_normal(FULL_DIM).astype(np.float32)
+        return v / np.linalg.norm(v)
+
+    @classmethod
+    def vector(cls, seed: str) -> np.ndarray:
+        words = re.findall(r"[a-z0-9]+", seed.lower()) or [seed]
+        v = np.sum([cls._word(w) for w in words], axis=0)
         return v / np.linalg.norm(v)
 
     def encode(self, kind: str, items: list[Any], batch_size: int) -> np.ndarray:
@@ -291,8 +305,8 @@ class FakeBackend:
 
     @staticmethod
     def label(kind: str, x: Any) -> str:
-        if kind == "text":
-            return x.split(": ")[-1].strip().lower()          # the text after its prompt
+        if kind == "text":                                  # the words after the prompt
+            return re.sub(r"^(task: [^|]*\| query: |title: [^|]*\| text: )", "", x)
         if kind == "image":
             return (getattr(x, "info", {}) or {}).get("label") or str(x.size)
         if kind == "audio":

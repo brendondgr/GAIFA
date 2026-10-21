@@ -164,7 +164,7 @@ The two fixes were in the checks, not the agent:
 With `output_id` the model called `stt_transcribe(audio=…)` first in all four runs and needed the hub's fix; named `audio` (`output_id` still accepted), it called it right the first time in all three.
 ### Workspace (plan 27.6, 2026-10-20)
 
-Two live tasks (their settings turn the dry run off) in `evals/workspace.py`, 50 tasks in all. `ws_fix_test`: a fresh folder in the temp dir (a `calc.py` whose `add` subtracts, unittest tests), added through the hub as a workspace at Run, in **Accept edits** mode; asked to run the tests, fix the bug and run them again. Checks: `calc.py` fixed in place, a test run after the edit with exit 0 and unittest's `OK` (`workspace_run`, or `workspace_python` running the tests), and no card for the edit (Accept edits). The harness approves the command cards. `ws_csv_chart`: three years of daily sales (`sales.csv`, 53 KB, ~13k tokens, so it arrives as a card), asked for a monthly revenue chart and the best month (July 2025). Checks: a clean `workspace_python` run, an image output, the month named. `Task.attach` may now return `{ids, vars}` (`vars` fill `{folder}` in the turns and reach the checks), and `Task.teardown` removes the folder.
+Two live tasks (their settings turn the dry run off) in `evals/workspace.py`, 53 tasks in all. `ws_fix_test`: a fresh folder in the temp dir (a `calc.py` whose `add` subtracts, unittest tests), added through the hub as a workspace at Run, in **Accept edits** mode; asked to run the tests, fix the bug and run them again. Checks: `calc.py` fixed in place, a test run after the edit with exit 0 and unittest's `OK` (`workspace_run`, or `workspace_python` running the tests), and no card for the edit (Accept edits). The harness approves the command cards. `ws_csv_chart`: three years of daily sales (`sales.csv`, 53 KB, ~13k tokens, so it arrives as a card), asked for a monthly revenue chart and the best month (July 2025). Checks: a clean `workspace_python` run, an image output, the month named. `Task.attach` may now return `{ids, vars}` (`vars` fill `{folder}` in the turns and reach the checks), and `Task.teardown` removes the folder.
 
 | Run (skynet, second hub) | ws_fix_test | ws_csv_chart | What changed after |
 |---|---|---|---|
@@ -173,6 +173,19 @@ Two live tasks (their settings turn the dry run off) in `evals/workspace.py`, 50
 | 3 | 3/3 | 1/3 | the agent read `inputs/sales.csv` without passing `inputs`. The result now notes an empty `inputs/` and lists the inputs it got |
 | 4 | 3/3 | 2/3 | `inputs: ["#1"]` reached the mod unresolved: the agent rewrote `#n` only in `ref`. `_refs` now resolves `#n` in any file input (`x-kind`), alone or in a list |
 | 5 | **3/3** | **3/3** | |
+
+### The library (plan 28.3, 2026-10-20)
+
+Two `context` cases in `evals/library.py` (53 tasks in all), run on `skynet` against a test hub with this agent and the embed mod, after the library had indexed the hub's 46 outputs:
+- **`library_ten_docs`:** ten 24-page light-station reports (`station_report`, about 96,000 tokens together, each a card) are attached, and the agent is asked whether any station keeps "a pet animal". Only the 7th report says so, on page 15, as "a ginger cat called Saffron". Checks: the reply names Saffron and Saltcombe and cites `#7` and page 15.
+- **`library_red_car`:** four pictures with camera names (`IMG_2041.png`…: a drawn red car and a blue house in `evals/fixtures/`, and two screenshots) are seeded in `outputs/eval/`, and the agent is asked to find "the picture of the red car". Checks: it used `embed_library_search`, the search ranked `IMG_2041` first, and the reply points to it.
+
+| Case | Runs | pass@1 | Mean time | How |
+|---|---|---|---|---|
+| `library_ten_docs` | 3 | 100% | 30 s | `hub_search_document` on each report (about 30 calls), not the library |
+| `library_red_car` | 3 | 100% | 26 s | `embed_library_search(query="red car", kind="image")`: the car first at 0.75 (the rest ≤ 0.59), then one `view_output` |
+
+On the first run the model copied the tool's second example (`thread_only=true`) for the picture, got nothing (the chat had no attachments) and looked at pictures one by one. The example and the description now say to leave `thread_only` out to search everything, and an empty scope answers with a `fix`.
 <!-- /RESULTS -->
 
 ## Gate

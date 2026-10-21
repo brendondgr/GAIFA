@@ -92,6 +92,7 @@ async def describe(agent: Agent, tid: str, thread: dict[str, Any], ids: list[str
     default_mode = ((thread.get("settings") or {}).get("doc_mode")) or "auto"
     n0 = len(ctx.outputs(agent.store.events(tid, types=("tool_result", "user"))))
     out: list[dict[str, Any]] = []
+    library: str | None | bool = False           # plan 28.3: looked up once, only when a document is that long
     for oid in ids:
         mode = (modes or {}).get(oid) or default_mode
         mode = mode if mode in MODES else "auto"
@@ -126,5 +127,18 @@ async def describe(agent: Agent, tid: str, thread: dict[str, Any], ids: list[str
                 limit = room if s["inline_tokens"] == WINDOW else min(int(s["inline_tokens"]), room)
             except Exception as e:  # noqa: BLE001
                 d["fallback"] = f"couldn't fetch all of {d['name']} ({e}); it was sent as a card"
+        if (w["pages"] or 0) > ctx.LIBRARY_PAGES and not d["inline"]:
+            if library is False:
+                library = await library_tool(agent)
+            if library:
+                d["library"] = library
         out.append(d)
     return out
+
+
+async def library_tool(agent: Agent) -> str | None:
+    """The embed mod's search tool, if it's in the catalog (deleting the mod removes the hint, plan 28.3)."""
+    try:
+        return next((t["name"] for t in await agent.hub.index() if t["name"] == ctx.LIBRARY_TOOL), None)
+    except Exception:  # noqa: BLE001: no hint then
+        return None

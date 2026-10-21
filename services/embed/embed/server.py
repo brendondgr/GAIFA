@@ -20,6 +20,9 @@ from .encoder import DIMS, KINDS, Encoder, GemmaBackend, parts_for, prompt
 from .hubclient import Hub, HubError
 from .settings import MODEL_ID, REPO, REVISION, Settings
 from .worker import WorkerBackend, WorkerDied
+from .api_chats import add_chat_routes
+from .api_library import add_library_routes
+from .library import Library, open_library
 
 log = logging.getLogger("embed")
 MAX_BYTES = {"image": 64_000_000, "audio": 512_000_000, "video": 2_000_000_000}
@@ -77,10 +80,14 @@ def _backend_error(e: Exception) -> JSONResponse:
                          "fix": "call again (it starts a new worker); if it repeats, read `aihub logs embed`"}, 503)
 
 
-def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | None = None) -> FastAPI:
+def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | None = None,
+               library: Library | None = None) -> FastAPI:
+    """`library`: the index to run (tests pass their own); by default one is opened when `settings.index`."""
     enc = encoder or Encoder(WorkerBackend(functools.partial(GemmaBackend, settings.model_dir, settings.device)),
                              settings.state_dir)
     hub = hub or Hub(settings.hub_url)
+    lib = library or (open_library(settings, enc, hub) if settings.index else None)
+    stop = asyncio.Event()
     tmp = settings.state_dir / "tmp"
     day = {"date": date.today(), "inputs": 0}
 
@@ -102,13 +109,22 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         tasks = [asyncio.create_task(idle_unloader()), asyncio.create_task(register())]
+        if lib is not None:
+            tasks.append(asyncio.create_task(lib.run(stop)))
         yield
+        stop.set()
         for t in tasks:
             t.cancel()
         await asyncio.to_thread(enc.unload)
+        if lib is not None:
+            lib.store.close()
 
     app = FastAPI(title="Embeddings", version="0.1.0", lifespan=lifespan,
                   description="EmbeddingGemma 2: text, code, images, audio and video in one 768-d space")
+    app.state.library = lib
+    if lib is not None:
+        add_library_routes(app, lib, enc)
+        add_chat_routes(app, lib, enc)
 
     async def make_room(kinds: set[str]) -> None:
         """Loading another encoder while loaded needs more memory: ask the hub for the difference. (A load from
@@ -135,14 +151,22 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
     def status() -> dict:
         if day["date"] != date.today():
             day.update(date=date.today(), inputs=0)
-        stats: list[dict] = [{"label": "Inputs today", "value": day["inputs"], "reset": "daily"},
-                             {"label": "Inputs", "value": sum(enc.counts.values())}]
+        stats: list[dict] = [{"label": "Inputs today", "value": day["inputs"], "reset": "daily"}]
+        jobs: list[dict] = []
+        if lib is not None:
+            c = lib.store.counts()
+            stats.append({"label": "Indexed", "value": c["done"]})
+            if lib.state == "indexing":
+                jobs.append({"id": "library", "label": f"Indexing outputs ({c['pending']} to go)", "state": "running",
+                             "progress": round(c["done"] / max(1, c["done"] + c["pending"]), 3), "route": "#/s/embed"})
+        else:
+            stats.append({"label": "Inputs", "value": sum(enc.counts.values())})
         if enc.loaded:
             stats.append({"label": "Loaded", "value": enc.key(enc.parts).replace("+", ", ")})
             stats.append({"label": "Device", "value": f"{'GPU' if enc.backend.device == 'cuda' else 'CPU'} {enc.backend.dtype}"})
         return {"loaded": enc.loaded, "busy": enc.busy or enc.loading,
                 "idle_s": round(time.time() - enc.last_used, 1),
-                "memory_estimate_gb": enc.estimate_gb(enc.parts or frozenset()), "stats": stats, "jobs": []}
+                "memory_estimate_gb": enc.estimate_gb(enc.parts or frozenset()), "stats": stats, "jobs": jobs}
 
     @app.post("/v1/load", summary="Load the text path, plus the encoders `kinds` need")
     async def load(body: LoadRequest | None = None) -> Any:
@@ -203,6 +227,8 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
         except (FileNotFoundError, WorkerDied) as e:
             return _backend_error(e)
         day["inputs"] += len(prepared)
+        if lib is not None:
+            lib.last_api = time.time()
         t2 = time.perf_counter()
         return {"model": MODEL_ID, "dim": body.dim, "task": body.task,
                 "vectors": [[round(float(x), 6) for x in v] for v in vecs],

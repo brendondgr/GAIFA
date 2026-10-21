@@ -373,7 +373,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `deleteModel(id, {files})` | `DELETE /api/models/{id}?files=0\|1` | `204` |
 | `scanModels()` | `POST /api/models/scan` | `{ discovered: Discovered[] }` |
 | `addModel(input)` | `POST /api/models` body `ModelInput` | `201 Model` |
-| `listOutputs(filter)` | `GET /api/outputs?service=&kind=&q=&from=&to=&cursor=&limit=` | `OutputPage` (`service` and `kind` are comma-separated lists; `q` matches every word; `limit` 1–500, default 60) |
+| `listOutputs(filter)` | `GET /api/outputs?service=&kind=&q=&from=&to=&cursor=&limit=&include_hidden=` | `OutputPage` (`service` and `kind` are comma-separated lists; `q` matches every word; `limit` 1–500, default 60; hidden outputs, the web mod's saved pages, only with `include_hidden=true`, plan 30.9) |
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
 | `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
 | `uploadOutput(file)` | `POST /api/outputs/upload?name=` (the file as the body) | `Output` (`201`): an image, video, audio, text or document file (plan 24.1); `upload_type` 415, `upload_encoding` 415 (a text file that isn't UTF-8, or UTF-16 with a BOM), `upload_too_large` 413 (64 MB), `upload_empty` 400 |
@@ -524,6 +524,7 @@ interface Output {
   created_ts: number;
   duration_s?: number;
   dims?: { w: number; h: number };
+  hidden?: boolean;              // plan 30.9: kept out of lists (the web mod's saved pages); set only when true
   meta: { prompt?: string; model?: string; voice?: string; seed?: number;
           params?: Record<string, unknown>;
           excerpt?: string;          // text outputs without a prompt: their first lines, for the card
@@ -533,7 +534,8 @@ interface OutputPage {
   items: Output[]; next_cursor: string | null;
   totals: { count: number; size_bytes: number;
             by_kind: Record<OutputKind, number>;      // counts with every filter except kind
-            by_service: Record<string, number> };     // counts with every filter except service
+            by_service: Record<string, number>;       // counts with every filter except service
+            hidden: number };                         // hidden outputs with these filters (listed only with include_hidden)
 }
 
 interface OutlineItem { level: number; title: string; offset: number; line: number; page?: number }   // plan 24.2

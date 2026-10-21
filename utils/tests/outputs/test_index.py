@@ -217,5 +217,5 @@ async def test_sync_upserts_and_removes(outs, tree, bus):
     ev = [e for e in drain(sub) if e["type"].startswith("output")]
     assert [e["type"] for e in ev] == ["output", "output_deleted"]
     assert ev[0]["output"]["size_bytes"] == 2
-    assert (await outs.list())["totals"] == {"count": 1, "size_bytes": 2, "by_kind": {"text": 1}, "by_service": {"svc": 1}}
+    assert (await outs.list())["totals"] == {"count": 1, "size_bytes": 2, "by_kind": {"text": 1}, "by_service": {"svc": 1}, "hidden": 0}
 

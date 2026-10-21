@@ -29,7 +29,7 @@ from utils.paths import Paths
 log = logging.getLogger("aihub.outputs")
 
 COLUMNS = ("id", "service", "kind", "title", "path", "is_dir", "main", "preview", "size_bytes", "created_ts",
-           "duration_s", "width", "height", "meta", "files", "search", "sig")
+           "duration_s", "width", "height", "meta", "files", "search", "sig", "hidden")
 CHUNK = 25  # outputs described per lock hold during the startup reconcile
 PREVIEW_JOBS = 2  # previews generated at once
 
@@ -100,6 +100,8 @@ class Outputs:
             v["subtype"] = sub
         if row["duration_s"] is not None:
             v["duration_s"] = row["duration_s"]
+        if row.get("hidden"):
+            v["hidden"] = True
         if row["width"] and row["height"]:
             v["dims"] = {"w": row["width"], "h": row["height"]}
         return v
@@ -116,7 +118,10 @@ class Outputs:
     async def list(
         self, service: str | None = None, kind: str | None = None, q: str | None = None,
         from_ts: float | None = None, to_ts: float | None = None, cursor: str | None = None, limit: int = 60,
+        include_hidden: bool = False,
     ) -> dict[str, Any]:
+        """A page of outputs with totals. Hidden outputs (the sidecar's `hidden`) are left out of the page and
+        the counts unless `include_hidden`; `totals.hidden` counts them with the other filters either way."""
         services = [s for s in (service or "").split(",") if s]
         kinds = [k for k in (kind or "").split(",") if k]
         for k in kinds:
@@ -133,6 +138,8 @@ class Outputs:
         def where(skip: str | None = None) -> tuple[str, list[Any]]:
             cl: list[str] = []
             args: list[Any] = []
+            if not include_hidden and skip != "hidden":
+                cl.append("hidden = 0")
             if services and skip != "service":
                 cl.append(f"service IN ({','.join('?' * len(services))})")
                 args += services
@@ -164,11 +171,14 @@ class Outputs:
             ws, as_ = where("service")
             by_kind = {r["kind"]: r["n"] for r in self.db.fetchall_sync(f"SELECT kind, COUNT(*) AS n FROM outputs WHERE {wk} GROUP BY kind", ak)}
             by_service = {r["service"]: r["n"] for r in self.db.fetchall_sync(f"SELECT service, COUNT(*) AS n FROM outputs WHERE {ws} GROUP BY service", as_)}
+            wh, ah = where("hidden")
+            hidden = self.db.fetchone_sync(f"SELECT COUNT(*) AS n FROM outputs WHERE {wh} AND hidden = 1", ah)["n"]
             more = len(rows) > limit
             rows = rows[:limit]
             nxt = f"{rows[-1]['created_ts']!r}:{rows[-1]['id']}" if more and rows else None
             return {"items": [self.view(r) for r in rows], "next_cursor": nxt,
-                    "totals": {"count": tot["n"], "size_bytes": tot["b"], "by_kind": by_kind, "by_service": by_service}}
+                    "totals": {"count": tot["n"], "size_bytes": tot["b"], "by_kind": by_kind, "by_service": by_service,
+                               "hidden": hidden}}
 
         return await asyncio.to_thread(run)
 
@@ -222,7 +232,7 @@ class Outputs:
             for r in described:
                 v = self.view(r)
                 self.bus.publish({"type": "output", "output": v})
-                if r["path"] not in rows and self.announcer:
+                if r["path"] not in rows and self.announcer and not r["hidden"]:
                     self.announcer.add(v)
             for r in removed:
                 self.bus.publish({"type": "output_deleted", "id": r["id"]})

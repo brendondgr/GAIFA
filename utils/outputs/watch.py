@@ -4,8 +4,9 @@
   `watchfiles` for up to 1 s. A dirty folder is rescanned; an output whose sizes changed
   since the last look waits another `stable_s` and is indexed once they hold still.
 - Deletions apply at once. Dotfiles (previews, `.trash`) and `*.part` never count.
-- **Startup:** a background `reconcile()` (no event per output), then the trash is purged,
-  and again every 6 hours.
+- **Startup:** a background `reconcile()` (no event per output), then the trash is purged and
+  hidden outputs past `[outputs] hidden_keep_days` go to the trash (`retention.py`), and again
+  every 6 hours.
 - If watching fails (e.g. `outputs/` was removed), an `outputs-watch` alert is raised,
   and the watcher retries every 5 s and rescans everything once it is back.
 """
@@ -21,7 +22,7 @@ from typing import Any
 
 from watchfiles import Change, awatch
 
-from utils.outputs import trash
+from utils.outputs import retention, trash
 from utils.outputs.announce import Announcer
 from utils.outputs.entries import scope_for
 from utils.outputs.index import Outputs
@@ -37,12 +38,14 @@ ALERT = "outputs-watch"
 
 class Watcher:
     def __init__(self, outputs: Outputs, alerts: Any = None, name_of: Any = None, *, stable_s: float = STABLE_S,
-                 debounce_ms: int = DEBOUNCE_MS, retry_s: float = RETRY_S, reconcile: bool = True) -> None:
+                 debounce_ms: int = DEBOUNCE_MS, retry_s: float = RETRY_S, reconcile: bool = True,
+                 hidden_keep_days: Any = lambda: 0) -> None:
         self.outputs = outputs
         self.dir: Path = outputs.dir
         self.alerts = alerts
         self.stable_s, self.debounce_ms, self.retry_s = stable_s, debounce_ms, retry_s
         self.do_reconcile = reconcile
+        self.hidden_keep_days = hidden_keep_days  # read at each pass, so a config change applies without a restart
         self.pending: dict[str, tuple[str, float]] = {}  # rel → (sig, when first seen)
         self._dirty: dict[str, float] = {}  # scope → when to look at it
         self._wake = asyncio.Event()
@@ -141,4 +144,8 @@ class Watcher:
                 await asyncio.to_thread(trash.purge, self.dir)
             except Exception:  # noqa: BLE001
                 log.exception("outputs: purging the trash")
+            try:
+                await retention.expire_hidden(self.outputs, float(self.hidden_keep_days() or 0))
+            except Exception:  # noqa: BLE001
+                log.exception("outputs: expiring hidden outputs")
             await asyncio.sleep(PURGE_EVERY_S)

@@ -63,8 +63,10 @@ async def list_outputs(
     to: float | None = Query(None, description="Created at or before (unix seconds)"),
     cursor: str | None = Query(None, description="`next_cursor` from the previous page"),
     limit: int = Query(60, ge=1, le=500),
+    include_hidden: bool = Query(False, description="Also list hidden outputs (pages the web mod saved for reading); "
+                                                    "`totals.hidden` counts them either way"),
 ) -> dict[str, Any]:
-    return await _outs(request).list(service, kind, q, from_, to, cursor, limit)
+    return await _outs(request).list(service, kind, q, from_, to, cursor, limit, include_hidden=include_hidden)
 
 
 @router.post("/api/outputs/upload", status_code=201, summary="Upload a file (the raw body) as an output in outputs/uploads/",

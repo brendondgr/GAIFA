@@ -9,6 +9,7 @@ sidecar, probes media): callers run it in a thread.
   audio file (top level first), else the first file.
 - **Created:** the sidecar's `created_ts`; else, inside a date folder, that date with the
   name's `HHMMSS-` time (or the file's time of day); else the main file's mtime.
+- **Hidden:** the sidecar's `"hidden": true` (the web mod's saved pages): kept out of the lists people see.
 - **id** = `sha1(path relative to outputs/)[:12]`.
 """
 
@@ -24,7 +25,7 @@ from typing import Any
 from utils.outputs import media
 from utils.outputs.entries import KINDS, MAIN_PRIORITY, Found, kind_of, read_sidecar
 
-STEERING = ("title", "kind", "main", "preview", "complete", "created_ts")
+STEERING = ("title", "kind", "main", "preview", "complete", "created_ts", "hidden")
 HMS_RE = re.compile(r"^(\d{2})(\d{2})(\d{2})[-_]")
 PREVIEW_NAMES = ("preview.png", "preview.jpg", "preview.jpeg", "preview.webp")
 
@@ -117,7 +118,7 @@ def describe(outputs: Path, f: Found) -> dict[str, Any] | None:
         "id": output_id(f.rel), "service": f.service, "kind": kind, "title": title[:300], "path": f.rel,
         "is_dir": int(f.is_dir), "main": main, "preview": None, "size_bytes": sum(s for _, s, _ in f.files),
         "created_ts": _created(f, side, mtimes.get(main or "", 0.0) or (outputs / f.rel).stat().st_mtime),
-        "duration_s": None, "width": None, "height": None, "sig": f.sig,
+        "duration_s": None, "width": None, "height": None, "sig": f.sig, "hidden": int(side.get("hidden") is True),
     }
     main_kind = kind_of(main) if main else None
     dims = None

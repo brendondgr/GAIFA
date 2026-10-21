@@ -232,6 +232,11 @@ class SpeechInputCfg(_Strict):
     _labels = field_validator("mics")(lambda cls, v: mic_labels(v))
 
 
+class OutputsCfg(_Strict):
+    """Plan 30.9: hidden outputs (the web mod's saved pages) older than this go to the outputs trash; 0 keeps them."""
+    hidden_keep_days: float = Field(0, ge=0)
+
+
 class DocsCfg(_Strict):
     """Plan 23.3: the setup docs follow the registry. Off: only `aihub docs` writes them."""
     regenerate: bool = True
@@ -250,6 +255,7 @@ class Config(_Strict):
     learning: LearningCfg = LearningCfg()
     speech_input: SpeechInputCfg = SpeechInputCfg()
     docs: DocsCfg = DocsCfg()
+    outputs: OutputsCfg = OutputsCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

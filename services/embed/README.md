@@ -8,7 +8,7 @@ POST /v1/embed  {"inputs": [{"text": "…", "title": "…"} | {"image": "output:
              →  {"vectors": [[…]], "inputs": [{kind, output?, seconds?, frames?, …}], "dim", "device", "dtype", "ms"}
 ```
 
-The library indexes every output in AIHub when the GPU is idle (`GET /v1/library`; collections at `/v1/collections`), and `POST /v1/search` searches it by meaning: the agent's `embed_library_search` and `embed_library_collections`.
+The library indexes every output in AIHub except hidden ones (the web mod's saved pages, plan 30.9: not the user's; one that becomes hidden is dropped) when the GPU is idle (`GET /v1/library`; collections at `/v1/collections`), and `POST /v1/search` searches it by meaning: the agent's `embed_library_search` and `embed_library_collections`.
 
 Vectors are unit length (cosine = dot product), in input order. Media are AIHub outputs, read through the hub. A video's soundtrack can be embedded as `{"audio": <video output>}`. Also `POST /v1/load {"kinds": […]}`, `POST /v1/unload`, `GET /v1/info`, `GET /v1/status`.
 

@@ -265,7 +265,7 @@ export function createHistory(ctx) {
       if (!['day', 'service', 'kind'].includes(by)) throw err(422, 'invalid_request', 'by: use day, service or kind');
       const buckets = new Map(by === 'day' ? days(frm, to).map(d => [d, { key: d, count: 0, size_bytes: 0, by_kind: {} }]) : []);
       for (const o of ctx.outputs()) {
-        if (o.created_ts < frm || o.created_ts >= to || (mode === 'empty' && o.created_ts < emptySince)) continue;
+        if (o.hidden || o.created_ts < frm || o.created_ts >= to || (mode === 'empty' && o.created_ts < emptySince)) continue;
         const key = by === 'day' ? ymd(o.created_ts) : o[by];
         if (!buckets.has(key)) buckets.set(key, { key, count: 0, size_bytes: 0, by_kind: {} });
         const b = buckets.get(key); b.count++; b.size_bytes += o.size_bytes || 0; b.by_kind[o.kind] = (b.by_kind[o.kind] || 0) + 1;

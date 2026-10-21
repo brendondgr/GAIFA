@@ -273,7 +273,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 - **Where:** write into `{outputs}/<YYYY-MM-DD>/`.
 - **File outputs:** name them `<HHMMSS>-<slug>.<ext>`. Write to `<name>.part` first, then rename; the watcher ignores `*.part` and dotfiles.
 - **Folder outputs** (e.g. a 3D job): a folder `<id>-<slug>/`. Write `output.json` with `"complete": false` when you create it and set `"complete": true` when the job is done: a folder with `output.json` is indexed as one output, and only once it is complete. A folder **without** `output.json` is just a folder: each file in it is its own output (so a mod's own subfolders, like ComfyUI's, work as they are).
-- **Sidecar:** `<file>.json` next to a file output (`<stem>.json` works too), or `output.json` inside a folder output. Every field is optional. `title`, `kind`, `main`, `preview`, `complete` and `created_ts` (unix seconds, for outputs copied in later) steer the index; everything else is shown as the output's metadata:
+- **Sidecar:** `<file>.json` next to a file output (`<stem>.json` works too), or `output.json` inside a folder output. Every field is optional. `title`, `kind`, `main`, `preview`, `complete`, `created_ts` (unix seconds, for outputs copied in later) and `hidden` steer the index. **Hidden outputs** (plan 30.9): `"hidden": true` keeps an output out of the lists people see: `GET /api/outputs` and its totals (unless `include_hidden=true`; `totals.hidden` counts them), the Overview's recent outputs, the agent's output search, the outputs chart, the activity feed and the embed library. By id, its files, `/text`, `/search`, the viewer, citations and delete work as for any output. The web mod saves every page and PDF this way: they are for the agent's reading, not the user's outputs. `[outputs] hidden_keep_days` (§9; default 0, off) moves hidden outputs older than that to the trash. For the rest, everything else is shown as the output's metadata:
 
 ```json
 {
@@ -547,6 +547,9 @@ model = "minicpm-5-2B"   # a relay model name, or a decide model id
 url = "http://127.0.0.1:4000"
 threshold = 0.95         # decide: every answer must clear it
 timeout_s = 3            # slower → ask
+
+[outputs]                # plan 30.9; not on the Settings page
+hidden_keep_days = 0     # hidden outputs (the web mod's saved pages) older than this go to outputs/.trash; 0 keeps them
 
 [agent.screen]           # plan 30.6: text screened for instructions aimed at an AI before the chat model reads it
 pages = true             # fetched pages (web_fetch, and hub_read_document on web outputs)

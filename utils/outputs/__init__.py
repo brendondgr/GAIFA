@@ -6,6 +6,7 @@
 - `index.py`: `Outputs`, the table kept in step with the disk; list/get/delete/files
 - `watch.py`: `Watcher`, live updates via `watchfiles`, the startup rescan, trash purging
 - `trash.py`: deletes go to `outputs/.trash/<date>/`, purged after 30 days
+- `retention.py`: hidden outputs (the web mod's saved pages) past `[outputs] hidden_keep_days` go to the trash (off by default)
 - `announce.py`: batched activity items for new outputs
 - `upload.py`: a file sent to `POST /api/outputs/upload` written as an output in `uploads/`
 - `text.py`, `readers.py`: the text of text and document outputs (plan 24.2), cached in `.text/`

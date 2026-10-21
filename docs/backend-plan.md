@@ -2735,6 +2735,9 @@ The Auto mode (27.4) needs something to decide, call by call, whether a command 
   *Done when:* `utils/tests/tools/test_web_read.py`, `test_screen_models.py`, `utils/tests/settings/test_screen_settings.py`, `utils/tests/web/chat-webpage.test.mjs`, `services/web/tests/test_markdown.py`.
   *Live 2026-10-21:* atlasandboots.com (8,505 characters) read and screened by gemma4-26B in 2.9 s, nothing removed; docs.python.org's data-structures page (29,223 characters) on the Read a page tab in 13.9 s, with its code blocks. Not yet: a Settings control for the screening model (set it in `config.toml`), and the decide path live; Sphinx's `¶` heading anchors still come through.
 
+- [x] **30.9 Saved web pages are hidden outputs (asked for 2026-10-21: "only user generated items are inside of Outputs").** The sidecar's `hidden: true` is indexed (migration 012, which also marks rows that already had it in their meta). `GET /api/outputs` leaves them out unless `include_hidden=true` and counts them in `totals.hidden`; so do the Overview, the agent's output search, the outputs chart and the activity feed. Getting one by id, its text, search, citations and delete are unchanged, so the agent still rereads pages and citations still open them. The web mod writes `hidden: true` for every page and PDF, and `pages.hide_saved` marked the existing ones (run once). The embed library skips hidden outputs and drops ones it had indexed. The Outputs page has a "Saved web pages (n)" chip (`web/outputs/hidden.js`). `[outputs] hidden_keep_days` (default 0, off) moves old hidden outputs to the trash: waiting for the user's choice.
+  *Done when:* `utils/tests/outputs/test_hidden.py`, `utils/tests/web/hidden.test.mjs`, `services/web/tests/test_hidden.py`, `services/embed/tests/test_hidden.py`.
+
 **Wire — Phase 30:** the Auto mode works; judged calls show their reason.
 
 **Checks & deliverables — Phase 30**

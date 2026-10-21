@@ -690,6 +690,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
           <sc-for list="{{ out.kindChips }}" as="c" hint-placeholder-count="4"><button onClick="{{ c.on }}" aria-pressed="{{ c.pressed }}" style="{{ c.st }}">{{ c.label }}<span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;opacity:.8">{{ c.count }}</span></button></sc-for>
           <sc-if value="{{ out.hasSvcChips }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="width:1px;height:20px;background:var(--bd,#1D2430);margin:0 4px"></span></sc-if>
           <sc-for list="{{ out.svcChips }}" as="c" hint-placeholder-count="3"><button onClick="{{ c.on }}" aria-pressed="{{ c.pressed }}" style="{{ c.st }}">{{ c.label }}<span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;opacity:.8">{{ c.count }}</span></button></sc-for>
+          <sc-if value="{{ out.hiddenChip }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="width:1px;height:20px;background:var(--bd,#1D2430);margin:0 4px"></span><button onClick="{{ out.hc.on }}" aria-pressed="{{ out.hc.ariaPressed }}" title="{{ out.hc.title }}" style="{{ out.hc.st }}">{{ out.hc.label }}<span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;opacity:.8">{{ out.hc.count }}</span></button></sc-if>
         </div>
         <sc-if value="{{ out.loading }}" hint-placeholder-val="{{ false }}"><div style="color:var(--mut,#8A94A6)">Loading outputs…</div></sc-if>
         <sc-if value="{{ out.empty }}" hint-placeholder-val="{{ false }}">
@@ -1169,7 +1170,7 @@ class Component extends DCLogic {
     services: [], memory: null, jobs: [], activity: [], alerts: [], recent: [], system: null, unread: 0,
     svc: null,
     mdl: { loaded: false, list: [], totals: null, disk: null, kinds: [], service: '', status: '', q: '', discovered: null, scanning: false, drawer: null, edit: null },
-    out: { loaded: false, items: [], cursor: null, totals: null, loading: false, view: 'grid', kinds: [], services: [], range: 'all', days: null, q: '', fixed: null, detail: null, promptOpen: false, fresh: {}, meaning: false },
+    out: { loaded: false, items: [], cursor: null, totals: null, loading: false, view: 'grid', kinds: [], services: [], range: 'all', days: null, q: '', fixed: null, detail: null, promptOpen: false, fresh: {}, meaning: false, hidden: false },
     st: { orig: null, draft: null, sys: null, err: null, saving: false, restart: false, doc: null },
     audio: { key: null, playing: false, t: 0, dur: 0 },
     jopen: {}, speed: 1,
@@ -1194,10 +1195,11 @@ class Component extends DCLogic {
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
     this.pages = {}; this.modListeners = new Set();
     const imp = f => import(new URL(f, location.href).href);
-    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
-      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js'), imp('outputs/meaning.js')]);
+    const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning, hidden] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
+      imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js'), imp('outputs/meaning.js'), imp('outputs/hidden.js')]);
     this.Viewer = viewer;  // plan 24.7: the text and PDF viewer in the Outputs drawer
     this.Meaning = meaning;  // plan 28.4: "By meaning" search on the Outputs page (the embed mod)
+    this.Hidden = hidden;  // plan 30.9: hidden outputs (saved web pages) and the "Saved web pages" chip
     this.C = charts; this.V = views; this.D = dash;  // revision 2 chart kit (charts.js, views.js, dashboard.js)
     this.Chat = chat; this.ChatSettings = chatSettings; this.ChatAp = chatAp; this.Sess = sess; this.ApiTool = apiTool;  // plan 14.1: the Chat page, Settings → Agent, the Approvals popover (web/chat/)
     this.histTimer = setInterval(() => { if (!document.hidden && this.state.ready && !this.state.hubDown) this.loadHist(); }, 60000);
@@ -1382,13 +1384,14 @@ class Component extends DCLogic {
       case 'output': {
         this.bumpOutputs();
         const o = ev.output, swap = list => list.map(x => x.id === o.id ? o : x);  // patch 8: a changed output replaces its card
+        const H = this.Hidden, place = (list, max) => H ? H.place(list, o, max) : (list.some(x => x.id === o.id) ? swap(list) : [o, ...list]).slice(0, max);  // plan 30.9: never a hidden one
         this.setState(st => {
-          const patch = { recent: st.recent.some(x => x.id === o.id) ? swap(st.recent) : [o, ...st.recent].slice(0, 8) };
+          const patch = { recent: place(st.recent, 8) };
           const f = st.out, had = f.items.find(x => x.id === o.id);
           if (had) patch.out = { ...f, items: swap(f.items), detail: f.detail?.id === o.id ? o : f.detail, totals: f.totals ? { ...f.totals, size_bytes: f.totals.size_bytes - had.size_bytes + o.size_bytes } : f.totals };
-          else if (f.loaded && this.outMatches(o, f)) patch.out = { ...f, items: [o, ...f.items], fresh: { ...f.fresh, [o.id]: true }, totals: f.totals ? { ...f.totals, count: f.totals.count + 1, size_bytes: f.totals.size_bytes + o.size_bytes,
-            by_kind: { ...f.totals.by_kind, [o.kind]: (f.totals.by_kind[o.kind] || 0) + 1 }, by_service: { ...f.totals.by_service, [o.service]: (f.totals.by_service[o.service] || 0) + 1 } } : f.totals };
-          if (st.svc?.outs && st.svc.id === o.service) patch.svc = { ...st.svc, outs: st.svc.outs.some(x => x.id === o.id) ? swap(st.svc.outs) : [o, ...st.svc.outs].slice(0, 6) };
+          else if (f.loaded && this.outMatches(o, f)) patch.out = { ...f, items: [o, ...f.items], fresh: { ...f.fresh, [o.id]: true }, totals: H ? H.addTo(f.totals, o, f.hidden) : f.totals };
+          else if (f.loaded && o.hidden && H && this.outMatches({ ...o, hidden: false }, f)) patch.out = { ...f, totals: H.addTo(f.totals, o, f.hidden) };  // only "Saved web pages" counts it
+          if (st.svc?.outs && st.svc.id === o.service) patch.svc = { ...st.svc, outs: place(st.svc.outs, 6) };
           return patch;
         });
         setTimeout(() => this.setState(st => { const fr = { ...st.out.fresh }; delete fr[o.id]; return { out: { ...st.out, fresh: fr } }; }), 3500);
@@ -1419,6 +1422,7 @@ class Component extends DCLogic {
     }
   };
   outMatches(o, f) {
+    if (o.hidden && !f.hidden) return false;  // plan 30.9: hidden outputs only with "Saved web pages" on
     if (f.fixed && o.service !== f.fixed) return false;
     if (!f.fixed && f.services.length && !f.services.includes(o.service)) return false;
     if (f.kinds.length && !f.kinds.includes(o.kind)) return false;
@@ -1725,6 +1729,7 @@ class Component extends DCLogic {
     const svc = o.fixed || o.services.join(','); if (svc) f.service = svc;
     if (o.kinds.length) f.kind = o.kinds.join(',');
     if (o.q && !o.meaning) f.q = o.q;  // plan 28.4: with By meaning on, the words go to the embed mod instead
+    if (o.hidden) f.include_hidden = true;  // plan 30.9: the "Saved web pages" chip
     const now = Date.now() / 1000;
     if (o.range === 'days' && o.days) { const [a, b] = o.days.map(k => new Date(k + 'T00:00:00').getTime() / 1000); f.from = a; f.to = b + 86399.999; } else if (o.range === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); f.from = d / 1000; } else if (o.range === '7d') f.from = now - 7 * 86400; else if (o.range === '30d') f.from = now - 30 * 86400;
     this.upd('out', { loading: true });
@@ -2194,6 +2199,8 @@ class Component extends DCLogic {
     v.kindChips = OKINDS.filter(([k]) => t.by_kind[k] || o.kinds.includes(k)).map(([k, l]) => { const on = o.kinds.includes(k); return { label: l, count: fnum(t.by_kind[k] || 0), st: chipSt(on), pressed: on ? 'true' : 'false', on: () => this.setOut({ kinds: on ? o.kinds.filter(x => x !== k) : [...o.kinds, k] }) }; });
     v.svcChips = embedded ? [] : Object.keys(t.by_service).concat(o.services.filter(x => !(x in t.by_service))).map(id => { const on = o.services.includes(id); return { label: this.svcMap[id]?.name || id, count: fnum(t.by_service[id] || 0), st: chipSt(on), pressed: on ? 'true' : 'false', on: () => this.setOut({ services: on ? o.services.filter(x => x !== id) : [...o.services, id] }) }; });
     v.hasSvcChips = v.svcChips.length > 0;
+    const hc = this.Hidden && this.Hidden.toggle(t, o.hidden);  // plan 30.9: hidden outputs (saved web pages), off by default
+    v.hiddenChip = !!hc; v.hc = hc ? { ...hc, count: fnum(hc.count), st: chipSt(hc.pressed), ariaPressed: hc.pressed ? 'true' : 'false', on: () => this.setOut({ hidden: !o.hidden }) } : {};
     // plan 28.4: "By meaning" (the embed mod's library) instead of titles and prompts, while the mod runs
     v.canMeaning = !embedded && !!this.Meaning && this.Meaning.canSearch(s.services); const mean = v.canMeaning && o.meaning;
     v.meaningPressed = mean ? 'true' : 'false'; v.meaningSt = { ...chipSt(mean), height: 32 }; v.qph = mean ? 'Describe what you’re looking for' : 'Search titles and prompts';
@@ -2203,6 +2210,7 @@ class Component extends DCLogic {
     v.searchRef = this.searchRef;
     const hasF = o.kinds.length || o.services.length || o.q || o.range !== 'all';
     v.empty = o.loaded && !o.items.length && !o.loading; v.emptyTitle = hasF ? 'No outputs match these filters' : 'No outputs yet'; v.emptyBody = hasF ? 'Try a wider date range or clear the filters.' : 'Anything a service produces lands here — clips, images, videos and 3D models.';
+    if (hc && !o.hidden) v.emptyBody += ' Pages the agent read on the web are hidden: Saved web pages lists them.';
     v.hasF = !!hasF; v.clear = () => this.setOut({ kinds: [], services: [], q: '', range: 'all', days: null });
     v.grid = o.loaded && o.view === 'grid' && o.items.length > 0 && !v.showMeaning; v.list = o.loaded && o.view === 'list' && o.items.length > 0 && !v.showMeaning;
     if (v.showMeaning) v.empty = false;

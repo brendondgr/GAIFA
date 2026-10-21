@@ -70,6 +70,8 @@ async def index_scope(lib: Library, ids: set[str], budget_s: float = SCOPED_BUDG
                 rec = await lib.hub.record(oid)
             except HubError:
                 continue
+            if rec.get("hidden"):                       # a saved web page attached to the chat: not indexed (plan 30.9)
+                continue
             lib.store.queue(rec, signature(rec))
     left = 0
     for oid in ids:

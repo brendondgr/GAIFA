@@ -205,7 +205,8 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.outputs = Outputs(paths, hub.db, hub.bus, hub.activity)
             hub.outputs.start()
             stack.push_async_callback(hub.outputs.close)
-            out_watcher = OutputsWatcher(hub.outputs, hub.alerts, name_of=_service_name(hub))
+            out_watcher = OutputsWatcher(hub.outputs, hub.alerts, name_of=_service_name(hub),
+                                         hidden_keep_days=lambda: hub.config.outputs.hidden_keep_days)
             out_watcher.start()
             stack.push_async_callback(out_watcher.close)
             # 7. memory: sample every 2 s; loads, proxied triggers and acquire go through it.

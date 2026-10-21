@@ -66,7 +66,7 @@ class FakeHub:
         self.clock = 1_000_000.0
 
     def add(self, oid: str, kind: str, data: bytes = b"", title: str | None = None, meta: dict | None = None,
-            text: str | None = None, pages: list[str] | None = None, preview: bytes | None = None) -> str:
+            text: str | None = None, pages: list[str] | None = None, preview: bytes | None = None, hidden: bool = False) -> str:
         if pages is not None:
             starts, acc = [], ""
             for p in pages:
@@ -81,7 +81,7 @@ class FakeHub:
         rec = {"id": oid, "kind": kind, "size_bytes": len(data), "service": "test", "title": title or oid,
                "files": [{"path": f"outputs/test/{oid}", "kind": kind, "size_bytes": len(data)}],
                "preview": f"/api/outputs/{oid}/preview?v=1" if preview else None, "created_ts": self.clock,
-               "meta": meta or {}}
+               "meta": meta or {}, **({"hidden": True} if hidden else {})}
         if preview:
             self.previews[oid] = preview
         self.outputs[oid] = (rec, data)
@@ -118,7 +118,8 @@ class FakeHub:
             self.models.append(json.loads(request.content))
             return httpx.Response(201, json={"id": "embeddinggemma-2"})
         if path == "/api/outputs":
-            items = sorted((r for r, _ in self.outputs.values()), key=lambda r: -r["created_ts"])
+            items = sorted((r for r, _ in self.outputs.values()
+                            if not r.get("hidden") or request.url.params.get("include_hidden") == "true"), key=lambda r: -r["created_ts"])
             start = int(request.url.params.get("cursor") or 0)
             limit = int(request.url.params.get("limit") or 60)
             nxt = start + limit if start + limit < len(items) else None

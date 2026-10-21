@@ -257,6 +257,7 @@ class Output(_Model):
     duration_s: float | None = None
     dims: Dims | None = None
     meta: dict[str, Any] = Field(description="The sidecar's other fields: prompt, model, voice, seed, params, source, …; `excerpt` for text")
+    hidden: bool | None = Field(None, description="Set (true) for an output kept out of the lists people see: the sidecar's `hidden` (the web mod's saved pages)")
 
 
 class OutputTotals(_Model):
@@ -264,6 +265,7 @@ class OutputTotals(_Model):
     size_bytes: int
     by_kind: dict[str, int] = Field(description="Counts with every filter except kind")
     by_service: dict[str, int] = Field(description="Counts with every filter except service")
+    hidden: int = Field(0, description="Hidden outputs with these filters (listed only with `include_hidden=true`)")
 
 
 class OutputPage(_Model):

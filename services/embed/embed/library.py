@@ -2,7 +2,8 @@
 
 It follows the hub over HTTP: `GET /api/outputs` on every (re)connect to `/api/events` (new, changed and deleted
 outputs since the last look), then `output` and `output_deleted` events. Each output becomes chunks in
-`embed.db`: a `meta` chunk from its title and prompt for every output; text and documents through the hub's text
+`embed.db` (except hidden outputs, the web mod's saved pages: they aren't the user's, plan 30.9; one that
+becomes hidden is dropped): a `meta` chunk from its title and prompt for every output; text and documents through the hub's text
 route (24.3), in ~800-token chunks that keep page and line; an image (a 3D model's preview); a video whole; audio
 whole plus 30 s windows when it's long.
 
@@ -117,6 +118,8 @@ class Library:
         seen: set[str] = set()
         queued = 0
         async for rec in self.hub.outputs():
+            if rec.get("hidden"):                       # the hub leaves them out; an older hub may not
+                continue
             seen.add(rec["id"])
             sig = signature(rec)
             if known.get(rec["id"]) != sig:
@@ -143,6 +146,10 @@ class Library:
         t = ev.get("type")
         if t == "output" and isinstance(ev.get("output"), dict):
             rec = ev["output"]
+            if rec.get("hidden"):                       # not the user's (a saved web page): never indexed
+                if rec.get("id"):
+                    self.store.delete(rec["id"])
+                return
             self.store.queue(rec, signature(rec))       # the hub only announces outputs whose files changed
             self.wake.set()
         elif t == "output_deleted":

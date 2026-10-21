@@ -279,6 +279,12 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX judged_ts ON judged (ts);
     """,
+    # 012: hidden outputs (plan 30.9): the sidecar's `"hidden": true` (the web mod's saved pages) keeps an output
+    # out of the lists people see. A row indexed before this with `hidden` in its meta is marked and re-described.
+    """
+    ALTER TABLE outputs ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;
+    UPDATE outputs SET hidden = 1, sig = '' WHERE json_valid(meta) AND json_extract(meta, '$.hidden') = 1;
+    """,
 ]
 
 _STOP = object()

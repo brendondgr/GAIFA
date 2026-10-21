@@ -108,6 +108,13 @@ function genOutputs(count, base) {
     }
     out.push({ id: 'o_' + hex(r, 10), created_ts: ts, ...o });
   }
+  // plan 30.9: pages the agent read, saved by the web mod as hidden outputs (listed only with include_hidden)
+  [['Ferry fares and timetables', 'harbour-council.example'], ['Release b6000 · llama.cpp', 'github.com']].forEach(([title, host], k) => {
+    if (k >= count) return;
+    const ts = base - (k + 1) * 3600, path = `outputs/web/${ymd(ts)}/${hms(ts)}-${slug(host)}-${slug(title)}.md`, text = `# ${title}\n\nSource: <https://${host}/>\n\n---\n\nA page the agent read.\n`;
+    out.push({ id: `o_webpage${k}`, created_ts: ts, service: 'web', kind: 'text', subtype: 'markdown', title, path, files: [{ path, kind: 'text', size_bytes: text.length }], url: '', preview: null,
+      size_bytes: text.length, hidden: true, meta: { url: `https://${host}/`, source: { service: 'web', url: `https://${host}/` }, text, excerpt: text } });
+  });
   return out.sort((a, b) => b.created_ts - a.created_ts);
 }
 
@@ -508,7 +515,7 @@ export function createMockApi() {
 
   const getSvc = id => { const s = svcById(id); if (!s) throw err(404, 'service_not_found', `No service "${id}"`); return s; };
   const api = {
-    async getOverview() { await net(); return { services: services.map(summary), memory: memory(), recent_outputs: outputs.slice(0, 8).map(clone), activity: activity.slice(0, 30).map(clone), alerts: [...alerts.values()].map(clone), jobs: [...jobs.values()].map(clone), system: system() }; },
+    async getOverview() { await net(); return { services: services.map(summary), memory: memory(), recent_outputs: outputs.filter(o => !o.hidden).slice(0, 8).map(clone), activity: activity.slice(0, 30).map(clone), alerts: [...alerts.values()].map(clone), jobs: [...jobs.values()].map(clone), system: system() }; },
     async getSystem() { await net(); return system(); },
     async getDoctor() {  // plan 12.4: the shape of GET /api/doctor, from the mock's own mods
       await net();
@@ -593,11 +600,13 @@ export function createMockApi() {
       if (f.q) { const q = f.q.toLowerCase(); base = base.filter(o => (o.title + ' ' + (o.meta.prompt || '')).toLowerCase().includes(q)); }
       if (f.from) base = base.filter(o => o.created_ts >= f.from); if (f.to) base = base.filter(o => o.created_ts <= f.to);
       const kinds = f.kind ? f.kind.split(',') : null, svcs = f.service ? f.service.split(',') : null;
+      const hidden = base.filter(o => o.hidden && (!kinds || kinds.includes(o.kind)) && (!svcs || svcs.includes(o.service))).length;  // plan 30.9
+      if (!f.include_hidden) base = base.filter(o => !o.hidden);
       const byKind = {}, bySvc = {};
       base.forEach(o => { if (!svcs || svcs.includes(o.service)) byKind[o.kind] = (byKind[o.kind] || 0) + 1; if (!kinds || kinds.includes(o.kind)) bySvc[o.service] = (bySvc[o.service] || 0) + 1; });
       const items = base.filter(o => (!kinds || kinds.includes(o.kind)) && (!svcs || svcs.includes(o.service)));
       const start = Number(f.cursor || 0), limit = Number(f.limit || 60), page = items.slice(start, start + limit);
-      return { items: page.map(clone), next_cursor: start + limit < items.length ? String(start + limit) : null, totals: { count: items.length, size_bytes: items.reduce((a, o) => a + o.size_bytes, 0), by_kind: byKind, by_service: bySvc } }; },
+      return { items: page.map(clone), next_cursor: start + limit < items.length ? String(start + limit) : null, totals: { count: items.length, size_bytes: items.reduce((a, o) => a + o.size_bytes, 0), by_kind: byKind, by_service: bySvc, hidden } }; },
     async getOutput(id) { await net(); const o = outputs.find(x => x.id === id); if (!o) throw err(404, 'output_not_found', `No output "${id}"`); return clone(o); },
     async uploadOutput(file) {
       await net(); const name = file.name || 'upload', ext = (name.split('.').pop() || '').toLowerCase();

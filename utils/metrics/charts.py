@@ -61,7 +61,8 @@ def _days(frm: float, to: float) -> list[str]:
 
 
 async def output_stats(db: Database, frm: float, to: float, by: str) -> dict[str, Any]:
-    rows = await db.fetchall("SELECT service, kind, size_bytes, created_ts FROM outputs WHERE created_ts >= ? AND created_ts < ?", (frm, to))
+    rows = await db.fetchall("SELECT service, kind, size_bytes, created_ts FROM outputs WHERE created_ts >= ? AND created_ts < ? "
+                             "AND hidden = 0", (frm, to))     # hidden outputs (saved web pages) aren't counted, as on the Outputs page
     buckets: dict[str, dict[str, Any]] = {}
     if by == "day":
         for d in _days(frm, to):

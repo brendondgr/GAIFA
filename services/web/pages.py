@@ -1,10 +1,16 @@
 """A fetched page → an output (architecture §4.7): HTML becomes markdown with trafilatura (what it loses, code
 blocks' languages and blank lines and tables without a header line, put back by htmlmd.py), text and JSON are kept
-as they are, PDFs are saved as `document` outputs for the hub's reading tools."""
+as they are, PDFs are saved as `document` outputs for the hub's reading tools.
+
+Every saved page is a **hidden** output (`"hidden": true` in its sidecar, plan 30.9): the hub keeps it for the
+reading tools, the screening report and citations, but leaves it out of Outputs, the pickers and the library,
+which hold what the user made. `hide_saved` marks pages saved before that, once."""
 
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -22,6 +28,8 @@ HTML_TYPES = {"text/html", "application/xhtml+xml"}
 TEXT_TYPES = {"text/plain", "text/markdown", "text/x-markdown"}
 JSON_TYPES = {"application/json", "application/ld+json"}
 TITLE_RE = re.compile(rb"<title[^>]*>(.*?)</title>", re.I | re.S)
+DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+log = logging.getLogger("web")
 
 
 @dataclass
@@ -110,6 +118,7 @@ def save(outputs: Path, page: Page, url: str, final_url: str, content_type: str,
                "fetched_ts": round(time.time(), 3), "fetched": now.astimezone().isoformat(timespec="seconds"),
                "content_type": content_type, "chars": len(page.text) if page.kind == "text" else None,
                "published": page.published, "site": page.site, "source": {"service": "web", "url": final_url},
+               "hidden": True,     # for the agent's reading, not one of the user's outputs (plan 30.9)
                "dry_run": True if dry_run else None}   # from the fake web (plan 26.2)
     for target, data in ((path, page.data),
                          (path.with_name(path.name + ".json"), json.dumps({k: v for k, v in sidecar.items() if v is not None}, indent=1).encode())):
@@ -117,3 +126,33 @@ def save(outputs: Path, page: Page, url: str, final_url: str, content_type: str,
         part.write_bytes(data)
         part.rename(target)
     return path
+
+
+def hide_saved(outputs: Path) -> int:
+    """Mark the sidecars of pages saved before pages were hidden (`<outputs>/<date>/*.json` with no `hidden` key)
+    as hidden. A sidecar that says `"hidden": false` is left as it is, so this runs safely any number of times.
+    Each is rewritten through a temporary dotfile and a rename (the hub's watcher ignores dotfiles). Returns how
+    many were marked."""
+    n = 0
+    try:
+        days = sorted(d for d in outputs.iterdir() if d.is_dir() and DAY_RE.match(d.name))
+    except OSError:
+        return 0
+    for day in days:
+        for side in sorted(day.glob("*.json")):
+            try:
+                data = json.loads(side.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(data, dict) or "hidden" in data or (data.get("source") or {}).get("service") != "web":
+                continue
+            data["hidden"] = True
+            tmp = side.with_name(f".{side.name}.hide")
+            try:
+                tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
+                os.replace(tmp, side)
+                n += 1
+            except OSError as e:
+                log.warning("couldn't mark %s hidden: %s", side, e)
+                tmp.unlink(missing_ok=True)
+    return n

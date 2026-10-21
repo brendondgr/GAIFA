@@ -535,6 +535,13 @@ idle_unload_s = 600
 enabled = true
 autostart = false
 
+[agent.judge]            # plan Phase 30: the Auto mode's judge (utils/tools/judge.py); the eval's pick, docs/agent-eval.md
+backend = "relay"        # or "decide" (a decision model in the decide mod)
+model = "minicpm-5-2B"   # a relay model name, or a decide model id
+url = "http://127.0.0.1:4000"
+threshold = 0.95         # decide: every answer must clear it
+timeout_s = 3            # slower → ask
+
 [learning]               # plan 21–22: preferences on the cards, and the learner; Settings → Learning
 enabled = true
 nightly_at = "03:00"     # the learner's nightly run; it also runs after idle_min minutes without a chat

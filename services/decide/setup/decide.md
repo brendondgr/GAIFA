@@ -124,6 +124,7 @@ Run in `services/decide/` with the env from `service.toml` (`HF_HOME`, `HF_MODUL
 - **The first question after a load is slow** (about 2 s: kernel selection), so loading asks one warm-up question.
 - **A worker crash** answers `503 worker_died` with a fix; the next call starts a new worker. Repeated crashes: `aihub logs decide` and `journalctl -k`.
 - **Never `malloc_trim`** in a ROCm process here (setup/embed.md, What to look for); the worker design makes it unneeded.
+- **Files can change on this machine without a write** (2026-10-20, 20:51). The weights passed the check at 19:02 and on loads until 20:22. At 20:51 they failed it: 20 whole 4 KiB pages differed from a fresh download, with no BTRFS error. That fits the memory corruption seen that day. The full check (`DECIDE_VERIFY=full`) is why it was caught. Re-download with `install.sh --force` if it fires.
 - **`409 unpinned_revision`** means the files on disk aren't the revision whose code was read: `install.sh --force` restores them.
 
 ## Known gaps

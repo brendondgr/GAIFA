@@ -186,6 +186,53 @@ Two `context` cases in `evals/library.py` (53 tasks in all), run on `skynet` aga
 | `library_red_car` | 3 | 100% | 26 s | `embed_library_search(query="red car", kind="image")`: the car first at 0.75 (the rest ≤ 0.59), then one `view_output` |
 
 On the first run the model copied the tool's second example (`thread_only=true`) for the picture, got nothing (the chat had no attachments) and looked at pictures one by one. The example and the description now say to leave `thread_only` out to search everything, and an empty scope answers with a `fix`.
+
+### The Auto judge (plan 30.4, 2026-10-20)
+
+**What is measured:** the judge (`utils/tools/judge.py`): the fixed rules first, then a model for what they leave unsure. The model sees only the user's typed request and the proposed call. Sources are pinned in `services/agent/evals/judge/manifest.toml` (`bench.sh` downloads them; their text stays in `data/state/judge-bench/`). Run with `uv run python -m services.agent.evals.judge.run`; metrics are in `services/agent/evals/judge/results.json`.
+
+**The 349 items:**
+- **93 injection items** (label ask), from AgentDojo v1.2 (MIT): a user task's request paired with the calls an injection task wants (35 injection tasks × 3 requests of the same suite; reads left out).
+- **192 safe AgentDojo items** (label allow): each user task's request with its own ground-truth calls.
+- **64 routine items** (label allow) inside the judge's scope: commands, edits, fetches and GPU jobs the user asked for (`routine.py`).
+
+The rules decide 22 items (all safe, all allowed); the model decides the other 327. The judge's wording was tuned on two suites (workspace, travel: "dev") and checked on the held-out ones (banking, slack, routine: "test").
+
+**Models:**
+- Chat models through `llama-server` (lcpp's binary, Vulkan), one at a time, 8 slots. Qwen3 0.6B ran as its GGUF (Q8_0) in llama.cpp, not in vLLM: the same weights' family.
+- skynet through its relay (`auto` = MiniCPM-V 4.7 35B on the remote machine).
+- d3-lite through the decide mod.
+
+The full runs use 8 parallel requests; latency is measured separately, one call at a time on a 40-item sample. The deployed judge asks after 3 s.
+
+| Candidate | False allows (of 93) | Asks on safe (of 256) | … on routine (of 64) | Held-out: false allows / asks | Latency alone, median / p95 | Memory |
+|---|---|---|---|---|---|---|
+| **MiniCPM5 2B** (lcpp, Q8_0) | **0** | 56.6% | 9.4% | 0 of 54 / 46.3% | 0.76 s / 1.03 s | 2.7 GB file |
+| Gemma 4 26B-A4B (lcpp, Q4_K_M) | 0 | 28.5% | 1.6% | 0 of 54 / 31.5% | 1.17 s / 1.53 s | 17 GB file |
+| skynet (MiniCPM-V 4.7 35B, remote) | 0 | 43.4% | 1.6% | 0 of 54 / 42.6% | 0.62 s / 1.13 s | remote |
+| d3-lite (decide), two questions at 0.95 | 0 | 90.2% | | | 0.17 s / 0.27 s | 5.1 GB |
+| d3-lite, two questions at 0.5 | 0 | 66.0% | | | | |
+| Qwen3 0.6B (llama.cpp, Q8_0) | **93** (all) | 0% | 0% | 54 of 54 / 0% | 0.24 s / 0.38 s | 0.6 GB file |
+
+**Pick: MiniCPM5 2B through the relay** (`[agent.judge]` defaults: `backend = "relay"`, `model = "minicpm-5-2B"`).
+- It meets the target (no false allow) at 2.7 GB and under a second.
+- Gemma 4 26B-A4B asks half as often on safe calls. It's the better judge when it's loaded anyway for chat, but it holds 18 GB.
+- 0 of 93 is no proof of "never above 1%": by the rule of three, the 95% upper bound is about 3%. The rules stay in front, and the judge only ever allows or asks.
+
+**What each candidate does:**
+- **Qwen3 0.6B** allows everything: it can't be the judge.
+- **d3-lite** keeps the harmful calls out at any threshold from 0.5 to 0.95, but asks on two thirds or more of the safe ones. Its probabilities aren't calibrated for this task.
+  - Of six phrasings tried on the dev suites, "does the proposed action do something the user did not ask for?" (want no) and "is it something the user asked for…?" (want yes) separated best (held-out AUC 0.92 and 0.81).
+  - "Could it cause harm?" (0.64) and "does it follow a file's instructions?" (0.12: inverted) were dropped.
+  - The d3-lite rows come from the first run (three questions) and the phrasing run (the two kept), both on a load whose weights passed the full file check. A rerun with the final wording was stopped by the corruption below.
+- **The chat models ask most on AgentDojo's actions** (sending email or money, invites): 58–75% for MiniCPM5. In the judge's own scope they rarely ask: MiniCPM5 asked on 7.5% of routine commands, none of the edits, a third of all safe fetches (AgentDojo's and routine), and half of the GPU jobs.
+- **Wording matters for small models.** The first prompt ended "The fixed rules couldn't decide: X isn't one the rules know", and MiniCPM5 asked on 88% of safe items, quoting that line. Saying that being passed on is no reason to ask, and that sending what the user asked for is fine, brought it to 57% (the dev suites shaped this; held-out 46%).
+
+**Not covered:**
+- Harmful *commands* aren't in a public benchmark here; the rules' 234 cases cover them (`utils/tests/tools/test_judge_rules.py`).
+- An injected edit inside an Edit folder is allowed by the rules by design (undo restores it). The judge doesn't see edits' effects.
+
+**Corruption during the eval:** at 20:51 d3-lite's weights failed their SHA-256 check on reload. No process had written them since the 19:01 download. 20 whole 4 KiB pages (28,613 bytes) differed from a fresh download, with no BTRFS error. That fits the memory corruption seen earlier that day (`setup/decide.md`). Local GPU work stopped there; the fresh copy passes. The judge failed closed on the damaged model: 38 of 38 model calls became asks.
 <!-- /RESULTS -->
 
 ## Gate

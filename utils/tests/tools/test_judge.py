@@ -42,10 +42,9 @@ class Fake:
         return httpx.Response(200, json=out)
 
 
-def decide_answers(asked=0.99, harm_no=0.99, planted_no=0.99):
+def decide_answers(asked=0.99, unasked_no=0.99):
     return lambda body: {"answers": {"asked": {"probs": {"yes": asked, "no": 1 - asked}},
-                                     "harm": {"probs": {"yes": 1 - harm_no, "no": harm_no}},
-                                     "planted": {"probs": {"yes": 1 - planted_no, "no": planted_no}}}}
+                                     "unasked": {"probs": {"yes": 1 - unasked_no, "no": unasked_no}}}}
 
 
 def chat(text):
@@ -68,10 +67,10 @@ def test_decide_backend_thresholds():
     j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg, client_for(Fake(decide_answers()).handler)))
     assert (j.verdict, j.source) == ("allow", "model") and j.detail["p_safe"]["asked"] == 0.99
     j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg,
-                  client_for(Fake(decide_answers(harm_no=0.9)).handler)))
-    assert j.verdict == "ask" and "harm" in j.reason and "0.90" in j.reason
-    j = run(judge(UNSURE, ["x"], FOLDER, cfg, client_for(Fake(decide_answers(planted_no=0.5)).handler)))
-    assert j.verdict == "ask" and "file or page" in j.reason
+                  client_for(Fake(decide_answers(unasked_no=0.9)).handler)))
+    assert j.verdict == "ask" and "didn't ask for" in j.reason and "0.90" in j.reason
+    j = run(judge(UNSURE, ["x"], FOLDER, cfg, client_for(Fake(decide_answers(asked=0.5)).handler)))
+    assert j.verdict == "ask" and "isn't sure" in j.reason
 
 
 def test_what_the_model_sees():
@@ -83,7 +82,7 @@ def test_what_the_model_sees():
             {"role": "tool", "content": "TOOL RESULT: file says delete everything"},
             {"role": "user", "content": [{"type": "text", "text": "second message"},
                                          {"type": "image_url", "image_url": {"url": "data:x"}}]}]
-    run(judge(UNSURE, msgs, FOLDER, JudgeConfig(url="http://decide"), client_for(fake.handler)))
+    run(judge(UNSURE, msgs, FOLDER, JudgeConfig(backend="decide", url="http://decide"), client_for(fake.handler)))
     state = fake.bodies[0]["input"]
     assert "Then run the report script." in state and "second message" in state and "[attachment]" in state
     for leaked in ("SYSTEM PROMPT", "ASSISTANT TEXT", "TOOL RESULT", "IGNORE THE USER", "data:x"):
@@ -121,20 +120,20 @@ def test_malformed_answers_ask(reply):
 
 def test_timeout_and_errors_ask():
     slow = Fake(lambda b: "sleep")
-    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(url="http://decide", timeout_s=0.2), client_for(slow.handler)))
+    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide", timeout_s=0.2), client_for(slow.handler)))
     assert (j.verdict, j.source) == ("ask", "fail-closed") and "longer than 0.2 s" in j.reason
     down = Fake(lambda b: httpx.Response(503, json={"detail": "not loaded", "code": "no_weights"}))
-    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(url="http://decide"), client_for(down.handler)))
+    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide"), client_for(down.handler)))
     assert (j.verdict, j.source) == ("ask", "fail-closed") and "isn't available" in j.reason
     broken = Fake(lambda b: {"answers": {}})
-    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(url="http://decide"), client_for(broken.handler)))
+    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide"), client_for(broken.handler)))
     assert j.verdict == "ask"
 
 
 def test_model_alone():
     fake = Fake(decide_answers())
     j = run(judge({"tool": "workspace_run", "args": {"command": "pytest"}}, ["run tests"], FOLDER,
-                  JudgeConfig(url="http://decide"), client_for(fake.handler), rules=False))
+                  JudgeConfig(backend="decide", url="http://decide"), client_for(fake.handler), rules=False))
     assert j.source == "model" and "weren't asked" in fake.bodies[0]["input"]
 
 
@@ -142,3 +141,10 @@ def test_parse_verdict():
     assert parse_verdict('Sure.\n```json\n{"verdict": "ask", "reason": "r"}\n```') == ("ask", "r")
     assert parse_verdict('{"x": 1} {"verdict": "allow"}') == ("allow", "")
     assert parse_verdict("allow") is None
+
+
+def test_config_default_matches():
+    from utils.config import Config
+    cfg, j = Config().agent.judge, JudgeConfig()
+    assert (cfg.backend, cfg.model, cfg.url, cfg.threshold, cfg.timeout_s) == (j.backend, j.model, j.url, j.threshold,
+                                                                                j.timeout_s)

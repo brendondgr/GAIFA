@@ -140,6 +140,10 @@ class Walker:
     def rel(self, p: Path) -> str:
         return p.relative_to(self.outputs).as_posix()
 
+    def _escapes(self, p: Path) -> bool:
+        """A symlink that leads outside the outputs folder: never indexed, so never served."""
+        return p.is_symlink() and not inside_real(p, self.outputs)
+
     def walk(self, scope: str = "") -> dict[str, Found]:
         parts = [x for x in scope.split("/") if x]
         if not parts:
@@ -174,7 +178,7 @@ class Walker:
         names = {c.name for c in children}
         stems = {c.stem for c in children if c.suffix.lower() != ".json"}
         for c in children:
-            if skipped(c.name):
+            if skipped(c.name) or self._escapes(c):
                 continue
             try:
                 is_dir = c.is_dir()
@@ -222,10 +226,16 @@ class Walker:
             dirnames[:] = sorted(x for x in dirnames if not skipped(x))
             base = Path(dirpath)
             for n in sorted(filenames):
-                if skipped(n) or (base == d and n == FOLDER_SIDECAR):
+                if skipped(n) or (base == d and n == FOLDER_SIDECAR) or self._escapes(base / n):
                     continue
                 out.append(base / n)
         return out
+
+
+def inside_real(p: Path, root: Path) -> bool:
+    """`p`, with every symlink followed, is inside `root` (also with its symlinks followed)."""
+    real, top = os.path.realpath(p), os.path.realpath(root)
+    return real == top or real.startswith(top + os.sep)
 
 
 def walk(outputs: Path, scope: str = "") -> dict[str, Found]:

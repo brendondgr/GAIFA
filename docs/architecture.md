@@ -377,7 +377,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /ui/services/{id}/{path}`, `GET /Mod_<id>.dc.html` | a mod's `ui/` folder (page modules), and its `Page.dc.html` under a name `dc-import` can find |
 | `GET /api/metrics`, `/api/metrics/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`, `/api/widgets`, `/api/widgets/{service}/{id}` | chart data; shapes in UI brief §11.7 |
 | `POST /api/outputs/upload?name=` | a file sent as the body (image, video, audio, text or document, ≤ 64 MB) saved to `outputs/uploads/<date>/` and indexed; returns the `Output` (Chat's Upload, plan chat-uploads U.4) |
-| `GET /api/outputs/{id}/file` | an output's main file (supports Range, for audio/video seeking) |
+| `GET /api/outputs/{id}/file` | an output's main file (supports Range, for audio/video seeking); a symlink that leads out of `outputs/` is never indexed or served, here or by `/files`, `/text`, `/preview` |
 | `GET /api/outputs/{id}/files/{path}` | a file inside a folder output |
 | `GET /api/outputs/{id}/preview` | thumbnail or poster |
 | `GET /api/outputs/{id}/text?offset=&limit=&page=&pages=` | a window of a text or document output's extracted text, with its outline, page count and scanned pages (plan 24.3; `not_text` 409, `no_page` 404) |

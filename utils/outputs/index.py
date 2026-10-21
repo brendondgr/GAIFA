@@ -23,7 +23,7 @@ from utils.db import Database
 from utils.events import EventBus
 from utils.outputs import media, text, trash
 from utils.outputs.describe import describe
-from utils.outputs.entries import KINDS, kind_of, subtype_of, walk
+from utils.outputs.entries import KINDS, inside_real, kind_of, subtype_of, walk
 from utils.paths import Paths
 
 log = logging.getLogger("aihub.outputs")
@@ -287,7 +287,7 @@ class Outputs:
         if not rel:
             raise OutputError(404, "output_not_found", f'Output "{oid}" has no such file')
         p = self.dir / rel
-        if not p.is_file():
+        if not p.is_file() or not inside_real(p, self.dir):   # a symlink out of outputs/ is never served
             raise OutputError(404, "output_not_found", f"{self.prefix}/{rel} is gone")
         return p
 
@@ -312,7 +312,7 @@ class Outputs:
             return self._safe(rel, oid)  # the image itself, or the 3D job's preview.png
         src = self._safe(row["main"], oid)
         try:
-            if p.stat().st_mtime >= src.stat().st_mtime:
+            if p.stat().st_mtime >= src.stat().st_mtime and inside_real(p, self.dir):
                 return p
         except OSError:
             pass

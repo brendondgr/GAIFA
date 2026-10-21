@@ -1,11 +1,13 @@
-// Dictation into the composer (plan 29.3): the microphone → an AudioWorklet that resamples to
-// 16 kHz mono → int16 frames over the stt mod's `WS /v1/stream` (through the hub's proxy) → the
-// committed text plus the live tail, written into the draft. The button shows only while the stt
-// mod is up, so deleting services/stt removes it. Click to toggle; press and hold to talk.
-// The pure parts (Resampler, toInt16, startMessage, reduce, dictated) are unit-tested in
-// utils/tests/web/chat-mic.test.mjs.
+// Dictation into the composer (plans 29.3–29.4). The preferred microphone (a ranked list of labels in the
+// hub's settings `speech_input`: the first one present is used, the next on unplug, and a higher one takes
+// over when plugged in) → an AudioWorklet that resamples to 16 kHz mono → int16 frames over the stt mod's
+// `WS /v1/stream` (through the hub's proxy) → the committed text plus the live tail, written into the draft.
+// The button shows only while the stt mod is up, so deleting services/stt removes it. Click to toggle, hold
+// to talk, or either (`mode`). The pure parts (Resampler, toInt16, the protocol, pickMic, nextMic, onRelease,
+// levelOf) and openMic's fallback and take-over are tested in utils/tests/web/chat-mic.test.mjs.
 
-import { h, T, Btn } from './chat-ui.js';
+import { h, T, Btn, Popover } from './chat-ui.js';
+import { SpeechInputPanel } from './chat-speech-input.js';
 
 const R = () => globalThis.React;
 export const RATE = 16000;
@@ -91,28 +93,127 @@ registerProcessor('mic-16k', Mic16k);`;
 /** The socket's address for a page served by the hub. */
 export const streamUrl = (loc = globalThis.location) => `${loc.protocol === 'https:' ? 'wss' : 'ws'}://${loc.host}/api/s/stt/v1/stream`;
 
-/** Starts dictating; returns { stop() } (stop flushes and resolves with the final state). */
-export async function dictate({ onState, url = streamUrl(), media = globalThis.navigator?.mediaDevices, preset, language }) {
-  const stream = await media.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+// ---- which microphone (plan 29.4): a ranked list of labels, the first one present wins ----------------
+
+/** Labels as the user sees them: Chrome's "Default - " / "Communications - " prefixes dropped, case ignored. */
+export const normLabel = l => String(l || '').replace(/^(default|communications)\s*-\s*/i, '').trim().toLowerCase();
+
+/** The real microphones in an `enumerateDevices()` list (not Chrome's "default"/"communications" aliases). */
+export const audioInputs = devices => (devices || []).filter(d => d.kind === 'audioinput' && !['default', 'communications'].includes(d.deviceId));
+
+/** The most preferred microphone that is present: `{deviceId, label, rank}`, or null (none listed is plugged in). */
+export function pickMic(devices, prefs = []) {
+  const inputs = audioInputs(devices);
+  for (let rank = 0; rank < prefs.length; rank++) {
+    const d = inputs.find(x => x.label && normLabel(x.label) === normLabel(prefs[rank]));
+    if (d) return { deviceId: d.deviceId, label: d.label, rank };
+  }
+  return null;
+}
+
+export const BROWSER_DEFAULT = { deviceId: null, label: 'the browser’s default microphone', rank: null };
+
+/** After a device change: the microphone to switch to, or undefined to keep `current`. A ranked mic that
+ * appears takes over from a lower one (or from the browser's default); an unplugged one falls back to the
+ * next present, else the browser's default. `lost` says the current track ended. */
+export function nextMic(devices, prefs, current, lost = false) {
+  const pick = pickMic(devices, prefs);
+  const present = !!current?.deviceId && audioInputs(devices).some(d => d.deviceId === current.deviceId);
+  const gone = lost || (current?.deviceId && !present);
+  if (gone) return pick || BROWSER_DEFAULT;
+  if (pick && pick.deviceId !== current?.deviceId && (current?.rank == null || pick.rank < current.rank)) return pick;
+  return undefined;
+}
+
+/** What a button release does: 'stop' or 'keep'. `started`: this press started dictation. */
+export function onRelease(mode, started, heldMs) {
+  if (mode === 'hold') return 'stop';
+  if (mode === 'toggle') return started ? 'keep' : 'stop';
+  return !started || heldMs > HOLD_MS ? 'stop' : 'keep';
+}
+
+/** An input level for a meter, 0–1: RMS on a −60…0 dB scale. */
+export function levelOf(samples) {
+  let sum = 0;
+  for (let i = 0; i < samples.length; i++) sum += samples[i] * samples[i];
+  const rms = Math.sqrt(sum / Math.max(1, samples.length));
+  return rms <= 0.001 ? 0 : Math.min(1, Math.max(0, 1 + Math.log10(rms) / 3));
+}
+
+const constraints = mic => ({ audio: { ...(mic?.deviceId ? { deviceId: { exact: mic.deviceId } } : {}), channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+const listInputs = async media => audioInputs(await media.enumerateDevices());
+
+/** Opens the preferred microphone and follows plugs and unplugs: `{stream, mic, stop}`; `onSwitch(stream, mic)`
+ * is told about each change. Labels are only visible once access is granted, so it picks again after opening. */
+export async function openMic({ media, mics = [], onSwitch = () => {} }) {
+  let mic = pickMic(await listInputs(media), mics) || BROWSER_DEFAULT;
+  let stream = await media.getUserMedia(constraints(mic));
+  let busy = false, again = false, closed = false;
+  const watch = () => stream.getAudioTracks?.().forEach(t => t.addEventListener?.('ended', () => change(true)));
+  const change = async (lost = false) => {
+    if (closed) return;
+    if (busy) { again = true; return; }             // a change during a switch is looked at once it's done
+    busy = true;
+    try {
+      const next = nextMic(await listInputs(media), mics, mic, lost);
+      if (next === undefined) return;
+      const s = await media.getUserMedia(constraints(next));
+      if (closed) { s.getTracks().forEach(t => t.stop()); return; }
+      const old = stream;
+      stream = s; mic = next;
+      watch(); onSwitch(stream, mic);
+      old.getTracks().forEach(t => t.stop());
+    } catch { /* the next change tries again */ } finally {
+      busy = false;
+      if (again) { again = false; change(); }
+    }
+  };
+  watch();
+  const first = nextMic(await listInputs(media), mics, mic.deviceId ? mic : null);
+  if (first && first.deviceId !== mic.deviceId) {
+    stream.getTracks().forEach(t => t.stop());
+    mic = first; stream = await media.getUserMedia(constraints(mic)); watch();
+  }
+  const onDevices = () => change();
+  media.addEventListener?.('devicechange', onDevices);
+  return {
+    get stream() { return stream; }, get mic() { return mic; },
+    stop() { closed = true; media.removeEventListener?.('devicechange', onDevices); stream.getTracks().forEach(t => t.stop()); },
+  };
+}
+
+/** Starts dictating; returns { stop() } (stop flushes and resolves with the final state). The state also
+ * carries `mic` (the label in use) and `level` (0–1, about ten times a second). */
+export async function dictate({ onState, url = streamUrl(), media = globalThis.navigator?.mediaDevices, preset, language, mics = [] }) {
   const ctx = new AudioContext();
   const mod = URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' }));
   await ctx.audioWorklet.addModule(mod);
   URL.revokeObjectURL(mod);
   const node = new AudioWorkletNode(ctx, 'mic-16k');
-  const src = ctx.createMediaStreamSource(stream);
-  let state = initial(), finished;
+  let src = null, state = { ...initial(), mic: null, level: 0 }, finished;
+  const tell = patch => { state = { ...state, ...patch }; onState(state); };
+  const plug = (stream, mic) => {
+    src?.disconnect();
+    src = ctx.createMediaStreamSource(stream);
+    src.connect(node);
+    tell({ mic: mic.label });
+  };
+  const input = await openMic({ media, mics, onSwitch: plug });
+  plug(input.stream, input.mic);
   const over = new Promise(r => { finished = r; });
   const ws = new WebSocket(url);
   ws.binaryType = 'arraybuffer';
-  const close = () => { src.disconnect(); node.disconnect(); stream.getTracks().forEach(t => t.stop()); ctx.close().catch(() => {}); };
+  const close = () => { src?.disconnect(); node.disconnect(); input.stop(); ctx.close().catch(() => {}); };
   ws.onopen = () => ws.send(JSON.stringify(startMessage({ preset, language })));
   ws.onmessage = e => { state = reduce(state, JSON.parse(e.data)); onState(state); if (state.done) finished(state); };
   ws.onclose = e => {
     close();
-    if (!state.done) { state = { ...state, error: state.error || (e.code !== 1000 ? (e.reason || `the stream closed (${e.code})`) : null) }; onState(state); finished(state); }
+    if (!state.done) { tell({ error: state.error || (e.code !== 1000 ? (e.reason || `the stream closed (${e.code})`) : null) }); finished(state); }
   };
-  node.port.onmessage = e => { if (state.ready && ws.readyState === 1) ws.send(toInt16(e.data).buffer); };
-  src.connect(node);
+  node.port.onmessage = e => {
+    if (Math.abs(levelOf(e.data) - state.level) > 0.02) tell({ level: levelOf(e.data) });
+    if (state.ready && ws.readyState === 1) ws.send(toInt16(e.data).buffer);
+  };
   return {
     stop() {
       close();
@@ -135,37 +236,55 @@ export function useSttUp(api) {
   return up;
 }
 
-/** The composer's microphone: dictation goes into the draft after what was already typed. */
+/** The saved dictation settings (hub settings `speech_input`), with their defaults. */
+export const SPEECH_DEFAULTS = { mics: [], language: '', preset: 'balanced', mode: 'both' };
+export const speechSettings = async api => ({ ...SPEECH_DEFAULTS, ...((await api?.getSettings?.().catch(() => null))?.speech_input || {}) });
+
+/** A small level bar (0–1). */
+export const LevelBar = ({ level, width = 46 }) => h('span', { 'aria-hidden': 'true', style: { display: 'inline-block', width, height: 5, borderRadius: 3, background: T.inset, overflow: 'hidden' } },
+  h('span', { style: { display: 'block', height: '100%', width: `${Math.round((level || 0) * 100)}%`, background: (level || 0) > 0.9 ? T.rd : T.gr, transition: 'width 80ms linear' } }));
+
+/** The composer's microphone: dictation goes into the draft after what was already typed. The menu (▾)
+ * holds the same microphone list and options as Settings → Speech input. */
 export function MicButton({ api, draft, setDraft, disabled }) {
   const React = R(), up = useSttUp(api);
-  const [on, setOn] = React.useState(false), [err, setErr] = React.useState(null);
+  const [on, setOn] = React.useState(false), [err, setErr] = React.useState(null), [live, setLive] = React.useState({ mic: null, level: 0 });
+  const [menu, setMenu] = React.useState(false), mode = React.useRef('both');
   const sess = React.useRef(null), want = React.useRef(false), base = React.useRef(''), press = React.useRef({ t: 0, started: false });
   React.useEffect(() => () => { want.current = false; sess.current?.stop(); }, []);
+  React.useEffect(() => { if (up) speechSettings(api).then(x => { mode.current = x.mode; }); }, [up, menu]);
   if (!up) return null;
   const start = async () => {
     setErr(null); base.current = draft || ''; want.current = true; setOn(true);
     try {
-      const s = await dictate({ onState: st => {
+      const prefs = await speechSettings(api);
+      mode.current = prefs.mode;
+      let said = '';
+      const s = await dictate({ mics: prefs.mics, preset: prefs.preset, language: prefs.language || undefined, onState: st => {
         if (st.error) setErr(st.error);
-        setDraft(joinDraft(base.current, dictated(st)));
+        setLive({ mic: st.mic, level: st.level });
+        const now = dictated(st);
+        if (now !== said) { said = now; setDraft(joinDraft(base.current, now)); }
         if (st.done || st.error) { setOn(false); sess.current = null; }
       } });
       if (want.current) sess.current = s; else s.stop();          // released before the microphone opened
     } catch (e) {
       want.current = false; setOn(false);
-      setErr(e?.name === 'NotAllowedError' ? 'Microphone access was refused' : (e?.message || 'No microphone'));
+      setErr(e?.name === 'NotAllowedError' ? 'Microphone access was refused' : e?.name === 'OverconstrainedError' ? 'That microphone is gone' : (e?.message || 'No microphone'));
     }
   };
   const stop = () => { want.current = false; setOn(false); const s = sess.current; sess.current = null; s?.stop(); };
-  return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 4 } },
+  return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative' } },
     h(Btn, { kind: on ? 'pri' : 'ghost', sm: true, icon: 'mic', disabled: disabled && !on, 'aria-pressed': on ? 'true' : 'false',
-      title: on ? 'Stop dictating' : 'Dictate (click to start and stop, or hold to talk)',
-      // Pointer: a press that starts it and is held past HOLD_MS stops on release (push to talk); a short
-      // press leaves it on, and the next press stops it. Keyboard (detail 0): Enter or Space toggles.
+      title: on ? 'Stop dictating' : { hold: 'Dictate (hold to talk)', toggle: 'Dictate (click to start and stop)' }[mode.current] || 'Dictate (click to start and stop, or hold to talk)',
+      // Pointer: what a release does depends on the mode (onRelease). Keyboard (detail 0): Enter or Space toggles.
       onPointerDown: e => { if (e.button) return; press.current = { t: Date.now(), started: !on }; if (!on) start(); },
       onPointerUp: () => { if (!press.current.t) return; const { t, started } = press.current; press.current = { t: 0, started: false };
-        if (!started || Date.now() - t > HOLD_MS) stop(); },
+        if (onRelease(mode.current, started, Date.now() - t) === 'stop') stop(); },
       onClick: e => { if (e.detail === 0) (on ? stop() : start()); } }),
-    on ? h('span', { role: 'status', style: { fontSize: 11.5, color: T.rd } }, 'Listening…') : null,
+    h(Btn, { kind: 'ghost', sm: true, icon: 'chevD', title: 'Microphone and dictation options', 'aria-expanded': menu ? 'true' : 'false', disabled: on, onClick: () => setMenu(!menu), style: { width: 18, padding: 0 } }),
+    h(Popover, { open: menu, onClose: () => setMenu(false), place: 'up-left', width: 360, label: 'Speech input' }, menu ? h(SpeechInputPanel, { api, compact: true }) : null),
+    on ? h('span', { role: 'status', title: live.mic || '', style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.rd, maxWidth: 220 } },
+      h(LevelBar, { level: live.level }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, live.mic ? `Listening · ${live.mic}` : 'Listening…')) : null,
     err ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, err) : null);
 }

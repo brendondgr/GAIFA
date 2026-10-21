@@ -34,6 +34,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "services": {"order": ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode", "fake-ok"], "enabled": {"fake-ok": True}, "autostart": {"fake-ok": True}},
             "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}}},
             "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
+            "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
         }
         before = _file(served)
         s["hub"]["port"] = served.hub.config.hub.port
@@ -125,6 +126,25 @@ async def test_saved_port_does_not_change_the_running_port(make_app, root):
             assert r.json()["restart_required"] is True
             assert hub.port == start and (await c.get("/api/system")).json()["hub"]["port"] == start
 
+
+
+async def test_speech_input_is_saved_in_config_toml(rig, serve):
+    """plan 29.4: the dictation settings (mics by label, most preferred first) survive restarts in config.toml."""
+    served = await _hub(rig, serve)
+    async with httpx.AsyncClient(base_url=served.url) as c:
+        mics = ["Blue Yeti Nano Analog Stereo", " Laptop Mic ", "Blue Yeti Nano Analog Stereo"]
+        r = await c.put("/api/settings", json={"speech_input": {"mics": mics, "language": "en", "mode": "hold"}})
+        assert r.status_code == 200
+        assert r.json()["settings"]["speech_input"] == {"mics": ["Blue Yeti Nano Analog Stereo", "Laptop Mic"],
+                                                        "language": "en", "preset": "balanced", "mode": "hold"}
+        assert tomllib.loads(_file(served))["speech_input"] == {"mics": ["Blue Yeti Nano Analog Stereo", "Laptop Mic"],
+                                                               "language": "en", "mode": "hold"}
+        assert served.hub.config.speech_input.mode == "hold"
+        for bad in ({"preset": "quick"}, {"mode": "always"}, {"language": "English"}, {"mics": [""]}):
+            r = await c.put("/api/settings", json={"speech_input": bad})
+            assert r.status_code == 422, bad
+        await c.put("/api/settings", json={"speech_input": {"mics": [], "language": "", "mode": "both"}})
+        assert "speech_input" not in tomllib.loads(_file(served))
 
 
 async def test_learning_switch_applies_at_once(rig, serve):

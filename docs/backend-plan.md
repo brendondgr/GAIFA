@@ -2381,7 +2381,7 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
 
 - [x] **24.3 Document routes: `utils/routes/outputs.py`.**
   - `GET /api/outputs/{id}/text?offset=&limit=&page=&pages=` → `{text, offset, next_offset | null, total_chars, tokens, pages, page_of_offset, outline, scanned, truncated}` (`limit` default 12000 chars, max 48000; `page`/`pages` like `3` or `3-5`).
-  - `GET /api/outputs/{id}/search?q=&limit=` → `{hits: [{page?, line, offset, text (the line with ±1 line of context)}], total}`: case-insensitive words, all must appear within one line or paragraph; a `"quoted phrase"` matches exactly; `/regex/` allowed and timed out after 1 s.
+  - `GET /api/outputs/{id}/search?q=&limit=` → `{hits: [{page?, line, offset, text (the line with ±1 line of context)}], total, capped?}`: case-insensitive words, all must appear within one line or paragraph; a `"quoted phrase"` matches exactly; `/regex/` allowed and timed out after 1 s.
   - `GET /api/outputs/{id}/page/{n}.png?width=` (PDF pages, rendered by `pypdfium2`, cached under `.previews`).
   - Errors use the envelope: `not_text` (409) for kinds without text, `no_page` (404).
   - Architecture §6 and the brief's §6 / §11.7 list the three routes; `web/api.js` gains `outputText`, `outputSearch`, `outputPageUrl`.

@@ -546,7 +546,7 @@ interface OutputText {                       // plan 24.3: a window of an output
   notes: string[];
 }
 interface SearchHit { page?: number; line: number; offset: number; text: string }   // text: the line with ±1 line of context
-interface OutputSearch { hits: SearchHit[]; total: number }
+interface OutputSearch { hits: SearchHit[]; total: number; capped?: boolean }   // capped: over 5,000 matches; total counts the first 5,000
 
 interface Activity { id: string; ts: number; service: string | null;
                      level: "info" | "warn" | "error"; text: string; route?: string }

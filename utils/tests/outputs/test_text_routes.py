@@ -96,6 +96,15 @@ async def test_regex_search_times_out(client, monkeypatch):
     assert (r.status_code, r.json()["code"]) == (422, "search_timeout")
 
 
+async def test_a_capped_search_answers_through_the_route(client, monkeypatch):
+    """Overnight 2026-10-21: word searches gained a cap and `capped: true`; the route's model forbids extra keys."""
+    monkeypatch.setattr(reading, "MAX_MATCHES", 3)
+    o = await up(client, "many.txt", "".join(f"quick line {i}\n" for i in range(10)).encode())
+    r = await client.get(f"/api/outputs/{o['id']}/search", params={"q": "quick"})
+    assert r.status_code == 200, r.text
+    assert r.json()["capped"] is True and r.json()["total"] == 3
+
+
 async def test_page_image(client, app):
     o = await up(client, "report.pdf")
     r = await client.get(f"/api/outputs/{o['id']}/page/2.png", params={"width": 300})

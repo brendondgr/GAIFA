@@ -11,6 +11,13 @@
 - **pptx / xlsx**: no text here; the workspace sandbox reads them (Phase 27).
 - Anything else is read as text (UTF-8, or UTF-16 with a BOM).
 
+Limits, so a small file can't take the hub's memory: a zip is unpacked at most `MAX_MEMBER` bytes a
+file and `MAX_UNZIP` a document (counted as they come: a member's declared size can lie), its XML
+is parsed as it unpacks and each paragraph or table dropped once read (at most `MAX_PARTS` elements
+in one), a reader stops past `MAX_TEXT` characters, a PDF past `MAX_PDF_PAGES` pages, and an ODF
+`<text:s text:c=…/>` gives at most `SPACES` spaces. Past a limit the reader keeps what it read, with
+a note.
+
 Headings are `(level, title, offset)`; `text.py` turns them into the outline.
 """
 
@@ -20,6 +27,7 @@ import json
 import re
 import threading
 import zipfile
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
@@ -29,6 +37,13 @@ from utils.outputs.upload import as_text
 
 SCANNED_CHARS = 20  # a PDF page with fewer characters than this is probably a scan
 _PDFIUM = threading.Lock()  # pdfium is not thread-safe
+MAX_TEXT = 4_100_000  # a reader stops past this; `text.MAX_CHARS` (4 M) then cuts the text and says so
+MAX_MEMBER = 50 * 2**20  # bytes unpacked from one file in a docx / odt / epub
+MAX_UNZIP = 200 * 2**20  # ... and from the whole document
+MAX_PARTS = 500_000  # XML elements in one paragraph or table
+MAX_PDF_PAGES = 20_000
+SPACES = 100  # most spaces one ODF <text:s text:c=…/> gives
+_CHUNK = 2**20
 
 
 @dataclass
@@ -76,6 +91,72 @@ class _Out:
         return Read("".join(self.parts), headings=self.headings)
 
 
+class _Zip:
+    """A document's zip, unpacked with a cap (`MAX_MEMBER`, `MAX_UNZIP`); past it a member just ends
+    early and a note says so."""
+
+    def __init__(self, z: zipfile.ZipFile) -> None:
+        self.z, self.left, self.notes = z, MAX_UNZIP, []
+
+    def chunks(self, name: str) -> Iterator[bytes]:
+        info = self.z.getinfo(name)  # KeyError when it's missing
+        cap, n, cut = min(MAX_MEMBER, self.left), 0, False
+        try:
+            with self.z.open(info) as f:
+                while n < cap and (b := f.read(min(_CHUNK, cap - n))):
+                    n += len(b)
+                    yield b
+                cut = n >= cap and (info.file_size > n or bool(f.read(1)))
+        finally:
+            self.left -= n
+        if cut:
+            self.notes.append(f"stopped reading {name} after {n / 2**20:.0f} MB unpacked (at most {MAX_MEMBER // 2**20} MB "
+                              f"a file, {MAX_UNZIP // 2**20} MB a document)")
+
+    def read(self, name: str) -> bytes:
+        return b"".join(self.chunks(name))
+
+    def xml(self, name: str) -> Iterator[tuple[str, ET.Element]]:
+        """`start` / `end` events of a member's XML, parsed as it unpacks (a cut member just ends)."""
+        parser, before = ET.XMLPullParser(("start", "end")), len(self.notes)
+        for b in self.chunks(name):
+            parser.feed(b)
+            yield from parser.read_events()
+        if len(self.notes) == before:
+            parser.close()
+            yield from parser.read_events()
+
+    def blocks(self, name: str, is_block: Callable[[ET.Element, list[ET.Element]], bool]) -> Iterator[tuple[ET.Element, list[ET.Element]]]:
+        """The outermost blocks of a member's XML (`is_block(element, its ancestors)`: paragraphs, tables),
+        each with its ancestors once it ends. What has been read is then dropped, in batches (one at a
+        time is quadratic), so memory holds about one block; one past `MAX_PARTS` elements ends it."""
+        stack: list[ET.Element] = []
+        done: list[int] = []  # how many of each open element's first children are read
+        inside = parts = 0  # open blocks; elements in the current one
+        for ev, el in self.xml(name):
+            if ev == "start":
+                inside += is_block(el, stack)
+                stack.append(el)
+                done.append(0)
+                parts += inside > 0
+                if parts > MAX_PARTS:
+                    self.notes.append(f"a paragraph or table has more than {MAX_PARTS:,} XML elements; stopped reading there")
+                    return
+                continue
+            stack.pop()
+            done.pop()
+            if is_block(el, stack):
+                inside -= 1
+                if not inside:
+                    yield el, stack
+                    parts = 0
+            if not inside and stack:
+                done[-1] += 1
+                if done[-1] >= 1024:
+                    del stack[-1][:done[-1]]
+                    done[-1] = 0
+
+
 def md_table(rows: list[list[str]]) -> str:
     rows = [[" ".join(c.split()).replace("|", "\\|") for c in r] for r in rows if r]
     if not rows:
@@ -99,7 +180,10 @@ def read_pdf(p: Path) -> Read:
     with _PDFIUM:
         doc = pdfium.PdfDocument(str(p))
         try:
-            for i in range(len(doc)):
+            total = len(doc)
+            for i in range(min(total, MAX_PDF_PAGES)):
+                if n > MAX_TEXT:
+                    break
                 page = doc[i]
                 tp = page.get_textpage()
                 body = tp.get_text_range().replace("\r\n", "\n").replace("\r", "\n").strip("\n")
@@ -121,6 +205,8 @@ def read_pdf(p: Path) -> Read:
         finally:
             doc.close()
     out.text = "".join(parts)
+    if total > MAX_PDF_PAGES:
+        out.notes.append(f"read the first {MAX_PDF_PAGES:,} of {total:,} pages")
     if marks:
         out.headings = marks
     else:
@@ -155,26 +241,34 @@ def _w_text(el: ET.Element) -> str:
     return "".join(out)
 
 
+def _docx_block(el: ET.Element, o: _Out) -> None:
+    if el.tag == WNS + "p":
+        style = el.find(f"{WNS}pPr/{WNS}pStyle")
+        name = (style.get(WNS + "val") if style is not None else "") or ""
+        m = _HEAD_STYLE.match(name)
+        text = _w_text(el)
+        if name.lower() == "title":
+            o.heading(1, text)
+        elif m:
+            o.heading(min(max(int(m[1]), 1), 6), text)
+        else:
+            o.block(text)
+    elif el.tag == WNS + "tbl":
+        o.block(md_table([[_w_text(c) for c in tr.findall(WNS + "tc")] for tr in el.findall(WNS + "tr")]))
+
+
 def read_docx(p: Path) -> Read:
-    with zipfile.ZipFile(p) as z:
-        root = ET.fromstring(z.read("word/document.xml"))
-    body = root.find(WNS + "body")
     o = _Out()
-    for el in (body if body is not None else []):
-        if el.tag == WNS + "p":
-            style = el.find(f"{WNS}pPr/{WNS}pStyle")
-            name = (style.get(WNS + "val") if style is not None else "") or ""
-            m = _HEAD_STYLE.match(name)
-            text = _w_text(el)
-            if name.lower() == "title":
-                o.heading(1, text)
-            elif m:
-                o.heading(min(max(int(m[1]), 1), 6), text)
-            else:
-                o.block(text)
-        elif el.tag == WNS + "tbl":
-            o.block(md_table([[_w_text(c) for c in tr.findall(WNS + "tc")] for tr in el.findall(WNS + "tr")]))
-    return o.read()
+    with zipfile.ZipFile(p) as z:
+        zr = _Zip(z)
+        for el, up in zr.blocks("word/document.xml", lambda el, up: len(up) == 2):  # a child of the root's child
+            if up[1].tag == WNS + "body":
+                _docx_block(el, o)
+                if o.n > MAX_TEXT:
+                    break
+    r = o.read()
+    r.notes += zr.notes
+    return r
 
 
 ONS = {"text": "urn:oasis:names:tc:opendocument:xmlns:text:1.0", "table": "urn:oasis:names:tc:opendocument:xmlns:table:1.0",
@@ -185,11 +279,19 @@ def _q(prefix: str, tag: str) -> str:
     return "{" + ONS[prefix] + "}" + tag
 
 
+def _spaces(c: str | None) -> str:
+    try:
+        n = int(c or 1)
+    except ValueError:
+        n = 1
+    return " " * min(max(n, 0), SPACES)
+
+
 def _o_text(el: ET.Element) -> str:
     out = [el.text or ""]
     for c in el:
         if c.tag == _q("text", "s"):
-            out.append(" " * int(c.get(_q("text", "c"), "1")))
+            out.append(_spaces(c.get(_q("text", "c"))))
         elif c.tag == _q("text", "tab"):
             out.append("\t")
         elif c.tag == _q("text", "line-break"):
@@ -200,30 +302,48 @@ def _o_text(el: ET.Element) -> str:
     return "".join(out)
 
 
-def _odt_walk(el: ET.Element, o: _Out) -> None:
-    for c in el:
-        if c.tag == _q("text", "h"):
-            o.heading(min(int(c.get(_q("text", "outline-level"), "1")), 6), _o_text(c))
-        elif c.tag == _q("text", "p"):
-            o.block(_o_text(c))
-        elif c.tag == _q("text", "list"):
-            items = ["- " + " ".join(_o_text(p) for p in li.iter(_q("text", "p"))) for li in c.findall(_q("text", "list-item"))]
-            o.block("\n".join(items))
-        elif c.tag == _q("table", "table"):
-            rows = [[" ".join(_o_text(p) for p in cell.iter(_q("text", "p"))) for cell in r.findall(_q("table", "table-cell"))]
-                    for r in c.iter(_q("table", "table-row"))]
-            o.block(md_table(rows))
-        else:
-            _odt_walk(c, o)
+_O_BLOCKS = {_q("text", "h"), _q("text", "p"), _q("text", "list"), _q("table", "table")}
+
+
+def _odt_block(c: ET.Element, o: _Out) -> None:
+    if c.tag == _q("text", "h"):
+        o.heading(min(int(c.get(_q("text", "outline-level"), "1")), 6), _o_text(c))
+    elif c.tag == _q("text", "p"):
+        o.block(_o_text(c))
+    elif c.tag == _q("text", "list"):
+        items = ["- " + " ".join(_o_text(p) for p in li.iter(_q("text", "p"))) for li in c.findall(_q("text", "list-item"))]
+        o.block("\n".join(items))
+    elif c.tag == _q("table", "table"):
+        rows = [[" ".join(_o_text(p) for p in cell.iter(_q("text", "p"))) for cell in r.findall(_q("table", "table-cell"))]
+                for r in c.iter(_q("table", "table-row"))]
+        o.block(md_table(rows))
+
+
+def _in_text(up: list[ET.Element]) -> bool:
+    return len(up) > 2 and up[1].tag == _q("office", "body") and up[2].tag == _q("office", "text")
 
 
 def read_odt(p: Path) -> Read:
+    """Headings, paragraphs, lists and tables (not inside another one) in office:body/office:text, else
+    anywhere."""
+    o, other = _Out(), _Out()  # `other`: blocks outside office:body/office:text, for a file without one
+    has_text = False
+
+    def is_block(el: ET.Element, up: list[ET.Element]) -> bool:
+        nonlocal has_text
+        has_text = has_text or (len(up) == 2 and el.tag == _q("office", "text") and up[1].tag == _q("office", "body"))
+        return el.tag in _O_BLOCKS
+
     with zipfile.ZipFile(p) as z:
-        root = ET.fromstring(z.read("content.xml"))
-    o = _Out()
-    body = root.find(f"{_q('office', 'body')}/{_q('office', 'text')}")
-    _odt_walk(body if body is not None else root, o)
-    return o.read()
+        zr = _Zip(z)
+        for el, up in zr.blocks("content.xml", is_block):
+            out = o if _in_text(up) else other
+            _odt_block(el, out)
+            if out.n > MAX_TEXT:
+                break
+    r = (o if has_text else other).read()
+    r.notes += zr.notes
+    return r
 
 
 # ---- HTML and epub ----------------------------------------------------------------
@@ -302,24 +422,29 @@ def read_html_text(text: str) -> Read:
 def read_epub(p: Path) -> Read:
     o = _Out()
     with zipfile.ZipFile(p) as z:
-        cont = ET.fromstring(z.read("META-INF/container.xml"))
+        zr = _Zip(z)
+        cont = ET.fromstring(zr.read("META-INF/container.xml"))
         rf = next((e for e in cont.iter() if e.tag.endswith("rootfile")), None)
         opf_path = rf.get("full-path") if rf is not None else None
         if not opf_path:
             return Read(notes=["no package document in META-INF/container.xml"])
-        opf = ET.fromstring(z.read(opf_path))
+        opf = ET.fromstring(zr.read(opf_path))
         base = PurePosixPath(opf_path).parent
         manifest = {e.get("id"): e.get("href") for e in opf.iter() if e.tag.endswith("}item")}
         for ref in (e for e in opf.iter() if e.tag.endswith("}itemref")):
+            if o.n > MAX_TEXT or zr.left <= 0:
+                break
             href = manifest.get(ref.get("idref"))
             if not href:
                 continue
             try:
-                raw = z.read(str(base / href.split("#")[0]) if str(base) != "." else href.split("#")[0])
+                raw = zr.read(str(base / href.split("#")[0]) if str(base) != "." else href.split("#")[0])
             except KeyError:
                 continue
             html_into(raw.decode("utf-8", errors="replace"), o)
-    return o.read()
+    r = o.read()
+    r.notes += zr.notes
+    return r
 
 
 # ---- notebooks and plain text --------------------------------------------------------

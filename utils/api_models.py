@@ -305,6 +305,7 @@ class SearchHit(_Model):
 class OutputSearch(_Model):
     hits: list[SearchHit]
     total: int
+    capped: bool | None = Field(None, description="true when more than 5,000 matches were found: `total` counts the first 5,000")
 
 
 # ---- memory (Phase 5) ----

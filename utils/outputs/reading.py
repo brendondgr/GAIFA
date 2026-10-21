@@ -5,17 +5,22 @@ run these in a thread.
   that page and stops at the range's end; `next_offset` continues through the document.
 - `search(ex, q, limit)`: words (all in one line, else in one paragraph), a `"quoted phrase"`
   (exact, any case, any whitespace between its words), or a `/regex/` (`/regex/i` ignores case)
-  run in a separate Python with a 1 s timeout, so a runaway pattern can't stall the hub.
-- `page_png(src, n, width, out)`: page `n` of a PDF rendered by `pypdfium2`, cached at `out`.
+  run in a separate Python with a 1 s timeout, so a runaway pattern can't stall the hub. At most
+  `MAX_MATCHES` matches are looked at; past that the answer has `capped: true`.
+- `page_png(src, n, width, out)`: page `n` of a PDF rendered by `pypdfium2`, cached at `out`; at
+  most `MAX_PAGE_PX` pixels and `MAX_PAGE_SIDE` a side, so a very tall page comes out narrower.
 """
 
 from __future__ import annotations
 
+import itertools
 import json
+import math
 import os
 import re
 import subprocess
 import sys
+from bisect import bisect_right
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +34,9 @@ SEARCH_LIMIT = 20
 REGEX_TIMEOUT_S = 1.0
 MAX_MATCHES = 5000
 PAGE_WIDTH = 1200
+MAX_PAGE_WIDTH = 2400
+MAX_PAGE_PX = 25_000_000
+MAX_PAGE_SIDE = 10_000
 
 _REGEX_CHILD = r"""
 import json, re, sys
@@ -88,7 +96,7 @@ def window(ex: Extract, offset: int = 0, limit: int = LIMIT, pages: str | None =
 def _regex_starts(text: str, pattern: str, ignore_case: bool) -> list[int]:
     try:
         r = subprocess.run([sys.executable, "-I", "-S", "-c", _REGEX_CHILD], timeout=REGEX_TIMEOUT_S, capture_output=True,
-                           input=json.dumps({"pattern": pattern, "i": ignore_case, "text": text, "max": MAX_MATCHES}).encode(),
+                           input=json.dumps({"pattern": pattern, "i": ignore_case, "text": text, "max": MAX_MATCHES + 1}).encode(),
                            check=False, env={"PATH": os.environ.get("PATH", "")})
     except subprocess.TimeoutExpired:
         raise OutputError(422, "search_timeout", f"/{pattern}/ took longer than {REGEX_TIMEOUT_S:g} s; try words or a simpler pattern") from None
@@ -102,6 +110,7 @@ def _regex_starts(text: str, pattern: str, ignore_case: bool) -> list[int]:
 
 
 def _starts(ex: Extract, q: str) -> list[int]:
+    """Where the matches start, in order; at most `MAX_MATCHES` + 1 (one more says there are more)."""
     text = ex.text
     if m := re.fullmatch(r"/(.+)/(i?)", q, re.S):
         return _regex_starts(text, m[1], bool(m[2]))
@@ -110,7 +119,7 @@ def _starts(ex: Extract, q: str) -> list[int]:
         if not words:
             return []
         rx = re.compile(r"\s+".join(map(re.escape, words)), re.I)
-        return [m.start() for m in rx.finditer(text)]
+        return [m.start() for m in itertools.islice(rx.finditer(text), MAX_MATCHES + 1)]
     words = q.lower().split()
     if not words:
         return []
@@ -135,7 +144,7 @@ def _starts(ex: Extract, q: str) -> list[int]:
             hit_lines.append(next(k for k in range(i, j) if any(w in low[k] for w in words)))
         i = j
     out = []
-    for i in sorted(hit_lines):
+    for i in sorted(hit_lines)[:MAX_MATCHES + 1]:
         first = min((low[i].find(w) for w in words if w in low[i]), default=0)
         out.append(line_at[i] + first)
     return out
@@ -146,22 +155,35 @@ def search(ex: Extract, q: str, limit: int = SEARCH_LIMIT) -> dict[str, Any]:
     if not q:
         raise OutputError(422, "invalid_request", "q: give words, a \"quoted phrase\" or a /regex/")
     starts = _starts(ex, q)
+    capped = len(starts) > MAX_MATCHES
     lines = ex.text.split("\n")
+    line_at = list(itertools.accumulate((len(x) + 1 for x in lines[:-1]), initial=0))  # where each line starts
     seen: set[int] = set()
     hits = []
-    for off in starts:
-        line = ex.line_of(off)
+    for off in starts[:MAX_MATCHES]:
+        line = bisect_right(line_at, off)  # 1-based, as `ex.line_of`
         if line in seen:
             continue
         seen.add(line)
-        hit: dict[str, Any] = {"line": line, "offset": off, "text": "\n".join(lines[max(0, line - 2):line + 1])}
-        if ex.pages:
-            hit["page"] = ex.page_of(off)
-        hits.append(hit)
-    return {"hits": hits[:max(1, limit)], "total": len(hits)}
+        if len(hits) < max(1, limit):
+            hit: dict[str, Any] = {"line": line, "offset": off, "text": "\n".join(lines[max(0, line - 2):line + 1])}
+            if ex.pages:
+                hit["page"] = ex.page_of(off)
+            hits.append(hit)
+    out: dict[str, Any] = {"hits": hits, "total": len(seen)}
+    if capped:
+        out["capped"] = True  # `total` counts the first MAX_MATCHES matches only
+    return out
 
 
 # ---- page images --------------------------------------------------------------------
+
+def page_scale(pw: float, ph: float, width: int) -> float:
+    """Pixels per point for a `pw` × `ph` page at `width` pixels, kept within `MAX_PAGE_PX` and `MAX_PAGE_SIDE`."""
+    pw, ph = max(pw, 1.0), max(ph, 1.0)
+    width = min(max(width, 1), MAX_PAGE_WIDTH)
+    return min(width / pw, MAX_PAGE_SIDE / max(pw, ph), math.sqrt(MAX_PAGE_PX / (pw * ph)))
+
 
 def page_png(src: Path, n: int, width: int, out: Path) -> Path:
     """Render page `n` (1-based) of the PDF `src` at `width` pixels into `out` (kept while newer than `src`)."""
@@ -178,7 +200,7 @@ def page_png(src: Path, n: int, width: int, out: Path) -> Path:
             if not 1 <= n <= len(doc):
                 raise no_page(f"No page {n}: the document has {len(doc)} pages")
             page = doc[n - 1]
-            im = page.render(scale=width / page.get_width()).to_pil()
+            im = page.render(scale=page_scale(*page.get_size(), width)).to_pil()
             page.close()
         finally:
             doc.close()

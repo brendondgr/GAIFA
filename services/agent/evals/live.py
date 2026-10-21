@@ -1,7 +1,8 @@
-"""`python -m evals.live [--model skynet] [--only a,b] [--out file.json]`: the live smoke test (plan
+"""`python -m evals.live [--model skynet] [--only a,b] [--out file.json] [--keep]`: the live smoke test (plan
 14.12). Real conversations that make real outputs, one at a time (the GPU runs one job at a time):
 an image, image → 3D, image → video (once), describe → speak, a quick-action button, a result-card
-button, a compacted thread, a fork, and the same on the local Gemma 4 26B.
+button, a compacted thread, a fork, and the same on the local Gemma 4 26B. Their chats and outputs
+are deleted afterwards unless `--keep`.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from typing import Any
 
 import httpx
 
+from . import cleanup
 from .harness import Harness, Run, Task, dump, first_option, grade
 from .tasks import aspect_is, engine_is, final_mentions, got_picture, kinds, no_picture, not_called, preset_in, ran, seed_picture, typed, uses_output_of
 
@@ -107,6 +109,8 @@ async def buttons(h: Harness, model: str) -> Run:
     await h._drive(Task("x", "live", [], []), tid, "What did my two buttons make? Answer in one sentence.", time.monotonic() + 600)
     run.events = await h._events(tid)
     run.seconds = round(time.monotonic() - t0, 1)
+    if not h.keep:
+        await cleanup.forget(h.c, h.hub, [tid], run.events)
     return run
 
 
@@ -118,7 +122,7 @@ BUTTON_CHECKS = Task("L5_L6_buttons", "live", [], [
 
 
 async def main(a: argparse.Namespace) -> int:
-    h = Harness(a.base, a.model, dry_run=False)
+    h = Harness(a.base, a.model, dry_run=False, keep=a.keep)
     rows = []
     tasks = [t for t in LIVE if not a.only or t.id in a.only.split(",")]
     try:
@@ -149,4 +153,5 @@ if __name__ == "__main__":
     p.add_argument("--model", default="skynet")
     p.add_argument("--only")
     p.add_argument("--out")
+    p.add_argument("--keep", action="store_true", help="keep the runs' chats and outputs")
     raise SystemExit(asyncio.run(main(p.parse_args())))

@@ -375,7 +375,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `addModel(input)` | `POST /api/models` body `ModelInput` | `201 Model` |
 | `listOutputs(filter)` | `GET /api/outputs?service=&kind=&q=&from=&to=&cursor=&limit=` | `OutputPage` (`service` and `kind` are comma-separated lists; `q` matches every word; `limit` 1–500, default 60) |
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
-| `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
+| `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days; `?permanent=true` deletes it for good (the eval's outputs) |
 | `uploadOutput(file)` | `POST /api/outputs/upload?name=` (the file as the body) | `Output` (`201`): an image, video, audio, text or document file (plan 24.1); `upload_type` 415, `upload_encoding` 415 (a text file that isn't UTF-8, or UTF-16 with a BOM), `upload_too_large` 413 (64 MB), `upload_empty` 400 |
 | `outputText(id, {offset, limit, page, pages})` | `GET /api/outputs/{id}/text?offset=&limit=&page=&pages=` | `OutputText` (plan 24.3; text and documents): `limit` 12000 chars by default, at most 48000; `page`/`pages` (`3` or `3-5`) start at that page and stop at the range's end; `next_offset` continues through the document. `not_text` 409 for other kinds, `no_page` 404 |
 | `outputSearch(id, q, {limit})` | `GET /api/outputs/{id}/search?q=&limit=` | `OutputSearch`: words (any case, all within one line, else one paragraph), a `"quoted phrase"`, or `/regex/` (`/regex/i` ignores case; `search_timeout` 422 past 1 s); `limit` 20, at most 200 |

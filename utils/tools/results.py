@@ -169,8 +169,10 @@ def made_kind(tool: str) -> str | None:
 
 
 def stand_in(hub: Hub, kind: str, tool: str, args: dict[str, Any], source: dict[str, Any] | None) -> str:
-    """A dry run's output in `outputs/eval/<date>/`: an image drawn from the prompt, or a copy of
-    `source` (an outputs row). Returns its path relative to outputs/."""
+    """A dry run's output in `outputs/eval/<date>/`: an image drawn from the prompt, a hard link
+    to `source` (an outputs row; a copy across filesystems), or with no source a small stub (a
+    second of silence, a one-triangle GLB, a one-second video). Returns its path relative to
+    outputs/. The eval harness deletes it when the run ends."""
     import hashlib
     import shutil
 
@@ -182,42 +184,27 @@ def stand_in(hub: Hub, kind: str, tool: str, args: dict[str, Any], source: dict[
     stem = f"{time.strftime('%H%M%S', now)}-dry-{slug}-{hashlib.sha1(json.dumps(args, sort_keys=True, default=str).encode()).hexdigest()[:4]}"
     side = {"title": words[:80], "kind": kind, "prompt": words, "dry_run": True, "params": {k: v for k, v in args.items() if k != "prompt"},
             "source": {"service": "eval", "tool": tool}}
-    if kind == "image" or source is None:
-        from PIL import Image, ImageDraw
 
-        w, h = 1024, 576
-        a = str(args.get("aspect") or "")
-        if a.startswith(("9:16", "2:3", "3:4")):
-            w, h = 576, 1024
-        elif a.startswith("1:1"):
-            w, h = 768, 768
-        hue = int(hashlib.sha1(words.encode()).hexdigest()[:2], 16)
-        im = Image.new("RGB", (w, h), (40 + hue // 3, 60 + (hue * 7) % 120, 90 + (hue * 3) % 140))
-        d = ImageDraw.Draw(im)
-        lines, line = [], ""
-        for word in words.split():
-            if len(line) + len(word) > 34:
-                lines.append(line)
-                line = ""
-            line += word + " "
-        lines.append(line)
-        y = h // 2 - 14 * len(lines[:12])
-        for ln in lines[:12]:
-            d.text((40, y), ln.strip(), fill=(255, 255, 255))
-            y += 28
-        d.text((40, 30), "DRY RUN (eval stand-in)", fill=(255, 230, 120))
-        path = day / f"{stem}.png"
-        im.save(path.with_name(path.name + ".part"), "PNG")
+    def finish(path: Path) -> str:
         path.with_name(path.name + ".json").write_text(json.dumps(side, indent=1))
         path.with_name(path.name + ".part").rename(path)
         return str(path.relative_to(hub.paths.outputs))
+
+    if source is None and kind in STUBS:
+        path = day / f"{stem}.{STUBS[kind]}"
+        if _stub(kind, path.with_name(path.name + ".part"), _drawn(words, args)):
+            return finish(path)
+    if kind == "image" or source is None:
+        path = day / f"{stem}.png"
+        _drawn(words, args).save(path.with_name(path.name + ".part"), "PNG")
+        return finish(path)
     src = hub.paths.outputs / source["path"]
     if source["is_dir"]:
         dst = day / stem
-        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(".*"))
+        shutil.copytree(src, dst, ignore=shutil.ignore_patterns(".*", "output.json"), copy_function=_link)
         meta = {}
         try:
-            meta = json.loads((dst / "output.json").read_text())
+            meta = json.loads((src / "output.json").read_text())
         except (OSError, ValueError):
             pass
         meta.update(side)
@@ -225,7 +212,90 @@ def stand_in(hub: Hub, kind: str, tool: str, args: dict[str, Any], source: dict[
         (dst / "output.json").write_text(json.dumps(meta, indent=1))
         return str(dst.relative_to(hub.paths.outputs))
     dst = day / f"{stem}{src.suffix}"
-    shutil.copyfile(src, dst.with_name(dst.name + ".part"))
-    dst.with_name(dst.name + ".json").write_text(json.dumps(side, indent=1))
-    dst.with_name(dst.name + ".part").rename(dst)
-    return str(dst.relative_to(hub.paths.outputs))
+    _link(src, dst.with_name(dst.name + ".part"))
+    return finish(dst)
+
+
+STUBS = {"audio": "wav", "model3d": "glb", "video": "mp4"}
+
+
+def _link(src: Any, dst: Any) -> None:
+    """A hard link (a stand-in costs no space), or a copy when the link can't be made."""
+    import os
+    import shutil
+
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+
+
+def _drawn(words: str, args: dict[str, Any]) -> Any:
+    """The stand-in picture: the prompt written on a colour from its hash."""
+    import hashlib
+
+    from PIL import Image, ImageDraw
+
+    w, h = 1024, 576
+    a = str(args.get("aspect") or "")
+    if a.startswith(("9:16", "2:3", "3:4")):
+        w, h = 576, 1024
+    elif a.startswith("1:1"):
+        w, h = 768, 768
+    hue = int(hashlib.sha1(words.encode()).hexdigest()[:2], 16)
+    im = Image.new("RGB", (w, h), (40 + hue // 3, 60 + (hue * 7) % 120, 90 + (hue * 3) % 140))
+    d = ImageDraw.Draw(im)
+    lines, line = [], ""
+    for word in words.split():
+        if len(line) + len(word) > 34:
+            lines.append(line)
+            line = ""
+        line += word + " "
+    lines.append(line)
+    y = h // 2 - 14 * len(lines[:12])
+    for ln in lines[:12]:
+        d.text((40, y), ln.strip(), fill=(255, 255, 255))
+        y += 28
+    d.text((40, 30), "DRY RUN (eval stand-in)", fill=(255, 230, 120))
+    return im
+
+
+def _stub(kind: str, out: Path, picture: Any) -> bool:
+    """Write a tiny file of `kind` to `out`. False when it can't (no ffmpeg for a video)."""
+    import struct
+    import wave
+
+    if kind == "audio":
+        with wave.open(str(out), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(16000)
+            w.writeframes(b"\0\0" * 16000)
+        return True
+    if kind == "model3d":
+        pos = struct.pack("<9f", 0, 0, 0, 1, 0, 0, 0, 1, 0)
+        gltf = {"asset": {"version": "2.0", "generator": "AIHub dry run"}, "scene": 0, "scenes": [{"nodes": [0]}],
+                "nodes": [{"mesh": 0}], "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+                "buffers": [{"byteLength": len(pos)}], "bufferViews": [{"buffer": 0, "byteLength": len(pos), "target": 34962}],
+                "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]}]}
+        js = json.dumps(gltf).encode()
+        js += b" " * (-len(js) % 4)
+        body = struct.pack("<II", len(js), 0x4E4F534A) + js + struct.pack("<II", len(pos), 0x004E4942) + pos
+        out.write_bytes(struct.pack("<4sII", b"glTF", 2, 12 + len(body)) + body)
+        return True
+    import shutil
+    import subprocess
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return False
+    png = out.with_name(f".{out.name}.png")        # a dotfile: the index never sees it
+    picture.resize((picture.width // 4 * 2, picture.height // 4 * 2)).save(png)
+    try:
+        r = subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-loop", "1", "-i", str(png), "-t", "1", "-r", "8",
+                            "-pix_fmt", "yuv420p", "-c:v", "libx264", "-f", "mp4", str(out)], capture_output=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    finally:
+        png.unlink(missing_ok=True)
+    return r.returncode == 0 and out.exists()

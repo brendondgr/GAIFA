@@ -26,6 +26,7 @@ from typing import Any
 BASE_DIR = Path(__file__).resolve().parents[1] / "harness"
 ALWAYS_ON = ("systemprompt.md", "guardrails.md")
 ALWAYS_ON_MAX = 24_000             # characters: every one competes with the model's own budget (Harness²)
+SKILL_DESC_MAX = 200               # characters: a skill's description is listed in every chat's prompt
 FILE = re.compile(r"^(systemprompt\.md|guardrails\.md|hooks\.toml|tools/[a-z0-9_]+\.md|skills/[a-z0-9][a-z0-9_-]{0,63}/SKILL\.md)$")
 
 
@@ -193,6 +194,9 @@ def validate(tree: dict[str, str], tools: set[str] | dict[str, Any] | None = Non
             name = rel.split("/")[1]
             if meta.get("name") != name or not meta.get("description"):
                 out.append(f"{rel}: frontmatter needs name: {name} and a description")
+            elif len(meta["description"]) > SKILL_DESC_MAX:
+                out.append(f"{rel}: the description is {len(meta['description'])} characters (at most {SKILL_DESC_MAX}): "
+                           "say when to read the skill; the procedure goes in its body")
         if rel.startswith("tools/") and tools is not None and rel[6:-3] not in tools:
             out.append(f"{rel}: there is no tool {rel[6:-3]!r}")
     if (tree.get("hooks.toml") or "").strip():
@@ -200,6 +204,19 @@ def validate(tree: dict[str, str], tools: set[str] | dict[str, Any] | None = Non
             out += hooks.problems(tomllib.loads(tree["hooks.toml"]), tools)
         except tomllib.TOMLDecodeError as e:
             out.append(f"hooks.toml: {e}")
+    return out
+
+
+def needs_approval(old: dict[str, str], new: dict[str, str]) -> list[str]:
+    """What a change from tree `old` to `new` alters that every chat reads or that acts in the tool loop:
+    the always-on files, a skill's frontmatter (its description is listed in every prompt) and hooks.toml.
+    The learner never puts such a change live itself: it becomes a proposal the user approves."""
+    out = [f for f in ALWAYS_ON if (old.get(f) or "") != (new.get(f) or "")]
+    if (old.get("hooks.toml") or "").strip() != (new.get("hooks.toml") or "").strip():
+        out.append("hooks.toml")
+    for rel in sorted(k for k in new if k.startswith("skills/")):
+        if rel not in old or _frontmatter(new[rel]) != _frontmatter(old[rel]):
+            out.append(f"{rel} (description)")
     return out
 
 

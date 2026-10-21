@@ -5,7 +5,7 @@ learner can add. No code runs: four verbs, checked when a version is made.
     verb = "hint_after_error"      # append `text` to the result the model sees when the call fails
     tool = "gen3d_make_3d"         # a tool name, or a glob (comfy_*)
     code = "invalid_arguments"     # optional: only for this error code
-    text = "Pass the picture as image; Cube3D takes only text."
+    text = "Pass the picture as image; Cube3D takes only text."   # at most 300 characters
 
     [[hook]]
     verb = "cap"                   # refuse calls past per_turn in one turn
@@ -22,7 +22,7 @@ learner can add. No code runs: four verbs, checked when a version is made.
     [[hook]]
     verb = "trim"                  # cap what a noisy result shows the model
     tool = "hub_list_models"
-    max_tokens = 1500
+    max_tokens = 1500              # an <untrusted> block it cuts is closed again
 """
 
 from __future__ import annotations
@@ -32,6 +32,8 @@ from typing import Any
 
 VERBS = {"hint_after_error": {"text"}, "cap": {"per_turn"}, "require_first": {"first"}, "trim": {"max_tokens"}}
 OPTIONAL = {"hint_after_error": {"code"}, "cap": {"fix"}, "require_first": {"when", "fix"}, "trim": set()}
+HINT_MAX = 300                     # characters: a hint lands after the result, outside its <untrusted> block
+_OPEN, _CLOSE = "<untrusted source=", "</untrusted>"
 
 
 def problems(data: dict[str, Any], tools: set[str] | None = None) -> list[str]:
@@ -52,6 +54,8 @@ def problems(data: dict[str, Any], tools: set[str] | None = None) -> list[str]:
             out.append(f"hook {i + 1} ({verb}): needs {', '.join(sorted(missing))}")
         if extra:
             out.append(f"hook {i + 1} ({verb}): unknown keys {', '.join(sorted(extra))}")
+        if verb == "hint_after_error" and "text" in h and (not isinstance(h["text"], str) or len(h["text"]) > HINT_MAX):
+            out.append(f"hook {i + 1} ({verb}): text must be at most {HINT_MAX} characters")
         for k in ("per_turn", "max_tokens"):
             if k in h and (not isinstance(h[k], int) or h[k] < 1):
                 out.append(f"hook {i + 1} ({verb}): {k} must be a positive integer")
@@ -83,6 +87,17 @@ class Hooks:
 
     def after(self, tool: str, status: str, code: str | None) -> tuple[str | None, int | None]:
         """(text to append to the result, a token cap for it)."""
-        hints = [h["text"] for h in self._for("hint_after_error", tool) if status == "error" and (not h.get("code") or h["code"] == code)]
+        hints = [str(h["text"])[:HINT_MAX] for h in self._for("hint_after_error", tool) if status == "error" and (not h.get("code") or h["code"] == code)]
         caps = [h["max_tokens"] for h in self._for("trim", tool)]
         return ("\n".join(hints) or None), (min(caps) if caps else None)
+
+    @staticmethod
+    def trim(content: str, max_tokens: int) -> str:
+        """A result cut to about `max_tokens` (4 characters a token). An `<untrusted>` block the cut leaves
+        open is closed again, so nothing after it (the trim note, a hint) reads as the page's own text."""
+        if len(content) <= max_tokens * 4:
+            return content
+        cut = content[: max_tokens * 4]
+        if cut.rfind(_OPEN) > cut.rfind(_CLOSE):
+            cut += "\n" + _CLOSE
+        return cut + " … (trimmed by a harness hook; read_result has the rest)"

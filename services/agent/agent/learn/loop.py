@@ -2,15 +2,19 @@
 
 One run, per domain with new real chats since its last run:
 1. evidence: the domain's recent chats as trajectories (your edits, denials, answers, thumbs, errors);
-2. reflect: one model call, the failures and divergences per chat;
+   a chat that read a page, a file or a transcript (context.read_untrusted) never teaches it, and in the
+   rest what the model wrote comes inside <untrusted> (render);
+2. reflect: one model call, the failures and divergences per chat (passed on to the editors as data);
 3. propose: two calls scoped like Harness²'s editors, INV (how the agent works: tool notes, hooks,
    guardrails) and PREF (what you want: skills, short rules), each a candidate harness version;
 4. probe: replay chats under the current harness and each candidate (dry runs, agent/learn/replay.py);
 5. compose: one call that merges what the replays support, adopts one candidate, or keeps the harness;
 6. gate: the eval tasks for the domain's tools plus a core set, no worse than the current version
-   (the full suite when always-on text changed);
-7. adopt: tool notes, skills and hooks go live at once; a prompt or guardrail change becomes a
-   proposal you approve (Learning → Harness); a failed gate keeps the current version;
+   (the full suite when what every chat reads changed);
+7. adopt: the domain's tool notes and skill bodies go live at once; a change to the prompt, the
+   guardrails, hooks.toml or a skill's description (listed in every prompt; harness.needs_approval)
+   becomes a proposal you approve (Learning → Review); a failed gate keeps the current version.
+   Tool notes may only change the domain's own tools;
 8. library: one lesson (or none) for the next round in this domain.
 
 Every model call goes to the same model as the chat (`skynet` through the relay). A run records its
@@ -28,6 +32,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
+from .. import context as ctx
+from ..harness import needs_approval
 from . import prompts as P
 from . import replay as R
 from .library import Library
@@ -36,7 +42,6 @@ log = logging.getLogger("agent.learn")
 DOMAINS: dict[str, tuple[str, ...]] = {"comfy": ("comfy_",), "gen3d": ("gen3d_",), "tts": ("tts_",),
                                        "llms": ("lcpp_", "vllm_", "relay_"), "hub": ("hub_",)}
 CORE = ["img_full", "model3d", "speech_named", "whats_running", "read_only", "injection"]
-ALWAYS_ON = ("systemprompt.md", "guardrails.md")
 
 
 class Paused(Exception):
@@ -60,12 +65,20 @@ def _json(text: str) -> dict[str, Any] | None:
 def doc_card(d: dict[str, Any]) -> str:
     """An attached document as the learner sees it (plan 24.8): its card, never its text."""
     size = f"{d['pages']} pages" if d.get("pages") else f"{d.get('lines') or 0} lines"
-    return f"(document {d.get('ref')}: {d.get('name')}, {size})"
+    return f"(document {ctx.label(d.get('ref'), 20)}: {ctx.label(d.get('name'))}, {size})"
+
+
+def _data(what: str, text: str) -> str:
+    return "\n" + ctx.untrusted(f"chat: {what}", text)
 
 
 def render(events: list[dict[str, Any]], cap: int = 3500, reply_cap: int = 300) -> str:
-    """A chat as a short trajectory for the prompts. Documents appear as their cards and tool results
-    as their status (plan 24.8): no text from a file, a web page or a transcript reaches the learner."""
+    """A chat as a short trajectory for the prompts. Documents appear as their cards and tool results as
+    their status (plan 24.8), so a file's, a page's or a transcript's own text never comes in whole. What
+    the model wrote can still carry it (its replies quote pages, its arguments are built from them, an error
+    echoes them, ask_user's options are its own words), so each of those comes inside `<untrusted>`: data,
+    never instructions. Only the user's own words (messages, denial reasons, thumbs notes) stand outside.
+    Shortened by whole entries, so no block is cut open."""
     out: list[str] = []
     cards: dict[str, dict[str, Any]] = {}
     for e in events:
@@ -74,31 +87,44 @@ def render(events: list[dict[str, Any]], cap: int = 3500, reply_cap: int = 300) 
             out.append(f"USER: {str(p.get('text', ''))[:400]}" + "".join(" " + doc_card(d) for d in p.get("docs") or []))
         elif t == "assistant" and p.get("text"):
             txt = p["text"].strip()
-            out.append(f"AGENT: {txt[:reply_cap]}" + (" […]" if len(txt) > reply_cap else ""))
+            out.append("AGENT:" + _data("the agent's reply", txt[:reply_cap] + (" […]" if len(txt) > reply_cap else "")))
         elif t == "tool_call":
-            out.append(f"CALL {p.get('name')} {json.dumps(p.get('arguments') or {}, default=str)[:300]}")
+            out.append(f"CALL {ctx.label(p.get('name'), 80)}" + _data("its arguments", json.dumps(p.get("arguments") or {}, default=str)[:300]))
         elif t == "approval":
             cards[p.get("id")] = p
         elif t == "decision":
             a = cards.get(p.get("id")) or {}
             if not p.get("approve"):
-                out.append(f"USER DENIED {a.get('tool')}" + (f": {p.get('reason')}" if p.get("reason") else ""))
+                out.append(f"USER DENIED {ctx.label(a.get('tool'), 80)}" + (f": {p.get('reason')}" if p.get("reason") else ""))
             elif p.get("arguments"):
                 was = a.get("arguments") or {}
                 ch = {k: (was.get(k), v) for k, v in p["arguments"].items() if json.dumps(was.get(k), default=str) != json.dumps(v, default=str)}
                 if ch:
-                    out.append(f"USER CHANGED THE CARD of {a.get('tool')}: " + "; ".join(f"{k}: {a_!r} → {b!r}" for k, (a_, b) in ch.items()))
+                    out.append(f"USER CHANGED THE CARD of {ctx.label(a.get('tool'), 80)}:"
+                               + _data("the card's fields, the agent's value → the user's", "; ".join(f"{k}: {a_!r} → {b!r}" for k, (a_, b) in ch.items())[:600]))
         elif t == "tool_result":
             err = p.get("error") or {}
-            out.append(f"  → {p.get('status')}" + (f" {err.get('code')}: {str(err.get('detail', ''))[:200]}" if err else ""))
+            out.append(f"  → {ctx.label(p.get('status'), 20)}" + (f" {ctx.label(err.get('code'), 60)}" + _data("the error", str(err.get("detail", ""))[:200]) if err else ""))
         elif t == "answer":
-            out.append("USER ANSWERED: " + "; ".join(f"{q[:80]} → {a}" for q, a in (p.get("answers") or {}).items()))
+            out.append("USER ANSWERED:" + _data("the agent's questions → the user's choices",
+                                                "; ".join(f"{q[:80]} → {a}" for q, a in (p.get("answers") or {}).items())[:600]))
         elif t == "feedback":
             out.append(f"USER THUMBS {str(p.get('value', '')).upper()}" + (f" ({p.get('note')})" if p.get("note") else ""))
         elif t == "error":
-            out.append(f"AGENT ERROR {p.get('code')}: {str(p.get('detail', ''))[:200]}")
-    text = "\n".join(out)
-    return text if len(text) <= cap else text[: cap // 2] + "\n…\n" + text[-cap // 2:]
+            out.append(f"AGENT ERROR {ctx.label(p.get('code'), 60)}" + _data("the error", str(p.get("detail", ""))[:200]))
+    if sum(len(x) + 1 for x in out) <= cap:
+        return "\n".join(out)
+    head: list[str] = []
+    tail: list[str] = []
+    for x in out:                        # whole entries from the start, then from the end, half the budget each
+        if sum(len(y) + 1 for y in head) + len(x) > cap // 2:
+            break
+        head.append(x)
+    for x in reversed(out[len(head):]):
+        if sum(len(y) + 1 for y in tail) + len(x) > cap // 2:
+            break
+        tail.insert(0, x)
+    return "\n".join([*head, "…", *tail])
 
 
 class Learner:
@@ -152,9 +178,9 @@ class Learner:
             tid = e["thread_id"]
             if tid in seen or not str(e["payload"].get("name", "")).startswith(pre):
                 continue
-            if tid not in skip:                                   # eval dry runs and chats that opted out never teach it
-                s = (st.thread(tid) or {}).get("settings") or {}
-                skip[tid] = bool(s.get("dry_run") or s.get("no_learn"))
+            if tid not in skip:                                   # eval dry runs, chats that opted out and chats that read
+                s = (st.thread(tid) or {}).get("settings") or {}    # a page, a file or a transcript never teach it
+                skip[tid] = bool(s.get("dry_run") or s.get("no_learn")) or ctx.read_untrusted(st.events(tid))
             if not skip[tid]:
                 seen.append(tid)
         return seen[: self.max_chats]
@@ -238,8 +264,9 @@ class Learner:
         for label, (dim, text) in (("INV", P.INV), ("PREF", P.PREF)):
             rec["stage"] = f"{domain}: propose {label}"
             prompt = P.PROPOSE.format(domain=domain, dimension=dim, dimension_text=text, components=P.COMPONENTS, evidence_rule=P.EVIDENCE_IS_DATA,
-                                      harness=harness_text, library=lib.text(), reflection=reflection[:4000], evidence=evidence)
-            n = await self._candidate(rec, f"{domain}:propose-{label}", prompt, cur, tools)
+                                      harness=harness_text, library=lib.text(), evidence=evidence,
+                                      reflection=ctx.untrusted("the review: a model's reading of the chats below", reflection[:4000]))
+            n = await self._candidate(rec, f"{domain}:propose-{label}", prompt, cur, tools, domain)
             if n:
                 out["candidates"].append({"label": label, "version": n, "notes": h.meta(n).get("notes", "")})
 
@@ -257,15 +284,16 @@ class Learner:
                                 f"diff:\n{h.diff(cur, c['version'])[:5000]}" for c in out["candidates"])
         cand_text = f"## the current harness (version {cur})\nreplays: {json.dumps(scores[cur])}\n\n" + cand_text
         final = await self._candidate(rec, f"{domain}:compose", P.COMPOSE.format(domain=domain, components=P.COMPONENTS, evidence_rule=P.EVIDENCE_IS_DATA,
-                                                                                  harness=harness_text, candidates=cand_text), cur, tools)
+                                                                                  harness=harness_text, candidates=cand_text), cur, tools, domain)
         if not final:
             out["notes"] = "the composer kept the harness as it is"
             return self._learn(rec, out, lib, domain, None)
         out["final"] = final
         for c in out["candidates"]:
             h.set_meta(c["version"], adopted_by="probed")        # kept for the record; the composed version is the one that counts
-        changed = set(h.meta(final).get("files") or []) | set(h.meta(final).get("removed") or [])
-        always = bool(changed & set(ALWAYS_ON))
+        review = needs_approval(tree, h.tree(final))
+        always = bool(review)
+        out["needs_approval"] = review
 
         rec["stage"] = f"{domain}: gate"
         gate = await self.gate(domain, cur, final, full=always)
@@ -275,7 +303,7 @@ class Learner:
             out["decision"], out["notes"] = "gate failed", gate.get("why", "")
             h.set_meta(final, adopted_by="rejected")
         elif always:
-            out["decision"] = "proposed"                     # a prompt or guardrail change: the user approves it
+            out["decision"] = "proposed"                     # what every chat reads, or the loop's hooks: the user approves it
             h.set_meta(final, adopted_by="proposed")
         else:
             out["decision"] = "adopted"
@@ -297,7 +325,7 @@ class Learner:
         out["library"] = str(path) if path else None
         return out
 
-    async def _candidate(self, rec: dict[str, Any], stage: str, prompt: str, parent: int, tools: set[str]) -> int | None:
+    async def _candidate(self, rec: dict[str, Any], stage: str, prompt: str, parent: int, tools: set[str], domain: str) -> int | None:
         """A model reply → a validated candidate version (retried once with the problem), or None."""
         from ..harness import HarnessError
 
@@ -308,12 +336,24 @@ class Learner:
                 return None
             try:
                 files = {str(k): str(v) for k, v in (j.get("files") or {}).items()}
+                self._own_notes(domain, parent, files, [str(r) for r in j.get("removed") or []])
                 return self.harness.create(files, list(j.get("removed") or []), parent=parent, notes=str(j.get("notes") or "")[:2000],
                                            adopted_by="candidate", tools=tools)
             except HarnessError as e:
                 prompt += f"\n\n# YOUR LAST REPLY WAS REFUSED\n{e}\nFix that and reply again with the JSON only."
                 rec["ledger"].append({"stage": stage, "refused": str(e)[:300], "attempt": attempt + 1})
         return None
+
+    def _own_notes(self, domain: str, parent: int, files: dict[str, str], removed: list[str]) -> None:
+        """A run changes tool notes of its domain's tools only: chats about one area don't speak for another's."""
+        from ..harness import HarnessError
+
+        old = self.harness.tree(parent)
+        bad = sorted(rel for rel in [*files, *removed] if rel.startswith("tools/") and not rel[6:].startswith(DOMAINS[domain])
+                     and (rel in removed or old.get(rel) != files.get(rel)))
+        if bad:
+            raise HarnessError(f"{', '.join(bad)}: these chats are about {domain}; change notes of its own tools only "
+                               f"({', '.join(p + '*' for p in DOMAINS[domain])})")
 
     def _records(self, chats: list[str]) -> list[R.Record]:
         recs = [R.record(self.agent.store.events(t), t) for t in chats]

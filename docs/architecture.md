@@ -752,10 +752,10 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   2. propose two scoped candidates, INV (how the agent works) and PREF (what you want);
   3. probe them by replaying chats as dry runs pinned to each candidate, scored from the record: the share of your card edits the candidate now pre-chooses, no repeated denials, no new errors;
   4. compose;
-  5. gate on the eval (the area's tasks plus a core set; the full suite for always-on changes);
+  5. gate on the eval (the area's tasks plus a core set; the full suite when a change reaches every chat);
   6. adopt;
   7. keep one lesson per round in that area's library, which only the improver reads.
-- **Who adopts what:** tool notes, skills and hooks are adopted automatically once the gate passes; prompt and guardrail changes wait for the user.
+- **Who adopts what:** the area's own tool notes and skill bodies are adopted automatically once the gate passes. Changes to the prompt, the guardrails, `hooks.toml` or a skill's description (listed in every prompt, at most 200 characters) wait for the user. A run may change tool notes only for its own area's tools. Chats that read a page, a file or a transcript never teach the learner; in the others the agent's own words, arguments and errors reach it inside `<untrusted>`, as does the review it passes to the editors. Hook hints are at most 300 characters, and `trim` closes an `<untrusted>` block it cuts (overnight 2026-10-21: a page's text could make the learner auto-adopt a skill whose description went into every later chat's prompt).
 - **When it runs:** nightly, after `[learning] idle_min` without a chat, or on Learn now. It pauses while you chat.
 - **Dry runs change nothing:** generating tools make stand-ins, and write and destructive tools return a stand-in success.
 

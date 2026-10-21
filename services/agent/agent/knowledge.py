@@ -79,8 +79,15 @@ class Knowledge:
                   for s in mods), *self.user_skills()]
 
     async def skill_list(self, off: set[str] | frozenset[str] = frozenset()) -> str:
-        """The skills, without those of mods turned off in this chat (their tools can't be used)."""
-        return "\n".join(f"- {s['id']}: {s['description']}" for s in await self.skills() if s["source"] not in off)
+        """The skills, without those of mods turned off in this chat (their tools can't be used). Each description
+        is one line; the harness's (which the learner writes) and your own at most SKILL_DESC_MAX characters."""
+        from .harness import SKILL_DESC_MAX
+
+        def desc(s: dict[str, str]) -> str:
+            d = re.sub(r"\s+", " ", s.get("description") or "").strip()
+            cap = SKILL_DESC_MAX if s["source"] in ("harness", "user") else 2 * SKILL_DESC_MAX
+            return d if len(d) <= cap else d[: cap - 1] + "…"
+        return "\n".join(f"- {s['id']}: {desc(s)}" for s in await self.skills() if s["source"] not in off)
 
     async def read(self, name: str) -> str | None:
         name = name.strip().strip("/")

@@ -367,9 +367,10 @@ class Agent:
             content = res["result"]   # a text answer (hub_read_document): as it is, not as an escaped JSON string
         else:
             content = json.dumps(body, ensure_ascii=False, default=str)
-        hint, cap = self.hooks_of(tid).after(name, res.get("status") or "done", (res.get("error") or {}).get("code"))
-        if cap and len(content) > cap * 4:                 # a trim hook (plan 22.2): about 4 characters a token
-            content = content[: cap * 4] + " … (trimmed by a harness hook; read_result has the rest)"
+        hk = self.hooks_of(tid)
+        hint, cap = hk.after(name, res.get("status") or "done", (res.get("error") or {}).get("code"))
+        if cap:                                            # a trim hook (plan 22.2), keeping <untrusted> blocks closed
+            content = hk.trim(content, cap)
         if hint:
             content += "\nNote: " + hint
             self.emit(tid, "note", {"text": f"hook: added a hint to {name}'s error", "level": "info"})

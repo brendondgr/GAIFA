@@ -106,7 +106,7 @@ def test_render_shows_edits_denials_and_answers():
           {"type": "decision", "payload": {"id": "b", "approve": False, "reason": "no"}},
           {"type": "answer", "payload": {"answers": {"Which?": "This"}}}]
     text = render(ev)
-    assert "USER CHANGED THE CARD of t: preset: 'base' → 'fast'" in text and "USER DENIED t2: no" in text and "Which? → This" in text
+    assert "USER CHANGED THE CARD of t:" in text and "preset: 'base' → 'fast'" in text and "USER DENIED t2: no" in text and "Which? → This" in text
 
 
 def test_eval_and_opted_out_chats_never_teach_it(env):

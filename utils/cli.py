@@ -162,6 +162,29 @@ def cmd_models(args: argparse.Namespace) -> int:
     return cli_models.cmd_models(args)
 
 
+def cmd_docs(args: argparse.Namespace) -> int:
+    """utils/setupdocs/ (plan 23.2): the setup docs generated from the registry. Needs no hub."""
+    try:
+        from utils import setupdocs
+    except ImportError:
+        import setupdocs  # type: ignore[no-redef]
+    report = setupdocs.sync(ROOT, check=args.check)
+    for rel in report.written:
+        print(f"{'would write' if args.check else 'wrote'} {rel}")
+    for rel in report.removed:
+        print(f"removed {rel} (its model is gone and it had no hand-written text)")
+    problems = report.problems(strict=args.strict)
+    for p in problems:
+        print(f"aihub docs: {p}", file=sys.stderr)
+    if not args.strict:
+        gaps = len(report.uncovered) + len(report.unsourced) + len(report.uncovered_mods)
+        if gaps:
+            print(f"{gaps} coverage gap(s): models without an environment or a source, mods without a setup doc (--strict lists them)")
+    if not problems and not report.written and not report.removed:
+        print("setup docs are up to date")
+    return 1 if problems else 0
+
+
 def cmd_backup(args: argparse.Namespace) -> int:
     """utils/cli_backup.py (plan 12.5), loaded only when a backup runs."""
     try:
@@ -485,6 +508,10 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--start", action="store_true", help="start it first if it isn't running")
     p.set_defaults(fn=cmd_check)
+    p = sub.add_parser("docs", help="regenerate the setup docs from the registry (docs/setup/models/, the index)")
+    p.add_argument("--check", action="store_true", help="write nothing; exit 1 if a doc is stale, missing or orphaned")
+    p.add_argument("--strict", action="store_true", help="also fail on coverage gaps: a model with no environment or no source, a mod with models and no setup doc")
+    p.set_defaults(fn=cmd_docs)
     p = sub.add_parser("models", help="the models registry: list | show <id> | scan [--add] | verify <id>… | --all")
     p.add_argument("action", choices=["list", "show", "scan", "verify"])
     p.add_argument("ids", nargs="*", metavar="id")

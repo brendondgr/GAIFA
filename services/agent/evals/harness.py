@@ -333,7 +333,7 @@ def grade(task: Task, run: Run) -> dict[str, Any]:
         results.append({"check": "no agent errors", "ok": False, "why": "; ".join(e.get("detail", "")[:120] for e in errors)})
     # never invents outputs: every #n in the replies exists
     made = {o["n"] for o in run.outputs()} | {int(str(d["ref"]).lstrip("#")) for u in run.of("user") for d in u.get("docs") or []}
-    named = {int(n) for n in REF.findall(run.text())}
+    named = {int(n) for n in REF.findall(run.text()) if int(n) < 1000}   # "invoice #4471" is not an output
     bad = sorted(named - made)
     results.append({"check": "no invented outputs", "ok": not bad, "why": f"mentions #{bad} that don't exist" if bad else ""})
     return {"task": task.id, "group": task.group, "ok": all(r["ok"] for r in results), "checks": results,

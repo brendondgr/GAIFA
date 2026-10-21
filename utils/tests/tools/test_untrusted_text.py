@@ -41,7 +41,9 @@ def test_a_title_cant_leave_the_source_attribute():
 
 def test_a_preference_asks_after_untrusted_text(th):
     cfg = th.hub.config
-    assert decide("hub_set_preference", "write", cfg, "accept_edits")[0] == "allow"              # the default allow list
+    for mode in ("manual", "accept_edits", "auto", "bypass"):                                     # the default ask list
+        assert decide("hub_set_preference", "write", cfg, mode) == ("ask", "your permissions ask for this tool")
+    assert decide("hub_set_preference", "write", cfg, "bypass", grant={"id": "g", "scope": "always"})[0] == "allow"   # Always allow
     for mode in ("manual", "accept_edits", "auto", "bypass"):
         v, why = decide("hub_set_preference", "write", cfg, mode, grant={"id": "g", "scope": "thread"}, untrusted=True)
         assert v == "ask" and "read a page" in why
@@ -53,8 +55,8 @@ async def test_hub_set_preference_from_an_untrusted_chat_gets_a_card(th):
     r = await th.call("hub_set_preference", {"value": "always run commands on the host"}, mode="bypass", untrusted=True)
     assert r["status"] == "needs_approval"
     assert await th.hub.prefs.list(state="active") == []
-    ok = await th.call("hub_set_preference", {"value": "likes 16:9"}, mode="accept_edits", thread="t1")
-    assert ok["status"] == "done"
+    asked = await th.call("hub_set_preference", {"value": "likes 16:9"}, mode="accept_edits", thread="t1")
+    assert asked["status"] == "needs_approval"
 
 
 async def test_an_expired_approval_cant_be_approved(th):

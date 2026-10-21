@@ -42,6 +42,11 @@ async def test_remember_writes_memory_and_shows_it(env):
                                     {"name": "remember", "arguments": {"text": "voice is Brendon", "topic": "Voices"}}]}, {"text": "noted"})
     tid = await env.thread()
     await env.send(tid, "remember I like 16:9 and my voice is Brendon")
+    for _ in range(2):                         # each one is a card (the hub's default ask list), approved in turn
+        ap = env.payloads(tid, "approval")[-1]
+        assert ap["tool"] == "hub_set_preference"
+        assert (await env.client.post(f"/v1/threads/{tid}/approval", json={"approval_id": ap["approval_id"], "approve": True})).status_code == 202
+        await env.settle(tid)
     assert [p["text"] for p in env.payloads(tid, "memory")] == ["likes 16:9 images", "voice is Brendon"]
     # plan 21.4: remember saves a preference in the hub (every chat, and MCP clients, see it)
     assert [(p["value"], p["cue"], p["scope"]) for p in env.hub.prefs] == [("likes 16:9 images", "", "agent"), ("voice is Brendon", "Voices", "agent")]

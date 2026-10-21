@@ -79,14 +79,25 @@ async def test_remember_after_reading_a_document_asks_even_in_accept_edits(env):
     assert res["content"] == "Saved: it's one of the user's preferences now."
 
 
+async def approve_last(env, tid):
+    ap = env.payloads(tid, "approval")[-1]
+    r = await env.client.post(f"/v1/threads/{tid}/approval", json={"approval_id": ap["approval_id"], "approve": True})
+    assert r.status_code == 202, r.text
+    await env.settle(tid)
+
+
 async def test_remember_in_a_clean_chat_and_with_learning_off(env):
-    tid = await env.thread()                                  # Manual: the allow list lets it run, as hub_set_preference
+    tid = await env.thread(mode="bypass")                     # the hub's ask list: a card even in Bypass, as hub_set_preference
     env.model.queue({"tool_calls": [{"name": "remember", "arguments": {"text": "likes 16:9"}}]}, {"text": "ok"})
     await env.send(tid, "remember I like 16:9")
-    assert [p["value"] for p in env.hub.prefs] == ["likes 16:9"] and "untrusted" not in env.hub.attempts[-1]["origin"]
-    env.hub.learning = False                                  # allowed, but learning is off: the memory file, as before
+    assert env.agent.store.thread(tid)["state"] == "waiting" and env.hub.prefs == []
+    assert "untrusted" not in env.hub.attempts[-1]["origin"]
+    await approve_last(env, tid)
+    assert [p["value"] for p in env.hub.prefs] == ["likes 16:9"]
+    env.hub.learning = False                                  # approved, but learning is off: the memory file, as before
     env.model.queue({"tool_calls": [{"name": "remember", "arguments": {"text": "voice is Brendon"}}]}, {"text": "ok"})
     await env.send(tid, "and my voice is Brendon")
+    await approve_last(env, tid)
     assert env.payloads(tid, "memory")[-1]["file"] is True
     assert "voice is Brendon" in (env.agent.cfg.data / "memory" / "MEMORY.md").read_text()
 

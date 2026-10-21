@@ -1919,7 +1919,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - **Bus:** `pref` events carry each change.
     - **Tests:** the prefs tests reuse the tools tests' `th` hub and `fake-tools`; 9 tests, plus `test_learning_switch_applies_at_once` in the settings tests.
 - [x] **21.4 The agent's side: stated preferences, prose memory, feedback, turn records.**
-  - **`hub_set_preference`** (`utils/tools/hub_tools.py`, risk `write`, in the default `allow` list): the agent saves what you state ("always use fast for 3D") as an active `stated` preference, and the reply says so. The prompt (`prompts.py` BASE) gets one line: "When the user states a lasting preference for a tool's setting, save it with hub_set_preference."
+  - **`hub_set_preference`** (`utils/tools/hub_tools.py`, risk `write`; in the default `allow` list until 2026-10-21, now in the default `ask` list, so every save is a card the user approves, in the composer's dock or the header's Approvals; `precheck` refuses a preference that can't be saved before the card): the agent saves what you state ("always use fast for 3D") as an active `stated` preference, and the reply says so. The prompt (`prompts.py` BASE) gets one line: "When the user states a lasting preference for a tool's setting, save it with hub_set_preference."
   - **`remember`** (`local.py`) writes an `agent`-scoped preference through the hub instead of appending to `MEMORY.md`.
     - `knowledge.memory_index()` renders active agent-scoped preferences, plus tool preferences for loaded tool groups only, under "Your preferences".
     - The existing `data/agent/memory/` files are imported once on start.

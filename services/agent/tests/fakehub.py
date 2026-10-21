@@ -5,8 +5,8 @@ Tools: hub_list_services (core, read), fake_get (read), fake_make_image (generat
 fake_render (generate job, `seconds`), fake_wipe (destructive), fake_fail (read, errors),
 gen3d_make_3d (generate job), tts_speak (generate), hub_read_document and hub_search_document (core,
 read; plan 24.4) over documents added with `doc()`, which also answer `/text` and `/page/{n}.png`, and
-hub_set_preference (core, write; in the allow list as in the hub's defaults, but it asks when the
-origin says the chat read untrusted text).
+hub_set_preference (core, write; in the ask list as in the hub's defaults, so it asks in every mode
+except Plan, which refuses it).
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ TOOLS = [
     T("hub_set_preference", "hub", "write", {"tool": {"type": "string"}, "field": {"type": "string"}, "value": {},
                                              "cue": {"type": "string"}}, ["value"], core=True, desc="Save a lasting preference"),
 ]
-ALLOW = {"hub_set_preference"}       # the hub's default permissions.allow
+ASK = {"hub_set_preference"}         # the hub's default permissions.ask
 
 
 def _model_view(t: dict[str, Any]) -> dict[str, Any]:
@@ -264,10 +264,7 @@ class FakeHub:
             risk = t["risk"]
             if mode in ("plan", "read_only") and risk != "read":
                 return {"status": "denied", "tool": name, "error": {"code": "denied", "detail": "Plan mode: only tools that read can run"}}
-            if name in ALLOW and (body.get("origin") or {}).get("untrusted"):
-                asks = True                  # a lasting preference from a chat that read untrusted text (the hub's rule)
-            else:
-                asks = name not in ALLOW and risk != "read" and not (mode in ("accept_edits", "auto", "bypass") and risk != "destructive")
+            asks = name in ASK or (risk != "read" and not (mode in ("accept_edits", "auto", "bypass") and risk != "destructive"))
             if asks:
                 aid = f"ap_{len(self.approvals) + 1}"
                 a = {"id": aid, "tool": name, "arguments": args, "ask_fields": t["ask"], "risk": risk, "origin": body.get("origin") or {},

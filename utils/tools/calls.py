@@ -173,6 +173,11 @@ class Calls:
             out = self._invalid(tool, await self._elsewhere(tool, arguments, problems))
             await self._refused(tool.name, arguments, origin, out["error"])
             return out
+        if tool.handler is not None and isinstance(arguments, dict):
+            from utils.tools import hub_tools
+            if err := await hub_tools.precheck(self.hub, tool.name, arguments):
+                await self._refused(tool.name, arguments, origin, err)
+                return {"status": "error", "tool": tool.name, "error": err}
         limits = await self._limits(tool, arguments, origin) if tool.limits else None
         grant = await self.hub.grants.match(tool, arguments, origin, (limits or {}).get("key")) \
             if self.hub.grants is not None and not (limits or {}).get("once") else None

@@ -135,6 +135,22 @@ class Prefs:
         if errs:
             raise PrefError(422, "invalid_pref", f"{errs[0]['detail']}; {errs[0]['fix']}")
 
+    async def check(self, body: dict[str, Any]) -> None:
+        """Whether `create(body)` would be refused (PrefError), without saving: the call path asks this before a card."""
+        if not self.on:
+            raise PrefError(409, "learning_off", "learning is turned off (Settings → Learning)")
+        p = {"scope": body.get("scope") or ("agent" if not body.get("tool") else "tool"), "tool": body.get("tool"),
+             "field": body.get("field"), "thread": body.get("thread"), "value": body.get("value"), "when": body.get("when") or {},
+             "source": body.get("source") or "stated", "state": body.get("state") or "active"}
+        await self._when(p)
+        await self._check(p)
+
+    async def _when(self, p: dict[str, Any]) -> None:
+        if p["scope"] != "agent" and not p["when"] and p.get("tool") and self.hub.tools:
+            tool = await self.hub.tools.get(p["tool"])
+            if tool is not None and p.get("field"):
+                p["when"] = when_for(tool, p["field"], p["value"])      # a choice applies only where it can
+
     async def create(self, body: dict[str, Any]) -> dict[str, Any]:
         if not self.on:
             raise PrefError(409, "learning_off", "learning is turned off (Settings → Learning)")
@@ -146,10 +162,7 @@ class Prefs:
              "confidence": float(body.get("confidence") if body.get("confidence") is not None else 1.0),
              "evidence": body.get("evidence") or [], "seen": int(body.get("seen") or 1), "contradicted": 0,
              "note": body.get("note") or "", "created_ts": now, "updated_ts": now, "last_used_ts": None}
-        if p["scope"] != "agent" and not p["when"] and p.get("tool") and self.hub.tools:
-            tool = await self.hub.tools.get(p["tool"])
-            if tool is not None and p.get("field"):
-                p["when"] = when_for(tool, p["field"], p["value"])      # a choice applies only where it can
+        await self._when(p)
         await self._check(p)
         same = await self._same(p)
         if same:                                      # the same preference again: one row, more evidence

@@ -115,8 +115,8 @@ class ServicesCfg(BaseModel):
 class PermissionsCfg(_Strict):
     """Tool permissions (plan 13.2, 25.1): name globs; the order with modes and grants is in `utils/tools/approvals.py`."""
     deny: list[str] = []
-    ask: list[str] = []
-    allow: list[str] = ["hub_start_service", "hub_set_preference"]
+    ask: list[str] = ["hub_set_preference"]     # a lasting preference reaches every later chat: a card in every mode
+    allow: list[str] = ["hub_start_service"]
 
 
 class JudgeCfg(_Strict):

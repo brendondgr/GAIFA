@@ -119,19 +119,40 @@ async def job_status(hub: Hub, args: dict[str, Any]) -> Any:
     return await hub.calls.status(args["call_id"], wait=float(args.get("wait") or 0))
 
 
+PREF_FIX = "check the tool's parameters (load it first) and use one of its allowed values"
+
+
+def _stated(args: dict[str, Any]) -> dict[str, Any]:
+    body = {"source": "stated", "state": "active", "value": args.get("value"), "cue": args.get("cue") or ""}
+    if args.get("tool"):
+        body.update(tool=args["tool"], field=args.get("field"), when=args.get("when") or {})
+    return body
+
+
 async def set_preference(hub: Hub, args: dict[str, Any]) -> Any:
     """A preference the user stated (plan 21.4): saved active, applied to that tool's cards from now on."""
     from utils.prefs import PrefError
     from utils.tools.modcall import ToolError
 
-    body = {"source": "stated", "state": "active", "value": args.get("value"), "cue": args.get("cue") or ""}
-    if args.get("tool"):
-        body.update(tool=args["tool"], field=args.get("field"), when=args.get("when") or {})
     try:
-        p = await hub.prefs.create(body)
+        p = await hub.prefs.create(_stated(args))
     except PrefError as e:
-        raise ToolError(e.code, e.detail, "check the tool's parameters (load it first) and use one of its allowed values") from None
+        raise ToolError(e.code, e.detail, PREF_FIX) from None
     return {"saved": {k: p[k] for k in ("id", "scope", "tool", "field", "value", "when")}}
+
+
+async def precheck(hub: Hub, name: str, args: dict[str, Any]) -> dict[str, Any] | None:
+    """An error for a call that would fail anyway, found before it asks (a card for a preference that can't be
+    saved helps no one: hub_set_preference is in the default ask list), else None."""
+    from utils.prefs import PrefError
+
+    if name != "hub_set_preference" or hub.prefs is None:
+        return None
+    try:
+        await hub.prefs.check(_stated(args))
+    except PrefError as e:
+        return {"code": e.code, "detail": e.detail, "fix": PREF_FIX}
+    return None
 
 
 async def list_preferences(hub: Hub, args: dict[str, Any]) -> Any:

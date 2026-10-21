@@ -54,6 +54,7 @@ STATIC = {
     "gpu.gtt_used": SeriesInfo("gpu.gtt_used", "GPU memory (GTT) used", "bytes"),
     "gpu.vram_used": SeriesInfo("gpu.vram_used", "GPU VRAM used", "bytes"),
     "jobs.running": SeriesInfo("jobs.running", "Jobs running", "count"),
+    "gpu.waiting": SeriesInfo("gpu.waiting", "Waiting for the GPU", "count"),
 }
 
 
@@ -72,6 +73,7 @@ class Recorder:
         self._last_stat: dict[str, tuple[float, str]] = {}  # daily counters: (value, local date)
         self._tools: dict[tuple[str, str], int] = {}       # (mod, "calls" | "errors") → finished this tick
         self._tasks: list[asyncio.Task[None]] = []
+        self.gpu: Any = None                               # utils.gpu.GpuQueue (plan 31.1): wait and hold times per mod
         self._sub: Any = None
         self.last_tick: int | None = None
 
@@ -186,10 +188,25 @@ class Recorder:
                         value = None  # the counter reset at midnight: break the line instead of a drop
                 out.append((info, value))
         out.append((STATIC["jobs.running"], float(running)))
+        out += self.gpu_samples()
         tools, self._tools = self._tools, {}
         for (mod, what), n in sorted(tools.items()):       # finished tool calls in this tick, per mod (plan 21.1)
             out.append((SeriesInfo(f"tools.{what}.{mod}", f"{self._name(mod) if mod != 'hub' else 'AIHub'} tool {what}", "count",
                                    service=None if mod == "hub" else mod), float(n)))
+        return out
+
+    def gpu_samples(self) -> list[tuple[SeriesInfo, float | None]]:
+        """`gpu.waiting` now, and per mod the mean wait (`gpu.wait.<id>`) and hold (`gpu.hold.<id>`) of the leases
+        granted or finished in this tick, in seconds (plan 31.1)."""
+        if self.gpu is None:
+            return []
+        out: list[tuple[SeriesInfo, float | None]] = [(STATIC["gpu.waiting"], float(len(self.gpu.waiting())))]
+        sums: dict[tuple[str, str], list[float]] = {}
+        for sid, what, secs in self.gpu.drain_stats():
+            sums.setdefault((sid, what), []).append(secs)
+        for (sid, what), vals in sorted(sums.items()):
+            label = f"{self._name(sid)}: {'wait for' if what == 'wait' else 'time on'} the GPU"
+            out.append((SeriesInfo(f"gpu.{what}.{sid}", label, "seconds", service=sid), round(sum(vals) / len(vals), 1)))
         return out
 
     def tool_event(self, call: dict[str, Any]) -> None:

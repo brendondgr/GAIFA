@@ -17,6 +17,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 | `agent/harness.py`, `harness/` | The harness as versioned files (plan 22.1): the base in git, learned versions in `data/agent/harness/`, rollback |
 | `agent/hooks.py` | Declarative hooks in the tool loop: hint_after_error, cap, require_first, trim (plan 22.2) |
 | `agent/records.py` | Turn records (`turns` in agent.db, plan 21.4) |
+| `agent/gpuwait.py` | "Waiting for the GPU" on the turn (plan 31.4): each model call names its chat (`X-AIHub-Thread`); while the relay holds it in AIHub's GPU queue, the hub's `GET /api/gpu` shows a waiting lease of that chat and the agent sends the transient `gpu_wait` `{text, eta_s, ahead}` (an empty one clears it) |
 | `agent/learn/` | Learning: `mine.py` preferences from card edits, answers and thumbs (21.5); `replay.py`, `loop.py`, `prompts.py`, `library.py`, `schedule.py` the harness learner (Phase 22) |
 | `ui/page.js` | The Learning page: Preferences, Review, Tool usage, Harness, Runs, Library |
 | `agent/hubapi.py` | AIHub over HTTP: tools, calls, approvals, outputs, skills, the event stream |

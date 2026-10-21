@@ -285,6 +285,11 @@ browser / curl ──HTTP──> gen3d (FastAPI, .venv)  ──stdin/stdout JSON
   after the time shown when it was sent.
 - **Queue**: SQLite (`data/gen3d.db`), one job on the GPU at a time. A job interrupted by a
   restart goes back to the front and resumes at the stage it was in (finished stages are kept).
+- **The GPU slot** (AIHub plan 31.3): a job takes AIHub's GPU slot (`gen3d/gpu_slot.py`) before its
+  first stage and holds it across all its stages, the Blender preview included; memory is asked for
+  after it. While another mod holds the slot the job stays `queued` with `stage: "waiting_gpu"`,
+  `ahead` and `eta_s`, and Cancel stops the wait. TRELLIS.2 and SAM 3D Body get the job's lease in
+  `X-AIHub-GPU-Lease`, so comfy runs them under it. Without AIHub the slot is skipped.
 - **Files**: `data/jobs/<id>/` (`mesh.glb`, `parts/`, `parts.glb`, `rigged.glb`, `rig.json`,
   `preview.png`, `input.*`). Deletes are permanent.
 

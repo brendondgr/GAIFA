@@ -97,6 +97,12 @@ def validate(body: Any) -> tuple[dict[str, Any], list[str]]:
             problems.append(f"jobs[{i}] ({j['id']}): progress must be between 0 and 1, or null")
             progress = None
         job: dict[str, Any] = {"id": j["id"], "label": str(j.get("label") or j["id"]), "progress": progress, "state": state}
+        if isinstance(j.get("stage"), str) and j["stage"]:      # e.g. "waiting_gpu" (plan 31.3), with what runs before it
+            job["stage"] = j["stage"][:40]
+            if isinstance(j.get("ahead"), list):
+                job["ahead"] = [a for a in j["ahead"][:10] if isinstance(a, dict)]
+            if _number(j.get("eta_s")):
+                job["eta_s"] = float(j["eta_s"])
         if isinstance(j.get("route"), str):
             if j["route"].startswith("#/"):              # a page in the UI; it becomes a link's href
                 job["route"] = j["route"]
@@ -160,7 +166,7 @@ def apply(mgr: ServiceManager, svc: Service, st: dict[str, Any], asked_at: float
 
 
 def _job_view(jobs: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
-    return [(j["id"], j["state"], j["progress"], j["label"]) for j in jobs]
+    return [(j["id"], j["state"], j["progress"], j["label"], j.get("stage")) for j in jobs]
 
 
 def _publish_jobs(mgr: ServiceManager, svc: Service, jobs: list[dict[str, Any]]) -> None:

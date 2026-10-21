@@ -3,6 +3,10 @@
 Stopping the process is the unload. It hands back every byte of GPU memory (weights,
 the caching allocator, captured graphs), which an in-process `del model` does not
 reliably do.
+
+Under AIHub, each synthesis (and each Whisper one-shot) takes the GPU slot first (plan 31.3,
+`gpu_slot.py`): while another mod's work holds the GPU, the request waits, listed in the status
+as a `waiting_gpu` job. An engine set to run on the CPU doesn't take it.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from .config import ROOT, breeze_env, settings
+from .gpu_slot import GpuCancelled, GpuSlot
 
 log = logging.getLogger("localtts.engines")
 WORKERS = ROOT / "workers"
@@ -34,9 +39,45 @@ class EngineError(RuntimeError):
     pass
 
 
+_GPU: GpuSlot | None = None
+WAITING: dict[str, dict] = {}        # request id → the status's waiting_gpu job (plan 31.3)
+
+
+def gpu() -> GpuSlot:
+    """AIHub's GPU slot (AIHUB_URL; without it, work runs at once)."""
+    global _GPU
+    if _GPU is None:
+        _GPU = GpuSlot(service="tts", group="tts")
+    return _GPU
+
+
+@contextlib.asynccontextmanager
+async def gpu_lease(label: str, request_id: str | None = None, on_gpu: bool = True):
+    """Hold the GPU slot for one piece of work; a request that waits is listed in `WAITING` meanwhile."""
+    if not on_gpu:
+        yield None
+        return
+    rid = request_id or os.urandom(4).hex()
+
+    def waiting(lease) -> None:
+        WAITING[rid] = {"id": f"speech-{rid}", "label": label, "state": "queued", "progress": None,
+                        "stage": "waiting_gpu", "ahead": lease.ahead, "eta_s": lease.eta_s}
+
+    try:
+        async with gpu().slot(label, on_wait=waiting) as lease:
+            WAITING.pop(rid, None)
+            yield lease
+    except GpuCancelled as exc:
+        raise EngineError(f"{label}: cancelled in the GPU queue") from exc
+    finally:
+        WAITING.pop(rid, None)
+
+
 class Engine:
-    def __init__(self, name: str, python: Path, script: str, env: dict[str, str] | None = None):
+    def __init__(self, name: str, python: Path, script: str, env: dict[str, str] | None = None,
+                 device_env: str | None = None):
         self.name = name
+        self.device_env = device_env      # the variable that can put the engine on the CPU
         self.python = python
         self.script = WORKERS / script
         self.env = env or {}
@@ -117,6 +158,13 @@ class Engine:
             **({"info": self.info} if self.info else {}),
         }
 
+    @property
+    def on_gpu(self) -> bool:
+        """Whether its work needs the GPU slot: not when set to the CPU, or when it loaded on the CPU."""
+        if self.device_env and (self.env.get(self.device_env) or os.environ.get(self.device_env) or "auto") == "cpu":
+            return False
+        return str(self.info.get("device", "")).lower() != "cpu"
+
     # ---- protocol --------------------------------------------------------------------------
 
     async def _read_event(self) -> dict:
@@ -128,7 +176,7 @@ class Engine:
 
     async def generate(self, **params) -> AsyncIterator[bytes]:
         """Yield PCM s16le chunks; the final item is the worker's `done` stats dict."""
-        async with self._lock:
+        async with self._lock, gpu_lease(f"{self.name.title()} speech", params.get("request_id"), self.on_gpu):
             if self._stale and self.alive:
                 await self._drain()
             await self.ensure_loaded()
@@ -189,6 +237,11 @@ async def _oneshot(script: str, args: list[str], what: str, timeout: float = 600
     """Run a worker once in a throwaway process (Breeze venv, which has Whisper); return its result."""
     if not settings.breeze_python.exists():
         raise EngineError(f"{what} needs Whisper from the Breeze environment ({settings.breeze_python} not found)")
+    async with gpu_lease(f"Whisper {what}", on_gpu=breeze_env().get("BREEZE_DEVICE") != "cpu"):
+        return await _oneshot_run(script, args, what, timeout)
+
+
+async def _oneshot_run(script: str, args: list[str], what: str, timeout: float) -> dict:
     proc = await asyncio.create_subprocess_exec(
         str(settings.breeze_python), str(WORKERS / script), *args,
         stdout=asyncio.subprocess.PIPE, stderr=None, cwd=str(WORKERS),
@@ -215,7 +268,7 @@ async def align_clips(job_file: Path) -> dict:
 
 
 ENGINES: dict[str, Engine] = {
-    "breeze": Engine("breeze", settings.breeze_python, "breeze_worker.py",
+    "breeze": Engine("breeze", settings.breeze_python, "breeze_worker.py", device_env="BREEZE_DEVICE",
                      env={"HF_HUB_OFFLINE": "1", **breeze_env(),
                           # Persistent torch.compile cache (the default lives in /tmp, wiped at boot).
                           "TORCHINDUCTOR_CACHE_DIR": str(Path("~/.cache/localtts/inductor").expanduser())}),

@@ -10,6 +10,12 @@ const STAGES = ['shape', 'parts', 'rig', 'preview'];
 const STAGE_LABEL = { shape: 'Shape', parts: 'Parts', rig: 'Rig', preview: 'Preview' };
 const STAGE_COLOR = { shape: 'var(--s1,#58C4DD)', parts: 'var(--s2,#FFB224)', rig: 'var(--s3,#BC8CFF)', preview: 'var(--s4,#3FB950)' };
 const TONE = { done: 'green', failed: 'red', canceled: 'dim', running: 'accent', queued: 'dim' };
+// Plan 31.3: a job waiting for AIHub's GPU slot (another mod's work runs first).
+const gpuWait = j => {
+  if (j.stage !== 'waiting_gpu') return null;
+  const a = (j.ahead || [])[0], eta = j.eta_s > 0 ? (j.eta_s >= 90 ? `, about ${Math.round(j.eta_s / 60)} min` : `, about ${Math.round(j.eta_s)} s`) : '';
+  return `Waiting for the GPU${a ? `: ${a.service}${a.label ? ` (${a.label})` : ''}` : ''}${eta}`;
+};
 const errText = e => e.detail || e.message || 'Request failed';
 
 export default {
@@ -271,9 +277,9 @@ function jobsTab(el, ctx, cleanups) {
       const row = h('button', { type: 'button', onclick: () => select(j.id), style: `display:flex;flex-direction:column;gap:4px;text-align:left;padding:8px 10px;border-radius:7px;cursor:pointer;font:inherit;color:var(--tx,#E6EAF2);border:1px solid ${on ? 'var(--acc,#FFB224)' : 'var(--bd,#1D2430)'};background:${on ? 'var(--hov,#161C28)' : 'var(--inset,#131926)'}` },
         h('div', { style: 'display:flex;gap:8px;align-items:center;min-width:0' },
           h('span', { style: 'flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis' }, j.title || j.id),
-          ui.badge(j.status, TONE[j.status])),
+          ui.badge(gpuWait(j) ? 'waiting for GPU' : j.status, TONE[j.status])),
         h('div', { style: 'display:flex;gap:8px;align-items:center;font-size:11px;color:var(--mut,#8A94A6)' },
-          h('span', { style: `font-family:${MONO}` }, j.status === 'running' && j.eta ? `${Math.round(p * 100)}% · ${fmtSecs(j.eta.eta_s)} left` : j.status === 'queued' && j.eta ? `#${j.eta.queue_position} · starts in ${fmtSecs(j.eta.starts_in_s)}` : fmtAgo(j.created)),
+          h('span', { style: `font-family:${MONO}` }, j.status === 'running' && j.eta ? `${Math.round(p * 100)}% · ${fmtSecs(j.eta.eta_s)} left` : gpuWait(j) ? gpuWait(j) : j.status === 'queued' && j.eta ? `#${j.eta.queue_position} · starts in ${fmtSecs(j.eta.starts_in_s)}` : fmtAgo(j.created)),
           h('span', { style: 'flex:1' }), Object.keys(j.stages || {}).map(s => h('span', { title: `${s}: ${j.stages[s].state}`, style: `width:8px;height:8px;border-radius:2px;background:${j.stages[s].state === 'done' ? STAGE_COLOR[s] : j.stages[s].state === 'running' ? 'var(--acc,#FFB224)' : 'var(--bds,#2A3547)'}` }))),
         ['running', 'queued'].includes(j.status) ? h('div', { style: 'height:3px;border-radius:2px;background:var(--bds,#2A3547);overflow:hidden' }, h('div', { style: `height:100%;width:${Math.round(p * 100)}%;background:var(--acc,#FFB224)` })) : null);
       return row;

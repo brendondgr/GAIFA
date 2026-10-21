@@ -30,6 +30,9 @@ LCPP_STATE_DIR = "{root}/data/state/lcpp"   # instance records inside the projec
 # in [memory] never_unload. A launch asks AIHub for memory itself (POST /api/memory/acquire).
 extra_units = ["lcpp-*.service"]
 
+[gpu]                              # plan 31.4: the relay takes an interactive GPU lease per request to this engine
+class = "interactive"
+
 [models]
 dirs = ["llm"]
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import re
 import time
 import uuid
@@ -18,6 +19,7 @@ from pydantic import AliasChoices, BaseModel, Field
 from . import catalog
 from .config import Settings
 from .engine import Engine, ModelBusy
+from .gpu import Gpu
 from .hub import Hub
 from .jobs import MAX_QUEUED_UPLOADS, Jobs
 from .live import mount as mount_live
@@ -63,16 +65,22 @@ def http_error(status: int, detail: str, code: str, fix: str | None = None) -> H
     return HTTPException(status, {"detail": detail, "code": code, **({"fix": fix} if fix else {})})
 
 
-def create_app(settings: Settings | None = None, *, engine: Engine | None = None, hub: Hub | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, engine: Engine | None = None, hub: Hub | None = None,
+               gpu: Gpu | None = None, cpu_engine: Engine | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     hub = hub or Hub(settings.hub_url)
     engine = engine or Engine(settings, registrar=hub.register_model)
-    jobs = Jobs(engine, hub, settings.outputs)
+    # Live dictation while another mod holds the GPU (plan 31.3): its own model on the CPU.
+    cpu_engine = cpu_engine or Engine(settings, gpu=False, registrar=hub.register_model)
+    # The GPU slot: only with AIHub (AIHUB_URL set); tests pass their own.
+    gpu = gpu or Gpu(os.environ.get("AIHUB_URL") or None)
+    jobs = Jobs(engine, hub, settings.outputs, gpu=gpu)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         await asyncio.to_thread(jobs.sweep)
         tasks = [asyncio.create_task(jobs.run()), asyncio.create_task(engine.idle_loop()),
+                 asyncio.create_task(cpu_engine.idle_loop()),
                  asyncio.create_task(hub.register_present(settings.weights))]
         try:
             yield
@@ -80,10 +88,12 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
             for t in tasks:
                 t.cancel()
             await engine.unload()
+            await cpu_engine.unload()
 
     app = FastAPI(title="Speech to Text", version="0.1.0", lifespan=lifespan,
                   description="Speech to text with faster-whisper (CTranslate2), ported from the TranscriberPrototype.")
     app.state.engine, app.state.jobs, app.state.settings, app.state.hub = engine, jobs, settings, hub
+    app.state.cpu_engine, app.state.gpu, app.state.streams = cpu_engine, gpu, {}
     day = {"date": date.today()}
 
     @app.get("/health", summary="Ready when the server answers (the model loads on demand)")
@@ -101,10 +111,12 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
                   and time.time() - j.finished < 600]
         return {
             "loaded": engine.ready,                 # true / false (architecture §4.6); which model: engine.model
-            "busy": engine.busy or bool(live),
+            "busy": engine.busy or cpu_engine.busy or bool(live),
             "idle_s": round(time.monotonic() - engine.last_used, 1),
             "memory_estimate_gb": info.memory_gb if info else None,
             "engine": engine.describe(),
+            "cpu_engine": cpu_engine.describe() if cpu_engine.state != "unloaded" else None,
+            "streams": list(app.state.streams.values()),   # open live streams: model, device and why
             "stats": [
                 {"label": "Transcripts today", "value": jobs.done_today, "reset": "daily"},
                 {"label": "Audio today (min)", "value": round(jobs.audio_today / 60, 1), "reset": "daily"},
@@ -112,7 +124,9 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
                 {"label": "Model", "value": f"{engine.model} · {engine.device}" if engine.ready else "none"},
             ],
             "jobs": [{"id": j.id, "label": j.label, "progress": j.progress, "state": j.state,
-                      "route": "#/s/stt/transcribe"} for j in live + recent[:5]],
+                      "route": "#/s/stt/transcribe",
+                      **({"stage": j.stage, "ahead": j.ahead, "eta_s": j.eta_s} if j.stage == "waiting_gpu" else {})}
+                     for j in live + recent[:5]],
         }
 
     @app.get("/v1/models", summary="The models: size, downloaded, loaded, and the device and precision each runs at")
@@ -214,7 +228,7 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
             raise http_error(404, f"no job {jid!r}", "not_found")
         return job.view()
 
-    mount_live(app, engine)
+    mount_live(app, engine, cpu_engine, gpu)
 
     @app.exception_handler(catalog.UnknownModel)
     async def unknown_model(_: Request, exc: catalog.UnknownModel) -> JSONResponse:

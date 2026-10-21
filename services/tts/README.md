@@ -236,6 +236,11 @@ client ──HTTP──> localtts (FastAPI, .venv)  ──stdin/stdout──> br
 - Voice uploads are converted by ffmpeg to 24 kHz mono WAV; missing transcripts come from
   a one-shot Whisper large-v3-turbo process that exits right after.
 - Deletes use `unlink`/`rmtree`: permanent, never the desktop Trash.
+- Under AIHub, each synthesis and each one-shot Whisper run takes AIHub's **GPU slot** first
+  (`[gpu]` in service.toml, `localtts/gpu_slot.py`, plan 31.3): while another mod's GPU work holds
+  it, the request waits and `/v1/status` lists it as a job in stage `waiting_gpu` (with what runs
+  before it). An engine set to the CPU (`BREEZE_DEVICE=cpu`, or Kokoro without CUDA) doesn't take
+  it. Without `AIHUB_URL` nothing waits.
 
 Saved voices live in `data/voices/<name>/{reference.wav,voice.json}` (git-ignored).
 Generated audio goes to `~/Music/TTS/` (`LOCALTTS_OUTPUTS_DIR`) unless `no_save` is set.

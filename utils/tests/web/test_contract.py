@@ -90,8 +90,8 @@ MODELS: dict[str, type[BaseModel]] = {
     "Session": rs.Session, "SessionStep": rs.SessionStep, "SessionMemory": rs.SessionMemory, "SessionRestore": rs.Restore,
     "SessionState": rs.SessionState,
 }
-# fields the hub adds beyond the brief, on purpose (none today)
-EXTRA: dict[str, set[str]] = {}
+# fields the hub adds beyond the brief, on purpose. Job's GPU fields (plan 31.3): until brief §6.4's Job lists them
+EXTRA: dict[str, set[str]] = {"Job": {"stage", "ahead", "eta_s"}}
 
 
 def _interfaces(text: str) -> dict[str, tuple[str | None, str]]:

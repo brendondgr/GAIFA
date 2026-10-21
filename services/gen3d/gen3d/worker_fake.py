@@ -173,8 +173,9 @@ class FakeComfyEngine:
         self.reduce = None
         self._cancel = False
 
-    async def run(self, req: JobRequest, jdir: Path, inputs: dict, on_event, cancel_check) -> dict:
+    async def run(self, req: JobRequest, jdir: Path, inputs: dict, on_event, cancel_check, gpu_headers=None) -> dict:
         self._cancel = False
+        self.gpu_headers = gpu_headers
         for sub, _feat, default, total in substages(req, "shape", set()):
             t0 = time.time()
             on_event({"event": "sub", "sub": sub, "total": total})

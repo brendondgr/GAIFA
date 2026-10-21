@@ -1,6 +1,11 @@
-"""Running packs (plan 11.7): memory, ComfyUI's queue, progress over its websocket, results with
-sidecars, cancel. Runs are rows in comfy.db; a run that was going when the adapter restarted is
-finished from ComfyUI's history."""
+"""Running packs (plan 11.7): the GPU slot, memory, ComfyUI's queue, progress over its websocket, results
+with sidecars, cancel. Runs are rows in comfy.db; a run that was going when the adapter restarted is
+finished from ComfyUI's history.
+
+The GPU slot (plan 31.3): a run takes AIHub's slot (`gpu_slot.py`) before it asks for memory and queues
+its prompt, and holds it until the prompt finishes, fails or is cancelled. A run that has to wait is
+answered at once as `queued` with `stage: "waiting_gpu"` (`ahead`, `eta_s`); a request that carries
+`X-AIHub-GPU-Lease` (gen3d handing over TRELLIS.2 or SAM 3D Body) runs under that lease instead."""
 
 from __future__ import annotations
 
@@ -22,6 +27,7 @@ from .client import ComfyClient, ComfyError
 from .config import Settings
 from .db import DB
 from .detect import memory_estimate
+from .gpu_slot import GpuSlot
 from .library import Library
 from .resolve import InputError, patch, resolve, slugify
 from .schema import input_schema
@@ -65,8 +71,12 @@ class NeedsRoom(Exception):
 
 
 class Runner:
-    def __init__(self, settings: Settings, db: DB, client: ComfyClient, library: Library, control):
+    def __init__(self, settings: Settings, db: DB, client: ComfyClient, library: Library, control,
+                 gpu: GpuSlot | None = None):
         self.s, self.db, self.client, self.lib, self.control = settings, db, client, library, control
+        self.gpu = gpu or GpuSlot(hub_url=settings.hub_url, service="comfy")
+        self.tasks: dict[str, asyncio.Task] = {}       # run id → its start task (it holds the GPU lease)
+        self.gpu_wait: dict[str, dict] = {}            # run id → {ahead, eta_s} while it waits for the GPU
         self.client_id = uuid.uuid4().hex
         self.events: dict[str, asyncio.Event] = {}
         self.last_pack: str | None = None
@@ -76,7 +86,8 @@ class Runner:
         self._ws_connected = False
 
     # ---- submitting -------------------------------------------------------------------------
-    async def submit(self, workflow: str, inputs: dict | None, preset: str | None = None, make_room: bool = False) -> dict:
+    async def submit(self, workflow: str, inputs: dict | None, preset: str | None = None, make_room: bool = False,
+                     parent: str | None = None) -> dict:
         lib = self.lib
         lib.packs.scan()
         pack = lib.packs.get(workflow)
@@ -98,6 +109,68 @@ class Runner:
         label = str(values.get("prompt") or pack.name)[:80]
         graph = patch(pack, conv, values, lib.catalog, slugify(label, pack.id))     # refuses a bad value before any loading
         needs = self.needs_gb(pack, conv)
+        rid = "r-" + uuid.uuid4().hex[:10]
+        ready: asyncio.Future = asyncio.get_running_loop().create_future()
+        self.tasks[rid] = asyncio.create_task(self._start(rid, pack, label, values, graph, needs, make_room, parent, ready))
+        await ready     # the prompt is queued in ComfyUI, or the run waits for the GPU; a failure before either is raised
+        return self.db.run(rid)
+
+    async def _start(self, rid: str, pack, label: str, values: dict, graph: dict, needs: float, make_room: bool,
+                     parent: str | None, ready: asyncio.Future) -> None:
+        """Take the GPU slot, then memory, then queue the prompt; hold the slot until the run ends."""
+        added = False
+
+        def add() -> None:
+            nonlocal added
+            if not added:
+                self.db.add_run(rid, pack.id, label, values)
+                self.events.setdefault(rid, asyncio.Event())
+                added = True
+
+        def on_wait(lease) -> None:
+            add()
+            self.gpu_wait[rid] = {"ahead": lease.ahead, "eta_s": lease.eta_s}
+            if not ready.done():
+                ready.set_result(None)
+
+        try:
+            async with self.gpu.slot(f"{pack.name}: {label}"[:120], est_s=self.typical_s(pack.id), parent=parent,
+                                     on_wait=on_wait):
+                self.gpu_wait.pop(rid, None)
+                await self._prepare(pack, needs, make_room)
+                add()
+                done = self.events[rid]
+                try:
+                    r = await self.client.prompt(graph, self.client_id, {"extra_pnginfo": {"aihub": {"workflow": pack.id, "run": rid}}})
+                except ComfyError as e:
+                    self.db.update_run(rid, state="failed", error=_node_errors(e.data) or e.detail, finished=time.time())
+                    self._done(rid)
+                    raise
+                pid = r["prompt_id"]
+                self.by_prompt[pid] = rid
+                self.live[rid] = {"total": len(graph), "done": set(), "frac": 0.0, "cached": set()}
+                self.db.update_run(rid, prompt_id=pid)
+                log.info("run %s: %s queued as %s (needs %.1f GB)", rid, pack.id, pid, needs)
+                if not ready.done():
+                    ready.set_result(None)
+                await done.wait()                        # finish(), cancel() or reconcile() ends it
+        except asyncio.CancelledError:
+            if not ready.done():
+                ready.cancel()
+            raise
+        except Exception as e:  # noqa: BLE001: given to the caller, or recorded on the run
+            if not ready.done():
+                ready.set_exception(e)
+            elif added and (self.db.run(rid) or {}).get("state") in ACTIVE:
+                detail = getattr(e, "detail", None) or str(e) or type(e).__name__
+                self.db.update_run(rid, state="failed", error=f"{detail}"[:500], finished=time.time())
+                self._done(rid)
+        finally:
+            self.gpu_wait.pop(rid, None)
+            self.tasks.pop(rid, None)
+
+    async def _prepare(self, pack, needs: float, make_room: bool) -> None:
+        """Memory (after the slot: holding a reservation while waiting would unload others for nothing), ComfyUI up."""
         if self.last_pack and self.last_pack != pack.id and await self.client.up():
             # Another workflow's models are still loaded: free them, so AIHub sees the room and this
             # run's measured peak is its own (not the two added together).
@@ -130,21 +203,19 @@ class Runner:
             if self._ws_connected:
                 break
             await asyncio.sleep(0.05)
-        rid = "r-" + uuid.uuid4().hex[:10]
-        self.db.add_run(rid, pack.id, label, values)
-        self.events[rid] = asyncio.Event()
-        try:
-            r = await self.client.prompt(graph, self.client_id, {"extra_pnginfo": {"aihub": {"workflow": pack.id, "run": rid}}})
-        except ComfyError as e:
-            self.db.update_run(rid, state="failed", error=_node_errors(e.data) or e.detail, finished=time.time())
-            self.events[rid].set()
-            raise
-        pid = r["prompt_id"]
-        self.by_prompt[pid] = rid
-        self.live[rid] = {"total": len(graph), "done": set(), "frac": 0.0, "cached": set()}
-        self.db.update_run(rid, prompt_id=pid)
-        log.info("run %s: %s queued as %s (needs %.1f GB)", rid, pack.id, pid, needs)
-        return self.db.run(rid)
+
+    def typical_s(self, workflow: str) -> float | None:
+        """How long this workflow's runs usually take (the median of the last 10), for the GPU queue's ETA."""
+        secs = sorted(r["finished"] - r["started"] for r in self.db.runs(states=("done",), workflow=workflow, limit=10)
+                      if r.get("started") and r.get("finished"))
+        return round(secs[len(secs) // 2], 1) if secs else None
+
+    def annotate(self, run: dict | None) -> dict | None:
+        """A run waiting for the GPU slot: `stage: "waiting_gpu"`, `ahead`, `eta_s` (plan 31.3)."""
+        w = self.gpu_wait.get(run["id"]) if run else None
+        if w is None or run.get("state") != "queued":
+            return run
+        return {**run, "stage": "waiting_gpu", "ahead": w["ahead"], "eta_s": w["eta_s"]}
 
     def needs_gb(self, pack, conv) -> float:
         m = pack.manifest
@@ -288,6 +359,8 @@ class Runner:
         for run in self.db.runs(states=ACTIVE, limit=50):
             pid = run.get("prompt_id")
             if not pid:
+                if run["id"] in self.tasks:             # waiting for the GPU slot or memory: not lost
+                    continue
                 if time.time() - run["created"] > 60:
                     self.db.update_run(run["id"], state="failed", error="never reached ComfyUI", finished=time.time())
                 continue
@@ -412,7 +485,10 @@ class Runner:
         self.db.update_run(rid, state="cancelled", finished=time.time(), error="cancelled")
         self.live.pop(rid, None)
         self._peaks.pop(rid, None)
-        self._done(rid)
+        self._done(rid)                         # a run holding the GPU slot gives it back
+        task = self.tasks.get(rid)
+        if task is not None and not pid:        # still waiting for the slot (or memory): stop waiting
+            task.cancel()
         return self.db.run(rid)
 
     async def _unstick(self, pid: str) -> None:

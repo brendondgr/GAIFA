@@ -113,16 +113,28 @@ function speakTab(el, ctx, cleanups) {
     else { body.voice = voiceSel.value; body.speed = st.speed; }
     genBtn.disabled = true; genBtn.textContent = 'Generating…';
     const t0 = performance.now();
-    const pending = panel(header('Generating'), ui.text(ctx.service.load === 'loaded' ? 'Speaking…' : `Loading ${breeze ? 'Breeze (about 30 s cold)' : 'Kokoro'}, then speaking…`, { muted: true }));
+    const note = ui.text(ctx.service.load === 'loaded' ? 'Speaking…' : `Loading ${breeze ? 'Breeze (about 30 s cold)' : 'Kokoro'}, then speaking…`, { muted: true });
+    const pending = panel(header('Generating'), note);
     result.prepend(pending);
+    // AIHub's GPU queue (plan 31.3): while the request waits for another mod's GPU work, say so.
+    const said = note.textContent;
+    const gpuWait = setInterval(async () => {
+      try {
+        const w = ((await ctx.call('GET', '/v1/status')).json.jobs || []).find(j => j.stage === 'waiting_gpu');
+        const a = w?.ahead?.[0];
+        note.textContent = w ? `Waiting for the GPU${a ? `: ${a.service}${a.label ? ` (${a.label})` : ''}` : ''}${w.eta_s ? `, about ${Math.max(1, Math.round(w.eta_s / 60))} min` : ''}…` : said;
+      } catch { /* the next tick tries again */ }
+    }, 1500);
+    cleanups.push(() => clearInterval(gpuWait));
     try {
       const r = await callRoom(ctx, 'POST', '/v1/speech', { json: body });
+      clearInterval(gpuWait);
       pending.remove();
       showResult(r, body, (performance.now() - t0) / 1000);
     } catch (e) {
       pending.remove();
       if (!e.cancelled) ctx.toast(errText(e), 'error');
-    } finally { genBtn.disabled = false; genBtn.textContent = 'Generate'; }
+    } finally { clearInterval(gpuWait); genBtn.disabled = false; genBtn.textContent = 'Generate'; }
   }
 
   function showResult(r, body, secs) {

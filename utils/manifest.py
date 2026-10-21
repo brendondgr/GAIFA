@@ -138,6 +138,14 @@ class MemorySpec(_Strict):
         return v
 
 
+class GpuSpec(_Strict):
+    """[gpu] (plan 31.2): the mod takes the GPU slot around its GPU work (`POST /api/gpu/acquire`). The
+    defaults for its leases; a lease can override both."""
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    cls: Literal["interactive", "job", "background"] = Field("job", alias="class")
+    group: str | None = Field(None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")   # default: the mod id
+
+
 class ModelsSpec(_Strict):
     dirs: list[str] = []
 
@@ -291,6 +299,7 @@ class Manifest(_Strict):
     version: str | None = None
     run: RunSpec
     memory: MemorySpec | None = None
+    gpu: GpuSpec | None = None
     models: ModelsSpec = ModelsSpec()
     outputs: OutputsSpec | None = None
     ui: UiSpec = UiSpec()
@@ -614,6 +623,9 @@ def launch_spec(mod: Mod, cfg: Config, paths: Paths, hub_port: int) -> LaunchSpe
         env["AIHUB_IDLE_UNLOAD_S"] = idle
         if m.memory.idle_unload_env:
             env[m.memory.idle_unload_env] = idle
+    if m.gpu:  # plan 31.2: the defaults the mod's gpu_slot client reads
+        env["AIHUB_GPU_CLASS"] = m.gpu.cls
+        env["AIHUB_GPU_GROUP"] = m.gpu.group or mod.id
     env.update({k: expand(v, values, f"config.toml [services.{mod.id}].env.{k}") for k, v in eff.env.items()})
     return LaunchSpec(
         id=mod.id,

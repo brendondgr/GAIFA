@@ -192,7 +192,42 @@ async def run(mgr: ServiceManager, svc: Service, start: bool = False, tools: Any
     # 11. page
     if m.ui.page:
         r.add("page", *page_check(svc.mod.dir / m.ui.page))
+
+    # 12. the GPU slot (plan 31.2)
+    gpu = gpu_check(m, svc.status if live else None)
+    if gpu:
+        r.add("gpu", *gpu)
     return r.as_dict()
+
+
+GPU_WORDS = re.compile(r"cuda|rocm|hip|gpu|vulkan|mps|xpu", re.I)
+
+
+def _devices(body: Any, depth: int = 0) -> list[str]:
+    """Every `device` string in a status body (a few levels deep)."""
+    if depth > 3:
+        return []
+    if isinstance(body, dict):
+        out = [v for k, v in body.items() if k == "device" and isinstance(v, str)]
+        return out + [d for v in body.values() for d in _devices(v, depth + 1)]
+    if isinstance(body, list):
+        return [d for v in body[:20] for d in _devices(v, depth + 1)]
+    return []
+
+
+def gpu_check(m: mf.Manifest, status: Any) -> tuple[str, str] | None:
+    """A mod with `[memory]` (it loads models) and no `[gpu]` doesn't wait for the GPU slot: a warning, unless
+    its status says it runs on the CPU."""
+    if m.gpu:
+        return "ok", f"takes the GPU slot: class {m.gpu.cls}, group {m.gpu.group or m.id}"
+    if not m.memory:
+        return None
+    devices = _devices(status)
+    if devices and not any(GPU_WORDS.search(d) for d in devices):
+        return "ok", f"runs on {', '.join(sorted(set(devices)))}: no GPU slot needed"
+    seen = f" (its status says device {', '.join(sorted(set(devices)))})" if devices else ""
+    return "warn", (f"loads models but has no [gpu]{seen}: its GPU work doesn't wait for other mods' work. Take the slot "
+                    "around it (docs/mods.md \"Taking the GPU\") and add [gpu] class = \"job\" to service.toml")
 
 
 def _manifest_ops(m: mf.Manifest) -> list[tuple[str, str]]:

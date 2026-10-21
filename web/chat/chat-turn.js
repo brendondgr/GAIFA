@@ -84,11 +84,11 @@ export function groupTurns(view, { running = false, now = Date.now() / 1000, too
   }
   flush();
   const turns = out.filter(b => b.kind === 'turn');
-  turns.forEach((t, i) => finish(t, running && i === turns.length - 1, now));
+  turns.forEach((t, i) => finish(t, running && i === turns.length - 1, now, view.gpu));
   return out;
 }
 
-function finish(turn, live, now) {
+function finish(turn, live, now, gpu = null) {
   turn.running = live;
   // the answer: the last step's text when that step called no tools
   const last = turn.steps[turn.steps.length - 1];
@@ -114,7 +114,7 @@ function finish(turn, live, now) {
   turn.pending = rows.filter(r => (r.type === 'tool' && r.status === 'waiting') || (r.type === 'question' && !r.item.answer && !r.item.result)).map(r => r.item);
   if (turn.pending.length) turn.running = live = true;          // waiting for you is still a live turn
   turn.elapsed = Math.max(0, (live ? now : turn.end) - turn.start);
-  turn.status = live ? status(turn, rows) : null;
+  turn.status = live ? status(turn, rows, gpu) : null;
   const work = toolRows.filter(r => !r.lookup).length, looks = toolRows.length - work;
   turn.summary = { work, lookups: looks, text: work ? `Ran ${work} tool${work === 1 ? '' : 's'}` : looks ? 'Looked something up' : rows.length ? 'Thought it through' : 'Done' };
 }
@@ -129,13 +129,14 @@ export function toolState(it, live, started) {
   return started ? 'running' : 'queued';
 }
 
-/** What the live header says, in order: waiting for you → a running tool → writing → thinking → working. */
-function status(turn, rows) {
+/** What the live header says, in order: waiting for you → a running tool → waiting for the GPU → writing → thinking → working. */
+function status(turn, rows, gpu = null) {
   const wait = turn.pending[0];
   if (wait) return { kind: 'waiting', item: wait, question: wait.kind === 'question' };
   const tools = rows.filter(r => r.type === 'tool' && r.status === 'running');
   const tool = tools.find(r => !r.lookup) || tools[0];
   if (tool) return { kind: tool.lookup ? 'lookup' : 'tool', row: tool, pct: tool.progress?.progress ?? null, note: tool.progress?.note || null };
+  if (gpu?.text) return { kind: 'gpu', text: gpu.text };       // the model call waits for the GPU slot (plan 31.4)
   if (turn.answer?.streaming || rows.some(r => r.type === 'update' && r.streaming)) return { kind: 'writing' };
   const th = rows.filter(r => r.type === 'thinking' && r.streaming).pop();
   if (th) return { kind: 'thinking', row: th };

@@ -2,14 +2,13 @@
 chunk, at most two hits an output, filtered by kind, a collection, or the chat's attachments.
 
 A scoped search (a collection, or `thread_only`) first indexes its own outputs that aren't indexed yet: someone
-is asking about them now, so it doesn't wait for the GPU to be idle, the rule for indexing everything else. A
+is asking about them now, so it takes `interactive` GPU leases rather than the background ones indexing uses. A
 search of everything does the same for outputs made in the last hour (newest first, for up to 5 s), so what
-was just made is found; older ones are left to the idle indexer.
+was just made is found; older ones are left to the background indexer. Every encode takes its own lease (plan 31.3).
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 import time
@@ -130,25 +129,25 @@ def lines_of(text: str, first_line: int, size: int = 200) -> list[list[tuple[int
     return out
 
 
-async def _closest(enc: Encoder, q: np.ndarray, texts: list[str]) -> np.ndarray:
-    vecs = await asyncio.to_thread(enc.embed, [("text", prompt(t, "document")) for t in texts], 768, {"text": 32})
+async def _closest(lib: Library, q: np.ndarray, texts: list[str]) -> np.ndarray:
+    vecs = await lib.encode([("text", prompt(t, "document")) for t in texts], 768, {"text": 32}, "Search: the matching lines")
     return vecs @ q
 
 
-async def best_lines(enc: Encoder, q: np.ndarray, rows: list[dict[str, Any]], per: int = 64) -> dict[int, tuple[int, str]]:
+async def best_lines(lib: Library, q: np.ndarray, rows: list[dict[str, Any]], per: int = 64) -> dict[int, tuple[int, str]]:
     """For each text hit, where in it the query matched: the closest window of lines (the snippet), then the
     closest line in that window (the line number). A chunk's start often isn't what matched: a rule on page 41
     behind 20 routine ones."""
     wins = [(r["id"], w) for r in rows for w in lines_of(r["text"], r["line"] or 1)[:per]]
     if not wins:
         return {}
-    scores = await _closest(enc, q, [" ".join(t for _, t in w) for _, w in wins])
+    scores = await _closest(lib, q, [" ".join(t for _, t in w) for _, w in wins])
     best: dict[int, tuple[float, list[tuple[int, str]]]] = {}
     for (cid, w), sc in zip(wins, scores):
         if cid not in best or sc > best[cid][0]:
             best[cid] = (float(sc), w)
     lines = [(cid, n, t) for cid, (_, w) in best.items() for n, t in w]
-    ls = await _closest(enc, q, [t for _, _, t in lines]) if lines else []
+    ls = await _closest(lib, q, [t for _, _, t in lines]) if lines else []
     top: dict[int, tuple[float, int]] = {}
     for (cid, n, _), sc in zip(lines, ls):
         if cid not in top or sc > top[cid][0]:
@@ -166,7 +165,7 @@ async def search(lib: Library, enc: Encoder, query: str, kind: str | None = None
     m = lib.store.matrix()
     if not len(m.ids):
         return []
-    q = (await asyncio.to_thread(enc.embed, [("text", prompt(query, "query"))], 768, {"text": 1}))[0]
+    q = (await lib.encode([("text", prompt(query, "query"))], 768, {"text": 1}, "Search"))[0]
     scores = m.vectors @ q
     kinds = {r["id"]: r["kind"] for r in lib.store.all()}
     hits: list[tuple[int, float]] = []
@@ -186,7 +185,7 @@ async def search(lib: Library, enc: Encoder, query: str, kind: str | None = None
         if len(hits) >= limit:
             break
     rows = lib.store.chunk_rows([h for h, _ in hits])
-    best = await best_lines(enc, q, [rows[c] for c, _ in hits if c in rows and rows[c].get("text")])
+    best = await best_lines(lib, q, [rows[c] for c, _ in hits if c in rows and rows[c].get("text")])
     out = []
     for cid, score in hits:
         r = rows.get(cid)

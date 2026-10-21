@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from . import outputs, voices
 from .config import settings
-from .engines import ENGINES
+from .engines import ENGINES, WAITING
 
 router = APIRouter()
 WIDGET_RANGES = {"7d": 7, "30d": 30}
@@ -22,7 +22,7 @@ def status():
     now = time.monotonic()
     return {
         "loaded": bool(alive),
-        "busy": any(e._lock.locked() or e.state == "loading" for e in ENGINES.values()),
+        "busy": any(e._lock.locked() or e.state == "loading" for e in ENGINES.values()) or bool(WAITING),
         "idle_s": round(min(now - e.last_used for e in alive), 1) if alive else None,
         "engines": {n: e.status() for n, e in ENGINES.items()},
         "stats": [
@@ -30,6 +30,8 @@ def status():
             {"label": "Engines installed", "value": sum(1 for e in ENGINES.values() if e.python.exists())},
             {"label": "Clips today", "value": outputs.clips_today(settings.outputs_dir), "reset": "daily"},
         ],
+        # Requests waiting for AIHub's GPU slot (plan 31.3): stage waiting_gpu, with what runs before them.
+        "jobs": [{**j, "route": "#/s/tts"} for j in list(WAITING.values())],
     }
 
 

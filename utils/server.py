@@ -85,6 +85,7 @@ class Hub:
     memory: MemoryManager | None = None
     memory_source: Any = None  # tests inject a fake (utils/memory/source.py)
     memory_every_s: float = 2.0
+    gpu: Any = None         # gpu.GpuQueue (plan 31.1)
     metrics: Recorder | None = None
     metrics_every_s: float = 10.0
     widgets: Widgets | None = None
@@ -133,7 +134,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, prefs, services, sessions, settings, skills, system, tools, web, webpages, widgets
+    from utils.routes import events, gpu, mcp, memory, metrics, models, outputs, overview, prefs, services, sessions, settings, skills, system, tools, web, webpages, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -216,9 +217,16 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.services.before_proxy.append(memory_hook(hub.memory))
             await hub.memory.start()
             stack.push_async_callback(hub.memory.close)
+            # 7b. the GPU queue (plan 31.1): mods take the slot around their GPU work, then ask for memory.
+            from utils.gpu import GpuQueue
+
+            hub.gpu = GpuQueue(hub.bus, hub.alerts, hub.activity, cfg=lambda: hub.config.gpu, name_of=_service_name(hub))
+            await hub.gpu.start()
+            stack.push_async_callback(hub.gpu.close)
             # 8. metrics: record every 10 s and follow service and job events; roll up hourly.
             hub.metrics = Recorder(hub.services, hub.memory, hub.db, hub.bus, hub.alerts,
                                    disk_path=paths.root, every=hub.metrics_every_s)
+            hub.metrics.gpu = hub.gpu
             await hub.metrics.start()
             stack.push_async_callback(hub.metrics.close)
             hub.widgets = Widgets(hub.services)
@@ -283,6 +291,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(metrics.router)  # before outputs: /api/outputs/stats isn't an output id
     app.include_router(outputs.router)
     app.include_router(memory.router)
+    app.include_router(gpu.router)
     app.include_router(widgets.router)
     app.include_router(overview.router)
     app.include_router(settings.router)
@@ -293,7 +302,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(mcp.router)  # /mcp: the tools over MCP (13.4)
     app.include_router(webpages.router)  # /api/web/read (30.8)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings", "tools", "sessions", "prefs", "webpages"):
+                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu"):
         hub.mark_live(area)
 
     app.include_router(web.router)

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 router = APIRouter()
 HEADER = "x-aihub-make-room"
+GPU_LEASE = "x-aihub-gpu-lease"     # a caller holding the GPU slot (gen3d) hands its lease down: run under it
 
 
 class RunRequest(BaseModel):
@@ -26,21 +27,30 @@ class DefaultsBody(BaseModel):
     defaults: dict[str, str | None] = Field(description="task → pack id (null clears it)")
 
 
-def _job(run: dict) -> dict:
-    return {k: run.get(k) for k in ("id", "workflow", "label", "state", "progress", "inputs", "outputs", "error",
-                                    "created", "started", "finished", "peak_gb", "prompt_id")}
+def _job(run: dict, runner=None) -> dict:
+    run = runner.annotate(run) if runner is not None else run
+    out = {k: run.get(k) for k in ("id", "workflow", "label", "state", "progress", "inputs", "outputs", "error",
+                                   "created", "started", "finished", "peak_gb", "prompt_id")}
+    if run.get("stage"):                          # "waiting_gpu", with what runs before it (plan 31.3)
+        out.update(stage=run["stage"], ahead=run.get("ahead") or [], eta_s=run.get("eta_s"))
+    return out
+
+
+def _parent(request: Request) -> str | None:
+    return (request.headers.get(GPU_LEASE) or "").strip() or None
 
 
 @router.post("/v1/run", status_code=202, summary="Run a workflow pack; returns its job (poll /v1/jobs/{id}?wait=…)")
 async def run(request: Request, body: RunRequest) -> dict:
     make_room = request.headers.get(HEADER, "").lower() in ("1", "true", "yes")
-    r = await request.app.state.runner.submit(body.workflow, body.inputs, body.preset, make_room)
-    return _job(r)
+    runner = request.app.state.runner
+    r = await runner.submit(body.workflow, body.inputs, body.preset, make_room, parent=_parent(request))
+    return _job(r, runner)
 
 
 @router.get("/v1/jobs", summary="Recent runs, newest first")
 def jobs(request: Request, limit: int = Query(50, ge=1, le=500), workflow: str | None = None) -> dict:
-    return {"jobs": [_job(r) for r in request.app.state.db.runs(workflow=workflow, limit=limit)]}
+    return {"jobs": [_job(r, request.app.state.runner) for r in request.app.state.db.runs(workflow=workflow, limit=limit)]}
 
 
 @router.get("/v1/jobs/{job_id}", summary="One run; ?wait=<seconds> waits until it finishes (up to that long)")
@@ -48,21 +58,21 @@ async def job(request: Request, job_id: str, wait: float = Query(0, ge=0, le=180
     r = await request.app.state.runner.wait(job_id, wait)
     if r is None:
         raise HTTPException(404, f"no job {job_id!r}")
-    return _job(r)
+    return _job(r, request.app.state.runner)
 
 
 @router.get("/v1/queue", summary="Runs waiting or running, and ComfyUI's own queue")
 async def queue(request: Request) -> dict:
     st = request.app.state
     ctl = st.control
-    return {"jobs": [_job(r) for r in st.db.runs(states=("queued", "running"), limit=100)],
+    return {"jobs": [_job(r, st.runner) for r in st.db.runs(states=("queued", "running"), limit=100)],
             "comfyui": {"running": len(ctl.running), "pending": len(ctl.pending), "up": ctl.up}}
 
 
 @router.post("/v1/queue/{job_id}/cancel", summary="Cancel a waiting or running run")
 async def cancel(request: Request, job_id: str) -> dict:
     try:
-        return _job(await request.app.state.runner.cancel(job_id))
+        return _job(await request.app.state.runner.cancel(job_id), request.app.state.runner)
     except KeyError:
         raise HTTPException(404, f"no job {job_id!r}") from None
 
@@ -141,7 +151,8 @@ async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
         if covered is not None and covered.tool:          # plan 20.5: a task tool runs it, with its checks and card
             raise InputError(f"{hidden.id} is {'an' if hidden.task[0] in 'aeiou' else 'a'} {hidden.task} workflow: call {covered.tool} "
                              f"with workflow={hidden.id!r} instead of run_workflow")
-        r = await st.runner.submit(args.get("workflow", ""), args.get("inputs") or {}, args.get("preset"), make_room)
+        r = await st.runner.submit(args.get("workflow", ""), args.get("inputs") or {}, args.get("preset"), make_room,
+                                   parent=_parent(request))
         return {"status": "running", "job_id": r["id"], "workflow": r["workflow"]}
     task = next((t for t in lib.tasks.tasks.values() if t.tool == name), None)
     if task is None:
@@ -166,7 +177,8 @@ async def call_tool(request: Request, name: str, body: ToolCall) -> dict:
         raise InputError(f"{pack.id} takes {len(slots)} reference picture(s), not {len(refs)}")
     args.update(dict(zip(slots, refs)))         # references → image_2, image_3, … (plan 20.3)
     filled = fill_references(sch.get("required", []), args)
-    r = await st.runner.submit(pack.id, {**{k: v for k, v in args.items() if k in takes}, **filled}, preset or None, make_room)
+    r = await st.runner.submit(pack.id, {**{k: v for k, v in args.items() if k in takes}, **filled}, preset or None, make_room,
+                               parent=_parent(request))
     out = {"status": "running", "job_id": r["id"], "workflow": pack.id, **({"preset": preset} if preset else {})}
     if filled:
         out["filled"] = {k: "the main image" for k in filled}

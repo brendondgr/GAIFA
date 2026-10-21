@@ -31,6 +31,7 @@ from urllib.parse import quote
 
 import httpx
 
+from utils.gpu import gpu_note
 from utils.services import ServiceError
 from utils.tools import results
 from utils.tools.approvals import Approvals, canonical, decide, judge
@@ -435,6 +436,10 @@ class Calls:
                 pass
         return c.public()
 
+    def _name_of(self, sid: str) -> str:
+        svc = self.hub.services.services.get(sid) if self.hub.services else None
+        return svc.mod.name if svc else sid
+
     def _publish(self, c: Call) -> None:
         ev = {k: v for k, v in c.public().items() if k != "result"}
         ev["origin"] = c.origin
@@ -628,6 +633,7 @@ class Calls:
         deadline = time.time() + FOLLOW_MAX_S
         body = first
         last_progress: float | None = None
+        gpu_was: str | None = None
         while True:
             st = _state_of(body) if body is not None and body is not first else None
             if st in DONE | FAILED | CANCELLED:
@@ -642,8 +648,11 @@ class Calls:
                 raise mod_error(svc, r)
             body = r.json()
             p = _progress(body)
-            if p != last_progress:
-                c.progress, last_progress = p, p
+            note = gpu_note(body, self._name_of)        # plan 31.3: "Waiting for the GPU: …" on the chat's step row
+            if p != last_progress or note != gpu_was:
+                if note or gpu_was:
+                    c.note = note
+                c.progress, last_progress, gpu_was = p, p, note
                 self._publish(c)
         if st in FAILED:
             err = body.get("error") if isinstance(body, dict) else None

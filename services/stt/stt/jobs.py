@@ -3,11 +3,13 @@
 An upload waits in ``runtime/tmp`` until its job ends (done, failed or cancelled, queued or not);
 at most ``MAX_QUEUED_UPLOADS`` wait at once, and files left by a crash are swept at startup. A
 running job holds a lease on its model (``Engine.acquire``); when a live stream holds another model,
-the job waits in stage ``waiting`` until it ends."""
+the job waits in stage ``waiting`` until it ends. On the GPU, a job first takes AIHub's GPU slot (plan
+31.3): while another mod's work holds it, the job is ``queued`` in stage ``waiting_gpu``."""
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import shutil
@@ -24,6 +26,7 @@ from .audio.formats import SAMPLE_RATE
 from .batch.batch import transcribe_samples
 from .config import MOD_DIR, VadConfig
 from .engine import Engine, ModelBusy
+from .gpu import Gpu, GpuCancelled
 from .hub import Hub, HubError
 from .vad import build_detector
 
@@ -48,7 +51,7 @@ class Job:
     source: dict[str, Any] = field(default_factory=dict)   # {"output_id"} or {"upload": name}
     upload: Path | None = None
     state: str = "queued"     # queued | running | done | failed | cancelled
-    stage: str = "queued"     # fetching | decoding | waiting | loading | transcribing | saving
+    stage: str = "queued"     # fetching | decoding | waiting_gpu | waiting | loading | transcribing | saving
     progress: float = 0.0
     created: float = field(default_factory=time.time)
     started: float | None = None
@@ -58,12 +61,16 @@ class Job:
     transcript: str | None = None        # the [mm:ss] paragraphs, for the agent's tool result
     error: str | None = None
     cancel: bool = False
+    ahead: list[dict[str, Any]] = field(default_factory=list)   # waiting_gpu: what runs before it
+    eta_s: float | None = None
 
     def view(self) -> dict[str, Any]:
         out = {"id": self.id, "label": self.label, "state": self.state, "stage": self.stage,
                "progress": round(self.progress, 3), "model": self.model, "language": self.language,
                "created": self.created, "started": self.started, "finished": self.finished,
                "duration": self.duration, "source": self.source, "error": self.error}
+        if self.stage == "waiting_gpu":
+            out["ahead"], out["eta_s"] = self.ahead, self.eta_s
         if self.result is not None:
             out["result"] = self.result
             out["transcript"] = self.transcript
@@ -75,8 +82,8 @@ class Job:
 
 
 class Jobs:
-    def __init__(self, engine: Engine, hub: Hub, outputs: Path, mod: str = "stt") -> None:
-        self.engine, self.hub, self.outputs, self.mod = engine, hub, outputs, mod
+    def __init__(self, engine: Engine, hub: Hub, outputs: Path, mod: str = "stt", gpu: Gpu | None = None) -> None:
+        self.engine, self.hub, self.outputs, self.mod, self.gpu = engine, hub, outputs, mod, gpu
         self.tmp = TMP
         self.receiving = 0           # uploads being written to runtime/tmp right now
         self.jobs: dict[str, Job] = {}
@@ -175,6 +182,33 @@ class Jobs:
         job.duration = samples.size / SAMPLE_RATE
         if job.cancel:
             return self._finish(job, "cancelled")
+        async with contextlib.AsyncExitStack() as stack:
+            if not await self._take_gpu(job, stack):
+                return self._finish(job, "cancelled")
+            await self._transcribe(job, samples)
+
+    async def _take_gpu(self, job: Job, stack: contextlib.AsyncExitStack) -> bool:
+        """The GPU slot, when the model runs on the GPU; False when the job was cancelled while it waited."""
+        if self.gpu is None or not self.gpu.enabled or self.engine.fell_back or not await self.engine.gpu():
+            return True
+
+        def waiting(lease) -> None:
+            job.state, job.stage, job.ahead, job.eta_s = "queued", "waiting_gpu", lease.ahead, lease.eta_s
+
+        rtf = self.engine.inference_seconds / self.engine.audio_seconds if self.engine.audio_seconds else None
+        est = round((job.duration or 0) * rtf + 5, 1) if rtf else None
+        try:
+            lease = await self.gpu.enter(stack, f"Transcribe: {job.label}", cls="job", est_s=est,
+                                         stop=lambda: job.cancel, on_wait=waiting)
+        except GpuCancelled:
+            job.cancel, job.error = True, "cancelled in the GPU queue"
+            return False
+        if lease is None or job.cancel:
+            return False
+        job.state, job.ahead, job.eta_s = "running", [], None
+        return True
+
+    async def _transcribe(self, job: Job, samples) -> None:
         while True:
             job.stage = "loading"
             try:

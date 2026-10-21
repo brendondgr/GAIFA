@@ -28,14 +28,8 @@ class Settings:
     batch_media: int = 4
     # the library (plan 28.2)
     databases: Path = HERE / "data"
-    index: bool = True                # follow the hub's outputs and index them
-    idle_measure: str = "aihub"       # aihub (other GPU mods working, and the device's median) | device (gpu_busy_percent)
-    idle_device_pct: float = 30.0     # the whole GPU's 30 s median at or above this counts as busy (both measures)
-    idle_window_s: float = 30.0       # the window of that median
-    idle_busy_pct: float = 10.0       # aihub: the other mods' Vulkan engine time must stay under this…
-    idle_seconds: float = 300.0       # …held for this long, before indexing starts
+    index: bool = True                # follow the hub's outputs and index them (each batch waits for the GPU slot, plan 31.3)
     index_audio_max_s: float = 3600.0 # longer audio is indexed up to here (30 s windows)
-    index_gap_s: float = 1.0          # pause between batches, then a fresh look at the GPU
     index_batch_text: int = 8         # chunks of ~800 tokens a batch (32 of them peaked at 7.5 GB)
 
     @classmethod
@@ -55,12 +49,6 @@ class Settings:
             batch_media=int(e.get("EMBED_BATCH_MEDIA", d.batch_media)),
             databases=Path(e.get("AIHUB_DATABASES", d.databases)),
             index=e.get("EMBED_INDEX", "1") not in ("", "0", "false", "no"),
-            idle_measure=e.get("EMBED_IDLE_MEASURE", d.idle_measure),
-            idle_device_pct=float(e.get("EMBED_IDLE_DEVICE_PCT", d.idle_device_pct)),
-            idle_window_s=float(e.get("EMBED_IDLE_WINDOW_S", d.idle_window_s)),
-            idle_busy_pct=float(e.get("EMBED_IDLE_BUSY_PCT", d.idle_busy_pct)),
-            idle_seconds=float(e.get("EMBED_IDLE_SECONDS", d.idle_seconds)),
             index_audio_max_s=float(e.get("EMBED_INDEX_AUDIO_MAX_S", d.index_audio_max_s)),
-            index_gap_s=float(e.get("EMBED_INDEX_GAP_S", d.index_gap_s)),
             index_batch_text=int(e.get("EMBED_INDEX_BATCH_TEXT", d.index_batch_text)),
         )

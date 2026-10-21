@@ -66,6 +66,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 30 | Auto mode: a small local judge, and a `decide` mod for decision models | M–L | Auto in the mode picker; judged calls with their reasons; the decide page |
 | 31 | The GPU queue: one generative GPU job at a time | L | the header's GPU section, the Overview widget, waiting rows in Chat and on mod pages |
 | 32 | The reply bar and Select → Reply | M | `chat`: Sources, Copy and thumbs under a reply; the Reply button on a selection, the quote chip and the quote on a message |
+| 34 | Environments: the folders a chat may use, and asking for more | M | the chat header's environment chip, the folder card, the Workspace page's Environments |
 | 33 | The sidebar: groups, a thin rail and service logos | M | the sidebar (groups, the rail, the Services menu), the Services page, a logo per mod |
 
 # Stage A — Foundation
@@ -2743,6 +2744,8 @@ The Auto mode (27.4) needs something to decide, call by call, whether a command 
 - [x] **30.9 Saved web pages are hidden outputs (asked for 2026-10-21: "only user generated items are inside of Outputs").** The sidecar's `hidden: true` is indexed (migration 012, which also marks rows that already had it in their meta). `GET /api/outputs` leaves them out unless `include_hidden=true` and counts them in `totals.hidden`; so do the Overview, the agent's output search, the outputs chart and the activity feed. Getting one by id, its text, search, citations and delete are unchanged, so the agent still rereads pages and citations still open them. The web mod writes `hidden: true` for every page and PDF, and `pages.hide_saved` marked the existing ones (run once). The embed library skips hidden outputs and drops ones it had indexed. The Outputs page has a "Saved web pages (n)" chip (`web/outputs/hidden.js`). `[outputs] hidden_keep_days` (default 0, off) moves old hidden outputs to the trash: waiting for the user's choice.
   *Done when:* `utils/tests/outputs/test_hidden.py`, `utils/tests/web/hidden.test.mjs`, `services/web/tests/test_hidden.py`, `services/embed/tests/test_hidden.py`.
 
+- [x] **30.10 Reading web pages faster and to the point (asked for 2026-10-21).** `web_fetch` returns numbered lines and a `cite` hint, and for a long page its passages most relevant to the question first (`utils/tools/webread.py`; `[agent.web] relevance`: auto, decide, lexical, off); only what's shown is screened, code and table rows go to the patterns; links the user typed are read without a card (`searched.shared`); the reply's Sources count attached pages and typed links ("you shared"); Settings → Agent → Reading web pages sets the screening model (closing 30.8's "Not yet"), relevance and `[outputs] hidden_keep_days`; Sphinx `¶` anchors are stripped. Offline: the screening reads up to about a third less on long pages; ranking takes 1–4 ms. *Done when:* `utils/tests/tools/test_webread.py`, `test_shared_links.py`, `test_screen_structural.py`, `utils/tests/settings/test_web_settings.py`, `services/agent/tests/test_links.py`, `utils/tests/web/chat-sources-shared.test.mjs`, `chat-webprefs.test.mjs`, `services/web/tests/test_markdown.py`.
+
 **Wire — Phase 30:** the Auto mode works; judged calls show their reason.
 
 **Checks & deliverables — Phase 30**
@@ -2799,6 +2802,7 @@ The user asked (2026-10-21) for work to **wait for the GPU**: a queue, so only o
 - **A switch.** `config.toml [gpu] queue = true` (default). Set to false, it goes back to memory-only admission, for debugging.
 
 **Needs a human answer:**
+- **Answered 2026-10-21:** chats on a local model wait behind a job ("Yes, it needs to. That is a requirement for this."), with the turn saying so; live dictation runs on the CPU while another group holds the slot ("Sure").
 - **Chat during a long job.** With the queue, a chat on a local model waits behind a 10-minute video, and the reply starts when the video is done. *Recommendation:* wait, and show "Waiting for the GPU: Images & Video, about 6 min left" on the turn's status line. The other option is to let interactive LLM requests run alongside a job, which is today's behaviour and the case that produced Whisper's nonsense.
 - **Dictation during a job.** Live dictation (stt `/v1/stream`) runs for minutes, mostly idle. Holding the slot for all of it would block every job, and waiting would make dictation lag. *Recommendation:* while another group holds the slot, live dictation runs on the CPU, either the same model or a smaller one (stt already has a CPU path), and says so on the mic button.
 
@@ -2806,7 +2810,7 @@ The user asked (2026-10-21) for work to **wait for the GPU**: a queue, so only o
 
 ## Phase 31 — The GPU queue
 
-- [ ] **31.1 The queue in the hub: `utils/gpu.py`, `utils/routes/gpu.py`.**
+- [x] **31.1 The queue in the hub: `utils/gpu.py`, `utils/routes/gpu.py`.**
   - `GpuQueue` (started in the lifespan after the memory manager, §5) holds `holder` (a group and its leases) and `waiting` (leases in order). A lease is `{id, service, group, class, label, est_s, thread?, call_id?, created_ts, granted_ts?, renewed_ts}`.
   - **Routes:**
     - `POST /api/gpu/acquire {service, group?, class, label, est_s?, parent?}?wait=` → `200 {lease, state: "granted"}`, or `202 {lease, state: "waiting", ahead: [{service, label, eta_s}]}` once `wait` runs out. The caller repeats it with `lease` to keep its place.
@@ -2819,14 +2823,14 @@ The user asked (2026-10-21) for work to **wait for the GPU**: a queue, so only o
   - **Config:** `config.toml [gpu] queue = true`, `lease_ttl_s = 60` (`utils/config.py` `GpuCfg`; architecture §9).
   *Done when:* `utils/tests/gpu/test_queue.py` covers FIFO within a class, interactive before jobs, background only when the queue is empty, group sharing (two LLM requests together; a job waits for both), a nested lease through `parent`, expiry and its alert, cancel, re-registering after a restart, and `queue = false`. `test_routes_gpu.py` covers the routes and the 202 path. The contract test covers the new routes.
 
-- [ ] **31.2 The contract for mods: `service.toml [gpu]`, a client, `aihub check`.**
+- [x] **31.2 The contract for mods: `service.toml [gpu]`, a client, `aihub check`.**
   - **Manifest:** `[gpu] class = "job" | "interactive" | "background"` and `group = "<name>"` (optional). It is the mod's default; a lease can override it.
   - **Client:** a small reference client, `gpu_slot(label, est_s=None, cls=None, parent=None)`. It is an async context manager that waits, renews in the background and releases on exit or cancel. It goes in `services/_template/` and is copied into each Python mod's own hub client, since mods never import the hub. Its header pass-through is `X-AIHub-GPU-Lease`.
   - **Check:** `aihub check <id>` warns when a mod that uses the GPU (a `[memory]` mod with a GPU `device` in its status) has no `[gpu]`.
   - **Docs:** docs/mods.md gets a "Taking the GPU" section; architecture §4.2 lists the extra; §7 gets "GPU queue".
   *Done when:* `utils/tests/services/test_gpu_manifest.py` (parsing, the check's warning) and the template's own test of the client against a fake hub: wait, renew, release on exception and on cancel.
 
-- [ ] **31.3 The job mods take the slot: comfy, gen3d, tts, stt (files), decide, embed.**
+- [x] **31.3 The job mods take the slot: comfy, gen3d, tts, stt (files), decide, embed.**
   - **comfy:** acquires before it submits a prompt to ComfyUI (`comfy/run.py`, after `/v1/run`'s memory acquire is moved behind the slot) and releases when the prompt finishes, fails or is cancelled. A queued run shows `waiting for the GPU` in its job stage.
   - **gen3d:** `Runner` (`gen3d/queue.py`) holds one lease per job across its stages. It passes the lease to comfy when it hands over TRELLIS.2 or SAM 3D Body. The Blender preview runs inside the same lease, unless `preview_device` is `cpu`.
   - **tts:** the engine lock (`localtts/engines.py`) takes the slot per synthesis, `group = "tts"`.
@@ -2836,19 +2840,28 @@ The user asked (2026-10-21) for work to **wait for the GPU**: a queue, so only o
   - Every mod's job status gets the stage `waiting_gpu` with `ahead`, so its page and the chat's step row can show it.
   *Done when:* each mod's tests (a fake hub) show its work waits while another lease holds the slot and runs after. A live check queues a comfy image while gen3d makes a model: the image starts only when the model is done, and the kernel log stays clean.
 
-- [ ] **31.4 Local LLMs take the slot per request: relay (or lcpp and vllm).**
+- [x] **31.4 Local LLMs take the slot per request: relay (or lcpp and vllm).**
   - A request to a local engine takes an `interactive` lease in the engine's group for the length of the request; a stream holds it until its last token.
   - **Where:** in the relay, for backends on this machine, since every chat goes through it (the agent at `:4000`, the judge, screening). If the relay can't do it cleanly, lcpp's daemon and vllm's server do it instead. Direct clients of llama-server's own port bypass the queue: a known limit, listed in §12.
   - The agent's turn status shows "Waiting for the GPU: <mod> <label>, about N min left" while its model request waits (needs the answer above).
   *Done when:* relay tests (a fake hub, a fake local backend) show two requests to one engine running together, a request waiting while a comfy job holds the slot, and a remote backend never taking it. The live check replays the overnight case: transcribe the 25 s seminar recording while Gemma 26B generates. The transcription waits for generation, then comes out right, and the kernel log stays clean.
 
-- [ ] **31.5 In the UI.**
+- [x] **31.5 In the UI.**
   - **The header:** the memory bar's popover gets a **GPU** section: what holds the slot (mod, label, elapsed, ETA) and what waits, in order, each with Cancel.
   - **Overview:** shows the same as a widget, plus wait times from 31.1's metrics.
   - **Chat:** a step whose job waits for the GPU says "Waiting for the GPU: 3D Generate is making a model (about 4 min)".
   - **Mod pages:** they show `waiting_gpu` like any other stage.
   - **Docs:** brief §11.7 and §11.13.
   *Done when:* a browser check with two queued jobs sees the order, the ETA and Cancel removing the second one. `utils/tests/web/` covers the popover's pure parts.
+
+*As built 2026-10-21 (the targeted tests of the hub and every mod pass; not yet run live):*
+- **Queue** (`utils/gpu.py`, routes in `utils/routes/gpu.py`): a group joins the holder unless another group's lease of the same or a higher class waits (so chat requests can't starve the judge); a mod that fails or stops frees its leases at once; the client makes its lease id up front, so a cancel can always release it; ETA from `est_s`, else the mod's last 10 holds; metrics `gpu.waiting`, `gpu.wait.<id>`, `gpu.hold.<id>`.
+- **Client** `services/_template/gpu_slot.py`, copied unchanged into comfy, gen3d, tts, stt, decide, embed and the relay; without a hub (or an older one) the work runs at once.
+- **Mods:** comfy takes the slot, then memory, then queues the prompt (a waiting run answers `queued`, `stage: "waiting_gpu"`); gen3d one lease per job, Blender preview included, passed to comfy; tts per synthesis inside the engine lock (group `tts`); stt file jobs `job`, dictation on the CPU when another group holds or waits for the slot (checked every 2 s, switching between frames); decide `interactive` per ask; embed searches `interactive`, indexing a `background` lease per batch (GpuIdle and `EMBED_IDLE_*` removed); a cancel from the queue is 409 `gpu_cancelled` (decide, embed).
+- **Relay:** per-request `interactive` leases for local OpenAI endpoints on loopback (group = the registration key, service = its owner, thread = `X-AIHub-Thread`), held to the stream's last chunk; tunnels like skynet never take it; relay setting `gpu_slot` (default on).
+- **Agent:** `agent/gpuwait.py` polls `GET /api/gpu` from 1.5 s into a model call and shows "Waiting for the GPU: <mod> <label>, about N min left" as the live status (`gpu_wait`).
+- **UI:** the memory popover's GPU section and the Overview's **GPU queue** widget (`web/gpu-queue.js`), "Waiting for the GPU" on mod pages, the jobs popover and step rows.
+- **Open:** the hub's `[memory] triggers` (gen3d, tts, stt) still reserve memory when a request is proxied, before the mod waits for the slot; the Auto judge and page screening on a local model wait behind GPU jobs and time out to ask; a GPU wait over 30 min fails an agent turn (its 1800 s model timeout); the mic button doesn't yet say it moved to the CPU; `relay/…/proxy.py` is 801 lines (split it).
 
 **Wire — Phase 31:** the header's GPU section, the Overview widget, waiting rows in Chat and on mod pages.
 
@@ -2932,6 +2945,23 @@ The sidebar lists every mod under SERVICES (brief §3), so with 14 mods it scrol
 **Checks & deliverables — Phase 33**
 - [ ] *Checked 2026-10-21 on a second hub (port 7077, this repo's mods not started, fake mods running and crashing): the three groups, the gear menu (modes, per-mod checkboxes, quick toggles), Counts, the rail in list and counts modes with state colours, collapse kept after a reload from `[ui.nav]` alone, fold, the Services page's switches, light theme, the phone drawer.* On the installed hub: collapse and expand (kept after a reload and in another browser), the rail's colours match the mods' states, hide and show mods from the gear menu and from the Services page, the three modes, fold the list, See all, light theme, the phone drawer.
 - [x] Delivered: `web/nav/sidebar.js`, `nav-model.js`, `logo.js`, `services-page.js`, a `ui/logo.svg` per mod, `[ui] logo`, `logo_url`, `[ui.nav]`, the tests.
+
+---
+
+## Phase 34 — Environments: the folders a chat may use, and asking for more
+
+Asked for 2026-10-21, after Claude's: named **environments** (sets of folders, each with its own level) that a chat works in, and when the user says "check out ~/Agents/Mycelium and understand X", the agent asks to read that folder, and the answer lets this chat use it. Builds on Phase 27 (the workspace mod) and Phase 25 (grants).
+
+- [x] **34.1 Environments in the workspace mod: `environments.py`, `api_env.py`.** CRUD (`GET/POST /v1/environments`, `PUT/DELETE /v1/environments/{id}`), folders with a level per environment, the migration from `folders.json` into Default (not deletable), folder ids shared across environments; `/v1/folders` kept. *Done when:* `services/workspace/tests/test_environments.py`.
+- [x] **34.2 A call works in its chat's environment.** `Folders.view(origin)`: the environment's folders plus `origin.folders` at Read; the edit, run, read and preflight routes use it; undo finds a folder in any environment.
+- [x] **34.3 Asking for a folder.** The preflight's `ask_folder`; in the hub, `_with_limits` asks, `Calls._folders` fills `origin.folders` from the chat's folder grants, `grants.check` writes a thread folder grant, `CallLimits.ask_folder`. Askable: inside home or a mounted drive, not hidden or secret-looking, symlinks resolved. *Done when:* `utils/tests/tools/test_folder_grants.py`.
+- [x] **34.4 The agent.** `origin.environment`, the chat's folders in the prompt (`context.folders_note`), the skill's line on asking. *Done when:* `services/agent/tests/test_environments.py`.
+- [x] **34.5 The UI.** The header chip and menu (`chat-env.js`), the folder card (Allow for this chat · Add to "<env>" · Deny) in the chat and the Approvals popover, the Workspace page's Environments view. *Done when:* `utils/tests/web/environments.test.mjs`. Checked on a second hub: the card, "Add to Grants", "Allow for this chat" working in that chat only.
+- [x] **34.6 Citations from the workspace.** A read result starts with how to cite it (`pkg/calc.py (cite lines as pkg/calc.py:N …)`) and search hits are `path:line`, so the model writes `calc.py:3`, not "line 3".
+
+**Checks & deliverables — Phase 34**
+- [ ] Live with the user: a chat in an environment named Grants reads its folders; "check out ~/Agents/Mycelium" asks, and Allow for this chat lets that chat (only) read it.
+- [x] Delivered: `services/workspace/environments.py`, `api_env.py`, the hub's folder grants, the agent's folder note, `web/chat/chat-env.js`, the tests.
 
 ---
 

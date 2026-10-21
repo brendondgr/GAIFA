@@ -31,9 +31,13 @@ def progress(job: dict) -> float | None:
     return round(total / len(stages), 3)
 
 
-def _job(job: dict) -> dict:
-    return {"id": job["id"], "label": (job.get("title") or job["id"])[:80], "progress": progress(job),
-            "state": STATE.get(job["status"], job["status"]), "route": f"#/s/gen3d/jobs?id={job['id']}"}
+def _job(job: dict, runner=None) -> dict:
+    out = {"id": job["id"], "label": (job.get("title") or job["id"])[:80], "progress": progress(job),
+           "state": STATE.get(job["status"], job["status"]), "route": f"#/s/gen3d/jobs?id={job['id']}"}
+    w = runner.gpu_wait.get(job["id"]) if runner is not None and job["status"] == "queued" else None
+    if w is not None:                                   # waiting for the GPU slot (plan 31.3)
+        out.update(stage="waiting_gpu", ahead=w["ahead"], eta_s=w["eta_s"])
+    return out
 
 
 @router.get("/v1/status")
@@ -59,7 +63,7 @@ def status(request: Request):
             {"label": "Avg time", "value": round(sum(secs) / len(secs)) if secs else None, "unit": "s"},
             {"label": "Previews", "value": prefs.preview_device().upper(), "hint": "where Blender draws preview renders"},
         ],
-        "jobs": [_job(j) for j in sorted(active, key=lambda j: j["created"])] + [_job(j) for j in recent],
+        "jobs": [_job(j, runner) for j in sorted(active, key=lambda j: j["created"])] + [_job(j) for j in recent],
     }
 
 

@@ -24,7 +24,7 @@ def main() -> None:
     settings = Settings.from_env(port=args.port)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("uvicorn.access").addFilter(_QuietPolls())
-    logging.getLogger("httpx").setLevel(logging.WARNING)   # the idle gate asks the hub every second: no line per request
+    logging.getLogger("httpx").setLevel(logging.WARNING)   # GPU lease renewals every 10 s: no line per request
     uvicorn.run(create_app(settings), host="127.0.0.1", port=settings.port, log_level="info")
 
 

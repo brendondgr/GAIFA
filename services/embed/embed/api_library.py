@@ -89,7 +89,7 @@ def add_library_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
             out["note"] = f"{n} output(s) aren't indexed yet, so results may miss them"
         return out
 
-    @app.get("/v1/library", summary="The index: state (idle, waiting_for_gpu, indexing, no_room), counts, the GPU's idleness")
+    @app.get("/v1/library", summary="The index: state (idle, waiting_gpu, indexing, paused, no_room), counts, its GPU wait")
     def library() -> dict:
         return lib.status()
 

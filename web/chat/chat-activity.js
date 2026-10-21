@@ -52,6 +52,7 @@ export function statusText(st, ctx) {
   if (!st) return null;
   if (st.kind === 'waiting') return { text: st.question ? 'Waiting for your answer below' : 'Waiting for you to approve below', tone: 'purple' };
   if (st.kind === 'tool' || st.kind === 'lookup') return { text: toolWords(st.row, ctx).label + '…', pct: st.pct, note: st.note };
+  if (st.kind === 'gpu') return { text: st.text };
   if (st.kind === 'writing') return { text: 'Writing…' };
   if (st.kind === 'thinking') return { text: 'Thinking…', seconds: st.row.seconds };
   return { text: 'Working…' };

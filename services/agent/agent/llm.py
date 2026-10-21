@@ -20,12 +20,21 @@ import json
 import re
 import time
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
 
 Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", text)
+# The chat a model call belongs to, sent as X-AIHub-Thread: the relay names it on the request's GPU lease (plan 31.4),
+# so the turn can say it is waiting for the GPU. Set for the length of one model call (`Agent._model`).
+THREAD: ContextVar[str | None] = ContextVar("aihub_thread", default=None)
+
+
+def _headers() -> dict[str, str]:
+    tid = THREAD.get()
+    return {"X-AIHub-Thread": tid} if tid else {}
 
 # Gemma's own `<|tool_call>call:name{…}<tool_call|>`, also written as `<call:name{…}</call>` by the 26B
 GEMMA_CALL = re.compile(r"(?:<\|tool_call\>\s*)?<?(?:call:)?([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*(?:<tool_call\|>|</call>)", re.S)
@@ -319,7 +328,7 @@ class LLM:
     async def _once(self, body: dict[str, Any], reply: Reply) -> None:
         """A non-streaming request (the fallback when a streamed reply came back empty)."""
         try:
-            r = await self.client.post(self.base + "/chat/completions", json={**body, "stream": False})
+            r = await self.client.post(self.base + "/chat/completions", json={**body, "stream": False}, headers=_headers())
         except httpx.HTTPError as e:
             raise LLMError(f"{type(e).__name__}: {e}"[:400], retryable=True) from None
         if r.status_code >= 400:
@@ -352,7 +361,7 @@ class LLM:
         t_think: float | None = None
         checked = 0          # length of thinking + text at the last `looping` check
         try:
-            async with self.client.stream("POST", self.base + "/chat/completions", json=body) as r:
+            async with self.client.stream("POST", self.base + "/chat/completions", json=body, headers=_headers()) as r:
                 if r.status_code >= 400:
                     text = (await r.aread()).decode(errors="replace")[:600]
                     raise LLMError(f"HTTP {r.status_code}: {_detail(text)}", r.status_code,

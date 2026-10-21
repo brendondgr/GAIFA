@@ -835,6 +835,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
         <div style="position:relative;height:14px"><div style="position:absolute;inset:0;display:flex;border-radius:5px;overflow:hidden;background:var(--row,#1A2130)"><sc-for list="{{ pmem.segs }}" as="g" hint-placeholder-count="3"><span title="{{ g.tip }}" style="{{ g.st }}"></span></sc-for></div><span aria-hidden="true" style="{{ pmem.reserveZone }}"></span><span aria-hidden="true" style="{{ pmem.reserveSt }}"></span></div>
         <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px"><sc-for list="{{ pmem.legend }}" as="g" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:8px"><span style="{{ g.sw }}"></span><span style="flex:1;color:var(--mut,#8A94A6)">{{ g.name }}</span><span style="font-family:'JetBrains Mono',ui-monospace,monospace">{{ g.size }}</span></div></sc-for></div>
         <div style="font-size:11.5px;color:var(--mut,#8A94A6);font-family:'JetBrains Mono',ui-monospace,monospace;padding-top:8px;border-top:1px solid var(--bd,#1D2430)">{{ pmem.gpu }}</div>
+        <div style="padding-top:8px;border-top:1px solid var(--bd,#1D2430)">{{ pmem.gpuEl }}</div>
         <a href="#/overview" onClick="{{ pop.close }}" style="font-size:12.5px">Memory details on Overview →</a>
       </div>
     </sc-if>
@@ -1125,7 +1126,7 @@ class Component extends DCLogic {
     vw: typeof window !== 'undefined' ? window.innerWidth : 1280, navOpen: false,
     theme: lsGet('hub.theme', 'system'), density: lsGet('hub.density', 'compact'),
     pop: null, svcMenu: false, palette: null, toasts: [], dialog: null,
-    services: [], memory: null, jobs: [], activity: [], alerts: [], recent: [], system: null, unread: 0,
+    services: [], memory: null, gpu: null, jobs: [], activity: [], alerts: [], recent: [], system: null, unread: 0,
     svc: null,
     mdl: { loaded: false, list: [], totals: null, disk: null, kinds: [], service: '', status: '', q: '', discovered: null, scanning: false, drawer: null, edit: null },
     out: { loaded: false, items: [], cursor: null, totals: null, loading: false, view: 'grid', kinds: [], services: [], range: 'all', days: null, q: '', fixed: null, detail: null, promptOpen: false, fresh: {}, meaning: false, hidden: false },
@@ -1154,6 +1155,7 @@ class Component extends DCLogic {
     this.clock = setInterval(() => { if (!document.hidden) this.forceUpdate(); }, 15000);
     this.pages = {}; this.modListeners = new Set();
     const imp = f => import(new URL(f, location.href).href);
+    imp('gpu-queue.js').then(m => { this.Gpu = m; this.forceUpdate(); });  // plan 31.5: the GPU queue (memory popover, Overview widget, job rows)
     Promise.all([imp('nav/sidebar.js'), imp('nav/services-page.js')]).then(([a, b]) => { this.Nav = a; this.SvcsPage = b; this.forceUpdate(); });  // plan 33: the sidebar and the Services page
     const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning, hidden, palMeaning] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
       imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js'), imp('outputs/meaning.js'), imp('outputs/hidden.js'), imp('palette-meaning.js')]);
@@ -1249,7 +1251,7 @@ class Component extends DCLogic {
   }
   // Revision 2: the dashboard layout and density/theme defaults from Settings, mod widgets, and sparkline history.
   loadExtras() {
-    this.loadHist(); this.loadApprovals(); this.loadSessions();
+    this.loadHist(); this.loadApprovals(); this.loadSessions(); this.loadGpu();
     this.api.listWidgets().then(w => this.setState({ widgets: w })).catch(() => this.setState({ widgets: [] }));
     this.api.getSettings().then(st => {
       const u = st.ui || {};
@@ -1264,6 +1266,8 @@ class Component extends DCLogic {
     clearTimeout(this.apT);
     this.apT = setTimeout(() => this.api.listApprovals().then(a => this.setState({ approvals: a, apLoaded: true })).catch(() => this.setState({ apLoaded: true })), 120);
   }
+  loadGpu() { if (this.api.isLive?.('gpu') || !this.api.isLive?.('services')) this.api.getGpu?.().then(g => this.setState({ gpu: g })).catch(() => {}); }  // plan 31.5; then `gpu` events
+  cancelGpu = id => this.api.cancelGpuLease(id).then(() => this.loadGpu()).catch(e => this.toast(e.message || 'Could not cancel it', 'error'));
   loadSessions() { this.api.listSessions?.().then(l => this.setState({ sessions: l })).catch(() => {}); }
   openSessions(focus = null) { this.setState({ dialog: { kind: 'sessions', focus }, palette: null, pop: null }); }
   loadToolIndex() { if (!this.state.toolIx) this.api.getToolIndex().then(ix => this.setState({ toolIx: Object.fromEntries(ix.map(t => [t.name, t.risk])) })).catch(() => {}); }
@@ -1350,6 +1354,7 @@ class Component extends DCLogic {
         break;
       }
       case 'memory': this.setState({ memory: ev.memory }); break;
+      case 'gpu': if (ev.gpu) this.setState({ gpu: ev.gpu }); break;
       case 'approval': this.loadApprovals(); break;
       case 'session': this.loadSessions(); break;
       case 'activity': this.setState(st => ({ activity: [ev.item, ...st.activity].slice(0, 80), unread: st.pop === 'activity' ? 0 : st.unread + 1 })); break;
@@ -1972,7 +1977,7 @@ class Component extends DCLogic {
       wrapSt: { display: 'flex', flexDirection: 'column', gap: compact ? 12 : 22, minWidth: 0 },
       gridSt: { display: 'grid', gridTemplateColumns: `repeat(auto-fill,minmax(min(100%,${compact ? 230 : 290}px),1fr))`, gap: compact ? 10 : 14 },
       customizing: s.customizing ? 'true' : 'false', onCustomize: () => this.setState(st => ({ customizing: !st.customizing })), custSt: btn(s.customizing ? 'pri' : 'sec', { sm: true }),
-      dash: view === 'dashboard' && D ? h(D.Dashboard, { api: this.api, services: svcs, memory: s.memory, jobs: s.jobs, activity: s.activity, recent: s.recent, hist1: s.hist1, hist24: s.hist24, widgets: s.widgets,
+      dash: view === 'dashboard' && D ? h(D.Dashboard, { api: this.api, services: svcs, memory: s.memory, gpu: s.gpu, cancelGpu: this.cancelGpu, jobs: s.jobs, activity: s.activity, recent: s.recent, hist1: s.hist1, hist24: s.hist24, widgets: s.widgets,
         layout: s.dash, onLayout: this.onLayout, customizing: s.customizing, onCustomize: v => this.setState({ customizing: v }), go: hh => this.go(hh), badge, compact, outTick: s.outTick }) : null,
       table: view === 'table' && V ? h(V.ServiceTable, { services: svcs, hist1: s.hist1, jobs: s.jobs, icons: ICON, badge, compact, actionsFor: sv => this.svcActions(sv, true).map(a => ({ label: a.label, d: a.d, on: a.on, dis: a.dis, primary: a.label === 'Start' })) }) : null,
       timeline: view === 'timeline' && V ? h(V.TimelineView, { api: this.api, services: svcs, go: hh => this.go(hh), range: s.tlRange, onRange: r => { lsSet('hub.tlRange', r); this.setState({ tlRange: r }); }, table: s.tlTable, onTable: v => this.setState({ tlTable: v }), mock: !this.api.isLive?.('metrics') }) : null,
@@ -2281,8 +2286,8 @@ class Component extends DCLogic {
     const close = () => this.setState({ pop: null });
     v.pop = { any: !!s.pop, mem: s.pop === 'memory', jobs: s.pop === 'jobs', act: s.pop === 'activity', ap: s.pop === 'approvals', close,
       st: { position: 'fixed', top: s.density === 'compact' ? 50 : 58, right: 12, zIndex: 70, width: 'min(440px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 80px)', overflow: 'auto', background: 'var(--card,#11151D)', border: '1px solid var(--bds,#2A3547)', borderRadius: 12, boxShadow: '0 16px 50px rgba(0,0,0,.45)', padding: 16 } };
-    if (s.pop === 'memory') v.pmem = { ...this.memVM(s.memory, true), chart: this.V ? React.createElement(this.V.MemoryChart, { api: this.api, services: s.services, range: '1h', height: 110, label: 'Memory, last hour' }) : null };
-    if (s.pop === 'jobs') v.pjobs = s.jobs.map(j => ({ label: j.label, href: j.route || '#/overview', pct: j.progress != null ? Math.round(j.progress * 100) + '%' : '', bar: { display: 'block', height: '100%', width: (j.progress || 0) * 100 + '%', background: 'var(--acc,#FFB224)', borderRadius: 9, transition: 'width .5s' }, state: j.state, svc: this.svcMap[j.service]?.name || j.service }));
+    if (s.pop === 'memory') v.pmem = { ...this.memVM(s.memory, true), gpuEl: this.Gpu && s.gpu ? React.createElement(this.Gpu.GpuSection, { gpu: s.gpu, nameOf: id => this.svcMap[id]?.name || id, onCancel: this.cancelGpu }) : null, chart: this.V ? React.createElement(this.V.MemoryChart, { api: this.api, services: s.services, range: '1h', height: 110, label: 'Memory, last hour' }) : null };
+    if (s.pop === 'jobs') v.pjobs = s.jobs.map(j => ({ label: j.label, href: j.route || '#/overview', pct: j.progress != null ? Math.round(j.progress * 100) + '%' : '', bar: { display: 'block', height: '100%', width: (j.progress || 0) * 100 + '%', background: 'var(--acc,#FFB224)', borderRadius: 9, transition: 'width .5s' }, state: this.Gpu?.jobGpuText(j, id => this.svcMap[id]?.name || id) || j.state, svc: this.svcMap[j.service]?.name || j.service }));
     if (s.pop === 'approvals') v.pap = this.ChatAp ? React.createElement(this.ChatAp.ApprovalsPanel, { api: this.api, approvals: s.approvals, loading: !s.apLoaded, toast: (t, l) => this.toast(t, l),
       onDecided: id => this.setState(st => ({ approvals: st.approvals.filter(a => a.id !== id) })) }) : null;
     if (s.pop === 'activity') { v.pact = s.activity.slice(0, 30).map(a => this.actRow(a)); v.pactEmpty = !s.activity.length; }

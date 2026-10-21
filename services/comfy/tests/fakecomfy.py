@@ -220,6 +220,10 @@ class FakeHub(FakeComfy):
         self.used = 5e9
         self.files: dict[str, tuple[str, bytes]] = {}
         self.registered: list[dict] = []
+        self.gpu_busy = False                      # another mod holds the GPU slot: acquires wait (202)
+        self.gpu_acquires: list[dict] = []
+        self.gpu_released: list[str] = []
+        self.gpu_held: set[str] = set()
         super().__init__()
 
     def _app(self) -> FastAPI:
@@ -235,6 +239,30 @@ class FakeHub(FakeComfy):
                 return JSONResponse({"detail": "Not enough memory", "code": "needs_room",
                                      "data": {"plan": {"unload": ["gen3d"]}}}, status_code=409)
             return {"granted": True, "freed": [], "plan": {}}
+
+        @app.post("/api/gpu/acquire")
+        async def gpu_acquire(request: Request):
+            import asyncio
+            from fastapi.responses import JSONResponse
+            body = await request.json()
+            hub.gpu_acquires.append(body)
+            if hub.gpu_busy and not body.get("parent"):
+                await asyncio.sleep(min(float(request.query_params.get("wait") or 0), 0.05))
+                return JSONResponse({"lease": body["lease"], "state": "waiting", "eta_s": 240,
+                                     "ahead": [{"id": "gl_other", "service": "gen3d", "label": "a model", "state": "held",
+                                                "eta_s": 240}]}, status_code=202)
+            hub.gpu_held.add(body["lease"])
+            return {"lease": body["lease"], "state": "granted"}
+
+        @app.post("/api/gpu/{lease}/renew")
+        def gpu_renew(lease: str):
+            return {"lease": lease, "state": "granted"}
+
+        @app.post("/api/gpu/{lease}/release")
+        def gpu_release(lease: str):
+            hub.gpu_released.append(lease)
+            hub.gpu_held.discard(lease)
+            return {"lease": lease, "state": "released"}
 
         @app.get("/api/services/comfy")
         def svc():

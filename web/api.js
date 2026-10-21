@@ -16,6 +16,7 @@ export const METHOD_AREA = {
   listOperations: 'operations',
   callService: 'proxy',
   getMemory: 'memory', planRoom: 'memory',
+  getGpu: 'gpu', cancelGpuLease: 'gpu',
   listModels: 'models', getModel: 'models', saveModel: 'models', verifyModel: 'models', deleteModel: 'models',
   scanModels: 'models', addModel: 'models',
   listOutputs: 'outputs', getOutput: 'outputs', deleteOutput: 'outputs', uploadOutput: 'outputs',
@@ -33,7 +34,7 @@ export const METHOD_AREA = {
 
 // HubEvent type → area, for merging live and mock event streams.
 export const EVENT_AREA = {
-  service: 'services', memory: 'memory', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
+  service: 'services', memory: 'memory', gpu: 'gpu', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
   approval: 'tools', tool_call: 'tools', grant: 'tools', grant_deleted: 'tools',
   session: 'sessions', session_step: 'sessions',
@@ -150,6 +151,8 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     listOperations: id => req('GET', `/api/services/${enc(id)}/operations`),
     saveServiceConfig: (id, cfg) => req('PUT', `/api/services/${enc(id)}/config`, { json: cfg }),
     getMemory: () => req('GET', '/api/memory'),
+    getGpu: () => req('GET', '/api/gpu'),  // plan 31.1: the GPU slot's holder, the waiting leases and the last 20
+    cancelGpuLease: id => req('DELETE', `/api/gpu/${enc(id)}`),
     planRoom: (id, needsBytes) => req('POST', '/api/memory/plan', { json: { service: id, needs_bytes: needsBytes } }),
     listModels: (f = {}) => req('GET', `/api/models${qs(f)}`),
     getModel: id => req('GET', `/api/models/${enc(id)}`),

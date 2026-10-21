@@ -32,6 +32,9 @@ idle_unload_env = "STT_IDLE_UNLOAD_S"
 [models]
 dirs = ["stt"]
 
+[gpu]                              # plan 31.3: file jobs wait for the GPU slot; live dictation runs on
+class = "job"                      # the CPU while another mod holds it (stt/gpu.py)
+
 [outputs]
 kinds = ["text"]
 

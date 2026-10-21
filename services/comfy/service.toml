@@ -36,6 +36,9 @@ containers = ["strix-halo-comfyui"]
 idle_unload_s = 600
 idle_unload_env = "COMFY_IDLE_UNLOAD_S"
 
+[gpu]                               # plan 31.3: each run takes the GPU slot before memory, and holds it until its prompt ends
+class = "job"
+
 [models]
 dirs = ["comfyui"]
 

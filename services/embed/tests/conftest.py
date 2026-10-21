@@ -144,13 +144,57 @@ class FakeHub:
         return httpx.Response(404, json={"detail": "not here", "code": "not_found"})
 
 
+class FakeGpu:
+    """AIHub's GPU queue for one test (plan 31.3). `blocked` holds back leases of these classes (another mod's work
+    runs or waits: acquire answers 202 after a short wait); `cancel_after` grants that many leases, then answers
+    the next one as cancelled from the queue. `log` lists (event, class), `held` the leases not yet released."""
+
+    def __init__(self, blocked: set[str] | None = None, cancel_after: int | None = None):
+        self.blocked = blocked or set()
+        self.cancel_after = cancel_after
+        self.log: list[tuple[str, str]] = []
+        self.held: dict[str, str] = {}
+        self.granted = 0
+
+    async def handler(self, request: httpx.Request) -> httpx.Response:
+        import asyncio
+
+        body = json.loads(request.content or b"{}")
+        path = request.url.path
+        if path == "/api/gpu/acquire":
+            cls, lid = body.get("class"), body["lease"]
+            if self.cancel_after is not None and self.granted >= self.cancel_after:
+                self.log.append(("cancelled", cls))
+                return httpx.Response(200, json={"lease": lid, "state": "cancelled"})
+            if cls in self.blocked:
+                if ("wait", cls) not in self.log[-1:]:
+                    self.log.append(("wait", cls))
+                await asyncio.sleep(0.01)
+                return httpx.Response(202, json={"lease": lid, "state": "waiting", "eta_s": 120, "ahead": [
+                    {"id": "gl_other", "service": "comfy", "label": "image", "state": "held", "eta_s": 120}]})
+            self.granted += 1
+            self.held[lid] = cls
+            self.log.append(("granted", cls))
+            return httpx.Response(200, json={"lease": lid, "state": "granted"})
+        lid = path.split("/")[3]
+        if path.endswith("/release"):
+            cls = self.held.pop(lid, None)
+            self.log.append(("released", cls or "?"))
+        return httpx.Response(200, json={"lease": lid, "state": "granted"})
+
+    def slot(self, service: str = "embed"):
+        from embed.gpu_slot import GpuSlot
+
+        return GpuSlot(hub_url="http://hub", service=service, transport=httpx.MockTransport(self.handler), poll_s=0.05)
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     model = tmp_path / "models" / "embed" / "embeddinggemma-2"
     model.mkdir(parents=True)
     (model / "model.safetensors").write_bytes(b"fake")
     return Settings(port=0, model_dir=model, state_dir=tmp_path / "state", hub_url="http://hub", idle_unload_s=0,
-                    batch_text=32, batch_media=4, databases=tmp_path / "db", index=False, index_gap_s=0)
+                    batch_text=32, batch_media=4, databases=tmp_path / "db", index=False)
 
 
 @pytest.fixture

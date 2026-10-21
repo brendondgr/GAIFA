@@ -39,6 +39,9 @@ class Job(_Model):
     progress: float | None
     state: Literal["queued", "running", "done", "failed", "cancelled"]
     route: str | None = None
+    stage: str | None = Field(None, description='"waiting_gpu" while it waits for the GPU slot (plan 31.3)')
+    ahead: list[dict[str, Any]] | None = Field(None, description="waiting_gpu: what runs before it ({service, label, eta_s})")
+    eta_s: float | None = Field(None, description="waiting_gpu: seconds until it starts, when known")
 
 
 class ServiceSummary(_Model):

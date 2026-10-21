@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 
 from .engine import Decider, LocalBackend
+from .gpu_slot import GpuCancelled, GpuSlot
 from .hubclient import Hub, HubError
 from .models import ADAPTERS
 from .settings import Settings
@@ -88,7 +89,7 @@ def _err(status: int, detail: str, code: str, fix: str | None = None, data: dict
 
 
 def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | None = None,
-               adapters: dict[str, type] | None = None) -> FastAPI:
+               adapters: dict[str, type] | None = None, gpu: GpuSlot | None = None) -> FastAPI:
     adapters = adapters or ADAPTERS
     if decider is None:
         factory = functools.partial(LocalBackend, adapters, settings.models_dir, settings.device,
@@ -96,7 +97,13 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
         decider = Decider(WorkerBackend(factory), settings.state_dir)
     dec = decider
     hub = hub or Hub(settings.hub_url)
+    # The GPU slot (plan 31.3): each ask is interactive work, ordered with every other mod's GPU work.
+    gpu = gpu or GpuSlot(hub_url=hub.url or "", service=hub.service, cls="interactive", transport=hub.transport)
     day = {"date": date.today(), "calls": 0}
+
+    def on_cpu() -> bool:
+        """The model runs (or will load) on the CPU: no slot to wait for."""
+        return dec.backend.device == "cpu" if dec.loaded else settings.device == "cpu"
 
     def resolve(name: str | None) -> tuple[str | None, JSONResponse | None]:
         """A model id that may be loaded, or the error to answer with: unknown, another revision, changed code."""
@@ -247,12 +254,18 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
         try:
             images = await media(body.images, "image")
             videos = await media(body.videos, "video")
-            await make_room(mid)
         except HubError as e:
             return JSONResponse(e.body(), status_code=e.status)
         questions = [q.model_dump(exclude_none=True) for q in body.questions]
+        label = f"{mid}: {len(questions)} question{'s' if len(questions) != 1 else ''}"
         try:
-            answers, ms = await asyncio.to_thread(dec.ask, mid, body.input, questions, images or None, videos or None)
+            async with (contextlib.nullcontext() if on_cpu() else gpu.slot(label, est_s=1)):   # slot first, then memory
+                await make_room(mid)
+                answers, ms = await asyncio.to_thread(dec.ask, mid, body.input, questions, images or None, videos or None)
+        except GpuCancelled as e:
+            return _err(409, str(e), "gpu_cancelled", fix="ask again")
+        except HubError as e:
+            return JSONResponse(e.body(), status_code=e.status)
         except (PermissionError, FileNotFoundError, WorkerDied, RuntimeError) as e:
             return backend_error(e)
         except ValueError as e:

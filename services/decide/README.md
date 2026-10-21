@@ -8,5 +8,8 @@ each in `decide/models/<id>.py`. Setup, the pinned revision and what its remote 
   `{answers: {id: {probs, top, p}}, ms, model, revision}`
 - `GET /v1/models`, `POST /v1/load`, `POST /v1/unload`, `GET /v1/status`
 - Agent tool: `decide_ask` (risk `read`)
+- Each ask takes an `interactive` lease from AIHub's GPU queue around the model call (plan 31.3; `decide/gpu_slot.py`
+  is an identical copy of `services/_template/gpu_slot.py`), then asks for memory if it switches models. On the CPU it
+  takes none. A lease cancelled from the queue answers 409 `gpu_cancelled`.
 
 Tests: `.venv/bin/python -m pytest -q` (fake model); `-m gpu -s` for the real one.

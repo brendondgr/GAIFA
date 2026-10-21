@@ -7,10 +7,11 @@ becomes hidden is dropped): a `meta` chunk from its title and prompt for every o
 route (24.3), in ~800-token chunks that keep page and line; an image (a 3D model's preview); a video whole; audio
 whole plus 30 s windows when it's long.
 
-Indexing waits for the GPU (decided 2026-10-20): it starts once the GPU has stayed under `idle_busy_pct` for
-`idle_seconds`, looks again between batches and stops as soon as something else uses it, and unloads the model
-when the queue is empty (unless a search used it in the last minute). Loading for indexing never evicts another
-mod: a 409 from the hub's memory acquire just waits.
+Indexing waits for the GPU (plan 31.3): each batch takes a `background` lease from AIHub's GPU queue, which the
+hub grants only when no other mod's GPU work runs or waits, so indexing yields to anything else between batches
+(state `waiting_gpu`, with what runs before it). A lease cancelled from the queue pauses indexing for a minute. It
+unloads the model when the queue is empty (unless a search used it in the last minute). Loading for indexing
+never evicts another mod: a 409 from the hub's memory acquire waits a minute.
 """
 
 from __future__ import annotations
@@ -20,7 +21,6 @@ import contextvars
 import hashlib
 import json
 import logging
-import os
 import re
 import time
 from collections.abc import Callable
@@ -32,7 +32,8 @@ import numpy as np
 from . import chunks as chunking
 from . import media
 from .encoder import Encoder, prompt
-from .gpu import DeviceMedian, GpuIdle, HubMeter
+from .gpu import slot_for, take
+from .gpu_slot import GpuCancelled, GpuSlot, Lease
 from .hubclient import Hub, HubError
 from .settings import Settings
 from .store import Chunk, Store
@@ -43,16 +44,17 @@ MAX_BYTES = {"image": 64_000_000, "audio": 512_000_000, "video": 2_000_000_000, 
 LONG_AUDIO_S = 60
 API_KEEP_S = 60            # a search in the last minute keeps the model loaded after indexing
 BACKOFF_S = (30, 600)      # after an encoder error the loop waits 30 s, doubling to 10 min while it repeats
+PAUSE_S = 60               # after a cancel from the GPU queue, or no room to load
 GATED = contextvars.ContextVar("gated", default=True)    # False while a search indexes its own outputs (28.3)
 
 
 class Stop(Exception):
-    """The GPU went busy between batches: leave the output pending and wait again."""
+    """The batch's GPU lease was cancelled from the queue: leave the output pending and try again later."""
 
 
 def not_the_outputs_fault(e: BaseException) -> bool:
     """Errors that say nothing about the output being indexed, so they don't count as its failed attempt: the
-    encoder's worker died while idle or loading, no weights, no room to load, the hub went away, the GPU went busy."""
+    encoder's worker died while idle or loading, no weights, no room to load, the hub went away, the lease was cancelled."""
     if isinstance(e, Stop):
         return True
     if isinstance(e, WorkerDied):
@@ -88,20 +90,15 @@ def meta_text(rec: dict[str, Any]) -> str:
 
 
 class Library:
-    def __init__(self, store: Store, enc: Encoder, hub: Hub, settings: Settings, gpu: GpuIdle | None = None,
+    def __init__(self, store: Store, enc: Encoder, hub: Hub, settings: Settings, gpu: GpuSlot | None = None,
                  sleep: Callable[[float], Any] = asyncio.sleep):
         self.store, self.enc, self.hub, self.s = store, enc, hub, settings
-        if gpu is None:
-            device = DeviceMedian(settings.idle_window_s)
-            read = device if settings.idle_measure == "device" else HubMeter(
-                settings.hub_url, os.environ.get("AIHUB_SERVICE_ID", "embed"), device, settings.idle_device_pct)
-            pct = settings.idle_device_pct if settings.idle_measure == "device" else settings.idle_busy_pct
-            gpu = GpuIdle(pct, settings.idle_seconds, ours=lambda: enc.busy or enc.loading, read=read)
-        self.gpu = gpu
+        self.gpu = gpu or slot_for(hub)
+        self.gpu_wait: dict[str, Any] | None = None    # while a batch's lease waits: {ahead, eta_s}
         self.sleep = sleep
         self.tmp = settings.state_dir / "tmp"
         self.wake = asyncio.Event()
-        self.state = "starting"            # starting | idle | waiting_for_gpu | indexing | no_room | no_hub | error
+        self.state = "starting"            # starting | idle | waiting_gpu | indexing | paused | no_room | no_hub | error
         self.error: str | None = None      # the encoder error that stopped indexing (state `error`), until it works again
         self.backoff = BACKOFF_S[0]
         self.current: dict[str, Any] | None = None
@@ -176,7 +173,6 @@ class Library:
             self.state = "no_hub"
             return
         follower = asyncio.create_task(self.hub.follow(self.on_event, self.on_connect, stop))
-        sampler = asyncio.create_task(self._sample(stop))
         try:
             while not stop.is_set():
                 if not self.store.pending(1) and not self.store.chats_pending(1):
@@ -185,10 +181,6 @@ class Library:
                     self.wake.clear()
                     await self._wait(stop, 30)
                     continue
-                if not self.gpu.idle():
-                    self.state = "waiting_for_gpu"
-                    await self._wait(stop, 5)
-                    continue
                 try:
                     await self.drain()
                 except Exception as e:              # noqa: BLE001: nothing ends the loop (or the follower with it)
@@ -196,17 +188,13 @@ class Library:
                     self._trouble(e)
                 if self.state == "no_hub":                 # new outputs don't cut these waits short: they'd fail too
                     await self._wait(stop, 30, wake=False)
+                elif self.state in ("paused", "no_room"):
+                    await self._wait(stop, PAUSE_S, wake=False)
                 elif self.state == "error":
                     await self._wait(stop, self.backoff, wake=False)
                     self.backoff = min(self.backoff * 2, BACKOFF_S[1])
         finally:
             follower.cancel()
-            sampler.cancel()
-
-    async def _sample(self, stop: asyncio.Event) -> None:
-        while not stop.is_set():
-            await asyncio.to_thread(self.gpu.sample)
-            await asyncio.sleep(1)
 
     async def _wait(self, stop: asyncio.Event, s: float, wake: bool = True) -> None:
         waiters = [asyncio.create_task(stop.wait())] + ([asyncio.create_task(self.wake.wait())] if wake else [])
@@ -223,12 +211,11 @@ class Library:
     def _stopped(self, e: BaseException) -> bool:
         """Drain's answer to an error from a step: True when indexing should stop now (the state says why)."""
         if isinstance(e, Stop):
-            self.state = "waiting_for_gpu"
+            self.state = "paused"                         # cancelled from the GPU queue: try again in a minute
         elif isinstance(e, HubError) and e.code == "hub_unreachable":
             self.state = "no_hub"
         elif isinstance(e, HubError) and e.code == "needs_room":
             self.state = "no_room"
-            self.gpu.quiet_since = self.gpu.clock()      # try again after another quiet period
         elif not_the_outputs_fault(e) or isinstance(e, WorkerDied):
             log.warning("library: the encoder failed: %s", e)
             self._trouble(e)
@@ -319,15 +306,37 @@ class Library:
         have = self.enc.estimate_gb(self.enc.parts) if self.enc.loaded and self.enc.parts is not None else 0
         await self.hub.acquire(self.enc.estimate_gb(want) - have, f"indexing ({self.enc.key(want)})")
 
+    async def encode(self, items: list[tuple[str, Any]], dim: int = 768, batch: dict[str, int] | None = None,
+                     label: str = "Search") -> np.ndarray:
+        """Someone is waiting for these vectors (a search): one `interactive` lease around the encode."""
+        try:
+            async with take(self.gpu, self.enc, self.s.device, label):
+                return await asyncio.to_thread(self.enc.embed, items, dim, batch or {"text": 32})
+        except GpuCancelled as e:
+            raise HubError(409, str(e), "gpu_cancelled", fix="search again") from e
+
+    def _on_wait(self, lease: Lease) -> None:
+        self.state, self.gpu_wait = "waiting_gpu", {"ahead": lease.ahead, "eta_s": lease.eta_s}
+
     async def _embed(self, kind: str, values: list[Any]) -> np.ndarray:
-        """One batch, then a look at the GPU: someone else's work stops indexing here."""
-        await self._room({kind})
+        """One batch under its own GPU lease: `background` while indexing (it waits for everything else), and
+        `interactive` while someone waits for the result (a scoped search, GATED off). Slot first, then memory."""
+        gated = GATED.get()
+        what = (self.current or {}).get("title") or ("chat summaries" if self._in_chats else "outputs")
         batch = {"text": self.s.index_batch_text, "image": self.s.batch_media, "audio": 1, "video": 1}
-        vecs = await asyncio.to_thread(self.enc.embed, [(kind, v) for v in values], 768, batch)
-        if GATED.get():
-            await self.sleep(self.s.index_gap_s)
-            if await asyncio.to_thread(self.gpu.busy_now):
-                raise Stop()
+        try:
+            async with take(self.gpu, self.enc, self.s.device, f"Indexing {str(what)[:60]}",
+                            cls="background" if gated else "interactive", on_wait=self._on_wait if gated else None):
+                if gated and self.gpu_wait is not None:
+                    self.state = "indexing"
+                self.gpu_wait = None
+                await self._room({kind})
+                vecs = await asyncio.to_thread(self.enc.embed, [(kind, v) for v in values], 768, batch)
+        except GpuCancelled as e:
+            raise Stop() from e
+        finally:
+            if gated:
+                self.gpu_wait = None
         if not self._in_chats and self.store.chats_pending(1):     # summaries go between an output's batches too
             await self.index_chats(gate=GATED.get())
         return vecs
@@ -417,10 +426,21 @@ class Library:
     def status(self) -> dict[str, Any]:
         return {"state": self.state, "error": self.error, "connected": self.connected, "counts": self.store.counts(), "chats": self.store.chat_counts(),
                 "current": self.current, "indexed_since_start": self.indexed,
-                "gpu": {"measure": getattr(self.gpu.read, "measure", "device"), "busy_pct": self.gpu.last,
-                        "detail": getattr(self.gpu.read, "detail", {}),
-                        "quiet_s": self.gpu.quiet_s(), "idle": self.gpu.idle(),
-                        "threshold_pct": self.gpu.busy_pct, "needs_quiet_s": self.gpu.idle_s}}
+                "gpu": {"class": "background", "waiting": self.gpu_wait is not None,
+                        "ahead": (self.gpu_wait or {}).get("ahead") or [], "eta_s": (self.gpu_wait or {}).get("eta_s")}}
+
+    def job(self) -> dict[str, Any] | None:
+        """The library as a job in `/v1/status` while it indexes or waits for the GPU (`stage: waiting_gpu`)."""
+        if self.state not in ("indexing", "waiting_gpu"):
+            return None
+        c = self.store.counts()
+        job: dict[str, Any] = {"id": "library", "label": f"Indexing outputs ({c['pending']} to go)",
+                               "state": "running" if self.state == "indexing" else "queued",
+                               "progress": round(c["done"] / max(1, c["done"] + c["pending"]), 3), "route": "#/s/embed"}
+        if self.state == "waiting_gpu":
+            job.update(stage="waiting_gpu", ahead=(self.gpu_wait or {}).get("ahead") or [],
+                       eta_s=(self.gpu_wait or {}).get("eta_s"))
+        return job
 
 
 def open_library(settings: Settings, enc: Encoder, hub: Hub) -> Library:

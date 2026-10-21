@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import media
 from .encoder import DIMS, KINDS, Encoder, GemmaBackend, parts_for, prompt
+from .gpu import slot_for, take
+from .gpu_slot import GpuCancelled, GpuSlot
 from .hubclient import Hub, HubError
 from .settings import MODEL_ID, REPO, REVISION, Settings
 from .worker import WorkerBackend, WorkerDied
@@ -73,12 +75,13 @@ def _error(e: HubError) -> JSONResponse:
 
 
 def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | None = None,
-               library: Library | None = None) -> FastAPI:
+               library: Library | None = None, gpu: GpuSlot | None = None) -> FastAPI:
     """`library`: the index to run (tests pass their own); by default one is opened when `settings.index`."""
     enc = encoder or Encoder(WorkerBackend(functools.partial(GemmaBackend, settings.model_dir, settings.device)),
                              settings.state_dir)
     hub = hub or Hub(settings.hub_url)
     lib = library or (open_library(settings, enc, hub) if settings.index else None)
+    gpu = gpu or (lib.gpu if lib is not None else slot_for(hub))     # the GPU slot (plan 31.3)
     stop = asyncio.Event()
     tmp = settings.state_dir / "tmp"
     day = {"date": date.today(), "inputs": 0}
@@ -148,9 +151,8 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
         if lib is not None:
             c = lib.store.counts()
             stats.append({"label": "Indexed", "value": c["done"]})
-            if lib.state == "indexing":
-                jobs.append({"id": "library", "label": f"Indexing outputs ({c['pending']} to go)", "state": "running",
-                             "progress": round(c["done"] / max(1, c["done"] + c["pending"]), 3), "route": "#/s/embed"})
+            if (job := lib.job()) is not None:          # indexing, or waiting for the GPU (stage waiting_gpu)
+                jobs.append(job)
         else:
             stats.append({"label": "Inputs", "value": sum(enc.counts.values())})
         if enc.loaded:
@@ -209,13 +211,18 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
         t0 = time.perf_counter()
         try:
             prepared = [await prepare(i, body.task) for i in body.inputs]
-            await make_room({p.kind for p in prepared})
         except HubError as e:
             return _error(e)
         batch = {"text": settings.batch_text, "image": settings.batch_media, "audio": 1, "video": 1}
         t1 = time.perf_counter()
         try:
-            vecs = await asyncio.to_thread(enc.embed, [(p.kind, p.value) for p in prepared], body.dim, batch)
+            async with take(gpu, enc, settings.device, f"Embed {len(prepared)} input{'s' if len(prepared) != 1 else ''}"):
+                await make_room({p.kind for p in prepared})               # slot first, then memory
+                vecs = await asyncio.to_thread(enc.embed, [(p.kind, p.value) for p in prepared], body.dim, batch)
+        except GpuCancelled as e:
+            return JSONResponse({"detail": str(e), "code": "gpu_cancelled", "fix": "embed again"}, 409)
+        except HubError as e:
+            return _error(e)
         except (FileNotFoundError, WorkerDied) as e:
             return backend_error(e)
         day["inputs"] += len(prepared)

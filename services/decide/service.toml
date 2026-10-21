@@ -38,6 +38,9 @@ triggers = ["POST /v1/decide"]
 idle_unload_s = 300
 idle_unload_env = "DECIDE_IDLE_UNLOAD_S"
 
+[gpu]                               # plan 31.3: each ask waits for the GPU slot (not on the CPU)
+class = "interactive"
+
 [models]
 dirs = ["decide"]
 

@@ -445,6 +445,10 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 
 **Known limit:** clients that call a mod's port directly (e.g. video-maker → `:5040`) bypass the hub. Their loads aren't managed unless the mod itself calls `acquire`.
 
+### GPU queue (plan 31)
+
+One GPU slot (`utils/gpu.py`, `[gpu] queue = true`, `lease_ttl_s = 60`). A mod with `[gpu] class = "job" | "interactive" | "background"` (and an optional `group`) takes the slot around its GPU work with `POST /api/gpu/acquire` (200 granted, 202 waiting with `ahead` and `eta_s`), renews it every 10 s and releases it (`services/_template/gpu_slot.py`). Order: interactive, then job, then background (only when nothing waits); FIFO within a class; nothing is pre-empted. A lease of the holder's group joins it unless another group's lease of the same or a higher class waits. `X-AIHub-GPU-Lease` runs nested work under its caller (gen3d → comfy). A held lease not renewed for `lease_ttl_s` expires with the `gpu_lease_expired` alert; a mod that fails or stops frees its leases at once; after a hub restart, renewals re-register leases. Slot first, then memory. Routes: `GET /api/gpu`, `POST /api/gpu/acquire?wait=`, `POST /api/gpu/{lease}/renew`, `POST /api/gpu/{lease}/release`, `DELETE /api/gpu/{lease}` (cancel a waiting lease); `gpu` events. The relay takes a lease per request to a local engine, so a chat on a local model waits behind a job; live dictation moves to the CPU instead. Clients of an engine's own port bypass the queue.
+
 ## 8. Models registry
 
 `data/models/registry.json` is written atomically and keyed by id, so git diffs stay readable:

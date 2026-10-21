@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from embed.server import create_app
-from tests.conftest import png
+from tests.conftest import FakeGpu, png
 from tests.test_library import make, run
 
 T1, T2 = "t_00000000000a", "t_00000000000b"                       # the agent's id shape
@@ -97,10 +97,13 @@ def test_thread_only_uses_the_chats_attachments(client, hub):
 def test_scoped_search_indexes_its_outputs_first(client, hub, lib):
     hub.add("new", "image", png("red car"), title="just attached")
     hub.threads[T1] = [{"type": "user", "payload": {"text": "find it", "attachments": ["new"]}}]
-    lib.gpu.read = lambda: 99                                       # the GPU is busy: background indexing waits
+    gpu = FakeGpu(blocked={"background"})                           # other work waits: background indexing would wait
+    lib.gpu = gpu.slot()
+    lib.enc.backend.device = "cuda"
     assert lib.store.get("new") is None
     res = hits(client.post("/v1/search", json={"query": "red car", "thread_only": True}, headers=ORIGIN))
     assert res[0]["output"] == "output:new" and lib.store.get("new")["state"] == "done"
+    assert {c for e, c in gpu.log if e == "granted"} == {"interactive"} and not gpu.held    # someone is waiting: interactive
 
 
 def test_unscoped_search_notes_what_isnt_indexed(client, hub, lib):
@@ -124,7 +127,9 @@ def test_search_of_everything_indexes_what_was_just_made(client, hub, lib):
     hub.add("fresh", "image", png("red car"), title="made a minute ago")
     hub.outputs["fresh"][0]["created_ts"] = time.time() - 60
     run(lib.reconcile())
-    lib.gpu.read = lambda: 99                                       # busy: the idle indexer wouldn't start
+    gpu = FakeGpu(blocked={"background"})                           # other work waits: background indexing would wait
+    lib.gpu = gpu.slot()
+    lib.enc.backend.device = "cuda"
     res = hits(client.post("/v1/search", json={"query": "red car", "kind": "image"}))
     assert "output:fresh" in {h["output"] for h in res[:2]} and lib.store.get("fresh")["state"] == "done"
 

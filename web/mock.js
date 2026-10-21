@@ -303,6 +303,10 @@ export function createMockApi() {
   const svcById = id => services.find(s => s.id === id);
   const emit = ev => { if (hubDown) return; for (const fn of listeners) { try { fn(ev); } catch (e) { console.error(`AIHub event handler failed (${ev.type}): ${e?.message}`, e?.stack); } } };
   const later = (ms, fn) => setTimeout(fn, ms / speed);
+  const gpuNow = Date.now() / 1000, gpuL = (id, service, name, cls, label, extra) => ({ id, service, name, group: service, class: cls, label, created_ts: gpuNow - 60, renewed_ts: gpuNow, ...extra });
+  const gpuQ = { queue: true, lease_ttl_s: 60, holder: { group: 'gen3d', leases: [gpuL('gl_mock00000001', 'gen3d', '3D Generate', 'job', 'Make 3D: chair', { granted_ts: gpuNow - 95, elapsed_s: 95, eta_s: 150 })] },
+    waiting: [gpuL('gl_mock00000002', 'comfy', 'Images & Video', 'job', 'Image: portrait', { eta_s: 150, waited_s: 40, ahead: [] }), gpuL('gl_mock00000003', 'tts', 'Speech', 'job', 'Speech: Hope', { eta_s: 240, waited_s: 12, ahead: [] })],
+    recent: [] };
   const net = () => new Promise((res, rej) => setTimeout(() => hubDown ? rej(new ApiError(0, 'AIHub not responding at 127.0.0.1:7000', 'hub_error')) : res(), 40 + Math.random() * 120));
   const err = (status, code, detail, data) => new ApiError(status, detail, code, data);
   const usedBytes = () => otherBytes + services.reduce((a, s) => a + s.used, 0);
@@ -585,6 +589,9 @@ export function createMockApi() {
       s.config = { ...s.config, ...clone(cfg), port }; settings.services.enabled[id] = s.config.enabled; settings.services.autostart[id] = s.config.autostart; pushSvc(s); act(`${s.name} settings saved${restart ? ' (restart required)' : ''}`, id);
       return { config: clone(s.config), restart_required: restart }; },
     async getMemory() { await net(); return memory(); },
+    async getGpu() { await net(); return clone(gpuQ); },  // plan 31.5: the GPU queue (a 3D model running, an image and speech waiting)
+    async cancelGpuLease(id) { await net(); const w = gpuQ.waiting.find(l => l.id === id); if (!w) throw err(404, 'gpu_lease_unknown', `no GPU lease ${id}`);
+      gpuQ.waiting = gpuQ.waiting.filter(l => l !== w); gpuQ.recent.unshift({ ...w, state: 'cancelled', ahead: undefined }); emit({ type: 'gpu', event: 'cancelled', lease: clone(w), gpu: clone(gpuQ) }); return { lease: id, state: 'cancelled', ahead: [] }; },
     async planRoom(id, needs) { await net(); const s = getSvc(id); const p = makePlan({ ...s, estimate: (needs ?? s.estimate) + s.used }); p.service = id; return p; },
     async listModels(f = {}) { await net(); let m = models;
       if (f.kind) m = m.filter(x => f.kind.split(',').includes(x.kind)); if (f.service) m = m.filter(x => x.services.includes(f.service)); if (f.status) m = m.filter(x => x.status === f.status);

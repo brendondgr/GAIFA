@@ -63,11 +63,12 @@ function transcribe(el, ctx) {
     if (j.state === 'done' && j.transcript) acts.push(ui.button('Show text', () => { text.hidden = !text.hidden; }, { small: true }));
     if (j.state === 'done' && j.result?.output) acts.push(ui.button('Outputs', () => ctx.navigate('#/outputs?service=stt'), { small: true }));
     if (j.state === 'queued' || j.state === 'running') acts.push(ui.button('Cancel', () => ctx.call('POST', `/v1/jobs/${j.id}/cancel`).then(refresh), { small: true }));
-    const meta = [j.model, j.duration != null ? fmtSecs(j.duration) : null, j.rtf != null ? `${(1 / j.rtf).toFixed(0)}× real time` : null, fmtAgo(j.created)].filter(Boolean).join(' · ');
+    const gpu = j.stage === 'waiting_gpu' && j.ahead?.length ? `after ${j.ahead[0].service}${j.ahead[0].label ? ` (${j.ahead[0].label})` : ''}${j.eta_s ? `, about ${Math.max(1, Math.round(j.eta_s / 60))} min` : ''}` : null;
+    const meta = [gpu, j.model, j.duration != null ? fmtSecs(j.duration) : null, j.rtf != null ? `${(1 / j.rtf).toFixed(0)}× real time` : null, fmtAgo(j.created)].filter(Boolean).join(' · ');
     return h('div', { style: 'display:flex;flex-direction:column;gap:6px;padding:10px;border:1px solid var(--bd,#1D2430);border-radius:8px' },
       h('div', { style: 'display:flex;align-items:center;gap:8px;min-width:0' },
         h('strong', { style: 'font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, j.label),
-        ui.badge(j.state === 'running' ? `${j.stage} ${Math.round(j.progress * 100)}%` : j.state, tone[j.state]), ...acts),
+        ui.badge(j.stage === 'waiting_gpu' ? 'Waiting for the GPU…' : j.state === 'running' ? `${j.stage} ${Math.round(j.progress * 100)}%` : j.state, tone[j.state]), ...acts),
       h('span', { style: 'font-size:11.5px;color:var(--mut,#8A94A6)' }, j.error ? `${meta} · ${j.error}` : meta),
       text);
   }

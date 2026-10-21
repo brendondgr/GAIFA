@@ -27,12 +27,18 @@ RECENT_S = 120
 STATE = {"queued": "queued", "running": "running", "done": "done", "failed": "failed", "cancelled": "cancelled"}
 
 
-def _run_jobs(db) -> tuple[list[dict], set[str]]:
+def _run_jobs(db, runner=None) -> tuple[list[dict], set[str]]:
     now = time.time()
     rows = db.runs(states=("queued", "running"), limit=50)
     rows += [r for r in db.runs(states=("done", "failed", "cancelled"), limit=10) if now - (r.get("finished") or 0) < RECENT_S]
-    jobs = [{"id": r["id"], "label": r["label"] or r["workflow"], "progress": r.get("progress"), "state": STATE[r["state"]],
-             "route": f"#/s/comfy/run?job={r['id']}"} for r in sorted(rows, key=lambda r: r["created"])]
+    jobs = []
+    for r in sorted(rows, key=lambda r: r["created"]):
+        r = runner.annotate(r) if runner is not None else r
+        j = {"id": r["id"], "label": r["label"] or r["workflow"], "progress": r.get("progress"), "state": STATE[r["state"]],
+             "route": f"#/s/comfy/run?job={r['id']}"}
+        if r.get("stage"):                       # waiting for the GPU slot (plan 31.3)
+            j.update(stage=r["stage"], ahead=r.get("ahead") or [], eta_s=r.get("eta_s"))
+        jobs.append(j)
     return jobs, {r["prompt_id"] for r in rows if r.get("prompt_id")}
 
 
@@ -43,7 +49,7 @@ def status(request: Request) -> dict:
     packs = getattr(st, "packs", None)
     ready = packs.count_ready() if packs else 0
     drafts = packs.count_drafts() if packs else 0
-    runs, ours = _run_jobs(st.db)
+    runs, ours = _run_jobs(st.db, getattr(st, "runner", None))
     today = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))
     made = sum(len(r.get("outputs") or []) for r in st.db.runs(states=("done",), since=today, limit=1000))
     return {

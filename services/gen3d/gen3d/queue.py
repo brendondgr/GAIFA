@@ -2,6 +2,11 @@
 
 Stages run in order; each reads its input from this job's earlier output, the parent job's output
 (`parent_id`), or an uploaded mesh. A stage that finished before a server restart is not re-run.
+
+The GPU slot (plan 31.3): a job takes AIHub's slot (`gpu_slot.py`) before its first stage and holds it
+across all of them, the Blender preview included; memory is asked for after it. While it waits, the
+job stays `queued` with `stage: "waiting_gpu"` (`ahead`, `eta_s`). The lease goes to comfy in
+`X-AIHub-GPU-Lease` when TRELLIS.2 or SAM 3D Body run there, so comfy runs under it.
 """
 
 from __future__ import annotations
@@ -15,6 +20,7 @@ from .config import settings
 from .engines import ENGINES
 from .eta import Estimator, substages
 from .events import Broadcaster
+from .gpu_slot import GpuSlot
 from .options import JobRequest, parse_request
 from .store import TERMINAL, Store
 
@@ -31,8 +37,13 @@ class Canceled(Exception):
 
 
 class Runner:
-    def __init__(self, store: Store, worker, previewer, events: Broadcaster, eta_scale: float = 1.0, comfy=None):
+    def __init__(self, store: Store, worker, previewer, events: Broadcaster, eta_scale: float = 1.0, comfy=None,
+                 gpu: GpuSlot | None = None):
         self.store = store
+        self.gpu = gpu or GpuSlot(service="gen3d")     # AIHUB_URL from the environment; none: runs at once
+        self.lease = None                               # the running job's GPU lease
+        self.gpu_wait: dict[str, dict] = {}             # job id → {ahead, eta_s} while it waits for the slot
+        self._cancel_waiting: set[str] = set()
         self.worker = worker                # a WorkerPool: one container per engine family, one at a time
         self.comfy = comfy                  # the delegated engines' runner (comfy_engine.ComfyEngine), or None
         if comfy is not None:
@@ -103,6 +114,31 @@ class Runner:
         job = self.store.get_job(jid)
         req = JobRequest.model_validate(job["request"])
         self.current = jid
+
+        def on_wait(lease) -> None:
+            self.gpu_wait[jid] = {"ahead": lease.ahead, "eta_s": lease.eta_s}
+            self.publish_job(jid)
+
+        est = (self.schedule().get(jid) or {}).get("own_s")
+        try:
+            async with self.gpu.slot(f"3D model: {job.get('title') or jid}"[:120], est_s=est, on_wait=on_wait) as lease:
+                self.gpu_wait.pop(jid, None)
+                if self.store.get_job(jid)["status"] in TERMINAL:      # cancelled as the slot came
+                    return
+                self.lease = lease
+                await self._run_held(jid, req)
+        except asyncio.CancelledError:
+            if jid not in self._cancel_waiting:
+                raise
+            asyncio.current_task().uncancel()           # cancel() stopped the wait for the slot, not the runner
+        finally:
+            self._cancel_waiting.discard(jid)
+            self.gpu_wait.pop(jid, None)
+            self.lease = None
+            self.current = None
+
+    async def _run_held(self, jid: str, req: JobRequest) -> None:
+        job = self.store.get_job(jid)
         self.store.update_job(jid, status="running", started=job.get("started") or time.time(), error=None)
         self.publish_job(jid)
         try:
@@ -243,7 +279,9 @@ class Runner:
         """TRELLIS.2 and SAM 3D Body: a run of their comfy pack through the hub (gen3d/comfy_engine.py)."""
         if self.comfy is None:
             raise StageError(f"{ENGINES[req.engine].label} runs in the comfy mod, which needs AIHub (AIHUB_URL)")
-        return await self.comfy.run(req, jdir, inputs, on_event, cancel_check)
+        # comfy runs under this job's GPU lease instead of queueing behind it
+        return await self.comfy.run(req, jdir, inputs, on_event, cancel_check,
+                                    gpu_headers=self.lease.headers if self.lease else {})
 
     def _set_stage(self, jid: str, stage: str, publish: bool = False, **fields) -> None:
         job = self.store.get_job(jid)
@@ -262,6 +300,9 @@ class Runner:
         if not job or job["status"] in TERMINAL:
             return job
         if job["status"] == "queued":
+            if jid == self.current and jid in self.gpu_wait and self._task:   # waiting for the GPU slot: stop waiting
+                self._cancel_waiting.add(jid)
+                self._task.cancel()
             self._mark_rest(jid, "canceled")
             self.store.update_job(jid, status="canceled", finished=time.time())
             self.store.write_output_json(jid)
@@ -323,6 +364,9 @@ class Runner:
         out = {k: v for k, v in job.items()}
         out["files"] = files
         out["eta"] = sched.get(job["id"])
+        w = self.gpu_wait.get(job["id"]) if job.get("status") == "queued" else None
+        if w is not None:                                   # plan 31.3: what runs on the GPU before it
+            out.update(stage="waiting_gpu", ahead=w["ahead"], eta_s=w["eta_s"])
         return out
 
     def publish_job(self, jid: str) -> None:

@@ -40,6 +40,9 @@ containers = ["gen3d-worker-*"]
 idle_unload_s = 600
 idle_unload_env = "GEN3D_IDLE_UNLOAD_S"
 
+[gpu]                                          # plan 31.3: one lease per job, across its stages (comfy runs under it)
+class = "job"
+
 [models]
 dirs = ["3d"]
 

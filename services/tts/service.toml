@@ -45,6 +45,10 @@ idle_unload_env = "LOCALTTS_IDLE_UNLOAD_S"
 [models]
 dirs = ["tts", "voices"]
 
+[gpu]                          # plan 31.3: each synthesis takes the GPU slot (localtts/engines.py)
+class = "job"
+group = "tts"
+
 [outputs]
 kinds = ["audio"]
 

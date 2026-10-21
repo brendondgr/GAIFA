@@ -4,7 +4,6 @@ embedded under the same idle rule as everything else, and searched by meaning fr
 
 from __future__ import annotations
 
-import asyncio
 import time
 from typing import Any
 
@@ -65,7 +64,7 @@ def add_chat_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
             rows = [r for r in store.chats() if r["state"] == "done" and r["vector"]]
             if not rows:
                 return {"results": [], "pending": store.chat_counts()["pending"]}
-            q = (await asyncio.to_thread(enc.embed, [("text", prompt(body.query, "query"))], 768, {"text": 1}))[0]
+            q = (await lib.encode([("text", prompt(body.query, "query"))], 768, {"text": 1}, "Search chats"))[0]
         except HubError as e:
             return JSONResponse(e.body(), e.status)
         except (FileNotFoundError, WorkerDied) as e:

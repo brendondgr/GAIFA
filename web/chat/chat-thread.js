@@ -92,7 +92,7 @@ export function buildView(events, live = {}) {
     if (pr && !it.result) it.progress = pr;
   }
   const pending = items.filter(i => (i.kind === 'question' && !i.answer && !i.result) || (i.kind === 'approval' && !i.decision && !i.result));
-  return { items, todos, state, usage, outputs, pending, lastSeq };
+  return { items, todos, state, usage, outputs, pending, lastSeq, gpu: live.gpu || null };
 }
 
 /** Folds one transient stream event (seq null) into the live state `{deltas, progress, meter}`. */
@@ -101,7 +101,7 @@ export function applyTransient(live, ev) {
   if (ev.type === 'delta') {
     const d = { ...(live.deltas[p.step] || { t0: ev.ts || Date.now() / 1000 }) };
     if (p.kind === 'thinking') d.thinking = (d.thinking || '') + (p.text || ''); else d.text = (d.text || '') + (p.text || '');
-    return { ...live, deltas: { ...live.deltas, [p.step]: d } };
+    return { ...live, deltas: { ...live.deltas, [p.step]: d }, gpu: null };   // a token came: no longer waiting for the GPU
   }
   if (ev.type === 'delta_reset') {
     const deltas = { ...live.deltas }; delete deltas[p.step];
@@ -109,12 +109,14 @@ export function applyTransient(live, ev) {
   }
   if (ev.type === 'progress') return { ...live, progress: { ...live.progress, [p.id]: p } };
   if (ev.type === 'context') return { ...live, meter: p };
+  if (ev.type === 'gpu_wait') return { ...live, gpu: p.text ? p : null };   // plan 31.4: the model call waits for the GPU slot
   return live;
 }
 
 /** After a stored event arrives: drop the deltas and progress it replaces. */
 export function settleLive(live, ev) {
   const p = ev.payload || {};
+  if (live.gpu && (ev.type === 'state' || ev.type === 'assistant' || ev.type === 'thinking' || ev.type === 'usage')) live = { ...live, gpu: null };
   if ((ev.type === 'assistant' || ev.type === 'thinking') && live.deltas[p.step]) {
     const d = { ...live.deltas[p.step] };
     delete d[ev.type === 'assistant' ? 'text' : 'thinking'];

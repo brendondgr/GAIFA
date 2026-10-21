@@ -5,6 +5,7 @@
 import { h, SERIES, OTHER, TONE, MONO, MUT, BD, fmtNum, useWidth, Frame, btnSt } from './chart-kit.js';
 import { AreaChart, LineChart, BarChart, HBarChart, Donut, Heatmap, Timeline, KpiTile, Sparkline } from './charts.js';
 import { useData, pollFor, chartState, Card, MemoryChart, StorageChart, svcColor, KIND_COLOR, KIND_LABEL } from './views.js';
+import { GpuQueueW, jobGpuText } from './gpu-queue.js';
 
 const R = () => globalThis.React;
 const RANGES = ['1h', '6h', '24h', '7d', '30d'];
@@ -96,9 +97,9 @@ function JobsW({ ctx, range, table }) {
   const name = id => ctx.services.find(s => s.id === id)?.name || id;
   const live = h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
     now.length ? now.slice(0, 3).map(j => h('a', { key: j.id, href: j.route || '#/s/' + j.service, style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--tx,#E6EAF2)', minWidth: 0 } },
-      h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, j.label),
+      h('span', { title: jobGpuText(j, name) || undefined, style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, j.label),
       h('span', { style: { width: 60, height: 5, borderRadius: 9, background: 'var(--row,#1A2130)', overflow: 'hidden', display: 'block', flex: 'none' } }, h('span', { style: { display: 'block', height: '100%', width: (j.progress || 0) * 100 + '%', background: TONE.accent } })),
-      h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: MUT, width: 48, textAlign: 'right' } }, j.state === 'queued' ? 'queued' : j.progress != null ? Math.round(j.progress * 100) + '%' : 'running')))
+      h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: MUT, width: 48, textAlign: 'right' } }, j.stage === 'waiting_gpu' ? 'GPU wait' : j.state === 'queued' ? 'queued' : j.progress != null ? Math.round(j.progress * 100) + '%' : 'running')))
       : h('div', { style: { fontSize: 11.5, color: MUT } }, 'No jobs running'));
   let chart;
   if (d.state !== 'ok') chart = h(HBarChart, { ...chartState(d), height: 90 });
@@ -168,6 +169,7 @@ const BASE = [
   { key: 'services', title: 'Services', span: 4, areas: ['services'], C: ServicesW, noTable: true },
   { key: 'memory', title: 'Memory over time', span: 4, ranges: RANGES, def: '6h', href: '#/settings/memory', areas: ['metrics'], C: MemTimeW },
   { key: 'memory-now', title: 'Memory now', span: 4, areas: ['memory'], C: MemNowW },
+  { key: 'gpu-queue', title: 'GPU queue', span: 4, ranges: ['24h', '7d'], def: '24h', areas: ['gpu', 'metrics'], C: GpuQueueW },  // plan 31.5
   { key: 'outputs-day', title: 'Outputs per day', span: 6, href: '#/outputs', areas: ['metrics'], C: OutDayW },
   { key: 'llm', title: 'LLM traffic', span: 6, ranges: ['24h', '7d'], def: '24h', areas: ['widgets'], mod: ['relay', 'traffic'] },
   { key: 'activity-heat', title: 'Activity heatmap', span: 6, ranges: ['7d', '14d'], def: '14d', areas: ['metrics'], C: HeatW },
@@ -235,7 +237,7 @@ function Customize({ defs, layout, onLayout, onClose, cols = 2 }) {
 }
 
 // ---------- dashboard ----------
-// props: api, services, memory, jobs, activity, recent, hist1, hist24, widgets (WidgetInfo[]),
+// props: api, services, memory, gpu (GpuState) and cancelGpu(id) (plan 31.5), jobs, activity, recent, hist1, hist24, widgets (WidgetInfo[]),
 // layout ({order, hidden, ranges}), onLayout, customizing, onCustomize, go, badge, compact, outTick
 export function Dashboard(props) {
   const React = R(), [ref, width] = useWidth(1200), [tables, setTables] = React.useState({});

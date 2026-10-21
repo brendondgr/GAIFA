@@ -260,6 +260,12 @@ class OutputsCfg(_Strict):
     hidden_keep_days: float = Field(0, ge=0)
 
 
+class GpuCfg(_Strict):
+    """Plan 31.1: the GPU queue. Off: memory-only admission (every lease is granted at once)."""
+    queue: bool = True
+    lease_ttl_s: float = Field(60, ge=5, le=3600)   # a held lease not renewed for this long is dropped (the mod died)
+
+
 class DocsCfg(_Strict):
     """Plan 23.3: the setup docs follow the registry. Off: only `aihub docs` writes them."""
     regenerate: bool = True
@@ -279,6 +285,7 @@ class Config(_Strict):
     speech_input: SpeechInputCfg = SpeechInputCfg()
     docs: DocsCfg = DocsCfg()
     outputs: OutputsCfg = OutputsCfg()
+    gpu: GpuCfg = GpuCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

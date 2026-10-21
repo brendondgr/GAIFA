@@ -28,7 +28,8 @@ from . import links
 from .docs import describe as describe_docs
 from . import prompts
 from .hubapi import HubAPI
-from .llm import LLM, LLMError, Reply
+from . import gpuwait
+from .llm import LLM, THREAD, LLMError, Reply
 from .store import Store, mode_of, new_id
 from .tools import LOCAL_NAMES, ToolSet
 
@@ -666,6 +667,19 @@ class Agent:
         return m
 
     async def _model(self, tid: str, tools: ToolSet, model: str, wrap_up: bool = False) -> tuple[Reply, str]:
+        """One model call (`_call_model`), with the chat named on its GPU lease and its wait shown (plan 31.4)."""
+        token = THREAD.set(tid)
+        client = getattr(self.hub, "client", None)
+        watcher = asyncio.create_task(gpuwait.watch(client, tid, lambda p: self.transient(tid, "gpu_wait", p))) if client else None
+        try:
+            return await self._call_model(tid, tools, model, wrap_up)
+        finally:
+            if watcher:
+                watcher.cancel()
+                await asyncio.gather(watcher, return_exceptions=True)
+            THREAD.reset(token)
+
+    async def _call_model(self, tid: str, tools: ToolSet, model: str, wrap_up: bool = False) -> tuple[Reply, str]:
         step = new_id("s_")
         msgs, sizes = await self.messages(tid, tools, model)
         choice = "auto"

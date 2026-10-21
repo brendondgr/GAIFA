@@ -1,5 +1,5 @@
 """The library (plan 28.2) with the fake backend and a fake hub: indexing on create, removal on delete, chunk
-positions, re-index on change, collections, a restart resuming, and the GPU and memory gates."""
+positions, re-index on change, collections, a restart resuming, the GPU slot (plan 31.3) and the memory gate."""
 
 from __future__ import annotations
 
@@ -11,31 +11,26 @@ from fastapi.testclient import TestClient
 
 from embed.chunks import OVERLAP, SIZE, chunk
 from embed.encoder import Encoder, FakeBackend
-from embed.gpu import GpuIdle
 from embed.hubclient import Hub
 from embed.library import Library, signature
 from embed.server import create_app
 from embed.store import Store
-from tests.conftest import mp4, png, wav
+from tests.conftest import FakeGpu, mp4, png, wav
 
 
 async def nosleep(_s: float) -> None:
     return None
 
 
-class Clock:
-    def __init__(self):
-        self.t = 0.0
-
-    def __call__(self) -> float:
-        return self.t
+class GpuBackend(FakeBackend):
+    device = "cuda"                                     # takes the GPU slot (the plain fake runs on the CPU)
 
 
-def make(settings, hub, backend=None, busy=lambda: 0, clock=None, idle_s=0.0) -> Library:
+def make(settings, hub, backend=None, gpu: FakeGpu | None = None) -> Library:
+    """A library on the fake hub. Without `gpu` the hub has no GPU queue (404: the work runs at once)."""
     enc = Encoder(backend or FakeBackend(), settings.state_dir)
-    gpu = GpuIdle(10, idle_s, ours=lambda: enc.busy, read=busy, clock=clock or Clock(), sleep=lambda s: None)
     return Library(Store(settings.databases / "embed.db"), enc, Hub("http://hub", transport=httpx.MockTransport(hub.handler)),
-                   settings, gpu=gpu, sleep=nosleep)
+                   settings, gpu=gpu.slot() if gpu else None, sleep=nosleep)
 
 
 def run(coro):
@@ -138,14 +133,11 @@ def test_change_during_indexing_stays_pending(settings, hub):
 def test_restart_resumes_where_it_was(settings, hub):
     for i in range(4):
         hub.add(f"i{i}", "image", png(f"x{i}"))
-    calls = {"n": 0}
-
-    def busy_after_two() -> int:                                    # someone takes the GPU after two outputs
-        calls["n"] += 1
-        return 50 if calls["n"] > 2 * 2 * 3 else 0                  # 2 batches an output (meta, image), 3 reads each
-    lib = make(settings, hub, busy=busy_after_two)
+    gpu = FakeGpu(cancel_after=2 * 2)                                # 2 batches an output (meta, image); then cancelled
+    lib = make(settings, hub, backend=GpuBackend(), gpu=gpu)
     run(lib.reconcile())
-    assert run(lib.drain()) == 2 and lib.state == "waiting_for_gpu"
+    assert run(lib.drain()) == 2 and lib.state == "paused"         # cancelled from the queue: tries again later
+    assert not gpu.held
     assert lib.store.counts()["done"] == 2 and lib.store.counts()["pending"] == 2
     lib.store.close()
     backend = FakeBackend()
@@ -156,30 +148,52 @@ def test_restart_resumes_where_it_was(settings, hub):
     assert len([b for b in backend.batches if b[0] == "image"]) == 2
 
 
-def test_waits_for_a_quiet_gpu(settings):
-    clock, level = Clock(), {"v": 40}
-    enc = Encoder(FakeBackend())
-    gpu = GpuIdle(10, 300, ours=lambda: enc.busy, read=lambda: level["v"], clock=clock, sleep=lambda s: None)
-    gpu.sample()
-    assert not gpu.idle()
-    level["v"] = 3
-    for t in range(0, 300, 60):
-        clock.t = t
-        gpu.sample()
-    assert not gpu.idle()                                           # quiet since the busy sample at 0: 240 s
-    clock.t = 301
-    gpu.sample()
-    assert gpu.idle()
-    level["v"] = 90                                                 # our own encoding: not counted
-    enc.busy = True
-    gpu.sample()
-    enc.busy = False
-    clock.t = 301.5
-    gpu.sample()                                                    # within the grace after our work
-    assert gpu.idle()
-    clock.t = 303
-    gpu.sample()                                                    # someone else's work: wait again
-    assert not gpu.idle() and gpu.quiet_s() == 0
+def test_indexing_waits_for_the_gpu_as_background_work(settings, hub):
+    """Each batch takes a background lease; while other work holds or waits for the slot the library waits
+    (state and status job `waiting_gpu`, with what runs before it), then indexes when the slot is free."""
+    hub.add("a", "image", png("a"))
+    gpu = FakeGpu(blocked={"background"})
+    lib = make(settings, hub, backend=GpuBackend(), gpu=gpu)
+
+    async def go() -> None:
+        await lib.reconcile()
+        task = asyncio.create_task(lib.drain())
+        for _ in range(100):
+            await asyncio.sleep(0.01)
+            if lib.state == "waiting_gpu":
+                break
+        assert lib.state == "waiting_gpu" and not lib.enc.backend.batches          # nothing encoded while it waits
+        job = lib.job()
+        assert job["stage"] == "waiting_gpu" and job["state"] == "queued" and job["ahead"][0]["service"] == "comfy"
+        assert lib.status()["gpu"]["waiting"] and lib.status()["gpu"]["eta_s"] == 120
+        gpu.blocked.clear()                                         # the other work is done
+        assert await asyncio.wait_for(task, 5) == 1
+    run(go())
+    assert lib.store.counts()["done"] == 1 and "stage" not in lib.job()      # indexing again (run() makes it idle)
+    assert {c for e, c in gpu.log if e == "granted"} == {"background"} and not gpu.held
+    assert gpu.log.count(("granted", "background")) == 2               # one short lease a batch (meta, image)
+
+
+def test_the_lease_is_released_when_a_batch_fails(settings, hub):
+    from embed.worker import WorkerDied
+
+    hub.add("a", "image", png("a"))
+    gpu = FakeGpu()
+    lib = make(settings, hub, backend=FlakyBackend(WorkerDied("the encoder worker died (exit code -9)", "call")), gpu=gpu)
+    lib.enc.backend.device = "cuda"
+    run(lib.reconcile())
+    run(lib.drain())
+    assert ("released", "background") in gpu.log and not gpu.held
+
+
+def test_cpu_takes_no_slot(settings, hub):
+    from dataclasses import replace
+
+    hub.add("a", "image", png("a"))
+    gpu = FakeGpu(blocked={"background", "interactive"})               # would wait forever if it asked
+    lib = make(replace(settings, device="cpu"), hub, gpu=gpu)
+    run(lib.reconcile())
+    assert run(lib.drain()) == 1 and gpu.log == []
 
 
 def test_unloads_when_the_queue_empties(settings, hub):
@@ -231,7 +245,7 @@ def test_collections_and_status_routes(settings, hub):
         assert c.delete("/v1/collections/trip 2").json() == {"deleted": cid}
         assert c.delete(f"/v1/collections/{cid}").status_code == 404
         st = c.get("/v1/library").json()
-        assert st["counts"]["pending"] == 0 and st["gpu"]["threshold_pct"] == 10
+        assert st["counts"]["pending"] == 0 and st["gpu"]["waiting"] is False
         assert c.post("/v1/library/reindex", json={}).json() == {"queued": 0}
         assert {"label": "Indexed", "value": 0} in c.get("/v1/status").json()["stats"]
 
@@ -284,14 +298,6 @@ def test_hub_going_away_pauses_without_failing(settings, hub):
     assert run(lib.drain()) == 0 and lib.state == "no_hub"
     row = lib.store.get("a")
     assert row["state"] == "pending" and row["attempts"] == 0
-
-
-def test_the_device_measure_uses_the_device_threshold(settings, hub):
-    from dataclasses import replace
-    lib = Library(Store(settings.databases / "d.db"), Encoder(FakeBackend()), Hub(None), replace(settings, idle_measure="device"))
-    assert lib.gpu.busy_pct == 30 and type(lib.gpu.read).__name__ == "DeviceMedian"
-    lib2 = Library(Store(settings.databases / "a.db"), Encoder(FakeBackend()), Hub(None), settings)
-    assert lib2.gpu.busy_pct == 10 and type(lib2.gpu.read).__name__ == "HubMeter"
 
 
 class FlakyBackend(FakeBackend):

@@ -34,6 +34,9 @@ unload = "POST /v1/unload"
 containers = ["aihub-vllm-*"]
 idle_unload_s = 0                   # a reload takes minutes; unload by hand
 
+[gpu]                              # plan 31.4: the relay takes an interactive GPU lease per request to this engine
+class = "interactive"
+
 [tools]
 list_profiles = { op = "GET /v1/profiles", description = "vLLM's model profiles: model, memory, context, whether downloaded, and which is loaded" }
 engine_status = { op = "GET /v1/engine", description = "The vLLM engine: state (unloaded, starting with its stage, ready, failed), the loaded profile, its endpoint and relay alias" }

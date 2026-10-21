@@ -10,6 +10,12 @@ const ORDER = ['prompt', 'prompt_2', 'negative', 'image', 'image_2', 'image_3', 
 const ADVANCED = ['width', 'height', 'megapixels', 'frames', 'fps', 'seed', 'steps', 'cfg'];
 const some = (...a) => a.filter(x => x != null && x !== false);   // replaceChildren would print null
 const JOB_TONE = { done: 'green', failed: 'red', cancelled: 'dim', running: 'accent', queued: 'dim' };
+// Plan 31.3: a run waiting for AIHub's GPU slot (another mod's work runs first).
+const gpuWait = j => {
+  if (j.stage !== 'waiting_gpu') return null;
+  const a = (j.ahead || [])[0], eta = j.eta_s > 0 ? (j.eta_s >= 90 ? `, about ${Math.round(j.eta_s / 60)} min` : `, about ${Math.round(j.eta_s)} s`) : '';
+  return `Waiting for the GPU${a ? `: ${a.service}${a.label ? ` (${a.label})` : ''}` : ''}${eta}`;
+};
 
 export function runTab(el, ctx, cleanups) {
   const { ui } = ctx, h = ui.h;
@@ -140,7 +146,7 @@ export function runTab(el, ctx, cleanups) {
         style: `text-align:left;border:1px solid ${j.id === selected ? 'var(--acct,#FFB224)' : 'var(--bd,#1D2430)'};background:var(--inset,#131926);border-radius:7px;padding:7px 9px;cursor:pointer;color:inherit;font:inherit;display:flex;flex-direction:column;gap:4px`,
       }, h('div', { style: 'display:flex;gap:6px;align-items:center' },
         h('span', { style: 'flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, j.label || j.workflow),
-        ui.badge(j.state === 'running' && j.progress != null ? `${Math.round(j.progress * 100)}%` : j.state, JOB_TONE[j.state])),
+        ui.badge(j.state === 'running' && j.progress != null ? `${Math.round(j.progress * 100)}%` : j.stage === 'waiting_gpu' ? 'waiting for GPU' : j.state, JOB_TONE[j.state])),
       h('div', { style: `font-size:11px;color:var(--mut,#8A94A6);font-family:${MONO}` }, `${j.workflow} · ${fmtAgo(j.created)}` +
         (j.finished && j.started ? ` · ${fmtSecs(j.finished - j.started)}` : '')), bar);
     }));
@@ -149,7 +155,7 @@ export function runTab(el, ctx, cleanups) {
   async function drawResult() {
     const j = jobs.find(x => x.id === selected) || jobs[0];
     if (!j) { result.replaceChildren(ui.text('Run a workflow to see its result here.', { muted: true, small: true })); return; }
-    const key = `${j.id}:${j.state}:${(j.outputs || []).length}`;
+    const key = `${j.id}:${j.state}:${(j.outputs || []).length}:${gpuWait(j) || ''}`;
     if (result.dataset.key === key && j.state !== 'running') return;
     result.dataset.key = key;
     const active = j.state === 'queued' || j.state === 'running';
@@ -162,7 +168,7 @@ export function runTab(el, ctx, cleanups) {
       j.state === 'done' ? ui.button('Open Outputs', () => ctx.navigate('#/outputs'), { small: true, kind: 'ghost' }) : null);
     const media = h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px' });
     result.replaceChildren(...some(stats, j.error && j.state !== 'cancelled' ? h('div', { style: `font-family:${MONO};font-size:12px;color:var(--rd,#F85149);white-space:pre-wrap` }, j.error) : null,
-      active ? ui.text(j.state === 'queued' ? 'Waiting in the queue…' : `Running… ${Math.round((j.progress || 0) * 100)}%`, { muted: true }) : null,
+      active ? ui.text(gpuWait(j) ? `${gpuWait(j)}…` : j.state === 'queued' ? 'Waiting in the queue…' : `Running… ${Math.round((j.progress || 0) * 100)}%`, { muted: true }) : null,
       media, j.inputs?.prompt ? ui.text(j.inputs.prompt, { small: true, muted: true }) : null, actions));
     for (const o of j.outputs || []) {
       let url = null;

@@ -3,6 +3,7 @@
 // mod is up, "By meaning" searches the chats' summaries instead of their titles (plan 28.5).
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, inputSt, fmtAgo, label11 } from './chat-ui.js';
+import { ScoreBadge } from '../score.js';
 
 const R = () => globalThis.React;
 
@@ -43,7 +44,7 @@ export function useEmbedUp(api) {
   return up;
 }
 
-/** Chats found by meaning (plan 28.5): title, date, score and the summary that matched, best first. */
+/** Chats found by meaning (plan 28.5): title, date, the similarity score (score.js) and the summary that matched, best first. */
 function MeaningList({ found, activeId, onOpen }) {
   if (found.busy && !found.rows.length) return h('div', { role: 'status', style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } }, 'Searching by meaning…');
   if (found.err) return h('div', { role: 'alert', style: { padding: '12px 10px', color: T.rd, fontSize: 12 } }, `Search by meaning failed: ${found.err}`);
@@ -56,7 +57,7 @@ function MeaningList({ found, activeId, onOpen }) {
         h('span', { style: { display: 'flex', gap: 6, alignItems: 'baseline' } },
           h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 } }, r.title || 'Chat'),
           h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: T.dim, flex: 'none' } }, r.date || ''),
-          h('span', { title: 'Cosine score: higher is closer', style: { fontFamily: MONO, fontSize: 10.5, color: T.cy || T.mut, flex: 'none' } }, (r.score ?? 0).toFixed(2))),
+          h(ScoreBadge, { score: r.score, style: { alignSelf: 'center' } })),
         h('span', { style: { fontSize: 11.5, color: T.mut, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, r.summary)))));
 }
 

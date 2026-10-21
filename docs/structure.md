@@ -146,6 +146,8 @@ utils/tests/
 | :--- | :--- |
 | `Hub.dc.html`, `OutputCard.dc.html`, `JsonView.dc.html` | The shell and every core page; shared components. Claude Design's v1 export, with revision 2 (brief §11) built here in plan 6.5 |
 | `chart-kit.js`, `charts.js` | Ours: the chart components of brief §11.6 (plain SVG on the page's React) and their shared frame, formatting and scales |
+| `score.js` | Ours (2026-10-21): the similarity badge for searches by meaning (`ScoreBadge`, `fmtScore`, `scoreWidth`, `scoreTitle`): the chat list, the Outputs page's By meaning and the header Search; tested in `utils/tests/web/score.test.mjs` |
+| `palette-meaning.js` | Ours (2026-10-21): the header Search's search by meaning (outputs through the embed mod, chats through the agent), merged under the name matches with their scores |
 | `outputs/hidden.js` | Ours (plan 30.9): the Outputs page's Saved web pages chip and the live-event rules for hidden outputs (`toggle`, `belongs`, `place`, `addTo`; tested in `utils/tests/web/hidden.test.mjs`) |
 | `outputs/viewer.js` | Ours (plan 24.7): the text and PDF viewer in the Outputs drawer (`DocViewer`): text and code with line numbers and the highlighter in `chat/highlight.js`, markdown rendered or as source, PDF pages as images with their text, search, opened at a page or line from a chat citation |
 | `outputs/meaning.js` | Ours (plan 28.4): the Outputs page's **By meaning** search (`MeaningResults`: the embed mod's ranked hits, one row per output; `canSearch`, `rows`, `plainSnippet`, `matchLabel` tested in `utils/tests/web/meaning.test.mjs`) |

@@ -4,6 +4,8 @@
 // The toggle shows only while the embed mod is running; deleting the mod hides it. The pure parts
 // (canSearch, plainSnippet, rows, matchLabel) are tested in utils/tests/web/meaning.test.mjs.
 
+import { ScoreBadge } from '../score.js';
+
 const R = () => globalThis.React;
 const h = (...a) => R().createElement(...a);
 const MONO = "'JetBrains Mono',ui-monospace,Menlo,monospace";
@@ -92,7 +94,7 @@ export function MeaningResults({ api, query, kinds = [], onOpen }) {
           h('span', { style: { display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' } },
             h('span', { style: { fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' } }, r.title),
             h('span', { style: { fontSize: 11.5, color: C.mut } }, LABEL[r.kind] || r.kind),
-            h('span', { title: 'Cosine score: higher is closer; about 0.5 is unrelated', style: { marginLeft: 'auto', fontFamily: MONO, fontSize: 11.5, color: C.cy } }, (r.score ?? 0).toFixed(2))),
+            h(ScoreBadge, { score: r.score, style: { marginLeft: 'auto', alignSelf: 'center' } })),
           r.matches.map((m, k) => h('span', { key: k, style: { fontSize: 12.5, color: C.mut, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } },
             h('span', { style: { fontFamily: MONO, fontSize: 11 } }, m.where), m.snippet ? ` ${m.snippet}` : ''))))))));
 }

@@ -4,7 +4,7 @@
 //
 //   models() threads({q, archived, limit}) searchChats(q, limit) create(body) get(tid) patch(tid, p) remove(tid) events(tid, after)
 //   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq)
-//   send(tid, text, attachments, doc_modes, quote) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
+//   send(tid, text, attachments, doc_modes, quotes) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
 //   feedback(tid, {value, output_id | seq, note}) decidePref(pid, approve)   (plan 21.7)
 //
@@ -83,9 +83,10 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     remove: tid => req('DELETE', T(tid)),
     events: (tid, after = 0) => req('GET', `${T(tid)}/events?after=${after}`),
     stream,
-    // quote: {text (markdown), seq?}: the part of an earlier reply this message answers (Select → Reply)
-    send: (tid, text, attachments = [], doc_modes = {}, quote = null) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),
-      ...(quote?.text ? { quote: { text: quote.text, ...(quote.seq != null ? { seq: quote.seq } : {}) } } : {}) }),
+    // quotes: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each (Select → Reply);
+    // `text` may be empty when a reply says something
+    send: (tid, text, attachments = [], doc_modes = {}, quotes = []) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),
+      ...(quotes?.length ? { quotes: quotes.map(q => ({ text: q.text, reply: q.reply || '', ...(q.seq != null ? { seq: q.seq } : {}) })) } : {}) }),
     answer: (tid, question_id, answers) => req('POST', `${T(tid)}/answer`, { question_id, answers }),
     approval: (tid, body) => req('POST', `${T(tid)}/approval`, body),
     action: (tid, tool, args = {}) => req('POST', `${T(tid)}/action`, { tool, arguments: args }),

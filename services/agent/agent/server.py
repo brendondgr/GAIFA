@@ -29,6 +29,8 @@ from .store import MODES, Store
 
 PING_S = 15.0
 QUOTE_MAX = 8000         # characters of a quoted reply (Select → Reply)
+REPLY_MAX = 4000         # characters of the user's reply to one quoted part
+QUOTES_TOTAL = 200_000   # characters of quoted parts and replies in one message, in all (no limit on how many)
 
 
 class NewThread(BaseModel):
@@ -51,9 +53,17 @@ class Quote(BaseModel):
     seq: int | None = Field(None, ge=1, description="the assistant event it came from")
 
 
+class QuoteReply(BaseModel):
+    text: str = Field(min_length=1, max_length=QUOTE_MAX, description="the quoted part of an earlier reply, as markdown")
+    reply: str = Field("", max_length=REPLY_MAX, description="the user's reply to that part")
+    seq: int | None = Field(None, ge=1, description="the assistant event it came from")
+
+
 class Message(BaseModel):
-    text: str = Field(min_length=1, max_length=100_000)
-    quote: Quote | None = Field(None, description="the part of an earlier reply this message answers (Select → Reply)")
+    text: str = Field("", max_length=100_000, description="may be empty when a quote-reply says something")
+    quotes: list[QuoteReply] | None = Field(None, description="parts of earlier replies and the user's reply to each, in order "
+                                                             "(Select → Reply); any number")
+    quote: Quote | None = Field(None, description="older clients: one quoted part with no reply (stored as `quotes`)")
     attachments: list[str] = Field(default_factory=list, description="output ids")
     doc_modes: dict[str, Literal["auto", "whole", "card"]] = Field(default_factory=dict,
                                                                    description="per attached document: whole, card, or auto (plan 24.9)")
@@ -138,6 +148,28 @@ async def _upkeep(store: Store, stop: asyncio.Event, every: float = 3600) -> Non
             await asyncio.wait_for(stop.wait(), timeout=every)
         except asyncio.TimeoutError:
             pass
+
+
+def check_quotes(agent: Agent, tid: str, body: Message) -> list[dict[str, Any]]:
+    """The message's quote-replies as stored, `[{text, reply, seq?}]` (any number of them); the older single `quote`
+    becomes one with an empty reply. 422 `invalid_quote`: both given, a blank quoted part, a seq that isn't a reply
+    here, or more than QUOTES_TOTAL characters of quotes and replies in all."""
+    if body.quotes is not None and body.quote is not None:
+        raise HTTPException(422, {"code": "invalid_quote", "detail": "send `quotes` or the older `quote`, not both"})
+    items = [QuoteReply(text=body.quote.text, seq=body.quote.seq)] if body.quote is not None else list(body.quotes or [])
+    total = sum(len(q.text) + len(q.reply) for q in items)
+    if total > QUOTES_TOTAL:
+        raise HTTPException(422, {"code": "invalid_quote", "detail": f"the quoted parts and replies are {total:,} characters "
+                                  f"in all; at most {QUOTES_TOTAL:,} (send some in a second message)"})
+    seqs = {e["seq"] for e in agent.store.events(tid, types=("assistant",))} if any(q.seq is not None for q in items) else set()
+    out = []
+    for i, q in enumerate(items, 1):
+        if not q.text.strip():
+            raise HTTPException(422, {"code": "invalid_quote", "detail": f"quote {i} is empty"})
+        if q.seq is not None and q.seq not in seqs:
+            raise HTTPException(422, {"code": "invalid_quote", "detail": f"quote.seq {q.seq} isn't a reply in this chat"})
+        out.append({"text": q.text, "reply": q.reply, **({"seq": q.seq} if q.seq is not None else {})})
+    return out
 
 
 def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str | None = None, llm_url: str | None = None) -> FastAPI:
@@ -369,15 +401,11 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def send(tid: str, body: Message, request: Request) -> dict:
         agent = A(request)
         thread_or_404(agent, tid)
-        quote = None
-        if body.quote is not None:
-            if not body.quote.text.strip():
-                raise HTTPException(422, {"code": "invalid_quote", "detail": "the quote is empty"})
-            src = agent.store.event(tid, body.quote.seq) if body.quote.seq is not None else None
-            if body.quote.seq is not None and (src is None or src["type"] != "assistant"):
-                raise HTTPException(422, {"code": "invalid_quote", "detail": f"quote.seq {body.quote.seq} isn't a reply in this chat"})
-            quote = {"text": body.quote.text, **({"seq": body.quote.seq} if body.quote.seq is not None else {})}
-        return await agent.send(tid, body.text, body.attachments, body.doc_modes, quote=quote)
+        quotes = check_quotes(agent, tid, body)
+        if not body.text.strip() and not any(q["reply"].strip() for q in quotes):
+            raise HTTPException(422, {"code": "empty_message" if not quotes else "invalid_quote",
+                                      "detail": "the message is empty" if not quotes else "say something: a reply to a quoted part or a message"})
+        return await agent.send(tid, body.text, body.attachments, body.doc_modes, quotes=quotes)
 
     @app.post("/v1/threads/{tid}/answer", status_code=202, summary="Answer an ask_user question card")
     async def answer(tid: str, body: Answer, request: Request) -> dict:

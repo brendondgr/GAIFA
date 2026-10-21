@@ -334,15 +334,26 @@ export function createMockClient(api, { speed = 1 } = {}) {
       }, 40));
       return { close() { closed = true; threads.get(tid)?.subs.delete(f); }, get lastSeq() { return last; } };
     },
-    async send(tid, text, attachments = [], docModes = {}, quote = null) {
+    async send(tid, text, attachments = [], docModes = {}, quotes = []) {
       await net(); const t = T(tid), queued = !!t.run;
+      // as the agent: quotes [{text 1–8,000, reply 0–4,000, seq?}], any number, 200,000 characters in all; an older single quote too
+      const qs = Array.isArray(quotes) ? quotes : quotes?.text != null ? [{ text: quotes.text, reply: '', seq: quotes.seq }] : [];
+      let total = 0;
+      for (const [i, q] of qs.entries()) {
+        if (!String(q.text || '').trim() || q.text.length > 8000) throw err(422, `quote ${i + 1}: 1 to 8,000 characters`, 'invalid_quote');
+        if (String(q.reply || '').length > 4000) throw err(422, `reply ${i + 1}: at most 4,000 characters`, 'invalid_quote');
+        if (q.seq != null && !t.events.some(e => e.seq === q.seq && e.type === 'assistant')) throw err(422, `quote.seq ${q.seq} isn't a reply in this chat`, 'invalid_quote');
+        total += q.text.length + String(q.reply || '').length;
+      }
+      if (total > 200000) throw err(422, `the quoted parts and replies are ${total} characters in all; at most 200,000`, 'invalid_quote');
+      const replies = qs.map(q => String(q.reply || '').trim()).filter(Boolean), said = [...replies, String(text || '').trim()].filter(Boolean).join('\n\n');
+      if (!said) throw err(422, qs.length ? 'say something: a reply to a quoted part or a message' : 'the message is empty', qs.length ? 'invalid_quote' : 'empty_message');
       if (!queued && t.pending) { emit(t, 'tool_result', { id: t.pending.id, name: t.pending.kind === 'question' ? 'ask_user' : 'comfy_generate_image', status: 'skipped', content: '{}', error: { code: 'skipped', detail: 'The user wrote a message instead of answering.' } }); t.pending = null; }
-      if (quote && (!String(quote.text || '').trim() || quote.text.length > 8000)) throw err(422, 'quote: 1 to 8,000 characters');
-      if (quote?.seq != null && !t.events.some(e => e.seq === quote.seq && e.type === 'assistant')) throw err(422, `quote.seq ${quote.seq} isn't a reply in this chat`);
       const docs = attachments.length ? await describe(t, attachments, docModes) : [];
-      const ev = emit(t, 'user', { text, ...(quote ? { quote: { text: quote.text, ...(quote.seq != null ? { seq: quote.seq } : {}) } } : {}), ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}) });
-      if (!t.thread.title) { t.thread.title = text.slice(0, 48); transient(t, 'thread', pub(t)); }
-      if (queued) t.queue.push(text); else start(t, run => messageTurn(t, run, text, docs));
+      const stored = qs.map(q => ({ text: q.text, reply: String(q.reply || ''), ...(q.seq != null ? { seq: q.seq } : {}) }));
+      const ev = emit(t, 'user', { text, ...(stored.length ? { quotes: stored } : {}), ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}) });
+      if (!t.thread.title) { t.thread.title = said.slice(0, 48); transient(t, 'thread', pub(t)); }
+      if (queued) t.queue.push(said); else start(t, run => messageTurn(t, run, said, docs));
       return ev;
     },
     async answer(tid, qid, answers) {

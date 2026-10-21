@@ -22,6 +22,8 @@ from typing import Any
 from evals.harness import Harness as EvalHarness
 from evals.harness import Run, Task
 
+from .. import context as ctx
+
 
 @dataclass
 class Record:
@@ -42,8 +44,8 @@ def record(events: list[dict[str, Any]], tid: str) -> Record:
     approvals: dict[str, dict[str, Any]] = {}
     for e in events:
         t, p = e["type"], e.get("payload") or {}
-        if t == "user" and p.get("text"):
-            rec.turns.append(p["text"])
+        if t == "user" and ctx.said(p):
+            rec.turns.append(ctx.said(p))      # the text and any replies to quoted parts
         elif t == "answer":
             rec.answers.update({q: a for q, a in (p.get("answers") or {}).items() if isinstance(a, str)})
         elif t == "approval":

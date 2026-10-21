@@ -5,14 +5,15 @@
 // slash commands (/compact, /clear, /model, /context and one per skill). Cards that wait for you (approvals,
 // questions, parameter cards a button opened) dock on top of it (`dock`, plan 19.6). Web pages attach too
 // (plan 30.8, chat-webpage.js): a pasted URL offers it, and the attach menu has "Add a web page".
-// A quote (Select → Reply, chat-quote.js) sits on top of the box; sending takes it with the message.
+// Quote-replies (Select → Reply, chat-quote-reply.js) are cards in the box, any number of them, each opening its
+// Reply popup to edit; sending takes them with the message (the text may then be empty).
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, label11, COL } from './chat-ui.js';
 import { actionsFor } from './chat-actions.js';
 import { MicButton } from './chat-mic.js';
 import { ACCEPT, uploadable, toChip, pasteFile, chipIcon, chipSize } from './chat-files.js';
 import { loneUrl, readPage, WebPageOffer, AddWebPage, WebBadge } from './chat-webpage.js';
-import { QuoteChip } from './chat-quote.js';
+import { QuoteCards, QuoteReplyDialog, editQuote, removeQuote, canSendQuotes, quotesProblem } from './chat-quote-reply.js';
 
 export { uploadable, toChip, pasteFile } from './chat-files.js';
 
@@ -91,11 +92,11 @@ function DocMode({ a, mode, onPick }) {
     b('card', 'Card', 'Send only its card (name, size, outline): the agent reads it in parts'));
 }
 
-export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quote, setQuote }) {
+export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes }) {
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
-  const [offer, setOffer] = React.useState(null), [reading, setReading] = React.useState(0);
+  const [offer, setOffer] = React.useState(null), [reading, setReading] = React.useState(0), [qOpen, setQOpen] = React.useState(null);
   const sized = chips => chips.filter(c => c.kind === 'text' || c.kind === 'document').forEach(c => api.outputText?.(c.id, { limit: 1 })
     .then(w => setAttachments(a => a.map(x => x.id === c.id ? { ...x, pages: w.pages, lines: w.lines } : x))).catch(() => {}));
   const upload = async list => {
@@ -130,8 +131,9 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
   const matches = slashMatches(draft, skills);
   React.useLayoutEffect(() => { const el = ref.current; if (!el) return; el.style.height = ''; if (draft && el.scrollHeight > el.clientHeight) el.style.height = Math.min(el.scrollHeight + 2, 220) + 'px'; }, [draft]);
   React.useEffect(() => { setSel(0); }, [matches.length]);
-  const can = !disabled && !uploading && !reading && (draft.trim() || attachments.length);
-  const send = () => { if (can) { setOffer(null); onSend(draft, attachments, quote || null); if (quote) setQuote?.(null); } };
+  const qProblem = quotesProblem(quotes);
+  const can = !disabled && !uploading && !reading && canSendQuotes(draft, attachments, quotes);
+  const send = () => { if (can) { setOffer(null); onSend(draft, attachments, quotes); } };   // the page clears the cards (and puts them back if it fails)
   const complete = c => { setDraft('/' + c.cmd + (c.arg ? ' ' : '')); ref.current?.focus(); };
   const onKey = e => {
     if (e.nativeEvent?.isComposing) return;
@@ -157,7 +159,10 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
         onDragOver: e => { if (hasFiles(e)) { e.preventDefault(); setOver(true); } }, onDragLeave: () => setOver(false),
         onDrop: e => { if (!hasFiles(e)) return; e.preventDefault(); setOver(false); upload(e.dataTransfer.files); },
         style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 8px 6px 10px', borderRadius: 10, border: `1px ${over ? 'dashed' : 'solid'} ${over ? T.cy : T.bds}`, background: over ? T.tcy : T.card } },
-        quote ? h(QuoteChip, { quote, onRemove: () => { setQuote?.(null); ref.current?.focus(); } }) : null,
+        h(QuoteCards, { quotes, onOpen: setQOpen, onRemove: i => setQuotes?.(l => removeQuote(l, l[i]?.id)) }),
+        qOpen != null && quotes[qOpen] ? h(QuoteReplyDialog, { key: quotes[qOpen].id, q: quotes[qOpen], editable: true, onClose: () => setQOpen(null),
+          onSave: r => setQuotes?.(l => editQuote(l, quotes[qOpen].id, r)), onRemove: () => setQuotes?.(l => removeQuote(l, quotes[qOpen].id)) }) : null,
+        qProblem ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, qProblem) : null,
         attachments.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 5 } }, attachments.map(a => h('span', { key: a.id, 'data-chip': a.kind, style: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 4px 0 3px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd, fontSize: 11.5, maxWidth: 340 } },
           a.preview ? h('img', { src: a.preview, alt: '', style: { width: 18, height: 18, objectFit: 'cover', borderRadius: 3 } }) : h(Icon, { d: chipIcon(a), size: 12 }),
           (a.kind === 'text' || a.kind === 'document') && onOpen
@@ -174,7 +179,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
         upErr ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, upErr) : null,
         h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => setDraft(e.target.value), onKeyDown: onKey, 'aria-label': 'Message',
           onPaste,
-          placeholder: running ? 'Add a message (it’s read after the current step)…' : quote ? 'Reply to the quoted part…' : 'Message the agent, or / for commands',
+          placeholder: running ? 'Add a message (it’s read after the current step)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
           style: { width: '100%', minHeight: 22, maxHeight: 220, resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
         h('div', { style: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', minWidth: 0 } },
           h('input', { ref: picker, type: 'file', multiple: true, accept: ACCEPT, hidden: true, 'aria-hidden': 'true',

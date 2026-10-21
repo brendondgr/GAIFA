@@ -13,7 +13,7 @@
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11 } from './chat-ui.js';
 import { renderMarkdown } from './chat-md.js';
 import { todosOpen } from './chat-thread.js';
-import { QuoteBlock } from './chat-quote.js';
+import { SentQuotes, quotesOf } from './chat-quote-reply.js';
 import { ReplyBar } from './chat-replybar.js';
 
 const R = () => globalThis.React;
@@ -82,15 +82,20 @@ function UserCard({ item, ctx }) {
   return h('div', { className: 'aichat-user', style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 6, minWidth: 0 } },
     h('div', { className: 'aichat-hov', style: { display: 'flex', gap: 2, paddingTop: 3 } },
       ctx.branch ? h(Btn, { kind: 'ghost', sm: true, icon: 'branch', title: 'Branch from here: a new chat up to this message, with it in the box to edit', onClick: () => ctx.branch(item) }) : null,
-      h(Btn, { kind: 'ghost', sm: true, icon: 'copy', title: 'Copy', onClick: () => ctx.copy?.(p.text) })),
+      h(Btn, { kind: 'ghost', sm: true, icon: 'copy', title: 'Copy', onClick: () => ctx.copy?.(userCopy(p)) })),
     h('div', { style: { maxWidth: 'min(85%, 620px)', minWidth: 0, padding: '7px 11px', borderRadius: 10, background: T.hov, border: '1px solid ' + T.bd, display: 'flex', flexDirection: 'column', gap: 6 } },
-      p.quote ? h(QuoteBlock, { quote: p.quote, ctx }) : null,    // Select → Reply: the part of a reply this answers
-      h('div', { style: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }, p.text),
+      h(SentQuotes, { payload: p, ctx }),    // Select → Reply: the parts of replies this answers, and the user's reply to each
+      p.text ? h('div', { style: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }, p.text) : null,
       atts.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4 } }, atts.map(id => h(AttachmentChip, { key: id, id, ctx, doc: (p.docs || []).find(d => d.id === id) }))) : null,
       // plan 24.9: a document asked for whole that didn't fit says so here, where the user looks
       ...(p.docs || []).filter(d => d.fallback).map(d => h('div', { key: 'fb' + d.id, role: 'note', 'data-fallback': d.id,
         style: { display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: T.acct } }, h(Icon, { d: 'alert', size: 12, style: { marginTop: 2, flex: 'none' } }), h('span', null, d.fallback))),
       item.queued ? h('div', null, h(Badge, { tone: 'purple', title: 'Sent during a turn: the agent reads it after the current step' }, 'queued')) : null));
+}
+/** A user message as copied: each quote-reply (the part as a blockquote, then the reply), then the text. */
+export function userCopy(p) {
+  const qs = quotesOf(p).map(q => `${q.text.split('\n').map(l => (l ? '> ' + l : '>')).join('\n')}${q.reply.trim() ? '\n\n' + q.reply.trim() : ''}`);
+  return [...qs, ...(p.text ? [p.text] : [])].join('\n\n');
 }
 function AttachmentChip({ id, ctx, doc }) {
   const o = ctx.outputs?.find(x => x.output_id === id);

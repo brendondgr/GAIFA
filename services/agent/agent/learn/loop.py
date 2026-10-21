@@ -84,7 +84,7 @@ def render(events: list[dict[str, Any]], cap: int = 3500, reply_cap: int = 300) 
     for e in events:
         t, p = e["type"], e.get("payload") or {}
         if t == "user":
-            out.append(f"USER: {str(p.get('text', ''))[:400]}" + "".join(" " + doc_card(d) for d in p.get("docs") or []))
+            out.append(f"USER: {ctx.said(p)[:400]}" + "".join(" " + doc_card(d) for d in p.get("docs") or []))   # replies to quotes too
         elif t == "assistant" and p.get("text"):
             txt = p["text"].strip()
             out.append("AGENT:" + _data("the agent's reply", txt[:reply_cap] + (" […]" if len(txt) > reply_cap else "")))

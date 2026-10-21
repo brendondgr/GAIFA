@@ -1,6 +1,7 @@
 // Select → Reply: a selection in a rendered reply back to markdown (round trip over the renderer's tags,
-// partial selections, code without its header bar, tables, citations, lists), the composer's quote chip
-// (add, remove, sending takes it), the quote on the user's message, and `quote` on the send API.
+// partial selections, code without its header bar, tables, citations, lists); the quote-replies: the draft list
+// (add, edit, remove, order, no limit), the cards in the composer and on the user's message, the Reply popup,
+// building the send payload (`quotes`, empty text with a reply), the older `quote` read as one, and the API.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -20,6 +21,7 @@ globalThis.React = {
 };
 const { renderMarkdown } = await load('chat/chat-md.js');
 const Q = await load('chat/chat-quote.js');
+const QR = await load('chat/chat-quote-reply.js');
 const { Composer } = await load('chat/chat-composer.js');
 const cards = await load('chat/chat-cards.js');
 const { createLiveClient } = await load('chat/chat-api.js');
@@ -110,62 +112,170 @@ test('code: part of a block stays a fenced block with its language; part of one 
   assert.equal(sel('Run `make test` now', ['make', 0], ['test', 4]), '`make test`');
 });
 
+// ---------- the draft's quote-replies ----------
+test('the draft list: add in order, edit a reply, remove one; no limit on how many; blank quotes add nothing', () => {
+  let l = QR.addQuote([], { text: '**one**', seq: 3, reply: 'why?' });
+  l = QR.addQuote(l, { text: 'two', reply: '' });
+  l = QR.addQuote(l, { text: '  ', reply: 'x' });                       // nothing to quote
+  assert.deepEqual(l.map(q => [q.text, q.reply, q.seq]), [['**one**', 'why?', 3], ['two', '', undefined]]);
+  assert.notEqual(l[0].id, l[1].id);
+  l = QR.editQuote(l, l[1].id, 'and this?');
+  assert.equal(l[1].reply, 'and this?');
+  const kept = QR.removeQuote(l, l[0].id);
+  assert.deepEqual(kept.map(q => q.text), ['two']);
+  let many = [];
+  for (let i = 1; i <= 25; i++) many = QR.addQuote(many, { text: `Question ${i}?`, reply: `answer ${i}`, seq: 9 });
+  assert.equal(many.length, 25);
+  assert.equal(new Set(many.map(q => q.id)).size, 25);
+  assert.deepEqual(QR.quotesPayload(many).slice(0, 2), [{ text: 'Question 1?', reply: 'answer 1', seq: 9 }, { text: 'Question 2?', reply: 'answer 2', seq: 9 }]);
+  assert.equal(QR.quotesProblem(many), null);
+});
+
+test('sending: empty text is fine with a reply; the payload trims replies; the limits are the agent’s', () => {
+  const qs = QR.addQuote([], { text: 'eggs', reply: '  how many?  ', seq: 4 }), blank = QR.addQuote([], { text: 'eggs', reply: ' ' });
+  assert.equal(QR.canSendQuotes('', [], qs), true);
+  assert.equal(QR.canSendQuotes('', [], blank), false);                  // nothing said
+  assert.equal(QR.canSendQuotes('ok', [], blank), true);
+  assert.equal(QR.canSendQuotes('', [{ id: 'a' }], blank), true);
+  assert.equal(QR.canSendQuotes('', [], []), false);
+  assert.deepEqual(QR.quotesPayload(qs), [{ text: 'eggs', reply: 'how many?', seq: 4 }]);
+  assert.equal(QR.messageText('  ', [], qs), '');
+  assert.equal(QR.messageText('', [{ id: 'a' }], blank), 'Here are the attached outputs.');
+  assert.equal(QR.messageText('', [{ id: 'a' }], qs), '');
+  assert.equal(QR.messageText(' hi ', [], []), 'hi');
+  assert.match(QR.quotesProblem([{ text: 'a'.repeat(8001), reply: '' }]), /Quote 1 is over 8,000/);
+  assert.match(QR.quotesProblem([{ text: 'a', reply: 'b'.repeat(4001) }]), /reply 1 is over 4,000/);
+  const big = Array.from({ length: 17 }, () => ({ text: 'q'.repeat(8000), reply: 'r'.repeat(4000) }));
+  assert.match(QR.quotesProblem(big), /204,000 characters in all; at most 200,000/);
+  assert.equal(QR.canSendQuotes('hi', [], big), false);
+});
+
+test('the older single quote reads as one quote-reply with no reply; branches get editable cards', () => {
+  assert.deepEqual(QR.quotesOf({ text: 'why?', quote: { text: '> x', seq: 3 } }), [{ text: '> x', reply: '', seq: 3 }]);
+  assert.deepEqual(QR.quotesOf({ quotes: [{ text: 'a', reply: 'b' }, { text: ' ' }, { text: 'c', reply: 'd', seq: 2 }] }),
+    [{ text: 'a', reply: 'b' }, { text: 'c', reply: 'd', seq: 2 }]);
+  assert.deepEqual(QR.quotesOf({ text: 'hi' }), []);
+  const cards = QR.draftQuotes({ quotes: [{ text: 'a', reply: 'b', seq: 5 }] });
+  assert.ok(cards[0].id) ;
+  assert.deepEqual({ ...cards[0], id: undefined }, { id: undefined, text: 'a', reply: 'b', seq: 5 });
+});
+
+test('the card preview: markdown as one line of plain text, clipped', () => {
+  assert.equal(QR.plainPreview('### Step 2\n\n- **mix** the flour\n- add `3` eggs'), 'Step 2 mix the flour add 3 eggs');
+  assert.equal(QR.plainPreview('See [the docs](https://a.b) and *this*.'), 'See the docs and this.');
+  assert.equal(QR.plainPreview('| a | b |\n| --- | ---: |\n| 1 | 2 |'), 'a · b 1 · 2');
+  assert.equal(QR.plainPreview('```python\nx = 1\n```'), 'x = 1');
+  assert.equal(QR.plainPreview('> quoted\n>\n> more'), 'quoted more');
+  assert.equal(QR.plainPreview('snake_case_name stays'), 'snake_case_name stays');
+  const long = QR.plainPreview('word '.repeat(100), 40);
+  assert.equal(long.length, 40); assert.ok(long.endsWith('…'));
+});
+
 // ---------- the composer ----------
 const composer = (props = {}) => expand(Composer({ draft: 'why?', setDraft: () => {}, attachments: [], setAttachments: () => {}, onSend: () => {},
   onStop: () => {}, running: false, tools: [], index: [], settings: {}, onSettings: () => {}, skills: [], outputs: [], api: {}, onQuick: () => {}, ...props }));
 const byLabel = (tree, l) => all(tree, n => n.props?.['aria-label'] === l)[0];
 const sendBtn = tree => all(tree, n => n.type === 'button' && /^(Send|Queue)/.test(n.props?.title || ''))[0];
+const cardsIn = tree => all(tree, n => n.props?.['data-quote-card'] !== undefined);
+const text = n => (typeof n === 'string' ? n : Array.isArray(n) ? n.map(text).join('') : n?.props ? text(n.props.children) : '');
 
-test('composer: the quote chip shows the quote; × removes it; sending takes it and clears it', () => {
-  const quote = { text: '**three** eggs', seq: 7 };
-  assert.equal(all(composer(), n => n.props?.['data-quote'] !== undefined).length, 0);     // no quote: no chip
-  const removed = [], tree = composer({ quote, setQuote: q => removed.push(q) });
-  const chip = all(tree, n => n.props?.['data-quote'] !== undefined)[0];
-  assert.ok(chip, 'a chip');
-  assert.match(all(chip, n => n.props?.dangerouslySetInnerHTML)[0].props.dangerouslySetInnerHTML.__html, /<strong>three<\/strong> eggs/);
-  assert.equal(byLabel(tree, 'Message').props.placeholder, 'Reply to the quoted part…');
-  byLabel(tree, 'Remove the quote').props.onClick();
-  assert.deepEqual(removed, [null]);
-  const sent = [], cleared = [], t2 = composer({ quote, setQuote: q => cleared.push(q), onSend: (...a) => sent.push(a) });
+test('composer: one card per quote-reply, in order; × removes it; sending takes them all, even with no text', () => {
+  let qs = QR.addQuote(QR.addQuote([], { text: '**three** eggs', seq: 7, reply: 'why three?' }), { text: 'flour', reply: '' });
+  assert.equal(cardsIn(composer()).length, 0);                                       // none: no cards
+  const updates = [], tree = composer({ quotes: qs, setQuotes: f => updates.push(f(qs)) });
+  const cs = cardsIn(tree);
+  assert.equal(cs.length, 2);
+  assert.match(text(cs[0]), /three eggs.*why three\?.*Reply/);
+  assert.match(text(cs[1]), /flour.*No reply/);
+  assert.equal(byLabel(tree, 'Message').props.placeholder, 'Add a message, or just send your replies…');
+  all(cs[0], n => n.props?.['aria-label'] === 'Remove this reply')[0].props.onClick();
+  assert.deepEqual(updates[0].map(q => q.text), ['flour']);
+  const sent = [], t2 = composer({ draft: '', quotes: qs, onSend: (...a) => sent.push(a) });
+  assert.equal(sendBtn(t2).props.disabled, false);
   sendBtn(t2).props.onClick();
-  assert.deepEqual(sent, [['why?', [], quote]]);
-  assert.deepEqual(cleared, [null]);
-  const t3 = composer({ onSend: (...a) => sent.push(a) });                                // without a quote: null
-  sendBtn(t3).props.onClick();
-  assert.deepEqual(sent[1], ['why?', [], null]);
+  assert.deepEqual(sent, [['', [], qs]]);
+  const t3 = composer({ draft: '', quotes: QR.addQuote([], { text: 'x', reply: '' }) });   // nothing said: can't send
+  assert.equal(sendBtn(t3).props.disabled, true);
+  const t4 = composer({ onSend: (...a) => sent.push(a) });                           // without cards: an empty list
+  sendBtn(t4).props.onClick();
+  assert.deepEqual(sent[1], ['why?', [], []]);
+});
+
+test('composer: 25 cards wrap in a row that scrolls; too much in all says why and blocks Send', () => {
+  let qs = [];
+  for (let i = 1; i <= 25; i++) qs = QR.addQuote(qs, { text: `Question ${i}?`, reply: `answer ${i}` });
+  const tree = composer({ quotes: qs });
+  assert.equal(cardsIn(tree).length, 25);
+  const row = all(tree, n => n.props?.['data-quote-cards'] !== undefined)[0];
+  assert.equal(row.props.style.flexWrap, 'wrap');
+  assert.equal(row.props.style.overflowY, 'auto');
+  assert.ok(row.props.style.maxHeight && row.props.style.maxHeight !== 'none');
+  const big = Array.from({ length: 17 }, () => ({ id: Math.random().toString(36), text: 'q'.repeat(8000), reply: 'r'.repeat(4000) }));
+  const t2 = composer({ quotes: big });
+  assert.match(text(all(t2, n => n.props?.role === 'alert')[0]), /at most 200,000/);
+  assert.equal(sendBtn(t2).props.disabled, true);
+});
+
+// ---------- the Reply popup ----------
+test('the Reply popup: the quote rendered, the reply editable with Save / Remove; read-only on a sent message', () => {
+  const saved = [], removed = [], closed = [];
+  const q = { id: 'a', text: '- add `3` eggs', reply: 'why three?', seq: 4 };
+  const tree = expand(QR.QuoteReplyDialog({ q, editable: true, onSave: r => saved.push(r), onRemove: () => removed.push(1), onClose: () => closed.push(1) }));
+  const dialog = all(tree, n => n.props?.role === 'dialog')[0];
+  assert.equal(dialog.props['aria-label'], 'Reply');
+  assert.equal(all(tree, n => n.props?.dangerouslySetInnerHTML)[0].props.dangerouslySetInnerHTML.__html, '<ul><li>add <code>3</code> eggs</li></ul>');
+  const area = byLabel(tree, 'Your reply');
+  assert.equal(area.props.value, 'why three?');
+  all(tree, n => n.type === 'button' && text(n) === 'Save')[0].props.onClick();       // fixed-state React: the reply as it was
+  assert.deepEqual(saved, ['why three?']);
+  all(tree, n => n.type === 'button' && text(n) === 'Remove')[0].props.onClick();
+  assert.deepEqual(removed, [1]);
+  const went = [], view = expand(QR.QuoteReplyDialog({ q, editable: false, onClose: () => {}, ctx: { scrollToReply: s => went.push(s) } }));
+  assert.equal(byLabel(view, 'Your reply'), undefined);
+  assert.match(text(view), /why three\?/);
+  all(view, n => n.type === 'button' && text(n) === 'Go to the quoted reply')[0].props.onClick();
+  assert.deepEqual(went, [4]);
 });
 
 // ---------- the user's message ----------
-test('the user card shows the quote above the text, rendered, and a click goes to the reply', () => {
+test('the user card shows its quote-replies as cards above the text; an old single quote shows as one', () => {
   const UserCard = cards.cardFor({ kind: 'user' });
-  const went = [];
-  const item = { kind: 'user', ev: { seq: 9, payload: { text: 'why three?', quote: { text: '- add `3` eggs', seq: 4 } } } };
-  const tree = expand(UserCard({ item, ctx: { scrollToReply: s => went.push(s) } }));
-  const q = all(tree, n => n.props?.['data-quote'] !== undefined)[0];
-  assert.ok(q);
-  const body = all(q, n => n.props?.dangerouslySetInnerHTML)[0];
-  assert.equal(body.props.dangerouslySetInnerHTML.__html, '<ul><li>add <code>3</code> eggs</li></ul>');
-  body.props.onClick({ target: { closest: () => null }, preventDefault() {} });
-  assert.deepEqual(went, [4]);
+  const item = { kind: 'user', ev: { seq: 9, payload: { text: 'thanks', quotes: [{ text: '- add `3` eggs', reply: 'why three?', seq: 4 }, { text: 'bake', reply: 'how long?' }] } } };
+  const tree = expand(UserCard({ item, ctx: {} }));
+  const cs = cardsIn(tree);
+  assert.equal(cs.length, 2);
+  assert.match(text(cs[0]), /add 3 eggs.*why three\?/);
+  assert.equal(all(cs[0], n => n.props?.['aria-label'] === 'Remove this reply').length, 0);   // sent: no ×
   const flat = JSON.stringify(tree);
-  assert.ok(flat.indexOf('data-quote') < flat.indexOf('why three?'), 'the quote comes first');
+  assert.ok(flat.indexOf('data-quote-card') < flat.indexOf('"thanks"'), 'the cards come first');
+  const old = expand(UserCard({ item: { kind: 'user', ev: { seq: 3, payload: { text: 'why?', quote: { text: 'old part', seq: 2 } } } }, ctx: {} }));
+  assert.equal(cardsIn(old).length, 1);
+  assert.match(text(cardsIn(old)[0]), /old part.*No reply/);
+  const empty = expand(UserCard({ item: { kind: 'user', ev: { seq: 4, payload: { text: '', quotes: [{ text: 'a', reply: 'b' }] } } }, ctx: {} }));
+  assert.equal(cardsIn(empty).length, 1);
   const plain = expand(UserCard({ item: { kind: 'user', ev: { seq: 2, payload: { text: 'hi' } } }, ctx: {} }));
-  assert.equal(all(plain, n => n.props?.['data-quote'] !== undefined).length, 0);
+  assert.equal(cardsIn(plain).length, 0);
+  assert.equal(cards.userCopy(item.ev.payload), '> - add `3` eggs\n\nwhy three?\n\n> bake\n\nhow long?\n\nthanks');
 });
 
 // ---------- the API ----------
-test('send carries the quote: the live client in the body, the mock on the user event', async () => {
+test('send carries quotes: the live client in the body, the mock validates and stores them (25 of them too)', async () => {
   const bodies = [];
   const c = createLiveClient({ fetch: async (url, o) => { bodies.push(JSON.parse(o.body)); return { ok: true, status: 202, text: async () => '{}' }; } });
-  await c.send('t1', 'why?', [], {}, { text: '> x', seq: 3 });
+  await c.send('t1', '', [], {}, [{ id: 'x', text: '> x', reply: 'why?', seq: 3 }, { text: 'y', reply: '' }]);
   await c.send('t1', 'plain');
-  await c.send('t1', 'no seq', [], {}, { text: 'y', seq: null });
-  assert.deepEqual(bodies, [{ text: 'why?', attachments: [], quote: { text: '> x', seq: 3 } }, { text: 'plain', attachments: [] },
-    { text: 'no seq', attachments: [], quote: { text: 'y' } }]);
+  assert.deepEqual(bodies, [{ text: '', attachments: [], quotes: [{ text: '> x', reply: 'why?', seq: 3 }, { text: 'y', reply: '' }] }, { text: 'plain', attachments: [] }]);
   const m = createMockClient({});
   const th = await m.create({});
-  await assert.rejects(m.send(th.id, 'x', [], {}, { text: 'a', seq: 999 }), e => e.status === 422);
-  await assert.rejects(m.send(th.id, 'x', [], {}, { text: 'a'.repeat(8001) }), e => e.status === 422);
-  const ev = await m.send(th.id, 'why?', [], {}, { text: 'quoted' });
-  assert.deepEqual(ev.payload.quote, { text: 'quoted' });
+  await assert.rejects(m.send(th.id, 'x', [], {}, [{ text: 'a', reply: '', seq: 999 }]), e => e.status === 422 && e.code === 'invalid_quote');
+  await assert.rejects(m.send(th.id, 'x', [], {}, [{ text: 'a'.repeat(8001), reply: '' }]), e => e.status === 422);
+  await assert.rejects(m.send(th.id, '', [], {}, [{ text: 'a', reply: ' ' }]), e => e.status === 422);
+  await assert.rejects(m.send(th.id, 'x', [], {}, Array.from({ length: 17 }, () => ({ text: 'q'.repeat(8000), reply: 'r'.repeat(4000) }))), e => e.status === 422);
+  const ev = await m.send(th.id, '', [], {}, [{ text: 'quoted', reply: 'my reply' }]);
+  assert.deepEqual(ev.payload.quotes, [{ text: 'quoted', reply: 'my reply' }]);
+  const many = Array.from({ length: 25 }, (_, i) => ({ text: `Q${i + 1}`, reply: `A${i + 1}` }));
+  const ev2 = await m.send(th.id, '', [], {}, many);
+  assert.equal(ev2.payload.quotes.length, 25);
+  const ev3 = await m.send(th.id, 'why?', [], {}, { text: 'old style' });              // an older single quote
+  assert.deepEqual(ev3.payload.quotes, [{ text: 'old style', reply: '' }]);
 });

@@ -20,7 +20,8 @@ import { createChatClient } from './chat-api.js';
 import { ThreadList, LIST_CSS, useEmbedUp } from './chat-list.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
 import { Composer } from './chat-composer.js';
-import { QuoteButton, QUOTE_CSS } from './chat-quote.js';
+import { QUOTE_CSS } from './chat-quote.js';
+import { QuoteReplyBox, QREPLY_CSS, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
 
 export { registerCard } from './chat-cards.js';
 export { registerAction, actionsFor } from './chat-actions.js';
@@ -44,7 +45,7 @@ function injectCss() {
   if (typeof document === 'undefined' || document.getElementById('aichat-css')) return;
   installCopy();
   const s = document.createElement('style');
-  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + QUOTE_CSS + PAGE_CSS;
+  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + QUOTE_CSS + QREPLY_CSS + PAGE_CSS;
   document.head.appendChild(s);
 }
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
@@ -57,7 +58,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const embedUp = useEmbedUp(api), [meaning, setMeaning] = useState(false), [found, setFound] = useState({ busy: false, rows: [], err: '' });  // plan 28.5
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [thread, setThread] = useState(null), [events, setEvents] = useState([]), [live, setLive] = useState(EMPTY_LIVE), [running, setRunning] = useState(false), [conn, setConn] = useState('open'), [ready, setReady] = useState(false);
-  const [quotes, setQuotes] = useState({});      // Select → Reply: the quote waiting in each chat's composer
+  const [quoteDrafts, setQuoteDrafts] = useState({});   // Select → Reply: the quote-reply cards waiting in each chat's composer
   const [drafts, setDrafts] = useState({}), [attachments, setAttachments] = useState([]), [toolForms, setToolForms] = useState([]);
   const [meterOpen, setMeterOpen] = useState(false), [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
   const [fresh, setFresh] = useState({ model: null, mode: 'manual', settings: {} });   // a chat not created yet
@@ -66,7 +67,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const scrollRef = useRef(null), contentRef = useRef(null), stick = useRef(true), first = useRef(true), inputRef = useRef(null), loadRef = useRef(null), queue = useRef([]), flushT = useRef(0);
   const dkey = tid || 'new', draft = drafts[dkey] || '';
   const setDraft = v => setDrafts(d => ({ ...d, [dkey]: typeof v === 'function' ? v(d[dkey] || '') : v }));
-  const quote = quotes[dkey] || null, setQuote = (q, k = dkey) => setQuotes(m => ({ ...m, [k]: q || null }));
+  const quotes = quoteDrafts[dkey] || [], setQuotes = (v, k = dkey) => setQuoteDrafts(m => ({ ...m, [k]: typeof v === 'function' ? v(m[k] || []) : v || [] }));
   const fail = e => { if (c.live && (DOWN.has(e?.code) || e?.status === 502 || e?.status === 503)) setDown(e); else toast(e?.detail || String(e?.message || e), 'error'); };
 
   // ---- data ----
@@ -173,14 +174,15 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     if (skill) return `Use the ${skill.id || skill.name} skill: ${arg}`.trim();
     return text;
   };
-  const send = async (text, atts = [], q = null) => {
+  const send = async (text, atts = [], qs = null) => {   // qs: the composer's quote-reply cards (null: a suggestion or a button)
     let t = text.trim();
-    const k = dkey;
-    if (t.startsWith('/')) { t = await slash(t); setDrafts(d => ({ ...d, [k]: '' })); if (t == null) { if (q) setQuote(q, k); return; } }
-    if (!t && !atts.length) { if (q) setQuote(q, k); return; }
-    setDrafts(d => ({ ...d, [k]: '' })); setAttachments([]); stick.current = true;
-    try { const id = await ensureThread(); await c.send(id, t || 'Here are the attached outputs.', atts.map(a => a.id), Object.fromEntries(atts.filter(a => a.mode).map(a => [a.id, a.mode])), q); }
-    catch (e) { setDrafts(d => ({ ...d, [k]: text })); if (q) setQuote(q, k); fail(e); }
+    const k = dkey, cards = qs || [];
+    if (t.startsWith('/')) { t = await slash(t); setDrafts(d => ({ ...d, [k]: '' })); if (t == null) return; }   // the cards stay for the next message
+    t = messageText(t, atts, cards);
+    if (!t && !cards.some(q => q.reply.trim())) return;
+    setDrafts(d => ({ ...d, [k]: '' })); setAttachments([]); if (cards.length) setQuotes([], k); stick.current = true;
+    try { const id = await ensureThread(); await c.send(id, t, atts.map(a => a.id), Object.fromEntries(atts.filter(a => a.mode).map(a => [a.id, a.mode])), quotesPayload(cards)); }
+    catch (e) { setDrafts(d => ({ ...d, [k]: text })); if (cards.length) setQuotes(l => [...cards, ...l], k); fail(e); }
   };
   const setModel = m => { if (thread) c.patch(thread.id, { model: m }).then(t => { setThread(x => ({ ...x, ...t })); c.context(thread.id).then(mm => setLive(l => ({ ...l, meter: mm }))).catch(() => {}); }, fail); else setFresh(f => ({ ...f, model: m })); };
   const setMode = m => { if (thread) c.patch(thread.id, { mode: m }).then(t => setThread(x => ({ ...x, ...t })), fail); else setFresh(f => ({ ...f, mode: m })); };
@@ -192,13 +194,13 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     if (!ok) return;
     try { await c.remove(t.id); setThreads(l => l.filter(x => x.id !== t.id)); if (t.id === tid) go('#/chat'); toast('Chat deleted', 'success'); } catch (e) { fail(e); }
   };
-  const forkAt = async (seq, text, q = null) => {   // q: the message's quote, kept for the edit (its seq is the same in the branch)
+  const forkAt = async (seq, text, qs = []) => {   // qs: the message's quote-replies, as cards to edit (their seqs are the same in the branch)
     try {
-      if (seq < 1) { go('#/chat'); setDrafts(d => ({ ...d, new: text || '' })); return; }
+      if (seq < 1) { go('#/chat'); setDrafts(d => ({ ...d, new: text || '' })); if (qs.length) setQuotes(qs.map(({ seq: _s, ...q }) => q), 'new'); return; }
       const th = await c.fork(tid, seq);
       setThreads(l => [th, ...l]);
       if (text != null) setDrafts(d => ({ ...d, [th.id]: text }));
-      if (q) setQuote(q, th.id);
+      if (qs.length) setQuotes(qs, th.id);
       go('#/chat/' + th.id);
       toast(text != null ? 'Branched: edit the message and send it' : 'Branched into a new chat', 'success');
     } catch (e) { fail(e); }
@@ -216,7 +218,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying
     decide: (a, approve, args, o = {}) => c.approval(tid, { approval_id: a.approval_id, approve, ...(approve ? { arguments: args, remember: o.remember || 'once', ...(o.confirm ? { confirm: true } : {}) } : { reason: o.reason || 'Denied in the chat' }) }),
     cancel: () => c.cancel(tid).catch(fail),
-    branch: it => forkAt(it.ev.seq - 1, it.ev.payload.text, it.ev.payload.quote),
+    branch: it => forkAt(it.ev.seq - 1, it.ev.payload.text, draftQuotes(it.ev.payload)),
     copy: text => navigator.clipboard?.writeText(text).then(() => toast('Copied', 'success'), () => {}),
     openOutput, runAction: (a, o) => runAction(a, o, { openTool, attach, sendPrompt: t => send(t) }),
     // plan 24.7: a citation in a reply (#n p.14, #n:88, output:<id> …) opens the viewer there
@@ -275,9 +277,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
           blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))))),
       h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
         dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
-        settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quote, setQuote,
+        settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quotes, setQuotes,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }) })),
-    h(QuoteButton, { scrollRef, onQuote: q => { setQuote(q); setTimeout(() => inputRef.current?.focus(), 0); } }));
+    h(QuoteReplyBox, { scrollRef, resetKey: dkey, onAdd: q => setQuotes(l => addQuote(l, q)) }));
 }
 
 function EmptyState({ onPick }) {

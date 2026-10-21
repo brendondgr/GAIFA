@@ -13,8 +13,10 @@
   one is in the user's message inside `<untrusted source="#n name">`; a large one is a card (size,
   outline, how to read it). Clearing drops an inline document's text once it is older than the
   last two user turns, leaving its card.
-- **Quotes** (Select → Reply): a user message that answers part of an earlier reply starts with
-  that part as a markdown blockquote and a one-line note, then the user's words.
+- **Quote-replies** (Select → Reply): a user message can answer parts of earlier replies. Each
+  comes first, in order: "About this part of your earlier answer:", the part as a markdown
+  blockquote, and "My reply: …" (the user's words); then the message's own text. An old event's
+  single `quote` reads as one with no reply.
 """
 
 from __future__ import annotations
@@ -76,7 +78,8 @@ def named_files(text: str) -> list[str]:
     return out[:20]
 
 
-QUOTE_NOTE = "(I'm replying to this part of your earlier answer.)"
+QUOTE_HEAD = "About this part of your earlier answer:"
+REPLY_HEAD = "My reply:"
 
 
 def quoted(text: str) -> str:
@@ -86,11 +89,40 @@ def quoted(text: str) -> str:
     return "\n".join(f"> {line}" if line.strip() else ">" for line in lines)
 
 
-def with_quote(text: str, quote: Any) -> str:
-    """The user's words after the quote they answer, and a note saying what it is."""
-    if not isinstance(quote, dict) or not str(quote.get("text") or "").strip():
-        return text
-    return f"{quoted(quote['text'])}\n\n{QUOTE_NOTE}\n\n{text}"
+def quotes_of(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """A user event's quote-replies, `[{text, reply, seq?}]` in order: `quotes`, or an older event's single
+    `quote: {text, seq?}` as one with an empty reply. Entries without quoted text are left out."""
+    p = payload or {}
+    raw = p.get("quotes")
+    if not isinstance(raw, list):
+        raw = [p["quote"]] if isinstance(p.get("quote"), dict) else []
+    out = []
+    for q in raw:
+        if isinstance(q, dict) and str(q.get("text") or "").strip():
+            out.append({"text": str(q["text"]), "reply": str(q.get("reply") or ""),
+                        **({"seq": q["seq"]} if isinstance(q.get("seq"), int) else {})})
+    return out
+
+
+def said(payload: dict[str, Any] | None) -> str:
+    """The user's own words in a message: each quote-reply's reply, then the text. Never the quoted parts:
+    they are the model's words (the Auto judge and `named_files` read only what the user wrote)."""
+    p = payload or {}
+    parts = [q["reply"].strip() for q in quotes_of(p) if q["reply"].strip()]
+    t = str(p.get("text") or "").strip()
+    return "\n\n".join([*parts, *([t] if t else [])])
+
+
+def with_quotes(text: str, quotes: list[dict[str, Any]]) -> str:
+    """The quote-replies, in order (the quoted part as a blockquote, then the user's reply), then the user's text."""
+    blocks = []
+    for q in quotes:
+        b = f"{QUOTE_HEAD}\n{quoted(q['text'])}"
+        reply = str(q.get("reply") or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+        if reply:
+            b += f"\n{REPLY_HEAD} {reply}"
+        blocks.append(b)
+    return "\n\n".join([*blocks, *([text] if text.strip() else [])])
 
 
 def label(text: Any, cap: int = 120) -> str:
@@ -304,7 +336,7 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
             continue
         if t == "user":
             flush()
-            text = with_quote(p.get("text") or "", p.get("quote"))
+            text = with_quotes(p.get("text") or "", quotes_of(p))
             docs = p.get("docs") or []
             rest = [a for a in p.get("attachments") or [] if a not in {d["id"] for d in docs}]
             if rest:

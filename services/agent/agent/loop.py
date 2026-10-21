@@ -121,8 +121,9 @@ class Agent:
         self.tasks[tid] = asyncio.create_task(self._turn(tid))
 
     async def send(self, tid: str, text: str, attachments: list[str] | None = None,
-                   doc_modes: dict[str, str] | None = None, quote: dict[str, Any] | None = None) -> dict[str, Any]:
-        """`quote`: {text (markdown), seq?}, the part of an earlier reply this message answers (Select → Reply)."""
+                   doc_modes: dict[str, str] | None = None, quotes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """`quotes`: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each, in order
+        (Select → Reply). `text` may be empty when a reply says something."""
         thread = self.store.thread(tid)
         if thread is None:
             raise KeyError(tid)
@@ -135,15 +136,16 @@ class Agent:
         n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
         for i, d in enumerate(docs):
             d["ref"] = f"#{n0 + i + 1}"
-        ev = self.emit(tid, "user", {"text": text, **({"quote": quote} if quote else {}),
+        ev = self.emit(tid, "user", {"text": text, **({"quotes": quotes} if quotes else {}),
                                      **({"attachments": attachments} if attachments else {}),
                                      **({"docs": docs} if docs else {}), **({"queued": True} if queued else {})})
         for d in docs:
             if d.get("fallback"):        # asked for whole, didn't fit (plan 24.9): say so in the chat
                 self.emit(tid, "note", {"text": d["fallback"], "level": "warn"})
         if not thread["title"]:
-            self.store.update_thread(tid, title=_title_from(text))
-            asyncio.create_task(self._title(tid, text))
+            words = ctx.said({"text": text, "quotes": quotes})      # an empty text with replies: name it by the replies
+            self.store.update_thread(tid, title=_title_from(words))
+            asyncio.create_task(self._title(tid, words))
         if not queued:
             self.start(tid)
         return ev
@@ -529,12 +531,13 @@ class Agent:
         """This turn's number (the seq of its user message: checkpoints and undo are per turn) and what the user said."""
         evs = self.store.events(tid, types=("user",))
         last = evs[-1] if evs else None
-        return (last["seq"] if last else 0), str((last or {}).get("payload", {}).get("text") or "")
+        return (last["seq"] if last else 0), ctx.said((last or {}).get("payload"))   # its text and quote-replies' replies
 
     def _said(self, tid: str, n: int = 6) -> list[str]:
-        """The user's last `n` typed messages (no attachments, files, pages or tool results), each cut at 2,000 characters."""
+        """The user's last `n` typed messages (no attachments, files, pages, quoted parts or tool results; replies to quoted
+        parts are the user's words and count), each cut at 2,000 characters."""
         evs = self.store.events(tid, types=("user",))[-n:]
-        return [str(e.get("payload", {}).get("text") or "")[:2000] for e in evs if (e.get("payload") or {}).get("text")]
+        return [w[:2000] for w in (ctx.said(e.get("payload")) for e in evs) if w]
 
     def _turn_calls(self, tid: str, cid: str) -> list[str]:
         """Tool names called so far in this turn (since the last user message), not counting `cid`."""

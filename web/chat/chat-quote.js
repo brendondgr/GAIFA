@@ -1,24 +1,15 @@
-// Select → Reply: select part of an agent's reply, press Reply, and the next message answers that part.
-// - The selection is turned back into **markdown** (`selectionQuote`): the part of the rendered reply
-//   (chat-md.js `renderMarkdown`) between the selection's two ends is cut out of the DOM as a plain tree
-//   (`clipTree`, which keeps the ancestors: a selection inside a bold word inside a list item stays
-//   `- **word**`), then written as markdown (`htmlToMarkdown`) for the renderer's own tags: paragraphs and
-//   line breaks, bold, italic, strikethrough, inline code, fenced code with its language (the header bar
-//   left out), lists (numbered from where the selection starts), quotes, headings (h3 → `#`: the renderer
-//   shifts levels by 2), rules, links, citations (as written: `#3 p.14`) and pipe tables with alignment.
-//   A selection across table cells quotes the rows it touches, whole, under the table's header; one inside
-//   a single cell quotes just the text. Part of one line of a code block is inline code.
-// - `QuoteButton`: the floating "Reply" button over a selection inside one reply (a `[data-quote-seq]`
-//   element around an `.aichat-md`); hidden on deselect, scroll and Escape.
-// - `QuoteChip`: the quote above the composer's box (one at a time; Reply again replaces it).
-// - `QuoteBlock`: the quote on the user's message (clipped to ~6 lines, "Show more"; a click scrolls to the reply).
-// The message carries it as `quote: {text, seq}` (chat-api.js `send`); the agent puts it before the
-// user's words as a blockquote (services/agent/agent/context.py `with_quote`).
+// Select → Reply, the selection half: part of an agent's reply, selected, turned back into **markdown**.
+// - `selectionQuote`: the part of the rendered reply (chat-md.js `renderMarkdown`) between the selection's two
+//   ends is cut out of the DOM as a plain tree (`clipTree`, which keeps the ancestors: a selection inside a bold
+//   word inside a list item stays `- **word**`), then written as markdown (`htmlToMarkdown`) for the renderer's
+//   own tags: paragraphs and line breaks, bold, italic, strikethrough, inline code, fenced code with its language
+//   (the header bar left out), lists (numbered from where the selection starts), quotes, headings (h3 → `#`: the
+//   renderer shifts levels by 2), rules, links, citations (as written: `#3 p.14`) and pipe tables with alignment.
+//   A selection across table cells quotes the rows it touches, whole, under the table's header; one inside a
+//   single cell quotes just the text. Part of one line of a code block is inline code.
+// - `scrollToReply`: back to the reply a quote came from, flashed.
+// The floating box, the composer's quote-reply cards and the Reply popup are in chat-quote-reply.js.
 
-import { h, T, Icon } from './chat-ui.js';
-import { renderMarkdown } from './chat-md.js';
-
-const R = () => globalThis.React;
 export const QUOTE_MAX = 8000;         // characters (the agent refuses longer)
 export const QUOTE_ICON = 'M9.5 7H6.5A1.5 1.5 0 0 0 5 8.5v3A1.5 1.5 0 0 0 6.5 13H9v1c0 1.5-1 2.5-2.5 3M18.5 7h-3A1.5 1.5 0 0 0 14 8.5v3a1.5 1.5 0 0 0 1.5 1.5H18v1c0 1.5-1 2.5-2.5 3';
 
@@ -233,87 +224,3 @@ export const QUOTE_CSS = `
 .aichat-quote .aichat-md{font-size:12px;color:var(--mut,#8A94A6)}
 .aichat-quote .aichat-md pre{max-height:none}
 `;
-
-// ---------- the floating Reply button ----------
-export function QuoteButton({ scrollRef, onQuote }) {
-  const React = R(), [at, setAt] = React.useState(null), down = React.useRef(false);
-  React.useEffect(() => {
-    const doc = globalThis.document;
-    if (!doc) return undefined;
-    let t = 0;
-    const update = () => {
-      clearTimeout(t);
-      t = setTimeout(() => {
-        if (down.current) return;
-        const sel = doc.getSelection?.(), q = selectionQuote(sel, doc);
-        if (!q) { setAt(null); return; }
-        // next to where the selection ends: under its last line, or over it near the bottom of the window
-        const range = sel.getRangeAt(0), rects = [...(range.getClientRects?.() || [])].filter(r => r.width), W = globalThis.innerWidth || 1000, H = globalThis.innerHeight || 800;
-        const last = rects[rects.length - 1] || range.getBoundingClientRect();
-        const top = last.bottom + 40 < H ? last.bottom + 6 : Math.max(8, last.top - 34);
-        setAt({ q, top, left: Math.max(8, Math.min(W - 92, last.right - 40)) });
-      }, 60);
-    };
-    const onDown = e => { if (!e.target?.closest?.('[data-quote-button]')) { down.current = true; setAt(null); } };
-    const onUp = e => { if (down.current && !(e.type === 'mousemove' && e.buttons)) { down.current = false; update(); } };   // a drag of the selection ends in dragend, not mouseup
-    const onKey = e => { if (e.key === 'Escape') setAt(null); };
-    const hide = () => setAt(null);
-    const sc = scrollRef?.current;
-    doc.addEventListener('selectionchange', update);
-    doc.addEventListener('mousedown', onDown, true);
-    for (const t of ['mouseup', 'pointerup', 'dragend', 'mousemove']) doc.addEventListener(t, onUp, true);
-    doc.addEventListener('keydown', onKey);
-    sc?.addEventListener('scroll', hide, { passive: true });
-    return () => {
-      clearTimeout(t);
-      doc.removeEventListener('selectionchange', update); doc.removeEventListener('mousedown', onDown, true);
-      for (const t of ['mouseup', 'pointerup', 'dragend', 'mousemove']) doc.removeEventListener(t, onUp, true);
-      doc.removeEventListener('keydown', onKey); sc?.removeEventListener('scroll', hide);
-    };
-  }, []);
-  if (!at) return null;
-  return h('button', { type: 'button', 'data-quote-button': '', title: 'Reply to this part: it goes above your message as a quote',
-    onMouseDown: e => e.preventDefault(),
-    onClick: () => { onQuote(at.q); globalThis.document?.getSelection?.()?.removeAllRanges(); setAt(null); },
-    style: { position: 'fixed', top: at.top, left: at.left, zIndex: 60, display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px',
-      borderRadius: 7, border: '1px solid ' + T.bdh, background: T.card, color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', boxShadow: '0 8px 24px rgba(0,0,0,.35)' } },
-  h(Icon, { d: QUOTE_ICON, size: 13 }), 'Reply');
-}
-
-// ---------- the chip above the composer's box ----------
-export function QuoteChip({ quote, onRemove }) {
-  const React = R(), html = React.useMemo(() => renderMarkdown(quote?.text || ''), [quote?.text]);
-  if (!quote) return null;
-  return h('div', { 'data-quote': '', role: 'group', 'aria-label': 'Replying to this part of a reply', className: 'aichat-quote',
-    style: { display: 'flex', alignItems: 'flex-start', gap: 6, padding: '4px 4px 4px 8px', borderLeft: '3px solid ' + T.bdh, borderRadius: 5, background: T.inset, minWidth: 0 } },
-  h('span', { style: { color: T.mut, display: 'flex', paddingTop: 2 } }, h(Icon, { d: QUOTE_ICON, size: 12 })),
-  h('div', { className: 'aichat-md', title: quote.text, onClick: e => { if (e.target?.closest?.('a[data-cite]')) e.preventDefault(); }, style: { flex: 1, minWidth: 0, maxHeight: 38, overflow: 'hidden' }, dangerouslySetInnerHTML: { __html: html } }),
-  h('button', { type: 'button', 'aria-label': 'Remove the quote', title: 'Remove the quote', onClick: onRemove,
-    style: { border: 0, background: 'none', padding: 2, color: T.mut, cursor: 'pointer', display: 'flex', flex: 'none' } }, h(Icon, { d: 'x', size: 11 })));
-}
-
-// ---------- the quote on a sent message ----------
-const CLIP = 6 * 18;   // ~6 lines of 12px text
-export function QuoteBlock({ quote, ctx }) {
-  const React = R(), [open, setOpen] = React.useState(false), [long, setLong] = React.useState(false), ref = React.useRef(null);
-  const html = React.useMemo(() => renderMarkdown(quote?.text || ''), [quote?.text]);
-  (React.useLayoutEffect || React.useEffect)(() => { const el = ref.current; if (el) setLong(el.scrollHeight > CLIP + 4); }, [html]);
-  if (!quote?.text) return null;
-  const go = () => (ctx?.scrollToReply || scrollToReply)(quote.seq);
-  return h('div', { 'data-quote': quote.seq ?? '', className: 'aichat-quote', style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 } },
-    h('div', { ref, role: quote.seq != null ? 'button' : undefined, tabIndex: quote.seq != null ? 0 : undefined,
-      title: quote.seq != null ? 'Show this part of the reply' : undefined,
-      onClick: e => {
-        const a = e.target?.closest?.('a');
-        if (a?.dataset?.cite) { e.preventDefault(); ctx?.openCite?.({ ref: a.dataset.cite, page: a.dataset.page, line: a.dataset.line }); return; }
-        if (!a && quote.seq != null) go();
-      },
-      onKeyDown: e => { if (quote.seq != null && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(); } },
-      className: 'aichat-md',
-      style: { padding: '2px 0 2px 9px', borderLeft: '3px solid ' + T.bdh, cursor: quote.seq != null ? 'pointer' : 'default',
-        maxHeight: open ? 'none' : CLIP, overflow: 'hidden', minWidth: 0,
-        ...(long && !open ? { WebkitMaskImage: 'linear-gradient(#000 70%, transparent)', maskImage: 'linear-gradient(#000 70%, transparent)' } : {}) },
-      dangerouslySetInnerHTML: { __html: html } }),
-    long ? h('button', { type: 'button', onClick: () => setOpen(!open), 'aria-expanded': open ? 'true' : 'false',
-      style: { alignSelf: 'flex-start', border: 0, background: 'none', padding: '0 0 0 9px', color: T.mut, font: 'inherit', fontSize: 11.5, cursor: 'pointer' } }, open ? 'Show less' : 'Show more') : null);
-}

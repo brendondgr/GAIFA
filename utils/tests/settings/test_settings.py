@@ -36,7 +36,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
                    "nav": {"collapsed": False, "services": "list", "hidden": [], "folded": False}},
             "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
             "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
-            "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.95, "timeout_s": 3.0,
+            "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.35, "timeout_s": 3.0,
                       "allow_commands": [], "ask_commands": []},
             "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800,
                        "backend": None, "model": None, "url": None, "threshold": None, "confirm": True, "parallel": 4},

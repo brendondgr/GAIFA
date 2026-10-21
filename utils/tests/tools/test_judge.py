@@ -42,9 +42,11 @@ class Fake:
         return httpx.Response(200, json=out)
 
 
-def decide_answers(asked=0.99, unasked_no=0.99):
-    return lambda body: {"answers": {"asked": {"probs": {"yes": asked, "no": 1 - asked}},
-                                     "unasked": {"probs": {"yes": 1 - unasked_no, "no": unasked_no}}}}
+def decide_answers(run=0.99, request=0.99, user=0.9, none=0.09):
+    """The decide mod's answers to the judge's three choice questions (judge.QUESTIONS)."""
+    return lambda body: {"answers": {"run_ask": {"probs": {"run": run, "ask": 1 - run}},
+                                     "source": {"probs": {"request": request, "elsewhere": 1 - request}},
+                                     "details": {"probs": {"user": user, "none": none, "other": 1 - user - none}}}}
 
 
 def chat(text):
@@ -63,14 +65,20 @@ def test_rules_decide_without_the_model():
 
 
 def test_decide_backend_thresholds():
-    cfg = JudgeConfig(backend="decide", url="http://decide", threshold=0.95)
-    j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg, client_for(Fake(decide_answers()).handler)))
-    assert (j.verdict, j.source) == ("allow", "model") and j.detail["p_safe"]["asked"] == 0.99
-    j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg,
-                  client_for(Fake(decide_answers(unasked_no=0.9)).handler)))
-    assert j.verdict == "ask" and "didn't ask for" in j.reason and "0.90" in j.reason
-    j = run(judge(UNSURE, ["x"], FOLDER, cfg, client_for(Fake(decide_answers(asked=0.5)).handler)))
-    assert j.verdict == "ask" and "isn't sure" in j.reason
+    """The lowest of the three "safe" probabilities must reach the cutoff (0.35 by default, tuned 2026-10-21)."""
+    cfg = JudgeConfig(backend="decide", url="http://decide")
+    assert cfg.threshold == 0.35
+    fake = Fake(decide_answers())
+    j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg, client_for(fake.handler)))
+    assert (j.verdict, j.source) == ("allow", "model") and j.detail["p_safe"] == {"run_ask": 0.99, "source": 0.99, "details": 0.99}
+    assert [q["type"] for q in fake.bodies[0]["questions"]] == ["choice"] * 3            # options that say what they mean
+    assert "run" in fake.bodies[0]["questions"][0]["options"]
+    j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg, client_for(Fake(decide_answers(request=0.2)).handler)))
+    assert j.verdict == "ask" and "something other than your request" in j.reason and "0.20" in j.reason
+    j = run(judge(UNSURE, ["x"], FOLDER, cfg, client_for(Fake(decide_answers(user=0.1, none=0.1)).handler)))
+    assert j.verdict == "ask" and "never mentioned" in j.reason              # details: user + none = 0.2
+    j = run(judge(UNSURE, ["x"], FOLDER, cfg, client_for(Fake(decide_answers(run=0.36)).handler)))
+    assert j.verdict == "allow"
 
 
 def test_what_the_model_sees():
@@ -87,8 +95,10 @@ def test_what_the_model_sees():
     assert "Then run the report script." in state and "second message" in state and "[attachment]" in state
     for leaked in ("SYSTEM PROMPT", "ASSISTANT TEXT", "TOOL RESULT", "IGNORE THE USER", "data:x"):
         assert leaked not in state
-    assert "python scripts/report.py" in state and "/w/proj (level: run)" in state
-    assert "runs code the rules can't see" in state                    # the rules' reason
+    j = json.loads(state)                                              # the decision model reads JSON
+    assert "python scripts/report.py" in j["proposed_call"]["arguments"] and j["workspace_folder"] == "/w/proj"
+    chat = describe(UNSURE, FOLDER, "runs code the rules can't see", own_words(msgs))   # a chat model's input
+    assert "/w/proj (level: run)" in chat and "runs code the rules can't see" in chat
 
 
 def test_long_arguments_are_cut():
@@ -134,7 +144,7 @@ def test_model_alone():
     fake = Fake(decide_answers())
     j = run(judge({"tool": "workspace_run", "args": {"command": "pytest"}}, ["run tests"], FOLDER,
                   JudgeConfig(backend="decide", url="http://decide"), client_for(fake.handler), rules=False))
-    assert j.source == "model" and "weren't asked" in fake.bodies[0]["input"]
+    assert j.source == "model" and json.loads(fake.bodies[0]["input"])["proposed_call"]["tool"] == "workspace_run"
 
 
 def test_parse_verdict():

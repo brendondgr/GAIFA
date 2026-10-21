@@ -262,6 +262,7 @@ def screen_config(config: Any) -> ScreenConfig:
     backend = getattr(sc, "backend", None) or jc.backend
     base = ({k: getattr(jc, k) for k in ("model", "url", "threshold")} if backend == jc.backend
             else dict(DECIDE_DEFAULTS if backend == "decide" else RELAY_DEFAULTS))
+    base["threshold"] = DECIDE_DEFAULTS["threshold"]   # the judge's cutoff is for its own three questions, not a passage
     for k in ("model", "url", "threshold"):
         if getattr(sc, k, None) is not None:
             base[k] = getattr(sc, k)

@@ -174,7 +174,7 @@ class JudgeCfg(_Strict):
     backend: Literal["relay", "decide"] = "relay"
     model: str = "minicpm-5-2B"             # a relay model name, or a decide model id
     url: str = "http://127.0.0.1:4000"      # the relay, or the decide mod (http://127.0.0.1:7000/api/s/decide)
-    threshold: float = Field(0.95, gt=0, le=1)   # decide: every answer must clear it
+    threshold: float = Field(0.35, gt=0, le=1)   # decide: the lowest "safe" probability of its three questions must reach it (judge.DECIDE_CUTOFF)
     timeout_s: float = Field(3.0, gt=0)     # slower → ask
     allow_commands: list[str] = []          # your rules (judge_user.py): these commands run in Auto, unless a rule asks
     ask_commands: list[str] = []            # … and these always ask

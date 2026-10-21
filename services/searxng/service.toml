@@ -1,0 +1,28 @@
+# SearXNG: finds the SearXNG on this machine, watches it and its engines, adjusts its settings (plan 26.3).
+# SearXNG itself runs outside AIHub (setup/searxng.md). Fields: docs/mods.md and architecture §4.3.
+id = "searxng"
+name = "SearXNG"
+description = "Watches the SearXNG this machine runs and adjusts its engines and settings"
+icon = "search"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]
+port = 5106
+health = "/health"                 # 200 while this server is up; SearXNG's state is in status
+status = "/v1/status"
+openapi = "/openapi.json"
+env_file = ".env"                  # SEARXNG_URL, SEARXNG_WATCH_S, SEARXNG_QUERY_S (see .env.example)
+start_timeout_s = 30
+stop_timeout_s = 10
+restart = "on-failure"
+install = "install.sh"
+
+[ui]
+page = "ui/page.js"                # Engines, Settings
+
+[tools]                            # changes back up settings.yml, restart SearXNG and roll back if a search fails
+engines = { op = "GET /v1/engines", description = "List SearXNG's search engines: on or off, categories, timeout and recent errors (rate limits, CAPTCHAs). Filter with enabled=true or failing=true." }
+health = { op = "GET /v1/health", description = "SearXNG's health: whether /healthz answers, the last test search (time, results, engines that failed) and recent history." }
+set_engine = { op = "POST /v1/engines/{name}", risk = "write", ask = ["enabled"], description = "Turn one SearXNG engine on or off. Backs up settings.yml, restarts SearXNG and checks a search works, restoring the backup if not. Use it for engines that keep failing (see searxng_engines with failing=true)." }
+adjust = { op = "POST /v1/settings", risk = "write", description = "Change SearXNG's settings: safe_search (0 off, 1 moderate, 2 strict), default_lang, request_timeout (seconds per engine), engine_timeouts per engine, json_format (true turns the JSON format on; the web mod needs it). One backup, restart and check for all of them; the backup goes back if the check fails." }

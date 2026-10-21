@@ -27,6 +27,7 @@ import safety
 
 DEFAULT_SEARXNG = "http://127.0.0.1:8080"
 PROBE_TTL_S = 15.0
+ENDPOINT_TTL_S = 60.0
 
 
 def error(status: int, code: str, detail: str, fix: str) -> JSONResponse:
@@ -77,8 +78,12 @@ class FetchOut(BaseModel):
     note: str | None = None
 
 
-def create_app(searxng_url: str | None = None, outputs: Path | None = None, guard: safety.Guard | None = None) -> FastAPI:
-    searxng = (searxng_url or os.environ.get("SEARXNG_URL") or DEFAULT_SEARXNG).rstrip("/")
+def create_app(searxng_url: str | None = None, outputs: Path | None = None, guard: safety.Guard | None = None,
+               hub_url: str | None = None) -> FastAPI:
+    """`hub_url`: where to ask the searxng mod for its URL (default AIHUB_URL; tests pass their own)."""
+    own = (searxng_url or os.environ.get("SEARXNG_URL") or DEFAULT_SEARXNG).rstrip("/")
+    hub = (hub_url if hub_url is not None else ("" if searxng_url else os.environ.get("AIHUB_URL", ""))).rstrip("/")
+    found = {"url": own, "source": "SEARXNG_URL", "at": 0.0}
     out_dir = outputs or Path(os.environ.get("AIHUB_OUTPUTS", "outputs"))
     state = {"searches": 0, "fetches": 0, "refused": 0, "busy": 0, "last_used": time.time(),
              "probe": (0.0, False, "not checked yet")}
@@ -94,7 +99,7 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         clients["web"] = safety.make_client(guard)
-        clients["searxng"] = httpx.AsyncClient(base_url=searxng, timeout=httpx.Timeout(15.0, connect=3.0), trust_env=False,
+        clients["searxng"] = httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=3.0), trust_env=False,
                                                headers={"User-Agent": safety.USER_AGENT})
         yield
         await asyncio.gather(*(c.aclose() for c in clients.values()))
@@ -105,15 +110,36 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
     def used() -> None:
         state["last_used"] = time.time()
 
+    async def searxng() -> str:
+        """The URL the searxng mod publishes (plan 26.3), asked at most once a minute, else SEARXNG_URL."""
+        if not hub or time.monotonic() - found["at"] < ENDPOINT_TTL_S:
+            return found["url"]
+        found["at"] = time.monotonic()
+        try:
+            r = await clients["searxng"].get(f"{hub}/api/s/searxng/v1/endpoint", timeout=2.0)
+            url = r.json().get("url") if r.status_code == 200 else None
+        except (httpx.HTTPError, ValueError, AttributeError):
+            url = None
+        if isinstance(url, str) and url.startswith(("http://", "https://")):
+            if url.rstrip("/") != found["url"]:
+                state["probe"] = (0.0, False, "not checked yet")
+            found.update(url=url.rstrip("/"), source="the searxng mod")
+        else:
+            if found["source"] != "SEARXNG_URL":
+                state["probe"] = (0.0, False, "not checked yet")
+            found.update(url=own, source="SEARXNG_URL")
+        return found["url"]
+
     async def probe() -> tuple[bool, str]:
+        base = await searxng()
         at, up, why = state["probe"]
-        if time.monotonic() - at < PROBE_TTL_S:
+        if at and time.monotonic() - at < PROBE_TTL_S:
             return up, why
         try:
-            r = await clients["searxng"].get("/healthz", timeout=2.0)
-            up, why = r.status_code < 400, f"{searxng} answers" if r.status_code < 400 else f"{searxng}/healthz: HTTP {r.status_code}"
+            r = await clients["searxng"].get(f"{base}/healthz", timeout=2.0)
+            up, why = r.status_code < 400, f"{base} answers" if r.status_code < 400 else f"{base}/healthz: HTTP {r.status_code}"
         except httpx.HTTPError as e:
-            up, why = False, f"{searxng} doesn't answer ({type(e).__name__})"
+            up, why = False, f"{base} doesn't answer ({type(e).__name__})"
         state["probe"] = (time.monotonic(), up, why)
         return up, why
 
@@ -136,7 +162,7 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
                 {"label": "Refused", "value": state["refused"]},
             ],
             "jobs": [],
-            "searxng": {"url": searxng, "up": up, "detail": why},
+            "searxng": {"url": found["url"], "from": found["source"], "up": up, "detail": why},
         }
 
     @app.post("/v1/search", summary="Search the web", response_model=SearchOut,
@@ -155,15 +181,16 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
             params["language"] = body.language
         state["busy"] += 1
         try:
-            r = await clients["searxng"].get("/search", params=params)
+            base = await searxng()
+            r = await clients["searxng"].get(f"{base}/search", params=params)
         except httpx.HTTPError as e:
-            state["probe"] = (time.monotonic(), False, f"{searxng} doesn't answer ({type(e).__name__})")
-            return error(503, "searxng_down", f"SearXNG at {searxng} doesn't answer ({type(e).__name__})",
+            state["probe"] = (time.monotonic(), False, f"{base} doesn't answer ({type(e).__name__})")
+            return error(503, "searxng_down", f"SearXNG at {base} doesn't answer ({type(e).__name__})",
                          "the web search service is down; tell the user (setup: services/web/setup/web.md) and don't retry now")
         finally:
             state["busy"] -= 1
         if r.status_code == 403:
-            return error(502, "searxng_no_json", f"SearXNG at {searxng} refused format=json (HTTP 403)",
+            return error(502, "searxng_no_json", f"SearXNG at {base} refused format=json (HTTP 403)",
                          "SearXNG needs `json` under search.formats in its settings.yml (services/web/setup/web.md)")
         if r.status_code == 429:
             return error(502, "searxng_limited", "SearXNG's rate limiter refused the search (HTTP 429)",

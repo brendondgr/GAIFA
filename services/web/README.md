@@ -5,13 +5,15 @@ An AIHub mod (plan Phase 26): web search through a SearXNG on this machine, and 
 | Route | What it does |
 |---|---|
 | `GET /health` | 200 while this server is up (SearXNG may still be down) |
-| `GET /v1/status` | SearXNG up or down (with the reason), searches, pages fetched, fetches refused |
+| `GET /v1/status` | SearXNG up or down (with the reason and where its URL came from), searches, pages fetched, fetches refused |
 | `POST /v1/search` | `{query, categories?, time_range?, language?, limit ≤ 20}` → `{results: [{title, url, snippet, engine, published?}], answers, suggestions, unresponsive}` |
 | `POST /v1/fetch` | `{url, max_chars?}` → the page saved as an output, its final URL, title and first `max_chars` of markdown |
 
 The agent's tools are `web_search` and `web_fetch`, both risk `network` (plan 25.1). `web_search` runs without asking: AIHub ships an `always` grant for it (hub.db migration 010), listed in Settings → Agent, where revoking it makes searches ask (`grant_key = "const:search"`, so one answer covers every search). `web_fetch` asks; its `grant_key = "url:host"`, so "allow in this chat" covers one site. The skill [skills/researching](skills/researching/SKILL.md) tells the agent how to research and cite.
 
 **Dry runs (the agent eval).** Both tools say `dry_run = true` in `[tools]`, so in a dry run the hub still calls this mod, with `"dry_run": true` in `X-AIHub-Origin`. The mod then answers from its **fake web**, [fakeweb/](fakeweb/) (`fakeweb.py`): canned search results and pages on `.example` hosts, which never resolve, and never the internet or SearXNG. The pages go through the same conversion and are saved as outputs with `"dry_run": true` in their sidecar. The eval task `web_two_sources` uses them.
+
+**Which SearXNG.** The URL the [`searxng` mod](../searxng/README.md) publishes (`GET /api/s/searxng/v1/endpoint` through the hub, asked at most once a minute), else `SEARXNG_URL` (default `http://127.0.0.1:8080`).
 
 ## Outputs
 

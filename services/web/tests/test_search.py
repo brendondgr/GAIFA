@@ -79,3 +79,30 @@ def test_status_up_and_counts(site, make_client):
     st = c.get("/v1/status").json()
     assert {s["label"]: s["value"] for s in st["stats"]} == {"SearXNG": "up", "Searches": 1, "Pages fetched": 0, "Refused": 0}
     assert st["loaded"] is None and st["busy"] is False and st["jobs"] == []
+
+
+def test_uses_the_url_the_searxng_mod_publishes(site, tmp_path):
+    """plan 26.3: the web mod asks the hub for the searxng mod's endpoint and falls back to its own SEARXNG_URL."""
+    import json
+
+    from fastapi.testclient import TestClient
+
+    import server
+    from conftest import make_guard
+
+    base = f"http://127.0.0.1:{site.port}"
+    site.routes["/api/s/searxng/v1/endpoint"] = (200, {"Content-Type": "application/json"},
+                                                 json.dumps({"url": base + "/published", "found_by": "probe", "up": True}).encode())
+    site.routes["/published/search"] = searx(RESULTS[:1])
+    site.routes["/own/search"] = searx(RESULTS[2:3])
+    site.routes["/published/healthz"] = (200, {}, b"OK")
+    app = server.create_app(base + "/own", tmp_path / "out", make_guard(site.port), hub_url=base)
+    with TestClient(app) as c:
+        assert c.post("/v1/search", json={"query": "x"}).json()["results"][0]["url"] == RESULTS[0]["url"]
+        st = c.get("/v1/status").json()["searxng"]
+        assert st == {"url": base + "/published", "from": "the searxng mod", "up": True, "detail": f"{base}/published answers"}
+    site.routes["/api/s/searxng/v1/endpoint"] = (503, {"Content-Type": "application/json"}, b'{"detail": "searxng is stopped"}')
+    app = server.create_app(base + "/own", tmp_path / "out", make_guard(site.port), hub_url=base)
+    with TestClient(app) as c:
+        assert c.post("/v1/search", json={"query": "x"}).json()["results"][0]["url"] == RESULTS[2]["url"]
+        assert c.get("/v1/status").json()["searxng"]["from"] == "SEARXNG_URL"

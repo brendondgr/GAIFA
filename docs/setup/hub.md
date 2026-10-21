@@ -88,6 +88,7 @@ Paths (`paths.models`, `paths.databases`, `paths.outputs`) must stay inside the 
 | 7 | `tts` (Speech) | [Kokoro](../../services/tts/setup/kokoro.md), [Breeze TTS 2](../../services/tts/setup/breeze.md) | yes |
 | 8 | `gen3d` (3D Generate) | [CubeArt](../../services/gen3d/setup/cubeart.md), [Hunyuan3D 2.1](../../services/gen3d/setup/img3d.md), [SAM 3D Objects](../../services/gen3d/setup/sam3do.md) | yes; two of its engines run in ComfyUI (6) |
 | 9 | `web` (Web search) | [web](../../services/web/setup/web.md) (SearXNG runs outside AIHub) | no |
+| 9b | `searxng` (optional: watches and adjusts that SearXNG) | [searxng](../../services/searxng/setup/searxng.md) | no |
 | 10 | `stt` (Speech to Text) | [faster-whisper](../../services/stt/setup/stt.md) | no; much faster with one |
 
 The relay comes first because the LLM mods publish themselves to it and the agent talks to models through it. ComfyUI comes before 3D Generate because TRELLIS.2 and SAM 3D Body run as ComfyUI workflows. Skip any mod you don't want: set `services.<id>.autostart = false` and it stays stopped.

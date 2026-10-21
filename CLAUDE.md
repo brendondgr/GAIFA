@@ -30,7 +30,7 @@ Full how-to: [docs/mods.md](docs/mods.md). A mod is done when `aihub check <id>`
 
 ## Rules
 - **Never run `git clean -x` or `git clean -X`.** They delete ignored files, which here means ~190 GB of model weights.
-- Nothing is written outside the project root, except the allowlist in plan Phase 12.4 and folders the user set to Edit or above in the workspace mod (plan Phase 27). The AIHub folder and `data/models/` never go above Read.
+- Nothing is written outside the project root, except the allowlist in plan Phase 12.4 and folders the user set to Edit or above in the workspace mod (plan Phase 27). The allowlist includes SearXNG's `settings.yml` and its `settings.yml.aihub-<date>` backups, written by the `searxng` mod (plan 26.3). The AIHub folder and `data/models/` never go above Read.
 - Mods talk to the hub only over HTTP.
 - No import-time side effects.
 - Tests pass before every commit. Commit message style: `AIHub (2.3): Service state machine with health checks`.

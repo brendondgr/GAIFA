@@ -12,13 +12,15 @@ defaults" for every tool without limits.
 1. the **deny** list of `config.toml [agent.permissions]` (name globs);
 2. a **mod's limits** (a workspace folder, plan 27): the mod's preflight (`[agent] limits`) says
    what the call would do (`action`), the folder's level and Bypass, and refuses what a hard limit
-   or the level stops. Nothing below lifts a refusal; the mod checks again when the call arrives;
+   or the level stops. Nothing below lifts a refusal; the mod checks again when the call arrives.
+   A preflight's `ask_folder` (a read in a folder the chat doesn't have, plan 34) asks, in every mode;
 3. the chat's **mode**: for a call with limits, the cell of `CELLS` for its action (run, ask,
    refuse, or the judge); without limits, `plan` denies everything but `read`;
 4. a **grant** that covers the call allows it (never for `once` actions: host runs, commits,
    anything touching a remote);
 5. the **ask** list; then a **page the chat's search found** (a `web_fetch` of a URL that a `web_search`
-   in the same chat returned, `utils/tools/searched.py`) runs; then the **allow** list (`execute`
+   in the same chat returned, `utils/tools/searched.py`), or of a **link the user typed** in the chat, runs; then
+   the **allow** list (`execute`
    ignores the allow list: only a grant skips its card);
 6. the **risk default**: `read` runs; in `accept_edits`, `auto` and `bypass` `write` and `generate`
    run; everything else asks (`network`, `execute` and `destructive` in every mode).
@@ -82,12 +84,13 @@ def canonical(mode: str | None) -> str:
 
 def decide(name: str, risk: str, config: Config, mode: str = "manual",
            grant: dict[str, Any] | None = None, limits: dict[str, Any] | None = None,
-           untrusted: bool = False, searched: bool = False) -> tuple[str, str]:
+           untrusted: bool = False, searched: bool = False, shared: bool = False) -> tuple[str, str]:
     """("allow" | "ask" | "deny" | "judge", why) for one call.
 
     `grant`: a grant that covers it (25.2). `limits`: the mod's preflight (27.4), or None. `untrusted`: the
     calling chat has read text from a page, a file or a transcript (the origin's `untrusted`). `searched`: a
-    web_fetch of a URL the chat's own web_search returned (`utils/tools/searched.py`)."""
+    web_fetch of a URL the chat's own web_search returned (`utils/tools/searched.py`); `shared`: of a link the user typed
+    in the chat (`searched.shared`)."""
     p = config.agent.permissions
     mode = canonical(mode)
     if any(fnmatch.fnmatchcase(name, g) for g in p.deny):
@@ -102,8 +105,8 @@ def decide(name: str, risk: str, config: Config, mode: str = "manual",
         return "allow", _granted(grant)
     if any(fnmatch.fnmatchcase(name, g) for g in p.ask):
         return "ask", "your permissions ask for this tool"
-    if searched and risk in ("read", "network"):
-        return "allow", "a page your search found"
+    if (searched or shared) and risk in ("read", "network"):
+        return "allow", "a page your search found" if searched else "a link you shared"
     if risk != "execute" and any(fnmatch.fnmatchcase(name, g) for g in p.allow):
         return "allow", "allowed by your permissions"
     if risk == "read":
@@ -120,6 +123,8 @@ def _with_limits(name: str, risk: str, p: Any, mode: str, grant: dict[str, Any] 
     refuse = limits.get("refuse")
     if refuse:
         return "deny", str(refuse.get("detail") or "the mod refused it")
+    if ask := limits.get("ask_folder"):        # plan 34: a folder outside the chat's environment asks, in every mode
+        return "ask", f"{ask.get('path')} isn't one of this chat's folders: it asks to read it"
     action = limits.get("action") if limits.get("action") in ACTIONS else "command"
     note = ""
     if mode == "bypass" and not limits.get("allow_bypass"):

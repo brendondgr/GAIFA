@@ -3,11 +3,13 @@
 // (chat-turn.js) and their results, which the hub wraps as `<untrusted …>` blocks. Pure part tested in
 // utils/tests/web/chat-sources.test.mjs.
 //
-//   turnSources(turn) → { read: [Source], found: [Source], queries: [string], count }
-//   Source: { url, site (the hostname), host (without www.), title, snippet, output_id?, n? }
+//   turnSources(turn, attached?) → { read: [Source], found: [Source], queries: [string], count }
+//   Source: { url, site (the hostname), host (without www.), title, snippet, output_id?, n?, shared? }
 //
-// `read` are the pages the turn fetched (deduplicated by URL, first read first); `found` are search results
-// it didn't open. The icons come from the web mod (`GET /api/s/web/v1/favicon?host=`), which fetches each
+// `read` are the pages the turn read: first the ones the user gave (`shared: true`, "you shared"): pages attached
+// with "Add a web page" (the user event's `docs` carry the page's `url`; older events are resolved through
+// `GET /api/outputs/{id}` by `useAttachedPages`, nothing stored) and links the user typed that the turn fetched; then
+// the rest it fetched (deduplicated by URL, first read first). `found` are search results it didn't open. The icons come from the web mod (`GET /api/s/web/v1/favicon?host=`), which fetches each
 // site's own icon once and caches it; a host it can't serve gets a letter on a tinted circle.
 
 import { h, T, MONO, Icon, Popover } from './chat-ui.js';
@@ -72,9 +74,21 @@ function partialResults(text) {
   return [...text.matchAll(re)].map(m => ({ title: unjson(m[1]), url: unjson(m[2]), snippet: unjson(m[3]) }));
 }
 
+/** The text of a web_fetch result without the hub's line numbers (`  120| …`) and excerpt lines (`── lines a–b ──`);
+ * its "About this page:" line when it has one. */
+export function plainPage(content) {
+  const s = unwrap(content).replace(/\r\n?/g, '\n');
+  const about = /^About this page: (.+)$/m.exec(s);
+  if (about) return { about: about[1] };
+  if (!/^\s*\d+\| /m.test(s)) return { text: s };
+  return { text: s.split('\n').filter(l => !/^── lines \d/.test(l)).map(l => l.replace(/^\s*\d+\| ?/, '')).join('\n') };
+}
+
 /** The first words of a fetched page: the markdown without the web mod's header (title, Source, Fetched), as plain text. */
 export function pageSnippet(content, n = SNIPPET) {
-  let s = unwrap(content).replace(/\r\n?/g, '\n');
+  const p = plainPage(content);
+  if (p.about != null) return clip(p.about, n);
+  let s = p.text;
   const head = /^# [^\n]*\n(?:[^\n]*\n){0,6}?---\n/.exec(s);       // pages.py: "# Title", Source, Fetched, Published, ---
   if (head && /\nSource: </.test(head[0])) s = s.slice(head[0].length);
   s = s.replace(/^\s*(```|~~~).*$/gm, ' ')
@@ -92,10 +106,49 @@ function source(url, o = {}) {
   return { url: u, site, host: hostOf(site), title: oneLine(o.title) || hostOf(site), snippet: o.snippet || '', ...(o.output_id ? { output_id: o.output_id, n: o.n ?? null } : {}) };
 }
 
-/** The turn's sources: pages read (web_fetch done) and search results not opened, with the searches' queries. */
-export function turnSources(turn) {
+/** URLs typed in a message (as the agent finds them, services/agent/agent/links.py), each as its urlKey. */
+export function typedLinks(text) {
+  const out = new Set();
+  for (const m of String(text ?? '').matchAll(/https?:\/\/[^\s<>"'`[\]{}|\\^]+/gi)) {
+    let u = m[0];
+    for (;;) {
+      if (/[.,;:!?*_~'"]$/.test(u)) u = u.slice(0, -1);
+      else if (u.endsWith(')') && (u.match(/\)/g) || []).length > (u.match(/\(/g) || []).length) u = u.slice(0, -1);
+      else break;
+    }
+    if (safeUrl(u)) out.add(urlKey(u));
+  }
+  return out;
+}
+
+/** The user's words in a message: its text and the replies to quoted parts (never the quoted parts). */
+const saidOf = p => [...(Array.isArray(p?.quotes) ? p.quotes.map(q => q?.reply || '') : []), p?.text || ''].join('\n');
+
+/** Pages the user attached to the turn's message: its `docs` with a `url` (plus `attached`, resolved ones). */
+export function attachedPages(turn, attached = []) {
+  const p = turn?.user?.ev?.payload || {}, out = [];
+  for (const d of p.docs || []) {
+    const r = d?.url ? d : attached.find(a => a.output_id === d?.id);
+    const url = safeUrl(r?.url);
+    if (url) out.push({ url, title: d.name || r.title, output_id: d.id, n: d.ref ? +String(d.ref).replace('#', '') : null,
+      snippet: d.inline && typeof d.text === 'string' ? pageSnippet(d.text) : '' });
+  }
+  return out;
+}
+
+/** The turn's sources: pages the user gave, pages read (web_fetch done) and search results not opened, with the
+ * searches' queries. `attached`: pages resolved by useAttachedPages for older events without `docs[].url`. */
+export function turnSources(turn, attached = []) {
   const rows = (turn?.steps || []).flatMap(s => s.rows || []).filter(r => r.type === 'tool');
   const hits = new Map(), queries = [], read = [], seen = new Map();
+  const typed = typedLinks(saidOf(turn?.user?.ev?.payload));
+  for (const a of attachedPages(turn, attached)) {
+    const s = source(a.url, { title: a.title, snippet: a.snippet, output_id: a.output_id, n: a.n });
+    if (!s || seen.has(urlKey(s.url))) continue;
+    s.shared = true;
+    seen.set(urlKey(s.url), s);
+    read.push(s);
+  }
   // the search results first, so a page read later finds its snippet
   for (const r of rows) {
     if (!SEARCH_TOOLS.has(r.name)) continue;
@@ -125,11 +178,33 @@ export function turnSources(turn) {
     const snippet = hit?.snippet || pageSnippet(part != null ? field(part, 'content') : got.content);
     const s = source(url, { title, snippet, output_id: out?.output_id, n: out?.n });
     if (!s) continue;
+    if (keys.some(k => typed.has(k))) s.shared = true;     // a link the user typed
     keys.forEach(k => seen.set(k, s));
     read.push(s);
   }
+  read.sort((a, b) => (b.shared ? 1 : 0) - (a.shared ? 1 : 0));     // what the user gave first (a stable sort)
   const found = [...hits.entries()].filter(([k]) => !seen.has(k)).map(([, s]) => s);
   return { read, found, queries, count: read.length };
+}
+
+const resolved = new Map();      // output id → {output_id, url, title} | null, for this page's life
+/** Attached outputs of the turn's message whose `docs` entry has no `url` (events from before it was stored):
+ * looked up once each through `ctx.api.getOutput` (works for hidden outputs); a web mod page gives its URL. */
+export function useAttachedPages(turn, ctx) {
+  const React = R(), p = turn?.user?.ev?.payload;
+  const ids = (p?.docs || []).filter(d => d?.id && !d.url).map(d => d.id);
+  const key = ids.join(','), [, bump] = React.useState(0);
+  React.useEffect(() => {
+    const todo = ids.filter(id => !resolved.has(id));
+    if (!todo.length || !ctx?.api?.getOutput) return;
+    let live = true;
+    Promise.all(todo.map(id => ctx.api.getOutput(id).then(o => {
+      const m = o?.meta || {}, url = o?.service === 'web' ? safeUrl(m.final_url) || safeUrl(m.url) : null;
+      resolved.set(id, url ? { output_id: id, url, title: o.title } : null);
+    }, () => resolved.set(id, null)))).then(() => { if (live) bump(x => x + 1); });
+    return () => { live = false; };
+  }, [key]);
+  return ids.map(id => resolved.get(id)).filter(Boolean);
 }
 
 /** Up to n distinct sites to show icons for: the pages read, then the results found. */
@@ -190,7 +265,8 @@ function SourceRow({ s, ctx }) {
     h('span', { style: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, fontSize: 11.5, color: T.mut } },
       h(Favicon, { site: s.site, size: 14 }),
       h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 } }, s.host),
-      s.n ? h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: T.dim, flex: 'none' } }, '#' + s.n) : null),
+      s.n ? h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: T.dim, flex: 'none' } }, '#' + s.n) : null,
+      s.shared ? h('span', { title: 'A page you attached or a link you wrote', style: { fontSize: 10.5, color: T.cy, flex: 'none' } }, 'you shared') : null),
     h('span', { className: 'aichat-clamp2', style: { fontSize: 13, fontWeight: 600, color: T.tx, lineHeight: 1.35, overflowWrap: 'anywhere' } }, s.title),
     s.snippet ? h('span', { className: 'aichat-clamp3', style: { fontSize: 12, color: T.mut, lineHeight: 1.45, overflowWrap: 'anywhere' } }, s.snippet) : null),
     viewer ? h('button', { type: 'button', title: `Open the saved page${s.n ? ' #' + s.n : ''} in the viewer`, 'aria-label': `Open ${s.title} in the viewer`,

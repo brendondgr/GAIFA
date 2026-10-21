@@ -2,9 +2,9 @@
 
 AIHub runs this as `.venv/bin/python server.py` with AIHUB_PORT, AIHUB_ROOT, AIHUB_MODELS,
 AIHUB_OUTPUTS and AIHUB_URL set (architecture §4.4). WORKSPACE_STATE (default
-`$AIHUB_ROOT/data/state/workspace`) holds folders.json, checkpoints and run records.
+`$AIHUB_ROOT/data/state/workspace`) holds environments.json (folders.json before plan 34), checkpoints and run records.
 
-Folders and levels: folders.py.
+Folders and levels: folders.py; environments (named sets of folders, plan 34): environments.py.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import api_edit
+import api_env
 import api_run
 import limits
 import reading
@@ -75,6 +76,15 @@ class GitIn(BaseModel):
     rev: str | None = Field(None, max_length=200, description="log/diff/show: a commit, branch or range (HEAD~3..HEAD); diff without it: the working tree")
     path: str | None = Field(None, max_length=1000, description="Only this file or folder")
     limit: int = Field(20, ge=1, le=200, description="log: how many commits")
+
+
+def view_of(ctx: Any, request: Request, environment: str | None = None) -> Folders:
+    """The folders this request may use (plan 34): its chat's environment (`?environment=` or the origin's)
+    and the folders the hub passed as allowed in that chat."""
+    o = reading.origin_of(request.headers.get("x-aihub-origin"))
+    if environment:
+        o = {**o, "environment": environment}
+    return ctx.folders.view(o)
 
 
 def named_of(request: Request) -> list[str]:
@@ -150,32 +160,39 @@ def create_app(state: Path | None = None, aihub_root: Path | None = None, models
 
     @app.get("/v1/status")
     def status() -> dict[str, Any]:
-        folders = ctx.folders.public()
+        envs = ctx.folders.envs.all()
         return {"loaded": None, "busy": False, "idle_s": round(time.time() - ctx.started, 1),
-                "stats": [{"label": "Folders", "value": len(folders)},
+                "stats": [{"label": "Folders", "value": len(ctx.folders.envs.ids(envs))},
+                          {"label": "Environments", "value": len(envs)},
                           {"label": "Edits", "value": ctx.counts["edits"]},
                           {"label": "Runs", "value": ctx.counts["runs"]}],
                 "jobs": []}
 
-    @app.get("/v1/folders", summary="List the workspace folders and their levels")
-    def folders() -> dict[str, Any]:
-        return {"folders": ctx.folders.public(), "levels": list(LEVELS)}
+    # Phase 27's folder routes: the folders of one environment (the chat's, `?environment=`, else Default),
+    # plus, for a chat's call, the folders the user allowed in that chat (plan 34)
+    @app.get("/v1/folders", summary="The folders a chat can use (its environment's, and those allowed in it) and their levels")
+    def folders(request: Request, environment: str | None = None) -> dict[str, Any]:
+        v = view_of(ctx, request, environment)
+        env = v.environment
+        return {"folders": v.public(), "levels": list(LEVELS), "environment": {"id": env.id, "name": env.name}}
 
-    @app.post("/v1/folders", summary="Add a folder (starts at Read)")
-    def add(body: FolderIn) -> dict[str, Any]:
-        f = ctx.folders.add(body.path, body.level, body.allow_bypass, body.id, body.name)
+    @app.post("/v1/folders", summary="Add a folder to an environment (Default unless ?environment=; starts at Read)")
+    def add(body: FolderIn, environment: str | None = None) -> dict[str, Any]:
+        f = ctx.folders.envs.add_folder(environment or "default", body.path, body.level, body.allow_bypass, body.id, body.name)
         return f.public(ctx.folders.caps)
 
-    @app.patch("/v1/folders/{fid}", summary="Change a folder's level, Bypass or name")
-    def update(fid: str, body: FolderPatch) -> dict[str, Any]:
-        f = ctx.folders.update(fid, body.level, body.allow_bypass, body.name)
+    @app.patch("/v1/folders/{fid}", summary="Change a folder's level, Bypass or name (in Default unless ?environment=)")
+    def update(fid: str, body: FolderPatch, environment: str | None = None) -> dict[str, Any]:
+        f = ctx.folders.envs.update_folder(environment or "default", fid, body.level, body.allow_bypass, body.name)
         return f.public(ctx.folders.caps)
 
-    @app.delete("/v1/folders/{fid}", summary="Remove a folder (its files are left alone)")
-    def remove(fid: str) -> dict[str, Any]:
-        if not ctx.folders.remove(fid):
+    @app.delete("/v1/folders/{fid}", summary="Remove a folder from an environment (Default unless ?environment=); its files are left alone")
+    def remove(fid: str, environment: str | None = None) -> dict[str, Any]:
+        if not ctx.folders.envs.remove_folder(environment or "default", fid):
             raise Refused("unknown_folder", f"there is no workspace folder {fid!r}", "", 404)
         return {"removed": fid}
+
+    api_env.mount(app, ctx)
 
     @app.get("/v1/recent", summary="Recent edits, runs and undos, newest first; ?thread= for one chat")
     def recent(thread: str | None = None, limit: int = 100) -> dict[str, Any]:
@@ -187,31 +204,35 @@ def create_app(state: Path | None = None, aihub_root: Path | None = None, models
 
     @app.post("/v1/limits", summary="The hub's preflight: what a call would do (action, folder, level, preview) or why it's refused")
     def preflight(body: LimitsIn) -> dict[str, Any]:
-        return limits.classify(ctx.folders, body.tool, body.arguments, body.origin)
+        return limits.classify(ctx.folders.view(body.origin), body.tool, body.arguments, body.origin)
 
     @app.post("/v1/tree", summary="List a folder's files")
     def tree(body: TreeIn, request: Request) -> str:
-        f = ctx.folders.get(body.folder)
+        v = view_of(ctx, request)
+        f = v.get(body.folder)
         ctx.counts["reads"] += 1
-        return reading.tree(ctx.folders, f, body.path, body.depth, body.limit, named_of(request))
+        return reading.tree(v, f, body.path, body.depth, body.limit, named_of(request))
 
     @app.post("/v1/read", summary="Read a file with line numbers")
     def read(body: ReadIn, request: Request) -> str:
-        f = ctx.folders.get(body.folder)
+        v = view_of(ctx, request)
+        f = v.get(body.folder)
         ctx.counts["reads"] += 1
-        return reading.read(ctx.folders, f, body.path, body.offset, body.limit, named_of(request))
+        return reading.read(v, f, body.path, body.offset, body.limit, named_of(request))
 
     @app.post("/v1/search", summary="Search a folder's files")
     def search(body: SearchIn, request: Request) -> str:
-        f = ctx.folders.get(body.folder)
+        v = view_of(ctx, request)
+        f = v.get(body.folder)
         ctx.counts["reads"] += 1
-        return reading.search(ctx.folders, f, body.query, body.regex, body.glob, body.path, body.limit, named_of(request))
+        return reading.search(v, f, body.query, body.regex, body.glob, body.path, body.limit, named_of(request))
 
     @app.post("/v1/git", summary="Read-only git: status, log, diff, show, branch")
     def git(body: GitIn, request: Request) -> str:
-        f = ctx.folders.get(body.folder)
-        relp = ctx.folders.resolve(f, body.path, named=named_of(request))[1] if body.path else None
-        root, _ = ctx.folders.resolve(f, ".")
+        v = view_of(ctx, request)
+        f = v.get(body.folder)
+        relp = v.resolve(f, body.path, named=named_of(request))[1] if body.path else None
+        root, _ = v.resolve(f, ".")
         ctx.counts["reads"] += 1
         return reading.git_read(f, root, body.command, body.rev, relp, body.limit)
 

@@ -197,13 +197,18 @@ def numbered(text: str, first: int = 1) -> str:
     return "\n".join(f"{first + i:>{w}}| {line}" for i, line in enumerate(lines))
 
 
+def _page(d: dict[str, Any]) -> str:
+    """An attached web page names where it came from, so a reply can link it."""
+    return f", a web page from {label(d['url'], 500)}" if isinstance(d.get("url"), str) and d["url"].startswith(("http://", "https://")) else ""
+
+
 def doc_card(d: dict[str, Any], dropped: bool = False) -> str:
     """A document the message doesn't carry whole: what it is and how to read it."""
     why = ("its text was dropped from this chat to save room" if dropped
            else "the user chose to send it as a card" if d.get("mode") == "card"
            else "the user asked for all of it, but it didn't fit the window" if d.get("fallback")
            else "too long to include here")
-    out = f"(attached {d['ref']}: {label(d.get('name'))}, {_size(d)}; {why}."
+    out = f"(attached {d['ref']}: {label(d.get('name'))}{_page(d)}, {_size(d)}; {why}."
     if d.get("library"):                 # plan 28.3: over LIBRARY_PAGES pages, and the embed mod is there
         out += (f" Too large to read whole: search it by meaning with {d['library']} (thread_only=true), then read "
                 f"the pages it finds.")
@@ -235,7 +240,7 @@ def doc_block(d: dict[str, Any], dropped: bool = False) -> str:
         else:
             how = f"its lines are numbered; cite them as {d['ref']}:N"
             body = numbered(d["text"])
-        return (f"(attached {d['ref']}: {label(d.get('name'))}, {_size(d)}; all of it follows, {how}. {DATA_NOTE})\n"
+        return (f"(attached {d['ref']}: {label(d.get('name'))}{_page(d)}, {_size(d)}; all of it follows, {how}. {DATA_NOTE})\n"
                 + untrusted(f"{d['ref']} {d.get('name')}", body))
     return doc_card(d, dropped=dropped)
 
@@ -407,3 +412,24 @@ def summary_cut(events: list[dict[str, Any]]) -> int | None:
     _, upto, _ = summary_state(events)
     cut = starts[-KEEP_TURNS] - 1
     return cut if cut > upto else None
+
+
+async def folders_note(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
+                       disabled: set[str] | list[str]) -> str:
+    """Plan 34: for the system prompt, the workspace folders this chat can use (its environment's, and those the user
+    allowed in it), as the workspace mod resolves them; "" when the mod is off, turned off here, or doesn't answer."""
+    import logging
+    import os
+
+    from . import prompts
+
+    if "workspace" in disabled or not any(s.get("id") == "workspace" and s.get("state") in ("ready", "degraded")
+                                          for s in services or []):
+        return ""
+    env = (settings or {}).get("environment")
+    try:
+        data = await hub.chat_folders(tid, env if isinstance(env, str) and env else None)
+    except Exception as e:  # noqa: BLE001: the prompt goes on without it
+        logging.getLogger("agent.context").warning("the folders of chat %s: %s", tid, e)
+        return ""
+    return prompts.folders_note(data, os.path.expanduser("~"))

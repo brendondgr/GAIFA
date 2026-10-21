@@ -116,6 +116,16 @@ class HubAPI:
         except Exception:  # noqa: BLE001: the chat is gone either way; a stale thread grant matches nothing
             log.warning("ending the grants of thread %s", tid)
 
+    async def chat_folders(self, tid: str, environment: str | None) -> dict[str, Any]:
+        """The workspace folders this chat can use (plan 34): its environment's and those the user allowed in it
+        (folder grants), as the workspace mod resolves them for the chat's calls: `{folders, environment}`."""
+        grants = await self._json("GET", "/api/grants", params={"thread": tid})
+        allowed = [{"path": g["key"][len("folder:"):], "level": "read"} for g in grants or []
+                   if g.get("kind") == "folder" and str(g.get("key") or "").startswith("folder:/")]
+        origin = {"service": "agent", "thread": tid, **({"environment": environment} if environment else {}),
+                  **({"folders": allowed} if allowed else {})}
+        return await self._json("GET", "/api/s/workspace/v1/folders", headers={"X-AIHub-Origin": json.dumps(origin)})
+
     # ---- preferences and feedback (plan 21.4) -------------------------------------------------
 
     async def prefs(self, **query: Any) -> list[dict[str, Any]]:

@@ -143,7 +143,21 @@ def read(folders: Folders, f: Folder, path: str, offset: int, limit: int, named:
     end = start + len(chunk) - 1
     head = f"{f.id}:{rel} lines {start}–{end} of {total}" if chunk else f"{f.id}:{rel} has {total} lines; none from {start}"
     more = f"\nMore: workspace_read(folder={f.id!r}, path={rel!r}, offset={end + 1})" if end < total else ""
-    return head + "\n" + untrusted(f"{f.id}:{rel}", body) + more + f"\nCite lines as {rel}:<line>."
+    return cite_line(rel) + "\n" + head + "\n" + untrusted(f"{f.id}:{rel}", body) + more
+
+
+def cite_line(rel: str) -> str:
+    """The first line of a read: how to cite it, with the folder-relative path (skynet wrote "line 3")."""
+    return f"{rel} (cite lines as {rel}:N, a range as {rel}:N-M)"
+
+
+_HIT = re.compile(r"^(.*?):(\d+):(.*)$", re.S)
+
+
+def hit_line(h: str) -> str:
+    """A search hit as `path:line: text`, so the model can cite `path:line` as it stands."""
+    m = _HIT.match(h)
+    return f"{m.group(1)}:{m.group(2)}: {m.group(3)}" if m else h
 
 
 def search(folders: Folders, f: Folder, query: str, regex: bool, glob: str | None, path: str | None,
@@ -161,9 +175,10 @@ def search(folders: Folders, f: Folder, query: str, regex: bool, glob: str | Non
     where = f"{f.id}:{rel}" if rel != "." else f.id
     if not hits:
         return f"No matches for {query!r} in {where}."
-    head = f"{len(hits)}{'+' if more else ''} matches for {query!r} in {where} (path:line: text)"
+    head = (f"{len(hits)}{'+' if more else ''} matches for {query!r} in {where}, each as path:line: text "
+            "(cite one as path:line, a range as path:N-M)")
     tail = "\n… more matches: narrow the query, glob or path" if more else ""
-    return head + "\n" + untrusted(f"workspace {f.id} search", "\n".join(hits)) + tail
+    return head + "\n" + untrusted(f"workspace {f.id} search", "\n".join(hit_line(h) for h in hits)) + tail
 
 
 def _rg(root: Path, base: Path, query: str, regex: bool, glob: str | None, limit: int) -> list[str]:

@@ -28,7 +28,7 @@ export const METHOD_AREA = {
   listApprovals: 'tools', getApproval: 'tools', decideApproval: 'tools', listGrants: 'tools', revokeGrant: 'tools', listJudged: 'tools', getJudgeStatus: 'tools',
   listSessions: 'sessions', saveSession: 'sessions', renameSession: 'sessions', deleteSession: 'sessions',
   restoreSession: 'sessions', getSessionState: 'sessions',
-  readWebPage: 'webpages',
+  readWebPage: 'webpages', getWebReading: 'webpages',
 };
 
 // HubEvent type → area, for merging live and mock event streams.
@@ -170,6 +170,8 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     outputPageUrl: (id, n, { width } = {}) => url(`/api/outputs/${enc(id)}/page/${n}.png${qs({ width })}`),
     // Plan 30.8: a web page read for the user (saved as a web output, screened whole); text: also its markdown
     readWebPage: (pageUrl, { text } = {}) => req('POST', '/api/web/read', { json: { url: pageUrl, text: !!text } }),
+    // How pages are read and screened, for Settings → Agent: the models each backend offers, what relevance uses now
+    getWebReading: () => req('GET', '/api/web/reading'),
     getSettings: () => req('GET', '/api/settings'),
     saveSettings: s => req('PUT', '/api/settings', { json: s }),
     getMetrics: ({ series, range, step } = {}) => req('GET', `/api/metrics${qs({ series, range, step })}`),

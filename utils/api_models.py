@@ -668,6 +668,25 @@ class ScreenSettings(_Model):
     url: str | None = Field(None, min_length=1, max_length=500, description="null: the judge's (or the backend's default)")
     threshold: float | None = Field(None, gt=0, le=1, description="decide: a passage is for a human reader at or above it")
     confirm: bool = Field(True, description="decide: what it flags is read again by the judge's chat model (relay)")
+    parallel: int = Field(4, ge=1, le=32, description="Model calls at once for one text")
+
+
+class WebReadSettings(_Model):
+    """`[agent.web]`: how web_fetch returns a page longer than its max_chars (`utils/tools/webread.py`)."""
+    relevance: Literal["auto", "decide", "lexical", "off"] = Field(description="Its passages most relevant to the question "
+                                                                   "first: auto (the decide mod when it's up with its model "
+                                                                   "loaded, else lexical), decide, lexical (words in common), "
+                                                                   "off (the page's start)")
+    model: str = Field(min_length=1, max_length=200, description="The decide model that scores passages")
+    url: str = Field(min_length=1, max_length=500, description="The decide mod")
+    candidates: int = Field(ge=4, le=200, description="decide re-ranks lexical's best this many passages")
+    timeout_s: float = Field(gt=0, le=60, description="Slower than this: lexical's order")
+
+
+class OutputsSettings(_Model):
+    """`[outputs]` (plan 30.9)."""
+    hidden_keep_days: float = Field(ge=0, le=3650, description="Hidden outputs (the web mod's saved pages) older than this "
+                                    "go to the outputs trash; 0 keeps them")
 
 
 class Settings(_Model):
@@ -680,6 +699,8 @@ class Settings(_Model):
     judge: JudgeSettings
     screen: ScreenSettings
     permissions: PermissionsSettings
+    web: WebReadSettings
+    outputs: OutputsSettings
 
 
 class SettingsPatch(_Model):
@@ -694,6 +715,8 @@ class SettingsPatch(_Model):
     judge: dict[str, Any] | None = None
     screen: dict[str, Any] | None = None
     permissions: dict[str, Any] | None = None
+    web: dict[str, Any] | None = None
+    outputs: dict[str, Any] | None = None
 
 
 class SavedSettings(_Model):

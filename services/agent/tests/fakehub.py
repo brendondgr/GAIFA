@@ -91,6 +91,9 @@ class FakeHub:
         self.chat_deletes: list[str] = []
         self.embed_up = True
         self.learning = True                           # False: hub_set_preference answers learning_off
+        self.workspace: dict[str, Any] | None = None   # plan 34: the workspace mod's folders by environment (None: not running)
+        self.grants: list[dict[str, Any]] = []         # GET /api/grants
+        self.folder_origins: list[dict[str, Any]] = []  # the X-AIHub-Origin of each GET /api/s/workspace/v1/folders
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -327,6 +330,19 @@ class FakeHub:
                 out = {**out, "grant": {"id": "gr_" + aid, "scope": body["remember"]}}
             return out
 
+        @app.get("/api/grants")
+        def grants(thread: str | None = None) -> list:
+            return [g for g in self.grants if not thread or g.get("thread") == thread]
+
+        @app.get("/api/s/workspace/v1/folders")
+        def ws_folders(request: Request) -> dict:
+            o = json.loads(request.headers.get("x-aihub-origin") or "{}")
+            self.folder_origins.append(o)
+            env = (self.workspace or {}).get(o.get("environment") or "default") or (self.workspace or {})["default"]
+            granted = [{"id": f["path"].rsplit("/", 1)[-1].lower(), "path": f["path"], "level": "read", "granted": True}
+                       for f in o.get("folders") or []]
+            return {"folders": [*env["folders"], *granted], "environment": {"id": env["id"], "name": env["name"]}}
+
         @app.delete("/api/grants")
         def end_grants(thread: str) -> dict:
             self.ended_grants.append(thread)
@@ -368,7 +384,8 @@ class FakeHub:
 
         @app.get("/api/services")
         def services() -> list:
-            return [{"id": "fake", "name": "Fake", "state": "ready", "load": "loaded"}]
+            return [{"id": "fake", "name": "Fake", "state": "ready", "load": "loaded"},
+                    *([{"id": "workspace", "name": "Workspace", "state": "ready"}] if self.workspace is not None else [])]
 
         @app.get("/api/memory")
         def memory() -> dict:

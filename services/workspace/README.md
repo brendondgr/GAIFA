@@ -1,6 +1,18 @@
 # Workspace
 
-An AIHub mod (plan Phase 27): folders on this machine that the chat agent reads, edits in place and runs code in. Each folder has a **level**, and the chat's **mode** decides what asks first; the stricter of the two wins. Setup: [setup/workspace.md](setup/workspace.md). The mod guide is [docs/mods.md](../../docs/mods.md).
+An AIHub mod (plan Phase 27): folders on this machine that the chat agent reads, edits in place and runs code in. Each folder has a **level**, and the chat's **mode** decides what asks first; the stricter of the two wins. Folders are grouped in **environments** (plan 34): a chat works in one. Setup: [setup/workspace.md](setup/workspace.md). The mod guide is [docs/mods.md](../../docs/mods.md).
+
+## Environments
+
+An environment is a named set of folders, each with its own level there (a folder can be Read in one and Edit in another), after Claude's. They live in `data/state/workspace/environments.json`. **Default** always exists (rename it, never delete it); Phase 27's `folders.json` became Default on first load, ids and levels kept (the old file is left as it was). A folder's id is the same in every environment, and no two folders share one.
+
+A chat picks its environment in its header (⌂ chip; saved as the thread's `settings.environment`; a new chat starts with the last one picked in that browser, else Default). The agent sends it in each call's origin (`environment`); a chat without one, or whose environment was deleted, uses Default. Every tool call sees only:
+- the folders of the chat's environment, and
+- the folders the user allowed **in that chat** (the hub passes them as `origin.folders`, from the chat's folder grants; only the hub sets it). These are always Read here, whatever the origin says, and are checked again as below.
+
+**Asking for a folder.** When the agent reads (tree, read, search, git) a full path (`~/…`, `/home/…`) that is in no folder of the chat, the preflight answers `ask_folder: {path, level: "read", max_level, capped?, environment: {id, name}}` with `key = "folder:<path>"` instead of a refusal. The hub turns it into a card in every mode: **Allow for this chat** (a thread-scoped folder grant in the hub; Settings → Agent and the chip's menu can take it back), **Add to "<environment>"** (the page adds it to the environment at Read through `POST /v1/environments/{id}/folders`, then the call runs once) or **Deny**. Editing or running in such a folder is never asked for: it needs the folder in the environment at a higher level. A path inside a folder the chat already has is refused with which folder and path to use instead.
+
+Folders that are never asked for (the Workspace page can still add them): anything outside the user's home or a mounted drive (`/mnt`, `/media/<you>`, `/run/media/<you>`); `/`, the home folder and anything above it; a hidden or secret-looking folder on the way (`~/.ssh`, `~/.config`, `secrets/`); a path that isn't a folder or doesn't exist. Symlinks are resolved first, so one can't lead out. The AIHub folder and `data/models/` stay at Read in every environment.
 
 ## Levels
 
@@ -30,11 +42,14 @@ Listings and searches skip `.git`, `node_modules`, `.venv`, caches and build fol
 | Route | What it does |
 |---|---|
 | `GET /health` | 200 while the server is up |
-| `GET /v1/status` | folders, edits and runs |
-| `GET /v1/folders` | the folders with their levels (`max_level` and `capped` say why one is held at Read) |
-| `POST /v1/folders` | `{path, level?, allow_bypass?, id?, name?}` adds one (Read unless you say otherwise) |
-| `PATCH /v1/folders/{id}` | `{level?, allow_bypass?, name?}` |
-| `DELETE /v1/folders/{id}` | removes it from the list; its files are left alone |
+| `GET /v1/status` | folders, environments, edits and runs |
+| `GET /v1/environments` | every environment with its folders and their levels |
+| `POST /v1/environments` | `{name, id?}` creates one (no folders yet); 409 for a name in use |
+| `GET /v1/environments/{id}`, `PUT /v1/environments/{id}` `{name}`, `DELETE /v1/environments/{id}` | one environment; rename; delete (not Default: 422) |
+| `POST /v1/environments/{id}/folders` | `{path, level?, allow_bypass?, id?, name?}` adds a folder there (Read unless you say otherwise; capped as below) |
+| `PATCH /v1/environments/{id}/folders/{fid}`, `DELETE …/folders/{fid}` | its level, Bypass or name there; remove it from that environment (its files are left alone) |
+| `GET /v1/folders` | the folders a chat can use: its environment's (`?environment=` or the origin's, else Default) and, for a chat's call, those allowed in it (`granted: true`); `max_level` and `capped` say why one is held at Read; also `environment: {id, name}` |
+| `POST /v1/folders`, `PATCH /v1/folders/{id}`, `DELETE /v1/folders/{id}` | Phase 27's routes, now for Default (or `?environment=`) |
 | `POST /v1/tree`, `/v1/read`, `/v1/search`, `/v1/git` | the reading tools (text, contents inside `<untrusted>`) |
 | `POST /v1/edit`, `/v1/write`, `/v1/move`, `/v1/delete`, `/v1/git/commit` | the editing tools: each returns its diff and `undo` |
 | `GET /v1/checkpoints?thread=` | turns with checkpoints (files, tools, size, the undo route), and the usage |
@@ -44,7 +59,7 @@ Listings and searches skip `.git`, `node_modules`, `.venv`, caches and build fol
 
 ## The page
 
-`ui/page.js`, three tabs: **Folders** (add a folder by its path, at Read; its level, only up to what it may reach, with the reason when it's capped; "allow Bypass"; remove), **Activity** (checkpoint usage; each turn's changed files with Undo, which refuses with the diffs if a file changed since; recent runs with their exit codes, Stop for a running one; links to the chat) and **Sandbox** (the image: built or not, Build or Rebuild, the build log). The chat also shows **Undo this turn** under a turn that changed files.
+`ui/page.js`, three tabs: **Environments** (the environments as a switcher with their folder counts; New environment by name; for the one picked: rename, delete (not Default), add a folder by its path at a level, each folder's level there, only up to what it may reach, with the reason when it's capped, "allow Bypass", remove; `#/s/workspace/folders` opens it too), **Activity** (checkpoint usage; each turn's changed files with Undo, which refuses with the diffs if a file changed since; recent runs with their exit codes, Stop for a running one; links to the chat) and **Sandbox** (the image: built or not, Build or Rebuild, the build log). The chat also shows **Undo this turn** under a turn that changed files.
 
 ## The sandbox
 
@@ -58,7 +73,7 @@ Commands and Python run in `localhost/aihub-workspace-sandbox:2` (rootless podma
 | `POST /v1/runs/{id}/cancel` | stop a run |
 | `POST /v1/run` | `workspace_run`: `{folder, command, where: sandbox \| host, network?, cwd?, timeout_s?}` → `{run, state, exit_code, seconds, where, network, stdout, stderr, note?}` (output inside `<untrusted>`; `stdout` is `(no output)` when the command printed nothing); Run for the sandbox and the host, Run + network for `network` and git remotes |
 | `POST /v1/python` | `workspace_python`: `{code, inputs?, folder?, network?, timeout_s?}`; inputs (outputs) are fetched from the hub into `inputs/` (`$AIHUB_INPUTS`); without a folder every file the code writes becomes an output in `outputs/workspace/<date>/<HHMMSS>-<name>` with a sidecar (the run and the code); with a folder, files in `$AIHUB_OUT` do. Only regular files become outputs: a symlink the code leaves is skipped |
-| `POST /v1/limits` | the hub's preflight before each call (plan 27.4): `{action, folder, level, allow_bypass, key, once, preview, refuse?}`. A command's `key`, what "allow in this chat" covers, is the folder (and `cwd`) plus the exact command line, with " (with internet)" or " (on this machine)": `proj pytest -q`. A compound command (`;`, `&&`, `\|\|`, `\|`, `&`, backticks, `$(`, newlines, redirections) has no key and is `once` |
+| `POST /v1/limits` | the hub's preflight before each call (plan 27.4): `{action, folder, level, allow_bypass, key, once, preview, refuse?, ask_folder?}` (`ask_folder`: plan 34, above). A command's `key`, what "allow in this chat" covers, is the folder (and `cwd`) plus the exact command line, with " (with internet)" or " (on this machine)": `proj pytest -q`. A compound command (`;`, `&&`, `\|\|`, `\|`, `&`, backticks, `$(`, newlines, redirections) has no key and is `once` |
 
 A call that goes away (the hub cancelled it) stops its run. Host runs (`where = "host"`) run `bash -c` in the folder on your machine, with your files and network, and are only reached after you allowed that one call: no grant covers them.
 

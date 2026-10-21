@@ -26,6 +26,7 @@ export function grantKeyOf(kind, args = {}) {
 export function limitsCover(limits) {
   const k = limits?.key;
   if (!k) return null;
+  if (String(k).startsWith('folder:')) return `in ${String(k).slice(7).replace(/^\/home\/[^/]+(?=\/|$)/, '~')}`;   // plan 34: a folder for this chat
   const [folder, ...rest] = String(k).split(' ');
   return rest.length ? `in ${folder}: ${rest.join(' ')}` : `in ${folder}`;
 }
@@ -45,9 +46,16 @@ export function grantText(kind, key) {
 
 /**
  * The buttons of an approval card. `thread`: the call came from a chat ("Allow in this chat" needs
- * one). Each is {remember, label, confirm?}; `confirm` asks a second time before deciding.
+ * one). Each is {remember, label, confirm?}; `confirm` asks a second time before deciding. `folder`: the
+ * preflight's `ask_folder` (plan 34): Allow for this chat · Add to “<environment>” (the caller adds it there,
+ * then allows the call once: chat-env.js decideFolder).
  */
-export function approvalButtons(risk, { thread = false, once = false } = {}) {
+export function approvalButtons(risk, { thread = false, once = false, folder = null } = {}) {
+  if (folder) {                  // plan 34: a folder outside the chat's environment: this chat, or the environment
+    const env = folder.environment;
+    return [...(thread ? [{ remember: 'thread', label: 'Allow for this chat', primary: true }] : [{ remember: 'once', label: 'Allow once', primary: true }]),
+      ...(env?.id ? [{ remember: 'environment', label: `Add to “${env.name || env.id}”` }] : [])];
+  }
   const out = [{ remember: 'once', label: 'Allow once', primary: true }];
   if (once) return out;          // host runs, commits, git remotes ask every time (plan 27.4)
   if (thread) out.push({ remember: 'thread', label: 'Allow in this chat' });
@@ -63,7 +71,7 @@ export function confirmText(tool, risk, cover) {
 
 /** The decided card's words for how it was allowed. */
 export function rememberText(remember) {
-  return remember === 'thread' ? 'Allowed in this chat' : remember === 'always' ? 'Always allowed' : null;
+  return remember === 'thread' ? 'Allowed in this chat' : remember === 'always' ? 'Always allowed' : remember === 'environment' ? 'Added to the environment' : null;
 }
 
 /** The arguments shown whole, monospaced and editable in a text box: an `execute` tool's code or

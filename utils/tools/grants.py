@@ -14,6 +14,11 @@ every call of the tool, e.g. searching). A grant whose key is null covers every 
 replaces the one read from the arguments. A preflight's `once` action (host runs, commits, git
 remotes, and a compound command, which has no key) can't be remembered at all.
 
+**A folder for one chat** (plan 34): when a mod's preflight answers `ask_folder` (the workspace mod: a path in
+no folder of the chat's environment), "Allow for this chat" writes a `kind = "folder"` grant (`tool = "<mod>_*"`,
+`key = "folder:<path>"`, thread scope only), and the hub passes the chat's folder grants to that mod as
+`origin.folders` on every call (`Calls._folders`).
+
 **Who it covers.** A `thread` grant covers calls whose origin names that thread (the chat); an MCP
 or API call has no thread, so only `always` grants apply to it. `thread` grants end with their
 thread (the agent calls `DELETE /api/grants?thread=` when a chat is deleted).
@@ -36,6 +41,7 @@ if TYPE_CHECKING:
 
 GRANT_KEY = re.compile(r"^(url:host|arg:[A-Za-z_][A-Za-z0-9_.-]{0,63}|const:[A-Za-z0-9_.:-]{1,64})$")
 REMEMBER = ("once", "thread", "always")
+FOLDER_KIND = "folder"      # plan 34: a folder the user allowed in one chat (key "folder:<path>", tool "<mod>_*")
 CONFIRM_RISKS = ("execute", "destructive")   # an `always` grant for these needs a second confirm
 
 
@@ -112,6 +118,13 @@ class Grants:
         if remember == "thread" and thread is None:
             raise HubError(422, "no_thread", "this call isn't from a chat, so it can't be allowed in this chat",
                            {"fix": "allow it once, or always"})
+        if ask := (limits or {}).get("ask_folder"):       # plan 34: "Allow for this chat" lets the chat read that folder
+            if remember != "thread":
+                raise HubError(422, "folder_always", "a folder is allowed in one chat; to keep it, add it to an environment",
+                               {"fix": "allow it in this chat, or add it to the environment (the card's choice, or the Workspace page)"})
+            prefix = tool.name[:-len(tool.tool)] if tool.tool and tool.name.endswith(tool.tool) else tool.name + "_"
+            return {"tool": prefix + "*", "key": f"folder:{ask['path']}", "kind": FOLDER_KIND, "risk": "read",
+                    "scope": "thread", "thread": thread}
         if remember == "always" and tool.risk in CONFIRM_RISKS and not confirm:
             raise HubError(422, "confirm_needed", f"always allowing a {tool.risk} tool needs a second confirm",
                            {"fix": "confirm on the card (confirm: true), or allow it once or in this chat"})
@@ -121,6 +134,15 @@ class Grants:
                            {"fix": "allow it once"})
         return {"tool": tool.name, "key": key, "kind": tool.grant_key, "risk": tool.risk, "scope": remember,
                 "thread": thread if remember == "thread" else None}
+
+    async def folders(self, tool_name: str, thread: str) -> list[dict[str, Any]]:
+        """The folders the user allowed in this chat for this tool's mod (plan 34), oldest first, as the mod reads
+        them in `origin.folders`: `[{path, level, grant}]`."""
+        rows = await self.db.fetchall(
+            "SELECT id, tool, key FROM grants WHERE kind = ? AND thread = ? AND (expires_ts IS NULL OR expires_ts > ?) "
+            "ORDER BY created_ts", (FOLDER_KIND, thread, time.time()))
+        return [{"path": r["key"][len("folder:"):], "level": "read", "grant": r["id"]} for r in rows
+                if fnmatch.fnmatchcase(tool_name, r["tool"]) and str(r["key"] or "").startswith("folder:/")]
 
     async def add(self, tool: str, key: str | None, scope: str, thread: str | None = None, *, kind: str | None = None,
                   risk: str | None = None, expires_ts: float | None = None, note: str = "") -> dict[str, Any]:

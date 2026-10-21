@@ -37,7 +37,7 @@ from utils.tools.approvals import Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.doc_tools import untrusted
 from utils.tools.modcall import ToolError, dry_run, mod_error
-from utils.tools import edits, options, searched
+from utils.tools import edits, options, searched, webread
 from utils.tools.schema import coerce, validate
 
 if TYPE_CHECKING:
@@ -178,19 +178,23 @@ class Calls:
             if err := await hub_tools.precheck(self.hub, tool.name, arguments):
                 await self._refused(tool.name, arguments, origin, err)
                 return {"status": "error", "tool": tool.name, "error": err}
+        origin = await self._folders(tool, origin)    # the folders the user allowed in this chat (plan 34)
         limits = await self._limits(tool, arguments, origin) if tool.limits else None
         grant = await self.hub.grants.match(tool, arguments, origin, (limits or {}).get("key")) \
             if self.hub.grants is not None and not (limits or {}).get("once") else None
         found = await searched.found_by(self.hub.db, arguments.get("url"), (origin or {}).get("thread")) \
             if tool.name == searched.FETCH_TOOL and grant is None and mode != "plan" and isinstance(arguments, dict) else None
+        shared = found is None and tool.name == searched.FETCH_TOOL and grant is None and mode != "plan" \
+            and isinstance(arguments, dict) and searched.shared(arguments.get("url"), (origin or {}).get("links"))
         verdict, why = decide(tool.name, tool.risk, self.hub.config, mode, grant, limits,
-                              untrusted=bool((origin or {}).get("untrusted")), searched=found is not None)
+                              untrusted=bool((origin or {}).get("untrusted")), searched=found is not None, shared=shared)
         judged = None
         if verdict == "judge":                         # Auto mode (plan 30.3): allow or ask, with its reason
             verdict, why, judged = await judge(self.hub, tool, arguments, origin, limits, why)
             judged = {**judged, "why": why}
-        if origin and "said" in origin:                # the user's words were for the judge only; never stored
-            origin = {k: v for k, v in origin.items() if k != "said"}
+        if tool.name == webread.FETCH_TOOL:
+            webread.note_question(origin)              # what the page is read for (in memory only)
+        origin = webread.private_out(origin)           # the user's words (said, question, links): never stored
         if judged is not None:
             origin = {**(origin or {}), "judge": judged}   # the call's record, the card and the step row say why
         if verdict == "deny":
@@ -201,6 +205,8 @@ class Calls:
             await self._refused(tool.name, arguments, origin, out["error"])
             return out
         if verdict == "ask":
+            if (limits or {}).get("ask_folder"):      # plan 34: the card asks for a folder; the popover reads it here
+                origin = {**(origin or {}), "ask_folder": limits["ask_folder"]}   # type: ignore[index]
             a = await self.approvals.create(tool.name, arguments, tool.ask, tool.risk, origin or {}, how)
             if judged is not None:
                 await self._judged(tool.name, judged, origin, approval_id=a["id"])
@@ -209,6 +215,8 @@ class Calls:
             origin = {**(origin or {}), "grant": grant["id"]}      # the records and the chat say which grant ran it
         elif found is not None and why == "a page your search found":
             origin = {**(origin or {}), "found_by": found}          # the web_search call whose results held the URL
+        elif shared and why == "a link you shared":
+            origin = {**(origin or {}), "shared_link": True}         # the user typed this URL in the chat
         out = await self._launch(tool, arguments, origin or {}, None, wait, filled=how)
         if judged is not None:
             await self._judged(tool.name, judged, origin, call_id=out.get("call_id"))
@@ -257,11 +265,14 @@ class Calls:
         problems = validate(tool.parameters, args) or options.problems(tool.parameters, args)
         if problems:
             raise HubError(422, "invalid_arguments", problems[0]["detail"], {"problems": problems})
-        limits = await self._limits(tool, args, a["origin"]) if tool.limits else None
+        origin = await self._folders(tool, a["origin"])     # the chat's allowed folders now (plan 34)
+        limits = await self._limits(tool, args, origin) if tool.limits else None
         if limits and limits.get("refuse"):            # the edited arguments, or the folder, changed meanwhile
             r = limits["refuse"]
             raise HubError(403, r.get("code") or "refused", str(r.get("detail") or "the mod refused it"), {"fix": r.get("fix")})
-        spec = self.hub.grants.check(tool, args, a["origin"], remember, confirm, limits) if self.hub.grants is not None else None
+        spec = self.hub.grants.check(tool, args, origin, remember, confirm, limits) if self.hub.grants is not None else None
+        if limits and limits.get("ask_folder"):        # allowed: this call reads the folder (and, with a grant, the chat)
+            origin = {**origin, "folders": [*origin.get("folders", []), {"path": limits["ask_folder"]["path"], "level": "read"}]}
         call_id = _id()
         changed = edits.edited(tool.parameters, a["arguments"], args)
         if not await self.approvals.close(aid, "approved", final=args, call_id=call_id, edited=changed):
@@ -274,7 +285,7 @@ class Calls:
                 await self.hub.prefs.after_decision(tool, {**(a.get("origin") or {}), "approval_id": aid}, args, changed, a.get("filled") or {})
             except Exception:  # noqa: BLE001: learning never blocks a call
                 log.exception("preferences after approval %s", aid)
-        out = await self._launch(tool, args, a["origin"], aid, wait, call_id, filled=filled)
+        out = await self._launch(tool, args, origin, aid, wait, call_id, filled=filled)
         return {**out, "grant": grant} if grant else out
 
     async def status(self, call_id: str, wait: float = 0) -> dict[str, Any]:
@@ -353,12 +364,21 @@ class Calls:
         if why:
             out["why"] = why
         if limits:      # what the card shows: the action, the folder, the diff or the command; `once`: no grant buttons
-            out["limits"] = {k: limits[k] for k in ("action", "folder", "level", "allow_bypass", "key", "once", "preview", "path")
+            out["limits"] = {k: limits[k] for k in ("action", "folder", "level", "allow_bypass", "key", "once", "preview", "path", "ask_folder")
                              if limits.get(k) is not None}
         if filled:
             out["filled"] = filled
             out["filled_by"] = {k: v for k, v in (how or {}).items() if k in filled}   # "default" | "pref:<id>" | "carried" (21.7)
         return out
+
+    async def _folders(self, tool: ToolDef, origin: dict[str, Any] | None) -> dict[str, Any]:
+        """Plan 34: a mod with a preflight gets the folders the user allowed in this chat as `origin.folders`
+        (`[{path, level, grant}]`, from the chat's folder grants). Only the hub sets it: a caller's is dropped."""
+        o = {k: v for k, v in (origin or {}).items() if k != "folders"}
+        if tool.limits and o.get("thread") and self.hub.grants is not None:
+            if rows := await self.hub.grants.folders(tool.name, str(o["thread"])):
+                o["folders"] = rows
+        return o
 
     async def _limits(self, tool: ToolDef, arguments: Any, origin: dict[str, Any] | None) -> dict[str, Any]:
         """The mod's preflight (plan 27.4): what the call would do. Fails closed: a refusal."""
@@ -476,17 +496,9 @@ class Calls:
 
     async def _screen_page(self, c: Call) -> None:
         """Plan 30.6: a fetched page's text is screened before the agent reads it; the output keeps the whole page.
-        The web mod sends the text inside `<untrusted>` (data, never instructions): the page's own lines are
-        screened, then wrapped again as they came."""
-        from utils.tools.screen import report, screen_for
-
-        if not isinstance(c.result, dict) or not isinstance(c.result.get("content"), str):
-            return
-        src, raw = unwrap(c.result["content"])
-        s = await screen_for(self.hub.config, raw, "page")
-        if s is not None:
-            c.result["content"] = untrusted(src, s.text) if src is not None else s.text
-            c.result["screening"] = report(s)
+        `webread.shape`: numbered lines, a long page's most relevant passages first, then screened (the web mod sends
+        the text inside `<untrusted>`: the page's own lines are screened, then wrapped again as they came)."""
+        await webread.shape(self.hub, c)
 
     async def _ensure_up(self, c: Call) -> Any:
         mgr = self.hub.services

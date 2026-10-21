@@ -4,7 +4,11 @@ Folder names carry their level: `read`, `edit`, `run`, `run_net`, and a `-bypass
 Bypass (`run_net-bypass`). `POST /v1/limits` answers what the real workspace mod's preflight does:
 the action, the level, Bypass, the grant key (the folder + the command; the real mod uses the exact command line), `once` for host
 runs, commits and git remotes, a preview, and a refusal when the level is too low or the command
-uses sudo. The tool routes echo what they were sent.
+uses sudo. The tool routes echo what they were sent (and the folders the hub passed as allowed in the chat).
+
+Plan 34: a folder given as a full path is a folder outside the chat's environment. A read of one answers
+`ask_folder` (the hub asks the user) unless the origin's `folders` holds it (then it reads, at Read);
+`/etc` is never asked for.
 """
 
 from __future__ import annotations
@@ -38,6 +42,8 @@ def paths() -> dict:
 def limits(b: dict) -> dict:
     tool, args = b.get("tool"), b.get("arguments") or {}
     folder = str(args.get("folder") or "")
+    if folder.startswith("/"):
+        return path_limits(tool, folder, b.get("origin") or {})
     level = folder.split("-")[0]
     out = {"action": "read", "folder": folder, "level": level, "allow_bypass": folder.endswith("-bypass"), "key": folder, "once": False}
     if level not in LEVELS:
@@ -64,9 +70,32 @@ def limits(b: dict) -> dict:
     return out
 
 
-def handle(path: str, body: dict) -> dict | None:
+def path_limits(tool: str | None, folder: str, origin: dict) -> dict:
+    out = {"action": "read" if tool == "read" else "edit", "folder": None, "level": "read", "allow_bypass": False,
+           "key": f"folder:{folder}", "once": False, "path": folder}
+    allowed = [f.get("path") for f in origin.get("folders") or [] if isinstance(f, dict)]
+    if folder == "/etc":
+        return {**out, "refuse": {"code": "not_grantable", "detail": "/etc is outside your home folder", "fix": "the Workspace page"}}
+    if folder in allowed:
+        out.update({"folder": folder.rsplit("/", 1)[-1], "key": folder.rsplit("/", 1)[-1]})
+        if out["action"] != "read":
+            out["refuse"] = {"code": "level", "detail": "allowed in this chat at Read", "fix": "add it to the environment"}
+        return out
+    if tool != "read":
+        return {**out, "refuse": {"code": "unknown_folder", "detail": f"{folder} isn't one of this chat's folders", "fix": "read it first"}}
+    env = origin.get("environment") or "default"
+    return {**out, "ask_folder": {"path": folder, "level": "read", "environment": {"id": env, "name": env.title()}}}
+
+
+def handle(path: str, body: dict, origin: dict | None = None) -> dict | None:
     if path == "/v1/limits":
         return limits(body)
     if path in ("/v1/read", "/v1/edit", "/v1/delete", "/v1/commit", "/v1/run"):
-        return {"ran": path.rsplit("/", 1)[1], "arguments": body}
+        out = {"ran": path.rsplit("/", 1)[1], "arguments": body}
+        folder = str(body.get("folder") or "")
+        if folder.startswith("/"):              # the mod checks again: a path must be allowed in the chat (plan 34)
+            out["folders"] = [f.get("path") for f in (origin or {}).get("folders") or []]
+            if folder not in out["folders"]:
+                return {"error": "unknown_folder"}
+        return out
     return None

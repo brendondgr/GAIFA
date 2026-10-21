@@ -7,10 +7,15 @@ output (markdown, or a PDF document), then its whole text is screened (`screen_s
 the `[agent.screen]` model, in pieces) and the report kept with the output, so the chat agent's later reads of it
 (`hub_read_document`, an attachment sent whole) reuse it instead of screening again. The chat sends the output as
 an attachment; the agent reads it inside `<untrusted>`, screened.
+
+`GET /api/web/reading`: what Settings → Agent shows about reading pages: the screening model in use (and the judge's),
+the models each backend offers (`choices`: the relay's, and the decide mod's when it's up; never started for this),
+and what `[agent.web] relevance` uses now.
 """
 
 from __future__ import annotations
 
+import time
 from typing import Any, Literal
 
 import httpx
@@ -19,7 +24,7 @@ from pydantic import BaseModel, Field
 
 from utils.api_models import Output
 from utils.server import HubError
-from utils.tools import results, screen, screen_store
+from utils.tools import results, screen, screen_store, webread
 
 router = APIRouter(tags=["web"])
 
@@ -120,3 +125,69 @@ async def read_page(body: ReadIn, request: Request) -> dict[str, Any]:
         out["markdown"] = ex.text
         out["screened"] = s.text + ex.text[out["screening"]["covered"]:] if s is not None else ex.text
     return out
+
+
+class ScreenNow(BaseModel):
+    backend: Literal["relay", "decide"]
+    model: str
+    confirm: str | None = Field(None, description="decide: the chat model that re-reads what it flags")
+    same_as_judge: bool = Field(description="[agent.screen] names no model of its own: the judge's")
+
+
+class Reading(BaseModel):
+    screen: ScreenNow
+    judge: dict[str, str] = Field(description="{backend, model} of the Auto judge")
+    choices: dict[str, list[str]] = Field(description="Models each backend offers now: relay (chat models), decide "
+                                          "(decision models; empty while the decide mod is down)")
+    relevance: str = Field(description="What [agent.web] relevance uses now: decide, lexical or off")
+    decide_up: bool
+
+
+_choices: dict[str, Any] = {}
+CHOICES_TTL_S = 30.0
+
+
+async def _models(url: str, backend: str) -> list[str]:
+    key = (url, backend)
+    hit = _choices.get(key)
+    if hit and time.monotonic() - hit[0] < CHOICES_TTL_S:
+        return hit[1]
+    out: list[str] = []
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(3)) as c:
+            r = await c.get(f"{url.rstrip('/')}/v1/models")
+            r.raise_for_status()
+            d = r.json()
+        if backend == "decide":
+            out = [str(m.get("id")) for m in d.get("models", []) if m.get("usable") and m.get("id")]
+        else:
+            out = sorted({str(m.get("id")) for m in d.get("data", []) if m.get("id")} - {"auto", "agent"})
+            out = [i for i in out if "/" not in i]           # local and named models, as the judge's picker
+    except (httpx.HTTPError, ValueError, AttributeError):
+        out = []
+    _choices[key] = (time.monotonic(), out)
+    return out
+
+
+@router.get("/api/web/reading", summary="How web pages are read: the screening model, choices, relevance", response_model=Reading)
+async def reading(request: Request) -> dict[str, Any]:
+    hub = request.app.state.hub
+    cfg = hub.config
+    sc = screen.screen_config(cfg)
+    jc = cfg.agent.judge
+    try:
+        decide_up = bool(hub.services.get("decide").up)
+    except Exception:  # noqa: BLE001: no decide mod
+        decide_up = False
+    from utils.tools.judge import config_from
+
+    relay_url = (sc.url if sc.backend == "relay" else sc.confirm.url if sc.confirm else
+                 config_from(jc).url if jc.backend == "relay" else screen.RELAY_DEFAULTS["url"])
+    decide_url = (cfg.agent.screen.url if cfg.agent.screen.backend == "decide" and cfg.agent.screen.url
+                  else jc.url if jc.backend == "decide" else screen.DECIDE_DEFAULTS["url"])
+    relay, decide = await _models(relay_url, "relay"), (await _models(decide_url, "decide") if decide_up else [])
+    return {"screen": {"backend": sc.backend, "model": sc.model, "confirm": sc.confirm.model if sc.confirm else None,
+                       "same_as_judge": not cfg.agent.screen.backend and not cfg.agent.screen.model},
+            "judge": {"backend": jc.backend, "model": jc.model},
+            "choices": {"relay": relay, "decide": decide},
+            "relevance": webread.backend(hub), "decide_up": decide_up}

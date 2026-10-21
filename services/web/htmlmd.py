@@ -8,6 +8,9 @@ content in. Pure functions over the page's bytes and the markdown; `pages.conver
 - **Tables:** pages that lay out text with tables (GitHub's comments) come out as rows with no header line, which
   no renderer shows as a table: a run of one-cell rows becomes paragraphs; wider rows get a header line, so the
   first row heads them.
+- **Heading anchors:** Sphinx's `¶`, and the `#`, `§` and `🔗` permalinks other sites put after a heading or a
+  definition (`[¶](https://docs.python.org#shlex.split)`, a bare `¶` at the end of a line), are dropped outside code
+  (`strip_anchors`).
 - **Fallback:** `plain(body)` keeps the page's structure (headings, paragraphs, list items, code, table rows),
   where `trafilatura.html2txt` gives one line of text.
 """
@@ -70,6 +73,34 @@ def restore_code(md: str, blocks: dict[str, tuple[str, str]]) -> str:
         fence = "````" if "```" in text else "```"
         return f"{fence}{lang}\n{text}\n{fence}\n"
     return _blank_after_fences(FENCE.sub(again, md))
+
+
+ANCHOR_TEXT = r"(?:¶|#|§|🔗|\U0001f517|permalink|permalink to this (?:headline|heading|definition|section))"
+ANCHOR_LINK = re.compile(r"\[\s*" + ANCHOR_TEXT + r"?\s*\]\(\s*<?[^()\s<>]*>?(?:\s+\"[^\"\n]*\")?\s*\)", re.I)
+BARE_ANCHOR = re.compile(r"[ \t]*[¶🔗]+[ \t]*$", re.M)
+
+
+def _anchor(m: re.Match) -> str:
+    """A permalink: `[¶](…)`, `[🔗](…)`, or `[#](…#x)` / `[](…#x)` / `[permalink](…#x)` that point at an anchor."""
+    s = m[0]
+    text = s[1:s.index("]")].strip()
+    if text in ("¶", "🔗", "§") or (s.count("#") > (1 if text == "#" else 0) and "#" in s[s.index("]"):]):
+        return ""
+    return s
+
+
+def strip_anchors(md: str) -> str:
+    """Heading and definition permalinks (Sphinx's `¶`, `#`, `§`, `🔗`, "Permalink to this headline") removed, outside
+    code fences."""
+    out, inside = [], False
+    for line in md.split("\n"):
+        if line.startswith(("```", "~~~")):
+            inside = not inside
+        elif not inside and any(c in line for c in "¶#§🔗["):
+            new = BARE_ANCHOR.sub("", ANCHOR_LINK.sub(_anchor, line))
+            line = new.rstrip() if new != line else line
+        out.append(line)
+    return "\n".join(out)
 
 
 def _blank_after_fences(md: str) -> str:

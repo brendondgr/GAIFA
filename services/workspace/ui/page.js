@@ -1,8 +1,9 @@
-// The Workspace page (plan 27.7): Folders (add one, its level, "allow Bypass", remove), Activity
+// The Workspace page (plan 27.7, 33): Environments (named sets of folders: create, rename, delete; in each,
+// add a folder, its level there, "allow Bypass", remove), Activity
 // (each chat's turns with their changed files and Undo, recent runs, checkpoint usage) and Sandbox
 // (the image: built or not, Build, the log; recent runs). Uses only ctx (design brief §5).
 
-import { panel, header, stat, fmtAgo, fmtBytes, requireRunning, MONO } from '/mod-kit.js';
+import { panel, header, stat, fmtAgo, fmtBytes, requireRunning, segmented, MONO } from '/mod-kit.js';
 import { h } from '/mod-ui.js';
 
 const LEVELS = [
@@ -16,47 +17,53 @@ const ROW = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px
 const tone = { done: 'green', timeout: 'red', cancelled: 'dim', error: 'red', running: 'accent' };
 
 export default {
-  tabs: [{ id: 'folders', label: 'Folders', icon: 'folder' }, { id: 'activity', label: 'Activity', icon: 'history' },
+  tabs: [{ id: 'environments', label: 'Environments', icon: 'folder' }, { id: 'activity', label: 'Activity', icon: 'history' },
     { id: 'sandbox', label: 'Sandbox', icon: 'box' }],
 
   mount(el, ctx) {
     if (!requireRunning(el, ctx, 'the workspace folders')) return;
     if (ctx.tab === 'activity') return activity(el, ctx);
     if (ctx.tab === 'sandbox') return sandbox(el, ctx);
-    return folders(el, ctx);
+    return environments(el, ctx);           // also the old #/s/workspace/folders
   },
 };
 
 const fail = (ctx, e) => ctx.toast(e.detail || e.message || String(e), 'error');
 
-function folders(el, ctx) {
+// Environments (plan 34, after Claude's): named sets of folders a chat works in, each folder with its own
+// level there. A chat picks one in its header; Default is what a chat without one uses.
+function environments(el, ctx) {
   const { ui } = ctx;
-  const path = ui.input({ placeholder: '/home/you/Projects/my-app', name: 'path', 'aria-label': 'Folder path' });
-  path.style.flex = '1 1 320px';
-  const list = h('div');
+  let envs = [], cur = 'default';
+  const chips = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' });
+  const body = h('div', { style: 'display:flex;flex-direction:column;gap:12px' });
+  const name = ui.input({ placeholder: 'Grants', name: 'env-name' });
+  name.setAttribute('aria-label', 'New environment name');
+  name.style.flex = '0 1 220px';
   el.append(h('div', { style: 'display:flex;flex-direction:column;gap:12px;max-width:980px' },
-    panel(header('Add a folder'),
-      ui.text('The agent can read a folder you add here, and nothing else on your machine. New folders start at Read; raise one to let the agent edit in place or run code. The AIHub folder and its models stay at Read.', { muted: true, small: true }),
+    panel(header('Environments'),
+      ui.text('An environment is a set of folders the agent can use in a chat, each with its own level. Pick one in a chat’s header (⌂). In a chat the agent can also ask to read a folder you name; you allow it in that chat, or add it here.', { muted: true, small: true }),
+      chips,
       h('form', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center', onsubmit: async e => {
         e.preventDefault();
-        if (!path.value.trim()) return;
-        try { await ctx.call('POST', '/v1/folders', { json: { path: path.value.trim() } }); path.value = ''; ctx.toast('Added at Read', 'success'); draw(); }
+        if (!name.value.trim()) return;
+        try { const r = await ctx.call('POST', '/v1/environments', { json: { name: name.value.trim() } }); name.value = ''; cur = r.json.id; ctx.toast(`Created ${r.json.name}`, 'success'); draw(); }
         catch (err) { fail(ctx, err); }
-      } }, path, ui.button('Add folder', null, { kind: 'primary', type: 'submit' }))),
-    panel(header('Folders', ui.button('Refresh', () => draw(), { small: true })),
-      h('div', { style: MUT }, LEVELS.map(([, w, d]) => `${w}: ${d}`).join(' · ')), list)));
+      } }, name, ui.button('New environment', null, { type: 'submit', small: true }))),
+    body));
 
-  async function patch(f, body) {
-    try { await ctx.call('PATCH', `/v1/folders/${encodeURIComponent(f.id)}`, { json: body }); draw(); }
-    catch (e) { fail(ctx, e); draw(); }
+  const envPath = (e, rest = '') => `/v1/environments/${encodeURIComponent(e.id)}${rest}`;
+  async function patch(e, f, b) {
+    try { await ctx.call('PATCH', envPath(e, `/folders/${encodeURIComponent(f.id)}`), { json: b }); } catch (err) { fail(ctx, err); }
+    draw();
   }
 
-  function row(f) {
+  function row(e, f) {
     const level = ui.select(LEVELS.filter(([k]) => LEVELS.findIndex(x => x[0] === k) <= LEVELS.findIndex(x => x[0] === f.max_level))
-      .map(([k, w]) => ({ value: k, label: w })), { value: f.level, onchange: e => patch(f, { level: e.target.value }) });
-    level.setAttribute('aria-label', `Level of ${f.id}`);
+      .map(([k, w]) => ({ value: k, label: w })), { value: f.level, onchange: ev => patch(e, f, { level: ev.target.value }) });
+    level.setAttribute('aria-label', `Level of ${f.id} in ${e.name}`);
     const bypass = h('input', { type: 'checkbox', checked: !!f.allow_bypass, disabled: f.level === 'read', 'aria-label': `Allow Bypass in ${f.id}`,
-      onchange: e => patch(f, { allow_bypass: e.target.checked }) });
+      onchange: ev => patch(e, f, { allow_bypass: ev.target.checked }) });
     return h('div', { style: ROW },
       h('div', { style: 'flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:2px' },
         h('span', { style: 'font-size:13px;font-weight:600' }, f.name || f.id, h('span', { style: `font-weight:400;font-family:${MONO};font-size:11px;color:var(--dim,#5E6878)` }, `  ${f.id}`)),
@@ -67,16 +74,57 @@ function folders(el, ctx) {
       h('label', { style: 'display:flex;align-items:center;gap:6px;font-size:12px', title: 'Offer the Bypass chat mode in this folder: edits and sandbox commands run without asking (your machine still asks)' },
         bypass, 'allow Bypass'),
       ui.button('Remove', async () => {
-        if (!(await ctx.confirm({ title: `Remove ${f.id}?`, body: 'The agent can no longer use it. Its files are left alone.', danger: true }))) return;
-        try { await ctx.call('DELETE', `/v1/folders/${encodeURIComponent(f.id)}`); draw(); } catch (e) { fail(ctx, e); }
+        if (!(await ctx.confirm({ title: `Remove ${f.id} from ${e.name}?`, body: 'Chats in this environment can no longer use it. Its files are left alone.', danger: true }))) return;
+        try { await ctx.call('DELETE', envPath(e, `/folders/${encodeURIComponent(f.id)}`)); draw(); } catch (err) { fail(ctx, err); }
       }, { small: true }));
   }
 
+  function envPanel(e) {
+    const path = ui.input({ placeholder: '/home/you/Projects/my-app', name: 'path' });
+    path.setAttribute('aria-label', `Folder path to add to ${e.name}`);
+    path.style.flex = '1 1 320px';
+    const lvl = ui.select(LEVELS.map(([k, w]) => ({ value: k, label: w })), { value: 'read' });
+    lvl.setAttribute('aria-label', 'Level of the new folder');
+    lvl.style.flex = '0 0 auto';
+    const rename = ui.button('Rename', async () => {
+      const box = ui.input({ value: e.name, name: 'rename' });
+      box.setAttribute('aria-label', `New name for ${e.name}`);
+      const save = async () => {
+        const v = box.value.trim();
+        if (v && v !== e.name) { try { await ctx.call('PUT', envPath(e), { json: { name: v } }); } catch (err) { fail(ctx, err); } }
+        draw();
+      };
+      box.onkeydown = ev => { if (ev.key === 'Enter') save(); if (ev.key === 'Escape') draw(); };
+      title.replaceChildren(box, ui.button('Save', save, { small: true, kind: 'primary' }));
+      box.focus();
+    }, { small: true });
+    const del = e.default ? null : ui.button('Delete', async () => {
+      if (!(await ctx.confirm({ title: `Delete ${e.name}?`, body: 'Chats that use it go back to Default. The folders and their files are left alone.', danger: true }))) return;
+      try { await ctx.call('DELETE', envPath(e)); cur = 'default'; draw(); } catch (err) { fail(ctx, err); }
+    }, { small: true, kind: 'danger' });
+    const title = h('div', { style: 'display:flex;align-items:center;gap:8px;flex:1;min-width:0' },
+      h('span', { style: 'font-size:14px;font-weight:600' }, e.name), e.default ? ui.badge('default', 'dim') : null,
+      h('span', { style: MUT }, `${e.folders.length} folder${e.folders.length === 1 ? '' : 's'}`));
+    return panel(
+      h('div', { style: 'display:flex;align-items:center;gap:8px;flex-wrap:wrap' }, title, rename, del),
+      e.default ? ui.text('Chats without an environment, and chats whose environment was deleted, use this one.', { muted: true, small: true }) : null,
+      h('form', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center', onsubmit: async ev => {
+        ev.preventDefault();
+        if (!path.value.trim()) return;
+        try { await ctx.call('POST', envPath(e, '/folders'), { json: { path: path.value.trim(), level: lvl.value } }); ctx.toast(`Added to ${e.name}`, 'success'); draw(); }
+        catch (err) { fail(ctx, err); }
+      } }, path, lvl, ui.button('Add folder', null, { kind: 'primary', type: 'submit', small: true })),
+      h('div', { style: MUT }, LEVELS.map(([, w, d]) => `${w}: ${d}`).join(' · ') + '. The AIHub folder and its models stay at Read.'),
+      h('div', null, ...(e.folders.length ? e.folders.map(f => row(e, f)) : [ui.text('No folders yet. Add one above.', { muted: true })])));
+  }
+
   async function draw() {
-    try {
-      const fs = (await ctx.call('GET', '/v1/folders')).json.folders || [];
-      list.replaceChildren(...(fs.length ? fs.map(row) : [ui.text('No folders yet. Add one above.', { muted: true })]));
-    } catch (e) { list.replaceChildren(ui.text(e.detail || 'Could not read the folders', { muted: true })); }
+    try { envs = (await ctx.call('GET', '/v1/environments')).json.environments || []; }
+    catch (e) { body.replaceChildren(ui.text(e.detail || 'Could not read the environments', { muted: true })); return; }
+    if (!envs.some(e => e.id === cur)) cur = envs[0]?.id || 'default';
+    chips.replaceChildren(segmented(envs.map(e => ({ value: e.id, label: `${e.name} (${e.folders.length})` })), cur, v => { cur = v; draw(); }, 'Environments'));
+    const e = envs.find(x => x.id === cur);
+    body.replaceChildren(...(e ? [envPanel(e)] : []));
   }
   draw();
 }

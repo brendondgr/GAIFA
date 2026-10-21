@@ -42,9 +42,11 @@ def test_tree_lists_skips_and_marks(client, proj):
 def test_read_numbers_lines_and_pages(client, proj):
     (proj / "long.txt").write_text("".join(f"line {i}\n" for i in range(1, 1001)))
     t = post(client, "/v1/read", folder="proj", path="pkg/calc.py").json()
-    assert t.startswith("proj:pkg/calc.py lines 1–6 of 6")
+    first, second = t.split("\n")[:2]
+    assert first == "pkg/calc.py (cite lines as pkg/calc.py:N, a range as pkg/calc.py:N-M)"
+    assert second.startswith("proj:pkg/calc.py lines 1–6 of 6")
     assert "1| def add(a, b):" in t and "2|     return a - b" in t
-    assert '<untrusted source="proj:pkg/calc.py">' in t and "Cite lines as pkg/calc.py:<line>" in t
+    assert '<untrusted source="proj:pkg/calc.py">' in t
     page = post(client, "/v1/read", folder="proj", path="long.txt", offset=400, limit=10).json()
     assert "lines 400–409 of 1000" in page and "400| line 400" in page and "offset=410" in page
     assert "of 1000" in post(client, "/v1/read", folder="proj", path="long.txt", offset=999).json()
@@ -75,7 +77,8 @@ def test_search(client, proj, monkeypatch, with_rg):
     elif reading.shutil.which("rg") is None:
         pytest.skip("ripgrep isn't installed")
     t = post(client, "/v1/search", folder="proj", query="return a").json()
-    assert "pkg/calc.py:2:    return a - b" in t and "pkg/calc.py:6:" in t
+    assert "pkg/calc.py:2:     return a - b" in t and "pkg/calc.py:6: " in t     # path:line: text, citable as it stands
+    assert "cite one as path:line" in t.split("\n")[0]
     assert "left-pad" not in post(client, "/v1/search", folder="proj", query="module.exports").json()
     assert "No matches" in post(client, "/v1/search", folder="proj", query="hunter2").json()
     rx = post(client, "/v1/search", folder="proj", query=r"def (add|mul)", regex=True).json()

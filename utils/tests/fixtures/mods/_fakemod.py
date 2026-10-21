@@ -320,7 +320,7 @@ class Handler(BaseHTTPRequestHandler):
         if MODE == "ws":
             import _fakews
 
-            out = _fakews.handle(url.path, self.body())
+            out = _fakews.handle(url.path, self.body(), json.loads(self.headers.get("X-AIHub-Origin") or "{}"))
             if out is not None:
                 return self.send(200, out)
         if MODE == "perms" and url.path in ("/v1/search", "/v1/fetch", "/v1/python", "/v1/run"):

@@ -41,6 +41,7 @@ class Page:
     data: bytes           # what is written
     published: str | None = None
     site: str | None = None
+    description: str | None = None   # the page's own summary (its meta description), when it has one
 
 
 def _decode(body: bytes, charset: str | None) -> str:
@@ -77,12 +78,14 @@ def convert(f: Fetched, fetched_iso: str) -> Page:
             md = htmlmd.fix_tables(htmlmd.restore_code(md, htmlmd.code_blocks(f.body)))
         else:       # no main content found: the page's visible text, with its headings, lists, code and tables
             md = htmlmd.plain(f.body) or trafilatura.html2txt(f.body) or ""
+        md = htmlmd.strip_anchors(md)
         meta = trafilatura.extract_metadata(f.body, default_url=f.url)
-        title = (meta.title if meta and meta.title else "") or _html_title(f.body) or host
+        title = htmlmd.strip_anchors((meta.title if meta and meta.title else "") or _html_title(f.body)).strip() or host
         published = meta.date if meta and meta.date else None
         site = meta.sitename if meta and meta.sitename else None
+        desc = re.sub(r"\s+", " ", meta.description).strip()[:500] if meta and meta.description else None
         text = _header(title, f.url, fetched_iso, published) + md.strip() + "\n"
-        return Page("text", "md", title, text, text.encode(), published, site)
+        return Page("text", "md", title, text, text.encode(), published, site, desc or None)
     if f.content_type in TEXT_TYPES or f.content_type in JSON_TYPES or f.content_type.startswith("text/"):
         raw = _decode(f.body, f.charset)
         title = Path(path).name or host
@@ -117,7 +120,7 @@ def save(outputs: Path, page: Page, url: str, final_url: str, content_type: str,
     sidecar = {"title": page.title, "kind": page.kind, "url": url, "final_url": final_url,
                "fetched_ts": round(time.time(), 3), "fetched": now.astimezone().isoformat(timespec="seconds"),
                "content_type": content_type, "chars": len(page.text) if page.kind == "text" else None,
-               "published": page.published, "site": page.site, "source": {"service": "web", "url": final_url},
+               "published": page.published, "site": page.site, "description": page.description, "source": {"service": "web", "url": final_url},
                "hidden": True,     # for the agent's reading, not one of the user's outputs (plan 30.9)
                "dry_run": True if dry_run else None}   # from the fake web (plan 26.2)
     for target, data in ((path, page.data),

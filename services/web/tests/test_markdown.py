@@ -70,3 +70,48 @@ def test_a_page_without_main_content_keeps_its_structure(monkeypatch):
     monkeypatch.setattr(pages.trafilatura, "extract", lambda *a, **k: None)   # trafilatura found no main content
     md = convert(body)
     assert "## Status\n\n- API: up" in md and "| b | 2 |" in md
+
+
+def test_heading_anchors_are_dropped():
+    """Plan 30.8: Sphinx's `¶` and other permalinks after headings and definitions don't reach the markdown; code keeps them."""
+    md = "\n".join([
+        "# `shlex` — Simple lexical analysis[¶](https://docs.python.org#module-shlex)",
+        'shlex.split(*s*)[¶](https://docs.python.org#shlex.split "Permalink to this definition")',
+        "## Install [#](https://example.org/a#install)",
+        "## Usage[](#usage)",
+        "### Notes ¶",
+        "## Links 🔗",
+        "See [the guide](https://example.org/guide#install) and [link](#install).",
+        "```python",
+        'x = "[¶](#a)"  # ¶',
+        "```",
+    ])
+    out = htmlmd.strip_anchors(md).split("\n")
+    assert out[:6] == ["# `shlex` — Simple lexical analysis", "shlex.split(*s*)", "## Install", "## Usage", "### Notes", "## Links"]
+    assert out[6] == "See [the guide](https://example.org/guide#install) and [link](#install)."
+    assert out[8] == 'x = "[¶](#a)"  # ¶'
+
+
+def test_sphinx_page_has_no_pilcrows():
+    body = ("<!doctype html><html><head><title>Data Structures</title></head><body><div class='body'><section>"
+            "<h1>5. Data Structures<a class='headerlink' href='#data-structures' title='Permalink to this headline'>¶</a></h1>"
+            "<p>This chapter describes some things you've learned about already in more detail, and adds some new things as well.</p>"
+            "<h2>5.1. More on Lists<a class='headerlink' href='#more-on-lists'>¶</a></h2>"
+            "<p>The list data type has some more methods. Here are all of the methods of list objects, with words enough.</p>"
+            "</section></div></body></html>").encode()
+    text = convert(body)
+    assert "¶" not in text
+    assert "More on Lists" in text
+
+
+def test_the_pages_description_is_kept(tmp_path):
+    """webread.py's "About this page" line: the page's meta description, in the sidecar and the fetch result."""
+    import json
+
+    body = DOC.replace(b"<title>Guide to tides</title>", b'<title>Guide to tides</title><meta name="description" content="How the  Moon\nmoves the sea.">')
+    f = SimpleNamespace(url="https://example.org/tides", content_type="text/html", body=body, charset="utf-8")
+    p = pages.convert(f, "2026-10-21T10:00:00-04:00")
+    assert p.description == "How the Moon moves the sea."
+    side = json.loads(pages.save(tmp_path, p, f.url, f.url, "text/html").with_suffix(".md.json").read_text())
+    assert side["description"] == "How the Moon moves the sea."
+    assert pages.convert(SimpleNamespace(**{**f.__dict__, "body": DOC}), "x").description is None

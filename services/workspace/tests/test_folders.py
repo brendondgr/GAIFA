@@ -140,8 +140,9 @@ def test_the_aihub_folder_and_models_stay_at_read(client, ctx, aihub):
 def test_a_stored_level_above_the_cap_reads_as_read(ctx, aihub):
     import json
 
-    ctx.folders.file.parent.mkdir(parents=True, exist_ok=True)
-    ctx.folders.file.write_text(json.dumps({"folders": [{"id": "hub", "path": str(aihub), "level": "run_net", "allow_bypass": True}]}))
+    legacy = ctx.folders.envs.legacy            # Phase 27's folders.json, migrated into Default on first load (plan 34)
+    legacy.parent.mkdir(parents=True, exist_ok=True)
+    legacy.write_text(json.dumps({"folders": [{"id": "hub", "path": str(aihub), "level": "run_net", "allow_bypass": True}]}))
     f = ctx.folders.get("hub")
     assert ctx.folders.level(f) == "read"
     pub = ctx.folders.public()[0]

@@ -18,9 +18,13 @@ async def up(client, name: str, data: bytes | None = None) -> dict:
 
 
 async def call(client, name: str, args: dict) -> dict:
-    r = await client.post(f"/api/tools/{name}/call?wait=10", json={"arguments": args, "mode": "ask", "origin": {"service": "test"}})
+    # wait long enough for a loaded machine: a PDF page read can pass 10 s there, and the call then answers "running"
+    # with no result yet (an occasional failure of the full suite, 2026-10-21)
+    r = await client.post(f"/api/tools/{name}/call?wait=60", json={"arguments": args, "mode": "ask", "origin": {"service": "test"}})
     assert r.status_code == 200, r.text
-    return r.json()
+    out = r.json()
+    assert out["status"] != "running", f"{name} still running after 60 s"
+    return out
 
 
 def book(n: int = 20) -> bytes:

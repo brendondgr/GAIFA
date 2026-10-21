@@ -1,5 +1,8 @@
 """A page the chat's own search found: `web_fetch` of a URL that a `web_search` earlier in the same chat
-returned runs without a card, in every mode but Plan (`approvals.decide`, `searched`).
+returned runs without a card, in every mode but Plan (`approvals.decide`, `searched`). So does a link the user
+typed in the chat (`shared`): the agent sends the http(s) links of the user's own messages as `origin.links` (their
+typed words and quote-replies' replies; never tool results, attachments or quoted parts), which the hub compares
+the same way and never stores.
 
 The URL came from the search engine, not from the model, so the model can't hide data in it; asking
 for every page a grounded answer reads would only teach the user to click Allow. What counts:
@@ -58,6 +61,22 @@ def urls_of(result: Any) -> set[str]:
         if n:
             out.add(n)
     return out
+
+
+MAX_LINKS = 200
+
+
+def shared(url: Any, links: Any) -> bool:
+    """`url` is one of the links the user typed in this chat (`origin.links`), after the same trivial normalisation,
+    and the judge's URL rules don't flag it."""
+    from utils.tools.judge_rules import fetch_rule
+
+    want = normal(url)
+    if not want or not isinstance(links, list):
+        return False
+    if want not in {normal(x) for x in links[:MAX_LINKS]}:
+        return False
+    return fetch_rule({"url": url}).verdict != "ask"
 
 
 async def found_by(db: Database, url: Any, thread: Any) -> str | None:

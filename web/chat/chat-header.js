@@ -1,5 +1,5 @@
 // The thread header (plan 14.1): title (click to rename), model picker with each model's context
-// window, the mode (plan 27.4), the context meter with its breakdown popover, and Branch.
+// window, the mode (plan 27.4), the environment (plan 34, chat-env.js), the context meter with its breakdown popover, and Branch.
 
 import { h, T, MONO, Icon, Btn, Popover, inputSt, fmtTokens, label11 } from './chat-ui.js';
 
@@ -91,7 +91,8 @@ function Title({ title, onRename }) {
   title || 'New chat');
 }
 
-export function ThreadHeader({ thread, models, model, mode, bypass, judge, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn }) {
+// envChip (plan 34): the chat's environment (chat-env.js EnvChip), next to the mode
+export function ThreadHeader({ thread, models, model, mode, bypass, judge, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn, envChip }) {
   const React = R(), [more, setMore] = React.useState(false);
   const st = running ? ['running', T.acc] : state === 'waiting' ? ['waiting for you', T.pu] : null;
   const controls = [h(ModelSelect, { key: 'm', models, value: model, onChange: onModel }), h(ModeSelect, { key: 'a', value: mode, onChange: onMode, bypass, judge })];
@@ -105,6 +106,7 @@ export function ThreadHeader({ thread, models, model, mode, bypass, judge, onMod
       h(Btn, { kind: 'ghost', sm: true, icon: 'sliders', title: 'Model and mode', onClick: () => setMore(!more) }),
       h(Popover, { open: more, onClose: () => setMore(false), width: 260, label: 'Model and mode' }, h('span', { style: label11 }, 'Model'), controls[0], h('span', { style: label11 }, 'Mode'), controls[1]))
       : controls,
+    envChip || null,
     thread || meter ? h(ContextMeter, { meter, open: meterOpen, onOpen: () => setMeterOpen(true), onClose: () => setMeterOpen(false), onCompact: thread ? onCompact : null, compacts, running, compact: narrow }) : null,
     onLearn ? h(Btn, { kind: 'ghost', sm: true, icon: 'bulb', 'aria-pressed': learn ? 'true' : 'false',   // plan 21.7: this chat teaches the agent, or not
       title: learn ? 'Learning from this chat: your choices here become preferences. Click to stop.' : 'Not learning from this chat. Click to learn from it again.',

@@ -186,12 +186,25 @@ class ScreenCfg(_Strict):
     url: str | None = None
     threshold: float | None = Field(None, gt=0, le=1)
     confirm: bool = True            # decide: what it flags is read again by the judge's chat model (relay)
+    parallel: int = Field(4, ge=1, le=32)   # model calls at once for one text
+
+
+class WebReadCfg(_Strict):
+    """How `web_fetch` returns a page longer than its `max_chars` (`utils/tools/webread.py`): its passages most relevant to
+    the call's `focus` or the user's question first. `auto`: the decide mod when it's up with its model loaded, else
+    lexical (words in common); `off`: the page's start, as fetched."""
+    relevance: Literal["auto", "decide", "lexical", "off"] = "auto"
+    model: str = "d3-lite"                                  # the decide model that scores passages
+    url: str = "http://127.0.0.1:7000/api/s/decide"
+    candidates: int = Field(24, ge=4, le=200)               # decide re-ranks lexical's best this many
+    timeout_s: float = Field(8.0, gt=0)                     # slower → lexical's order
 
 
 class AgentCfg(_Strict):
     permissions: PermissionsCfg = PermissionsCfg()
     judge: JudgeCfg = JudgeCfg()
     screen: ScreenCfg = ScreenCfg()
+    web: WebReadCfg = WebReadCfg()
     make_room: bool = True          # tool calls unload idle mods when a model needs room
     approval_ttl_h: float = Field(24, gt=0)
 

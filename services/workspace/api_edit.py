@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +11,6 @@ from pydantic import BaseModel, Field
 
 import editing
 import reading
-from folders import Refused
 
 
 class EditIn(BaseModel):
@@ -59,8 +57,9 @@ def mount(app: FastAPI, ctx: Any) -> None:
     def run(tool: str, body: BaseModel, request: Request) -> dict[str, Any]:
         o = origin(request)
         args = body.model_dump()
-        ch = editing.plan(ctx.folders, tool, args, named(o))
-        out = editing.apply(ctx.folders, ctx.checkpoints, ch, o)
+        v = ctx.folders.view(o)          # the chat's environment and allowed folders (plan 34)
+        ch = editing.plan(v, tool, args, named(o))
+        out = editing.apply(v, ctx.checkpoints, ch, o)
         ctx.counts["edits"] += 1
         ctx.recent("edit", {"tool": tool, "folder": ch.folder.id, "summary": ch.summary, "thread": o.get("thread"),
                             "undo": out.get("undo")})
@@ -97,10 +96,8 @@ def mount(app: FastAPI, ctx: Any) -> None:
                 "entries": [{k: e.get(k) for k in ("n", "folder", "rel", "tool", "ts", "existed", "size")} for e in meta.get("entries") or []]}
 
     def root_of(fid: str) -> Path | None:
-        try:
-            return Path(os.path.realpath(ctx.folders.get(fid).path))
-        except Refused:
-            return None
+        p = ctx.folders.root_of(fid)          # in any environment (a folder's id is the same in each)
+        return Path(p) if p else None
 
     @app.post("/v1/checkpoints/{thread}/{turn}/undo", summary="Undo a turn: every file back as it was before it")
     def undo(thread: str, turn: str) -> Any:

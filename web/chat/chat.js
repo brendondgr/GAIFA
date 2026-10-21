@@ -19,6 +19,7 @@ import { TurnView, ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, LIST_CSS, useEmbedUp } from './chat-list.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
+import { EnvChip, decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
 import { Composer } from './chat-composer.js';
 import { QUOTE_CSS } from './chat-quote.js';
 import { QuoteReplyBox, QREPLY_CSS, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
@@ -61,7 +62,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [quoteDrafts, setQuoteDrafts] = useState({});   // Select → Reply: the quote-reply cards waiting in each chat's composer
   const [drafts, setDrafts] = useState({}), [attachments, setAttachments] = useState([]), [toolForms, setToolForms] = useState([]);
   const [meterOpen, setMeterOpen] = useState(false), [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
-  const [fresh, setFresh] = useState({ model: null, mode: 'manual', settings: {} });   // a chat not created yet
+  const [fresh, setFresh] = useState(() => ({ model: null, mode: 'manual', settings: newChatSettings({}, lastEnv()) }));   // a chat not created yet; its environment: the last one picked (plan 34)
   const [folders, setFolders] = useState(null);   // the workspace mod's folders, for Bypass (plan 27.4)
   const [judge, setJudge] = useState(null);       // GET /api/judge/status: Auto is offered while its model answers (plan 30.5)
   const scrollRef = useRef(null), contentRef = useRef(null), stick = useRef(true), first = useRef(true), inputRef = useRef(null), loadRef = useRef(null), queue = useRef([]), flushT = useRef(0);
@@ -90,7 +91,6 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     c.models().then(setModels).catch(fail);
     c.settings().then(setSettings).catch(() => {});
     api.listTools().then(setTools).catch(() => setTools([]));
-    api.callService?.('workspace', 'GET', '/v1/folders').then(r => setFolders(r.json?.folders || [])).catch(() => setFolders([]));
     const judged = () => api.getJudgeStatus?.().then(setJudge).catch(() => setJudge(null));
     judged();
     const jt = setInterval(judged, 60000);
@@ -130,6 +130,10 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     return () => { alive = false; s.close(); clearTimeout(flushT.current); flushT.current = 0; };
   }, [tid]);
 
+  const envId = (thread ? thread.settings?.environment : fresh.settings?.environment) || null;   // plan 34: the chat's environment
+  useEffect(() => {      // its folders (and those allowed in this chat), for Bypass (plan 27.4)
+    api.callService?.('workspace', 'GET', '/v1/folders', envId ? { query: { environment: envId } } : {}).then(r => setFolders(r.json?.folders || [])).catch(() => setFolders([]));
+  }, [envId]);
   const view = useMemo(() => buildView(events, live), [events, live]);
   const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
   const [now, setNow] = useState(() => Date.now() / 1000);   // ticks while a turn runs, so the fold's timers count
@@ -187,6 +191,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const setModel = m => { if (thread) c.patch(thread.id, { model: m }).then(t => { setThread(x => ({ ...x, ...t })); c.context(thread.id).then(mm => setLive(l => ({ ...l, meter: mm }))).catch(() => {}); }, fail); else setFresh(f => ({ ...f, model: m })); };
   const setMode = m => { if (thread) c.patch(thread.id, { mode: m }).then(t => setThread(x => ({ ...x, ...t })), fail); else setFresh(f => ({ ...f, mode: m })); };
   const setGroups = s => { if (thread) c.patch(thread.id, { settings: s }).then(t => setThread(x => ({ ...x, ...t })), fail); else setFresh(f => ({ ...f, settings: { ...f.settings, ...s } })); };
+  const setEnv = id => { rememberEnv(id); setGroups({ ...(thread ? thread.settings || {} : {}), environment: id }); };
   const rename = (t, title) => c.patch(t.id, { title }).then(n => { setThreads(l => l.map(x => (x.id === t.id ? { ...x, ...n } : x))); if (t.id === tid) setThread(x => ({ ...x, ...n })); }, fail);
   const archive = t => c.patch(t.id, { archived: !t.archived }).then(() => { setThreads(l => l.filter(x => x.id !== t.id)); toast(t.archived ? 'Moved back to chats' : 'Archived', 'success'); }, fail);
   const remove = async t => {
@@ -216,7 +221,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running, dock: true,
     answer: (qid, answers) => c.answer(tid, qid, answers),
     // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying
-    decide: (a, approve, args, o = {}) => c.approval(tid, { approval_id: a.approval_id, approve, ...(approve ? { arguments: args, remember: o.remember || 'once', ...(o.confirm ? { confirm: true } : {}) } : { reason: o.reason || 'Denied in the chat' }) }),
+    // plan 34: "Add to <environment>" adds the folder there first (chat-env.js), then allows the call once
+    decide: async (a, approve, args, o = {}) => { if (approve && a.limits?.ask_folder) o = await decideFolder(api, a.limits.ask_folder, o);
+      return c.approval(tid, { approval_id: a.approval_id, approve, ...(approve ? { arguments: args, remember: o.remember || 'once', ...(o.confirm ? { confirm: true } : {}) } : { reason: o.reason || 'Denied in the chat' }) }); },
     cancel: () => c.cancel(tid).catch(fail),
     branch: it => forkAt(it.ev.seq - 1, it.ev.payload.text, draftQuotes(it.ev.payload)),
     copy: text => navigator.clipboard?.writeText(text).then(() => toast('Copied', 'success'), () => {}),
@@ -259,6 +266,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
     h('section', { 'aria-label': 'Chat', style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
       h(ThreadHeader, { thread, models, model: thread?.model || fresh.model || models?.default, mode: thread?.mode || fresh.mode, bypass: bypassAllowed(folders, events), judge, onModel: setModel, onMode: setMode,
+        envChip: h(EnvChip, { key: 'env', api, thread, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), narrow: (narrow ? width : width - 248) < 700 }),
         onRename: title => rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
         learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,
         running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: narrow ? () => setDrawer(true) : null, narrow: (narrow ? width : width - 248) < 700 }),

@@ -8,7 +8,8 @@ lines), then:
    anyone. Phrases aimed at an AI ("ignore previous instructions",
    "if you are an AI assistant…") are only *suspects*: the model decides, since pages that explain prompt
    injection quote them.
-2. **A model** reads every passage that has words: the judge's (`[agent.judge]`) unless `[agent.screen]` names its
+2. **A model** reads every passage that has words, except code and table rows without a sentence in them
+   (`structural`: six words in a row anywhere, or a phrase aimed at an AI, and the model reads it): the judge's (`[agent.judge]`) unless `[agent.screen]` names its
    own (`screen_config`). A chat model (through the relay) reads windows of numbered passages with a strict rubric:
    flag text that tries to instruct or manipulate an AI reading it; text written to inform a human reader,
    including about prompt injection, is safe. An answer that says "not safe" without naming a passage of its
@@ -38,6 +39,8 @@ import httpx
 from .judge import SPECIAL_TOKENS, JudgeConfig, defuse
 
 WORDS = re.compile(r"[^\W\d_]{2,}")                  # a passage without a word ("---", "| 1 | 2 |") instructs no one
+SENTENCE = re.compile(r"(?:^|\s)(?:[^\W\d_][\w'’,.:;!?-]*\s+){5,}[^\W\d_]")   # six words in a row: prose, not code
+FENCE = re.compile(r"^\s*(```|~~~)")
 
 _VS = "\ufe00-\ufe0f\U000e0100-\U000e01ef"          # variation selectors
 HIDDEN_CHARS = re.compile("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\u00ad\U000e0000-\U000e007f"
@@ -92,6 +95,7 @@ class ScreenConfig(JudgeConfig):
     flags (None: the decision model's answer stands)."""
     confirm: JudgeConfig | None = None
     window: int = MAX_WINDOW
+    parallel: int = PARALLEL
 
     def key(self) -> str:
         """What a stored screening report was made with (`screen_store`): another model or threshold, another report."""
@@ -142,6 +146,25 @@ def passages(text: str) -> list[tuple[int, int]]:
             out.append((start, i))
             start = None
     return out
+
+
+def code_lines(lines: list[str]) -> set[int]:
+    """The lines inside fenced code blocks, fences included (an unclosed fence runs to the end)."""
+    out, inside = set(), False
+    for i, line in enumerate(lines):
+        fence = bool(FENCE.match(line))
+        if inside or fence:
+            out.add(i)
+        if fence:
+            inside = not inside
+    return out
+
+
+def structural(lines: list[str], code: set[int], first: int) -> bool:
+    """A passage the model needn't read: every line is code (inside a fence) or a table row, no line has six words in
+    a row (a sentence, as in a comment or a cell of prose), and no phrase aimed at an AI. Patterns still read it."""
+    return all((first + i) in code or line.lstrip().startswith("|") for i, line in enumerate(lines)) \
+        and not any(SENTENCE.search(line) for line in lines) and not SUSPECT.search("\n".join(lines))
 
 
 def pieces(text: str, size: int = MAX_PASSAGE, overlap: int = OVERLAP) -> list[str]:
@@ -246,7 +269,7 @@ def screen_config(config: Any) -> ScreenConfig:
     confirm = None
     if own.backend == "decide" and getattr(sc, "confirm", True) and jc.backend == "relay":
         confirm = judge.config_from(jc)
-    return ScreenConfig(**own.__dict__, confirm=confirm, window=sc.window_chars)
+    return ScreenConfig(**own.__dict__, confirm=confirm, window=sc.window_chars, parallel=getattr(sc, "parallel", PARALLEL))
 
 
 def covers(config: Any, kind: str) -> bool:
@@ -261,7 +284,7 @@ async def screen_for(config: Any, text: str, kind: str, whole: bool = False) -> 
         return None
     timeout = sc.timeout_s * max(1.0, len(text) / WHOLE_CHARS) if whole else sc.timeout_s
     cfg = screen_config(config)
-    return await screen(text, cfg, timeout_s=timeout, window=cfg.window)
+    return await screen(text, cfg, timeout_s=timeout, window=cfg.window, parallel=cfg.parallel)
 
 
 def report(s: Screened) -> dict[str, Any]:
@@ -284,7 +307,8 @@ def user_report(s: Screened, cfg: ScreenConfig | None = None) -> dict[str, Any]:
 
 
 async def screen(text: str, cfg: JudgeConfig | None = None, client: httpx.AsyncClient | None = None,
-                 use_model: bool = True, timeout_s: float = 30.0, window: int = MAX_WINDOW) -> Screened:
+                 use_model: bool = True, timeout_s: float = 30.0, window: int = MAX_WINDOW,
+                 parallel: int = PARALLEL) -> Screened:
     import time
 
     t0 = time.perf_counter()
@@ -304,7 +328,9 @@ async def screen(text: str, cfg: JudgeConfig | None = None, client: httpx.AsyncC
         elif SUSPECT.search(HIDDEN_CHARS.sub("", t)):
             suspects[n] = "phrases aimed at an AI"
     checked = "patterns+model"
-    todo = [n for n in range(len(texts)) if n not in found and WORDS.search(texts[n])]
+    code = code_lines(lines)
+    todo = [n for n in range(len(texts)) if n not in found and WORDS.search(texts[n])
+            and not structural(lines[spans[n][0]:spans[n][1]], code, spans[n][0])]
     units = [(n, p) for n in todo for p in pieces(texts[n])]          # what the model reads: every passage, whole
     flagged: dict[int, str] = {}
     if use_model and units:
@@ -313,7 +339,7 @@ async def screen(text: str, cfg: JudgeConfig | None = None, client: httpx.AsyncC
         try:
             decide = cfg.backend == "decide"
             confirm = getattr(cfg, "confirm", None)
-            sem = asyncio.Semaphore(PARALLEL)
+            sem = asyncio.Semaphore(max(1, parallel))
             unit_texts = [p for _, p in units]
 
             async def one(ask: Any, texts_: list[str], group: list[int], c: JudgeConfig) -> dict[int, str]:

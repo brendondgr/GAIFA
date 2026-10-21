@@ -121,3 +121,28 @@ MODE_NOTES = {   # plan 27.4: what the chat's mode means for the model (the hub 
 
 def mode_note(mode: str) -> str:
     return MODE_NOTES.get(mode, "")
+
+
+LEVEL_WORDS = {"read": "Read", "edit": "Edit", "run": "Run", "run_net": "Run + network"}
+
+
+def _home(path: str, home: str) -> str:
+    return "~" + path[len(home):] if home and (path == home or path.startswith(home.rstrip("/") + "/")) else path
+
+
+def folders_note(data: dict[str, Any] | None, home: str = "") -> str:
+    """Plan 34: the folders this chat can use (its environment's, then those the user allowed in this chat),
+    from the workspace mod's `GET /v1/folders` for the chat; "" when the workspace mod didn't answer."""
+    if not isinstance(data, dict):
+        return ""
+    env = (data.get("environment") or {}).get("name") or "Default"
+    fs = [f for f in data.get("folders") or [] if isinstance(f, dict) and f.get("path")]
+    row = lambda f: f"{_home(str(f['path']), home)} ({LEVEL_WORDS.get(f.get('level'), f.get('level'))}, id {f.get('id')})"  # noqa: E731
+    mine = [row(f) for f in fs if not f.get("granted")]
+    allowed = [row(f) for f in fs if f.get("granted")]
+    out = (f"\nFolders this chat can use (environment {env}): {'; '.join(mine)}" if mine
+           else f"\nThis chat's environment ({env}) has no workspace folders.")
+    if allowed:
+        out += f"\nAllowed in this chat by the user: {'; '.join(allowed)}"
+    return out + ("\nTo look at another folder the user names, pass its full path as `folder` to workspace_tree or "
+                  "workspace_read: the user is asked to let this chat read it. If they deny it, tell them; don't retry it.")

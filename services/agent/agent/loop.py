@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import context as ctx
+from . import links
 from .docs import describe as describe_docs
 from . import prompts
 from .hubapi import HubAPI
@@ -360,6 +361,8 @@ class Agent:
         body: dict[str, Any] = {"status": res.get("status")}
         if res.get("result") is not None:
             body["result"] = res["result"]
+        if outs and isinstance(body.get("result"), dict) and isinstance(body["result"].get("cite"), str):
+            body["result"] = {**body["result"], "cite": body["result"]["cite"].replace("#n:", f"#{outs[0]['n']}:")}
         if outs:
             body["outputs"] = [{"ref": f"#{o['n']}", "output": f"output:{o['output_id']}", "kind": o["kind"],
                                 "summary": ctx.label(o["summary"])} for o in outs]
@@ -472,8 +475,14 @@ class Agent:
                 origin["named"] = named     # secret-looking files the user named: the workspace mod opens only these
             if (thread.get("settings") or {}).get("dry_run"):
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
+            if isinstance((thread.get("settings") or {}).get("environment"), str):
+                origin["environment"] = thread["settings"]["environment"]   # the chat's workspace folders (plan 34)
             if mode == "auto":
                 origin["said"] = self._said(tid)   # the Auto judge reads only the user's own words (plan 30.3)
+            if hub_name == "web_fetch":            # links the user typed open without a card; the page is read for the question
+                origin["links"] = links.of_events(self.store.events(tid, types=("user",)))
+                if said:
+                    origin["question"] = said[:2000]
             if (thread.get("settings") or {}).get("no_learn"):
                 origin["no_learn"] = True   # this chat opted out of learning (plan 21.4)
             if ctx.read_untrusted(self.store.events(tid)):
@@ -611,7 +620,8 @@ class Agent:
                  "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "
                     "the user can turn them back on in the composer)" if tools.disabled else "")
-                 + prompts.mode_note(mode_of((self.store.thread(tid) or {}).get("mode"))),
+                 + prompts.mode_note(mode_of((self.store.thread(tid) or {}).get("mode")))
+                 + await ctx.folders_note(self.hub, tid, thread_settings(self.store, tid), services, tools.disabled),
                  "outputs": prompts.outputs_table(ctx.model_outputs(events)), "summary": summary}
         sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),

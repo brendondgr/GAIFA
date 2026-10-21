@@ -144,7 +144,7 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
       h(Btn, { key: 'deny', label: busy ? 'Working…' : 'Deny', disabled: busy, onClick: () => cancel(why.trim()) }),
       h(Btn, { key: 'back', kind: 'ghost', label: 'Back', disabled: busy, onClick: () => setDenying(false) })]
     : [...choices.map((c, i) => h(Btn, { key: c.remember, kind: i === 0 ? 'pri' : 'sec', icon: i === 0 ? 'play' : undefined, label: busy && i === 0 ? 'Working…' : c.label + (c.confirm ? '…' : ''),
-        disabled: busy, title: c.remember === 'once' ? 'Run this call' : `Also run calls like this ${cover || ''} without asking${c.remember === 'thread' ? ', in this chat' : ', everywhere'}`, onClick: () => choose(c) })),
+        disabled: busy, title: choiceTitle(c, cover, lim?.ask_folder), onClick: () => choose(c) })),
       onCancel ? h(Btn, { key: 'deny', kind: 'ghost', label: cancelLabel, disabled: busy, onClick: () => setDenying(true) }) : null];
   const given = Object.fromEntries(Object.entries(args).filter(([k]) => !main.includes(k) && !files.includes(k) && !codes.includes(k)));
   return h('div', { style: cardSt({ accent: spec.risk === 'execute' ? T.acct : T.bds, pad: compact ? '8px 10px' : '10px 12px', gap: 10 }), onKeyDown: e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(choices?.[0]); } } }, head,
@@ -167,9 +167,29 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
       ask2 || denying ? null : h('span', { style: { fontSize: 11.5, color: T.dim, marginLeft: 'auto' } }, choices ? 'Ctrl+Enter allows once' : 'Ctrl+Enter runs')));
 }
 
+function choiceTitle(c, cover, ask) {
+  if (ask) return c.remember === 'environment' ? `Add ${ask.path} to the environment ${ask.environment?.name || ''} at Read: every chat in it can read it`
+    : c.remember === 'thread' ? `Let this chat read ${ask.path} (Read); other chats still ask` : 'Read it for this call only';
+  return c.remember === 'once' ? 'Run this call' : `Also run calls like this ${cover || ''} without asking${c.remember === 'thread' ? ', in this chat' : ', everywhere'}`;
+}
+
+// Plan 34: the agent asks to read a folder outside the chat's environment: the path, the level, where it would go.
+function FolderAsk({ ask }) {
+  const env = ask.environment?.name;
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 } },
+    h('div', { style: { fontSize: 13, fontWeight: 500 } }, 'Let this chat read ', h('span', { style: { fontFamily: MONO, fontSize: 12.5, overflowWrap: 'anywhere' } }, shortHome(ask.path)), '?'),
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12, color: T.mut } },
+      h(Icon, { d: 'folder', size: 13 }), h('span', { title: ask.path, style: { fontFamily: MONO, fontSize: 11.5, overflowWrap: 'anywhere' } }, ask.path),
+      h(Badge, { tone: 'green', title: 'list, read, search and read-only git; nothing changes' }, 'Read'),
+      env ? h('span', null, `· not in this chat's environment (${env})`) : null),
+    h('div', { style: { fontSize: 11.5, color: T.dim } }, 'Edit or Run there: raise it on the Workspace page once it is in an environment.'));
+}
+const shortHome = p => String(p || '').replace(/^\/home\/[^/]+(?=\/|$)/, '~');
+
 // What a workspace call would do (plan 27.4): on your machine (a warning), the diff of an edit
 // (+/- coloured, scrollable), and why it asks (the mode).
 function LimitsBlock({ lim, why }) {
+  if (lim.ask_folder) return h(FolderAsk, { ask: lim.ask_folder });
   const p = lim.preview || {}, host = lim.action === 'host';
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12, color: host ? T.rd : T.mut } },
@@ -212,7 +232,7 @@ function ApprovalCard({ item, ctx }) {
     ctx.cancel ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: ctx.cancel }) : null)
     : r?.error && d?.approve ? h(ErrorBox, { error: r.error }) : r && d?.approve && r.status !== 'done' ? h(Badge, { tone: (STATUS[r.status] || ['dim'])[0] }, (STATUS[r.status] || [0, r.status])[1]) : null;
   return h(ParamCard, { spec: a, outputs: ctx.outputs, api: ctx.api, mods: ctx.mods, decided, after, cancelLabel: 'Deny',
-    choices: approvalButtons(a.risk, { thread: true, once: !!a.limits?.once }),
+    choices: approvalButtons(a.risk, { thread: true, once: !!a.limits?.once, folder: a.limits?.ask_folder }),
     onRun: (args, c) => ctx.decide(a, true, args, c), onCancel: reason => ctx.decide(a, false, null, { reason }) });
 }
 

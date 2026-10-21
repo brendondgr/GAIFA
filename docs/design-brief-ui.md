@@ -377,6 +377,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `getOutput(id)` | `GET /api/outputs/{id}` | `Output` |
 | `deleteOutput(id)` | `DELETE /api/outputs/{id}` | `204`; the output moves to `outputs/.trash/`, emptied after 30 days |
 | `uploadOutput(file)` | `POST /api/outputs/upload?name=` (the file as the body) | `Output` (`201`): an image, video, audio, text or document file (plan 24.1); `upload_type` 415, `upload_encoding` 415 (a text file that isn't UTF-8, or UTF-16 with a BOM), `upload_too_large` 413 (64 MB), `upload_empty` 400 |
+| `getWebReading()` | `GET /api/web/reading` | `{screen: {backend, model, confirm: string \| null, same_as_judge}, judge: {backend, model}, choices: {relay: string[], decide: string[]}, relevance: "decide" \| "lexical" \| "off", decide_up: boolean}`: the screening and relevance models in use and the choices (Settings → Agent → Reading web pages) |
 | `readWebPage(url, {text?})` | `POST /api/web/read` | `WebPage` (plan 30.8): `{output: Output, url, final_url, title, kind: 'text'\|'document', chars, screening: {removed, checked, ms, model?, covered, findings: [{passage, why, by, excerpt, line}]} \| null, markdown?, screened?}`; the web mod's errors (`blocked_address` 403, `robots` 403, `too_large` 413, `unsupported_type` 415, `timeout` 504, …) with `data.fix`; `service_not_found` 404 without the web mod |
 | `outputText(id, {offset, limit, page, pages})` | `GET /api/outputs/{id}/text?offset=&limit=&page=&pages=` | `OutputText` (plan 24.3; text and documents; `screened=true`: as the chat model reads it, screened per `[agent.screen]`, the note in `notes`): `limit` 12000 chars by default, at most 48000; `page`/`pages` (`3` or `3-5`) start at that page and stop at the range's end; `next_offset` continues through the document. `not_text` 409 for other kinds, `no_page` 404 |
 | `outputSearch(id, q, {limit})` | `GET /api/outputs/{id}/search?q=&limit=` | `OutputSearch`: words (any case, all within one line, else one paragraph), a `"quoted phrase"`, or `/regex/` (`/regex/i` ignores case; `search_timeout` 422 past 1 s); `limit` 20, at most 200 |
@@ -587,7 +588,9 @@ interface Settings {
   screen: { pages: boolean; documents: boolean; transcripts: boolean;   // [agent.screen] (plan 30.6)
             timeout_s: number; window_chars: number;
             backend: "relay" | "decide" | null; model: string | null; url: string | null;   // null: the judge's (plan 30.8)
-            threshold: number | null; confirm: boolean };
+            threshold: number | null; confirm: boolean; parallel: number };   // parallel: model calls at once for one text
+  web: { relevance: "auto" | "decide" | "lexical" | "off"; model: string; url: string; candidates: number; timeout_s: number };   // [agent.web]: a long page's relevant passages first (webread.py, 2026-10-21)
+  outputs: { hidden_keep_days: number };   // [outputs] (plan 30.9): saved web pages go to the trash after this many days; 0 keeps them
 }
 
 type HubEvent =
@@ -1102,6 +1105,7 @@ interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command"
                        folder?: string; level?: string; allow_bypass?: boolean; path?: string;
                        key?: string;                                // what "allow in this chat" covers: the folder and the exact command
                        once?: boolean;                              // asks every time: only "Allow once" (host runs, commits, git remotes)
+                       ask_folder?: { path: string; level: string; max_level: string; capped?: string; environment: { id: string; name: string } };   // plan 34: a folder outside the chat's environment
                        preview?: { summary?: string; diff?: string; command?: string; where?: "sandbox" | "host"; network?: boolean; cwd?: string; note?: string } }
 interface Grant { id: string; tool: string;                         // a name glob
                   key?: string;                                     // a host, a folder, a constant (absent = every call of the tool)
@@ -1182,6 +1186,9 @@ Built by hand in `web/chat/` (plain ES modules on the page's React, like the das
   - for `execute`, the code or command (a string argument named `code`, `command`, `script`, `cmd`, `source` or `shell`, or with `format: "code"` / `x-code`) shows whole in a monospaced, scrollable, editable box: what's in it is what runs;
   - decided: the fold's row says "Approved by you, and allowed in this chat" (or "always allowed").
 - **Settings → Agent → Permissions** lists the grants (tool, risk, what it covers, "always" or a link to its chat, uses, age, expiry) with **Revoke** (plan 25.2), then **Tool permissions** (plan 30.7): "Never run", "Always ask" and "Run without asking", tool-name globs saved to `[agent.permissions]` (the defaults, `hub_set_preference` asks and `hub_start_service` runs, show as entries).
+- **Settings → Agent → Reading web pages** (2026-10-21; `chat-webprefs.js`): screen pages, your documents, transcripts; "Screen pages with" (Same as the judge / A decision model (decide) / Another chat model, with a model picker from each backend's choices; for decide, the threshold and "Let the judge's chat model confirm what it flags"); characters per call × calls at once; "Long pages" (`[agent.web] relevance`: auto, decide, lexical, off) and its model; "Saved web pages: delete after N days (0 keeps them)".
+- **Environments (plan 34; `chat-env.js`):** the header shows the chat's environment as a chip "⌂ <name> · N folders" (+n for folders allowed in this chat) next to the mode; its menu lists the environments (each with its folders and levels), "Allowed in this chat" (each removable: that revokes its grant) and "Manage environments…" (the Workspace page). A new chat starts in the last environment picked in this browser, else Default; the chip is hidden while the workspace mod is down. A folder card reads "Let this chat read ~/x?" with the path, a Read badge and "not in this chat's environment (<name>)"; its buttons are **Allow for this chat**, **Add to "<env>"** and **Deny** (in the Approvals popover with no chat, Allow once replaces the first). The Workspace page's Environments view: a switcher, New environment, Rename, Delete (not Default), add a folder (path and level), and the folder rows (level up to its cap, allow Bypass, Remove).
+- **Sources you shared:** pages attached with "Add a web page" and links you typed that the agent read come first in the reply's Sources, labelled "you shared".
 - **Settings → Agent → Judged calls** (plan 30.7): under the judge picker, **Your command rules**: "Always allow these commands in Auto" and "Always ask before these", each a list with add and remove and Save; errors show inline, and a 422 names the list. Each recent call the judge's model asked about offers **Always allow `<rule>`** (`suggest`), which confirms and then adds the rule. A verdict from your rules has the source `user`, shown as "your rule".
 - **Settings → Agent:** the models, AGENT.md and MEMORY.md editors, topic files, skills, the modes and how permissions work.
 

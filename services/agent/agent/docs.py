@@ -109,6 +109,9 @@ async def describe(agent: Agent, tid: str, thread: dict[str, Any], ids: list[str
                              "outline": [{k: x[k] for k in ("level", "title", "page", "line") if x.get(k) is not None}
                                          for x in w["outline"][:30]],
                              "mode": mode, "inline": False}
+        page = _page_url(o)
+        if page:
+            d["url"] = page          # a web page the user attached: the reply's Sources lists it
         if w.get("scanned"):
             d["scanned"] = w["scanned"][:50]
         if w.get("notes"):
@@ -134,6 +137,17 @@ async def describe(agent: Agent, tid: str, thread: dict[str, Any], ids: list[str
                 d["library"] = library
         out.append(d)
     return out
+
+
+def _page_url(o: dict[str, Any]) -> str | None:
+    """Where a saved web page came from (the web mod's sidecar: final_url, url), or None for other outputs."""
+    if o.get("service") != "web":
+        return None
+    meta = o.get("meta") or {}
+    for u in (meta.get("final_url"), meta.get("url"), (meta.get("source") or {}).get("url")):
+        if isinstance(u, str) and u.startswith(("http://", "https://")) and len(u) <= 2048:
+            return u
+    return None
 
 
 async def library_tool(agent: Agent) -> str | None:

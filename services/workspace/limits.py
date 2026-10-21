@@ -6,6 +6,10 @@ exact command line, with where and internet (`grant_key`); a compound command ha
 `action`; this mod applies the hard limits and the folder's level (a `refuse` here ends the
 call, whatever the mode). The routes check the same limits again when the call arrives.
 
+A reading call on a full path that is in no folder of the chat (plan 34) answers `ask_folder:
+{path, level, environment}` instead of a refusal: the hub turns it into a card ("Let this chat read
+…?"), and once the user allows it the hub passes the folder in `origin.folders`.
+
 Actions: `read` · `edit` · `delete` · `commit` · `command` (in the sandbox) · `network` (in the
 sandbox with internet) · `host` (on this machine, outside the sandbox) · `remote` (git push,
 pull, fetch, clone: talks to a remote).
@@ -94,12 +98,21 @@ def check_command(command: str) -> None:
 
 
 def classify(folders: Folders, tool: str, args: dict[str, Any], origin: dict[str, Any]) -> dict[str, Any]:
+    """`folders`: the call's view (its chat's environment and allowed folders, `Folders.view`)."""
     named = origin.get("named") if isinstance(origin.get("named"), list) else None
     out: dict[str, Any] = {"action": "read", "folder": None, "level": None, "allow_bypass": False, "key": None, "once": False}
     try:
         f = None
         if tool != "folders" and (args.get("folder") or tool not in ("python",)):
-            f = folders.get(str(args.get("folder") or ""))
+            try:
+                f = folders.get(str(args.get("folder") or ""))
+            except Refused as e:
+                ask = folders.ask_for(str(args.get("folder") or "")) if e.code == "unknown_folder" and tool in READ_TOOLS else None
+                if ask is None:
+                    raise
+                # plan 34: a folder the user named that this chat doesn't have: the hub asks them (an approval card)
+                out.update({"key": f"folder:{ask['path']}", "path": ask["path"], "level": "read", "ask_folder": ask})
+                return out
             out.update({"folder": f.id, "level": folders.level(f), "allow_bypass": bool(f.allow_bypass) and folders.level(f) != "read",
                         "key": f.id, "path": f.path})
         if tool in READ_TOOLS:

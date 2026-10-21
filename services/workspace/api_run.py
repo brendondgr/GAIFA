@@ -42,7 +42,7 @@ def mount(app: FastAPI, ctx: Any) -> None:
     @app.post("/v1/run", summary="Run a command in a workspace folder (the sandbox, or this machine)")
     async def run(body: RunIn, request: Request) -> dict[str, Any]:
         o = _origin(request)
-        out = await running.run_command(ctx.folders, sb, body.model_dump(), o, request.is_disconnected)
+        out = await running.run_command(ctx.folders.view(o), sb, body.model_dump(), o, request.is_disconnected)
         ctx.counts["runs"] += 1
         ctx.recent("run", {"folder": body.folder, "summary": f"{body.where}: {body.command[:120]} → {out.get('exit_code')}",
                            "thread": o.get("thread"), "run": out["run"]})
@@ -51,7 +51,7 @@ def mount(app: FastAPI, ctx: Any) -> None:
     @app.post("/v1/python", summary="Run Python in the sandbox; files it writes become outputs")
     async def python(body: PythonIn, request: Request) -> dict[str, Any]:
         o = _origin(request)
-        out = await running.run_python(ctx.folders, sb, ctx.state, ctx.outputs, ctx.hub_url, body.model_dump(), o,
+        out = await running.run_python(ctx.folders.view(o), sb, ctx.state, ctx.outputs, ctx.hub_url, body.model_dump(), o,
                                        request.is_disconnected)
         ctx.counts["runs"] += 1
         ctx.recent("run", {"folder": body.folder, "summary": f"python → {out.get('exit_code')}, {len(out.get('files') or [])} file(s)",

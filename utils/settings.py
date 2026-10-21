@@ -43,6 +43,8 @@ def view(hub: Hub) -> dict[str, Any]:
         "judge": cfg.agent.judge.model_dump(),      # config.toml [agent.judge] (plan 30.3)
         "screen": cfg.agent.screen.model_dump(),    # [agent.screen] (plan 30.6)
         "permissions": cfg.agent.permissions.model_dump(),   # [agent.permissions]: tool-name globs (plan 13.2)
+        "web": cfg.agent.web.model_dump(),          # [agent.web]: a long page's relevant passages first (webread.py)
+        "outputs": cfg.outputs.model_dump(),        # [outputs]: saved web pages' clean-up (plan 30.9)
     }
 
 
@@ -89,6 +91,8 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     gb = new["memory"]["reserve_gb"]
     if float(gb).is_integer():
         new["memory"]["reserve_gb"] = int(gb)  # written as 13, not 13.0
+    if float(new["outputs"]["hidden_keep_days"]).is_integer():
+        new["outputs"]["hidden_keep_days"] = int(new["outputs"]["hidden_keep_days"])
     port = new["hub"]["port"]
     clash = next((s for s in mgr.list() if s.port == port), None)
     if clash:
@@ -110,13 +114,15 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         "judge": d.agent.judge.model_dump(),
         "screen": d.agent.screen.model_dump(),
         "permissions": d.agent.permissions.model_dump(),
+        "web": d.agent.web.model_dump(),
+        "outputs": d.outputs.model_dump(),
     }
     changes: dict[str, Any] = {}
     for section, keys in defaults.items():
         for key, default in keys.items():
             if new[section][key] != before[section][key]:
                 changes.setdefault(section, {})[key] = _or_default(new[section][key], default)
-    for section in ("judge", "screen", "permissions"):   # they live under [agent] in config.toml
+    for section in ("judge", "screen", "permissions", "web"):   # they live under [agent] in config.toml
         if section in changes:
             changes.setdefault("agent", {})[section] = changes.pop(section)
     if new["ui"]["dashboard"] != before["ui"]["dashboard"]:

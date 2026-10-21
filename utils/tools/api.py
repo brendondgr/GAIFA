@@ -56,7 +56,7 @@ class Grant(_Model):
     id: str
     tool: str = Field(description="A tool name glob")
     key: str | None = Field(None, description="What it covers: a host, a folder, a constant; null: every call of the tool")
-    kind: str | None = Field(None, description="The tool's grant_key: url:host, arg:<name>, const:<x>")
+    kind: str | None = Field(None, description="The tool's grant_key: url:host, arg:<name>, const:<x>; `folder` for a folder allowed in one chat (plan 34)")
     risk: str | None = None
     scope: Literal["thread", "always"]
     thread: str | None = None
@@ -108,6 +108,8 @@ class CallLimits(_Model):
     once: bool | None = Field(None, description="Asks every time: no grant buttons (host runs, commits, git remotes)")
     preview: dict[str, Any] | None = Field(None, description="{summary, diff} for an edit; {command, where, network, cwd, note?} for a run")
     path: str | None = None
+    ask_folder: dict[str, Any] | None = Field(None, description="Plan 34: a folder outside the chat's environment the call asks to "
+                                              "read: {path, level, max_level, capped?, environment: {id, name}}")
 
 
 Mode = Literal["plan", "manual", "accept_edits", "auto", "bypass", "ask", "read_only"]

@@ -11,6 +11,7 @@ import { RISK_TONE, grantText } from './chat-risk.js';
 import { SpeechInputSection } from './chat-speech-input.js';
 import { JudgedList } from './chat-judge.js';
 import { PermissionRules } from './chat-rules.js';
+import { WebReadingSection } from './chat-webprefs.js';
 
 const R = () => globalThis.React;
 const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
@@ -52,6 +53,7 @@ export function AgentSettings({ api, toast = () => {} }) {
           h('span', null, h('span', { style: { color: T.mut } }, 'fallback '), s?.fallback ? s.fallback + window_(s.fallback) : 'none'),
           h('span', null, h('span', { style: { color: T.mut } }, 'max steps '), s?.max_steps ?? '—')))),
     s?.documents ? section('Documents', h(DocSettings, { value: s.documents, onSave: d => save({ documents: d }) })) : null,
+    h(WebReadingSection, { api, toast }),   // [agent.screen], [agent.web], [outputs] hidden_keep_days
     section('Instructions',
       s ? h(Editor, { label: 'AGENT.md', hint: 'Standing instructions, read every turn (data/agent/AGENT.md).', value: s.agent_md, placeholder: '# How I like things\n- Prefer 16:9 images', onSave: v => save({ agent_md: v }) }) : h('span', { style: { color: T.mut } }, 'Loading…')),
     section('Memory',

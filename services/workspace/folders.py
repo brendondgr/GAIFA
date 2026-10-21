@@ -1,8 +1,10 @@
-"""Workspace folders, their levels, and the hard limits on paths (plan 27.1).
+"""Workspace folders, their levels, and the hard limits on paths (plan 27.1, 33).
 
-A folder is `{id, path, level, allow_bypass}`, kept in `$WORKSPACE_STATE/folders.json`. The four
-levels, lowest first: `read` · `edit` (files change in place) · `run` (commands in the sandbox) ·
-`run_net` (the sandbox with full internet). New folders start at `read`.
+A folder is `{id, path, level, allow_bypass}`, kept in an environment (`environments.py`, plan 34;
+Phase 27 kept one list in `folders.json`, now Default). The four levels, lowest first: `read` ·
+`edit` (files change in place) · `run` (commands in the sandbox) · `run_net` (the sandbox with full
+internet). New folders start at `read`. A call sees the folders of its chat's environment plus those
+the user allowed in that chat (`Folders.view(origin)`).
 
 **Caps.** The AIHub folder and its `data/models/` never go above `read`, whatever is asked: a
 folder inside either is capped, and no write anywhere may land inside them (a folder that
@@ -19,11 +21,9 @@ folder inside either is capped, and no write anywhere may land inside them (a fo
 from __future__ import annotations
 
 import fnmatch
-import json
 import os
 import re
 import secrets as _secrets
-import tempfile
 import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -85,9 +85,12 @@ class Folder:
     level: str = "read"
     allow_bypass: bool = False
     name: str = ""
+    granted: bool = False      # allowed in this chat only (plan 34), not a folder of the environment
 
     def public(self, caps: Caps) -> dict[str, Any]:
         cap, why = caps.cap_of(Path(self.path))
+        if self.granted:
+            cap, why = "read", why or "allowed in this chat only, at Read: add it to the environment for more"
         level = self.level if at_least(cap, self.level) else cap
         return {**asdict(self), "name": self.name or Path(self.path).name, "level": level, "max_level": cap,
                 "capped": why, "level_word": LEVEL_WORD[level], "exists": Path(self.path).is_dir(),
@@ -119,33 +122,108 @@ class Caps:
         return None
 
 
-class Folders:
-    """folders.json, read on every call (the page and the tools see the same list)."""
+def check_folder(path: str) -> Path:
+    """A folder the user adds on the Workspace page: an existing folder, not `/`, the home folder or above it."""
+    real = Path(os.path.realpath(os.path.expanduser(path)))
+    if not real.is_dir():
+        raise Refused("not_a_folder", f"{path} isn't a folder", "give the full path of an existing folder", 422)
+    home = Path(os.path.realpath(Path.home()))
+    if real == Path("/") or real == home or inside(home, real):
+        raise Refused("too_broad", f"{real} is too broad for a workspace", "add a project folder instead", 422)
+    return real
 
-    def __init__(self, state: Path, caps: Caps) -> None:
-        self.file = state / "folders.json"
+
+def grant_roots() -> list[Path]:
+    """Where a folder the agent asks for may be (plan 34): the user's home, and mounted drives."""
+    user = os.environ.get("USER") or Path.home().name
+    return [Path(os.path.realpath(p)) for p in (Path.home(), Path("/mnt"), Path("/media") / user, Path("/run/media") / user)]
+
+
+def grantable(path: str) -> Path:
+    """A folder the agent may ask the user for (plan 34), or Refused: the Workspace page's checks, and it must be
+    in the user's home (or a mounted drive), with no hidden or secret-looking folder on the way (~/.ssh,
+    ~/.config, a `secrets` folder). Symlinks are followed first, so one can't lead out."""
+    raw = os.path.expanduser(path.strip())
+    if not raw.startswith("/") or "\0" in raw:
+        raise Refused("bad_path", f"{path} isn't a full path", "pass the folder's full path (/home/… or ~/…)", 422)
+    real = Path(os.path.realpath(raw))
+    if not real.exists():
+        raise Refused("not_found", f"{path} doesn't exist", "check the path with the user", 404)
+    if not real.is_dir():
+        raise Refused("not_a_folder", f"{path} is a file, not a folder",
+                      "ask for the folder it is in, then read the file with path=", 422)
+    check_folder(str(real))
+    root = next((r for r in grant_roots() if inside(real, r) and real != r), None)
+    if root is None:
+        raise Refused("not_grantable", f"{real} is outside your home folder; the agent only asks for folders in it",
+                      "the user can add it on the Workspace page")
+    rel = real.relative_to(root)
+    if any(p.startswith(".") for p in rel.parts) or is_secret(str(rel)):
+        raise Refused("not_grantable", f"{real} is a hidden or secret-looking folder; the agent doesn't ask for those",
+                      "the user can add it on the Workspace page")
+    return real
+
+
+def new_id(base: str, taken: set[str]) -> str:
+    slug = re.sub(r"[^a-z0-9._-]+", "-", base.lower()).strip("-.") or "folder"
+    slug = slug[:40]
+    if slug not in taken:
+        return slug
+    for i in range(2, 100):
+        if f"{slug}-{i}" not in taken:
+            return f"{slug}-{i}"
+    return f"{slug}-{_secrets.token_hex(3)}"
+
+
+class Folders:
+    """The folders one call may use (plan 34): those of the chat's environment (`origin.environment`,
+    else Default) plus the folders the user allowed in this chat (`origin.folders`, which only the hub
+    sets, from the chat's folder grants; always Read here). `view(origin)` makes one per call; the
+    instance the server keeps is Default's view, which the Phase 27 `/v1/folders` routes use."""
+
+    def __init__(self, state: Path | None, caps: Caps, envs: Any = None, env: str | None = None,
+                 granted: list[Any] | tuple[Any, ...] = ()) -> None:
+        from environments import Environments
         self.caps = caps
+        self.envs = envs if envs is not None else Environments(state or Path("."), caps)
+        self.env_id = env
+        self.granted_raw = list(granted) if isinstance(granted, (list, tuple)) else []
         self._lock = threading.Lock()
 
-    def _load(self) -> list[Folder]:
-        try:
-            raw = json.loads(self.file.read_text())
-        except (OSError, ValueError):
-            return []
-        out = []
-        for f in raw.get("folders", []):
-            try:
-                out.append(Folder(**{k: f[k] for k in ("id", "path", "level", "allow_bypass", "name") if k in f}))
-            except TypeError:
+    def view(self, origin: dict[str, Any] | None) -> Folders:
+        o = origin if isinstance(origin, dict) else {}
+        env = o.get("environment")
+        return Folders(None, self.caps, self.envs, str(env) if isinstance(env, str) and env else None, o.get("folders") or [])
+
+    @property
+    def environment(self) -> Any:
+        return self.envs.of(self.env_id)
+
+    def _granted(self, env_folders: list[Folder]) -> list[Folder]:
+        """The chat's folders from the origin, checked again (grantable, not already in the environment), at Read."""
+        out: list[Folder] = []
+        ids = self.envs.ids()
+        mine = {os.path.realpath(f.path) for f in env_folders}
+        taken = set(ids) | {f.id for f in env_folders}
+        for g in self.granted_raw[:50]:
+            path = g.get("path") if isinstance(g, dict) else g
+            if not isinstance(path, str) or not path.startswith("/"):
                 continue
+            try:
+                real = grantable(path)
+            except Refused:
+                continue
+            if str(real) in mine:
+                continue
+            fid = next((i for i, p in ids.items() if p == str(real)), None) or new_id(real.name, taken)
+            taken.add(fid)
+            mine.add(str(real))
+            out.append(Folder(fid, str(real), "read", False, "", granted=True))
         return out
 
-    def _save(self, folders: list[Folder]) -> None:
-        self.file.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=self.file.parent, prefix=".folders.")
-        with os.fdopen(fd, "w") as f:
-            json.dump({"folders": [asdict(x) for x in folders]}, f, indent=2)
-        os.replace(tmp, self.file)
+    def _load(self) -> list[Folder]:
+        env = self.environment.folders
+        return [*env, *self._granted(env)]
 
     def list(self) -> list[Folder]:
         return self._load()
@@ -167,9 +245,30 @@ class Folders:
         for f in folders:
             if ref.lower() == (f.name or Path(f.path).name).lower():
                 return f
+        if real:
+            for f in folders:
+                if inside(Path(real), Path(os.path.realpath(f.path))):
+                    rel = os.path.relpath(real, os.path.realpath(f.path))
+                    raise Refused("inside_folder", f"{ref} is inside the folder {f.id} ({f.path})",
+                                  f"pass folder={f.id!r} and path={rel!r}", 404)
         known = ", ".join(f.id for f in folders) or "none yet"
-        raise Refused("unknown_folder", f"there is no workspace folder {ref!r} (folders: {known})",
-                      "call workspace_folders to see them; the user adds folders on the Workspace page", 404)
+        env = self.environment
+        fix = ("pass its full path as `folder` to workspace_tree or workspace_read: the user is asked to let this chat "
+               "read it (editing or running there needs it in the environment at a higher level, on the Workspace page)"
+               if real else "call workspace_folders to see them; the user adds folders on the Workspace page")
+        raise Refused("unknown_folder", f"{ref!r} isn't one of this chat's folders (environment {env.name}: {known})", fix, 404)
+
+    def ask_for(self, ref: str) -> dict[str, Any] | None:
+        """A path the model named that isn't one of this chat's folders: what the card asks for (plan 34),
+        or None when `ref` isn't a path. Refused when the folder can never be asked for."""
+        ref = (ref or "").strip()
+        if not ref.startswith(("/", "~")):
+            return None
+        real = grantable(ref)
+        cap, why = self.caps.cap_of(real)
+        env = self.environment
+        return {"path": str(real), "level": "read", "max_level": cap, **({"capped": why} if why else {}),
+                "environment": {"id": env.id, "name": env.name}}
 
     def level(self, f: Folder) -> str:
         cap, _ = self.caps.cap_of(Path(f.path))
@@ -177,66 +276,18 @@ class Folders:
 
     def add(self, path: str, level: str = "read", allow_bypass: bool = False, fid: str | None = None,
             name: str = "") -> Folder:
-        real = Path(os.path.realpath(os.path.expanduser(path)))
-        if not real.is_dir():
-            raise Refused("not_a_folder", f"{path} isn't a folder", "give the full path of an existing folder", 422)
-        if real == Path("/") or real == Path.home():
-            raise Refused("too_broad", f"{real} is too broad for a workspace", "add a project folder instead", 422)
-        with self._lock:
-            folders = self._load()
-            if any(os.path.realpath(f.path) == str(real) for f in folders):
-                raise Refused("exists", f"{real} is already a workspace", "change its level instead", 409)
-            fid = fid or self._new_id(real.name, folders)
-            if not ID_RE.match(fid) or any(f.id == fid for f in folders):
-                raise Refused("bad_id", f"{fid!r} is taken or isn't a valid id", "use lowercase letters, digits, . _ -", 422)
-            f = Folder(fid, str(real), "read", False, name)
-            folders.append(f)
-            self._save(folders)
-        if level != "read" or allow_bypass:
-            f = self.update(fid, level=level, allow_bypass=allow_bypass)
-        return f
+        return self.envs.add_folder(self.environment.id, path, level, allow_bypass, fid, name)
 
     def update(self, fid: str, level: str | None = None, allow_bypass: bool | None = None,
                name: str | None = None) -> Folder:
-        with self._lock:
-            folders = self._load()
-            f = next((x for x in folders if x.id == fid), None)
-            if f is None:
-                raise Refused("unknown_folder", f"there is no workspace folder {fid!r}", "", 404)
-            if level is not None:
-                if level not in LEVELS:
-                    raise Refused("bad_level", f"level must be one of {', '.join(LEVELS)}", "", 422)
-                cap, why = self.caps.cap_of(Path(f.path))
-                if not at_least(cap, level):
-                    raise Refused("capped", f"{f.path} can't go above {LEVEL_WORD[cap]}: {why}", "", 422)
-                f.level = level
-            if allow_bypass is not None:
-                f.allow_bypass = bool(allow_bypass)
-            if name is not None:
-                f.name = name.strip()[:64]
-            self._save(folders)
-            return f
+        return self.envs.update_folder(self.environment.id, fid, level, allow_bypass, name)
 
     def remove(self, fid: str) -> bool:
-        with self._lock:
-            folders = self._load()
-            kept = [f for f in folders if f.id != fid]
-            if len(kept) == len(folders):
-                return False
-            self._save(kept)
-            return True
+        return self.envs.remove_folder(self.environment.id, fid)
 
-    @staticmethod
-    def _new_id(base: str, folders: list[Folder]) -> str:
-        slug = re.sub(r"[^a-z0-9._-]+", "-", base.lower()).strip("-.") or "folder"
-        slug = slug[:40]
-        taken = {f.id for f in folders}
-        if slug not in taken:
-            return slug
-        for i in range(2, 100):
-            if f"{slug}-{i}" not in taken:
-                return f"{slug}-{i}"
-        return f"{slug}-{_secrets.token_hex(3)}"
+    def root_of(self, fid: str) -> str | None:
+        """A folder id's real path in any environment (checkpoints record the id)."""
+        return self.envs.ids().get(fid)
 
     # ---- paths -----------------------------------------------------------------------------
 

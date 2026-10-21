@@ -38,8 +38,11 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.95, "timeout_s": 3.0,
                       "allow_commands": [], "ask_commands": []},
             "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800,
-                       "backend": None, "model": None, "url": None, "threshold": None, "confirm": True},
+                       "backend": None, "model": None, "url": None, "threshold": None, "confirm": True, "parallel": 4},
             "permissions": {"deny": [], "ask": ["hub_set_preference"], "allow": ["hub_start_service"]},
+            "web": {"relevance": "auto", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide", "candidates": 24,
+                    "timeout_s": 8.0},
+            "outputs": {"hidden_keep_days": 0.0},
         }
         before = _file(served)
         s["hub"]["port"] = served.hub.config.hub.port

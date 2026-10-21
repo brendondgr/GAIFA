@@ -7,6 +7,7 @@
 import { h, T, Icon, label11, fmtAgo } from './chat-ui.js';
 import { ParamCard } from './chat-forms.js';
 import { approvalButtons } from './chat-risk.js';
+import { decideFolder } from './chat-env.js';
 
 export function originText(o = {}) {
   if (o.service === 'agent') return 'from a chat';
@@ -17,6 +18,7 @@ export function originText(o = {}) {
 
 export function ApprovalsPanel({ api, approvals, loading, onDecided, toast = () => {} }) {
   const decide = async (a, approve, args, o = {}) => {
+    if (approve && a.origin?.ask_folder) o = await decideFolder(api, a.origin.ask_folder, o);   // plan 34: Add to <environment>
     await api.decideApproval(a.id, approve ? { approve: true, args, remember: o.remember, confirm: o.confirm } : { approve: false, reason: o.reason || 'Denied in the Approvals popover' });
     const how = { thread: ' in this chat', always: ' always' }[o.remember] || '';
     toast(approve ? `Allowed ${a.tool}${how}` : `Denied ${a.tool}`, approve ? 'success' : 'info');
@@ -31,7 +33,8 @@ export function ApprovalsPanel({ api, approvals, loading, onDecided, toast = () 
       h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.mut } },
         h('span', null, originText(a.origin)), h('span', null, '·'), h('span', null, fmtAgo(a.created_ts) === 'now' ? 'just now' : fmtAgo(a.created_ts) + ' ago'), h('span', { style: { flex: 1 } }),
         a.origin?.service === 'agent' && a.origin?.thread ? h('a', { href: '#/chat/' + encodeURIComponent(a.origin.thread), style: { fontSize: 11.5 } }, 'Open chat →') : null),
-      h(ParamCard, { spec: { tool: a.tool, arguments: a.arguments, ask_fields: a.ask_fields, schema: a.schema, risk: a.risk, description: a.description, grant_key: a.grant_key }, compact: true, api, outputs: [], mods: [String(a.tool).split('_')[0]],
-        choices: approvalButtons(a.risk, { thread: !!a.origin?.thread }), cancelLabel: 'Deny',
+      h(ParamCard, { spec: { tool: a.tool, arguments: a.arguments, ask_fields: a.ask_fields, schema: a.schema, risk: a.risk, description: a.description, grant_key: a.grant_key,
+          ...(a.origin?.ask_folder ? { limits: { action: 'read', key: 'folder:' + a.origin.ask_folder.path, ask_folder: a.origin.ask_folder } } : {}) }, compact: true, api, outputs: [], mods: [String(a.tool).split('_')[0]],
+        choices: approvalButtons(a.risk, { thread: !!a.origin?.thread, folder: a.origin?.ask_folder }), cancelLabel: 'Deny',
         onRun: (args, o) => decide(a, true, args, o), onCancel: reason => decide(a, false, null, { reason }) }))));
 }

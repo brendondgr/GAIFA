@@ -4,14 +4,15 @@
 // passes it); a reply outside a turn gets Copy and the thumbs only.
 
 import { h } from './chat-ui.js';
-import { turnSources, SourcesPill } from './chat-sources.js';
+import { turnSources, SourcesPill, useAttachedPages } from './chat-sources.js';
 import { CopyButton } from './chat-copy.js';
 
 const R = () => globalThis.React;
 
 export function ReplyBar({ text, ctx, thumbs }) {
   const React = R(), turn = ctx?.turn || null;
-  const src = React.useMemo(() => (turn ? turnSources(turn) : null), [turn]);
+  const attached = useAttachedPages(turn, ctx);   // pages attached before docs carried their URL
+  const src = React.useMemo(() => (turn ? turnSources(turn, attached) : null), [turn, attached.length]);
   if (turn?.running) return null;
   return h('div', { role: 'group', 'aria-label': 'Reply actions', style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, minWidth: 0, marginTop: 4 } },
     src && (src.read.length || src.found.length) ? h(SourcesPill, { src, ctx }) : null,

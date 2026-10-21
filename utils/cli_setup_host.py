@@ -18,12 +18,16 @@ GTT_MIB, PAGES = "131072", "33554432"     # host.md §1: 128 GiB
 GPU_PARAMS = f"amdgpu.gttsize={GTT_MIB} ttm.pages_limit={PAGES}"
 INSTALLERS = {                             # command → an installer that needs no root (host.md §3, the mods' setup docs)
     "uv": "curl -LsSf https://astral.sh/uv/install.sh | sh",
-    "opencode": "curl -fsSL https://opencode.ai/install | bash   (services/opencode/setup/opencode.md)",
+    "opencode": "curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path   (services/opencode/setup/opencode.md)",
+    "blender": "Blender from blender.org, unpacked and linked into ~/.local/bin (host.md §3)",
 }
 PACKAGES = {                               # command → the Fedora package (host.md §3)
     "podman": "podman", "toolbox": "toolbox", "git": "git-core", "node": "nodejs22", "npm": "nodejs22-npm",
-    "espeak-ng": "espeak-ng", "ffmpeg": "ffmpeg (RPM Fusion; host.md §3)", "curl": "curl", "blender": "blender",
+    "espeak-ng": "espeak-ng", "ffmpeg": "ffmpeg", "curl": "curl", "tar": "tar", "unzip": "unzip",
 }
+
+
+ADVICE = {"linger", "clone-under-home"}   # reported, never blocking a plan
 
 
 @dataclass
@@ -117,8 +121,14 @@ def checks(probe: Probe, root: Path, needs: set[str] = frozenset(), disk_gb: flo
             fix, root_ = INSTALLERS[cmd], False
         else:
             pkg = PACKAGES.get(cmd, cmd)
-            fix, root_ = (f"sudo dnf install {pkg}", True) if " " not in pkg else (f"install {pkg}", False)
+            fix, root_ = f"sudo dnf install {pkg}", True
+            if cmd == "ffmpeg":
+                fix += "   (the full ffmpeg is in RPM Fusion: host.md §3)"
         out.append(Check(f"needs:{cmd}", ok, f"{cmd} is installed" if ok else f"{cmd} is missing", "" if ok else fix, needs_root=not ok and root_))
+    home = Path.home()
+    under = root.resolve().is_relative_to(home.resolve())
+    out.append(Check("clone-under-home", under, "the clone is under your home folder" if under else f"the clone ({root}) isn't under {home}",
+                     "" if under else "move the clone under your home folder: the ComfyUI toolbox only sees $HOME (host.md §5)", gpu=True))
     lin = probe.linger()
     out.append(Check("linger", lin, "lingering is on: AIHub keeps running after you log out" if lin else "lingering is off: the hub stops when you log out",
                      "" if lin else "loginctl enable-linger $USER"))
@@ -130,7 +140,7 @@ def checks(probe: Probe, root: Path, needs: set[str] = frozenset(), disk_gb: flo
 def blocking(found: list[Check], gpu: bool) -> list[Check]:
     """The failed checks that stop a plan: GPU ones only when a chosen mod uses the GPU, and the
     disk; lingering is advice."""
-    return [c for c in found if not c.ok and c.id != "linger" and (gpu or not c.gpu)]
+    return [c for c in found if not c.ok and c.id not in ADVICE and (gpu or not c.gpu)]
 
 
 def text(found: list[Check]) -> str:

@@ -234,6 +234,8 @@ run = "scripts/install-runtime.sh"
 what = "builds the engine venvs from locks/ (about 14 GB, 10 min)"
 ask = ""                                    # a yes/no question first, such as a licence; "no" skips this setup
 interactive = false                         # true: it prompts (a login), so under --json the person runs it
+skip_if = ""                                # a command: exit 0 means nothing to do (logged in already), so it's done
+optional = false                            # with an ask: a "no" skips only this step, not the setup
 
 [[suggest]]                                 # optional starter models (1–3)
 name = "Kokoro 82M"
@@ -246,6 +248,9 @@ good_for = "fast English voices"
 licence = "Apache-2.0"
 required = true                             # the engine can't run without it
 gated = false                               # true: accept the repo's terms on Hugging Face first
+next = ""                                   # what's left to do once it's chosen (it joins the report)
+# start_op = "POST /api/instances"          # a mod route run after the download (launching it), with
+# start_body = { model_id = "qwen3-8b" }    # its body
 -->
 ```
 
@@ -253,7 +258,7 @@ gated = false                               # true: accept the repo's terms on H
 - `models`: globs relative to `data/models/` for the models this environment runs (`comfyui/**`); the local model inventory (`aihub docs`) uses them to say which setup doc runs a model.
 - `scan`: tracked files in the mod (globs relative to its folder, e.g. `workflows/*/workflow.json`) whose mentions of a model's file name or Hugging Face repo are listed in its inventory doc as "referenced by".
 - `[[suggest]]` can name a mod route instead of a repo, for mods with their own downloader: `op = "POST /v1/load"` and `body = { preset = "balanced" }` (no `dest`, `files` or `revision`). Mark weights an engine can't run without `required = true`; everything else is optional, and the default is to download nothing.
-- `[[config]]` asks for a setting after install, when its choices exist: `key` (`services.<id>.env.<VAR>` or `agent.judge.model`, written to `config.toml`), `text`, `choices` (`"relay-models"`, the relay's models then, or a list), `required`, `restart` (a mod id or `"hub"`). The agent's doc asks for its model this way; an agent answers with `--set "<id or key>=<value>"`, and can add a hosted provider first (`"providers"` in `--answers`).
+- `[[config]]` asks for a setting after install, when its choices exist: `key` (`services.<id>.env.<VAR>` or `agent.judge.model`, written to `config.toml`), `text`, `choices` (`"relay-models"`, the relay's chat models then, without its `auto` router and OpenCode's `agent`; `"folder"`, an absolute folder outside AIHub, made if missing; or a list), `required`, `restart` (a mod id or `"hub"`). The agent's doc asks for its model this way; an agent answers with `--set "<id or key>=<value>"`, and can add a hosted provider first (`"providers"` in `--answers`).
 - Unknown keys are errors, at the top and inside `[[steps]]`, `[[suggest]]` and `[[config]]`; `aihub docs --check` reports them.
 - `aihub setup` runs `[[steps]]` and `check` in the mod's folder, asks every `ask` question and every model choice before it runs anything (the hub stage included); a "no" skips that setup and every chosen setup whose `after` names it, and the report lists them. An `interactive` step runs in the terminal for a person; under `--json` the run stops with its command, the person runs it, and `--done <step id>` continues. A `[[suggest]]` with an `op` is followed until the job it starts ends (the mod's jobs in `GET /api/services/<id>`), and a failed job fails the step. The wizard downloads the chosen `[[suggest]]` models after the steps (a step may fetch weights its installer needs offline first: the wizard's download then finds them and only registers them). A `repo` suggestion in `hf-cache` pinned to a commit also gets `refs/main` pointed at it, for engines that load by `main`.
 

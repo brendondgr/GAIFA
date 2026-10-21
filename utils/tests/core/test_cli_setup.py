@@ -38,7 +38,7 @@ class FakeRunner(cli_setup.Runner):
         self.fail, self.up, self.refuse = set(fail), up, set(refuse)
         self.jobs = list(jobs or [])          # successive answers of GET /api/services/<mod>'s jobs
 
-    def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True) -> tuple[int, str]:
+    def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True, echo: bool = False) -> tuple[int, str]:
         self.ran.append((cmd, cwd.name, env))
         if cmd == "bin/aihub install":
             self.up = True
@@ -405,3 +405,106 @@ def test_set_value_edits_in_place_and_refuses_what_it_cant(tmp_path: Path) -> No
     with pytest.raises(cli_setup.Stop) as x:
         cli_setup_config.set_value(g, "services.agent.env.AGENT_MODEL", "b")
     assert "set it by hand" in x.value.data["output"] and g.read_text() == '[services.agent]\nenv = { AGENT_MODEL = "a" }\n'
+
+
+# ---- the second review's fixes (plan 23.14) ---------------------------------------------------
+
+
+def test_providers_start_the_relay_first(agent_root: Path, tmp_path: Path, capsys) -> None:
+    f = tmp_path / "a.json"
+    f.write_text(json.dumps({"yes": True, "providers": [{"name": "or", "base_url": "https://openrouter.ai/api/v1", "key": "k", "models": ["m"]}],
+                             "values": {"services.agent.env.AGENT_MODEL": "m"}}))
+    runner = RelayRunner(["m"])
+    assert cli_setup.cmd_setup(args("agent", answers=str(f)), runner, FakeProbe()) == 0
+    paths = [p for _, p, _ in runner.calls]
+    assert paths.index("/api/s/relay/v1/models") < paths.index("/api/s/relay/admin/endpoints")
+
+
+def test_not_chat_models_are_left_out(agent_root: Path, capsys) -> None:
+    assert cli_setup.cmd_setup(args("agent", yes=True), RelayRunner(["agent", "auto", "gpt-4o"]), FakeProbe()) == 2
+    assert out(capsys)["choices"] == ["gpt-4o"]
+    assert cli_setup.cmd_setup(args("agent", yes=True), RelayRunner(["auto"]), FakeProbe()) == 2
+    r = out(capsys)
+    assert r["choices"] == [] and "serves no chat model yet" in r["answer_with"]
+
+
+def test_a_route_download_waits_for_its_job_to_appear(root: Path, capsys) -> None:
+    jobs = [[], [], [], [], [{"id": "j1", "state": "running"}], [{"id": "j1", "state": "done"}], [], []]
+    runner = FakeRunner(jobs=jobs)
+    a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"])
+    assert cli_setup.cmd_setup(a, runner, FakeProbe()) == 0
+    polls = [p for m, p, _ in runner.calls if m == "GET" and p == "/api/services/tts"]
+    assert len(polls) >= 6                                            # not done at the first quiet polls
+
+
+SHARED = block("comfyui", "ComfyUI", summary='"Images"', gpu="true", disk_gb="4",
+               _tables='[[suggest]]\nname = "Qwen encoder and VAE"\nrepo = "Comfy-Org/Qwen-Image-2.1"\ndest = "comfyui"\nfiles = ["text_encoders/enc.safetensors", "vae/vae.safetensors"]\n'
+                       'kind = "text-encoder"\nsize_gb = 18\ngood_for = "x"\nnext = "update ComfyUI first (its doc)"')
+
+
+def test_files_in_a_shared_folder_register_one_by_one(root: Path, capsys) -> None:
+    d = root / "services" / "comfy" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "comfy"\n')
+    (d / "comfyui.md").write_text(SHARED)
+    runner = FakeRunner()
+    assert cli_setup.cmd_setup(args("comfyui", yes=True, models=["comfyui=Qwen encoder and VAE"]), runner, FakeProbe()) == 0
+    regs = [b for m, p, b in runner.calls if p == "/api/models"]
+    assert [b["path"] for b in regs] == ["comfyui/text_encoders/enc.safetensors", "comfyui/vae/vae.safetensors"]
+    assert regs[0]["name"] == "Qwen encoder and VAE: enc.safetensors"
+    assert "comfyui: Qwen encoder and VAE: update ComfyUI first (its doc)" in out(capsys)["next"]
+
+
+def test_skip_if_and_optional_steps(root: Path, capsys) -> None:
+    doc = root / "services" / "relay" / "setup" / "env.md"
+    doc.write_text(RELAY.replace('what = "the backend venv"', 'what = "the backend venv"\n\n'
+                                 '[[steps]]\nrun = "opencode auth login"\nwhat = "log in"\ninteractive = true\nskip_if = "test -f ~/.auth"\n\n'
+                                 '[[steps]]\nrun = "install-nodes"\nwhat = "the custom nodes"\nask = "Install third-party nodes?"\noptional = true\n\n'
+                                 '[[steps]]\nrun = "after-nodes"\nwhat = "the rest"'))
+    runner = FakeRunner()                                             # every command exits 0, so skip_if says: nothing to do
+    assert cli_setup.cmd_setup(args("relay", yes=True, decline=["relay/3"]), runner, FakeProbe()) == 0
+    r = out(capsys)
+    ran = [c for c, _, _ in runner.ran]
+    assert "opencode auth login" not in ran and "install-nodes" not in ran and "after-nodes" in ran
+    assert "relay/2: nothing to do (test -f ~/.auth)" in r["skipped"] and "relay/3: declined (optional)" in r["skipped"]
+
+
+def test_a_resumed_run_keeps_the_answers(root: Path, capsys) -> None:
+    a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=none"])
+    assert cli_setup.cmd_setup(a, FakeRunner(fail={"aihub check tts"}), FakeProbe()) == 1
+    capsys.readouterr()
+    assert cli_setup.cmd_setup(args("tts", yes=True), FakeRunner(), FakeProbe()) == 0   # no licence or model question again
+    assert out(capsys)["failed"] == []
+
+
+def test_a_folder_value(root: Path, tmp_path: Path, capsys) -> None:
+    doc = root / "services" / "relay" / "setup" / "env.md"
+    doc.write_text(RELAY.replace('what = "the backend venv"', 'what = "the backend venv"\n\n[[config]]\nkey = "services.opencode.env.OPENCODE_PROJECT_DIR"\ntext = "Which folder?"\nchoices = "folder"\nrequired = true'))
+    inside = str(root / "services")
+    assert cli_setup.cmd_setup(args("relay", yes=True, set=[f"services.opencode.env.OPENCODE_PROJECT_DIR={inside}"]), RelayRunner([]), FakeProbe()) == 1
+    assert out(capsys)["reason"] == "unknown-value"
+    outside = tmp_path.parent / f"{tmp_path.name}-project"
+    assert cli_setup.cmd_setup(args("relay", yes=True, set=[f"services.opencode.env.OPENCODE_PROJECT_DIR={outside}"]), RelayRunner([]), FakeProbe()) == 0
+    assert outside.is_dir() and f'OPENCODE_PROJECT_DIR = "{outside.resolve()}"' in (root / "config.toml").read_text()
+
+
+def test_start_op_runs_after_the_download(root: Path, capsys) -> None:
+    doc = root / "services" / "tts" / "setup" / "env.md"
+    doc.write_text(TTS.replace('body = { preset = "small" }', 'body = { preset = "small" }\nstart_op = "POST /api/instances"\nstart_body = { model_id = "w" }'))
+    runner = FakeRunner()
+    assert cli_setup.cmd_setup(args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"]), runner, FakeProbe()) == 0
+    posts = [(p, b) for m, p, b in runner.calls if m == "POST"]
+    assert posts.index(("/api/s/tts/v1/load", {"preset": "small"})) < posts.index(("/api/s/tts/api/instances", {"model_id": "w"}))
+
+
+def test_host_labels(root: Path) -> None:
+    found = {c.id: c for c in cli_setup_host.checks(FakeProbe(have=("uv", "git")), root, {"ffmpeg", "blender"})}
+    assert found["needs:ffmpeg"].needs_root and found["needs:ffmpeg"].fix.startswith("sudo dnf install ffmpeg")
+    assert not found["needs:blender"].needs_root and "blender.org" in found["needs:blender"].fix
+    assert "clone-under-home" in found and "clone-under-home" in cli_setup_host.ADVICE
+
+
+def test_output_streams_to_stderr_under_json(tmp_path: Path, capsys) -> None:
+    cli_setup.run_mod.cli = cli
+    rc, tail = cli_setup.Runner().run("echo hello; echo there >&2", tmp_path, stream=False, echo=True)
+    assert rc == 0 and tail == "hello\nthere\n" and "    hello" in capsys.readouterr().err

@@ -18,6 +18,7 @@ STATE = Path("data") / "state" / "setup" / "run.json"
 TERMINAL = {"done", "finished", "ok", "ready", "completed", "failed", "error", "cancelled", "canceled"}
 FAILED = {"failed", "error"}
 JOB_TIMEOUT_S = 6 * 3600
+APPEAR_S = 45                 # how long a download route's job may take to show in the hub's status
 
 
 class Stop(Exception):
@@ -42,14 +43,24 @@ class Answers:
 class Runner:
     """Commands, hub calls and waiting; tests pass a fake."""
 
-    def run(self, cmd: str, cwd: Path, env: dict[str, str] | None = None, stream: bool = True) -> tuple[int, str]:
+    def run(self, cmd: str, cwd: Path, env: dict[str, str] | None = None, stream: bool = True, echo: bool = False) -> tuple[int, str]:
+        """`stream`: output straight to the terminal; else captured (its tail returned), and with
+        `echo` also copied to stderr as it comes (--json: progress for an agent, stdout stays JSON)."""
         import os
         full = {**os.environ, **(env or {})}
         full["PATH"] = f"{Path(cli.CODE) / 'bin'}:{full.get('PATH', '')}"   # `aihub` before ~/.local/bin is on PATH
         if stream:
             return subprocess.run(["bash", "-c", cmd], cwd=cwd, env=full).returncode, ""
-        p = subprocess.run(["bash", "-c", cmd], cwd=cwd, env=full, capture_output=True, text=True)
-        return p.returncode, (p.stdout + p.stderr)[-4000:]
+        if not echo:
+            p = subprocess.run(["bash", "-c", cmd], cwd=cwd, env=full, capture_output=True, text=True)
+            return p.returncode, (p.stdout + p.stderr)[-4000:]
+        tail: list[str] = []
+        with subprocess.Popen(["bash", "-c", cmd], cwd=cwd, env=full, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as p:
+            for line in p.stdout or []:
+                sys.stderr.write("    " + line)
+                tail.append(line)
+                del tail[:-200]
+        return p.returncode, "".join(tail)[-4000:]
 
     def call(self, method: str, path: str, body: Any = None) -> Any:
         return cli.call(method, path, body, timeout=600)
@@ -220,15 +231,18 @@ def _jobs(runner: Runner, mod: str) -> list[dict[str, Any]]:
 def follow_jobs(runner: Runner, mod: str, before: set[str], args: argparse.Namespace, what: str) -> None:
     """After a mod's download route: wait until the jobs it started end (a route answers at once and
     downloads in the background); a failed job is a failed step."""
-    deadline, quiet, last = time.monotonic() + JOB_TIMEOUT_S, 0, ""
+    deadline, quiet, last, seen, waited = time.monotonic() + JOB_TIMEOUT_S, 0, "", False, 0.0
     while time.monotonic() < deadline:
         jobs = [j for j in _jobs(runner, mod) if str(j.get("id")) not in before]
+        seen = seen or bool(jobs)
         bad = [j for j in jobs if str(j.get("state", "")).lower() in FAILED]
         if bad:
             raise Stop("failed", output=json.dumps(bad[0])[:2000])
         active = [j for j in jobs if str(j.get("state", "")).lower() not in TERMINAL]
         if not active:
-            quiet += 1
+            # The hub's status of an idle mod refreshes every 10 s: until the new job has shown up
+            # (or 45 s passed, for a route that finished at once), nothing is known yet.
+            quiet = quiet + 1 if (seen or waited >= APPEAR_S) else 0
             if quiet >= 2:
                 return
         else:
@@ -239,6 +253,7 @@ def follow_jobs(runner: Runner, mod: str, before: set[str], args: argparse.Names
                 say(args, line)
                 last = line
         runner.sleep(3)
+        waited += 3
     raise Stop("failed", output=f"{what}: still running after {JOB_TIMEOUT_S // 3600} h")
 
 
@@ -259,11 +274,13 @@ def download(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespac
         return
     rev = f" --revision {s.revision}" if s.revision else ""
     files = "".join(f" {f}" for f in s.files)
+    token = Path.home() / ".cache" / "huggingface" / "token"   # `hf auth login`'s, which HF_HOME would hide
+    tok = {"HF_TOKEN_PATH": str(token)} if token.is_file() else {}
     if s.dest == "hf-cache":
-        cmd, env, reg = f"uvx --from huggingface_hub hf download {s.repo}{files}{rev}", {"HF_HOME": str(root / "data/models/hf-cache")}, f"hf-cache/hub/models--{s.repo.replace('/', '--')}"
+        cmd, env, reg = f"uvx --from huggingface_hub hf download {s.repo}{files}{rev}", {"HF_HOME": str(root / "data/models/hf-cache"), **tok}, f"hf-cache/hub/models--{s.repo.replace('/', '--')}"
     else:
-        cmd, env, reg = f'uvx --from huggingface_hub hf download {s.repo}{files}{rev} --local-dir "data/models/{s.dest}"', None, s.dest
-    rc, out = runner.run(cmd, root, env=env, stream=not args.json)
+        cmd, env, reg = f'uvx --from huggingface_hub hf download {s.repo}{files}{rev} --local-dir "data/models/{s.dest}"', tok or None, s.dest
+    rc, out = runner.run(cmd, root, env=env, stream=not args.json, echo=args.json)
     if rc:
         raise Stop("failed", output=out)
     if s.dest == "hf-cache" and len(s.revision) == 40 and all(c in "0123456789abcdef" for c in s.revision):
@@ -273,13 +290,32 @@ def download(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespac
         ref.parent.mkdir(parents=True, exist_ok=True)
         if not ref.exists():
             ref.write_text(s.revision)
-    body = {"path": reg, "name": s.name, "kind": s.kind, "services": [e.mod],
-            "source": {"type": "huggingface", "repo": s.repo, **({"revision": s.revision} if s.revision else {})}}
+    source = {"type": "huggingface", "repo": s.repo, **({"revision": s.revision} if s.revision else {})}
+    if s.files and s.dest != "hf-cache":
+        # Files into a shared folder (comfyui/): each is its own model, never the whole folder.
+        bodies = [{"path": f"{s.dest}/{f}", "name": f"{s.name}: {f.rsplit('/', 1)[-1]}" if len(s.files) > 1 else s.name,
+                   "kind": s.kind, "services": [e.mod], "source": source} for f in s.files]
+    else:
+        bodies = [{"path": reg, "name": s.name, "kind": s.kind, "services": [e.mod], "source": source}]
+    for body in bodies:
+        try:
+            runner.call("POST", "/api/models", body)
+        except Exception as x:  # noqa: BLE001: 409 model_exists means it's registered already
+            if getattr(x, "code", "") != "model_exists":
+                raise Stop("failed", output=f"registering {body['path']}: {getattr(x, 'detail', x)}") from None
+
+
+def start(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespace) -> None:
+    """A suggestion's `start_op` after its download: launching the model (lcpp), so it's usable."""
+    if not s.start_op:
+        return
+    runner.run(f"aihub start {e.mod}", root, stream=False)
+    method, path = s.start_op.split()
+    say(args, f"    starting {s.name}: {s.start_op}")
     try:
-        runner.call("POST", "/api/models", body)
-    except Exception as x:  # noqa: BLE001: 409 model_exists means it's registered already
-        if getattr(x, "code", "") != "model_exists":
-            raise Stop("failed", output=f"registering it: {getattr(x, 'detail', x)}") from None
+        runner.call(method, f"/api/s/{e.mod}{path}", s.start_body or None)
+    except Exception as x:  # noqa: BLE001
+        raise Stop("failed", output=f"{s.start_op}: {getattr(x, 'detail', x)}") from None
 
 
 def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answers: Answers, root: Path, code: Path, runner: Runner) -> dict[str, Any]:
@@ -292,12 +328,25 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         save_state(root, state)
         return Stop("failed", report=report)
 
+    # A resumed run keeps the earlier run's answers (what's given now wins).
+    kept = state.setdefault("answers", {})
+    answers.accept |= set(kept.get("accept", [])) - answers.decline
+    answers.decline |= set(kept.get("decline", [])) - answers.accept
+    for k, v in kept.get("models", {}).items():
+        answers.models.setdefault(k, v)
+    for k, v in kept.get("values", {}).items():
+        answers.values.setdefault(k, v)
     # Every question first (licences, model choices), before the hub stage and any step: a "no"
-    # costs nothing, and skips that setup and whatever needs it.
+    # costs nothing, and skips that setup and whatever needs it (an optional step: only itself).
     declined: dict[str, str] = {}
+    optional_no: set[str] = set()
     for s in p["steps"]:
         if s["ask"] and s["setup"] not in declined and state["steps"].get(s["id"]) != "done" and not ask(args, answers, s["id"], s["ask"]):
-            declined[s["setup"]] = s["id"]
+            step = by_id[s["setup"]].setup.steps[int(s["id"].rsplit("/", 1)[1]) - 1]
+            if step.optional:
+                optional_no.add(s["id"])
+            else:
+                declined[s["setup"]] = s["id"]
     skip = dependents(envs, set(declined))
     for sid in sorted(skip):
         why = declined.get(sid)
@@ -305,6 +354,8 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
     live = [e for e in envs if e.id not in skip]
     check_mod_answers(answers, live)
     picked = {e.id: models_for(args, answers, e) for e in live if e.setup.suggest}
+    kept.update(accept=sorted(answers.accept), decline=sorted(answers.decline), models={k: [s.name for s in v] for k, v in picked.items()}, values=dict(answers.values))
+    save_state(root, state)
     report["hub"] = hub_stage(code, runner, stream=not args.json)
     for s in p["steps"]:
         e = by_id[s["setup"]]
@@ -314,6 +365,14 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             report["skipped"].append(f"{s['id']}: done in an earlier run")
             continue
         step = e.setup.steps[int(s["id"].rsplit("/", 1)[1]) - 1]
+        if s["id"] in optional_no:
+            report["skipped"].append(f"{s['id']}: declined (optional)")
+            continue
+        if step.skip_if and runner.run(step.skip_if, root / "services" / e.mod, stream=False)[0] == 0:
+            state["steps"][s["id"]] = "done"
+            save_state(root, state)
+            report["skipped"].append(f"{s['id']}: nothing to do ({step.skip_if})")
+            continue
         if step.interactive and s["id"] in answers.done:
             state["steps"][s["id"]] = "done"
             save_state(root, state)
@@ -324,7 +383,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             raise Stop("interactive", id=s["id"], run=s["run"], cwd=f"services/{e.mod}", text=s["what"],
                        answer_with=f"run it yourself in services/{e.mod}, then again with --done {s['id']}", report=report)
         say(args, f"\n==> {s['id']}: {s['what']}\n    $ {s['run']}")
-        rc, out = runner.run(s["run"], root / "services" / e.mod, stream=not args.json or step.interactive)
+        rc, out = runner.run(s["run"], root / "services" / e.mod, stream=not args.json or step.interactive, echo=args.json)
         if rc:
             raise fail({"setup": e.id, "step": s["id"], "run": s["run"], "output": out, "doc": doc_of(e, root)})
         state["steps"][s["id"]] = "done"
@@ -334,6 +393,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         chosen = picked.get(e.id, [])
         if e.setup.suggest and not chosen:
             report["next"].append(f"{e.id}: no models chosen; to add your own, see {doc_of(e, root)} (Choosing models)")
+        report["next"] += [f"{e.id}: {s.name}: {s.next}" for s in chosen if s.next]
         for s in chosen:
             key = f"{e.id}:{s.name}"
             if state["models"].get(key) == "done":
@@ -342,6 +402,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             say(args, f"\n==> {e.id}: model {s.name} ({s.size_gb:.2f} GB)")
             try:
                 download(s, e, root, runner, args)
+                start(s, e, root, runner, args)
             except Stop as x:
                 raise fail({"setup": e.id, "step": f"model:{s.name}", "output": x.data.get("output", ""), "doc": doc_of(e, root)}) from None
             state["models"][key] = "done"

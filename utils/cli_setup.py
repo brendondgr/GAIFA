@@ -31,8 +31,8 @@ Stop, Answers, Runner = run_mod.Stop, run_mod.Answers, run_mod.Runner
 EXIT = """exit codes: 0 done (or a plan printed); 1 failed, stopped by the host, or unknown; 2 a question needs an answer, or an interactive step needs you.
 value questions (the agent's model) come after install, since their choices (the relay's models) exist only then.
 under --json stdout is one JSON object: {"stage": "plan" | "report" | "stopped" | "host" | "choose" | "hub", …};
-a stop has "reason" ("question", "interactive", "failed", "host", "unknown", "unknown-model", "cycle") and, for a question,
-"id", "kind" (yes-no or models), "choices" and "answer_with". A report has done, skipped, failed (each with its doc), checks, next.
+a stop has "reason" ("question", "interactive", "failed", "host", "unknown", "unknown-model", "unknown-value", "cycle") and,
+for a question, "id", "kind" (yes-no, models or value), "choices" and "answer_with". A report has done, skipped, failed (each with its doc), checks, next.
 progress lines go to stderr. docs: docs/setup/README.md; each mod's services/<id>/setup/*.md"""
 
 
@@ -188,7 +188,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             return 1 if host_mod.blocking(found, gpu=False) else 0
         if not targets:
             if not run_mod.interactive(args):
-                emit(args, {"stage": "choose", "choices": [{"id": e.id, "mod": e.mod, "summary": e.setup.summary, "gpu": e.setup.gpu, "disk_gb": e.setup.disk_gb} for e in offered.values()], "problems": problems},
+                emit(args, {"stage": "choose", "choices": [{"id": e.id, "mod": e.mod, "summary": e.setup.summary, "gpu": e.setup.gpu, "disk_gb": e.setup.disk_gb, "after": e.setup.after} for e in offered.values()], "problems": problems},
                      "\n".join(f"  {e.id:24} {e.setup.summary}" for e in offered.values()))
                 return 0
             ids = sorted(offered, key=lambda i: (offered[i].mod, i))

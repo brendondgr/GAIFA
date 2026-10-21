@@ -18,6 +18,9 @@ else:
     from cli_setup_run import Answers, Runner, Stop, doc_of, interactive, say  # type: ignore[no-redef]
 
 
+NOT_CHAT = {"auto", "agent"}   # the relay's router pseudo-model, and OpenCode's coding agent (it runs shell commands)
+
+
 def relay_models(runner: Runner, root: Path) -> list[str]:
     """The model names the relay serves now (starting it first if it isn't running)."""
     for attempt in (0, 1):
@@ -96,6 +99,9 @@ def _prompt(e: Any, c: Any, choices: list[str], runner: Runner) -> str | None:
         print(f"  {i}. {m}")
     if c.choices == "relay-models":
         print("  h. add a hosted provider (an OpenAI-compatible API: its URL, key and model names)")
+    if c.choices == "folder":
+        pick = input("An absolute folder outside AIHub" + ("" if c.required else " (Enter to skip)") + ": ").strip()
+        return pick or None
     while True:
         pick = input("Number" + (", h" if c.choices == "relay-models" else "") + ("" if c.required else ", or Enter to skip") + ": ").strip()
         if not pick and not c.required:
@@ -113,6 +119,8 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
     """Providers first, then every [[config]] value of the chosen setups."""
     state.setdefault("config", {})
     state.setdefault("providers", [])
+    if answers.providers:
+        relay_models(runner, root)        # starts the relay: providers are its endpoints
     for p in answers.providers:
         if p.get("name") not in state["providers"]:
             say(args, f"\n==> relay: adding the provider {p.get('name')}")
@@ -124,7 +132,12 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
             qid = f"{e.id}/config:{c.key}"
             value = answers.values.get(qid, answers.values.get(c.key))
             while True:
-                choices = relay_models(runner, root) if c.choices == "relay-models" else list(c.choices)
+                if c.choices == "relay-models":
+                    choices = [m for m in relay_models(runner, root) if m not in NOT_CHAT]
+                elif c.choices == "folder":
+                    choices = []
+                else:
+                    choices = list(c.choices)
                 if value is None and interactive(args):
                     value = _prompt(e, c, choices, runner)
                     if value == "":
@@ -133,11 +146,23 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
                 break
             if value is None:
                 if c.required:
-                    raise Stop("question", id=qid, kind="value", text=c.text, choices=choices,
-                               answer_with=f'--set "{qid}=<value>"' + ("; to add a hosted provider first: \"providers\" in --answers (services/relay/setup/relay.md)" if c.choices == "relay-models" else ""))
+                    hint = ""
+                    if c.choices == "relay-models":
+                        hint = ("; to add a hosted provider first: \"providers\" in --answers (services/relay/setup/relay.md)"
+                                + ("" if choices else "; the relay serves no chat model yet: set up lcpp with a model (setup launches it), add a hosted provider, or set up opencode"))
+                    elif c.choices == "folder":
+                        hint = " (an absolute folder outside AIHub; created if missing)"
+                    raise Stop("question", id=qid, kind="value", text=c.text, choices=choices if c.choices != "folder" else "folder",
+                               answer_with=f'--set "{qid}=<value>"' + hint)
                 report["next"].append(f"{qid}: not set ({c.text}); later: --set \"{qid}=<value>\", or Settings")
                 continue
-            if choices and value not in choices:
+            if c.choices == "folder":
+                folder = Path(value).expanduser()
+                if not folder.is_absolute() or folder.resolve().is_relative_to(root.resolve()):
+                    raise Stop("unknown-value", id=qid, value=value, choices="an absolute folder outside AIHub", doc=doc_of(e, root))
+                folder.mkdir(parents=True, exist_ok=True)
+                value = str(folder.resolve())
+            elif choices and value not in choices:
                 raise Stop("unknown-value", id=qid, value=value, choices=choices, doc=doc_of(e, root))
             if state["config"].get(qid) == value and get_value(cfg, c.key) == value:
                 report["skipped"].append(f"{qid}: already {value}")

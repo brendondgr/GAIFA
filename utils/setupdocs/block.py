@@ -14,8 +14,8 @@ from typing import Any
 TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config"}
 CONFIG = {"key", "text", "choices", "required", "restart"}
 CONFIG_KEY = re.compile(r"^(services\.[a-z][a-z0-9-]{1,31}\.env\.[A-Z][A-Z0-9_]*|agent\.judge\.model)$")
-STEP = {"run", "what", "ask", "interactive"}
-SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated"}
+STEP = {"run", "what", "ask", "interactive", "skip_if", "optional"}
+SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated", "next", "start_op", "start_body"}
 
 
 @dataclass
@@ -24,6 +24,8 @@ class Step:
     what: str                       # what it does, how big, how long
     ask: str = ""                   # a yes/no question first (a licence); empty: no question
     interactive: bool = False       # it prompts (a login): under --json the person runs it, then the run resumes
+    skip_if: str = ""               # a command: exit 0 means there's nothing to do (logged in already), so it's done
+    optional: bool = False          # with an `ask`: a "no" skips only this step, not the whole setup
 
 
 @dataclass
@@ -41,13 +43,16 @@ class Suggest:
     licence: str = ""
     required: bool = False          # the engine can't run without it
     gated: bool = False             # accept the repo's terms on Hugging Face first
+    next: str = ""                  # what the person still has to do once it's chosen (joins the report)
+    start_op: str = ""              # a mod route run after the download, such as launching it ("POST /api/instances")
+    start_body: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class Config:
     key: str                        # services.<id>.env.<VAR>, or agent.judge.model, in config.toml
     text: str                       # the question
-    choices: str | list[str] = "relay-models"   # the relay's models once it runs, or a fixed list
+    choices: str | list[str] = "relay-models"   # the relay's models once it runs, "folder" (an absolute path outside AIHub), or a list
     required: bool = False          # no answer stops the run; else it's left for later (the report says so)
     restart: str = ""               # a mod id (or "hub") restarted once it's set
 
@@ -86,9 +91,15 @@ def _step(i: int, d: Any) -> tuple[Step | None, str | None]:
             return None, f"{where}: `{key}` must be a non-empty string"
     if not isinstance(d.get("ask", ""), str):
         return None, f"{where}: `ask` must be a string"
-    if not isinstance(d.get("interactive", False), bool):
-        return None, f"{where}: `interactive` must be true or false"
-    return Step(run=d["run"].strip(), what=d["what"].strip(), ask=d.get("ask", "").strip(), interactive=d.get("interactive", False)), None
+    for key in ("interactive", "optional"):
+        if not isinstance(d.get(key, False), bool):
+            return None, f"{where}: `{key}` must be true or false"
+    if not isinstance(d.get("skip_if", ""), str):
+        return None, f"{where}: `skip_if` must be a command"
+    if d.get("optional") and not d.get("ask"):
+        return None, f"{where}: an `optional` step needs an `ask` (its question)"
+    return Step(run=d["run"].strip(), what=d["what"].strip(), ask=d.get("ask", "").strip(), interactive=d.get("interactive", False),
+                skip_if=d.get("skip_if", "").strip(), optional=d.get("optional", False)), None
 
 
 def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:
@@ -128,16 +139,22 @@ def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:
             return None, f"{where}: `dest`, `files`, `revision` and `kind` go with `repo`, not `op` (the mod registers what it downloads)"
     if not _strs(d.get("files", [])) and d.get("files", []) != []:
         return None, f"{where}: `files` must be a list of file names"
-    for key in ("revision", "licence"):
+    for key in ("revision", "licence", "next"):
         if not isinstance(d.get(key, ""), str):
             return None, f"{where}: `{key}` must be a string"
+    so = d.get("start_op", "")
+    if so and (not isinstance(so, str) or len(so.split()) != 2 or so.split()[0] not in ("POST", "PUT") or not so.split()[1].startswith("/")):
+        return None, f"{where}: `start_op` must look like \"POST /api/instances\""
+    if not isinstance(d.get("start_body", {}), dict) or (d.get("start_body") and not so):
+        return None, f"{where}: `start_body` is a table, and needs `start_op`"
     for key in ("required", "gated"):
         if not isinstance(d.get(key, False), bool):
             return None, f"{where}: `{key}` must be true or false"
     return Suggest(name=d["name"].strip(), size_gb=float(d["size_gb"]), good_for=d["good_for"].strip(),
                    repo=repo.strip(), revision=d.get("revision", "").strip(), files=list(d.get("files", [])),
                    dest=posixpath.normpath(d["dest"].strip()) if repo else "", kind=d.get("kind", "other").strip(), op=op.strip(), body=dict(d.get("body", {})),
-                   licence=d.get("licence", "").strip(), required=d.get("required", False), gated=d.get("gated", False)), None
+                   licence=d.get("licence", "").strip(), required=d.get("required", False), gated=d.get("gated", False),
+                   next=d.get("next", "").strip(), start_op=so.strip() if so else "", start_body=dict(d.get("start_body", {}))), None
 
 
 def _config(i: int, d: Any) -> tuple[Config | None, str | None]:
@@ -152,8 +169,8 @@ def _config(i: int, d: Any) -> tuple[Config | None, str | None]:
     if not isinstance(d.get("text"), str) or not d["text"].strip():
         return None, f"{where}: `text` must be a non-empty question"
     choices = d.get("choices", "relay-models")
-    if not (choices == "relay-models" or _strs(choices)):
-        return None, f"{where}: `choices` must be \"relay-models\" or a list of strings"
+    if not (choices in ("relay-models", "folder") or _strs(choices)):
+        return None, f"{where}: `choices` must be \"relay-models\", \"folder\" or a list of strings"
     if not isinstance(d.get("required", False), bool) or not isinstance(d.get("restart", ""), str):
         return None, f"{where}: `required` is true or false, `restart` a mod id or \"hub\""
     return Config(key=d["key"], text=d["text"].strip(), choices=choices, required=d.get("required", False), restart=d.get("restart", "").strip()), None

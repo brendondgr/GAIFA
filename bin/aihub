@@ -5,8 +5,8 @@ here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 root="$(dirname "$here")"
 py="$root/.venv/bin/python"
 if [[ ! -x "$py" ]]; then
-    # The CLI is standard library only; `serve` still needs the venv.
-    echo "aihub: $py is missing; run \`uv sync\` in $root" >&2
+    # The CLI is standard library only; `serve` still needs the venv. `setup` runs `uv sync` itself.
+    [[ "${1:-}" == "setup" ]] || echo "aihub: $py is missing; run \`uv sync\` in $root (or \`bin/aihub setup\`)" >&2
     py="$(command -v python3)"
 fi
 exec "$py" "$root/utils/cli.py" "$@"

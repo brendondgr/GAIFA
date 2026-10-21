@@ -7,7 +7,7 @@ summary = "__NAME__: one line on what it gives you"
 gpu = false
 disk_gb = 0.1
 needs = []
-check = "aihub check __ID__"
+check = "aihub check __ID__ --start"
 
 [[steps]]
 run = "aihub install __ID__"

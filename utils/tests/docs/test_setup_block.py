@@ -120,4 +120,4 @@ def test_the_template_parses_once_filled_in(tmp_path: Path) -> None:
     tpl = (Path(__file__).resolve().parents[3] / "services" / "_template" / "setup" / "env.md").read_text()
     env, problem = envs.parse(doc(tmp_path, tpl.replace("__ID__", "my-mod").replace("__NAME__", "My Mod"), mod="my-mod"), "my-mod")
     assert problem is None
-    assert env.setup.summary.startswith("My Mod") and env.setup.check == "aihub check my-mod" and env.setup.steps[0].run == "aihub install my-mod"
+    assert env.setup.summary.startswith("My Mod") and env.setup.check == "aihub check my-mod --start" and env.setup.steps[0].run == "aihub install my-mod"

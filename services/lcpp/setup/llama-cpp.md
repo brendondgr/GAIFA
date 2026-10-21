@@ -7,7 +7,7 @@ summary = "LLM Launcher: run any GGUF chat model with llama.cpp on the GPU (Vulk
 gpu = true
 disk_gb = 0.15
 needs = ["uv", "curl", "tar", "sha256sum", "systemd-run"]
-check = "aihub check lcpp"
+check = "aihub check lcpp --start"
 
 [[steps]]
 run = "aihub install lcpp"

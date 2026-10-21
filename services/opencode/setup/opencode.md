@@ -8,7 +8,7 @@ gpu = false
 disk_gb = 0.2
 needs = ["opencode"]
 after = []
-check = "aihub check opencode"
+check = "aihub check opencode --start"
 
 [[steps]]
 run = "opencode auth login"

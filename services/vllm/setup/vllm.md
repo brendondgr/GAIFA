@@ -8,7 +8,7 @@ gpu = true
 disk_gb = 12.5
 needs = ["uv", "podman"]
 after = ["relay"]
-check = "aihub check vllm"
+check = "aihub check vllm --start"
 
 [[steps]]
 run = "aihub install vllm"

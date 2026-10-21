@@ -8,7 +8,7 @@ gpu = false
 disk_gb = 0.05
 needs = ["uv"]
 after = ["relay"]
-check = "aihub check agent"
+check = "aihub check agent --start"
 
 [[steps]]
 run = "aihub install agent"

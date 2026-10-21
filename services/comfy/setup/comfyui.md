@@ -7,7 +7,7 @@ summary = "Images & Video: ComfyUI in a ROCm toolbox, running any workflow pack 
 gpu = true
 disk_gb = 16
 needs = ["podman", "toolbox", "git"]
-check = "aihub check comfy && podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest"
+check = "aihub check comfy --start && podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest"
 
 [[steps]]
 run = "aihub install comfy"

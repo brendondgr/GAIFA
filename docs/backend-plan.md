@@ -2248,7 +2248,8 @@ Asked for on 2026-10-20. AIHub is public, but only this machine can install it: 
 - **Per-model docs become a local inventory** of your own models, out of git (23.6).
 - **Each mod suggests a few starter models, all optional;** engines that need fixed weights list those as required (23.7, 23.8).
 - The old 23.7 (checksums for every committed model doc) is dropped with them.
-- **An all-in-one setup that an agent can run for the person,** following the same process a person follows: `aihub setup` from a bare clone, with a JSON plan, answers and report for an agent, and a skill that points agents to it (23.9, 23.11). Root steps stay the person's.
+- **An all-in-one setup that an agent can run for the person,** following the same process a person follows: `aihub setup` from a bare clone, with a JSON plan, answers and report for an agent, and a skill that points agents to it (23.9, 23.13). Root steps stay the person's.
+- **After the fresh reader (23.10):** fix everything it found; this machine's state leaves git for neutral defaults (23.11); the wizard asks for the agent's model, and uninstalled mods aren't autostarted (23.12).
 
 ## Phase 23 — Setup docs per mod, and `aihub setup`
 
@@ -2373,8 +2374,21 @@ Touches architecture §4 (a mod may ship `setup/`), §8 (model docs come from th
   - **A fresh reader:** an agent with no context follows `docs/setup/` and `aihub setup --dry-run` for a few mod choices, and lists every step that is ambiguous, assumes knowledge, or names a file, command or value that doesn't exist; each item is fixed or answered.
   - **A fresh clone** (needs the user's OK): a clone of the pushed `main` into `data/state/fresh-clone/` (gitignored), then `aihub setup relay agent` against a hub on another port (no systemd unit), choosing no models. The GPU mods are checked by `--dry-run` only.
   *Done when:* the reader's list is empty, the clone's relay and agent come up healthy through the wizard, and the clone is removed afterwards.
+  - *As built, so far:* the fresh clone passed (`131db14`): from a bare clone, `aihub setup --yes --json relay agent`, with its hub on 7078 in the foreground and the mods as child processes on other ports, installed both and passed both checks. The reader (2026-10-21) found 7 blockers, 24 confusing items and some minor ones; the user chose to fix all of them (2026-10-21), in two batches:
+    1. **The wizard:** a "no" skips that setup and what depends on it (`--decline`, `"decline"`); steps marked `interactive = true` hand their command to the person under `--json` and resume; route downloads are followed until their job ends, and a failed route call is a failed step with its doc; the plan text shows the hub stage, the host results and the checks; every question is asked before the hub is installed; the disk check counts the chosen models, and an image two setups share once; progress lines on stderr under `--json`; the exit codes and report shape in `--help`; a mod id that expands to several setups says so; `--models` takes setup ids first; opencode's installer as a non-root fix.
+    2. **The docs:** a hosted provider in `relay.md` (an `openai` endpoint with a base URL and key, by the page or `POST /admin/endpoints`); OpenCode's real installer; stt's host ROCm packages in `host.md` and its needs, and `gpu` as stated; gen3d after comfy, lcpp and vllm after the relay; licence questions for Cube3D, Qwen-Image and Hunyuan3D; comfy's suggestions grouped so each choice runs; the ComfyUI image pulled by digest; the nightly wheel indexes' pruning noted; the stale lines the reader listed.
 
-- [ ] **23.11 Rules, skills and docs in sync.**
+- [ ] **23.11 Neutral defaults in git** (user, 2026-10-21).
+  - This machine's state leaves git: `config.toml`, `data/models/registry.json` and `services/lcpp/data/models.json` become local (gitignored), and git keeps `config.example.toml` (the defaults: no autostarts, no judge model), an empty registry and an empty catalog as examples. A missing `config.toml` is created from the example on the first `aihub` command or hub start; a missing registry or catalog is an empty one. This machine's files stay exactly as they are.
+  - `CLAUDE.md`'s rules: defaults go in `config.example.toml`; `config.toml` is yours.
+  *Done when:* a fresh clone's hub starts with no models, no catalog entries and nothing autostarted, `aihub doctor` reports no missing models, this machine's hub and settings are unchanged, and the suite passes.
+
+- [ ] **23.12 The agent's model, and mods that aren't installed** (user, 2026-10-21).
+  - **A model question:** after the relay and the LLM mods are set up, the wizard lists the relay's models (`GET /v1/models`), plus "a hosted provider" (base URL, key and model names into a relay endpoint), and writes the choice to `config.toml [services.agent] env.AGENT_MODEL` (and the Auto judge's `[agent.judge] model`, optional). Under `--json` it's a `value` question with the relay's models as choices. The agent's `check` fails when its model isn't on the relay.
+  - **No autostart for a mod that isn't installed:** the hub skips autostart, and shows "not installed", for a mod whose command doesn't exist yet, so a fresh install isn't a wall of failed mods.
+  *Done when:* tests cover the question (both modes), the write to `config.toml` (comments kept) and the check; a fake mod without its venv shows "not installed" and isn't started; on this machine nothing changes.
+
+- [ ] **23.13 Rules, skills and docs in sync.**
   - `CLAUDE.md`: a rule ("A new mod ships a setup doc with an `aihub-setup` block: summary, steps, check, suggestions"); the status line; `docs/setup/` in Layout. The README's Quickstart becomes `aihub setup`, and Requirements point to `docs/setup/host.md` (and drop the out-of-date "about 190 GB").
   - **The agent's entry point:** a project skill `.claude/skills/aihub-setup/SKILL.md` and a "Setting up a new machine" section in `AGENTS.md` and `CLAUDE.md`: ask the person which mods and which models (the suggestions, their own, or none), show `aihub setup --plan`, run it with their answers, hand them any `sudo` commands, confirm every `check`, and on a failure read that mod's setup doc (What to look for, Known gaps). `docs/setup/README.md` opens with the same procedure for a person, step for step.
   - Architecture §4 (`setup/` among a mod's optional extras); `docs/mods.md`; `docs/structure.md`.

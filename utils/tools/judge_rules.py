@@ -1,7 +1,9 @@
 """The judge's fixed rules (plan 30.2): the first stage of the Auto mode's judge.
 
 `classify(call, folder) -> Verdict(verdict, reason, rule)`, where `verdict` is:
-- `allow`: clearly safe (read-only commands, test runners on a known list, edits inside an Edit folder);
+- `allow`: clearly safe (read-only commands and test runners on a known list, each with its own list of options;
+  edits inside an Edit folder; documentation on a known host). Never a command that runs with the internet on
+  (`args.network`): what it reads it could send, so the model decides;
 - `ask`: clearly needs the user (rm -rf outside build folders, `curl … | sh`, writes to dotfiles, history rewriting,
   killing processes, credentials, anything on the host, sudo);
 - `unsure`: the rules can't tell; the judge's model decides (plan 30.3), with `reason` saying why.
@@ -16,6 +18,7 @@ the folder's level (Phase 27) refuse; the worst a rule does is ask.
 
 from __future__ import annotations
 
+import fnmatch
 import ipaddress
 import posixpath
 import re
@@ -33,6 +36,14 @@ MAX_COMMAND = 4000
 HIJACK_ENV_RE = re.compile(r"^(LD_PRELOAD|LD_LIBRARY_PATH|LD_AUDIT|PYTHONSTARTUP|PYTHONPATH|BASH_ENV|ENV|PROMPT_COMMAND"
                            r"|GIT_SSH_COMMAND|GIT_SSH|GIT_EXTERNAL_DIFF|GIT_ASKPASS|SSH_ASKPASS|PAGER|GIT_PAGER|EDITOR"
                            r"|VISUAL|NODE_OPTIONS|PERL5OPT|RUBYOPT)=")
+# Variables that point a tool at other programs, configs or search paths (rg's config can add --pre, PATH picks the
+# program that runs): the rules can't see what runs, so the model decides.
+CONFIG_ENV_RE = re.compile(r"^(PATH|HOME|XDG_\w+|ZDOTDIR|SHELL|IFS|PS4|RIPGREP_CONFIG_PATH|LESS\w*|TAR_OPTIONS"
+                           r"|MAKEFLAGS|MFLAGS|GNUMAKEFLAGS|MAKEFILES|BAT_\w+|MANPAGER|GIT_\w+|NPM_CONFIG_\w+|YARN_\w+"
+                           r"|PERL5?LIB|RUBYLIB|NODE_PATH|PYTEST_ADDOPTS|PYTEST_PLUGINS|DYLD_\w+|LD_\w+|GCONV_PATH"
+                           r"|CARGO_\w+|RUSTC\w*|RUSTFLAGS|RUSTDOCFLAGS|GOFLAGS|GOROOT|GOPATH|GOTOOLCHAIN|CC|CXX|CPP"
+                           r"|LD|AR|CFLAGS|CXXFLAGS|LDFLAGS|PYTHONHOME|PYTHONUSERBASE|VIRTUAL_ENV|UV_\w+|PIP_\w+"
+                           r"|TOX_\w+|BROWSER)=", re.I)
 
 
 class Verdict(NamedTuple):
@@ -80,8 +91,197 @@ SENSITIVE_WRITE_RE = re.compile(
     r"|\.netrc$|\.npmrc$|\.pypirc$|\.envrc$|\.env(\.[\w.-]+)?$|\.git-credentials$|\.mcp\.json$|\.claude/|\.cursor/)")
 DOCS_HOSTS = {"docs.python.org", "developer.mozilla.org", "pypi.org", "en.wikipedia.org", "docs.rs", "crates.io",
               "pkg.go.dev", "www.npmjs.com", "nodejs.org", "docs.github.com", "learn.microsoft.com",
-              "docs.pytest.org", "fastapi.tiangolo.com", "docs.pydantic.dev", "huggingface.co", "readthedocs.io",
+              "docs.pytest.org", "fastapi.tiangolo.com", "docs.pydantic.dev", "huggingface.co",
               "www.rust-lang.org", "doc.rust-lang.org", "go.dev", "man7.org", "www.postgresql.org", "sqlite.org"}
+# Exact hosts only: a multi-tenant domain (readthedocs.io, github.io, netlify.app …) serves whoever signs up, so a page
+# there could be an attacker's server; the model decides those.
+MAX_DOCS_PATH = 300
+ENCODED_RE = re.compile(r"[A-Za-z0-9+/=_-]{40,}")         # a path segment long enough to carry a secret
+SLUG_RE = re.compile(r"[a-z0-9]{1,24}(?:[-_.][a-z0-9]{1,24})+")   # words-with-hyphens, as page names are
+SHA_RE = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
+DOT_SECRETS = (".env", ".env.local", ".envrc", ".netrc", ".npmrc", ".pypirc", ".git-credentials", ".htpasswd", ".ssh",
+               ".aws", ".gnupg", ".kube", ".docker", ".password-store")
+NAMED_SECRETS = ("id_rsa", "id_dsa", "id_ecdsa", "id_ed25519", "credentials", "secrets", "secret", "shadow", "key.pem",
+                 "server.key", "cert.p12", "vault.kdbx")
+# The options an allowed tool may take, as (short switches, short options that take a value, long options): a long
+# name ending in "=" takes a value, "==" two; "#" lets digits through (head -20). Any other option falls through to
+# the model: the lists leave out whatever runs a program (rg --pre, fd -x, sort --compress-program, bat --pager),
+# writes a file (sort -o, tree -o, yq -i, xxd -r), sets the clock or the host name, or reaches a remote.
+OPTS: dict[str, tuple[str, str, str]] = {
+    "ls": ("aAbBcCdDfFgGhHiklLmnNopqQrRsStuUvxXZ1", "ITw", "all almost-all author escape block-size= ignore-backups "
+           "color classify file-type format= full-time group-directories-first no-group human-readable si dereference "
+           "dereference-command-line hide= ignore= indicator-style= inode kibibytes literal numeric-uid-gid "
+           "quote-name quoting-style= reverse recursive size sort= time= time-style= tabsize= width= directory zero"),
+    "cat": ("AbeEnstTuv", "", "show-all number-nonblank show-ends number squeeze-blank show-tabs show-nonprinting"),
+    "head": ("qvz#", "cn", "bytes= lines= quiet silent verbose zero-terminated"),
+    "tail": ("fFqvz#", "cns", "bytes= follow lines= quiet silent verbose retry pid= sleep-interval= zero-terminated"),
+    "less": ("NRSFXi", "", ""), "more": ("", "", ""),
+    "wc": ("clmwL", "", "bytes chars lines words max-line-length total="),
+    "grep": ("abcEFGhHiIlLnoPqrRsTuUvVwxyzZ#", "ABCefmdD", "include= exclude= exclude-dir= color colour recursive "
+             "dereference-recursive ignore-case no-ignore-case line-number count files-with-matches "
+             "files-without-match word-regexp line-regexp invert-match only-matching quiet silent no-filename "
+             "with-filename max-count= after-context= before-context= context= regexp= file= fixed-strings "
+             "extended-regexp perl-regexp basic-regexp binary-files= text null null-data label= byte-offset "
+             "no-messages devices= directories= initial-tab line-buffered"),
+    "rg": ("abcFHhiIlLnNopPqsSuUvVwx0.", "ABCefgtTmMrEdj", "hidden no-ignore no-ignore-vcs no-ignore-dot "
+           "no-ignore-parent glob= iglob= type= type-not= files files-with-matches files-without-match count "
+           "count-matches json vimgrep max-depth= max-count= fixed-strings ignore-case smart-case case-sensitive "
+           "word-regexp line-regexp line-number no-line-number no-heading heading with-filename no-filename color= "
+           "colors= context= after-context= before-context= replace= multiline multiline-dotall follow sort= sortr= "
+           "stats trim max-filesize= no-messages only-matching invert-match type-list column no-column null pcre2 "
+           "engine= unrestricted no-config text binary passthru byte-offset max-columns= max-columns-preview quiet "
+           "regexp= file= threads= encoding= crlf null-data line-buffered block-buffered context-separator= "
+           "field-match-separator= path-separator= version help"),
+    "ag": ("acfHilLnQsStuUvw0.", "ABCmGgW", "hidden ignore= ignore-case case-sensitive smart-case literal "
+           "word-regexp files-with-matches files-without-matches count context= after= before= depth= max-count= "
+           "nocolor color nogroup group column follow vimgrep noheading only-matching invert-match stats "
+           "skip-vcs-ignores unrestricted all-types search-binary"),
+    "fd": ("HIsiugFalLp0q1", "dteESjco", "hidden no-ignore no-ignore-vcs unrestricted case-sensitive ignore-case glob "
+           "regex fixed-strings absolute-path list-details follow full-path print0 max-depth= min-depth= exact-depth= "
+           "type= extension= exclude= size= changed-within= changed-before= owner= max-results= color= threads= "
+           "strip-cwd-prefix base-directory= search-path= prune one-file-system quiet show-errors format="),
+    "tree": ("adfilsuhgpDFQNqrtvUcCnAxJ", "LPI", "dirsfirst filesfirst noreport gitignore charset= du prune matchdirs "
+             "filelimit= sort= ignore-case timefmt= si inodes device version help"),
+    "sort": ("bdfgiMhnRrVcCsuzm", "ktS", "key= field-separator= numeric-sort human-numeric-sort general-numeric-sort "
+             "month-sort random-sort version-sort reverse unique ignore-case ignore-leading-blanks dictionary-order "
+             "ignore-nonprinting stable check zero-terminated buffer-size= parallel= merge debug sort="),
+    "uniq": ("cdDiuz", "fsw", "count repeated all-repeated unique ignore-case zero-terminated skip-fields= "
+             "skip-chars= check-chars= group"),
+    "cut": ("nsz", "bcfd", "bytes= characters= fields= delimiter= complement only-delimited output-delimiter= "
+            "zero-terminated"),
+    "tr": ("cCdst", "", "complement delete squeeze-repeats truncate-set1"),
+    "diff": ("aBbdEiNpqrsTtuwyZ#", "CDFIUWSxXL", "unified= context= recursive brief new-file ignore-all-space "
+             "ignore-space-change ignore-blank-lines ignore-case side-by-side color= exclude= exclude-from= text "
+             "strip-trailing-cr no-dereference suppress-common-lines label= report-identical-files minimal "
+             "from-file= to-file= ignore-matching-lines= show-function-line= show-c-function width= expand-tabs "
+             "initial-tab normal speed-large-files unidirectional-new-file horizon-lines= tabsize= palette="),
+    "cmp": ("bls", "in", "print-bytes verbose quiet silent ignore-initial= bytes="),
+    "comm": ("123iz", "", "check-order nocheck-order output-delimiter= total zero-terminated"),
+    "jq": ("acCeEjMnrRsSt#", "fL", "arg== argjson== slurpfile== rawfile== args jsonargs tab indent= raw-output "
+           "compact-output slurp null-input exit-status sort-keys raw-input join-output ascii-output color-output "
+           "monochrome-output from-file= seq stream stream-errors raw-output0 unbuffered"),
+    "yq": ("ePCMnrNj", "opI", "output-format= input-format= prettyPrint colors no-colors null-input exit-status "
+           "unwrapScalar no-doc indent= raw-output"),
+    "file": ("bikLhNr0E", "eFP", "brief mime mime-type mime-encoding keep-going dereference no-dereference no-pad raw "
+             "print0 extension separator= exclude= parameter="),
+    "stat": ("Lft", "c", "dereference file-system terse format= printf= cached="),
+    "du": ("abcDhHklLmsSxP0", "dBtX", "all apparent-size bytes total dereference-args human-readable inodes "
+           "dereference count-links max-depth= summarize separate-dirs si one-file-system exclude= exclude-from= "
+           "threshold= time time-style= block-size= null"),
+    "df": ("ahHiklPT", "Btx", "all block-size= human-readable si inodes local portability print-type type= "
+           "exclude-type= output total"),
+    "date": ("uRI", "dfr", "date= file= reference= utc universal rfc-email rfc-3339= iso-8601 debug"),
+    "xxd": ("abCEeipudh", "cglsonR", ""),
+    "hexdump": ("bcCdovx", "efns", ""),
+    "od": ("bcdfilosvx", "AjNtwS", "address-radix= skip-bytes= read-bytes= format= output-duplicates width= strings= "
+           "endian= traditional"),
+    "cksum": ("z", "al", "algorithm= base64 check length= raw tag untagged zero"),
+    "strings": ("adfwo#", "nte", "all data print-file-name bytes= radix= encoding= include-all-whitespace"),
+    "rev": ("", "", ""), "fold": ("bs", "w", "bytes spaces width="), "tac": ("br", "s", "before regex separator="),
+    "fmt": ("cstu#", "wpg", "crown-margin tagged-paragraph split-only uniform-spacing width= prefix= goal="),
+    "expand": ("i#", "t", "initial tabs="), "unexpand": ("a#", "t", "all first-only tabs="),
+    "paste": ("sz", "d", "delimiters= serial zero-terminated"),
+    "join": ("iz", "aejotv12", "ignore-case check-order nocheck-order header zero-terminated"),
+    "zcat": ("fqvltnN", "", "force quiet verbose list test"),
+    "bat": ("pnAuP", "lHrm", "plain number show-all language= highlight-line= line-range= style= color= theme= "
+            "decorations= tabs= wrap= terminal-width= list-languages list-themes diff file-name= map-syntax= "
+            "squeeze-blank"),
+    "hostname": ("fsiIdAa", "", "fqdn short ip-address all-ip-addresses domain all-fqdns alias"),
+    "column": ("txJLe", "socNRHOWETrinpd", "table separator= output-separator= output-width= fillrows json "
+               "keep-empty-lines table-columns= table-right= table-hide= table-name= table-order= table-wrap= "
+               "table-noextreme= table-truncate="),
+    "nl": ("p", "bdfhilnsvw", "body-numbering= section-delimiter= footer-numbering= header-numbering= "
+           "line-increment= join-blank-lines= number-format= no-renumber number-separator= starting-line-number= "
+           "number-width="),
+    "bc": ("lqsw", "", "mathlib quiet standard warn"),
+    "top": ("bcHiSs1", "ndpuUoOwE", ""),
+    "pgrep": ("flaxnovciwA", "ruUGgPstFd", "full list-name list-full exact newest oldest inverse count ignore-case "
+              "lightweight delimiter= pidfile="),
+    "realpath": ("emLPqsz", "", "canonicalize-existing canonicalize-missing logical physical quiet strip no-symlinks "
+                 "zero relative-to= relative-base="),
+    "readlink": ("femnqsvz", "", "canonicalize canonicalize-existing canonicalize-missing no-newline quiet silent "
+                 "verbose zero"),
+}
+OPTS.update({k: OPTS["grep"] for k in ("egrep", "fgrep")})
+OPTS.update({k: ("bctwz", "l", "binary check tag text ignore-missing quiet status strict warn zero length=")
+             for k in ("md5sum", "sha1sum", "sha256sum", "sha512sum", "b2sum")})
+# Only print what they're given or facts about the machine, whatever their options.
+ANY_ARGS = {"echo", "printf", "true", "false", "test", "[", ":", "expr", "pwd", "basename", "dirname", "which", "type",
+            "sleep", "seq", "tput", "set", "unset", "export", "exit", "return", "wait", "ps", "lsof", "nproc",
+            "uptime", "whoami", "locale", "cal", "id", "uname", "free", "lscpu", "{", "}", "do", "done", "then", "fi",
+            "else", "elif", "if", "for", "while", "until", "in", "case", "esac"}
+# Every option of these only changes what they print, so an argument the rules can't see ($X, $(…), a glob that
+# could expand to "--something") can't make them run or write anything.
+SUB_OK = {"grep", "egrep", "fgrep", "cat", "head", "tail", "wc", "ls", "stat", "du", "md5sum", "sha1sum", "sha256sum",
+          "sha512sum", "b2sum", "cksum", "strings", "cut", "tr", "nl", "rev", "fold", "fmt", "expand", "unexpand",
+          "paste", "tac", "comm", "cmp", "diff", "jq"}
+# Test runners and checkers: they run the project's own code (the test-runner policy), but only with these options;
+# the lists leave out plugins and configs from elsewhere (pytest -p/-c/--rootdir, eslint --plugin/--rulesdir),
+# --basetemp (pytest empties it), installs (mypy --install-types) and remotes.
+RUNNER_OPTS: dict[str, tuple[str, str, str]] = {
+    "pytest": ("qvxslH", "kmnrW", "lf last-failed ff failed-first nf new-first sw stepwise stepwise-skip co "
+               "collect-only tb= maxfail= durations= durations-min= no-header no-summary disable-warnings showlocals "
+               "capture= verbose quiet exitfirst strict-markers runxfail cov= cov-report= cov-fail-under= cov-branch "
+               "no-cov doctest-modules import-mode= color= code-highlight= timeout= deselect= ignore= ignore-glob= "
+               "junitxml= setup-show fixtures markers version help log-level= log-cli-level= numprocesses= dist= "
+               "maxprocesses= randomly-seed= continue-on-collection-errors full-trace"),
+    "mypy": ("v", "pm", "strict ignore-missing-imports no-incremental show-error-codes pretty python-version= "
+             "config-file= cache-dir= junit-xml= html-report= follow-imports= explicit-package-bases "
+             "namespace-packages check-untyped-defs disallow-untyped-defs warn-unused-ignores no-error-summary "
+             "exclude= show-column-numbers no-color-output warn-return-any disallow-any-generics package= module= "
+             "verbose version"),
+    "ruff": ("qne", "", "fix unsafe-fixes no-fix diff check select= ignore= extend-select= extend-ignore= "
+             "output-format= statistics show-fixes no-cache quiet exit-zero exit-non-zero-on-fix line-length= "
+             "target-version= preview no-preview show-files show-settings"),
+    "black": ("qvS", "lt", "check diff quiet verbose line-length= target-version= skip-string-normalization "
+              "skip-magic-trailing-comma preview fast safe color no-color include= exclude= extend-exclude= "
+              "force-exclude="),
+    "isort": ("cqv", "l", "check-only check diff profile= quiet verbose skip= skip-glob= line-length= "
+              "float-to-top atomic"),
+    "flake8": ("qv", "", "max-line-length= max-complexity= select= ignore= extend-ignore= extend-select= exclude= "
+               "extend-exclude= count statistics show-source quiet verbose"),
+    "pycodestyle": ("qv", "", "max-line-length= ignore= select= count statistics show-source quiet verbose"),
+    "pyflakes": ("", "", ""), "tabnanny": ("qv", "", ""), "py_compile": ("q", "", ""),
+    "pylint": ("E", "j", "errors-only disable= enable= jobs= score= reports= max-line-length= recursive="),
+    "pyright": ("", "p", "outputjson level= pythonversion= verbose stats warnings project= skipunannotated"),
+    "eslint": ("", "", "fix fix-dry-run ext= max-warnings= quiet cache cache-location= ignore-pattern= no-ignore "
+               "report-unused-disable-directives color no-color no-error-on-unmatched-pattern"),
+    "tsc": ("b", "p", "noEmit project= pretty strict incremental build listFiles outDir= declaration skipLibCheck "
+            "target= module= version"),
+    "prettier": ("cl", "", "check write list-different ignore-path= log-level= no-color cache"),
+    "jest": ("io", "tw", "coverage ci runInBand silent verbose testNamePattern= bail passWithNoTests maxWorkers= "
+             "testPathPattern= findRelatedTests onlyChanged json outputFile= watchAll="),
+    "vitest": ("", "t", "run coverage reporter= silent bail= passWithNoTests"),
+    "shellcheck": ("xaCV", "sfeSo", "shell= format= exclude= severity= external-sources color= enable="),
+    "ctest": ("VQ", "jRE", "output-on-failure parallel= tests-regex= exclude-regex= test-dir= verbose quiet "
+              "stop-on-failure rerun-failed"),
+    "golangci-lint": ("v", "", "fix timeout= verbose fast new"),
+    "biome": ("", "", "write apply verbose"),
+    "tox": ("qvrp", "emf", "recreate parallel= skip-missing-interpreters= notest no-recreate-pkg"),
+    "nox": ("rRl", "skt", "session= keywords= tags= reuse-existing-virtualenvs list no-error-on-missing-interpreters"),
+    "unittest": ("vqfbc", "spkt", "locals buffer failfast catch"),
+    "doctest": ("vf", "o", ""),
+    "compileall": ("qflb", "rjxdi", ""),
+}
+RUNNER_OPTS["py.test"] = RUNNER_OPTS["pytest"]
+GENERIC_RUNNER = ("qv", "", "quiet verbose version help")
+# Build tools, after their verb.
+BUILD_OPTS: dict[str, tuple[str, str, str]] = {
+    "cargo": ("qvr", "pFj", "all workspace release package= lib bins bin= tests test= benches bench= examples "
+              "example= all-targets features= all-features no-default-features quiet verbose no-fail-fast doc locked "
+              "offline frozen jobs= target= target-dir= manifest-path= message-format= color= no-run check exclude= "
+              "profile= keep-going no-deps document-private-items"),
+    "go": ("", "", "v race cover short a n x json failfast benchmem trimpath run= count= timeout= tags= o= bench= "
+           "p= mod= cpu= parallel= coverprofile= covermode= coverpkg= skip= shuffle= benchtime= list= m"),
+    "meson": ("v", "Cj", "print-errorlogs suite= num-processes= reconfigure wipe buildtype= verbose"),
+    "gradle": ("qi", "x", "offline info stacktrace no-daemon console= parallel quiet exclude-task= continue"),
+    "mvn": ("qoBe", "T", "batch-mode offline quiet errors no-transfer-progress threads="),
+    "dotnet": ("", "cvf", "configuration= verbosity= no-restore no-build framework= filter= nologo"),
+    "swift": ("v", "cj", "configuration= filter= parallel jobs= verbose"),
+    "zig": ("", "j", "summary= verbose"),
+    "cmake": ("v", "SBGjt", "build= parallel= target= config= clean-first verbose"),
+    "ninja": ("vn", "Cjk", ""),
+}
 PY_DANGER_RE = re.compile(r"\b(shutil\.rmtree|os\.(remove|unlink|rmdir|removedirs|system|popen|exec\w*|spawn\w*|kill)"
                           r"|subprocess|pty\.spawn|ctypes|socket\.|__import__\(['\"](os|subprocess)|send2trash"
                           r"|\.unlink\(|\.rmdir\(|eval\(|exec\()")
@@ -135,9 +335,19 @@ def write_target(word: str, ctx: Ctx, what: str = "writes") -> Verdict:
 def read_target(word: str, ctx: Ctx) -> Verdict | None:
     path = ctx.resolve(word)
     probe = path if path is not None else word
-    if SECRET_FILE_RE.search(probe):
+    if SECRET_FILE_RE.search(probe) or any(_glob_secret(part) for part in word.split("/")):
         return ask(f"reads {word}, which may hold credentials", "read-secret")
     return None
+
+
+def _glob_secret(part: str) -> bool:
+    """A glob that could match a secret's name (`.en?`, `.e*`, `id_*`). A glob starting with a wildcard doesn't match
+    dotfiles, and one with fewer than two plain letters (`*`, `*.py`'s kin) is too wide to mean a secret."""
+    if not re.search(r"[*?\[]", part):
+        return False
+    if part.startswith("."):
+        return any(fnmatch.fnmatchcase(n, part) for n in DOT_SECRETS)
+    return len(re.sub(r"[*?]|\[[^]]*]", "", part)) >= 2 and any(fnmatch.fnmatchcase(n, part) for n in NAMED_SECRETS)
 
 
 def edit_rule(tool: str, args: dict[str, Any], ctx: Ctx) -> Verdict:
@@ -181,9 +391,13 @@ def fetch_rule(args: dict[str, Any]) -> Verdict:
     except ValueError:
         if host == "localhost" or host.endswith((".local", ".internal", ".lan", ".localhost", ".home.arpa")):
             return ask(f"fetches a local name ({host})", "private")
-    if len(url) > 2000 or any(len(v) >= 64 and re.fullmatch(r"[A-Za-z0-9+/=_-]+", v) for _, v in parse_qsl(u.query)):
+    segments = [s for s in u.path.split("/") if s]
+    if len(url) > 2000 or any(len(v) >= 64 and re.fullmatch(r"[A-Za-z0-9+/=_-]+", v) for _, v in parse_qsl(u.query)) \
+            or any(ENCODED_RE.fullmatch(s) and not SLUG_RE.fullmatch(s) and not SHA_RE.fullmatch(s) for s in segments):
         return ask("the URL carries a long encoded value (it could send data out)", "exfil-url")
-    if not u.query and (host in DOCS_HOSTS or any(host.endswith("." + d) for d in DOCS_HOSTS)):
+    if len(u.path) > MAX_DOCS_PATH or any(ENCODED_RE.fullmatch(s) for s in segments):
+        return unsure(f"fetches {host} with a long path", "fetch")
+    if not u.query and host in DOCS_HOSTS:
         return allow(f"reads documentation on {host}", "docs")
     return unsure(f"fetches {host}", "fetch")
 
@@ -211,7 +425,11 @@ def classify(call: dict[str, Any], folder: dict[str, Any] | None = None) -> Verd
             return ask("runs on your machine, outside the sandbox: always asks", "host")
         if not ctx.at_least("run"):
             return ask(f"commands need Run; the folder is at {ctx.level}", "run-level")
-        return classify_command(str(args.get("command") or ""), ctx)
+        v = classify_command(str(args.get("command") or ""), ctx)
+        if v.verdict == "allow" and args.get("network"):
+            # with the internet on, even a reading command could send what it reads: no rule allows; the model decides
+            return unsure(f"{v.reason}, with the internet on", "network")
+        return v
     if tool == "workspace_python":
         code = str(args.get("code") or "")
         if SECRET_RE.search(code):

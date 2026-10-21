@@ -775,7 +775,7 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   | bypass | run | run | run | run | run | run | ask | ask |
 
   "judge" is Phase 30's seam: `decide` answers `"judge"` and the caller awaits `approvals.judge()` → `utils/tools/judge.py`:
-  - **Rules first** (`judge_rules.py`, `judge_commands.py`): clearly safe calls run (read-only commands, known test runners, edits inside the folder); clearly harmful ones ask (rm -rf outside build folders, pipes into a shell, dotfiles, history rewriting, killing processes, credentials, root).
+  - **Rules first** (`judge_rules.py`, `judge_commands.py`): clearly safe calls run (read-only commands and known test runners, each only with the options on its list and no path outside the folder; edits inside the folder; documentation on an exact list of hosts); a command run with the internet on is never allowed by a rule (the model decides); clearly harmful ones ask (rm -rf outside build folders, pipes into a shell, dotfiles, history rewriting, killing processes, credentials, root).
   - **Then a model** (`[agent.judge]`: a chat model through the relay, or a decision model in `decide`) for what the rules leave unsure. It sees only the user's own typed messages (`origin.said`, which the agent sends in Auto and the hub never stores), the call, the folder and its level. It answers allow or ask.
   - **Fail closed:** a timeout (3 s), an error or a malformed answer asks. It never denies.
   - **The record:** the verdict goes into the call's `origin.judge` (the result, the card and the step row show `why`: "Auto: ran (judged safe: …)" or "Auto: asked you (…)") and into the `judged` table (`GET /api/judge/recent`).

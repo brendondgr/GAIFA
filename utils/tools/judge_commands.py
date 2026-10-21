@@ -1,11 +1,13 @@
 """The judge's rules for shell commands (plan 30.2), used by `judge_rules.classify` for `workspace_run`.
 
 `classify_command(command, ctx)` splits the line with `shell.parse` and judges every simple command in it, after
-stripping assignments and wrappers (`env`, `nohup`, `timeout`, `nice`, `xargs`, `uv run`, `python -m`, `sudo`) and
-judging `bash -c` scripts and `$(…)` substitutions as commands of their own. Each command has a rule: read-only
-tools and known test runners are allowed, writes are allowed inside the folder at Edit or above (never to dotfiles
-or configs that run code), and removing trees, pipes into a shell, history rewriting, killing processes, disks,
-remote connections, uploads, root and credentials ask. What the rules don't know is `unsure`.
+stripping assignments, shell keywords (`if`, `then`, `do`, `{`) and wrappers (`env`, `nohup`, `timeout`, `nice`,
+`xargs`, `uv run`, `python -m`, `sudo`) and judging `bash -c` scripts and `$(…)` substitutions as commands of their
+own. Each command has a rule: read-only tools and known test runners are allowed only with the options on their
+lists (`judge_rules.OPTS`, `RUNNER_OPTS`, `BUILD_OPTS`; any other option, or an operand that could turn into one, is
+`unsure`), and test runners only with paths inside the folder; writes are allowed inside the folder at Edit or above
+(never to dotfiles or configs that run code), and removing trees, pipes into a shell, history rewriting, killing
+processes, disks, remote connections, uploads, root and credentials ask. What the rules don't know is `unsure`.
 """
 
 from __future__ import annotations
@@ -13,8 +15,9 @@ from __future__ import annotations
 import posixpath
 import re
 
-from .judge_rules import (HIJACK_ENV_RE, LEVELS, MAX_COMMAND, SECRET_FILE_RE, SECRET_RE, SENSITIVE_WRITE_RE, Ctx,
-                          Verdict, allow, ask, combine, read_target, unsure, write_target)
+from .judge_rules import (ANY_ARGS, BUILD_OPTS, CONFIG_ENV_RE, GENERIC_RUNNER, HIJACK_ENV_RE, LEVELS, MAX_COMMAND, OPTS,
+                          RUNNER_OPTS, SECRET_FILE_RE, SECRET_RE, SENSITIVE_WRITE_RE, SUB_OK, Ctx, Verdict, allow, ask,
+                          combine, read_target, unsure, write_target)
 from .shell import SUB, Command, parse
 
 __all__ = ["classify_command", "LEVELS"]
@@ -28,15 +31,15 @@ READ_ONLY = {"ls", "cat", "head", "tail", "less", "more", "wc", "grep", "egrep",
              "readlink", "true", "false", "test", "[", "sleep", "seq", "column", "nl", "xxd", "hexdump", "od",
              "md5sum", "sha1sum", "sha256sum", "sha512sum", "b2sum", "cksum", "strings", "rev", "fold", "fmt",
              "expand", "unexpand", "paste", "join", "tac", "zcat", "bat", "hostname", "nproc", "free", "uptime",
-             "lscpu", "ps", "top", "htop", "pgrep", "lsof", "tput", "locale", "cal", "expr", "bc",
+             "lscpu", "ps", "top", "pgrep", "lsof", "tput", "locale", "cal", "expr", "bc",
              "cd", "export", "unset", "set", ":", "exit", "return", "wait", "{", "}", "do", "done",
              "then", "fi", "else", "elif", "if", "for", "while", "until", "in", "case", "esac"}
 TEST_RUNNERS = {"pytest", "py.test", "tox", "nox", "jest", "vitest", "mocha", "ava", "tap", "karma", "phpunit",
                 "rspec", "ctest", "mypy", "pyright", "pyre", "ruff", "flake8", "pylint", "pyflakes", "pycodestyle",
                 "black", "isort", "eslint", "tsc", "prettier", "stylelint", "shellcheck", "hadolint", "golangci-lint",
                 "clippy-driver", "rubocop", "biome"}
-PY_MODULES_OK = TEST_RUNNERS | {"unittest", "doctest", "compileall", "py_compile", "json.tool", "timeit", "pydoc",
-                                "tabnanny", "pyflakes", "coverage"}
+PY_MODULES_OK = TEST_RUNNERS | {"unittest", "doctest", "compileall", "py_compile", "tabnanny", "pyflakes",
+                                "coverage"}     # not timeit (it runs code from its arguments) or pydoc (-w writes)
 FORMAT_WRITERS = {"black", "isort", "prettier", "ruff", "biome"}     # rewrite files unless told to check
 INTERPRETERS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "csh", "tcsh", "python", "python3", "python2", "perl",
                 "ruby", "node", "deno", "bun", "php", "lua", "Rscript", "pwsh", "powershell", "osascript", "source",
@@ -68,8 +71,10 @@ GIT_HISTORY = {"rebase", "filter-branch", "filter-repo", "replace", "update-ref"
                "remote", "credential", "send-email", "request-pull", "archive", "bundle", "daemon",
                "instaweb", "svn", "p4", "fast-import", "hook"}
 GIT_NETWORK = {"clone", "fetch", "pull", "ls-remote"}
+GIT_WRITE_OPTS = ("output", "ext-diff", "open-files-in-pager")    # write a file, or run a program
 NPM_SCRIPT_OK = re.compile(r"^(test|tests|lint|build|check|typecheck|type-check|format:check|fmt:check|"
                            r"test:[\w:-]+|lint:[\w:-]+|build:[\w:-]+|check:[\w:-]+)$")
+TARGET_RE = re.compile(r"^[A-Za-z0-9_.-]+$")         # a plain make/just target: no assignments, no paths
 
 def _flags(words: list[str]) -> set[str]:
     """Single-letter flags merged (-rf → r, f) plus long ones, up to `--`."""
@@ -82,6 +87,154 @@ def _flags(words: list[str]) -> set[str]:
         elif w.startswith("-") and len(w) > 1:
             out.update(w[1:])
     return out
+
+
+def options(base: str, words: list[str], ctx: Ctx, spec: tuple[str, str, str]
+            ) -> tuple[Verdict | None, list[str], list[str]]:
+    """Every option in `words` checked against `spec` (see OPTS): (a verdict when one isn't on the list, else None;
+    the operands; the options' values). A value that names a secret asks, as a file name does."""
+    short, valued, longs = spec
+    switch, takes = set(), {}
+    for n in longs.split():
+        k = n.rstrip("=")
+        takes.update({k: len(n) - len(k)}) if k != n else switch.add(k)
+    pos: list[str] = []
+    vals: list[str] = []
+    i = 0
+    while i < len(words):
+        a = words[i]
+        i += 1
+        if a == "--":
+            pos += words[i:]
+            break
+        if a.startswith("--"):
+            name, eq, val = a[2:].partition("=")
+            if name in takes:
+                n = takes[name] - (1 if eq else 0)
+                vals += ([val] if eq else []) + words[i:i + n]
+                i += n
+            elif name not in switch:
+                return unsure(f"{base} {a.split('=')[0]} isn't an option the rules know is safe", "option"), pos, vals
+        elif a.startswith("-") and len(a) > 1:
+            for j, c in enumerate(a[1:], 1):
+                if c in valued:
+                    if a[j + 1:]:
+                        vals.append(a[j + 1:])
+                    else:
+                        vals += words[i:i + 1]
+                        i += 1
+                    break
+                if not (c in short or c.isdigit() and "#" in short):
+                    return unsure(f"{base} -{c} isn't an option the rules know is safe", "option"), pos, vals
+        else:
+            pos.append(a)
+    for v in vals:
+        if found := read_target(v, ctx):
+            return found, pos, vals
+    return None, pos, vals
+
+
+def _opaque(words: list[str]) -> str | None:
+    """A word whose value the rules can't see: a substitution or variable (it can split into words, one of them an
+    option), or a glob or brace at its start (a file named `--pre=sh` matches `*`)."""
+    return next((w for w in words if SUB in w or "$" in w or w[:1] in ("*", "?", "[") or
+                 w[:1] == "{" and re.search(r",|\.\.", w)), None)
+
+
+def _outside(words: list[str], ctx: Ctx) -> str | None:
+    """The first word that names a path outside the folder (absolute, `~` or `..`), also after `=`, `:` or `,`
+    (--cov-report=html:/tmp/x)."""
+    for w in words:
+        for piece in re.split(r"[=:,]", w):
+            if piece.startswith(("/", "~")) or ".." in piece.split("/"):
+                path = ctx.resolve(piece)
+                if path is None or not ctx.inside(path):
+                    return w
+    return None
+
+
+def read_only_rule(base: str, args: list[str], ctx: Ctx) -> Verdict:
+    """A read-only tool: allowed only with options on its list (OPTS) and operands that can't turn into options."""
+    if base in ANY_ARGS:
+        if base == "printf" and args[:1] and args[0].startswith("-v"):
+            return unsure("printf -v sets a shell variable", "option")
+        return allow(f"{base} only reads", "read-only")
+    if base not in SUB_OK and (w := _opaque(args)):
+        return unsure(f"{base} gets an argument the rules can't see ({w.replace(SUB, '$(…)')}); it could be an option",
+                      "dynamic")
+    found, pos, _ = options(base, args, ctx, OPTS[base])
+    if found:
+        return found
+    if base == "date" and [p for p in pos if not p.startswith("+")] or base == "hostname" and pos:
+        return unsure(f"{base} with an operand sets the clock or the host name", "option")
+    if base != "date" and (p := next((p for p in pos if p.startswith("+")), None)):
+        return unsure(f"{base} {p}: a + operand can be a command", "option")
+    if base in ("uniq", "xxd") and len(pos) > 1:
+        return unsure(f"{base} writes to its second file name ({pos[1]})", "write-option")
+    if base in ("jq", "yq") and re.search(r"\$ENV\b|\benv\b", " ".join(pos)):
+        return unsure(f"{base} prints the environment, which may hold secrets", "env-dump")
+    return allow(f"{base} only reads", "read-only")
+
+
+def runner_rule(base: str, args: list[str], ctx: Ctx, spec: tuple[str, str, str]) -> Verdict | None:
+    """A test runner's or build tool's options and paths: None when they're on its list and inside the folder."""
+    if w := _opaque(args):
+        return unsure(f"{base} with arguments from another command ({w.replace(SUB, '$(…)')})", "dynamic")
+    found, pos, vals = options(base, args, ctx, spec)
+    if found:
+        return found
+    if w := _outside(pos + vals, ctx):
+        return unsure(f"{base} names a path outside the folder ({w})", "runner-outside")
+    return None
+
+
+def make_rule(base: str, args: list[str], ctx: Ctx) -> Verdict:
+    """make and just run the folder's recipes (the test-runner policy), with plain targets and a few switches only:
+    `make --eval`, `-f`, `-C`, `-I`, `CC=…` and `just --shell` change what runs."""
+    if w := _opaque(args):
+        return unsure(f"{base} with arguments from another command ({w.replace(SUB, '$(…)')})", "dynamic")
+    ok = (r"-[kBsSnqiwrR]+|-j\d*|--(keep-going|silent|quiet|always-make|dry-run|just-print|no-print-directory|"
+          r"print-directory|jobs(=\d+)?)") if base == "make" else r"-n|--dry-run|-l|--list|-q|--quiet|--summary"
+    for a in args:
+        if not (re.fullmatch(ok, a) or TARGET_RE.match(a) and not a.startswith("-")):
+            return unsure(f"{base} {a}: not a plain target or a switch the rules know", "build")
+    if any(a in ("install", "uninstall", "deploy", "publish", "release", "clean", "distclean") for a in args):
+        return unsure(f"{base} {' '.join(args)} may install, publish or delete", "build")
+    return allow(f"{base} builds or tests the project", "test-runner")
+
+
+def tar_rule(args: list[str], ctx: Ctx) -> Verdict:
+    """tar lists an archive (-t with -f FILE and -v) and nothing else: --checkpoint-action, -I and --to-command run
+    programs, and a `host:file` archive is opened over rsh."""
+    w = (["-" + args[0]] if args and not args[0].startswith("-") else args[:1]) + args[1:]
+    if re.search(r"^-[a-z]*[xc]", w[0] if w else "") or {"--extract", "--create", "-x", "-c"} & set(w):
+        return unsure("tar unpacks or packs files", "tar")
+    listing, i = False, 0
+    while i < len(w):
+        a = w[i]
+        i += 1
+        if a in ("--list", "--verbose"):
+            listing |= a == "--list"
+        elif a.startswith("--file=") or a == "--file" or re.fullmatch(r"-[tv]*f", a) or re.fullmatch(r"-[tv]+", a):
+            listing |= "t" in a.split("=")[0] and not a.startswith("--file")
+            if a.endswith("f") or a == "--file" or a.startswith("--file="):
+                name = a.split("=", 1)[1] if "=" in a else (w[i] if i < len(w) else "")
+                i += 0 if "=" in a else 1
+                if ":" in name:
+                    return unsure(f"tar opens {name} over the network (host:file)", "tar")
+                if found := read_target(name, ctx):
+                    return found
+        elif a.startswith("-"):
+            return unsure(f"tar {a} isn't an option the rules know is safe", "tar")
+    return allow("tar lists an archive", "read-only") if listing else unsure("tar without -t", "tar")
+
+
+def _env_assign(word: str) -> Verdict | None:
+    if HIJACK_ENV_RE.match(word):
+        return ask(f"sets {word.split('=')[0]}, which makes other programs run code", "env-hijack")
+    if CONFIG_ENV_RE.match(word):
+        return unsure(f"sets {word.split('=')[0]}, which changes what programs run or read", "env-config")
+    return None
 
 
 def _args(words: list[str]) -> list[str]:
@@ -102,9 +255,13 @@ def unwrap(words: list[str], ctx: Ctx, depth: int) -> tuple[list[str], list[Verd
     while w:
         head = posixpath.basename(w[0]) if "/" in w[0] and not w[0].startswith(".") else w[0]
         if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w[0]):
-            if HIJACK_ENV_RE.match(w[0]):
-                seen.append(ask(f"sets {w[0].split('=')[0]}, which makes other programs run code", "env-hijack"))
+            if v := _env_assign(w[0]):
+                seen.append(v)
             w = w[1:]
+        elif head in ("{", "then", "do", "else", "elif", "if", "while", "until", "!", "(", "time"):
+            w = w[1:]                       # a keyword before a command: the command after it runs
+        elif head in ("for", "select", "case", "function"):
+            return [], seen                 # `for x in …`: words, not a command (substitutions are judged apart)
         elif head in PRIVILEGE:
             seen.append(ask(f"{head} runs it as another user (root)", "sudo"))
             w = w[1:]
@@ -113,6 +270,8 @@ def unwrap(words: list[str], ctx: Ctx, depth: int) -> tuple[list[str], list[Verd
         elif head == "env":
             w = w[1:]
             while w and (w[0].startswith("-") or "=" in w[0]):
+                if not w[0].startswith("-") and (v := _env_assign(w[0])):
+                    seen.append(v)
                 if w[0] in ("-u", "-C", "-S", "--chdir", "--unset", "--split-string"):
                     if w[0] in ("-S", "--split-string") and len(w) > 1:
                         w = w[1].split() + w[2:]
@@ -206,6 +365,8 @@ def command_rule(w: list[str], cmd: Command, ctx: Ctx, depth: int) -> Verdict:
     if base in KILLERS or (base == "fuser" and "k" in flags):
         return ask(f"{base} stops processes or the machine", "kill")
     if base == "systemctl" or base == "service":
+        if any(re.match(r"-[HM]|--host|--machine", a) for a in args):
+            return ask(f"{base} --host reaches another machine", "remote")
         verb = next((a for a in args if not a.startswith("-")), "")
         if verb in ("status", "show", "list-units", "list-unit-files", "is-active", "is-enabled", "cat", ""):
             return allow("reads service state", "systemctl-read")
@@ -218,8 +379,8 @@ def command_rule(w: list[str], cmd: Command, ctx: Ctx, depth: int) -> Verdict:
         return ask(f"{base} connects to another machine", "remote")
     if base == "printenv" or (base in ("env", "set", "export", "declare") and not args):
         return unsure("prints the environment, which may hold secrets", "env-dump")
-    if base in ("export", "declare", "alias") and (hit := next((a for a in args if HIJACK_ENV_RE.match(a)), None)):
-        return ask(f"sets {hit.split('=')[0]}, which makes other programs run code", "env-hijack")
+    if base in ("export", "declare", "alias") and (hit := next((v for a in args if (v := _env_assign(a))), None)):
+        return hit
     if base == "rm" or base == "rmdir" or base == "unlink":
         return rm_rule(base, args, flags, ctx)
     if base == "find":
@@ -263,14 +424,18 @@ def command_rule(w: list[str], cmd: Command, ctx: Ctx, depth: int) -> Verdict:
     if base == "sed" and ("i" in flags or "--in-place" in flags):
         files = _args(args)[1:]
         return combine([write_target(f, ctx, "edits in place") for f in files] or [unsure("sed -i", "sed")])
-    if base == "awk" or base == "gawk":
-        if re.search(r"system\s*\(|\|\s*getline|print\s*>|\bfflush|\"\s*\|", " ".join(args)):
-            return ask("awk runs commands or writes files from its program", "awk-system")
+    if base in ("awk", "gawk", "mawk", "nawk"):
+        prog = " ".join(args)
+        if re.search(r"system\s*\(|\|\s*getline|\bprintf?\b[^;}\n]*\||\bfflush|\"\s*\|", prog):
+            return ask("awk runs commands from its program", "awk-system")
+        found, pos, _ = options(base, args, ctx, ("", "Fv", "field-separator= assign="))   # not -f, -e, -i, -l
+        if found or dynamic or re.fullmatch(r"\$\{?[A-Za-z_]\w*\}?", pos[0] if pos else ""):
+            return found or unsure(f"{base} with arguments from another command", "dynamic")
+        if re.search(r"\bprintf?\b[^;}\n]*>|getline\s*(\w+\s*)?<|ENVIRON|PROCINFO|@load|@include", prog):
+            return unsure("awk writes or reads a file named in its program, or reads the environment", "awk-write")
         return allow("awk reads and prints", "read-only")
     if base == "tar":
-        if re.search(r"^-?[a-z]*[xc]", args[0] if args else "") or {"--extract", "--create", "-x", "-c"} & set(args):
-            return unsure("tar unpacks or packs files", "tar")
-        return allow("tar lists an archive", "read-only")
+        return tar_rule(args, ctx)
     if base in ("unzip", "gunzip", "bunzip2", "unxz", "7z", "zip", "gzip"):
         return unsure(f"{base} writes files", "archive")
     if base in READ_ONLY:
@@ -279,14 +444,23 @@ def command_rule(w: list[str], cmd: Command, ctx: Ctx, depth: int) -> Verdict:
             if target is None or not ctx.inside(target):
                 return unsure(f"cd leaves the folder ({' '.join(args) or '~'})", "cd-outside")
             ctx.cwd = target
-        return allow(f"{base} only reads", "read-only")
+            return allow("cd only reads", "read-only")
+        return read_only_rule(base, args, ctx)
     if base == "npm" or base == "yarn" or base == "pnpm" or base == "bun":
         verb = args[0] if args else ""
         script = args[1] if verb in ("run", "run-script") and len(args) > 1 else verb
+        extra = args[2:] if verb in ("run", "run-script") else args[1:]
         if verb in ("test", "t") or NPM_SCRIPT_OK.match(script or ""):
+            if [a for a in extra if a not in ("--silent", "-s", "--if-present")]:
+                return unsure(f"{base} {verb} with more arguments (they reach the script or set {base}'s config)",
+                              "script")
             return allow(f"{base} {verb} {script if script != verb else ''}".strip() + " runs the project's tests or "
                          "build", "test-runner")
         if verb in ("ls", "list", "outdated", "view", "info", "why", "explain", "config" if "get" in args else "-"):
+            if (w := _opaque(extra)) or [a for a in extra if a.startswith("-") and a.split("=")[0] not in
+                                         ("--all", "-a", "--json", "--long", "-l", "--parseable", "-p", "--depth",
+                                          "--omit", "--prod", "--dev", "--global", "-g")]:
+                return unsure(f"{base} {verb} with options the rules don't know", "option")
             return allow(f"{base} {verb} only reads", "read-only")
         return unsure(f"{base} {verb} runs a project script", "script")
     if base in ("cargo", "go", "make", "gradle", "mvn", "dotnet", "swift", "zig", "cmake", "meson", "ninja", "just"):
@@ -296,6 +470,13 @@ def command_rule(w: list[str], cmd: Command, ctx: Ctx, depth: int) -> Verdict:
                 "make": None, "just": None, "ninja": None, "cmake": None, "meson": {"test", "compile", "setup"},
                 "gradle": {"test", "build", "check"}, "mvn": {"test", "verify", "compile", "package"},
                 "dotnet": {"test", "build"}, "swift": {"test", "build"}, "zig": {"build", "test"}}[base]
+        if base in ("make", "just"):
+            return make_rule(base, args, ctx)
+        rest = args if okay is None else args[1:]
+        if base == "go":                    # go's flags take one dash: -run, -count=1
+            rest = ["-" + a if re.match(r"-[a-z]", a) else a for a in rest]
+        if (okay is None or verb in okay) and (found := runner_rule(base, rest, ctx, BUILD_OPTS[base])):
+            return found
         if okay is None:
             if any(a in ("install", "uninstall", "deploy", "publish", "release", "clean", "distclean") for a in args):
                 return unsure(f"{base} {' '.join(args)} may install, publish or delete", "build")
@@ -305,7 +486,16 @@ def command_rule(w: list[str], cmd: Command, ctx: Ctx, depth: int) -> Verdict:
                 return allow("cargo fmt rewrites the project's files", "formatter")
             return allow(f"{base} {verb} builds or tests the project", "test-runner")
         return unsure(f"{base} {verb} isn't a build or test the rules know", "build")
+    if base == "coverage":
+        sub, m = (args[0] if args else ""), (args.index("-m") if "-m" in args else 0)
+        if sub == "run" and 0 < m < len(args) - 1 and args[m + 1] in TEST_RUNNERS | {"unittest"} and \
+                all(re.fullmatch(r"--(branch|parallel-mode|source=[\w.,/-]+)|-p", a) for a in args[1:m]):
+            return command_rule(args[m + 1:], cmd, ctx, depth)          # coverage run -m pytest …: pytest's rule
+        if sub not in ("report", "html", "xml", "json", "lcov", "combine", "erase", "debug"):
+            return unsure(f"coverage {sub} runs code the rules can't see", "interpreter")
     if base in TEST_RUNNERS or base in PY_MODULES_OK:
+        if found := runner_rule(base, args, ctx, RUNNER_OPTS.get(base, GENERIC_RUNNER)):
+            return found
         if base in FORMAT_WRITERS and not ({"--check", "--diff", "check", "--dry-run", "-c"} & set(args)) \
                 and not (base == "ruff" and args[:1] == ["check"] and "--fix" not in args):
             return combine([allow(f"{base} rewrites files", "formatter")] +
@@ -316,7 +506,9 @@ def command_rule(w: list[str], cmd: Command, ctx: Ctx, depth: int) -> Verdict:
     if base == "pip" or base == "pip3":
         verb = args[0] if args else ""
         if verb in ("list", "show", "freeze", "check", "--version", "help", "index", "inspect"):
-            return allow(f"pip {verb} only reads", "read-only")
+            found, _, _ = options(base, args[1:], ctx, ("oulevfq", "", "format= outdated uptodate local editable "
+                                                        "exclude-editable not-required verbose files all quiet path="))
+            return found or allow(f"pip {verb} only reads", "read-only")    # not --log FILE: it writes
         if verb == "uninstall":
             return unsure("pip uninstall removes packages", "install")
         return unsure(f"pip {verb}", "install")
@@ -365,6 +557,12 @@ def rm_rule(base: str, args: list[str], flags: set[str], ctx: Ctx) -> Verdict:
 
 
 def find_rule(args: list[str], ctx: Ctx, depth: int) -> Verdict:
+    pattern = ("-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename", "-regex", "-iregex", "-lname",
+               "-ilname")
+    for i, a in enumerate(args):            # `find . $X` could expand to -exec …; `-name '*.py'` is a pattern
+        if (w := _opaque([a])) and not (i and args[i - 1] in pattern and SUB not in a and "$" not in a and
+                                        re.search(r"[\w.]", a)):
+            return unsure(f"find gets an argument the rules can't see ({w.replace(SUB, '$(…)')})", "dynamic")
     if "-delete" in args:
         return ask("find -delete removes every file it matches", "rm-tree")
     found = []
@@ -398,8 +596,18 @@ def git_rule(args: list[str], ctx: Ctx) -> Verdict:
     verb, rest = args[0], args[1:]
     flags = _flags(rest)
     if verb in GIT_READ:
-        if verb == "diff" and ("--output" in flags or "--ext-diff" in flags):
-            return unsure("git diff writes to a file or runs a diff program", "git-write")
+        if w := _opaque(rest):
+            return unsure(f"git {verb} gets an argument the rules can't see ({w.replace(SUB, '$(…)')})", "dynamic")
+        for a in rest[:rest.index("--") if "--" in rest else len(rest)]:
+            name = a[2:].split("=", 1)[0]
+            # git takes any unambiguous prefix of a long option: --outp is --output
+            if a.startswith("--") and len(name) >= 1 and any(d.startswith(name) for d in GIT_WRITE_OPTS) or \
+                    verb == "grep" and re.match(r"-[^-]*O", a) or verb == "help" and a.startswith("-") and \
+                    a not in ("-a", "--all", "-g", "--guides"):
+                return unsure(f"git {verb} {a.split('=')[0]} writes a file or runs a program", "git-write")
+        for a in rest:                      # git show HEAD:.env prints the file
+            if ":" in a and not a.startswith("-") and (found := read_target(a.split(":", 1)[1], ctx)):
+                return found
         return allow(f"git {verb} only reads", "git-read")
     if verb == "branch":
         if {"d", "D", "--delete", "m", "M", "--move", "f", "--force", "c", "C", "--set-upstream-to", "u"} & flags:

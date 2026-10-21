@@ -22,6 +22,7 @@ A mod is a folder `services/<id>/` with a `service.toml` and an HTTP server on `
 - **Outputs** follow architecture §4.7: `<date>/<HHMMSS>-<slug>.<ext>`, `.part` then rename, optional sidecar JSON.
 - **Page modules** use only `ctx` (`ctx.call`, `ctx.api`, `ctx.ui`, `ctx.on`): no `fetch`, no raw colors, and a Start button when the mod is stopped.
 - **Don't stop or move the existing apps' services, models or data** without the user's approval (see the `aihub` skill's invariants).
+- **Ship a setup doc:** `services/<id>/setup/<env>.md` from the template (`aihub new` copies one), with its `aihub-setup` block filled in (summary, steps, check, a few optional model suggestions) so `aihub setup <id>` can install it; describe the mod, not this machine's models (docs/mods.md §9). `aihub docs --check --strict` must pass.
 
 ## Choosing how much UI
 Each level is optional; pick the least that serves the user (docs/mods.md §5):

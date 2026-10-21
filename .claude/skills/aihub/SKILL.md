@@ -35,6 +35,8 @@ The docs are the source of truth. Read the section you need before acting; don't
 | UI states that must be reachable | brief §8, §11.10 |
 | The UI baseline | `docs/reference/ui-export-2026-10-04/README.md` |
 | ComfyUI workflow packs (`workflow.toml`, tasks, the CLI) | [docs/workflows.md](../../../docs/workflows.md); skill `comfy-workflow` |
+| Setting up a machine, or some mods (`aihub setup`) | [docs/setup/README.md](../../../docs/setup/README.md), each mod's `services/<id>/setup/*.md`; skill `aihub-setup` |
+| A mod's setup doc and its `aihub-setup` block | [docs/mods.md §9](../../../docs/mods.md#9-setup-docs) |
 
 ## Invariants (never break these)
 - **Never run `git clean -x` or `-X`.** Ignored files include ~190 GB of model weights.

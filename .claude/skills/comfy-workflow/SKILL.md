@@ -22,6 +22,7 @@ A workflow is a **pack**: `services/comfy/workflows/<id>/` with `workflow.json` 
 ## Rules
 - **Never install custom nodes yourself.** Name the package and let the user install it with ComfyUI-Manager: custom nodes run third-party code.
 - **Ask before downloading model files.** They're large, and downloading needs the user's go-ahead. Say the file, its source and its size.
+- **A pack's models are the user's choice.** Record where each file comes from in the workflow (`properties.models` URLs) so the page's Download button and `comfyui workflows check` can name it; don't add a pack's models to comfy's setup doc as requirements (`services/comfy/setup/comfyui.md` suggests a few, optionally).
 - **Leave `memory_gb` out unless the user wants to pin it.** Runs measure it.
 - **Edit the graph in ComfyUI, not by hand in `workflow.json`.** The pack is `<id>.json` in ComfyUI's browser, and saves there come back into the pack. Use `[set]` for single values.
 - **A task needs certain input names** (`tasks.toml`): `image-edit` needs `image` and `prompt`, and so on. The agent only sees packs that are `ready`.

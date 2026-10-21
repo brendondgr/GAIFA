@@ -74,41 +74,22 @@ to 3D) all pass. Details and the remaining failures: [docs/agent-eval.md](docs/a
 
 ## Requirements
 
-- Linux with systemd user services (the hub and every mod run as `systemd --user` units).
-- [uv](https://docs.astral.sh/uv/) for every Python environment. It fetches Python itself; the
-  hub needs Python ≥ 3.12.
-- For the GPU mods, the hardware AIHub was built on: an AMD Strix Halo (gfx1151) with ROCm.
-  Images & Video and 3D Generate run in the
-  [`kyuz0/amd-strix-halo-comfyui`](https://hub.docker.com/r/kyuz0/amd-strix-halo-comfyui) image
-  through podman/toolbox. The LLM Launcher needs `llama-server` (llama.cpp) installed.
-- Node.js and npm, to build the relay's web UI during `aihub install relay`.
-- Model weights in `data/models/` (about 190 GB for the full set). They are not in the repository.
-
-The hub itself and the relay, OpenCode and agent mods have no GPU requirement.
+- Linux with systemd user services (the hub and every mod run as `systemd --user` units), Python 3.11 or newer, git and [uv](https://docs.astral.sh/uv/) (it fetches the Python the hub and mods use).
+- For the GPU mods, the hardware AIHub is built on: an AMD Strix Halo (gfx1151), with the kernel settings and packages in [docs/setup/host.md](docs/setup/host.md). Images & Video and 3D Generate run in the [`kyuz0/amd-strix-halo-comfyui`](https://hub.docker.com/r/kyuz0/amd-strix-halo-comfyui) image through podman/toolbox.
+- The hub, and the relay, OpenCode, agent, web and workspace mods, need no GPU.
+- Models are your choice, per mod: each mod's setup doc says what it runs, suggests a few, and says how to add your own. None are in the repository.
 
 ## Quickstart
 
 ```bash
-git clone git@github.com:brendondgr/AIHub.git
+git clone https://github.com/brendondgr/AIHub.git
 cd AIHub
-uv sync
-bin/aihub install
+bin/aihub setup
 ```
 
-`aihub install` writes and starts the `aihub` systemd user service and links `aihub` into
-`~/.local/bin`. Open <http://127.0.0.1:7000>: the Overview lists the mods. Each mod sets up its own
-environment with:
+`aihub setup` does the whole install: the hub (`uv sync`, then `aihub install`, which writes and starts the `aihub` systemd user service and links `aihub` into `~/.local/bin`), the host checks (it prints any `sudo` fixes for you to run; it never runs them), then the mods you pick from a list. It asks every question first (licences, which models), installs each mod, downloads the models you chose, asks for the agent's model once your relay has some, and checks each mod. If it stops, run it again: it resumes. Open <http://127.0.0.1:7000> when it's done.
 
-```bash
-aihub install relay
-aihub install agent
-aihub start all
-```
-
-Repeat `aihub install <id>` for `lcpp`, `tts`, `gen3d` and `comfy`. Speech and 3D Generate also build
-their model runtimes with `services/tts/scripts/install-runtime.sh` and
-`services/gen3d/scripts/install-runtime.sh`. Then run `aihub doctor`, which checks the whole install
-and says what's missing.
+To set up only some mods: `bin/aihub setup relay agent tts`; to see the plan first: `--plan`. An AI agent can run the same process for you (`--plan --json`, answers in a file, one JSON report; the `aihub-setup` skill): the steps and questions are the same as yours. The guide behind it, and each mod's own setup doc, are in [docs/setup/](docs/setup/README.md).
 
 ## Usage
 

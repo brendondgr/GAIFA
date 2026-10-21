@@ -4,6 +4,16 @@ How to install AIHub on a new machine: the host, the hub, then **the mods you wa
 
 **Other hardware.** The hub and the CPU-only mods (LLM Relay, OpenCode, Chat) run on any Linux with systemd. The GPU mods don't run elsewhere without changes: an NVIDIA or another AMD GPU needs its own images, wheels and model choices, which these docs don't cover. macOS and Windows aren't supported (AIHub runs on systemd user services).
 
+## The quick way
+
+```bash
+bin/aihub setup
+```
+
+From a fresh clone, that's the whole process, in this order: the hub; the host checks (any fix that needs `sudo` is printed for you to run, never run for you); choosing mods from a list; the plan, with every step, size and question; your answers (licences, which models); install; the models you chose; the agent's model, from your relay's; each mod's check; a report. Run it again after a stop: it resumes. `--plan` shows the plan without doing anything; `bin/aihub setup relay agent` sets up only those (and what they need).
+
+**Having an agent do it.** An AI agent follows the same process for you: it reads the plan (`bin/aihub setup --plan --json <mods>`), asks you the same questions, passes your answers (`--answers <file>`, or `--accept`, `--decline`, `--models`, `--set`), hands you any `sudo` command and any step that prompts (a login), and reads one JSON report. `bin/aihub setup --help` lists the exit codes and the report's shape; agents in this repo have the `aihub-setup` skill. The rest of this guide is what the wizard reads, for when you want to know what it does or do a step by hand.
+
 ## The order
 
 | Step | Doc | Time | Disk |

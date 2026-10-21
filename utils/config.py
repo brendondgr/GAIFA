@@ -8,6 +8,7 @@ A missing file means defaults. Each mod's own defaults live in its
 from __future__ import annotations
 
 import ipaddress
+import re
 import tomllib
 from copy import deepcopy
 from pathlib import Path
@@ -112,11 +113,50 @@ class ServicesCfg(BaseModel):
         return out
 
 
+MAX_PATTERNS = 100
+TOOL_GLOB = re.compile(r"[A-Za-z0-9_.*?!\[\]-]{1,100}")
+COMMAND_BAD = re.compile(r"[;|&$`<>()\\'\"\x00-\x1f\x7f]")     # shell syntax: a rule names one simple command
+
+
+def _unique(v: list[str]) -> list[str]:
+    if len(v) > MAX_PATTERNS:
+        raise ValueError(f"at most {MAX_PATTERNS} entries")
+    return list(dict.fromkeys(v))
+
+
+def tool_globs(v: list[str]) -> list[str]:
+    """`[agent.permissions]` lists: tool-name globs (`comfy_*`), trimmed, each once."""
+    v = [str(g).strip() for g in v]
+    for g in v:
+        if not TOOL_GLOB.fullmatch(g):
+            raise ValueError(f"{g!r}: a tool name or glob (letters, digits, _ . - and * ? [ ]), 1-100 characters")
+    return _unique(v)
+
+
+def command_patterns(v: list[str]) -> list[str]:
+    """`[agent.judge] allow_commands / ask_commands` (`utils/tools/judge_user.py`): a command and its words, with
+    `*` globs (`pytest *`); spaces collapsed, each once. The first word is a plain command name (no `*`), and no
+    shell syntax (; | & $ < > ( ), backticks, backslashes, quotes), newlines or control characters."""
+    out = []
+    for raw in v:
+        if m := COMMAND_BAD.search(str(raw)):
+            raise ValueError(f"{raw!r}: no shell syntax or control characters ({m.group(0)!r}); a rule is one command")
+        p = " ".join(str(raw).split())
+        if not p or len(p) > 200:
+            raise ValueError("each command rule is 1-200 characters")
+        if re.search(r"[*?\[]", p.split()[0]):
+            raise ValueError(f"{p!r}: start with the command's name (no * in the first word)")
+        out.append(p)
+    return _unique(out)
+
+
 class PermissionsCfg(_Strict):
     """Tool permissions (plan 13.2, 25.1): name globs; the order with modes and grants is in `utils/tools/approvals.py`."""
     deny: list[str] = []
     ask: list[str] = ["hub_set_preference"]     # a lasting preference reaches every later chat: a card in every mode
     allow: list[str] = ["hub_start_service"]
+
+    _globs = field_validator("deny", "ask", "allow")(lambda cls, v: tool_globs(v))
 
 
 class JudgeCfg(_Strict):
@@ -126,6 +166,10 @@ class JudgeCfg(_Strict):
     url: str = "http://127.0.0.1:4000"      # the relay, or the decide mod (http://127.0.0.1:7000/api/s/decide)
     threshold: float = Field(0.95, gt=0, le=1)   # decide: every answer must clear it
     timeout_s: float = Field(3.0, gt=0)     # slower → ask
+    allow_commands: list[str] = []          # your rules (judge_user.py): these commands run in Auto, unless a rule asks
+    ask_commands: list[str] = []            # … and these always ask
+
+    _patterns = field_validator("allow_commands", "ask_commands")(lambda cls, v: command_patterns(v))
 
 
 class ScreenCfg(_Strict):

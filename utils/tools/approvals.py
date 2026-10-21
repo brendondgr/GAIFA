@@ -127,7 +127,9 @@ def _with_limits(name: str, risk: str, p: Any, mode: str, grant: dict[str, Any] 
         if asked:
             return "ask", "your permissions ask for this tool"
         return "allow", f"{MODE_WORD[mode]}: {ACTION_WORD[action]} run without asking{note}"
-    if limits.get("once"):
+    if limits.get("once"):          # no grant covers it (a compound command, a host run, a git remote, a commit)
+        if cell == "judge" and not asked:   # but Auto's judge reads each part of a compound command (judge_commands)
+            return "judge", f"Auto: the judge decides{note}"
         return "ask", f"{ACTION_WORD[action]} ask every time{note}"
     if grant is not None:
         return "allow", _granted(grant)

@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from utils.config import mic_labels
+from utils.config import command_patterns, mic_labels, tool_globs
 
 ServiceState = Literal["stopped", "starting", "ready", "degraded", "stopping", "failed"]
 LoadState = Literal["unloaded", "loading", "loaded", "unloading", "n/a"]
@@ -638,6 +638,20 @@ class JudgeSettings(_Model):
     url: str = Field(min_length=1, max_length=500, description="The relay, or the decide mod")
     threshold: float = Field(gt=0, le=1, description="decide: every answer must clear it")
     timeout_s: float = Field(gt=0, le=60, description="Slower than this → ask")
+    allow_commands: list[str] = Field([], description="Your rules: commands that run in Auto unless a fixed rule asks "
+                                      "(`pytest *`; utils/tools/judge_user.py)")
+    ask_commands: list[str] = Field([], description="Your rules: commands that always ask in Auto")
+
+    _patterns = field_validator("allow_commands", "ask_commands")(lambda cls, v: command_patterns(v))
+
+
+class PermissionsSettings(_Model):
+    """`[agent.permissions]`: tool-name globs (plan 13.2, 25.1); the order they apply in is architecture §14.7."""
+    deny: list[str]
+    ask: list[str]
+    allow: list[str] = Field(description="Ignored for `execute` tools: only a grant skips their card")
+
+    _globs = field_validator("deny", "ask", "allow")(lambda cls, v: tool_globs(v))
 
 
 class ScreenSettings(_Model):
@@ -658,6 +672,7 @@ class Settings(_Model):
     speech_input: SpeechInputSettings
     judge: JudgeSettings
     screen: ScreenSettings
+    permissions: PermissionsSettings
 
 
 class SettingsPatch(_Model):
@@ -671,6 +686,7 @@ class SettingsPatch(_Model):
     speech_input: dict[str, Any] | None = None
     judge: dict[str, Any] | None = None
     screen: dict[str, Any] | None = None
+    permissions: dict[str, Any] | None = None
 
 
 class SavedSettings(_Model):

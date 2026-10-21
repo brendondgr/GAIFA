@@ -35,8 +35,10 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}}},
             "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
             "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
-            "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.95, "timeout_s": 3.0},
+            "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.95, "timeout_s": 3.0,
+                      "allow_commands": [], "ask_commands": []},
             "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800},
+            "permissions": {"deny": [], "ask": ["hub_set_preference"], "allow": ["hub_start_service"]},
         }
         before = _file(served)
         s["hub"]["port"] = served.hub.config.hub.port
@@ -178,3 +180,35 @@ async def test_the_judge_is_picked_in_settings_and_saved_under_agent(rig, serve)
         assert r.status_code == 422 and r.json()["data"]["field"].startswith("judge")
         r = await c.put("/api/settings", json={"judge": {"model": "minicpm-5-2B"}})   # back to the default: the key goes
         assert "judge" not in (tomllib.loads(_file(served)).get("agent") or {})
+
+
+async def test_command_rules_and_tool_permissions_are_edited_in_settings(rig, serve):
+    """The user overrides the Auto judge from the app: [agent.judge] allow_commands / ask_commands and
+    [agent.permissions], saved under [agent], applied at once, refused with the field when a pattern is bad."""
+    served = await _hub(rig, serve, "")
+    async with httpx.AsyncClient(base_url=served.url) as c:
+        r = await c.put("/api/settings", json={"judge": {"allow_commands": ["pytest   *", "make -C * test"], "ask_commands": ["git status"]},
+                                               "permissions": {"deny": ["tts_delete_voice"], "ask": ["hub_set_preference", "comfy_*"]}})
+        assert r.status_code == 200, r.text
+        s = r.json()["settings"]
+        assert s["judge"]["allow_commands"] == ["pytest *", "make -C * test"] and s["judge"]["ask_commands"] == ["git status"]
+        assert s["permissions"] == {"deny": ["tts_delete_voice"], "ask": ["hub_set_preference", "comfy_*"], "allow": ["hub_start_service"]}
+        cfg = served.hub.config.agent
+        assert cfg.judge.allow_commands == ["pytest *", "make -C * test"] and cfg.permissions.deny == ["tts_delete_voice"]
+        doc = tomllib.loads(_file(served))
+        assert doc["agent"]["judge"] == {"allow_commands": ["pytest *", "make -C * test"], "ask_commands": ["git status"]}
+        assert doc["agent"]["permissions"] == {"deny": ["tts_delete_voice"], "ask": ["hub_set_preference", "comfy_*"]}
+        assert "permissions" not in doc
+        for bad in ("pytest; curl x | sh", "a && b", "echo $(id)", "x\ny", "* -q", ""):
+            r = await c.put("/api/settings", json={"judge": {"allow_commands": [bad]}})
+            assert r.status_code == 422 and r.json()["code"] == "invalid_config", bad
+            assert r.json()["data"]["field"] == "judge.allow_commands", bad
+        r = await c.put("/api/settings", json={"judge": {"ask_commands": [f"c{i}" for i in range(101)]}})
+        assert r.status_code == 422 and r.json()["data"]["field"] == "judge.ask_commands"
+        r = await c.put("/api/settings", json={"permissions": {"allow": ["hub start"]}})
+        assert r.status_code == 422 and r.json()["data"]["field"] == "permissions.allow"
+        assert served.hub.config.agent.judge.allow_commands == ["pytest *", "make -C * test"]     # a refusal changes nothing
+        # back to the defaults: the keys go
+        r = await c.put("/api/settings", json={"judge": {"allow_commands": [], "ask_commands": []},
+                                               "permissions": {"deny": [], "ask": ["hub_set_preference"]}})
+        assert r.status_code == 200 and "agent" not in tomllib.loads(_file(served))

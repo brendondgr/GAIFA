@@ -344,7 +344,10 @@ def simple(cmd: Command, ctx: Ctx, depth: int) -> Verdict:
     words, seen = unwrap(cmd.words, ctx, depth)
     found += seen
     if words:
-        found.append(command_rule(words, cmd, ctx, depth))
+        v = command_rule(words, cmd, ctx, depth)
+        found.append(ctx.user.apply(ctx, cmd.words, words, v) if ctx.user else v)   # your rules (judge_user.py)
+    if ctx.user and (v := ctx.user.asks(cmd.words, words)):
+        found.append(v)
     return combine(found) if found else allow("nothing runs", "noop")
 
 

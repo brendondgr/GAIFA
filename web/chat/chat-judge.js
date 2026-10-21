@@ -1,11 +1,13 @@
-// The Auto mode's judge in Settings → Agent (plan 30.5): whether its model answers, and the calls it decided,
-// newest first: what ran and what asked, with the reason and a link to the chat. GET /api/judge/status and
-// GET /api/judge/recent (api.getJudgeStatus, api.listJudged).
+// The Auto mode's judge in Settings → Agent (plan 30.5): whether its model answers, your command rules
+// (chat-rules.js), and the calls it decided, newest first: what ran and what asked, with the reason, a link to the
+// chat and, for a command the model asked about, "Always allow <rule>". GET /api/judge/status, GET /api/judge/recent
+// and GET/PUT /api/settings (api.getJudgeStatus, api.listJudged, api.getSettings, api.saveSettings).
 
 import { h, T, MONO, Badge, Btn, fmtAgo } from './chat-ui.js';
+import { CommandRules, withRule, errText, allowConfirm } from './chat-rules.js';
 
 const R = () => globalThis.React;
-const SOURCE = { rules: 'the fixed rules', model: 'the model', 'fail-closed': 'failed: asked' };
+const SOURCE = { rules: 'the fixed rules', user: 'your rule', model: 'the model', 'fail-closed': 'failed: asked' };
 
 const URLS = { relay: 'http://127.0.0.1:4000', decide: 'http://127.0.0.1:7000/api/s/decide' };
 
@@ -36,10 +38,18 @@ function JudgePicker({ api, st, onSaved }) {
 
 export function JudgedList({ api, limit = 30 }) {
   const React = R(), [rows, setRows] = React.useState(null), [st, setSt] = React.useState(null), [err, setErr] = React.useState(null);
+  const [cfg, setCfg] = React.useState(null), [note, setNote] = React.useState(null);
   const load = () => {
     api.listJudged({ limit }).then(setRows, e => setErr(e));
     api.getJudgeStatus?.().then(setSt, () => setSt(null));
+    api.getSettings?.().then(setCfg, () => setCfg(null));
   };
+  const always = async p => {     // the "Always allow" shortcut: one more allow rule, after a confirm
+    if (!cfg?.judge || !globalThis.confirm?.(allowConfirm(p))) return;
+    try { const r = await api.saveSettings({ judge: { allow_commands: withRule(cfg.judge.allow_commands, p) } }); setCfg(r.settings); setNote({ ok: `Added “${p}” to your command rules.` }); }
+    catch (e) { setNote({ error: `Couldn’t add “${p}”: ${errText(e)}` }); }
+  };
+  const allowed = new Set(cfg?.judge?.allow_commands || []);
   React.useEffect(() => { if (api?.listJudged) load(); }, []);
   if (!api?.listJudged) return null;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid ' + T.bd, paddingTop: 10 } },
@@ -49,7 +59,10 @@ export function JudgedList({ api, limit = 30 }) {
     st ? h('div', { role: 'status', style: { fontSize: 12, color: st.available ? T.mut : T.acct } },
       st.available ? `Judge: ${st.model} (${st.backend}), answering.` : `Judge: ${st.model} (${st.backend}) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`) : null,
     st ? h(JudgePicker, { api, st, onSaved: () => setTimeout(load, 300) }) : null,
+    h(CommandRules, { api, cfg, onSaved: setCfg }),
+    note ? h('span', { role: note.error ? 'alert' : 'status', style: { fontSize: 12, color: note.error ? T.rd : T.mut } }, note.error || note.ok) : null,
     err ? h('span', { role: 'alert', style: { fontSize: 12, color: T.rd } }, `Couldn’t load the judged calls: ${err.detail || err.message}`) : null,
+    rows?.length ? h('span', { style: { fontWeight: 500, marginTop: 4 } }, 'Recent calls') : null,
     rows && !rows.length ? h('span', { style: { fontSize: 12.5, color: T.mut } }, 'None yet. Pick Auto in a chat’s header to let the judge decide.') : null,
     (rows || []).map(r => h('div', { key: r.id, style: { display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', fontSize: 12.5, padding: '6px 8px', borderRadius: 6, background: T.inset } },
       h(Badge, { tone: r.verdict === 'allow' ? 'green' : 'purple' }, r.verdict === 'allow' ? 'ran' : 'asked'),
@@ -57,5 +70,8 @@ export function JudgedList({ api, limit = 30 }) {
       h('span', { style: { color: T.mut, minWidth: 0, overflowWrap: 'anywhere', flexBasis: '100%' } }, r.reason),
       h('span', { style: { fontSize: 11.5, color: T.dim } }, [SOURCE[r.source] || r.source, r.ms != null ? `${Math.round(r.ms)} ms` : null,
         fmtAgo(r.ts) === 'now' ? 'just now' : fmtAgo(r.ts) + ' ago'].filter(Boolean).join(' · ')),
-      r.thread ? h('a', { href: '#/chat/' + encodeURIComponent(r.thread), style: { fontSize: 11.5 } }, 'the chat →') : null)));
+      r.thread ? h('a', { href: '#/chat/' + encodeURIComponent(r.thread), style: { fontSize: 11.5 } }, 'the chat →') : null,
+      cfg?.judge && api.saveSettings ? (r.suggest || []).filter(p => !allowed.has(p)).map(p => h(Btn, { key: p, sm: true, kind: 'ghost', icon: 'check',
+        title: 'Add it to “Always allow these commands in Auto”', onClick: () => always(p) },
+        'Always allow ', h('code', { style: { fontFamily: MONO, fontSize: 11.5 } }, p))) : null)));
 }

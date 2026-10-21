@@ -42,6 +42,7 @@ def view(hub: Hub) -> dict[str, Any]:
         "speech_input": cfg.speech_input.model_dump(),
         "judge": cfg.agent.judge.model_dump(),      # config.toml [agent.judge] (plan 30.3)
         "screen": cfg.agent.screen.model_dump(),    # [agent.screen] (plan 30.6)
+        "permissions": cfg.agent.permissions.model_dump(),   # [agent.permissions]: tool-name globs (plan 13.2)
     }
 
 
@@ -108,13 +109,14 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         "speech_input": d.speech_input.model_dump(),
         "judge": d.agent.judge.model_dump(),
         "screen": d.agent.screen.model_dump(),
+        "permissions": d.agent.permissions.model_dump(),
     }
     changes: dict[str, Any] = {}
     for section, keys in defaults.items():
         for key, default in keys.items():
             if new[section][key] != before[section][key]:
                 changes.setdefault(section, {})[key] = _or_default(new[section][key], default)
-    for section in ("judge", "screen"):   # they live under [agent] in config.toml
+    for section in ("judge", "screen", "permissions"):   # they live under [agent] in config.toml
         if section in changes:
             changes.setdefault("agent", {})[section] = changes.pop(section)
     if new["ui"]["dashboard"] != before["ui"]["dashboard"]:

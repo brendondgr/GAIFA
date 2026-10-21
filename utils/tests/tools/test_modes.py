@@ -192,3 +192,10 @@ def test_decide_with_limits_unit():
     assert decide("w_run", "execute", cfg(allow=["w_*"]), "manual", None, {"action": "command"})[0] == "ask"
     assert decide("w_commit", "write", cfg(), "manual", {"scope": "always"}, {"action": "commit", "once": True})[0] == "ask"
     assert decide("w_run", "execute", cfg(), "auto", None, {"action": "command"})[0] == "judge"
+    # a compound command is `once` (no grant covers it), but in Auto the judge still reads each part (2026-10-21)
+    once = {"action": "command", "once": True}
+    assert decide("w_run", "execute", cfg(), "auto", None, once)[0] == "judge"
+    assert decide("w_run", "execute", cfg(), "auto", {"scope": "always"}, once)[0] == "judge"   # never the grant
+    assert decide("w_run", "execute", cfg(), "manual", None, once)[0] == "ask"
+    assert decide("w_run", "execute", cfg(ask=["w_run"]), "auto", None, once)[0] == "ask"
+    assert decide("w_run", "execute", cfg(), "auto", None, {"action": "host", "once": True})[0] == "ask"

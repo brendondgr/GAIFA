@@ -71,7 +71,7 @@ class Judged(_Model):
     """Auto mode (plan 30.3): the judge's verdict on a call, on its result or its card and in Settings → Agent."""
     verdict: Literal["allow", "ask"]
     reason: str = ""
-    source: str = Field("", description="rules | model | fail-closed")
+    source: str = Field("", description="rules | user (your command rules) | model | fail-closed")
     rule: str = ""
     ms: float | None = None
     model: str = ""
@@ -86,6 +86,8 @@ class JudgedCall(Judged):
     thread: str | None = None
     call_id: str | None = None
     approval_id: str | None = None
+    suggest: list[str] | None = Field(None, description="A command the judge's model asked about: allow rules that would "
+                                      "cover it (Settings → Agent's \"Always allow\"; utils/tools/judge_user.py suggest)")
 
 
 class JudgeStatus(_Model):

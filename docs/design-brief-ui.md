@@ -578,7 +578,9 @@ interface Settings {
   speech_input: { mics: string[];   // plan 29.4: microphone labels, most preferred first; the first one present is used
                   language: string; preset: "fast" | "balanced" | "accurate" | "best"; mode: "both" | "toggle" | "hold" };
   judge: { backend: "relay" | "decide"; model: string;   // config.toml [agent.judge] (plan 30.3); picked in Settings → Agent
-           url: string; threshold: number; timeout_s: number };
+           url: string; threshold: number; timeout_s: number;
+           allow_commands: string[]; ask_commands: string[] };   // your command rules for Auto (`pytest *`; judge_user.py, plan 30.7)
+  permissions: { deny: string[]; ask: string[]; allow: string[] };   // [agent.permissions]: tool-name globs (architecture §14.7)
   screen: { pages: boolean; documents: boolean; transcripts: boolean;   // [agent.screen] (plan 30.6)
             timeout_s: number; window_chars: number };
 }
@@ -1087,7 +1089,8 @@ interface Judged { verdict: "allow" | "ask"; reason: string;
                    rule: string; ms?: number; model: string;
                    summary: string;                                 // the command, URL or file, in one line
                    why?: string }                                   // the step row: "Auto: ran (judged safe: …)" | "Auto: asked you (…)"
-interface JudgedCall extends Judged { id: number; ts: number; tool: string; thread?: string; call_id?: string; approval_id?: string }
+interface JudgedCall extends Judged { id: number; ts: number; tool: string; thread?: string; call_id?: string; approval_id?: string;
+                                      suggest?: string[] }   // allow rules that would cover a command the model asked about (plan 30.7)
 interface JudgeStatus { available: boolean; backend: string; model: string; detail: string;   // Auto is offered only when available
                        choices: string[] }   // models the backend offers that the judge could use (the picker in Settings → Agent)
 interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote";
@@ -1167,7 +1170,8 @@ Built by hand in `web/chat/` (plain ES modules on the page's React, like the das
   - **Allow once · Allow in this chat · Always allow**, then **Deny**. "Allow in this chat" shows only for a call from a chat (`origin.thread`); "Always allow…" on `execute` and `destructive` opens a second confirm ("Always let the agent run code with … in every chat and from MCP, without asking?") before it decides with `confirm: true`. Deny opens a reason box (optional; Enter denies, the agent reads the reason). Ctrl+Enter allows once;
   - for `execute`, the code or command (a string argument named `code`, `command`, `script`, `cmd`, `source` or `shell`, or with `format: "code"` / `x-code`) shows whole in a monospaced, scrollable, editable box: what's in it is what runs;
   - decided: the fold's row says "Approved by you, and allowed in this chat" (or "always allowed").
-- **Settings → Agent → Permissions** lists the grants (tool, risk, what it covers, "always" or a link to its chat, uses, age, expiry) with **Revoke** (plan 25.2).
+- **Settings → Agent → Permissions** lists the grants (tool, risk, what it covers, "always" or a link to its chat, uses, age, expiry) with **Revoke** (plan 25.2), then **Tool permissions** (plan 30.7): "Never run", "Always ask" and "Run without asking", tool-name globs saved to `[agent.permissions]` (the defaults, `hub_set_preference` asks and `hub_start_service` runs, show as entries).
+- **Settings → Agent → Judged calls** (plan 30.7): under the judge picker, **Your command rules**: "Always allow these commands in Auto" and "Always ask before these", each a list with add and remove and Save; errors show inline, and a 422 names the list. Each recent call the judge's model asked about offers **Always allow `<rule>`** (`suggest`), which confirms and then adds the rule. A verdict from your rules has the source `user`, shown as "your rule".
 - **Settings → Agent:** the models, AGENT.md and MEMORY.md editors, topic files, skills, the modes and how permissions work.
 
 **Events → turns.** `chat-thread.js` `buildView(events, live)` folds the log into items, then `chat-turn.js` `groupTurns(view, {running, now, tools})` groups them into turns of steps by the `step` id the agent puts on thinking, text and tool calls; the last step's text is the answer when that step called no tools. `buildView` folds the log into items as follows. A `tool_call` becomes a **tool** item (its `call`, live `progress` and `tool_result` folded in), or an **approval** item when an `approval` event names it (with its `decision`); `ask_user` becomes a **question** item with its `answer`; a result with outputs adds a **result** item; `update_todos` and `remember` calls are hidden (their `todos` / `memory` events have cards); `usage`, `state`, `call`, `answer`, `decision` are folded. Every other event type is an item of its own kind. Live `delta` events show streaming text and thinking until the stored `assistant` / `thinking` event of that step replaces them.

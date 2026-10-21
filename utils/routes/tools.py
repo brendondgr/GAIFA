@@ -180,8 +180,16 @@ async def revoke_thread_grants(request: Request, thread: str = Query(..., min_le
             "with the reason; ?thread=", response_model=list[JudgedCall], response_model_exclude_none=True)
 async def judged_recent(request: Request, thread: str | None = None, limit: int = Query(50, ge=1, le=500)) -> list[dict[str, Any]]:
     where, args = ("WHERE thread = ?", (thread,)) if thread else ("", ())
+    from utils.tools.judge_user import suggest
+
     rows = await _hub(request).db.fetchall(f"SELECT * FROM judged {where} ORDER BY ts DESC, id DESC LIMIT ?", (*args, limit))
-    return [dict(r) for r in rows]
+    out = [dict(r) for r in rows]
+    for r in out:     # asked by the model (the rules weren't sure): your allow rule could cover it
+        prefix = f"{r['tool']}: "
+        if r["verdict"] == "ask" and r["source"] in ("model", "fail-closed") and r["tool"] in ("workspace_run", "workspace_shell") \
+                and r["summary"].startswith(prefix) and "… (cut:" not in r["summary"]:
+            r["suggest"] = suggest(r["summary"][len(prefix):]) or None
+    return out
 
 
 @router.get("/api/judge/status", summary="Whether the judge's model answers (Auto is offered only when it does)",

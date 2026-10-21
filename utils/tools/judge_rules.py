@@ -291,12 +291,16 @@ PY_NET_RE = re.compile(r"\b(requests|httpx|urllib|aiohttp|http\.client|ftplib|sm
 
 
 class Ctx:
-    """Where a command runs: the folder (an absolute path), the current directory inside it, and its level."""
+    """Where a command runs: the folder (an absolute path), the current directory inside it, and its level; and your
+    own rules (`judge_user.UserRules`), with what they allowed in this call."""
 
-    def __init__(self, folder: dict[str, Any] | None):
+    def __init__(self, folder: dict[str, Any] | None, user: Any = None):
         self.root = posixpath.normpath((folder or {}).get("path") or "/nonexistent-folder")
         self.level = (folder or {}).get("level") or "read"
         self.cwd = self.root
+        self.user = user or None
+        self.user_allowed: list[str] = []    # your allow rules that covered a command
+        self.rules_allowed = False           # a command the fixed rules allowed without one (with user rules only)
 
     def at_least(self, need: str) -> bool:
         return LEVELS.index(self.level) >= LEVELS.index(need) if self.level in LEVELS else False
@@ -413,12 +417,14 @@ def gpu_rule(tool: str, est: dict[str, Any]) -> Verdict:
     return unsure(f"{tool} is a long GPU job (about {secs / 60:.0f} min, {gb:.0f} GB)", "long-job")
 
 
-def classify(call: dict[str, Any], folder: dict[str, Any] | None = None) -> Verdict:
-    """The rules' verdict on one tool call (see the module docstring)."""
+def classify(call: dict[str, Any], folder: dict[str, Any] | None = None, user: Any = None) -> Verdict:
+    """The rules' verdict on one tool call (see the module docstring). `user`: your command rules
+    (`judge_user.UserRules`), applied to each command of a `workspace_run`."""
     tool = str(call.get("tool") or "")
     args = call.get("args") or call.get("arguments") or {}
-    ctx = Ctx(folder)
+    ctx = Ctx(folder, user)
     from .judge_commands import classify_command     # it imports this module's helpers
+    from .judge_user import line_verdict
 
     if tool in ("workspace_run", "workspace_shell"):
         if (args.get("where") or "sandbox") != "sandbox":
@@ -426,10 +432,11 @@ def classify(call: dict[str, Any], folder: dict[str, Any] | None = None) -> Verd
         if not ctx.at_least("run"):
             return ask(f"commands need Run; the folder is at {ctx.level}", "run-level")
         v = classify_command(str(args.get("command") or ""), ctx)
-        if v.verdict == "allow" and args.get("network"):
+        if v.verdict == "allow" and args.get("network") and (ctx.rules_allowed or not ctx.user_allowed):
             # with the internet on, even a reading command could send what it reads: no rule allows; the model decides
+            # (your own allow rules do, when they cover every command in the line)
             return unsure(f"{v.reason}, with the internet on", "network")
-        return v
+        return line_verdict(v, ctx, bool(args.get("network"))) if v.verdict == "allow" and ctx.user_allowed else v
     if tool == "workspace_python":
         code = str(args.get("code") or "")
         if SECRET_RE.search(code):

@@ -2,7 +2,10 @@
 30.3 connects it to the approvals (config, the tool record, the step row).
 
 `await judge(call, user_messages, folder, cfg)` → `Judgement(verdict: allow | ask, reason, source, …)`:
-1. The fixed rules (`judge_rules.classify`) decide what they can: allow or ask.
+1. The fixed rules (`judge_rules.classify`) decide what they can: allow or ask. Your own command rules
+   (`[agent.judge] allow_commands / ask_commands`, `judge_user.py`) apply inside them, to each command of a line:
+   an ask rule asks; an allow rule allows where the fixed rules allowed or were unsure, never where they ask
+   (source `user`).
 2. What they leave `unsure` goes to a model, which sees only **the user's own typed messages** (attached documents
    inside `<untrusted>` are cut out), the proposed call, the folder and its level, and the rules' reason: never
    files, pages or tool results (the injection guard).
@@ -31,6 +34,7 @@ from typing import Any
 import httpx
 
 from .judge_rules import classify
+from .judge_user import UserRules
 
 UNTRUSTED_RE = re.compile(r"<untrusted\b[^>]*>.*?(</untrusted>|$)", re.DOTALL | re.IGNORECASE)
 MAX_MESSAGES = 8
@@ -78,18 +82,21 @@ class JudgeConfig:
     threshold: float = 0.95
     timeout_s: float = 3.0
     api_key: str | None = None
+    allow_commands: list[str] = field(default_factory=list)    # your rules (judge_user.py)
+    ask_commands: list[str] = field(default_factory=list)
 
 
 def config_from(cfg: Any) -> JudgeConfig:
     """`config.agent.judge` (utils/config.py JudgeCfg) → JudgeConfig."""
-    return JudgeConfig(backend=cfg.backend, model=cfg.model, url=cfg.url, threshold=cfg.threshold, timeout_s=cfg.timeout_s)
+    return JudgeConfig(backend=cfg.backend, model=cfg.model, url=cfg.url, threshold=cfg.threshold, timeout_s=cfg.timeout_s,
+                       allow_commands=list(cfg.allow_commands), ask_commands=list(cfg.ask_commands))
 
 
 @dataclass
 class Judgement:
     verdict: str                          # allow | ask
     reason: str
-    source: str                           # rules | model | fail-closed
+    source: str                           # rules | user (your command rules) | model | fail-closed
     rule: str = ""
     ms: float = 0.0
     model: str = ""
@@ -236,9 +243,10 @@ async def judge(call: dict[str, Any], user_messages: list[Any], folder: dict[str
     """The verdict on one call. `rules=False` sends every call to the model (the eval measures it alone)."""
     cfg = cfg or JudgeConfig()
     t0 = time.perf_counter()
-    r = classify(call, folder)
+    r = classify(call, folder, UserRules(cfg.allow_commands, cfg.ask_commands))
     if rules and r.verdict in ("allow", "ask"):
-        return Judgement(r.verdict, r.reason, "rules", rule=r.rule, ms=round((time.perf_counter() - t0) * 1000, 2))
+        return Judgement(r.verdict, r.reason, "user" if r.rule in ("user-allow", "user-ask") else "rules", rule=r.rule,
+                         ms=round((time.perf_counter() - t0) * 1000, 2))
     cut = arguments(call)[1]
     if cut:              # the model would read only part of the call: what it can't see could hide anything
         return Judgement("ask", TOO_LONG, "fail-closed", rule=r.rule, ms=round((time.perf_counter() - t0) * 1000, 2),

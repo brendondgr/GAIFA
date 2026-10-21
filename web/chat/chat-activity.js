@@ -149,7 +149,7 @@ function ToolRow({ row, ctx, open, onToggle }) {
       it_by(row) ? h(Badge, { tone: 'cyan', title: 'Started by a button, not by the model' }, 'you') : null,
       h(Chev, { open })),
     row.status === 'running' && !row.lookup ? h('div', { style: { padding: '0 0 2px 21px' } }, h(ProgressBar, { value: pct, note: row.progress?.note })) : null,
-    judged ? h('div', { title: judged.source === 'rules' ? 'Decided by the fixed rules' : judged.source === 'model' ? `Decided by the judge's model (${judged.model}, ${Math.round(judged.ms || 0)} ms)` : 'The judge failed, so it asked',
+    judged ? h('div', { title: judged.source === 'rules' ? 'Decided by the fixed rules' : judged.source === 'user' ? 'Decided by your command rule (Settings → Agent)' : judged.source === 'model' ? `Decided by the judge's model (${judged.model}, ${Math.round(judged.ms || 0)} ms)` : 'The judge failed, so it asked',
       'aria-label': judged.why, style: { display: 'flex', alignItems: 'baseline', gap: 5, padding: '0 0 2px 21px', fontSize: 11.5, color: judged.verdict === 'allow' ? T.mut : T.pu, minWidth: 0 } },
       h('span', { style: { display: 'flex', alignSelf: 'center', flex: 'none' } }, h(Icon, { d: 'shield', size: 11 })), h('span', { style: { minWidth: 0, overflowWrap: 'anywhere' } }, judged.why)) : null,
     open ? h('div', { style: { padding: '2px 0 6px 21px' } }, h(Detail, { row, item: row.item, ctx })) : null);

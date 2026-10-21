@@ -58,6 +58,12 @@ LOCAL: list[dict[str, Any]] = [
      "in its note.",
      "parameters": {"type": "object", "properties": {"seq": {"type": "integer"}, "offset": {"type": "integer", "default": 0},
                                                     "limit": {"type": "integer", "default": 12000}}, "required": ["seq"]}},
+    {"name": "chat_search", "description": "Find the user's earlier chats by meaning (plan 28.5): what a chat was about, "
+     "in words. Returns each chat's title, date, a short summary and its link (#/chat/<id>), best first, so you can say "
+     "\"you did this in the chat on 10-14\". Only chats that have been quiet a while have summaries.",
+     "parameters": {"type": "object", "properties": {"query": {"type": "string"},
+                                                    "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5}},
+                    "required": ["query"]}},
     {"name": "remember", "description": "Save a lasting fact or preference about the user (e.g. 'prefers 16:9 images'). "
      "Optional `topic` files it under a topic.",
      "parameters": {"type": "object", "properties": {"text": {"type": "string"}, "topic": {"type": "string"}},

@@ -98,13 +98,17 @@ class GemmaBackend:
         self.dtype = "float32"
 
     def load(self, parts: frozenset[str]) -> None:
+        if self.want == "cpu":                              # keep ROCm off the GPU: even torch.cuda.is_available()
+            os.environ["HIP_VISIBLE_DEVICES"] = "-1"        # opens /dev/kfd. Set before torch is imported (in the
+            os.environ["ROCR_VISIBLE_DEVICES"] = "-1"       # worker process, so only it is affected)
+            os.environ["CUDA_VISIBLE_DEVICES"] = ""
         import torch                                        # imported on first load: health answers at once
         from sentence_transformers import SentenceTransformer
 
         if not (self.model_dir / "model.safetensors").is_file():
             raise FileNotFoundError(f"no weights in {self.model_dir}")
         self.unload()
-        gpu = torch.cuda.is_available() and self.want in ("auto", "cuda")
+        gpu = self.want != "cpu" and torch.cuda.is_available()
         if self.want == "cuda" and not gpu:
             raise RuntimeError("EMBED_DEVICE=cuda but torch sees no GPU")
         dtype = torch.bfloat16 if gpu and torch.cuda.is_bf16_supported() else torch.float32
@@ -119,8 +123,8 @@ class GemmaBackend:
             return
         self.model = None
         gc.collect()
-        import torch
-        if torch.cuda.is_available():
+        if self.device == "cuda":
+            import torch
             torch.cuda.empty_cache()
 
     def encode(self, kind: str, items: list[Any], batch_size: int) -> np.ndarray:

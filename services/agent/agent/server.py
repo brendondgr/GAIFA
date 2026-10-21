@@ -21,7 +21,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
-from . import docs
+from . import api_summaries, docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -100,6 +100,7 @@ def config_from_env() -> Config:
                   default_window=int(os.environ.get("AGENT_DEFAULT_WINDOW", "32768")),
                   inline_tokens=int(os.environ.get("AGENT_INLINE_TOKENS", "6000")),
                   reply_reserve=int(os.environ.get("AGENT_REPLY_RESERVE", "4096")),
+                  summary_idle_min=float(os.environ.get("AGENT_SUMMARY_IDLE_MIN", "30")),
                   all_tools_models=tuple(m for m in os.environ.get("AGENT_ALL_TOOLS", "").split(",") if m))
 
 
@@ -176,6 +177,9 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         app.state.learner = Learner(agent, base=f"{hub_url.rstrip('/')}/api/s/agent")       # plan 22.5–22.6
         app.state.schedule = Schedule(agent, app.state.learner)
         scheduler = asyncio.create_task(app.state.schedule.run_forever(stop))
+        from .summaries import Summaries
+        agent.summaries = Summaries(agent, cfg.summary_idle_min)                             # plan 28.5
+        summarizer = asyncio.create_task(agent.summaries.run_forever(stop))
         await agent.resume_all()
         try:
             yield
@@ -188,13 +192,15 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             upkeep.cancel()
             importer.cancel()
             scheduler.cancel()
-            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, return_exceptions=True)
+            summarizer.cancel()
+            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, summarizer, return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()
 
     app = FastAPI(title="Agent", version="0.1.0", lifespan=lifespan,
                   description="AIHub's chat agent: one loop, tools on demand, questions and parameter cards (plan Phase 14).")
+    api_summaries.add_routes(app)                                    # plan 28.5
 
     def A(request: Request) -> Agent:
         return request.app.state.agent
@@ -310,6 +316,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         await agent.cancel(tid)
         agent.store.delete_thread(tid)
         await agent.hub.end_grants(tid)      # "allow in this chat" ends with the chat (plan 25.2)
+        if getattr(agent, "summaries", None):
+            await agent.summaries.forget(tid)   # its summary and vector go too (plan 28.5)
         return {"deleted": tid}
 
     @app.get("/v1/threads/{tid}/events", summary="The thread's events after a seq (replay after a reload)")

@@ -153,7 +153,7 @@ class Library:
         sampler = asyncio.create_task(self._sample(stop))
         try:
             while not stop.is_set():
-                if not self.store.pending(1):
+                if not self.store.pending(1) and not self.store.chats_pending(1):
                     self.state = "idle"
                     await self._unload_if_unused()
                     self.wake.clear()
@@ -187,6 +187,7 @@ class Library:
         """Index pending outputs until the queue is empty, the GPU goes busy or there's no room. Returns how
         many were indexed."""
         n = 0
+        self.state = "indexing"
         while (rows := self.store.pending(1)):
             row = rows[0]
             self.state, self.current = "indexing", {"id": row["id"], "title": row["title"], "kind": row["kind"]}
@@ -214,8 +215,26 @@ class Library:
                 self.store.fail(row["id"], f"{type(e).__name__}: {e}")
             finally:
                 self.current = None
-        if not self.store.pending(1):
+        if not self.store.pending(1) and self.state == "indexing":
+            try:
+                n += await self.index_chats()
+            except Stop:
+                self.state = "waiting_for_gpu"
+            except HubError as e:
+                self.state = "no_room" if e.code == "needs_room" else self.state
+        if not self.store.pending(1) and not self.store.chats_pending(1):
             await self._unload_if_unused()
+        return n
+
+    async def index_chats(self, gate: bool = True, limit: int = 8) -> int:
+        """Chat summaries (plan 28.5), a batch at a time; `gate=False` when someone is searching them."""
+        GATED.set(gate)
+        n = 0
+        while (rows := self.store.chats_pending(limit)):
+            vecs = await self._embed("text", [prompt(r["summary"], "document", r["title"]) for r in rows])
+            for r, v in zip(rows, vecs):
+                self.store.finish_chat(r["thread_id"], r["summary"], v)
+            n += len(rows)
         return n
 
     async def _unload_if_unused(self) -> None:
@@ -325,7 +344,7 @@ class Library:
     # status ---------------------------------------------------------------------------------
 
     def status(self) -> dict[str, Any]:
-        return {"state": self.state, "connected": self.connected, "counts": self.store.counts(),
+        return {"state": self.state, "connected": self.connected, "counts": self.store.counts(), "chats": self.store.chat_counts(),
                 "current": self.current, "indexed_since_start": self.indexed,
                 "gpu": {"measure": getattr(self.gpu.read, "measure", "device"), "busy_pct": self.gpu.last,
                         "detail": getattr(self.gpu.read, "detail", {}),

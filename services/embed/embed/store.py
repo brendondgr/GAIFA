@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS chunks (
     text TEXT);                                                              -- a text chunk's words, for the best line
 CREATE INDEX IF NOT EXISTS chunks_output ON chunks(output_id);
 CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, created_ts REAL);
+CREATE TABLE IF NOT EXISTS chats (                                           -- plan 28.5: the `chats` collection
+    thread_id TEXT PRIMARY KEY, title TEXT, summary TEXT NOT NULL, created_ts REAL, updated_ts REAL,
+    state TEXT NOT NULL, vector BLOB);                                       -- pending | done
 CREATE TABLE IF NOT EXISTS collection_outputs (
     collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE, output_id TEXT NOT NULL,
     PRIMARY KEY (collection_id, output_id));
@@ -178,6 +181,37 @@ class Store:
         with self.lock:
             self._matrix = (version, m)
         return m
+
+    # chats (plan 28.5): a summary a chat, one vector each ---------------------------------------
+
+    def put_chat(self, tid: str, title: str, summary: str, created_ts: float | None, updated_ts: float | None) -> None:
+        with self.lock:
+            self.db.execute("INSERT INTO chats (thread_id, title, summary, created_ts, updated_ts, state) "
+                            "VALUES (?, ?, ?, ?, ?, 'pending') ON CONFLICT(thread_id) DO UPDATE SET title = excluded.title, "
+                            "summary = excluded.summary, created_ts = excluded.created_ts, updated_ts = excluded.updated_ts, "
+                            "state = 'pending'", (tid, title, summary, created_ts, updated_ts))
+
+    def chats_pending(self, limit: int = 8) -> list[dict[str, Any]]:
+        return self._rows("SELECT thread_id, title, summary FROM chats WHERE state = 'pending' "
+                          "ORDER BY updated_ts DESC LIMIT ?", (limit,))
+
+    def finish_chat(self, tid: str, summary: str, vector: np.ndarray) -> None:
+        """Done only if the summary is still the one embedded (a newer one stays pending)."""
+        with self.lock:
+            self.db.execute("UPDATE chats SET state = 'done', vector = ? WHERE thread_id = ? AND summary = ?",
+                            (np.asarray(vector, dtype=np.float16)[:DIM].tobytes(), tid, summary))
+
+    def delete_chat(self, tid: str) -> bool:
+        with self.lock:
+            return self.db.execute("DELETE FROM chats WHERE thread_id = ?", (tid,)).rowcount > 0
+
+    def chats(self) -> list[dict[str, Any]]:
+        return self._rows("SELECT thread_id, title, summary, created_ts, updated_ts, state, vector FROM chats")
+
+    def chat_counts(self) -> dict[str, int]:
+        out = {"pending": 0, "done": 0}
+        out.update({r["state"]: r["n"] for r in self._rows("SELECT state, COUNT(*) AS n FROM chats GROUP BY state")})
+        return out
 
     # collections ---------------------------------------------------------------------------
 

@@ -228,6 +228,19 @@ class Local:
     def images(self, events: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
         return {e["seq"]: e["payload"]["image"] for e in events if e["type"] == "tool_result" and e["payload"].get("image")}
 
+    async def t_chat_search(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        """Plan 28.5: earlier chats by meaning, through the embed mod's `chats`."""
+        s = getattr(self.a, "summaries", None)
+        if s is None:
+            return self.err(tid, cid, "chat_search", "unavailable", "the summariser isn't running")
+        try:
+            hits = await s.search(str(args.get("query") or ""), int(args.get("limit") or 5))
+        except Exception as e:  # noqa: BLE001: no embed mod
+            return self.err(tid, cid, "chat_search", "unavailable", f"search by meaning needs the embed mod ({e})",
+                            fix="tell the user chat search needs the Embeddings mod running")
+        hits = [h for h in hits if h["thread_id"] != tid]                  # not the chat it's asked from
+        return self.ok(tid, cid, "chat_search", {"chats": hits} if hits else {"chats": [], "note": "no earlier chat matches"})
+
     async def t_read_result(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         seq = int(args["seq"])
         off, lim = int(args.get("offset") or 0), min(int(args.get("limit") or 12000), 40000)

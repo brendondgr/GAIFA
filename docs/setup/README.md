@@ -10,7 +10,7 @@ How to install AIHub on a new machine: the host, the hub, then **the mods you wa
 |---|---|---|---|
 | 1. The machine | [host.md](host.md): kernel parameters, groups, packages, accounts | 30 min and a reboot | — |
 | 2. The hub | [hub.md](hub.md): clone, `uv sync`, `aihub install`, `aihub doctor` | 5 min | 100 MB |
-| 3. The mods you want | their setup docs (below), in the order in [hub.md](hub.md#installing-the-mods) | 10 min to an hour each | up to 15 GB each (images, runtimes) |
+| 3. The mods you want | their setup docs (below), in the order in [hub.md](hub.md#installing-the-mods) | 10 min to an hour each | up to about 22 GB each (images, runtimes, containers; the ComfyUI image, 15.1 GB, is shared by Images & Video and 3D Generate and counted once) |
 | 4. Their models | each mod's setup doc: what kind of model it runs, a few optional suggestions, how to add your own | the downloads | from nothing to hundreds of GB: your choice |
 
 Pick only the mods you need; each setup doc says what the mod gives you and what it needs. AIHub doesn't come with a model list to copy: the models are yours to choose, per mod.
@@ -27,17 +27,17 @@ Pick only the mods you need; each setup doc says what the mod gives you and what
 | Mod | What it gives you | GPU | Disk | Setup docs |
 |---|---|---|---|---|
 | `agent` | Chat agent: the Chat page's tool loop (files, search, images, speech) on any chat model the relay serves | no | 50 MB | [Chat agent](../../services/agent/setup/agent.md) |
-| `comfy` | Images & Video: ComfyUI in a ROCm toolbox, running any workflow pack (images, edits, video, and two of 3D Generate's engines) | yes | 16.0 GB | [ComfyUI in the Strix Halo toolbox](../../services/comfy/setup/comfyui.md) |
+| `comfy` | Images & Video: ComfyUI in a ROCm toolbox, running any workflow pack (images, edits, video, and two of 3D Generate's engines) | yes | 4.0 GB | [ComfyUI in the Strix Halo toolbox](../../services/comfy/setup/comfyui.md) |
 | `decide` | Decisions: fast yes/no, choice and score answers with probabilities (the Auto judge's d3-lite) | yes | 6.6 GB | [Decisions: d3-lite](../../services/decide/setup/decide.md) |
 | `embed` | Embeddings: search outputs, documents and chats by meaning (text, images, audio, video in one space) | yes | 6.6 GB | [Embeddings: EmbeddingGemma 2](../../services/embed/setup/embed.md) |
-| `gen3d` | 3D Generate: text to 3D meshes with Cube3D, named parts with CubePart, and game rigs (the server, the ROCm image and the first engine) · 3D Generate: one picture to a watertight mesh with Hunyuan3D 2.1 (best for characters) · 3D Generate: one picture to a mesh, the quickest full shape, with Meta's SAM 3D Objects (gated weights) | yes | 21.5 GB | [CubeArt: Cube3D and CubePart (3D Generate)](../../services/gen3d/setup/cubeart.md), [Hunyuan3D 2.1 (3D Generate)](../../services/gen3d/setup/img3d.md), [SAM 3D Objects (3D Generate)](../../services/gen3d/setup/sam3do.md) |
+| `gen3d` | 3D Generate: text to 3D meshes with Cube3D, named parts with CubePart, and game rigs (the server, the ROCm image and the first engine) · 3D Generate: one picture to a watertight mesh with Hunyuan3D 2.1 (best for characters) · 3D Generate: one picture to a mesh, the quickest full shape, with Meta's SAM 3D Objects (gated weights) | yes | 6.5 GB | [CubeArt: Cube3D and CubePart (3D Generate)](../../services/gen3d/setup/cubeart.md), [Hunyuan3D 2.1 (3D Generate)](../../services/gen3d/setup/img3d.md), [SAM 3D Objects (3D Generate)](../../services/gen3d/setup/sam3do.md) |
 | `lcpp` | LLM Launcher: run any GGUF chat model with llama.cpp on the GPU (Vulkan), published to the relay | yes | 150 MB | [llama.cpp (LLM Launcher)](../../services/lcpp/setup/llama-cpp.md) |
 | `opencode` | OpenCode: a coding agent behind the relay's agent model, plus OpenCode Zen's free hosted models | no | 200 MB | [OpenCode](../../services/opencode/setup/opencode.md) |
 | `relay` | LLM Relay: one OpenAI-compatible endpoint for every chat model, local or remote, with usage charts | no | 350 MB | [LLM Relay](../../services/relay/setup/relay.md) |
 | `searxng` | SearXNG watcher: see your SearXNG's health and engines, and change its settings from AIHub or the agent | no | 30 MB | [SearXNG watcher (the searxng mod)](../../services/searxng/setup/searxng.md) |
-| `stt` | Speech to text: transcribe audio and video files, live dictation and the Chat microphone (Whisper) | yes | 750 MB | [Speech to Text (faster-whisper)](../../services/stt/setup/stt.md) |
+| `stt` | Speech to text: transcribe audio and video files, live dictation and the Chat microphone (Whisper; runs on the CPU, much faster with the GPU) | no | 750 MB | [Speech to Text (faster-whisper)](../../services/stt/setup/stt.md) |
 | `tts` | Speech: voice cloning, voice design and delivery directions with Breeze TTS 2 (non-commercial), plus Whisper word timings · Speech: text to speech with Kokoro's fast built-in English voices (the server and its first engine) | yes | 13.6 GB | [Breeze TTS 2 and Whisper (Speech)](../../services/tts/setup/breeze.md), [Kokoro-82M (Speech)](../../services/tts/setup/kokoro.md) |
-| `vllm` | vLLM: serve Hugging Face chat models (safetensors, AWQ) on the GPU, published to the relay | yes | 12.5 GB | [vLLM](../../services/vllm/setup/vllm.md) |
+| `vllm` | vLLM: serve Hugging Face chat models (safetensors, AWQ) on the GPU, published to the relay | yes | 100 MB | [vLLM](../../services/vllm/setup/vllm.md) |
 | `web` | Web: search through your SearXNG and fetch pages and PDFs into Outputs, for you and the agent | no | 100 MB | [Web (SearXNG search and page fetching)](../../services/web/setup/web.md) |
 | `workspace` | Workspace: let the agent read and edit your folders at a level you set, and run code in a podman sandbox | no | 1.1 GB | [Workspace (folders, edits in place, the sandbox)](../../services/workspace/setup/workspace.md) |
 <!-- end generated -->

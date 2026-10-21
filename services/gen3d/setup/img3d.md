@@ -5,14 +5,15 @@ models = ["3d/Hunyuan3D-2.1"]
 scan = []
 summary = "3D Generate: one picture to a watertight mesh with Hunyuan3D 2.1 (best for characters)"
 gpu = true
-disk_gb = 3
+disk_gb = 0
 needs = ["podman", "git"]
 after = ["gen3d-cubeart"]
 check = ".venv/bin/python -m gen3d.doctor | grep -Eq 'ok +Hunyuan3D 2.1 \\(image engine\\) +ready'"
 
 [[steps]]
 run = "scripts/install-runtime.sh"
-what = "the runtime installer again (it skips what gen3d-cubeart built): clones Hunyuan3D-2.1 at the pinned commit and builds runtime/img3d/.venv inside the image, layered on CubeArt's (about 3 GB, no GPU devices passed)"
+what = "the runtime installer again, which finds what gen3d-cubeart's run already built (it always clones Hunyuan3D-2.1 at the pinned commit and builds runtime/img3d/.venv, layered on CubeArt's, about 3 GB, counted there) and checks it; this setup's own part is the weights"
+ask = "Hunyuan3D 2.1 comes under the Tencent Hunyuan 3D 2.1 Community License (https://huggingface.co/tencent/Hunyuan3D-2.1/blob/main/LICENSE): its Territory is worldwide 'excluding the territory of the European Union, United Kingdom and South Korea', and a product with more than 1 million monthly active users must ask Tencent for a licence. Download and use Hunyuan3D 2.1's weights under that licence? (SAM 3D Objects is layered on its venv: no skips that too.)"
 
 [[suggest]]
 name = "Hunyuan3D 2.1 (shape)"
@@ -33,7 +34,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-One of 3D Generate's picture engines (`engine = hunyuan21`): Tencent's **Hunyuan3D 2.1**, shape only (no texture), from one picture to a watertight mesh. It's the one to pick for characters. It runs in a `gen3d-worker-*` container of the ROCm image, with the venv `runtime/img3d/.venv` and the upstream code in `runtime/hunyuan3d-2.1/` (only `hy3dshape/` is used). The same worker also reduces meshes from other engines to a face budget (`target_faces`). The server venv, the image and how the venvs are layered are in [cubeart.md](cubeart.md). **Licence:** the Tencent Hunyuan 3D 2.1 Community Licence, which excludes the EU, the UK and South Korea.
+One of 3D Generate's picture engines (`engine = hunyuan21`): Tencent's **Hunyuan3D 2.1**, shape only (no texture), from one picture to a watertight mesh. It's the one to pick for characters. It runs in a `gen3d-worker-*` container of the ROCm image, with the venv `runtime/img3d/.venv` and the upstream code in `runtime/hunyuan3d-2.1/` (only `hy3dshape/` is used). The same worker also reduces meshes from other engines to a face budget (`target_faces`). The server venv, the image and how the venvs are layered are in [cubeart.md](cubeart.md). **Licence:** the Tencent Hunyuan 3D 2.1 Community License ([LICENSE](https://huggingface.co/tencent/Hunyuan3D-2.1/blob/main/LICENSE), the card's `tencent-hunyuan-community`): its Territory is worldwide "excluding the territory of the European Union, United Kingdom and South Korea", and above 1 million monthly active users you must request a licence from Tencent. `aihub setup` asks before installing it.
 
 ## Tested with
 

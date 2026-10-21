@@ -10,7 +10,7 @@ What the machine needs before you clone AIHub. Every value here was read from th
 | Chip | AMD Ryzen AI MAX+ 395 with Radeon 8060S (Strix Halo, `gfx1151`), 128 GB unified memory |
 | OS | Fedora Linux 44 (KDE Plasma), kernel `7.2.11-200.fc44` |
 | GPU drivers | the kernel's `amdgpu`; `linux-firmware-20260916`, `mesa-vulkan-drivers-26.2.4` (llama.cpp uses Vulkan, through RADV) |
-| ROCm | none on the host: ROCm and PyTorch come inside the containers and the engine venvs |
+| ROCm | on the host only for `stt` (Speech to Text): Fedora's `rocm-hip` 7.1.1, `rocblas` 7.1.1, `hipblas`, `hiprand`, `rocrand` 7.1.0, which its ROCm build of CTranslate2 links against (§3). Every other mod brings ROCm and PyTorch inside its container or engine venv |
 | Containers | podman 5.8.9, toolbox 0.3 |
 | Tools | uv 0.12.23, git 2.56.0, Node 22.23.1 (`nodejs22`), npm 10.9.8, espeak-ng 1.52.0, ffmpeg 8.1.3 (RPM Fusion), Blender 5.2.2 (optional) |
 
@@ -83,7 +83,15 @@ Log out and back in, then check that `id` lists both. (On this machine: `groups=
 ## 3. Packages
 
 ```bash
-sudo dnf install podman toolbox git-core nodejs22 nodejs22-npm espeak-ng
+sudo dnf install podman toolbox git-core nodejs22 nodejs22-npm espeak-ng mesa-vulkan-drivers
+```
+
+`mesa-vulkan-drivers` is Mesa's RADV, the Vulkan driver the LLM Launcher's llama.cpp runs on (most desktop installs have it already).
+
+For Speech to Text (`stt`) on the GPU, the ROCm runtime libraries its CTranslate2 build needs (no other mod uses host ROCm; without them `stt` runs on the CPU):
+
+```bash
+sudo dnf install rocm-hip rocblas hipblas hiprand rocrand
 ```
 
 - **ffmpeg** (Speech, 3D previews, video outputs): Fedora's own `ffmpeg-free` lacks some codecs. This machine uses RPM Fusion's full `ffmpeg`. Enable [RPM Fusion](https://rpmfusion.org/Configuration), then `sudo dnf swap ffmpeg-free ffmpeg --allowerasing`.
@@ -95,12 +103,16 @@ sudo dnf install podman toolbox git-core nodejs22 nodejs22-npm espeak-ng
 
   It installs to `~/.local/bin/uv`. Don't install Python packages with pip or dnf for AIHub; every environment is made by uv or lives in a container.
 - **Blender** (optional): 3D Generate renders previews with it if `~/.local/bin/blender` exists. This machine uses Blender 5.2.2 LTS from blender.org, unpacked and linked there.
-- **Node 22 and npm** are only for building the LLM Relay's web UI once, during `aihub install relay`.
+- **Node 22 and npm** (optional) are only for building the LLM Relay's web UI once, during `aihub install relay`; without npm the relay installs and runs, without its page.
 
 **Check it:**
 
 ```bash
 podman --version && toolbox --version && uv --version && node --version && espeak-ng --version && ffmpeg -version | head -1
+```
+
+```bash
+rpm -q mesa-vulkan-drivers rocm-hip rocblas hipblas hiprand rocrand
 ```
 
 ## 4. Keep your services running
@@ -121,7 +133,7 @@ loginctl enable-linger $USER
 | ComfyUI image `kyuz0/amd-strix-halo-comfyui` (Images & Video, 3D Generate) | 15.1 GB |
 | vLLM image `kyuz0/vllm-therock-gfx1151` | 12.4 GB |
 | Speech runtimes (`services/tts/runtime/`) | 14 GB |
-| 3D runtimes (`services/gen3d/runtime/`) | 13 GB |
+| 3D runtimes (`services/gen3d/runtime/`) | about 7 GB (13 GB here, with a 6.1 GB `runtime/lab/` only this machine has) |
 | llama.cpp (`services/lcpp/runtime/`) | 262 MB |
 | The hub's and mods' own venvs | under 100 MB each |
 
@@ -138,7 +150,7 @@ Each mod's setup doc gives the sizes of the models it suggests. Put the clone on
   ```
 
   The token is stored in `~/.cache/huggingface/token`, where the mods' downloaders find it (or set `HF_TOKEN`).
-- **Licences you accept by installing:** each model doc names its licence when it has restrictions. The one the installers ask about is **Breeze TTS 2** (non-commercial): the Speech runtime installer needs `--accept-breeze-license`.
+- **Licences you accept by installing:** each mod's setup doc names the licences of what it installs and suggests, and `aihub setup` asks before installing the restricted ones: **Breeze TTS 2** (non-commercial; the Speech runtime installer needs `--accept-breeze-license`), **Cube3D** (Roblox's research-only RAIL-MS), **Hunyuan3D 2.1** (Tencent's community licence, which excludes the EU, the UK and South Korea) and **SAM 3D Objects** (gated). The **Qwen-Image 2.1** suggestions (research or evaluation only) name their licence in the model choice.
 - **OpenCode** (optional) needs an OpenCode Zen key or a provider key; see the OpenCode environment doc.
 
 ## What to look for

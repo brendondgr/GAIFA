@@ -7,6 +7,7 @@ summary = "LLM Launcher: run any GGUF chat model with llama.cpp on the GPU (Vulk
 gpu = true
 disk_gb = 0.15
 needs = ["uv", "curl", "tar", "sha256sum", "systemd-run"]
+after = ["relay"]
 check = "aihub check lcpp --start"
 
 [[steps]]
@@ -46,7 +47,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 The `lcpp` mod (port 7710) starts and stops llama.cpp servers for GGUF models and publishes each to the [relay](../../relay/setup/relay.md). It has two parts:
 - **The daemon**, `.venv/` in this folder (FastAPI, uvicorn, httpx). It loads no model. Each instance it launches is its own transient systemd user unit (`lcpp-<name>.service`), so instances survive a daemon restart.
-- **`llama-server`**, a prebuilt **Vulkan** build of llama.cpp from the [ggml-org releases](https://github.com/ggml-org/llama.cpp/releases), unpacked by hand under `runtime/` (gitignored). It runs on the GPU through Mesa's RADV driver; no ROCm is needed.
+- **`llama-server`**, a prebuilt **Vulkan** build of llama.cpp from the [ggml-org releases](https://github.com/ggml-org/llama.cpp/releases), downloaded and unpacked under `runtime/` (gitignored) by the block's steps (or by hand, Install). It runs on the GPU through Mesa's RADV driver; no ROCm is needed.
 
 The LLM Launcher page, any local GGUF the agent or the Auto judge uses (on this machine, `gemma4-26B`), and the agent's `list_llms` / `start_llm` tools need this environment.
 
@@ -67,7 +68,7 @@ Read from this machine on 2026-10-21:
 ## Prerequisites
 
 - [host.md](../../../docs/setup/host.md): the kernel parameters (GTT), the `video` and `render` groups, `mesa-vulkan-drivers`, the IOMMU **on**.
-- The [relay](../../relay/setup/relay.md), if instances should be reachable from Chat and the agent.
+- The [relay](../../relay/setup/relay.md), set up first (`after = ["relay"]`, so `aihub setup lcpp` sets it up too): instances publish themselves to it, and Chat and the agent reach them only through it.
 - `systemd-run`, `systemctl` and `journalctl` (instances are user units).
 
 ## Install
@@ -76,7 +77,7 @@ Read from this machine on 2026-10-21:
 aihub install lcpp
 ```
 
-Runs `aihub-install.sh`: `uv sync --python 3.14` makes `.venv/` from `uv.lock` (about 29 MB). It doesn't fetch llama.cpp. Do that by hand, from the repo root:
+Runs `aihub-install.sh`: `uv sync --python 3.14` makes `.venv/` from `uv.lock` (about 29 MB). It doesn't fetch llama.cpp: the block's next two steps do (`aihub setup` runs them), or by hand, from the repo root:
 
 ```bash
 mkdir -p services/lcpp/runtime/llama.cpp/vendor services/lcpp/runtime/llama.cpp/bin
@@ -118,7 +119,21 @@ Two optional starting points, which `aihub setup` offers (the page's form does t
 | [Qwen3 8B](https://huggingface.co/Qwen/Qwen3-8B-GGUF), Q4_K_M | 5.0 GB | an everyday chat model with tool calls and thinking, small enough to run beside other mods | Apache-2.0 |
 | [Gemma 4 26B-A4B](https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF), Q8_0 with its `mmproj` (images) and `mtp` (draft) files | 28.1 GB | a strong agent and judge model (a mixture of experts, about 4B active per token); a QAT Q4_K_M variant of it is the agent's fallback and the judge on this machine | Apache-2.0 |
 
-Each joins the catalog under a suggested id; a nickname on the page sets the name the relay lists it under.
+Each joins the catalog under an id made from its file name: `qwen3-8b` and `gemma-4-26b-a4b-it` (`suggest_id` in `src/lcpp/catalog.py`).
+
+### Running a model, and its name on the relay
+
+A download only adds the model to the catalog; nothing runs until you launch it. With the mod running (`aihub start lcpp`):
+- **On the page:** LLM Launcher → **Launch a model**, pick it, keep **Publish to relay** on, **Launch**. The Instances tab shows it starting, then ready.
+- **From a terminal**, with the mod's own CLI (it talks to the daemon on 7710):
+
+  ```bash
+  services/lcpp/.venv/bin/lcpp start qwen3-8b --dry-run
+  ```
+
+  shows the memory estimate and the exact `llama-server` command without starting anything; without `--dry-run` it launches and waits until ready (`-c <tokens>` sets the context, `--alias <name>` the relay name, `services/lcpp/.venv/bin/lcpp stop <name>` stops it).
+
+**The relay name.** A catalog entry has an id and optional `nicknames` (in `data/models.json`, or **Models → edit** on the page). A published instance registers on the relay as the endpoint `lcpp:<port>`, with its **alias** = the alias given at launch, else the first nickname, else the id; and it lists the id and every nickname as models. So a freshly downloaded Qwen3 8B is `qwen3-8b` on the relay; give it the nickname `qwen3` and it's `qwen3` too. These names exist only while the instance runs (`curl -s http://127.0.0.1:4000/v1/models` lists them); for the agent's `AGENT_MODEL`, a nickname you keep is the stable choice ([agent](../../agent/setup/agent.md#choosing-models)).
 
 ## Configuration
 
@@ -146,10 +161,10 @@ services/lcpp/runtime/llama.cpp/bin/current/llama-server --version
 Expect `version: 0.6.0-dev (build 11445, commit 58cb9138e)`. It loads no model.
 
 ```bash
-aihub check lcpp
+aihub check lcpp --start
 ```
 
-Expect `lcpp: all checks passed`.
+Starts the daemon if it's stopped (a stopped mod's live checks are skipped; the daemon loads no model), then checks it. Expect `lcpp: all checks passed`.
 
 ```bash
 cd services/lcpp && LCPP_HOME=$PWD LCPP_MODELS_DIR=$PWD/../../data/models/llm .venv/bin/lcpp doctor
@@ -168,11 +183,11 @@ A fake llama-server, no GPU and no systemd: expect `91 passed` (2026-10-21).
 - **Use the stock, pinned build.** Run the ggml-org release as published; don't build llama.cpp with custom kernels or flags, and keep the IOMMU on ([host.md, the IOMMU warning](../../../docs/setup/host.md#1-let-the-gpu-use-the-memory)). On this chip the GPU writes into the same memory as everything else, and in October 2026 experimental GPU compute corrupted files on this machine.
 - **`lcpp doctor` without the two variables** looks for models in `services/lcpp/models/` and reports every model's file as not found. Pass `LCPP_HOME` and `LCPP_MODELS_DIR` as above.
 - **Two Vulkan devices.** `vulkaninfo --summary` lists the Radeon (`driverName = radv`) and `llvmpipe` (Mesa's CPU renderer). If the Radeon is missing, check the `video`/`render` groups and `mesa-vulkan-drivers`. `llama.environment` (`AMD_VULKAN_ICD=RADV`, `GPU_MAX_HW_QUEUES=8`) is passed to every instance; keep it as it is.
-- **Memory.** A launch asks AIHub for memory first (`POST /api/memory/acquire`); a `needs_room` answer means other mods would have to unload. `lcpp start <model> --dry-run` (or the page's launch form) shows the estimate without starting anything. The GPU can only use the GTT the kernel parameters give it (host.md).
+- **Memory.** A launch asks AIHub for memory first (`POST /api/memory/acquire`); a `needs_room` answer means other mods would have to unload. `services/lcpp/.venv/bin/lcpp start <model> --dry-run` (or the page's launch form) shows the estimate without starting anything. The GPU can only use the GTT the kernel parameters give it (host.md).
 - **Instances aren't on the relay.** The relay was down when they became ready: registrations wait as `pending` and retry. The page's Relay view shows them.
 
 ## Known gaps
 
-- Nothing downloads or unpacks llama.cpp; the steps above are by hand. The build isn't pinned anywhere but the `current` link.
+- The build is pinned only by the block's steps (build 11445 and its sha256) and the `current` link; upgrading is by hand (Install).
 - `aihub-install.sh` and `.gitignore` point to `runtime/README.md`, which doesn't exist (`runtime/` is gitignored). This doc replaces it.
-- The `lcpp` command on `PATH` is a uv tool (`~/.local/bin/lcpp`, editable install of this folder) installed by the old `scripts/install.sh`, outside the project.
+- The `lcpp` command on this machine's `PATH` is a uv tool (`~/.local/bin/lcpp`, editable install of this folder) installed by the old `scripts/install.sh`, outside the project; a new machine doesn't have it, so this doc uses `services/lcpp/.venv/bin/lcpp`, which does the same.

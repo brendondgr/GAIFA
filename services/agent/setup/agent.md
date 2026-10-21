@@ -66,7 +66,7 @@ The agent runs no model and downloads none, so it has no suggestions. It sends e
 - **[llama.cpp](../../lcpp/setup/llama-cpp.md) (`lcpp`):** any GGUF you add; a running instance registers under its catalog nickname (`nicknames` in `services/lcpp/data/models.json`), or the alias given at launch. Its doc suggests two models that take tool calls.
 - **[vLLM](../../vllm/setup/vllm.md):** a loaded profile registers under its `alias` (such as `Qwen3-0.6B-vLLM`; the profiles are parked here).
 - **[OpenCode](../../opencode/setup/opencode.md):** `agent`, or a free hosted id such as `opencode/glm-5.3-flash-free`, with no GPU at all.
-- **An endpoint you added** on the relay's page (any OpenAI-compatible server): its alias.
+- **An endpoint you added** on the relay (any OpenAI-compatible server, such as a hosted provider: [Adding a hosted provider](../../relay/setup/relay.md#adding-a-hosted-provider)): the model ids you listed on it, or its alias. With no GPU, this or OpenCode is the way to a model.
 
 A model that is always up makes the better default; an lcpp nickname is listed only while its instance runs. The thread's model can also be changed per chat in Chat's header.
 
@@ -97,10 +97,10 @@ env = { AGENT_MODEL = "gemma4-26B", AGENT_FALLBACK_MODEL = "" }
 ## Check it works
 
 ```bash
-aihub check agent
+aihub check agent --start
 ```
 
-Expect `agent: all checks passed` (two widgets, the Learning page).
+Starts the agent if it's stopped (a stopped mod's live checks are skipped), then checks it. Expect `agent: all checks passed` (two widgets, the Learning page).
 
 ```bash
 curl -s http://127.0.0.1:7000/api/s/agent/v1/models

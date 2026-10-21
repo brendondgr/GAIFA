@@ -135,6 +135,7 @@ Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp
 
 ## What to look for
 
+- **The nightly wheel index drops old builds.** `locks/embed.txt` pins torch and ROCm build `10.2.0a20260926` from `https://nightly.repo.amd.com/rocm/whl-next/`, which on 2026-10-21 kept only about the last two months of builds. When a pinned wheel is gone, `aihub install embed` stops at uv's resolve ("No solution found"); what to do is in [Breeze's doc](../../tts/setup/breeze.md#what-to-look-for) (uv's cache first, else move every package of the build to one the index still has, together).
 - **Never fp16.** The model card says activations overflow fp16 (NaN, or quietly bad vectors). The backend picks bf16 when `torch.cuda.is_bf16_supported()` and fp32 otherwise.
 - **Never `malloc_trim` in a ROCm process here.** On 2026-10-20 a `malloc_trim(0)` after loading, added to give back the heap the weights were read into, came just before the server and another mod's GPU worker crashed in the HSA/HIP runtimes and the kernel reported corrupt page tables (bf16 −inf patterns). The same boot also had disk checksum errors from hours earlier, so the cause isn't certain. The worker process makes it unneeded either way: unloading ends the worker.
 - **A worker crash** (a segfault in `libhsa-runtime64`) answers `503 worker_died` with a fix; the server stays up, and the next call starts a new worker. Repeated crashes: `aihub logs embed` and `journalctl -k`.

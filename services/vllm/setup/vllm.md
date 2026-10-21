@@ -5,7 +5,8 @@ models = []
 scan = ["profiles/*.toml"]
 summary = "vLLM: serve Hugging Face chat models (safetensors, AWQ) on the GPU, published to the relay"
 gpu = true
-disk_gb = 12.5
+disk_gb = 0.1
+images = { "docker.io/kyuz0/vllm-therock-gfx1151" = 12.4 }
 needs = ["uv", "podman"]
 after = ["relay"]
 check = "aihub check vllm --start"

@@ -5,21 +5,24 @@ models = ["3d/cube3d-v0.5", "3d/cubepart", "3d/clip-vit-large-patch14", "3d/Qwen
 scan = []
 summary = "3D Generate: text to 3D meshes with Cube3D, named parts with CubePart, and game rigs (the server, the ROCm image and the first engine)"
 gpu = true
-disk_gb = 17
+disk_gb = 6.5
+images = { "docker.io/kyuz0/amd-strix-halo-comfyui" = 15.1 }
 needs = ["podman", "git", "uv"]
+after = ["comfyui"]
 check = "out=$(.venv/bin/python -m gen3d.doctor); grep -q 'ok *ROCm image' <<<\"$out\" && ! grep MISSING <<<\"$out\" | grep -qv '(image engine)'"
 
 [[steps]]
 run = "aihub install gen3d"
 what = "makes .venv/ in this folder with Python 3.12 from requirements.txt: the server only (about 50 MB, a minute)"
+ask = "Cube3D and CubePart come under Roblox's Cube3D Research-Only RAIL-MS licence (the LICENSE of https://github.com/Roblox/cube, which the next steps clone; the weights' card, https://huggingface.co/Roblox/cube3d-v0.5, is tagged openrail): its Permitted Purpose is 'for academic or research purposes only'. Install CubeArt under that licence? (The runtime step also clones the code of Hunyuan3D 2.1, under Tencent's community licence, and SAM 3D Objects, under the SAM Licence; their weights come only with their own setups, which ask about them.)"
 
 [[steps]]
-run = "podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest || podman pull docker.io/kyuz0/amd-strix-halo-comfyui:latest"
-what = "the ROCm image for gfx1151 (15.1 GB, shared with the comfy mod), pulled only when it's missing: the worker venvs are built on its torch, so a newer :latest wouldn't match them"
+run = "podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest || { podman pull docker.io/kyuz0/amd-strix-halo-comfyui@sha256:0066678ae9043f69a1c8c7699e70626ceffd35c1a8ca03227a05640ad0241ed2 && podman tag docker.io/kyuz0/amd-strix-halo-comfyui@sha256:0066678ae9043f69a1c8c7699e70626ceffd35c1a8ca03227a05640ad0241ed2 docker.io/kyuz0/amd-strix-halo-comfyui:latest; }"
+what = "the ROCm image for gfx1151 (15.1 GB, shared with the comfy mod, whose setup runs first and pulls it), pulled by the digest in Tested with only when :latest is missing, then tagged :latest: the worker venvs are built on its torch, so a newer :latest wouldn't match them"
 
 [[steps]]
 run = "scripts/install-runtime.sh"
-what = "clones Roblox/cube at the pinned commit and builds runtime/CubeArt/.venv inside the image (about 2 GB, no GPU devices passed); the same run also builds the img3d and sam3do venvs (about 4.5 GB more, pytorch3d from source); time not measured here"
+what = "clones Roblox/cube at the pinned commit and builds runtime/CubeArt/.venv inside the image (about 2 GB, no GPU devices passed); the same run always clones the Hunyuan3D 2.1, SAM 3D Objects and DINOv2 code and builds the img3d and sam3do venvs too (about 4.5 GB more, pytorch3d from source), so this setup counts their disk; their weights come only with their own setups; time not measured here"
 
 [[suggest]]
 name = "Cube3D v0.5"
@@ -29,7 +32,7 @@ dest = "3d/cube3d-v0.5"
 kind = "3d"
 size_gb = 8.27
 good_for = "text to mesh (the shape GPT and its shape tokenizer)"
-licence = "Cube3D Research-Only RAIL-MS"
+licence = "Cube3D Research-Only RAIL-MS (academic or research purposes only; the card's tag says openrail)"
 required = true
 
 [[suggest]]
@@ -85,7 +88,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The 3D Generate mod (`gen3d`, port 5050) has a server and GPU workers. The server, `python -m gen3d`, runs in `.venv/` in this folder and never touches the GPU. Each job's GPU work runs in a worker: a `podman run -i` of the ROCm image (`gen3d-worker-*`), with one of three venvs from `runtime/` layered on the image's own torch. This doc covers the server venv, the image, and **CubeArt** (`runtime/CubeArt/`): Roblox's **Cube3D v0.5** (text to mesh, with a CLIP-L text encoder) and **CubePart** (named parts, with a Qwen3-VL-4B text encoder). The `shape` stage with `engine = cube3d` and the `parts` stage need it; `rig` and `preview` run on the CPU. The picture engines are in [img3d.md](img3d.md) (Hunyuan3D 2.1) and [sam3do.md](sam3do.md) (SAM 3D Objects). TRELLIS.2 and SAM 3D Body run as ComfyUI packs: see [ComfyUI](../../comfy/setup/comfyui.md). Cube3D's licence is the research-only RAIL-MS.
+The 3D Generate mod (`gen3d`, port 5050) has a server and GPU workers. The server, `python -m gen3d`, runs in `.venv/` in this folder and never touches the GPU. Each job's GPU work runs in a worker: a `podman run -i` of the ROCm image (`gen3d-worker-*`), with one of three venvs from `runtime/` layered on the image's own torch. This doc covers the server venv, the image, and **CubeArt** (`runtime/CubeArt/`): Roblox's **Cube3D v0.5** (text to mesh, with a CLIP-L text encoder) and **CubePart** (named parts, with a Qwen3-VL-4B text encoder). The `shape` stage with `engine = cube3d` and the `parts` stage need it; `rig` and `preview` run on the CPU. The picture engines are in [img3d.md](img3d.md) (Hunyuan3D 2.1) and [sam3do.md](sam3do.md) (SAM 3D Objects). TRELLIS.2 and SAM 3D Body run as ComfyUI packs: see [ComfyUI](../../comfy/setup/comfyui.md). **Licence:** Roblox's code repo, [Roblox/cube](https://github.com/Roblox/cube), is under the **Cube3D Research-Only RAIL-MS** licence, whose Permitted Purpose is "for academic or research purposes only" (its listed artifacts are Cube3D and its inference code; CubePart's README says its code is under the same licence). The weights' Hugging Face cards are tagged only `openrail`, with no licence text. `aihub setup` asks before installing.
 
 ## Tested with
 
@@ -106,6 +109,7 @@ The weights are the five repos in Choosing models, all in `data/models/3d/` (abo
 
 - [host.md](../../../docs/setup/host.md): podman, the `video` and `render` groups, the kernel settings in [§1](../../../docs/setup/host.md#1-let-the-gpu-use-the-memory) with the IOMMU on, and optionally Blender at `~/.local/bin/blender` for previews.
 - git, uv, and about 30 GB for the weights.
+- [ComfyUI](../../comfy/setup/comfyui.md) first (`after = ["comfyui"]`): two of 3D Generate's engines, TRELLIS.2 and SAM 3D Body, run as ComfyUI packs in the comfy mod, and its setup pulls the image this one shares. So choosing 3D Generate in `aihub setup` sets up ComfyUI too.
 
 ## Install
 
@@ -116,10 +120,10 @@ aihub install gen3d
 Runs `aihub-install.sh`: makes `.venv/` with Python 3.12 from `requirements.txt` (the server only).
 
 ```bash
-podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest || podman pull docker.io/kyuz0/amd-strix-halo-comfyui:latest
+podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest || { podman pull docker.io/kyuz0/amd-strix-halo-comfyui@sha256:0066678ae9043f69a1c8c7699e70626ceffd35c1a8ca03227a05640ad0241ed2 && podman tag docker.io/kyuz0/amd-strix-halo-comfyui@sha256:0066678ae9043f69a1c8c7699e70626ceffd35c1a8ca03227a05640ad0241ed2 docker.io/kyuz0/amd-strix-halo-comfyui:latest; }
 ```
 
-The ROCm image (15.1 GB), shared with the comfy mod, pulled only when it's missing: the worker venvs are built on its torch, and a newer `:latest` wouldn't match them. The installer stops without it.
+The ROCm image (15.1 GB), shared with the comfy mod, pulled by the digest in Tested with only when `:latest` is missing, then tagged `:latest` (the name `install-runtime.sh` and the workers use, `GEN3D_IMAGE`'s default): the worker venvs are built on its torch, and a newer `:latest` wouldn't match them. The installer stops without it. If that digest can't be pulled any more, see ComfyUI's What to look for ("The image's digest is the pin").
 
 The weights have **no downloader in git** (CubeArt's old `scripts/download_weights.sh` sits in the gitignored `runtime/`, and nothing recreates it); they're the block's required suggestions (Choosing models), each with its repo, files and folder. By hand, from the project folder, one command per repo with the files and folder the block gives, for example:
 
@@ -162,10 +166,10 @@ CubeArt runs fixed weights, all five repos below, in `data/models/3d/<folder>/` 
 ## Check it works
 
 ```bash
-aihub check gen3d
+aihub check gen3d --start
 ```
 
-Expect `gen3d: all checks passed` (2026-10-21).
+Starts the server if it's stopped (a stopped mod's live checks are skipped; the server never touches the GPU) and checks it. Expect `gen3d: all checks passed` (2026-10-21).
 
 ```bash
 cd services/gen3d && .venv/bin/python -m gen3d.doctor
@@ -191,7 +195,7 @@ A GET, so nothing loads. Expect `"loaded": false`, `"worker": {"state": "stopped
 
 ## Known gaps
 
-- No script in the mod downloads the weights; the commands above are manual (`aihub setup` will take them from the block, plan 23.9).
-- The image is `:latest`, not pinned by digest in code; the venvs' `constraints.txt` record the torch they were built against.
+- No script in the mod downloads the weights: `aihub setup` downloads them from the block's suggestions, and by hand it's the commands above.
+- The image is pinned only by the setup step's digest; the code runs `:latest` (`GEN3D_IMAGE`), and the venvs' `constraints.txt` record the torch they were built against.
 - `install-runtime.sh` checks out Roblox/cube's commit only on the first clone.
 - CubeArt's own scripts (`cubeart`, `cube-run`, `scripts/`) in `runtime/CubeArt/` came from the old `~/Models/3D/CubeArt` and aren't recreated; the mod doesn't need them.

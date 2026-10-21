@@ -3,15 +3,15 @@ id = "stt"
 title = "Speech to Text (faster-whisper)"
 models = ["stt/**"]
 scan = []
-summary = "Speech to text: transcribe audio and video files, live dictation and the Chat microphone (Whisper)"
-gpu = true
+summary = "Speech to text: transcribe audio and video files, live dictation and the Chat microphone (Whisper; runs on the CPU, much faster with the GPU)"
+gpu = false
 disk_gb = 0.75
-needs = ["uv", "ffmpeg"]
-check = "aihub start stt && aihub check stt"
+needs = ["uv", "curl", "unzip"]
+check = "aihub check stt --start"
 
 [[steps]]
 run = "aihub install stt"
-what = "makes .venv/ (Python 3.14, about 250 MB) and puts the ROCm build of CTranslate2 in, downloading its release zip (about 400 MB, from GitHub) when no wheel is kept in runtime/wheels/"
+what = "makes .venv/ (Python 3.14, about 250 MB); on a machine with a GPU (/dev/kfd) it puts the ROCm build of CTranslate2 in, downloading its release zip with curl and unpacking it with unzip (about 400 MB, from GitHub) when no wheel is kept in runtime/wheels/; it needs host.md's ROCm packages to use the GPU"
 
 [[suggest]]
 name = "Whisper small (the balanced preset)"
@@ -36,7 +36,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The `stt` mod's one environment: `.venv/` in this folder, with faster-whisper on CTranslate2 and the ROCm build of CTranslate2 put over PyPI's CPU/CUDA one. The server (`server.py`) never touches the GPU; the model runs in a worker process (`python -m stt.asr.worker`) that it restarts after a GPU fault, moving to the CPU after three faults in ten minutes. Everything the mod does needs this environment: file transcription (`POST /v1/transcribe`), the live stream and the Chat microphone. Ported from the TranscriberPrototype ("Loud Radish", `~/Projects/TranscriberPrototype`).
+The `stt` mod's one environment: `.venv/` in this folder, with faster-whisper on CTranslate2 and the ROCm build of CTranslate2 put over PyPI's CPU/CUDA one. The server (`server.py`) never touches the GPU; the model runs in a worker process (`python -m stt.asr.worker`) that it restarts after a GPU fault, moving to the CPU after three faults in ten minutes. Everything the mod does needs this environment: file transcription (`POST /v1/transcribe`), the live stream and the Chat microphone. **It runs without a GPU:** with no `/dev/kfd` the installer leaves PyPI's CPU build of CTranslate2 in, and `STT_DEVICE=auto` picks the CPU (int8), which is correct but much slower; the GPU needs the host ROCm packages below. Ported from the TranscriberPrototype ("Loud Radish", `~/Projects/TranscriberPrototype`).
 
 ## Tested with
 
@@ -54,7 +54,15 @@ Read from this machine on 2026-10-20 (Radeon 8060S, gfx1151, Fedora 44):
 
 ## Prerequisites
 
-- [host.md](../../../docs/setup/host.md): the ROCm runtime packages above (`hiprand` and `rocrand` are the two a base ROCm install leaves out) and `ffmpeg`. Without ffmpeg only WAV files can be read.
+- For the GPU, the host ROCm runtime packages above, which CTranslate2's ROCm build links against ([host.md §3](../../../docs/setup/host.md#3-packages); `hiprand` and `rocrand` are the two a base ROCm install leaves out):
+
+  ```bash
+  sudo dnf install rocm-hip rocblas hipblas hiprand rocrand
+  ```
+
+  `rpm -q rocm-hip rocblas hipblas hiprand rocrand` lists them (here: the versions in Tested with). Without them it runs on the CPU.
+- `ffmpeg` ([host.md §3](../../../docs/setup/host.md#3-packages)), at run time: it decodes every input but WAV. Without it only WAV files can be read.
+- `curl` and `unzip`, for the installer's wheel download (GPU machines only).
 - `uv` on `PATH`.
 - No accounts: the models are public on Hugging Face.
 
@@ -99,10 +107,10 @@ On the CPU every model runs at int8.
 ## Check it works
 
 ```bash
-aihub start stt && aihub check stt
+aihub check stt --start
 ```
 
-Expect `all checks passed`. Then the tests (the GPU test loads `small` and unloads it):
+Starts the mod if it's stopped (a stopped mod's live checks are skipped), then checks it. Expect `all checks passed`. Then the tests (the GPU test loads `small` and unloads it):
 
 ```bash
 cd services/stt && .venv/bin/python -m pytest -q

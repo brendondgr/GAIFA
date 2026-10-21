@@ -6,23 +6,26 @@ scan = []
 summary = "OpenCode: a coding agent behind the relay's agent model, plus OpenCode Zen's free hosted models"
 gpu = false
 disk_gb = 0.2
-needs = ["opencode"]
+needs = ["curl", "tar"]
 after = []
 check = "aihub check opencode --start"
 
 [[steps]]
-run = "opencode auth login"
-what = "stores a provider key (OpenCode Zen or another) in ~/.local/share/opencode/auth.json; interactive"
-ask = "Log OpenCode in to a provider now? Answer no if this folder's .env sets OPENCODE_API_KEY."
+run = '[ -x "$HOME/.opencode/bin/opencode" ] || curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path'
+what = "OpenCode's official installer: the newest 1.x release, one binary of about 170 MB, into ~/.opencode/bin/ (no root; --no-modify-path leaves ~/.bashrc alone); skipped when it's there"
+
+[[steps]]
+run = '[ -s "$HOME/.local/share/opencode/auth.json" ] || grep -qs "^OPENCODE_API_KEY=." .env || PATH="$HOME/.opencode/bin:$PATH" opencode auth login'
+what = "logs OpenCode in to a provider (OpenCode Zen or another): it asks which and for the key, stored in ~/.local/share/opencode/auth.json; skipped when you're logged in or this folder's .env sets OPENCODE_API_KEY"
+interactive = true
 
 [[steps]]
 run = "aihub start opencode"
 what = "starts opencode serve on 127.0.0.1:4096; the first start mints the Basic credential in opencode-auth.env"
 
 [[steps]]
-run = "aihub restart relay"
-what = "lets a relay that is already running register the agent endpoint with the new credential"
-ask = "Is the relay already set up and running? Yes restarts it now."
+run = '''if [ -x ../relay/web/backend/.venv/bin/python ]; then aihub restart relay; else echo "the relay is not installed yet; its own setup starts it with this credential"; fi'''
+what = "restarts the relay (starting it if it's stopped), so it registers the agent endpoint with the new credential; skipped when the relay isn't installed yet"
 -->
 
 # OpenCode: setup
@@ -31,7 +34,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The `opencode` mod runs `opencode serve` on `127.0.0.1:4096`. It's the upstream behind the relay's `agent` model, and it gives the relay OpenCode Zen's free hosted models (`opencode/…-free`). The mod is only a manifest and two scripts: `run.sh` sources `.env`, loads or mints the HTTP Basic credential (`auth.sh`) and runs `opencode serve` in `OPENCODE_PROJECT_DIR`. The `opencode` binary itself is installed outside AIHub, in `~/.opencode/bin` (allowed by plan Phase 12.4). The mod is optional: nothing else in AIHub needs it.
+The `opencode` mod runs `opencode serve` on `127.0.0.1:4096`. It's the upstream behind the relay's `agent` model, and it gives the relay OpenCode Zen's free hosted models (`opencode/…-free`). The mod is only a manifest and two scripts: `run.sh` sources `.env`, loads or mints the HTTP Basic credential (`auth.sh`) and runs `opencode serve` in `OPENCODE_PROJECT_DIR`. The `opencode` binary itself is installed outside AIHub, in `~/.opencode/bin` (allowed by plan Phase 12.4), by OpenCode's own installer. The mod is optional: nothing else in AIHub needs it.
 
 ## Tested with
 
@@ -45,18 +48,24 @@ Read from this machine on 2026-10-21:
 
 ## Prerequisites
 
-- [The hub](../../../docs/setup/hub.md). No GPU, no models.
+- [The hub](../../../docs/setup/hub.md). No GPU, no models. `curl` and `tar` for OpenCode's installer.
 - An OpenCode Zen API key, or a key for another provider OpenCode supports ([host.md §6](../../../docs/setup/host.md#6-accounts-and-licences)).
 - Install it before the [relay](../../relay/setup/relay.md) starts, or restart the relay afterwards: the relay looks for the credential only at start.
 
 ## Install
 
-The `opencode` command must exist before `aihub setup` runs this doc: install OpenCode from <https://opencode.ai> first. Its installer puts the binary in `~/.opencode/bin/` and adds that folder to `PATH` in `~/.bashrc` (here: `export PATH=/home/bdgr/.opencode/bin:$PATH`). `run.sh` adds `~/.opencode/bin` to `PATH` itself, since a systemd unit doesn't read `~/.bashrc`.
-
-Give OpenCode a provider key, either once interactively:
+Install OpenCode with its official installer ([opencode.ai/docs](https://opencode.ai/docs/)):
 
 ```bash
-opencode auth login
+curl -fsSL https://opencode.ai/install | bash
+```
+
+It needs `curl` and `tar`, no root. It downloads the newest 1.x release (one binary, about 170 MB) into `~/.opencode/bin/` and, unless you pass `--no-modify-path` (as `aihub setup` does: `curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path`), adds that folder to `PATH` in your shell's rc file (`~/.bashrc` here). `--version <1.x version>` installs a given release (this machine runs the one in Tested with). `run.sh` adds `~/.opencode/bin` to `PATH` itself, since a systemd unit doesn't read `~/.bashrc`; without the rc change, run it as `~/.opencode/bin/opencode` in your shell.
+
+Give OpenCode a provider key, either once interactively (it asks which provider, then the key; `aihub setup` hands this step to you):
+
+```bash
+~/.opencode/bin/opencode auth login
 ```
 
 (`auth` is an alias of `opencode providers`; the key goes to `~/.local/share/opencode/auth.json`), or as `OPENCODE_API_KEY` in this folder's `.env` (below).
@@ -83,22 +92,40 @@ The mod downloads no model, so it has no suggestions. OpenCode calls hosted prov
 
 | Key | Required | Meaning |
 |---|---|---|
-| `OPENCODE_PROJECT_DIR` | optional, but set it | the folder OpenCode's bash, edit and write tools act in. Unset, it's `services/opencode/` |
+| `OPENCODE_PROJECT_DIR` | optional, but set it | the folder OpenCode's bash, edit and write tools act in. Unset, it's `services/opencode/`, inside AIHub (see below) |
 | `OPENCODE_API_KEY` | one of this or `opencode auth login` | OpenCode Zen's key; `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` for those providers |
 | `OPENCODE_SERVER_USERNAME`, `OPENCODE_SERVER_PASSWORD` | optional | pin the Basic credential instead of minting one. Set the same two in `services/relay/.env` |
 | `OPENCODE_AUTH_FILE` | optional | where the minted credential is kept (default `opencode-auth.env` here; the relay's `service.toml` points to the same file) |
 | `OPENCODE_ENABLED` | optional | `0` makes `run.sh` exit without starting |
 | `OPENCODE_PORT` | don't | `run.sh` sources `.env` after AIHub's environment, so a value here wins; keep it 4096 or leave it out |
 
+**Set `OPENCODE_PROJECT_DIR` to a folder you choose, outside AIHub.** Unset, `opencode serve` runs in `services/opencode/`, so the agent's shell, edit and write tools start inside the AIHub folder, which the rest of AIHub keeps read-only. Pick (or make) the project you want the `agent` model to work on, for example:
+
+```bash
+mkdir -p ~/Projects/agent-work
+```
+
+```bash
+cp -n services/opencode/.env.example services/opencode/.env
+```
+
+Then set the line in `services/opencode/.env` to that folder's absolute path (no `~` and no `$HOME`: the file takes plain `KEY=value`), such as `OPENCODE_PROJECT_DIR=/home/you/Projects/agent-work`, and restart the mod:
+
+```bash
+aihub restart opencode
+```
+
+`aihub logs opencode` then prints `opencode serve --port 4096 in /home/you/Projects/agent-work`. A folder that doesn't exist stops the mod (exit 78, What to look for). It's not a sandbox: OpenCode runs as you, so give it a folder whose changes you can review or undo (a git checkout). One server works in one folder; to switch projects, change the line and restart.
+
 This machine's `.env` also has `OPENCODE_ENDPOINT_NAME`, `OPENCODE_ALIAS`, `OPENCODE_MODELS` and `OPENCODE_MODEL`, copied from DashLLM. Nothing in this mod reads them; the first two belong in the relay's `.env`. Which model the `agent` alias runs is set on the relay's Endpoints view.
 
 ## Check it works
 
 ```bash
-aihub check opencode
+aihub check opencode --start
 ```
 
-Expect `opencode: no failures, but 1 check skipped`: the health check is TCP (`tcp answered`), and `openapi` is skipped because every route needs the Basic credential.
+Starts the mod if it's stopped (a stopped mod's live checks are skipped), then checks it. Expect `opencode: no failures, but 1 check skipped`: the health check is TCP (`tcp answered`), and `openapi` is skipped because every route needs the Basic credential.
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4096/
@@ -129,5 +156,5 @@ The `opencode` endpoint (`alias` `agent`, `protocol` `opencode`) with `health` `
 
 ## Known gaps
 
-- Nothing installs the `opencode` binary; the official install command isn't recorded in this repo. The version isn't pinned (`opencode upgrade` moves it).
-- **Open question:** where `OPENCODE_PROJECT_DIR` should point. This machine's `.env` still points to the old DashLLM clone, `~/Tools/DashLLM`, outside the project.
+- The version isn't pinned: the installer takes the newest 1.x, and `opencode upgrade` moves it.
+- This machine's `.env` still points `OPENCODE_PROJECT_DIR` at the old DashLLM clone, `~/Tools/DashLLM`; which project it should be here is the user's choice.

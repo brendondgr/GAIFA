@@ -151,6 +151,7 @@ Run in `services/decide/` with the env from `service.toml` (`HF_HOME`, `HF_MODUL
 
 ## What to look for
 
+- **The nightly wheel index drops old builds.** `locks/decide.txt` pins torch and ROCm build `10.2.0a20260926` from `https://nightly.repo.amd.com/rocm/whl-next/`, which on 2026-10-21 kept only about the last two months of builds. When a pinned wheel is gone, `aihub install decide` stops at uv's resolve ("No solution found"); what to do is in [Breeze's doc](../../tts/setup/breeze.md#what-to-look-for) (uv's cache first, else move every package of the build to one the index still has, together).
 - **Numerics are fixed by the checkpoint** (BF16 backbone, FP32 readout); the runtime refuses dtype casts. On the CPU it still runs BF16 (slow).
 - **The first question after a load is slow** (about 2 s: kernel selection), so loading asks one warm-up question.
 - **A worker crash** answers `503 worker_died` with a fix; the next call starts a new worker. Repeated crashes: `aihub logs decide` and `journalctl -k`.

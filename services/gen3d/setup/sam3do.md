@@ -5,7 +5,7 @@ models = ["3d/sam-3d-objects", "3d/moge-vitl"]
 scan = []
 summary = "3D Generate: one picture to a mesh, the quickest full shape, with Meta's SAM 3D Objects (gated weights)"
 gpu = true
-disk_gb = 1.5
+disk_gb = 0
 needs = ["podman", "git", "uv"]
 after = ["gen3d-cubeart", "gen3d-img3d"]
 check = ".venv/bin/python -m gen3d.doctor | grep -Eq 'ok +SAM 3D Objects \\(image engine\\) +ready'"
@@ -13,11 +13,12 @@ check = ".venv/bin/python -m gen3d.doctor | grep -Eq 'ok +SAM 3D Objects \\(imag
 [[steps]]
 run = "uvx --from huggingface_hub hf auth whoami >/dev/null 2>&1 || uvx --from huggingface_hub hf auth login"
 what = "logs in to Hugging Face once (your token goes to ~/.cache/huggingface/token), for the gated weights; skipped when you're logged in"
+interactive = true
 ask = "SAM 3D Objects' weights are gated: accept the SAM Licence on https://huggingface.co/facebook/sam-3d-objects and wait until access is granted. Is access granted?"
 
 [[steps]]
 run = "scripts/install-runtime.sh"
-what = "the runtime installer again (it skips what the other gen3d docs built): clones sam-3d-objects and DINOv2 at the pinned commits and builds runtime/sam3do/.venv inside the image, layered on img3d's and CubeArt's (about 1.5 GB; pytorch3d is built from source, CPU ops only; no GPU devices passed)"
+what = "the runtime installer again, which finds what gen3d-cubeart's run already built (it always clones sam-3d-objects and DINOv2 at the pinned commits and builds runtime/sam3do/.venv, layered on img3d's and CubeArt's, about 1.5 GB, counted there; pytorch3d from source, CPU ops only) and checks it; this setup's own part is the gated weights"
 
 [[suggest]]
 name = "SAM 3D Objects"

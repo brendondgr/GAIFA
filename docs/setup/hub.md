@@ -91,19 +91,15 @@ Paths (`paths.models`, `paths.databases`, `paths.outputs`) must stay inside the 
 | 9b | `searxng` (optional: watches and adjusts that SearXNG) | [searxng](../../services/searxng/setup/searxng.md) | no |
 | 10 | `stt` (Speech to Text) | [faster-whisper](../../services/stt/setup/stt.md) | no; much faster with one |
 
-The relay comes first because the LLM mods publish themselves to it and the agent talks to models through it. ComfyUI comes before 3D Generate because TRELLIS.2 and SAM 3D Body run as ComfyUI workflows. Skip any mod you don't want: set `services.<id>.autostart = false` and it stays stopped.
+The relay comes first because the LLM mods publish themselves to it and the agent talks to models through it. ComfyUI comes before 3D Generate because TRELLIS.2 and SAM 3D Body run as ComfyUI workflows, and its setup pulls the image both use. The setup docs say so in their blocks (`after`: `lcpp`, `vllm` and `agent` after `relay`, 3D Generate's after `comfyui`), so `aihub setup <ids>` puts them in this order and sets up what a choice needs. Skip any mod you don't want: set `services.<id>.autostart = false` and it stays stopped.
 
 After each one:
 
 ```bash
-aihub start <id>
+aihub check <id> --start
 ```
 
-```bash
-aihub check <id>
-```
-
-`aihub check` passes when the mod's health route answers and its manifest, status and tools are valid.
+`--start` starts the mod first if it's stopped; then `aihub check` checks its manifest, command, port and page module, and, with the mod running, its health route, status, widgets and tools. **A stopped mod's live checks are skipped**, not failed (`no failures, but N checks skipped`), so a plain `aihub check <id>` on a stopped mod proves little; the setup docs' checks all use `--start`.
 
 ## What to look for
 

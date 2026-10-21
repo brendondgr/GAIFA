@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
@@ -187,5 +188,14 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
     return app
 
 
+class _QuietPolls(logging.Filter):
+    """AIHub polls health and status every few seconds; keep them out of the log."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return not any(f'"GET {p} ' in msg for p in ("/health", "/v1/status"))
+
+
 if __name__ == "__main__":
+    logging.getLogger("uvicorn.access").addFilter(_QuietPolls())
     uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("AIHUB_PORT", "5106")), log_level="info")

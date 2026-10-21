@@ -13,11 +13,20 @@ import os
 import uvicorn
 
 
+class _QuietPolls(logging.Filter):
+    """AIHub polls health and status every few seconds; keep them out of the log."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        return not any(f'"GET {p} ' in msg for p in ("/health", "/v1/status"))
+
+
 def main() -> None:
     from stt.server import create_app
 
     logging.basicConfig(level=getattr(logging, os.environ.get("LOG_LEVEL", "info").upper(), logging.INFO),
                         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    logging.getLogger("uvicorn.access").addFilter(_QuietPolls())
     app = create_app()
     uvicorn.run(app, host="127.0.0.1", port=app.state.settings.port, log_level="info")
 

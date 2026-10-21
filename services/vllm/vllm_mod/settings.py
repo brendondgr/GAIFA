@@ -22,11 +22,16 @@ class Settings:
     podman: str = "podman"
     fake: bool = False
     start_timeout_s: float = 1200.0       # a first start compiles kernels for minutes
-    overhead_gb: float = 4.0              # what the processes use beyond vLLM's own budget (18.7)
+    overhead_gb: float = 6.0              # beyond vLLM's own budget: measured 4.2 GB (0.6B), 6.4 GB (35B-A3B)
 
     @property
     def cache_dir(self) -> Path:
         return self.state_dir / "cache"
+
+    @property
+    def site_dir(self) -> Path:
+        """engine_site/: the sitecustomize every Python in the engine container loads."""
+        return HERE / "engine_site"
 
     @classmethod
     def from_env(cls, port: int | None = None) -> "Settings":

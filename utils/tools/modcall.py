@@ -31,11 +31,11 @@ class ToolError(Exception):
 
 async def dry_run(hub: Hub, c: Any) -> bool:
     """`origin.dry_run` (the agent eval): a generating tool makes a stand-in output under
-    `outputs/eval/` instead of running (an image drawn from the prompt; a copy of the newest real
-    video, audio or 3D model), titled from the arguments, so chains and cards are tested without
-    the GPU. A tool with `dry_run = true` in `[tools]` goes to its mod as usual: the mod sees
-    `dry_run` in `X-AIHub-Origin` and answers without its side effects (the web mod reads its fake
-    web instead of the internet; plan 26.2)."""
+    `outputs/eval/` instead of running (an image drawn from the prompt; a hard link to the newest
+    real video, audio or 3D model, or a small stub when there is none), titled from the arguments,
+    so chains and cards are tested without the GPU. A tool with `dry_run = true` in `[tools]` goes
+    to its mod as usual: the mod sees `dry_run` in `X-AIHub-Origin` and answers without its side
+    effects (the web mod reads its fake web instead of the internet; plan 26.2)."""
     if not c.origin.get("dry_run") or c.tool.risk == "read" or c.tool.mod_dry_run:
         return False
     if c.tool.risk != "generate":                 # write and destructive: a stand-in success, nothing changes (plan 22.4)
@@ -49,9 +49,8 @@ async def dry_run(hub: Hub, c: Any) -> bool:
         if not page["items"]:
             page = await hub.outputs.list(kind=kind, limit=200)
         source = next((o for o in page["items"] if o["service"] != "eval"), None)
-        if source is None:
-            raise ToolError("dry_run", f"dry run: no existing {kind} to stand in for {c.tool.name}")
-        source = await hub.outputs.row(source["id"])
+        if source is not None:
+            source = await hub.outputs.row(source["id"])
     rel = await asyncio.to_thread(results.stand_in, hub, kind, c.tool.name, c.arguments, source)
     await asyncio.sleep(0.3)
     c.outputs = await results.outputs_for(hub, [rel])

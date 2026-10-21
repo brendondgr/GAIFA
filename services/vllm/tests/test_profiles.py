@@ -68,6 +68,8 @@ def test_engine_command(tmp_path):
     assert f"{tmp_path / 'state' / 'cache'}:{tmp_path / 'state' / 'cache'}" in cmd
     envs = [cmd[i + 1] for i, x in enumerate(cmd) if x == "-e"]
     assert "HF_HUB_OFFLINE=1" in envs and "X=1" in envs and "VLLM_ROCM_USE_AITER=0" in envs
+    assert "TRITON_CACHE_AUTOTUNING=1" in envs and f"PYTHONPATH={s.site_dir}" in envs
+    assert f"{s.site_dir}:{s.site_dir}:ro" in cmd and (s.site_dir / "sitecustomize.py").is_file()
     i = cmd.index("img@sha256:abc")
     assert cmd[i + 1:i + 3] == ["vllm", "serve"]
 

@@ -161,6 +161,10 @@ def test_stages_only_move_forward():
     s = next_stage(s, "Capturing CUDA graphs (PIECEWISE): 25%")
     assert s == "capturing graphs"
     assert next_stage(s, "Loading weights took 0.1 s") == "capturing graphs"
+    # eager mode announces what it turns off; that isn't a stage
+    s = next_stage("initializing", "WARNING Enforce eager set, disabling torch.compile, CUDAGraphs, and JIT kernel warmup.")
+    assert s == "initializing"
+    assert next_stage("loading weights", "INFO Model loading took 22.87 GiB memory and 17.0 seconds") == "profiling"
 
 
 def test_routes(settings, make_engine, make_downloads, hub):

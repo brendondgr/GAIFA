@@ -188,6 +188,7 @@ class Store:
         with self._lock:
             self._c.execute("BEGIN")
             self._c.execute("DELETE FROM events WHERE thread_id = ?", (tid,))
+            self._c.execute("DELETE FROM turns WHERE thread_id = ?", (tid,))
             n = self._c.execute("DELETE FROM threads WHERE id = ?", (tid,)).rowcount
             self._c.execute("COMMIT")
         return bool(n)

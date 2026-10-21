@@ -265,8 +265,9 @@ class Outputs:
 
     # deleting ----------------------------------------------------------------
 
-    async def delete(self, oid: str) -> None:
-        """Move the output (file, sidecar and preview, or the whole folder) to `outputs/.trash/`."""
+    async def delete(self, oid: str, permanent: bool = False) -> None:
+        """Move the output (file, sidecar and preview, or the whole folder) to `outputs/.trash/`,
+        or with `permanent` delete it for good (eval and test outputs)."""
         async with self.lock:
             row = await self.row(oid)
             target = self.dir / row["path"]
@@ -274,12 +275,13 @@ class Outputs:
             if len(parts) < 2 or ".." in parts or not target.resolve().is_relative_to(self.dir.resolve()):
                 raise OutputError(409, "output_not_deletable", f"{self.prefix}/{row['path']} is outside {self.prefix}/ (a symlink?); delete it there")
             if target.exists() or target.is_symlink():
-                await asyncio.to_thread(trash.move, self.dir, row["path"], bool(row["is_dir"]))
+                await asyncio.to_thread(trash.remove if permanent else trash.move, self.dir, row["path"], bool(row["is_dir"]))
             await self.db.write(lambda c: self._apply(c, [], [oid]))
         self._preview_failed.pop(oid, None)
         self.bus.publish({"type": "output_deleted", "id": oid})
         if self.activity:
-            await self.activity.add(f'Moved "{row["title"]}" to the outputs trash', row["service"], "info")
+            await self.activity.add(f'Deleted "{row["title"]}"' if permanent else f'Moved "{row["title"]}" to the outputs trash',
+                                    row["service"], "info")
 
     # files -------------------------------------------------------------------
 

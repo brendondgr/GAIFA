@@ -4,7 +4,8 @@ its questions and parameter cards from the task's script, and grades the outcome
 A run never needs a person: questions are answered by `Task.answer`, cards by `Task.card`
 (approve as-is, approve with edits, or deny). With `dry_run`, generating tools stand in existing
 outputs (the hub's dry-run), so 30 tasks × 3 runs fit in minutes without the GPU; live runs make
-real outputs.
+real outputs. Either way a run's chats and outputs are deleted when it ends (`evals/cleanup.py`)
+unless `keep`.
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
+
+from . import cleanup
 
 REF = re.compile(r"#(\d+)\b")
 EQUIV = {"comfy_generate_image": ("zimage-turbo", "zimage-intorealism", "qwen21-t2i"), "comfy_animate_image": ("wan21-i2v",),
@@ -133,14 +136,23 @@ def approve_all(a: dict[str, Any]) -> tuple[bool, dict[str, Any] | None]:
 
 class Harness:
     def __init__(self, base: str, model: str, dry_run: bool = True, all_tools: bool = False,
-                 log: Callable[[str], None] = print, transport: Any = None, hub: str | None = None) -> None:
+                 log: Callable[[str], None] = print, transport: Any = None, hub: str | None = None,
+                 keep: bool = False) -> None:
         self.base, self.model, self.dry_run, self.all_tools, self.log = base.rstrip("/"), model, dry_run, all_tools, log
         self._hub = hub.rstrip("/") if hub else None   # the hub `attach` talks to; else derived by hub_url()
+        self.keep = keep
         self.c = httpx.AsyncClient(base_url=self.base, timeout=httpx.Timeout(60, connect=10), trust_env=False, transport=transport)
+        hub = cleanup.hub_of(self.base)
+        self.hub = httpx.AsyncClient(base_url=hub, timeout=30, trust_env=False) if hub and transport is None else None
         self.glitches: list[str] = []      # transient HTTP failures seen (and retried)
 
     async def close(self) -> None:
+        if not self.keep:
+            cleanup.remove_files(cleanup.SEEDED)
+            cleanup.SEEDED.clear()
         await self.c.aclose()
+        if self.hub is not None:
+            await self.hub.aclose()
 
     async def _events(self, tid: str) -> list[dict[str, Any]]:
         last = None
@@ -339,13 +351,9 @@ class Harness:
                 await self.c.delete(f"/v1/prefs/{pid}")
             except Exception:  # noqa: BLE001
                 pass
-        if self.dry_run:  # dry-run threads go to Archived, out of the chat list (live ones stay as examples)
-            for t in (tid, run.extra.get("fork")):
-                if t:
-                    try:
-                        await self.c.patch(f"/v1/threads/{t}", json={"archived": True})
-                    except Exception:  # noqa: BLE001
-                        pass
+        if not self.keep:  # the run's chats and outputs go now (the grade reads the events kept in `run`)
+            await cleanup.forget(self.c, self.hub, [t for t in (tid, run.extra.get("fork")) if t],
+                                 run.events + run.fork_events + run.original_before)
         run.seconds = round(time.monotonic() - t0, 1)
         return run
 

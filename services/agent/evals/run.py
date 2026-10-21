@@ -1,7 +1,8 @@
-"""`python -m evals.run [--model skynet] [--runs 3] [--live] [--all-tools] [--only a,b] [--out file.json]`
+"""`python -m evals.run [--model skynet] [--runs 3] [--live] [--all-tools] [--only a,b] [--out file.json] [--keep]`
 
 Runs the eval tasks against the agent (through the hub's proxy by default) and writes every run,
-its checks and a pass^k summary as JSON. `--live` makes real outputs (no dry run).
+its checks and a pass^k summary as JSON. `--live` makes real outputs (no dry run). Each run's chats
+and outputs are deleted when it ends; `--keep` leaves them to look at.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from .tasks import TASKS
 
 async def main(a: argparse.Namespace) -> int:
     tasks = [t for t in TASKS if not a.only or t.id in a.only.split(",")]
-    h = Harness(a.base, a.model, dry_run=not a.live, all_tools=a.all_tools)
+    h = Harness(a.base, a.model, dry_run=not a.live, all_tools=a.all_tools, keep=a.keep)
     rows: list[dict] = []
     sem = asyncio.Semaphore(a.concurrency)
     started = time.time()
@@ -61,6 +62,7 @@ if __name__ == "__main__":
     p.add_argument("--model", default="skynet")
     p.add_argument("--runs", type=int, default=3)
     p.add_argument("--live", action="store_true")
+    p.add_argument("--keep", action="store_true", help="keep the runs' chats and outputs")
     p.add_argument("--all-tools", action="store_true")
     p.add_argument("--only")
     p.add_argument("--out")

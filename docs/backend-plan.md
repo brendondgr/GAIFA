@@ -2356,9 +2356,8 @@ Touches architecture §4.7 (outputs and their kinds), §6 (new routes), §14 (th
 
 **Needs a human answer:**
 - **Writing into workspace folders:** answered 2026-10-20, see Phase 27's decisions.
-- **Indexing workspace folders by meaning (Phase 28)** waits for the user's answer.
 
-**Later (wanted, not planned yet):** a voice conversation in Chat (speak, and the reply is read back through `tts`); `tts` using the `stt` mod's Whisper for voice cloning instead of its own copy.
+**Later (wanted, not planned yet):** a voice conversation in Chat (speak, and the reply is read back through `tts`); `tts` using the `stt` mod's Whisper for voice cloning instead of its own copy; indexing workspace folders by meaning ("find the code that does X"; the user isn't sure it's worth it, since workspaces matter only for specific tasks).
 
 ---
 
@@ -2574,7 +2573,7 @@ Bypass is offered only for folders where you've ticked "allow Bypass" on the Wor
   - Follows the hub's outputs over HTTP (`GET /api/outputs` on start, then `/api/events` for new and deleted outputs) and indexes text and documents in chunks (~800 tokens, 100 overlap, page and line kept), images, audio and video clips (whole, plus 30 s windows for long audio) into `data/databases/embed.db` (SQLite: chunks, vectors as float16 blobs at 768-d; brute-force cosine in numpy until it's slow, `sqlite-vec` noted as the next step).
   - Uses the hub's text route (24.3) for document text, never its own readers.
   - **Everything in Outputs is indexed** (decided 2026-10-20: uploads, generated media, fetched pages, transcripts, workspace runs); a better search on top comes later.
-  - **Only when the GPU is idle** (decided 2026-10-20): the indexer samples the GPU's busy percentage every second (`/sys/class/drm/card*/device/gpu_busy_percent`, read by the mod; the hub's `/api/memory` for what's loaded) and starts only after it has stayed **under 10 % for 5 minutes**; it stops between batches as soon as the GPU goes busy, and unloads the model when the queue is empty. The thresholds are settings (`EMBED_IDLE_BUSY_PCT`, `EMBED_IDLE_SECONDS`).
+  - **Only when the GPU is idle** (decided 2026-10-20: real GPU work, not the raw sensor), sampled every second, for **5 minutes** before indexing starts: no other GPU mod (one with `[memory]`) is busy, has requests in flight or a running job (the hub tracks all three), Vulkan work from DRM fdinfo is low, **and** the whole GPU's `gpu_busy_percent` 30-second median is under about 30 %. Found while building: the raw sensor sits at 13–17 % at rest and spikes to 80–88 % every ~15 s, and per-process fdinfo counters don't see ROCm compute (it goes through `/dev/kfd`), so neither works alone. It stops between batches as soon as the GPU goes busy and unloads the model when the queue is empty. The measure (`EMBED_IDLE_MEASURE = "aihub" | "device"`) and thresholds are settings.
   - Collections: `{id, name, outputs[]}`; a thread's attachments form an implicit collection.
   *Done when:* tests cover indexing on create, removal on delete, chunk positions, re-index on change, collections, and a restart resuming from where it was.
 
@@ -2586,6 +2585,13 @@ Bypass is offered only for folders where you've ticked "allow Bypass" on the Wor
 - [ ] **28.4 Search on the Outputs page: `web/outputs/`.**
   - A "by meaning" toggle next to the search box, shown when the embed mod is up; results ranked with their kind and snippet.
   *Done when:* a browser check finds an image by a description that isn't in its title or prompt.
+
+- [ ] **28.5 Conversations you can look up (decided 2026-10-20).**
+  - When a chat has been quiet for `agent.summary_idle_min` (default 30 minutes), the agent writes a short summary of it: what was asked, what was done, the outputs made (refs), decisions, and open ends. Documents, fetched pages and transcripts appear by name only, never their text (24.8's rule). Stored with the thread (`agent.db`, `thread_summaries`), rewritten when the chat continues and goes quiet again; dry-run and `no_learn` chats are skipped.
+  - The summary is embedded by the `embed` mod (its own collection, `chats`), under the same idle-GPU rule; deleting a chat deletes its summary and vectors.
+  - Looking up: a search box on the Chat list ("by meaning", next to the title filter) and a tool `chat_search(query, limit)` (risk `read`) that returns chats with their summary, date and a link, so the agent can say "you did this in the chat on 10-14".
+  - This is conversation search, not memory about the user: nothing here feeds preferences or the prompt unless a chat is looked up.
+  *Done when:* `services/agent/tests/test_summaries.py` (a fake model and a fake embed mod) covers the idle trigger, the rewrite, the no-text rule for documents, skipping dry runs, deletion; a real check: three real chats summarised after going idle, found by a query that isn't in their titles, from the Chat list and through the tool.
 
 **Wire — Phase 28:** meaning search on the Outputs page; the embed mod in the memory panel and Models.
 
@@ -2660,7 +2666,7 @@ The Auto mode (27.4) needs something to decide, call by call, whether a command 
 - [ ] **30.3 The judge: `utils/tools/judge.py`.** Builds the input from the allowed inputs only, calls the `decide` mod or the relay (by `[agent.judge] backend`), parses the verdict, fails closed; every verdict is recorded with the call (the tool record from Phase 21) so you can see why something ran.
   *Done when:* `utils/tests/tools/test_judge.py` (a fake relay) covers the prompt's contents (no file text, no tool results), timeout, malformed answers, and the record.
 
-- [ ] **30.4 The judge's eval: `services/agent/evals/judge/`.** About 200 labelled cases: safe routine work, harmful commands, and injection cases where a file or page asks for something harmful. Metrics: **false allows on harmful cases (target 0, never above 1 %)**, asks on safe cases (lower is better), latency. Run each candidate (d3-lite and any other decision models in `decide`, and the three chat models); the results and the pick go in `docs/agent-eval.md`.
+- [ ] **30.4 The judge's eval: `services/agent/evals/judge/`.** Labelled cases from **existing public benchmarks** (decided 2026-10-20): AgentDojo (MIT) and deepset's `prompt-injections` (Apache-2.0) for injection and harmful cases, plus routine safe commands and edits; downloaded into `data/state/judge-bench/` (gitignored), with only a pinned manifest of sources and revisions, the runner, the scoring and the results in git. Metrics: **false allows on harmful cases (target 0, never above 1 %)**, asks on safe cases (lower is better), latency. Run each candidate (d3-lite and any other decision models in `decide`, and the three chat models); the results and the pick go in `docs/agent-eval.md`.
   *Done when:* every candidate is measured, one meets the target, and `[agent.judge]` defaults to it.
 
 - [ ] **30.5 In the UI.** A step row says "Auto: ran (judged safe: <reason>)" or "Auto: asked you (<reason>)"; Settings → Agent lists recent judged calls; Auto isn't offered while the judge's model isn't available.

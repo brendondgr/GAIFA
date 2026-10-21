@@ -276,6 +276,7 @@ skynet (MiniCPM-V 4.7 35B, remote) ran on 2026-10-20 while the local GPU was pau
 | skynet, first run (before skips; old stand-ins in Outputs) | 52 × 3 | 73% | 36/52 (69%) | — |
 | skynet, with skips and the grader fixes | 44 × 3 | 88.6% | 37/44 (84.1%) | 26 s |
 | skynet, + "make or draw something is a picture" in the base prompt | 44 × 3 | 92.4% | 38/44 (86.4%) | 26 s |
+| skynet, after the night's security and robustness fixes (untrusted text wrapped, judge rules, origin checks) | 44 × 3 | 93.9% | 41/44 (93.2%) | 26 s |
 | Gemma 4 26B (local, lcpp) | 44 × 1 | 90.9% | 40/44 (90.9%) | 164 s |
 
 **What changed overnight:**

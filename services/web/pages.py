@@ -1,5 +1,6 @@
-"""A fetched page → an output (architecture §4.7): HTML becomes markdown with trafilatura, text and
-JSON are kept as they are, PDFs are saved as `document` outputs for the hub's reading tools."""
+"""A fetched page → an output (architecture §4.7): HTML becomes markdown with trafilatura (what it loses, code
+blocks' languages and blank lines and tables without a header line, put back by htmlmd.py), text and JSON are kept
+as they are, PDFs are saved as `document` outputs for the hub's reading tools."""
 
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from urllib.parse import urlsplit
 
 import trafilatura
 
+import htmlmd
 from safety import Fetched, Refused
 
 HTML_TYPES = {"text/html", "application/xhtml+xml"}
@@ -63,8 +65,10 @@ def convert(f: Fetched, fetched_iso: str) -> Page:
     if f.content_type in HTML_TYPES or (not f.content_type and f.body.lstrip()[:15].lower().startswith((b"<!doctype", b"<html"))):
         md = trafilatura.extract(f.body, url=f.url, output_format="markdown", include_links=True, include_tables=True,
                                  include_formatting=True, include_comments=False, favor_recall=True)
-        if not md:  # no main content found: the page's visible text, plainly
-            md = trafilatura.html2txt(f.body) or ""
+        if md:
+            md = htmlmd.fix_tables(htmlmd.restore_code(md, htmlmd.code_blocks(f.body)))
+        else:       # no main content found: the page's visible text, with its headings, lists, code and tables
+            md = htmlmd.plain(f.body) or trafilatura.html2txt(f.body) or ""
         meta = trafilatura.extract_metadata(f.body, default_url=f.url)
         title = (meta.title if meta and meta.title else "") or _html_title(f.body) or host
         published = meta.date if meta and meta.date else None

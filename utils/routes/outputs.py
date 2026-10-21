@@ -134,12 +134,25 @@ async def output_text(
     limit: int = Query(reading.LIMIT, ge=1, le=reading.MAX_LIMIT, description="Characters to return"),
     page: int | None = Query(None, ge=1, description="Start at this page (PDFs)"),
     pages: str | None = Query(None, description='A page or a range, like "3" or "3-5" (PDFs)'),
+    screened: bool = Query(False, description="As the chat model may read it: screened by `[agent.screen]` when it "
+                           "covers this output (fetched pages; documents and transcripts when turned on), the note in `notes`"),
 ) -> dict[str, Any]:
     """Errors: `not_text` (409) for kinds without text, `no_page` (404) for a page the document
     doesn't have."""
-    ex = await _outs(request).text(output_id.removeprefix("output:"))
+    oid = output_id.removeprefix("output:")
+    ex = await _outs(request).text(oid)
     spec = pages or (str(page) if page else None)
-    return await asyncio.to_thread(reading.window, ex, offset, limit, spec)
+    w = await asyncio.to_thread(reading.window, ex, offset, limit, spec)
+    if screened:   # plan 30.8: the chat agent's reads (attachments sent whole, view_output)
+        from utils.tools.screen import kind_of as screen_kind
+        from utils.tools.screen_store import screened_window
+
+        hub = request.app.state.hub
+        s = await screened_window(hub.outputs.dir, hub.config, oid, ex.text, w["text"], w["offset"],
+                                  screen_kind(await hub.outputs.get(oid)))
+        if s is not None:
+            w = {**w, "text": s.text, "notes": list(w["notes"]) + ([s.note()] if s.note() else [])}
+    return w
 
 
 @router.get("/api/outputs/{output_id}/search", summary="Find words, a \"phrase\" or a /regex/ in an output's text",

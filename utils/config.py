@@ -180,6 +180,12 @@ class ScreenCfg(_Strict):
     transcripts: bool = False
     timeout_s: float = Field(30.0, gt=0)
     window_chars: int = Field(800, ge=200, le=20000)   # passages per model call: 800 for a small judge (MiniCPM5 2B), 6000 for a large one
+    # The screening model, when it isn't the judge's (unset: [agent.judge]'s); screen.screen_config
+    backend: Literal["relay", "decide"] | None = None
+    model: str | None = None
+    url: str | None = None
+    threshold: float | None = Field(None, gt=0, le=1)
+    confirm: bool = True            # decide: what it flags is read again by the judge's chat model (relay)
 
 
 class AgentCfg(_Strict):

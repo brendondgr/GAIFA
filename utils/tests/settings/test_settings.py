@@ -37,7 +37,8 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
             "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.95, "timeout_s": 3.0,
                       "allow_commands": [], "ask_commands": []},
-            "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800},
+            "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800,
+                       "backend": None, "model": None, "url": None, "threshold": None, "confirm": True},
             "permissions": {"deny": [], "ask": ["hub_set_preference"], "allow": ["hub_start_service"]},
         }
         before = _file(served)

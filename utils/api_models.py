@@ -661,6 +661,11 @@ class ScreenSettings(_Model):
     transcripts: bool
     timeout_s: float = Field(gt=0, le=600)
     window_chars: int = Field(ge=200, le=20000)
+    backend: Literal["relay", "decide"] | None = Field(None, description="The screening model's backend; null: the judge's")
+    model: str | None = Field(None, min_length=1, max_length=200, description="null: the judge's (or the backend's default)")
+    url: str | None = Field(None, min_length=1, max_length=500, description="null: the judge's (or the backend's default)")
+    threshold: float | None = Field(None, gt=0, le=1, description="decide: a passage is for a human reader at or above it")
+    confirm: bool = Field(True, description="decide: what it flags is read again by the judge's chat model (relay)")
 
 
 class Settings(_Model):

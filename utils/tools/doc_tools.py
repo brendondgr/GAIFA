@@ -81,10 +81,12 @@ async def read_document(hub: Hub, args: dict[str, Any]) -> str:
             limit //= 2
     except OutputError as e:
         raise ToolError(e.code, e.detail, "read by offset, or give pages within the document") from None
-    from utils.tools.screen import kind_of, screen_for
+    from utils.tools.screen import kind_of
+    from utils.tools.screen_store import screened_window
 
     start, end = w["offset"], w["offset"] + len(w["text"])
-    screened = await screen_for(hub.config, w["text"], kind_of(o))     # plan 30.6: same lines, so citations hold
+    # plan 30.6: same lines, so citations hold; a page screened whole when it was read (plan 30.8) isn't screened again
+    screened = await screened_window(hub.outputs.dir, hub.config, oid, ex.text, w["text"], start, kind_of(o))
     if screened is not None:
         w = {**w, "text": screened.text, "notes": list(w["notes"]) + ([screened.note()] if screened.note() else [])}
     where = f"characters {start:,}–{end:,} of {w['total_chars']:,}"

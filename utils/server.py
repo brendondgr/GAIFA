@@ -133,7 +133,7 @@ def default_backend(options: Options) -> Any:
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, prefs, services, sessions, settings, skills, system, tools, web, widgets
+    from utils.routes import events, mcp, memory, metrics, models, outputs, overview, prefs, services, sessions, settings, skills, system, tools, web, webpages, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
@@ -290,8 +290,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(sessions.router)
     app.include_router(prefs.router)
     app.include_router(mcp.router)  # /mcp: the tools over MCP (13.4)
+    app.include_router(webpages.router)  # /api/web/read (30.8)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings", "tools", "sessions", "prefs"):
+                 "overview", "settings", "tools", "sessions", "prefs", "webpages"):
         hub.mark_live(area)
 
     app.include_router(web.router)

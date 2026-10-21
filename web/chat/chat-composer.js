@@ -3,12 +3,14 @@
 // pasting a file; each becomes an output in outputs/uploads/, plan chat-uploads U.5; text, code and
 // documents too, and a long paste becomes a file, plan 24.6: Ctrl+Shift+V pastes it as text), the quick actions (registry: on 'composer'), tool-group toggles, Stop, and
 // slash commands (/compact, /clear, /model, /context and one per skill). Cards that wait for you (approvals,
-// questions, parameter cards a button opened) dock on top of it (`dock`, plan 19.6).
+// questions, parameter cards a button opened) dock on top of it (`dock`, plan 19.6). Web pages attach too
+// (plan 30.8, chat-webpage.js): a pasted URL offers it, and the attach menu has "Add a web page".
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, label11, COL } from './chat-ui.js';
 import { actionsFor } from './chat-actions.js';
 import { MicButton } from './chat-mic.js';
 import { ACCEPT, uploadable, toChip, pasteFile, chipIcon, chipSize } from './chat-files.js';
+import { loneUrl, readPage, WebPageOffer, AddWebPage, WebBadge } from './chat-webpage.js';
 
 export { uploadable, toChip, pasteFile } from './chat-files.js';
 
@@ -37,7 +39,7 @@ export async function uploadAll(api, files) {
   };
 }
 
-function AttachPicker({ api, outputs, chosen, onToggle }) {
+function AttachPicker({ api, outputs, chosen, onToggle, onReadPage }) {
   const React = R(), [recent, setRecent] = React.useState(null);
   React.useEffect(() => { api.listOutputs({ limit: 24 }).then(p => setRecent(p.items || [])).catch(() => setRecent([])); }, []);
   const mine = (outputs || []).slice().reverse().map(o => ({ id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }));
@@ -52,6 +54,7 @@ function AttachPicker({ api, outputs, chosen, onToggle }) {
   };
   const grid = list => h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(58px, 1fr))', gap: 6 } }, list.map(tile));
   return h(R().Fragment, null,
+    onReadPage ? h(AddWebPage, { onRead: onReadPage }) : null,
     mine.length ? h('span', { style: label11 }, 'In this chat') : null, mine.length ? grid(mine) : null,
     h('span', { style: label11 }, 'Recent outputs'), recent == null ? h('span', { style: { color: T.mut, fontSize: 12 } }, 'Loading…') : rest.length ? grid(rest) : h('span', { style: { color: T.mut, fontSize: 12 } }, 'Nothing yet.'));
 }
@@ -90,6 +93,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
+  const [offer, setOffer] = React.useState(null), [reading, setReading] = React.useState(0);
   const sized = chips => chips.filter(c => c.kind === 'text' || c.kind === 'document').forEach(c => api.outputText?.(c.id, { limit: 1 })
     .then(w => setAttachments(a => a.map(x => x.id === c.id ? { ...x, pages: w.pages, lines: w.lines } : x))).catch(() => {}));
   const upload = async list => {
@@ -103,19 +107,29 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
       if (errors.length) setUpErr(errors.join(' · '));
     } finally { setUploading(n => n - files.length); }
   };
+  const attachPage = async url => {   // plan 30.8: the page read, saved and screened by the hub, attached like an upload
+    setOffer(null); setUpErr(null); setReading(n => n + 1);
+    try {
+      const chip = await readPage(api, url);
+      setAttachments(a => a.some(x => x.id === chip.id) ? a : [...a, chip]);
+      sized([chip]);
+    } catch (e) { setUpErr(`${url}: ${e?.detail || e?.message || 'couldn’t read the page'}${e?.data?.fix ? ` (${e.data.fix})` : ''}`); }
+    finally { setReading(n => n - 1); }
+  };
   const onPaste = e => {
     const f = uploadable(e.clipboardData?.files);
     if (f.length) { e.preventDefault(); upload(f); return; }
     if (plain.current) { plain.current = false; return; }        // Ctrl+Shift+V: into the box as it is
     const pf = pasteFile(e.clipboardData?.getData?.('text/plain'));
-    if (pf && typeof File !== 'undefined') { e.preventDefault(); upload([new File([pf.body], pf.name, { type: 'text/plain' })]); }
+    if (pf && typeof File !== 'undefined') { e.preventDefault(); upload([new File([pf.body], pf.name, { type: 'text/plain' })]); return; }
+    setOffer(loneUrl(e.clipboardData?.getData?.('text/plain')));   // a lone URL: pasted as text, and offered as a page
   };
   const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
   const matches = slashMatches(draft, skills);
   React.useLayoutEffect(() => { const el = ref.current; if (!el) return; el.style.height = ''; if (draft && el.scrollHeight > el.clientHeight) el.style.height = Math.min(el.scrollHeight + 2, 220) + 'px'; }, [draft]);
   React.useEffect(() => { setSel(0); }, [matches.length]);
-  const can = !disabled && !uploading && (draft.trim() || attachments.length);
-  const send = () => { if (can) onSend(draft, attachments); };
+  const can = !disabled && !uploading && !reading && (draft.trim() || attachments.length);
+  const send = () => { if (can) { setOffer(null); onSend(draft, attachments); } };
   const complete = c => { setDraft('/' + c.cmd + (c.arg ? ' ' : '')); ref.current?.focus(); };
   const onKey = e => {
     if (e.nativeEvent?.isComposing) return;
@@ -147,10 +161,13 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
             ? h('button', { type: 'button', title: `Open ${a.title || a.id}`, onClick: () => onOpen(a.id), style: { border: 0, background: 'none', padding: 0, color: T.tx, font: 'inherit', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, (a.n ? `#${a.n} ` : '') + (a.title || a.id))
             : h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, (a.n ? `#${a.n} ` : '') + (a.title || a.id)),
           chipSize(a) ? h('span', { style: { color: T.dim, fontFamily: MONO, fontSize: 10.5, whiteSpace: 'nowrap' } }, chipSize(a)) : null,
+          a.web ? h(WebBadge, { web: a.web }) : null,
           a.kind === 'text' || a.kind === 'document' ? h(DocMode, { a, mode: a.mode || settings?.doc_mode || 'auto', onPick: m => {   // plan 24.9
             setAttachments(l => l.map(x => (x.id === a.id ? { ...x, mode: m } : x))); onSettings?.({ doc_mode: m }); } }) : null,
           h('button', { type: 'button', 'aria-label': `Remove ${a.title || a.id}`, onClick: () => toggleAtt(a), style: { border: 0, background: 'none', padding: 2, color: T.mut, cursor: 'pointer', display: 'flex' } }, h(Icon, { d: 'x', size: 11 }))))) : null,
         uploading ? h('span', { role: 'status', style: { fontSize: 11.5, color: T.mut } }, `Uploading ${uploading} file${uploading > 1 ? 's' : ''}…`) : null,
+        reading ? h('span', { role: 'status', style: { fontSize: 11.5, color: T.mut } }, `Reading ${reading > 1 ? `${reading} pages` : 'the page'} and screening it…`) : null,
+        offer && !reading ? h(WebPageOffer, { url: offer, onAttach: attachPage, onDismiss: () => setOffer(null) }) : null,
         upErr ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, upErr) : null,
         h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => setDraft(e.target.value), onKeyDown: onKey, 'aria-label': 'Message',
           onPaste,
@@ -162,8 +179,8 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
           h(Btn, { kind: 'ghost', sm: true, icon: 'upload', title: 'Upload files: images, video, audio, text, code, PDFs and documents (or drop or paste them here)', disabled, onClick: () => picker.current?.click() }),
           h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
           h('span', { style: { position: 'relative' } },
-            h(Btn, { kind: 'ghost', sm: true, icon: 'clip', title: 'Attach an output', onClick: () => setPop(pop === 'att' ? null : 'att') }),
-            h(Popover, { open: pop === 'att', onClose: () => setPop(null), place: 'up-left', width: 340, label: 'Attach outputs' }, h(AttachPicker, { api, outputs, chosen: attachments, onToggle: toggleAtt }))),
+            h(Btn, { kind: 'ghost', sm: true, icon: 'clip', title: 'Attach an output or a web page', onClick: () => setPop(pop === 'att' ? null : 'att') }),
+            h(Popover, { open: pop === 'att', onClose: () => setPop(null), place: 'up-left', width: 340, label: 'Attach outputs' }, h(AttachPicker, { api, outputs, chosen: attachments, onToggle: toggleAtt, onReadPage: api.readWebPage ? url => { setPop(null); attachPage(url); } : null }))),
           h('span', { style: { position: 'relative' } },
             h(Btn, { kind: 'ghost', sm: true, icon: 'sliders', title: 'Tool groups', onClick: () => setPop(pop === 'tools' ? null : 'tools') }),
             h(Popover, { open: pop === 'tools', onClose: () => setPop(null), place: 'up-left', width: 330, label: 'Tool groups' }, h(ToolGroups, { index, settings, onChange: onSettings }))),
@@ -173,5 +190,5 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
           h('span', { style: { flex: 1 } }),
           running ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: onStop, title: 'Stop the turn (and its running tool)' }) : null,
           h(Btn, { kind: 'pri', sm: true, icon: 'send', title: running ? 'Queue this message' : 'Send (Enter)', disabled: !can, onClick: send }))),
-      h('div', { style: { textAlign: 'center', fontSize: 11, color: T.dim, paddingTop: 5 } }, 'Enter sends · Shift+Enter new line · / commands · drop or paste files')));
+      h('div', { style: { textAlign: 'center', fontSize: 11, color: T.dim, paddingTop: 5 } }, 'Enter sends · Shift+Enter new line · / commands · drop or paste files or a link')));
 }

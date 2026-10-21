@@ -105,4 +105,4 @@ async def test_conftest_client(client, root):
 
 def test_services_dir_copies_mods(services_dir):
     d = services_dir("fake-ok", "fake-mem")
-    assert sorted(p.name for p in d.iterdir()) == ["_fakemod.py", "_fakews.py", "fake-mem", "fake-ok"]
+    assert sorted(p.name for p in d.iterdir()) == ["_fakemod.py", "_fakepage.py", "_fakews.py", "fake-mem", "fake-ok"]

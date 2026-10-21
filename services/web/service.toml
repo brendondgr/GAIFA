@@ -21,6 +21,9 @@ install = "install.sh"
 [outputs]                          # outputs/web/<date>/<HHMMSS>-<host>-<slug>.md, and .pdf documents
 kinds = ["text"]                   # gains "document" with plan 24.1 (the PDFs carry kind "document" in their sidecar)
 
+[ui]
+page = "ui/page.js"                # Read a page (plan 30.8): through the hub's POST /api/web/read, screened whole
+
 [agent]
 skills = "skills"                  # skills/<name>/SKILL.md for the chat agent (plan 14.9)
 

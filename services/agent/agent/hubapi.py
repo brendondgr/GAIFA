@@ -154,8 +154,10 @@ class HubAPI:
         return r.content, r.headers.get("content-type", "")
 
     async def output_text(self, oid: str, **params: Any) -> dict[str, Any]:
-        """A window of a text or document output's text (plan 24.3): offset, limit, page, pages."""
-        return await self._json("GET", f"/api/outputs/{oid}/text", params={k: v for k, v in params.items() if v is not None})
+        """A window of a text or document output's text (plan 24.3): offset, limit, page, pages. Screened as the hub's
+        `[agent.screen]` says (a fetched page always; plan 30.8), since the model reads it."""
+        q = {"screened": "true", **{k: v for k, v in params.items() if v is not None}}
+        return await self._json("GET", f"/api/outputs/{oid}/text", params=q)
 
     async def output_page(self, oid: str, n: int, width: int = 1024) -> bytes:
         """Page n of a PDF output as a PNG."""

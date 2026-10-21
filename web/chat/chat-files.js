@@ -65,6 +65,7 @@ export const toChip = o => ({ id: o.id, kind: o.kind, title: o.title, preview: o
 
 /** The chip's icon: by kind, and code for code. */
 export function chipIcon(a) {
+  if (a.web) return 'globe';            // a web page read for the chat (plan 30.8)
   if (a.kind === 'text') return /^(code|config|web|data):|notebook/.test(a.subtype || '') ? 'code' : 'doc';
   return { image: 'image', video: 'video', audio: 'wave', model3d: 'cube', document: 'doc' }[a.kind] || 'clip';
 }

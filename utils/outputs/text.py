@@ -116,6 +116,7 @@ def cached(outputs: Path, oid: str, main: str, kind: str, subtype: str | None) -
 
 
 def forget(outputs: Path, oid: str) -> None:
-    """Remove the output's cached text and page images."""
+    """Remove the output's cached text, its screening report (`utils/tools/screen_store.py`) and page images."""
     cache_file(outputs, oid).unlink(missing_ok=True)
+    (outputs / TEXT_DIR / f"{oid}.screening.json").unlink(missing_ok=True)
     shutil.rmtree(outputs / PAGES_DIR / oid, ignore_errors=True)

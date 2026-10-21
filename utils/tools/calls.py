@@ -37,7 +37,7 @@ from utils.tools.approvals import Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.doc_tools import untrusted
 from utils.tools.modcall import ToolError, dry_run, mod_error
-from utils.tools import edits, options
+from utils.tools import edits, options, searched
 from utils.tools.schema import coerce, validate
 
 if TYPE_CHECKING:
@@ -181,8 +181,10 @@ class Calls:
         limits = await self._limits(tool, arguments, origin) if tool.limits else None
         grant = await self.hub.grants.match(tool, arguments, origin, (limits or {}).get("key")) \
             if self.hub.grants is not None and not (limits or {}).get("once") else None
+        found = await searched.found_by(self.hub.db, arguments.get("url"), (origin or {}).get("thread")) \
+            if tool.name == searched.FETCH_TOOL and grant is None and mode != "plan" and isinstance(arguments, dict) else None
         verdict, why = decide(tool.name, tool.risk, self.hub.config, mode, grant, limits,
-                              untrusted=bool((origin or {}).get("untrusted")))
+                              untrusted=bool((origin or {}).get("untrusted")), searched=found is not None)
         judged = None
         if verdict == "judge":                         # Auto mode (plan 30.3): allow or ask, with its reason
             verdict, why, judged = await judge(self.hub, tool, arguments, origin, limits, why)
@@ -205,6 +207,8 @@ class Calls:
             return {**self._needs(tool, a, filled, how, limits, why), **({"judge": judged} if judged else {})}
         if grant is not None:
             origin = {**(origin or {}), "grant": grant["id"]}      # the records and the chat say which grant ran it
+        elif found is not None and why == "a page your search found":
+            origin = {**(origin or {}), "found_by": found}          # the web_search call whose results held the URL
         out = await self._launch(tool, arguments, origin or {}, None, wait, filled=how)
         if judged is not None:
             await self._judged(tool.name, judged, origin, call_id=out.get("call_id"))

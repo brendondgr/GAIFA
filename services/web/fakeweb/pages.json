@@ -2,5 +2,9 @@
   "https://kestrel-ferries.example/timetables/winter-2026": {"file": "kestrel-winter-2026.html", "content_type": "text/html"},
   "https://kestrel-ferries.example/timetables/summer-2026": {"file": "kestrel-summer-2026.html", "content_type": "text/html"},
   "https://harbour-council.example/transport/ferry-fares": {"file": "council-ferry-fares.html", "content_type": "text/html"},
-  "https://islanders-forum.example/t/ferry-bike-price": {"file": "forum-ferry-bike.html", "content_type": "text/html"}
+  "https://islanders-forum.example/t/ferry-bike-price": {"file": "forum-ferry-bike.html", "content_type": "text/html"},
+  "https://paine-trailnotes.example/conditions/march": {"file": "paine-march-conditions.html", "content_type": "text/html"},
+  "https://ridgeline-outfitters.example/guides/leather-vs-synthetic": {"file": "ridgeline-leather-vs-synthetic.html", "content_type": "text/html"},
+  "https://brightfield-lights.example/k7/specs": {"file": "brightfield-k7-specs.html", "content_type": "text/html"},
+  "https://torch-forum.example/t/k7-18650": {"file": "torch-forum-k7.html", "content_type": "text/html"}
 }

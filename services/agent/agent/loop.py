@@ -771,10 +771,9 @@ class Agent:
     async def _title(self, tid: str, text: str) -> None:
         try:
             model = (self.store.thread(tid) or {}).get("model") or self.cfg.model
-            r = await asyncio.wait_for(self.llm.chat(model, [{"role": "system", "content": prompts.TITLE_PROMPT},
-                                                             {"role": "user", "content": text[:2000]}]), timeout=120)
-            title = r.text.strip().strip('"').strip()[:60]
-            if title and "\n" not in title:
+            r = await asyncio.wait_for(self.llm.chat(model, prompts.title_messages(text)), timeout=120)
+            title = prompts.reply_title(r.text, r.thinking)   # an answer instead of a title keeps the heuristic one
+            if title:
                 self.store.update_thread(tid, title=title)
                 self.transient(tid, "thread", self.store.thread(tid) or {})
         except Exception:  # noqa: BLE001 - the heuristic title stays

@@ -300,6 +300,10 @@ skynet (MiniCPM-V 4.7 35B, remote) ran on 2026-10-20 while the local GPU was pau
 - A 10-minute meeting summarised with [mm:ss] citations, and a fox image turned into 3D and speech: 5 full chains, live.
 <!-- /RESULTS -->
 
+### Grounding (2026-10-21)
+
+Three `context` tasks in `evals/tasks.py` (56 tasks in all), dry runs against the web mod's fake web. `ground_trek_gear` ("I'm hiking in Torres del Paine for 8 days in March. Should I get leather or synthetic boots, and what about gaiters?") and `ground_product_fact` ("Will an 18650 battery work in my Brightfield K7 headlamp?", a made-up lamp with an out-of-date forum post saying no) never say "look it up". They pass when `web_search` ran with no card, a page it returned was fetched with no card, the reply names a fetched page's host, and it gives a fact only that page has ("9 of 14" days of mud, the 1,180 m snowline or the 26-hour drying time; the BF-S18 adapter). `no_search_needed` (a greeting, then how to reverse a Python list in place) passes when neither web tool was called and the reply gives `.reverse()`. `web_two_sources` now fetches its pages without cards, since they are pages its search found. On skynet (MiniCPM-V 4.7), 3 runs each: 12/12, after two fixes. The fake web's results said engine `fakeweb`, so the model treated them as placeholders and searched up to 24 times; they now say `duckduckgo`, with hosts still under `.example`, which never resolves. And the rule now asks for links and a Sources list: before, the answers used the pages' facts but named no page.
+
 ## Gate
 
 Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

@@ -31,7 +31,7 @@ async def test_harness_answers_and_grades(env):
 
 
 def test_eval_tasks_in_eight_groups():
-    assert len(TASKS) == 53 and len({t.id for t in TASKS}) == 53
+    assert len(TASKS) == 56 and len({t.id for t in TASKS}) == 56
     assert {t.group for t in TASKS} == {"single", "chain", "capability", "preference", "must-ask", "no-ask", "safety", "context"}
 
 
@@ -120,6 +120,49 @@ def test_web_two_sources_grades_citations_and_the_search_card():
     assert ok["ok"], ok["checks"]
     bad = grade(task, run(True))
     assert not bad["ok"] and [c["check"] for c in bad["checks"] if not c["ok"]] == ["web_search ran without a card"]
+
+
+def test_grounding_tasks_grade_what_they_should():
+    """A real-world question: passes when search ran, a page it found was fetched without a card and the
+    reply cites it with a fact only that page has; a fetch that asked, a URL the search didn't return, an
+    answer from memory, or a search for chit-chat fails."""
+    import json as _json
+
+    from evals.harness import Run
+
+    task = next(t for t in TASKS if t.id == "ground_product_fact")
+    specs = "https://brightfield-lights.example/k7/specs"
+
+    def ev(t, **p):
+        return {"type": t, "payload": p}
+
+    def run(fetch_url=specs, card=False, search=True, text=f"Yes, with the BF-S18 sleeve ([#1]({specs})).") -> Run:
+        events = []
+        if search:
+            events += [ev("tool_call", id="c1", name="web_search", by="model", arguments={"query": "Brightfield K7 18650"}),
+                       ev("tool_result", id="c1", name="web_search", status="done",
+                          content=_json.dumps({"results": [{"title": "K7", "url": specs}]}))]
+        if fetch_url:
+            events.append(ev("tool_call", id="c2", name="web_fetch", by="model", arguments={"url": fetch_url}))
+            if card:
+                events.append(ev("approval", id="c2", approval_id="ap2", tool="web_fetch", risk="network"))
+            events.append(ev("tool_result", id="c2", name="web_fetch", status="done", outputs=[{"n": 1, "kind": "text"}]))
+        events.append(ev("assistant", text=text))
+        return Run(task=task.id, model="m", events=events)
+
+    def failed(r: Run, t=task) -> list[str]:
+        return [c["check"] for c in grade(t, r)["checks"] if not c["ok"]]
+
+    assert failed(run()) == []
+    assert failed(run(card=True)) == ["fetched a search result without a card"]
+    assert failed(run(fetch_url="https://elsewhere.example/k7", text="Yes, BF-S18 (elsewhere.example).")) == ["fetched a search result without a card"]
+    assert "cites a fetched page" in failed(run(fetch_url=None, text="Yes, with the BF-S18 sleeve."))
+    assert set(failed(run(search=False, fetch_url=None, text="Probably not."))) >= {"web_search ran without a card", "reply mentions BF-S18"}
+    trek = next(t for t in TASKS if t.id == "ground_trek_gear")
+    assert failed(run(), trek) == [n for n, _ in trek.checks if n.startswith("reply mentions")]   # only its own pages' facts
+    quiet = next(t for t in TASKS if t.id == "no_search_needed")
+    assert failed(run(search=False, fetch_url=None, text="Use xs.reverse()."), quiet) == []
+    assert failed(run(text="Use xs.reverse()."), quiet) == ["never called web_search, web_fetch"]
 
 
 def test_library_cases_grade_what_they_should():

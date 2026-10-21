@@ -26,6 +26,8 @@ class FakeModel:
         self.script: list[dict[str, Any]] = []
         self.received: list[dict[str, Any]] = []
         self.titles = 0
+        self.title = "Test title"                       # what the model answers when asked for a title
+        self.title_asks: list[dict[str, Any]] = []      # those requests
         self.models: dict[str, dict[str, Any]] = {
             "main": {"context_length": 8000, "tools": True, "vision": True, "reasoning": True},
             "backup": {"context_length": 16000, "tools": True, "vision": False, "reasoning": False},
@@ -40,7 +42,8 @@ class FakeModel:
         text = json.dumps(body)
         if "Give this chat a short title" in text:
             self.titles += 1
-            return {"text": "Test title"}
+            self.title_asks.append(body)
+            return {"text": self.title}
         for i, r in enumerate(self.script):
             if r.get("match") and r["match"] not in text:
                 continue

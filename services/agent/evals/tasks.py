@@ -132,6 +132,32 @@ def fetched(*urls: str):
     return (f"fetched {', '.join(u.split('/')[2] for u in urls)}", c)
 
 
+def fetched_found():
+    """A web_fetch of a URL that the chat's web_search returned ran without a card (a page the search found)."""
+    def c(r: Run):
+        found = "\n".join(str(x.get("content") or "") for x in r.results("web_search"))
+        cards = {a.get("id") for a in r.of("approval") if a.get("tool") == "web_fetch"}
+        ok = {x["id"] for x in r.done("web_fetch")}
+        urls = [str((c.get("arguments") or {}).get("url") or "") for c in r.calls("web_fetch", by=None)
+                if c["id"] in ok and c["id"] not in cards]
+        hits = [u for u in urls if u and u in found]
+        return bool(hits), f"{len(hits)} found pages fetched without a card, {len(cards)} cards"
+    return ("fetched a search result without a card", c)
+
+
+def cites_fetched():
+    """The reply names a page it fetched (its host is in the text)."""
+    def c(r: Run):
+        from urllib.parse import urlsplit
+
+        ok = {x["id"] for x in r.done("web_fetch")}
+        hosts = {urlsplit(str((c.get("arguments") or {}).get("url") or "")).hostname for c in r.calls("web_fetch", by=None)
+                 if c["id"] in ok} - {None, ""}
+        t = r.text().lower()
+        return any(h.lower() in t for h in hosts), f"fetched {sorted(hosts)[:4]}"
+    return ("cites a fetched page", c)
+
+
 def final_mentions(*words: str):
     def c(r: Run):
         t = r.text().lower()
@@ -475,7 +501,19 @@ TASKS: list[Task] = [
                                         "for an adult with a bike? Look it up on the web and cite your sources."],
          [no_card("web_search"), fetched(WINTER, FARES), final_mentions("08:40", "8:40"), final_mentions("11.90"),
           final_mentions("kestrel-ferries.example"), final_mentions("harbour-council.example")],
-         settings={"dry_run": True}, note="plan 26.2: search runs on the shipped grant, each fetch asks; the web mod's fake web answers (fakeweb/)"),
+         settings={"dry_run": True}, note="plan 26.2: search runs on the shipped grant; fetching what it found runs without a card; "
+                                          "the web mod's fake web answers (fakeweb/)"),
+    # Grounding: a question about the real world, without "look it up": search, fetch what it found (no card), answer from it.
+    Task("ground_trek_gear", "context", ["I'm hiking in Torres del Paine for 8 days in March. Should I get leather or synthetic boots, "
+                                         "and what about gaiters?"],
+         [no_card("web_search"), fetched_found(), cites_fetched(), final_mentions("9 of 14", "nine of 14", "17 of 31", "1,180", "1180", "1 180", "26 hours", "drying room")],
+         settings={"dry_run": True}, note="grounding: the facts are only on the fake pages (fakeweb/: paine-trailnotes, ridgeline-outfitters)"),
+    Task("ground_product_fact", "context", ["Will an 18650 battery work in my Brightfield K7 headlamp?"],
+         [no_card("web_search"), fetched_found(), cites_fetched(), final_mentions("BF-S18")],
+         settings={"dry_run": True}, note="grounding: a made-up lamp, so only the maker's page (fakeweb/) knows; a 2025 forum post says no"),
+    Task("no_search_needed", "context", ["Hi! How's your day going?", "In Python, how do I reverse a list in place?"],
+         [not_called("web_search", "web_fetch"), final_mentions(".reverse()", "reverse()")],
+         settings={"dry_run": True}, note="grounding's other side: chit-chat and coding help that doesn't depend on a version"),
 ]
 
 from .workspace import TASKS as _WORKSPACE  # noqa: E402  (plan 27.6)

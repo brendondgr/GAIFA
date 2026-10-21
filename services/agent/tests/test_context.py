@@ -52,6 +52,8 @@ def test_cap_text_and_rebuild_placement():
 
 
 async def test_long_result_is_capped_and_read_result_pages(env):
+    env.model.models["main"]["context_length"] = 12000      # room for one capped result without clearing it
+    env.agent.llm._models = (0.0, [])
     env.hub.tools["fake_get"]["risk"] = "read"
     orig = env.hub._execute
 

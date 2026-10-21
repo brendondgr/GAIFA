@@ -25,5 +25,6 @@ def test_web_mod_declares_network_tools():
     tools = mod.manifest.tools
     assert (tools["search"].op, tools["search"].risk, tools["search"].grant_key) == ("POST /v1/search", "network", "const:search")
     assert (tools["fetch"].op, tools["fetch"].risk, tools["fetch"].grant_key) == ("POST /v1/fetch", "network", "url:host")
+    assert tools["search"].core and tools["fetch"].core      # always loaded: answers are grounded without load_tools first
     assert mod.manifest.run.port == 5102
     assert (ROOT / "services" / "web" / "skills" / "researching" / "SKILL.md").is_file()

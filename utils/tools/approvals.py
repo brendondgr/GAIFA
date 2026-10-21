@@ -17,7 +17,9 @@ defaults" for every tool without limits.
    refuse, or the judge); without limits, `plan` denies everything but `read`;
 4. a **grant** that covers the call allows it (never for `once` actions: host runs, commits,
    anything touching a remote);
-5. the **ask**, then **allow** list (`execute` ignores the allow list: only a grant skips its card);
+5. the **ask** list; then a **page the chat's search found** (a `web_fetch` of a URL that a `web_search`
+   in the same chat returned, `utils/tools/searched.py`) runs; then the **allow** list (`execute`
+   ignores the allow list: only a grant skips its card);
 6. the **risk default**: `read` runs; in `accept_edits`, `auto` and `bypass` `write` and `generate`
    run; everything else asks (`network`, `execute` and `destructive` in every mode).
 
@@ -80,11 +82,12 @@ def canonical(mode: str | None) -> str:
 
 def decide(name: str, risk: str, config: Config, mode: str = "manual",
            grant: dict[str, Any] | None = None, limits: dict[str, Any] | None = None,
-           untrusted: bool = False) -> tuple[str, str]:
+           untrusted: bool = False, searched: bool = False) -> tuple[str, str]:
     """("allow" | "ask" | "deny" | "judge", why) for one call.
 
     `grant`: a grant that covers it (25.2). `limits`: the mod's preflight (27.4), or None. `untrusted`: the
-    calling chat has read text from a page, a file or a transcript (the origin's `untrusted`)."""
+    calling chat has read text from a page, a file or a transcript (the origin's `untrusted`). `searched`: a
+    web_fetch of a URL the chat's own web_search returned (`utils/tools/searched.py`)."""
     p = config.agent.permissions
     mode = canonical(mode)
     if any(fnmatch.fnmatchcase(name, g) for g in p.deny):
@@ -99,6 +102,8 @@ def decide(name: str, risk: str, config: Config, mode: str = "manual",
         return "allow", _granted(grant)
     if any(fnmatch.fnmatchcase(name, g) for g in p.ask):
         return "ask", "your permissions ask for this tool"
+    if searched and risk in ("read", "network"):
+        return "allow", "a page your search found"
     if risk != "execute" and any(fnmatch.fnmatchcase(name, g) for g in p.allow):
         return "allow", "allowed by your permissions"
     if risk == "read":

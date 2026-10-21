@@ -325,7 +325,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, out)
         if MODE == "perms" and url.path in ("/v1/search", "/v1/fetch", "/v1/python", "/v1/run"):
             origin = json.loads(self.headers.get("X-AIHub-Origin") or "{}")
-            return self.send(200, {"ran": url.path.rsplit("/", 1)[1], "arguments": self.body(), "dry_run": bool(origin.get("dry_run"))})
+            b = self.body()
+            out = {"ran": url.path.rsplit("/", 1)[1], "arguments": b, "dry_run": bool(origin.get("dry_run"))}
+            urls = [w for w in str(b.get("query") or "").split() if w.startswith(("http://", "https://"))] if isinstance(b, dict) else []
+            if url.path == "/v1/search" and urls:                # URLs in the query come back as results, as the web mod's
+                out["results"] = [{"title": "x", "url": u} for u in urls]
+            return self.send(200, out)
         if MODE == "tools":
             if url.path == "/v1/images":
                 b = self.body()

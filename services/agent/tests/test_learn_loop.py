@@ -51,7 +51,11 @@ async def test_a_tool_note_is_adopted_and_learned(env):
     assert rec["state"] == "done" and d["decision"] == "adopted" and h.current() == d["final"]
     assert h.tree()["tools/gen3d_make_3d.md"].startswith("Send stages as a list")
     assert h.meta(d["final"])["adopted_by"] == "auto" and h.meta(d["final"])["gate"]["ok"]
-    assert [x["cue"] for x in Library(env.agent.cfg.data, "gen3d").listing()] == [EXP["cue"]]
+    [entry] = Library(env.agent.cfg.data, "gen3d").listing()
+    assert entry["cue"] == EXP["cue"] and entry["version"] == d["final"] and entry["withdrawn"] is None
+    h.activate(0)                                                   # rolled back: the next round no longer reads it
+    assert Library(env.agent.cfg.data, "gen3d").text() == "(none yet)"
+    h.activate(d["final"])
     stages = [x["stage"] for x in rec["ledger"]]
     assert stages[:3] == ["gen3d:reflect", "gen3d:propose-INV", "gen3d:propose-PREF"] and "gen3d:compose" in stages
     assert (env.agent.cfg.data / "learn" / "runs" / f"{rec['id']}.json").is_file()

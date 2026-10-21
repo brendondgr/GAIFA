@@ -123,7 +123,8 @@ export default {
       const areas = Object.entries(lib).filter(([, l]) => l.length);
       put(ui.text('Lessons the learner kept for its next rounds (the live agent never reads them).', { muted: true }),
         ...(areas.length ? areas.map(([d, l]) => ui.card(h('h2', { style: 'margin:0;font-size:14px' }, d),
-          ...l.map(e => h('div', { style: 'padding:6px 0;border-top:1px solid var(--bd,#1D2430);font-size:12.5px;display:flex;flex-direction:column;gap:2px' },
+          ...l.map(e => h('div', { style: `padding:6px 0;border-top:1px solid var(--bd,#1D2430);font-size:12.5px;display:flex;flex-direction:column;gap:2px${e.withdrawn ? ';opacity:.6' : ''}` },
+            e.withdrawn ? h('div', null, ui.badge(`withdrawn: ${e.withdrawn}`, 'dim')) : null,
             h('div', null, h('strong', null, 'When '), e.cue), h('div', null, e.lesson), ui.text(`${e.evidence} · ${e.confidence}`, { muted: true })))))
           : [ui.empty('No lessons yet', 'Each improvement run may keep one per area.')]));
     }

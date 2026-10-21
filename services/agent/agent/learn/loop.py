@@ -321,7 +321,7 @@ class Learner:
         text = await self.ask(rec, f"{domain}:experience", P.EXPERIENCE.format(domain=domain, record=record, evidence_rule=P.EVIDENCE_IS_DATA))
         exp = None if "NO_ENTRY" in text and not _json(text) else _json(text)
         diff = self.harness.diff(self.harness.meta(final).get("parent") or 0, final) if final else ""
-        path = lib.add(rec["id"], exp or {}, diff, adopted=out["decision"]) if exp else None
+        path = lib.add(rec["id"], exp or {}, diff, adopted=out["decision"], version=final) if exp else None
         out["library"] = str(path) if path else None
         return out
 

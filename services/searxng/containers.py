@@ -14,6 +14,7 @@ newest `KEEP_BACKUPS` backups are kept; older ones, matched by their exact name,
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import re
 import shutil
@@ -142,9 +143,15 @@ class CliRuntime:
             raise RuntimeError_(f"can't run {b}: {e.strerror}") from None
         try:
             out, err = await asyncio.wait_for(p.communicate(stdin), timeout)
-        except TimeoutError:
-            p.kill()
-            raise RuntimeError_(f"{Path(b).name} {' '.join(args[:2])} took longer than {timeout:.0f} s") from None
+        except BaseException as e:   # a timeout, or the watch loop cancelled at shutdown: never leave the child running
+            if p.returncode is None:
+                with contextlib.suppress(ProcessLookupError):
+                    p.kill()
+                with contextlib.suppress(BaseException):
+                    await asyncio.wait_for(p.wait(), 5)   # reaped, so nothing holds the process at exit
+            if isinstance(e, TimeoutError):
+                raise RuntimeError_(f"{Path(b).name} {' '.join(args[:2])} took longer than {timeout:.0f} s") from None
+            raise
         if p.returncode != 0:
             raise RuntimeError_(f"{Path(b).name} {' '.join(args[:3])}: {(err or out).decode(errors='replace').strip()[:400]}")
         return out.decode(errors="replace")

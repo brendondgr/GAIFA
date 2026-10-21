@@ -228,3 +228,26 @@ async def test_cli_runtime_prunes_its_own_backups_only(docker, folder):
     rm = [x["args"] for x in _calls(log) if x["args"][:3] == ["exec", c.id, "rm"]]
     assert len(rm) == 1 and all(a.startswith("/etc/searxng/settings.yml.aihub-") for a in rm[0][5:])
     assert await rt.prune(c, 10) == []
+
+
+async def test_a_cancelled_or_slow_command_leaves_no_process(tmp_path):
+    """A container command cancelled at shutdown (or past its timeout) is killed and reaped: a child left running
+    held the test process at exit now and then (2 in 50 runs, 2026-10-21)."""
+    import asyncio
+    import os
+    slow = tmp_path / "docker"
+    slow.write_text("#!/bin/sh\necho $$ > \"$0.pid\"\nexec sleep 30\n")
+    slow.chmod(0o755)
+    rt = CliRuntime(str(slow))
+    task = asyncio.create_task(rt._run("ps", timeout=20))
+    for _ in range(100):
+        if (tmp_path / "docker.pid").exists():
+            break
+        await asyncio.sleep(0.05)
+    pid = int((tmp_path / "docker.pid").read_text())
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not os.path.exists(f"/proc/{pid}")              # killed and reaped (not even a zombie)
+    with pytest.raises(Exception, match="took longer"):
+        await rt._run("ps", timeout=0.3)

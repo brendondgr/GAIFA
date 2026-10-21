@@ -62,6 +62,7 @@ class ToolDef:
     cap_bytes: int | None = None     # results kept whole up to this size (default results.CAP_BYTES; plan 24.4)
     problems: list[str] = field(default_factory=list)
     grant_key: str | None = None     # plan 25.2: what "allow in this chat" covers (utils/tools/grants.py)
+    mod_dry_run: bool = False        # plan 26.2: in a dry run the call still goes to the mod, which answers it itself
 
     def public(self, full: bool = True, view: str = "full") -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "mod": self.mod or "hub", "risk": self.risk, "core": self.core,
@@ -213,7 +214,7 @@ class Catalog:
             problems += grant_problems(spec.grant_key, params)
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=list(spec.examples), core=spec.core, route=route, response=op["response"],
-                               job=job, problems=problems, grant_key=spec.grant_key))
+                               job=job, problems=problems, grant_key=spec.grant_key, mod_dry_run=spec.dry_run))
         if svc.m.agent.tools_source:
             out += await self._source(svc)
         return out
@@ -258,7 +259,7 @@ class Catalog:
         if db is None:
             return
         rows = [{**t.public(), "route": t.route.__dict__ if t.route else None, "response": t.response,
-                 "job_ops": t.job, "tool": t.tool} for t in tools]
+                 "job_ops": t.job, "tool": t.tool, "mod_dry_run": t.mod_dry_run} for t in tools]
         await db.execute("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                          (KV_PREFIX + sid, json.dumps({"ts": time.time(), "tools": rows})))
 
@@ -279,13 +280,15 @@ class Catalog:
                 out.append(ToolDef(r["name"], svc.id, r.get("tool") or r["name"], r.get("description", ""), r.get("parameters") or {},
                                    risk=r.get("risk", "write"), ask=r.get("ask") or [], examples=r.get("examples") or [],
                                    core=bool(r.get("core")), source=r.get("source", "manifest"), route=route,
-                                   response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key")))
+                                   response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key"),
+                                   mod_dry_run=bool(r.get("mod_dry_run"))))
             return out
         assert svc.m
         return [ToolDef(tool_name(svc.id, n), svc.id, n, s.description or s.op, {"type": "object"},
                         risk=s.risk or default_risk(s.op.split(" ", 1)[0], s.confirm), ask=list(s.ask),
                         examples=list(s.examples), core=s.core,
-                        job=_job_ops(s.job_status, s.job_cancel) if s.job else None, grant_key=s.grant_key)
+                        job=_job_ops(s.job_status, s.job_cancel) if s.job else None, grant_key=s.grant_key,
+                        mod_dry_run=s.dry_run)
                 for n, s in svc.m.tools.items()]
 
     # ---- lookups -----------------------------------------------------------------------------

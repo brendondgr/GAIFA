@@ -9,12 +9,14 @@ An AIHub mod (plan Phase 26): web search through a SearXNG on this machine, and 
 | `POST /v1/search` | `{query, categories?, time_range?, language?, limit ≤ 20}` → `{results: [{title, url, snippet, engine, published?}], answers, suggestions, unresponsive}` |
 | `POST /v1/fetch` | `{url, max_chars?}` → the page saved as an output, its final URL, title and first `max_chars` of markdown |
 
-The agent's tools are `web_search` and `web_fetch`, both risk `network` (plan 25.1): `web_search` has `grant_key = "const:search"`, so one "allow in this chat" covers every search; `web_fetch` has `grant_key = "url:host"`, so it covers one site. The skill [skills/researching](skills/researching/SKILL.md) tells the agent how to research and cite.
+The agent's tools are `web_search` and `web_fetch`, both risk `network` (plan 25.1). `web_search` runs without asking: AIHub ships an `always` grant for it (hub.db migration 010), listed in Settings → Agent, where revoking it makes searches ask (`grant_key = "const:search"`, so one answer covers every search). `web_fetch` asks; its `grant_key = "url:host"`, so "allow in this chat" covers one site. The skill [skills/researching](skills/researching/SKILL.md) tells the agent how to research and cite.
+
+**Dry runs (the agent eval).** Both tools say `dry_run = true` in `[tools]`, so in a dry run the hub still calls this mod, with `"dry_run": true` in `X-AIHub-Origin`. The mod then answers from its **fake web**, [fakeweb/](fakeweb/) (`fakeweb.py`): canned search results and pages on `.example` hosts, which never resolve, and never the internet or SearXNG. The pages go through the same conversion and are saved as outputs with `"dry_run": true` in their sidecar. The eval task `web_two_sources` uses them.
 
 ## Outputs
 
 - **Pages** become markdown: `outputs/web/<date>/<HHMMSS>-<host>-<slug>.md`, starting with the title, the source URL and the fetch time, then the page's main content. Plain text and JSON are kept as they are (JSON in a fenced block).
-- **PDFs** are saved as they came: `…/<HHMMSS>-<host>-<slug>.pdf` with `kind = "document"` in the sidecar, so the hub's document tools (plan 24.3–24.4) read them. Until plan 24.1 adds the `document` kind, the index shows them as `other`.
+- **PDFs** are saved as they came: `…/<HHMMSS>-<host>-<slug>.pdf` with `kind = "document"` in the sidecar, so the hub's document tools (plan 24.3–24.4) read them. (`[outputs] kinds` in `service.toml` says only `text`: the manifest doesn't accept `document` there yet.)
 - **Sidecar** `<file>.json`: `title`, `kind`, `url` (as asked), `final_url` (after redirects), `fetched_ts`, `fetched` (ISO time), `content_type`, `chars`, `published` and `site` when the page says, `source`.
 
 ## Fetch rules (`safety.py`)

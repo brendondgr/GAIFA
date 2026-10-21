@@ -313,7 +313,8 @@ class Handler(BaseHTTPRequestHandler):
             JOBS[jid] = {"id": jid, "label": b.get("label") or jid, "start": time.time(), "seconds": float(b.get("seconds") or 1)}
             return self.send(202, {"id": jid})
         if MODE == "perms" and url.path in ("/v1/search", "/v1/fetch", "/v1/python", "/v1/run"):
-            return self.send(200, {"ran": url.path.rsplit("/", 1)[1], "arguments": self.body()})
+            origin = json.loads(self.headers.get("X-AIHub-Origin") or "{}")
+            return self.send(200, {"ran": url.path.rsplit("/", 1)[1], "arguments": self.body(), "dry_run": bool(origin.get("dry_run"))})
         if MODE == "tools":
             if url.path == "/v1/images":
                 b = self.body()

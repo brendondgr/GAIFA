@@ -17,10 +17,11 @@ from typing import Literal
 
 import httpx
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+import fakeweb
 import pages
 import safety
 
@@ -82,6 +83,12 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
     state = {"searches": 0, "fetches": 0, "refused": 0, "busy": 0, "last_used": time.time(),
              "probe": (0.0, False, "not checked yet")}
     robots = safety.Robots()
+    fake: list[fakeweb.FakeWeb] = []          # loaded on the first dry run
+
+    def fake_web() -> fakeweb.FakeWeb:
+        if not fake:
+            fake.append(fakeweb.FakeWeb.load())
+        return fake[0]
     clients: dict[str, httpx.AsyncClient] = {}
 
     @asynccontextmanager
@@ -134,9 +141,11 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
 
     @app.post("/v1/search", summary="Search the web", response_model=SearchOut,
               responses={503: {"description": "SearXNG doesn't answer"}, 502: {"description": "SearXNG refused or failed"}})
-    async def search(body: SearchIn):
+    async def search(body: SearchIn, x_aihub_origin: str | None = Header(None, include_in_schema=False)):
         """Results come from SearXNG: title, URL, a snippet, the engine that found it, and the date when known."""
         used()
+        if fakeweb.is_dry_run(x_aihub_origin):   # the agent eval: the fake web, never the internet
+            return SearchOut(query=body.query, results=[SearchResult(**r) for r in fake_web().search(body.query, body.limit)])
         params = {"q": body.query, "format": "json", "pageno": 1}
         if body.categories:
             params["categories"] = ",".join(body.categories)
@@ -187,16 +196,23 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
               responses={403: {"description": "Not allowed: a local or private address, or robots.txt"},
                          413: {"description": "Over 10 MB"}, 415: {"description": "Not a page, text or PDF"},
                          502: {"description": "The site failed"}, 504: {"description": "Over 20 s"}})
-    async def fetch(body: FetchIn):
+    async def fetch(body: FetchIn, x_aihub_origin: str | None = Header(None, include_in_schema=False)):
         """The page becomes markdown (main content only), saved under the web mod's outputs with a
         sidecar (URL, title, fetch time). PDFs are saved as documents. Only public http(s) pages;
         robots.txt is honoured; 10 MB and 20 s at most."""
         used()
+        dry = fakeweb.is_dry_run(x_aihub_origin)
         state["busy"] += 1
         try:
-            f = await safety.fetch(clients["web"], robots, body.url.strip())
+            if dry:   # the agent eval: the fake web, never the internet
+                f = fake_web().fetch(body.url.strip())
+                if f is None:
+                    raise safety.Refused("http_error", f"{body.url} answered HTTP 404 (the fake web of a dry run has no such page)",
+                                         "fetch one of the search results", 502)
+            else:
+                f = await safety.fetch(clients["web"], robots, body.url.strip())
             page = await asyncio.to_thread(pages.convert, f, datetime.now().astimezone().isoformat(timespec="seconds"))
-            path = await asyncio.to_thread(pages.save, out_dir, page, body.url.strip(), f.url, f.content_type)
+            path = await asyncio.to_thread(pages.save, out_dir, page, body.url.strip(), f.url, f.content_type, dry)
         except safety.Refused as e:
             state["refused"] += 1
             return error(e.status, e.code, e.detail, e.fix)

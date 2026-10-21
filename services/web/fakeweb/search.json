@@ -1,0 +1,14 @@
+[
+  {"title": "Winter timetable 2026–27 · Kestrel Ferries", "url": "https://kestrel-ferries.example/timetables/winter-2026",
+   "snippet": "Sailings between Kestrel Point and Gull Island from 2 November 2026 to 28 March 2027, weekdays, Saturdays and Sundays.",
+   "engine": "fakeweb", "published": "2026-10-01", "keywords": ["kestrel", "ferry", "ferries", "timetable", "winter", "sunday", "first", "sailing"]},
+  {"title": "Summer timetable 2026 · Kestrel Ferries", "url": "https://kestrel-ferries.example/timetables/summer-2026",
+   "snippet": "Sailings from 30 March to 1 November 2026. Extra evening crossings in July and August.",
+   "engine": "fakeweb", "published": "2026-03-20", "keywords": ["kestrel", "ferry", "ferries", "timetable", "summer", "sunday"]},
+  {"title": "Ferry fares 2026/27 – Harbour Council", "url": "https://harbour-council.example/transport/ferry-fares",
+   "snippet": "Fares on the Kestrel Point – Gull Island ferry from 1 October 2026: adults, children, concessions, bicycles and cars.",
+   "engine": "fakeweb", "published": "2026-09-15", "keywords": ["kestrel", "ferry", "fare", "fares", "price", "ticket", "return", "bike", "bicycle", "cyclist", "cost"]},
+  {"title": "How much is the Gull Island ferry with a bike? – Islanders Forum", "url": "https://islanders-forum.example/t/ferry-bike-price",
+   "snippet": "Paid £10.50 return for me and my bike last spring…", "engine": "fakeweb", "published": "2025-05-02",
+   "keywords": ["ferry", "bike", "bicycle", "price", "return", "kestrel"]}
+]

@@ -7,10 +7,13 @@ only docs with a `summary`. Unknown keys are errors, at the top and inside `[[st
 from __future__ import annotations
 
 import posixpath
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
-TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest"}
+TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config"}
+CONFIG = {"key", "text", "choices", "required", "restart"}
+CONFIG_KEY = re.compile(r"^(services\.[a-z][a-z0-9-]{1,31}\.env\.[A-Z][A-Z0-9_]*|agent\.judge\.model)$")
 STEP = {"run", "what", "ask", "interactive"}
 SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated"}
 
@@ -41,6 +44,15 @@ class Suggest:
 
 
 @dataclass
+class Config:
+    key: str                        # services.<id>.env.<VAR>, or agent.judge.model, in config.toml
+    text: str                       # the question
+    choices: str | list[str] = "relay-models"   # the relay's models once it runs, or a fixed list
+    required: bool = False          # no answer stops the run; else it's left for later (the report says so)
+    restart: str = ""               # a mod id (or "hub") restarted once it's set
+
+
+@dataclass
 class Setup:
     summary: str = ""
     gpu: bool | None = None
@@ -51,6 +63,7 @@ class Setup:
     check: str = ""
     steps: list[Step] = field(default_factory=list)
     suggest: list[Suggest] = field(default_factory=list)
+    config: list[Config] = field(default_factory=list)   # values asked after install (choices come from it)
 
 
 def _strs(v: Any) -> bool:
@@ -127,6 +140,25 @@ def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:
                    licence=d.get("licence", "").strip(), required=d.get("required", False), gated=d.get("gated", False)), None
 
 
+def _config(i: int, d: Any) -> tuple[Config | None, str | None]:
+    where = f"config[{i}]"
+    if not isinstance(d, dict):
+        return None, f"{where} must be a table ([[config]])"
+    unknown = sorted(set(d) - CONFIG)
+    if unknown:
+        return None, f"{where}: unknown key(s) {', '.join(unknown)} (allowed: {', '.join(sorted(CONFIG))})"
+    if not isinstance(d.get("key"), str) or not CONFIG_KEY.match(d["key"]):
+        return None, f"{where}: `key` must be services.<id>.env.<VAR> or agent.judge.model"
+    if not isinstance(d.get("text"), str) or not d["text"].strip():
+        return None, f"{where}: `text` must be a non-empty question"
+    choices = d.get("choices", "relay-models")
+    if not (choices == "relay-models" or _strs(choices)):
+        return None, f"{where}: `choices` must be \"relay-models\" or a list of strings"
+    if not isinstance(d.get("required", False), bool) or not isinstance(d.get("restart", ""), str):
+        return None, f"{where}: `required` is true or false, `restart` a mod id or \"hub\""
+    return Config(key=d["key"], text=d["text"].strip(), choices=choices, required=d.get("required", False), restart=d.get("restart", "").strip()), None
+
+
 def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
     """The version-2 keys of an already-parsed block → (Setup, None) or (None, problem)."""
     out = Setup()
@@ -156,7 +188,7 @@ def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
         if not isinstance(data["check"], str) or not data["check"].strip():
             return None, "`check` must be a non-empty command"
         out.check = data["check"].strip()
-    for key, fn, into in (("steps", _step, out.steps), ("suggest", _suggest, out.suggest)):
+    for key, fn, into in (("steps", _step, out.steps), ("suggest", _suggest, out.suggest), ("config", _config, out.config)):
         v = data.get(key, [])
         if not isinstance(v, list):
             return None, f"`{key}` must be an array of tables ([[{key}]])"

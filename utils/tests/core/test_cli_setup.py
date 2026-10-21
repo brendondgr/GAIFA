@@ -89,7 +89,7 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def args(*targets: str, **kw: Any) -> Namespace:
-    base = dict(targets=list(targets), plan=False, json=True, yes=False, answers=None, accept=None, decline=None, done=None, models=None, from_scratch=False)
+    base = dict(targets=list(targets), plan=False, json=True, yes=False, answers=None, accept=None, decline=None, done=None, models=None, set=None, from_scratch=False)
     return Namespace(**{**base, **kw})
 
 
@@ -309,3 +309,99 @@ def test_the_plan_shows_the_hub_stage_expansion_and_shared_images(root: Path, ca
     p = out(capsys)
     assert p["expanded"] == {"tts": ["tts-breeze", "tts-kokoro"]} and p["disk_gb"] == 18.0     # 1 + 2 + the image once
     assert p["hub"][0].startswith("uv sync") and p["hub"][1].startswith("aihub install")
+
+
+# ---- values asked after install (plan 23.12) --------------------------------------------------
+
+from utils import cli_setup_config  # noqa: E402
+
+AGENT_CFG = '''[[config]]
+key = "services.agent.env.AGENT_MODEL"
+text = "Which model should Chat use?"
+required = true
+restart = "agent"
+
+[[config]]
+key = "agent.judge.model"
+text = "Which model should judge Auto mode?"
+restart = "hub"'''
+
+
+class RelayRunner(FakeRunner):
+    def __init__(self, models: list[str], **kw: Any) -> None:
+        super().__init__(**kw)
+        self.models = models
+
+    def call(self, method: str, path: str, body: Any = None) -> Any:
+        if path == "/api/s/relay/v1/models":
+            self.calls.append((method, path, body))
+            return {"data": [{"id": m} for m in self.models]}
+        return super().call(method, path, body)
+
+
+@pytest.fixture
+def agent_root(root: Path) -> Path:
+    doc = root / "services" / "agent" / "setup" / "env.md"
+    doc.write_text(AGENT.replace('what = "the venv"', 'what = "the venv"\n\n' + AGENT_CFG))
+    return root
+
+
+def test_a_required_value_stops_with_the_relays_models(agent_root: Path, capsys) -> None:
+    runner = RelayRunner(["gpt-4o", "qwen3-8b"])
+    assert cli_setup.cmd_setup(args("agent", yes=True), runner, FakeProbe()) == 2
+    r = out(capsys)
+    assert r["kind"] == "value" and r["id"] == "agent/config:services.agent.env.AGENT_MODEL" and r["choices"] == ["gpt-4o", "qwen3-8b"]
+    assert r["report"]["done"] == ["relay/1", "agent/1"]                # install first: the choices exist only then
+
+
+def test_set_writes_config_and_restarts(agent_root: Path, capsys) -> None:
+    runner = RelayRunner(["gpt-4o", "qwen3-8b"])
+    a = args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=qwen3-8b"])
+    assert cli_setup.cmd_setup(a, runner, FakeProbe()) == 0
+    r = out(capsys)
+    cfg = (agent_root / "config.toml").read_text()
+    assert '[services.agent.env]\nAGENT_MODEL = "qwen3-8b"' in cfg and cfg.startswith("[services]\norder")   # the rest kept
+    assert any(c == "aihub restart agent" for c, _, _ in runner.ran)
+    assert "agent/config:services.agent.env.AGENT_MODEL = qwen3-8b" in r["done"]
+    assert any("agent.judge.model" in n for n in r["next"])            # optional, left for later
+    assert {"setup": "agent", "run": "services.agent.env.AGENT_MODEL on the relay", "ok": True} in r["checks"]
+
+
+def test_a_value_the_relay_doesnt_serve_is_refused(agent_root: Path, capsys) -> None:
+    a = args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=skynet"])
+    assert cli_setup.cmd_setup(a, RelayRunner(["gpt-4o"]), FakeProbe()) == 1
+    r = out(capsys)
+    assert r["reason"] == "unknown-value" and r["choices"] == ["gpt-4o"]
+
+
+def test_a_hosted_provider_is_added_first(agent_root: Path, tmp_path: Path, capsys) -> None:
+    f = tmp_path / "a.json"
+    f.write_text(json.dumps({"yes": True, "providers": [{"name": "openai", "base_url": "https://api.openai.com/v1", "key": "sk-test", "models": ["gpt-4o"]}],
+                             "values": {"services.agent.env.AGENT_MODEL": "gpt-4o"}}))
+    runner = RelayRunner(["gpt-4o"])
+    assert cli_setup.cmd_setup(args("agent", answers=str(f)), runner, FakeProbe()) == 0
+    body = next(b for m, p, b in runner.calls if p == "/api/s/relay/admin/endpoints")
+    assert body == {"name": "openai", "base_url": "https://api.openai.com/v1", "protocol": "openai", "available_models": ["gpt-4o"], "upstream_key": "sk-test"}
+    assert "relay: provider openai" in out(capsys)["done"]
+
+
+def test_the_check_fails_when_the_model_is_gone(agent_root: Path, capsys) -> None:
+    a = args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=gpt-4o"])
+    assert cli_setup.cmd_setup(a, RelayRunner(["gpt-4o"]), FakeProbe()) == 0
+    capsys.readouterr()
+    cli_setup_config.verify([e for e in cli_setup.resolve(["agent"], cli_setup.choices(agent_root)[0], agent_root)], agent_root, RelayRunner([]), report := {"checks": [], "failed": []})
+    assert report["failed"][0]["step"] == "config:services.agent.env.AGENT_MODEL"
+
+
+def test_set_value_edits_in_place_and_refuses_what_it_cant(tmp_path: Path) -> None:
+    f = tmp_path / "config.toml"
+    f.write_text('# mine\n[services.agent.env]\nAGENT_MODEL = "old"   # a comment\nOTHER = "x"\n\n[hub]\nport = 7000\n')
+    cli_setup_config.set_value(f, "services.agent.env.AGENT_MODEL", "new")
+    assert f.read_text() == '# mine\n[services.agent.env]\nAGENT_MODEL = "new"\nOTHER = "x"\n\n[hub]\nport = 7000\n'
+    cli_setup_config.set_value(f, "agent.judge.model", "gemma")
+    assert f.read_text().endswith('[agent.judge]\nmodel = "gemma"\n')
+    g = tmp_path / "inline.toml"
+    g.write_text('[services.agent]\nenv = { AGENT_MODEL = "a" }\n')
+    with pytest.raises(cli_setup.Stop) as x:
+        cli_setup_config.set_value(g, "services.agent.env.AGENT_MODEL", "b")
+    assert "set it by hand" in x.value.data["output"] and g.read_text() == '[services.agent]\nenv = { AGENT_MODEL = "a" }\n'

@@ -16,7 +16,18 @@ what = "makes .venv/ from requirements-dev.txt (about 45 MB, seconds from uv's c
 
 [[steps]]
 run = "aihub start agent"
-what = "starts the agent on 127.0.0.1:5100; set AGENT_MODEL to one of your relay's models (Choosing models in its setup doc)"
+what = "starts the agent on 127.0.0.1:5100; after install, the wizard asks which of your relay's models it uses"
+
+[[config]]
+key = "services.agent.env.AGENT_MODEL"
+text = "Which model should Chat use? (one your relay serves; with no local LLM, add a hosted provider)"
+required = true
+restart = "agent"
+
+[[config]]
+key = "agent.judge.model"
+text = "Which model should judge Auto mode's actions? (a small, quick one is fine; without one, Auto mode asks about everything)"
+restart = "hub"
 -->
 
 # Chat agent: setup
@@ -62,7 +73,7 @@ aihub start agent
 
 ## Choosing models
 
-The agent runs no model and downloads none, so it has no suggestions. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
+The agent runs no model and downloads none, so it has no suggestions. `aihub setup` asks which model it uses once the relay and your LLM mods are installed (their models exist only then), offers to add a hosted provider when the relay has none, writes the answer to `config.toml`, and checks it's on the relay; an agent passes it with `--set "services.agent.env.AGENT_MODEL=<name>"`. The Auto judge's model (`[agent.judge] model`) is asked the same way, and can be skipped. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
 - **[llama.cpp](../../lcpp/setup/llama-cpp.md) (`lcpp`):** any GGUF you add; a running instance registers under its catalog nickname (`nicknames` in `services/lcpp/data/models.json`), or the alias given at launch. Its doc suggests two models that take tool calls.
 - **[vLLM](../../vllm/setup/vllm.md):** a loaded profile registers under its `alias` (such as `Qwen3-0.6B-vLLM`; the profiles are parked here).
 - **[OpenCode](../../opencode/setup/opencode.md):** `agent`, or a free hosted id such as `opencode/glm-5.3-flash-free`, with no GPU at all.
@@ -75,9 +86,12 @@ A model that is always up makes the better default; an lcpp nickname is listed o
 `service.toml` `[run.env]` sets every key. To change one on your machine, don't edit `service.toml`: put it in `config.toml`, which wins (architecture §4.4), and restart the mod:
 
 ```toml
-[services.agent]
-env = { AGENT_MODEL = "gemma4-26B", AGENT_FALLBACK_MODEL = "" }
+[services.agent.env]
+AGENT_MODEL = "gemma4-26B"
+AGENT_FALLBACK_MODEL = ""
 ```
+
+(This table form is the one `aihub setup` edits; it leaves an inline `env = { … }` alone and asks you to set it by hand.)
 
 | Key | Set to | Required | Meaning |
 |---|---|---|---|
@@ -126,5 +140,5 @@ Expect `225 passed` (2026-10-21, about a minute).
 
 ## Known gaps
 
-- `aihub install agent` doesn't check that `AGENT_MODEL` and `AGENT_FALLBACK_MODEL` exist on the relay; nothing warns until a chat fails.
+- `aihub install agent` alone doesn't check that `AGENT_MODEL` exists on the relay (`aihub setup` does, and asks for it); `AGENT_FALLBACK_MODEL` isn't asked or checked.
 - `requirements.txt` is unpinned.

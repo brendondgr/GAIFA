@@ -29,6 +29,7 @@ else:
 
 Stop, Answers, Runner = run_mod.Stop, run_mod.Answers, run_mod.Runner
 EXIT = """exit codes: 0 done (or a plan printed); 1 failed, stopped by the host, or unknown; 2 a question needs an answer, or an interactive step needs you.
+value questions (the agent's model) come after install, since their choices (the relay's models) exist only then.
 under --json stdout is one JSON object: {"stage": "plan" | "report" | "stopped" | "host" | "choose" | "hub", …};
 a stop has "reason" ("question", "interactive", "failed", "host", "unknown", "unknown-model", "cycle") and, for a question,
 "id", "kind" (yes-no or models), "choices" and "answer_with". A report has done, skipped, failed (each with its doc), checks, next.
@@ -122,6 +123,11 @@ def plan(envs: list[setupdocs.Env], checks: list[host_mod.Check], hub: list[str]
                 suggestions.append({"setup": e.id, "mod": e.mod, "name": s.name, "size_gb": s.size_gb, "good_for": s.good_for,
                                     "licence": s.licence or None, "required": s.required, "gated": s.gated,
                                     "source": s.repo or f"{e.mod} {s.op}"})
+        for c in e.setup.config:
+            qid = f"{e.id}/config:{c.key}"
+            questions.append({"id": qid, "kind": "value", "text": c.text, "required": c.required, "after_install": True,
+                              "choices": "the relay's models, once it runs" if c.choices == "relay-models" else list(c.choices),
+                              "answer_with": f'--set "{qid}=<value>"'})
     gpu = any(e.setup.gpu for e in envs)
     env_gb, req_gb, images = sizes(envs)
     return {"setups": [e.id for e in envs], "mods": sorted({e.mod for e in envs}), "expanded": expanded or {}, "gpu": gpu,
@@ -147,6 +153,9 @@ def plan_text(p: dict[str, Any]) -> str:
         out += ["", "Models (you choose; required ones are preselected):"]
         for s in p["suggestions"]:
             out.append(f"  {s['setup']:24} {s['name']} ({s['size_gb']:.2f} GB){' required' if s['required'] else ''}{' gated' if s['gated'] else ''}: {s['good_for']}")
+    values = [q for q in p["questions"] if q["kind"] == "value"]
+    if values:
+        out += ["", "After install, it asks (the choices exist only then):"] + [f"  {q['id']:24} {q['text']}{'' if q['required'] else ' (optional)'}" for q in values]
     if p["checks"]:
         out += ["", "Then each check: " + "; ".join(c["run"] for c in p["checks"])]
     bad = [c for c in p["host"] if not c["ok"]]
@@ -229,9 +238,10 @@ def add_parser(sub: Any) -> None:
     p.add_argument("--plan", action="store_true", help="print the plan (the hub, steps, questions, models, checks, host) and stop")
     p.add_argument("--json", action="store_true", help="one JSON result on stdout, progress on stderr; never prompts (for agents)")
     p.add_argument("--yes", action="store_true", help="accept the plan without asking")
-    p.add_argument("--answers", metavar="FILE", help='answers as JSON: {"yes": true, "accept": [ids], "decline": [ids], "done": [ids], "models": {"<setup or mod id>": [names]}}')
+    p.add_argument("--answers", metavar="FILE", help='answers as JSON: {"yes": true, "accept": [ids], "decline": [ids], "done": [ids], "models": {"<setup or mod id>": [names]}, "values": {"<id or key>": "value"}, "providers": [{"name", "base_url", "key", "models": [names]}]}')
     p.add_argument("--accept", action="append", metavar="ID", help="answer yes to a question (repeatable)")
     p.add_argument("--decline", action="append", metavar="ID", help="answer no: that setup, and what needs it, is skipped (repeatable)")
     p.add_argument("--models", action="append", metavar="ID=NAMES", help="models for a setup (or each setup of a mod): names comma-separated, or none (repeatable)")
     p.add_argument("--done", action="append", metavar="ID", help="an interactive step you ran yourself (repeatable)")
+    p.add_argument("--set", action="append", metavar="ID=VALUE", help="a value question's answer, by its id or config key, e.g. agent/config:services.agent.env.AGENT_MODEL=gpt-4o (repeatable)")
     p.add_argument("--from-scratch", action="store_true", help="forget which steps a previous run finished")

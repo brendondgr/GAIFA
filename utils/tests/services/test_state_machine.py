@@ -227,6 +227,17 @@ async def test_autostart_respects_enabled_autostart_and_after(rig):
     assert mgr.get("manual").state == "ready"
 
 
+async def test_a_mod_that_isnt_installed_isnt_autostarted(rig):
+    rig.add("fake-ok", as_id="fresh", edit={"command": '[".venv/bin/python", "server.py"]'})   # no .venv yet
+    rig.add("fake-ok", as_id="ready-one")
+    mgr = await rig.manager(autostart=True)
+    await until(lambda: mgr.get("ready-one").state == "ready")
+    await asyncio.sleep(0.2)
+    fresh = mgr.get("fresh")
+    assert fresh.state == "stopped" and fresh.last_error == "not installed: run `aihub setup fresh`"
+    assert mgr.installed(fresh) is False and mgr.installed(mgr.get("ready-one")) is True
+
+
 async def test_port_conflict_names_the_holder(rig):
     rig.add("fake-ok")
     mgr = await rig.manager()

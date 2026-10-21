@@ -17,6 +17,7 @@ happened.
 from __future__ import annotations
 
 import asyncio
+import shutil
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -229,6 +230,18 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
             await self.backend.stop(svc.id, svc.m.run.stop_timeout_s if svc.m else 30)
         except BackendError as e:
             log.warning("stop %s: %s", svc.id, e)
+
+    def installed(self, svc: Service) -> bool:
+        """The mod's command exists (its venv, binary or script): it has been set up (plan 23.12).
+        Only the first word is checked, so `bash run.sh` counts as installed."""
+        argv = self._command(svc)
+        if svc.external or not argv:
+            return True
+        exe = argv[0]
+        if "/" in exe:
+            p = Path(exe)
+            return (p if p.is_absolute() else svc.mod.dir / p).exists()
+        return shutil.which(exe) is not None
 
     def _command(self, svc: Service) -> list[str]:
         try:

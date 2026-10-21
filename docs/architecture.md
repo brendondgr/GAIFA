@@ -223,7 +223,7 @@ skills = "skills"                   # optional: skills/<name>/SKILL.md for the a
 - Operations (`[memory]`, `[[ui.widgets]].source`, `[tools]`, `[api.responses]` keys) are written `"METHOD /path"`.
 - `[ui].page` must be inside the mod's `ui/` folder, and so must `[ui].logo` (an `.svg`, `.png` or `.webp`). The summary's `logo_url` is `/ui/services/<id>/<file>`, or null when the file is missing.
 - Two mods can't share a port, and no mod may use the hub's port.
-- Mods not mentioned in `config.toml` are enabled and autostart.
+- Mods not mentioned in `config.toml` are enabled and autostart, once they're installed: a mod whose command doesn't exist yet (no venv, binary or script) isn't autostarted and shows `not installed: run aihub setup <id>` as its last error (plan 23.12).
 
 ### 4.4 Placeholders and environment
 

@@ -196,6 +196,10 @@ class DiscoveryMixin(_Base):
             svc = self.services[mod.id]
             if not (svc.startable and svc.eff.enabled and svc.eff.autostart) or svc.external or svc.state != "stopped":
                 continue
+            if not self.installed(svc):   # a fresh clone: nothing to start until it's set up (plan 23.12)
+                svc.last_error = f"not installed: run `aihub setup {svc.id}`"
+                log.info("autostart %s: not installed", svc.id)
+                continue
             deps = [tasks[d] for d in (svc.m.run.after if svc.m else []) if d in tasks]
             tasks[svc.id] = asyncio.create_task(self._start_after(svc, deps))
         await asyncio.gather(*tasks.values(), return_exceptions=True)

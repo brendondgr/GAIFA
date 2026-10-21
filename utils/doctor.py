@@ -150,11 +150,18 @@ async def _ports_units(hub: Any) -> list[dict[str, Any]]:
             out.append(check("units", "fail", f"{s.id}: failed", s.last_error or "", f"aihub logs {s.id}"))
         elif s.state == "degraded":
             out.append(check("units", "warn", f"{s.id}: degraded (health checks failing)", s.last_error or "", f"aihub logs {s.id}"))
+        elif s.state == "stopped" and s.eff.enabled and s.eff.autostart and s.startable and not _installed(hub, s):
+            out.append(check("units", "note", f"{s.id}: not installed", "it starts with the hub once it's set up", f"aihub setup {s.id}"))
         elif s.state == "stopped" and s.eff.enabled and s.eff.autostart and s.startable:
             out.append(check("units", "warn", f"{s.id}: stopped, but set to start with the hub", "", f"aihub start {s.id}"))
         else:
             out.append(check("units", "ok", f"{s.id}: {s.state}"))
     return out
+
+
+def _installed(hub: Any, s: Any) -> bool:
+    mgr = getattr(hub, "services", None)
+    return mgr.installed(s) if mgr is not None and hasattr(mgr, "installed") else True
 
 
 def _disk(hub: Any) -> list[dict[str, Any]]:

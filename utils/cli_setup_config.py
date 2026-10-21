@@ -1,0 +1,164 @@
+"""`aihub setup`'s values (plan 23.12): settings a setup doc asks for once its mods are installed, such
+as the agent's model, whose choices only exist then (the relay's models). Hosted providers become
+relay endpoints first. Values go into config.toml with a text edit (standard library only), checked
+by parsing the result. Asked after install and models, before the checks."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import tomllib
+from pathlib import Path
+from typing import Any
+
+if __package__:
+    from utils.cli_setup_run import Answers, Runner, Stop, doc_of, interactive, say
+else:
+    from cli_setup_run import Answers, Runner, Stop, doc_of, interactive, say  # type: ignore[no-redef]
+
+
+def relay_models(runner: Runner, root: Path) -> list[str]:
+    """The model names the relay serves now (starting it first if it isn't running)."""
+    for attempt in (0, 1):
+        try:
+            data = runner.call("GET", "/api/s/relay/v1/models") or {}
+            return sorted({str(m.get("id")) for m in data.get("data", []) if m.get("id")})
+        except Exception:  # noqa: BLE001: not running yet
+            if attempt == 0:
+                runner.run("aihub start relay", root, stream=False)
+    return []
+
+
+def add_provider(runner: Runner, p: dict[str, Any]) -> str:
+    """A hosted provider (an OpenAI-compatible API) as a relay endpoint: services/relay/setup/relay.md."""
+    body = {"name": p["name"], "base_url": p["base_url"], "protocol": "openai", "available_models": list(p.get("models", []))}
+    if p.get("key"):
+        body["upstream_key"] = p["key"]
+    try:
+        runner.call("POST", "/api/s/relay/admin/endpoints", body)
+    except Exception as x:  # noqa: BLE001
+        raise Stop("failed", output=f"adding the provider {p['name']!r} to the relay: {getattr(x, 'detail', x)}") from None
+    return p["name"]
+
+
+def _table_and_key(key: str) -> tuple[str, str]:
+    if key == "agent.judge.model":
+        return "agent.judge", "model"
+    _, mod, _, var = key.split(".", 3)
+    return f"services.{mod}.env", var
+
+
+def set_value(path: Path, key: str, value: str) -> None:
+    """Set one value in config.toml, keeping everything else as it is; the result must parse."""
+    table, k = _table_and_key(key)
+    text = path.read_text() if path.exists() else ""
+    line = f"{k} = {json.dumps(value)}"
+    lines = text.splitlines()
+    head = next((i for i, x in enumerate(lines) if x.strip() == f"[{table}]"), None)
+    if head is None:
+        new = text.rstrip("\n") + ("\n\n" if text.strip() else "") + f"[{table}]\n{line}\n"
+    else:
+        end = next((i for i in range(head + 1, len(lines)) if lines[i].lstrip().startswith("[")), len(lines))
+        at = next((i for i in range(head + 1, end) if re.match(rf"^\s*{re.escape(k)}\s*=", lines[i])), None)
+        if at is None:
+            lines.insert(head + 1, line)
+        else:
+            lines[at] = line
+        new = "\n".join(lines) + "\n"
+    try:
+        data = tomllib.loads(new)
+    except tomllib.TOMLDecodeError as e:
+        raise Stop("failed", output=f"config.toml: setting {key} would make it invalid ({e}); set it by hand") from None
+    cur: Any = data
+    for part in key.split("."):
+        cur = cur.get(part) if isinstance(cur, dict) else None
+    if cur != value:
+        raise Stop("failed", output=f"config.toml: {key} is set another way (an inline table?); set it by hand")
+    tmp = path.with_suffix(".toml.tmp")
+    tmp.write_text(new)
+    tmp.replace(path)
+
+
+def get_value(path: Path, key: str) -> str | None:
+    try:
+        cur: Any = tomllib.loads(path.read_text())
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    for part in key.split("."):
+        cur = cur.get(part) if isinstance(cur, dict) else None
+    return cur if isinstance(cur, str) else None
+
+
+def _prompt(e: Any, c: Any, choices: list[str], runner: Runner) -> str | None:
+    print(f"\n{c.text}" + ("" if c.required else " (optional)"))
+    for i, m in enumerate(choices, 1):
+        print(f"  {i}. {m}")
+    if c.choices == "relay-models":
+        print("  h. add a hosted provider (an OpenAI-compatible API: its URL, key and model names)")
+    while True:
+        pick = input("Number" + (", h" if c.choices == "relay-models" else "") + ("" if c.required else ", or Enter to skip") + ": ").strip()
+        if not pick and not c.required:
+            return None
+        if pick == "h" and c.choices == "relay-models":
+            name = add_provider(runner, {"name": input("  a name for it: ").strip(), "base_url": input("  base URL (e.g. https://api.openai.com/v1): ").strip(),
+                                         "key": input("  API key: ").strip(), "models": [m.strip() for m in input("  model names, comma-separated: ").split(",") if m.strip()]})
+            print(f"  added {name}")
+            return ""   # ask again with the new models
+        if pick.isdigit() and 0 < int(pick) <= len(choices):
+            return choices[int(pick) - 1]
+
+
+def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Path, runner: Runner, report: dict[str, Any], state: dict[str, Any]) -> None:
+    """Providers first, then every [[config]] value of the chosen setups."""
+    state.setdefault("config", {})
+    state.setdefault("providers", [])
+    for p in answers.providers:
+        if p.get("name") not in state["providers"]:
+            say(args, f"\n==> relay: adding the provider {p.get('name')}")
+            state["providers"].append(add_provider(runner, p))
+            report["done"].append(f"relay: provider {p.get('name')}")
+    cfg = root / "config.toml"
+    for e in live:
+        for c in e.setup.config:
+            qid = f"{e.id}/config:{c.key}"
+            value = answers.values.get(qid, answers.values.get(c.key))
+            while True:
+                choices = relay_models(runner, root) if c.choices == "relay-models" else list(c.choices)
+                if value is None and interactive(args):
+                    value = _prompt(e, c, choices, runner)
+                    if value == "":
+                        value = None
+                        continue
+                break
+            if value is None:
+                if c.required:
+                    raise Stop("question", id=qid, kind="value", text=c.text, choices=choices,
+                               answer_with=f'--set "{qid}=<value>"' + ("; to add a hosted provider first: \"providers\" in --answers (services/relay/setup/relay.md)" if c.choices == "relay-models" else ""))
+                report["next"].append(f"{qid}: not set ({c.text}); later: --set \"{qid}=<value>\", or Settings")
+                continue
+            if choices and value not in choices:
+                raise Stop("unknown-value", id=qid, value=value, choices=choices, doc=doc_of(e, root))
+            if state["config"].get(qid) == value and get_value(cfg, c.key) == value:
+                report["skipped"].append(f"{qid}: already {value}")
+                continue
+            set_value(cfg, c.key, value)
+            if c.restart:
+                runner.run("aihub restart" if c.restart == "hub" else f"aihub restart {c.restart}", root, stream=False)
+            state["config"][qid] = value
+            report["done"].append(f"{qid} = {value}")
+
+
+def verify(live: list[Any], root: Path, runner: Runner, report: dict[str, Any]) -> None:
+    """After the checks: a value chosen from the relay's models must still be one of them."""
+    models: list[str] | None = None
+    for e in live:
+        for c in e.setup.config:
+            value = get_value(root / "config.toml", c.key)
+            if c.choices != "relay-models" or value is None:
+                continue
+            models = relay_models(runner, root) if models is None else models
+            ok = value in models
+            report["checks"].append({"setup": e.id, "run": f"{c.key} on the relay", "ok": ok})
+            if not ok:
+                report["failed"].append({"setup": e.id, "step": f"config:{c.key}", "output": f"{value!r} isn't a model the relay serves ({', '.join(models) or 'none'})", "doc": doc_of(e, root)})

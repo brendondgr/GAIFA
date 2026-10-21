@@ -34,6 +34,8 @@ class Answers:
     decline: set[str] = field(default_factory=set)             # … answered no: that setup (and what needs it) is skipped
     done: set[str] = field(default_factory=set)                # interactive steps the person ran themselves
     models: dict[str, list[str]] = field(default_factory=dict)  # setup or mod id → suggestion names; [] = none
+    values: dict[str, str] = field(default_factory=dict)       # a [[config]] question id (or its key) → value
+    providers: list[dict[str, Any]] = field(default_factory=list)  # hosted providers to add to the relay first
     yes: bool = False                                          # the plan is accepted
 
 
@@ -83,10 +85,15 @@ def read_answers(args: argparse.Namespace) -> Answers:
         a.decline |= set(data.get("decline", []))
         a.done |= set(data.get("done", []))
         a.models.update({k: list(v) for k, v in data.get("models", {}).items()})
+        a.values.update({k: str(v) for k, v in data.get("values", {}).items()})
+        a.providers += list(data.get("providers", []))
         a.yes = a.yes or bool(data.get("yes"))
     a.accept |= set(getattr(args, "accept", None) or [])
     a.decline |= set(getattr(args, "decline", None) or [])
     a.done |= set(getattr(args, "done", None) or [])
+    for spec in getattr(args, "set", None) or []:
+        key, _, value = spec.partition("=")
+        a.values[key.strip()] = value.strip()
     for spec in args.models or []:
         key, _, names = spec.partition("=")
         a.models[key.strip()] = [n.strip() for n in names.split(",") if n.strip() and n.strip() != "none"]
@@ -340,6 +347,18 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             state["models"][key] = "done"
             save_state(root, state)
             report["done"].append(key)
+    if __package__:
+        from utils import cli_setup_config as config_mod
+    else:
+        import cli_setup_config as config_mod  # type: ignore[no-redef]
+    try:
+        config_mod.phase(live, args, answers, root, runner, report, state)
+    except Stop as x:
+        save_state(root, state)
+        if x.reason == "failed":
+            raise fail({"setup": "config", "step": "config", "output": x.data.get("output", ""), "doc": "docs/setup/README.md"}) from None
+        raise Stop(x.reason, **x.data, report=report) from None
+    save_state(root, state)
     for c in p["checks"]:
         e = by_id[c["setup"]]
         if e.id in skip:
@@ -348,6 +367,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         report["checks"].append({"setup": e.id, "run": c["run"], "ok": rc == 0, **({"output": out} if rc else {})})
         if rc:
             report["failed"].append({"setup": e.id, "step": "check", "run": c["run"], "output": out, "doc": doc_of(e, root)})
+    config_mod.verify(live, root, runner, report)
     if report["failed"]:
         report["next"].append("open each failure's doc (What to look for, Known gaps), fix it, and run aihub setup again: it resumes")
     save_state(root, state)

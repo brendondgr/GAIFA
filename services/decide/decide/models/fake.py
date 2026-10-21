@@ -2,7 +2,8 @@
 
 yes/no: "yes" when the input contains the question's `yes_if` word (tests put it in the question as
 `[yes_if: word]`), else 0.1. choice: the first option named in the input gets 0.8. score: the level named in
-the input gets 0.7. A question containing "[too long]" is answered `max_length_exceeded`.
+the input gets 0.7. A question containing "[too long]" is answered `max_length_exceeded`; an input containing
+"[gpu error]" raises the RuntimeError a GPU library would.
 """
 
 from __future__ import annotations
@@ -54,6 +55,8 @@ class FakeModel:
             videos: list[tuple[str, bytes]] | None = None) -> dict[str, Any]:
         assert self.loaded, "ask while unloaded"
         text = str(state).lower()
+        if "[gpu error]" in text:
+            raise RuntimeError("miopenStatusUnknownError")
         FakeModel.calls.append({"state": state, "questions": questions, "images": len(images or []),
                                 "batches": -(-len(questions) // self.batch_size)})
         out: dict[str, Any] = {}

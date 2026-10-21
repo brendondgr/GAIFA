@@ -194,8 +194,10 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
         if isinstance(e, FileNotFoundError):
             return _err(503, str(e), "no_weights", fix="run services/decide/install.sh")
         log.error("%s", e)
-        return _err(503, str(e), "worker_died",
-                    fix="call again (it starts a new worker); if it repeats, read `aihub logs decide`")
+        if isinstance(e, WorkerDied):
+            return _err(503, str(e), "worker_died",
+                        fix="call again (it starts a new worker); if it repeats, read `aihub logs decide`")
+        return _err(503, str(e), "model_error", fix="the model failed on this input; read `aihub logs decide`")
 
     @app.post("/v1/load", summary="Load a decision model")
     async def load(body: LoadRequest | None = None) -> Any:

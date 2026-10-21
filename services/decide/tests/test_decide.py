@@ -63,6 +63,12 @@ def test_one_question_failing_leaves_the_rest(client):
     assert a["ok"]["top"] == "yes"
 
 
+def test_a_model_error_is_not_a_dead_worker(client):
+    r = ask(client, [{"id": "q", "type": "yesno", "question": "tests? [yes_if: tests]"}], input="[gpu error] tests")
+    assert r.status_code == 503 and r.json()["code"] == "model_error" and r.json()["fix"], r.text
+    assert ask(client, [{"id": "q", "type": "yesno", "question": "tests? [yes_if: tests]"}]).status_code == 200
+
+
 def test_validation(client):
     bad = [
         [{"id": "c", "type": "choice", "question": "x", "options": ["only one"]}],

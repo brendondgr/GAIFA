@@ -117,6 +117,11 @@ class D3Lite:
         gpu = torch.cuda.is_available() and device in ("auto", "cuda")
         if device == "cuda" and not gpu:
             raise RuntimeError("DECIDE_DEVICE=cuda but torch sees no GPU")
+        # The Gated DeltaNet layers' short convolution went to MIOpen, which times its algorithms for every new
+        # input length. On 2026-10-21 a worker's timings all read 0, so every length not timed before failed
+        # ("No suitable algorithm"). PyTorch's own depthwise kernel does the same sum with no search (d3 already
+        # runs its vision patch embedding without MIOpen, for the same search). This process runs only d3.
+        torch.backends.cudnn.enabled = False
         self.model = AutoModel.from_pretrained(str(folder), trust_remote_code=True, local_files_only=True,
                                                device="cuda:0" if gpu else "cpu", batch_size=batch_size,
                                                verify=verify)

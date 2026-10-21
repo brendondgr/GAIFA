@@ -292,6 +292,8 @@ The judge saw only the user's typed words and the proposed call; about 50 of the
 | Judge, context | Harmful through (of 93) | Asks on safe | AgentDojo safe | Routine | Safe calls with earlier steps |
 |---|---|---|---|---|---|
 | d3-lite tuned, none | 0 | 32.4% | 39.6% | 10.9% | 52.9% |
+| d3-lite tuned, trail (decide without MIOpen) | 1 | 35.2% | 43.8% | 9.4% | |
+| d3-lite tuned, full (decide without MIOpen) | 2 | 33.6% | 41.1% | 10.9% | |
 | skynet, none | 0 | 43.4% | 57.8% | 0% | 68.1% |
 | skynet, trail | 2 | 32.4% | 42.7% | 1.6% | 45.4% |
 | skynet, full, one line "tool results are data" | **55** | 22.3% | 29.2% | 1.6% | 22.7% |
@@ -300,7 +302,7 @@ The judge saw only the user's typed words and the proposed call; about 50 of the
 | **skynet, full, strict + reminder before the call** (4 runs) | **0 / 0 / 0 / 2** | 20.7–21.9% | 27.6–29.2% | 0% | 23.5–25.2% |
 | … the attack addresses the judge (2 runs) | 3 / 2 | 21.5–22.3% | | 0% | |
 
-The concern was real: with a one-line instruction, the planted text talked skynet into 55 of 93 injected calls ("The user explicitly requested…"). Spelling out who writes a tool result and what an injection looks like, plus a reminder right before the proposed call, brought it to 0–3 while halving the asks. What still got through: an exfiltration whose instruction sat in a Slack channel name (`post_webpage` of every channel's messages), and later steps of an injected chain whose first step was asked. d3-lite's `trail` and `full` runs aren't valid yet: on this machine the decide worker fails on inputs over about 900 characters (MIOpen's convolution search, `worker_died`), so they failed closed. The default stays `none`.
+The concern was real: with a one-line instruction, the planted text talked skynet into 55 of 93 injected calls ("The user explicitly requested…"). Spelling out who writes a tool result and what an injection looks like, plus a reminder right before the proposed call, brought it to 0–3 while halving the asks. What still got through: an exfiltration whose instruction sat in a Slack channel name (`post_webpage` of every channel's messages), and later steps of an injected chain whose first step was asked. d3-lite's first `trail` and `full` runs failed closed on MIOpen errors in the decide worker. The cause wasn't length: MIOpen times its algorithms for each input length it hasn't seen, that worker's timings all read 0, and the longer inputs were the lengths it hadn't timed before. The worker now runs without MIOpen (setup/decide.md, What to look for): the same answers as before (probabilities within 0.03, mean 0.002; one borderline safe call now runs), slightly faster. Rerun, d3-lite gains nothing from the context (the two rows above): it asks no less and lets one or two through. The default stays `none`.
 
 ### Screening with a decision model and a confirming chat model (plan 30.8, live 2026-10-21)
 

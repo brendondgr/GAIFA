@@ -5,7 +5,7 @@ import pytest
 from utils import config
 from utils.config import Config, ConfigError
 
-ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config.toml"
+ROOT_CONFIG = Path(__file__).resolve().parents[3] / "config.example.toml"   # the shipped defaults (plan 23.11)
 
 
 def test_missing_file_gives_defaults(tmp_path):
@@ -14,6 +14,21 @@ def test_missing_file_gives_defaults(tmp_path):
     assert cfg.hub.port == 7000 and cfg.hub.host == "127.0.0.1"
     assert cfg.memory.never_unload == ["lcpp"]
     assert cfg.ports.new_mods == (5100, 5199)
+
+
+def test_a_missing_config_is_made_from_the_example(tmp_path):
+    (tmp_path / "config.example.toml").write_text(ROOT_CONFIG.read_text())
+    cfg = config.load(tmp_path / "config.toml")
+    assert (tmp_path / "config.toml").read_text() == ROOT_CONFIG.read_text()
+    assert cfg.services.overrides["tts"].idle_unload_s == 180
+    (tmp_path / "config.toml").write_text('[hub]\nport = 7100\n')
+    assert config.load(tmp_path / "config.toml").hub.port == 7100        # an existing one is never replaced
+
+
+def test_the_example_is_neutral():
+    cfg = config.load(ROOT_CONFIG)
+    assert not any(ov.autostart for ov in cfg.services.overrides.values())   # nothing starts that a person didn't set up
+    assert "judge" not in ROOT_CONFIG.read_text().split("# The Auto judge")[0]
 
 
 def test_shipped_config_is_valid():
@@ -69,15 +84,15 @@ def test_save_round_trip_keeps_comments_and_order(tmp_path):
     f = tmp_path / "config.toml"
     original = ROOT_CONFIG.read_text()
     f.write_text(original)
-    cfg = config.save(f, {"memory": {"reserve_gb": 16}, "services": {"tts": {"autostart": False}}})
+    cfg = config.save(f, {"memory": {"reserve_gb": 16}, "services": {"tts": {"idle_unload_s": 300}}})
     assert cfg.memory.reserve_gb == 16
-    assert cfg.services.overrides["tts"].autostart is False
+    assert cfg.services.overrides["tts"].idle_unload_s == 300
     text = f.read_text()
     assert "# loopback only; anything else is refused at startup" in text
     assert "reserve_gb = 16" in text
     # Only the changed lines differ.
     diff = [(a, b) for a, b in zip(original.splitlines(), text.splitlines()) if a != b]
-    assert diff == [("reserve_gb = 12", "reserve_gb = 16"), ("autostart = true", "autostart = false")]
+    assert diff == [("reserve_gb = 12", "reserve_gb = 16"), ("idle_unload_s = 180", "idle_unload_s = 300")]
 
 
 def test_save_adds_new_tables(tmp_path):

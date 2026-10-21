@@ -321,8 +321,20 @@ def validate(data: dict[str, Any], source: str = "config.toml") -> Config:
         raise ConfigError(_describe(e, source)) from None
 
 
+EXAMPLE = "config.example.toml"   # tracked: the defaults; config.toml itself is each machine's own (plan 23.11)
+
+
+def ensure(path: Path) -> None:
+    """A fresh clone has no config.toml: copy it from the tracked example next to it, once."""
+    example = path.with_name(EXAMPLE)
+    if not path.exists() and example.is_file():
+        write_atomic(path, example.read_text())
+
+
 def load(path: Path) -> Config:
-    """Read and validate `path`. A missing file gives the defaults."""
+    """Read and validate `path`, made from config.example.toml first when it's missing. With
+    neither file, the defaults."""
+    ensure(path)
     if not path.exists():
         return Config()
     try:

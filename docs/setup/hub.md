@@ -63,7 +63,7 @@ followed by the checks over every mod and model (`aihub doctor -v` lists the one
 
 ## Configuration
 
-`config.toml` at the root holds the hub's settings; the Settings page edits it and keeps its comments. The defaults work. The ones you may change on a new machine:
+`config.toml` at the root holds the hub's settings. It's yours and not in git: the first `aihub` command copies it from `config.example.toml`, the defaults every clone starts from. The Settings page edits it and keeps its comments. The defaults work. The ones you may change on a new machine:
 
 | Setting | Default | Change it when |
 |---|---|---|

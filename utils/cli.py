@@ -549,7 +549,18 @@ def parser() -> argparse.ArgumentParser:
     return ap
 
 
+def ensure_config() -> None:
+    """A fresh clone's first command: config.toml from config.example.toml (plan 23.11), as the hub does."""
+    cfg, example = ROOT / "config.toml", CODE / "config.example.toml"
+    if not cfg.exists() and example.is_file():
+        try:
+            shutil.copyfile(example, cfg)
+        except OSError:
+            pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    ensure_config()
     args = parser().parse_args(argv)
     try:
         return args.fn(args)

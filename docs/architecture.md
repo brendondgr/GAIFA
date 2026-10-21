@@ -495,6 +495,8 @@ One GPU slot (`utils/gpu.py`, `[gpu] queue = true`, `lease_ttl_s = 60`). A mod w
 
 ## 9. `config.toml`
 
+`config.toml` is each machine's own and not in git: on the first `aihub` command or hub start it's copied from the tracked `config.example.toml`, which holds the defaults a fresh clone starts from (no autostarts, no judge model; plan 23.11). With neither file, the code's defaults apply.
+
 Sizes in GB (`reserve_gb`, a manifest's `estimate_gb`, a status's `memory_estimate_gb`) are decimal: 1 GB = 10⁹ bytes, as the UI and `aihub` show them.
 
 ```toml

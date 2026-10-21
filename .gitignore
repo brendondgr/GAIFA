@@ -2,7 +2,6 @@
 __pycache__/
 .pytest_cache/
 /data/models/*
-!/data/models/registry.json
 !/data/models/.gitkeep
 /data/databases/*
 !/data/databases/.gitkeep
@@ -18,3 +17,7 @@ __pycache__/
 /data/agent/
 /data/logs/
 /data/state/
+
+# Each machine's own state (plan 23.11): config.toml is made from config.example.toml on first run;
+# the models registry (data/models/registry.json) is covered by /data/models/* above.
+/config.toml

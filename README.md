@@ -161,7 +161,7 @@ file is in [docs/structure.md](docs/structure.md).
 
 ## Configuration
 
-Settings live in `config.toml` at the repository root (the Settings page edits it and keeps its
+Settings live in `config.toml` at the repository root, made from `config.example.toml` on the first run and not in git (the Settings page edits it and keeps its
 comments). The main ones:
 
 | Setting | Default | Meaning |

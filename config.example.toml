@@ -1,5 +1,7 @@
-# AIHub settings. Each mod ships defaults in services/<id>/service.toml; values here override them.
-# The Settings page edits this file and keeps comments. A missing file means the defaults below.
+# AIHub settings: the defaults a fresh clone starts from. On the first `aihub` command (or hub start)
+# this file is copied to config.toml, which is yours: it isn't in git, and the Settings page edits it
+# and keeps its comments. Each mod ships its own defaults in services/<id>/service.toml; values in
+# config.toml override them. Change defaults for everyone here, your own settings in config.toml.
 
 [hub]
 host = "127.0.0.1"          # loopback only; anything else is refused at startup
@@ -28,28 +30,17 @@ density = "compact"         # or "comfortable"
 order = ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode"]
 
 [services.tts]
-enabled = true
-autostart = true
 idle_unload_s = 180
 
 [services.gen3d]
-enabled = true
-autostart = true
 idle_unload_s = 600
 
-[services.comfy]
-enabled = true
-autostart = false
-
-[services.vllm]
-enabled = true
-autostart = false              # parked 2026-10-20: its models were deleted; services/vllm/profiles/.parked.json lists the profiles skipped here
-
 [docs]
-regenerate = false             # plan 23.6: true keeps this machine's model inventory (data/state/setup/models/, local) current as the registry changes
-
-[agent.judge]
-model = "gemma4-26B"
+regenerate = false          # true keeps this machine's model inventory (data/state/setup/models/, local) current as the registry changes
 
 [agent.screen]
 window_chars = 6000
+
+# The Auto judge's model, a name your relay serves (`aihub setup` asks; Settings → Agent):
+# [agent.judge]
+# model = ""

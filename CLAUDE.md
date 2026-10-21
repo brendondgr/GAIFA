@@ -8,7 +8,8 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 
 ## Layout
 - `utils/`: hub code (Python package) · `services/`: mods · `web/`: the UI (Claude Design `.dc.html` format; revision 2 built here, see `web/PATCHES.md`)
-- `data/models/` (only `registry.json` is tracked) · `data/databases/` · `outputs/<mod>/<date>/`
+- `data/models/` (nothing in it is tracked: the registry is each machine's own) · `data/databases/` · `outputs/<mod>/<date>/`
+- `config.toml` is this machine's (gitignored), made from the tracked `config.example.toml` on first run: change defaults for everyone in the example, your own settings in `config.toml`. The same for `services/lcpp/data/models.json` (plan 23.11).
 - `docs/`: architecture, plan, UI brief, `reference/` UI exports
 
 ## Commands

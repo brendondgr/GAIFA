@@ -11,6 +11,7 @@ dependencies = [
     "tomlkit",
     "watchfiles",
     "pillow",
+    "huggingface-hub>=2.2,<3",
     "websockets",           # the proxy passes mod WebSockets through (plan 29.2)
     "pypdfium2>=5.14.0",
 ]

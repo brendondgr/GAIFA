@@ -70,6 +70,25 @@ ensure_container() {
   ctr_running || { echo "[comfyui] Starting toolbox container ..."; podman start "$TOOLBOX" >/dev/null; }
 }
 
+# A wedged container (seen 2026-10-10 and 2026-10-21): podman says it's Up, but `podman exec` fails with
+# "crun: the container … is not running" (conmon lost track of it), so nothing can be started or stopped inside
+# it. Recovery: stop ComfyUI's process from the host if it still serves (its PID file holds the container-side
+# PID, useless here), then stop and start the container. Returns non-zero if exec still fails after that.
+host_comfy_pids() { ps -eo pid=,comm=,args= | awk -v p="--port $PORT" '$2 ~ /^python/ && index($0, "main.py --listen") && index($0, p) {print $1}'; }
+ensure_exec() {
+  ctr_running || return 0
+  podman exec "$TOOLBOX" true >/dev/null 2>&1 && return 0
+  echo "[comfyui] The toolbox container is wedged (podman exec fails while it reports running); restarting it ..."
+  local p; for p in $(host_comfy_pids); do kill "$p" 2>/dev/null || true; done
+  for _ in $(seq 1 20); do [ -z "$(host_comfy_pids)" ] && break; sleep 0.5; done
+  for p in $(host_comfy_pids); do kill -9 "$p" 2>/dev/null || true; done
+  rm -f "$PIDFILE"
+  podman stop -t 10 "$TOOLBOX" >/dev/null 2>&1 || true      # may report "conmon exited prematurely": it's stopped anyway
+  podman start "$TOOLBOX" >/dev/null 2>&1 || podman start "$TOOLBOX" >/dev/null
+  if podman exec "$TOOLBOX" true >/dev/null 2>&1; then echo "[comfyui] Container recovered."; return 0; fi
+  echo "[comfyui] The container still refuses exec after a restart: check \`podman ps -a\` and its logs."; return 1
+}
+
 # The toolbox ships a minimal venv; the custom nodes need a couple of pure-python deps (NOT
 # torch). Idempotent and fast when already present; re-heals after `comfyui update`.
 ensure_deps() {
@@ -98,7 +117,8 @@ case "${1:-}" in
   start)
     mkdir -p "$DATA" "$OUTPUTS" "$MOD/input" "$MOD/user/default" "$MOD/custom_nodes" "$MOD/workflows"
     ensure_container
-    if web_up; then echo "[comfyui] Already running -> $URL" ; exit 0 ; fi
+    if web_up && podman exec "$TOOLBOX" true >/dev/null 2>&1; then echo "[comfyui] Already running -> $URL" ; exit 0 ; fi
+    ensure_exec || exit 1
     if comfy_alive; then echo "[comfyui] ComfyUI process already up, waiting for UI..." ; wait_for_ui ; exit $? ; fi
     ensure_deps
     : > "$LOG" ; rm -f "$PIDFILE"
@@ -117,6 +137,10 @@ case "${1:-}" in
     echo "[comfyui] Stopped."
     ;;
   quit)
+    if ctr_running && ! podman exec "$TOOLBOX" true >/dev/null 2>&1; then
+      ensure_exec || true                 # a wedged container: recovering it stops ComfyUI too
+      echo "[comfyui] ComfyUI stopped (toolbox restarted)."; exit 0
+    fi
     pid="$(comfy_pid)"
     if [ -n "$pid" ] && ctr_running; then
       podman exec -u "$USER" "$TOOLBOX" kill "$pid" 2>/dev/null || true

@@ -106,17 +106,23 @@ class Store:
 
     def finish(self, oid: str, chunks: list[Chunk], state: str = "done", sig: str | None = None) -> None:
         """Replace the output's chunks in one transaction (a restart never sees half an output). If its sig
-        changed meanwhile (`sig` given and different), it stays pending for another pass."""
+        changed meanwhile (`sig` given and different), it stays pending for another pass; if it was deleted
+        meanwhile (no row), no chunks are kept."""
         with self.lock:
             self.db.execute("BEGIN")
             try:
                 self.db.execute("DELETE FROM chunks WHERE output_id = ?", (oid,))
+                row = self.get(oid)
+                if row is None:
+                    self.db.execute("COMMIT")
+                    self.version += 1
+                    return
                 self.db.executemany(
                     'INSERT INTO chunks (output_id, kind, page, line, "offset", start_s, end_s, snippet, vector, text) '
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [(oid, c.kind, c.page, c.line, c.offset, c.start_s, c.end_s, c.snippet[:400],
                       np.asarray(c.vector, dtype=np.float16)[:DIM].tobytes(), c.text) for c in chunks])
-                still = sig is None or (self.get(oid) or {}).get("sig") == sig
+                still = sig is None or row["sig"] == sig
                 self.db.execute("UPDATE outputs SET state = ?, chunks = ?, error = NULL, indexed_ts = ? WHERE id = ?",
                                 (state if still else "pending", len(chunks), time.time(), oid))
                 self.db.execute("COMMIT")
@@ -144,6 +150,14 @@ class Store:
             self.db.execute("DELETE FROM collection_outputs WHERE output_id = ?", (oid,))
             self.version += 1
             return n > 0
+
+    def drop_orphans(self) -> int:
+        """Chunks whose output is gone (from before `finish` checked for the row). Returns how many."""
+        with self.lock:
+            n = self.db.execute("DELETE FROM chunks WHERE output_id NOT IN (SELECT id FROM outputs)").rowcount
+            if n:
+                self.version += 1
+            return n
 
     def counts(self) -> dict[str, int]:
         out = {s: 0 for s in ("pending", "done", "skipped", "failed")}

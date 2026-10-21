@@ -18,6 +18,11 @@ from PIL import Image, UnidentifiedImageError
 
 SAMPLE_RATE = 16000
 FRAME_SIDE = 768            # frames are scaled to fit this; the processor resizes them again to its token budget
+# An image is scaled down to at most this many pixels right after decoding: the processor's budget is 280 soft
+# tokens of 3×3 patches of 16 px (~0.65 MP), and a call takes up to 256 images. One larger than MAX_PIXELS isn't
+# decoded at all (PIL's own bomb check stops at ~179 MP, 0.5 GB of RGB, which is too much here).
+IMAGE_PIXELS = 1_600_000
+MAX_PIXELS = 64_000_000
 
 
 class MediaError(Exception):
@@ -57,10 +62,20 @@ def _ffmpeg(args: list[str], timeout: float = 300) -> bytes:
 def image(data: bytes) -> Prepared:
     try:
         im = Image.open(io.BytesIO(data))
+        w, h = im.size
+        if w * h > MAX_PIXELS:
+            raise MediaError(f"the image is {w}×{h} ({w * h / 1e6:.0f} MP); the limit is {MAX_PIXELS / 1e6:.0f} MP")
+        scale = (IMAGE_PIXELS / (w * h)) ** 0.5
+        if scale < 1:
+            im.draft("RGB", (max(1, int(w * scale)), max(1, int(h * scale))))   # a JPEG decodes at 1/2–1/8 size
         im.load()
-    except (UnidentifiedImageError, OSError) as e:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
         raise MediaError(f"not an image: {e}") from e
-    return Prepared("image", im.convert("RGB"), {"width": im.width, "height": im.height})
+    im = im.convert("RGB")
+    if im.width * im.height > IMAGE_PIXELS:
+        scale = (IMAGE_PIXELS / (im.width * im.height)) ** 0.5
+        im = im.resize((max(1, int(im.width * scale)), max(1, int(im.height * scale))), Image.Resampling.BICUBIC)
+    return Prepared("image", im, {"width": w, "height": h})
 
 
 def audio(data: bytes, max_s: float, tmp_dir: Path) -> Prepared:
@@ -104,24 +119,29 @@ def duration(src: str) -> float | None:
 
 
 def ppm_frames(raw: bytes) -> list[Image.Image]:
-    """Split ffmpeg's `-c:v ppm -f image2pipe` stream into images (each is `P6 w h 255` then w·h·3 bytes)."""
-    frames, i = [], 0
-    while i < len(raw):
+    """Split ffmpeg's `-c:v ppm -pix_fmt rgb24 -f image2pipe` stream into images (each is `P6 w h 255` then
+    w·h·3 bytes). Anything else (a 16-bit `65535` frame, a stream cut short) is a MediaError."""
+    frames, i, n = [], 0, len(raw)
+    while i < n:
         parts, j = [], i
         while len(parts) < 4:                           # magic, width, height, maxval; whitespace-separated
-            while raw[j:j + 1].isspace():
+            while j < n and raw[j:j + 1].isspace():
                 j += 1
             k = j
-            while not raw[k:k + 1].isspace():
+            while k < n and k - j < 16 and not raw[k:k + 1].isspace():
                 k += 1
+            if k == j or k >= n:
+                raise MediaError("a frame from ffmpeg was cut short")
             parts.append(raw[j:k])
             j = k
-        if parts[0] != b"P6":
-            raise MediaError("unexpected frame format from ffmpeg")
+        if parts[0] != b"P6" or parts[3] != b"255" or not (parts[1].isdigit() and parts[2].isdigit()):
+            raise MediaError(f"unexpected frame format from ffmpeg ({b' '.join(parts).decode(errors='replace')})")
         w, h = int(parts[1]), int(parts[2])
-        start = j + 1
-        frames.append(Image.frombytes("RGB", (w, h), raw[start:start + w * h * 3]))
-        i = start + w * h * 3
+        start, size = j + 1, w * h * 3
+        if start + size > n:
+            raise MediaError("a frame from ffmpeg was cut short")
+        frames.append(Image.frombytes("RGB", (w, h), raw[start:start + size]))
+        i = start + size
     return frames
 
 
@@ -133,7 +153,7 @@ def video(data: bytes, max_frames: int, tmp_dir: Path) -> Prepared:
         secs = duration(src)
         fps = 1.0 if not secs or secs <= max_frames else max_frames / secs
         raw = _ffmpeg(["-i", src, "-an", "-vf", f"fps={fps:.6f},{scale}", "-frames:v", str(max_frames),
-                       "-c:v", "ppm", "-f", "image2pipe", "pipe:1"])
+                       "-pix_fmt", "rgb24", "-c:v", "ppm", "-f", "image2pipe", "pipe:1"])     # 8 bits, also from 10-bit video
     frames = ppm_frames(raw)
     if not frames:
         raise MediaError("no video frames in the file")

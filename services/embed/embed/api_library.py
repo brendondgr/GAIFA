@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any, Literal
 
@@ -13,7 +14,9 @@ from .encoder import Encoder
 from .hubclient import HubError
 from .library import Library
 from .search import index_recent, index_scope, origin_thread, scope, search
+from .worker import WorkerDied
 
+log = logging.getLogger("embed")
 OutputKind = Literal["text", "document", "image", "audio", "video", "model3d", "archive", "other"]
 
 
@@ -37,6 +40,15 @@ class ReindexBody(BaseModel):
 
 def _ids(refs: list[str]) -> list[str]:
     return [r.removeprefix("output:") for r in refs]
+
+
+def backend_error(e: Exception) -> JSONResponse:
+    """The encoder failed: no weights, or its worker died (the next call starts a new one)."""
+    if isinstance(e, FileNotFoundError):
+        return JSONResponse({"detail": str(e), "code": "no_weights", "fix": "run services/embed/install.sh"}, 503)
+    log.error("%s", e)
+    return JSONResponse({"detail": str(e), "code": "worker_died",
+                         "fix": "call again (it starts a new worker); if it repeats, read `aihub logs embed`"}, 503)
 
 
 def _missing(cid: str) -> JSONResponse:
@@ -65,6 +77,8 @@ def add_library_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
             hits = await search(lib, enc, body.query, body.kind, ids, body.limit)
         except HubError as e:
             return JSONResponse(e.body(), e.status)
+        except (FileNotFoundError, WorkerDied) as e:
+            return backend_error(e)
         c = store.counts()
         out: dict[str, Any] = {"results": hits, "searched": len(ids) if ids is not None else c["done"]}
         if ids is not None and not ids:

@@ -21,7 +21,7 @@ from .hubclient import Hub, HubError
 from .settings import MODEL_ID, REPO, REVISION, Settings
 from .worker import WorkerBackend, WorkerDied
 from .api_chats import add_chat_routes
-from .api_library import add_library_routes
+from .api_library import add_library_routes, backend_error
 from .library import Library, open_library
 
 log = logging.getLogger("embed")
@@ -70,14 +70,6 @@ class LoadRequest(BaseModel):
 
 def _error(e: HubError) -> JSONResponse:
     return JSONResponse(e.body(), status_code=e.status)
-
-
-def _backend_error(e: Exception) -> JSONResponse:
-    if isinstance(e, FileNotFoundError):
-        return JSONResponse({"detail": str(e), "code": "no_weights", "fix": "run services/embed/install.sh"}, 503)
-    log.error("%s", e)
-    return JSONResponse({"detail": str(e), "code": "worker_died",
-                         "fix": "call again (it starts a new worker); if it repeats, read `aihub logs embed`"}, 503)
 
 
 def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | None = None,
@@ -177,7 +169,7 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
         except HubError as e:
             return _error(e)
         except (FileNotFoundError, WorkerDied) as e:
-            return _backend_error(e)
+            return backend_error(e)
         return {"loaded": enc.key(enc.parts), "device": enc.backend.device, "dtype": enc.backend.dtype,
                 "memory_gb": enc.estimate_gb(enc.parts)}
 
@@ -225,7 +217,7 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
         try:
             vecs = await asyncio.to_thread(enc.embed, [(p.kind, p.value) for p in prepared], body.dim, batch)
         except (FileNotFoundError, WorkerDied) as e:
-            return _backend_error(e)
+            return backend_error(e)
         day["inputs"] += len(prepared)
         if lib is not None:
             lib.last_api = time.time()

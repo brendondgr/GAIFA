@@ -18,7 +18,7 @@ from typing import Any
 import numpy as np
 
 from .encoder import Encoder, prompt
-from .hubclient import Hub, HubError
+from .hubclient import THREAD_ID, Hub, HubError
 from .library import Library, signature
 
 PER_OUTPUT = 2
@@ -34,11 +34,12 @@ def untrusted(source: str, text: str) -> str:
 
 
 def origin_thread(header: str | None) -> str | None:
-    """The chat a tool call came from: the hub's `X-AIHub-Origin` header (`{"thread": …}`)."""
+    """The chat a tool call came from: the hub's `X-AIHub-Origin` header (`{"thread": …}`); None unless it's a chat id."""
     try:
-        return (json.loads(header) or {}).get("thread") if header else None
+        tid = (json.loads(header) or {}).get("thread") if header else None
     except (ValueError, AttributeError):
         return None
+    return tid if isinstance(tid, str) and THREAD_ID.fullmatch(tid) else None
 
 
 async def scope(lib: Library, hub: Hub, collection: str | None, thread: str | None) -> set[str] | None:
@@ -81,7 +82,9 @@ async def index_scope(lib: Library, ids: set[str], budget_s: float = SCOPED_BUDG
         try:
             await lib.index_one(row, gate=False)
         except Exception as e:                      # noqa: BLE001: the search still answers with what's there
-            lib.store.fail(oid, f"{type(e).__name__}: {e}")
+            if not lib.fail(oid, e):                # the encoder or the hub, not this output: the rest would fail too
+                deadline = 0
+                left += 1
     return left
 
 
@@ -97,7 +100,8 @@ async def index_recent(lib: Library, budget_s: float = RECENT_BUDGET_S, recent_s
         try:
             await lib.index_one(row, gate=False)
         except Exception as e:                      # noqa: BLE001
-            lib.store.fail(row["id"], f"{type(e).__name__}: {e}")
+            if not lib.fail(row["id"], e):          # the encoder or the hub, not this output: leave it to the indexer
+                return
 
 
 def lines_of(text: str, first_line: int, size: int = 200) -> list[list[tuple[int, str]]]:
@@ -167,6 +171,8 @@ async def search(lib: Library, enc: Encoder, query: str, kind: str | None = None
     per: dict[str, int] = {}
     for i in np.argsort(-scores):
         oid = m.outputs[i]
+        if oid not in kinds:                        # its output is gone (deleted while it was being indexed)
+            continue
         if ids is not None and oid not in ids:
             continue
         if kind and kinds.get(oid) != kind:

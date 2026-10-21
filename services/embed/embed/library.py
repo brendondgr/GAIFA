@@ -35,16 +35,30 @@ from .gpu import DeviceMedian, GpuIdle, HubMeter
 from .hubclient import Hub, HubError
 from .settings import Settings
 from .store import Chunk, Store
+from .worker import WorkerDied
 
 log = logging.getLogger("embed")
 MAX_BYTES = {"image": 64_000_000, "audio": 512_000_000, "video": 2_000_000_000, "model3d": 64_000_000}
 LONG_AUDIO_S = 60
 API_KEEP_S = 60            # a search in the last minute keeps the model loaded after indexing
+BACKOFF_S = (30, 600)      # after an encoder error the loop waits 30 s, doubling to 10 min while it repeats
 GATED = contextvars.ContextVar("gated", default=True)    # False while a search indexes its own outputs (28.3)
 
 
 class Stop(Exception):
     """The GPU went busy between batches: leave the output pending and wait again."""
+
+
+def not_the_outputs_fault(e: BaseException) -> bool:
+    """Errors that say nothing about the output being indexed, so they don't count as its failed attempt: the
+    encoder's worker died while idle or loading, no weights, no room to load, the hub went away, the GPU went busy."""
+    if isinstance(e, Stop):
+        return True
+    if isinstance(e, WorkerDied):
+        return e.stage != "call"
+    if isinstance(e, HubError):
+        return e.code in ("needs_room", "hub_unreachable")
+    return isinstance(e, (FileNotFoundError, BrokenPipeError))
 
 
 def signature(rec: dict[str, Any]) -> str:
@@ -86,7 +100,9 @@ class Library:
         self.sleep = sleep
         self.tmp = settings.state_dir / "tmp"
         self.wake = asyncio.Event()
-        self.state = "starting"            # starting | idle | waiting_for_gpu | indexing | no_room | no_hub
+        self.state = "starting"            # starting | idle | waiting_for_gpu | indexing | no_room | no_hub | error
+        self.error: str | None = None      # the encoder error that stopped indexing (state `error`), until it works again
+        self.backoff = BACKOFF_S[0]
         self.current: dict[str, Any] | None = None
         self.last_api = 0.0                # the server sets this on every /v1/embed and search
         self.indexed = 0
@@ -109,6 +125,8 @@ class Library:
         removed = 0
         for oid in set(known) - seen:
             removed += self.store.delete(oid)
+        if orphans := self.store.drop_orphans():
+            log.info("library: dropped %d chunks of deleted outputs", orphans)
         if queued:
             self.wake.set()
         log.info("library: %d outputs, %d to index, %d removed", len(seen), queued, removed)
@@ -155,7 +173,7 @@ class Library:
         try:
             while not stop.is_set():
                 if not self.store.pending(1) and not self.store.chats_pending(1):
-                    self.state = "idle"
+                    self.state, self.error = "idle", None
                     await self._unload_if_unused()
                     self.wake.clear()
                     await self._wait(stop, 30)
@@ -164,9 +182,16 @@ class Library:
                     self.state = "waiting_for_gpu"
                     await self._wait(stop, 5)
                     continue
-                await self.drain()
-                if self.state == "no_hub":
-                    await self._wait(stop, 30)
+                try:
+                    await self.drain()
+                except Exception as e:              # noqa: BLE001: nothing ends the loop (or the follower with it)
+                    log.exception("library: indexing stopped")
+                    self._trouble(e)
+                if self.state == "no_hub":                 # new outputs don't cut these waits short: they'd fail too
+                    await self._wait(stop, 30, wake=False)
+                elif self.state == "error":
+                    await self._wait(stop, self.backoff, wake=False)
+                    self.backoff = min(self.backoff * 2, BACKOFF_S[1])
         finally:
             follower.cancel()
             sampler.cancel()
@@ -176,65 +201,88 @@ class Library:
             await asyncio.to_thread(self.gpu.sample)
             await asyncio.sleep(1)
 
-    async def _wait(self, stop: asyncio.Event, s: float) -> None:
-        waiters = [asyncio.create_task(stop.wait()), asyncio.create_task(self.wake.wait())]
+    async def _wait(self, stop: asyncio.Event, s: float, wake: bool = True) -> None:
+        waiters = [asyncio.create_task(stop.wait())] + ([asyncio.create_task(self.wake.wait())] if wake else [])
         try:
             await asyncio.wait(waiters, timeout=s, return_when=asyncio.FIRST_COMPLETED)
         finally:
             for w in waiters:
                 w.cancel()
 
+    def _trouble(self, e: BaseException) -> None:
+        """Indexing can't go on now (the encoder failed, or something unexpected): say why, and `run` backs off."""
+        self.state, self.error = "error", f"{type(e).__name__}: {e}"[:500]
+
+    def _stopped(self, e: BaseException) -> bool:
+        """Drain's answer to an error from a step: True when indexing should stop now (the state says why)."""
+        if isinstance(e, Stop):
+            self.state = "waiting_for_gpu"
+        elif isinstance(e, HubError) and e.code == "hub_unreachable":
+            self.state = "no_hub"
+        elif isinstance(e, HubError) and e.code == "needs_room":
+            self.state = "no_room"
+            self.gpu.quiet_since = self.gpu.clock()      # try again after another quiet period
+        elif not_the_outputs_fault(e) or isinstance(e, WorkerDied):
+            log.warning("library: the encoder failed: %s", e)
+            self._trouble(e)
+        else:
+            return False
+        return True
+
+    async def _chats(self) -> int | None:
+        """Chat summaries, or None when indexing should stop (a summary has no attempts to count)."""
+        try:
+            n = await self.index_chats()
+            if n:
+                self.error, self.backoff = None, BACKOFF_S[0]
+            return n
+        except Exception as e:                      # noqa: BLE001: never ends the loop
+            if not self._stopped(e):
+                log.warning("library: chat summaries failed: %s", e)
+                self._trouble(e)
+            return None
+
     async def drain(self) -> int:
         """Index pending outputs until the queue is empty, the GPU goes busy or there's no room. Returns how
         many were indexed."""
         n = 0
         self.state = "indexing"
-        try:                                    # chat summaries first: few, cheap, and someone may be waiting (28.5)
-            n += await self.index_chats()
-        except Stop:
-            self.state = "waiting_for_gpu"
+        done = await self._chats()              # chat summaries first: few, cheap, and someone may be waiting (28.5)
+        if done is None:
             return n
-        except HubError as e:
-            if e.code == "needs_room":
-                self.state = "no_room"
-                return n
-            raise
+        n += done
         while (rows := self.store.pending(1)):
             if self.store.chats_pending(1):      # summaries that came in meanwhile go before the next output
-                try:
-                    n += await self.index_chats()
-                except Stop:
-                    self.state = "waiting_for_gpu"
+                if (done := await self._chats()) is None:
                     break
+                n += done
             row = rows[0]
             self.state, self.current = "indexing", {"id": row["id"], "title": row["title"], "kind": row["kind"]}
             try:
                 await self.index_one(row)
                 n += 1
                 self.indexed += 1
-            except Stop:
-                self.state = "waiting_for_gpu"
-                break
-            except HubError as e:
-                if e.code == "hub_unreachable":             # the hub went away: nothing to count against the output
-                    self.state = "no_hub"
-                    break
-                if e.code == "needs_room":
-                    self.state = "no_room"
-                    self.gpu.quiet_since = self.gpu.clock()      # try again after another quiet period
-                    break
-                if e.status == 404:
-                    self.store.delete(row["id"])
-                else:
-                    self.store.fail(row["id"], f"{e.code}: {e.detail}")
+                self.error, self.backoff = None, BACKOFF_S[0]
             except Exception as e:                  # noqa: BLE001: one bad output never stops the library
-                log.warning("library: %s failed: %s", row["id"], e)
-                self.store.fail(row["id"], f"{type(e).__name__}: {e}")
+                if isinstance(e, HubError) and e.status == 404:     # the output is gone
+                    self.store.delete(row["id"])
+                    continue
+                if self.fail(row["id"], e):          # a worker that died on its inputs counts too: they may be the cause
+                    log.warning("library: %s failed: %s", row["id"], e)
+                if self._stopped(e):
+                    break
             finally:
                 self.current = None
         if not self.store.pending(1) and not self.store.chats_pending(1):
             await self._unload_if_unused()
         return n
+
+    def fail(self, oid: str, e: BaseException) -> bool:
+        """Count a failed attempt at an output, unless the error isn't the output's fault. Returns whether it counted."""
+        if not_the_outputs_fault(e):
+            return False
+        self.store.fail(oid, f"{e.code}: {e.detail}" if isinstance(e, HubError) else f"{type(e).__name__}: {e}")
+        return True
 
     async def index_chats(self, gate: bool = True, limit: int = 8) -> int:
         """Chat summaries (plan 28.5), a batch at a time; `gate=False` when someone is searching them."""
@@ -360,7 +408,7 @@ class Library:
     # status ---------------------------------------------------------------------------------
 
     def status(self) -> dict[str, Any]:
-        return {"state": self.state, "connected": self.connected, "counts": self.store.counts(), "chats": self.store.chat_counts(),
+        return {"state": self.state, "error": self.error, "connected": self.connected, "counts": self.store.counts(), "chats": self.store.chat_counts(),
                 "current": self.current, "indexed_since_start": self.indexed,
                 "gpu": {"measure": getattr(self.gpu.read, "measure", "device"), "busy_pct": self.gpu.last,
                         "detail": getattr(self.gpu.read, "detail", {}),

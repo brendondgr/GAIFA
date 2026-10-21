@@ -13,8 +13,11 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from .api_library import backend_error
 from .encoder import Encoder, prompt
+from .hubclient import HubError
 from .library import Library
+from .worker import WorkerDied
 
 SEARCH_BUDGET_S = 20           # a search first embeds pending summaries, for up to this long
 
@@ -51,17 +54,22 @@ def add_chat_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
         return store.chat_counts()
 
     @app.post("/v1/chats/search", summary="Find chats by meaning")
-    async def search_chats(body: ChatSearch) -> dict:
+    async def search_chats(body: ChatSearch) -> Any:
         """Chats whose summary is closest to the query, best first (cosine; ~0.5 is unrelated). Pending summaries
         are embedded first: someone is waiting for them."""
         deadline = time.monotonic() + SEARCH_BUDGET_S
-        while store.chats_pending(1) and time.monotonic() < deadline:
-            await lib.index_chats(gate=False)
-        lib.last_api = time.time()
-        rows = [r for r in store.chats() if r["state"] == "done" and r["vector"]]
-        if not rows:
-            return {"results": [], "pending": store.chat_counts()["pending"]}
-        q = (await asyncio.to_thread(enc.embed, [("text", prompt(body.query, "query"))], 768, {"text": 1}))[0]
+        try:
+            while store.chats_pending(1) and time.monotonic() < deadline:
+                await lib.index_chats(gate=False)
+            lib.last_api = time.time()
+            rows = [r for r in store.chats() if r["state"] == "done" and r["vector"]]
+            if not rows:
+                return {"results": [], "pending": store.chat_counts()["pending"]}
+            q = (await asyncio.to_thread(enc.embed, [("text", prompt(body.query, "query"))], 768, {"text": 1}))[0]
+        except HubError as e:
+            return JSONResponse(e.body(), e.status)
+        except (FileNotFoundError, WorkerDied) as e:
+            return backend_error(e)
         m = np.frombuffer(b"".join(r["vector"] for r in rows), dtype=np.float16).reshape(len(rows), -1).astype(np.float32)
         scores = m @ q
         order = np.argsort(-scores)[: body.limit]

@@ -6,12 +6,14 @@ import asyncio
 import json
 import logging
 import os
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 import httpx
 
 log = logging.getLogger("embed")
+THREAD_ID = re.compile(r"t_[0-9a-f]{12}")      # the agent's thread ids (services/agent: "t_" + 6 random bytes in hex)
 
 
 class HubError(Exception):
@@ -117,7 +119,11 @@ class Hub:
         return (await self._get(f"/api/outputs/{oid}/{'preview' if preview else 'file'}", read=300)).content
 
     async def thread_attachments(self, tid: str) -> list[str]:
-        """The outputs attached in a chat: the agent's `user` events (through the hub's proxy)."""
+        """The outputs attached in a chat: the agent's `user` events (through the hub's proxy). The id goes into
+        a hub path, so only the agent's own id shape is sent."""
+        if not THREAD_ID.fullmatch(tid):
+            raise HubError(422, f"{tid[:40]!r} isn't a chat id (t_ and 12 hex digits)", "bad_thread",
+                           fix="use the thread:<id> collection that library_collections lists, or leave collection out")
         try:
             evs = (await self._get(f"/api/s/agent/v1/threads/{tid}/events")).json()
         except HubError as e:
@@ -125,10 +131,16 @@ class Hub:
                 raise HubError(404, f"no chat {tid!r} (or the agent mod isn't installed)", "no_thread",
                                fix="leave thread_only out to search everything") from e
             raise
+        except ValueError as e:
+            raise HubError(502, f"the agent's events for {tid} weren't JSON", "hub_error") from e
+        if not isinstance(evs, list):
+            raise HubError(502, f"the agent's events for {tid} came as {type(evs).__name__}, not a list", "hub_error")
         out: list[str] = []
         for e in evs:
-            if e.get("type") == "user":
-                out += [a for a in (e.get("payload") or {}).get("attachments") or [] if a not in out]
+            payload = e.get("payload") if isinstance(e, dict) and e.get("type") == "user" else None
+            atts = payload.get("attachments") if isinstance(payload, dict) else None
+            if isinstance(atts, list):
+                out += [a for a in atts if isinstance(a, str) and a not in out]
         return out
 
     async def follow(self, on_event: Callable[[dict[str, Any]], Awaitable[None]],

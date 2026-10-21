@@ -13,7 +13,8 @@ from embed.server import create_app
 from tests.conftest import png
 from tests.test_library import make, run
 
-ORIGIN = {"X-AIHub-Origin": json.dumps({"tool_call": "c1", "service": "agent", "thread": "t1"})}
+T1, T2 = "t_00000000000a", "t_00000000000b"                       # the agent's id shape
+ORIGIN = {"X-AIHub-Origin": json.dumps({"tool_call": "c1", "service": "agent", "thread": T1})}
 
 
 @pytest.fixture
@@ -75,27 +76,27 @@ def test_kind_and_collection_filters(client):
 
 
 def test_thread_only_uses_the_chats_attachments(client, hub):
-    hub.threads["t1"] = [{"type": "user", "payload": {"text": "look", "attachments": ["txt"]}},
+    hub.threads[T1] = [{"type": "user", "payload": {"text": "look", "attachments": ["txt"]}},
                          {"type": "assistant", "payload": {"text": "ok"}},
                          {"type": "user", "payload": {"text": "and this", "attachments": ["dog", "txt"]}}]
     res = hits(client.post("/v1/search", json={"query": "red car", "thread_only": True}, headers=ORIGIN))
     assert {h["output"] for h in res} == {"output:txt", "output:dog"}
     cols = client.get("/v1/collections", headers=ORIGIN).json()["collections"]
-    assert cols[0] == {"id": "thread:t1", "name": "this chat's attachments", "outputs": ["txt", "dog"], "count": 2,
+    assert cols[0] == {"id": f"thread:{T1}", "name": "this chat's attachments", "outputs": ["txt", "dog"], "count": 2,
                        "implicit": True}
-    assert {h["output"] for h in hits(client.post("/v1/search", json={"query": "x", "collection": "thread:t1"}))} == \
+    assert {h["output"] for h in hits(client.post("/v1/search", json={"query": "x", "collection": f"thread:{T1}"}))} == \
         {"output:txt", "output:dog"}
     r = client.post("/v1/search", json={"query": "x", "thread_only": True})
     assert r.status_code == 422 and r.json()["code"] == "no_thread"
-    hub.threads["t2"] = []
+    hub.threads[T2] = []
     r = client.post("/v1/search", json={"query": "x", "thread_only": True},
-                    headers={"X-AIHub-Origin": json.dumps({"thread": "t2"})})
+                    headers={"X-AIHub-Origin": json.dumps({"thread": T2})})
     assert r.json()["results"] == [] and "no attachments" in r.json()["note"]
 
 
 def test_scoped_search_indexes_its_outputs_first(client, hub, lib):
     hub.add("new", "image", png("red car"), title="just attached")
-    hub.threads["t1"] = [{"type": "user", "payload": {"text": "find it", "attachments": ["new"]}}]
+    hub.threads[T1] = [{"type": "user", "payload": {"text": "find it", "attachments": ["new"]}}]
     lib.gpu.read = lambda: 99                                       # the GPU is busy: background indexing waits
     assert lib.store.get("new") is None
     res = hits(client.post("/v1/search", json={"query": "red car", "thread_only": True}, headers=ORIGIN))
@@ -142,3 +143,49 @@ def test_the_snippet_is_the_line_that_matched(settings, hub):
     assert h["page"] == 2 and text.split("\n")[h["line"] - 1] == "stop lifting in high wind"
     assert h["snippet"] == ('<untrusted source="output:m Manual">\nroutine inspection line stop lifting in high wind '
                             'routine inspection line\n</untrusted>')                 # the line, one on each side
+
+
+def test_chunks_of_a_deleted_output_take_no_hit_slots(client, lib):
+    """Left from an output deleted mid-index: they're skipped before the limit, not after (which left no hits)."""
+    from embed.encoder import FakeBackend
+    with lib.store.lock:
+        for _ in range(3):
+            lib.store.db.execute("INSERT INTO chunks (output_id, kind, vector) VALUES ('gone', 'image', ?)",
+                                 (FakeBackend.vector("zebra stripes").astype("float16").tobytes(),))
+        lib.store.version += 1
+    res = hits(client.post("/v1/search", json={"query": "zebra stripes", "limit": 1}))
+    assert len(res) == 1 and res[0]["output"] != "output:gone"
+
+
+def test_search_answers_the_errors_envelope_when_the_encoder_fails(client, lib, hub):
+    from embed.worker import WorkerDied
+
+    def died(*a):
+        raise WorkerDied("the encoder worker died (exit code -9); the next call starts a new one")
+    orig = lib.enc.backend.encode
+    lib.enc.backend.encode = died
+    for path in ("/v1/search", "/v1/chats/search"):
+        lib.store.put_chat("t_00000000000c", "x", "a summary", 1, 1)
+        r = client.post(path, json={"query": "red car"})
+        assert r.status_code == 503 and r.json()["code"] == "worker_died" and r.json()["fix"], (path, r.text)
+    lib.enc.backend.encode = orig
+    lib.enc.unload()
+    hub.room = False                                                 # loading for the pending summary: no room
+    r = client.post("/v1/chats/search", json={"query": "a summary"})
+    assert r.status_code == 409 and r.json()["code"] == "needs_room"
+
+
+def test_thread_ids_are_checked_and_odd_answers_handled(client, hub):
+    for bad in ("../../../api/settings", "t1", "t_00000000000a/../x", "t_00000000000A"):
+        r = client.post("/v1/search", json={"query": "x", "collection": f"thread:{bad}"})
+        assert r.status_code == 422 and r.json()["code"] == "bad_thread", bad
+    r = client.post("/v1/search", json={"query": "x", "thread_only": True},
+                    headers={"X-AIHub-Origin": json.dumps({"thread": "../x"})})
+    assert r.status_code == 422 and r.json()["code"] == "no_thread"
+    for odd in ({"events": []}, [1, "x", {"type": "user", "payload": "p"}, {"type": "user", "payload": {"attachments": "a"}}]):
+        hub.threads[T1] = odd
+        r = client.post("/v1/search", json={"query": "x", "thread_only": True}, headers=ORIGIN)
+        if isinstance(odd, dict):
+            assert r.status_code == 502 and r.json()["code"] == "hub_error"
+        else:
+            assert r.status_code == 200 and r.json()["results"] == []

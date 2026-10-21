@@ -78,3 +78,23 @@ def test_the_worker_can_run_in_another_python(monkeypatch, tmp_path):
         assert Encoder(w, tmp_path).embed([("text", "x: hello")], 768, BATCH).shape == (1, 768)
     finally:
         w.unload()
+
+
+def test_a_worker_killed_while_idle_is_replaced(worker, tmp_path):
+    """The OOM killer or a GPU reset ends the worker between calls: the next call starts a new one with the same
+    encoders, and answers (no broken pipe, no `loaded` that isn't)."""
+    import signal
+    import time
+    enc = Encoder(worker, tmp_path)
+    enc.load(frozenset({"vision"}))
+    for alive in (None, True):
+        pid = worker.proc.pid
+        os.kill(pid, signal.SIGKILL)
+        deadline = time.time() + 10
+        while worker.proc.is_alive() and time.time() < deadline:
+            time.sleep(0.05)
+        if alive:                                    # not yet known to be dead: the send finds out (a broken pipe)
+            worker.proc.is_alive = lambda: True
+        v = enc.embed([("text", "x: hello")], 768, BATCH)
+        assert v.shape == (1, 768) and enc.loaded and worker.alive and worker.proc.pid != pid
+        assert worker.parts == frozenset({"vision"})

@@ -292,3 +292,87 @@ def test_the_device_measure_uses_the_device_threshold(settings, hub):
     assert lib.gpu.busy_pct == 30 and type(lib.gpu.read).__name__ == "DeviceMedian"
     lib2 = Library(Store(settings.databases / "a.db"), Encoder(FakeBackend()), Hub(None), settings)
     assert lib2.gpu.busy_pct == 10 and type(lib2.gpu.read).__name__ == "HubMeter"
+
+
+class FlakyBackend(FakeBackend):
+    """Fails its first `n` encodes with `error` (a worker that died, no weights), then works."""
+
+    def __init__(self, error: Exception, n: int = 1, on: str = "encode"):
+        super().__init__()
+        self.error, self.n, self.on = error, n, on
+
+    def _maybe_fail(self, where: str) -> None:
+        if where == self.on and self.n > 0:
+            self.n -= 1
+            raise self.error
+
+    def load(self, parts):
+        self._maybe_fail("load")
+        super().load(parts)
+
+    def encode(self, kind, items, batch_size):
+        self._maybe_fail("encode")
+        return super().encode(kind, items, batch_size)
+
+
+def test_an_encoder_error_never_ends_the_loop(settings, hub, monkeypatch):
+    """A worker that died (or no weights) stops indexing for a back-off, says why, keeps following the hub, and
+    counts nothing against the outputs; the next pass starts a new worker and indexes everything."""
+    from embed import library as library_mod
+    from embed.worker import WorkerDied
+    monkeypatch.setattr(library_mod, "BACKOFF_S", (0.05, 0.1))
+    hub.add("a", "image", png("a"), title="a cat")
+    lib = make(settings, hub, backend=FlakyBackend(WorkerDied("the encoder worker died (exit code -9)", "idle"), n=2))
+    lib.backoff = 0.05
+    run(lib.reconcile())                                            # (the fake hub has no event stream)
+    lib.store.put_chat("t_00000000000a", "x", "a summary", 1, 1)
+    seen = set()
+
+    async def go() -> None:
+        stop = asyncio.Event()
+        task = asyncio.create_task(lib.run(stop))
+        for _ in range(200):
+            await asyncio.sleep(0.02)
+            seen.add(lib.state)
+            assert not task.done(), task.exception()
+            if lib.store.counts()["done"] == 1 and lib.store.chat_counts()["done"] == 1 and lib.state == "idle":
+                break
+        stop.set()
+        await asyncio.wait_for(task, 5)
+    run(go())
+    assert "error" in seen and lib.store.counts()["done"] == 1 and lib.store.chat_counts()["done"] == 1
+    assert lib.store.get("a")["attempts"] == 0 and lib.error is None
+
+
+@pytest.mark.parametrize("error,on,counted", [
+    (FileNotFoundError("no weights in /models/embed"), "load", False),
+    ("idle", "encode", False),                       # killed while idle: nothing to do with the output
+    ("call", "encode", True),                        # died on the output's own inputs: it may be the cause
+])
+def test_encoder_errors_stop_indexing_and_count_only_a_crash_on_the_inputs(settings, hub, error, on, counted):
+    from embed.worker import WorkerDied
+    if isinstance(error, str):
+        error = WorkerDied("the encoder worker died (exit code -9)", error)
+    hub.add("a", "image", png("a"), title="a cat")
+    hub.add("b", "image", png("b"), title="a dog")
+    lib = make(settings, hub, backend=FlakyBackend(error, on=on))
+    run(lib.reconcile())
+    assert run(lib.drain()) == 0 and lib.state == "error" and type(error).__name__ in lib.error
+    assert lib.store.counts()["pending"] == 2 and lib.store.get("b")["attempts"] == int(counted)
+    assert lib.status()["error"] == lib.error
+    assert run(lib.drain()) == 2 and lib.store.counts()["done"] == 2 and lib.error is None
+
+
+def test_an_output_deleted_while_it_is_indexed_leaves_no_chunks(settings, hub):
+    from embed.store import Chunk
+    hub.add("o", "text", text="some words", title="note")
+    lib = make(settings, hub)
+    run(lib.reconcile())
+    lib.store.delete("o")                                           # output_deleted arrives during index_one
+    lib.store.finish("o", [Chunk("text", FakeBackend.vector("some words"), "x")], sig=lib.store.sigs().get("o"))
+    assert lib.store.counts()["chunks"] == 0 and len(lib.store.matrix().ids) == 0
+    with lib.store.lock:                                            # one left by an older version: reconcile drops it
+        lib.store.db.execute("INSERT INTO chunks (output_id, kind, vector) VALUES ('gone', 'text', ?)",
+                             (FakeBackend.vector("x").astype("float16").tobytes(),))
+    run(lib.reconcile())
+    assert lib.store.counts()["chunks"] == 0

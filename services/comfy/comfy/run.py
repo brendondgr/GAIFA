@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import time
 import uuid
@@ -36,6 +37,26 @@ KIND_BY_EXT = {".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "ima
 
 ROOM_WAIT_S = 5.0     # between asks for memory after freeing ComfyUI's models (memory comes back in a few seconds)
 INTERRUPT_GRACE_S = 90.0   # after an interrupt, how long ComfyUI may keep running the prompt before it is unloaded as stuck
+
+OUTPUT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+OUTSIDE = ("a file input is an output id (output:<id>), an upload (upload:<name>, from POST /v1/uploads) or a "
+           "file name inside ComfyUI's input folder; absolute paths, '..', '\\' and names that lead out of it "
+           "aren't accepted (upload the file, or pass its output id)")
+
+
+def inside(root: Path, name: str) -> bool:
+    """`name` is a plain relative path that stays inside `root` (symlinks followed). Decided before
+    anything looks for the file, so a refusal never tells whether it exists."""
+    if not name or "\x00" in name or "\\" in name or name.startswith("~"):
+        return False
+    p = Path(name)
+    if p.is_absolute() or ".." in p.parts:
+        return False
+    try:
+        return (root / p).resolve().is_relative_to(root.resolve())
+    except (OSError, RuntimeError, ValueError):
+        return False
+
 
 class NeedsRoom(Exception):
     def __init__(self, detail: str, plan: Any):
@@ -74,6 +95,8 @@ class Runner:
                  (p.get("type") == "array" and (p.get("items") or {}).get("format") == "aihub-file")}
         for k in files & set(values):
             values[k] = await self.materialize(values[k])
+        label = str(values.get("prompt") or pack.name)[:80]
+        graph = patch(pack, conv, values, lib.catalog, slugify(label, pack.id))     # refuses a bad value before any loading
         needs = self.needs_gb(pack, conv)
         if self.last_pack and self.last_pack != pack.id and await self.client.up():
             # Another workflow's models are still loaded: free them, so AIHub sees the room and this
@@ -107,9 +130,7 @@ class Runner:
             if self._ws_connected:
                 break
             await asyncio.sleep(0.05)
-        label = str(values.get("prompt") or pack.name)[:80]
         rid = "r-" + uuid.uuid4().hex[:10]
-        graph = patch(pack, conv, values, lib.catalog, slugify(label, pack.id))
         self.db.add_run(rid, pack.id, label, values)
         self.events[rid] = asyncio.Event()
         try:
@@ -151,19 +172,27 @@ class Runner:
             log.warning("memory acquire answered %s: %s", r.status_code, r.text[:200])
 
     async def materialize(self, value: Any) -> Any:
-        """A file input → a name ComfyUI's LoadImage takes (a file in its input folder)."""
+        """A file input → a name ComfyUI's LoadImage takes (a file in its input folder). ComfyUI
+        itself only checks that input/<name> exists, so a name that could leave the folder
+        ("../…", "upload:../…") is refused here, before anything looks for it."""
         if isinstance(value, list):
             return [await self.materialize(v) for v in value]
         v = str(value)
         inp = self.s.input
+        if "\x00" in v:
+            raise InputError(f"{v!r}: {OUTSIDE}")
         if v.startswith("upload:"):
             name = v[len("upload:"):]
-            if not (inp / "aihub" / name).exists():
+            if not inside(inp / "aihub", name):
+                raise InputError(f"{v!r}: {OUTSIDE}")
+            if not (inp / "aihub" / name).is_file():
                 raise InputError(f"no uploaded file {name!r}")
             return f"aihub/{name}"
         oid = v[len("output:"):] if v.startswith("output:") else None
         if oid is None and v.startswith("/api/outputs/"):
             oid = v.split("/")[3]
+        if oid is not None and not OUTPUT_ID.fullmatch(oid):
+            raise InputError(f"{v!r}: not an output id (output:<id>, as hub_search_outputs or a job's result gives it)")
         if oid:
             if not self.s.hub_url:
                 raise InputError("output ids need AIHub")
@@ -186,12 +215,14 @@ class Runner:
             (inp / "aihub").mkdir(parents=True, exist_ok=True)
             shutil.copyfile(p, inp / "aihub" / p.name)
             return f"aihub/{p.name}"
+        if not inside(inp, v):
+            raise InputError(f"{v!r}: {OUTSIDE}")
         rel = self.s.outputs.parent / v                    # a result's path, as jobs report it ("comfy/<date>/…")
-        if not p.is_absolute() and ".." not in p.parts and rel.is_file() and rel.resolve().is_relative_to(self.s.outputs.parent.resolve()):
+        if inside(self.s.outputs.parent, v) and rel.is_file():
             (inp / "aihub").mkdir(parents=True, exist_ok=True)
             shutil.copyfile(rel, inp / "aihub" / p.name)
             return f"aihub/{p.name}"
-        if (inp / v).exists():
+        if (inp / v).is_file():
             return v
         raise InputError(f"{v!r}: not an output id (output:<id>), an upload (upload:<name>) or a file in ComfyUI's input folder")
 

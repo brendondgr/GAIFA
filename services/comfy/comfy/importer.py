@@ -13,12 +13,13 @@ import io
 import json
 import re
 import shutil
+import stat
 import struct
 import subprocess
 import tempfile
 import zipfile
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .convert import ConvertError, is_api, is_editor, to_api
@@ -172,6 +173,11 @@ def read_zip(name: str, data: bytes) -> Found:
     infos = [i for i in z.infolist() if not i.is_dir() and not i.filename.startswith("__MACOSX")]
     if len(infos) > MAX_ZIP_FILES or sum(i.file_size for i in infos) > MAX_ZIP_BYTES:
         raise ImportError_(f"{name}: too big to import ({len(infos)} files)")
+    for i in infos:
+        if stat.S_ISLNK(i.external_attr >> 16):
+            raise ImportError_(f"{name}: {i.filename!r} is a symlink; zip the file itself")
+        if "\\" in i.filename or "\x00" in i.filename:
+            raise ImportError_(f"{name}: {i.filename!r} has a backslash in its name; zip it again with '/' folders")
     found = Found(source=name)
     workflows = []
     for i in infos:
@@ -182,9 +188,8 @@ def read_zip(name: str, data: bytes) -> Found:
         elif base.lower().endswith(".png") and png_text(b).get("workflow") and not workflows:
             pass                                     # a picture of the workflow; the JSON is preferred
         else:
-            rel = Path(i.filename)
-            parts = [p for p in rel.parts if p not in ("..", "")]
-            if len(parts) > 1 and parts[0] == Path(infos[0].filename).parts[0] and len({Path(x.filename).parts[0] for x in infos}) == 1:
+            parts = _parts(i.filename)
+            if len(parts) > 1 and len({(_parts(x.filename) or [""])[0] for x in infos}) == 1:
                 parts = parts[1:]                    # the zip's own top folder
             if parts:
                 found.assets["/".join(parts)] = b
@@ -203,6 +208,20 @@ def read_zip(name: str, data: bytes) -> Found:
             _take(found, d)
     found.source = f"{name}:{workflows[0][0]}"
     return found
+
+
+def _parts(entry: str) -> list[str]:
+    """A zip entry's name as folder parts that stay relative: no root, drive letter, '.' or '..'."""
+    return [p for p in PurePosixPath(entry).parts
+            if p not in ("", ".", "..") and not p.startswith("/") and not re.fullmatch(r"[A-Za-z]:", p)]
+
+
+def _asset_path(assets: Path, rel: str) -> Path | None:
+    """Where an asset goes: inside the pack's assets/ folder, or None."""
+    if not rel or "\\" in rel or "\x00" in rel or rel.startswith("/") or re.search(r"(^|/)\.\.?(/|$)", rel):
+        return None
+    p = assets / rel
+    return p if p.resolve().is_relative_to(assets.resolve()) else None
 
 
 def unique_id(packs: Packs, base: str) -> str:
@@ -234,9 +253,9 @@ def create(packs: Packs, catalog: NodeCatalog, found: Found, wid: str | None, na
         if keep_api:
             (d / API).write_text(json.dumps(found.api, indent=1))
         for rel, b in found.assets.items():
-            if re.search(r"(^|/)\.\.?(/|$)", rel):
+            p = _asset_path(d / "assets", rel)
+            if p is None:
                 continue
-            p = d / "assets" / rel
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(b)
     except OSError:

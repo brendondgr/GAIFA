@@ -17,6 +17,7 @@ from PIL.PngImagePlugin import PngInfo
 from comfy import importer
 from comfy.downloads import Downloads
 from comfy.nodes import NodeCatalog
+from comfy.packs import Packs
 from comfy.server import create_app
 from fakecomfy import FakeComfy, FakeHub
 
@@ -175,3 +176,78 @@ def test_cli_imports_media_and_zips_from_relative_paths(tmp_path, settings, monk
     assert cli.main(["new", "from-png", "--from", "shot.png"]) == 0
     assert (settings.workflows / "from-png" / "workflow.json").exists()
     assert "made workflows/from-png/ (editor file)" in capsys.readouterr().out
+
+
+def test_zip_entries_cant_write_outside_the_pack(tmp_path):
+    """An entry named /home/…/.bashrc beside the workflow became the asset "//home/…", and
+    d/"assets"/"//home/…" is that absolute path: the import wrote it."""
+    target = tmp_path / "escaped.txt"
+    b = io.BytesIO()
+    with zipfile.ZipFile(b, "w") as z:
+        z.writestr("wf.json", json.dumps(EDITOR))
+        z.writestr(str(target), b"WRITTEN-OUTSIDE")
+        z.writestr("C:/luts/Blue.cube", "LUT")
+        z.writestr("../../up.txt", "UP")
+    f = importer.read_file("pack.zip", b.getvalue())
+    assert all(not k.startswith("/") and ".." not in k.split("/") for k in f.assets), f.assets
+    packs = Packs(tmp_path / "wf")
+    pid = importer.create(packs, None, f, "evil", "pack.zip")
+    assert not target.exists() and not (tmp_path / "up.txt").exists()
+    assets = tmp_path / "wf" / pid / "assets"
+    written = {str(p.relative_to(assets)) for p in assets.rglob("*") if p.is_file()}
+    assert written == {str(target).lstrip("/"), "luts/Blue.cube", "up.txt"}
+    f.assets["//etc/x"] = b"x"                                   # whatever a reader hands it, create stays inside
+    f.assets["a\\..\\..\\y"] = b"y"
+    importer.create(packs, None, f, "evil2", "pack.zip")
+    assert not (tmp_path / "wf" / "evil2" / "assets" / "etc").exists()
+
+
+def test_zip_symlinks_and_backslashes_are_refused():
+    for entry, attr in (("assets/link", (0o120777 << 16)), ("luts\\Blue.cube", 0o100644 << 16)):
+        b = io.BytesIO()
+        with zipfile.ZipFile(b, "w") as z:
+            z.writestr("wf.json", json.dumps(EDITOR))
+            info = zipfile.ZipInfo(entry)
+            info.external_attr = attr
+            z.writestr(info, "/home/bdgr/.ssh/id_ed25519")
+        with pytest.raises(importer.ImportError_):
+            importer.read_file("pack.zip", b.getvalue())
+
+
+def test_hf_token_goes_only_to_huggingface(tmp_path, monkeypatch):
+    """netloc.endswith("huggingface.co") sent HF_TOKEN to nothuggingface.co; redirects to http were followed."""
+    import comfy.downloads as dls
+    import httpx
+    seen: list[tuple[str, str | None]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((str(request.url), request.headers.get("authorization")))
+        if request.url.path.endswith("/to-http"):
+            return httpx.Response(302, headers={"location": "http://huggingface.co/plain.safetensors"})
+        return httpx.Response(200, content=b"x" * 1000)
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(dls.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    monkeypatch.setenv("HF_TOKEN", "hf_secret")
+
+    async def go(url, name, limit=None):
+        if limit:
+            monkeypatch.setattr(dls, "MAX_BYTES", limit)
+        d = Downloads(tmp_path / "models")
+        dl = d.start(url, "vae", name)
+        for _ in range(100):
+            if dl.state in ("done", "failed"):
+                break
+            await asyncio.sleep(0.02)
+        return dl
+
+    assert asyncio.run(go("https://nothuggingface.co/x.safetensors", "a.safetensors")).state == "done"
+    assert seen[-1][1] is None
+    asyncio.run(go("https://huggingface.co.evil.example/x.safetensors", "b.safetensors"))
+    assert seen[-1][1] is None
+    asyncio.run(go("https://cdn-lfs.huggingface.co/x.safetensors", "c.safetensors"))
+    assert seen[-1][1] == "Bearer hf_secret"
+    dl = asyncio.run(go("https://huggingface.co/to-http", "d.safetensors"))
+    assert dl.state == "failed" and "https" in dl.error and not (tmp_path / "models" / "vae" / "d.safetensors").exists()
+    dl = asyncio.run(go("https://huggingface.co/big.safetensors", "e.safetensors", limit=500))
+    assert dl.state == "failed" and not (tmp_path / "models" / "vae" / "e.safetensors").exists()

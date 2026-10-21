@@ -168,6 +168,9 @@ def patch(pack: Pack, conv: Converted, values: dict[str, Any], catalog: NodeCata
         targets = [(eid, im.field)] + [split_target(t) for t in im.also]
         for node, fld in targets:
             if node in g:
+                if PATH_FIELD.search(fld) and not _plain_name(values[name]):
+                    raise InputError(f"{name}: {values[name]!r} would set {fld}, which says where a node saves: "
+                                     "give a plain name without '/', '\\' or '..'")
                 g[node]["inputs"][fld] = values[name]
     now = now or datetime.now()
     savers = [k for k, n in g.items() if catalog.is_output(n["class_type"]) and "filename_prefix" in n["inputs"]
@@ -175,6 +178,17 @@ def patch(pack: Pack, conv: Converted, values: dict[str, Any], catalog: NodeCata
     for i, k in enumerate(sorted(savers, key=lambda x: [int(p) if p.isdigit() else 0 for p in x.split(":")])):
         g[k]["inputs"]["filename_prefix"] = f"{now:%Y-%m-%d}/{now:%H%M%S}-{slug}" + (f"-{i + 1}" if len(savers) > 1 else "")
     return g
+
+
+PATH_FIELD = re.compile(r"(filename_prefix|subfolder|(output|save)_(path|dir|directory|folder))$", re.I)   # where a node saves
+
+
+def _plain_name(v: Any) -> bool:
+    """A caller's value for a field that says where a node saves: one name, no folders. Core
+    ComfyUI keeps filename_prefix inside its output folder; custom saving nodes don't all check."""
+    if not isinstance(v, str):
+        return True
+    return not (v.startswith("~") or ".." in v or any(c in v for c in "/\\\x00"))
 
 
 def slugify(text: str, fallback: str = "comfy") -> str:

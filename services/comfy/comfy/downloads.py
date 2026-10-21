@@ -11,7 +11,7 @@ import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 
 import httpx
 
@@ -23,6 +23,13 @@ KIND = {"diffusion_models": "image", "unet": "image", "checkpoints": "image", "t
         "clip": "text-encoder", "vae": "vae", "loras": "lora", "clip_vision": "vision", "upscale_models": "upscale",
         "latent_upscale_models": "upscale"}
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,200}$")
+MAX_BYTES = 100 * 1024**3        # no single model file is bigger; a server that sends more is refused
+
+
+def is_hf(url: str) -> bool:
+    """huggingface.co or one of its subdomains (where HF_TOKEN may go), not nothuggingface.co."""
+    host = (urlsplit(url).hostname or "").lower().rstrip(".")
+    return host == "huggingface.co" or host.endswith(".huggingface.co")
 
 
 @dataclass
@@ -76,18 +83,29 @@ class Downloads:
         dl.state = "running"
         headers = {}
         token = os.environ.get("HF_TOKEN")
-        if token and urlparse(dl.url).netloc.endswith("huggingface.co"):
-            headers["Authorization"] = f"Bearer {token}"
+        if token and is_hf(dl.url):
+            headers["Authorization"] = f"Bearer {token}"   # httpx drops it on a redirect to another host
+        schemes = ("https", "http") if self.allow_http else ("https",)
+
+        async def https_only(request: httpx.Request) -> None:      # every hop, redirects included
+            if request.url.scheme not in schemes:
+                raise RuntimeError(f"a redirect led to {request.url.scheme}://{request.url.host}: only https is followed")
+
         try:
-            async with httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(30, read=300)) as c:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(30, read=300), max_redirects=10,
+                                         event_hooks={"request": [https_only]}) as c:
                 async with c.stream("GET", dl.url, headers=headers) as r:
                     if r.status_code >= 400:
                         raise RuntimeError(f"the server answered {r.status_code}")
                     dl.total = int(r.headers.get("content-length") or 0) or None
+                    if dl.total and dl.total > MAX_BYTES:
+                        raise RuntimeError(f"the file is {dl.total / 1e9:.0f} GB, over the {MAX_BYTES / 1e9:.0f} GB limit")
                     with part.open("wb") as f:
                         async for chunk in r.aiter_bytes(1 << 20):
-                            f.write(chunk)
                             dl.bytes += len(chunk)
+                            if dl.bytes > MAX_BYTES:
+                                raise RuntimeError(f"stopped at the {MAX_BYTES / 1e9:.0f} GB limit")
+                            f.write(chunk)
             os.replace(part, dest)
             dl.state = "done"
             log.info("downloaded %s/%s (%d bytes)", dl.folder, dl.name, dl.bytes)
@@ -103,7 +121,7 @@ class Downloads:
             return None
         rel = f"comfyui/{dl.folder}/{dl.name}"
         u = urlparse(dl.url)
-        repo = "/".join(u.path.strip("/").split("/")[:2]) if u.netloc.endswith("huggingface.co") else None
+        repo = "/".join(u.path.strip("/").split("/")[:2]) if is_hf(dl.url) else None
         kind = KIND.get(dl.folder, "other")
         if kind == "image" and re.search(r"wan|video|hunyuan|ltx|scail", dl.name, re.I):
             kind = "video"

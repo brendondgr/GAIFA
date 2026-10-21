@@ -32,7 +32,7 @@ services/comfy/workflows/<id>/
 
 Every import becomes a **draft**. It is checked against your installed nodes and models, and AIHub suggests its inputs. Review it on the page, or run `comfyui workflows suggest <id>`. Saving the review (or `--write`) writes `workflow.toml`, and the draft becomes a pack.
 
-**From a zip:** each workflow JSON in it becomes its own draft (`<id>-1`, `<id>-2`, … when there are several, as Civitai packs often ship variants). The zip's other files (LUTs, example images) are kept in each pack's `assets/`. An editor file is preferred over an API graph; the API graph is kept as `workflow.api.json` only when the editor file is missing or doesn't convert.
+**From a zip:** each workflow JSON in it becomes its own draft (`<id>-1`, `<id>-2`, … when there are several, as Civitai packs often ship variants). The zip's other files (LUTs, example images) are kept in each pack's `assets/`. An editor file is preferred over an API graph; the API graph is kept as `workflow.api.json` only when the editor file is missing or doesn't convert. Entry names are kept inside the pack's `assets/`; a zip with symlinks or backslash names is refused.
 
 **What isn't found by itself** (add it by hand in `workflow.toml`, or with "Expose another field" on the review screen):
 - inputs on custom nodes that aren't installed: their fields can't be known until they are (the check names the package; a note says where the prompt comes from)
@@ -138,6 +138,8 @@ A pack's `task` says what it does. The agent gets **one tool per task** that has
 - `upload:<name>`: from `POST /v1/uploads`, or the Upload button
 - a result's path, such as `comfy/2026-10-06/….png` (the "Use as input" button)
 - a file already in ComfyUI's input folder
+
+A name that would leave its folder (an absolute path, `..`, a backslash, `~`, or a symlink out) is refused with 422 before the file is looked up, so the answer is the same whether the file exists or not; an `output:` id must be a plain id. A caller's value for `filename_prefix` or another save-location field must be one name, with no `/`, `\` or `..`.
 
 ## 5. Changing a workflow
 

@@ -286,3 +286,50 @@ def test_megapixels_sets_a_square_resolution(tmp_path):
     assert resolve(pack, schema, {"prompt": "x"}, preset="fast") == {"prompt": "x", "resolution": 768}
     assert resolve(pack, schema, {"prompt": "x"}, preset="draft")["resolution"] == 576
     assert resolve(pack, schema, {"prompt": "x", "megapixels": 2}, preset="fast")["resolution"] == 1440   # the caller wins
+
+
+@pytest.mark.parametrize("value", ["../home/Pictures/secret.png", "upload:../../home/Pictures/secret.png",
+                                   "upload:/etc/hostname", "sub/../../secret.png", "..\\secret.png", "upload:..",
+                                   "output:../../api/outputs/o42", "/api/outputs/../file", "a\x00b.png", "link/secret.png"])
+def test_a_file_input_cant_leave_the_input_folder(env, value):
+    """ComfyUI's LoadImage only checks that input/<name> exists: "../…" reached any picture under
+    $HOME (the toolbox shares it), and the error told whether a file was there."""
+    c, fake, hub, s = env
+    secret = s.input.parent / "home" / "Pictures" / "secret.png"     # input/../home/…, as $HOME is from the real input/
+    secret.parent.mkdir(parents=True)
+    secret.write_bytes(b"SECRET")
+    (s.input.parent / "secret.png").write_bytes(b"SECRET")
+    (s.input / "aihub").mkdir(parents=True, exist_ok=True)
+    (s.input / "link").symlink_to(secret.parent)                      # a folder link inside input/ that leads out
+    hub.files["o42"] = ("comfy/2026-10-06/x.png", b"OUT")
+    n = len(fake.prompts)
+    missing = value.replace("secret", "nothere")
+    r1 = c.post("/v1/run", json={"workflow": "wan", "inputs": {"prompt": "x", "image": value}})
+    r2 = c.post("/v1/run", json={"workflow": "wan", "inputs": {"prompt": "x", "image": missing}})
+    assert r1.status_code == 422 and r1.json()["code"] == "invalid_input", r1.json()
+    assert r1.json()["detail"].replace("secret", "nothere") == r2.json()["detail"]   # same answer: existence isn't told
+    assert len(fake.prompts) == n
+
+
+def test_plain_names_in_the_input_folder_still_work(env):
+    c, fake, hub, s = env
+    (s.input / "3d").mkdir(parents=True)
+    (s.input / "3d" / "front.png").write_bytes(b"PNG")
+    run(c, {"workflow": "wan", "inputs": {"prompt": "x", "image": "3d/front.png"}})
+    assert fake.prompts[-1]["prompt"]["10"]["inputs"]["image"] == "3d/front.png"
+
+
+def test_a_save_location_input_is_one_name(env):
+    """A caller's value that lands on a filename_prefix (or another save-location field) can't hold
+    folders: custom saving nodes don't all keep it inside ComfyUI's output folder."""
+    c, fake, hub, s = env
+    d = s.workflows / "zsave"
+    d.mkdir()
+    shutil.copyfile(FIX / "workflows" / "zit-workflow.json", d / "workflow.json")
+    (d / "workflow.toml").write_text(ZIT + '[inputs.name]\nnode = "77"\nfield = "filename_prefix"\n')
+    n = len(fake.prompts)
+    for bad in ("../../../.config/autostart/x", "/tmp/x", "a/b", "..\\x"):
+        r = c.post("/v1/run", json={"workflow": "zsave", "inputs": {"prompt": "x", "name": bad}})
+        assert r.status_code == 422 and "filename_prefix" in r.json()["detail"], r.json()
+    assert len(fake.prompts) == n
+    assert run(c, {"workflow": "zsave", "inputs": {"prompt": "x", "name": "portrait-1"}})["state"] == "done"

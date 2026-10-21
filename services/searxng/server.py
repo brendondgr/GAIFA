@@ -54,10 +54,11 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
         await sx.tick()
         task = asyncio.create_task(sx.watch())
         yield
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
-        await sx.http.aclose()
+        task.cancel()   # shutdown never waits long: a watch round stuck in a call, or a pooled connection, can't hold it
+        with contextlib.suppress(asyncio.CancelledError, TimeoutError):
+            await asyncio.wait_for(task, 5)
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(sx.http.aclose(), 5)
 
     app = FastAPI(title="SearXNG", version="0.1.0", lifespan=lifespan,
                   description="Finds the SearXNG on this machine, watches it and its engines, and adjusts its settings.")

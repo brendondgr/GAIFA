@@ -3,6 +3,27 @@ id = "embed"
 title = "Embeddings: EmbeddingGemma 2"
 models = ["embed/**"]
 scan = []
+summary = "Embeddings: search outputs, documents and chats by meaning (text, images, audio, video in one space)"
+gpu = true
+disk_gb = 6.6
+needs = ["uv"]
+check = "aihub start embed && aihub check embed"
+
+[[steps]]
+run = "aihub install embed"
+what = "makes .venv/ from locks/embed.txt (ROCm nightly torch, about 4 GB of wheels, 6.6 GB installed) and downloads EmbeddingGemma 2 (1.5 GB)"
+
+[[suggest]]
+name = "EmbeddingGemma 2"
+repo = "google/embeddinggemma-2"
+revision = "914f7f89142e33e77833254d9c9b90c3cef7303b"
+files = []
+dest = "embed/embeddinggemma-2"
+kind = "text-encoder"
+size_gb = 1.53
+good_for = "the encoder the mod runs: 768-d vectors for text, code, images, audio and video"
+licence = "Apache-2.0"
+required = true
 -->
 
 # Embeddings: setup
@@ -47,6 +68,14 @@ services/embed/install.sh --cpu
 ```
 
 The same packages unpinned, with PyTorch's CPU wheels. The model then runs in fp32 (see What to look for).
+
+## Choosing models
+
+The mod runs **one fixed model**, required: EmbeddingGemma 2 at a pinned revision (`REVISION` in `embed/settings.py` and `install.sh`), in `data/models/embed/embeddinggemma-2/` (`EMBED_MODEL_DIR`). `install.sh` downloads it; `--no-weights` skips that if you fetch it yourself. Vectors from different models don't mix, so another encoder would mean new code and re-indexing the library.
+
+| Model | Size | Good for | Licence |
+|---|---|---|---|
+| [google/embeddinggemma-2](https://huggingface.co/google/embeddinggemma-2) at `914f7f89` | 1.5 GB | text, code, images, audio and video in one 768-d space (Matryoshka 512/256/128), 8k context | Apache-2.0 |
 
 ## Configuration
 

@@ -69,7 +69,7 @@ def test_every_key(tmp_path: Path) -> None:
     assert [st.run for st in s.steps] == ["aihub install tts", "scripts/install-runtime.sh --accept-breeze-license"]
     assert s.steps[0].ask == "" and s.steps[1].ask.startswith("Breeze TTS 2")
     k, w = s.suggest
-    assert (k.repo, k.revision, k.dest, k.size_gb, k.required, k.gated, k.op) == ("hexgrad/Kokoro-82M", "f3ff357", "hf-cache", 0.34, True, False, "")
+    assert (k.repo, k.revision, k.dest, k.size_gb, k.required, k.gated, k.op, k.kind) == ("hexgrad/Kokoro-82M", "f3ff357", "hf-cache", 0.34, True, False, "", "other")
     assert (w.op, w.body, w.repo, w.required) == ("POST /v1/load", {"preset": "balanced"}, "", False)
 
 
@@ -93,6 +93,8 @@ def test_the_new_keys_are_optional(tmp_path: Path) -> None:
     ('[[suggest]]\nname = "A"\nsize_gb = 1\ngood_for = "b"\nrepo = "nope"\ndest = "x"', "`repo` must look like org/name"),
     ('[[suggest]]\nname = "A"\nsize_gb = 1\ngood_for = "b"\nop = "load it"', '`op` must look like "POST /v1/load"'),
     ('[[suggest]]\nname = "A"\nsize_gb = 1\ngood_for = "b"\nop = "POST /v1/load"\ndest = "x"', "go with `repo`, not `op`"),
+    ('[[suggest]]\nname = "A"\nsize_gb = 1\ngood_for = "b"\nop = "POST /v1/load"\nkind = "tts"', "go with `repo`, not `op`"),
+    ('[[suggest]]\nname = "A"\nsize_gb = 1\ngood_for = "b"\nrepo = "o/r"\ndest = "x"\nkind = ""', "`kind` must be a registry kind"),
     ('[[suggest]]\nname = "A"\ngood_for = "b"\nrepo = "o/r"\ndest = "x"', "`size_gb` must be a number"),
     ('[[suggest]]\nname = "A"\nsize_gb = 1\ngood_for = "b"\nrepo = "o/r"\ndest = "x"\nrequired = "yes"', "`required` must be true or false"),
     ('[[suggest]]\nname = "A"\nsize_gb = 1\ngood_for = "b"\nrepo = "o/r"\ndest = "x"\nmirror = "y"', "suggest[0]: unknown key(s) mirror"),

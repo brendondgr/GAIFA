@@ -3,6 +3,15 @@ id = "web"
 title = "Web (SearXNG search and page fetching)"
 models = []
 scan = []
+summary = "Web: search through your SearXNG and fetch pages and PDFs into Outputs, for you and the agent"
+gpu = false
+disk_gb = 0.1
+needs = ["uv"]
+check = "aihub start web && aihub check web"
+
+[[steps]]
+run = "aihub install web"
+what = "makes .venv/ from requirements-dev.txt (about 70 MB, under a minute); SearXNG, for search, runs outside AIHub (this doc's Install)"
 -->
 
 # Web: setup
@@ -84,6 +93,10 @@ aihub install web
 ```
 
 Makes `.venv/` in this folder from `requirements-dev.txt` (the server's packages and pytest; about 70 MB, under a minute).
+
+## Choosing models
+
+None: the mod runs no model. Pages are read with trafilatura, and search is whatever engines your SearXNG asks.
 
 ## Configuration
 

@@ -3,6 +3,27 @@ id = "decide"
 title = "Decisions: d3-lite"
 models = ["decide/**"]
 scan = []
+summary = "Decisions: fast yes/no, choice and score answers with probabilities (the Auto judge's d3-lite)"
+gpu = true
+disk_gb = 6.6
+needs = ["uv"]
+check = "aihub start decide && aihub check decide"
+
+[[steps]]
+run = "aihub install decide"
+what = "makes .venv/ from locks/decide.txt (ROCm nightly torch, about 4 GB of wheels, 6.6 GB installed) and downloads d3-lite (1.7 GB) at its pinned revision"
+
+[[suggest]]
+name = "d3-lite"
+repo = "vllm-sr/d3-lite"
+revision = "03560c26f5199c3c04129a2ccb38960c913635e0"
+files = []
+dest = "decide/d3-lite"
+kind = "other"
+size_gb = 1.73
+good_for = "the decision model the mod runs: yes/no, choice and score questions over text, images and video"
+licence = "Apache-2.0"
+required = true
 -->
 
 # Decisions: setup
@@ -66,6 +87,16 @@ Runs `install.sh`:
 2. Downloads d3-lite at the pinned revision into `data/models/decide/d3-lite/` if it isn't there (1.7 GB, without the card's images), then checks every file against `MODEL_MANIFEST.json`.
 
 On start the mod registers the model with the hub (`POST /api/models`, kind `other`, tags `decision-model` and `classification`, source with the revision). `install.sh --force` downloads the pinned files again (after the check reports changed files); `--cpu` installs PyTorch's CPU wheels on another machine.
+
+## Choosing models
+
+The mod runs **fixed, pinned weights**, not any model: a decision model's code runs with `trust_remote_code`, so each one is added in code (`decide/models/`) after its code is read, at one revision. Today there is one, **d3-lite** (required; `install.sh` downloads it into `data/models/decide/d3-lite/`):
+
+| Model | Size | Good for | Licence |
+|---|---|---|---|
+| [vllm-sr/d3-lite](https://huggingface.co/vllm-sr/d3-lite) at `03560c26` | 1.7 GB | yes/no, choice and score questions over text, images and video | Apache-2.0 |
+
+Adding another decision model means a new module in `decide/models/` with its pinned files, and the reading described above.
 
 ## Configuration
 

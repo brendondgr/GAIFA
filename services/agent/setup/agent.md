@@ -3,6 +3,20 @@ id = "agent"
 title = "Chat agent"
 models = []
 scan = []
+summary = "Chat agent: the Chat page's tool loop (files, search, images, speech) on any chat model the relay serves"
+gpu = false
+disk_gb = 0.05
+needs = ["uv"]
+after = ["relay"]
+check = "aihub check agent"
+
+[[steps]]
+run = "aihub install agent"
+what = "makes .venv/ from requirements-dev.txt (about 45 MB, seconds from uv's cache)"
+
+[[steps]]
+run = "aihub start agent"
+what = "starts the agent on 127.0.0.1:5100; set AGENT_MODEL to one of your relay's models (Choosing models in its setup doc)"
 -->
 
 # Chat agent: setup
@@ -46,6 +60,16 @@ Then point it at models that exist on **your** relay (next section) and start it
 aihub start agent
 ```
 
+## Choosing models
+
+The agent runs no model and downloads none, so it has no suggestions. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
+- **[llama.cpp](../../lcpp/setup/llama-cpp.md) (`lcpp`):** any GGUF you add; a running instance registers under its catalog nickname (`nicknames` in `services/lcpp/data/models.json`), or the alias given at launch. Its doc suggests two models that take tool calls.
+- **[vLLM](../../vllm/setup/vllm.md):** a loaded profile registers under its `alias` (such as `Qwen3-0.6B-vLLM`; the profiles are parked here).
+- **[OpenCode](../../opencode/setup/opencode.md):** `agent`, or a free hosted id such as `opencode/glm-5.3-flash-free`, with no GPU at all.
+- **An endpoint you added** on the relay's page (any OpenAI-compatible server): its alias.
+
+A model that is always up makes the better default; an lcpp nickname is listed only while its instance runs. The thread's model can also be changed per chat in Chat's header.
+
 ## Configuration
 
 `service.toml` `[run.env]` sets every key. To change one on your machine, don't edit `service.toml`: put it in `config.toml`, which wins (architecture §4.4), and restart the mod:
@@ -66,13 +90,7 @@ env = { AGENT_MODEL = "gemma4-26B", AGENT_FALLBACK_MODEL = "" }
 | `AGENT_INLINE_TOKENS` | `6000` | optional | an attached document up to this size goes into the message whole |
 | `AGENT_DEFAULT_WINDOW`, `AGENT_REPLY_RESERVE`, `AGENT_SUMMARY_IDLE_MIN`, `AGENT_ALL_TOOLS` | unset | optional | 32768, 4096, 30 and none by default (`agent/server.py`) |
 
-**The two model names are this machine's.** `skynet` is a remote GPU box reached through an SSH tunnel; it exists only here. `gemma4-26B` is lcpp's nickname for Gemma 4 26B-A4B, and the relay lists it only while an lcpp instance of it runs. On a new machine, pick names you have:
-- **lcpp:** a running instance registers under its catalog nickname (`nicknames` in `services/lcpp/data/models.json`; here `gemma4-26B`), or the alias given at launch.
-- **vllm:** a loaded profile registers under its `alias` (`Qwen3-0.6B-vLLM`, `Qwen3.6-35B-A3B-vLLM`; both parked here, see the vLLM doc).
-- **OpenCode:** `agent`, or an id such as `opencode/glm-5.3-flash-free`.
-- **An endpoint you added:** its alias.
-
-The thread's model can also be changed per chat in Chat's header.
+**The two model names are this machine's,** as examples: `skynet` is a remote GPU box reached through an SSH tunnel that exists only here, and `gemma4-26B` is lcpp's nickname for the Gemma 4 26B-A4B GGUF used here. On your machine, set names you have (Choosing models, above).
 
 **Settings → Agent** holds the Auto mode's judge model: `config.toml [agent.judge]`, here `model = "gemma4-26B"` with `backend = "relay"`. The default in code is `minicpm-5-2B`, which isn't on this relay either: pick one of yours there, or the `decide` mod's models with `backend = "decide"`. The same page has the document defaults and speech input.
 

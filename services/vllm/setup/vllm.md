@@ -3,6 +3,32 @@ id = "vllm"
 title = "vLLM"
 models = []
 scan = ["profiles/*.toml", "profiles/disabled/*.toml"]
+summary = "vLLM: serve Hugging Face chat models (safetensors, AWQ) on the GPU, published to the relay; parked here"
+gpu = true
+disk_gb = 12.5
+needs = ["uv", "podman"]
+after = ["relay"]
+check = "aihub check vllm"
+
+[[steps]]
+run = "aihub install vllm"
+what = "makes the adapter's .venv/ and pulls the pinned kyuz0/vllm-therock-gfx1151 image (12.4 GB on disk, from Docker Hub)"
+
+[[suggest]]
+name = "Qwen3 0.6B (the smoke-test profile)"
+op = "POST /v1/downloads"
+body = { profile = "qwen3-0.6b" }
+size_gb = 1.52
+good_for = "proving vLLM runs on your GPU in about 2 minutes; move its profile back from profiles/disabled/ first"
+licence = "Apache-2.0"
+
+[[suggest]]
+name = "Qwen3.6 35B-A3B, AWQ 4-bit"
+op = "POST /v1/downloads"
+body = { profile = "qwen3.6-35b-a3b-awq" }
+size_gb = 25.0
+good_for = "a capable agent model with tool calls and thinking, about 3B active; move its profile back from profiles/disabled/ first"
+licence = "Apache-2.0"
 -->
 
 # vLLM: setup
@@ -58,6 +84,17 @@ mv services/vllm/profiles/disabled/qwen3-0.6b.toml services/vllm/profiles/
 Then set `autostart = true` under `[services.vllm]` in `config.toml` (or leave it off and start by hand), `aihub start vllm`, and load the profile from the vLLM page. **The first load downloads its model** into `data/models/hf-cache/` (`HF_HOME`) before it asks for memory, registers it as `<repo> (vLLM)`, then starts the engine. The engine itself runs with `HF_HUB_OFFLINE=1`.
 
 **The first start compiles.** The smoke test took 130 s cold (torch.compile 16 s); a hybrid model like Qwen3.6 also autotunes Triton kernels during its first start. The adapter waits up to 1200 s. The compile and tuning caches persist in `data/state/vllm/cache/` (`triton`, `inductor`, `vllm`, `xdg`), so later starts are faster.
+
+## Choosing models
+
+vLLM runs **Hugging Face repos** in a format the pinned image supports (safetensors in BF16, AWQ; not GGUF). Each model is a **profile**: `profiles/<id>.toml`, written by hand or with the page's profile form (`PUT /v1/profiles/<id>`), naming the repo, its alias on the relay and its memory budget. `POST /v1/downloads {"profile": "<id>"}` (the page's Download button) fetches its repo into `data/models/hf-cache/` without loading it; a load downloads first if needed. Gated repos need a Hugging Face token.
+
+The two seed profiles are the suggestions, both optional and both **parked** in `profiles/disabled/` on this machine, so move one back (above) before `aihub setup` or the page can download it. Sizes from Hugging Face, 2026-10-21:
+
+| Profile | Repo | Size | Good for | Licence |
+|---|---|---|---|---|
+| `qwen3-0.6b` | [Qwen/Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B) | 1.5 GB | the smoke test: proves the engine runs (`memory_gb = 12`) | Apache-2.0 |
+| `qwen3.6-35b-a3b-awq` | [cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit](https://huggingface.co/cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit) | 25.0 GB | an agent model with tool calls and thinking, about 3B active (`memory_gb = 40`, not yet measured) | Apache-2.0 |
 
 ## Configuration
 

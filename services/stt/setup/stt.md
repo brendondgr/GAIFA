@@ -3,6 +3,31 @@ id = "stt"
 title = "Speech to Text (faster-whisper)"
 models = ["stt/**"]
 scan = []
+summary = "Speech to text: transcribe audio and video files, live dictation and the Chat microphone (Whisper)"
+gpu = true
+disk_gb = 0.75
+needs = ["uv", "ffmpeg"]
+check = "aihub start stt && aihub check stt"
+
+[[steps]]
+run = "aihub install stt"
+what = "makes .venv/ (Python 3.14, about 250 MB) and puts the ROCm build of CTranslate2 in, downloading its release zip (about 400 MB, from GitHub) when no wheel is kept in runtime/wheels/"
+
+[[suggest]]
+name = "Whisper small (the balanced preset)"
+op = "POST /v1/load"
+body = { preset = "balanced" }
+size_gb = 0.49
+good_for = "the default: dictation and files at about 30x real time on the GPU"
+licence = "MIT"
+
+[[suggest]]
+name = "Whisper large-v3-turbo (the accurate preset)"
+op = "POST /v1/load"
+body = { preset = "accurate" }
+size_gb = 1.62
+good_for = "nearly large-v3's accuracy at about four times its speed; long or noisy recordings"
+licence = "MIT"
 -->
 
 # Speech to Text (faster-whisper): setup
@@ -41,7 +66,9 @@ aihub install stt
 
 Runs `install.sh`: makes `.venv/` with uv-managed Python 3.14 from `requirements-dev.txt` (about 250 MB, a minute), then, on a machine with `/dev/kfd`, reinstalls CTranslate2 from the ROCm wheel kept in `runtime/wheels/` (gitignored). When no wheel is kept there it downloads `rocm-python-wheels-Linux.zip` (about 400 MB) from the [CTranslate2 v4.8.1 release](https://github.com/OpenNMT/CTranslate2/releases/tag/v4.8.1) and keeps the `cp314-cp314` wheel.
 
-Models are fetched on first use into `data/models/stt/<name>/` and registered in the models registry. To fetch one ahead of time:
+## Choosing models
+
+The mod runs **faster-whisper's CTranslate2 conversions of Whisper**, from a fixed list (`stt/catalog.py`): `tiny` to `large-v3`, picked by preset or by name. None is needed to install it: a model is fetched on first use into `data/models/stt/<name>/` and registered in the models registry. The suggestions are two presets; Whisper's weights are MIT-licensed. To fetch one ahead of time (it loads it, too):
 
 ```bash
 curl -X POST http://127.0.0.1:7000/api/s/stt/v1/load -H 'content-type: application/json' -d '{"preset": "balanced"}'

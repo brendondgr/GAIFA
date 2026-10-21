@@ -3,6 +3,39 @@ id = "lcpp"
 title = "llama.cpp (LLM Launcher)"
 models = ["llm/**"]
 scan = ["data/models.json"]
+summary = "LLM Launcher: run any GGUF chat model with llama.cpp on the GPU (Vulkan), published to the relay"
+gpu = true
+disk_gb = 0.15
+needs = ["uv", "curl", "tar", "sha256sum", "systemd-run"]
+check = "aihub check lcpp"
+
+[[steps]]
+run = "aihub install lcpp"
+what = "makes the daemon's .venv/ from uv.lock (about 29 MB); it doesn't fetch llama.cpp"
+
+[[steps]]
+run = "mkdir -p runtime/llama.cpp/vendor runtime/llama.cpp/bin && curl -L -o runtime/llama.cpp/vendor/llama-b11445-bin-ubuntu-vulkan-x64.tar.gz https://github.com/ggml-org/llama.cpp/releases/download/b11445/llama-b11445-bin-ubuntu-vulkan-x64.tar.gz"
+what = "downloads llama.cpp build 11445, the Vulkan release asset (32 MB, from GitHub)"
+
+[[steps]]
+run = 'echo "dd98daa1df6ae680e69a0b5e27789b00d90715e712d007bd14c2c35d3841faf6  runtime/llama.cpp/vendor/llama-b11445-bin-ubuntu-vulkan-x64.tar.gz" | sha256sum -c && tar xzf runtime/llama.cpp/vendor/llama-b11445-bin-ubuntu-vulkan-x64.tar.gz -C runtime/llama.cpp/bin && ln -sfn llama-b11445 runtime/llama.cpp/bin/current'
+what = "checks the archive's sha256, unpacks llama-b11445/ (about 90 MB) and points runtime/llama.cpp/bin/current at it"
+
+[[suggest]]
+name = "Qwen3 8B (Q4_K_M)"
+op = "POST /api/downloads"
+body = { repo = "Qwen/Qwen3-8B-GGUF", revision = "7c41481f57cb95916b40956ab2f0b139b296d974", choice = "Qwen3-8B-Q4_K_M.gguf" }
+size_gb = 5.03
+good_for = "an everyday chat model with tool calls and thinking, small enough to run beside other mods"
+licence = "Apache-2.0"
+
+[[suggest]]
+name = "Gemma 4 26B-A4B (Q8_0, with vision and MTP)"
+op = "POST /api/downloads"
+body = { repo = "ggml-org/gemma-4-26B-A4B-it-GGUF", revision = "9cf8c8db0f83fb4582f15381f8fb1a7c1b0b9ca2", choice = "gemma-4-26B-A4B-it-Q8_0.gguf", mmproj = "mmproj-gemma-4-26B-A4B-it-Q8_0.gguf", draft = "mtp-gemma-4-26B-A4B-it-Q8_0.gguf" }
+size_gb = 28.13
+good_for = "a strong agent and judge model (mixture of experts, about 4B active), images in, an MTP draft"
+licence = "Apache-2.0"
 -->
 
 # llama.cpp (LLM Launcher): setup
@@ -15,7 +48,7 @@ The `lcpp` mod (port 7710) starts and stops llama.cpp servers for GGUF models an
 - **The daemon**, `.venv/` in this folder (FastAPI, uvicorn, httpx). It loads no model. Each instance it launches is its own transient systemd user unit (`lcpp-<name>.service`), so instances survive a daemon restart.
 - **`llama-server`**, a prebuilt **Vulkan** build of llama.cpp from the [ggml-org releases](https://github.com/ggml-org/llama.cpp/releases), unpacked by hand under `runtime/` (gitignored). It runs on the GPU through Mesa's RADV driver; no ROCm is needed.
 
-The LLM Launcher page, the `gemma4-26B` model the agent and the Auto judge use here, and the agent's `list_llms` / `start_llm` tools need this environment.
+The LLM Launcher page, any local GGUF the agent or the Auto judge uses (on this machine, `gemma4-26B`), and the agent's `list_llms` / `start_llm` tools need this environment.
 
 ## Tested with
 
@@ -47,9 +80,6 @@ Runs `aihub-install.sh`: `uv sync --python 3.14` makes `.venv/` from `uv.lock` (
 
 ```bash
 mkdir -p services/lcpp/runtime/llama.cpp/vendor services/lcpp/runtime/llama.cpp/bin
-```
-
-```bash
 curl -L -o services/lcpp/runtime/llama.cpp/vendor/llama-b11445-bin-ubuntu-vulkan-x64.tar.gz https://github.com/ggml-org/llama.cpp/releases/download/b11445/llama-b11445-bin-ubuntu-vulkan-x64.tar.gz
 ```
 
@@ -73,13 +103,22 @@ ln -sfn llama-b11445 services/lcpp/runtime/llama.cpp/bin/current
 
 `data/lcpp.json` runs `runtime/llama.cpp/bin/current/llama-server`, so moving `current` is how you upgrade or roll back (`aihub restart lcpp` afterwards; running instances keep their binary).
 
-### Adding a model
+## Choosing models
 
-GGUFs live in `data/models/llm/<Folder>/` (`LCPP_MODELS_DIR`); the catalog is `data/models.json`, with paths relative to that folder. Summary of [README.md → Adding a model](../README.md#adding-a-model):
+llama.cpp runs **any GGUF** chat model; which ones is your choice, and none is needed to install the mod. GGUFs live in `data/models/llm/<Folder>/` (`LCPP_MODELS_DIR`); the catalog is `data/models.json`, with paths relative to that folder. How much fits is set by the GTT ([host.md](../../../docs/setup/host.md)): on 128 GB of unified memory, a model's file plus its context's KV cache should leave room for the other mods. Summary of [README.md → Adding a model](../README.md#adding-a-model):
 - **From Hugging Face:** the page's **Models → Add model → Hugging Face**, with a repo id or a link to one `.gguf` file. It lists the quants and the `mmproj` / `mtp` sidecars, downloads into `data/models/llm/<folder>/`, checks the Hub's sha256, adds it to the catalog and registers it in AIHub's models registry.
 - **By hand:** put the GGUF in `data/models/llm/<Name>/`, then **Models → Discovered → Add to catalog** (or an entry in `data/models.json`), and `aihub models scan --add` to register it.
 
 Only GGUF runs here; safetensors, AWQ and GPTQ repos go to [vLLM](../../vllm/setup/vllm.md).
+
+Two optional starting points, which `aihub setup` offers (the page's form does the same with a repo id and a quant); sizes from Hugging Face, 2026-10-21:
+
+| Model | Size | Good for | Licence |
+|---|---|---|---|
+| [Qwen3 8B](https://huggingface.co/Qwen/Qwen3-8B-GGUF), Q4_K_M | 5.0 GB | an everyday chat model with tool calls and thinking, small enough to run beside other mods | Apache-2.0 |
+| [Gemma 4 26B-A4B](https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF), Q8_0 with its `mmproj` (images) and `mtp` (draft) files | 28.1 GB | a strong agent and judge model (a mixture of experts, about 4B active per token); a QAT Q4_K_M variant of it is the agent's fallback and the judge on this machine | Apache-2.0 |
+
+Each joins the catalog under a suggested id; a nickname on the page sets the name the relay lists it under.
 
 ## Configuration
 

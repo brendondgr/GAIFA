@@ -3,6 +3,47 @@ id = "gen3d-sam3do"
 title = "SAM 3D Objects (3D Generate)"
 models = ["3d/sam-3d-objects", "3d/moge-vitl"]
 scan = []
+summary = "3D Generate: one picture to a mesh, the quickest full shape, with Meta's SAM 3D Objects (gated weights)"
+gpu = true
+disk_gb = 1.5
+needs = ["podman", "git", "uv"]
+after = ["gen3d-cubeart", "gen3d-img3d"]
+check = ".venv/bin/python -m gen3d.doctor | grep -Eq 'ok +SAM 3D Objects \\(image engine\\) +ready'"
+
+[[steps]]
+run = "uvx --from huggingface_hub hf auth whoami >/dev/null 2>&1 || uvx --from huggingface_hub hf auth login"
+what = "logs in to Hugging Face once (your token goes to ~/.cache/huggingface/token), for the gated weights; skipped when you're logged in"
+ask = "SAM 3D Objects' weights are gated: accept the SAM Licence on https://huggingface.co/facebook/sam-3d-objects and wait until access is granted. Is access granted?"
+
+[[steps]]
+run = "scripts/install-runtime.sh"
+what = "the runtime installer again (it skips what the other gen3d docs built): clones sam-3d-objects and DINOv2 at the pinned commits and builds runtime/sam3do/.venv inside the image, layered on img3d's and CubeArt's (about 1.5 GB; pytorch3d is built from source, CPU ops only; no GPU devices passed)"
+
+[[suggest]]
+name = "SAM 3D Objects"
+repo = "facebook/sam-3d-objects"
+files = ["checkpoints/pipeline.yaml", "checkpoints/ss_generator.ckpt", "checkpoints/ss_generator.yaml", "checkpoints/ss_decoder.ckpt",
+  "checkpoints/ss_decoder.yaml", "checkpoints/ss_encoder.yaml", "checkpoints/slat_generator.ckpt", "checkpoints/slat_generator.yaml",
+  "checkpoints/slat_decoder_mesh.ckpt", "checkpoints/slat_decoder_mesh.yaml", "checkpoints/slat_decoder_gs.ckpt",
+  "checkpoints/slat_decoder_gs.yaml", "checkpoints/slat_decoder_gs_4.yaml", "checkpoints/slat_encoder.yaml", "LICENSE", "README.md"]
+dest = "3d/sam-3d-objects"
+kind = "3d"
+size_gb = 12.28
+good_for = "the engine's checkpoints (geometry only)"
+licence = "SAM Licence"
+required = true
+gated = true
+
+[[suggest]]
+name = "MoGe v1 ViT-L"
+repo = "Ruicheng/moge-vitl"
+files = ["model.pt"]
+dest = "3d/moge-vitl"
+kind = "3d"
+size_gb = 1.26
+good_for = "the depth / point-map model SAM 3D Objects reads the picture with"
+licence = "MIT"
+required = true
 -->
 
 # SAM 3D Objects: setup
@@ -49,13 +90,22 @@ From the project folder: the checkpoints the registry lists (12.3 GB).
 uvx --from huggingface_hub hf download Ruicheng/moge-vitl model.pt --local-dir data/models/3d/moge-vitl
 ```
 
-MoGe v1 ViT-L (1.3 GB). Nothing in git downloads either model.
+MoGe v1 ViT-L (1.3 GB). Nothing in git downloads either model; they're the block's required suggestions.
 
 ```bash
 services/gen3d/scripts/install-runtime.sh
 ```
 
 After CubeArt and img3d, it clones sam-3d-objects into `runtime/sam3d-objects/` and DINOv2 into `runtime/sam3do/dinov2/` at the commits above, then inside the image (no GPU devices passed) makes `runtime/sam3do/.venv`, writes `_layers.pth` and `constraints.txt`, installs `locks/sam3do.txt`, builds pytorch3d from source if it doesn't import (CPU ops only, `--no-build-isolation`, `MAX_JOBS=16`), and checks the imports (`sam3do ok`). It wasn't re-run for this doc.
+
+## Choosing models
+
+SAM 3D Objects runs fixed weights: its checkpoints from `facebook/sam-3d-objects` in `data/models/3d/sam-3d-objects/checkpoints/`, and MoGe v1 in `data/models/3d/moge-vitl/` (the engine loads v1 by that path; keep it v1: MoGe v3's code path imports FlexGEMM's Triton kernels, see What to look for). DINOv2's weights are inside the checkpoints. There's nothing to swap. The engine is optional within 3D Generate: without it, the engine picker lists `sam3d_objects` with what's missing.
+
+| Suggestion | Size | Good for | Licence | Required |
+|---|---|---|---|---|
+| SAM 3D Objects (`facebook/sam-3d-objects`, 16 files, gated) | 12.28 GB | the engine's checkpoints | SAM Licence | yes, for this engine |
+| MoGe v1 ViT-L (`Ruicheng/moge-vitl`, `model.pt`) | 1.26 GB | its depth model | MIT | yes, for this engine |
 
 ## Configuration
 

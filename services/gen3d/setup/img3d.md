@@ -3,6 +3,28 @@ id = "gen3d-img3d"
 title = "Hunyuan3D 2.1 (3D Generate)"
 models = ["3d/Hunyuan3D-2.1"]
 scan = []
+summary = "3D Generate: one picture to a watertight mesh with Hunyuan3D 2.1 (best for characters)"
+gpu = true
+disk_gb = 3
+needs = ["podman", "git"]
+after = ["gen3d-cubeart"]
+check = ".venv/bin/python -m gen3d.doctor | grep -Eq 'ok +Hunyuan3D 2.1 \\(image engine\\) +ready'"
+
+[[steps]]
+run = "scripts/install-runtime.sh"
+what = "the runtime installer again (it skips what gen3d-cubeart built): clones Hunyuan3D-2.1 at the pinned commit and builds runtime/img3d/.venv inside the image, layered on CubeArt's (about 3 GB, no GPU devices passed)"
+
+[[suggest]]
+name = "Hunyuan3D 2.1 (shape)"
+repo = "tencent/Hunyuan3D-2.1"
+files = ["hunyuan3d-dit-v2-1/model.fp16.ckpt", "hunyuan3d-vae-v2-1/model.fp16.ckpt", "hunyuan3d-dit-v2-1/config.yaml",
+  "hunyuan3d-vae-v2-1/config.yaml", "LICENSE", "Notice.txt", "README.md"]
+dest = "3d/Hunyuan3D-2.1"
+kind = "3d"
+size_gb = 8.02
+good_for = "the engine's shape model and VAE (the repo's texture model isn't used)"
+licence = "Tencent Hunyuan 3D 2.1 Community Licence (excludes the EU, the UK and South Korea)"
+required = true
 -->
 
 # Hunyuan3D 2.1: setup
@@ -35,13 +57,21 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 uvx --from huggingface_hub hf download tencent/Hunyuan3D-2.1 hunyuan3d-dit-v2-1/model.fp16.ckpt hunyuan3d-vae-v2-1/model.fp16.ckpt LICENSE Notice.txt README.md hunyuan3d-dit-v2-1/config.yaml hunyuan3d-vae-v2-1/config.yaml --local-dir data/models/3d/Hunyuan3D-2.1
 ```
 
-From the project folder: the shape model and its VAE (8.0 GB). The repo also holds the texture (paint) model, which isn't used; this command leaves it out. Nothing in git downloads these weights.
+From the project folder: the shape model and its VAE (8.0 GB). The repo also holds the texture (paint) model, which isn't used; this command leaves it out. Nothing in git downloads these weights; they're the block's required suggestion.
 
 ```bash
 services/gen3d/scripts/install-runtime.sh
 ```
 
 After CubeArt (see [cubeart.md](cubeart.md#install)), it clones Hunyuan3D-2.1 into `runtime/hunyuan3d-2.1/` and checks out the commit above, then inside the image (no GPU devices passed) makes `runtime/img3d/.venv`, writes `_layers.pth` and `constraints.txt` (the image's torch family), installs `locks/img3d.txt`, and checks `import hy3dshape, timm, fast_simplification` (`img3d ok`). It wasn't re-run for this doc.
+
+## Choosing models
+
+Hunyuan3D 2.1 runs fixed weights: the shape model and its VAE from `tencent/Hunyuan3D-2.1`, in `data/models/3d/Hunyuan3D-2.1/`, which the worker loads by these paths (`gen3d/engines.py`). There's nothing to swap. The engine is optional within 3D Generate: without it, the engine picker lists `hunyuan21` with what's missing, and the other engines are unaffected.
+
+| Suggestion | Size | Good for | Licence | Required |
+|---|---|---|---|---|
+| Hunyuan3D 2.1, shape only (`tencent/Hunyuan3D-2.1`, 7 files) | 8.02 GB | the engine's weights | Tencent Hunyuan 3D 2.1 Community (not the EU, UK or South Korea) | yes, for this engine |
 
 ## Configuration
 

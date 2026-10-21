@@ -3,6 +3,42 @@ id = "tts-kokoro"
 title = "Kokoro-82M (Speech)"
 models = ["hf-cache/hub/models--hexgrad--Kokoro-82M"]
 scan = []
+summary = "Speech: text to speech with Kokoro's fast built-in English voices (the server and its first engine)"
+gpu = true
+disk_gb = 6.6
+needs = ["uv", "espeak-ng", "ffmpeg"]
+after = []
+check = "uv pip freeze --python runtime/venvs/kokoro/bin/python | diff -q - <(sort locks/kokoro.txt) && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
+
+[[steps]]
+run = "aihub install tts"
+what = "makes .venv/ in this folder with Python 3.12 from requirements.txt: the server only (about 90 MB, a minute)"
+
+[[steps]]
+run = "HF_HOME=../../data/models/hf-cache uvx --from huggingface_hub hf download hexgrad/Kokoro-82M --revision f3ff3571791e39611d31c381e3a41a3af07b4987 --include config.json --include kokoro-v1_0.pth --include 'voices/a*.pt' --include 'voices/b*.pt' && mkdir -p ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/refs && printf f3ff3571791e39611d31c381e3a41a3af07b4987 > ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/refs/main"
+what = "Kokoro's weights and its 28 English voices into the project's Hugging Face cache (0.34 GB, the required suggestion below), with the cache's main pointed at that commit; needed before the next step, which runs offline"
+
+[[steps]]
+run = "scripts/install-runtime.sh"
+what = "builds runtime/venvs/kokoro from locks/kokoro.txt (about 6.5 GB of ROCm wheels, about 10 min), writes ~/.local/bin/kokoro-tts and ~/.config/tts-engines/engines.json, and ends with a smoke test that loads Kokoro on the GPU; it stops before Breeze"
+
+[[suggest]]
+name = "Kokoro 82M with the English voices"
+repo = "hexgrad/Kokoro-82M"
+revision = "f3ff3571791e39611d31c381e3a41a3af07b4987"
+files = ["config.json", "kokoro-v1_0.pth",
+  "voices/af_alloy.pt", "voices/af_aoede.pt", "voices/af_bella.pt", "voices/af_heart.pt", "voices/af_jessica.pt",
+  "voices/af_kore.pt", "voices/af_nicole.pt", "voices/af_nova.pt", "voices/af_river.pt", "voices/af_sarah.pt",
+  "voices/af_sky.pt", "voices/am_adam.pt", "voices/am_echo.pt", "voices/am_eric.pt", "voices/am_fenrir.pt",
+  "voices/am_liam.pt", "voices/am_michael.pt", "voices/am_onyx.pt", "voices/am_puck.pt", "voices/am_santa.pt",
+  "voices/bf_alice.pt", "voices/bf_emma.pt", "voices/bf_isabella.pt", "voices/bf_lily.pt", "voices/bm_daniel.pt",
+  "voices/bm_fable.pt", "voices/bm_george.pt", "voices/bm_lewis.pt"]
+dest = "hf-cache"
+kind = "tts"
+size_gb = 0.34
+good_for = "the engine's weights and its 28 American and British English voices"
+licence = "Apache-2.0"
+required = true
 -->
 
 # Kokoro-82M: setup
@@ -45,7 +81,11 @@ Runs `aihub-install.sh`: makes `.venv/` with Python 3.12 from `requirements.txt`
 HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download hexgrad/Kokoro-82M --revision f3ff3571791e39611d31c381e3a41a3af07b4987 --include config.json --include kokoro-v1_0.pth --include "voices/a*.pt" --include "voices/b*.pt"
 ```
 
-From the project folder: the model and the English voices into the project's Hugging Face cache (about 340 MB). Do this first: the runtime installer runs offline (What to look for). The exact file list is in [kokoro-82m.md](../../../docs/setup/models/kokoro-82m.md).
+```bash
+mkdir -p data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/refs && printf f3ff3571791e39611d31c381e3a41a3af07b4987 > data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/refs/main
+```
+
+From the project folder: the model and the English voices into the project's Hugging Face cache (about 340 MB; the same files as the block's required suggestion). Do this first: the runtime installer runs offline (What to look for). The second command matters: a download by commit doesn't write the cache's `refs/main`, and Kokoro loads by `main`, so offline it wouldn't find the files.
 
 ```bash
 services/tts/scripts/install-runtime.sh
@@ -54,6 +94,14 @@ services/tts/scripts/install-runtime.sh
 Builds `runtime/venvs/kokoro` with uv (Python 3.12) and installs exactly `locks/kokoro.txt` from the index above (a few GB of wheels). Then it runs `engines/install.sh --gpu rocm --rocm-index … --prefix runtime/venvs/kokoro`, which keeps that torch, copies `kokoro_tts.py` into the venv, writes the `~/.local/bin/kokoro-tts` launcher, records the engine in `~/.config/tts-engines/engines.json`, and ends with a smoke test (`kokoro-tts --check`), **which loads Kokoro on the GPU**. Without `--accept-breeze-license` it stops there with a note about Breeze; with it, it goes on to [breeze.md](breeze.md). Re-running is safe. It wasn't re-run for this doc.
 
 The two files outside the project (`~/.local/bin/kokoro-tts`, `~/.config/tts-engines/engines.json`) are on AIHub's allowlist. video-maker reads them too.
+
+## Choosing models
+
+Kokoro is a fixed engine: it runs one set of weights, `hexgrad/Kokoro-82M`, from the project's Hugging Face cache (`data/models/hf-cache/`), and its worker never downloads (`HF_HUB_OFFLINE=1`). There is nothing to choose but the voices. They're the `.pt` files in the repo's `voices/`; the command above takes the English ones, which are the two languages the engine is set up for (`--lang a` American, `b` British). The repo has voices for other languages too; they aren't wired in or tested here. Kokoro can't make new voices: cloned and designed voices are Breeze's ([breeze.md](breeze.md#voices)).
+
+| Suggestion | Size | Good for | Licence | Required |
+|---|---|---|---|---|
+| Kokoro 82M with the English voices (`hexgrad/Kokoro-82M` at `f3ff357…`) | 0.34 GB | the engine's weights and its 28 voices | Apache-2.0 | yes |
 
 ## Configuration
 
@@ -105,6 +153,7 @@ Expect a `kokoro` entry with `"backend": "rocm"`, `"torch": "2.12.0a0+rocm7.13.0
 
 ## Known gaps
 
-- `aihub install tts` builds only the server venv; `install-runtime.sh` is a separate manual step, and nothing downloads Kokoro's model ahead of it.
+- `aihub install tts` builds only the server venv; the model download and `install-runtime.sh` are separate steps (in the block, for `aihub setup`).
+- `aihub check tts` isn't the block's check: on a fresh install its clips widget fails (`series must be a non-empty list`) until a clip is made.
 - MIOpen keeps its databases in `~/.config/miopen/` and `~/.cache/miopen/` (both exist here), outside the project and not on the allowlist.
 - On another GPU, `engines/setup.sh --plan` picks a torch build instead of the locks; that path isn't documented here.

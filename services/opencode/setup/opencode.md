@@ -3,6 +3,26 @@ id = "opencode"
 title = "OpenCode"
 models = []
 scan = []
+summary = "OpenCode: a coding agent behind the relay's agent model, plus OpenCode Zen's free hosted models"
+gpu = false
+disk_gb = 0.2
+needs = ["opencode"]
+after = []
+check = "aihub check opencode"
+
+[[steps]]
+run = "opencode auth login"
+what = "stores a provider key (OpenCode Zen or another) in ~/.local/share/opencode/auth.json; interactive"
+ask = "Log OpenCode in to a provider now? Answer no if this folder's .env sets OPENCODE_API_KEY."
+
+[[steps]]
+run = "aihub start opencode"
+what = "starts opencode serve on 127.0.0.1:4096; the first start mints the Basic credential in opencode-auth.env"
+
+[[steps]]
+run = "aihub restart relay"
+what = "lets a relay that is already running register the agent endpoint with the new credential"
+ask = "Is the relay already set up and running? Yes restarts it now."
 -->
 
 # OpenCode: setup
@@ -31,7 +51,7 @@ Read from this machine on 2026-10-21:
 
 ## Install
 
-Install OpenCode from <https://opencode.ai>. Its installer puts the binary in `~/.opencode/bin/` and adds that folder to `PATH` in `~/.bashrc` (here: `export PATH=/home/bdgr/.opencode/bin:$PATH`). `run.sh` adds `~/.opencode/bin` to `PATH` itself, since a systemd unit doesn't read `~/.bashrc`.
+The `opencode` command must exist before `aihub setup` runs this doc: install OpenCode from <https://opencode.ai> first. Its installer puts the binary in `~/.opencode/bin/` and adds that folder to `PATH` in `~/.bashrc` (here: `export PATH=/home/bdgr/.opencode/bin:$PATH`). `run.sh` adds `~/.opencode/bin` to `PATH` itself, since a systemd unit doesn't read `~/.bashrc`.
 
 Give OpenCode a provider key, either once interactively:
 
@@ -52,6 +72,10 @@ On its first start `auth.sh` writes `opencode-auth.env` in this folder (gitignor
 ```bash
 aihub restart relay
 ```
+
+## Choosing models
+
+The mod downloads no model, so it has no suggestions. OpenCode calls hosted providers: with an OpenCode Zen key, the relay serves its free models (`opencode/…-free`) and the `agent` alias; the relay drops paid ids. Which model `agent` runs is set on the relay's Endpoints view. Local models belong to [llama.cpp](../../lcpp/setup/llama-cpp.md) or [vLLM](../../vllm/setup/vllm.md).
 
 ## Configuration
 

@@ -3,6 +3,80 @@ id = "gen3d-cubeart"
 title = "CubeArt: Cube3D and CubePart (3D Generate)"
 models = ["3d/cube3d-v0.5", "3d/cubepart", "3d/clip-vit-large-patch14", "3d/Qwen3-VL-4B-Instruct", "3d/Qwen-Image"]
 scan = []
+summary = "3D Generate: text to 3D meshes with Cube3D, named parts with CubePart, and game rigs (the server, the ROCm image and the first engine)"
+gpu = true
+disk_gb = 17
+needs = ["podman", "git", "uv"]
+check = "out=$(.venv/bin/python -m gen3d.doctor); grep -q 'ok *ROCm image' <<<\"$out\" && ! grep MISSING <<<\"$out\" | grep -qv '(image engine)'"
+
+[[steps]]
+run = "aihub install gen3d"
+what = "makes .venv/ in this folder with Python 3.12 from requirements.txt: the server only (about 50 MB, a minute)"
+
+[[steps]]
+run = "podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest || podman pull docker.io/kyuz0/amd-strix-halo-comfyui:latest"
+what = "the ROCm image for gfx1151 (15.1 GB, shared with the comfy mod), pulled only when it's missing: the worker venvs are built on its torch, so a newer :latest wouldn't match them"
+
+[[steps]]
+run = "scripts/install-runtime.sh"
+what = "clones Roblox/cube at the pinned commit and builds runtime/CubeArt/.venv inside the image (about 2 GB, no GPU devices passed); the same run also builds the img3d and sam3do venvs (about 4.5 GB more, pytorch3d from source); time not measured here"
+
+[[suggest]]
+name = "Cube3D v0.5"
+repo = "Roblox/cube3d-v0.5"
+files = ["shape_gpt.safetensors", "shape_tokenizer.safetensors"]
+dest = "3d/cube3d-v0.5"
+kind = "3d"
+size_gb = 8.27
+good_for = "text to mesh (the shape GPT and its shape tokenizer)"
+licence = "Cube3D Research-Only RAIL-MS"
+required = true
+
+[[suggest]]
+name = "CubePart"
+repo = "Roblox/cubepart"
+files = ["multi_part_dit.safetensors", "vae.safetensors"]
+dest = "3d/cubepart"
+kind = "3d"
+size_gb = 9.9
+good_for = "splitting a mesh into named parts"
+licence = "OpenRAIL (model card)"
+required = true
+
+[[suggest]]
+name = "CLIP ViT-L/14"
+repo = "openai/clip-vit-large-patch14"
+files = ["config.json", "merges.txt", "model.safetensors", "preprocessor_config.json", "special_tokens_map.json",
+  "tokenizer.json", "tokenizer_config.json", "vocab.json"]
+dest = "3d/clip-vit-large-patch14"
+kind = "text-encoder"
+size_gb = 1.71
+good_for = "Cube3D's text encoder"
+licence = "not stated on the model card"
+required = true
+
+[[suggest]]
+name = "Qwen3-VL-4B-Instruct"
+repo = "Qwen/Qwen3-VL-4B-Instruct"
+files = ["chat_template.json", "config.json", "generation_config.json", "merges.txt", "model-00001-of-00002.safetensors",
+  "model-00002-of-00002.safetensors", "model.safetensors.index.json", "preprocessor_config.json", "tokenizer.json",
+  "tokenizer_config.json", "video_preprocessor_config.json", "vocab.json"]
+dest = "3d/Qwen3-VL-4B-Instruct"
+kind = "text-encoder"
+size_gb = 8.89
+good_for = "CubePart's text encoder"
+licence = "Apache-2.0"
+required = true
+
+[[suggest]]
+name = "Qwen-Image transformer config"
+repo = "Qwen/Qwen-Image"
+files = ["transformer/config.json"]
+dest = "3d/Qwen-Image"
+size_gb = 0.0
+good_for = "CubePart reads its architecture from this one file (371 bytes)"
+licence = "Apache-2.0"
+required = true
 -->
 
 # CubeArt (Cube3D and CubePart): setup
@@ -26,17 +100,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 | Upstream code | https://github.com/Roblox/cube.git at `3c6d06ddbef3160a1e1950cb13ab63dd12a61e50` (2026-05-27) in `runtime/CubeArt/cube/` (five example GLBs under `cubepart/examples/inputs/` show as modified; the code is unchanged) |
 | Blender (previews) | 5.2.2 LTS at `~/.local/bin/blender` |
 
-The weights, all in `data/models/3d/` (about 29 GB):
-
-| Folder | Hugging Face repo | Files | Size |
-|---|---|---|---|
-| `cube3d-v0.5` | `Roblox/cube3d-v0.5` | `shape_gpt.safetensors`, `shape_tokenizer.safetensors` | 8.3 GB |
-| `cubepart` | `Roblox/cubepart` | `multi_part_dit.safetensors`, `vae.safetensors` | 9.9 GB |
-| `clip-vit-large-patch14` | `openai/clip-vit-large-patch14` | `model.safetensors` and its configs | 1.7 GB |
-| `Qwen3-VL-4B-Instruct` | `Qwen/Qwen3-VL-4B-Instruct` | two safetensors shards and their configs | 8.9 GB |
-| `Qwen-Image` | `Qwen/Qwen-Image` | `transformer/config.json` only (CubePart reads its architecture) | 4 kB |
-
-No revision is recorded for them.
+The weights are the five repos in Choosing models, all in `data/models/3d/` (about 29 GB), with the files the block lists; no revision is recorded for them.
 
 ## Prerequisites
 
@@ -52,38 +116,34 @@ aihub install gen3d
 Runs `aihub-install.sh`: makes `.venv/` with Python 3.12 from `requirements.txt` (the server only).
 
 ```bash
-podman pull docker.io/kyuz0/amd-strix-halo-comfyui:latest
+podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest || podman pull docker.io/kyuz0/amd-strix-halo-comfyui:latest
 ```
 
-The ROCm image (15.1 GB), shared with the comfy mod. The installer stops without it.
+The ROCm image (15.1 GB), shared with the comfy mod, pulled only when it's missing: the worker venvs are built on its torch, and a newer `:latest` wouldn't match them. The installer stops without it.
 
-The weights have **no downloader in git** (CubeArt's old `scripts/download_weights.sh` sits in the gitignored `runtime/`, and nothing recreates it). From the project folder, one command each (the lists come from the registry; each model's doc in [docs/setup/models/](../../../docs/setup/models/) has the same):
+The weights have **no downloader in git** (CubeArt's old `scripts/download_weights.sh` sits in the gitignored `runtime/`, and nothing recreates it); they're the block's required suggestions (Choosing models), each with its repo, files and folder. By hand, from the project folder, one command per repo with the files and folder the block gives, for example:
 
 ```bash
 uvx --from huggingface_hub hf download Roblox/cube3d-v0.5 shape_gpt.safetensors shape_tokenizer.safetensors --local-dir data/models/3d/cube3d-v0.5
 ```
 
 ```bash
-uvx --from huggingface_hub hf download Roblox/cubepart multi_part_dit.safetensors vae.safetensors --local-dir data/models/3d/cubepart
-```
-
-```bash
-uvx --from huggingface_hub hf download openai/clip-vit-large-patch14 config.json merges.txt model.safetensors preprocessor_config.json special_tokens_map.json tokenizer.json tokenizer_config.json vocab.json --local-dir data/models/3d/clip-vit-large-patch14
-```
-
-```bash
-uvx --from huggingface_hub hf download Qwen/Qwen3-VL-4B-Instruct chat_template.json config.json generation_config.json merges.txt model-00001-of-00002.safetensors model-00002-of-00002.safetensors model.safetensors.index.json preprocessor_config.json tokenizer.json tokenizer_config.json video_preprocessor_config.json vocab.json --local-dir data/models/3d/Qwen3-VL-4B-Instruct
-```
-
-```bash
-uvx --from huggingface_hub hf download Qwen/Qwen-Image transformer/config.json --local-dir data/models/3d/Qwen-Image
-```
-
-```bash
 services/gen3d/scripts/install-runtime.sh
 ```
 
-Builds all three worker venvs. For CubeArt: clones Roblox/cube into `runtime/CubeArt/cube/` and checks out the commit above, links `runtime/CubeArt/weights` to `data/models/3d`, then inside the image (`podman run --rm`, no GPU devices passed) makes `runtime/CubeArt/.venv` with the image's Python 3.13, adds a `.pth` pointing at `/opt/venv`'s site-packages, writes the image's torch/torchvision/torchaudio/triton/numpy versions to `constraints.txt` so pip never replaces them, installs `locks/cubeart.txt`, and checks the imports. Then it builds [img3d](img3d.md) and [sam3do](sam3do.md). Re-running is safe; finished steps are skipped. It wasn't re-run for this doc.
+Builds all three worker venvs; it needs the image but not the weights. For CubeArt: clones Roblox/cube into `runtime/CubeArt/cube/` and checks out the commit above, links `runtime/CubeArt/weights` to `data/models/3d`, then inside the image (`podman run --rm`, no GPU devices passed) makes `runtime/CubeArt/.venv` with the image's Python 3.13, adds a `.pth` pointing at `/opt/venv`'s site-packages, writes the image's torch/torchvision/torchaudio/triton/numpy versions to `constraints.txt` so pip never replaces them, installs `locks/cubeart.txt`, and checks the imports. Then it builds [img3d](img3d.md) and [sam3do](sam3do.md). Re-running is safe; finished steps are skipped. It wasn't re-run for this doc.
+
+## Choosing models
+
+CubeArt runs fixed weights, all five repos below, in `data/models/3d/<folder>/` (`GEN3D_WEIGHTS`, mounted read-only into the worker). There's nothing to swap: the code loads these exact files, and `gen3d.doctor` checks them. Cube3D and CLIP-L make the mesh from text; CubePart, Qwen3-VL-4B and Qwen-Image's config split it into parts. The picture engines are separate choices, each with its own weights: Hunyuan3D 2.1 ([img3d.md](img3d.md)), SAM 3D Objects ([sam3do.md](sam3do.md)), and TRELLIS.2 and SAM 3D Body, whose models belong to ComfyUI packs ([comfyui.md](../../comfy/setup/comfyui.md#choosing-models)).
+
+| Suggestion | Size | Good for | Licence | Required |
+|---|---|---|---|---|
+| Cube3D v0.5 (`Roblox/cube3d-v0.5`, 2 files) | 8.27 GB | text to mesh | Cube3D Research-Only RAIL-MS | yes |
+| CubePart (`Roblox/cubepart`, 2 files) | 9.90 GB | named parts | OpenRAIL (model card) | yes |
+| CLIP ViT-L/14 (`openai/clip-vit-large-patch14`) | 1.71 GB | Cube3D's text encoder | not stated on the card | yes |
+| Qwen3-VL-4B-Instruct (`Qwen/Qwen3-VL-4B-Instruct`) | 8.89 GB | CubePart's text encoder | Apache-2.0 | yes |
+| Qwen-Image config (`Qwen/Qwen-Image`, `transformer/config.json`) | 371 bytes | CubePart's architecture | Apache-2.0 | yes |
 
 ## Configuration
 
@@ -131,7 +191,7 @@ A GET, so nothing loads. Expect `"loaded": false`, `"worker": {"state": "stopped
 
 ## Known gaps
 
-- No script downloads the weights; the commands above are manual.
+- No script in the mod downloads the weights; the commands above are manual (`aihub setup` will take them from the block, plan 23.9).
 - The image is `:latest`, not pinned by digest in code; the venvs' `constraints.txt` record the torch they were built against.
 - `install-runtime.sh` checks out Roblox/cube's commit only on the first clone.
 - CubeArt's own scripts (`cubeart`, `cube-run`, `scripts/`) in `runtime/CubeArt/` came from the old `~/Models/3D/CubeArt` and aren't recreated; the mod doesn't need them.

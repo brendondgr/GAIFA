@@ -12,7 +12,7 @@ from typing import Any
 
 TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "needs", "after", "check", "steps", "suggest"}
 STEP = {"run", "what", "ask"}
-SUGGEST = {"name", "repo", "revision", "files", "dest", "op", "body", "size_gb", "good_for", "licence", "required", "gated"}
+SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated"}
 
 
 @dataclass
@@ -31,6 +31,7 @@ class Suggest:
     revision: str = ""
     files: list[str] = field(default_factory=list)   # empty: the whole repo
     dest: str = ""                  # "hf-cache", or a folder under data/models/
+    kind: str = "other"             # the registry kind it's registered as (llm, tts, image, …)
     op: str = ""                    # …or a mod route that downloads and registers it ("POST /v1/load")
     body: dict[str, Any] = field(default_factory=dict)
     licence: str = ""
@@ -99,13 +100,15 @@ def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:
             return None, f"{where}: `dest` must be a folder inside data/models/"
         if "op" in d or "body" in d:
             return None, f"{where}: `body` goes with `op`, not `repo`"
+        if not isinstance(d.get("kind", "other"), str) or not d.get("kind", "other").strip():
+            return None, f"{where}: `kind` must be a registry kind (llm, tts, image, …)"
     else:
         if len(op.split()) != 2 or op.split()[0] not in ("GET", "POST", "PUT") or not op.split()[1].startswith("/"):
             return None, f"{where}: `op` must look like \"POST /v1/load\""
         if not isinstance(d.get("body", {}), dict):
             return None, f"{where}: `body` must be a table"
-        if any(k in d for k in ("dest", "files", "revision")):
-            return None, f"{where}: `dest`, `files` and `revision` go with `repo`, not `op`"
+        if any(k in d for k in ("dest", "files", "revision", "kind")):
+            return None, f"{where}: `dest`, `files`, `revision` and `kind` go with `repo`, not `op` (the mod registers what it downloads)"
     if not _strs(d.get("files", [])) and d.get("files", []) != []:
         return None, f"{where}: `files` must be a list of file names"
     for key in ("revision", "licence"):
@@ -116,7 +119,7 @@ def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:
             return None, f"{where}: `{key}` must be true or false"
     return Suggest(name=d["name"].strip(), size_gb=float(d["size_gb"]), good_for=d["good_for"].strip(),
                    repo=repo.strip(), revision=d.get("revision", "").strip(), files=list(d.get("files", [])),
-                   dest=posixpath.normpath(d["dest"].strip()) if repo else "", op=op.strip(), body=dict(d.get("body", {})),
+                   dest=posixpath.normpath(d["dest"].strip()) if repo else "", kind=d.get("kind", "other").strip(), op=op.strip(), body=dict(d.get("body", {})),
                    licence=d.get("licence", "").strip(), required=d.get("required", False), gated=d.get("gated", False)), None
 
 

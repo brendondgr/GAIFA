@@ -3,6 +3,48 @@ id = "tts-breeze"
 title = "Breeze TTS 2 and Whisper (Speech)"
 models = ["tts/breeze-tts-2", "hf-cache/hub/models--openai--whisper-large-v3-turbo", "voices/**"]
 scan = []
+summary = "Speech: voice cloning, voice design and delivery directions with Breeze TTS 2 (non-commercial), plus Whisper word timings"
+gpu = true
+disk_gb = 7
+needs = ["uv", "git", "ffmpeg"]
+after = ["tts-kokoro"]
+check = "uv pip freeze --python runtime/venvs/breeze-tts/bin/python | diff -q - <(sort locks/breeze-tts.txt) && git -C runtime/breeze-tts apply --reverse --check \"$PWD/engines/breeze/patches/0001-rocm-port-and-dtype.patch\" && grep -q '\"breeze\"' ~/.config/tts-engines/engines.json"
+
+[[steps]]
+run = "uvx --from huggingface_hub hf download BreezeBlue/Breeze-TTS-2 --local-dir ../../data/models/tts/breeze-tts-2"
+what = "Breeze TTS 2's weights into data/models/tts/breeze-tts-2 (7.7 GB, the required suggestion below); needed before the installer, which runs offline"
+ask = "Breeze TTS 2's weights and everything it makes are licensed for research and non-commercial use only (https://huggingface.co/BreezeBlue/Breeze-TTS-2). Accept that licence and install Breeze? (This answer is also the installer's --accept-breeze-license below.)"
+
+[[steps]]
+run = "HF_HOME=../../data/models/hf-cache uvx --from huggingface_hub hf download openai/whisper-large-v3-turbo --include '*.json' --include '*.safetensors' --include '*.txt'"
+what = "Whisper large-v3-turbo into the project's Hugging Face cache (1.6 GB, required: the Breeze installer fetches it offline and stops without it)"
+
+[[steps]]
+run = "scripts/install-runtime.sh --accept-breeze-license"
+what = "re-checks Kokoro (its smoke test loads Kokoro on the GPU again), then builds runtime/venvs/breeze-tts from locks/breeze-tts.txt (about 7 GB of wheels, 10 to 15 min), clones and patches Breeze's source, and runs a smoke test that loads Breeze on the GPU and compiles its fast stages (about 50 s); the engine is recorded only when the test passes"
+
+[[suggest]]
+name = "Breeze TTS 2"
+repo = "BreezeBlue/Breeze-TTS-2"
+files = []
+dest = "tts/breeze-tts-2"
+kind = "tts"
+size_gb = 7.68
+good_for = "the engine's weights: cloning, designing and directing voices"
+licence = "BreezeBlue Research and Non-Commercial Licence"
+required = true
+
+[[suggest]]
+name = "Whisper large-v3-turbo"
+repo = "openai/whisper-large-v3-turbo"
+files = ["added_tokens.json", "config.json", "generation_config.json", "merges.txt", "model.safetensors", "normalizer.json",
+  "preprocessor_config.json", "special_tokens_map.json", "tokenizer.json", "tokenizer_config.json", "vocab.json"]
+dest = "hf-cache"
+kind = "stt"
+size_gb = 1.62
+good_for = "transcripts of new voice clips and word timings (Breeze's timings, /v1/align)"
+licence = "MIT"
+required = true
 -->
 
 # Breeze TTS 2 and Whisper: setup
@@ -40,7 +82,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 uvx --from huggingface_hub hf download BreezeBlue/Breeze-TTS-2 --local-dir data/models/tts/breeze-tts-2
 ```
 
-From the project folder: Breeze's weights (about 7.7 GB). The exact file list is in [breeze-tts-2.md](../../../docs/setup/models/breeze-tts-2.md).
+From the project folder: Breeze's weights, the whole repo (about 7.7 GB).
 
 ```bash
 HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download openai/whisper-large-v3-turbo --include "*.json" --include "*.safetensors" --include "*.txt"
@@ -63,6 +105,17 @@ curl -F name=myvoice -F audio=@me.wav -F "transcript=Exactly what I say in the c
 ```
 
 Leave out the transcript and Whisper writes one (check it: clone quality depends on it). **Design voice** invents one from a description and keeps its sample as the reference. The mod doesn't register a new voice in the models registry; `aihub models scan --add` adds it as kind `voice`. More in the mod's README, "Add a voice".
+
+## Choosing models
+
+Breeze is a fixed engine: it runs one set of weights, `BreezeBlue/Breeze-TTS-2`, from `data/models/tts/breeze-tts-2` (`BREEZE_MODEL`), and nothing in it downloads while it runs. What you choose are voices (above), not models.
+
+**Whisper is required too.** Synthesis itself doesn't use it, but `engines/breeze/install.sh` always fetches `openai/whisper-large-v3-turbo` (offline under `install-runtime.sh`, so it must be in the cache first) and stops without it, and then Breeze is never recorded as installed. After that, Whisper writes transcripts of new voice clips, Breeze's word timings and `POST /v1/align`. `LOCALTTS_WHISPER_MODEL` can name another Whisper checkpoint in Transformers format for transcripts and `/v1/align` (put it in the cache yourself; not tested here), but the installer still asks for large-v3-turbo.
+
+| Suggestion | Size | Good for | Licence | Required |
+|---|---|---|---|---|
+| Breeze TTS 2 (`BreezeBlue/Breeze-TTS-2`) | 7.68 GB | the engine's weights | research and non-commercial only | yes |
+| Whisper large-v3-turbo (`openai/whisper-large-v3-turbo`) | 1.62 GB | transcripts and word timings | MIT | yes (the installer needs it) |
 
 ## Configuration
 
@@ -104,7 +157,7 @@ From the project folder. No output and exit 0 means the patch is applied as ship
 
 ## What to look for
 
-- **The runtime installer runs offline.** `install-runtime.sh` exports `HF_HUB_OFFLINE=1` unless you set it, and `engines/breeze/install.sh` downloads with `snapshot_download`. With nothing on disk, the weights step and the Whisper step fail with `LocalEntryNotFoundError` (offline mode), and the install stops. Download both first (Install). Setting `HF_HUB_OFFLINE=0` for that one run also lets it download (not tried here). The installer names the repo `BreezeBlue/Breeze-TTS-2`; the registry records `BreezeBlue/breeze-tts-2`. Hugging Face repo names aren't case-sensitive, so both should name the same repo (not checked here).
+- **The runtime installer runs offline.** `install-runtime.sh` exports `HF_HUB_OFFLINE=1` unless you set it, and `engines/breeze/install.sh` downloads with `snapshot_download`. With nothing on disk, the weights step and the Whisper step fail with `LocalEntryNotFoundError` (offline mode), and the install stops. Download both first (Install). Setting `HF_HUB_OFFLINE=0` for that one run also lets it download (not tried here). The installer names the repo `BreezeBlue/Breeze-TTS-2`; the registry records `BreezeBlue/breeze-tts-2`. The Hugging Face API resolves both to `BreezeBlue/Breeze-TTS-2` (checked 2026-10-21).
 - **The fast stages are HIP graphs.** `depth_decoder` and `backbone_decode` capture `torch.cuda.CUDAGraph`s (upstream's `models/cudagraph/`), which run as HIP graphs on ROCm. They're upstream's stock code and the installer's choice for gfx1151 (warm speed about RTF 1.5). `LOCALTTS_BREEZE_FAST=` (empty) runs eager instead: RTF about 2.7, no warmup. Don't add more graph stages (`text_encoder`, `backbone_prefill`, `codec`) or custom kernels.
 - **The first start after an install compiles** (about 50 s; later cold starts about 30 s). Breeze's torch.compile cache is `~/.cache/localtts/inductor`.
 - **Worker settings:** `MIOPEN_FIND_MODE=2`, `MIOPEN_LOG_LEVEL=3`, `ROCPROFILER_REGISTER_ENABLED=0` (see [kokoro.md](kokoro.md#what-to-look-for)). Breeze holds about 3.1 GB of RAM and 9.9 GB of GTT while loaded (`[memory] estimate_gb = 13` with Kokoro).
@@ -113,7 +166,7 @@ From the project folder. No output and exit 0 means the patch is applied as ship
 
 ## Known gaps
 
-- Nothing downloads Breeze's weights or Whisper ahead of the installer, and the installer can't download them while it forces offline mode.
+- `aihub install tts` doesn't download Breeze's weights or Whisper; the block's steps do, ahead of the installer, which can't download them while it forces offline mode.
 - Breeze's weights have no revision recorded in the registry.
 - Breeze's torch.compile cache (`~/.cache/localtts/inductor`, 56 MB here) and MIOpen's databases (`~/.config/miopen/`, `~/.cache/miopen/`) are outside the project and not on the allowlist.
 - The voices are personal and can't be reproduced; a new machine starts with none.

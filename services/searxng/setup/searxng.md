@@ -3,6 +3,15 @@ id = "searxng"
 title = "SearXNG watcher (the searxng mod)"
 models = []
 scan = []
+summary = "SearXNG watcher: see your SearXNG's health and engines, and change its settings from AIHub or the agent"
+gpu = false
+disk_gb = 0.03
+needs = ["uv"]
+check = "aihub start searxng && aihub check searxng"
+
+[[steps]]
+run = "aihub install searxng"
+what = "makes .venv/ from requirements-dev.txt (about 28 MB, under a minute); SearXNG itself is set up as in the web mod's setup doc"
 -->
 
 # SearXNG watcher: setup
@@ -29,6 +38,10 @@ aihub install searxng
 ```
 
 Makes `.venv/` from `requirements-dev.txt` (under a minute).
+
+## Choosing models
+
+None: the mod runs no model. Which search engines SearXNG asks is chosen on its Engines tab.
 
 ## Configuration
 

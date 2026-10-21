@@ -3,6 +3,19 @@ id = "workspace"
 title = "Workspace (folders, edits in place, the sandbox)"
 models = []
 scan = []
+summary = "Workspace: let the agent read and edit your folders at a level you set, and run code in a podman sandbox"
+gpu = false
+disk_gb = 1.1
+needs = ["uv", "podman", "git"]
+check = "aihub start workspace && aihub check workspace"
+
+[[steps]]
+run = "aihub install workspace"
+what = "makes .venv/ from requirements-dev.txt (about 26 MB, under a minute)"
+
+[[steps]]
+run = "podman build -t localhost/aihub-workspace-sandbox:2 -f sandbox/Containerfile sandbox"
+what = "builds the sandbox image from base images pinned by digest (1.06 GB, a few minutes; needs the internet once)"
 -->
 
 # Workspace: setup
@@ -43,6 +56,10 @@ podman build -t localhost/aihub-workspace-sandbox:2 -f services/workspace/sandbo
 ```
 
 To change the data libraries: edit `sandbox/requirements.in`, recompile `requirements.lock` (the command is at its top), bump `VERSION` in `sandbox.py`, rebuild.
+
+## Choosing models
+
+None: the mod runs no model. The model that reads and edits your folders is the chat's, chosen as in the [agent's setup doc](../../agent/setup/agent.md#choosing-models).
 
 ## Configuration
 

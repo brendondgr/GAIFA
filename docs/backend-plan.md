@@ -27,6 +27,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | H — Capabilities and learning | 20–22 | Engines and workflows declare what they can do; complete tool records and preferences on every card; a learner that improves the agent's harness (after Harness²) | gen3d, comfy, the agent, the hub's tool calls; additive only |
 | I — Setup docs | 23 | A doc per environment (in its mod) and per model (generated from the registry, with hand-written sections), kept in sync by `aihub docs` and a test | No: docs, a CLI command and a registry change hook |
 | J — The agent reads, searches and works | 24–30 | Documents, text and code in Chat; permission tiers and grants; web search (SearXNG); workspaces with edits in place, a sandbox and chat modes; search by meaning (EmbeddingGemma 2); speech to text; an Auto mode with a local judge | Chat, the approvals and the outputs index (additive); four new mods |
+| K — One GPU job at a time | 31 | A hub-wide GPU slot that mods take around their GPU work: a queue, groups for LLM engines, leases that expire, the queue in the UI | comfy, gen3d, tts, stt, decide, embed and the relay (each takes the slot); nothing is removed |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -61,6 +62,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 28 | New `embed` mod and the library | M–L | search by meaning on the Outputs page |
 | 29 | New `stt` mod (speech to text) | M–L | the stt page; the mic button in Chat |
 | 30 | Auto mode: a small local judge, and a `decide` mod for decision models | M–L | Auto in the mode picker; judged calls with their reasons; the decide page |
+| 31 | The GPU queue: one generative GPU job at a time | L | the header's GPU section, the Overview widget, waiting rows in Chat and on mod pages |
 
 # Stage A — Foundation
 
@@ -2749,6 +2751,98 @@ The Auto mode (27.4) needs something to decide, call by call, whether a command 
 | `embed` mod | EmbeddingGemma 2, the library index, search tools | `services/embed/` |
 | `stt` mod | speech to text | `services/stt/` |
 | Tests | per step, named in each `Done when` | `utils/tests/…`, `services/<id>/tests/` |
+
+---
+
+# Stage K — One GPU job at a time
+
+This machine has one GPU, shared by every mod, and it isn't stable when two heavy jobs run on it together. The hub admits work by **memory only** (architecture §7): if a load fits, it goes ahead, whatever else is running. Each mod already runs its own work one at a time (gen3d's `Runner`, stt's FIFO, ComfyUI's queue, the tts engine lock, decide's lock, vllm one container), but **nothing orders work across mods**. Two cases from the overnight run of 2026-10-21:
+- Whisper (stt) transcribed a 25 s recording as nonsense, in 87 s, while lcpp's Gemma 26B was generating. On an idle GPU, the same file was right in 2 s, twice.
+- The night's one GPU fault (a ring timeout at 02:11) was Blender drawing gen3d's preview during a run of chains.
+
+The user asked (2026-10-21) for work to **wait for the GPU**: a queue, so only one generative GPU job runs at a time. The approach: a **GPU slot** in the hub that mods take around their GPU work and give back after, the way they already ask the memory manager for room (`/api/memory/acquire`). The hub orders the waiting work, shows the queue, and recovers a slot from a mod that died. It touches architecture §5 (boot order), §7 (memory), §12 (risks), the mod contract's optional extras (§4.2) and docs/mods.md.
+
+**Simple gaps (assumed):**
+- **Mods take the slot themselves.** Only a mod knows when its GPU work really starts and ends: a submitted job waits in the mod's own queue, and a proxied request may return before the work is done. The hub's tool path and proxy can't see that, so they don't take slots for mods. A mod that doesn't take the slot keeps today's behaviour, and `aihub check` warns about it (31.2).
+- **Slot first, then memory.** A mod waits for the slot, then asks for room. Holding a memory reservation while waiting would unload other mods for nothing.
+- **Groups share the slot.** Requests to one LLM engine (lcpp's llama-server, vllm) can run together, since the engine batches them, but never alongside another group's work. A lease names its `group` (default: the mod id). While a group holds the slot, more leases of that group join it; another group waits until the last one leaves.
+- **Classes and order.** Each lease has a class:
+  - `interactive`: an LLM request, a judge or screening decision, an embed search;
+  - `job`: an image, video, 3D, speech or file-transcription job;
+  - `background`: embed indexing, or the learner's replays.
+  The queue is FIFO within a class, and interactive work goes ahead of queued jobs. Nothing is pre-empted: a running job always finishes. Background work starts only when nothing else is waiting, so embed's own `GpuIdle` check (`services/embed/embed/gpu.py`) becomes a background lease.
+- **Nested work hands its lease down.** gen3d sends TRELLIS.2 and SAM 3D Body to comfy through the proxy while it holds the slot. The lease id goes along in an `X-AIHub-GPU-Lease` header, and comfy runs under it instead of queueing behind its own caller, which would deadlock.
+- **Leases expire.** A holder renews its lease every 10 s. After 60 s without a renewal, the lease is dropped, with an alert naming the mod. A mod that crashes therefore frees the slot within a minute.
+- **Hub restarts.** The queue starts empty. A renewal that names a lease the hub doesn't know re-registers it as held, if the slot is free or held by the same group. Otherwise the mod is told to wait, and the work already running finishes, since the GPU can't be stopped from outside. So a restart can't run two groups together for longer than one renewal.
+- **Remote models don't count.** skynet and any relay backend that isn't on this machine never take the slot.
+- **A switch.** `config.toml [gpu] queue = true` (default). Set to false, it goes back to memory-only admission, for debugging.
+
+**Needs a human answer:**
+- **Chat during a long job.** With the queue, a chat on a local model waits behind a 10-minute video, and the reply starts when the video is done. *Recommendation:* wait, and show "Waiting for the GPU: Images & Video, about 6 min left" on the turn's status line. The other option is to let interactive LLM requests run alongside a job, which is today's behaviour and the case that produced Whisper's nonsense.
+- **Dictation during a job.** Live dictation (stt `/v1/stream`) runs for minutes, mostly idle. Holding the slot for all of it would block every job, and waiting would make dictation lag. *Recommendation:* while another group holds the slot, live dictation runs on the CPU, either the same model or a smaller one (stt already has a CPU path), and says so on the mic button.
+
+---
+
+## Phase 31 — The GPU queue
+
+- [ ] **31.1 The queue in the hub: `utils/gpu.py`, `utils/routes/gpu.py`.**
+  - `GpuQueue` (started in the lifespan after the memory manager, §5) holds `holder` (a group and its leases) and `waiting` (leases in order). A lease is `{id, service, group, class, label, est_s, thread?, call_id?, created_ts, granted_ts?, renewed_ts}`.
+  - **Routes:**
+    - `POST /api/gpu/acquire {service, group?, class, label, est_s?, parent?}?wait=` → `200 {lease, state: "granted"}`, or `202 {lease, state: "waiting", ahead: [{service, label, eta_s}]}` once `wait` runs out. The caller repeats it with `lease` to keep its place.
+    - `POST /api/gpu/{lease}/renew`.
+    - `POST /api/gpu/{lease}/release`.
+    - `DELETE /api/gpu/{lease}` cancels a waiting lease (the UI's Cancel).
+    - `GET /api/gpu` returns the holder, the waiting list and the last 20 finished leases with their wait and run times.
+  - **Events:** `gpu` on the bus (granted, waiting, released, expired), plus an alert `gpu_lease_expired`.
+  - **Records:** `metrics` records wait and hold times per mod (§13), for the Overview.
+  - **Config:** `config.toml [gpu] queue = true`, `lease_ttl_s = 60` (`utils/config.py` `GpuCfg`; architecture §9).
+  *Done when:* `utils/tests/gpu/test_queue.py` covers FIFO within a class, interactive before jobs, background only when the queue is empty, group sharing (two LLM requests together; a job waits for both), a nested lease through `parent`, expiry and its alert, cancel, re-registering after a restart, and `queue = false`. `test_routes_gpu.py` covers the routes and the 202 path. The contract test covers the new routes.
+
+- [ ] **31.2 The contract for mods: `service.toml [gpu]`, a client, `aihub check`.**
+  - **Manifest:** `[gpu] class = "job" | "interactive" | "background"` and `group = "<name>"` (optional). It is the mod's default; a lease can override it.
+  - **Client:** a small reference client, `gpu_slot(label, est_s=None, cls=None, parent=None)`. It is an async context manager that waits, renews in the background and releases on exit or cancel. It goes in `services/_template/` and is copied into each Python mod's own hub client, since mods never import the hub. Its header pass-through is `X-AIHub-GPU-Lease`.
+  - **Check:** `aihub check <id>` warns when a mod that uses the GPU (a `[memory]` mod with a GPU `device` in its status) has no `[gpu]`.
+  - **Docs:** docs/mods.md gets a "Taking the GPU" section; architecture §4.2 lists the extra; §7 gets "GPU queue".
+  *Done when:* `utils/tests/services/test_gpu_manifest.py` (parsing, the check's warning) and the template's own test of the client against a fake hub: wait, renew, release on exception and on cancel.
+
+- [ ] **31.3 The job mods take the slot: comfy, gen3d, tts, stt (files), decide, embed.**
+  - **comfy:** acquires before it submits a prompt to ComfyUI (`comfy/run.py`, after `/v1/run`'s memory acquire is moved behind the slot) and releases when the prompt finishes, fails or is cancelled. A queued run shows `waiting for the GPU` in its job stage.
+  - **gen3d:** `Runner` (`gen3d/queue.py`) holds one lease per job across its stages. It passes the lease to comfy when it hands over TRELLIS.2 or SAM 3D Body. The Blender preview runs inside the same lease, unless `preview_device` is `cpu`.
+  - **tts:** the engine lock (`localtts/engines.py`) takes the slot per synthesis, `group = "tts"`.
+  - **stt:** file jobs (`stt/jobs.py`) are `job`; live dictation follows the answer above.
+  - **decide:** each ask is `interactive`.
+  - **embed:** searches are `interactive`; library indexing is `background` and replaces `GpuIdle`.
+  - Every mod's job status gets the stage `waiting_gpu` with `ahead`, so its page and the chat's step row can show it.
+  *Done when:* each mod's tests (a fake hub) show its work waits while another lease holds the slot and runs after. A live check queues a comfy image while gen3d makes a model: the image starts only when the model is done, and the kernel log stays clean.
+
+- [ ] **31.4 Local LLMs take the slot per request: relay (or lcpp and vllm).**
+  - A request to a local engine takes an `interactive` lease in the engine's group for the length of the request; a stream holds it until its last token.
+  - **Where:** in the relay, for backends on this machine, since every chat goes through it (the agent at `:4000`, the judge, screening). If the relay can't do it cleanly, lcpp's daemon and vllm's server do it instead. Direct clients of llama-server's own port bypass the queue: a known limit, listed in §12.
+  - The agent's turn status shows "Waiting for the GPU: <mod> <label>, about N min left" while its model request waits (needs the answer above).
+  *Done when:* relay tests (a fake hub, a fake local backend) show two requests to one engine running together, a request waiting while a comfy job holds the slot, and a remote backend never taking it. The live check replays the overnight case: transcribe the 25 s seminar recording while Gemma 26B generates. The transcription waits for generation, then comes out right, and the kernel log stays clean.
+
+- [ ] **31.5 In the UI.**
+  - **The header:** the memory bar's popover gets a **GPU** section: what holds the slot (mod, label, elapsed, ETA) and what waits, in order, each with Cancel.
+  - **Overview:** shows the same as a widget, plus wait times from 31.1's metrics.
+  - **Chat:** a step whose job waits for the GPU says "Waiting for the GPU: 3D Generate is making a model (about 4 min)".
+  - **Mod pages:** they show `waiting_gpu` like any other stage.
+  - **Docs:** brief §11.7 and §11.13.
+  *Done when:* a browser check with two queued jobs sees the order, the ETA and Cancel removing the second one. `utils/tests/web/` covers the popover's pure parts.
+
+**Wire — Phase 31:** the header's GPU section, the Overview widget, waiting rows in Chat and on mod pages.
+
+**Checks & deliverables — Phase 31**
+- [ ] Live, one at a time: an image and a 3D model, queued together, run one after the other. A chat on the local model, sent during a job, waits with its status and then answers. The overnight Whisper case comes out right. A mod killed while holding the slot frees it within a minute, with the alert. The kernel log is clean throughout.
+- [ ] Delivered: `utils/gpu.py`, `utils/routes/gpu.py`, the `[gpu]` manifest table and client, the mods' leases, the relay's per-request leases, the UI. Docs: architecture §4.2, §5, §7, §9, §12; docs/mods.md; brief §11.7, §11.13.
+
+| Deliverable | Description | Location |
+| --- | --- | --- |
+| GPU queue | slot, leases, groups, classes, expiry, routes, events | `utils/gpu.py`, `utils/routes/gpu.py` |
+| Mod contract | `[gpu]` in `service.toml`, the client, the check | `services/_template/`, `utils/services/`, docs/mods.md |
+| Mods | comfy, gen3d, tts, stt, decide and embed take the slot | `services/<id>/` |
+| Local LLMs | per-request leases | `services/relay/` (or `lcpp`, `vllm`) |
+| UI | the header's GPU section, the Overview widget, waiting rows | `web/` |
+| Tests | per step, named in each `Done when` | `utils/tests/gpu/`, `services/<id>/tests/` |
 
 ---
 

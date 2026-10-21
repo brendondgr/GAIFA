@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from ruamel.yaml import YAML
 
-from containers import BACKUP_RE, Container, backup_name
+from containers import BACKUP_RE, Container, backup_name, backup_order
 
 SETTINGS = """\
 use_default_settings: true
@@ -155,7 +155,15 @@ class FakeRuntime:
         self.log.append(f"restore {backup}")
 
     def backups(self, c: Container) -> list[str]:
-        return sorted((p.name for p in self.folder.iterdir() if BACKUP_RE.match(p.name)), reverse=True)
+        return sorted((p.name for p in self.folder.iterdir() if BACKUP_RE.match(p.name)), key=backup_order, reverse=True)
+
+    async def prune(self, c: Container, keep: int) -> list[str]:
+        old = self.backups(c)[keep:]
+        for n in old:
+            (self.folder / n).unlink()
+        if old:
+            self.log.append(f"prune {len(old)}")
+        return old
 
     async def restart(self, c: Container) -> None:
         self.restarts += 1

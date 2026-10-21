@@ -36,6 +36,7 @@ function healthCard(ctx, h, found) {
       ui.text(h.health.detail || '', { muted: true })),
     ui.text(`Container: ${found.container ? `${found.container.name} (${found.container.runtime}, ${found.container.state})` : 'none found'}` +
       ` · settings: ${found.settings_file || '—'} · found by ${found.found_by || '—'}`, { muted: true }),
+    found.settings_problem ? ui.text(found.settings_problem, { mono: true }) : null,
     ui.text(`Last test search: ${q.ok ? `${q.ms} ms, ${q.results ?? '?'} results` : (q.detail || 'not run yet')} at ${when(q.ts)}` +
       (q.unresponsive && q.unresponsive.length ? ` · failed: ${q.unresponsive.join(', ')}` : ''), { muted: true }),
     ui.row(ui.button('Test search now', async () => { await ctx.call('POST', '/v1/health/query'); ctx.refresh(); }, { small: true }),
@@ -76,7 +77,11 @@ async function engines(el, ctx) {
 async function settingsTab(el, ctx) {
   const { ui } = ctx;
   const r = await ctx.call('GET', '/v1/settings');
-  if (r.status >= 400) { el.append(ui.empty('No settings file', r.json.detail, null)); return; }
+  if (r.status >= 400) {
+    const bad = r.json.code === 'settings_invalid';
+    el.append(ui.empty(bad ? 'settings.yml needs a fix' : 'No settings file', bad ? `${r.json.detail}. ${r.json.fix}.` : r.json.detail, null));
+    return;
+  }
   const s = r.json.settings;
   const safe = ui.select([{ value: '', label: 'SearXNG default' }, { value: '0', label: 'Off' }, { value: '1', label: 'Moderate' }, { value: '2', label: 'Strict' }],
     { value: s.safe_search == null ? '' : String(s.safe_search) });

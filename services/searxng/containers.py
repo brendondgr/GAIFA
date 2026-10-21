@@ -3,8 +3,12 @@ makes outside the project: `settings.yml` and its backups `settings.yml.aihub-<d
 bind-mounted at the container's settings path.
 
 The file belongs to the container's `searxng` user (uid 977 in the image) and isn't writable from
-the host, so writes go through the container (`docker exec`, which the `docker` group allows): a
-write replaces the file's contents in place, so its owner and mode stay as they were.
+the host, so writes go through the container (`docker exec`, which the `docker` group allows). A
+write never leaves the file half written: the new text goes to `.settings.yml.aihub-new` next to it
+(a `cp -p` of the file, so owner and mode stay), its size is checked, and `mv -f` renames it over
+`settings.yml` in one step. Only when the rename is refused (settings.yml bind-mounted on its own)
+is the checked copy written over the file in place. Restoring a backup goes the same way. Only the
+newest `KEEP_BACKUPS` backups are kept; older ones, matched by their exact name, are deleted.
 """
 
 from __future__ import annotations
@@ -18,8 +22,22 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
-BACKUP_RE = re.compile(r"^settings\.yml\.aihub-\d{4}-\d{2}-\d{2}T\d{6}(-\d+)?$")
+BACKUP_RE = re.compile(r"^settings\.yml\.aihub-(\d{4}-\d{2}-\d{2}T\d{6})(?:-(\d+))?$")
 DEFAULT_SETTINGS_IN = "/etc/searxng/settings.yml"
+KEEP_BACKUPS = 10
+
+# $0 settings.yml, $1 "-" (the new text on stdin, $2 bytes) or a backup to copy back. The new file is
+# a copy of the old one (owner, mode) with the new text, checked for size, then renamed over it.
+_REPLACE = r'''
+f="$0"; t="${f%/*}/.${f##*/}.aihub-new"
+rm -f "$t" && cp -p "$f" "$t" || exit 1
+if [ "$1" = - ]; then n="$2"; cat > "$t" || { rm -f "$t"; exit 1; }
+else n=$(($(wc -c < "$1"))) && cat "$1" > "$t" || { rm -f "$t"; exit 1; }; fi
+got=$(($(wc -c < "$t")))
+if [ "$got" -ne "$n" ]; then rm -f "$t"; echo "the new settings.yml came out $got bytes of $n; settings.yml is unchanged" >&2; exit 1; fi
+mv -f "$t" "$f" 2>/dev/null && exit 0
+cat "$t" > "$f"; s=$?; rm -f "$t"; exit $s
+'''
 
 
 class RuntimeError_(Exception):
@@ -48,6 +66,12 @@ class Container:
         return {k: v for k, v in asdict(self).items() if k != "env"}
 
 
+def backup_order(name: str) -> tuple[str, int]:
+    """Oldest first: by the date in the name, then its -2, -3 … (so -10 comes after -9)."""
+    m = BACKUP_RE.match(name)
+    return (m.group(1), int(m.group(2) or 1)) if m else ("", 0)
+
+
 def backup_name(now: datetime | None = None) -> str:
     return f"settings.yml.aihub-{(now or datetime.now()).strftime('%Y-%m-%dT%H%M%S')}"
 
@@ -59,6 +83,7 @@ class Runtime(Protocol):
     async def write(self, c: Container, text: str) -> None: ...
     async def restore(self, c: Container, backup: str) -> None: ...
     def backups(self, c: Container) -> list[str]: ...
+    async def prune(self, c: Container, keep: int) -> list[str]: ...
     async def restart(self, c: Container) -> None: ...
 
 
@@ -142,9 +167,12 @@ class CliRuntime:
         hits.sort(key=lambda r: 0 if str(r.get("State", "")).lower() == "running" else 1)
         if not hits:
             return None
-        info = json.loads(await self._run("inspect", str(hits[0].get("ID") or hits[0].get("Id")), timeout=15))[0]
-        name = Path(self._bin() or "docker").name
-        return container_from_inspect("podman" if "podman" in name else "docker", info)
+        try:   # the container can go between `ps` and `inspect`: then nothing is found, this round
+            info = json.loads(await self._run("inspect", str(hits[0].get("ID") or hits[0].get("Id")), timeout=15))[0]
+            name = Path(self._bin() or "docker").name
+            return container_from_inspect("podman" if "podman" in name else "docker", info)
+        except (RuntimeError_, ValueError, LookupError, TypeError, AttributeError):
+            return None
 
     async def read(self, c: Container) -> str:
         if c.settings_host and Path(c.settings_host).is_file():
@@ -166,19 +194,28 @@ class CliRuntime:
         return name
 
     async def write(self, c: Container, text: str) -> None:
-        await self._run("exec", "-i", c.id, "sh", "-c", 'cat > "$0"', c.settings_in, stdin=text.encode())
+        data = text.encode()
+        await self._run("exec", "-i", c.id, "sh", "-c", _REPLACE, c.settings_in, "-", str(len(data)), stdin=data)
 
     async def restore(self, c: Container, backup: str) -> None:
-        await self._run("exec", c.id, "sh", "-c", 'cat "$0" > "$1"', self._backup_path(c, backup), c.settings_in)
+        await self._run("exec", c.id, "sh", "-c", _REPLACE, c.settings_in, self._backup_path(c, backup))
 
     def backups(self, c: Container) -> list[str]:
+        """This mod's backups, newest first."""
         if not c.settings_host:
             return []
         folder = Path(c.settings_host).parent
         try:
-            return sorted((p.name for p in folder.iterdir() if BACKUP_RE.match(p.name)), reverse=True)
+            return sorted((p.name for p in folder.iterdir() if BACKUP_RE.match(p.name)), key=backup_order, reverse=True)
         except OSError:
             return []
+
+    async def prune(self, c: Container, keep: int = KEEP_BACKUPS) -> list[str]:
+        """Delete this mod's backups past the newest `keep`; returns their names."""
+        old = self.backups(c)[max(keep, 1):]
+        if old:
+            await self._run("exec", c.id, "rm", "-f", "--", *(self._backup_path(c, n) for n in old))
+        return old
 
     async def restart(self, c: Container) -> None:
         if c.compose_dir and c.compose_service and Path(c.compose_dir).is_dir():

@@ -4,7 +4,7 @@
   is `searxng/*`. The container is looked up either way, since its settings file is what changes.
 - **Watch:** `/healthz`, `/config` (engines) and `/stats/errors` every `watch_s` (60 s); a test
   query every `query_s` (10 min by default, so the upstream engines aren't asked 1440 times a day).
-- **Change:** one at a time: back up `settings.yml`, write it, restart the container, wait for
+- **Change:** one at a time: back up `settings.yml` (keeping the newest `keep_backups`), write it, restart the container, wait for
   `/healthz`, run a query (JSON when on, else HTML) and check the change shows in `/config`; when
   any of that fails, put the backup back, restart again and say why.
 """
@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 
 import settings as st
-from containers import Container, Runtime, RuntimeError_
+from containers import KEEP_BACKUPS, Container, Runtime, RuntimeError_
 
 PROBES = ("http://127.0.0.1:8080", "http://127.0.0.1:8888")
 CHECK_QUERY = "aihub settings check"
@@ -36,9 +36,10 @@ class ChangeFailed(Exception):
 
 class Searx:
     def __init__(self, runtime: Runtime, env_url: str | None = None, probes: tuple[str, ...] = PROBES,
-                 watch_s: float = 60, query_s: float = 600, ready_s: float = 60, client: httpx.AsyncClient | None = None) -> None:
+                 watch_s: float = 60, query_s: float = 600, ready_s: float = 60, client: httpx.AsyncClient | None = None,
+                 keep_backups: int = KEEP_BACKUPS) -> None:
         self.runtime, self.env_url, self.probes = runtime, (env_url or "").rstrip("/") or None, probes
-        self.watch_s, self.query_s, self.ready_s = watch_s, query_s, ready_s
+        self.watch_s, self.query_s, self.ready_s, self.keep_backups = watch_s, query_s, ready_s, keep_backups
         self.http = client or httpx.AsyncClient(timeout=httpx.Timeout(15, connect=3), trust_env=False)
         self.url: str | None = None
         self.found_by: str | None = None
@@ -53,6 +54,7 @@ class Searx:
         self.lock = asyncio.Lock()
         self._last_query_ts: float | None = None   # None: no test query yet, so the first round runs one
         self._read_cache: str | None = None      # settings.yml as last read
+        self.settings_problem: str | None = None  # why settings.yml can't be used as it is (doesn't parse, …)
 
     # ---- detect ------------------------------------------------------------------------------
 
@@ -87,7 +89,8 @@ class Searx:
                 "container": c.public() if c else None,
                 "compose_dir": c.compose_dir if c else None,
                 "settings_file": c.settings_host if c else None,
-                "can_adjust": bool(c and c.state == "running" and c.settings_host)}
+                "can_adjust": bool(c and c.state == "running" and c.settings_host),
+                "settings_problem": self.settings_problem}
 
     # ---- watch -------------------------------------------------------------------------------
 
@@ -151,14 +154,33 @@ class Searx:
         except ValueError:
             return None
 
+    def bad_settings_fix(self, c: Container | None = None) -> str:
+        c = c or self.container
+        where = (c.settings_host or c.settings_in) if c else "settings.yml"
+        newest = self.runtime.backups(c)[:1] if c else []
+        back = f", or copy back the newest backup ({newest[0]}) next to it" if newest else ""
+        return f"fix {where} by hand{back}; changes wait until it parses (the mod reads it again every minute and on Look again)"
+
     async def read_settings(self) -> dict[str, Any] | None:
+        """settings.yml as this mod adjusts it; None when there's no container, the read fails, or the
+        file can't be used (then `settings_problem` says why and where, and changes are refused)."""
         if not self.container:
             return None
         try:
-            self._read_cache = await self.runtime.read(self.container)
+            text = await self.runtime.read(self.container)
         except (OSError, RuntimeError_):
             return None
-        return st.summary(st.load(self._read_cache))
+        except ValueError:    # bytes that aren't UTF-8
+            self._read_cache, self.settings_problem = None, "settings.yml isn't UTF-8 text"
+            return None
+        self._read_cache = text
+        try:
+            out = st.summary(st.load(text))
+        except st.BadSettings as e:
+            self.settings_problem = str(e)
+            return None
+        self.settings_problem = None
+        return out
 
     async def tick(self) -> None:
         """One round of the watch loop."""
@@ -235,7 +257,11 @@ class Searx:
         except (OSError, RuntimeError_) as e:
             raise ChangeFailed(f"{label}: couldn't read settings.yml ({getattr(e, 'detail', e)}); nothing was changed",
                                {"fix": "check that Docker (or podman) and the container work, then try again"}, "read_failed", 503) from None
-        doc = st.load(before)
+        try:
+            doc = st.load(before)
+        except st.BadSettings as e:
+            self.settings_problem = str(e)
+            raise ChangeFailed(f"{label}: {e}; nothing was changed", {"fix": self.bad_settings_fix(c)}, "settings_invalid", 409) from None
         edit(doc)
         after = st.dump(doc)
         record: dict[str, Any] = {"ts": time.time(), "label": label}
@@ -252,6 +278,11 @@ class Searx:
             raise ChangeFailed(f"{label}: couldn't back up settings.yml ({getattr(e, 'detail', e)}); nothing was changed",
                                {"fix": "check that Docker (or podman) and the container work, then try again"}, "backup_failed", 503) from None
         record["backup"] = backup
+        try:   # older backups go; one that won't is no reason to stop the change
+            if pruned := await self.runtime.prune(c, self.keep_backups):
+                record["pruned"] = pruned
+        except (OSError, RuntimeError_) as e:
+            record["prune_failed"] = getattr(e, "detail", str(e))
         try:
             await self.runtime.write(c, after)
             await self.runtime.restart(c)

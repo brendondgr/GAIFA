@@ -24,6 +24,8 @@ import settings as st
 from containers import CliRuntime, Runtime
 from searx import ChangeFailed, Searx
 
+log = logging.getLogger("searxng")
+
 
 def error(status: int, code: str, detail: str, fix: str, **data: Any) -> JSONResponse:
     return JSONResponse({"detail": detail, "code": code, "fix": fix, **({"data": data} if data else {})}, status_code=status)
@@ -51,8 +53,11 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        await sx.detect()
-        await sx.tick()
+        try:   # whatever the first look finds, the server starts and says so; the watch loop tries again
+            await sx.detect()
+            await sx.tick()
+        except Exception:  # noqa: BLE001
+            log.exception("the first look for SearXNG failed; the watch loop tries again")
         task = asyncio.create_task(sx.watch())
         yield
         task.cancel()   # shutdown never waits long: a watch round stuck in a call, or a pooled connection, can't hold it
@@ -78,7 +83,7 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
             "loaded": None, "busy": sx.busy, "idle_s": round(time.time() - started, 1),
             "stats": [
                 {"label": "SearXNG", "value": "up" if up else ("not found" if not sx.url else "down"),
-                 "hint": f"{sx.url or 'no URL'}: {sx.health.get('detail')}"},
+                 "hint": f"{sx.url or 'no URL'}: {sx.health.get('detail')}" + (f"; {sx.settings_problem}" if sx.settings_problem else "")},
                 {"label": "Engines on", "value": sum(1 for e in sx.engines if e["enabled"])},
                 {"label": "Engines failing", "value": len(failing), "hint": ", ".join(failing[:8]) or "none"},
                 {"label": "Test search", "unit": "ms", "value": (sx.last_query or {}).get("ms") or 0,
@@ -122,6 +127,10 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
     @app.get("/v1/settings", summary="The settings this mod adjusts, and the backups")
     async def get_settings() -> dict:
         s = await sx.read_settings()
+        if s is None and sx.settings_problem:
+            return error(409, "settings_invalid", sx.settings_problem, sx.bad_settings_fix(),
+                         file=sx.container.settings_host if sx.container else None,
+                         backups=sx.runtime.backups(sx.container) if sx.container else [], changes=list(sx.changes))
         if s is None:
             return error(404, "no_settings", "no SearXNG settings file was found", "see the mod's setup doc")
         return {"settings": s, "file": sx.container.settings_host if sx.container else None,

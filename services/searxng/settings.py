@@ -10,7 +10,7 @@ from __future__ import annotations
 import io
 from typing import Any
 
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 SAFE_SEARCH = {0: "off", 1: "moderate", 2: "strict"}
@@ -24,12 +24,27 @@ def _yaml() -> YAML:
     return y
 
 
+class BadSettings(ValueError):
+    """settings.yml can't be used as it is (it doesn't parse, or isn't a mapping): says where."""
+
+
+def _where(mark: Any) -> str:
+    return f"line {mark.line + 1}, column {mark.column + 1}" if mark is not None else "an unknown place"
+
+
 def load(text: str) -> CommentedMap:
-    doc = _yaml().load(text) if text.strip() else None
+    try:
+        doc = _yaml().load(text) if text.strip() else None
+    except YAMLError as e:
+        problem = getattr(e, "problem", None) or str(e).splitlines()[0]
+        context = getattr(e, "context", None)
+        cmark = getattr(e, "context_mark", None)
+        also = f" ({context} at {_where(cmark)})" if context and cmark is not None else ""
+        raise BadSettings(f"settings.yml doesn't parse: {problem} at {_where(getattr(e, 'problem_mark', None))}{also}") from None
     if doc is None:
         doc = CommentedMap()
     if not isinstance(doc, dict):
-        raise ValueError("settings.yml isn't a mapping")
+        raise BadSettings(f"settings.yml isn't a mapping (its top level is {'a list' if isinstance(doc, list) else 'a single value'})")
     return doc
 
 
@@ -91,7 +106,7 @@ def summary(doc: dict[str, Any]) -> dict[str, Any]:
     """What this mod adjusts, as the file says it (None: SearXNG's default)."""
     search = doc.get("search") if isinstance(doc.get("search"), dict) else {}
     outgoing = doc.get("outgoing") if isinstance(doc.get("outgoing"), dict) else {}
-    engines = [e for e in doc.get("engines") or [] if isinstance(e, dict) and e.get("name")]
+    engines = [e for e in doc.get("engines") if isinstance(e, dict) and e.get("name")] if isinstance(doc.get("engines"), list) else []
     formats = search.get("formats")
     return {
         "use_default_settings": bool(doc.get("use_default_settings")),

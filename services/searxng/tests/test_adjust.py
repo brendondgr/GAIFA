@@ -124,3 +124,60 @@ def test_a_read_that_fails_changes_nothing_and_says_so(client, runtime):
     r = client.post("/v1/settings", json={"safe_search": 1})
     assert r.status_code == 503 and r.json()["code"] == "read_failed" and "Input/output error" in r.json()["detail"]
     assert runtime.restarts == 0
+
+
+BROKEN = "use_default_settings: true\nserver:\n  secret_key: 'half-edited\n  limiter: [\n"   # a quote never closed
+
+
+def test_a_settings_file_that_doesnt_parse_is_reported_and_left_alone(folder, fake, runtime):
+    """The mod starts and says where the file breaks; changes are refused until it's fixed (it crash-looped)."""
+    from fastapi.testclient import TestClient
+
+    import server
+    (folder / "settings.yml").write_text(BROKEN)
+    with TestClient(server.create_app(runtime, env_url=fake.url, watch_s=3600, query_s=3600, ready_s=2)) as c:
+        hint = next(x for x in c.get("/v1/status").json()["stats"] if x["label"] == "SearXNG")["hint"]
+        assert "settings.yml doesn't parse" in hint and "line 5, column 1" in hint and "line 3, column 15" in hint
+        assert "doesn't parse" in c.get("/v1/found").json()["settings_problem"]
+        r = c.get("/v1/settings")
+        assert r.status_code == 409 and r.json()["code"] == "settings_invalid", r.text
+        assert "line 5, column 1" in r.json()["detail"] and str(folder / "settings.yml") in r.json()["fix"]
+        r = c.post("/v1/engines/bing", json={"enabled": False})
+        assert r.status_code == 409 and r.json()["code"] == "settings_invalid" and "nothing was changed" in r.json()["detail"]
+        assert (folder / "settings.yml").read_text() == BROKEN and runtime.restarts == 0 and _backups(folder) == []
+        (folder / "settings.yml").write_text("- a list\n- not a mapping\n")
+        r = c.get("/v1/settings")
+        assert r.status_code == 409 and "isn't a mapping (its top level is a list)" in r.json()["detail"]
+        (folder / "settings.yml").write_text(SETTINGS)                          # fixed by hand
+        assert c.get("/v1/settings").status_code == 200 and c.get("/v1/found").json()["settings_problem"] is None
+        assert c.post("/v1/engines/bing", json={"enabled": False}).json()["changed"] is True
+
+
+def test_startup_survives_a_runtime_that_fails(fake):
+    """Whatever the first look runs into, the server starts (and the watch loop looks again)."""
+    from fastapi.testclient import TestClient
+
+    import server
+
+    class Broken:
+        async def find(self):
+            raise RuntimeError("the container went away")
+    with TestClient(server.create_app(Broken(), env_url=fake.url, watch_s=3600)) as c:
+        assert c.get("/health").status_code == 200
+        assert c.get("/v1/found").json()["container"] is None
+
+
+def test_old_backups_are_pruned(client, folder, runtime):
+    """A change keeps the newest 10 of this mod's backups; files it didn't name stay."""
+    old = [f"settings.yml.aihub-2026-01-{d:02d}T120000" for d in range(1, 13)] + ["settings.yml.aihub-2026-01-12T120000-2"]
+    for n in old:
+        (folder / n).write_text("old")
+    others = ["settings.yml.aihub-mine", "settings.yml.bak", "settings.yml.aihub-2026-01-01T120000.txt"]
+    for n in others:
+        (folder / n).write_text("not ours")
+    r = client.post("/v1/engines/bing", json={"enabled": False}).json()
+    assert r["changed"] is True
+    left = runtime.backups(None)
+    assert len(left) == 10 and left[0] == r["backup"] and left[1] == "settings.yml.aihub-2026-01-12T120000-2"
+    assert sorted(r["pruned"]) == [f"settings.yml.aihub-2026-01-{d:02d}T120000" for d in range(1, 5)]
+    assert all((folder / n).exists() for n in others)

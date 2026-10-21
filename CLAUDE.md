@@ -18,7 +18,7 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 - `aihub new <id>`: a new mod from `services/_template/`, installed and loaded; `aihub rescan` after adding or removing mod folders by hand.
 - `aihub models list | show <id> | scan [--add] | verify <id>… | --all`: the models registry.
 - `aihub status | start | stop | restart | logs [id] [-f] | doctor [--inventory] | open`: the hub as a systemd user service (logs read `data/logs/<id>.log`) (`aihub install` writes `~/.config/systemd/user/aihub.service` and links `~/.local/bin/aihub`). After changing hub code, `aihub restart`. `aihub doctor` checks the whole install (also Settings → About).
-- `aihub backup <folder>`: databases, registry, `config.toml` and the mods' `.env` files in a dated archive.
+- `aihub backup <folder>`: databases, registry, `config.toml`, the mods' `.env` files and their small settings files (`data/state/<id>/*.json`, such as the workspace folders) in a dated archive.
 
 ## Mod contract
 Full how-to: [docs/mods.md](docs/mods.md). A mod is done when `aihub check <id>` passes.

@@ -25,6 +25,12 @@ def test_backup_archives_live_databases_and_settings(root, tmp_path):
     (root / "services" / "relay").mkdir()
     (root / "services" / "relay" / ".env").write_text("SECRET=1\n")
     (root / "services" / "tts").mkdir()                 # no .env: nothing to add
+    st = root / "data" / "state"
+    (st / "workspace").mkdir(parents=True)
+    (st / "workspace" / "folders.json").write_text('{"folders": []}')   # a mod's saved settings: kept
+    (st / "lab" / "cache").mkdir(parents=True)
+    (st / "lab" / "big.json").write_text("x" * (2 * 1024 * 1024))      # over 1 MB: left out
+    (st / "lab" / "cache" / "deep.json").write_text("{}")               # nested: left out
     dest = tmp_path / "backups"
 
     assert cli.main(["backup", str(dest)]) == 0
@@ -33,7 +39,8 @@ def test_backup_archives_live_databases_and_settings(root, tmp_path):
     assert stat.S_IMODE(out.stat().st_mode) == 0o600
     with tarfile.open(out) as tar:
         names = sorted(tar.getnames())
-        assert names == ["backup.json", "config.toml", "databases/hub.db", "registry.json", "services/relay/.env"]
+        assert names == ["backup.json", "config.toml", "databases/hub.db", "registry.json", "services/relay/.env",
+                         "state/workspace/folders.json"]
         tar.extractall(tmp_path / "x", filter="data")
     copy = sqlite3.connect(tmp_path / "x" / "databases" / "hub.db")
     assert copy.execute("SELECT count(*) FROM t").fetchone()[0] == 100

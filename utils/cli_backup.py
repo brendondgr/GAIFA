@@ -2,7 +2,9 @@
 
 - every `*.db` in the databases folder, copied with SQLite's online backup (consistent while the
   hub and mods keep writing; WAL files are folded in)
-- the models registry (`registry.json`), `config.toml`, and each mod's `services/<id>/.env`
+- the models registry (`registry.json`), `config.toml`, each mod's `services/<id>/.env`, and the small
+  JSON files mods keep their settings in (`data/state/<id>/*.json` up to 1 MB: the workspace folders and
+  their levels, and the like)
 
 Model weights, outputs and venvs are not included: they are large and can be fetched, kept or
 rebuilt. The archive holds secrets (the `.env` files), so it is written owner-only (0600).
@@ -21,6 +23,9 @@ import tempfile
 import time
 import tomllib
 from pathlib import Path
+
+
+STATE_MAX_BYTES = 1024 * 1024   # small JSON settings only; labs and caches under data/state/ stay out
 
 
 def _paths(root: Path) -> tuple[Path, Path]:
@@ -61,6 +66,9 @@ def backup(root: Path, dest: Path, now: float | None = None) -> tuple[Path, list
                 staged.append((p, arc))
         for env in sorted((root / "services").glob("*/.env")):
             staged.append((env, f"services/{env.parent.name}/.env"))
+        for st in sorted((root / "data" / "state").glob("*/*.json")):   # mods' saved settings (workspace folders, …)
+            if st.is_file() and st.stat().st_size <= STATE_MAX_BYTES:
+                staged.append((st, f"state/{st.parent.name}/{st.name}"))
         part = out.with_name(out.name + ".part")
         fd = os.open(part, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "wb") as f, tarfile.open(fileobj=f, mode="w:gz") as tar:

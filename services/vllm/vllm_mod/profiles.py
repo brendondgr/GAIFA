@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import tomllib
@@ -69,11 +70,26 @@ class Profile(BaseModel):
         return {k: v for k, v in self.model_dump(exclude={"id"}).items() if v not in (None, "", [], {})}
 
 
+PARKED = ".parked.json"   # gitignored: this machine's parked profiles, e.g. ["qwen3.6-35b-a3b-awq"]
+
+
+def parked(folder: Path) -> set[str]:
+    """Profiles this machine keeps out of the list (their models were deleted): loading one would
+    download it again. A local file, so a fresh clone gets every profile."""
+    try:
+        return {str(x) for x in json.loads((folder / PARKED).read_text())}
+    except (OSError, ValueError, TypeError):
+        return set()
+
+
 def load_profiles(folder: Path) -> tuple[dict[str, Profile], dict[str, str]]:
-    """Every profile in the folder, plus a problem per file that doesn't parse."""
+    """Every profile in the folder except the parked ones, plus a problem per file that doesn't parse."""
     found: dict[str, Profile] = {}
     problems: dict[str, str] = {}
+    skip = parked(folder) if folder.is_dir() else set()
     for f in sorted(folder.glob("*.toml")) if folder.is_dir() else []:
+        if f.stem in skip:
+            continue
         try:
             data = tomllib.loads(f.read_text())
             if "id" in data and data["id"] != f.stem:

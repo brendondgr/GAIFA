@@ -7,7 +7,7 @@ import pytest
 from vllm_mod.profiles import LABEL, Profile, engine_command, load_profiles, serve_args, utilization
 from vllm_mod.settings import Settings
 
-SEEDS = Path(__file__).resolve().parent.parent / "profiles" / "disabled"   # parked 2026-10-20: their models were deleted
+SEEDS = Path(__file__).resolve().parent.parent / "profiles"
 GTT = 130_446_385_152          # this machine's mem_info_gtt_total
 
 
@@ -15,12 +15,24 @@ def _p(**kw) -> Profile:
     return Profile(**{"id": "t", "name": "T", "model": "org/m", "memory_gb": 12, "max_model_len": 8192, **kw})
 
 
-def test_seed_profiles_parse():
-    found, problems = load_profiles(SEEDS)
+def test_seed_profiles_parse(tmp_path):
+    for f in SEEDS.glob("*.toml"):               # a copy: this machine may park some (profiles/.parked.json)
+        (tmp_path / f.name).write_text(f.read_text())
+    found, problems = load_profiles(tmp_path)
     assert problems == {}
     assert {"qwen3-0.6b", "qwen3.6-35b-a3b-awq"} <= set(found)
     awq = found["qwen3.6-35b-a3b-awq"]
     assert awq.enforce_eager and awq.trust_remote_code and awq.tool_parser == "qwen3_coder"
+
+
+def test_parked_profiles_are_skipped(tmp_path):
+    for name in ("a", "b"):
+        (tmp_path / f"{name}.toml").write_text('name="A"\nmodel="o/m"\nmemory_gb=4\nmax_model_len=4096\n')
+    (tmp_path / ".parked.json").write_text('["b"]')
+    found, problems = load_profiles(tmp_path)
+    assert set(found) == {"a"} and problems == {}
+    (tmp_path / ".parked.json").write_text("not json")
+    assert set(load_profiles(tmp_path)[0]) == {"a", "b"}          # a broken file parks nothing
 
 
 def test_problems_are_reported_per_file(tmp_path):

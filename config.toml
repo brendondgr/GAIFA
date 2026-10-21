@@ -43,7 +43,7 @@ autostart = false
 
 [services.vllm]
 enabled = true
-autostart = false              # parked 2026-10-20: its models were deleted; profiles in services/vllm/profiles/disabled/
+autostart = false              # parked 2026-10-20: its models were deleted; services/vllm/profiles/.parked.json lists the profiles skipped here
 
 [docs]
 regenerate = false             # plan 23.6: true keeps this machine's model inventory (data/state/setup/models/, local) current as the registry changes

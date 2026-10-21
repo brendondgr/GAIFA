@@ -37,7 +37,7 @@ Pick only the mods you need; each setup doc says what the mod gives you and what
 | `searxng` | SearXNG watcher: see your SearXNG's health and engines, and change its settings from AIHub or the agent | no | 30 MB | [SearXNG watcher (the searxng mod)](../../services/searxng/setup/searxng.md) |
 | `stt` | Speech to text: transcribe audio and video files, live dictation and the Chat microphone (Whisper) | yes | 750 MB | [Speech to Text (faster-whisper)](../../services/stt/setup/stt.md) |
 | `tts` | Speech: voice cloning, voice design and delivery directions with Breeze TTS 2 (non-commercial), plus Whisper word timings · Speech: text to speech with Kokoro's fast built-in English voices (the server and its first engine) | yes | 13.6 GB | [Breeze TTS 2 and Whisper (Speech)](../../services/tts/setup/breeze.md), [Kokoro-82M (Speech)](../../services/tts/setup/kokoro.md) |
-| `vllm` | vLLM: serve Hugging Face chat models (safetensors, AWQ) on the GPU, published to the relay; parked here | yes | 12.5 GB | [vLLM](../../services/vllm/setup/vllm.md) |
+| `vllm` | vLLM: serve Hugging Face chat models (safetensors, AWQ) on the GPU, published to the relay | yes | 12.5 GB | [vLLM](../../services/vllm/setup/vllm.md) |
 | `web` | Web: search through your SearXNG and fetch pages and PDFs into Outputs, for you and the agent | no | 100 MB | [Web (SearXNG search and page fetching)](../../services/web/setup/web.md) |
 | `workspace` | Workspace: let the agent read and edit your folders at a level you set, and run code in a podman sandbox | no | 1.1 GB | [Workspace (folders, edits in place, the sandbox)](../../services/workspace/setup/workspace.md) |
 <!-- end generated -->

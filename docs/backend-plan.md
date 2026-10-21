@@ -30,6 +30,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | K — One GPU job at a time | 31 | A hub-wide GPU slot that mods take around their GPU work: a queue, groups for LLM engines, leases that expire, the queue in the UI | comfy, gen3d, tts, stt, decide, embed and the relay (each takes the slot); nothing is removed |
 | L — Replies you can act on | 32 | Under a reply, the pages it read (with their icons) and Copy in three ways; Select → Reply with the quote as markdown | Chat, the agent's send API, the web mod (a favicon route); additive |
 | M — Navigation | 33 | The sidebar in three groups, services shown as a list, a button or counts, a thin rail with state colours, a logo per mod, a Services page | the UI shell, `[ui.nav]`, a `[ui] logo` per mod; additive |
+| N — Other machines | 35–40 | AIHub beyond this machine: hardware detection, memory in pools (RAM and each GPU's VRAM), running without systemd, a variant per accelerator for every mod chosen by `aihub setup`, checked on Linux with NVIDIA and Windows (WSL2) with Intel; macOS by CI. Plan: [plans/portability.md](plans/portability.md) | Additive: this machine keeps its backends; every step's tests include its recorded hardware |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -68,6 +69,12 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 32 | The reply bar and Select → Reply | M | `chat`: Sources, Copy and thumbs under a reply; the Reply button on a selection, the quote chip and the quote on a message |
 | 34 | Environments: the folders a chat may use, and asking for more | M | the chat header's environment chip, the folder card, the Workspace page's Environments |
 | 33 | The sidebar: groups, a thin rail and service logos | M | the sidebar (groups, the rail, the Services menu), the Services page, a logo per mod |
+| 35 | Know the machine: hardware detection | M | the Hardware card in Settings → About |
+| 36 | Memory in pools: RAM and each GPU's VRAM | M–L | one memory bar per pool in the header and the Overview |
+| 37 | Running without systemd, Fedora or AMD | M | — |
+| 38 | Mods choose a backend: variants per accelerator | M | the variant badge and the unavailable state on mod cards |
+| 39 | The mods on other machines | L | — |
+| 40 | Checking on real machines | M | — |
 
 # Stage A — Foundation
 

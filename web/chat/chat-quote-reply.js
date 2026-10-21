@@ -128,9 +128,8 @@ export function QuoteReplyBox({ scrollRef, onAdd, resetKey }) {
         const sel = doc.getSelection?.(), q = selectionQuote(sel, doc);
         if (!q) return;                                                // nothing quotable: a box already open stays
         const range = sel.getRangeAt(0).cloneRange();
-        highlight(range); setReply('');
-        setBox({ q, range, at: place(range) });
-        setTimeout(() => input.current?.focus({ preventScroll: true }), 0);
+        setReply('');
+        setBox({ q, range, at: place(range), open: false });             // a Reply button first; the box opens on its click
       }, delay);
     };
     const onDown = e => { if (!inBox(e.target)) { down.current = true; if (cur.current) close(); } };
@@ -157,6 +156,20 @@ export function QuoteReplyBox({ scrollRef, onAdd, resetKey }) {
   }, []);
   (React.useLayoutEffect || React.useEffect)(() => { const el = input.current; if (!el) return; el.style.height = ''; if (el.scrollHeight > el.clientHeight) el.style.height = Math.min(el.scrollHeight + 2, 110) + 'px'; }, [reply]);
   if (!box) return null;
+  if (!box.open) {
+    const open = () => {
+      highlight(box.range);                                            // the input takes the focus, so keep the quote lit
+      setBox({ ...box, open: true });
+      setTimeout(() => input.current?.focus({ preventScroll: true }), 0);
+    };
+    return h('button', { ref, type: 'button', className: 'aichat-qbtn', 'data-quote-box': '', onClick: open,
+      onMouseDown: e => e.preventDefault(),                            // keep the selection while clicking
+      title: 'Reply to this part', 'aria-label': 'Reply to the selected part',
+      style: { position: 'fixed', top: box.at.top, left: box.at.left, bottom: box.at.bottom, zIndex: 60, display: 'inline-flex', alignItems: 'center', gap: 5,
+        height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid ' + T.bds, background: T.card, color: T.tx, boxShadow: SHADOW,
+        font: 'inherit', fontSize: 12.5, cursor: 'pointer' } },
+    h(Icon, { d: 'reply', size: 13 }), 'Reply');
+  }
   const ok = !!reply.trim();
   const submit = () => {
     if (!ok) return;

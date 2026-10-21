@@ -107,7 +107,9 @@ function finish(turn, live, now) {
     if (!it.result && !(it.approval && !it.decision)) firstOpen = false;
     r.seconds = it.result ? Math.max(0, (it.resultTs || from) - from) : live && r.status === 'running' ? Math.max(0, now - from) : null;
   }
-  turn.outputs = toolRows.flatMap(r => (r.item.result?.outputs || []).map(o => ({ ...o, tool: r.name })));
+  // pages the web tools saved are hidden outputs (plan 30.9): the reply bar's Sources lists them, so they stay out of the strip
+  turn.outputs = toolRows.filter(r => !/^web_/.test(r.name || '')).flatMap(r => (r.item.result?.outputs || [])
+    .filter(o => !o.hidden).map(o => ({ ...o, tool: r.name })));
   turn.undo = undoOf(toolRows);
   turn.pending = rows.filter(r => (r.type === 'tool' && r.status === 'waiting') || (r.type === 'question' && !r.item.answer && !r.item.result)).map(r => r.item);
   if (turn.pending.length) turn.running = live = true;          // waiting for you is still a live turn

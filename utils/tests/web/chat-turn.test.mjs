@@ -82,6 +82,19 @@ test('tool results cleared mid-turn keep the turn whole; the marker follows it',
   assert.deepEqual(t.steps.flatMap(s => s.rows).map(r => r.type), ['tool', 'thinking', 'tool']);
 });
 
+test('pages the web tools saved stay out of the output strip', () => {
+  const evs = [
+    { seq: 1, ts: 10, type: 'user', payload: { text: 'tell me about FSU' } },
+    { seq: 2, ts: 11, type: 'tool_call', payload: { id: 'f1', name: 'web_fetch', arguments: { url: 'https://fsu.edu/' }, step: 'a' } },
+    { seq: 3, ts: 12, type: 'tool_result', payload: { id: 'f1', name: 'web_fetch', status: 'done', content: '{}', outputs: [{ n: 1, output_id: 'p1', kind: 'text', title: 'About FSU' }] } },
+    { seq: 4, ts: 13, type: 'tool_call', payload: { id: 'i1', name: 'comfy_generate_image', arguments: { prompt: 'x' }, step: 'b' } },
+    { seq: 5, ts: 14, type: 'tool_result', payload: { id: 'i1', name: 'comfy_generate_image', status: 'done', outputs: [{ n: 2, output_id: 'o2', kind: 'image' }, { n: 3, output_id: 'o3', kind: 'text', hidden: true }] } },
+    { seq: 6, ts: 15, type: 'assistant', payload: { text: 'Here.', step: 'c' } },
+  ];
+  const [t] = ct.groupTurns(th.buildView(evs), { running: false, now: 20 });
+  assert.deepEqual(t.outputs.map(o => o.output_id), ['o2']);
+});
+
 test('a turn a button started, a queued message, and standalone items', () => {
   const evs = [
     { seq: 1, ts: 10, type: 'user', payload: { text: 'hi' } },

@@ -7,6 +7,7 @@ import time
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from . import prefs
 from .options import STAGE_ORDER
 
 router = APIRouter()
@@ -56,6 +57,7 @@ def status(request: Request):
             {"label": "Jobs", "value": total},
             {"label": "Queue", "value": sum(1 for j in active if j["status"] == "queued")},
             {"label": "Avg time", "value": round(sum(secs) / len(secs)) if secs else None, "unit": "s"},
+            {"label": "Previews", "value": prefs.preview_device().upper(), "hint": "where Blender draws preview renders"},
         ],
         "jobs": [_job(j) for j in sorted(active, key=lambda j: j["created"])] + [_job(j) for j in recent],
     }

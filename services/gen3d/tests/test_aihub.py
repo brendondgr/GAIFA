@@ -71,7 +71,7 @@ def test_an_upload_goes_in_a_dated_folder_too(c):
 def test_status_has_the_aihub_shape(c):
     job = c.post("/v1/jobs", json={"prompt": "status probe", "stages": ["shape"]}).json()
     s = c.get("/v1/status").json()
-    assert [x["label"] for x in s["stats"]] == ["Jobs", "Queue", "Avg time"]
+    assert [x["label"] for x in s["stats"]] == ["Jobs", "Queue", "Avg time", "Previews"]
     assert set(s) >= {"loaded", "busy", "idle_s", "jobs"}
     mine = [j for j in s["jobs"] if j["id"] == job["id"]]
     assert mine and mine[0]["route"] == f"#/s/gen3d/jobs?id={job['id']}" and mine[0]["state"] in ("queued", "running", "done")

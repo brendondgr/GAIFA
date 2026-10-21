@@ -172,6 +172,7 @@ curl http://127.0.0.1:5050/v1/chats                             # also POST, GET
 curl -X POST 'http://127.0.0.1:5050/v1/load?models=shape,parts' # warm the models up
 curl -X POST http://127.0.0.1:5050/v1/unload                    # free the GPU (?force=true cancels a running job)
 curl http://127.0.0.1:5050/health
+curl http://127.0.0.1:5050/v1/settings                          # PUT {"preview_device": "cpu"|"gpu"}: see Preview renders
 ```
 
 Python:
@@ -343,7 +344,8 @@ Edit `~/.config/gen3d/gen3d.env`, then `gen3d restart`:
 | `GEN3D_CUBEART` | `runtime/CubeArt` | weights, venv and upstream code |
 | `GEN3D_IMAGE` | `docker.io/kyuz0/amd-strix-halo-comfyui:latest` | the ROCm image the worker runs in |
 | `GEN3D_BLENDER` | `blender` | empty disables previews |
-| `GEN3D_PREVIEW_DEVICE` | `gpu` | `cpu` renders previews with Mesa's software rasterizer (llvmpipe) instead of the GPU; see below |
+| `GEN3D_PREVIEW_DEVICE` | `cpu` | `cpu` renders previews with Mesa's software rasterizer (llvmpipe), `gpu` on the GPU (faster); a choice saved on the page wins; see below |
+| `GEN3D_STATE_DIR` | `GEN3D_DATA` | where the page's settings live (`settings.json`); AIHub sets `data/state/gen3d` |
 | `GEN3D_PREVIEW_MAX_FACES` | 300000 | meshes above this are simplified for the preview only (the saved mesh is untouched); 0 = never |
 | `GEN3D_PREVIEW_TIMEOUT_S` | 180 | a preview render that runs longer is killed and the stage fails |
 | `GEN3D_KEEP_ALIVE_S` | 330 | HTTP keep-alive; keep it above the browser's |
@@ -353,9 +355,15 @@ Edit `~/.config/gen3d/gen3d.env`, then `gen3d restart`:
 
 `scripts/render_blender.py` draws the 4-view sheet with Blender's Workbench at 384 px a view (768 px
 sheet; at most 512 a view), flat shading, no shadows or cavity. Workbench draws through OpenGL, so
-**it uses the GPU even with `blender -b`** (`GEN3D_PREVIEW_DEVICE=gpu`, the default). With `cpu`,
-Blender starts with `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe --gpu-backend opengl`, and the
-script refuses to render unless the GL context is llvmpipe/softpipe, so it never falls back to the GPU.
+**it uses the GPU even with `blender -b`** (`gpu`). With `cpu`, the default, Blender starts with
+`LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe --gpu-backend opengl`, and the script refuses to render unless the GL context is llvmpipe/softpipe, so it never falls back to the GPU.
+The switch is on AIHub's 3D Generate page, Create tab (**Preview renders: CPU (safer) / GPU
+(faster)**), and in the API:
+`curl -X PUT http://127.0.0.1:5050/v1/settings -H 'content-type: application/json' -d '{"preview_device": "gpu"}'`
+(`GET` shows it; `null` forgets the choice). It is saved in `settings.json` in `GEN3D_STATE_DIR`
+(`data/state/gen3d/` under AIHub, so `aihub backup` keeps it) and read for each preview, so it applies to
+the next one without a restart: the saved choice, else `GEN3D_PREVIEW_DEVICE`, else `cpu`. The mod's
+status shows it as **Previews**.
 Meshes over `GEN3D_PREVIEW_MAX_FACES` are simplified in memory by vertex clustering (a Weld modifier at
 diagonal/2000, /1000, /500, /250, the first that fits; /250 is about a pixel of a tile). Timings on
 llvmpipe here (32 threads): a cube 1.3 s, 400k triangles 3.7 s, 1.3M 3.2 s, a 24.7M-triangle TRELLIS

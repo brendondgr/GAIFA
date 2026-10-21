@@ -41,11 +41,13 @@ def test_cpu_device_forces_software_gl():
     assert blender_env("gpu", {"PATH": "/usr/bin"}) == {"PATH": "/usr/bin"}
 
 
-def test_device_setting_defaults_to_gpu(monkeypatch):
-    from gen3d.config import _device
-    for value, want in (("", "gpu"), ("gpu", "gpu"), ("CPU ", "cpu"), ("cuda", "gpu")):
+def test_device_setting_defaults_to_cpu(monkeypatch):
+    from gen3d.config import Settings, _device
+    for value, want in (("", "cpu"), ("cpu", "cpu"), (" GPU ", "gpu"), ("gpu", "gpu"), ("cuda", "cpu")):
         monkeypatch.setenv("GEN3D_PREVIEW_DEVICE", value)
         assert _device("GEN3D_PREVIEW_DEVICE") == want
+    monkeypatch.delenv("GEN3D_PREVIEW_DEVICE")
+    assert Settings().preview_device == "cpu"
 
 
 def test_face_limit_decides_the_simplification():

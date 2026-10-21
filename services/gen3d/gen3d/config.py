@@ -18,7 +18,8 @@ def _flag(name: str) -> bool:
 
 
 def _device(name: str) -> str:
-    return "cpu" if os.environ.get(name, "").strip().lower() == "cpu" else "gpu"
+    """cpu unless the variable says gpu: a typo never puts the preview on the GPU."""
+    return "gpu" if os.environ.get(name, "").strip().lower() == "gpu" else "cpu"
 
 
 @dataclass(frozen=True)
@@ -38,7 +39,8 @@ class Settings:
     image: str = os.environ.get("GEN3D_IMAGE", "docker.io/kyuz0/amd-strix-halo-comfyui:latest")
     podman: str = os.environ.get("GEN3D_PODMAN", "podman")
     blender: str = os.path.expanduser(os.environ.get("GEN3D_BLENDER", "blender"))
-    # Preview renders: gpu = Workbench on the GPU (OpenGL); cpu = the same under Mesa's llvmpipe, no GPU.
+    # Preview renders: cpu = Workbench under Mesa's llvmpipe, no GPU; gpu = the same on the GPU (OpenGL).
+    # The default when the page has no saved choice (prefs.py: the saved choice wins).
     preview_device: str = field(default_factory=lambda: _device("GEN3D_PREVIEW_DEVICE"))
     preview_max_faces: int = int(os.environ.get("GEN3D_PREVIEW_MAX_FACES", "300000"))  # 0 = never simplify
     preview_timeout_s: float = float(os.environ.get("GEN3D_PREVIEW_TIMEOUT_S", "180"))
@@ -48,6 +50,8 @@ class Settings:
     db: str = os.environ.get("GEN3D_DB", "")
     outputs: str = os.environ.get("GEN3D_OUTPUTS", "")
     weights_dir: str = os.environ.get("GEN3D_WEIGHTS", "")
+    # Settings changed on the page (prefs.py): AIHub's data/state/gen3d, standalone the data folder.
+    state_dir: str = os.environ.get("GEN3D_STATE_DIR", "")
 
     @property
     def jobs_dir(self) -> Path:
@@ -56,6 +60,10 @@ class Settings:
     @property
     def db_path(self) -> Path:
         return Path(self.db).expanduser() if self.db else self.data / "gen3d.db"
+
+    @property
+    def state_path(self) -> Path:
+        return Path(self.state_dir).expanduser() if self.state_dir else self.data
 
     @property
     def weights(self) -> Path:

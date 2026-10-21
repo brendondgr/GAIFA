@@ -1,8 +1,9 @@
 """Preview renders: Blender (on the host) draws a 4-view contact sheet of a job's newest result.
 
-Blender's Workbench draws through OpenGL, so the default (`GEN3D_PREVIEW_DEVICE=gpu`) uses the GPU even in
-background mode. `cpu` forces Mesa's software rasterizer (llvmpipe), and the script refuses to render if the
-context it gets is a hardware one. Meshes over `GEN3D_PREVIEW_MAX_FACES` are simplified for the picture only.
+Blender's Workbench draws through OpenGL, so `gpu` uses the GPU even in background mode. `cpu` (the default)
+forces Mesa's software rasterizer (llvmpipe), and the script refuses to render if the context it gets is a
+hardware one. The device is read for each render: the page's saved choice, else `GEN3D_PREVIEW_DEVICE`
+(prefs.py). Meshes over `GEN3D_PREVIEW_MAX_FACES` are simplified for the picture only.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import shutil
 import struct
 from pathlib import Path
 
+from . import prefs
 from .config import ROOT, settings
 
 log = logging.getLogger("gen3d.preview")
@@ -80,7 +82,7 @@ async def render_preview(jdir: Path, glb: Path, png: Path, size: int = 384) -> N
         log.info("no Blender (%r): preview skipped", settings.blender)
         return
     check_previewable(glb)
-    device, timeout = settings.preview_device, settings.preview_timeout_s
+    device, timeout = prefs.preview_device(), settings.preview_timeout_s
     proc = await asyncio.create_subprocess_exec(
         *blender_command(exe, glb, png, size, device, settings.preview_max_faces), env=blender_env(device),
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, cwd=str(jdir))

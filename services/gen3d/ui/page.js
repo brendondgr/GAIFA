@@ -182,6 +182,7 @@ function createTab(el, ctx, cleanups) {
     h('div', { style: 'display:flex;gap:8px;justify-content:flex-end' }, submit));
   const up = panel(header('Or start from a mesh'), ui.text('Upload a .glb, .obj, .ply or .stl to split it into parts and rig it (the shape stage is skipped).', { muted: true, small: true }),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, upFile, upBtn));
+  const previews = previewPanel(ctx);
   const durations = jobDurationsCard(ctx);
   const stagesCard = chartCard({
     title: 'Job time per stage', ranges: ['7d', '30d'], height: 150,
@@ -189,7 +190,7 @@ function createTab(el, ctx, cleanups) {
     draw: (d, o) => rh(charts.BarChart, { categories: d.categories, series: d.series.map(s => ({ label: STAGE_LABEL[s.name] || s.name, values: s.values, color: STAGE_COLOR[s.name] })), stacked: true, unit: 'seconds', ...o }),
   });
   cleanups.push(durations.unmount, stagesCard.unmount);
-  const grid = columns(h('div', { style: 'display:flex;flex-direction:column;gap:12px;min-width:0' }, form, up),
+  const grid = columns(h('div', { style: 'display:flex;flex-direction:column;gap:12px;min-width:0' }, form, up, previews),
     h('div', { style: 'display:flex;flex-direction:column;gap:12px;min-width:0' }, stagesCard, durations), 380);
   cleanups.push(grid.cleanup);
   el.append(grid);
@@ -208,6 +209,25 @@ function createTab(el, ctx, cleanups) {
     if (!parts.value && templates[st.template]) parts.value = templates[st.template].join(', ');
     presetHelp(); renderEngine(); estimate();
   }).catch(e => ctx.toast(errText(e), 'error'));
+}
+
+// Where Blender draws previews, saved by gen3d (PUT /v1/settings) and used from the next preview on.
+const PREVIEW_NOTE = {
+  cpu: 'CPU: software rendering, never touches the GPU; a huge mesh can take a minute. Applies to the next preview.',
+  gpu: 'GPU: faster, but a broken giant mesh can hang the GPU (the 2026-10-21 crash). Applies to the next preview.',
+};
+function previewPanel(ctx) {
+  const { ui } = ctx;
+  const note = ui.text('', { muted: true, small: true });
+  let cur = null;
+  const show = v => { cur = v; seg.set(v); note.textContent = PREVIEW_NOTE[v] || ''; };
+  const seg = segmented([{ value: 'cpu', label: 'CPU (safer)' }, { value: 'gpu', label: 'GPU (faster)' }], 'cpu', async v => {
+    if (v === cur) return;
+    try { show((await ctx.call('PUT', '/v1/settings', { json: { preview_device: v } })).json.preview_device); }
+    catch (e) { if (cur) seg.set(cur); ctx.toast(errText(e), 'error'); }
+  }, 'Preview renders');
+  ctx.call('GET', '/v1/settings').then(r => show(r.json.preview_device)).catch(e => { note.textContent = errText(e); });
+  return panel(header('Preview renders', seg), note);
 }
 
 function jobDurationsCard(ctx) {

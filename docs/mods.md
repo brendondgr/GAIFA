@@ -236,6 +236,7 @@ ask = ""                                    # a yes/no question first, such as a
 interactive = false                         # true: it prompts (a login), so under --json the person runs it
 skip_if = ""                                # a command: exit 0 means nothing to do (logged in already), so it's done
 optional = false                            # with an ask: a "no" skips only this step, not the setup
+next = ""                                   # what's left to do by hand once it has run (it joins the report)
 
 [[suggest]]                                 # optional starter models (1–3)
 name = "Kokoro 82M"

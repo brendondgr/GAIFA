@@ -73,17 +73,17 @@ aihub start agent
 
 ## Choosing models
 
-The agent runs no model and downloads none, so it has no suggestions. `aihub setup` asks which model it uses once the relay and your LLM mods are installed (their models exist only then), offers to add a hosted provider when the relay has none, writes the answer to `config.toml`, and checks it's on the relay; an agent passes it with `--set "services.agent.env.AGENT_MODEL=<name>"`. The Auto judge's model (`[agent.judge] model`) is asked the same way, and can be skipped. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
+The agent runs no model and downloads none, so it has no suggestions. `aihub setup` asks which model it uses once the relay and your LLM mods are installed (their models exist only then), offers to add a hosted provider when the relay has none, saves the answer through the hub (into `config.toml`, applied at once), restarts the agent, and checks it's on the relay; an agent passes it with `--set "services.agent.env.AGENT_MODEL=<name>"`. The Auto judge's model (`[agent.judge] model`) is asked the same way, and can be skipped. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
 - **[llama.cpp](../../lcpp/setup/llama-cpp.md) (`lcpp`):** any GGUF you add; a running instance registers under its catalog nickname (`nicknames` in `services/lcpp/data/models.json`), or the alias given at launch. Its doc suggests two models that take tool calls.
 - **[vLLM](../../vllm/setup/vllm.md):** a loaded profile registers under its `alias` (such as `Qwen3-0.6B-vLLM`; the profiles are parked here).
-- **[OpenCode](../../opencode/setup/opencode.md):** `agent`, or a free hosted id such as `opencode/glm-5.3-flash-free`, with no GPU at all.
+- **[OpenCode](../../opencode/setup/opencode.md):** a free hosted id such as `opencode/glm-5.3-flash-free`, with no GPU at all. (Its `agent` model is OpenCode's own coding agent, which runs shell commands in its folder; setup doesn't offer it as Chat's model.)
 - **An endpoint you added** on the relay (any OpenAI-compatible server, such as a hosted provider: [Adding a hosted provider](../../relay/setup/relay.md#adding-a-hosted-provider)): the model ids you listed on it, or its alias. With no GPU, this or OpenCode is the way to a model.
 
 A model that is always up makes the better default; an lcpp nickname is listed only while its instance runs. The thread's model can also be changed per chat in Chat's header.
 
 ## Configuration
 
-`service.toml` `[run.env]` sets every key. To change one on your machine, don't edit `service.toml`: put it in `config.toml`, which wins (architecture §4.4), and restart the mod:
+`service.toml` `[run.env]` sets every key. To change one on your machine, don't edit `service.toml`: `config.toml` wins (architecture §4.4). `aihub setup` sets the two it asks for through the hub, which saves `config.toml` and applies the value at once, then restarts the mod. By hand, the hub reads `config.toml` only when it starts, so edit it, run `aihub restart` (the hub), then `aihub restart agent`:
 
 ```toml
 [services.agent.env]
@@ -91,7 +91,7 @@ AGENT_MODEL = "<your-model>"
 AGENT_FALLBACK_MODEL = "<another-model>"   # optional; "" (the default) for none
 ```
 
-(This table form is the one `aihub setup` edits; it leaves an inline `env = { … }` alone and asks you to set it by hand.)
+(When the hub isn't running, `aihub setup` edits this table form in the file itself; it leaves an inline `env = { … }` alone and asks you to set it by hand.)
 
 | Key | Set to | Required | Meaning |
 |---|---|---|---|
@@ -132,7 +132,7 @@ Expect `225 passed` (2026-10-21, about a minute).
 
 ## What to look for
 
-- **Every chat fails or falls back.** `AGENT_MODEL` names a model your relay doesn't have (such as `service.toml`'s `skynet`, which exists only on the machine these docs were written on). Check the list above and set it in `config.toml`.
+- **Every chat fails or falls back.** `AGENT_MODEL` names a model your relay doesn't have (such as `service.toml`'s `skynet`, which exists only on the machine these docs were written on). Check the list above, then `aihub setup agent --set "services.agent.env.AGENT_MODEL=<name>"`, or edit `config.toml` and restart the hub, then the agent (Configuration).
 - **A fallback that's off most of the time.** An lcpp nickname is on the relay only while its instance runs. Start it from the LLM Launcher page, or choose a fallback that is always up.
 - **The judge asks about everything in Auto.** Its model doesn't answer within `timeout_s` (3 s) or isn't on the relay, so each call falls back to asking you. Pick a reachable model in Settings → Agent.
 - **A model without tool calls** answers but never uses a tool. The relay's facts (`tools`) say which ones take them.

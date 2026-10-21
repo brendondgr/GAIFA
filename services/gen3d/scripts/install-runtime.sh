@@ -20,7 +20,8 @@ if [ ! -d "$CA/cube/.git" ]; then
   git clone --quiet https://github.com/Roblox/cube.git "$CA/cube"
   git -C "$CA/cube" checkout --quiet "$COMMIT"
 fi
-[ -e "$CA/weights" ] || ln -s ../../../../data/models/3d "$CA/weights"
+mkdir -p "$HUB/data/models/3d"   # a fresh clone has no models yet: the link must not dangle
+[ -L "$CA/weights" ] || [ -e "$CA/weights" ] || ln -s ../../../../data/models/3d "$CA/weights"
 podman image exists "$IMAGE" || { echo "the ROCm image $IMAGE isn't pulled (podman pull $IMAGE)" >&2; exit 1; }
 
 echo "== venv (inside $IMAGE)"

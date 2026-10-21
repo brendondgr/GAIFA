@@ -40,7 +40,7 @@ fi
 # The folder OpenCode's shell, edit and write tools act in: one the person chose, outside AIHub
 # (plan 23.14). Unset used to mean this folder, which put an agent's shell inside AIHub.
 AIHUB="$(cd "$ROOT/../.." && pwd -P)"
-how="set OPENCODE_PROJECT_DIR to a folder outside AIHub: aihub setup opencode asks for it, or [services.opencode.env] in config.toml (a line in $ROOT/.env wins over it), then aihub restart opencode"
+how="set OPENCODE_PROJECT_DIR to a folder outside AIHub: aihub setup opencode asks for it, or [services.opencode.env] in config.toml (a line in $ROOT/.env wins over it), which the hub reads when it starts: aihub restart, then aihub restart opencode"
 if [ -z "${OPENCODE_PROJECT_DIR:-}" ]; then
   echo "OPENCODE_PROJECT_DIR is not set, so there's no folder for OpenCode to work in; $how" >&2
   exit 1

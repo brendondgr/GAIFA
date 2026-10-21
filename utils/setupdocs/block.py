@@ -14,7 +14,7 @@ from typing import Any
 TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config"}
 CONFIG = {"key", "text", "choices", "required", "restart"}
 CONFIG_KEY = re.compile(r"^(services\.[a-z][a-z0-9-]{1,31}\.env\.[A-Z][A-Z0-9_]*|agent\.judge\.model)$")
-STEP = {"run", "what", "ask", "interactive", "skip_if", "optional"}
+STEP = {"run", "what", "ask", "interactive", "skip_if", "optional", "next"}
 SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated", "next", "start_op", "start_body"}
 
 
@@ -26,6 +26,7 @@ class Step:
     interactive: bool = False       # it prompts (a login): under --json the person runs it, then the run resumes
     skip_if: str = ""               # a command: exit 0 means there's nothing to do (logged in already), so it's done
     optional: bool = False          # with an `ask`: a "no" skips only this step, not the whole setup
+    next: str = ""                  # what the person still has to do once it has run (joins the report)
 
 
 @dataclass
@@ -96,10 +97,12 @@ def _step(i: int, d: Any) -> tuple[Step | None, str | None]:
             return None, f"{where}: `{key}` must be true or false"
     if not isinstance(d.get("skip_if", ""), str):
         return None, f"{where}: `skip_if` must be a command"
+    if not isinstance(d.get("next", ""), str):
+        return None, f"{where}: `next` must be a string"
     if d.get("optional") and not d.get("ask"):
         return None, f"{where}: an `optional` step needs an `ask` (its question)"
     return Step(run=d["run"].strip(), what=d["what"].strip(), ask=d.get("ask", "").strip(), interactive=d.get("interactive", False),
-                skip_if=d.get("skip_if", "").strip(), optional=d.get("optional", False)), None
+                skip_if=d.get("skip_if", "").strip(), optional=d.get("optional", False), next=d.get("next", "").strip()), None
 
 
 def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:

@@ -328,14 +328,33 @@ restart = "hub"'''
 
 
 class RelayRunner(FakeRunner):
+    """A relay with `models`, and a hub that remembers what's saved through it (env, judge)."""
+
     def __init__(self, models: list[str], **kw: Any) -> None:
         super().__init__(**kw)
         self.models = models
+        self.env: dict[str, dict[str, str]] = {}
+        self.judge: str | None = None
 
     def call(self, method: str, path: str, body: Any = None) -> Any:
+        if path in self.refuse:
+            raise cli.ApiError(500, "the hub said no", "hub_error")
         if path == "/api/s/relay/v1/models":
             self.calls.append((method, path, body))
             return {"data": [{"id": m} for m in self.models]}
+        if method == "PUT" and path.endswith("/config"):
+            self.calls.append((method, path, body))
+            self.env[path.split("/")[3]] = dict(body["env"])
+            return {}
+        if method == "PUT" and path == "/api/settings":
+            self.calls.append((method, path, body))
+            self.judge = body["judge"]["model"]
+            return {}
+        if method == "GET" and path == "/api/settings":
+            return {"judge": {"model": self.judge}}
+        if method == "GET" and path.startswith("/api/services/"):
+            self.calls.append((method, path, body))
+            return {"jobs": [], "config": {"env": self.env.get(path.split("/")[3], {})}}
         return super().call(method, path, body)
 
 
@@ -359,8 +378,8 @@ def test_set_writes_config_and_restarts(agent_root: Path, capsys) -> None:
     a = args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=qwen3-8b"])
     assert cli_setup.cmd_setup(a, runner, FakeProbe()) == 0
     r = out(capsys)
-    cfg = (agent_root / "config.toml").read_text()
-    assert '[services.agent.env]\nAGENT_MODEL = "qwen3-8b"' in cfg and cfg.startswith("[services]\norder")   # the rest kept
+    assert ("PUT", "/api/services/agent/config", {"env": {"AGENT_MODEL": "qwen3-8b"}}) in runner.calls   # through the hub: applied at once
+    assert (agent_root / "config.toml").read_text() == '[services]\norder = ["relay", "tts", "agent"]\n'   # the hub writes the file, not us
     assert any(c == "aihub restart agent" for c, _, _ in runner.ran)
     assert "agent/config:services.agent.env.AGENT_MODEL = qwen3-8b" in r["done"]
     assert any("agent.judge.model" in n for n in r["next"])            # optional, left for later
@@ -389,7 +408,9 @@ def test_the_check_fails_when_the_model_is_gone(agent_root: Path, capsys) -> Non
     a = args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=gpt-4o"])
     assert cli_setup.cmd_setup(a, RelayRunner(["gpt-4o"]), FakeProbe()) == 0
     capsys.readouterr()
-    cli_setup_config.verify([e for e in cli_setup.resolve(["agent"], cli_setup.choices(agent_root)[0], agent_root)], agent_root, RelayRunner([]), report := {"checks": [], "failed": []})
+    gone = RelayRunner([])
+    gone.env["agent"] = {"AGENT_MODEL": "gpt-4o"}
+    cli_setup_config.verify([e for e in cli_setup.resolve(["agent"], cli_setup.choices(agent_root)[0], agent_root)], agent_root, gone, report := {"checks": [], "failed": []})
     assert report["failed"][0]["step"] == "config:services.agent.env.AGENT_MODEL"
 
 
@@ -484,8 +505,9 @@ def test_a_folder_value(root: Path, tmp_path: Path, capsys) -> None:
     assert cli_setup.cmd_setup(args("relay", yes=True, set=[f"services.opencode.env.OPENCODE_PROJECT_DIR={inside}"]), RelayRunner([]), FakeProbe()) == 1
     assert out(capsys)["reason"] == "unknown-value"
     outside = tmp_path.parent / f"{tmp_path.name}-project"
-    assert cli_setup.cmd_setup(args("relay", yes=True, set=[f"services.opencode.env.OPENCODE_PROJECT_DIR={outside}"]), RelayRunner([]), FakeProbe()) == 0
-    assert outside.is_dir() and f'OPENCODE_PROJECT_DIR = "{outside.resolve()}"' in (root / "config.toml").read_text()
+    runner = RelayRunner([])
+    assert cli_setup.cmd_setup(args("relay", yes=True, set=[f"services.opencode.env.OPENCODE_PROJECT_DIR={outside}"]), runner, FakeProbe()) == 0
+    assert outside.is_dir() and runner.env["opencode"] == {"OPENCODE_PROJECT_DIR": str(outside.resolve())}
 
 
 def test_start_op_runs_after_the_download(root: Path, capsys) -> None:
@@ -519,3 +541,81 @@ def test_a_mod_id_means_all_its_setups_even_when_one_shares_its_id(root: Path) -
     offered, _ = cli_setup.choices(root)
     assert [e.id for e in cli_setup.resolve(["gen3d"], offered, root)] == ["gen3d", "gen3d-cube"]
     assert [e.id for e in cli_setup.resolve(["gen3d-cube"], offered, root)] == ["gen3d", "gen3d-cube"]   # after: the base only
+
+
+# ---- the third review (plan 23.14) ----------------------------------------------------------------
+
+def test_a_value_the_hub_wont_take_goes_into_the_file_and_a_rerun_applies_it(agent_root: Path, capsys) -> None:
+    a = args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=qwen3-8b"])
+    assert cli_setup.cmd_setup(a, RelayRunner(["qwen3-8b"], refuse={"/api/services/agent/config"}), FakeProbe()) == 0
+    r = out(capsys)
+    assert '[services.agent.env]\nAGENT_MODEL = "qwen3-8b"' in (agent_root / "config.toml").read_text()
+    assert any("the hub didn't take it" in n for n in r["next"])
+    again = RelayRunner(["qwen3-8b"])
+    assert cli_setup.cmd_setup(a, again, FakeProbe()) == 0                # not "already set": the hub runs without it
+    assert again.env["agent"] == {"AGENT_MODEL": "qwen3-8b"}
+
+
+def test_the_whole_env_table_is_sent_and_every_restart_runs_in_order(agent_root: Path, capsys) -> None:
+    (agent_root / "config.toml").write_text('[services.agent.env]\nAGENT_FALLBACK_MODEL = "m2"\n')
+    doc = agent_root / "services" / "agent" / "setup" / "env.md"
+    doc.write_text(doc.read_text().replace('restart = "agent"', 'restart = "agent relay"'))
+    runner = RelayRunner(["m1", "m2"])
+    assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m1"]), runner, FakeProbe()) == 0
+    capsys.readouterr()
+    assert runner.env["agent"] == {"AGENT_FALLBACK_MODEL": "m2", "AGENT_MODEL": "m1"}   # the route replaces the table
+    ran = [c for c, _, _ in runner.ran]
+    assert ran.index("aihub restart agent") < ran.index("aihub restart relay")
+    failing = RelayRunner(["m1"], fail={"aihub restart agent"})
+    assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m1"], from_scratch=True), failing, FakeProbe()) == 1
+    assert "restarting agent" in out(capsys)["report"]["failed"][0]["output"]
+
+
+class LateRelay(RelayRunner):
+    """A model that registers on the relay only after a few looks (lcpp's instance loading)."""
+
+    def __init__(self, after: int, **kw: Any) -> None:
+        super().__init__([], **kw)
+        self.after = after
+
+    def call(self, method: str, path: str, body: Any = None) -> Any:
+        if path == "/api/s/relay/v1/models":
+            self.after -= 1
+            self.models = ["qwen3-8b"] if self.after < 0 else []
+        return super().call(method, path, body)
+
+
+def test_the_relays_models_are_waited_for(agent_root: Path, capsys) -> None:
+    runner = LateRelay(after=3)
+    assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=qwen3-8b"]), runner, FakeProbe()) == 0
+    assert runner.env["agent"] == {"AGENT_MODEL": "qwen3-8b"} and "waiting for the relay" in capsys.readouterr().err
+    assert cli_setup.cmd_setup(args("agent", yes=True, from_scratch=True), LateRelay(after=3), FakeProbe()) == 2
+    assert out(capsys)["choices"] == ["qwen3-8b"]                     # the question lists it once it's there
+
+
+def test_the_relay_starts_before_the_models(agent_root: Path, capsys) -> None:
+    runner = RelayRunner(["m"])
+    assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m"]), runner, FakeProbe()) == 0
+    ran = [c for c, _, _ in runner.ran]
+    assert ran.index("aihub install agent") < ran.index("aihub start relay")
+
+
+def test_rejoin_puts_back_names_with_commas() -> None:
+    known = {"Gemma 4 (Q8_0, with vision)", "Qwen3 8B"}
+    assert cli_setup.run_mod.rejoin(["Gemma 4 (Q8_0", " with vision)".strip(), "Qwen3 8B"], known) == ["Gemma 4 (Q8_0, with vision)", "Qwen3 8B"]
+    assert cli_setup.run_mod.rejoin(["Other", "Qwen3 8B"], known) == ["Other", "Qwen3 8B"]     # another setup's name stays itself
+
+
+def test_a_skipped_setups_questions_are_not_asked(root: Path, capsys) -> None:
+    agent_doc = root / "services" / "agent" / "setup" / "env.md"
+    agent_doc.write_text(AGENT.replace('after = ["relay"]', 'after = ["relay", "tts-kokoro"]')
+                         .replace('what = "the venv"', 'what = "the venv"\nask = "Accept the agent\'s terms?"'))
+    assert cli_setup.cmd_setup(args("relay", "tts", "agent", yes=True, decline=["tts-kokoro/2"]), FakeRunner(), FakeProbe()) == 0
+    assert "agent: needs a declined setup" in out(capsys)["skipped"]
+
+
+def test_a_steps_next_joins_the_report(root: Path, capsys) -> None:
+    doc = root / "services" / "relay" / "setup" / "env.md"
+    doc.write_text(RELAY.replace('what = "the backend venv"', 'what = "the backend venv"\nnext = "install the packages by hand"'))
+    assert cli_setup.cmd_setup(args("relay", yes=True), FakeRunner(), FakeProbe()) == 0
+    assert "relay/1: install the packages by hand" in out(capsys)["next"]

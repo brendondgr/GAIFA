@@ -6,6 +6,7 @@ by parsing the result. Asked after install and models, before the checks."""
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import re
 import tomllib
@@ -19,6 +20,8 @@ else:
 
 
 NOT_CHAT = {"auto", "agent"}   # the relay's router pseudo-model, and OpenCode's coding agent (it runs shell commands)
+WAIT_S = 60          # how long to wait for the relay to list a model…
+WAIT_STARTED_S = 900 # …or, when this run launched one (lcpp), for it to load and register
 
 
 def relay_models(runner: Runner, root: Path) -> list[str]:
@@ -83,6 +86,56 @@ def set_value(path: Path, key: str, value: str) -> None:
     tmp.replace(path)
 
 
+def _override_env(path: Path, mod: str) -> dict[str, str]:
+    try:
+        env = tomllib.loads(path.read_text()).get("services", {}).get(mod, {}).get("env", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    return {str(k): str(v) for k, v in env.items()} if isinstance(env, dict) else {}
+
+
+def apply(runner: Runner, root: Path, key: str, value: str) -> bool:
+    """Set a value through the hub, which saves config.toml and applies it at once (a mod restart then
+    runs with it). False: the hub didn't take it, and the file was edited directly instead, which
+    the hub reads only when it starts."""
+    try:
+        if key == "agent.judge.model":
+            runner.call("PUT", "/api/settings", {"judge": {"model": value}})
+        else:
+            _, mod, _, var = key.split(".", 3)
+            runner.call("PUT", f"/api/services/{mod}/config", {"env": {**_override_env(root / "config.toml", mod), var: value}})
+        return True
+    except Exception:  # noqa: BLE001: the hub is down, or refused it: the careful text edit
+        set_value(root / "config.toml", key, value)
+        return False
+
+
+def applied(runner: Runner, key: str) -> str | None:
+    """The value the hub runs with now (None when unknown)."""
+    try:
+        if key == "agent.judge.model":
+            return ((runner.call("GET", "/api/settings") or {}).get("judge") or {}).get("model")
+        _, mod, _, var = key.split(".", 3)
+        return (((runner.call("GET", f"/api/services/{mod}") or {}).get("config") or {}).get("env") or {}).get(var)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def wait_models(runner: Runner, root: Path, args: argparse.Namespace, want: str | None, timeout: float) -> list[str]:
+    """The relay's chat models, waited for while the list is empty or lacks `want`: a model just
+    launched (lcpp) or just discovered (OpenCode) registers some seconds to minutes later."""
+    waited, said = 0.0, False
+    while True:
+        models = [m for m in relay_models(runner, root) if m not in NOT_CHAT]
+        if (models and (want is None or want in models)) or waited >= timeout:
+            return models
+        if not said:
+            say(args, "    waiting for the relay to list " + (want or "a chat model") + " (a model just started takes a while to load)")
+            said = True
+        runner.sleep(5)
+        waited += 5
+
+
 def get_value(path: Path, key: str) -> str | None:
     try:
         cur: Any = tomllib.loads(path.read_text())
@@ -94,11 +147,13 @@ def get_value(path: Path, key: str) -> str | None:
 
 
 def _prompt(e: Any, c: Any, choices: list[str], runner: Runner) -> str | None:
+    """None: skipped; "": ask again (a provider added, or a refresh)."""
     print(f"\n{c.text}" + ("" if c.required else " (optional)"))
     for i, m in enumerate(choices, 1):
         print(f"  {i}. {m}")
     if c.choices == "relay-models":
         print("  h. add a hosted provider (an OpenAI-compatible API: its URL, key and model names)")
+        print("  r. look again (a model that's still loading appears once it's ready)")
     if c.choices == "folder":
         pick = input("An absolute folder outside AIHub" + ("" if c.required else " (Enter to skip)") + ": ").strip()
         return pick or None
@@ -106,16 +161,18 @@ def _prompt(e: Any, c: Any, choices: list[str], runner: Runner) -> str | None:
         pick = input("Number" + (", h" if c.choices == "relay-models" else "") + ("" if c.required else ", or Enter to skip") + ": ").strip()
         if not pick and not c.required:
             return None
+        if pick == "r" and c.choices == "relay-models":
+            return ""
         if pick == "h" and c.choices == "relay-models":
             name = add_provider(runner, {"name": input("  a name for it: ").strip(), "base_url": input("  base URL (e.g. https://api.openai.com/v1): ").strip(),
-                                         "key": input("  API key: ").strip(), "models": [m.strip() for m in input("  model names, comma-separated: ").split(",") if m.strip()]})
+                                         "key": getpass.getpass("  API key (hidden): ").strip(), "models": [m.strip() for m in input("  model names, comma-separated: ").split(",") if m.strip()]})
             print(f"  added {name}")
             return ""   # ask again with the new models
         if pick.isdigit() and 0 < int(pick) <= len(choices):
             return choices[int(pick) - 1]
 
 
-def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Path, runner: Runner, report: dict[str, Any], state: dict[str, Any]) -> None:
+def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Path, runner: Runner, report: dict[str, Any], state: dict[str, Any], started: bool = False) -> None:
     """Providers first, then every [[config]] value of the chosen setups."""
     state.setdefault("config", {})
     state.setdefault("providers", [])
@@ -133,7 +190,7 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
             value = answers.values.get(qid, answers.values.get(c.key))
             while True:
                 if c.choices == "relay-models":
-                    choices = [m for m in relay_models(runner, root) if m not in NOT_CHAT]
+                    choices = wait_models(runner, root, args, value, WAIT_STARTED_S if started else WAIT_S)
                 elif c.choices == "folder":
                     choices = []
                 else:
@@ -164,12 +221,16 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
                 value = str(folder.resolve())
             elif choices and value not in choices:
                 raise Stop("unknown-value", id=qid, value=value, choices=choices, doc=doc_of(e, root))
-            if state["config"].get(qid) == value and get_value(cfg, c.key) == value:
+            if state["config"].get(qid) == value and applied(runner, c.key) == value:
                 report["skipped"].append(f"{qid}: already {value}")
                 continue
-            set_value(cfg, c.key, value)
-            if c.restart:
-                runner.run("aihub restart" if c.restart == "hub" else f"aihub restart {c.restart}", root, stream=False)
+            live_now = apply(runner, root, c.key, value)
+            if not live_now:
+                report["next"].append(f"{qid}: written to config.toml, but the hub didn't take it: run `aihub restart`, then restart {c.restart or 'the mod'}")
+            for target in c.restart.split():
+                rc, out = runner.run("aihub restart" if target == "hub" else f"aihub restart {target}", root, stream=False)
+                if rc:
+                    raise Stop("failed", output=f"restarting {target} after setting {c.key}: {out}")
             state["config"][qid] = value
             report["done"].append(f"{qid} = {value}")
 
@@ -179,11 +240,11 @@ def verify(live: list[Any], root: Path, runner: Runner, report: dict[str, Any]) 
     models: list[str] | None = None
     for e in live:
         for c in e.setup.config:
-            value = get_value(root / "config.toml", c.key)
+            value = applied(runner, c.key) or get_value(root / "config.toml", c.key)   # what the hub runs with
             if c.choices != "relay-models" or value is None:
                 continue
             models = relay_models(runner, root) if models is None else models
-            ok = value in models
+            ok = value in models and applied(runner, c.key) in (None, value)
             report["checks"].append({"setup": e.id, "run": f"{c.key} on the relay", "ok": ok})
             if not ok:
                 report["failed"].append({"setup": e.id, "step": f"config:{c.key}", "output": f"{value!r} isn't a model the relay serves ({', '.join(models) or 'none'})", "doc": doc_of(e, root)})

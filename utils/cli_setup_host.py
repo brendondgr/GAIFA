@@ -24,6 +24,7 @@ INSTALLERS = {                             # command → an installer that needs
 PACKAGES = {                               # command → the Fedora package (host.md §3)
     "podman": "podman", "toolbox": "toolbox", "git": "git-core", "node": "nodejs22", "npm": "nodejs22-npm",
     "espeak-ng": "espeak-ng", "ffmpeg": "ffmpeg", "curl": "curl", "tar": "tar", "unzip": "unzip",
+    "sha256sum": "coreutils", "systemd-run": "systemd", "vulkaninfo": "vulkan-tools",
 }
 
 

@@ -74,9 +74,9 @@ to 3D) all pass. Details and the remaining failures: [docs/agent-eval.md](docs/a
 
 ## Requirements
 
-- Linux with systemd user services (the hub and every mod run as `systemd --user` units), Python 3.11 or newer, git and [uv](https://docs.astral.sh/uv/) (it fetches the Python the hub and mods use).
+- Linux with systemd user services (the hub and every mod run as `systemd --user` units), Python 3.11 or newer for the setup command, git and [uv](https://docs.astral.sh/uv/) (it fetches the Python 3.12+ that the hub and mods run on).
 - For the GPU mods, the hardware AIHub is built on: an AMD Strix Halo (gfx1151), with the kernel settings and packages in [docs/setup/host.md](docs/setup/host.md). Images & Video and 3D Generate run in the [`kyuz0/amd-strix-halo-comfyui`](https://hub.docker.com/r/kyuz0/amd-strix-halo-comfyui) image through podman/toolbox.
-- The hub, and the relay, OpenCode, agent, web and workspace mods, need no GPU.
+- The hub, and the relay, OpenCode, agent, web and workspace mods, need no GPU; Speech to Text (stt) runs without one too, only slower.
 - Models are your choice, per mod: each mod's setup doc says what it runs, suggests a few, and says how to add your own. None are in the repository.
 
 ## Quickstart

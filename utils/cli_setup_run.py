@@ -124,18 +124,38 @@ def ask(args: argparse.Namespace, answers: Answers, qid: str, text: str) -> bool
     return yes
 
 
+def rejoin(names: list[str], known: set[str]) -> list[str]:
+    """`--models` splits on commas, but a name may hold one ("Gemma 4 (Q8_0, with vision)"): pieces
+    that only make a known name together are put back."""
+    out: list[str] = []
+    buf = ""
+    for part in names:
+        cand = f"{buf}, {part}" if buf else part
+        if cand in known:
+            out.append(cand)
+            buf = ""
+        elif buf and part in known:       # the piece before was a name of its own (another setup's)
+            out += [buf, part]
+            buf = ""
+        else:
+            buf = cand
+    if buf:
+        out.append(buf)
+    return out
+
+
 def models_for(args: argparse.Namespace, answers: Answers, e: Any) -> list[Any]:
     """The suggestions chosen for one setup. A mod id's answer covers each of its setups, which take
     the names that are theirs; a setup id's answer is that setup's alone."""
     known = {s.name: s for s in e.setup.suggest}
     if e.id in answers.models:
-        names = answers.models[e.id]
+        names = rejoin(answers.models[e.id], set(known))
         unknown = [n for n in names if n not in known]
         if unknown:
             raise Stop("unknown-model", setup=e.id, names=unknown, choices=list(known))
         return [known[n] for n in names]
     if e.mod in answers.models:
-        return [known[n] for n in answers.models[e.mod] if n in known]
+        return [known[n] for n in rejoin(answers.models[e.mod], set(known)) if n in known]
     if not interactive(args):
         raise Stop("question", id=f"{e.id}/models", kind="models", choices=list(known),
                    required=[s.name for s in e.setup.suggest if s.required], answer_with=f'--models "{e.id}=<names>" (or none)')
@@ -156,7 +176,7 @@ def check_mod_answers(answers: Answers, envs: list[Any]) -> None:
         by_mod.setdefault(e.mod, set()).update(s.name for s in e.setup.suggest)
     for key, names in answers.models.items():
         if key in by_mod and key not in {e.id for e in envs}:
-            unknown = [n for n in names if n not in by_mod[key]]
+            unknown = [n for n in rejoin(names, by_mod[key]) if n not in by_mod[key]]
             if unknown:
                 raise Stop("unknown-model", setup=key, names=unknown, choices=sorted(by_mod[key]))
 
@@ -341,6 +361,8 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
     declined: dict[str, str] = {}
     optional_no: set[str] = set()
     for s in p["steps"]:
+        if s["setup"] in dependents(envs, set(declined)):
+            continue                      # it's skipped already: its questions don't matter
         if s["ask"] and s["setup"] not in declined and state["steps"].get(s["id"]) != "done" and not ask(args, answers, s["id"], s["ask"]):
             step = by_id[s["setup"]].setup.steps[int(s["id"].rsplit("/", 1)[1]) - 1]
             if step.optional:
@@ -361,10 +383,11 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         e = by_id[s["setup"]]
         if e.id in skip:
             continue
+        step = e.setup.steps[int(s["id"].rsplit("/", 1)[1]) - 1]
         if state["steps"].get(s["id"]) == "done":
             report["skipped"].append(f"{s['id']}: done in an earlier run")
+            report["next"] += [f"{s['id']}: {step.next}"] if step.next else []
             continue
-        step = e.setup.steps[int(s["id"].rsplit("/", 1)[1]) - 1]
         if s["id"] in optional_no:
             report["skipped"].append(f"{s['id']}: declined (optional)")
             continue
@@ -389,6 +412,10 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         state["steps"][s["id"]] = "done"
         save_state(root, state)
         report["done"].append(s["id"])
+        report["next"] += [f"{s['id']}: {step.next}"] if step.next else []
+    if any(e.mod == "relay" or "relay" in e.setup.after for e in live):
+        runner.run("aihub start relay", root, stream=False)   # LLM mods publish to it as their models start
+    started = False
     for e in live:
         chosen = picked.get(e.id, [])
         if e.setup.suggest and not chosen:
@@ -403,6 +430,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             try:
                 download(s, e, root, runner, args)
                 start(s, e, root, runner, args)
+                started = started or bool(s.start_op)
             except Stop as x:
                 raise fail({"setup": e.id, "step": f"model:{s.name}", "output": x.data.get("output", ""), "doc": doc_of(e, root)}) from None
             state["models"][key] = "done"
@@ -413,7 +441,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
     else:
         import cli_setup_config as config_mod  # type: ignore[no-redef]
     try:
-        config_mod.phase(live, args, answers, root, runner, report, state)
+        config_mod.phase(live, args, answers, root, runner, report, state, started)
     except Stop as x:
         save_state(root, state)
         if x.reason == "failed":

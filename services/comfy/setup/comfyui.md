@@ -30,6 +30,7 @@ clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127
 what = "clones the five custom nodes into custom_nodes/ at the commits in Tested with (about 85 MB); optional: a no skips only this step; their Python packages go into the toolbox by hand once it exists (Install, Updating ComfyUI in the toolbox)"
 ask = "Custom nodes are third-party code that runs inside ComfyUI. Clone ComfyUI-GGUF, KJNodes, VideoHelperSuite, WanVideoWrapper and rgthree at the pinned commits? A no skips only the nodes, not ComfyUI: then the qwen21-* packs (ComfyUI-GGUF; the Turbo ones also KJNodes) and the scail2-* video packs (VideoHelperSuite) won't run; packs with core nodes only, such as trellis2-* and sam3d-body, still do."
 optional = true
+next = "the custom nodes' Python packages go into the toolbox by hand once ComfyUI has started once: the two commands under Updating ComfyUI in the toolbox (services/comfy/setup/comfyui.md); until then the packs that use them fail with missing node types"
 
 [[suggest]]
 name = "Qwen-Image 2.1 Turbo Q8_0 (1 of 2: the diffusion model)"

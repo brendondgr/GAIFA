@@ -44,9 +44,10 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Mod UIs | Optional `services/<id>/ui/page.js` or `ui/Page.dc.html`, plus optional dashboard widgets (`[[ui.widgets]]`). Without them, a mod still gets a full generic page, and its numeric stats are charted automatically. | adding a mod needs no UI work |
 | Chat, agent, save states | **Built last** (backend-plan Stage D): the agent is a mod with **its own loop, modelled on Claude Code** (no agent framework): tools load on demand, it asks for choices with question and parameter cards, threads are an append-only event log in SQLite; sessions can be saved and restored; logs and runtime state move inside the folder | requested: do these once everything else is built. Research: [agent-architecture.md](agent-architecture.md). A framework (LangGraph) was the earlier plan; a hand-written loop gives the control a local model needs (thinking fields, leaked tool calls, tool loading) |
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
+| Writing outside the folder | Nothing is written outside the project root, except the allowlist (plan 12.4) and **workspace folders the user set to Edit or above** (plan Phase 27). The AIHub folder and `data/models/` are capped at Read. | requested 2026-10-20: the agent edits your projects in place, and only where you raised the folder's level |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
-| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `embed` 5104, `stt` 5105, `decide` 5107. | clients such as video-maker keep working |
+| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `workspace` 5103, `embed` 5104, `stt` 5105, `decide` 5107. | clients such as video-maker keep working |
 
 ## 3. Directory layout
 
@@ -200,6 +201,7 @@ hide = ["GET /ui/{path}"]              # globs on "METHOD /path", e.g. "* /admin
 speak = { op = "POST /v1/speech", description = "Speak text in a saved voice", risk = "generate", ask = ["name"], hide = ["stream"] }
 delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
 # fetch = { op = "POST /v1/fetch", risk = "network", grant_key = "url:host" }   # grant_key: url:host | arg:<name> | const:<x> (§14.7)
+# read = { op = "POST /v1/read", risk = "read", cap_kb = 64 }   # results kept whole up to 64 KB (default 8)
 # risk: read | write | generate | network | execute | destructive (default: read for GET, destructive for DELETE/confirm, else write; §14.7)
 # ask = [...] inputs the user chooses (parameter card) · examples = [{...}] · core = true (always loaded)
 # hide = [...] / fixed = {...}: parameters kept from the model / always sent
@@ -558,6 +560,7 @@ mode = "both"            # both (click or hold) | toggle | hold
 | `lcpp` | `~/Models/LLMs` | 7710 | `models/*` → `data/models/llm/` | — (its JSON state stays in `services/lcpp/data/`) | `LCPP_MODELS_DIR`, catalog paths relative to it, downloads register in the hub, memory acquire, status route, `pidfd_open` fallback |
 | `comfy` | `~/Models/ComfyUI*` + `~/.local/bin/comfyui` | 5070 (ComfyUI 8199) | `~/Models/ComfyUI/models/*` → `data/models/comfyui/` | — | new adapter mod (§11) |
 | `web` | new (plan Phase 26); searches through the SearXNG on 8080 that runs outside AIHub (`SEARXNG_URL`) | 5102 | — | — | new mod: `POST /v1/search`, `POST /v1/fetch` (pages → markdown `text` outputs, PDFs → `document` outputs, with sidecars); fetches only public http(s) addresses, checked after DNS and on every redirect, 10 MB / 20 s, `robots.txt`; tools `web_search` and `web_fetch` (risk `network`) |
+| `workspace` | new (plan Phase 27): folders on this machine at a level each (Read · Edit · Run · Run + network) | 5103 | — | — (folders, checkpoints and run records in `data/state/workspace/`) | new mod: reading tools, edits in place with checkpoints and undo per turn, commands and Python in a rootless podman sandbox (`localhost/aihub-workspace-sandbox:2`) or, asking each time, on the host; the hub's preflight `POST /v1/limits` (`[agent] limits`, §14.7) |
 
 **Moves are instant:** every source path and AIHub are on the same btrfs subvolume (`/home`), so `mv` is a rename, not a copy. Old paths keep a symlink until everything that uses them has been updated.
 
@@ -588,6 +591,7 @@ mode = "both"            # both (click or hold) | toggle | hold
 10. **Some UIs use absolute paths:** mods' own UIs keep working on their own ports and are linked as "native UI". AIHub's UI never loads them inside its own pages.
 11. **The UI runtime is Claude Design's generated `support.js` (React 18).** Don't edit it. Any change a new export needs goes in `web/PATCHES.md`, and the brief asks Claude Design to fold those changes in on its next pass.
 12. **Metric storage grows over time.** Rollups and retention (§13) keep `hub.db` small: roughly 30 series × 10 s for 48 h is about 0.5 M rows, pruned hourly.
+13. **Workspace folders are written in place** (plan Phase 27). Only folders at Edit or above, never the AIHub folder or `data/models/`, and never through a symlink out of the folder (`services/workspace/folders.py`).
 
 ## 13. Metrics and charts
 
@@ -732,13 +736,24 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
 
 ### 14.7 Permissions: risks, the order, grants (plan Phase 25)
 - **Risks.** Every tool has one: `read`, `write`, `generate`, `network` (reaches the internet), `execute` (runs code or commands) or `destructive`. A mod declares it in `[tools]` (`risk = …`) or its `tools_source`.
+- **Modes** (plan 27.4, after Claude Code's): `plan` (reads only), `manual` (everything that changes something asks), `accept_edits` (edits and generations apply; commands, the internet and deletes ask), `auto` (as Accept edits, with a judge for commands, plan Phase 30; until it exists they ask) and `bypass` (edits and sandbox commands run; only in workspace folders that allow it). The old names map over: `ask` → `manual`, `read_only` → `plan`; `auto` is the Auto mode (the agent migrated stored `auto` threads, which meant "Use defaults", to `accept_edits`).
 - **The order** in which a call is decided is fixed (`utils/tools/approvals.py` `decide`); the first that answers wins:
   1. the **deny** list of `[agent.permissions]`;
-  2. the thread's **mode**: `read_only` denies everything but `read`;
-  3. a **mod's own limits** (a workspace folder's level, Phase 27): the mod enforces them when the call reaches it, so nothing below lifts them;
-  4. a **grant** that covers the call allows it;
+  2. a **mod's limits**: a mod with `[agent] limits` (the workspace mod) answers a preflight before each call: what it would do (`action`), the folder's level and Bypass, a diff or the command, and a refusal for hard limits (paths out of the folder, secrets, `.git/`, `sudo`, the AIHub folder above Read) or a level too low ("needs the folder at Run"). A refusal ends the call in every mode; the mod checks again when the call arrives; a preflight that fails refuses;
+  3. the thread's **mode**: with limits, the cell of the table below for the call's action (Bypass in a folder that doesn't allow it counts as Accept edits); without, `plan` denies everything but `read`;
+  4. a **grant** that covers the call allows it, keyed by the mod's `key` when it gives one (a folder and a command's first word); never for actions that ask every time (`host`, `remote`, `commit`);
   5. the **ask** list, then the **allow** list (`execute` ignores the allow list: only a grant skips its card);
-  6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `auto` mode ("Use defaults"); `network`, `execute` and `destructive` ask in every mode.
+  6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `accept_edits`, `auto` and `bypass`; `network` asks (in `auto` the judge decides); `execute` and `destructive` ask in every mode.
+
+  | Mode | read | edit | delete | commit | command (sandbox) | network (sandbox + internet) | host (your machine) | remote (git push, …) |
+  |---|---|---|---|---|---|---|---|---|
+  | plan | run | refused | refused | refused | refused | refused | refused | refused |
+  | manual | run | ask | ask | ask | ask | ask | ask | ask |
+  | accept_edits | run | run | ask | ask | ask | ask | ask | ask |
+  | auto | run | run | judge | ask | judge | judge | ask | ask |
+  | bypass | run | run | run | run | run | run | ask | ask |
+
+  "judge" is Phase 30's seam: `decide` answers `"judge"` and the caller awaits `approvals.judge()`, which fails closed ("ask") until the judge exists.
 - **Grants** (`utils/tools/grants.py`, table `grants`, migration 009): one answer that covers more than one call. Deciding an approval with `remember: "thread"` ("Allow in this chat") or `"always"` writes a grant `{tool, key, scope, thread, expires_ts}`; `once` (the default) writes none. `always` for `execute` and `destructive` needs a second confirm (`confirm: true`, else 422 `confirm_needed`); `thread` needs a call from a chat (else 422 `no_thread`).
   - **Keys.** A tool may declare `grant_key` in `[tools]` (or its `tools_source` item): `url:host` takes the host of its `url` argument (exact: `api.github.com` is not `github.com`), `arg:<name>` takes that argument as is (a folder), `const:<x>` is always `x` (every search). A grant covers a call of its tool whose key equals the grant's; a tool without a grant key gets grants that cover every call.
   - **Shipped.** Migration 010 adds one `always` grant, `gr_default_web_search` (`web_search`, key `search`), so web searches run without asking (the user's decision, plan 26.2). It's listed and revoked like any other, and since a migration runs once per database, a revoked grant stays revoked.

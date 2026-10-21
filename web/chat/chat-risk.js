@@ -22,6 +22,18 @@ export function grantKeyOf(kind, args = {}) {
   return null;
 }
 
+/** What a mod's own grant key covers (plan 27.4): "itsdangerous pytest" → "in itsdangerous, pytest commands". */
+export function limitsCover(limits) {
+  const k = limits?.key;
+  if (!k) return null;
+  const [folder, ...rest] = String(k).split(' ');
+  return rest.length ? `in ${folder}, ${rest.join(' ')} commands` : `in ${folder}`;
+}
+
+// What a call with limits does, in words, for the card (plan 27.4).
+export const ACTION_WORD = { read: 'reads', edit: 'edits a file', delete: 'deletes a file', commit: 'commits', command: 'runs in the sandbox',
+  network: 'runs in the sandbox with internet', host: 'runs on your machine', remote: 'talks to a git remote' };
+
 /** What a grant covers, in words: "on github.com", "in ~/Projects/foo", "every search"; null: every call. */
 export function grantText(kind, key) {
   if (!kind || key == null) return null;
@@ -35,8 +47,9 @@ export function grantText(kind, key) {
  * The buttons of an approval card. `thread`: the call came from a chat ("Allow in this chat" needs
  * one). Each is {remember, label, confirm?}; `confirm` asks a second time before deciding.
  */
-export function approvalButtons(risk, { thread = false } = {}) {
+export function approvalButtons(risk, { thread = false, once = false } = {}) {
   const out = [{ remember: 'once', label: 'Allow once', primary: true }];
+  if (once) return out;          // host runs, commits, git remotes ask every time (plan 27.4)
   if (thread) out.push({ remember: 'thread', label: 'Allow in this chat' });
   out.push({ remember: 'always', label: 'Always allow', ...(CONFIRM_RISKS.includes(risk) ? { confirm: true } : {}) });
   return out;
@@ -53,13 +66,15 @@ export function rememberText(remember) {
   return remember === 'thread' ? 'Allowed in this chat' : remember === 'always' ? 'Always allowed' : null;
 }
 
-/** The arguments of an `execute` tool that hold its code or command: shown whole, monospaced, editable. */
-export function codeFields(schema, risk) {
-  if (risk !== 'execute') return [];
+/** The arguments shown whole, monospaced and editable in a text box: an `execute` tool's code or
+ * command, and any text argument of any tool that spans lines (an edit's `old` and `new`, a file's
+ * `content`), which a one-line field would flatten (plan 27.7). */
+export function codeFields(schema, risk, args = {}) {
   const props = schema?.properties || {};
   return Object.keys(props).filter(k => {
     const p = props[k] || {};
     if (p.type && p.type !== 'string') return false;
-    return p.format === 'code' || p['x-code'] || CODE_NAMES.includes(k);
+    if (typeof args?.[k] === 'string' && args[k].includes('\n')) return true;
+    return risk === 'execute' && (p.format === 'code' || p['x-code'] || CODE_NAMES.includes(k));
   });
 }

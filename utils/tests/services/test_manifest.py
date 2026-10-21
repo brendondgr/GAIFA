@@ -257,7 +257,7 @@ def test_fake_mod_fixtures_are_valid():
     from utils.tests.conftest import FAKE_MODS
 
     mods = discover([FAKE_MODS])
-    assert [m.id for m in mods] == ["fake-crash", "fake-mem", "fake-ok", "fake-perms", "fake-slow", "fake-tools"]
+    assert [m.id for m in mods] == ["fake-crash", "fake-mem", "fake-ok", "fake-perms", "fake-slow", "fake-tools", "fake-ws"]
     assert all(m.ok for m in mods), [m.errors for m in mods]
 
 

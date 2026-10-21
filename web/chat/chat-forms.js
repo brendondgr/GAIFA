@@ -5,7 +5,7 @@
 
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, shortArgs, toolLabel, inputSt } from './chat-ui.js';
 import { registerCard, ErrorBox, ProgressBar, STATUS } from './chat-cards.js';
-import { RISK_TONE, RISK_WORD, grantKeyOf, grantText, codeFields, confirmText, rememberText, approvalButtons } from './chat-risk.js';
+import { RISK_TONE, RISK_WORD, ACTION_WORD, grantKeyOf, grantText, limitsCover, codeFields, confirmText, rememberText, approvalButtons } from './chat-risk.js';
 import { schemaForm } from '../mod-form.js';
 import { labelOf } from '../mod-options.js';
 import { createUi } from '../mod-ui.js';
@@ -81,7 +81,7 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
   const React = R(), schema = spec.schema || { properties: {} }, props = schema.properties || {}, req = schema.required || [];
   const args = spec.arguments || {};
   const files = Object.keys(props).filter(k => props[k]?.['x-kind']);
-  const codes = codeFields(schema, spec.risk).filter(k => !files.includes(k));          // execute: the code, shown whole
+  const codes = codeFields(schema, spec.risk, args).filter(k => !files.includes(k));    // execute: the code; any text with line breaks
   const missing = req.filter(k => !files.includes(k) && !codes.includes(k) && empty(args[k]));
   const main = [...new Set([...missing, ...(spec.ask_fields || []).filter(k => props[k] && !files.includes(k) && !codes.includes(k))])];
   const rest = Object.keys(props).filter(k => !files.includes(k) && !codes.includes(k) && !main.includes(k));
@@ -97,7 +97,8 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
   const prefNote = mine.map(k => shown(k) + (by[k] === 'carried' ? ' (as on your last card)' : '')).join(', ');
   const [err, setErr] = React.useState(null), [busy, setBusy] = React.useState(false);
   const key = spec.tool + JSON.stringify(Object.keys(props));
-  const cover = grantText(spec.grant_key, grantKeyOf(spec.grant_key, { ...args, ...codeVals }));   // "on github.com", "in ~/Projects/foo"
+  const lim = spec.limits || null;   // a workspace call (plan 27.4): what it does, its diff or command
+  const cover = limitsCover(lim) || grantText(spec.grant_key, grantKeyOf(spec.grant_key, { ...args, ...codeVals }));   // "on github.com", "in ~/Projects/foo"
   const head = h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flexWrap: 'wrap' } },
     h('span', { style: { color: T.pu, display: 'flex' } }, h(Icon, { d: spec.risk === 'execute' ? 'code' : spec.risk === 'network' ? 'globe' : 'sliders', size: 14 })),
     h('span', { style: { fontWeight: 600 } }, title || toolLabel(spec.tool, mods)),
@@ -147,7 +148,8 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
       onCancel ? h(Btn, { key: 'deny', kind: 'ghost', label: cancelLabel, disabled: busy, onClick: () => setDenying(true) }) : null];
   const given = Object.fromEntries(Object.entries(args).filter(([k]) => !main.includes(k) && !files.includes(k) && !codes.includes(k)));
   return h('div', { style: cardSt({ accent: spec.risk === 'execute' ? T.acct : T.bds, pad: compact ? '8px 10px' : '10px 12px', gap: 10 }), onKeyDown: e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(choices?.[0]); } } }, head,
-    spec.description && !compact ? h('div', { style: { fontSize: 12, color: T.mut, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, spec.description.split('\n')[0]) : null,
+    lim ? h(LimitsBlock, { lim, why: spec.why }) : null,
+    spec.description && !compact && !lim?.preview ? h('div', { style: { fontSize: 12, color: T.mut, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, spec.description.split('\n')[0]) : null,
     shortArgs(given) ? h('div', { title: shortArgs(given, 2000), style: { fontFamily: MONO, fontSize: 11.5, color: T.mut, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, shortArgs(given)) : null,
     files.map(k => h(FilePicker, { key: k, name: k, prop: props[k], required: req.includes(k), value: fileVals[k], outputs, api, onChange: v => setFileVals(s => ({ ...s, [k]: v })) })),
     codes.map(k => h(CodeBox, { key: 'code:' + k, name: k, prop: props[k], value: codeVals[k], disabled: !!busy, onChange: v => setCodeVals(s => ({ ...s, [k]: v })) })),
@@ -161,6 +163,29 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
     err ? h(ErrorBox, { error: err }) : null,
     h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } }, ...footer,
       ask2 || denying ? null : h('span', { style: { fontSize: 11.5, color: T.dim, marginLeft: 'auto' } }, choices ? 'Ctrl+Enter allows once' : 'Ctrl+Enter runs')));
+}
+
+// What a workspace call would do (plan 27.4): on your machine (a warning), the diff of an edit
+// (+/- coloured, scrollable), and why it asks (the mode).
+function LimitsBlock({ lim, why }) {
+  const p = lim.preview || {}, host = lim.action === 'host';
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 } },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12, color: host ? T.rd : T.mut } },
+      host ? h(Icon, { d: 'alert', size: 13 }) : null,
+      h('span', null, (ACTION_WORD[lim.action] || lim.action) + (lim.folder ? ` · ${lim.folder}` : '') + (p.summary ? ` · ${p.summary}` : '')),
+      host ? h('strong', null, 'outside the sandbox: your files, your network') : null,
+      p.network && !host ? h(Badge, { tone: 'cyan' }, 'internet') : null,
+      lim.once ? h('span', { style: { color: T.dim } }, '· asks every time') : null,
+      why ? h('span', { style: { color: T.dim, marginLeft: 'auto' } }, why) : null),
+    p.diff ? h(DiffBox, { text: p.diff }) : null);
+}
+
+function DiffBox({ text }) {
+  const lines = String(text).replace(/\n$/, '').split('\n');
+  const tone = l => l.startsWith('+++') || l.startsWith('---') ? T.mut : l.startsWith('+') ? T.gr : l.startsWith('-') ? T.rd : l.startsWith('@@') ? T.cy : T.tx;
+  return h('pre', { 'aria-label': 'The change', style: { margin: 0, maxHeight: 320, overflow: 'auto', padding: '8px 10px', borderRadius: 7, border: '1px solid ' + T.bds,
+    background: T.sb, fontFamily: MONO, fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre', tabSize: 4 } },
+    lines.map((l, i) => h('div', { key: i, style: { color: tone(l) } }, l || ' ')));
 }
 
 // An execute tool's code or command (plan 25.3): whole, monospaced, scrollable and editable; what's here is what runs.
@@ -185,7 +210,7 @@ function ApprovalCard({ item, ctx }) {
     ctx.cancel ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: ctx.cancel }) : null)
     : r?.error && d?.approve ? h(ErrorBox, { error: r.error }) : r && d?.approve && r.status !== 'done' ? h(Badge, { tone: (STATUS[r.status] || ['dim'])[0] }, (STATUS[r.status] || [0, r.status])[1]) : null;
   return h(ParamCard, { spec: a, outputs: ctx.outputs, api: ctx.api, mods: ctx.mods, decided, after, cancelLabel: 'Deny',
-    choices: approvalButtons(a.risk, { thread: true }),
+    choices: approvalButtons(a.risk, { thread: true, once: !!a.limits?.once }),
     onRun: (args, c) => ctx.decide(a, true, args, c), onCancel: reason => ctx.decide(a, false, null, { reason }) });
 }
 

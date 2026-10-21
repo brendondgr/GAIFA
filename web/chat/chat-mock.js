@@ -54,10 +54,10 @@ export function createMockClient(api, { speed = 1 } = {}) {
       { name: 'comfy', description: 'Choosing a ComfyUI workflow and its settings per task', source: 'comfy', id: 'comfy/comfy' },
       { name: 'tts', description: 'Voices and delivery direction', source: 'tts', id: 'tts/tts' },
       { name: 'gen3d', description: 'Presets, parts and rigs for 3D models', source: 'gen3d', id: 'gen3d/gen3d' }],
-    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['ask', 'auto', 'read_only'], documents: { inline_tokens: 6000, reply_reserve: 4096 } };
+    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['plan', 'manual', 'accept_edits', 'auto', 'bypass'], documents: { inline_tokens: 6000, reply_reserve: 4096 } };
 
   function newThread(o = {}) {
-    const ts = now(), th = { id: rid('t_'), title: o.title || '', model: o.model || null, mode: o.mode || 'ask', state: 'idle', settings: o.settings || {}, created: ts, updated: ts, archived: false, parent_id: o.parent_id || null, fork_seq: o.fork_seq ?? null };
+    const ts = now(), th = { id: rid('t_'), title: o.title || '', model: o.model || null, mode: o.mode || 'manual', state: 'idle', settings: o.settings || {}, created: ts, updated: ts, archived: false, parent_id: o.parent_id || null, fork_seq: o.fork_seq ?? null };
     const t = { thread: th, events: [], subs: new Set(), run: null, queue: [], pending: null };
     threads.set(th.id, t);
     return t;

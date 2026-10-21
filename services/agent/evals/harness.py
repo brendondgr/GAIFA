@@ -111,7 +111,9 @@ class Task:
     fork_turn: str | None = None
     compact_after_turn: int | None = None
     setup: Callable[[], Any] | None = None
-    attach: Callable[[str], Any] | None = None   # (hub URL) → output ids attached to the first turn (plan 29.3)
+    attach: Callable[[str], Any] | None = None   # (hub URL) → output ids attached to the first turn (plan 29.3),
+    #                                              or {ids, vars}: `vars` fill {name} in the turns and reach the checks (plan 27.6)
+    teardown: Callable[[str, dict[str, Any]], Any] | None = None   # (hub URL, vars): undo what attach set up
     prefs: list[dict[str, Any]] = field(default_factory=list)   # preferences seeded for this task, removed after (plan 21.6)
     timeout: float = 600
     note: str = ""
@@ -261,7 +263,11 @@ class Harness:
                 attached = task.attach(self.hub_url())
                 if asyncio.iscoroutine(attached):
                     attached = await attached
+            if isinstance(attached, dict):
+                run.extra["vars"] = dict(attached.get("vars") or {})
+                attached = attached.get("ids") or None
             for i, text in enumerate(task.turns, 1):
+                text = text.format(**run.extra["vars"]) if run.extra.get("vars") else text
                 await self._drive(task, tid, text, deadline, attached if i == 1 else None)
                 if i == len(task.turns):
                     await self._followup(task, tid, deadline)
@@ -289,6 +295,13 @@ class Harness:
                     run.events = await self._events(tid)
                 except Exception:  # noqa: BLE001
                     pass
+        if task.teardown:
+            try:
+                r = task.teardown(self.hub_url(), run.extra.get("vars") or {})
+                if asyncio.iscoroutine(r):
+                    await r
+            except Exception as e:  # noqa: BLE001
+                self.glitches.append(f"teardown {task.id}: {e}")
         for pid in seeded:
             try:
                 await self.c.delete(f"/v1/prefs/{pid}")

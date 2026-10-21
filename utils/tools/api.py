@@ -67,6 +67,21 @@ class Grant(_Model):
     last_used_ts: float | None = None
 
 
+class CallLimits(_Model):
+    """needs_approval for a tool with a preflight (plan 27.4): what the call would do."""
+    action: Literal["read", "edit", "delete", "commit", "command", "network", "host", "remote"]
+    folder: str | None = None
+    level: str | None = None
+    allow_bypass: bool | None = None
+    key: str | None = Field(None, description="What \"allow in this chat\" covers (the folder, and a command's first word)")
+    once: bool | None = Field(None, description="Asks every time: no grant buttons (host runs, commits, git remotes)")
+    preview: dict[str, Any] | None = Field(None, description="{summary, diff} for an edit; {command, where, network, cwd, note?} for a run")
+    path: str | None = None
+
+
+Mode = Literal["plan", "manual", "accept_edits", "auto", "bypass", "ask", "read_only"]
+
+
 class ToolCallResult(_Model):
     status: Literal["needs_approval", "denied", "running", "done", "error", "cancelled"]
     tool: str | None
@@ -88,12 +103,14 @@ class ToolCallResult(_Model):
     filled_by: dict[str, str] | None = None
     grant_key: str | None = None
     grant: Grant | None = None
+    why: str | None = Field(None, description="needs_approval: why it asks (the mode, a list, the risk)")
+    limits: CallLimits | None = None
 
 
 class CallRequest(_Model):
     arguments: dict[str, Any] = Field(default_factory=dict)
     origin: dict[str, Any] = Field(default_factory=dict, description="Who asks: {service, thread, …}; shown on the approval")
-    mode: Literal["ask", "auto", "read_only"] = "ask"
+    mode: Mode = Field("manual", description="The chat's mode (plan 27.4); the old names ask and read_only map to manual and plan")
 
 
 class Approval(_Model):

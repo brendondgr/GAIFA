@@ -1,0 +1,23 @@
+# Test fixture: a workspace mod in miniature (plan 27.4) with its preflight, for the mode × level tests.
+id = "fake-ws"
+name = "Fake Workspace"
+description = "folders with levels, and a preflight"
+
+[run]
+command = ["python3", "../_fakemod.py", "ws"]
+port = 5189
+health = "/health"
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+start_timeout_s = 15
+stop_timeout_s = 5
+restart = "no"
+
+[agent]
+limits = "POST /v1/limits"
+
+[tools]
+read = { op = "POST /v1/read", description = "Read a file", risk = "read", grant_key = "arg:folder" }
+edit = { op = "POST /v1/edit", description = "Edit a file", risk = "write", grant_key = "arg:folder" }
+delete = { op = "POST /v1/delete", description = "Delete a file", risk = "destructive", grant_key = "arg:folder" }
+commit = { op = "POST /v1/commit", description = "Commit", risk = "write", grant_key = "arg:folder" }
+run = { op = "POST /v1/run", description = "Run a command", risk = "execute", grant_key = "arg:folder" }

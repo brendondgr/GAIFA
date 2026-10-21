@@ -1,4 +1,4 @@
-"""The 49 eval tasks (plan 13.5; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5; a web research case from plan 26.2): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 51 eval tasks (plan 13.5; two workspace cases from plan 27.6, in workspace.py; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5; a web research case from plan 26.2): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -469,3 +469,7 @@ TASKS: list[Task] = [
           final_mentions("kestrel-ferries.example"), final_mentions("harbour-council.example")],
          settings={"dry_run": True}, note="plan 26.2: search runs on the shipped grant, each fetch asks; the web mod's fake web answers (fakeweb/)"),
 ]
+
+from .workspace import TASKS as _WORKSPACE  # noqa: E402  (plan 27.6)
+
+TASKS += _WORKSPACE

@@ -224,7 +224,7 @@ class FakeHub:
         @app.post("/api/tools/{name}/call")
         async def call(name: str, request: Request, wait: float = 1800) -> dict:
             body = await request.json()
-            args, mode = body.get("arguments") or {}, body.get("mode") or "ask"
+            args, mode = body.get("arguments") or {}, body.get("mode") or "manual"
             self.attempts.append({"name": name, "arguments": args, "mode": mode, "origin": body.get("origin")})
             t = self.tools.get(name)
             if t is None:
@@ -243,9 +243,9 @@ class FakeHub:
                 return {"status": "error", "tool": name, "error": {"code": "invalid_arguments", "detail": f"{missing[0]} is required",
                                                                    "fix": f"add {missing[0]}"}}
             risk = t["risk"]
-            if mode == "read_only" and risk != "read":
-                return {"status": "denied", "tool": name, "error": {"code": "denied", "detail": "read-only"}}
-            if risk != "read" and not (mode == "auto" and risk != "destructive"):
+            if mode in ("plan", "read_only") and risk != "read":
+                return {"status": "denied", "tool": name, "error": {"code": "denied", "detail": "Plan mode: only tools that read can run"}}
+            if risk != "read" and not (mode in ("accept_edits", "auto", "bypass") and risk != "destructive"):
                 aid = f"ap_{len(self.approvals) + 1}"
                 a = {"id": aid, "tool": name, "arguments": args, "ask_fields": t["ask"], "risk": risk, "origin": body.get("origin") or {},
                      "state": "pending", "created_ts": time.time(), "call_id": None, "final": None}

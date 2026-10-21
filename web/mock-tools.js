@@ -116,7 +116,7 @@ export function createToolMocks({ emit, net, err, later, now, outputs = () => []
       await net();
       const t = byName.get(name); if (!t) throw unknown(name);
       check(t, args);
-      if (mode === 'read_only' && t.risk !== 'read') return { status: 'denied', tool: name, error: { code: 'denied', detail: 'the thread is read-only: only tools that read can run' } };
+      if ((mode === 'read_only' || mode === 'plan') && t.risk !== 'read') return { status: 'denied', tool: name, error: { code: 'denied', detail: 'Plan mode: only tools that read can run' } };
       const g = granted(t, args, origin);
       if (g) g.used++;
       const asks = !g && (['network', 'execute', 'destructive'].includes(t.risk) || (t.risk !== 'read' && mode !== 'auto'));

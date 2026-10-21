@@ -162,6 +162,17 @@ The two fixes were in the checks, not the agent:
 | skynet, the parameter renamed `audio` | 1 × 3 | 100% | 1/1 | 9 s |
 
 With `output_id` the model called `stt_transcribe(audio=…)` first in all four runs and needed the hub's fix; named `audio` (`output_id` still accepted), it called it right the first time in all three.
+### Workspace (plan 27.6, 2026-10-20)
+
+Two live tasks (their settings turn the dry run off) in `evals/workspace.py`, 50 tasks in all. `ws_fix_test`: a fresh folder in the temp dir (a `calc.py` whose `add` subtracts, unittest tests), added through the hub as a workspace at Run, in **Accept edits** mode; asked to run the tests, fix the bug and run them again. Checks: `calc.py` fixed in place, a test run after the edit with exit 0 and unittest's `OK` (`workspace_run`, or `workspace_python` running the tests), and no card for the edit (Accept edits). The harness approves the command cards. `ws_csv_chart`: three years of daily sales (`sales.csv`, 53 KB, ~13k tokens, so it arrives as a card), asked for a monthly revenue chart and the best month (July 2025). Checks: a clean `workspace_python` run, an image output, the month named. `Task.attach` may now return `{ids, vars}` (`vars` fill `{folder}` in the turns and reach the checks), and `Task.teardown` removes the folder.
+
+| Run (skynet, second hub) | ws_fix_test | ws_csv_chart | What changed after |
+|---|---|---|---|
+| 1 | 3/3 | 0/3 | `workspace_python` wasn't loaded: the agent wrote scripts into a workspace folder (one of another run's fixtures, and the itsdangerous scratch clone, undone afterwards with the checkpoints) and ran them there. `workspace_python` became `core`; `workspace_folders` says never to use a folder as scratch space |
+| 2 (six-row CSV) | 2/3 | 2/3 | the CSV was inlined, so the agent copied the rows into its code; one reply cited a CSV line as `#3`. The CSV became 53 KB |
+| 3 | 3/3 | 1/3 | the agent read `inputs/sales.csv` without passing `inputs`. The result now notes an empty `inputs/` and lists the inputs it got |
+| 4 | 3/3 | 2/3 | `inputs: ["#1"]` reached the mod unresolved: the agent rewrote `#n` only in `ref`. `_refs` now resolves `#n` in any file input (`x-kind`), alone or in a list |
+| 5 | **3/3** | **3/3** | |
 <!-- /RESULTS -->
 
 ## Gate

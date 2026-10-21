@@ -33,7 +33,7 @@ def test_manifests_follow_the_contract(folder):
 
 
 def test_all_four_exist():
-    assert {p.name for p in FAKE_MODS.iterdir() if p.is_dir()} == {"fake-ok", "fake-slow", "fake-crash", "fake-mem", "fake-tools", "fake-perms"}
+    assert {p.name for p in FAKE_MODS.iterdir() if p.is_dir()} == {"fake-ok", "fake-slow", "fake-crash", "fake-mem", "fake-tools", "fake-perms", "fake-ws"}
 
 
 @pytest.mark.parametrize("name", ["tts", "gen3d", "lcpp", "relay"])
@@ -105,4 +105,4 @@ async def test_conftest_client(client, root):
 
 def test_services_dir_copies_mods(services_dir):
     d = services_dir("fake-ok", "fake-mem")
-    assert sorted(p.name for p in d.iterdir()) == ["_fakemod.py", "fake-mem", "fake-ok"]
+    assert sorted(p.name for p in d.iterdir()) == ["_fakemod.py", "_fakews.py", "fake-mem", "fake-ok"]

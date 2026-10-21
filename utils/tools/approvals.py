@@ -1,15 +1,29 @@
-"""Permissions and approvals (plan 13.2, 25.1).
+"""Permissions, chat modes and approvals (plan 13.2, 25.1, 27.4).
 
-**Deciding a call** follows one fixed order (architecture §14), the first that answers wins:
+**Modes** (after Claude Code's): `plan` (read and explain; nothing changes), `manual` (everything
+that changes something asks), `accept_edits` (edits apply, commands ask), `auto` (edits apply, a
+judge decides commands: until plan Phase 30 builds it, they ask) and `bypass` (edits and commands
+in the sandbox run; only folders that allow it). The old names map over: `ask` → `manual`,
+`read_only` → `plan`; `auto` is now the Auto mode, which behaves as `accept_edits` did as "Use
+defaults" for every tool without limits.
+
+**Deciding a call** follows one fixed order (architecture §14.7); the first that answers wins:
 
 1. the **deny** list of `config.toml [agent.permissions]` (name globs);
-2. the thread's **mode**: `read_only` denies everything but `read`;
-3. a **mod's own limits** (a workspace folder's level, Phase 27): the mod enforces them when the
-   call reaches it, so no grant, list entry or approval lifts them;
-4. a **grant** that covers the call (plan 25.2, `utils/tools/grants.py`) allows it;
+2. a **mod's limits** (a workspace folder, plan 27): the mod's preflight (`[agent] limits`) says
+   what the call would do (`action`), the folder's level and Bypass, and refuses what a hard limit
+   or the level stops. Nothing below lifts a refusal; the mod checks again when the call arrives;
+3. the chat's **mode**: for a call with limits, the cell of `CELLS` for its action (run, ask,
+   refuse, or the judge); without limits, `plan` denies everything but `read`;
+4. a **grant** that covers the call allows it (never for `once` actions: host runs, commits,
+   anything touching a remote);
 5. the **ask**, then **allow** list (`execute` ignores the allow list: only a grant skips its card);
-6. the **risk default**: `read` runs; in `auto` mode `write` and `generate` run; everything else
-   asks (`network`, `execute` and `destructive` ask in every mode).
+6. the **risk default**: `read` runs; in `accept_edits`, `auto` and `bypass` `write` and `generate`
+   run; everything else asks (`network`, `execute` and `destructive` in every mode).
+
+**The judge** (plan Phase 30): a cell (or, in Auto, a `network` tool without limits) may answer
+`"judge"`. `decide` stays pure; the caller then awaits `judge()`, which Phase 30 replaces. Until
+then it fails closed: "ask".
 
 **Approvals:** a call that has to ask is stored in `approvals` and runs nothing. Deciding it
 (`POST /api/approvals/{id}`) may carry edited arguments: those are validated and are what runs.
@@ -29,32 +43,103 @@ if TYPE_CHECKING:
     from utils.db import Database
     from utils.events import EventBus
 
-MODES = ("ask", "auto", "read_only")
+MODES = ("plan", "manual", "accept_edits", "auto", "bypass")
+OLD_MODES = {"ask": "manual", "read_only": "plan"}
+MODE_WORD = {"plan": "Plan", "manual": "Manual", "accept_edits": "Accept edits", "auto": "Auto", "bypass": "Bypass"}
+EDITS_RUN = ("accept_edits", "auto", "bypass")    # modes where `write` and `generate` tools run without a card
+AUTO_RUNS = ("write", "generate")
+ACTIONS = ("read", "edit", "delete", "commit", "command", "network", "host", "remote")
+
+# The mode × action table (plan Phase 27). "judge": Auto's judge decides (Phase 30); until then it asks.
+CELLS: dict[str, dict[str, str]] = {
+    "plan":         {"read": "allow", "edit": "deny", "delete": "deny", "commit": "deny", "command": "deny",
+                     "network": "deny", "host": "deny", "remote": "deny"},
+    "manual":       {"read": "allow", "edit": "ask", "delete": "ask", "commit": "ask", "command": "ask",
+                     "network": "ask", "host": "ask", "remote": "ask"},
+    "accept_edits": {"read": "allow", "edit": "allow", "delete": "ask", "commit": "ask", "command": "ask",
+                     "network": "ask", "host": "ask", "remote": "ask"},
+    "auto":         {"read": "allow", "edit": "allow", "delete": "judge", "commit": "ask", "command": "judge",
+                     "network": "judge", "host": "ask", "remote": "ask"},
+    "bypass":       {"read": "allow", "edit": "allow", "delete": "allow", "commit": "allow", "command": "allow",
+                     "network": "allow", "host": "ask", "remote": "ask"},
+}
+ACTION_WORD = {"read": "reads", "edit": "edits", "delete": "deletes", "commit": "commits", "command": "commands",
+               "network": "commands with internet", "host": "commands on your machine", "remote": "git remotes"}
 
 
-AUTO_RUNS = ("write", "generate")   # what `auto` mode runs without a card
+def canonical(mode: str | None) -> str:
+    """A mode by its new or old name; unknown → manual."""
+    m = OLD_MODES.get(mode or "", mode or "")
+    return m if m in MODES else "manual"
 
 
-def decide(name: str, risk: str, config: Config, mode: str = "ask",
-           grant: dict[str, Any] | None = None) -> tuple[str, str]:
-    """("allow" | "ask" | "deny", why) for one call. `grant`: a grant that covers it (25.2)."""
+def decide(name: str, risk: str, config: Config, mode: str = "manual",
+           grant: dict[str, Any] | None = None, limits: dict[str, Any] | None = None) -> tuple[str, str]:
+    """("allow" | "ask" | "deny" | "judge", why) for one call.
+
+    `grant`: a grant that covers it (25.2). `limits`: the mod's preflight (27.4), or None."""
     p = config.agent.permissions
+    mode = canonical(mode)
     if any(fnmatch.fnmatchcase(name, g) for g in p.deny):
         return "deny", "denied by your permissions (Settings → Agent)"
-    if mode == "read_only" and risk != "read":
-        return "deny", "the thread is read-only: only tools that read can run"
+    if limits is not None:
+        return _with_limits(name, risk, p, mode, grant, limits)
+    if mode == "plan" and risk != "read":
+        return "deny", "Plan mode: only tools that read can run"
     if grant is not None:
-        return "allow", ("allowed in this chat" if grant.get("scope") == "thread" else "always allowed") + \
-            (f" for {grant['key']}" if grant.get("key") else "")
+        return "allow", _granted(grant)
     if any(fnmatch.fnmatchcase(name, g) for g in p.ask):
         return "ask", "your permissions ask for this tool"
     if risk != "execute" and any(fnmatch.fnmatchcase(name, g) for g in p.allow):
         return "allow", "allowed by your permissions"
     if risk == "read":
         return "allow", "reads only"
-    if mode == "auto" and risk in AUTO_RUNS:
-        return "allow", "Use defaults: runs without asking"
+    if mode in EDITS_RUN and risk in AUTO_RUNS:
+        return "allow", f"{MODE_WORD[mode]}: runs without asking"
+    if mode == "auto" and risk == "network":
+        return "judge", "Auto: the judge decides"
     return "ask", f"{risk} tools ask first"
+
+
+def _with_limits(name: str, risk: str, p: Any, mode: str, grant: dict[str, Any] | None,
+                 limits: dict[str, Any]) -> tuple[str, str]:
+    refuse = limits.get("refuse")
+    if refuse:
+        return "deny", str(refuse.get("detail") or "the mod refused it")
+    action = limits.get("action") if limits.get("action") in ACTIONS else "command"
+    note = ""
+    if mode == "bypass" and not limits.get("allow_bypass"):
+        mode, note = "accept_edits", " (Bypass isn't allowed in this folder, so as in Accept edits)"
+    cell = CELLS[mode][action]
+    if cell == "deny":
+        return "deny", f"{MODE_WORD[mode]} mode: {ACTION_WORD[action]} are refused{note}"
+    asked = any(fnmatch.fnmatchcase(name, g) for g in p.ask)
+    if cell == "allow":
+        if asked:
+            return "ask", "your permissions ask for this tool"
+        return "allow", f"{MODE_WORD[mode]}: {ACTION_WORD[action]} run without asking{note}"
+    if limits.get("once"):
+        return "ask", f"{ACTION_WORD[action]} ask every time{note}"
+    if grant is not None:
+        return "allow", _granted(grant)
+    if asked:
+        return "ask", "your permissions ask for this tool"
+    if risk != "execute" and any(fnmatch.fnmatchcase(name, g) for g in p.allow):
+        return "allow", "allowed by your permissions"
+    if cell == "judge":
+        return "judge", f"Auto: the judge decides{note}"
+    return "ask", f"{MODE_WORD[mode]}: {ACTION_WORD[action]} ask first{note}"
+
+
+def _granted(grant: dict[str, Any]) -> str:
+    return ("allowed in this chat" if grant.get("scope") == "thread" else "always allowed") + \
+        (f" for {grant['key']}" if grant.get("key") else "")
+
+
+async def judge(hub: Any, tool: Any, arguments: dict[str, Any], origin: dict[str, Any] | None,
+                limits: dict[str, Any] | None, why: str) -> tuple[str, str]:
+    """Auto mode's judge (plan Phase 30 replaces this): ("allow" | "ask", why). Fails closed."""
+    return "ask", "Auto: no judge yet, so it asks"
 
 
 def _row(r: dict[str, Any] | None) -> dict[str, Any] | None:

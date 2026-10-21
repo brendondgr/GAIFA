@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS threads (
     id        TEXT PRIMARY KEY,
     title     TEXT NOT NULL DEFAULT '',
     model     TEXT,
-    mode      TEXT NOT NULL DEFAULT 'ask',
+    mode      TEXT NOT NULL DEFAULT 'manual',
     state     TEXT NOT NULL DEFAULT 'idle',
     settings  TEXT NOT NULL DEFAULT '{}',
     created   REAL NOT NULL,
@@ -61,7 +61,14 @@ CREATE TABLE IF NOT EXISTS events (
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS events_type ON events (type, ts);
 """
-MODES = ("ask", "auto", "read_only")
+MODES = ("plan", "manual", "accept_edits", "auto", "bypass")     # plan 27.4, after Claude Code's
+OLD_MODES = {"ask": "manual", "read_only": "plan"}
+
+
+def mode_of(mode: str | None) -> str:
+    """A mode by its new or old name (`auto` is now the Auto mode); unknown → manual."""
+    m = OLD_MODES.get(mode or "", mode or "")
+    return m if m in MODES else "manual"
 
 
 def new_id(prefix: str) -> str:
@@ -80,6 +87,16 @@ class Store:
         self._c.executescript(SCHEMA)
         from .records import SCHEMA as TURNS            # plan 21.4: one row per turn
         self._c.executescript(TURNS)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """user_version 1 (plan 27.4): the old modes become the new ones. `auto` was "Use defaults"
+        (edits and generations ran, everything else asked), which is Accept edits now."""
+        with self._lock:
+            if self._c.execute("PRAGMA user_version").fetchone()[0] < 1:
+                self._c.execute("UPDATE threads SET mode = CASE mode WHEN 'ask' THEN 'manual' WHEN 'auto' THEN 'accept_edits' "
+                                "WHEN 'read_only' THEN 'plan' ELSE mode END")
+                self._c.execute("PRAGMA user_version = 1")
 
     def close(self) -> None:
         with self._lock:
@@ -103,14 +120,14 @@ class Store:
         t["archived"] = bool(t["archived"])
         return t
 
-    def create_thread(self, title: str = "", model: str | None = None, mode: str = "ask",
+    def create_thread(self, title: str = "", model: str | None = None, mode: str = "manual",
                       settings: dict[str, Any] | None = None, parent_id: str | None = None,
                       fork_seq: int | None = None) -> dict[str, Any]:
         tid, now = new_id("t_"), time.time()
         with self._lock:
             self._c.execute("INSERT INTO threads (id, title, model, mode, settings, created, updated, parent_id, fork_seq) "
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                            (tid, title, model, mode if mode in MODES else "ask", json.dumps(settings or {}), now, now,
+                            (tid, title, model, mode_of(mode), json.dumps(settings or {}), now, now,
                              parent_id, fork_seq))
         return self.thread(tid)  # type: ignore[return-value]
 
@@ -137,6 +154,8 @@ class Store:
                 v = json.dumps(v)
             if k == "archived":
                 v = int(bool(v))
+            if k == "mode":
+                v = mode_of(v)
             sets.append(f"{k} = ?")
             args.append(v)
         if sets:

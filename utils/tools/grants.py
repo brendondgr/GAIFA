@@ -9,6 +9,11 @@ domain" or "this folder" rather than every call: `grant_key = "url:host"` (the h
 argument), `"arg:<name>"` (that argument as is) or `"const:<x>"` (always `x`, so one answer covers
 every call of the tool, e.g. searching). A grant whose key is null covers every call of its tool.
 
+**A mod's own key** (plan 27.4): a mod with a preflight (`[agent] limits`) may name the key itself
+(`limits.key`, e.g. "itsdangerous pytest": the folder and the command's first word), which then
+replaces the one read from the arguments. A preflight's `once` action (host runs, commits, git
+remotes) can't be remembered at all.
+
 **Who it covers.** A `thread` grant covers calls whose origin names that thread (the chat); an MCP
 or API call has no thread, so only `always` grants apply to it. `thread` grants end with their
 thread (the agent calls `DELETE /api/grants?thread=` when a chat is deleted).
@@ -78,9 +83,10 @@ class Grants:
     def __init__(self, db: Database, bus: EventBus) -> None:
         self.db, self.bus = db, bus
 
-    async def match(self, tool: ToolDef, arguments: Any, origin: dict[str, Any] | None) -> dict[str, Any] | None:
-        """The newest live grant that covers this call, or None. Counts the use."""
-        key, thread = key_of(tool.grant_key, arguments), _thread(origin)
+    async def match(self, tool: ToolDef, arguments: Any, origin: dict[str, Any] | None,
+                    key: str | None = None) -> dict[str, Any] | None:
+        """The newest live grant that covers this call, or None. Counts the use. `key`: the mod's own (27.4)."""
+        key, thread = key or key_of(tool.grant_key, arguments), _thread(origin)
         rows = await self.db.fetchall(
             "SELECT * FROM grants WHERE (expires_ts IS NULL OR expires_ts > ?) AND (scope = 'always' OR thread = ?) "
             "ORDER BY created_ts DESC", (time.time(), thread or "\0"))
@@ -91,7 +97,7 @@ class Grants:
         return None
 
     def check(self, tool: ToolDef, arguments: Any, origin: dict[str, Any] | None, remember: str,
-              confirm: bool) -> dict[str, Any] | None:
+              confirm: bool, limits: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """What `remember` would write for an approved call (None for `once`); raises HubError when it can't."""
         from utils.server import HubError
 
@@ -99,6 +105,9 @@ class Grants:
             raise HubError(422, "invalid_arguments", f"remember must be one of {', '.join(REMEMBER)}")
         if remember == "once":
             return None
+        if limits and limits.get("once"):
+            raise HubError(422, "once_only", f"{tool.name}: this kind of call ({limits.get('action')}) asks every time",
+                           {"fix": "allow it once"})
         thread = _thread(origin)
         if remember == "thread" and thread is None:
             raise HubError(422, "no_thread", "this call isn't from a chat, so it can't be allowed in this chat",
@@ -106,7 +115,7 @@ class Grants:
         if remember == "always" and tool.risk in CONFIRM_RISKS and not confirm:
             raise HubError(422, "confirm_needed", f"always allowing a {tool.risk} tool needs a second confirm",
                            {"fix": "confirm on the card (confirm: true), or allow it once or in this chat"})
-        key = key_of(tool.grant_key, arguments)
+        key = (limits or {}).get("key") or key_of(tool.grant_key, arguments)
         if tool.grant_key and key is None:
             raise HubError(422, "no_grant_key", f"{tool.name} has no {tool.grant_key} in these arguments to remember",
                            {"fix": "allow it once"})

@@ -201,6 +201,20 @@ export function ActionHead({ turn, ctx }) {
       h(Icon, { d: w.icon || 'tool', size: 13 }), 'You ran ', h('span', { style: { color: T.tx } }, w.label.replace(/^(\w)/, c => c.toLowerCase()))));
 }
 
+/** "Undo this turn" (plan 27.7): every file this turn changed in a workspace folder, back as it was. */
+function UndoTurn({ paths, ctx }) {
+  const React = R(), [state, setState] = React.useState(null);
+  const go = async () => {
+    setState('busy');
+    try { setState(await ctx.undo(paths)); } catch { setState(null); }
+  };
+  return h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } },
+    state === 'undone' ? h('span', null, 'Undone: the files are back as they were before this turn.')
+      : h('button', { type: 'button', className: 'aichat-row', disabled: state === 'busy', onClick: go, title: 'Put every file this turn changed back as it was (refused if you changed one since)',
+        style: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 8px', border: '1px solid ' + T.bds, borderRadius: 6, background: 'none', color: T.mut, font: 'inherit', cursor: 'pointer' } },
+        h(Icon, { d: 'undo', size: 12 }), state === 'busy' ? 'Undoing…' : 'Undo this turn'));
+}
+
 /** One turn: your message (or "You ran …"), the fold, errors, cards waiting for you, the outputs, the answer. */
 export function TurnView({ turn, ctx }) {
   const kids = [
@@ -210,6 +224,7 @@ export function TurnView({ turn, ctx }) {
     ...(ctx.dock ? [] : turn.pending.map(it => h(Card, { key: it.key, item: it, ctx }))),
     turn.outputs.length ? h(OutputStrip, { key: 'o', outputs: turn.outputs, ctx }) : null,
     turn.answer ? h(Card, { key: 'a', item: turn.answer.item, ctx }) : null,
+    turn.undo?.length && !turn.running && ctx.undo ? h(UndoTurn, { key: 'undo', paths: turn.undo, ctx }) : null,
   ];
   return h(R().Fragment, null, ...kids.filter(Boolean));
 }

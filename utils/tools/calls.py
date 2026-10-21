@@ -2,7 +2,8 @@
 
 Every call answers with one shape, `{status, tool, …}`:
 
-- `needs_approval`: `{approval_id, arguments, ask_fields, schema, risk, description, grant_key?}`; nothing ran
+- `needs_approval`: `{approval_id, arguments, ask_fields, schema, risk, description, grant_key?, limits?}`; nothing ran
+- `denied`: also when the mod's preflight (plan 27.4, `[agent] limits`) refuses it: its `code` and `fix`
 - `denied`: `{error: {code, detail, fix}}`
 - `running`: `{call_id, progress, job_id}`: still going after `wait` seconds (`GET /api/tools/calls/{id}`)
 - `done`: `{call_id, result, outputs}`; `outputs` are `{output_id, ref, url, kind, title, summary}`
@@ -32,7 +33,7 @@ import httpx
 
 from utils.services import ServiceError
 from utils.tools import results
-from utils.tools.approvals import MODES, Approvals, decide
+from utils.tools.approvals import Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.modcall import ToolError, dry_run, mod_error
 from utils.tools import edits, options
@@ -158,8 +159,7 @@ class Calls:
                 "fix": (f"did you mean {', '.join(close)}? " if close else "") + "find tools with find_tools or GET /api/tools?q="}}
             await self._refused(name, arguments, origin, out["error"])
             return out
-        if mode not in MODES:
-            mode = "ask"
+        mode = canonical(mode)
         arguments = coerce(tool.parameters, arguments if arguments is not None else {})
         arguments, filled = options.fill_defaults(tool.parameters, arguments) if isinstance(arguments, dict) else (arguments, [])
         how = {k: "default" for k in filled}
@@ -172,16 +172,22 @@ class Calls:
             out = self._invalid(tool, await self._elsewhere(tool, arguments, problems))
             await self._refused(tool.name, arguments, origin, out["error"])
             return out
-        grant = await self.hub.grants.match(tool, arguments, origin) if self.hub.grants is not None else None
-        verdict, why = decide(tool.name, tool.risk, self.hub.config, mode, grant)
+        limits = await self._limits(tool, arguments, origin) if tool.limits else None
+        grant = await self.hub.grants.match(tool, arguments, origin, (limits or {}).get("key")) \
+            if self.hub.grants is not None and not (limits or {}).get("once") else None
+        verdict, why = decide(tool.name, tool.risk, self.hub.config, mode, grant, limits)
+        if verdict == "judge":                         # Auto mode (plan Phase 30 plugs its judge in here)
+            verdict, why = await judge(self.hub, tool, arguments, origin, limits, why)
         if verdict == "deny":
-            out = {"status": "denied", "tool": tool.name, "error": {"code": "denied", "detail": f"{tool.name}: {why}",
-                                                                   "fix": "don't retry it; tell the user it's not allowed, or ask them to change the setting"}}
+            refuse = (limits or {}).get("refuse") or {}
+            out = {"status": "denied", "tool": tool.name, "error": {
+                "code": refuse.get("code") or "denied", "detail": f"{tool.name}: {why}",
+                "fix": refuse.get("fix") or "don't retry it; tell the user it's not allowed, or ask them to change the setting"}}
             await self._refused(tool.name, arguments, origin, out["error"])
             return out
         if verdict == "ask":
             a = await self.approvals.create(tool.name, arguments, tool.ask, tool.risk, origin or {}, how)
-            return self._needs(tool, a, filled, how)
+            return self._needs(tool, a, filled, how, limits, why)
         if grant is not None:
             origin = {**(origin or {}), "grant": grant["id"]}      # the records and the chat say which grant ran it
         return await self._launch(tool, arguments, origin or {}, None, wait, filled=how)
@@ -213,7 +219,11 @@ class Calls:
         problems = validate(tool.parameters, args) or options.problems(tool.parameters, args)
         if problems:
             raise HubError(422, "invalid_arguments", problems[0]["detail"], {"problems": problems})
-        spec = self.hub.grants.check(tool, args, a["origin"], remember, confirm) if self.hub.grants is not None else None
+        limits = await self._limits(tool, args, a["origin"]) if tool.limits else None
+        if limits and limits.get("refuse"):            # the edited arguments, or the folder, changed meanwhile
+            r = limits["refuse"]
+            raise HubError(403, r.get("code") or "refused", str(r.get("detail") or "the mod refused it"), {"fix": r.get("fix")})
+        spec = self.hub.grants.check(tool, args, a["origin"], remember, confirm, limits) if self.hub.grants is not None else None
         call_id = _id()
         changed = edits.edited(tool.parameters, a["arguments"], args)
         if not await self.approvals.close(aid, "approved", final=args, call_id=call_id, edited=changed):
@@ -244,7 +254,7 @@ class Calls:
         stored = json.loads(row["result"]) if row["result"] else {}
         out = {"status": row["state"], "call_id": call_id, "tool": row["tool"]}
         if row["state"] == "done":
-            tool = await self.catalog.get(row["tool"]) if row["tool"] and row["tool"].startswith("hub_") else None
+            tool = await self.catalog.get(row["tool"]) if row["tool"] else None
             out["result"] = results.cap(stored.get("result"), call_id, (tool.cap_bytes if tool else None) or results.CAP_BYTES)
             out["outputs"] = stored.get("outputs") or []
         elif row["state"] == "error":
@@ -296,15 +306,43 @@ class Calls:
                                                                 "problems": problems[:10]}}
 
     def _needs(self, tool: ToolDef, a: dict[str, Any], filled: list[str] | None = None,
-               how: dict[str, str] | None = None) -> dict[str, Any]:
+               how: dict[str, str] | None = None, limits: dict[str, Any] | None = None,
+               why: str | None = None) -> dict[str, Any]:
         out = {"status": "needs_approval", "tool": tool.name, "approval_id": a["id"], "arguments": a["arguments"],
                "ask_fields": tool.ask, "risk": tool.risk, "schema": tool.parameters, "description": tool.description}
         if tool.grant_key:
             out["grant_key"] = tool.grant_key
+        if why:
+            out["why"] = why
+        if limits:      # what the card shows: the action, the folder, the diff or the command; `once`: no grant buttons
+            out["limits"] = {k: limits[k] for k in ("action", "folder", "level", "allow_bypass", "key", "once", "preview", "path")
+                             if limits.get(k) is not None}
         if filled:
             out["filled"] = filled
             out["filled_by"] = {k: v for k, v in (how or {}).items() if k in filled}   # "default" | "pref:<id>" | "carried" (21.7)
         return out
+
+    async def _limits(self, tool: ToolDef, arguments: Any, origin: dict[str, Any] | None) -> dict[str, Any]:
+        """The mod's preflight (plan 27.4): what the call would do. Fails closed: a refusal."""
+        try:
+            svc = self.hub.services.get(tool.mod or "")
+            if not svc.up:
+                if not svc.startable or not svc.eff.enabled:
+                    raise ToolError("service_not_running", f"{svc.mod.name} is {svc.state}")
+                svc = await self.hub.services.start(svc.id, wait=True)
+            method, path = (tool.limits or "").split(" ", 1)
+            r = await self.client.request(method, svc.url + path, timeout=httpx.Timeout(30, connect=5),
+                                          json={"tool": tool.tool, "arguments": arguments, "origin": origin or {}})
+            r.raise_for_status()
+            out = r.json()
+            if not isinstance(out, dict):
+                raise ValueError("the preflight didn't answer an object")
+            return out
+        except Exception as e:  # noqa: BLE001
+            log.warning("preflight of %s: %s", tool.name, e)
+            return {"action": "command", "refuse": {"code": "limits_unavailable",
+                                                   "detail": f"couldn't check what this call may do ({type(e).__name__}: {e})"[:300],
+                                                   "fix": f"start the {tool.mod} mod (its Logs tab says why it failed), then try again"}}
 
     async def _elsewhere(self, tool: ToolDef, args: Any, problems: list[dict[str, str]]) -> list[dict[str, str]]:
         """An enum value this tool refuses but another tool of the same mod takes for the same
@@ -470,7 +508,7 @@ class Calls:
         if PLACEHOLDER.search(path):
             raise ToolError("invalid_arguments", f"missing path value(s): {', '.join(PLACEHOLDER.findall(path))}",
                             "add them to the arguments")
-        headers = {"X-AIHub-Origin": json.dumps({"tool_call": c.id, **c.origin})[:500]}
+        headers = {"X-AIHub-Origin": origin_header({"tool_call": c.id, **c.origin})}
         if self.hub.config.agent.make_room:
             headers["X-AIHub-Make-Room"] = "1"
         for hook in self.hub.services.before_proxy:       # the memory triggers read headers case-insensitively
@@ -559,6 +597,16 @@ class Calls:
             await self.client.request(method, svc.url + path, timeout=15)
         except Exception as e:  # noqa: BLE001
             log.warning("cancelling job %s of %s: %s", c.job_id, c.tool.name, e)
+
+
+def origin_header(origin: dict[str, Any], limit: int = 2000) -> str:
+    """X-AIHub-Origin as valid JSON: the largest keys are dropped until it fits."""
+    o = dict(origin)
+    text = json.dumps(o, default=str)
+    while len(text) > limit and o:
+        del o[max(o, key=lambda k: len(json.dumps(o[k], default=str)))]
+        text = json.dumps(o, default=str)
+    return text
 
 
 def _job_summary(body: Any) -> Any:

@@ -148,7 +148,7 @@ async def test_action_button_runs_without_a_model_call(env):
     assert r.status_code == 202
     await env.settle(tid)
     assert len(env.model.received) == n          # no model call
-    assert env.hub.calls[-1] == {"name": "fake_make_image", "arguments": {"prompt": "button fox", "aspect": "16:9"}, "mode": "auto",
+    assert env.hub.calls[-1] == {"name": "fake_make_image", "arguments": {"prompt": "button fox", "aspect": "16:9"}, "mode": "accept_edits",
                                  "call_id": env.hub.calls[-1]["call_id"]}
     assert env.payloads(tid, "tool_call")[-1]["by"] == "user"
     assert env.payloads(tid, "tool_result")[-1]["outputs"][0]["n"] == 1

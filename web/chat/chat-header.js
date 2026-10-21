@@ -1,10 +1,18 @@
 // The thread header (plan 14.1): title (click to rename), model picker with each model's context
-// window, ask mode, the context meter with its breakdown popover, and Branch.
+// window, the mode (plan 27.4), the context meter with its breakdown popover, and Branch.
 
 import { h, T, MONO, Icon, Btn, Popover, inputSt, fmtTokens, label11 } from './chat-ui.js';
 
 const R = () => globalThis.React;
-export const MODES = [['ask', 'Ask about choices', 'Parameter cards for anything that generates, writes, uses the internet, runs code or deletes'], ['auto', 'Use defaults', 'Runs with the defaults; only tools that use the internet, run code or delete ask'], ['read_only', 'Read only', 'Only tools that read can run']];
+// The five chat modes (plan 27.4, after Claude Code's). The stricter of the mode and a workspace folder's level wins.
+export const MODES = [
+  ['plan', 'Plan', 'Reads and explains; edits, commands and anything that changes something are refused'],
+  ['manual', 'Manual', 'Everything that changes something asks first: edits show their diff, commands their command'],
+  ['accept_edits', 'Accept edits', 'Edits and generations apply without asking (undo per turn); commands, the internet and deletes ask'],
+  ['auto', 'Auto', 'As Accept edits; commands ask until the judge (plan Phase 30) can decide them'],
+  ['bypass', 'Bypass', 'Edits and commands in the sandbox run without asking, only in folders that allow Bypass; your machine still asks']];
+const OLD_MODES = { ask: 'manual', read_only: 'plan' };
+export const modeOf = m => { const k = OLD_MODES[m] || m; return MODES.some(x => x[0] === k) ? k : 'manual'; };
 const PARTS = [['instructions', 'Instructions'], ['skills_memory', 'Skills & memory'], ['tool_index', 'Tool index'], ['tools', 'Loaded tools'], ['outputs', 'Outputs table'], ['messages', 'Messages'], ['documents', 'Documents'], ['tool_results', 'Tool results']];
 const PART_COLOR = ['var(--s6,#79C0FF)', 'var(--s3,#BC8CFF)', 'var(--s7,#D2A8FF)', 'var(--s1,#58C4DD)', 'var(--s8,#E3B341)', 'var(--s4,#3FB950)', 'var(--s2,#FFB224)', 'var(--s5,#F78166)'];
 const selSt = { ...inputSt, height: 28, paddingRight: 6, fontSize: 12, cursor: 'pointer', maxWidth: 210 };
@@ -19,9 +27,20 @@ export function ModelSelect({ models, value, onChange }) {
     !known && cur ? h('option', { value: cur }, cur) : null,
     list.map(m => h('option', { key: m.id, value: m.id }, modelLabel(m) + (m.id === models.default ? ' (default)' : ''))));
 }
-export function ModeSelect({ value, onChange }) {
-  return h('select', { value: value || 'ask', onChange: e => onChange(e.target.value), 'aria-label': 'Ask mode', title: MODES.find(m => m[0] === (value || 'ask'))?.[2], style: selSt },
-    MODES.map(([k, l]) => h('option', { key: k, value: k }, l)));
+// bypass: offer Bypass (every workspace folder this chat uses allows it); a chat already in Bypass keeps it listed.
+export function ModeSelect({ value, onChange, bypass = false }) {
+  const cur = modeOf(value);
+  return h('select', { value: cur, onChange: e => onChange(e.target.value), 'aria-label': 'Mode', title: MODES.find(m => m[0] === cur)?.[2], style: selSt },
+    MODES.filter(([k]) => k !== 'bypass' || bypass || cur === 'bypass').map(([k, l]) => h('option', { key: k, value: k }, l)));
+}
+
+/** Bypass is offered when the workspace folders this chat has used all allow it (or, before it used any, one does). */
+export function bypassAllowed(folders, events = []) {
+  if (!Array.isArray(folders) || !folders.length) return false;
+  const used = new Set();
+  for (const e of events) if (e.type === 'tool_call' && /^workspace_/.test(e.payload?.name || '') && e.payload?.arguments?.folder) used.add(String(e.payload.arguments.folder));
+  const find = id => folders.find(f => f.id === id || f.path === id || f.name === id);
+  return used.size ? [...used].every(id => !!find(id)?.allow_bypass) : folders.some(f => f.allow_bypass);
 }
 
 function meterTone(p) { return p >= 85 ? T.rd : p >= 70 ? T.acc : T.cy; }
@@ -65,10 +84,10 @@ function Title({ title, onRename }) {
   title || 'New chat');
 }
 
-export function ThreadHeader({ thread, models, model, mode, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn }) {
+export function ThreadHeader({ thread, models, model, mode, bypass, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn }) {
   const React = R(), [more, setMore] = React.useState(false);
   const st = running ? ['running', T.acc] : state === 'waiting' ? ['waiting for you', T.pu] : null;
-  const controls = [h(ModelSelect, { key: 'm', models, value: model, onChange: onModel }), h(ModeSelect, { key: 'a', value: mode, onChange: onMode })];
+  const controls = [h(ModelSelect, { key: 'm', models, value: model, onChange: onModel }), h(ModeSelect, { key: 'a', value: mode, onChange: onMode, bypass })];
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, height: 44, padding: '0 12px', borderBottom: '1px solid ' + T.bd, background: T.bg, flex: 'none', minWidth: 0 } },
     onMenu ? h(Btn, { kind: 'ghost', sm: true, icon: 'menu', title: 'Chats', onClick: onMenu }) : null,
     h(Title, { title: thread?.title, onRename: thread ? onRename : null }),

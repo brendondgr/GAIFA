@@ -1,0 +1,9 @@
+# The data libraries the sandbox ships (plan 27.5). requirements.lock is compiled from this:
+#   uv pip compile --python-version 3.12 --python-platform x86_64-manylinux_2_28 requirements.in -o requirements.lock
+numpy
+pandas
+matplotlib
+openpyxl
+python-pptx
+python-docx
+pypdfium2

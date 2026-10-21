@@ -66,3 +66,20 @@ def build(parts: dict[str, str]) -> str:
 SUMMARY_PROMPT = """Summarize the conversation so far for your own later use, so the chat can continue without the full history. Keep: the user's goals and preferences, decisions made, every output reference (#n and output:<id>) with what it is, open questions, the current todo list, and the tools that were loaded. Plain text, under 400 words."""
 
 TITLE_PROMPT = "Give this chat a short title (at most 6 words, no quotes, no trailing period) based on the user's first message."
+
+
+MODE_NOTES = {   # plan 27.4: what the chat's mode means for the model (the hub enforces it either way)
+    "plan": "\nThis chat is in Plan mode: tools that read run; edits, commands and anything else that changes something "
+            "are refused. Read and explain, and propose a plan (the files and the changes) for the user to approve; they can "
+            "switch the mode to let you carry it out.",
+    "manual": "",
+    "accept_edits": "\nThis chat is in Accept edits mode: edits in workspace folders apply without asking (the user can undo a "
+                    "whole turn); commands still ask.",
+    "auto": "\nThis chat is in Auto mode: edits apply; commands ask unless they're judged safe.",
+    "bypass": "\nThis chat is in Bypass mode: edits and sandbox commands run without asking in folders that allow it; "
+              "anything on the user's machine still asks. Take care: say what you're about to do.",
+}
+
+
+def mode_note(mode: str) -> str:
+    return MODE_NOTES.get(mode, "")

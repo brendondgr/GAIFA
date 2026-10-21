@@ -138,6 +138,11 @@ class LearningCfg(_Strict):
     fade_days: int = Field(60, ge=1)
 
 
+class DocsCfg(_Strict):
+    """Plan 23.3: the setup docs follow the registry. Off: only `aihub docs` writes them."""
+    regenerate: bool = True
+
+
 class Config(_Strict):
     hub: HubCfg = HubCfg()
     paths: PathsCfg = PathsCfg()
@@ -148,6 +153,7 @@ class Config(_Strict):
     agent: AgentCfg = AgentCfg()
     sessions: SessionsCfg = SessionsCfg()
     learning: LearningCfg = LearningCfg()
+    docs: DocsCfg = DocsCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

@@ -34,6 +34,7 @@ from utils.outputs.watch import Watcher as OutputsWatcher
 from utils.paths import DEFAULT_ROOT, Paths
 from utils.registry import Registry, RegistryError
 from utils.registry.alerts import Watcher as RegistryWatcher
+from utils.registry.docs_hook import DocsHook
 from utils.registry.verify import Verifier
 from utils.services import ServiceError, ServiceManager
 from utils.widgets import Widgets
@@ -170,6 +171,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             verifier = Verifier(hub.registry)
             verifier.start()
             stack.push_async_callback(verifier.close)
+            docs_hook = DocsHook(hub.registry, paths.root, lambda: hub.config.docs.regenerate)
+            docs_hook.start()
+            stack.push_async_callback(docs_hook.close)
             # 5. services: find manifests, adopt running units, autostart in the background.
             hub.services = ServiceManager(
                 paths, hub.config, hub.backend, hub.bus, hub.activity, hub.alerts, hub.port,

@@ -183,7 +183,7 @@ async def add(reg: Registry, inp: ModelInput) -> dict[str, Any]:
     reg.publish(mid)
     if reg.activity:
         await reg.activity.add(f"Added {entry.name} to the registry", route=f"#/models/{mid}")
-    reg.changed()
+    reg.changed(mid)
     return reg.view(mid)
 
 

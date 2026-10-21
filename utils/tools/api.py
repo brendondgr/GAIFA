@@ -93,6 +93,7 @@ class JudgeStatus(_Model):
     backend: str
     model: str
     detail: str = ""
+    choices: list[str] = Field(default_factory=list, description="Models the backend offers that the judge could use (Settings → Agent)")
 
 
 class CallLimits(_Model):

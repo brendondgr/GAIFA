@@ -630,6 +630,24 @@ class SpeechInputSettings(_Model):
     _labels = field_validator("mics")(lambda cls, v: mic_labels(v))
 
 
+class JudgeSettings(_Model):
+    """`[agent.judge]`: the Auto mode's judge (plan 30.3)."""
+    backend: Literal["relay", "decide"]
+    model: str = Field(min_length=1, max_length=200, description="A relay model name, or a decide model id")
+    url: str = Field(min_length=1, max_length=500, description="The relay, or the decide mod")
+    threshold: float = Field(gt=0, le=1, description="decide: every answer must clear it")
+    timeout_s: float = Field(gt=0, le=60, description="Slower than this → ask")
+
+
+class ScreenSettings(_Model):
+    """`[agent.screen]`: screening fetched pages (and, when on, documents and transcripts) with the judge's model (plan 30.6)."""
+    pages: bool
+    documents: bool
+    transcripts: bool
+    timeout_s: float = Field(gt=0, le=600)
+    window_chars: int = Field(ge=200, le=20000)
+
+
 class Settings(_Model):
     hub: HubSettings
     memory: MemorySettings
@@ -637,6 +655,8 @@ class Settings(_Model):
     ui: UiSettings
     learning: LearningSettings
     speech_input: SpeechInputSettings
+    judge: JudgeSettings
+    screen: ScreenSettings
 
 
 class SettingsPatch(_Model):
@@ -648,6 +668,8 @@ class SettingsPatch(_Model):
     ui: dict[str, Any] | None = None
     learning: dict[str, Any] | None = None
     speech_input: dict[str, Any] | None = None
+    judge: dict[str, Any] | None = None
+    screen: dict[str, Any] | None = None
 
 
 class SavedSettings(_Model):

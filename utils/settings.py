@@ -40,6 +40,8 @@ def view(hub: Hub) -> dict[str, Any]:
         "ui": {"theme": cfg.ui.theme, "density": cfg.ui.density, "dashboard": cfg.ui.dashboard.model_dump()},
         "learning": cfg.learning.model_dump(),
         "speech_input": cfg.speech_input.model_dump(),
+        "judge": cfg.agent.judge.model_dump(),      # config.toml [agent.judge] (plan 30.3)
+        "screen": cfg.agent.screen.model_dump(),    # [agent.screen] (plan 30.6)
     }
 
 
@@ -104,12 +106,17 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         "ui": {"theme": d.ui.theme, "density": d.ui.density},
         "learning": d.learning.model_dump(),
         "speech_input": d.speech_input.model_dump(),
+        "judge": d.agent.judge.model_dump(),
+        "screen": d.agent.screen.model_dump(),
     }
     changes: dict[str, Any] = {}
     for section, keys in defaults.items():
         for key, default in keys.items():
             if new[section][key] != before[section][key]:
                 changes.setdefault(section, {})[key] = _or_default(new[section][key], default)
+    for section in ("judge", "screen"):   # they live under [agent] in config.toml
+        if section in changes:
+            changes.setdefault("agent", {})[section] = changes.pop(section)
     if new["ui"]["dashboard"] != before["ui"]["dashboard"]:
         layout = {k: v for k, v in new["ui"]["dashboard"].items() if v}
         changes.setdefault("ui", {})["dashboard"] = config_mod.Replace(layout or None)

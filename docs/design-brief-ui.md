@@ -577,6 +577,10 @@ interface Settings {
               nightly_at: string; idle_min: number; infer_after: number; fade_days: number };
   speech_input: { mics: string[];   // plan 29.4: microphone labels, most preferred first; the first one present is used
                   language: string; preset: "fast" | "balanced" | "accurate" | "best"; mode: "both" | "toggle" | "hold" };
+  judge: { backend: "relay" | "decide"; model: string;   // config.toml [agent.judge] (plan 30.3); picked in Settings → Agent
+           url: string; threshold: number; timeout_s: number };
+  screen: { pages: boolean; documents: boolean; transcripts: boolean;   // [agent.screen] (plan 30.6)
+            timeout_s: number; window_chars: number };
 }
 
 type HubEvent =
@@ -1084,7 +1088,8 @@ interface Judged { verdict: "allow" | "ask"; reason: string;
                    summary: string;                                 // the command, URL or file, in one line
                    why?: string }                                   // the step row: "Auto: ran (judged safe: …)" | "Auto: asked you (…)"
 interface JudgedCall extends Judged { id: number; ts: number; tool: string; thread?: string; call_id?: string; approval_id?: string }
-interface JudgeStatus { available: boolean; backend: string; model: string; detail: string }   // Auto is offered only when available
+interface JudgeStatus { available: boolean; backend: string; model: string; detail: string;   // Auto is offered only when available
+                       choices: string[] }   // models the backend offers that the judge could use (the picker in Settings → Agent)
 interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote";
                        folder?: string; level?: string; allow_bypass?: boolean; path?: string;
                        key?: string;                                // what "allow in this chat" covers: the folder, and a command's first word

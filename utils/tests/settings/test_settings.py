@@ -35,6 +35,8 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "ui": {"theme": "system", "density": "compact", "dashboard": {"order": [], "hidden": [], "ranges": {}}},
             "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
             "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
+            "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.95, "timeout_s": 3.0},
+            "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800},
         }
         before = _file(served)
         s["hub"]["port"] = served.hub.config.hub.port
@@ -159,3 +161,20 @@ async def test_learning_switch_applies_at_once(rig, serve):
         assert r.status_code == 422
         await c.put("/api/settings", json={"learning": {"enabled": True, "nightly_at": "03:00"}})
         assert "learning" not in tomllib.loads(_file(served))
+
+
+async def test_the_judge_is_picked_in_settings_and_saved_under_agent(rig, serve):
+    """Overnight 2026-10-21: the judge's model could only be changed by editing config.toml by hand."""
+    served = await _hub(rig, serve, "")
+    async with httpx.AsyncClient(base_url=served.url) as c:
+        r = await c.put("/api/settings", json={"judge": {"model": "gemma4-26B"}, "screen": {"window_chars": 6000}})
+        assert r.status_code == 200, r.text
+        assert r.json()["settings"]["judge"]["model"] == "gemma4-26B" and r.json()["settings"]["screen"]["window_chars"] == 6000
+        assert served.hub.config.agent.judge.model == "gemma4-26B"          # applies at once
+        doc = tomllib.loads(_file(served))
+        assert doc["agent"]["judge"] == {"model": "gemma4-26B"} and doc["agent"]["screen"] == {"window_chars": 6000}
+        assert "judge" not in doc and "screen" not in doc
+        r = await c.put("/api/settings", json={"judge": {"backend": "nope"}})
+        assert r.status_code == 422 and r.json()["data"]["field"].startswith("judge")
+        r = await c.put("/api/settings", json={"judge": {"model": "minicpm-5-2B"}})   # back to the default: the key goes
+        assert "judge" not in (tomllib.loads(_file(served)).get("agent") or {})

@@ -252,7 +252,7 @@ async def status(cfg: Any, client: httpx.AsyncClient | None = None, max_age_s: f
     key = (jc.backend, jc.model, jc.url)
     if _status.get("key") == key and time.time() - _status.get("ts", 0) < max_age_s:
         return _status["value"]
-    out = {"available": False, "backend": jc.backend, "model": jc.model, "detail": ""}
+    out = {"available": False, "backend": jc.backend, "model": jc.model, "detail": "", "choices": []}
     own = client is None
     client = client or httpx.AsyncClient(timeout=httpx.Timeout(3))
     try:
@@ -260,12 +260,14 @@ async def status(cfg: Any, client: httpx.AsyncClient | None = None, max_age_s: f
         r.raise_for_status()
         d = r.json()
         if jc.backend == "decide":
+            out["choices"] = [m.get("id") for m in d.get("models", []) if m.get("usable")]
             m = next((m for m in d.get("models", []) if m.get("id") == jc.model), None)
             out["available"] = bool(m and m.get("usable"))
             out["detail"] = "" if out["available"] else ("; ".join((m or {}).get("problems") or []) or
                                                          f"the decide mod has no model {jc.model}")
         else:
             ids = {m.get("id") for m in d.get("data", [])}
+            out["choices"] = sorted(i for i in ids if i and "/" not in i and i not in ("auto", "agent"))   # local and named models
             out["available"] = jc.model in ids
             out["detail"] = "" if out["available"] else f"the relay doesn't list {jc.model} (start it, or pick another judge)"
     except (httpx.HTTPError, ValueError) as e:

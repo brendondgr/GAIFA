@@ -17,9 +17,9 @@ from pydantic import AliasChoices, BaseModel, Field
 
 from . import catalog
 from .config import Settings
-from .engine import Engine
+from .engine import Engine, ModelBusy
 from .hub import Hub
-from .jobs import TMP, Jobs
+from .jobs import MAX_QUEUED_UPLOADS, Jobs
 from .live import mount as mount_live
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,7 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
+        await asyncio.to_thread(jobs.sweep)
         tasks = [asyncio.create_task(jobs.run()), asyncio.create_task(engine.idle_loop()),
                  asyncio.create_task(hub.register_present(settings.weights))]
         try:
@@ -127,6 +128,8 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
         name = catalog.pick(body.model, body.preset)
         try:
             await engine.ensure(name)
+        except ModelBusy as exc:
+            raise http_error(409, str(exc), "busy", exc.fix) from exc
         except Exception as exc:  # noqa: BLE001
             raise http_error(500, f"couldn't load {name}: {exc}", "load_failed",
                              "try a smaller model, or check `aihub logs stt`") from exc
@@ -162,17 +165,29 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
         save: bool = Query(True, description="Save the transcript as an output"),
     ) -> dict:
         safe = re.sub(r"[^A-Za-z0-9._-]+", "-", filename).strip("-.") or "upload.wav"
-        TMP.mkdir(parents=True, exist_ok=True)
-        path = TMP / f"upload-{uuid.uuid4().hex[:10]}-{safe}"
+        if jobs.uploads_waiting() >= MAX_QUEUED_UPLOADS:
+            raise http_error(429, f"{MAX_QUEUED_UPLOADS} uploads are already waiting to be transcribed", "queue_full",
+                             "wait for queued jobs to finish (GET /v1/jobs) or cancel some, then send it again")
+        jobs.tmp.mkdir(parents=True, exist_ok=True)
+        path = jobs.tmp / f"upload-{uuid.uuid4().hex[:10]}-{safe}"
         size = 0
-        with path.open("wb") as f:
-            async for chunk in request.stream():
-                size += len(chunk)
-                if size > MAX_UPLOAD:
-                    f.close()
-                    path.unlink(missing_ok=True)
-                    raise http_error(413, "the file is larger than 4 GB", "too_large")
-                f.write(chunk)
+        jobs.receiving += 1
+        try:
+            with path.open("wb") as f:
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > MAX_UPLOAD:
+                        raise http_error(413, "the file is larger than 4 GB", "too_large")
+                    f.write(chunk)
+        except OSError as exc:            # the disk filled up, most likely
+            path.unlink(missing_ok=True)
+            raise http_error(507, f"couldn't store the upload: {exc.strerror or exc}", "no_space",
+                             "free some disk space, then send it again") from exc
+        except BaseException:             # too large, or the client went away mid-upload
+            path.unlink(missing_ok=True)
+            raise
+        finally:
+            jobs.receiving -= 1
         if size == 0:
             path.unlink(missing_ok=True)
             raise http_error(422, "the body is empty; send the file's bytes", "invalid_input")

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
+import threading
 import wave
 from pathlib import Path
 
@@ -16,8 +18,13 @@ import numpy as np
 from .formats import SAMPLE_RATE
 from .resample import resample
 
-#: Twelve hours of audio; anything longer is refused rather than filling memory (~2.7 GB).
+#: Twelve hours of audio; anything longer is cut there rather than filling memory. ffmpeg's float32
+#: output is read straight into one array that grows in place, so twelve hours peak at about 2.8 GB
+#: (16 kHz × 4 bytes × 43,200 s), one copy, not the bytes plus a converted and a clipped copy.
 MAX_SECONDS = 12 * 3600
+READ_BYTES = 4 << 20             # one read from ffmpeg's pipe
+FIRST_SECONDS = 600              # the buffer's first size when ffprobe can't say how long the file is
+DECODE_TIMEOUT_S = 1800
 
 
 class DecodeError(ValueError):
@@ -47,19 +54,56 @@ def decode(path: Path | str) -> np.ndarray:
         return read_wav(source)
     cmd = [exe, "-nostdin", "-v", "error", "-i", str(source), "-map", "0:a:0", "-vn", "-ac", "1",
            "-ar", str(SAMPLE_RATE), "-t", str(MAX_SECONDS), "-f", "f32le", "-"]
-    try:
-        run = subprocess.run(cmd, capture_output=True, timeout=1800, check=False)
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise DecodeError(f"{source.name}: ffmpeg failed ({exc})") from exc
-    if run.returncode != 0:
-        err = run.stderr.decode("utf-8", "replace")
-        lines = err.strip().splitlines()
-        detail = lines[-1] if lines else f"exit code {run.returncode}"
-        if "matches no streams" in err:
-            detail = "it has no audio track"
-        raise DecodeError(f"{source.name}: couldn't read audio: {detail}")
-    samples = np.frombuffer(run.stdout, dtype="<f4").astype(np.float32, copy=True)
-    return np.clip(samples, -1.0, 1.0)
+    seconds = probe_duration(source)
+    first = min(seconds + 1, MAX_SECONDS) if seconds else FIRST_SECONDS
+    with tempfile.TemporaryFile() as stderr:
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=stderr, bufsize=0)
+        except OSError as exc:
+            raise DecodeError(f"{source.name}: ffmpeg failed ({exc})") from exc
+        timed_out = threading.Event()
+        timer = threading.Timer(DECODE_TIMEOUT_S, lambda: (timed_out.set(), proc.kill()))
+        timer.start()
+        try:
+            samples = _read_f32(proc.stdout, int(first * SAMPLE_RATE))
+            code = proc.wait()
+        finally:
+            timer.cancel()
+            proc.stdout.close()
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+        if code != 0:
+            stderr.seek(0)
+            err = stderr.read(1 << 20).decode("utf-8", "replace")
+            lines = err.strip().splitlines()
+            detail = lines[-1] if lines else f"exit code {code}"
+            if "matches no streams" in err:
+                detail = "it has no audio track"
+            elif timed_out.is_set():
+                detail = f"ffmpeg took longer than {DECODE_TIMEOUT_S // 60} minutes"
+            raise DecodeError(f"{source.name}: couldn't read audio: {detail}")
+    if not samples.dtype.isnative:                      # ffmpeg wrote little-endian; this host isn't
+        samples = samples.astype(np.float32)
+    return np.clip(samples, -1.0, 1.0, out=samples)
+
+
+def _read_f32(pipe, capacity: int) -> np.ndarray:
+    """Little-endian float32 samples from ``pipe`` into one array, grown and finally trimmed in place
+    (``ndarray.resize`` reallocates, which moves no pages for an allocation this size)."""
+    buf = np.empty(max(capacity, SAMPLE_RATE) * 4, dtype=np.uint8)
+    filled = 0
+    while True:
+        if filled == buf.size:
+            buf.resize(max(buf.size + 4 * SAMPLE_RATE, min(buf.size * 2, 4 * (MAX_SECONDS + 1) * SAMPLE_RATE)),
+                       refcheck=False)
+        with memoryview(buf) as whole, whole[filled:filled + READ_BYTES] as window:
+            got = pipe.readinto(window)
+        if not got:
+            break
+        filled += got
+    buf.resize(filled - filled % 4, refcheck=False)
+    return buf.view("<f4")
 
 
 def read_wav(path: Path) -> np.ndarray:

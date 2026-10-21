@@ -64,7 +64,7 @@ On the CPU every model runs at int8.
 | Key | Where | Required | Meaning |
 |---|---|---|---|
 | `STT_DEVICE` | `[run.env]` | optional | `auto` (the GPU when CTranslate2 sees one), `cpu` or `cuda` |
-| `STT_IDLE_UNLOAD_S` | from `[memory] idle_unload_s` | optional | unload the model after this many idle seconds; `0` never (default 300) |
+| `STT_IDLE_UNLOAD_S` | from `[memory] idle_unload_s` | optional | unload the model after this many idle seconds; `0` never (default 300). An open live stream or a running job keeps it loaded, however long the silence |
 | `STT_BACKEND` | env | optional | `faster-whisper`, or `mock` (a scripted model, for tests) |
 | `STT_ALLOW_UNSAFE_COMPUTE` | env | optional | `1` lets int8 `small` and up load on an AMD GPU (it faults gfx1151) |
 | `STT_NO_GPU_REPAIR` | env | optional | `1` stops the worker from reinstalling the kept ROCm wheel |
@@ -99,6 +99,8 @@ Expect `1`; `0` means the PyPI build is installed (rerun `aihub install stt`).
 - **`uv` puts PyPI's CTranslate2 back** whenever it syncs the package; `ctranslate2.get_cuda_device_count()` then says `0` and everything runs on the CPU, slowly but correctly. Each worker start reinstalls the kept wheel when the installed one didn't come from it.
 - **A GPU fault costs a restart, not the server.** `GET /v1/status` → `engine.notices` lists each restart; after three in ten minutes `engine.fell_back` is true and `device` is `cpu`.
 - **Garbage text in many languages at 10–30× the normal time** means the GPU's arithmetic is wrong, not the model: on 2026-10-20 it appeared together with a kernel oops and btrfs checksum errors, and a clean run of the same file minutes earlier. Check `journalctl -k -b` before blaming the mod.
+- **One model at a time, and a model in use stays.** An open live stream or a running file job holds its model: asking for another one answers `409 busy` (`/v1/load`) or closes the stream with 4409 `busy`, and a queued job waits in stage `waiting` until the stream ends. `POST /v1/unload` still unloads; a stream that is still open loads the model again on its next word.
+- **Uploads wait in `runtime/tmp/`** (up to 4 GB each) until their job ends, cancelled or not. At most 8 wait at once (then `429 queue_full`); a full disk answers `507 no_space`; files older than an hour are swept when the mod starts.
 - Whisper invents text over silence ("thank you", "bye"). The ported hallucination filter (`stt/asr/hallucination.py`) and Whisper's own VAD filter drop it; a silent file gives an empty transcript.
 
 ## Known gaps

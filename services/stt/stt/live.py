@@ -14,8 +14,12 @@ The protocol, in order:
    ``{"type": "done", "text", "duration", "language", "segments", "output"?}`` and closes (1000).
 
 Errors arrive as ``{"type": "error", "detail", "code"}`` followed by a close (4400 for a protocol
-mistake, 4500 when the model fails). Commits follow LocalAgreement-2: a word is committed once two
-passes agree on it, so committed text trails the speaker by about one to two seconds.
+mistake, 4409 ``busy`` when a file job or another stream is using a different model, 4500 when the
+model fails). An open stream holds a lease on its model: the idle unloader leaves it loaded through
+any silence, and if it is unloaded anyway (``POST /v1/unload``) the next pass loads it again.
+
+Commits follow LocalAgreement-2: a word is committed once two passes agree on it, so committed text
+trails the speaker by about one to two seconds.
 """
 
 from __future__ import annotations
@@ -36,7 +40,7 @@ from .audio.decode import DecodeError, pcm_frame
 from .audio.formats import SAMPLE_RATE
 from .audio.resample import resample
 from .config import StreamingConfig, VadConfig
-from .engine import Engine
+from .engine import Engine, ModelBusy
 from .segment import Segment
 from .streaming import CommittedSegment, EngineNotice, HypothesisUpdate, StreamingEngine
 from .vad import build_gate
@@ -56,7 +60,8 @@ class LiveSession:
 
     def __init__(self, engine: Engine, *, model: str, language: str | None, sample_rate: int) -> None:
         self.engine, self.model, self.language, self.rate = engine, model, language, sample_rate
-        self.stream = StreamingEngine(StreamingConfig(), transcribe=partial(engine.transcribe, language=language),
+        transcribe = partial(engine.transcribe, language=language, model=model)
+        self.stream = StreamingEngine(StreamingConfig(), transcribe=transcribe,
                                       capabilities=engine.capabilities, model_id=engine.model_id)
         self.gate = build_gate(VadConfig())
         self.pending = np.zeros(0, dtype=np.float32)
@@ -106,6 +111,7 @@ def mount(app: FastAPI, engine: Engine) -> None:
     async def stream(ws: WebSocket) -> None:
         await ws.accept()
         session: LiveSession | None = None
+        leased: str | None = None
         try:
             first = await ws.receive()
             if first["type"] == "websocket.disconnect":
@@ -127,10 +133,14 @@ def mount(app: FastAPI, engine: Engine) -> None:
             except catalog.UnknownModel as exc:
                 raise ProtocolError(str(exc)) from exc
             try:
-                await engine.ensure(model)
+                await engine.acquire(model)
+            except ModelBusy as exc:
+                await _fail(ws, f"{exc}; {exc.fix}", "busy", 4409)
+                return
             except Exception as exc:  # noqa: BLE001
                 await _fail(ws, f"couldn't load {model}: {exc}", "load_failed", 4500)
                 return
+            leased = model
             session = LiveSession(engine, model=model, language=start.get("language") or None, sample_rate=rate)
             await ws.send_json({"type": "ready", "model": model, "device": engine.device,
                                 "precision": engine.precision, "sample_rate": SAMPLE_RATE})
@@ -166,6 +176,9 @@ def mount(app: FastAPI, engine: Engine) -> None:
         except Exception as exc:  # noqa: BLE001 - the client hears what happened
             logger.exception("Live stream failed")
             await _fail(ws, str(exc) or type(exc).__name__, "stream_failed", 4500)
+        finally:
+            if leased is not None:
+                engine.release(leased)
 
 
 async def _done(session: LiveSession, start: dict, settings) -> dict[str, Any]:

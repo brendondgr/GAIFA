@@ -3,11 +3,15 @@ input, and the transcript's shapes (plan 29.1)."""
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
+import numpy as np
 import pytest
 from conftest import ALTERNATING, SEMINAR, SILENT, wait_job
 from fastapi.testclient import TestClient
@@ -149,3 +153,168 @@ def test_markdown_paragraphs_break_at_pauses_and_hours_get_their_own_field():
     md = transcripts.markdown(segs, title="T", duration=3727, model="small", language="en")
     assert "\n[00:00] One. Two.\n" in md and "\n[00:12] Three.\n" in md and "\n[1:02:05] Late.\n" in md
     assert transcripts.srt(segs[:1]) == "1\n00:00:00,000 --> 00:00:04,000\nOne.\n\n"
+
+
+# -- runtime/tmp: uploads never outlive their job, and the queue has a ceiling --------------------------
+
+@pytest.fixture
+def held(monkeypatch):
+    """Decoding blocks until ``held.set()``, so the first job stays running and the rest stay queued."""
+    import threading
+
+    import stt.jobs
+
+    gate = threading.Event()
+    real = stt.jobs.decode
+    monkeypatch.setattr(stt.jobs, "decode", lambda path: (gate.wait(30), real(path))[1])
+    yield gate
+    gate.set()
+
+
+def _send(client, name: str = "a.wav"):
+    return client.post("/v1/transcribe/upload", params={"filename": name, "save": "false"},
+                       content=ALTERNATING.read_bytes())
+
+
+def test_cancelling_a_queued_upload_deletes_its_file_at_once(settings, tmp_dir, held):
+    with TestClient(create_app(settings, hub=LocalHub({}))) as client:
+        first, queued = _send(client, "first.wav").json(), _send(client, "queued.wav").json()
+        assert any("queued" in p.name for p in tmp_dir.iterdir())
+        assert client.post(f"/v1/jobs/{queued['id']}/cancel").json()["state"] == "cancelled"
+        assert not any("queued" in p.name for p in tmp_dir.iterdir())
+        held.set()
+        assert wait_job(client, first["id"])["state"] == "done"
+        time.sleep(0.1)
+        assert list(tmp_dir.iterdir()) == []
+
+
+def test_waiting_uploads_are_capped_with_a_429(settings, tmp_dir, held, monkeypatch):
+    import stt.server
+
+    monkeypatch.setattr(stt.server, "MAX_QUEUED_UPLOADS", 2)
+    with TestClient(create_app(settings, hub=LocalHub({}))) as client:
+        assert _send(client).status_code == 202                  # running (held in decoding)
+        deadline = time.monotonic() + 5
+        while client.get("/v1/jobs").json()["jobs"][0]["state"] != "running":
+            assert time.monotonic() < deadline
+            time.sleep(0.02)
+        assert _send(client).status_code == 202 and _send(client).status_code == 202
+        r = _send(client)
+        assert r.status_code == 429 and r.json()["code"] == "queue_full" and "cancel" in r.json()["fix"]
+        assert len(list(tmp_dir.iterdir())) == 3                 # the refused one wrote nothing
+        held.set()
+
+
+def test_an_upload_cut_off_midway_leaves_no_file(settings, tmp_dir):
+    app = create_app(settings, hub=LocalHub({}))
+    messages = iter([{"type": "http.request", "body": b"RIFF" + b"\0" * 4096, "more_body": True},
+                     {"type": "http.disconnect"}])
+    sent: list[dict] = []
+
+    async def receive():
+        return next(messages)
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "POST",
+             "scheme": "http", "path": "/v1/transcribe/upload", "raw_path": b"/v1/transcribe/upload",
+             "query_string": b"filename=cut.wav", "root_path": "", "headers": [], "server": ("t", 80),
+             "client": ("t", 1)}
+    with contextlib.suppress(Exception):
+        asyncio.run(app(scope, receive, send))
+    assert tmp_dir.is_dir() and list(tmp_dir.iterdir()) == []
+    assert app.state.jobs.list() == [] and app.state.jobs.receiving == 0
+
+
+def test_a_full_disk_mid_upload_answers_507_and_leaves_no_file(settings, tmp_dir, monkeypatch):
+    import errno
+    import pathlib
+
+    real_open = pathlib.Path.open
+
+    class Full:
+        def __init__(self, f):
+            self.f = f
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            self.f.close()
+
+        def write(self, data):
+            raise OSError(errno.ENOSPC, "No space left on device")
+
+    def opener(self, *args, **kwargs):
+        f = real_open(self, *args, **kwargs)
+        return Full(f) if self.parent == tmp_dir else f
+
+    monkeypatch.setattr(pathlib.Path, "open", opener)
+    with TestClient(create_app(settings, hub=LocalHub({}))) as client:
+        r = _send(client)
+    assert r.status_code == 507 and r.json()["code"] == "no_space" and "No space" in r.json()["detail"]
+    assert list(tmp_dir.iterdir()) == []
+
+
+def test_files_left_in_runtime_tmp_by_a_crash_are_swept_at_startup(settings, tmp_dir):
+    import os
+
+    tmp_dir.mkdir(parents=True)
+    old_file, old_job, fresh = tmp_dir / "upload-1-old.wav", tmp_dir / "j_old", tmp_dir / "upload-2-new.wav"
+    old_file.write_bytes(b"x" * 1000)
+    old_job.mkdir()
+    (old_job / "input.wav").write_bytes(b"x")
+    fresh.write_bytes(b"x")                                    # maybe another instance's upload
+    for p in (old_job / "input.wav", old_job, old_file):
+        os.utime(p, (time.time() - 7200, time.time() - 7200))
+    with TestClient(create_app(settings, hub=LocalHub({}))):
+        pass
+    assert sorted(p.name for p in tmp_dir.iterdir()) == ["upload-2-new.wav"]
+
+
+# -- decoding keeps one copy of the audio in memory --------------------------------------------------
+
+PEAK_SCRIPT = """
+import sys
+import numpy as np
+from stt.audio.decode import decode
+def peak():   # this process's own high-water mark (ru_maxrss can carry the parent's across fork + exec)
+    return next(int(l.split()[1]) * 1024 for l in open("/proc/self/status") if l.startswith("VmHWM"))
+decode(sys.argv[2])                                       # warm up: imports, ffmpeg, the allocator
+before = peak()
+samples = decode(sys.argv[1])
+print((peak() - before) / samples.nbytes)
+"""
+
+
+def _sine_wav(path: Path, seconds: int) -> Path:
+    import wave
+
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1), w.setsampwidth(2), w.setframerate(16_000)
+        w.writeframes((np.sin(np.arange(16_000 * seconds) / 9) * 9000).astype("<i2").tobytes())
+    return path
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_decoding_peaks_at_about_one_copy_of_the_audio(tmp_path):
+    """Twenty minutes (77 MB as float32) in a fresh process: the peak grows by about one copy, where
+    the bytes from ffmpeg plus a converted and a clipped copy made it about three."""
+    import sys
+
+    long, short = _sine_wav(tmp_path / "long.wav", 1200), _sine_wav(tmp_path / "short.wav", 1)
+    out = subprocess.run([sys.executable, "-c", PEAK_SCRIPT, str(long), str(short)], capture_output=True,
+                         text=True, check=True, cwd=Path(__file__).parent.parent)
+    assert float(out.stdout) < 1.35, f"peak grew by {float(out.stdout):.2f}× the audio"
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="needs ffmpeg")
+def test_decoding_without_a_known_duration_grows_the_buffer(tmp_path, monkeypatch):
+    import stt.audio.decode as dec
+
+    monkeypatch.setattr(dec, "probe_duration", lambda path: None)
+    monkeypatch.setattr(dec, "FIRST_SECONDS", 1)
+    monkeypatch.setattr(dec, "READ_BYTES", 10_000)                 # not a multiple of 4: reads split samples
+    samples = dec.decode(SEMINAR)
+    assert samples.dtype == np.float32 and np.array_equal(samples, dec.read_wav(SEMINAR))

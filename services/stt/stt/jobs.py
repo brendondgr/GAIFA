@@ -1,4 +1,9 @@
-"""File transcription jobs, one at a time: input → canonical audio → pause-cut chunks → outputs."""
+"""File transcription jobs, one at a time: input → canonical audio → pause-cut chunks → outputs.
+
+An upload waits in ``runtime/tmp`` until its job ends (done, failed or cancelled, queued or not);
+at most ``MAX_QUEUED_UPLOADS`` wait at once, and files left by a crash are swept at startup. A
+running job holds a lease on its model (``Engine.acquire``); when a live stream holds another model,
+the job waits in stage ``waiting`` until it ends."""
 
 from __future__ import annotations
 
@@ -18,7 +23,7 @@ from .audio.decode import DecodeError, decode
 from .audio.formats import SAMPLE_RATE
 from .batch.batch import transcribe_samples
 from .config import MOD_DIR, VadConfig
-from .engine import Engine
+from .engine import Engine, ModelBusy
 from .hub import Hub, HubError
 from .vad import build_detector
 
@@ -26,6 +31,9 @@ logger = logging.getLogger(__name__)
 
 TMP = MOD_DIR / "runtime" / "tmp"
 KEEP = 50                    # finished jobs remembered
+MAX_QUEUED_UPLOADS = 8       # uploads received or waiting in runtime/tmp at once (4 GB each at most)
+STALE_S = 3600               # files in runtime/tmp older than this are swept at startup
+WAIT_POLL_S = 1.0            # how often a job waiting for another model looks again
 
 
 @dataclass
@@ -40,7 +48,7 @@ class Job:
     source: dict[str, Any] = field(default_factory=dict)   # {"output_id"} or {"upload": name}
     upload: Path | None = None
     state: str = "queued"     # queued | running | done | failed | cancelled
-    stage: str = "queued"     # fetching | decoding | loading | transcribing | saving
+    stage: str = "queued"     # fetching | decoding | waiting | loading | transcribing | saving
     progress: float = 0.0
     created: float = field(default_factory=time.time)
     started: float | None = None
@@ -69,6 +77,8 @@ class Job:
 class Jobs:
     def __init__(self, engine: Engine, hub: Hub, outputs: Path, mod: str = "stt") -> None:
         self.engine, self.hub, self.outputs, self.mod = engine, hub, outputs, mod
+        self.tmp = TMP
+        self.receiving = 0           # uploads being written to runtime/tmp right now
         self.jobs: dict[str, Job] = {}
         self._queue: asyncio.Queue[Job] = asyncio.Queue()
         self.done_today = 0
@@ -82,6 +92,30 @@ class Jobs:
         self._trim()
         return job
 
+    def uploads_waiting(self) -> int:
+        """Uploads being received or queued: each holds a file in runtime/tmp."""
+        return self.receiving + sum(1 for j in self.jobs.values() if j.upload is not None and j.state == "queued")
+
+    def sweep(self, max_age: float = STALE_S) -> int:
+        """Delete files and job folders in runtime/tmp older than ``max_age`` (left by a crash)."""
+        if not self.tmp.is_dir():
+            return 0
+        cutoff, swept = time.time() - max_age, 0
+        for entry in self.tmp.iterdir():
+            try:
+                if entry.lstat().st_mtime >= cutoff:
+                    continue
+                if entry.is_dir() and not entry.is_symlink():
+                    shutil.rmtree(entry, ignore_errors=True)
+                else:
+                    entry.unlink(missing_ok=True)
+                swept += 1
+            except OSError:
+                continue
+        if swept:
+            logger.info("Swept %d stale files from %s", swept, self.tmp)
+        return swept
+
     def get(self, jid: str) -> Job | None:
         return self.jobs.get(jid)
 
@@ -94,12 +128,19 @@ class Jobs:
             job.cancel = True
             if job.state == "queued":
                 self._finish(job, "cancelled")
+                self._drop_upload(job)
         return job
+
+    @staticmethod
+    def _drop_upload(job: Job) -> None:
+        if job.upload is not None:
+            job.upload.unlink(missing_ok=True)
 
     async def run(self) -> None:
         while True:
             job = await self._queue.get()
             if job.state != "queued":
+                self._drop_upload(job)
                 continue
             try:
                 await self._run(job)
@@ -108,12 +149,11 @@ class Jobs:
                 job.error = str(exc) or type(exc).__name__
                 self._finish(job, "failed")
             finally:
-                if job.upload is not None:
-                    job.upload.unlink(missing_ok=True)
+                self._drop_upload(job)
 
     async def _run(self, job: Job) -> None:
         job.state, job.started = "running", time.time()
-        work = TMP / job.id
+        work = self.tmp / job.id
         try:
             path = job.upload
             if path is None:
@@ -135,18 +175,29 @@ class Jobs:
         job.duration = samples.size / SAMPLE_RATE
         if job.cancel:
             return self._finish(job, "cancelled")
-        job.stage = "loading"
-        await self.engine.ensure(job.model)
-        job.stage = "transcribing"
-        detector = build_detector(VadConfig())
+        while True:
+            job.stage = "loading"
+            try:
+                await self.engine.acquire(job.model)
+                break
+            except ModelBusy:
+                job.stage = "waiting"      # a live stream holds another model; start when it ends
+                if job.cancel:
+                    return self._finish(job, "cancelled")
+                await asyncio.sleep(WAIT_POLL_S)
+        try:
+            job.stage = "transcribing"
+            detector = build_detector(VadConfig())
 
-        def progress(reached: float, _segments: list) -> None:
-            job.progress = min(0.99, reached / job.duration) if job.duration else 0.99
+            def progress(reached: float, _segments: list) -> None:
+                job.progress = min(0.99, reached / job.duration) if job.duration else 0.99
 
-        segments = await asyncio.to_thread(
-            transcribe_samples, samples,
-            transcribe=partial(self.engine.transcribe, language=job.language),
-            detector=detector, prompt=job.prompt, on_progress=progress, should_stop=lambda: job.cancel)
+            segments = await asyncio.to_thread(
+                transcribe_samples, samples,
+                transcribe=partial(self.engine.transcribe, language=job.language, model=job.model),
+                detector=detector, prompt=job.prompt, on_progress=progress, should_stop=lambda: job.cancel)
+        finally:
+            self.engine.release(job.model)
         if job.cancel:
             return self._finish(job, "cancelled")
         res = transcripts.result(segments, duration=job.duration, language=job.language or self.engine.last_language,

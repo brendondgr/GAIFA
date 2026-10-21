@@ -23,6 +23,17 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip)
 
 
+@pytest.fixture(autouse=True)
+def tmp_dir(tmp_path, monkeypatch):
+    """Uploads and job folders go to a temporary runtime/tmp, never the installed mod's (whose stale
+    files each app's startup sweeps)."""
+    import stt.jobs
+
+    folder = tmp_path / "runtime-tmp"
+    monkeypatch.setattr(stt.jobs, "TMP", folder)
+    return folder
+
+
 @pytest.fixture
 def settings(tmp_path):
     from stt.config import Settings

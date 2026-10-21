@@ -13,6 +13,8 @@ from typing import Any
 import httpx
 
 log = logging.getLogger("agent.hub")
+RETRY_S = 30.0          # how long a call waits out a hub that is restarting
+RETRY_FIRST_S = 0.5
 
 
 class HubAPI:
@@ -26,7 +28,7 @@ class HubAPI:
         await self.client.aclose()
 
     async def _json(self, method: str, path: str, **kw: Any) -> Any:
-        r = await self.client.request(method, path, **kw)
+        r = await self._request(method, path, **kw)
         if r.status_code >= 400:
             try:
                 body = r.json()
@@ -34,6 +36,22 @@ class HubAPI:
                 body = {"detail": r.text[:300]}
             raise HubCallError(r.status_code, body.get("code") or "hub_error", body.get("detail") or str(body), body.get("data"))
         return r.json() if r.content else None
+
+    async def _request(self, method: str, path: str, **kw: Any) -> httpx.Response:
+        """One request, waiting out a hub restart: a connection that couldn't be made never reached
+        the hub, so it is retried for up to RETRY_S whatever the method; a connection dropped after
+        sending is retried only for GET (a POST may have run)."""
+        deadline, delay = time.monotonic() + RETRY_S, RETRY_FIRST_S
+        while True:
+            try:
+                return await self.client.request(method, path, **kw)
+            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.RemoteProtocolError, httpx.ReadError) as e:
+                sent = not isinstance(e, (httpx.ConnectError, httpx.ConnectTimeout))
+                if (sent and method != "GET") or time.monotonic() + delay > deadline:
+                    raise
+                log.warning("hub unreachable (%s %s: %s); retrying in %.1f s", method, path, type(e).__name__, delay)
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 4.0)
 
     # ---- tools -------------------------------------------------------------------------------
 
@@ -130,7 +148,7 @@ class HubAPI:
         return await self._json("GET", f"/api/outputs/{oid}")
 
     async def output_bytes(self, oid: str, preview: bool = False) -> tuple[bytes, str]:
-        r = await self.client.get(f"/api/outputs/{oid}/{'preview' if preview else 'file'}")
+        r = await self._request("GET", f"/api/outputs/{oid}/{'preview' if preview else 'file'}")
         if r.status_code >= 400:
             raise HubCallError(r.status_code, "not_found", f"output {oid}: HTTP {r.status_code}")
         return r.content, r.headers.get("content-type", "")
@@ -141,7 +159,7 @@ class HubAPI:
 
     async def output_page(self, oid: str, n: int, width: int = 1024) -> bytes:
         """Page n of a PDF output as a PNG."""
-        r = await self.client.get(f"/api/outputs/{oid}/page/{n}.png", params={"width": width})
+        r = await self._request("GET", f"/api/outputs/{oid}/page/{n}.png", params={"width": width})
         if r.status_code >= 400:
             try:
                 body = r.json()
@@ -151,7 +169,7 @@ class HubAPI:
         return r.content
 
     async def output_file(self, oid: str, path: str) -> tuple[bytes, str]:
-        r = await self.client.get(f"/api/outputs/{oid}/files/{path}")
+        r = await self._request("GET", f"/api/outputs/{oid}/files/{path}")
         if r.status_code >= 400:
             raise HubCallError(r.status_code, "not_found", f"output {oid}/{path}: HTTP {r.status_code}")
         return r.content, r.headers.get("content-type", "")

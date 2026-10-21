@@ -40,6 +40,10 @@ Listings and searches skip `.git`, `node_modules`, `.venv`, caches and build fol
 | `POST /v1/checkpoints/{thread}/{turn}/undo` | every file back as it was before the turn; 409 `changed_since` with diffs when a file changed outside the agent |
 | `GET /v1/recent?thread=` | recent edits, runs and undos |
 
+## The page
+
+`ui/page.js`, three tabs: **Folders** (add a folder by its path, at Read; its level, only up to what it may reach, with the reason when it's capped; "allow Bypass"; remove), **Activity** (checkpoint usage; each turn's changed files with Undo, which refuses with the diffs if a file changed since; recent runs with their exit codes, Stop for a running one; links to the chat) and **Sandbox** (the image: built or not, Build or Rebuild, the build log). The chat also shows **Undo this turn** under a turn that changed files.
+
 ## The sandbox
 
 Commands and Python run in `localhost/aihub-workspace-sandbox:1` (rootless podman, `sandbox.py`): only Python 3.12, uv, Node LTS, git, ripgrep, build-essential and the data libraries. Your user inside, the folder at its own absolute path (read-write from Run), the rest of `$HOME` an empty tmpfs (the uv, pip and npm caches are overlays: read, never written back), a read-only root, no network unless the folder is at Run + network and the call asks for it (then full internet), 8 GB of memory and 1024 processes at most, 120 s by default (600 s at most). Every run is a record in `data/state/workspace/runs/` (`<id>.json` with the last 32 KB of output, `.out` and `.err` with the first 1 MB).

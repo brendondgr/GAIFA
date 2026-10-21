@@ -18,6 +18,9 @@ stop_timeout_s = 10
 restart = "on-failure"
 install = "install.sh"
 
+[ui]
+page = "ui/page.js"                # Folders (levels, allow Bypass), Activity (turns with Undo, runs, checkpoints), Sandbox (plan 27.7)
+
 [agent]
 skills = "skills"                  # skills/<name>/SKILL.md for the chat agent (plan 14.9)
 limits = "POST /v1/limits"         # the hub asks this before deciding a call (plan 27.4): action, level, Bypass, preview

@@ -209,6 +209,19 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     runTool: async (item, args) => { const id = await ensureThread(); await c.action(id, item.tool.name, args); setToolForms(f => f.filter(x => x.key !== item.key)); },
     closeTool: item => setToolForms(f => f.filter(x => x.key !== item.key)),
     feedback: tid && c.feedback ? body => c.feedback(tid, body) : null,         // plan 21.7
+    // plan 27.7: "Undo this turn": each path is a hub route (/api/s/<mod>/…/undo) a tool result named
+    undo: api.callService ? async paths => {
+      let conflict = null;
+      for (const p of paths) {
+        const m = /^\/api\/s\/([^/]+)(\/.*)$/.exec(p);
+        if (!m) continue;
+        try { await api.callService(m[1], 'POST', m[2]); }
+        catch (e) { if (e.status === 409) conflict = e; else { fail(e); throw e; } }
+      }
+      if (conflict) { toast(`${conflict.detail || 'A file changed since this turn; nothing was restored'}. The Workspace page (Activity) shows what changed.`, 'error'); throw conflict; }
+      toast('Undone', 'success');
+      return 'undone';
+    } : null,
     decidePref: c.decidePref ? (pid, ok) => c.decidePref(pid, ok).then(r => { toast(ok ? 'Saved: it fills your cards from now on' : 'Not used', 'success'); return r; }, e => { fail(e); throw e; }) : null,
   };
 

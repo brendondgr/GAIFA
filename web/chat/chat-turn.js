@@ -25,6 +25,17 @@ export function isLookup(name, tools) {
   return String(name).startsWith('hub_');
 }
 
+/** The hub paths that undo this turn's changes (plan 27.7): any tool result whose JSON carries `result.undo`. */
+export function undoOf(toolRows) {
+  const out = [];
+  for (const r of toolRows) {
+    const c = r.item.result?.content;
+    if (r.item.result?.status !== 'done' || typeof c !== 'string' || !c.includes('"undo"')) continue;
+    try { const u = JSON.parse(c)?.result?.undo; if (typeof u === 'string' && u.startsWith('/api/s/') && !out.includes(u)) out.push(u); } catch { /* not JSON */ }
+  }
+  return out;
+}
+
 const STANDALONE = new Set(['compact']);      // drawn between turns, never inside one
 const tsOf = it => it?.ev?.ts || 0;
 
@@ -92,6 +103,7 @@ function finish(turn, live, now) {
     r.seconds = it.result ? Math.max(0, (it.resultTs || from) - from) : live && r.status === 'running' ? Math.max(0, now - from) : null;
   }
   turn.outputs = toolRows.flatMap(r => (r.item.result?.outputs || []).map(o => ({ ...o, tool: r.name })));
+  turn.undo = undoOf(toolRows);
   turn.pending = rows.filter(r => (r.type === 'tool' && r.status === 'waiting') || (r.type === 'question' && !r.item.answer && !r.item.result)).map(r => r.item);
   if (turn.pending.length) turn.running = live = true;          // waiting for you is still a live turn
   turn.elapsed = Math.max(0, (live ? now : turn.end) - turn.start);

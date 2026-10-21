@@ -93,3 +93,13 @@ test('a host run warns and asks every time', () => {
   const btns = all(t, n => n.type === 'button').map(b => text(b).trim());
   assert.ok(btns.includes('Allow once') && !btns.some(b => /in this chat|Always/.test(b)), btns.join(','));
 });
+
+test('a turn whose workspace edits carry `undo` offers Undo this turn (plan 27.7)', async () => {
+  const { undoOf } = await load('chat/chat-turn.js');
+  const res = (status, result) => ({ item: { result: { status, content: JSON.stringify({ status, result }) } } });
+  const path = '/api/s/workspace/v1/checkpoints/t_1/5/undo';
+  assert.deepEqual(undoOf([res('done', { undo: path, diff: '' }), res('done', { undo: path }), res('done', { other: 1 })]), [path]);
+  assert.deepEqual(undoOf([res('error', { undo: path })]), []);
+  assert.deepEqual(undoOf([{ item: { result: { status: 'done', content: 'plain text with "undo"' } } }]), []);
+  assert.deepEqual(undoOf([res('done', { undo: 'http://elsewhere/undo' })]), []);
+});

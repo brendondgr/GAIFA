@@ -63,6 +63,25 @@ test('the sample turn while running: answers stream as the answer, waiting rows,
   assert.deepEqual(stopped.steps[1].rows.filter(r => r.type === 'tool').map(r => r.status), ['stopped', 'stopped']);
 });
 
+test('tool results cleared mid-turn keep the turn whole; the marker follows it', () => {
+  // seen 2026-10-21: after "Older tool results cleared", each later step was drawn as a bare "thinking event" / "tool_call event" card
+  const evs = [
+    { seq: 1, ts: 10, type: 'user', payload: { text: 'research this' } },
+    { seq: 2, ts: 11, type: 'tool_call', payload: { id: 's1', name: 'web_search', arguments: { query: 'a' }, step: 'a' } },
+    { seq: 3, ts: 12, type: 'tool_result', payload: { id: 's1', name: 'web_search', status: 'done', content: '{}' } },
+    { seq: 4, ts: 13, type: 'compact', payload: { stage: 'clear', cleared: [3] } },
+    { seq: 5, ts: 14, type: 'thinking', payload: { text: 'next', seconds: 1, step: 'b' } },
+    { seq: 6, ts: 15, type: 'tool_call', payload: { id: 's2', name: 'web_search', arguments: { query: 'b' }, step: 'b' } },
+    { seq: 7, ts: 16, type: 'tool_result', payload: { id: 's2', name: 'web_search', status: 'done', content: '{}' } },
+    { seq: 8, ts: 17, type: 'assistant', payload: { text: 'Done.', step: 'c' } },
+  ];
+  const blocks = ct.groupTurns(th.buildView(evs), { running: false, now: 20 });
+  assert.deepEqual(blocks.map(b => b.kind === 'turn' ? 'turn' : b.item.kind), ['turn', 'compact']);
+  const [t] = blocks;
+  assert.equal(t.answer.text, 'Done.');
+  assert.deepEqual(t.steps.flatMap(s => s.rows).map(r => r.type), ['tool', 'thinking', 'tool']);
+});
+
 test('a turn a button started, a queued message, and standalone items', () => {
   const evs = [
     { seq: 1, ts: 10, type: 'user', payload: { text: 'hi' } },

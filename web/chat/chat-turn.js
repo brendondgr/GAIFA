@@ -36,13 +36,15 @@ export function undoOf(toolRows) {
   return out;
 }
 
-const STANDALONE = new Set(['compact']);      // drawn between turns, never inside one
+const STANDALONE = new Set(['compact']);      // drawn between turns, never inside one: one mid-turn waits for the turn to end
 const tsOf = it => it?.ev?.ts || 0;
 
 export function groupTurns(view, { running = false, now = Date.now() / 1000, tools = null } = {}) {
   const out = [];
-  let turn = null;
+  let turn = null, held = [];                  // standalone items that came while a turn was open
+  const flush = () => { out.push(...held); held = []; };
   const open = (it, action) => {
+    flush();
     turn = { kind: 'turn', key: 'turn:' + it.key, user: action ? null : it, action: action ? it : null, steps: [], errors: [], start: tsOf(it), end: tsOf(it) };
     out.push(turn);
   };
@@ -55,7 +57,9 @@ export function groupTurns(view, { running = false, now = Date.now() / 1000, too
     return s;
   };
   for (const it of view.items || []) {
-    if (STANDALONE.has(it.kind)) { turn = null; out.push({ kind: 'item', item: it }); continue; }
+    // results cleared mid-turn (a compact event between a turn's steps) must not end the turn: its later steps
+    // would each fall out of the fold as a card of their own
+    if (STANDALONE.has(it.kind)) { (turn ? held : out).push({ kind: 'item', item: it }); continue; }
     const p = it.ev?.payload || {};
     if (it.kind === 'user') { open(it); continue; }
     if ((it.kind === 'tool' || it.kind === 'approval') && it.call?.by === 'user') open(it, true);
@@ -78,6 +82,7 @@ export function groupTurns(view, { running = false, now = Date.now() / 1000, too
       stepOf(null).rows.push({ type: 'other', key: it.key, item: it });
     }
   }
+  flush();
   const turns = out.filter(b => b.kind === 'turn');
   turns.forEach((t, i) => finish(t, running && i === turns.length - 1, now));
   return out;

@@ -103,7 +103,10 @@ def numbered(text: str, first: int = 1) -> str:
 
 def doc_card(d: dict[str, Any], dropped: bool = False) -> str:
     """A document the message doesn't carry whole: what it is and how to read it."""
-    why = "its text was dropped from this chat to save room" if dropped else "too long to include here"
+    why = ("its text was dropped from this chat to save room" if dropped
+           else "the user chose to send it as a card" if d.get("mode") == "card"
+           else "the user asked for all of it, but it didn't fit the window" if d.get("fallback")
+           else "too long to include here")
     out = f"(attached {d['ref']}: {d.get('name')}, {_size(d)}; {why}."
     if d.get("library"):                 # plan 28.3: over LIBRARY_PAGES pages, and the embed mod is there
         out += (f" Too large to read whole: search it by meaning with {d['library']} (thread_only=true), then read "

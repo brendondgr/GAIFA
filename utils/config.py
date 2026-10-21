@@ -138,6 +138,28 @@ class LearningCfg(_Strict):
     fade_days: int = Field(60, ge=1)
 
 
+def mic_labels(v: list[str]) -> list[str]:
+    """Microphone labels: trimmed, not empty, each once, in the order given."""
+    out: list[str] = []
+    for label in v:
+        label = str(label).strip()
+        if not label or len(label) > 200:
+            raise ValueError("each microphone is its label: 1-200 characters")
+        if label not in out:
+            out.append(label)
+    return out
+
+
+class SpeechInputCfg(_Strict):
+    """Plan 29.4: dictation in Chat (the stt mod). Saved settings, not personal memory."""
+    mics: list[str] = Field([], max_length=20)   # microphone labels, most preferred first (browsers change device ids)
+    language: str = Field("", pattern=r"^([a-z]{2,3})?$")   # "" = detect
+    preset: Literal["fast", "balanced", "accurate", "best"] = "balanced"
+    mode: Literal["both", "toggle", "hold"] = "both"   # click to start/stop, hold to talk, or either
+
+    _labels = field_validator("mics")(lambda cls, v: mic_labels(v))
+
+
 class Config(_Strict):
     hub: HubCfg = HubCfg()
     paths: PathsCfg = PathsCfg()
@@ -148,6 +170,7 @@ class Config(_Strict):
     agent: AgentCfg = AgentCfg()
     sessions: SessionsCfg = SessionsCfg()
     learning: LearningCfg = LearningCfg()
+    speech_input: SpeechInputCfg = SpeechInputCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

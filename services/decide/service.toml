@@ -1,0 +1,45 @@
+# Decisions (plan 30.1): decision models answer questions about an input (yes/no, a choice, a score) with a
+# probability per answer and no generated text. d3-lite first. Fields: architecture §4.3; setup/decide.md.
+id = "decide"
+name = "Decisions"
+description = "Decision models: yes/no, choice and score questions answered with probabilities (d3-lite)"
+icon = "check"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "-m", "decide"]
+port = 5107
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+start_timeout_s = 30
+stop_timeout_s = 30
+restart = "on-failure"
+install = "install.sh"
+
+[run.env]
+DECIDE_MODELS_DIR = "{models}/decide"
+DECIDE_STATE_DIR = "{root}/data/state/decide"
+DECIDE_MODEL = "d3-lite"
+DECIDE_DEVICE = "auto"              # auto | cuda | cpu (bf16 either way: the checkpoint fixes its numerics)
+HF_HOME = "{hf_home}"
+HF_HUB_OFFLINE = "1"
+# trust_remote_code copies the model's code into HF_MODULES_CACHE; Triton (the ROCm path) caches kernels; a video
+# is decoded from a temporary file. All three stay inside the project.
+HF_MODULES_CACHE = "{root}/data/state/decide/modules"
+TRITON_CACHE_DIR = "{root}/data/state/decide/triton"
+TMPDIR = "{root}/data/state/decide/tmp"
+
+[memory]
+estimate_gb = 5.2                   # d3-lite on gfx1151 (PSS + GTT after use); status reports the measured one
+load = "POST /v1/load"
+unload = "POST /v1/unload"
+triggers = ["POST /v1/decide"]
+idle_unload_s = 300
+idle_unload_env = "DECIDE_IDLE_UNLOAD_S"
+
+[models]
+dirs = ["decide"]
+
+[tools]
+ask = { op = "POST /v1/decide", risk = "read", description = "Ask a small decision model yes/no, choice or score questions about a text (or JSON), answered with a probability per answer in about 0.1 s, without generated text. Give `input` and `questions`: [{id, type: \"yesno\" | \"choice\" | \"score\", question, options (choice: 2–64 names), scale (score: 2–10 levels, lowest first)}]. Each answer is {probs, top, p}; treat p below 0.9 as unsure. Good for quick classification or checking a fact stated in the text; not for open questions.", examples = [{ input = "The parcel arrived broken and the customer wants a refund.", questions = [{ id = "refund", type = "yesno", question = "Does the customer ask for a refund?" }, { id = "team", type = "choice", question = "Which team handles this?", options = ["returns", "billing", "technical"] }] }] }

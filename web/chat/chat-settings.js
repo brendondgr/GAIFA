@@ -1,12 +1,14 @@
-// Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, the memory index and its topics, the
+// Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, the memory index and its topics, documents
+// (plan 24.9: whole documents up to a size or the model's window, and the reply reserve), the
 // models, skills, the ask modes and permissions with the grants (plan 25.2: what was allowed in a
-// chat or always, with revoke). (Show thinking is retired: thinking is a row in each turn's
+// chat or always, with revoke), and Speech input (plan 29.4, chat-speech-input.js). (Show thinking is retired: thinking is a row in each turn's
 // activity fold, plan 19.4.) Mounted by Hub.dc.html's Settings page.
 
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens, fmtAgo } from './chat-ui.js';
 import { getChatClient } from './chat.js';
 import { MODES } from './chat-header.js';
 import { RISK_TONE, grantText } from './chat-risk.js';
+import { SpeechInputSection } from './chat-speech-input.js';
 
 const R = () => globalThis.React;
 const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
@@ -47,6 +49,7 @@ export function AgentSettings({ api, toast = () => {} }) {
           h('span', null, h('span', { style: { color: T.mut } }, 'default '), s ? s.model + window_(s.model) : '—'),
           h('span', null, h('span', { style: { color: T.mut } }, 'fallback '), s?.fallback ? s.fallback + window_(s.fallback) : 'none'),
           h('span', null, h('span', { style: { color: T.mut } }, 'max steps '), s?.max_steps ?? '—')))),
+    s?.documents ? section('Documents', h(DocSettings, { value: s.documents, onSave: d => save({ documents: d }) })) : null,
     section('Instructions',
       s ? h(Editor, { label: 'AGENT.md', hint: 'Standing instructions, read every turn (data/agent/AGENT.md).', value: s.agent_md, placeholder: '# How I like things\n- Prefer 16:9 images', onSave: v => save({ agent_md: v }) }) : h('span', { style: { color: T.mut } }, 'Loading…')),
     section('Memory',
@@ -59,6 +62,7 @@ export function AgentSettings({ api, toast = () => {} }) {
       ...(s?.skills || []).map(k => h('div', { key: k.id, style: { display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 12.5 } },
         h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 90 } }, '/' + k.name), h('span', { style: { flex: 1, color: T.mut } }, k.description), h(Badge, null, k.source)))),
     h(LearningSection, { api, toast }),
+    h(SpeechInputSection, { api, toast }),   // plan 29.4: only while the stt mod is up
     section('Permissions',
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, MODES.map(([k, l, d]) => h('div', { key: k, style: { display: 'flex', gap: 10, fontSize: 12.5, alignItems: 'baseline' } },
         h('span', { style: { minWidth: 130, fontWeight: 500 } }, l), h('span', { style: { color: T.mut } }, d)))),
@@ -66,6 +70,28 @@ export function AgentSettings({ api, toast = () => {} }) {
         h('span', null, 'Each chat picks its mode in the header (new chats: Ask about choices). Per-tool rules are name globs in ', h('code', { style: { fontFamily: MONO } }, '[agent.permissions]'),
           ' of config.toml. A call is decided by the deny list, then the chat’s mode, then a mod’s own limits, then your grants (below), then the ask and allow lists, then its risk: reading runs; writing and generating ask unless the chat uses defaults; using the internet, running code and deleting always ask. Pending approvals from any client are in the header’s Approvals button.')),
       h(GrantsList, { api, toast })));
+}
+
+// Documents (plan 24.9): how big an attached document may be to go into the message whole, and what the
+// reply keeps free. A chip's Whole / Card overrides it for one document (and is remembered for the chat).
+function DocSettings({ value, onSave }) {
+  const React = R(), [v, setV] = React.useState(value), [busy, setBusy] = React.useState(false);
+  React.useEffect(() => setV(value), [value]);
+  const win = v.inline_tokens === 'window', dirty = JSON.stringify(v) !== JSON.stringify(value);
+  const num = (k, disabled, label) => h('input', { type: 'number', min: 0, step: 500, value: disabled ? '' : v[k], disabled, 'aria-label': label,
+    placeholder: disabled ? 'window' : '', onChange: e => setV(x => ({ ...x, [k]: Math.max(0, Math.round(Number(e.target.value) || 0)) })),
+    style: { width: 96, height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.sb, color: T.tx, fontFamily: MONO, fontSize: 12 } });
+  return h(R().Fragment, null,
+    row('Whole documents up to', 'An attached document this size or smaller goes into the message whole; a larger one is a card (name, size, outline) the agent reads in parts. Whole / Card on a chip overrides it.',
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } }, num('inline_tokens', win, 'Whole documents up to (tokens)'),
+        h('span', { style: { fontSize: 12, color: T.mut } }, 'tokens'),
+        h('label', { style: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5 } },
+          h('input', { type: 'checkbox', checked: win, onChange: e => setV(x => ({ ...x, inline_tokens: e.target.checked ? 'window' : 6000 })) }), 'up to the model’s window'))),
+    row('Reply reserve', 'Tokens kept free for the reply and tools: a document goes whole only if it fits the window after this and what the chat already holds.',
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } }, num('reply_reserve', false, 'Reply reserve (tokens)'), h('span', { style: { fontSize: 12, color: T.mut } }, 'tokens'))),
+    dirty ? h('div', { style: { display: 'flex', gap: 8 } },
+      h(Btn, { kind: 'pri', sm: true, label: busy ? 'Saving…' : 'Save', disabled: busy, onClick: async () => { setBusy(true); try { await onSave(v); } catch { /* toasted */ } finally { setBusy(false); } } }),
+      h(Btn, { kind: 'ghost', sm: true, label: 'Revert', onClick: () => setV(value) })) : null);
 }
 
 // Grants (plan 25.2): what a card's "Allow in this chat" or "Always allow" covers, newest first, with revoke.

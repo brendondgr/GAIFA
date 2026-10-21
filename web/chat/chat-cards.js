@@ -83,14 +83,19 @@ function UserCard({ item, ctx }) {
       h(Btn, { kind: 'ghost', sm: true, icon: 'copy', title: 'Copy', onClick: () => ctx.copy?.(p.text) })),
     h('div', { style: { maxWidth: 'min(85%, 620px)', minWidth: 0, padding: '7px 11px', borderRadius: 10, background: T.hov, border: '1px solid ' + T.bd, display: 'flex', flexDirection: 'column', gap: 6 } },
       h('div', { style: { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' } }, p.text),
-      atts.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4 } }, atts.map(id => h(AttachmentChip, { key: id, id, ctx }))) : null,
+      atts.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 4 } }, atts.map(id => h(AttachmentChip, { key: id, id, ctx, doc: (p.docs || []).find(d => d.id === id) }))) : null,
+      // plan 24.9: a document asked for whole that didn't fit says so here, where the user looks
+      ...(p.docs || []).filter(d => d.fallback).map(d => h('div', { key: 'fb' + d.id, role: 'note', 'data-fallback': d.id,
+        style: { display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: T.acct } }, h(Icon, { d: 'alert', size: 12, style: { marginTop: 2, flex: 'none' } }), h('span', null, d.fallback))),
       item.queued ? h('div', null, h(Badge, { tone: 'purple', title: 'Sent during a turn: the agent reads it after the current step' }, 'queued')) : null));
 }
-function AttachmentChip({ id, ctx }) {
+function AttachmentChip({ id, ctx, doc }) {
   const o = ctx.outputs?.find(x => x.output_id === id);
-  return h('span', { title: o?.title || id, style: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 7px 0 3px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd, fontSize: 11.5, color: T.mut, maxWidth: 200 } },
+  const how = doc ? (doc.inline ? 'whole' : 'card') : null;   // plan 24.9: how the document went to the model
+  return h('span', { title: o?.title || id, style: { display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 7px 0 3px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd, fontSize: 11.5, color: T.mut, maxWidth: 260 } },
     o?.preview ? h('img', { src: o.preview, alt: '', style: { width: 16, height: 16, objectFit: 'cover', borderRadius: 3 } }) : h(Icon, { d: 'clip', size: 12 }),
-    h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, o ? `#${o.n} ${o.title || ''}` : id));
+    h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, o ? `#${o.n} ${o.title || ''}` : id),
+    how ? h('span', { title: how === 'whole' ? 'Sent whole: the model has all of it' : 'Sent as a card: the agent reads it in parts', style: { fontFamily: MONO, fontSize: 10, color: T.dim } }, how) : null);
 }
 
 // ---------- assistant ----------

@@ -267,6 +267,8 @@ export function createMockApi() {
     memory: { reserve_gb: 12, auto_make_room: false, never_unload: ['lcpp'], priority: ['tts', 'comfy', 'gen3d', 'example', 'relay', 'lcpp'] },
     services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) },
     ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} } },
+    learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
+    speech_input: { mics: [], language: '', preset: 'balanced', mode: 'both' },
   };
   // LocalTTS's own voice shape (GET /v1/voices → { custom, kokoro }), so the Speech page works on the mock.
   const voice = (name, source, duration_s, transcript, extra = {}) => ({ engine: 'breeze', name, transcript, duration_s, created: '2026-09-26T10:30:00-0400', source, instruction: null, language: null, transcript_auto: false, ...extra });

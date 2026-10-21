@@ -159,7 +159,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     if (!t && !atts.length) return;
     const k = dkey;
     setDrafts(d => ({ ...d, [k]: '' })); setAttachments([]); stick.current = true;
-    try { const id = await ensureThread(); await c.send(id, t || 'Here are the attached outputs.', atts.map(a => a.id)); }
+    try { const id = await ensureThread(); await c.send(id, t || 'Here are the attached outputs.', atts.map(a => a.id), Object.fromEntries(atts.filter(a => a.mode).map(a => [a.id, a.mode]))); }
     catch (e) { setDrafts(d => ({ ...d, [k]: text })); fail(e); }
   };
   const setModel = m => { if (thread) c.patch(thread.id, { model: m }).then(t => { setThread(x => ({ ...x, ...t })); c.context(thread.id).then(mm => setLive(l => ({ ...l, meter: mm }))).catch(() => {}); }, fail); else setFresh(f => ({ ...f, model: m })); };

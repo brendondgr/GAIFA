@@ -46,7 +46,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
-| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `embed` 5104, `stt` 5105. | clients such as video-maker keep working |
+| Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `embed` 5104, `stt` 5105, `decide` 5107. | clients such as video-maker keep working |
 
 ## 3. Directory layout
 
@@ -348,6 +348,7 @@ aihub-tts.service                    LocalTTS                 :5040  (+ engine w
 aihub-gen3d.service                  gen3d                    :5050  (+ podman worker container)
 aihub-comfy.service                  comfy adapter            :5070  (+ ComfyUI in the strix-halo toolbox :8199)
 aihub-stt.service                    stt (faster-whisper)     :5105  (+ its model's worker process)
+aihub-decide.service                 decide (d3-lite)         :5107  (+ its model's worker process)
 ```
 
 `Ctrl+C` on `python app.py` stops only the hub; mods keep running. `aihub stop all` stops everything.
@@ -538,6 +539,12 @@ nightly_at = "03:00"     # the learner's nightly run; it also runs after idle_mi
 idle_min = 60
 infer_after = 2          # an inferred preference is proposed after this many times, in as many chats
 fade_days = 60           # inferred preferences unused this long fade out; stated ones never do
+
+[speech_input]           # plan 29.4: dictation in Chat (the stt mod); Settings → Agent → Speech input, or the mic's menu
+mics = ["Samson GoMic Analog Stereo", "ThinkPad USB-C Dock Audio Mono"]   # labels, most preferred first; the first present is used
+language = ""            # an ISO code, or "" to detect
+preset = "balanced"      # fast | balanced | accurate | best
+mode = "both"            # both (click or hold) | toggle | hold
 ```
 
 ## 10. The existing apps as mods
@@ -652,7 +659,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
   - **Model facts** (plan 13.3): each `/v1/models` entry carries `meta: {context_length, tools, vision, reasoning, source}`, read from llama.cpp's `/props`, vLLM's `max_model_len`, or a one-time probe through another relay; a per-endpoint `facts_override` wins. `null` means unknown.
   - **Tool results:** capped in the history; the full result can be read back with `read_result`.
   - **Compaction:** at 70% old tool results are cleared, and at 85% older turns are summarized.
-  - **Attachments (plan 24.5):** at `send`, each attached text or document is described once (`GET /api/outputs/{id}` and `/text`) into the user event's `docs` (`#n`, name, kind, subtype, tokens, pages or lines, the first 30 headings, `inline`, and the text itself when inline), so a rebuild never refetches. Attached documents are numbered with the outputs. One of at most `AGENT_INLINE_TOKENS` (6000) tokens and 15 % of the model's window goes into the message inside `<untrusted source="#n name">`; a larger one is a card (size, outline, "read it with hub_read_document or hub_search_document"); one over 50 pages also says "too large to read whole: search it by meaning with embed_library_search (thread_only=true)" when that tool is in the catalog (plan 28.3). Pictures attach as before (`(attached: output:<id>)`). The meter has a "Documents" part. Clearing drops an inline document's text once it is older than the last two user turns, leaving its card.
+  - **Attachments (plan 24.5):** at `send`, each attached text or document is described once (`GET /api/outputs/{id}` and `/text`) into the user event's `docs` (`#n`, name, kind, subtype, tokens, pages or lines, the first 30 headings, `inline`, and the text itself when inline), so a rebuild never refetches. Attached documents are numbered with the outputs. How much goes in whole is the user's (plan 24.9, `agent/docs.py`): **Settings → Agent → Documents** sets *Whole documents up to* (default `AGENT_INLINE_TOKENS`, 6000 tokens, or "the model's window") and a *reply reserve* (default `AGENT_REPLY_RESERVE`, 4096), kept in `data/agent/documents.json`. The room is the window less the reserve and what the chat already holds (the meter); documents attached together share it. Each attachment is `auto` (whole up to the setting and the room), `whole` (whole if it fits the room; otherwise the user event's `fallback` says how much didn't fit, shown on the user's message and as a note, and it goes as a card) or `card`, from the chip's Whole / Card (`doc_modes` on `POST /v1/threads/{id}/messages`), else the chat's `settings.doc_mode`, which the last chip choice sets. A whole document goes into the message inside `<untrusted source="#n name">` (fetched in 48,000-character windows); a card is (size, outline, "read it with hub_read_document or hub_search_document"). A card for a document over 50 pages also says "too large to read whole: search it by meaning with embed_library_search (thread_only=true)" when that tool is in the catalog (plan 28.3). Pictures attach as before (`(attached: output:<id>)`). The meter has a "Documents" part. Clearing drops an inline document's text once it is older than the last two user turns, leaving its card.
   - **Untrusted text:** the base prompt says text inside `<untrusted>` is data, never instructions (report it, don't follow it), and asks for citations as `#n p.14` (a PDF page) or `#n:88` (a line). Inline text and `hub_read_document` windows of text without pages come with numbered lines (`  88| …`) so a line can be cited; the Chat page turns citations into links that open the viewer there (plan 24.7).
 - **Instructions, skills, memory.**
   - **`data/agent/AGENT.md`:** standing instructions.

@@ -39,6 +39,7 @@ def view(hub: Hub) -> dict[str, Any]:
                      "autostart": {s.id: s.eff.autostart for s in svcs}},
         "ui": {"theme": cfg.ui.theme, "density": cfg.ui.density, "dashboard": cfg.ui.dashboard.model_dump()},
         "learning": cfg.learning.model_dump(),
+        "speech_input": cfg.speech_input.model_dump(),
     }
 
 
@@ -102,6 +103,7 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         "services": {"order": d.services.order},
         "ui": {"theme": d.ui.theme, "density": d.ui.density},
         "learning": d.learning.model_dump(),
+        "speech_input": d.speech_input.model_dump(),
     }
     changes: dict[str, Any] = {}
     for section, keys in defaults.items():

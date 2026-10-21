@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import context as ctx
+from .docs import describe as describe_docs
 from . import prompts
 from .hubapi import HubAPI
 from .llm import LLM, LLMError, Reply
@@ -39,9 +40,6 @@ WRAP_UP = ("(A note from the app, not from the user: you have repeated the same 
            "Tools are off for this reply. Answer the user in plain text: what you did, what blocked you, and what they can do.)")
 
 
-INLINE_SHARE = 0.15  # an inline document takes at most this share of the model's window (plan 24.5)
-
-
 @dataclass
 class Config:
     model: str = "skynet"
@@ -50,7 +48,8 @@ class Config:
     default_window: int = 32768
     data: Any = None   # Path of data/agent
     all_tools_models: tuple[str, ...] = ()
-    inline_tokens: int = 6000   # an attached document up to this size (and 15 % of the window) goes into the message
+    inline_tokens: int = 6000   # an attached document up to this size goes in whole (Settings → Agent can change it; docs.py)
+    reply_reserve: int = 4096   # tokens kept free for the reply and tools when documents go in whole (plan 24.9)
 
 
 @dataclass
@@ -121,65 +120,26 @@ class Agent:
             return
         self.tasks[tid] = asyncio.create_task(self._turn(tid))
 
-    async def send(self, tid: str, text: str, attachments: list[str] | None = None) -> dict[str, Any]:
+    async def send(self, tid: str, text: str, attachments: list[str] | None = None,
+                   doc_modes: dict[str, str] | None = None) -> dict[str, Any]:
         thread = self.store.thread(tid)
         if thread is None:
             raise KeyError(tid)
         queued = self.running(tid)
         if not queued and thread["state"] == "waiting":
             await self._dismiss_pending(tid, "The user wrote a message instead of answering.")
-        docs = await self._describe(tid, thread, attachments) if attachments else []
+        docs = await describe_docs(self, tid, thread, attachments, doc_modes) if attachments else []
         ev = self.emit(tid, "user", {"text": text, **({"attachments": attachments} if attachments else {}),
                                      **({"docs": docs} if docs else {}), **({"queued": True} if queued else {})})
+        for d in docs:
+            if d.get("fallback"):        # asked for whole, didn't fit (plan 24.9): say so in the chat
+                self.emit(tid, "note", {"text": d["fallback"], "level": "warn"})
         if not thread["title"]:
             self.store.update_thread(tid, title=_title_from(text))
             asyncio.create_task(self._title(tid, text))
         if not queued:
             self.start(tid)
         return ev
-
-    async def _describe(self, tid: str, thread: dict[str, Any], ids: list[str]) -> list[dict[str, Any]]:
-        """Plan 24.5: each attached text or document, described once (so a rebuild never refetches):
-        its #n, size and outline, and its text when it fits `inline_tokens` and 15 % of the window."""
-        model = thread.get("model") or self.cfg.model
-        cap = min(self.cfg.inline_tokens, int(await self.window(model, tid) * INLINE_SHARE))
-        n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
-        out: list[dict[str, Any]] = []
-        library: str | None | bool = False           # looked up once, only when a document is that long
-        for oid in ids:
-            try:
-                o = await self.hub.output(oid)
-                if o.get("kind") not in ("text", "document"):
-                    continue
-                w = await self.hub.output_text(oid, limit=min(48000, max(200, cap * ctx.CHARS_PER_TOKEN)))
-            except Exception as e:  # noqa: BLE001: it stays a plain attachment
-                log.info("describing attachment %s: %s", oid, e)
-                continue
-            d: dict[str, Any] = {"ref": f"#{n0 + len(out) + 1}", "id": oid, "name": o.get("title") or oid, "kind": o["kind"],
-                                 "subtype": o.get("subtype"), "tokens": w["tokens"], "pages": w["pages"], "lines": w["lines"],
-                                 "outline": [{k: x[k] for k in ("level", "title", "page", "line") if x.get(k) is not None}
-                                             for x in w["outline"][:30]],
-                                 "inline": bool(w["text"]) and w["next_offset"] is None and w["tokens"] <= cap}
-            if w.get("scanned"):
-                d["scanned"] = w["scanned"][:50]
-            if w.get("notes"):
-                d["notes"] = w["notes"][:5]
-            if d["inline"]:
-                d["text"] = w["text"]
-            if (w["pages"] or 0) > ctx.LIBRARY_PAGES:
-                if library is False:
-                    library = await self._library_tool()
-                if library:
-                    d["library"] = library
-            out.append(d)
-        return out
-
-    async def _library_tool(self) -> str | None:
-        """The embed mod's search tool, if it's in the catalog (deleting the mod removes the hint)."""
-        try:
-            return next((t["name"] for t in await self.hub.index() if t["name"] == ctx.LIBRARY_TOOL), None)
-        except Exception:  # noqa: BLE001: no hint then
-            return None
 
     async def answer(self, tid: str, question_id: str, answers: dict[str, Any]) -> dict[str, Any]:
         q = self._find(tid, "question", question_id)

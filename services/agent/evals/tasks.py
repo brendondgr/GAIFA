@@ -1,4 +1,4 @@
-"""The 48 eval tasks (plan 13.5; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5): single generations, chains, must-ask, must-not-ask, refusals and
+"""The 49 eval tasks (plan 13.5; one transcription case from plan 29.3; two image-to-3D cases from plan 17.10; nine capability cases from plan 20.5; five preference cases from plan 21.6; a document case from plan 24.5; a web research case from plan 26.2): single generations, chains, must-ask, must-not-ask, refusals and
 safety, and context. Each check grades an outcome, not a tool sequence."""
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ from .docs import lighthouse_report
 from .harness import Run, Task, first_option
 
 ROOT = Path(__file__).resolve().parents[3]
+WINTER = "https://kestrel-ferries.example/timetables/winter-2026"   # services/web/fakeweb/ (plan 26.2)
+FARES = "https://harbour-council.example/transport/ferry-fares"
 
 
 # ---- check builders ------------------------------------------------------------------------------
@@ -104,6 +106,23 @@ def used(name: str):
 
 def used_any(*names: str):
     return (f"used {' or '.join(names)}", lambda r: (any(r.calls(n, by=None) for n in names), ""))
+
+
+def no_card(name: str):
+    """`name` ran without an approval card (a grant covered it)."""
+    def c(r: Run):
+        cards = [a for a in r.of("approval") if a.get("tool") == name]
+        return bool(r.done(name)) and not cards, f"{len(r.done(name))} done, {len(cards)} cards"
+    return (f"{name} ran without a card", c)
+
+
+def fetched(*urls: str):
+    def c(r: Run):
+        got = [str(a.get("url", "")) for a in r.final_args("web_fetch")]
+        ok_ids = {x["id"] for x in r.done("web_fetch")}
+        done_urls = [str(c.get("arguments", {}).get("url", "")) for c in r.calls("web_fetch", by=None) if c["id"] in ok_ids]
+        return all(any(u in d for d in done_urls) for u in urls), f"fetched {got[:4]}"
+    return (f"fetched {', '.join(u.split('/')[2] for u in urls)}", c)
 
 
 def final_mentions(*words: str):
@@ -444,4 +463,9 @@ TASKS: list[Task] = [
     Task("pdf_page7", "context", ["In the attached report, what is the name of the lighthouse keeper's cat, and on which page is it?"],
          [final_mentions("Biscuit"), final_mentions("7"), used_any("hub_read_document", "hub_search_document")],
          attach=upload_files(lambda: [("north-rock-inspection.pdf", lighthouse_report())]), note="plan 24.5: a 20-page PDF as a card, read with tools"),
+    Task("web_two_sources", "context", ["This winter, what time is the first Sunday ferry from Kestrel Point, and how much is a return ticket "
+                                        "for an adult with a bike? Look it up on the web and cite your sources."],
+         [no_card("web_search"), fetched(WINTER, FARES), final_mentions("08:40", "8:40"), final_mentions("11.90"),
+          final_mentions("kestrel-ferries.example"), final_mentions("harbour-council.example")],
+         settings={"dry_run": True}, note="plan 26.2: search runs on the shipped grant, each fetch asks; the web mod's fake web answers (fakeweb/)"),
 ]

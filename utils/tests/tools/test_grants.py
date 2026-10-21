@@ -14,6 +14,12 @@ from utils.tests.tools.test_mcp import call as mcp_call
 from utils.tools.grants import key_of, problems
 
 FETCH, RUN, PY, SEARCH, WIPE = "fake_perms_fetch", "fake_perms_run", "fake_perms_python", "fake_perms_search", "fake_perms_wipe"
+SHIPPED = "gr_default_web_search"   # migration 010 (plan 26.2): in every database; test_shipped_grant covers it
+
+
+def made(grants: list[dict]) -> list[dict]:
+    """The grants a test made: without the one AIHub ships."""
+    return [g for g in grants if g["id"] != SHIPPED]
 
 
 def test_keys_from_arguments():
@@ -105,7 +111,7 @@ async def test_always_for_execute_and_destructive_needs_a_second_confirm(ph):
     err = await approve(ph, r, 422, remember="always")
     assert err["code"] == "confirm_needed" and err["data"]["fix"]
     assert (await ph.client.get(f"/api/approvals/{r['approval_id']}")).json()["state"] == "pending"   # nothing decided
-    assert not (await ph.client.get("/api/grants")).json()
+    assert not made((await ph.client.get("/api/grants")).json())
     g = (await approve(ph, r, remember="always", confirm=True))["grant"]
     assert (g["scope"], g["key"], g["risk"]) == ("always", "python", "execute")
     w = await ph.call(WIPE, {"jid": "j_1"})
@@ -142,7 +148,7 @@ async def test_a_deleted_chat_ends_its_grants(ph):
     keep = await ph.hub.grants.add(FETCH, "a.org", "always")
     assert (await ph.client.delete("/api/grants")).status_code == 422      # a thread is required
     assert (await ph.client.delete("/api/grants?thread=t1")).json() == {"deleted": 1}
-    assert {(g.get("thread"), g["tool"]) for g in (await ph.client.get("/api/grants")).json()} == {("t2", SEARCH), (None, FETCH)}
+    assert {(g.get("thread"), g["tool"]) for g in made((await ph.client.get("/api/grants")).json())} == {("t2", SEARCH), (None, FETCH)}
     assert keep["id"] in [g["id"] for g in (await ph.client.get(f"/api/grants?tool={FETCH}")).json()]
 
 
@@ -179,3 +185,44 @@ async def test_every_mode_and_button_in_chat_and_over_mcp(ph, tool, args):
             assert ("aihub/approval" in (mcp.get("_meta") or {})) == (remember != "always"), (mode, remember)
             for g in (await ph.client.get("/api/grants")).json():
                 await ph.client.delete(f"/api/grants/{g['id']}")
+
+
+async def test_shipped_grant_lets_web_search_run_and_a_revoke_stays(ph, tmp_path):
+    """Migration 010 (plan 26.2): one `always` grant for web_search, listed like any grant; revoking
+    it deletes it, and opening the database again doesn't bring it back."""
+    import sqlite3
+
+    from utils.db import MIGRATIONS, migrate
+    from utils.tools.catalog import ToolDef
+
+    g = {x["id"]: x for x in (await ph.client.get("/api/grants")).json()}[SHIPPED]
+    assert (g["tool"], g["key"], g["kind"], g["risk"], g["scope"], g.get("thread")) == ("web_search", "search", "const:search", "network", "always", None)
+    assert "Revoke" in g["note"]
+    search = ToolDef("web_search", "web", "search", "", {}, risk="network", grant_key="const:search")
+    fetch = ToolDef("web_fetch", "web", "fetch", "", {}, risk="network", grant_key="url:host")
+    assert (await ph.hub.grants.match(search, {"query": "x"}, {"thread": "t9"}))["id"] == SHIPPED
+    assert (await ph.hub.grants.match(search, {"query": "x"}, None))["id"] == SHIPPED      # MCP too: it's `always`
+    assert await ph.hub.grants.match(fetch, {"url": "https://example.org/"}, {"thread": "t9"}) is None
+    assert (await ph.client.delete(f"/api/grants/{SHIPPED}")).status_code == 200
+    assert SHIPPED not in [x["id"] for x in (await ph.client.get("/api/grants")).json()]
+
+    conn = sqlite3.connect(tmp_path / "hub.db")
+    assert migrate(conn) == len(MIGRATIONS)
+    assert conn.execute("SELECT count(*) FROM grants WHERE id = ?", (SHIPPED,)).fetchone()[0] == 1
+    conn.execute("DELETE FROM grants WHERE id = ?", (SHIPPED,))
+    conn.commit()
+    assert migrate(conn) == len(MIGRATIONS)
+    assert conn.execute("SELECT count(*) FROM grants WHERE id = ?", (SHIPPED,)).fetchone()[0] == 0
+    conn.close()
+
+
+async def test_dry_run_reaches_a_mod_that_answers_it(ph):
+    """`dry_run = true` in `[tools]` (plan 26.2): in a dry run the call goes to the mod, which sees
+    `dry_run` in X-AIHub-Origin; a network tool without it gets the stand-in, as before."""
+    r = await ph.call(FETCH, {"url": "https://example.org/a"}, thread="t1", dry_run=True, service="agent")
+    out = await approve(ph, r)
+    assert out["result"] == {"ran": "fetch", "arguments": {"url": "https://example.org/a"}, "dry_run": True}
+    r = await ph.call(SEARCH, {"query": "x"}, thread="t1", dry_run=True, service="agent")
+    out = await approve(ph, r)
+    assert out["result"] == {"dry_run": True, "arguments": {"query": "x"}}
+    assert (await ph.call(FETCH, {"url": "https://example.org/b"}, thread="t1", service="agent"))["status"] == "needs_approval"

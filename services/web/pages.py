@@ -90,7 +90,7 @@ def _slug(s: str, n: int) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:n].strip("-")
 
 
-def save(outputs: Path, page: Page, url: str, final_url: str, content_type: str) -> Path:
+def save(outputs: Path, page: Page, url: str, final_url: str, content_type: str, dry_run: bool = False) -> Path:
     """`<outputs>/<date>/<HHMMSS>-<host>-<slug>.<ext>` (written as .part, then renamed) and its sidecar."""
     now = datetime.now()
     day = outputs / now.strftime("%Y-%m-%d")
@@ -105,7 +105,8 @@ def save(outputs: Path, page: Page, url: str, final_url: str, content_type: str)
     sidecar = {"title": page.title, "kind": page.kind, "url": url, "final_url": final_url,
                "fetched_ts": round(time.time(), 3), "fetched": now.astimezone().isoformat(timespec="seconds"),
                "content_type": content_type, "chars": len(page.text) if page.kind == "text" else None,
-               "published": page.published, "site": page.site, "source": {"service": "web", "url": final_url}}
+               "published": page.published, "site": page.site, "source": {"service": "web", "url": final_url},
+               "dry_run": True if dry_run else None}   # from the fake web (plan 26.2)
     for target, data in ((path, page.data),
                          (path.with_name(path.name + ".json"), json.dumps({k: v for k, v in sidecar.items() if v is not None}, indent=1).encode())):
         part = target.with_name(target.name + ".part")

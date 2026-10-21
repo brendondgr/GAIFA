@@ -251,6 +251,15 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX grants_thread ON grants (thread);
     """,
+    # 010: the grant AIHub ships (plan 26.2; the user's decision, 2026-10-20): web searches run without
+    # asking. It is an ordinary `always` grant, so Settings → Agent lists it and revoking it deletes
+    # it; the migration runs once per database, so a revoked grant stays revoked.
+    """
+    INSERT OR IGNORE INTO grants (id, tool, key, kind, risk, scope, thread, created_ts, note)
+    VALUES ('gr_default_web_search', 'web_search', 'search', 'const:search', 'network', 'always', NULL,
+            CAST(strftime('%s', 'now') AS REAL),
+            'Shipped with AIHub: web searches run without asking. Revoke it to be asked each time.');
+    """,
 ]
 
 _STOP = object()

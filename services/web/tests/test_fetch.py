@@ -96,3 +96,23 @@ def test_redirect_followed_to_allowed_page(site, make_client):
     assert r["final_url"] == f"http://other.test:{site.port}/final" and r["title"] == "Release b6000"
     side = json.loads(Path(r["path"] + ".json").read_text())
     assert side["url"] == f"http://site.test:{site.port}/old" and side["final_url"] == r["final_url"]
+
+
+DRY = {"X-AIHub-Origin": '{"tool_call": "c1", "dry_run": true}'}
+
+
+def test_dry_run_reads_the_fake_web(site, make_client):
+    """In a dry run (the agent eval) search and fetch answer from fakeweb/ and never go out (plan 26.2)."""
+    c = make_client()
+    s = c.post("/v1/search", json={"query": "kestrel ferry bike fare"}, headers=DRY).json()
+    urls = [r["url"] for r in s["results"]]
+    assert "https://harbour-council.example/transport/ferry-fares" in urls and all(".example/" in u for u in urls)
+    assert not [x for x in site.seen if x["path"] == "/search"]            # SearXNG wasn't asked
+    r = c.post("/v1/fetch", json={"url": "https://harbour-council.example/transport/ferry-fares"}, headers=DRY).json()
+    assert r["kind"] == "text" and "£11.90" in r["content"] and "Adult with bicycle" in r["content"]
+    side = json.loads(Path(r["path"] + ".json").read_text())
+    assert side["dry_run"] is True and side["url"] == "https://harbour-council.example/transport/ferry-fares"
+    miss = c.post("/v1/fetch", json={"url": "https://elsewhere.example/"}, headers=DRY)
+    assert miss.status_code == 502 and miss.json()["code"] == "http_error" and "fake web" in miss.json()["detail"]
+    real = c.post("/v1/fetch", json={"url": "https://harbour-council.example/transport/ferry-fares"})   # not a dry run: the real rules
+    assert real.status_code == 502 and real.json()["code"] == "dns_failed"

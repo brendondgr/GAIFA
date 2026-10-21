@@ -31,7 +31,7 @@ async def test_harness_answers_and_grades(env):
 
 
 def test_eval_tasks_in_eight_groups():
-    assert len(TASKS) == 48 and len({t.id for t in TASKS}) == 48
+    assert len(TASKS) == 49 and len({t.id for t in TASKS}) == 49
     assert {t.group for t in TASKS} == {"single", "chain", "capability", "preference", "must-ask", "no-ask", "safety", "context"}
 
 
@@ -89,3 +89,34 @@ def test_the_eval_report_has_the_cat_only_on_page_7():
     streams = re.findall(rb"stream\n(.*?)\nendstream", data, re.S)
     assert [i for i, s in enumerate(streams) if b"Biscuit" in s] == [6]
     assert io.BytesIO(data).getbuffer().nbytes > 20 * 1500
+
+
+def test_web_two_sources_grades_citations_and_the_search_card():
+    """plan 26.2: passes when search ran on its grant (no card), both pages were fetched and the reply
+    gives both facts with both sites; a search that showed a card fails it."""
+    from evals.harness import Run
+    from evals.tasks import FARES, WINTER
+
+    task = next(t for t in TASKS if t.id == "web_two_sources")
+    assert task.settings == {"dry_run": True}
+
+    def ev(t, **p):
+        return {"type": t, "payload": p}
+
+    def run(search_card: bool) -> Run:
+        events = [ev("tool_call", id="c1", name="web_search", by="model", arguments={"query": "kestrel ferry"})]
+        if search_card:
+            events.append(ev("approval", id="c1", approval_id="ap1", tool="web_search", risk="network"))
+        events.append(ev("tool_result", id="c1", name="web_search", status="done"))
+        for n, (cid, url) in enumerate((("c2", WINTER), ("c3", FARES)), 1):
+            events += [ev("tool_call", id=cid, name="web_fetch", by="model", arguments={"url": url}),
+                       ev("approval", id=cid, approval_id="ap" + cid, tool="web_fetch", risk="network"),
+                       ev("tool_result", id=cid, name="web_fetch", status="done", outputs=[{"n": n, "kind": "text"}])]
+        events.append(ev("assistant", text="The first Sunday ferry leaves at 08:40 ([#1](https://kestrel-ferries.example/timetables/winter-2026)); "
+                                            "an adult return with a bike is £11.90 ([#2](https://harbour-council.example/transport/ferry-fares))."))
+        return Run(task="web_two_sources", model="m", events=events)
+
+    ok = grade(task, run(False))
+    assert ok["ok"], ok["checks"]
+    bad = grade(task, run(True))
+    assert not bad["ok"] and [c["check"] for c in bad["checks"] if not c["ok"]] == ["web_search ran without a card"]

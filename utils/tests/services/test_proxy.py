@@ -175,3 +175,28 @@ async def test_no_gzip_on_proxied_streams(hub):
     async with httpx.AsyncClient(base_url=hub.url) as c:
         r = await c.get("/api/s/fake-ok/v1/events", headers={"accept-encoding": "gzip"})
     assert "content-encoding" not in r.headers
+
+
+async def test_proxied_responses_cant_script_the_hubs_origin(hub):
+    """A mod's file is served from the hub's origin: nosniff always, and documents open sandboxed."""
+    async with httpx.AsyncClient(base_url=hub.url) as c:
+        r = await c.post("/api/s/fake-ok/v1/echo", json={})
+    assert r.headers["x-content-type-options"] == "nosniff" and "content-security-policy" not in r.headers
+
+
+@pytest.mark.parametrize("ctype, sandboxed", [
+    ("text/html; charset=utf-8", True), ("image/svg+xml", True), ("application/xhtml+xml", True), ("text/xml", True),
+    ("application/xml", True), ("application/rss+xml", True), ("TEXT/HTML", True), (None, True),
+    ("application/json", False), ("image/png", False), ("audio/wav", False), ("text/event-stream", False), ("text/plain", False),
+])
+def test_documents_from_a_mod_open_sandboxed(ctype, sandboxed):
+    from utils import proxy
+
+    resp = httpx.Response(200, headers={"content-type": ctype} if ctype else {})
+    got = proxy._guard_headers(resp)
+    assert (b"x-content-type-options", b"nosniff") in got
+    assert ((b"content-security-policy", b"sandbox") in got) is sandboxed
+    # the mod's own nosniff isn't doubled; its own policy stays and ours is added to it
+    resp = httpx.Response(200, headers={"content-type": "text/html", "x-content-type-options": "nosniff",
+                                        "content-security-policy": "default-src 'self'"})
+    assert proxy._guard_headers(resp) == [(b"content-security-policy", b"sandbox")]

@@ -266,7 +266,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 - **`loaded`**: models are in memory; omit or set `null` if the mod has none.
 - **`memory_estimate_gb`**: optional; overrides the manifest estimate, for example per workflow.
 - **Polling:** every 2 s while loading, busy or running jobs, otherwise every 10 s, only while the mod is ready. Invalid parts of the body are ignored (`aihub check` lists them).
-- **`jobs`**: each `{id, label, progress (0–1 or null), state, route?}`, with `state` one of queued, running, done, failed, cancelled. Report finished jobs with their final state; a job that just disappears is shown as `done`.
+- **`jobs`**: each `{id, label, progress (0–1 or null), state, route?}`, with `state` one of queued, running, done, failed, cancelled. Report finished jobs with their final state; a job that just disappears is shown as `done`. `route` must start with `#/` (a page in AIHub); anything else is dropped and reported.
 - **`stats`**: at most 4 entries. **Numeric `value`s are recorded** each time status is polled, as the series `svc.<id>.stat.<slug(label)>`. That powers tile sparklines and the mod's charts with no extra work. Counters that reset ("… today") should say so with `"reset": "daily"`, so charts don't show the reset as a drop.
 
 ### 4.7 Output conventions
@@ -364,6 +364,8 @@ aihub-decide.service                 decide (d3-lite)         :5107  (+ its mode
 - **External mods** (`kind = "external"`): health only. Never reachable = `stopped`; reachable = `ready`; lost = `degraded`, then `failed`. Start and stop are refused (`external_service`).
 - `python app.py --dev` runs mods as child processes instead of units; they stop with the hub.
 
+**Who may call the hub.** There is no login; `utils/origin.py` keeps other websites out. A request whose `Host` isn't `127.0.0.1`, `localhost` or `[::1]` (any port) gets 421 `bad_host`, which stops DNS rebinding. POST, PUT, PATCH, DELETE and WebSocket handshakes that carry an `Origin` must come from the hub's own page (`http://<loopback name>:<hub port>`), and `Sec-Fetch-Site: cross-site` is refused: 403 `cross_origin`. Requests without an `Origin` (curl, the mods, MCP clients) are allowed. Proxied mod responses get `X-Content-Type-Options: nosniff`, and documents (HTML, SVG, XML, untyped) get `Content-Security-Policy: sandbox`. (Added overnight 2026-10-21: before, a website rebinding its name to 127.0.0.1 could read chats and call tools in Bypass mode.)
+
 ## 6. Hub API
 
 The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md)**. These routes are backend-only additions:
@@ -395,7 +397,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/skills`, `GET /api/skills/{mod}/{name}` | the mods' agent skills (plan 14.9) |
 | `GET/POST /api/prefs`, `PATCH/DELETE /api/prefs/{id}`, `POST /api/prefs/{id}/approve\|reject` | preferences (plan 21.2, §14.5): saved only when they fit the tool's schema and choices; applied to every caller's card |
 | `GET /api/doctor/inventory` | every path outside the project that anything uses, with its reason (plan 16.3) |
-| `POST /mcp` | the agent's tools over MCP (plan 13.4; streamable HTTP, stateless, JSON responses; 2026-07-28 per-request `_meta` plus the 2025 `initialize` era). Annotations from `risk`; `ask` calls return `input_required` (an elicitation form of the ask fields) to clients that declare elicitation, else an explanation with `_meta["aihub/approval"]`; the MCP-only tool `aihub_wait_approval` waits for a decision (never approves). `GET`/`DELETE` → 405; a non-loopback `Origin` → 403. Claude Code: `claude mcp add --transport http aihub http://127.0.0.1:7000/mcp` |
+| `POST /mcp` | the agent's tools over MCP (plan 13.4; streamable HTTP, stateless, JSON responses; 2026-07-28 per-request `_meta` plus the 2025 `initialize` era). Annotations from `risk`; `ask` calls return `input_required` (an elicitation form of the ask fields) to clients that declare elicitation, else an explanation with `_meta["aihub/approval"]`; the MCP-only tool `aihub_wait_approval` waits for a decision (never approves). `GET`/`DELETE` → 405; an `Origin` other than the hub's own page, or `Sec-Fetch-Site: cross-site` → 403 (JSON-RPC error). Claude Code: `claude mcp add --transport http aihub http://127.0.0.1:7000/mcp` |
 
 **Alerts** (plan 6.4) are the banner items above the Overview grid. Each has a stable id, so it is raised once and cleared when its cause goes away:
 

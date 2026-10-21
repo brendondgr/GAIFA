@@ -189,10 +189,16 @@ async def test_modern_input_required_form_is_the_parameter_card(th):
 
 
 async def test_origin_and_jsonrpc_errors(th):
-    status, body = await rpc(th, "tools/list", headers={"Origin": "https://evil.example"})
+    # only the hub's own page (any loopback name, the hub's port) or no Origin at all; JSON-RPC errors, not the envelope
+    for bad in ("https://evil.example", "http://localhost:5173", "http://127.0.0.1:5070", "http://127.attacker.com:7000",
+                "https://127.0.0.1:7000", "null"):
+        status, body = await rpc(th, "tools/list", headers={"Origin": bad})
+        assert status == 403 and "error" in body, bad
+    status, body = await rpc(th, "tools/list", headers={"Origin": "http://127.0.0.1:7000", "Sec-Fetch-Site": "cross-site"})
     assert status == 403 and "error" in body
-    for ok in ("http://localhost:5173", "http://127.0.0.1:7000", "http://[::1]:7000"):
-        assert (await rpc(th, "tools/list", headers={"Origin": ok}))[0] == 200
+    for ok in ("http://localhost:7000", "http://127.0.0.1:7000", "http://[::1]:7000"):
+        assert (await rpc(th, "tools/list", headers={"Origin": ok, "Sec-Fetch-Site": "same-origin"}))[0] == 200
+    assert (await rpc(th, "tools/list"))[0] == 200
     r = await th.client.post("/mcp", content=b"{nope", headers={"Content-Type": "application/json"})
     assert r.status_code == 400 and r.json()["error"]["code"] == -32700
     r = await th.client.post("/mcp", json=[{"jsonrpc": "2.0", "id": 1, "method": "ping"}])

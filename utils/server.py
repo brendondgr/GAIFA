@@ -29,6 +29,7 @@ from utils.events import SSE_PING_S, ActivityLog, Alerts, EventBus
 from utils.memory import MemoryManager
 from utils.memory.triggers import hook as memory_hook
 from utils.metrics import MetricsError, Recorder
+from utils.origin import LOOPBACK_HOSTS, RequestGuard
 from utils.outputs import OutputError, Outputs
 from utils.outputs.watch import Watcher as OutputsWatcher
 from utils.paths import DEFAULT_ROOT, Paths
@@ -62,6 +63,7 @@ class Options:
     dev: bool = False  # subprocess backend instead of systemd
     autostart: bool = True
     demo_mods: bool = False  # also load utils/tests/fixtures/mods/
+    extra_hosts: tuple[str, ...] = ()  # Host names allowed besides loopback: only the tests' ASGI clients (`http://hub`)
 
 
 @dataclass
@@ -98,6 +100,7 @@ class Hub:
     sse_ping_s: float = SSE_PING_S
 
     listen_port: int | None = None  # fixed when the app is built: a saved hub.port applies at the next start
+    allowed_hosts: frozenset[str] = LOOPBACK_HOSTS  # Host header names the hub answers (utils/origin.py)
 
     @property
     def port(self) -> int:
@@ -135,6 +138,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
     hub.listen_port = hub.port
+    hub.allowed_hosts = LOOPBACK_HOSTS | {h.lower() for h in options.extra_hosts}
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -266,6 +270,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
         openapi_url="/api/openapi.json",
     )
     app.state.hub = hub
+    app.add_middleware(RequestGuard, hub=hub)  # Host and Origin rules: DNS rebinding, cross-site requests
     _error_handlers(app)
 
     app.include_router(system.router)

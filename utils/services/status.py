@@ -98,7 +98,10 @@ def validate(body: Any) -> tuple[dict[str, Any], list[str]]:
             progress = None
         job: dict[str, Any] = {"id": j["id"], "label": str(j.get("label") or j["id"]), "progress": progress, "state": state}
         if isinstance(j.get("route"), str):
-            job["route"] = j["route"]
+            if j["route"].startswith("#/"):              # a page in the UI; it becomes a link's href
+                job["route"] = j["route"]
+            else:
+                problems.append(f"jobs[{i}] ({j['id']}): route must start with \"#/\" (a page in AIHub)")
         out["jobs"].append(job)
     return out, problems
 

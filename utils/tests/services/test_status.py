@@ -168,3 +168,12 @@ async def test_without_status_route_load_is_na_or_hub_managed(rig):
     await mgr.start("fake-ok", wait=True)  # status route 404s: values just stay as they were
     await asyncio.sleep(0.4)
     assert mgr.get("fake-ok").state == "ready" and mgr.get("fake-ok").stats == []
+
+
+def test_a_job_route_must_be_a_page_in_the_ui():
+    """A job's route becomes a link's href in the header: only `#/…` pages, never javascript: or another site."""
+    bad = ["javascript:alert(document.domain)", "https://evil.example/", "//evil.example", "/api/s/x", " #/s/x", ""]
+    st, problems = status.validate({"jobs": [{"id": f"j{i}", "route": r} for i, r in enumerate(bad)]
+                                            + [{"id": "ok", "route": "#/s/gen3d/jobs?id=ok"}]})
+    assert [j.get("route") for j in st["jobs"]] == [None] * len(bad) + ["#/s/gen3d/jobs?id=ok"]
+    assert len(problems) == len(bad) and all('route must start with "#/"' in p for p in problems)

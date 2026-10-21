@@ -81,6 +81,7 @@ def root(tmp_path, monkeypatch) -> Path:
 def make_app(root):
     def make(cfg: config.Config | None = None, backend=None, **opts):
         cfg = cfg or config.load(root / "config.toml")
+        opts.setdefault("extra_hosts", ("hub",))  # the ASGI clients' base_url http://hub (production: loopback only)
         return create_app(config.build_paths(cfg, root), cfg, backend=backend or SubprocessBackend(), options=Options(**opts))
 
     return make

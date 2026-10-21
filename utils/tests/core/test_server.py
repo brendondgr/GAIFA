@@ -107,7 +107,7 @@ async def test_static_web(tmp_path):
     (paths.web / "x.txt").write_text("hello")
     app = create_app(paths, cfg)
     async with app.router.lifespan_context(app):
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://hub") as c:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1:7000") as c:
             assert (await c.get("/x.txt")).text == "hello"
 
 

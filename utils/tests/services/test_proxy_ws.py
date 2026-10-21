@@ -59,6 +59,17 @@ async def ws_hub(rig, serve):
         await asyncio.wait_for(task, 10)
 
 
+async def handshake(hub, host: str) -> int:
+    """The status a WebSocket handshake sent with this Host header gets (the client libraries set their own Host)."""
+    reader, writer = await asyncio.open_connection("127.0.0.1", hub.port)
+    writer.write((f"GET /api/s/ws-echo/v1/echo HTTP/1.1\r\nHost: {host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                  "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").encode())
+    await writer.drain()
+    status = int((await asyncio.wait_for(reader.readline(), 10)).split()[1])
+    writer.close()
+    return status
+
+
 def ws_url(hub, path: str) -> str:
     return hub.url.replace("http", "ws", 1) + path
 
@@ -86,8 +97,13 @@ async def test_the_mods_close_code_reaches_the_client(ws_hub):
 
 
 async def test_a_foreign_page_and_a_stopped_mod_are_refused(ws_hub):
-    with pytest.raises(websockets.InvalidStatus, match="403"):
-        await websockets.connect(ws_url(ws_hub, "/api/s/ws-echo/v1/echo"), origin="https://evil.example")
+    # names that only look like this machine, another port on it, https, a sandboxed page
+    for bad in ("https://evil.example", "http://127.attacker.com", f"http://127.0.0.1.nip.io:{ws_hub.port}",
+                "http://evil.localhost", "http://127.0.0.1:5070", f"https://127.0.0.1:{ws_hub.port}", "null"):
+        with pytest.raises(websockets.InvalidStatus, match="403"):
+            await websockets.connect(ws_url(ws_hub, "/api/s/ws-echo/v1/echo"), origin=bad)
+    assert await handshake(ws_hub, "attacker.example") == 403            # DNS rebinding: a foreign Host
+    assert await handshake(ws_hub, f"127.0.0.1:{ws_hub.port}") == 101
     async with websockets.connect(ws_url(ws_hub, "/api/s/ws-echo/v1/echo"), origin=ws_hub.url) as ws:
         assert "query" in await ws.recv()
     async with websockets.connect(ws_url(ws_hub, "/api/s/nope/v1/echo")) as ws:

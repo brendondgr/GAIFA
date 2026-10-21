@@ -2,13 +2,14 @@
 
 Bodies stream both ways, so uploads, audio and server-sent events pass through
 without being buffered. The mod's responses, errors included, are returned
-unchanged; the hub only answers itself (with the error envelope) when the mod
-isn't running (503 `service_not_running`) or can't be reached (502 `upstream_error`).
+unchanged, plus `X-Content-Type-Options: nosniff` and, on documents (HTML, SVG, XML or
+untyped), `Content-Security-Policy: sandbox`, so a file a mod serves can't run script as
+the hub. The hub only answers itself (with the error envelope) when the mod isn't running (503 `service_not_running`) or can't be reached (502 `upstream_error`).
 
 WebSockets pass through too (plan 29.2, the stt mod's live stream): text and binary
 messages both ways until either side closes. A page from another origin is refused
-at the handshake (HTTP 403). Otherwise the hub accepts and closes with a code the
-browser can read: 4404 no such mod, 4503 not running, 4502 it didn't accept. The connection counts as a request in flight, so the mod isn't idle-unloaded.
+at the handshake (HTTP 403, `utils/origin.py`). Otherwise the hub accepts and closes
+with a code the browser can read: 4404 no such mod, 4503 not running, 4502 it didn't accept. The connection counts as a request in flight, so the mod isn't idle-unloaded.
 """
 
 from __future__ import annotations
@@ -18,13 +19,13 @@ import contextlib
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlsplit
 
 import httpx
 from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
+from utils import origin
 from utils.services import Service, ServiceError
 
 if TYPE_CHECKING:
@@ -37,6 +38,7 @@ HOP_BY_HOP = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "trailers",
     "transfer-encoding", "upgrade", "proxy-connection",
 }
+DOCUMENT_TYPES = {"text/html", "application/xhtml+xml", "image/svg+xml", "text/xml", "application/xml", "text/xsl"}
 TIMEOUT = httpx.Timeout(connect=3.0, write=300.0, read=None, pool=10.0)
 
 # Awaited before a request is sent: (service, method, path, request headers). The memory
@@ -79,6 +81,18 @@ def _response_headers(resp: httpx.Response, svc: Service, prefix: str) -> list[t
         if lk == "location":
             v = _rewrite_location(v.decode("latin-1"), svc, prefix).encode("latin-1")
         out.append((lk.encode("latin-1"), v))
+    return out + _guard_headers(resp)
+
+
+def _guard_headers(resp: httpx.Response) -> list[tuple[bytes, bytes]]:
+    """A mod's response is served from the hub's origin: no type sniffing, and a document (HTML, SVG, XML, or
+    no type at all) opens sandboxed, so a file a mod serves can't run script as the hub."""
+    out = []
+    if "x-content-type-options" not in resp.headers:
+        out.append((b"x-content-type-options", b"nosniff"))
+    ctype = resp.headers.get("content-type", "").split(";")[0].strip().lower()
+    if not ctype or ctype in DOCUMENT_TYPES or ctype.endswith("+xml"):
+        out.append((b"content-security-policy", b"sandbox"))     # adds to any policy the mod sent
     return out
 
 
@@ -161,19 +175,17 @@ async def proxy(request: Request, service_id: str, path: str = "") -> StreamingR
     return await forward(request.app.state.hub.services, request, service_id)
 
 
-def _loopback_origin(origin: str | None) -> bool:
-    """No Origin (not a browser page), or a page served from this machine."""
-    if not origin:
-        return True
-    host = urlsplit(origin).hostname or ""
-    return host in ("localhost", "::1") or host.startswith("127.") or host.endswith(".localhost")
+def _own_origin(ws: WebSocket) -> bool:
+    """No Origin (not a browser page), or the hub's own page (`utils/origin.py`; the middleware checks it too)."""
+    hub = ws.app.state.hub
+    return origin.refusal({k.lower(): v for k, v in ws.headers.items()}, hub.allowed_hosts, hub.port) is None
 
 
 @router.websocket("/api/s/{service_id}/{path:path}")
 async def proxy_ws(ws: WebSocket, service_id: str, path: str = "") -> None:
     import websockets
 
-    if not _loopback_origin(ws.headers.get("origin")):
+    if not _own_origin(ws):
         await ws.close(code=1008)                # before accept: the handshake gets HTTP 403
         return
     mgr = ws.app.state.hub.services

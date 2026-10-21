@@ -18,8 +18,9 @@ whose `elicitation/create` form is the parameter card; every other client gets a
 that the approval waits in AIHub (header → Approvals), plus `_meta["aihub/approval"]`, and can wait
 for the outcome with `aihub_wait_approval`.
 
-**Security:** the hub listens on loopback only; a present `Origin` must be `http://127.0.0.1`,
-`http://localhost` or `http://[::1]` (any port), else 403.
+**Security:** the hub listens on loopback only; a present `Origin` must be the hub's own
+(`http://127.0.0.1`, `http://localhost` or `http://[::1]` with the hub's port) and
+`Sec-Fetch-Site` mustn't be `cross-site`, else 403 (`utils/origin.py`).
 """
 
 from __future__ import annotations
@@ -27,10 +28,10 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import re
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
+from utils import origin
 from utils.tools import mcp_approval
 from utils.tools.mcp_approval import Approver, ProtocolError
 
@@ -53,7 +54,6 @@ PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR =
 HEADER_MISMATCH, UNSUPPORTED_VERSION = -32020, -32022
 MODERN_STATUS = {PARSE_ERROR: 400, INVALID_REQUEST: 400, INVALID_PARAMS: 400, HEADER_MISMATCH: 400,
                  UNSUPPORTED_VERSION: 400, METHOD_NOT_FOUND: 404}
-ORIGIN_OK = re.compile(r"^http://(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?$", re.IGNORECASE)
 LIST_TTL_MS = 30_000
 INSTRUCTIONS = (
     "AIHub runs this machine's local AI services (speech, images & video, 3D, LLMs). Its tools make files "
@@ -94,11 +94,6 @@ class Request:
         return str(self.version) >= version
 
 
-def origin_ok(headers: Mapping[str, str]) -> bool:
-    o = headers.get("origin")
-    return o is None or bool(ORIGIN_OK.match(o.strip()))
-
-
 def _decode_header(v: str | None) -> str | None:
     if v and v.startswith("=?base64?") and v.endswith("?="):
         try:
@@ -131,9 +126,9 @@ class McpServer:
 
     async def handle(self, raw: bytes, headers: Mapping[str, str], base: str) -> tuple[int, dict[str, Any] | None]:
         """One POST body → (HTTP status, JSON body or None for 202). `headers` keys are lowercase."""
-        if not origin_ok(headers):
+        if origin.refusal(headers, self.hub.allowed_hosts, self.hub.port):
             return 403, error(None, INVALID_REQUEST, f"Forbidden origin {headers.get('origin')!r}: AIHub's MCP endpoint "
-                                                     "only answers loopback pages and local clients")
+                                                     "only answers AIHub's own page and local clients")
         try:
             msg = json.loads(raw)
         except (ValueError, UnicodeDecodeError) as e:

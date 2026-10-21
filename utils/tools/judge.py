@@ -11,8 +11,8 @@
    files, pages or tool results (the injection guard). With `[agent.judge] context = "trail"` it also sees the
    agent's earlier calls this turn, and with `"full"` their results and the agent's text too, each inside
    `<untrusted>` (judge_context.py; the hub reads them from `tool_calls`).
-   - `backend = "decide"`: a decision model in the `decide` mod answers two yes/no questions; the call runs only
-     when every answer clears `threshold` (default 0.95) the safe way.
+   - `backend = "decide"`: a decision model in the `decide` mod answers three choice questions; the call runs only
+     when the lowest "safe" probability reaches `threshold` (default 0.35, DECIDE_CUTOFF).
    - `backend = "relay"`: a chat model (OpenAI-compatible, through the relay) answers `{verdict, reason}` as JSON at
      temperature 0.
 3. Fail closed: unsure, malformed, slower than `timeout_s` (3 s) or not reachable → ask. There is no deny. Arguments

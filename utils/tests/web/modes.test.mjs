@@ -150,3 +150,18 @@ test('Settings → Agent lists judged calls and the judge status', async () => {
   assert.match(text(el), /Judged calls/);
   assert.equal(JudgedList({ api: {} }), null);                   // an old hub without the routes: nothing
 });
+
+test('Settings → Agent picks what the judge reads, saved on change', async () => {
+  const { JudgeContext } = await load('chat/chat-judge.js');
+  const saved = [];
+  const api = { saveSettings: async b => { saved.push(b); return { settings: { judge: b.judge } }; } };
+  const el = expand(JudgeContext({ api, cfg: { judge: { context: 'full' } } }));
+  const sel = all(el, n => n.type === 'select')[0];
+  assert.equal(sel.props.value, 'full');
+  assert.deepEqual(all(sel, n => n.type === 'option').map(o => o.props.value), ['none', 'trail', 'full']);
+  await sel.props.onChange({ target: { value: 'trail' } });
+  assert.deepEqual(saved, [{ judge: { context: 'trail' } }]);
+  const unset = all(expand(JudgeContext({ api, cfg: { judge: {} } })), n => n.type === 'select')[0];
+  assert.equal(unset.props.value, 'none');                         // not in config.toml: the default
+  assert.equal(JudgeContext({ api: {}, cfg: { judge: {} } }), null);   // no saving: nothing
+});

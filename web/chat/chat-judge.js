@@ -1,4 +1,4 @@
-// The Auto mode's judge in Settings → Agent (plan 30.5): whether its model answers, your command rules
+// The Auto mode's judge in Settings → Agent (plan 30.5): whether its model answers, what it reads, your command rules
 // (chat-rules.js), and the calls it decided, newest first: what ran and what asked, with the reason, a link to the
 // chat and, for a command the model asked about, "Always allow <rule>". GET /api/judge/status, GET /api/judge/recent
 // and GET/PUT /api/settings (api.getJudgeStatus, api.listJudged, api.getSettings, api.saveSettings).
@@ -36,6 +36,30 @@ function JudgePicker({ api, st, onSaved }) {
     msg ? h('span', { role: 'status', style: { color: T.mut } }, msg) : null);
 }
 
+// [agent.judge] context (judge_context.py): what the judge reads of the turn besides your words.
+export const CONTEXTS = [
+  ['none', 'Your words and the call'],
+  ['trail', '+ the agent’s earlier calls this turn'],
+  ['full', '+ their results and the agent’s text'],
+];
+
+/** What the judge reads; saved as soon as it's picked. */
+export function JudgeContext({ api, cfg, onSaved }) {
+  const React = R(), [msg, setMsg] = React.useState(null);
+  if (!cfg?.judge || !api?.saveSettings) return null;
+  const pick = async context => {
+    setMsg(null);
+    try { const r = await api.saveSettings({ judge: { context } }); onSaved?.(r.settings); setMsg('Saved.'); }
+    catch (e) { setMsg(`Couldn’t save: ${errText(e)}`); }
+  };
+  const sel = { height: 26, fontSize: 12.5, background: T.inset, color: 'inherit', border: '1px solid ' + T.bd, borderRadius: 5 };
+  return h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12.5 } },
+    h('span', { style: { color: T.mut } }, 'The judge reads'),
+    h('select', { 'aria-label': 'What the judge reads', value: cfg.judge.context || 'none', style: sel, onChange: e => pick(e.target.value) },
+      CONTEXTS.map(([v, label]) => h('option', { key: v, value: v }, label))),
+    msg ? h('span', { role: 'status', style: { color: T.mut } }, msg) : null);
+}
+
 export function JudgedList({ api, limit = 30 }) {
   const React = R(), [rows, setRows] = React.useState(null), [st, setSt] = React.useState(null), [err, setErr] = React.useState(null);
   const [cfg, setCfg] = React.useState(null), [note, setNote] = React.useState(null);
@@ -59,6 +83,7 @@ export function JudgedList({ api, limit = 30 }) {
     st ? h('div', { role: 'status', style: { fontSize: 12, color: st.available ? T.mut : T.acct } },
       st.available ? `Judge: ${st.model} (${st.backend}), answering.` : `Judge: ${st.model} (${st.backend}) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`) : null,
     st ? h(JudgePicker, { api, st, onSaved: () => setTimeout(load, 300) }) : null,
+    h(JudgeContext, { api, cfg, onSaved: setCfg }),
     h(CommandRules, { api, cfg, onSaved: setCfg }),
     note ? h('span', { role: note.error ? 'alert' : 'status', style: { fontSize: 12, color: note.error ? T.rd : T.mut } }, note.error || note.ok) : null,
     err ? h('span', { role: 'alert', style: { fontSize: 12, color: T.rd } }, `Couldn’t load the judged calls: ${err.detail || err.message}`) : null,

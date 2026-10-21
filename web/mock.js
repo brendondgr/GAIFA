@@ -278,7 +278,7 @@ export function createMockApi() {
     ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} }, nav: { collapsed: false, services: 'list', hidden: [], folded: false } },
     learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
     speech_input: { mics: [], language: '', preset: 'balanced', mode: 'both' },
-    judge: { backend: 'relay', model: 'minicpm-5-2B', url: 'http://127.0.0.1:4000', threshold: 0.95, timeout_s: 3, allow_commands: [], ask_commands: [] },
+    judge: { backend: 'relay', model: 'minicpm-5-2B', url: 'http://127.0.0.1:4000', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: [], ask_commands: [] },
     screen: { pages: true, documents: false, transcripts: false, timeout_s: 30, window_chars: 800, backend: null, model: null, url: null, threshold: null, confirm: true },
     permissions: { deny: [], ask: ['hub_set_preference'], allow: ['hub_start_service'] },
   };

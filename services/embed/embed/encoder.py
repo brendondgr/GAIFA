@@ -260,8 +260,9 @@ class Encoder:
 
 
 class FakeBackend:
-    """Deterministic vectors from a hash of the input, for tests: the same input always gives the same vector,
-    and a text that names an image's `label` points the same way as that image."""
+    """Deterministic vectors for tests, a bag of words: each word hashes to a fixed unit vector and a text is their
+    normalized sum, so cosine follows the words two inputs share. The prompt is left out, so "red car" as a query,
+    a chunk saying "red car" and an image labelled "red car" (a PNG text chunk) point the same way."""
 
     device = "cpu"
     dtype = "float32"
@@ -279,9 +280,15 @@ class FakeBackend:
         self.parts = None
 
     @staticmethod
-    def vector(seed: str) -> np.ndarray:
-        rng = np.random.default_rng(int(hashlib.sha256(seed.encode()).hexdigest()[:8], 16))
+    def _word(w: str) -> np.ndarray:
+        rng = np.random.default_rng(int(hashlib.sha256(w.encode()).hexdigest()[:8], 16))
         v = rng.standard_normal(FULL_DIM).astype(np.float32)
+        return v / np.linalg.norm(v)
+
+    @classmethod
+    def vector(cls, seed: str) -> np.ndarray:
+        words = re.findall(r"[a-z0-9]+", seed.lower()) or [seed]
+        v = np.sum([cls._word(w) for w in words], axis=0)
         return v / np.linalg.norm(v)
 
     def encode(self, kind: str, items: list[Any], batch_size: int) -> np.ndarray:
@@ -294,9 +301,8 @@ class FakeBackend:
 
     @staticmethod
     def label(kind: str, x: Any) -> str:
-        if kind == "text":                                  # the last line, after its prompt
-            last = next((ln for ln in reversed(x.splitlines()) if ln.strip()), x)
-            return last.split(": ")[-1].strip().lower()
+        if kind == "text":                                  # the words after the prompt
+            return re.sub(r"^(task: [^|]*\| query: |title: [^|]*\| text: )", "", x)
         if kind == "image":
             return (getattr(x, "info", {}) or {}).get("label") or str(x.size)
         if kind == "audio":

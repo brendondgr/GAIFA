@@ -57,7 +57,7 @@ def test_indexes_every_kind_on_create(settings, hub, tmp_path):
     assert run(lib.reconcile()) == {"outputs": 6, "queued": 6, "removed": 0}
     assert run(lib.drain()) == 6
     assert lib.store.counts()["done"] == 5 and lib.store.counts()["skipped"] == 1 and lib.store.counts()["pending"] == 0
-    assert kinds(lib, "doc") == ["meta", "text"]
+    assert kinds(lib, "doc") == ["meta", "text", "text"]                 # a chunk a page: none crosses a page's end
     assert kinds(lib, "img") == ["meta", "image"]
     assert kinds(lib, "aud") == ["meta", "audio", "audio", "audio", "audio"]    # whole + 0–30, 30–60, 60–70
     assert [(c["start_s"], c["end_s"]) for c in lib.store.chunks_of("aud")[2:]] == [(0, 30), (30, 60), (60, 70)]

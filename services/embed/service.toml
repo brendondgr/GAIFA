@@ -24,9 +24,9 @@ EMBED_DEVICE = "auto"               # auto | cuda | cpu (fp32; bf16 on the GPU, 
 HF_HOME = "{hf_home}"
 HF_HUB_OFFLINE = "1"
 # The library (plan 28.2): index every output, only once the GPU has been quiet (busy under this % for this long).
-# The source: engine (other processes' DRM engine time) or busy_percent (gpu_busy_percent; noisy on gfx1151).
+# The measure: aihub (other mods' GPU use, from the hub's /api/memory) or device (gpu_busy_percent: the whole GPU).
 EMBED_INDEX = "1"
-EMBED_IDLE_SOURCE = "engine"
+EMBED_IDLE_MEASURE = "aihub"
 EMBED_IDLE_BUSY_PCT = "10"
 EMBED_IDLE_SECONDS = "300"
 

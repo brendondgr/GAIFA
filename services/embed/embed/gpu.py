@@ -1,28 +1,32 @@
-"""When the GPU is free for background indexing (plan 28.2, decided 2026-10-20): its busy percentage, sampled
-every second, has stayed under `busy_pct` for `idle_s`.
+"""When the GPU is free for background indexing (plan 28.2, decided 2026-10-20): a reading sampled every second
+has stayed under `busy_pct` for `idle_s`.
 
-Two sources (`EMBED_IDLE_SOURCE`):
-- `engine` (the default): the share of time other processes kept the GPU's busiest engine working, from each
-  DRM client's `drm-engine-*` counters in `/proc/*/fdinfo`, leaving out the embed mod's own processes. It
-  measures work.
-- `busy_percent`: `/sys/class/drm/card*/device/gpu_busy_percent`, as first decided. On gfx1151 it sits at
-  13–17 % with nothing running and jumps to 80–90 % about every 15 s (measured 2026-10-20, while the engine
-  counters showed 3.5 %), so "under 10 % for 5 minutes" never happens there.
+Two measures (`EMBED_IDLE_MEASURE`):
+- `aihub` (the default): AIHub's own GPU use, and nothing heavy from outside it. It reads 100 while another
+  GPU mod (one with `[memory]`) is busy, has a request in flight or a job running (the hub's `GET
+  /api/services`), or while the whole GPU's `gpu_busy_percent` has a median of `device_pct` or more over the last
+  `window_s` (someone else's work: a game, a script). Otherwise it is the other mods' `gpu_busy_pct` from `GET
+  /api/memory` (the DRM engine counters: Vulkan work such as lcpp's). ROCm compute goes through `/dev/kfd`, which
+  neither DRM fdinfo nor this kernel's `/sys/class/kfd/kfd/proc/<pid>` accounts per process (2026-10-20), hence
+  the activity signals.
+- `device`: the whole GPU's `gpu_busy_percent` median alone. On gfx1151 it sits at 13–17 % with only the desktop
+  running and jumps to 80–90 % about every 15 s, so under 10 % it rarely holds; raise the threshold with it.
 
-Our own encoding makes the GPU busy too, so samples taken while the encoder works (and for `grace_s` after) are
-left out: they neither count as quiet nor as busy. Between batches the indexer reads the GPU afresh (`busy_now`);
-any other work on the GPU then stops indexing and the quiet period starts again. A machine without the file
-(no amdgpu) counts as idle.
+Our own encoding makes the GPU busy too: samples taken while the encoder works (and for `grace_s` after) are
+left out. Between batches the indexer reads again (`busy_now`); any other work then stops indexing and the quiet
+period starts over. A machine without the sysfs file counts its device part as idle.
 """
 
 from __future__ import annotations
 
 import glob
-import os
-import re
+import statistics
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
+
+import httpx
 
 SYSFS = "/sys/class/drm/card*/device/gpu_busy_percent"
 
@@ -39,64 +43,59 @@ def read_busy(pattern: str = SYSFS) -> int | None:
     return best
 
 
-ENGINE_RE = re.compile(r"^drm-engine-([\w-]+):\s+(\d+) ns", re.MULTILINE)
-CLIENT_RE = re.compile(r"^drm-client-id:\s+(\d+)", re.MULTILINE)
+class DeviceMedian:
+    """`gpu_busy_percent`, as the median of the readings in the last `window_s` (the desktop's spikes don't count)."""
 
-
-def engine_counters(proc: Path = Path("/proc")) -> dict[str, tuple[set[int], dict[str, int]]]:
-    """Each DRM client (an open GPU device, shared between processes after a fork): its pids and its engines'
-    busy nanoseconds."""
-    out: dict[str, tuple[set[int], dict[str, int]]] = {}
-    for d in proc.iterdir():
-        if not d.name.isdigit():
-            continue
-        try:
-            fds = list((d / "fdinfo").iterdir())
-        except OSError:
-            continue
-        for f in fds:
-            try:
-                text = f.read_text()
-            except OSError:
-                continue
-            c = CLIENT_RE.search(text)
-            if not c:
-                continue
-            pids, eng = out.setdefault(c.group(1), (set(), {}))
-            pids.add(int(d.name))
-            for name, ns in ENGINE_RE.findall(text):
-                eng[name] = max(eng.get(name, 0), int(ns))
-    return out
-
-
-class EngineMeter:
-    """A `read` for GpuIdle: percent of the time since the last read that other processes kept the busiest
-    engine working. The first read only takes a snapshot (None)."""
-
-    def __init__(self, exclude: Callable[[], set[int]] = lambda: {os.getpid()},
-                 counters: Callable[[], dict[str, tuple[set[int], dict[str, int]]]] = engine_counters,
+    def __init__(self, window_s: float = 30, read: Callable[[], int | None] = read_busy,
                  clock: Callable[[], float] = time.monotonic):
-        self.exclude, self.counters, self.clock = exclude, counters, clock
-        self.prev: dict[str, dict[str, int]] | None = None
-        self.t = 0.0
+        self.window_s, self.read, self.clock = window_s, read, clock
+        self.samples: list[tuple[float, int]] = []
 
     def __call__(self) -> int | None:
-        snap, now = self.counters(), self.clock()
-        ours = self.exclude()
-        cur = {cid: eng for cid, (pids, eng) in snap.items() if not pids & ours}
-        prev, dt = self.prev, now - self.t
-        self.prev, self.t = cur, now
-        if prev is None or dt <= 0:
-            return None
-        per_engine: dict[str, int] = {}
-        for cid, eng in cur.items():
-            before = prev.get(cid)
-            if before is None:                          # a client opened since the last read: count from now
-                continue
-            for name, ns in eng.items():
-                per_engine[name] = per_engine.get(name, 0) + max(0, ns - before.get(name, ns))
-        busiest = max(per_engine.values(), default=0)
-        return min(100, round(busiest / (dt * 1e9) * 100))
+        now, v = self.clock(), self.read()
+        if v is not None:
+            self.samples.append((now, v))
+        self.samples = [(t, x) for t, x in self.samples if now - t <= self.window_s]
+        return int(statistics.median(x for _, x in self.samples)) if self.samples else None
+
+    def pegged(self, n: int = 3, pct: int = 95) -> bool:
+        """The last `n` readings all at `pct` or more: a GPU someone keeps fully busy, seen at once rather than when
+        it takes over the median (the desktop's spikes stay under 90 %)."""
+        last = [x for _, x in self.samples[-n:]]
+        return len(last) == n and min(last) >= pct
+
+
+class HubMeter:
+    """The `aihub` measure (see the module's docstring): 100 while another GPU mod works or the device is busy,
+    else the other mods' `gpu_busy_pct`. An unreachable hub leaves the device's median as the reading."""
+
+    def __init__(self, hub_url: str | None, me: str = "embed", device: Callable[[], int | None] | None = None,
+                 device_pct: float = 30, get: Callable[[str], Any] | None = None):
+        self.url, self.me = (hub_url or "").rstrip("/"), me
+        self.device = device or DeviceMedian()
+        self.device_pct = device_pct
+        self.get = get or (lambda url: httpx.get(url, timeout=2).json())
+        self.measure = "aihub"
+        self.detail: dict[str, Any] = {}
+
+    def __call__(self) -> int | None:
+        dev = self.device()
+        self.detail = {"device_median_pct": dev, "device_pct": self.device_pct}
+        if dev is not None and (dev >= self.device_pct or getattr(self.device, "pegged", lambda: False)()):
+            return 100
+        if not self.url:
+            return 0 if dev is not None else None
+        try:
+            services = self.get(f"{self.url}/api/services")
+            rows = self.get(f"{self.url}/api/memory").get("by_service") or []
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return 0 if dev is not None else None
+        working = [s["id"] for s in services if s.get("id") != self.me and s.get("load") not in (None, "n/a")
+                   and s.get("state") in ("ready", "degraded", "starting")
+                   and (s.get("busy") or s.get("in_flight") or any(j.get("state") in ("queued", "running") for j in s.get("jobs") or []))]
+        vulkan = round(sum(r.get("gpu_busy_pct") or 0 for r in rows if r.get("id") != self.me))
+        self.detail.update(mods_working=working, mods_gpu_busy_pct=vulkan)
+        return 100 if working else min(100, vulkan)
 
 
 class GpuIdle:

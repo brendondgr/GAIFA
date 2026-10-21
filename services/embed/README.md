@@ -21,7 +21,7 @@ Vectors are unit length (cosine = dot product), in input order. Media are AIHub 
 | `embed/library.py` | the library: follows the hub's outputs and events, chunks and embeds each output when the GPU is idle |
 | `embed/store.py` | `embed.db`: indexed outputs, chunks with float16 vectors, collections; the vector matrix for search |
 | `embed/chunks.py` | ~800-token chunks with 100 of overlap, keeping offset, page and line |
-| `embed/gpu.py` | when the GPU is free: other processes' DRM engine time, or `gpu_busy_percent` |
+| `embed/gpu.py` | when the GPU is free: `aihub` (other GPU mods working, their Vulkan engine time, the device's 30 s median) or `device` |
 | `embed/api_library.py` | `/v1/search`, `/v1/library`, `/v1/library/reindex`, `/v1/collections` |
 | `embed/search.py` | search: the query against every chunk, filters, a chat's or collection's scope indexed first |
 | `embed/hubclient.py` | outputs, memory acquire and the models registry over HTTP |

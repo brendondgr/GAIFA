@@ -42,16 +42,16 @@ def hits(r) -> list[dict]:
 
 def test_ranks_by_meaning_and_wraps_snippets(client, hub):
     res = hits(client.post("/v1/search", json={"query": "red car"}))
-    assert all(h["score"] == pytest.approx(1.0, abs=1e-3) for h in res[:3])
+    assert res[0]["score"] == pytest.approx(1.0, abs=1e-3) and all(h["score"] > 0.9 for h in res[:3])
     assert sorted((h["output"], h["match"]) for h in res[:3]) == [("output:car", "image"), ("output:doc", "text"),
                                                                     ("output:doc", "text")]
     text = hub.texts["doc"][0]
     docs = [h for h in res[:3] if h["output"] == "output:doc"]
     assert any(h["page"] == 2 for h in docs) and all(h["kind"] == "document" for h in docs)
-    for h in docs:
-        row = next(c for c in client.get("/v1/library/outputs/doc").json()["chunk_list"] if c["line"] == h["line"])
-        assert h["line"] == text.count("\n", 0, row["offset"]) + 1
-    assert docs[0]["snippet"].startswith('<untrusted source="output:doc Notes">') and "red car" in docs[0]["snippet"]
+    lines = text.split("\n")
+    for h in docs:                                                   # the lines that matched, not the chunk's start
+        assert lines[h["line"] - 1] == "red car"
+        assert "red car" in h["snippet"] and "blue" not in h["snippet"]
 
 
 def test_two_hits_an_output_at_most_and_the_limit(client):
@@ -126,3 +126,19 @@ def test_search_of_everything_indexes_what_was_just_made(client, hub, lib):
     lib.gpu.read = lambda: 99                                       # busy: the idle indexer wouldn't start
     res = hits(client.post("/v1/search", json={"query": "red car", "kind": "image"}))
     assert "output:fresh" in {h["output"] for h in res[:2]} and lib.store.get("fresh")["state"] == "done"
+
+
+def test_the_snippet_is_the_line_that_matched(settings, hub):
+    """A rule on page 2, behind routine lines: the hit's line and snippet are that rule, not the chunk's start."""
+    page2 = "\n".join(["routine inspection line"] * 12 + ["stop lifting in high wind"] + ["routine inspection line"] * 5)
+    hub.add("m", "document", title="Manual", pages=["cover page\n" * 30, page2 + "\n"])
+    lib = make(settings, hub)
+    run(lib.reconcile())
+    run(lib.drain())
+    lib.run = lambda stop: asyncio.sleep(0)
+    with TestClient(create_app(settings, encoder=lib.enc, hub=lib.hub, library=lib)) as c:
+        h = next(x for x in hits(c.post("/v1/search", json={"query": "stop lifting in high wind"})) if x["match"] == "text")
+    text = hub.texts["m"][0]
+    assert h["page"] == 2 and text.split("\n")[h["line"] - 1] == "stop lifting in high wind"
+    assert h["snippet"] == ('<untrusted source="output:m Manual">\nroutine inspection line stop lifting in high wind '
+                            'routine inspection line\n</untrusted>')                 # the line, one on each side

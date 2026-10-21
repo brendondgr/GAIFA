@@ -29,7 +29,9 @@ class Settings:
     # the library (plan 28.2)
     databases: Path = HERE / "data"
     index: bool = True                # follow the hub's outputs and index them
-    idle_source: str = "engine"       # engine (other processes' DRM engine time) | busy_percent (gpu_busy_percent)
+    idle_measure: str = "aihub"       # aihub (other GPU mods working, and the device's median) | device (gpu_busy_percent)
+    idle_device_pct: float = 30.0     # aihub: the whole GPU's 30 s median at or above this counts as busy
+    idle_window_s: float = 30.0       # the window of that median
     idle_busy_pct: float = 10.0       # the GPU counts as idle under this busy percentage…
     idle_seconds: float = 300.0       # …held for this long, before indexing starts
     index_audio_max_s: float = 3600.0 # longer audio is indexed up to here (30 s windows)
@@ -53,7 +55,9 @@ class Settings:
             batch_media=int(e.get("EMBED_BATCH_MEDIA", d.batch_media)),
             databases=Path(e.get("AIHUB_DATABASES", d.databases)),
             index=e.get("EMBED_INDEX", "1") not in ("", "0", "false", "no"),
-            idle_source=e.get("EMBED_IDLE_SOURCE", d.idle_source),
+            idle_measure=e.get("EMBED_IDLE_MEASURE", d.idle_measure),
+            idle_device_pct=float(e.get("EMBED_IDLE_DEVICE_PCT", d.idle_device_pct)),
+            idle_window_s=float(e.get("EMBED_IDLE_WINDOW_S", d.idle_window_s)),
             idle_busy_pct=float(e.get("EMBED_IDLE_BUSY_PCT", d.idle_busy_pct)),
             idle_seconds=float(e.get("EMBED_IDLE_SECONDS", d.idle_seconds)),
             index_audio_max_s=float(e.get("EMBED_INDEX_AUDIO_MAX_S", d.index_audio_max_s)),

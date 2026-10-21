@@ -58,7 +58,8 @@ The same packages unpinned, with PyTorch's CPU wheels. The model then runs in fp
 | `EMBED_IDLE_UNLOAD_S` | the mod's Settings tab (`idle_unload_s`) | no | unload after this many idle seconds; default 300, 0 = never |
 | `EMBED_MAX_INPUTS`, `EMBED_AUDIO_MAX_S`, `EMBED_BATCH_TEXT`, `EMBED_BATCH_MEDIA` | `config.toml` env | no | 256 inputs a call; audio cut at 320 s (25 tokens a second fills the 8k context); batches of 32 texts and 4 images |
 | `EMBED_INDEX` | `service.toml` | no | `1` (default): the library follows the hub's outputs and indexes them into `data/databases/embed.db`; `0` turns it off |
-| `EMBED_IDLE_SOURCE` | `service.toml` | no | how the library tells the GPU is free: `engine` (default; other processes' DRM engine time from `/proc/*/fdinfo`) or `busy_percent` (`gpu_busy_percent`; see What to look for) |
+| `EMBED_IDLE_MEASURE` | `service.toml` | no | how the library tells the GPU is free: `aihub` (default: no other GPU mod busy, with a request in flight or a job running, their Vulkan engine time under the threshold, and the whole GPU's 30 s median under `EMBED_IDLE_DEVICE_PCT`) or `device` (the whole GPU's `gpu_busy_percent` median alone) |
+| `EMBED_IDLE_DEVICE_PCT`, `EMBED_IDLE_WINDOW_S` | `config.toml` env | no | `aihub`: the whole GPU counts as busy at a 30 s median of 30 % or more, or three readings in a row of 95 % or more |
 | `EMBED_IDLE_BUSY_PCT`, `EMBED_IDLE_SECONDS` | `service.toml` | no | indexing starts once the GPU has stayed under 10 % for 300 s, and stops between batches when it isn't |
 | `EMBED_INDEX_BATCH_TEXT`, `EMBED_INDEX_GAP_S`, `EMBED_INDEX_AUDIO_MAX_S` | `config.toml` env | no | 8 chunks a batch; 1 s between batches before the next look at the GPU; audio indexed up to an hour |
 
@@ -98,7 +99,10 @@ The live check (2026-10-20, through the hub, three real pictures from `services/
 
 Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp32, `EMBED_DEVICE=cpu`) the rankings are the same but it's slow: 64 texts in 30 s, about 22 s an image.
 
-**The library** (2026-10-20, against a dev hub with 32 outputs: two documents, 24 pictures, audio and video clips): all 32 indexed into 90 chunks in about 140 s once the GPU had been quiet, with one pause midway when something else used the GPU. Then the model unloaded. Much of that time is the 1 s look at the GPU after each batch. Indexing records the text path at 3.1 GB.
+**The library**, checked live on 2026-10-20 against a test hub:
+- 32 outputs (two documents, 24 pictures, audio and video clips) indexed into 90 chunks in about 140 s once the GPU had been quiet; with the real 300 s, 46 outputs waited 300 s and then took about 130 s; then the model unloaded. Much of that time is the 1 s look at the GPU after each batch. Indexing records the text path at 3.1 GB.
+- The gate, with a test mod: it reporting busy (no GPU work) held indexing back within 4 s; its real GPU work stopped indexing at the end of the batch in flight (14 s later, with the model still loading); indexing came back 20 s after the median fell. Another session's speech-to-text work on the GPU (outside the test hub) also held it back, as it should.
+- A new picture was queued at once and found by a search; a text file edited on disk was queued again and its new sentence found; deleting two outputs removed them from the library and from the results.
 
 **Search** (plan 28.3): `POST /v1/search` and the agent's tools `embed_library_search` and `embed_library_collections`. On the same hub, "the picture of the red car" ranks the drawn car first at 0.75, with the other pictures at or below 0.59. A search of everything first indexes pending outputs from the last day, for up to 10 s; a search within a chat or collection first indexes all of its outputs, for up to 120 s. Either can take seconds right after a large upload.
 
@@ -111,7 +115,7 @@ Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp
 - **Matryoshka:** a slice of a unit vector isn't one, so the mod normalizes again after truncating (sentence-transformers' `truncate_dim` with `normalize_embeddings` normalizes *before* truncating). Queries and documents must use the same `dim`.
 - **Prompts:** text with `task: "query"` gets `task: search result | query: `, documents get `title: {title or none} | text: `. Media take no prompt.
 - **Video** is decoded at 1 fps and scaled to fit 768 px. A video longer than 32 s is sampled evenly down to 32 frames (the processor's own cap). An mp4 often keeps its index at the end, so ffmpeg reads a temporary copy in `data/state/embed/tmp/`, never a pipe.
-- **`gpu_busy_percent` is noisy on gfx1151.** With nothing running it reads 13–17 % and jumps to 80–90 % about every 15 s, while the DRM engine counters of every process add up to 3.5 % (measured 2026-10-20). "Under 10 % for 5 minutes" never holds on it, so the default source is `engine`: the busiest engine's share of time across every process except the embed mod's own. `GET /v1/library` shows the reading (`gpu.busy_pct`) and how long it's been quiet.
+- **What "idle" means.** `gpu_busy_percent` reads 13–17 % with only the desktop running (Xwayland, plasmashell, browsers) and jumps to 80–90 % about every 15 s, so the `aihub` measure asks what AIHub's mods are doing instead, and keeps the whole GPU only as a 30 s median (spikes don't count) against 30 %. Per-process busy time isn't available for ROCm: a test mod running torch matmuls kept the GPU at 98 % while its DRM fdinfo engine counters stayed at 0 (compute goes through `/dev/kfd`'s user-mode queues), and `/sys/class/kfd/kfd/proc/<pid>/` here has only queues, VRAM and `evicted_ms`. `GET /v1/library` shows the reading, the mods it saw working and the device's median.
 - **Indexing never evicts another mod.** It asks the hub for memory without making room; a `409 needs_room` leaves the library in `no_room` until the next quiet period. A search still loads the model the usual way, and the [memory] triggers make room for it.
 - **Weights through a symlink** are refused by the hub's registry (`doesn't exist in data/models`): keep them as a real folder.
 

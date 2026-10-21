@@ -29,6 +29,7 @@ LISTEN = "0A"
 CMD_TIMEOUT_S = 5
 DRM_MEM_RE = re.compile(r"^drm-memory-(gtt|vram):\s+(\d+)\s*KiB", re.MULTILINE)
 DRM_CLIENT_RE = re.compile(r"^drm-client-id:\s+(\d+)", re.MULTILINE)
+DRM_ENGINE_RE = re.compile(r"^drm-engine-([\w-]+):\s+(\d+)\s*ns", re.MULTILINE)
 
 
 def _read(path: str | Path) -> str | None:
@@ -163,6 +164,40 @@ def footprint(pids: Iterable[int], proc: Path = PROC) -> int:
         every.extend(p for p in process_tree(pid, proc) if p not in every)
     seen: set[str] = set()
     return sum(pss_bytes(p, proc) + gpu_bytes(p, seen, proc) for p in every)
+
+
+def engine_ns(pids: Iterable[int], proc: Path = PROC) -> dict[str, int]:
+    """Busy nanoseconds per GPU engine (`gfx`, `compute`, `dma`, …) of these processes and their descendants,
+    from their DRM clients' fdinfo, each client counted once (plan 28.2: how busy AIHub keeps the GPU)."""
+    every: list[int] = []
+    for pid in pids:
+        every.extend(p for p in process_tree(pid, proc) if p not in every)
+    seen: set[str] = set()
+    out: dict[str, int] = {}
+    for pid in every:
+        try:
+            entries = list((proc / str(pid) / "fdinfo").iterdir())
+        except OSError:
+            continue
+        for f in entries:
+            text = _read(f)
+            if not text or "drm-client-id" not in text:
+                continue
+            cid = DRM_CLIENT_RE.search(text)
+            if not cid or cid.group(1) in seen:
+                continue
+            seen.add(cid.group(1))
+            for name, ns in DRM_ENGINE_RE.findall(text):
+                out[name] = out.get(name, 0) + int(ns)
+    return out
+
+
+def busy_pct(before: dict[str, int], after: dict[str, int], seconds: float) -> float:
+    """The busiest engine's share of `seconds`, in percent (0–100), between two `engine_ns` readings."""
+    if seconds <= 0:
+        return 0.0
+    most = max((max(0, ns - before.get(name, ns)) for name, ns in after.items()), default=0)
+    return round(min(100.0, most / (seconds * 1e9) * 100), 1)
 
 
 # ---- units and containers ---------------------------------------------------------

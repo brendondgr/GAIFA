@@ -324,6 +324,8 @@ class ServiceMemory(_Model):
     idle_s: float | None
     auto_unload: bool
     priority: int
+    gpu_busy_pct: float | None = Field(None, description="How busy the mod kept the GPU since the last sample: its "
+                                       "busiest engine's share of the time, 0–100 (DRM fdinfo; absent until two samples)")
 
 
 class SystemMemory(_Model):

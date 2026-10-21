@@ -29,7 +29,8 @@ class AcquireRequest(BaseModel):
     reason: str = ""
 
 
-@router.get("/api/memory", summary="Memory now: system, GPU, each mod, other, reserve", response_model=SystemMemory)
+@router.get("/api/memory", summary="Memory now: system, GPU, each mod, other, reserve", response_model=SystemMemory,
+            response_model_exclude_unset=True)
 async def get_memory(request: Request) -> dict[str, Any]:
     mem = _mem(request)
     # The last sample's numbers with load states as of now (a load may have finished since).

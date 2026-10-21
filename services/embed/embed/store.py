@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS outputs (
 CREATE INDEX IF NOT EXISTS outputs_state ON outputs(state, created_ts);
 CREATE TABLE IF NOT EXISTS chunks (
     id INTEGER PRIMARY KEY, output_id TEXT NOT NULL, kind TEXT NOT NULL,        -- text | meta | image | audio | video
-    page INTEGER, line INTEGER, "offset" INTEGER, start_s REAL, end_s REAL, snippet TEXT, vector BLOB NOT NULL);
+    page INTEGER, line INTEGER, "offset" INTEGER, start_s REAL, end_s REAL, snippet TEXT, vector BLOB NOT NULL,
+    text TEXT);                                                              -- a text chunk's words, for the best line
 CREATE INDEX IF NOT EXISTS chunks_output ON chunks(output_id);
 CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, created_ts REAL);
 CREATE TABLE IF NOT EXISTS collection_outputs (
@@ -37,6 +38,7 @@ class Chunk:
     kind: str
     vector: np.ndarray
     snippet: str = ""
+    text: str | None = None
     page: int | None = None
     line: int | None = None
     offset: int | None = None
@@ -61,6 +63,8 @@ class Store:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(SCHEMA)
+        if "text" not in {r[1] for r in self.db.execute("PRAGMA table_info(chunks)")}:     # a database from before
+            self.db.execute("ALTER TABLE chunks ADD COLUMN text TEXT")
         self.lock = threading.RLock()
         self.version = 0                                # bumped on every chunk change; the matrix cache follows it
         self._matrix: tuple[int, Matrix] | None = None
@@ -105,10 +109,10 @@ class Store:
             try:
                 self.db.execute("DELETE FROM chunks WHERE output_id = ?", (oid,))
                 self.db.executemany(
-                    'INSERT INTO chunks (output_id, kind, page, line, "offset", start_s, end_s, snippet, vector) '
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    'INSERT INTO chunks (output_id, kind, page, line, "offset", start_s, end_s, snippet, vector, text) '
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     [(oid, c.kind, c.page, c.line, c.offset, c.start_s, c.end_s, c.snippet[:400],
-                      np.asarray(c.vector, dtype=np.float16)[:DIM].tobytes()) for c in chunks])
+                      np.asarray(c.vector, dtype=np.float16)[:DIM].tobytes(), c.text) for c in chunks])
                 still = sig is None or (self.get(oid) or {}).get("sig") == sig
                 self.db.execute("UPDATE outputs SET state = ?, chunks = ?, error = NULL, indexed_ts = ? WHERE id = ?",
                                 (state if still else "pending", len(chunks), time.time(), oid))
@@ -155,7 +159,7 @@ class Store:
             return {}
         marks = ",".join("?" * len(ids))
         rows = self._rows(f'SELECT c.id, c.output_id, c.kind, c.page, c.line, c."offset", c.start_s, c.end_s, c.snippet, '
-                          f"o.kind AS output_kind, o.title FROM chunks c JOIN outputs o ON o.id = c.output_id "
+                          f"c.text, o.kind AS output_kind, o.title FROM chunks c JOIN outputs o ON o.id = c.output_id "
                           f"WHERE c.id IN ({marks})", ids)
         return {r["id"]: r for r in rows}
 

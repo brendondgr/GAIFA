@@ -38,7 +38,7 @@ def worker():
 
 def test_load_encode_reload_unload(worker, tmp_path):
     enc = Encoder(worker, tmp_path)
-    v = enc.embed([("text", "x: hello")], 768, BATCH)
+    v = enc.embed([("text", "task: search result | query: hello")], 768, BATCH)
     assert v.shape == (1, 768) and np.allclose(v[0], FakeBackend.vector("hello"))
     pid = worker.proc.pid
     assert pid != os.getpid() and worker.footprint_bytes() > 0

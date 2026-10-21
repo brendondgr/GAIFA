@@ -3,8 +3,8 @@ chunk, at most two hits an output, filtered by kind, a collection, or the chat's
 
 A scoped search (a collection, or `thread_only`) first indexes its own outputs that aren't indexed yet: someone
 is asking about them now, so it doesn't wait for the GPU to be idle, the rule for indexing everything else. A
-search of everything does the same for outputs made in the last day (newest first, for up to 10 s), so what was
-just made is found; older ones are left to the idle indexer.
+search of everything does the same for outputs made in the last hour (newest first, for up to 5 s), so what
+was just made is found; older ones are left to the idle indexer.
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ from .library import Library, signature
 
 PER_OUTPUT = 2
 SCOPED_BUDGET_S = 120          # how long a scoped search may spend indexing its outputs first
-RECENT_S = 86400               # an unscoped search indexes pending outputs this new…
-RECENT_BUDGET_S = 10           # …for up to this long
+RECENT_S = 3600                # an unscoped search indexes pending outputs this new…
+RECENT_BUDGET_S = 5            # …for up to this long (a backlog after a big batch would slow every search)
 _CLOSE = re.compile(r"</\s*untrusted", re.I)
 
 
@@ -100,6 +100,61 @@ async def index_recent(lib: Library, budget_s: float = RECENT_BUDGET_S, recent_s
             lib.store.fail(row["id"], f"{type(e).__name__}: {e}")
 
 
+def lines_of(text: str, first_line: int, size: int = 200) -> list[list[tuple[int, str]]]:
+    """A chunk as windows of about `size` characters: each a run of whole lines with their line numbers; a longer
+    line comes in sentence-sized pieces with its number. ~16 windows for an 800-token chunk."""
+    out: list[list[tuple[int, str]]] = []
+    cur: list[tuple[int, str]] = []
+    for i, ln in enumerate(text.split("\n")):
+        ln = ln.strip()
+        if not ln:
+            continue
+        if len(ln) > size:
+            if cur:
+                out.append(cur)
+                cur = []
+            out += [[(first_line + i, p.strip())] for p in re.split(r"(?<=[.!?])\s+", ln) if p.strip()]
+            continue
+        cur.append((first_line + i, ln))
+        if sum(len(x) + 1 for _, x in cur) >= size:
+            out.append(cur)
+            cur = []
+    if cur:
+        out.append(cur)
+    return out
+
+
+async def _closest(enc: Encoder, q: np.ndarray, texts: list[str]) -> np.ndarray:
+    vecs = await asyncio.to_thread(enc.embed, [("text", prompt(t, "document")) for t in texts], 768, {"text": 32})
+    return vecs @ q
+
+
+async def best_lines(enc: Encoder, q: np.ndarray, rows: list[dict[str, Any]], per: int = 64) -> dict[int, tuple[int, str]]:
+    """For each text hit, where in it the query matched: the closest window of lines (the snippet), then the
+    closest line in that window (the line number). A chunk's start often isn't what matched: a rule on page 41
+    behind 20 routine ones."""
+    wins = [(r["id"], w) for r in rows for w in lines_of(r["text"], r["line"] or 1)[:per]]
+    if not wins:
+        return {}
+    scores = await _closest(enc, q, [" ".join(t for _, t in w) for _, w in wins])
+    best: dict[int, tuple[float, list[tuple[int, str]]]] = {}
+    for (cid, w), sc in zip(wins, scores):
+        if cid not in best or sc > best[cid][0]:
+            best[cid] = (float(sc), w)
+    lines = [(cid, n, t) for cid, (_, w) in best.items() for n, t in w]
+    ls = await _closest(enc, q, [t for _, _, t in lines]) if lines else []
+    top: dict[int, tuple[float, int]] = {}
+    for (cid, n, _), sc in zip(lines, ls):
+        if cid not in top or sc > top[cid][0]:
+            top[cid] = (float(sc), n)
+    out = {}
+    for cid, (_, w) in best.items():
+        n = top[cid][1]
+        i = next(k for k, (m, _) in enumerate(w) if m == n)
+        out[cid] = (n, " ".join(t for _, t in w[max(0, i - 1):i + 2])[:300])     # the line, with one on each side
+    return out
+
+
 async def search(lib: Library, enc: Encoder, query: str, kind: str | None = None, ids: set[str] | None = None,
                  limit: int = 8) -> list[dict[str, Any]]:
     m = lib.store.matrix()
@@ -123,6 +178,7 @@ async def search(lib: Library, enc: Encoder, query: str, kind: str | None = None
         if len(hits) >= limit:
             break
     rows = lib.store.chunk_rows([h for h, _ in hits])
+    best = await best_lines(enc, q, [rows[c] for c, _ in hits if c in rows and rows[c].get("text")])
     out = []
     for cid, score in hits:
         r = rows.get(cid)
@@ -130,10 +186,11 @@ async def search(lib: Library, enc: Encoder, query: str, kind: str | None = None
             continue
         hit: dict[str, Any] = {"output": f"output:{r['output_id']}", "kind": r["output_kind"], "title": r["title"],
                                "match": r["kind"], "score": round(score, 3)}
-        for k in ("page", "line", "start_s", "end_s"):
-            if r.get(k) is not None:
-                hit[k] = r[k]
-        if r.get("snippet"):
-            hit["snippet"] = untrusted(f"output:{r['output_id']} {r['title']}", r["snippet"])
+        line, snip = best.get(cid, (r.get("line"), r.get("snippet")))
+        for k, v in (("page", r.get("page")), ("line", line), ("start_s", r.get("start_s")), ("end_s", r.get("end_s"))):
+            if v is not None:
+                hit[k] = v
+        if snip:
+            hit["snippet"] = untrusted(f"output:{r['output_id']} {r['title']}", snip)
         out.append(hit)
     return out

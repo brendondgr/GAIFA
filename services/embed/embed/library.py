@@ -31,7 +31,7 @@ import numpy as np
 from . import chunks as chunking
 from . import media
 from .encoder import Encoder, prompt
-from .gpu import EngineMeter, GpuIdle, read_busy
+from .gpu import DeviceMedian, GpuIdle, HubMeter
 from .hubclient import Hub, HubError
 from .settings import Settings
 from .store import Chunk, Store
@@ -77,7 +77,9 @@ class Library:
                  sleep: Callable[[float], Any] = asyncio.sleep):
         self.store, self.enc, self.hub, self.s = store, enc, hub, settings
         if gpu is None:
-            read = read_busy if settings.idle_source == "busy_percent" else EngineMeter(exclude=self._our_pids)
+            device = DeviceMedian(settings.idle_window_s)
+            read = device if settings.idle_measure == "device" else HubMeter(
+                settings.hub_url, os.environ.get("AIHUB_SERVICE_ID", "embed"), device, settings.idle_device_pct)
             gpu = GpuIdle(settings.idle_busy_pct, settings.idle_seconds, ours=lambda: enc.busy or enc.loading, read=read)
         self.gpu = gpu
         self.sleep = sleep
@@ -88,14 +90,6 @@ class Library:
         self.last_api = 0.0                # the server sets this on every /v1/embed and search
         self.indexed = 0
         self.connected = False
-
-    def _our_pids(self) -> set[int]:
-        """This process and the model's worker: their GPU work isn't someone else's."""
-        pids = {os.getpid()}
-        proc = getattr(self.enc.backend, "proc", None)
-        if proc is not None and proc.pid:
-            pids.add(proc.pid)
-        return pids
 
     # following the hub ----------------------------------------------------------------------
 
@@ -287,7 +281,7 @@ class Library:
         for i in range(0, len(pieces), self.s.index_batch_text):
             group = pieces[i:i + self.s.index_batch_text]
             vecs = await self._embed("text", [prompt(p.text, "document", title) for p in group])
-            out += [Chunk("text", v, chunking.snippet(p.text), page=p.page, line=p.line, offset=p.offset)
+            out += [Chunk("text", v, chunking.snippet(p.text), text=p.text, page=p.page, line=p.line, offset=p.offset)
                     for p, v in zip(group, vecs)]
         return out
 
@@ -332,7 +326,9 @@ class Library:
     def status(self) -> dict[str, Any]:
         return {"state": self.state, "connected": self.connected, "counts": self.store.counts(),
                 "current": self.current, "indexed_since_start": self.indexed,
-                "gpu": {"busy_pct": self.gpu.last, "quiet_s": self.gpu.quiet_s(), "idle": self.gpu.idle(),
+                "gpu": {"measure": getattr(self.gpu.read, "measure", "device"), "busy_pct": self.gpu.last,
+                        "detail": getattr(self.gpu.read, "detail", {}),
+                        "quiet_s": self.gpu.quiet_s(), "idle": self.gpu.idle(),
                         "threshold_pct": self.gpu.busy_pct, "needs_quiet_s": self.gpu.idle_s}}
 
 

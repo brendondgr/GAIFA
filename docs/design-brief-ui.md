@@ -471,7 +471,8 @@ interface Memory {
   gpu: { name: string; vram_total_bytes: number; vram_used_bytes: number;
          gtt_total_bytes: number; gtt_used_bytes: number } | null;
   by_service: { id: string; used_bytes: number; estimate_bytes: number | null; load: LoadState;
-                idle_s: number | null; auto_unload: boolean; priority: number }[];
+                idle_s: number | null; auto_unload: boolean; priority: number;
+                gpu_busy_pct?: number }[];  // its busiest GPU engine's share since the last sample, 0–100 (plan 28.2)
   other_bytes: number;           // OS, desktop, browser — anything the AIHub does not own
 }
 

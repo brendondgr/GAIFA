@@ -4,7 +4,6 @@ Tokens are estimated as characters / 4, the hub's own estimate (`/api/outputs/{i
 
 from __future__ import annotations
 
-import bisect
 import re
 from dataclasses import dataclass
 
@@ -36,7 +35,15 @@ def _cut(text: str, start: int, size: int) -> int:
 
 
 def chunk(text: str, page_starts: list[int] | None = None, size: int = SIZE, overlap: int = OVERLAP) -> list[TextChunk]:
-    """`page_starts`: each page's first character offset, ascending (from the text route's `pages=N` windows)."""
+    """`page_starts`: each page's first character offset, ascending (from the text route's `pages=N` windows).
+    With pages, no chunk crosses a page's end, so every line a search finds in a chunk is on that chunk's page."""
+    if page_starts:
+        bounds = [*page_starts, len(text)]
+        paged: list[TextChunk] = []
+        for n, (a, b) in enumerate(zip(bounds, bounds[1:]), 1):
+            first = text.count("\n", 0, a) + 1
+            paged += [TextChunk(c.text, a + c.offset, n, first + c.line - 1) for c in chunk(text[a:b], None, size, overlap)]
+        return paged
     out: list[TextChunk] = []
     start, line, counted = 0, 1, 0
     n = len(text)
@@ -46,8 +53,7 @@ def chunk(text: str, page_starts: list[int] | None = None, size: int = SIZE, ove
         if piece.strip():
             line += text.count("\n", counted, start)
             counted = start
-            page = bisect.bisect_right(page_starts, start) if page_starts else None
-            out.append(TextChunk(piece, start, page or None, line))
+            out.append(TextChunk(piece, start, None, line))
         if end >= n:
             break
         nxt = max(end - overlap, start + 1)

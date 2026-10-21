@@ -10,8 +10,8 @@ import posixpath
 from dataclasses import dataclass, field
 from typing import Any
 
-TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "needs", "after", "check", "steps", "suggest"}
-STEP = {"run", "what", "ask"}
+TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest"}
+STEP = {"run", "what", "ask", "interactive"}
 SUGGEST = {"name", "repo", "revision", "files", "dest", "kind", "op", "body", "size_gb", "good_for", "licence", "required", "gated"}
 
 
@@ -20,6 +20,7 @@ class Step:
     run: str                        # bash, in the mod's folder
     what: str                       # what it does, how big, how long
     ask: str = ""                   # a yes/no question first (a licence); empty: no question
+    interactive: bool = False       # it prompts (a login): under --json the person runs it, then the run resumes
 
 
 @dataclass
@@ -43,7 +44,8 @@ class Suggest:
 class Setup:
     summary: str = ""
     gpu: bool | None = None
-    disk_gb: float | None = None
+    disk_gb: float | None = None                     # the environment, without its container images
+    images: dict[str, float] = field(default_factory=dict)   # images it pulls → GB, counted once across setups
     needs: list[str] = field(default_factory=list)
     after: list[str] = field(default_factory=list)
     check: str = ""
@@ -71,7 +73,9 @@ def _step(i: int, d: Any) -> tuple[Step | None, str | None]:
             return None, f"{where}: `{key}` must be a non-empty string"
     if not isinstance(d.get("ask", ""), str):
         return None, f"{where}: `ask` must be a string"
-    return Step(run=d["run"].strip(), what=d["what"].strip(), ask=d.get("ask", "").strip()), None
+    if not isinstance(d.get("interactive", False), bool):
+        return None, f"{where}: `interactive` must be true or false"
+    return Step(run=d["run"].strip(), what=d["what"].strip(), ask=d.get("ask", "").strip(), interactive=d.get("interactive", False)), None
 
 
 def _suggest(i: int, d: Any) -> tuple[Suggest | None, str | None]:
@@ -138,6 +142,11 @@ def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
         if not _num(data["disk_gb"]):
             return None, "`disk_gb` must be a number of GB (0 or more)"
         out.disk_gb = float(data["disk_gb"])
+    if "images" in data:
+        im = data["images"]
+        if not isinstance(im, dict) or not all(isinstance(k, str) and k.strip() and _num(v) for k, v in im.items()):
+            return None, "`images` must be a table of image name = GB"
+        out.images = {k.strip(): float(v) for k, v in im.items()}
     for key in ("needs", "after"):
         if key in data:
             if not _strs(data[key]):

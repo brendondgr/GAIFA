@@ -223,7 +223,8 @@ models = ["hf-cache/hub/models--hexgrad--Kokoro-82M"]
 scan = []
 summary = "Speech: fast English voices"     # one line, shown when choosing mods
 gpu = true                                  # needs the GPU (and so host.md's GPU parts)
-disk_gb = 14                                # the environment alone; models are extra
+disk_gb = 14                                # the environment alone; images and models are extra
+images = { "docker.io/org/image" = 15.1 }   # container images it pulls, in GB: two setups sharing one count it once
 needs = ["podman", "espeak-ng"]             # host commands that must exist
 after = ["tts"]                             # setup ids to do first
 check = "aihub check tts"                   # proves it works
@@ -231,7 +232,8 @@ check = "aihub check tts"                   # proves it works
 [[steps]]                                   # run in order, with bash, in the mod's folder
 run = "scripts/install-runtime.sh"
 what = "builds the engine venvs from locks/ (about 14 GB, 10 min)"
-ask = ""                                    # a yes/no question first, such as a licence
+ask = ""                                    # a yes/no question first, such as a licence; "no" skips this setup
+interactive = false                         # true: it prompts (a login), so under --json the person runs it
 
 [[suggest]]                                 # optional starter models (1–3)
 name = "Kokoro 82M"
@@ -252,7 +254,7 @@ gated = false                               # true: accept the repo's terms on H
 - `scan`: tracked files in the mod (globs relative to its folder, e.g. `workflows/*/workflow.json`) whose mentions of a model's file name or Hugging Face repo are listed in its inventory doc as "referenced by".
 - `[[suggest]]` can name a mod route instead of a repo, for mods with their own downloader: `op = "POST /v1/load"` and `body = { preset = "balanced" }` (no `dest`, `files` or `revision`). Mark weights an engine can't run without `required = true`; everything else is optional, and the default is to download nothing.
 - Unknown keys are errors, at the top and inside `[[steps]]` and `[[suggest]]`; `aihub docs --check` reports them.
-- `aihub setup` runs `[[steps]]` and `check` in the mod's folder, asks every `ask` question and every model choice before it runs anything, and downloads the chosen `[[suggest]]` models after the steps (a step may fetch weights its installer needs offline first: the wizard's download then finds them and only registers them). A `repo` suggestion in `hf-cache` pinned to a commit also gets `refs/main` pointed at it, for engines that load by `main`.
+- `aihub setup` runs `[[steps]]` and `check` in the mod's folder, asks every `ask` question and every model choice before it runs anything (the hub stage included); a "no" skips that setup and every chosen setup whose `after` names it, and the report lists them. An `interactive` step runs in the terminal for a person; under `--json` the run stops with its command, the person runs it, and `--done <step id>` continues. A `[[suggest]]` with an `op` is followed until the job it starts ends (the mod's jobs in `GET /api/services/<id>`), and a failed job fails the step. The wizard downloads the chosen `[[suggest]]` models after the steps (a step may fetch weights its installer needs offline first: the wizard's download then finds them and only registers them). A `repo` suggestion in `hf-cache` pinned to a commit also gets `refs/main` pointed at it, for engines that load by `main`.
 
 Then these sections, in this order. Leave a section out only when it has nothing to say:
 

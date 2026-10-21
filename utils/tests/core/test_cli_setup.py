@@ -32,10 +32,11 @@ BARE = block("bare", "Bare")   # no summary: not offered
 
 
 class FakeRunner(cli_setup.Runner):
-    def __init__(self, fail: set[str] = frozenset(), up: bool = True) -> None:
+    def __init__(self, fail: set[str] = frozenset(), up: bool = True, jobs: list[list[dict]] | None = None, refuse: set[str] = frozenset()) -> None:
         self.ran: list[tuple[str, str, dict | None]] = []
         self.calls: list[tuple[str, str, Any]] = []
-        self.fail, self.up = set(fail), up
+        self.fail, self.up, self.refuse = set(fail), up, set(refuse)
+        self.jobs = list(jobs or [])          # successive answers of GET /api/services/<mod>'s jobs
 
     def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True) -> tuple[int, str]:
         self.ran.append((cmd, cwd.name, env))
@@ -45,7 +46,14 @@ class FakeRunner(cli_setup.Runner):
 
     def call(self, method: str, path: str, body: Any = None) -> Any:
         self.calls.append((method, path, body))
+        if path in self.refuse:
+            raise cli.ApiError(500, "the mod said no", "hub_error")
+        if method == "GET" and path.startswith("/api/services/"):
+            return {"jobs": self.jobs.pop(0) if self.jobs else []}
         return {}
+
+    def sleep(self, s: float) -> None:
+        pass
 
     def hub_up(self) -> bool:
         return self.up
@@ -60,6 +68,7 @@ class FakeProbe(cli_setup_host.Probe):
     def which(self, cmd: str) -> bool: return cmd in self._have
     def free_gb(self, path: Path) -> float: return 500.0
     def gtt_bytes(self) -> int: return 130_000_000_000
+    def mem_bytes(self) -> int: return 130_000_000_000
     def linger(self) -> bool: return True
 
 
@@ -80,7 +89,7 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def args(*targets: str, **kw: Any) -> Namespace:
-    base = dict(targets=list(targets), plan=False, json=True, yes=False, answers=None, accept=None, models=None, from_scratch=False)
+    base = dict(targets=list(targets), plan=False, json=True, yes=False, answers=None, accept=None, decline=None, done=None, models=None, from_scratch=False)
     return Namespace(**{**base, **kw})
 
 
@@ -108,6 +117,7 @@ def test_the_plan_as_json(root: Path, capsys) -> None:
     assert p["setups"] == ["relay", "tts-kokoro", "agent"] and p["gpu"] is True and p["disk_gb"] == 14.3
     assert [s["id"] for s in p["steps"]] == ["relay/1", "tts-kokoro/1", "tts-kokoro/2", "agent/1"]
     assert [q["id"] for q in p["questions"]] == ["tts-kokoro/2", "tts-kokoro/models"]
+    assert p["questions"][0]["answer_with"] == "--accept tts-kokoro/2 or --decline tts-kokoro/2" and p["hub"] == []
     assert p["questions"][1]["required"] == ["Kokoro 82M"] and p["required_models_gb"] == 0.34
     assert p["blocking"] == [] and {c["id"] for c in p["host"]} >= {"kernel-gtt", "iommu-on", "needs:espeak-ng"}
 
@@ -147,12 +157,19 @@ def test_no_answer_stops_with_the_question(root: Path, capsys) -> None:
     assert out(capsys)["id"] == "tts-kokoro/models" and runner.ran == []   # the model choice, also first
 
 
+def test_questions_come_before_the_hub_is_installed(root: Path, capsys) -> None:
+    runner = FakeRunner(up=False)
+    assert cli_setup.cmd_setup(args("tts", yes=True), runner, FakeProbe()) == 2
+    assert runner.ran == []                                           # no `bin/aihub install` before the licence is answered
+
+
 def test_a_full_run_with_answers(root: Path, capsys) -> None:
     runner = FakeRunner()
     a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Kokoro 82M,Whisper"])
     assert cli_setup.cmd_setup(a, runner, FakeProbe()) == 0
     r = out(capsys)
     assert r["failed"] == [] and r["done"] == ["tts-kokoro/1", "tts-kokoro/2", "tts-kokoro:Kokoro 82M", "tts-kokoro:Whisper"]
+    assert r["hub"] == ["already installed and running"]
     cmds = [(c, cwd) for c, cwd, _ in runner.ran]
     assert ("aihub install tts", "tts") in cmds and ("scripts/install-runtime.sh --accept-breeze-license", "tts") in cmds
     dl = next((c, env) for c, _, env in runner.ran if c.startswith("uvx"))
@@ -189,7 +206,7 @@ def test_a_failure_stops_and_a_rerun_resumes(root: Path, capsys) -> None:
     again = FakeRunner()
     assert cli_setup.cmd_setup(args("agent", yes=True), again, FakeProbe()) == 0
     r = out(capsys)
-    assert r["skipped"] == ["relay/1"] and r["done"] == ["agent/1"]
+    assert r["skipped"] == ["relay/1: done in an earlier run"] and r["done"] == ["agent/1"]
     fresh = FakeRunner()
     assert cli_setup.cmd_setup(args("agent", yes=True, from_scratch=True), fresh, FakeProbe()) == 0
     assert out(capsys)["done"] == ["relay/1", "agent/1"]
@@ -210,6 +227,85 @@ def test_the_hub_stage_from_a_bare_clone(root: Path, capsys) -> None:
 
 
 def test_the_host_stage(root: Path, capsys) -> None:
-    assert cli_setup.cmd_setup(args("host"), FakeRunner(), FakeProbe(groups=("video",))) == 1
+    assert cli_setup.cmd_setup(args("host"), FakeRunner(), FakeProbe(groups=("video",))) == 0   # GPU checks are advice here
     checks = {c["id"]: c for c in out(capsys)["host"]}
     assert checks["gpu-groups"]["ok"] is False and "usermod" in checks["gpu-groups"]["fix"]
+    assert cli_setup.cmd_setup(args("host"), FakeRunner(), FakeProbe(have=("git",))) == 1        # uv missing blocks everything
+    probe = FakeProbe()
+    probe.gtt_bytes = lambda: 65_000_000_000                          # the default: half the memory
+    assert {c.id: c for c in cli_setup_host.checks(probe, root)}["gtt-size"].ok is False
+
+
+def test_opencode_installs_without_root(root: Path) -> None:
+    found = {c.id: c for c in cli_setup_host.checks(FakeProbe(), root, {"opencode", "podman"})}
+    assert found["needs:opencode"].needs_root is False and "opencode.ai/install" in found["needs:opencode"].fix
+    assert found["needs:podman"].needs_root is True and found["needs:podman"].fix == "sudo dnf install podman"
+
+
+def test_no_skips_that_setup_and_what_needs_it(root: Path, capsys) -> None:
+    agent_doc = root / "services" / "agent" / "setup" / "env.md"
+    agent_doc.write_text(AGENT.replace('after = ["relay"]', 'after = ["relay", "tts-kokoro"]'))
+    runner = FakeRunner()
+    assert cli_setup.cmd_setup(args("relay", "tts", "agent", yes=True, decline=["tts-kokoro/2"]), runner, FakeProbe()) == 0
+    r = out(capsys)
+    assert r["skipped"] == ["agent: needs a declined setup", "tts-kokoro: declined tts-kokoro/2"]
+    assert r["done"] == ["relay/1"] and [c["setup"] for c in r["checks"]] == ["relay"]
+    assert not any("tts" in c for c, _, _ in runner.ran)               # nothing of the declined setup ran
+
+
+def test_an_interactive_step_is_handed_to_the_person(root: Path, capsys) -> None:
+    doc = root / "services" / "relay" / "setup" / "env.md"
+    doc.write_text(RELAY.replace('what = "the backend venv"', 'what = "the backend venv"\n\n[[steps]]\nrun = "opencode auth login"\nwhat = "log in"\ninteractive = true'))
+    runner = FakeRunner()
+    assert cli_setup.cmd_setup(args("relay", yes=True), runner, FakeProbe()) == 2
+    r = out(capsys)
+    assert r["reason"] == "interactive" and r["id"] == "relay/2" and r["run"] == "opencode auth login" and "--done relay/2" in r["answer_with"]
+    assert [c for c, _, _ in runner.ran] == ["aihub install relay"]    # it ran up to that step
+    again = FakeRunner()
+    assert cli_setup.cmd_setup(args("relay", yes=True, done=["relay/2"]), again, FakeProbe()) == 0
+    r = out(capsys)
+    assert r["done"] == ["relay/2 (run by you)"] and "opencode auth login" not in [c for c, _, _ in again.ran]
+
+
+def test_a_route_download_is_followed_until_its_job_ends(root: Path, capsys) -> None:
+    jobs = [[{"id": "old", "state": "done"}],                         # before the call: ignored
+            [{"id": "old", "state": "done"}, {"id": "j1", "state": "running", "progress": 0.5}],
+            [{"id": "j1", "state": "done"}], []]
+    runner = FakeRunner(jobs=jobs)
+    a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"])
+    assert cli_setup.cmd_setup(a, runner, FakeProbe()) == 0
+    assert "running 50%" in capsys.readouterr().err                   # progress on stderr under --json
+
+
+def test_a_failed_job_or_route_is_a_failed_step_with_its_doc(root: Path, capsys) -> None:
+    a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=Whisper"], from_scratch=True)
+    assert cli_setup.cmd_setup(a, FakeRunner(jobs=[[], [{"id": "j2", "state": "failed", "error": "disk full"}]]), FakeProbe()) == 1
+    r = out(capsys)
+    f = r["report"]["failed"][0]
+    assert f["step"] == "model:Whisper" and "disk full" in f["output"] and f["doc"] == "services/tts/setup/env.md"
+    assert cli_setup.cmd_setup(a, FakeRunner(refuse={"/api/s/tts/v1/load"}), FakeProbe()) == 1
+    assert "the mod said no" in out(capsys)["report"]["failed"][0]["output"]
+
+
+def test_a_mods_model_answer_covers_each_of_its_setups(root: Path, capsys) -> None:
+    breeze = root / "services" / "tts" / "setup" / "breeze.md"
+    breeze.write_text(block("tts-breeze", "Breeze", summary='"Cloning"', gpu="true", disk_gb="7",
+                            _tables='[[suggest]]\nname = "Breeze 2"\nrepo = "o/breeze"\ndest = "tts/breeze"\nsize_gb = 7\ngood_for = "x"'))
+    runner = FakeRunner()
+    a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts=Kokoro 82M,Breeze 2"])
+    assert cli_setup.cmd_setup(a, runner, FakeProbe()) == 0
+    assert {c for c in out(capsys)["done"] if ":" in c} == {"tts-kokoro:Kokoro 82M", "tts-breeze:Breeze 2"}
+    assert cli_setup.cmd_setup(args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts=Nope"], from_scratch=True), FakeRunner(), FakeProbe()) == 1
+    assert out(capsys)["reason"] == "unknown-model"
+
+
+def test_the_plan_shows_the_hub_stage_expansion_and_shared_images(root: Path, capsys) -> None:
+    (root / ".venv" / "bin" / "python").unlink()
+    img = 'images = { "docker.io/x/rocm" = 15.0 }'
+    (root / "services" / "tts" / "setup" / "env.md").write_text(TTS.replace('disk_gb = 14', f'disk_gb = 1\n{img}'))
+    breeze = root / "services" / "tts" / "setup" / "breeze.md"
+    breeze.write_text(block("tts-breeze", "Breeze", summary='"Cloning"', gpu="true", disk_gb="2", images='{ "docker.io/x/rocm" = 15.0 }'))
+    assert cli_setup.cmd_setup(args("tts", plan=True), FakeRunner(up=False), FakeProbe()) == 0
+    p = out(capsys)
+    assert p["expanded"] == {"tts": ["tts-breeze", "tts-kokoro"]} and p["disk_gb"] == 18.0     # 1 + 2 + the image once
+    assert p["hub"][0].startswith("uv sync") and p["hub"][1].startswith("aihub install")

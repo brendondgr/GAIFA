@@ -16,6 +16,10 @@ from pathlib import Path
 
 GTT_MIB, PAGES = "131072", "33554432"     # host.md §1: 128 GiB
 GPU_PARAMS = f"amdgpu.gttsize={GTT_MIB} ttm.pages_limit={PAGES}"
+INSTALLERS = {                             # command → an installer that needs no root (host.md §3, the mods' setup docs)
+    "uv": "curl -LsSf https://astral.sh/uv/install.sh | sh",
+    "opencode": "curl -fsSL https://opencode.ai/install | bash   (services/opencode/setup/opencode.md)",
+}
 PACKAGES = {                               # command → the Fedora package (host.md §3)
     "podman": "podman", "toolbox": "toolbox", "git": "git-core", "node": "nodejs22", "npm": "nodejs22-npm",
     "espeak-ng": "espeak-ng", "ffmpeg": "ffmpeg (RPM Fusion; host.md §3)", "curl": "curl", "blender": "blender",
@@ -59,6 +63,15 @@ class Probe:
         except OSError:
             return 0.0
 
+    def mem_bytes(self) -> int:
+        try:
+            for line in Path("/proc/meminfo").read_text().splitlines():
+                if line.startswith("MemTotal:"):
+                    return int(line.split()[1]) * 1024
+        except (OSError, ValueError):
+            pass
+        return 0
+
     def gtt_bytes(self) -> int:
         for p in Path("/sys/class/drm").glob("card*/device/mem_info_gtt_total"):
             try:
@@ -88,20 +101,24 @@ def checks(probe: Probe, root: Path, needs: set[str] = frozenset(), disk_gb: flo
     iommu_off = params.get("amd_iommu") == "off"
     out.append(Check("iommu-on", not iommu_off, "the IOMMU is on" if not iommu_off else "amd_iommu=off: nothing stops a stray GPU write (host.md §1)",
                      "" if not iommu_off else 'sudo grubby --update-kernel=ALL --remove-args="amd_iommu=off" && sudo reboot', needs_root=True, gpu=True))
-    gtt = probe.gtt_bytes()
-    out.append(Check("gtt-size", gtt >= 64e9, f"GTT {gtt / 2**30:.1f} GiB" if gtt else "no GPU memory reported (/sys/class/drm/card*/device/mem_info_gtt_total)",
-                     "" if gtt >= 64e9 else "set the kernel parameters above and reboot; check with: cat /sys/class/drm/card*/device/mem_info_gtt_total", gpu=True))
+    gtt, mem = probe.gtt_bytes(), probe.mem_bytes()
+    enough = gtt >= 0.75 * mem if mem else gtt >= 96e9   # the default GTT is half the memory; host.md wants most of it
+    out.append(Check("gtt-size", bool(gtt) and enough, f"GTT {gtt / 2**30:.1f} GiB of {mem / 2**30:.0f} GiB" if gtt else "no GPU memory reported (/sys/class/drm/card*/device/mem_info_gtt_total)",
+                     "" if gtt and enough else "set the kernel parameters above and reboot; check with: cat /sys/class/drm/card*/device/mem_info_gtt_total", gpu=True))
     have = probe.groups()
     lacking = [g for g in ("video", "render") if g not in have]
     out.append(Check("gpu-groups", not lacking, "in the video and render groups" if not lacking else f"not in {', '.join(lacking)}",
                      "" if not lacking else "sudo usermod -aG video,render $USER  (then log out and in)", needs_root=True, gpu=True))
     out.append(Check("uv", probe.which("uv"), "uv is installed" if probe.which("uv") else "uv is missing",
-                     "" if probe.which("uv") else "curl -LsSf https://astral.sh/uv/install.sh | sh"))
+                     "" if probe.which("uv") else INSTALLERS["uv"]))
     for cmd in sorted({"git", *needs} - {"uv"}):
         ok = probe.which(cmd)
-        pkg = PACKAGES.get(cmd, cmd)
-        out.append(Check(f"needs:{cmd}", ok, f"{cmd} is installed" if ok else f"{cmd} is missing",
-                         "" if ok else f"sudo dnf install {pkg}" if " " not in pkg else f"install {pkg}", needs_root=not ok and " " not in pkg))
+        if cmd in INSTALLERS:
+            fix, root_ = INSTALLERS[cmd], False
+        else:
+            pkg = PACKAGES.get(cmd, cmd)
+            fix, root_ = (f"sudo dnf install {pkg}", True) if " " not in pkg else (f"install {pkg}", False)
+        out.append(Check(f"needs:{cmd}", ok, f"{cmd} is installed" if ok else f"{cmd} is missing", "" if ok else fix, needs_root=not ok and root_))
     lin = probe.linger()
     out.append(Check("linger", lin, "lingering is on: AIHub keeps running after you log out" if lin else "lingering is off: the hub stops when you log out",
                      "" if lin else "loginctl enable-linger $USER"))

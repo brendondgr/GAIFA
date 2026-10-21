@@ -10,7 +10,8 @@
 | Where it goes | `data/models/comfyui/diffusion_models/qwen-image-2.1-turbo-fp8.safetensors` |
 | Source | Hugging Face [abenzerps/Qwen-Image-2.1-Turbo-Quantized](https://huggingface.co/abenzerps/Qwen-Image-2.1-Turbo-Quantized) |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
+| Referenced by | [`workflows/qwen21-turbo-edit-multi/workflow.json`](../../../services/comfy/workflows/qwen21-turbo-edit-multi/workflow.json), [`workflows/qwen21-turbo-remove-bg/workflow.json`](../../../services/comfy/workflows/qwen21-turbo-remove-bg/workflow.json), [`workflows/qwen21-turbo-t2i/workflow.json`](../../../services/comfy/workflows/qwen21-turbo-t2i/workflow.json) |
 | Registry notes | Official Qwen/Qwen-Image-2.1-Turbo, quantized; used by the qwen21-turbo-* packs. Upstream qwen-image-2.1-turbo-fp8.safetensors (sha256 024e1bef…) with ComfyUI per-layer FP8 metadata added by services/comfy/scripts/fix_fp8_quant_metadata.py (header only; without it ComfyUI runs the FP8 weights unscaled). |
 
 ### Files

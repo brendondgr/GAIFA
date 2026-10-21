@@ -10,7 +10,7 @@
 | Where it goes | `data/models/tts/breeze-tts-2` |
 | Source | Hugging Face [BreezeBlue/breeze-tts-2](https://huggingface.co/BreezeBlue/breeze-tts-2) |
 | Used by | `tts` |
-| Environment | none yet |
+| Environment | [Breeze TTS 2 and Whisper (Speech)](../../../services/tts/setup/breeze.md) |
 | Registry notes | Research and non-commercial use only (BreezeBlue license). |
 
 ### Files

@@ -159,7 +159,7 @@ def test_references_skip_files_git_doesnt_track(root: Path) -> None:
     ({"type": "url", "url": "https://x.test/m.bin"}, None, "comfyui/m/m.bin", ['curl -L --fail -o "data/models/comfyui/m/m.bin.part" "https://x.test/m.bin"']),
     ({"type": "huggingface", "repo": "o/r", "revision": "abc"}, None, "comfyui/vae/v.safetensors", ['--include "*v.safetensors" --revision abc --local-dir data/state/downloads/m', 'find data/state/downloads/m -name "v.safetensors"']),
     ({"type": "huggingface", "repo": "o/r"}, [{"path": "3d/r/a.ckpt"}, {"path": "3d/r/sub/b.yaml"}], "3d/r", ["hf download o/r a.ckpt sub/b.yaml --local-dir data/models/3d/r"]),
-    ({"type": "huggingface", "repo": "o/r", "revision": "c0ffee"}, [{"path": "hf-cache/hub/models--o--r/snapshots/c0ffee/config.json"}], "hf-cache/hub/models--o--r", ["HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download o/r config.json --revision c0ffee"]),
+    ({"type": "huggingface", "repo": "o/r", "revision": "c0ffee"}, [{"path": "hf-cache/hub/models--o--r/snapshots/c0ffee/config.json"}, {"path": "hf-cache/hub/models--o--r/refs/main"}], "hf-cache/hub/models--o--r", ["HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download o/r config.json --revision c0ffee"]),
     ({"type": "created", "note": "a clip"}, None, "voices/v", []),
     ({"type": "local"}, None, "llm/x.gguf", []),
     (None, None, "llm/x.gguf", []),

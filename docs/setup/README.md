@@ -27,13 +27,19 @@ You can stop after any mod. Each environment doc says which features need it; ea
 | Environment | Mod | Models | Size |
 |---|---|---|---|
 | [Chat agent](../../services/agent/setup/agent.md) | `agent` | 0 | — |
+| [ComfyUI in the Strix Halo toolbox](../../services/comfy/setup/comfyui.md) | `comfy` | 15 | 64.4 GB |
 | [Decisions: d3-lite](../../services/decide/setup/decide.md) | `decide` | 1 | 1.7 GB |
 | [Embeddings: EmbeddingGemma 2](../../services/embed/setup/embed.md) | `embed` | 1 | 1.5 GB |
+| [CubeArt: Cube3D and CubePart (3D Generate)](../../services/gen3d/setup/cubeart.md) | `gen3d` | 5 | 28.8 GB |
+| [Hunyuan3D 2.1 (3D Generate)](../../services/gen3d/setup/img3d.md) | `gen3d` | 1 | 8.0 GB |
+| [SAM 3D Objects (3D Generate)](../../services/gen3d/setup/sam3do.md) | `gen3d` | 2 | 13.5 GB |
 | [llama.cpp (LLM Launcher)](../../services/lcpp/setup/llama-cpp.md) | `lcpp` | 2 | 18.3 GB |
 | [OpenCode](../../services/opencode/setup/opencode.md) | `opencode` | 0 | — |
 | [LLM Relay](../../services/relay/setup/relay.md) | `relay` | 0 | — |
 | [SearXNG watcher (the searxng mod)](../../services/searxng/setup/searxng.md) | `searxng` | 0 | — |
 | [Speech to Text (faster-whisper)](../../services/stt/setup/stt.md) | `stt` | 5 | 5.4 GB |
+| [Breeze TTS 2 and Whisper (Speech)](../../services/tts/setup/breeze.md) | `tts` | 5 | 9.3 GB |
+| [Kokoro-82M (Speech)](../../services/tts/setup/kokoro.md) | `tts` | 1 | 342 MB |
 | [vLLM](../../services/vllm/setup/vllm.md) | `vllm` | 0 | — |
 | [Web (SearXNG search and page fetching)](../../services/web/setup/web.md) | `web` | 0 | — |
 | [Workspace (folders, edits in place, the sandbox)](../../services/workspace/setup/workspace.md) | `workspace` | 0 | — |
@@ -42,42 +48,42 @@ You can stop after any mod. Each environment doc says which features need it; ea
 
 | Model | Kind | Size | Environment | Source |
 |---|---|---|---|---|
-| [Cube3D v0.5 (shape)](models/cube3d-v0.5.md) | 3d | 8.3 GB | none yet | recorded |
-| [CubePart (part splitting)](models/cubepart.md) | 3d | 9.9 GB | none yet | recorded |
-| [Hunyuan3D 2.1 (shape DiT + VAE)](models/hunyuan3d-2.1.md) | 3d | 8.0 GB | none yet | recorded |
-| [MoGe v1 ViT-L](models/moge-vitl.md) | 3d | 1.3 GB | none yet | recorded |
-| [Qwen-Image transformer config (CubePart)](models/qwen-image-config.md) | 3d | 371 B | none yet | recorded |
-| [SAM 3D Objects (geometry checkpoints)](models/sam-3d-objects.md) | 3d | 12.3 GB | none yet | recorded |
-| [qwen-image-2.1-turbo-fp8](models/qwen-image-2.1-turbo-fp8.md) | image | 7.1 GB | none yet | recorded |
-| [qwen-image-2.1-turbo-Q8_0](models/qwen-image-2.1-turbo-q8-0.md) | image | 7.6 GB | none yet | recorded |
-| [qwen-image-2.1-UC-fp8](models/qwen-image-2.1-uc-fp8.md) | image | 7.1 GB | none yet | recorded |
-| [qwen-image-2.1-UC-Q8_0](models/qwen-image-2.1-uc-q8-0.md) | image | 7.6 GB | none yet | recorded |
-| [TRELLIS.2 (bf16)](models/trellis-2-bf16.md) | image | 10.3 GB | none yet | recorded |
+| [Cube3D v0.5 (shape)](models/cube3d-v0.5.md) | 3d | 8.3 GB | CubeArt: Cube3D and CubePart (3D Generate) | recorded |
+| [CubePart (part splitting)](models/cubepart.md) | 3d | 9.9 GB | CubeArt: Cube3D and CubePart (3D Generate) | recorded |
+| [Hunyuan3D 2.1 (shape DiT + VAE)](models/hunyuan3d-2.1.md) | 3d | 8.0 GB | Hunyuan3D 2.1 (3D Generate) | recorded |
+| [MoGe v1 ViT-L](models/moge-vitl.md) | 3d | 1.3 GB | SAM 3D Objects (3D Generate) | recorded |
+| [Qwen-Image transformer config (CubePart)](models/qwen-image-config.md) | 3d | 371 B | CubeArt: Cube3D and CubePart (3D Generate) | recorded |
+| [SAM 3D Objects (geometry checkpoints)](models/sam-3d-objects.md) | 3d | 12.3 GB | SAM 3D Objects (3D Generate) | recorded |
+| [qwen-image-2.1-turbo-fp8](models/qwen-image-2.1-turbo-fp8.md) | image | 7.1 GB | ComfyUI in the Strix Halo toolbox | recorded |
+| [qwen-image-2.1-turbo-Q8_0](models/qwen-image-2.1-turbo-q8-0.md) | image | 7.6 GB | ComfyUI in the Strix Halo toolbox | recorded |
+| [qwen-image-2.1-UC-fp8](models/qwen-image-2.1-uc-fp8.md) | image | 7.1 GB | ComfyUI in the Strix Halo toolbox | recorded |
+| [qwen-image-2.1-UC-Q8_0](models/qwen-image-2.1-uc-q8-0.md) | image | 7.6 GB | ComfyUI in the Strix Halo toolbox | recorded |
+| [TRELLIS.2 (bf16)](models/trellis-2-bf16.md) | image | 10.3 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [Gemma 4 26B-A4B it (Q4_K_M, QAT, HauhauCS balanced)](models/gemma-4-26b-it.md) | llm | 18.2 GB | llama.cpp (LLM Launcher) | **not recorded** |
 | [smollm2-135m-instruct](models/smollm2-135m-instruct.md) | llm | 105 MB | llama.cpp (LLM Launcher) | recorded |
-| [chroma-flash-heun_r32-fp32](models/chroma-flash-heun-r32-fp32.md) | lora | 450 MB | none yet | **not recorded** |
-| [krea2filterbypass](models/krea2filterbypass.md) | lora | 160 B | none yet | **not recorded** |
-| [qwen2-1uncenV2](models/qwen2-1uncenv2.md) | lora | 80 MB | none yet | **not recorded** |
+| [chroma-flash-heun_r32-fp32](models/chroma-flash-heun-r32-fp32.md) | lora | 450 MB | ComfyUI in the Strix Halo toolbox | **not recorded** |
+| [krea2filterbypass](models/krea2filterbypass.md) | lora | 160 B | ComfyUI in the Strix Halo toolbox | **not recorded** |
+| [qwen2-1uncenV2](models/qwen2-1uncenv2.md) | lora | 80 MB | ComfyUI in the Strix Halo toolbox | **not recorded** |
 | [d3-lite (Decision 3.0)](models/d3-lite-decision-3.0.md) | other | 1.7 GB | Decisions: d3-lite | recorded |
-| [MoGe 2 ViT-L normal (fp16)](models/moge-2-vitl-normal-fp16.md) | other | 662 MB | none yet | recorded |
-| [SAM 3D Body (DINOv3, bf16)](models/sam-3d-body-dinov3-bf16.md) | other | 2.8 GB | none yet | recorded |
+| [MoGe 2 ViT-L normal (fp16)](models/moge-2-vitl-normal-fp16.md) | other | 662 MB | ComfyUI in the Strix Halo toolbox | recorded |
+| [SAM 3D Body (DINOv3, bf16)](models/sam-3d-body-dinov3-bf16.md) | other | 2.8 GB | ComfyUI in the Strix Halo toolbox | recorded |
 | [Whisper base (faster-whisper)](models/whisper-base-faster-whisper.md) | stt | 148 MB | Speech to Text (faster-whisper) | recorded |
 | [Whisper large-v3 (faster-whisper)](models/whisper-large-v3-faster-whisper.md) | stt | 3.1 GB | Speech to Text (faster-whisper) | recorded |
-| [Whisper large-v3 turbo](models/whisper-large-v3-turbo.md) | stt | 1.6 GB | none yet | recorded |
+| [Whisper large-v3 turbo](models/whisper-large-v3-turbo.md) | stt | 1.6 GB | Breeze TTS 2 and Whisper (Speech) | recorded |
 | [Whisper large-v3-turbo (faster-whisper)](models/whisper-large-v3-turbo-faster-whisper.md) | stt | 1.6 GB | Speech to Text (faster-whisper) | recorded |
 | [Whisper small (faster-whisper)](models/whisper-small-faster-whisper.md) | stt | 486 MB | Speech to Text (faster-whisper) | recorded |
 | [Whisper tiny (faster-whisper)](models/whisper-tiny-faster-whisper.md) | stt | 78 MB | Speech to Text (faster-whisper) | recorded |
-| [CLIP ViT-L/14 (Cube3D text encoder)](models/clip-vit-large-patch14.md) | text-encoder | 1.7 GB | none yet | recorded |
+| [CLIP ViT-L/14 (Cube3D text encoder)](models/clip-vit-large-patch14.md) | text-encoder | 1.7 GB | CubeArt: Cube3D and CubePart (3D Generate) | recorded |
 | [EmbeddingGemma 2](models/embeddinggemma-2.md) | text-encoder | 1.5 GB | Embeddings: EmbeddingGemma 2 | recorded |
-| [Qwen3-VL 4B Instruct (CubePart text encoder)](models/qwen3-vl-4b-instruct.md) | text-encoder | 8.9 GB | none yet | recorded |
-| [qwen3vl_8b_bf16](models/qwen3vl-8b-bf16.md) | text-encoder | 17.5 GB | none yet | recorded |
-| [Breeze TTS 2](models/breeze-tts-2.md) | tts | 7.7 GB | none yet | recorded |
-| [Kokoro 82M](models/kokoro-82m.md) | tts | 342 MB | none yet | recorded |
-| [4x_foolhardy_Remacri](models/4x-foolhardy-remacri.md) | upscale | 67 MB | none yet | **not recorded** |
-| [qwen_image_2.1_vae_bf16](models/qwen-image-2.1-vae-bf16.md) | vae | 676 MB | none yet | recorded |
-| [TRELLIS.2 shape VAE (bf16)](models/trellis-2-shape-vae-bf16.md) | vae | 1.1 GB | none yet | recorded |
-| [DINOv3 ViT-L](models/dino-v3-vit-l.md) | vision | 1.2 GB | none yet | recorded |
-| [Voice: Arabella](models/voice-arabella.md) | voice | 2 MB | none yet | recorded |
-| [Voice: Brendon](models/voice-brendon.md) | voice | 1 MB | none yet | recorded |
-| [Voice: Hope](models/voice-hope.md) | voice | 2 MB | none yet | recorded |
+| [Qwen3-VL 4B Instruct (CubePart text encoder)](models/qwen3-vl-4b-instruct.md) | text-encoder | 8.9 GB | CubeArt: Cube3D and CubePart (3D Generate) | recorded |
+| [qwen3vl_8b_bf16](models/qwen3vl-8b-bf16.md) | text-encoder | 17.5 GB | ComfyUI in the Strix Halo toolbox | recorded |
+| [Breeze TTS 2](models/breeze-tts-2.md) | tts | 7.7 GB | Breeze TTS 2 and Whisper (Speech) | recorded |
+| [Kokoro 82M](models/kokoro-82m.md) | tts | 342 MB | Kokoro-82M (Speech) | recorded |
+| [4x_foolhardy_Remacri](models/4x-foolhardy-remacri.md) | upscale | 67 MB | ComfyUI in the Strix Halo toolbox | **not recorded** |
+| [qwen_image_2.1_vae_bf16](models/qwen-image-2.1-vae-bf16.md) | vae | 676 MB | ComfyUI in the Strix Halo toolbox | recorded |
+| [TRELLIS.2 shape VAE (bf16)](models/trellis-2-shape-vae-bf16.md) | vae | 1.1 GB | ComfyUI in the Strix Halo toolbox | recorded |
+| [DINOv3 ViT-L](models/dino-v3-vit-l.md) | vision | 1.2 GB | ComfyUI in the Strix Halo toolbox | recorded |
+| [Voice: Arabella](models/voice-arabella.md) | voice | 2 MB | Breeze TTS 2 and Whisper (Speech) | recorded |
+| [Voice: Brendon](models/voice-brendon.md) | voice | 1 MB | Breeze TTS 2 and Whisper (Speech) | recorded |
+| [Voice: Hope](models/voice-hope.md) | voice | 2 MB | Breeze TTS 2 and Whisper (Speech) | recorded |
 <!-- end generated -->

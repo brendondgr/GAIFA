@@ -61,8 +61,10 @@ def _inner(e: dict[str, Any]) -> list[str]:
     for f in e.get("files", []):
         p = f["path"]
         rel = p[len(base) + 1:] if p.startswith(base + "/") else posixpath.basename(p)
-        if base.startswith("hf-cache/") and rel.startswith("snapshots/"):
-            rel = rel.split("/", 2)[2] if rel.count("/") >= 2 else rel
+        if base.startswith("hf-cache/"):
+            if not rel.startswith("snapshots/") or rel.count("/") < 2:
+                continue                         # refs/main, blobs: the cache's own bookkeeping, not repo files
+            rel = rel.split("/", 2)[2]
         out.append(rel)
     return out
 

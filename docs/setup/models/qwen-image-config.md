@@ -10,7 +10,7 @@
 | Where it goes | `data/models/3d/Qwen-Image` |
 | Source | Hugging Face [Qwen/Qwen-Image](https://huggingface.co/Qwen/Qwen-Image) |
 | Used by | `gen3d` |
-| Environment | none yet |
+| Environment | [CubeArt: Cube3D and CubePart (3D Generate)](../../../services/gen3d/setup/cubeart.md) |
 | Registry notes | Only transformer/config.json; CubePart reads its architecture. |
 
 ### Files

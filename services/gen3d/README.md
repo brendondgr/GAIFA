@@ -320,6 +320,8 @@ copies of CubeArt's scripts (the preview script since changed: see Preview rende
 
 ## Install / reinstall
 
+> **Under AIHub** this is the `gen3d` mod: `aihub install gen3d`, `podman pull` the ROCm image, `scripts/install-runtime.sh`, then the weights. Setup: [setup/cubeart.md](setup/cubeart.md), [setup/img3d.md](setup/img3d.md), [setup/sam3do.md](setup/sam3do.md). The steps below are the old standalone 3DGenerate install.
+
 ```bash
 git clone git@github.com:brendondgr/3DGenerate.git ~/Projects/3DGenerate && cd ~/Projects/3DGenerate
 ./install.sh                # server venv + `gen3d` command + app launcher + boot service, then starts it

@@ -10,7 +10,8 @@
 | Where it goes | `data/models/comfyui/diffusion_models/qwen-image-2.1-UC-Q8_0.gguf` |
 | Source | Hugging Face [abenzerps/Qwen-Image-2.1-Uncensored-GGUF](https://huggingface.co/abenzerps/Qwen-Image-2.1-Uncensored-GGUF) |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
+| Referenced by | [`workflows/qwen21-edit-multi/workflow.json`](../../../services/comfy/workflows/qwen21-edit-multi/workflow.json), [`workflows/qwen21-remove-bg/workflow.json`](../../../services/comfy/workflows/qwen21-remove-bg/workflow.json), [`workflows/qwen21-t2i/workflow.json`](../../../services/comfy/workflows/qwen21-t2i/workflow.json) |
 
 ### Files
 

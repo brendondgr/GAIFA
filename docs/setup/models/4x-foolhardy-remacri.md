@@ -10,7 +10,7 @@
 | Where it goes | `data/models/comfyui/upscale_models/4x_foolhardy_Remacri.safetensors` |
 | Source | not recorded |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
 
 ### Files
 

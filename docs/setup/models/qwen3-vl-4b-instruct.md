@@ -10,7 +10,7 @@
 | Where it goes | `data/models/3d/Qwen3-VL-4B-Instruct` |
 | Source | Hugging Face [Qwen/Qwen3-VL-4B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct) |
 | Used by | `gen3d` |
-| Environment | none yet |
+| Environment | [CubeArt: Cube3D and CubePart (3D Generate)](../../../services/gen3d/setup/cubeart.md) |
 
 ### Files
 

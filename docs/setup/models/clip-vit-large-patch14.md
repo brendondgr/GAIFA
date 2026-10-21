@@ -10,7 +10,7 @@
 | Where it goes | `data/models/3d/clip-vit-large-patch14` |
 | Source | Hugging Face [openai/clip-vit-large-patch14](https://huggingface.co/openai/clip-vit-large-patch14) |
 | Used by | `gen3d` |
-| Environment | none yet |
+| Environment | [CubeArt: Cube3D and CubePart (3D Generate)](../../../services/gen3d/setup/cubeart.md) |
 
 ### Files
 

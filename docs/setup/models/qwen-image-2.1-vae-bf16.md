@@ -10,7 +10,8 @@
 | Where it goes | `data/models/comfyui/vae/qwen_image_2.1_vae_bf16.safetensors` |
 | Source | Hugging Face [Comfy-Org/Qwen-Image-2.1](https://huggingface.co/Comfy-Org/Qwen-Image-2.1) |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
+| Referenced by | [`workflows/qwen21-edit-multi/workflow.json`](../../../services/comfy/workflows/qwen21-edit-multi/workflow.json), [`workflows/qwen21-remove-bg/workflow.json`](../../../services/comfy/workflows/qwen21-remove-bg/workflow.json), [`workflows/qwen21-t2i/workflow.json`](../../../services/comfy/workflows/qwen21-t2i/workflow.json), [`workflows/qwen21-turbo-edit-multi/workflow.json`](../../../services/comfy/workflows/qwen21-turbo-edit-multi/workflow.json), [`workflows/qwen21-turbo-remove-bg/workflow.json`](../../../services/comfy/workflows/qwen21-turbo-remove-bg/workflow.json), [`workflows/qwen21-turbo-t2i/workflow.json`](../../../services/comfy/workflows/qwen21-turbo-t2i/workflow.json) |
 
 ### Files
 

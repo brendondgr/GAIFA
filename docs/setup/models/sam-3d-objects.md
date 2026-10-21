@@ -10,7 +10,7 @@
 | Where it goes | `data/models/3d/sam-3d-objects` |
 | Source | Hugging Face [facebook/sam-3d-objects](https://huggingface.co/facebook/sam-3d-objects) |
 | Used by | `gen3d` |
-| Environment | none yet |
+| Environment | [SAM 3D Objects (3D Generate)](../../../services/gen3d/setup/sam3do.md) |
 | Registry notes | gen3d engine sam3d_objects (gated repo; access granted 2026-10-10). Licence: SAM Licence. |
 
 ### Files

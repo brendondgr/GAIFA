@@ -10,7 +10,7 @@
 | Where it goes | `data/models/comfyui/loras/chroma-flash-heun_r32-fp32.safetensors` |
 | Source | not recorded |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
 
 ### Files
 

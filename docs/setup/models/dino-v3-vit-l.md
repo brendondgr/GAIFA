@@ -10,7 +10,7 @@
 | Where it goes | `data/models/comfyui/clip_vision/dino_v3_vit_l.safetensors` |
 | Source | Hugging Face [Comfy-Org/TRELLIS.2](https://huggingface.co/Comfy-Org/TRELLIS.2) |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
 | Registry notes | TRELLIS.2's image conditioning (Comfy-Org repack; Meta's own repo is gated). Licence: DINOv3 Licence. |
 
 ### Files

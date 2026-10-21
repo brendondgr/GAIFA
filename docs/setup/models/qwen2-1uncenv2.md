@@ -10,7 +10,7 @@
 | Where it goes | `data/models/comfyui/loras/qwen2-1uncenV2.safetensors` |
 | Source | not recorded |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
 
 ### Files
 

@@ -10,7 +10,7 @@
 | Where it goes | `data/models/comfyui/diffusion_models/trellis_2_bf16.safetensors` |
 | Source | Hugging Face [Comfy-Org/TRELLIS.2](https://huggingface.co/Comfy-Org/TRELLIS.2) |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
 | Registry notes | ComfyUI-native TRELLIS.2; packs trellis2-shape, trellis2-lowpoly, trellis2-draft (gen3d engine trellis2). Licence: MIT. |
 
 ### Files

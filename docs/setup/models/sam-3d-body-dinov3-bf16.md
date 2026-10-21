@@ -10,7 +10,7 @@
 | Where it goes | `data/models/comfyui/detection/sam_3d_body_dinov3_bf16.safetensors` |
 | Source | Hugging Face [Comfy-Org/sam-3d-body](https://huggingface.co/Comfy-Org/sam-3d-body) |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
 | Registry notes | ComfyUI-native SAM 3D Body; pack sam3d-body (gen3d engine sam3d_body). Comfy-Org repack (Meta's repo is gated). Licence: SAM Licence. |
 
 ### Files

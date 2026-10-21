@@ -10,7 +10,7 @@
 | Where it goes | `data/models/comfyui/vae/trellis_2_shape_vae_bf16.safetensors` |
 | Source | Hugging Face [Comfy-Org/TRELLIS.2](https://huggingface.co/Comfy-Org/TRELLIS.2) |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
 | Registry notes | TRELLIS.2's shape decoder. Licence: MIT. |
 
 ### Files

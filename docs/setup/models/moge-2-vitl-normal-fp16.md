@@ -10,7 +10,7 @@
 | Where it goes | `data/models/comfyui/geometry_estimation/moge_2_vitl_normal_fp16.safetensors` |
 | Source | Hugging Face [Comfy-Org/MoGe](https://huggingface.co/Comfy-Org/MoGe) |
 | Used by | `comfy` |
-| Environment | none yet |
+| Environment | [ComfyUI in the Strix Halo toolbox](../../../services/comfy/setup/comfyui.md) |
 | Registry notes | Optional field-of-view estimate for SAM 3D Body. Licence: MIT. |
 
 ### Files

@@ -10,7 +10,7 @@
 | Where it goes | `data/models/hf-cache/hub/models--openai--whisper-large-v3-turbo` |
 | Source | Hugging Face [openai/whisper-large-v3-turbo](https://huggingface.co/openai/whisper-large-v3-turbo) |
 | Used by | `tts` |
-| Environment | none yet |
+| Environment | [Breeze TTS 2 and Whisper (Speech)](../../../services/tts/setup/breeze.md) |
 | Registry notes | Transcribes voice references and aligns word timings. |
 
 ### Files
@@ -35,7 +35,7 @@
 From the project folder (`uvx` runs Hugging Face's CLI without installing it; gated repos need `hf auth login` first, see [host.md](../host.md#6-accounts-and-licences)):
 
 ```bash
-HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download openai/whisper-large-v3-turbo added_tokens.json config.json generation_config.json merges.txt model.safetensors normalizer.json preprocessor_config.json special_tokens_map.json tokenizer.json tokenizer_config.json vocab.json refs/main
+HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download openai/whisper-large-v3-turbo added_tokens.json config.json generation_config.json merges.txt model.safetensors normalizer.json preprocessor_config.json special_tokens_map.json tokenizer.json tokenizer_config.json vocab.json
 ```
 <!-- end generated -->
 

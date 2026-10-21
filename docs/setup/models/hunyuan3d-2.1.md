@@ -10,7 +10,7 @@
 | Where it goes | `data/models/3d/Hunyuan3D-2.1` |
 | Source | Hugging Face [tencent/Hunyuan3D-2.1](https://huggingface.co/tencent/Hunyuan3D-2.1) |
 | Used by | `gen3d` |
-| Environment | none yet |
+| Environment | [Hunyuan3D 2.1 (3D Generate)](../../../services/gen3d/setup/img3d.md) |
 | Registry notes | gen3d engine hunyuan21 (shape only). Licence: Tencent Hunyuan 3D 2.1 Community Licence, which excludes the EU, UK and South Korea. |
 
 ### Files

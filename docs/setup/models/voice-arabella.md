@@ -10,7 +10,7 @@
 | Where it goes | `data/models/voices/arabella` |
 | Source | made on this machine (uploaded reference clip) |
 | Used by | `tts` |
-| Environment | none yet |
+| Environment | [Breeze TTS 2 and Whisper (Speech)](../../../services/tts/setup/breeze.md) |
 
 ### Files
 

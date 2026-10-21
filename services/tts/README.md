@@ -242,6 +242,8 @@ Generated audio goes to `~/Music/TTS/` (`LOCALTTS_OUTPUTS_DIR`) unless `no_save`
 
 ## Install / reinstall
 
+> **Under AIHub** this is the `tts` mod: `aihub install tts`, then the engines with `scripts/install-runtime.sh --accept-breeze-license` (weights first: the script runs offline). Setup: [setup/kokoro.md](setup/kokoro.md) and [setup/breeze.md](setup/breeze.md). The steps below are the old standalone LocalTTS install.
+
 ```bash
 git clone https://github.com/brendondgr/LocalTTS && cd LocalTTS
 ./install.sh                # server + `localtts` command + boot service; offers to set up engines

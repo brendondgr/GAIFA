@@ -10,7 +10,7 @@
 | Where it goes | `data/models/3d/moge-vitl` |
 | Source | Hugging Face [Ruicheng/moge-vitl](https://huggingface.co/Ruicheng/moge-vitl) |
 | Used by | `gen3d` |
-| Environment | none yet |
+| Environment | [SAM 3D Objects (3D Generate)](../../../services/gen3d/setup/sam3do.md) |
 | Registry notes | SAM 3D Objects' depth / point-map model. Licence: MIT. |
 
 ### Files

@@ -10,7 +10,7 @@
 | Where it goes | `data/models/3d/cubepart` |
 | Source | Hugging Face [Roblox/cubepart](https://huggingface.co/Roblox/cubepart) |
 | Used by | `gen3d` |
-| Environment | none yet |
+| Environment | [CubeArt: Cube3D and CubePart (3D Generate)](../../../services/gen3d/setup/cubeart.md) |
 
 ### Files
 

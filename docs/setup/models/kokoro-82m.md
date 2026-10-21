@@ -10,7 +10,7 @@
 | Where it goes | `data/models/hf-cache/hub/models--hexgrad--Kokoro-82M` |
 | Source | Hugging Face [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) at `f3ff3571791e` |
 | Used by | `tts` |
-| Environment | none yet |
+| Environment | [Kokoro-82M (Speech)](../../../services/tts/setup/kokoro.md) |
 | Registry notes | All 28 English voices (a*, b*). |
 
 ### Files
@@ -54,7 +54,7 @@
 From the project folder (`uvx` runs Hugging Face's CLI without installing it; gated repos need `hf auth login` first, see [host.md](../host.md#6-accounts-and-licences)):
 
 ```bash
-HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download hexgrad/Kokoro-82M config.json kokoro-v1_0.pth voices/af_alloy.pt voices/af_aoede.pt voices/af_bella.pt voices/af_heart.pt voices/af_jessica.pt voices/af_kore.pt voices/af_nicole.pt voices/af_nova.pt voices/af_river.pt voices/af_sarah.pt voices/af_sky.pt voices/am_adam.pt voices/am_echo.pt voices/am_eric.pt voices/am_fenrir.pt voices/am_liam.pt voices/am_michael.pt voices/am_onyx.pt voices/am_puck.pt voices/am_santa.pt voices/bf_alice.pt voices/bf_emma.pt voices/bf_isabella.pt voices/bf_lily.pt voices/bm_daniel.pt voices/bm_fable.pt voices/bm_george.pt voices/bm_lewis.pt refs/main --revision f3ff3571791e39611d31c381e3a41a3af07b4987
+HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download hexgrad/Kokoro-82M config.json kokoro-v1_0.pth voices/af_alloy.pt voices/af_aoede.pt voices/af_bella.pt voices/af_heart.pt voices/af_jessica.pt voices/af_kore.pt voices/af_nicole.pt voices/af_nova.pt voices/af_river.pt voices/af_sarah.pt voices/af_sky.pt voices/am_adam.pt voices/am_echo.pt voices/am_eric.pt voices/am_fenrir.pt voices/am_liam.pt voices/am_michael.pt voices/am_onyx.pt voices/am_puck.pt voices/am_santa.pt voices/bf_alice.pt voices/bf_emma.pt voices/bf_isabella.pt voices/bf_lily.pt voices/bm_daniel.pt voices/bm_fable.pt voices/bm_george.pt voices/bm_lewis.pt --revision f3ff3571791e39611d31c381e3a41a3af07b4987
 ```
 <!-- end generated -->
 

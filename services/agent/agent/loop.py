@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import context as ctx
+from .compaction import Compaction
 from . import links
 from .docs import describe as describe_docs
 from . import prompts
@@ -85,7 +86,7 @@ def thread_settings(store: Any, tid: str) -> dict[str, Any]:
     t = store.thread(tid)
     return (t or {}).get("settings") or {}
 
-class Agent:
+class Agent(Compaction):
     def __init__(self, cfg: Config, store: Store, hub: HubAPI, llm: LLM) -> None:
         from .local import Local
 
@@ -751,42 +752,6 @@ class Agent:
         events = self.store.events(tid)
         self.transient(tid, "context", ctx.meter(events, window, sizes) | {"model": model})
         return reply, model
-
-    async def _compact_if_needed(self, tid: str, tools: ToolSet, model: str, force: bool = False) -> bool:
-        """Returns True when the turn must stop (the thrash guard)."""
-        window = await self.window(model, tid)
-        msgs, sizes = await self.messages(tid, tools, model)
-        used = ctx.est(msgs) + sizes["tools"]
-        if not force and used < ctx.CLEAR_AT * window:
-            return False
-        events = self.store.events(tid)
-        cands = ctx.clear_candidates(events)
-        if cands:
-            self.emit(tid, "compact", {"stage": "clear", "cleared": cands, "before": used})
-            msgs, sizes = await self.messages(tid, tools, model)
-            used = ctx.est(msgs) + sizes["tools"]
-        if force or used >= ctx.SUMMARIZE_AT * window:
-            cut = ctx.summary_cut(self.store.events(tid))
-            if cut:
-                await self._summarize(tid, model, cut, used)
-                msgs, sizes = await self.messages(tid, tools, model)
-                used = ctx.est(msgs) + sizes["tools"]
-        if used >= ctx.SUMMARIZE_AT * window:
-            self.emit(tid, "error", {"code": "context_full", "detail": f"the chat still uses {used:,} of {window:,} tokens after "
-                                     "compaction (one item is too large)", "fix": "start a new chat, or fork from an earlier message"})
-            return True
-        return False
-
-    async def _summarize(self, tid: str, model: str, cut: int, before: int) -> None:
-        events = [e for e in self.store.events(tid) if e["seq"] <= cut]
-        old_summary, _, _ = ctx.summary_state(events)
-        msgs, _ = ctx.rebuild(events)
-        prompt = [{"role": "system", "content": "You summarize chats." + (f"\nEarlier summary:\n{old_summary}" if old_summary else "")},
-                  *msgs, {"role": "user", "content": prompts.SUMMARY_PROMPT}]
-        reply = await self.llm.chat(model, prompt)
-        outs = prompts.outputs_table(ctx.model_outputs(events))
-        summary = reply.text.strip() + (f"\n\nOutputs so far:\n{outs}" if outs else "")
-        self.emit(tid, "compact", {"stage": "summary", "summary": summary, "upto_seq": cut, "before": before})
 
     async def compact(self, tid: str) -> dict[str, Any]:
         if self.running(tid):

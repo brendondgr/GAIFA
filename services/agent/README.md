@@ -7,7 +7,8 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 | File | What it does |
 |---|---|
 | `agent/llm.py` | The model client: streams `/v1/chat/completions` from the relay (no `max_tokens`), thinking from `reasoning`/`reasoning_content`, leaked tool calls re-parsed |
-| `agent/loop.py` | `Agent`: turns, pauses (`ask_user`, parameter cards), queued messages, cancel, actions (buttons), the step cap, fallback model, compaction |
+| `agent/loop.py` | `Agent`: turns, pauses (`ask_user`, parameter cards), queued messages, cancel, actions (buttons), the step cap, fallback model |
+| `agent/compaction.py` | Compaction, mixed into `Agent`: clear old tool results, then summarize the older part of the chat |
 | `agent/store.py` | `agent.db`: threads and their append-only event log; fork |
 | `agent/context.py` | Messages rebuilt from the log, the context meter, result capping, compaction helpers |
 | `agent/tools.py` | The local tools' schemas and `ToolSet` (core + loaded + pinned − disabled) |

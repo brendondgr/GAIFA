@@ -117,6 +117,8 @@ class Task:
     prefs: list[dict[str, Any]] = field(default_factory=list)   # preferences seeded for this task, removed after (plan 21.6)
     timeout: float = 600
     note: str = ""
+    needs: tuple[str, ...] = ()   # what must exist to run it: a tool ("comfy_animate_image") or one of its choices
+    #                               ("comfy_generate_image.workflow=zimage-intorealism"); else it is skipped, not failed
 
 
 def first_option(q: dict[str, Any]) -> dict[str, Any]:
@@ -228,8 +230,37 @@ class Harness:
         if asked and not acted:
             await self._drive(task, tid, text, deadline)
 
+    async def missing(self, task: Task) -> str | None:
+        """Why `task` can't run on this install (a tool or a choice it needs isn't offered), or None."""
+        if not task.needs:
+            return None
+        names = sorted({n.split("=")[0].split(".")[0] for n in task.needs})
+        async with httpx.AsyncClient(base_url=self.hub_url(), timeout=30, trust_env=False) as hub:
+            r = await hub.get("/api/tools", params={"names": ",".join(names), "view": "model"})
+            tools = {t["name"]: t for t in r.json()} if r.status_code == 200 else {}
+            if r.status_code != 200:   # one at a time: the hub refuses the whole list when one is unknown
+                for n in names:
+                    r1 = await hub.get("/api/tools", params={"names": n, "view": "model"})
+                    if r1.status_code == 200:
+                        tools.update({t["name"]: t for t in r1.json()})
+        for need in task.needs:
+            tool, _, choice = need.partition(".")
+            if tool not in tools:
+                return f"{tool} isn't in the catalog here"
+            if choice:
+                field, _, value = choice.partition("=")
+                prop = ((tools[tool].get("parameters") or {}).get("properties") or {}).get(field) or {}
+                offered = [str(v) for v in (prop.get("enum") or [])] + [str(o.get("value")) for o in prop.get("x-options") or []]
+                if value not in offered:
+                    return f"{tool} doesn't offer {field}={value} here"
+        return None
+
     async def run(self, task: Task) -> Run:
         run = Run(task.id, self.model)
+        why = await self.missing(task)
+        if why:
+            run.extra["skipped"] = why
+            return run
         t0 = time.monotonic()
         deadline = t0 + task.timeout
         settings = {"dry_run": self.dry_run, **task.settings}
@@ -320,6 +351,9 @@ class Harness:
 
 
 def grade(task: Task, run: Run) -> dict[str, Any]:
+    if run.extra.get("skipped"):
+        return {"task": task.id, "group": task.group, "ok": None, "skipped": run.extra["skipped"], "checks": [],
+                "seconds": 0.0, "tools": [], "asked": False, "final": "", "turns": task.turns}
     results = []
     for name, check in task.checks:
         try:
@@ -344,6 +378,8 @@ def grade(task: Task, run: Run) -> dict[str, Any]:
 
 
 def summary(rows: list[dict[str, Any]], runs: int) -> dict[str, Any]:
+    skipped = sorted({(r["task"], r["skipped"]) for r in rows if r.get("skipped")})
+    rows = [r for r in rows if not r.get("skipped")]
     by: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
         by.setdefault(r["task"], []).append(r)
@@ -355,7 +391,8 @@ def summary(rows: list[dict[str, Any]], runs: int) -> dict[str, Any]:
     n = len(tasks)
     return {"tasks": n, "pass_k": sum(t["pass_k"] for t in tasks), "pass_k_rate": round(sum(t["pass_k"] for t in tasks) / n, 3) if n else 0,
             "pass_1_rate": round(sum(r["ok"] for r in rows) / len(rows), 3) if rows else 0,
-            "by_task": tasks, "mean_seconds": round(sum(r["seconds"] for r in rows) / len(rows), 1) if rows else 0}
+            "by_task": tasks, "mean_seconds": round(sum(r["seconds"] for r in rows) / len(rows), 1) if rows else 0,
+            "skipped": [{"task": t, "why": w} for t, w in skipped]}
 
 
 def dump(path: Any, obj: Any) -> None:

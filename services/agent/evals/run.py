@@ -29,6 +29,9 @@ async def main(a: argparse.Namespace) -> int:
             row["run"] = i
             rows.append(row)
             bad = [c["check"] for c in row["checks"] if not c["ok"]]
+            if row.get("skipped"):
+                print(f"[{len(rows):3}/{len(tasks) * a.runs}] {t.id:22} run {i} SKIP {row['skipped']}", flush=True)
+                return
             print(f"[{len(rows):3}/{len(tasks) * a.runs}] {t.id:22} run {i} {'PASS' if row['ok'] else 'FAIL'} "
                   f"{row['seconds']:6.1f}s tools={row['tools']}" + (f" failed={bad}" if bad else "")
                   + (f" error={run.error} {run.extra.get('traceback', '')[-400:]}" if run.error else ""), flush=True)
@@ -47,6 +50,8 @@ async def main(a: argparse.Namespace) -> int:
     print(json.dumps({k: v for k, v in s.items() if k != "by_task"}, indent=1))
     for t in s["by_task"]:
         print(f"  {t['task']:22} {t['passes']}/{t['runs']} {'' if t['pass_k'] else 'FAILED: ' + ', '.join(t['failed_checks'])}")
+    for t in s["skipped"]:
+        print(f"  {t['task']:22} skipped: {t['why']}")
     return 0
 
 

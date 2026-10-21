@@ -149,3 +149,21 @@ def test_library_cases_grade_what_they_should():
         ev("assistant", text=f"Yes: {STATIONS[ANSWER_DOC - 1]} keeps a ginger cat called Saffron (#{ANSWER_DOC} p.{ANSWER_PAGE}).")])
     assert grade(docs, answer)["ok"]
     assert b"Saffron" not in station_report(1) and len(station_report(ANSWER_DOC)) > 40_000
+
+
+async def test_a_task_that_cant_run_here_is_skipped_not_failed(env):
+    """Overnight 2026-10-21: tasks whose tools or workflows aren't offered (models removed) are skipped
+    and kept out of the pass rates."""
+    from evals.harness import summary
+
+    h = Harness("http://agent", "main", dry_run=True, transport=httpx.ASGITransport(app=env.app))
+
+    async def missing(task):
+        return "comfy_animate_image isn't in the catalog here" if task.needs else None
+    h.missing = missing
+    skip = await h.run(Task("v1", "single", ["animate it"], [], needs=("comfy_animate_image",)))
+    row = grade(Task("v1", "single", ["animate it"], []), skip)
+    assert row["ok"] is None and "catalog" in row["skipped"] and not skip.events
+    s = summary([row, {"task": "t2", "group": "single", "ok": True, "checks": [], "seconds": 1.0}], 1)
+    assert s["tasks"] == 1 and s["pass_k"] == 1 and s["skipped"] == [{"task": "v1", "why": row["skipped"]}]
+    await h.close()

@@ -78,14 +78,14 @@ def not_asked():
     return ("didn't ask", lambda r: (not r.asked(), "asked: " + json.dumps(r.of("question")[:1])[:200] if r.asked() else ""))
 
 
-def asked_before(name: str):
 def asks_in_words(text: str) -> bool:
     """A reply that asks for something: a "?", or "Please share/paste/send … " with no question mark."""
     return "?" in text or bool(re.search(r"\b(please|could you|can you|would you)\b.{0,40}\b(share|send|paste|provide|give|tell|upload|attach)\b",
                                          text, re.I | re.S))
 
 
-    """A question card, or a reply that asks in words ("?"), before `name` ran."""
+def asked_before(name: str):
+    """A question card, or a reply that asks in words, before `name` ran."""
     def c(r: Run):
         types = [(e["type"], e["payload"].get("name")) for e in r.events]
         qi = next((i for i, (e, t) in enumerate(zip(r.events, types)) if t[0] == "question" or
@@ -484,3 +484,16 @@ TASKS += _WORKSPACE
 from .library import TASKS as LIBRARY_TASKS  # noqa: E402: plan 28.3's cases, kept in their own file
 
 TASKS += LIBRARY_TASKS
+
+# What each task needs to be runnable here (a tool, or a choice a tool offers); without it the task is
+# skipped, not failed: e.g. after the Wan 2.1 and Z-Image models were removed (2026-10-20), the video
+# tools and those workflows aren't offered on this machine.
+_INTOREALISM = f"{IMG}.workflow=zimage-intorealism"
+NEEDS = {
+    "img_then_video": (I2V,), "three_steps": (I2V,), "compact_continue": (I2V,), "animate_without_image": (I2V,),
+    "video_text": (VID,),
+    "carry_in_chat": (_INTOREALISM,), "pref_prefilled": (_INTOREALISM,), "full_image_spec": (_INTOREALISM,),
+    "explicit_beats_pref": (_INTOREALISM, f"{IMG}.workflow=zimage-turbo"),
+}
+for _t in TASKS:
+    _t.needs = NEEDS.get(_t.id, _t.needs)

@@ -50,6 +50,11 @@ Commands and Python run in `localhost/aihub-workspace-sandbox:1` (rootless podma
 | `POST /v1/sandbox/build` | build it (minutes) |
 | `GET /v1/runs?thread=`, `GET /v1/runs/{id}` | run records |
 | `POST /v1/runs/{id}/cancel` | stop a run |
+| `POST /v1/run` | `workspace_run`: `{folder, command, where: sandbox \| host, network?, cwd?, timeout_s?}` → `{run, state, exit_code, seconds, where, network, stdout, stderr, note?}` (output inside `<untrusted>`); Run for the sandbox and the host, Run + network for `network` and git remotes |
+| `POST /v1/python` | `workspace_python`: `{code, inputs?, folder?, network?, timeout_s?}`; inputs (outputs) are fetched from the hub into `inputs/` (`$AIHUB_INPUTS`); without a folder every file the code writes becomes an output in `outputs/workspace/<date>/<HHMMSS>-<name>` with a sidecar (the run and the code); with a folder, files in `$AIHUB_OUT` do |
+| `POST /v1/limits` | the hub's preflight before each call (plan 27.4): `{action, folder, level, allow_bypass, key, once, preview, refuse?}` |
+
+A call that goes away (the hub cancelled it) stops its run. Host runs (`where = "host"`) run `bash -c` in the folder on your machine, with your files and network, and are only reached after you allowed that one call: no grant covers them.
 
 ## Checkpoints
 

@@ -201,7 +201,9 @@ class Sandbox:
                 args += ["-v", f"{src}:{src}:O"]
         for path, mode in mounts:
             args += ["-v", f"{path}:{path}:{'rw' if mode == 'rw' else 'ro'}"]
-        for k, v in {"HOME": home, **env}.items():
+        caches = {"UV_CACHE_DIR": f"{home}/.cache/uv", "PIP_CACHE_DIR": f"{home}/.cache/pip", "npm_config_cache": f"{home}/.npm",
+                  "XDG_CACHE_HOME": "/tmp/.cache", "XDG_CONFIG_HOME": "/tmp/.config", "MPLCONFIGDIR": "/tmp/.config/matplotlib"}
+        for k, v in {"HOME": home, **caches, **env}.items():
             args += ["-e", f"{k}={v}"]
         args += ["-w", str(cwd), self.image_name, "bash", "-c", run.command]
         return args

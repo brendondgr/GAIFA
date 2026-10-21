@@ -37,3 +37,10 @@ def test_workspace_editing_tools():
     assert m is not None
     for name, risk in (("edit", "write"), ("write", "write"), ("move", "write"), ("delete", "destructive"), ("git_commit", "write")):
         assert (m.tools[name].risk, m.tools[name].grant_key) == (risk, "arg:folder"), name
+
+
+def test_workspace_running_tools():
+    m = parse(ROOT / "services" / "workspace").manifest
+    assert m is not None and m.agent.limits == "POST /v1/limits"
+    assert (m.tools["run"].risk, m.tools["run"].grant_key) == ("execute", "arg:folder")
+    assert m.tools["python"].risk == "execute" and m.tools["python"].grant_key is None   # the preflight's key: "python"

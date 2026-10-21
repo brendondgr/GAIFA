@@ -63,3 +63,15 @@ async def test_the_mode_turn_and_named_files_reach_the_hub(env):
     for mode in ("accept_edits", "bypass"):
         r = await env.client.patch(f"/v1/threads/{tid}", json={"mode": mode})
         assert r.status_code == 200 and r.json()["mode"] == mode
+
+
+def test_file_inputs_get_the_chats_numbers_resolved(env):
+    """plan 27.6: `#n` in a file input (workspace_python's `inputs`), alone or in a list, becomes output:<id>."""
+    loop = env.agent.loop if hasattr(env.agent, "loop") else env.agent
+    loop.local.resolve_ref = lambda tid, ref: {"#1": "0123456789ab", "#2": "ba9876543210"}.get(ref.strip())
+    schema = {"properties": {"inputs": {"type": "array", "x-kind": "file"}, "image": {"type": "string", "x-kind": "image"},
+                             "code": {"type": "string"}}}
+    out = loop._refs("t", {"inputs": ["#1", "#2", "output:ffffffffffff"], "image": "#2", "code": "#1 stays", "ref": "#1"}, schema)
+    assert out == {"inputs": ["output:0123456789ab", "output:ba9876543210", "output:ffffffffffff"], "image": "output:ba9876543210",
+                   "code": "#1 stays", "ref": "output:0123456789ab"}
+    assert loop._refs("t", {"inputs": ["#9"]}, schema) == {"inputs": ["#9"]}      # an unknown number is left for the mod to refuse

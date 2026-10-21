@@ -349,12 +349,20 @@ class Agent:
         step = calls[-1]["payload"].get("step")
         return [e for e in calls if e["payload"].get("step") == step]
 
-    def _refs(self, tid: str, args: dict[str, Any]) -> dict[str, Any]:
-        """A hub tool's `ref` given as this chat's `#n` → `output:<id>` (the hub doesn't know the chat's numbers)."""
-        ref = args.get("ref")
-        if isinstance(ref, str) and re.fullmatch(r"\s*#\d+\s*", ref) and (oid := self.local.resolve_ref(tid, ref)):
-            return {**args, "ref": f"output:{oid}"}
-        return args
+    def _refs(self, tid: str, args: dict[str, Any], schema: dict[str, Any] | None = None) -> dict[str, Any]:
+        """This chat's `#n` → `output:<id>` (the hub doesn't know the chat's numbers): in a hub tool's `ref`,
+        and in any file input of `schema` (`x-kind`), alone or in a list (plan 27.6: workspace_python's inputs)."""
+        def one(v: Any) -> Any:
+            if isinstance(v, str) and re.fullmatch(r"\s*#\d+\s*", v) and (oid := self.local.resolve_ref(tid, v)):
+                return f"output:{oid}"
+            return v
+        out = dict(args)
+        if "ref" in out:
+            out["ref"] = one(out["ref"])
+        for k, p in ((schema or {}).get("properties") or {}).items():
+            if k in out and isinstance(p, dict) and (p.get("x-kind") or (p.get("items") or {}).get("x-kind")):
+                out[k] = [one(x) for x in out[k]] if isinstance(out[k], list) else one(out[k])
+        return out
 
     def _unresolved(self, tid: str) -> list[dict[str, Any]]:
         done = {e["payload"]["id"] for e in self.store.events(tid, types=("tool_result",))}
@@ -472,7 +480,7 @@ class Agent:
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
             if (thread.get("settings") or {}).get("no_learn"):
                 origin["no_learn"] = True   # this chat opted out of learning (plan 21.4)
-            args = self._refs(tid, args or {})
+            args = self._refs(tid, args or {}, (tools.full.get(name) or {}).get("parameters"))
             res = await self.hub.call(name, args, origin, mode, wait=2)
             if res.get("status") == "needs_approval":
                 self.emit(tid, "approval", {"id": cid, "approval_id": res["approval_id"], "tool": name,

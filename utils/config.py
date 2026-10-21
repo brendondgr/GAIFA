@@ -118,8 +118,18 @@ class PermissionsCfg(_Strict):
     allow: list[str] = ["hub_start_service", "hub_set_preference"]
 
 
+class JudgeCfg(_Strict):
+    """The Auto mode's judge (plan Phase 30, `utils/tools/judge.py`); the default is the eval's pick (docs/agent-eval.md)."""
+    backend: Literal["relay", "decide"] = "relay"
+    model: str = "minicpm-5-2B"             # a relay model name, or a decide model id
+    url: str = "http://127.0.0.1:4000"      # the relay, or the decide mod (http://127.0.0.1:7000/api/s/decide)
+    threshold: float = Field(0.95, gt=0, le=1)   # decide: every answer must clear it
+    timeout_s: float = Field(3.0, gt=0)     # slower → ask
+
+
 class AgentCfg(_Strict):
     permissions: PermissionsCfg = PermissionsCfg()
+    judge: JudgeCfg = JudgeCfg()
     make_room: bool = True          # tool calls unload idle mods when a model needs room
     approval_ttl_h: float = Field(24, gt=0)
 

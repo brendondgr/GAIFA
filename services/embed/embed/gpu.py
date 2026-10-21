@@ -9,8 +9,8 @@ Two measures (`EMBED_IDLE_MEASURE`):
   /api/memory` (the DRM engine counters: Vulkan work such as lcpp's). ROCm compute goes through `/dev/kfd`, which
   neither DRM fdinfo nor this kernel's `/sys/class/kfd/kfd/proc/<pid>` accounts per process (2026-10-20), hence
   the activity signals.
-- `device`: the whole GPU's `gpu_busy_percent` median alone. On gfx1151 it sits at 13–17 % with only the desktop
-  running and jumps to 80–90 % about every 15 s, so under 10 % it rarely holds; raise the threshold with it.
+- `device`: the whole GPU's `gpu_busy_percent` median alone, against the same `device_pct` (30 %). On gfx1151 it
+  sits at 13–17 % with only the desktop running and jumps to 80–90 % about every 15 s.
 
 Our own encoding makes the GPU busy too: samples taken while the encoder works (and for `grace_s` after) are
 left out. Between batches the indexer reads again (`busy_now`); any other work then stops indexing and the quiet

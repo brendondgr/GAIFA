@@ -284,3 +284,11 @@ def test_hub_going_away_pauses_without_failing(settings, hub):
     assert run(lib.drain()) == 0 and lib.state == "no_hub"
     row = lib.store.get("a")
     assert row["state"] == "pending" and row["attempts"] == 0
+
+
+def test_the_device_measure_uses_the_device_threshold(settings, hub):
+    from dataclasses import replace
+    lib = Library(Store(settings.databases / "d.db"), Encoder(FakeBackend()), Hub(None), replace(settings, idle_measure="device"))
+    assert lib.gpu.busy_pct == 30 and type(lib.gpu.read).__name__ == "DeviceMedian"
+    lib2 = Library(Store(settings.databases / "a.db"), Encoder(FakeBackend()), Hub(None), settings)
+    assert lib2.gpu.busy_pct == 10 and type(lib2.gpu.read).__name__ == "HubMeter"

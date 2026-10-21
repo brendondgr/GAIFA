@@ -30,9 +30,9 @@ class Settings:
     databases: Path = HERE / "data"
     index: bool = True                # follow the hub's outputs and index them
     idle_measure: str = "aihub"       # aihub (other GPU mods working, and the device's median) | device (gpu_busy_percent)
-    idle_device_pct: float = 30.0     # aihub: the whole GPU's 30 s median at or above this counts as busy
+    idle_device_pct: float = 30.0     # the whole GPU's 30 s median at or above this counts as busy (both measures)
     idle_window_s: float = 30.0       # the window of that median
-    idle_busy_pct: float = 10.0       # the GPU counts as idle under this busy percentage…
+    idle_busy_pct: float = 10.0       # aihub: the other mods' Vulkan engine time must stay under this…
     idle_seconds: float = 300.0       # …held for this long, before indexing starts
     index_audio_max_s: float = 3600.0 # longer audio is indexed up to here (30 s windows)
     index_gap_s: float = 1.0          # pause between batches, then a fresh look at the GPU

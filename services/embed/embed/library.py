@@ -80,7 +80,8 @@ class Library:
             device = DeviceMedian(settings.idle_window_s)
             read = device if settings.idle_measure == "device" else HubMeter(
                 settings.hub_url, os.environ.get("AIHUB_SERVICE_ID", "embed"), device, settings.idle_device_pct)
-            gpu = GpuIdle(settings.idle_busy_pct, settings.idle_seconds, ours=lambda: enc.busy or enc.loading, read=read)
+            pct = settings.idle_device_pct if settings.idle_measure == "device" else settings.idle_busy_pct
+            gpu = GpuIdle(pct, settings.idle_seconds, ours=lambda: enc.busy or enc.loading, read=read)
         self.gpu = gpu
         self.sleep = sleep
         self.tmp = settings.state_dir / "tmp"

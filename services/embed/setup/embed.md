@@ -58,8 +58,8 @@ The same packages unpinned, with PyTorch's CPU wheels. The model then runs in fp
 | `EMBED_IDLE_UNLOAD_S` | the mod's Settings tab (`idle_unload_s`) | no | unload after this many idle seconds; default 300, 0 = never |
 | `EMBED_MAX_INPUTS`, `EMBED_AUDIO_MAX_S`, `EMBED_BATCH_TEXT`, `EMBED_BATCH_MEDIA` | `config.toml` env | no | 256 inputs a call; audio cut at 320 s (25 tokens a second fills the 8k context); batches of 32 texts and 4 images |
 | `EMBED_INDEX` | `service.toml` | no | `1` (default): the library follows the hub's outputs and indexes them into `data/databases/embed.db`; `0` turns it off |
-| `EMBED_IDLE_MEASURE` | `service.toml` | no | how the library tells the GPU is free: `aihub` (default: no other GPU mod busy, with a request in flight or a job running, their Vulkan engine time under the threshold, and the whole GPU's 30 s median under `EMBED_IDLE_DEVICE_PCT`) or `device` (the whole GPU's `gpu_busy_percent` median alone) |
-| `EMBED_IDLE_DEVICE_PCT`, `EMBED_IDLE_WINDOW_S` | `config.toml` env | no | `aihub`: the whole GPU counts as busy at a 30 s median of 30 % or more, or three readings in a row of 95 % or more |
+| `EMBED_IDLE_MEASURE` | `service.toml` | no | how the library tells the GPU is free: `aihub` (default: no other GPU mod busy, with a request in flight or a job running, their Vulkan engine time under the threshold, and the whole GPU's 30 s median under `EMBED_IDLE_DEVICE_PCT`) or `device` (the whole GPU's `gpu_busy_percent` median alone, against `EMBED_IDLE_DEVICE_PCT`) |
+| `EMBED_IDLE_DEVICE_PCT`, `EMBED_IDLE_WINDOW_S` | `service.toml`, `config.toml` env | no | both measures: the whole GPU counts as busy at a 30 s median of 30 % or more, or three readings in a row of 95 % or more |
 | `EMBED_IDLE_BUSY_PCT`, `EMBED_IDLE_SECONDS` | `service.toml` | no | indexing starts once the GPU has stayed under 10 % for 300 s, and stops between batches when it isn't |
 | `EMBED_INDEX_BATCH_TEXT`, `EMBED_INDEX_GAP_S`, `EMBED_INDEX_AUDIO_MAX_S` | `config.toml` env | no | 8 chunks a batch; 1 s between batches before the next look at the GPU; audio indexed up to an hour |
 

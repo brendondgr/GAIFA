@@ -27,8 +27,9 @@ HF_HUB_OFFLINE = "1"
 # The measure: aihub (other mods' GPU use, from the hub's /api/memory) or device (gpu_busy_percent: the whole GPU).
 EMBED_INDEX = "1"
 EMBED_IDLE_MEASURE = "aihub"
-EMBED_IDLE_BUSY_PCT = "10"
-EMBED_IDLE_SECONDS = "300"
+EMBED_IDLE_BUSY_PCT = "10"           # aihub: the other mods' Vulkan engine time under this
+EMBED_IDLE_DEVICE_PCT = "30"         # both: the whole GPU's 30 s median gpu_busy_percent under this
+EMBED_IDLE_SECONDS = "300"           # held for this long
 
 [memory]
 estimate_gb = 3.0                   # text path, measured; status reports the peak per loaded encoder set

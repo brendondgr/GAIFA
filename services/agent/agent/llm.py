@@ -8,6 +8,9 @@
   `<|tool_call>call:name{…}<tool_call|>`, Hermes `<tool_call>{…}</tool_call>`, a lone JSON
   object or a ```json block naming a known tool), it's re-parsed.
 - **Usage** (`prompt_tokens`, `completion_tokens`) from the final chunk (`stream_options`).
+- **Control tokens** in user and tool messages (`<|turn>`, `<|im_start|>`, `[INST]`, … typed, attached, or in a page
+  or file a tool read) are defused before sending (`defuse`): llama.cpp parses special tokens in the rendered prompt,
+  so such text could otherwise open a turn of its own.
 """
 
 from __future__ import annotations
@@ -32,8 +35,30 @@ FENCED = re.compile(r"```(?:json|tool_code|tool)?\s*(\{.*?\})\s*```", re.S)
 ONE_FENCE = re.compile(r"^```[A-Za-z_]*\s*\n?(.*?)\s*```$", re.S)
 CHANNEL_OPEN = re.compile(r"<\|channel\>(?:thought|analysis|final)?\s*")
 THINK = re.compile(r"^\s*<(think|thinking)>(.*?)(?:</\1>|$)", re.S)
+# Chat-template control tokens (the hub's utils/tools/judge.py SPECIAL_TOKENS: mods don't import the hub)
+SPECIAL_TOKENS = re.compile(
+    r"<\|[^<>|\n]{0,40}\|>|<\|[A-Za-z_][\w.-]{0,40}>|<[A-Za-z_][\w.-]{0,40}\|>|<｜[^<>｜\n]{0,40}｜>"
+    r"|</?(?:start_of_turn|end_of_turn|start_of_image|end_of_image|s|think|thinking|bos|eos|pad|unk|mask|tool_call"
+    r"|tool_response)>|\[/?(?:INST|SYSTEM_PROMPT|TOOL_CALLS|AVAILABLE_TOOLS|TOOL_RESULTS|THINK)\]|<<\s*/?SYS\s*>>", re.I)
 PLANNING = re.compile(r"^\s*(\*\s*)?(the user\b|user:|i should\b|i need to\b|i will\b|i'll\b|let me\b|now i\b|okay[,.]|ok[,.]|wait[,.]|"
                       r"plan:|first,? i\b|my plan\b|the request\b|the task\b)", re.I)
+
+
+def defuse(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """`messages` with each control-token look-alike in user and tool text made inert (its first `<` or `[` becomes
+    `‹` or `［`); the system prompt and the model's own turns are sent as they are."""
+    def fix(text: str) -> str:
+        return SPECIAL_TOKENS.sub(lambda m: {"<": "‹", "[": "［"}[m.group(0)[0]] + m.group(0)[1:], text)
+    out = []
+    for m in messages:
+        c = m.get("content")
+        if m.get("role") in ("user", "tool") and isinstance(c, str):
+            m = {**m, "content": fix(c)}
+        elif m.get("role") in ("user", "tool") and isinstance(c, list):
+            m = {**m, "content": [{**p, "text": fix(p["text"])} if isinstance(p, dict) and isinstance(p.get("text"), str)
+                                  else p for p in c]}
+        out.append(m)
+    return out
 
 
 class TagRouter:
@@ -312,7 +337,7 @@ class LLM:
     async def chat(self, model: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None,
                    on_delta: Delta | None = None, known: set[str] | None = None, stream: bool = True,
                    tool_choice: str = "auto") -> Reply:
-        body: dict[str, Any] = {"model": model, "messages": messages, "stream": True,
+        body: dict[str, Any] = {"model": model, "messages": defuse(messages), "stream": True,
                                 "stream_options": {"include_usage": True}}
         if tools:
             body["tools"] = tools

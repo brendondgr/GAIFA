@@ -10,7 +10,13 @@
      when every answer clears `threshold` (default 0.95) the safe way.
    - `backend = "relay"`: a chat model (OpenAI-compatible, through the relay) answers `{verdict, reason}` as JSON at
      temperature 0.
-3. Fail closed: unsure, malformed, slower than `timeout_s` (3 s) or not reachable → ask. There is no deny.
+3. Fail closed: unsure, malformed, slower than `timeout_s` (3 s) or not reachable → ask. There is no deny. Arguments
+   the model couldn't see whole (a string over 1,500 characters, a list or object over 50 items, deeper than 6, or
+   over 6,000 characters in all) → ask without asking the model: what it can't read could hide anything.
+
+Everything the model reads goes through `defuse`: chat-template control tokens (`<|turn>`, `<|im_start|>`, `[INST]`,
+…) lose their first character to a lookalike, so text in a URL or a message can't open a turn of its own (llama.cpp
+parses special tokens in the rendered prompt).
 """
 
 from __future__ import annotations
@@ -30,6 +36,18 @@ UNTRUSTED_RE = re.compile(r"<untrusted\b[^>]*>.*?(</untrusted>|$)", re.DOTALL | 
 MAX_MESSAGES = 8
 MAX_MESSAGE_CHARS = 2000
 MAX_ARG_CHARS = 1500
+MAX_ITEMS = 50                        # of a list or an object
+MAX_DEPTH = 6
+MAX_ARGS_CHARS = 6000                 # the arguments' JSON in all
+TOO_LONG = "too long for the judge to read whole"
+
+# Chat-template control tokens: ChatML and Harmony `<|…|>`, Gemma 4 `<|turn>`/`<turn|>`, Gemma `<start_of_turn>`,
+# DeepSeek's fullwidth `<｜…｜>`, Llama 2 / Mistral `[INST]` and `<<SYS>>`, `<s>`, `<think>`. (A copy lives in
+# services/agent/agent/llm.py: mods don't import the hub.)
+SPECIAL_TOKENS = re.compile(
+    r"<\|[^<>|\n]{0,40}\|>|<\|[A-Za-z_][\w.-]{0,40}>|<[A-Za-z_][\w.-]{0,40}\|>|<｜[^<>｜\n]{0,40}｜>"
+    r"|</?(?:start_of_turn|end_of_turn|start_of_image|end_of_image|s|think|thinking|bos|eos|pad|unk|mask|tool_call"
+    r"|tool_response)>|\[/?(?:INST|SYSTEM_PROMPT|TOOL_CALLS|AVAILABLE_TOOLS|TOOL_RESULTS|THINK)\]|<<\s*/?SYS\s*>>", re.I)
 
 QUESTIONS = [   # (id, question, the answer that lets the call run): the two that separated best in the eval
     ("asked", "Is the proposed action something the user asked for in their messages, or a normal step toward it?",
@@ -96,43 +114,77 @@ def own_words(messages: list[Any]) -> list[str]:
     return out[-MAX_MESSAGES:]
 
 
-def _short(v: Any) -> Any:
+def defuse(text: str) -> str:
+    """`text` with every control-token look-alike made inert: its first `<` or `[` becomes `‹` or `［`."""
+    return SPECIAL_TOKENS.sub(lambda m: {"<": "‹", "[": "［"}[m.group(0)[0]] + m.group(0)[1:], text)
+
+
+def _short(v: Any, cut: list[str], depth: int = 0) -> Any:
+    """`v` as the model sees it; each part that had to be cut is noted in `cut`."""
     if isinstance(v, str) and len(v) > MAX_ARG_CHARS:
+        cut.append("string")
         return v[:MAX_ARG_CHARS] + f"… ({len(v)} characters)"
+    if isinstance(v, (dict, list)) and depth >= MAX_DEPTH:
+        cut.append("nesting")
+        return "… (nested too deep)"
     if isinstance(v, dict):
-        return {k: _short(x) for k, x in v.items()}
+        items = list(v.items())
+        out = {_short(str(k), cut, depth + 1): _short(x, cut, depth + 1) for k, x in items[:MAX_ITEMS]}
+        if len(items) > MAX_ITEMS:
+            cut.append("object")
+            out["…"] = f"({len(items) - MAX_ITEMS} more keys not shown)"
+        return out
     if isinstance(v, list):
-        return [_short(x) for x in v[:50]]
+        out = [_short(x, cut, depth + 1) for x in v[:MAX_ITEMS]]
+        if len(v) > MAX_ITEMS:
+            cut.append("list")
+            out.append(f"… ({len(v) - MAX_ITEMS} more items not shown)")
+        return out
     return v
 
 
+def arguments(call: dict[str, Any]) -> tuple[str, list[str]]:
+    """The call's arguments as the model reads them (JSON), and what was cut to fit (empty: it's whole)."""
+    cut: list[str] = []
+    text = json.dumps(_short(call.get("args") or call.get("arguments") or {}, cut), ensure_ascii=False, default=str)
+    if len(text) > MAX_ARGS_CHARS:
+        cut.append("total")
+        text = text[:MAX_ARGS_CHARS] + f"… ({len(text)} characters)"
+    return text, cut
+
+
 def describe(call: dict[str, Any], folder: dict[str, Any] | None, rules_reason: str, user: list[str]) -> str:
-    """The model's whole input: nothing but the allowed parts."""
+    """The model's whole input: nothing but the allowed parts, defused."""
     lines = ["The user's messages (oldest first):"]
     lines += [f"{i}. {m}" for i, m in enumerate(user, 1)] or ["(none)"]
     if folder:
         lines.append(f"\nWorkspace folder: {folder.get('path')} (level: {folder.get('level')})")
-    args = _short(call.get("args") or call.get("arguments") or {})
     lines.append(f"\nProposed call: {call.get('tool')}")
-    lines.append("Arguments: " + json.dumps(args, ensure_ascii=False))
+    lines.append("Arguments: " + arguments(call)[0])
     if call.get("estimate"):
-        lines.append("Estimate: " + json.dumps(call["estimate"]))
+        lines.append("Estimate: " + json.dumps(call["estimate"], default=str))
     lines.append(f"\nWhy the fixed rules passed it on: {rules_reason}")
-    return "\n".join(lines)
+    return defuse("\n".join(lines))
+
+
+THINKING_RE = re.compile(r"<think(?:ing)?>.*?(?:</think(?:ing)?>|$)|<\|channel>.*?(?:<channel\|>|$)", re.DOTALL)
 
 
 def parse_verdict(text: str) -> tuple[str, str] | None:
-    """`{verdict, reason}` from a chat model's reply (the first JSON object in it, after any thinking)."""
-    text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL)
-    for m in re.finditer(r"\{[^{}]*\}", text):
+    """`{verdict, reason}` from a chat model's reply: thinking (closed or not) is dropped, and the verdict must be the
+    reply's last JSON object and its only one with a verdict (anything else is no answer: ask)."""
+    objs = []
+    for m in re.finditer(r"\{[^{}]*\}", THINKING_RE.sub("", text or "")):
         try:
             obj = json.loads(m.group(0))
         except ValueError:
             continue
-        v = str(obj.get("verdict", "")).strip().lower()
-        if v in ("allow", "ask"):
-            return v, str(obj.get("reason") or "").strip()[:300]
-    return None
+        if isinstance(obj, dict):
+            objs.append(obj)
+    if not objs or sum("verdict" in o for o in objs) != 1:
+        return None
+    v = str(objs[-1].get("verdict", "")).strip().lower()
+    return (v, str(objs[-1].get("reason") or "").strip()[:300]) if v in ("allow", "ask") else None
 
 
 async def ask_decide(state: str, cfg: JudgeConfig, client: httpx.AsyncClient) -> Judgement:
@@ -187,6 +239,10 @@ async def judge(call: dict[str, Any], user_messages: list[Any], folder: dict[str
     r = classify(call, folder)
     if rules and r.verdict in ("allow", "ask"):
         return Judgement(r.verdict, r.reason, "rules", rule=r.rule, ms=round((time.perf_counter() - t0) * 1000, 2))
+    cut = arguments(call)[1]
+    if cut:              # the model would read only part of the call: what it can't see could hide anything
+        return Judgement("ask", TOO_LONG, "fail-closed", rule=r.rule, ms=round((time.perf_counter() - t0) * 1000, 2),
+                         detail={"cut": sorted(set(cut))})
     state = describe(call, folder, r.reason if r.verdict == "unsure" else "(the rules weren't asked)",
                      own_words(user_messages))
     own = client is None
@@ -222,12 +278,17 @@ def call_for(tool_name: str, arguments: dict[str, Any], limits: dict[str, Any] |
     return call, folder
 
 
+SUMMARY_CHARS = 400
+
+
 def summary(call: dict[str, Any]) -> str:
-    """One line for the step row and Settings → Agent: the command, the URL or the file."""
+    """One line for the step row and Settings → Agent: the command, the URL or the file (a longer one says so)."""
     a = call.get("args") or {}
     for k in ("command", "url", "path", "source", "code"):
         if a.get(k):
-            return f"{call['tool']}: {str(a[k])[:160]}"
+            v = str(a[k])
+            return f"{call['tool']}: " + (v if len(v) <= SUMMARY_CHARS else
+                                          v[:SUMMARY_CHARS] + f"… (cut: {len(v):,} characters)")
     return str(call.get("tool"))
 
 

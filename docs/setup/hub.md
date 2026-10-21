@@ -69,7 +69,7 @@ followed by the checks over every mod and model (`aihub doctor -v` lists the one
 |---|---|---|
 | `memory.reserve_gb` | `12` | you run without a desktop (lower) or with heavy apps open (higher) |
 | `memory.auto_make_room` | `false` | you'd rather the hub unload idle mods without asking |
-| `services.<id>.autostart` | per mod | a mod you haven't installed shouldn't start with the hub |
+| `services.<id>.autostart` | per mod | a mod you've installed shouldn't start with the hub (one that isn't installed yet never autostarts) |
 
 Paths (`paths.models`, `paths.databases`, `paths.outputs`) must stay inside the project folder.
 
@@ -86,12 +86,12 @@ Paths (`paths.models`, `paths.databases`, `paths.outputs`) must stay inside the 
 | 5 | `agent` (Chat) | [agent](../../services/agent/setup/agent.md) | no, but it needs an LLM from 3, 4 or a remote one |
 | 6 | `comfy` (Images & Video) | [ComfyUI](../../services/comfy/setup/comfyui.md) | yes |
 | 7 | `tts` (Speech) | [Kokoro](../../services/tts/setup/kokoro.md), [Breeze TTS 2](../../services/tts/setup/breeze.md) | yes |
-| 8 | `gen3d` (3D Generate) | [CubeArt](../../services/gen3d/setup/cubeart.md), [Hunyuan3D 2.1](../../services/gen3d/setup/img3d.md), [SAM 3D Objects](../../services/gen3d/setup/sam3do.md) | yes; two of its engines run in ComfyUI (6) |
+| 8 | `gen3d` (3D Generate) | [the base](../../services/gen3d/setup/gen3d.md) (the server, the image, every engine's runtime), then the engines: [CubeArt](../../services/gen3d/setup/cubeart.md), [Hunyuan3D 2.1](../../services/gen3d/setup/img3d.md), [SAM 3D Objects](../../services/gen3d/setup/sam3do.md) | yes; two of its engines run in ComfyUI (6) |
 | 9 | `web` (Web search) | [web](../../services/web/setup/web.md) (SearXNG runs outside AIHub) | no |
 | 9b | `searxng` (optional: watches and adjusts that SearXNG) | [searxng](../../services/searxng/setup/searxng.md) | no |
 | 10 | `stt` (Speech to Text) | [faster-whisper](../../services/stt/setup/stt.md) | no; much faster with one |
 
-The relay comes first because the LLM mods publish themselves to it and the agent talks to models through it. ComfyUI comes before 3D Generate because TRELLIS.2 and SAM 3D Body run as ComfyUI workflows, and its setup pulls the image both use. The setup docs say so in their blocks (`after`: `lcpp`, `vllm` and `agent` after `relay`, 3D Generate's after `comfyui`), so `aihub setup <ids>` puts them in this order and sets up what a choice needs. Skip any mod you don't want: set `services.<id>.autostart = false` and it stays stopped.
+The relay comes first because the LLM mods publish themselves to it and the agent talks to models through it. ComfyUI comes before 3D Generate because TRELLIS.2 and SAM 3D Body run as ComfyUI workflows, and its setup pulls the image both use. The setup docs say so in their blocks (`after`: `lcpp`, `vllm` and `agent` after `relay`, 3D Generate's base after `comfyui` and each of its engines after the base), so `aihub setup <ids>` puts them in this order and sets up what a choice needs. Skip any mod you don't want: a mod that isn't installed yet (its command doesn't exist) isn't autostarted, and the hub shows it as "not installed: run aihub setup <id>" (plan 23.12).
 
 After each one:
 

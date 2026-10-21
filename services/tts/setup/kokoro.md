@@ -120,16 +120,16 @@ The full list is in `localtts.env.example` (standalone use); under AIHub, `servi
 ## Check it works
 
 ```bash
-aihub check tts
+aihub check tts --start
 ```
 
-Expect `ok` on every line but one on 2026-10-21: `FAIL widget clips series must be a non-empty list of {name, values}`, because no clips were made in the last 7 days (the widget answers an empty `series`).
+Starts the server if it's stopped (a stopped mod's live checks are skipped; starting it loads no engine) and checks it. Expect `ok` on every line but one: `FAIL widget clips series must be a non-empty list of {name, values}`. That's a known tts bug, not your install: the clips widget answers an empty `series` until a clip has been made in the last 7 days, so a fresh install always shows it (seen 2026-10-21). Make one clip on the Speech page and it passes.
 
 ```bash
 curl -s http://127.0.0.1:7000/api/s/tts/v1/status
 ```
 
-A GET, so nothing loads. Expect `"loaded": false`, both engines `"state": "unloaded"`, and the stat `{"label": "Engines installed", "value": 2}`.
+A GET, so nothing loads. Expect `"loaded": false`, both engines (`kokoro` and `breeze`) `"state": "unloaded"`, and the stat `{"label": "Engines installed", "value": 1}` with Kokoro only (it counts the engine venvs that exist, `localtts/hub.py`); `2` once [Breeze TTS 2](breeze.md) is set up too, as on the machine these docs were written on.
 
 ```bash
 uv pip freeze --python services/tts/runtime/venvs/kokoro/bin/python | diff - <(sort services/tts/locks/kokoro.txt)

@@ -27,8 +27,9 @@ clone ComfyUI-VideoHelperSuite https://github.com/Kosinkadink/ComfyUI-VideoHelpe
 clone ComfyUI-WanVideoWrapper https://github.com/kijai/ComfyUI-WanVideoWrapper.git 088128b224242e110d3906c6750e9a3a348a659b
 clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127c29d5d8135ac1536ecbd4c383
 '''
-what = "clones the five custom nodes into custom_nodes/ at the commits in Tested with (about 85 MB); their Python packages still go in through ComfyUI-Manager (Known gaps)"
-ask = "Custom nodes are third-party code that runs inside ComfyUI. Clone ComfyUI-GGUF, KJNodes, VideoHelperSuite, WanVideoWrapper and rgthree at the pinned commits? (The Qwen-Image 2.1 packs need the first two.)"
+what = "clones the five custom nodes into custom_nodes/ at the commits in Tested with (about 85 MB); optional: a no skips only this step; their Python packages go into the toolbox by hand once it exists (Install, Updating ComfyUI in the toolbox)"
+ask = "Custom nodes are third-party code that runs inside ComfyUI. Clone ComfyUI-GGUF, KJNodes, VideoHelperSuite, WanVideoWrapper and rgthree at the pinned commits? A no skips only the nodes, not ComfyUI: then the qwen21-* packs (ComfyUI-GGUF; the Turbo ones also KJNodes) and the scail2-* video packs (VideoHelperSuite) won't run; packs with core nodes only, such as trellis2-* and sam3d-body, still do."
+optional = true
 
 [[suggest]]
 name = "Qwen-Image 2.1 Turbo Q8_0 (1 of 2: the diffusion model)"
@@ -59,6 +60,7 @@ kind = "image"
 size_gb = 12.65
 good_for = "picture to 3D: the trellis2-* packs, which are also 3D Generate's trellis2 engine; needs ComfyUI newer than the image's 0.22"
 licence = "MIT (TRELLIS.2); DINOv3 Licence (the image encoder)"
+next = "TRELLIS.2 (and SAM 3D Body) need ComfyUI 0.37.0, newer than the image's 0.22.0: after the first services/comfy/bin/comfyui start has made the toolbox, update ComfyUI inside it to commit 93810483a473 with the two commands in services/comfy/setup/comfyui.md (Install, Updating ComfyUI in the toolbox), then check the packs with services/comfy/bin/comfyui workflows check trellis2-shape sam3d-body"
 -->
 
 # ComfyUI: setup
@@ -131,7 +133,21 @@ with `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1`. `--disable-mmap` avoids ROCm's
 git clone <repo> services/comfy/custom_nodes/<folder> && git -C services/comfy/custom_nodes/<folder> checkout <commit>
 ```
 
-Their Python dependencies go into the container's venv. Here they were installed through ComfyUI-Manager (in ComfyUI: Manager → Custom Nodes Manager, or Install via Git URL), which runs each node's `requirements.txt`; installing through the Manager and then checking out the commit above works too. Only some packs need them: the Qwen-Image 2.1 packs load their diffusion model with ComfyUI-GGUF's `UnetLoaderGGUF` (and the Turbo ones their VAE with KJNodes' `VAELoaderKJ`), the Wan packs use the Wan wrapper; the TRELLIS.2 and SAM 3D Body packs use core nodes only.
+Their Python dependencies go into the container's venv (the second command under "Updating ComfyUI in the toolbox" below; here they were installed through ComfyUI-Manager, Manager → Custom Nodes Manager, which runs the same `requirements.txt`). The step is optional: a "no" skips only the nodes. Only some packs need them: the Qwen-Image 2.1 packs load their diffusion model with ComfyUI-GGUF's `UnetLoaderGGUF` (and the Turbo ones their VAE with KJNodes' `VAELoaderKJ`), the `scail2-*` video packs use VideoHelperSuite; the TRELLIS.2 and SAM 3D Body packs use core nodes only.
+
+**Updating ComfyUI in the toolbox.** The image ships ComfyUI 0.22.0; TRELLIS.2 and SAM 3D Body need the commit in Tested with (0.37.0). `aihub setup` doesn't do this (it stays manual, plan 23.14), and the report reminds you when TRELLIS.2 is chosen. The toolbox exists only after the first `bin/comfyui start` (or the first load from the hub); stop ComfyUI first (`services/comfy/bin/comfyui quit`). From `services/comfy/`, ComfyUI itself, with the image's torch family held by a constraints file so pip never replaces it:
+
+```bash
+toolbox run -c strix-halo-comfyui bash -lc "cd /opt/ComfyUI && git fetch && git checkout 93810483a4739a1588236919a3128d3070244146 && /opt/venv/bin/pip list --format=freeze | grep -iE '^(torch|torchvision|torchaudio|triton|numpy)==' > '$PWD/data/toolbox-constraints.txt' && /opt/venv/bin/pip install -c '$PWD/data/toolbox-constraints.txt' -r requirements.txt"
+```
+
+Then each custom node's `requirements.txt` (all five have one), into the same venv:
+
+```bash
+toolbox run -c strix-halo-comfyui bash -lc "for r in '$PWD'/custom_nodes/*/requirements.txt; do /opt/venv/bin/pip install -c '$PWD/data/toolbox-constraints.txt' -r \"\$r\" || exit 1; done"
+```
+
+`/opt/venv` is the image's venv (`VIRTUAL_ENV`, first on its `PATH`), the one `bin/comfyui` launches ComfyUI with; the host's `$PWD` is the same path inside, since the toolbox shares your home. Then `bin/comfyui start` and `bin/comfyui workflows check trellis2-shape sam3d-body`. These commands weren't run for this doc (this machine's container was updated on 2026-09-24, with ComfyUI-Manager).
 
 ## Choosing models
 
@@ -198,7 +214,7 @@ Reads ComfyUI's version from the container's own layer without starting it. Expe
 
 ## What to look for
 
-- **The container's ComfyUI is newer than the image.** `/opt/ComfyUI` was updated in place (0.22.0 → 0.37.0). TRELLIS.2 and SAM 3D Body are core nodes only since then (`comfy_extras/nodes_trellis2.py`, `nodes_sam3d_body.py` aren't in the image). **Recreating the toolbox from the image loses them**, and with them the `trellis2-*` and `sam3d-body` packs and two of 3D Generate's engines. That includes `bin/comfyui update`, which pulls `:latest` and recreates the container, and `podman rm strix-halo-comfyui`. On a new machine, update ComfyUI inside the new toolbox to the commit above (from ComfyUI-Manager, or `git` in `/opt/ComfyUI`) and check the packs again.
+- **The container's ComfyUI is newer than the image.** `/opt/ComfyUI` was updated in place (0.22.0 → 0.37.0). TRELLIS.2 and SAM 3D Body are core nodes only since then (`comfy_extras/nodes_trellis2.py`, `nodes_sam3d_body.py` aren't in the image). **Recreating the toolbox from the image loses them**, and with them the `trellis2-*` and `sam3d-body` packs and two of 3D Generate's engines. That includes `bin/comfyui update`, which pulls `:latest` and recreates the container, and `podman rm strix-halo-comfyui`. On a new machine, update ComfyUI inside the new toolbox to the commit above (Install, "Updating ComfyUI in the toolbox") and check the packs again.
 - **A wedged container** (seen 2026-10-10 and 2026-10-21): podman says it's Up, but `podman exec` fails with "crun: the container … is not running", so ComfyUI can't be started or stopped inside it. `bin/comfyui start` and `quit` now recover by themselves: they stop ComfyUI's process from the host, then stop and start the container. If exec still fails, they stop with a message; check `podman ps -a`.
 - **The image's digest is the pin.** `:latest` on Docker Hub moves, and gen3d's worker venvs are built against the torch inside the digest above (their `constraints.txt`). If the pull by digest ever fails because the owner removed that build, pull `:latest`, note its digest and torch version (`podman run --rm <image> /opt/venv/bin/python -c "import torch; print(torch.__version__)"`), then rebuild gen3d's venvs (`services/gen3d/scripts/install-runtime.sh` after deleting `runtime/*/.venv`) and run the packs' checks again. Keep a copy of a working image with `podman save -o <file>.tar <image>` if you need to rebuild offline.
 - **`--disable-mmap` stays.** Without it, loading goes through ROCm's slow mmap path once more than 64 GB is mapped, and can hang.
@@ -207,6 +223,6 @@ Reads ComfyUI's version from the container's own layer without starting it. Expe
 
 ## Known gaps
 
-- Nothing installs the custom nodes' Python packages; ComfyUI-Manager is manual (the clones are the block's step, asked first).
-- The image is pinned only by the setup step's digest: `bin/comfyui` and `bin/comfyui update` use `:latest`, and the in-place update to 0.37.0 isn't scripted.
+- Nothing in `aihub setup` installs the custom nodes' Python packages or updates ComfyUI in the toolbox: both are the manual commands in Install (the clones are the block's optional step, asked first).
+- The image is pinned only by the setup step's digest: `bin/comfyui` and `bin/comfyui update` use `:latest`, and the in-place update to 0.37.0 is the manual commands in Install.
 - The Z-Image and Wan 2.1 packs (`zimage-turbo`, `zimage-intorealism`, `qwen-edit-refine-zimage`, `wan21-t2v`, `wan21-i2v`) have `agent = false`: their models were deleted on 2026-10-20 to free disk space. The workflows are kept; `check` shows them `broken` until the models are downloaded again. The Flux 2 Klein, Krea 2 and Qwen-Image-Edit packs are also `broken` here (their models aren't on disk) but still have the agent on; a broken pack isn't offered to it.

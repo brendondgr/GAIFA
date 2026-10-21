@@ -99,6 +99,8 @@ from its OpenAPI), Chat, Models, Outputs and Settings. The command line covers t
 | Command | What it does |
 |---------|--------------|
 | `aihub status` | The hub and each mod: state, load, port, memory |
+| `aihub setup [<mod>…] [--plan] [--json]` | Set up the hub, the host checks and the mods you choose with their models (`docs/setup/`); `--plan` only shows the plan, `--json` is for an agent; it resumes after a stop |
+| `aihub check <id> [--start]` | Check a mod against the contract (manifest, port, health, status, widgets, tools); `--start` starts it first, since a stopped mod's live checks are skipped |
 | `aihub start \| stop \| restart [id \| all]` | The hub (no id), one mod, or every mod |
 | `aihub load \| unload <id>` | Load a mod's models into memory, or free them |
 | `aihub logs [id] [-f]` | A mod's log (`data/logs/<id>.log`), or the hub's |

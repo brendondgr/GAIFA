@@ -70,7 +70,9 @@ def resolve(targets: list[str], offered: dict[str, setupdocs.Env], root: Path) -
                 add(d, f"{eid} needs it")
 
     for t in targets:
-        for eid in [x.id for x in sorted(by_mod[t], key=lambda x: x.id)] if t in by_mod and t not in offered else [t]:
+        # What you ask for: a mod id means all of that mod's setups, even where one setup shares its id
+        # (gen3d's base); inside `after`, a setup id wins (an engine needs the base, not its siblings).
+        for eid in [x.id for x in sorted(by_mod[t], key=lambda x: x.id)] if t in by_mod else [t]:
             add(eid, "asked for")
     rank = {m: i for i, m in enumerate(_order(root))}
     key = lambda e: (rank.get(e.mod, len(rank)), e.mod, e.id)  # noqa: E731

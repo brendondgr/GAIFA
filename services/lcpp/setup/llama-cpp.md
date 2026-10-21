@@ -29,6 +29,9 @@ body = { repo = "Qwen/Qwen3-8B-GGUF", revision = "7c41481f57cb95916b40956ab2f0b1
 size_gb = 5.03
 good_for = "an everyday chat model with tool calls and thinking, small enough to run beside other mods"
 licence = "Apache-2.0"
+start_op = "POST /api/instances"
+start_body = { model_id = "qwen3-8b" }
+next = "lcpp instances stop at a reboot: to bring back what was running, set [sessions] restore_on_boot = true in config.toml (Settings → Sessions), which restores the setup from before the restart, lcpp instances included; or launch it again on the LLM Launcher page"
 
 [[suggest]]
 name = "Gemma 4 26B-A4B (Q8_0, with vision and MTP)"
@@ -37,6 +40,9 @@ body = { repo = "ggml-org/gemma-4-26B-A4B-it-GGUF", revision = "9cf8c8db0f83fb45
 size_gb = 28.13
 good_for = "a strong agent and judge model (mixture of experts, about 4B active), images in, an MTP draft"
 licence = "Apache-2.0"
+start_op = "POST /api/instances"
+start_body = { model_id = "gemma-4-26b-a4b-it" }
+next = "lcpp instances stop at a reboot: to bring back what was running, set [sessions] restore_on_boot = true in config.toml (Settings → Sessions), which restores the setup from before the restart, lcpp instances included; or launch it again on the LLM Launcher page"
 -->
 
 # llama.cpp (LLM Launcher): setup
@@ -49,7 +55,7 @@ The `lcpp` mod (port 7710) starts and stops llama.cpp servers for GGUF models an
 - **The daemon**, `.venv/` in this folder (FastAPI, uvicorn, httpx). It loads no model. Each instance it launches is its own transient systemd user unit (`lcpp-<name>.service`), so instances survive a daemon restart.
 - **`llama-server`**, a prebuilt **Vulkan** build of llama.cpp from the [ggml-org releases](https://github.com/ggml-org/llama.cpp/releases), downloaded and unpacked under `runtime/` (gitignored) by the block's steps (or by hand, Install). It runs on the GPU through Mesa's RADV driver; no ROCm is needed.
 
-The LLM Launcher page, any local GGUF the agent or the Auto judge uses (on this machine, `gemma4-26B`), and the agent's `list_llms` / `start_llm` tools need this environment.
+The LLM Launcher page, any local GGUF the agent or the Auto judge uses (on the machine these docs were written on, for example, `gemma4-26B`), and the agent's `list_llms` / `start_llm` tools need this environment.
 
 ## Tested with
 
@@ -117,13 +123,13 @@ Two optional starting points, which `aihub setup` offers (the page's form does t
 | Model | Size | Good for | Licence |
 |---|---|---|---|
 | [Qwen3 8B](https://huggingface.co/Qwen/Qwen3-8B-GGUF), Q4_K_M | 5.0 GB | an everyday chat model with tool calls and thinking, small enough to run beside other mods | Apache-2.0 |
-| [Gemma 4 26B-A4B](https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF), Q8_0 with its `mmproj` (images) and `mtp` (draft) files | 28.1 GB | a strong agent and judge model (a mixture of experts, about 4B active per token); a QAT Q4_K_M variant of it is the agent's fallback and the judge on this machine | Apache-2.0 |
+| [Gemma 4 26B-A4B](https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF), Q8_0 with its `mmproj` (images) and `mtp` (draft) files | 28.1 GB | a strong agent and judge model (a mixture of experts, about 4B active per token); a QAT Q4_K_M variant of it is the Auto judge on the machine these docs were written on | Apache-2.0 |
 
-Each joins the catalog under an id made from its file name: `qwen3-8b` and `gemma-4-26b-a4b-it` (`suggest_id` in `src/lcpp/catalog.py`).
+Each joins the catalog under an id made from its file name: `qwen3-8b` and `gemma-4-26b-a4b-it` (`suggest_id` in `src/lcpp/catalog.py`). **`aihub setup` launches the model you choose** once it's downloaded (`POST /api/instances` with that `model_id`, the suggestion's `start_op`), published to the relay (`relay.auto_register`, on by default), so the agent's model question that follows lists it. An instance doesn't survive a reboot: `[sessions] restore_on_boot = true` in `config.toml` (Settings → Sessions) brings back what was running before the restart, lcpp instances included; the setup report says so.
 
 ### Running a model, and its name on the relay
 
-A download only adds the model to the catalog; nothing runs until you launch it. With the mod running (`aihub start lcpp`):
+A download only adds the model to the catalog; nothing runs until you launch it (`aihub setup` launches the model it downloaded; any other one is yours to launch). With the mod running (`aihub start lcpp`):
 - **On the page:** LLM Launcher → **Launch a model**, pick it, keep **Publish to relay** on, **Launch**. The Instances tab shows it starting, then ready.
 - **From a terminal**, with the mod's own CLI (it talks to the daemon on 7710):
 

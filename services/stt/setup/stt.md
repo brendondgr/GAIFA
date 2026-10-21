@@ -6,7 +6,7 @@ scan = []
 summary = "Speech to text: transcribe audio and video files, live dictation and the Chat microphone (Whisper; runs on the CPU, much faster with the GPU)"
 gpu = false
 disk_gb = 0.75
-needs = ["uv", "curl", "unzip"]
+needs = ["uv", "curl", "unzip", "ffmpeg"]
 check = "aihub check stt --start"
 
 [[steps]]
@@ -123,7 +123,7 @@ cd services/stt && STT_GPU_TESTS=1 .venv/bin/python -m pytest -q -s tests/test_g
 Expect `small on the GPU: 25.3 s of audio in 0.9 s, real-time factor 0.036` or close to it (2026-10-20).
 
 ```bash
-.venv/bin/python -c "import ctranslate2; print(ctranslate2.get_cuda_device_count())"
+cd services/stt && .venv/bin/python -c "import ctranslate2; print(ctranslate2.get_cuda_device_count())"
 ```
 
 Expect `1`; `0` means the PyPI build is installed (rerun `aihub install stt`).

@@ -37,8 +37,20 @@ fi
 # shellcheck disable=SC1091
 . "$ROOT/auth.sh"
 
-PROJECT_DIR="${OPENCODE_PROJECT_DIR:-$ROOT}"
+# The folder OpenCode's shell, edit and write tools act in: one the person chose, outside AIHub
+# (plan 23.14). Unset used to mean this folder, which put an agent's shell inside AIHub.
+AIHUB="$(cd "$ROOT/../.." && pwd -P)"
+how="set OPENCODE_PROJECT_DIR to a folder outside AIHub: aihub setup opencode asks for it, or [services.opencode.env] in config.toml (a line in $ROOT/.env wins over it), then aihub restart opencode"
+if [ -z "${OPENCODE_PROJECT_DIR:-}" ]; then
+  echo "OPENCODE_PROJECT_DIR is not set, so there's no folder for OpenCode to work in; $how" >&2
+  exit 1
+fi
+PROJECT_DIR="$OPENCODE_PROJECT_DIR"
 [ -d "$PROJECT_DIR" ] || { echo "OPENCODE_PROJECT_DIR does not exist: $PROJECT_DIR" >&2; exit 78; }
+REAL="$(cd "$PROJECT_DIR" && pwd -P)"
+case "$REAL/" in
+  "$AIHUB"/*) echo "OPENCODE_PROJECT_DIR is inside AIHub ($REAL), which stays read-only to agents; $how" >&2; exit 1 ;;
+esac
 
 cd "$PROJECT_DIR"
 echo "opencode serve --port ${OPENCODE_PORT:-4096} in $PROJECT_DIR"

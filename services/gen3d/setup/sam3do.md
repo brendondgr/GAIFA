@@ -6,19 +6,20 @@ scan = []
 summary = "3D Generate: one picture to a mesh, the quickest full shape, with Meta's SAM 3D Objects (gated weights)"
 gpu = true
 disk_gb = 0
-needs = ["podman", "git", "uv"]
-after = ["gen3d-cubeart", "gen3d-img3d"]
+needs = ["uv"]
+after = ["gen3d"]
 check = ".venv/bin/python -m gen3d.doctor | grep -Eq 'ok +SAM 3D Objects \\(image engine\\) +ready'"
 
 [[steps]]
-run = "uvx --from huggingface_hub hf auth whoami >/dev/null 2>&1 || uvx --from huggingface_hub hf auth login"
-what = "logs in to Hugging Face once (your token goes to ~/.cache/huggingface/token), for the gated weights; skipped when you're logged in"
+run = "uvx --from huggingface_hub hf auth login"
+skip_if = "uvx --from huggingface_hub hf auth whoami"
+what = "logs in to Hugging Face once (your token goes to ~/.cache/huggingface/token), for the gated weights; skipped when you're logged in already"
 interactive = true
 ask = "SAM 3D Objects' weights are gated: accept the SAM Licence on https://huggingface.co/facebook/sam-3d-objects and wait until access is granted. Is access granted?"
 
 [[steps]]
-run = "scripts/install-runtime.sh"
-what = "the runtime installer again, which finds what gen3d-cubeart's run already built (it always clones sam-3d-objects and DINOv2 at the pinned commits and builds runtime/sam3do/.venv, layered on img3d's and CubeArt's, about 1.5 GB, counted there; pytorch3d from source, CPU ops only) and checks it; this setup's own part is the gated weights"
+run = "test -d runtime/sam3d-objects/sam3d_objects && test -d runtime/sam3do/dinov2/dinov2 && test -e runtime/sam3do/.venv/bin/activate || { echo 'runtime/sam3do is not built: run aihub setup gen3d (scripts/install-runtime.sh)' >&2; exit 1; }"
+what = "checks that the gen3d setup built this engine (the sam-3d-objects and DINOv2 clones at their pinned commits and runtime/sam3do/.venv, layered on img3d's and CubeArt's, with pytorch3d); nothing is installed here: this setup's own part is the gated weights"
 
 [[suggest]]
 name = "SAM 3D Objects"
@@ -53,7 +54,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-One of 3D Generate's picture engines (`engine = sam3d_objects`): Meta's **SAM 3D Objects**, geometry only, from one picture (its alpha is the mask) to a mesh. It's the quickest full shape, with a rougher surface. It runs in a `gen3d-worker-*` container of the ROCm image, with the venv `runtime/sam3do/.venv`, the upstream code in `runtime/sam3d-objects/`, and DINOv2's code in `runtime/sam3do/dinov2/`. Its depth model is **MoGe v1** (`Ruicheng/moge-vitl`). The server venv, the image and how the venvs are layered are in [cubeart.md](cubeart.md). **Licence:** the SAM Licence; the weights are **gated** on Hugging Face. MoGe is MIT. SAM 3D Body (people) is a different model and runs in ComfyUI: see [ComfyUI](../../comfy/setup/comfyui.md).
+One of 3D Generate's picture engines (`engine = sam3d_objects`): Meta's **SAM 3D Objects**, geometry only, from one picture (its alpha is the mask) to a mesh. It's the quickest full shape, with a rougher surface. It runs in a `gen3d-worker-*` container of the ROCm image, with the venv `runtime/sam3do/.venv`, the upstream code in `runtime/sam3d-objects/`, and DINOv2's code in `runtime/sam3do/dinov2/`. Its depth model is **MoGe v1** (`Ruicheng/moge-vitl`). The server venv, the image, this engine's code and venv, and how the venvs are layered are in [gen3d.md](gen3d.md); this setup is the licence, the login and the weights. **Licence:** the SAM Licence; the weights are **gated** on Hugging Face. MoGe is MIT. SAM 3D Body (people) is a different model and runs in ComfyUI: see [ComfyUI](../../comfy/setup/comfyui.md).
 
 ## Tested with
 
@@ -61,7 +62,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 
 | Part | Version |
 |---|---|
-| Image | `docker.io/kyuz0/amd-strix-halo-comfyui:latest` at `sha256:0066678ae9043f69a1c8c7699e70626ceffd35c1a8ca03227a05640ad0241ed2`; torch `2.13.0a0+rocm7.14.0a20260529` from its `/opt/venv` (see [cubeart.md](cubeart.md#tested-with)) |
+| Image | `docker.io/kyuz0/amd-strix-halo-comfyui:latest` at `sha256:0066678ae9043f69a1c8c7699e70626ceffd35c1a8ca03227a05640ad0241ed2`; torch `2.13.0a0+rocm7.14.0a20260529` from its `/opt/venv` (see [gen3d.md](gen3d.md#tested-with)) |
 | `runtime/sam3do/.venv` | Python 3.13.13 inside the image; `_layers.pth` puts img3d's, CubeArt's, then `/opt/venv`'s site-packages on its path; `locks/sam3do.txt`: hydra-core 1.3.7, lightning 2.6.6, pyvista 0.49.0, xatlas 0.0.11, roma 1.6.1, pymeshfix 0.18.1, fvcore 0.1.5.post20221221, `utils3d` at `3913c65d81e05e47b9f367250cf8c0f7462a0900`, `moge` at `74fbce054ebed49800de42d0ad0e83495065719a` (MoGe 3.0.0) |
 | pytorch3d | 0.7.8, built from https://github.com/facebookresearch/pytorch3d.git at `75ebeeaea0908c5527e7b1e305fbc7681382db47` with `FORCE_CUDA=0` (CPU ops only) |
 | Upstream code | https://github.com/facebookresearch/sam-3d-objects.git at `f91db411c50efee93d8db7aeb323885650f6f722` (2026-06-02); https://github.com/facebookresearch/dinov2.git at `7764ea0f912e53c92e82eb78a2a1631e92725fc8` (2026-06-03); no local changes |
@@ -69,7 +70,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 
 ## Prerequisites
 
-- [img3d.md](img3d.md) and [cubeart.md](cubeart.md): this venv is layered on both, so `install-runtime.sh` builds them first.
+- [gen3d.md](gen3d.md) (`after = ["gen3d"]`): its `install-runtime.sh` builds this venv on top of img3d's and CubeArt's, in the same run, so this setup needs neither engine's weights.
 - **Access to the gated repo.** Accept the terms on https://huggingface.co/facebook/sam-3d-objects, then log in once ([host.md §6](../../../docs/setup/host.md#6-accounts-and-licences)). This machine was granted access on 2026-10-10.
 - About 14 GB for the weights, and 22 GB of free memory when it runs (`memory_gb = 22` in `gen3d/engines.py`).
 
@@ -79,7 +80,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 uvx --from huggingface_hub hf auth login
 ```
 
-Stores your token in `~/.cache/huggingface/token`; needed once for the gated repo.
+Stores your token in `~/.cache/huggingface/token`; needed once for the gated repo. `aihub setup` skips it when `uvx --from huggingface_hub hf auth whoami` succeeds (the step's `skip_if`).
 
 ```bash
 uvx --from huggingface_hub hf download facebook/sam-3d-objects checkpoints/slat_decoder_gs.ckpt checkpoints/slat_decoder_mesh.ckpt checkpoints/slat_generator.ckpt checkpoints/ss_decoder.ckpt checkpoints/ss_generator.ckpt LICENSE README.md checkpoints/pipeline.yaml checkpoints/slat_decoder_gs.yaml checkpoints/slat_decoder_gs_4.yaml checkpoints/slat_decoder_mesh.yaml checkpoints/slat_encoder.yaml checkpoints/slat_generator.yaml checkpoints/ss_decoder.yaml checkpoints/ss_encoder.yaml checkpoints/ss_generator.yaml --local-dir data/models/3d/sam-3d-objects
@@ -94,10 +95,10 @@ uvx --from huggingface_hub hf download Ruicheng/moge-vitl model.pt --local-dir d
 MoGe v1 ViT-L (1.3 GB). Nothing in git downloads either model; they're the block's required suggestions.
 
 ```bash
-services/gen3d/scripts/install-runtime.sh
+cd services/gen3d && test -d runtime/sam3d-objects/sam3d_objects && test -d runtime/sam3do/dinov2/dinov2 && test -e runtime/sam3do/.venv/bin/activate
 ```
 
-After CubeArt and img3d, it clones sam-3d-objects into `runtime/sam3d-objects/` and DINOv2 into `runtime/sam3do/dinov2/` at the commits above, then inside the image (no GPU devices passed) makes `runtime/sam3do/.venv`, writes `_layers.pth` and `constraints.txt`, installs `locks/sam3do.txt`, builds pytorch3d from source if it doesn't import (CPU ops only, `--no-build-isolation`, `MAX_JOBS=16`), and checks the imports (`sam3do ok`). It wasn't re-run for this doc.
+The setup's second step: checks that [gen3d.md](gen3d.md#install)'s `install-runtime.sh` cloned sam-3d-objects into `runtime/sam3d-objects/` and DINOv2 into `runtime/sam3do/dinov2/` at the commits above and made `runtime/sam3do/.venv` (with `_layers.pth`, `constraints.txt`, `locks/sam3do.txt` and pytorch3d built from source, CPU ops only, checked by `sam3do ok`); it installs nothing.
 
 ## Choosing models
 

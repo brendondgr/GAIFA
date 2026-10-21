@@ -87,16 +87,16 @@ A model that is always up makes the better default; an lcpp nickname is listed o
 
 ```toml
 [services.agent.env]
-AGENT_MODEL = "gemma4-26B"
-AGENT_FALLBACK_MODEL = ""
+AGENT_MODEL = "<your-model>"
+AGENT_FALLBACK_MODEL = "<another-model>"   # optional; "" (the default) for none
 ```
 
 (This table form is the one `aihub setup` edits; it leaves an inline `env = { … }` alone and asks you to set it by hand.)
 
 | Key | Set to | Required | Meaning |
 |---|---|---|---|
-| `AGENT_MODEL` | `skynet` | yes | the default chat model: a name the relay's `/v1/models` lists |
-| `AGENT_FALLBACK_MODEL` | `gemma4-26B` | optional | when the thread's model doesn't answer, the turn goes on with this one; empty for none |
+| `AGENT_MODEL` | `<your-model>`, asked by `aihub setup` (`service.toml` and the code say `skynet`, a name from the machine these docs were written on) | yes | the default chat model: a name the relay's `/v1/models` lists |
+| `AGENT_FALLBACK_MODEL` | `""` (none) | optional | when the thread's model doesn't answer, the turn goes on with this one; empty, the default, means no fallback |
 | `AGENT_LLM_URL` | `http://127.0.0.1:4000/v1` | yes (set) | the relay |
 | `AGENT_DB` | `{databases}/agent.db` | yes (set) | threads and their event logs |
 | `AGENT_DATA` | `{root}/data/agent` | yes (set) | AGENT.md, memory, skills, the learned harness |
@@ -104,9 +104,9 @@ AGENT_FALLBACK_MODEL = ""
 | `AGENT_INLINE_TOKENS` | `6000` | optional | an attached document up to this size goes into the message whole |
 | `AGENT_DEFAULT_WINDOW`, `AGENT_REPLY_RESERVE`, `AGENT_SUMMARY_IDLE_MIN`, `AGENT_ALL_TOOLS` | unset | optional | 32768, 4096, 30 and none by default (`agent/server.py`) |
 
-**The two model names are this machine's,** as examples: `skynet` is a remote GPU box reached through an SSH tunnel that exists only here, and `gemma4-26B` is lcpp's nickname for the Gemma 4 26B-A4B GGUF used here. On your machine, set names you have (Choosing models, above).
+**Use names your relay has** (Choosing models, above). For example, on the machine these docs were written on, `AGENT_MODEL` is `skynet` (a remote GPU box reached through an SSH tunnel that exists only there) and the fallback was `gemma4-26B` (lcpp's nickname for the Gemma 4 26B-A4B GGUF); neither name exists on yours.
 
-**Settings → Agent** holds the Auto mode's judge model: `config.toml [agent.judge]`, here `model = "gemma4-26B"` with `backend = "relay"`. The default in code is `minicpm-5-2B`, which isn't on this relay either: pick one of yours there, or the `decide` mod's models with `backend = "decide"`. The same page has the document defaults and speech input.
+**Settings → Agent** holds the Auto mode's judge model: `config.toml [agent.judge]`, `model = "<your-model>"` with `backend = "relay"` (on the machine these docs were written on, for example, `gemma4-26B`). The default in code is `minicpm-5-2B`, which a relay rarely has: pick one of yours there, or the `decide` mod's models with `backend = "decide"`. The same page has the document defaults and speech input.
 
 ## Check it works
 
@@ -120,7 +120,7 @@ Starts the agent if it's stopped (a stopped mod's live checks are skipped), then
 curl -s http://127.0.0.1:7000/api/s/agent/v1/models
 ```
 
-The agent's view of the relay: `default`, `fallback`, and `models` with each one's facts (`context_length`, `tools`, `vision`, `reasoning`). Here (2026-10-21) `{"default":"skynet","fallback":"gemma4-26B","models":[{"id":"auto",…},{"id":"skynet",…,"health":"healthy"}]}`. Your `AGENT_MODEL` should be in that list; `gemma4-26B` isn't here because no lcpp instance was running.
+The agent's view of the relay: `default`, `fallback`, and `models` with each one's facts (`context_length`, `tools`, `vision`, `reasoning`). Expect `{"default":"<your-model>","fallback":null,"models":[{"id":"auto",…},{"id":"<your-model>",…,"health":"healthy"}]}` (`fallback` is the name when you set one). Your `AGENT_MODEL` should be in that list; an lcpp nickname is there only while its instance runs.
 
 The unit tests (a scripted model and a stand-in hub; no model, relay or GPU):
 
@@ -132,7 +132,7 @@ Expect `225 passed` (2026-10-21, about a minute).
 
 ## What to look for
 
-- **Every chat fails or falls back.** `AGENT_MODEL` names a model your relay doesn't have (`skynet` on any other machine). Check the list above and set it in `config.toml`.
+- **Every chat fails or falls back.** `AGENT_MODEL` names a model your relay doesn't have (such as `service.toml`'s `skynet`, which exists only on the machine these docs were written on). Check the list above and set it in `config.toml`.
 - **A fallback that's off most of the time.** An lcpp nickname is on the relay only while its instance runs. Start it from the LLM Launcher page, or choose a fallback that is always up.
 - **The judge asks about everything in Auto.** Its model doesn't answer within `timeout_s` (3 s) or isn't on the relay, so each call falls back to asking you. Pick a reachable model in Settings → Agent.
 - **A model without tool calls** answers but never uses a tool. The relay's facts (`tools`) say which ones take them.

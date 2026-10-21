@@ -508,3 +508,14 @@ def test_output_streams_to_stderr_under_json(tmp_path: Path, capsys) -> None:
     cli_setup.run_mod.cli = cli
     rc, tail = cli_setup.Runner().run("echo hello; echo there >&2", tmp_path, stream=False, echo=True)
     assert rc == 0 and tail == "hello\nthere\n" and "    hello" in capsys.readouterr().err
+
+
+def test_a_mod_id_means_all_its_setups_even_when_one_shares_its_id(root: Path) -> None:
+    d = root / "services" / "gen3d" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "gen3d"\n')
+    (d / "gen3d.md").write_text(block("gen3d", "Base", summary='"3D base"', gpu="true"))
+    (d / "cube.md").write_text(block("gen3d-cube", "Cube", summary='"3D engine"', gpu="true", after='["gen3d"]'))
+    offered, _ = cli_setup.choices(root)
+    assert [e.id for e in cli_setup.resolve(["gen3d"], offered, root)] == ["gen3d", "gen3d-cube"]
+    assert [e.id for e in cli_setup.resolve(["gen3d-cube"], offered, root)] == ["gen3d", "gen3d-cube"]   # after: the base only

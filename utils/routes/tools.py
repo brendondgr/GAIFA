@@ -5,6 +5,7 @@
 - `GET /api/tools/calls/{id}?wait=`, `GET /api/tools/calls/{id}/result?offset=&limit=`, `POST …/cancel`
 - `GET /api/approvals[?state=]`, `GET /api/approvals/{id}`, `POST /api/approvals/{id} {approve, arguments?, remember?, confirm?}`
 - `GET /api/grants[?thread=][?tool=]`, `DELETE /api/grants/{id}`, `DELETE /api/grants?thread=` (plan 25.2)
+- `GET /api/judge/recent[?thread=]`, `GET /api/judge/status` (the Auto mode's judge, plan 30.3, 30.5)
 """
 
 from __future__ import annotations
@@ -15,7 +16,8 @@ from typing import Any, Literal
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict
 
-from utils.tools.api import Approval, CallRequest, Decision, Grant, ResultPage, Tool, ToolCallResult, ToolIndexItem
+from utils.tools.api import (Approval, CallRequest, Decision, Grant, JudgedCall, JudgeStatus, ResultPage, Tool, ToolCallResult,
+                             ToolIndexItem)
 
 router = APIRouter(tags=["tools"])
 WAIT_MAX = 3600
@@ -172,3 +174,19 @@ async def revoke_grant(grant_id: str, request: Request) -> dict[str, Any]:
                response_model=GrantsDeleted)
 async def revoke_thread_grants(request: Request, thread: str = Query(..., min_length=1)) -> dict[str, Any]:
     return {"deleted": await _hub(request).grants.end_thread(thread)}
+
+
+@router.get("/api/judge/recent", summary="Calls the Auto mode's judge decided, newest first (plan 30.5): what ran and what asked, "
+            "with the reason; ?thread=", response_model=list[JudgedCall], response_model_exclude_none=True)
+async def judged_recent(request: Request, thread: str | None = None, limit: int = Query(50, ge=1, le=500)) -> list[dict[str, Any]]:
+    where, args = ("WHERE thread = ?", (thread,)) if thread else ("", ())
+    rows = await _hub(request).db.fetchall(f"SELECT * FROM judged {where} ORDER BY ts DESC, id DESC LIMIT ?", (*args, limit))
+    return [dict(r) for r in rows]
+
+
+@router.get("/api/judge/status", summary="Whether the judge's model answers (Auto is offered only when it does)",
+            response_model=JudgeStatus)
+async def judge_status(request: Request) -> dict[str, Any]:
+    from utils.tools.judge import status
+
+    return await status(_hub(request).config)

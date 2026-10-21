@@ -176,8 +176,14 @@ class Calls:
         grant = await self.hub.grants.match(tool, arguments, origin, (limits or {}).get("key")) \
             if self.hub.grants is not None and not (limits or {}).get("once") else None
         verdict, why = decide(tool.name, tool.risk, self.hub.config, mode, grant, limits)
-        if verdict == "judge":                         # Auto mode (plan Phase 30 plugs its judge in here)
-            verdict, why = await judge(self.hub, tool, arguments, origin, limits, why)
+        judged = None
+        if verdict == "judge":                         # Auto mode (plan 30.3): allow or ask, with its reason
+            verdict, why, judged = await judge(self.hub, tool, arguments, origin, limits, why)
+            judged = {**judged, "why": why}
+        if origin and "said" in origin:                # the user's words were for the judge only; never stored
+            origin = {k: v for k, v in origin.items() if k != "said"}
+        if judged is not None:
+            origin = {**(origin or {}), "judge": judged}   # the call's record, the card and the step row say why
         if verdict == "deny":
             refuse = (limits or {}).get("refuse") or {}
             out = {"status": "denied", "tool": tool.name, "error": {
@@ -187,10 +193,28 @@ class Calls:
             return out
         if verdict == "ask":
             a = await self.approvals.create(tool.name, arguments, tool.ask, tool.risk, origin or {}, how)
-            return self._needs(tool, a, filled, how, limits, why)
+            if judged is not None:
+                await self._judged(tool.name, judged, origin, approval_id=a["id"])
+            return {**self._needs(tool, a, filled, how, limits, why), **({"judge": judged} if judged else {})}
         if grant is not None:
             origin = {**(origin or {}), "grant": grant["id"]}      # the records and the chat say which grant ran it
-        return await self._launch(tool, arguments, origin or {}, None, wait, filled=how)
+        out = await self._launch(tool, arguments, origin or {}, None, wait, filled=how)
+        if judged is not None:
+            await self._judged(tool.name, judged, origin, call_id=out.get("call_id"))
+            out = {**out, "judge": judged}
+        return out
+
+    async def _judged(self, tool: str, j: dict[str, Any], origin: dict[str, Any] | None,
+                      call_id: str | None = None, approval_id: str | None = None) -> None:
+        """Settings → Agent lists recent judged calls (plan 30.5); a failure here never breaks the call."""
+        try:
+            await self.hub.db.execute(
+                "INSERT INTO judged (ts, tool, verdict, reason, source, rule, ms, model, summary, thread, call_id, approval_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (time.time(), tool, j.get("verdict"), j.get("reason") or "", j.get("source") or "", j.get("rule") or "",
+                 j.get("ms"), j.get("model") or "", j.get("summary") or "", (origin or {}).get("thread"), call_id, approval_id))
+        except Exception:  # noqa: BLE001
+            log.exception("recording a judged call")
 
     async def decide(self, aid: str, approve: bool, arguments: dict[str, Any] | None = None,
                      reason: str | None = None, wait: float = DEFAULT_WAIT_S, remember: str = "once",

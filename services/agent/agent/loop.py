@@ -452,6 +452,8 @@ class Agent:
                 origin["named"] = named     # secret-looking files the user named: the workspace mod opens only these
             if (thread.get("settings") or {}).get("dry_run"):
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
+            if mode == "auto":
+                origin["said"] = self._said(tid)   # the Auto judge reads only the user's own words (plan 30.3)
             if (thread.get("settings") or {}).get("no_learn"):
                 origin["no_learn"] = True   # this chat opted out of learning (plan 21.4)
             args = self._refs(tid, args or {}, (tools.full.get(name) or {}).get("parameters"))
@@ -500,6 +502,11 @@ class Agent:
         evs = self.store.events(tid, types=("user",))
         last = evs[-1] if evs else None
         return (last["seq"] if last else 0), str((last or {}).get("payload", {}).get("text") or "")
+
+    def _said(self, tid: str, n: int = 6) -> list[str]:
+        """The user's last `n` typed messages (no attachments, files, pages or tool results), each cut at 2,000 characters."""
+        evs = self.store.events(tid, types=("user",))[-n:]
+        return [str(e.get("payload", {}).get("text") or "")[:2000] for e in evs if (e.get("payload") or {}).get("text")]
 
     def _turn_calls(self, tid: str, cid: str) -> list[str]:
         """Tool names called so far in this turn (since the last user message), not counting `cid`."""

@@ -260,6 +260,25 @@ MIGRATIONS: list[str] = [
             CAST(strftime('%s', 'now') AS REAL),
             'Shipped with AIHub: web searches run without asking. Revoke it to be asked each time.');
     """,
+    # 011: the Auto mode's judged calls (plan 30.3, 30.5): utils/tools/judge.py. Settings → Agent lists them.
+    """
+    CREATE TABLE judged (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts          REAL NOT NULL,
+        tool        TEXT NOT NULL,
+        verdict     TEXT NOT NULL CHECK (verdict IN ('allow', 'ask')),
+        reason      TEXT NOT NULL DEFAULT '',
+        source      TEXT NOT NULL DEFAULT '',
+        rule        TEXT NOT NULL DEFAULT '',
+        ms          REAL,
+        model       TEXT NOT NULL DEFAULT '',
+        summary     TEXT NOT NULL DEFAULT '',
+        thread      TEXT,
+        call_id     TEXT,
+        approval_id TEXT
+    );
+    CREATE INDEX judged_ts ON judged (ts);
+    """,
 ]
 
 _STOP = object()

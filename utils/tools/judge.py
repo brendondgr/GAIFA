@@ -205,3 +205,73 @@ async def judge(call: dict[str, Any], user_messages: list[Any], folder: dict[str
     j.rule = r.rule
     j.ms = round((time.perf_counter() - t0) * 1000, 1)
     return j
+
+
+# ---- the Auto mode's seam (plan 30.3): approvals.judge() → judge_call()
+
+def call_for(tool_name: str, arguments: dict[str, Any], limits: dict[str, Any] | None,
+             origin: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """The call and folder the rules and the model see. A workspace tool's preflight (`limits`) gives the folder's
+    path and level; a mod may report a job's estimate as `origin.estimate` {seconds, memory_gb, memory_share}."""
+    call: dict[str, Any] = {"tool": tool_name, "args": dict(arguments or {})}
+    if (origin or {}).get("estimate"):
+        call["estimate"] = origin["estimate"]
+    folder = None
+    if limits and limits.get("path"):
+        folder = {"path": limits["path"], "level": limits.get("level") or "read"}
+    return call, folder
+
+
+def summary(call: dict[str, Any]) -> str:
+    """One line for the step row and Settings → Agent: the command, the URL or the file."""
+    a = call.get("args") or {}
+    for k in ("command", "url", "path", "source", "code"):
+        if a.get(k):
+            return f"{call['tool']}: {str(a[k])[:160]}"
+    return str(call.get("tool"))
+
+
+async def judge_call(cfg: Any, tool_name: str, arguments: dict[str, Any], origin: dict[str, Any] | None,
+                     limits: dict[str, Any] | None) -> Judgement:
+    """The Auto verdict on one call the approvals table left to the judge. `origin.said` holds the user's own typed
+    messages (the agent sends them in Auto; nothing else from the chat reaches the judge)."""
+    call, folder = call_for(tool_name, arguments, limits, origin)
+    said = (origin or {}).get("said") or []
+    j = await judge(call, said if isinstance(said, list) else [said], folder, config_from(cfg.agent.judge))
+    j.detail = {**j.detail, "summary": summary(call)}
+    return j
+
+
+_status: dict[str, Any] = {}
+
+
+async def status(cfg: Any, client: httpx.AsyncClient | None = None, max_age_s: float = 30) -> dict[str, Any]:
+    """Whether the judge's model answers (cached `max_age_s`): the relay lists the model, or the decide mod has it
+    usable. Settings and the composer offer Auto only when it does."""
+    jc = config_from(cfg.agent.judge)
+    key = (jc.backend, jc.model, jc.url)
+    if _status.get("key") == key and time.time() - _status.get("ts", 0) < max_age_s:
+        return _status["value"]
+    out = {"available": False, "backend": jc.backend, "model": jc.model, "detail": ""}
+    own = client is None
+    client = client or httpx.AsyncClient(timeout=httpx.Timeout(3))
+    try:
+        r = await client.get(f"{jc.url.rstrip('/')}/v1/models")
+        r.raise_for_status()
+        d = r.json()
+        if jc.backend == "decide":
+            m = next((m for m in d.get("models", []) if m.get("id") == jc.model), None)
+            out["available"] = bool(m and m.get("usable"))
+            out["detail"] = "" if out["available"] else ("; ".join((m or {}).get("problems") or []) or
+                                                         f"the decide mod has no model {jc.model}")
+        else:
+            ids = {m.get("id") for m in d.get("data", [])}
+            out["available"] = jc.model in ids
+            out["detail"] = "" if out["available"] else f"the relay doesn't list {jc.model} (start it, or pick another judge)"
+    except (httpx.HTTPError, ValueError) as e:
+        out["detail"] = f"{jc.url} doesn't answer ({type(e).__name__})"
+    finally:
+        if own:
+            await client.aclose()
+    _status.update(key=key, ts=time.time(), value=out)
+    return out

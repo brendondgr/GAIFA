@@ -2,7 +2,7 @@
 // /api/s/agent. `createChatClient({api})` returns the live client when the `proxy` area is live,
 // and the scripted mock agent (chat-mock.js) in `?mock`. Both have the same methods:
 //
-//   models() threads({q, archived, limit}) create(body) get(tid) patch(tid, p) remove(tid) events(tid, after)
+//   models() threads({q, archived, limit}) searchChats(q, limit) create(body) get(tid) patch(tid, p) remove(tid) events(tid, after)
 //   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq)
 //   send(tid, text, attachments) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
@@ -76,6 +76,7 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     live: true,
     models: () => req('GET', '/v1/models'),
     threads: ({ q, archived, limit } = {}) => req('GET', '/v1/threads' + qs({ q, archived: archived ? 'true' : undefined, limit })),
+    searchChats: (q, limit = 8) => req('GET', '/v1/chats/search' + qs({ q, limit })).then(r => r.results || []),  // plan 28.5
     create: (body = {}) => req('POST', '/v1/threads', body),
     get: tid => req('GET', T(tid)),
     patch: (tid, p) => req('PATCH', T(tid), p),

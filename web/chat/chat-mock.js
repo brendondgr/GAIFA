@@ -302,6 +302,18 @@ export function createMockClient(api, { speed = 1 } = {}) {
         .filter(t => !qq || t.thread.title.toLowerCase().includes(qq) || t.events.some(e => ['user', 'assistant'].includes(e.type) && String(e.payload.text).toLowerCase().includes(qq)))
         .sort((a, b) => b.thread.updated - a.thread.updated).slice(0, limit).map(pub);
     },
+    // plan 28.5: chats by meaning; the mock ranks by shared words and uses the first reply as the summary
+    async searchChats(q, limit = 8) {
+      await seed(); await net();
+      const words = new Set(String(q).toLowerCase().split(/\W+/).filter(Boolean));
+      return [...threads.values()].map(t => {
+        const text = t.events.filter(e => ['user', 'assistant'].includes(e.type)).map(e => String(e.payload.text)).join(' ');
+        const shared = [...new Set(text.toLowerCase().split(/\W+/))].filter(w => words.has(w)).length;
+        const summary = String(t.events.find(e => e.type === 'assistant')?.payload.text || '').slice(0, 240);
+        return { thread_id: t.thread.id, title: t.thread.title, summary, date: new Date(t.thread.updated * 1000).toISOString().slice(0, 10),
+          link: '#/chat/' + t.thread.id, score: Math.round(100 * shared / Math.max(1, words.size)) / 100 };
+      }).filter(r => r.score > 0).sort((a, b) => b.score - a.score).slice(0, limit);
+    },
     async create(body = {}) { await net(); return pub(newThread(body)); },
     async get(tid) { await seed(); await net(); return pub(T(tid)); },
     async patch(tid, p) { await net(); const t = T(tid); for (const k of ['title', 'model', 'mode', 'archived']) if (p[k] != null) t.thread[k] = p[k];

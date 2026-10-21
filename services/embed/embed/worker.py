@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import multiprocessing as mp
+import os
 from collections.abc import Callable
 from typing import Any
 
@@ -84,6 +85,8 @@ class WorkerBackend:
             info = self._call(("load", parts))
         else:
             ctx = mp.get_context("spawn")                   # never fork a process that may hold a GPU context
+            if python := os.environ.get("EMBED_WORKER_PYTHON"):  # e.g. a CPU-only torch venv, so the GPU isn't touched
+                ctx.set_executable(python)
             self.conn, child = ctx.Pipe()
             self.proc = ctx.Process(target=serve, args=(child, self.factory, parts), name="embed-worker", daemon=True)
             self.proc.start()

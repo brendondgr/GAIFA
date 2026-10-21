@@ -67,3 +67,14 @@ def test_server_answers_503_when_the_worker_dies(settings, hub):
         assert r.status_code == 503 and r.json()["code"] == "worker_died" and r.json()["fix"]
         assert c.get("/v1/status").json()["loaded"] is False
         assert c.post("/v1/embed", json={"inputs": [{"text": "fine"}]}).status_code == 200
+
+
+def test_the_worker_can_run_in_another_python(monkeypatch, tmp_path):
+    """EMBED_WORKER_PYTHON: e.g. a CPU-only torch venv, so a CPU run never opens the GPU."""
+    import sys
+    monkeypatch.setenv("EMBED_WORKER_PYTHON", sys.executable)
+    w = WorkerBackend(CrashingBackend)
+    try:
+        assert Encoder(w, tmp_path).embed([("text", "x: hello")], 768, BATCH).shape == (1, 768)
+    finally:
+        w.unload()

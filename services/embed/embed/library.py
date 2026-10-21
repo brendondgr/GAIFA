@@ -91,6 +91,7 @@ class Library:
         self.last_api = 0.0                # the server sets this on every /v1/embed and search
         self.indexed = 0
         self.connected = False
+        self._in_chats = False
 
     # following the hub ----------------------------------------------------------------------
 
@@ -188,7 +189,23 @@ class Library:
         many were indexed."""
         n = 0
         self.state = "indexing"
+        try:                                    # chat summaries first: few, cheap, and someone may be waiting (28.5)
+            n += await self.index_chats()
+        except Stop:
+            self.state = "waiting_for_gpu"
+            return n
+        except HubError as e:
+            if e.code == "needs_room":
+                self.state = "no_room"
+                return n
+            raise
         while (rows := self.store.pending(1)):
+            if self.store.chats_pending(1):      # summaries that came in meanwhile go before the next output
+                try:
+                    n += await self.index_chats()
+                except Stop:
+                    self.state = "waiting_for_gpu"
+                    break
             row = rows[0]
             self.state, self.current = "indexing", {"id": row["id"], "title": row["title"], "kind": row["kind"]}
             try:
@@ -215,13 +232,6 @@ class Library:
                 self.store.fail(row["id"], f"{type(e).__name__}: {e}")
             finally:
                 self.current = None
-        if not self.store.pending(1) and self.state == "indexing":
-            try:
-                n += await self.index_chats()
-            except Stop:
-                self.state = "waiting_for_gpu"
-            except HubError as e:
-                self.state = "no_room" if e.code == "needs_room" else self.state
         if not self.store.pending(1) and not self.store.chats_pending(1):
             await self._unload_if_unused()
         return n
@@ -230,11 +240,15 @@ class Library:
         """Chat summaries (plan 28.5), a batch at a time; `gate=False` when someone is searching them."""
         GATED.set(gate)
         n = 0
-        while (rows := self.store.chats_pending(limit)):
-            vecs = await self._embed("text", [prompt(r["summary"], "document", r["title"]) for r in rows])
-            for r, v in zip(rows, vecs):
-                self.store.finish_chat(r["thread_id"], r["summary"], v)
-            n += len(rows)
+        self._in_chats = True
+        try:
+            while (rows := self.store.chats_pending(limit)):
+                vecs = await self._embed("text", [prompt(r["summary"], "document", r["title"]) for r in rows])
+                for r, v in zip(rows, vecs):
+                    self.store.finish_chat(r["thread_id"], r["summary"], v)
+                n += len(rows)
+        finally:
+            self._in_chats = False
         return n
 
     async def _unload_if_unused(self) -> None:
@@ -259,6 +273,8 @@ class Library:
             await self.sleep(self.s.index_gap_s)
             if await asyncio.to_thread(self.gpu.busy_now):
                 raise Stop()
+        if not self._in_chats and self.store.chats_pending(1):     # summaries go between an output's batches too
+            await self.index_chats(gate=GATED.get())
         return vecs
 
     async def index_one(self, row: dict[str, Any], gate: bool = True) -> None:

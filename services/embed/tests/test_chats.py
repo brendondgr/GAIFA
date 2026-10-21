@@ -47,3 +47,22 @@ def test_empty(settings, hub):
     lib = make(settings, hub)
     with client_for(settings, lib) as c:
         assert c.post("/v1/chats/search", json={"query": "x"}).json() == {"results": [], "pending": 0}
+
+
+def test_summaries_go_between_a_long_outputs_batches(settings, hub):
+    """A big document takes many batches (minutes on the CPU); a summary that arrives meanwhile doesn't wait."""
+    hub.add("big", "text", text=("A paragraph about rivers and bridges. " * 90 + "\n\n") * 12, title="big.txt")
+    lib = make(settings, hub)
+    run(lib.reconcile())
+    seen = []
+    orig = lib.enc.backend.encode
+
+    def encode(kind, items, bs):
+        if not seen:                                              # during the document's first batch
+            lib.store.put_chat("t9", "Taxes", "worked out the quarterly tax estimate", 0, 0)
+        seen.append(len(items))
+        return orig(kind, items, bs)
+    lib.enc.backend.encode = encode
+    run(lib.drain())
+    assert lib.store.chat_counts() == {"pending": 0, "done": 1}
+    assert seen.index(1) < len(seen) - 1                             # the summary went before the document's last batch

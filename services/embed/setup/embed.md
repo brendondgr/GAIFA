@@ -55,6 +55,7 @@ The same packages unpinned, with PyTorch's CPU wheels. The model then runs in fp
 | `EMBED_MODEL_DIR` | `service.toml` `[run.env]` | yes (set) | the weights, `{models}/embed/embeddinggemma-2` |
 | `EMBED_STATE_DIR` | `service.toml` | yes (set) | `data/state/embed/`: `memory.json` (the measured memory per encoder set) and the temporary copies ffmpeg reads |
 | `EMBED_DEVICE` | `service.toml` / `config.toml [services.embed].env` | no | `auto` (default: the GPU when torch sees one), `cuda`, `cpu` |
+| `EMBED_WORKER_PYTHON` | `config.toml [services.embed].env` | no | the model's worker runs in this Python instead: a CPU-only torch venv, so a CPU run never opens `/dev/kfd` (a ROCm torch build opens it on its first CPU op even with `EMBED_DEVICE=cpu`, and rejects `-1` in `HIP_VISIBLE_DEVICES`/`ROCR_VISIBLE_DEVICES` with a fatal error). Build one with `uv venv` and `uv pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match -r services/embed/requirements.txt` |
 | `EMBED_IDLE_UNLOAD_S` | the mod's Settings tab (`idle_unload_s`) | no | unload after this many idle seconds; default 300, 0 = never |
 | `EMBED_MAX_INPUTS`, `EMBED_AUDIO_MAX_S`, `EMBED_BATCH_TEXT`, `EMBED_BATCH_MEDIA` | `config.toml` env | no | 256 inputs a call; audio cut at 320 s (25 tokens a second fills the 8k context); batches of 32 texts and 4 images |
 | `EMBED_INDEX` | `service.toml` | no | `1` (default): the library follows the hub's outputs and indexes them into `data/databases/embed.db`; `0` turns it off |
@@ -120,6 +121,9 @@ Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp
 - **Weights through a symlink** are refused by the hub's registry (`doesn't exist in data/models`): keep them as a real folder.
 
 ## Known gaps
+
+- **GPU checks waiting for the machine to be checked** (paused 2026-10-20 after crashes in GPU work): the GPU tests (`pytest -m gpu`) on the final code, the idle gate's resume after another mod's GPU load (seen once), indexing pictures, audio and video at GPU speed, and 28.5's chat search in bf16 (run in fp32 on the CPU).
+- With the model on the CPU, a search waits for the indexer's batch in flight: 23–46 s with pictures in the backlog.
 
 - CPU speed: matmul runs at 0.9 TFLOP/s in fp32 here, so the slowness is elsewhere in the model's CPU path. Not looked into further.
 - The vision token budget is the default (280 tokens an image, 140 a video frame); the card allows 70–1120.

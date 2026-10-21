@@ -63,7 +63,7 @@ def doc_card(d: dict[str, Any]) -> str:
     return f"(document {d.get('ref')}: {d.get('name')}, {size})"
 
 
-def render(events: list[dict[str, Any]], cap: int = 3500) -> str:
+def render(events: list[dict[str, Any]], cap: int = 3500, reply_cap: int = 300) -> str:
     """A chat as a short trajectory for the prompts. Documents appear as their cards and tool results
     as their status (plan 24.8): no text from a file, a web page or a transcript reaches the learner."""
     out: list[str] = []
@@ -73,7 +73,8 @@ def render(events: list[dict[str, Any]], cap: int = 3500) -> str:
         if t == "user":
             out.append(f"USER: {str(p.get('text', ''))[:400]}" + "".join(" " + doc_card(d) for d in p.get("docs") or []))
         elif t == "assistant" and p.get("text"):
-            out.append(f"AGENT: {p['text'][:300]}")
+            txt = p["text"].strip()
+            out.append(f"AGENT: {txt[:reply_cap]}" + (" […]" if len(txt) > reply_cap else ""))
         elif t == "tool_call":
             out.append(f"CALL {p.get('name')} {json.dumps(p.get('arguments') or {}, default=str)[:300]}")
         elif t == "approval":

@@ -98,10 +98,8 @@ class GemmaBackend:
         self.dtype = "float32"
 
     def load(self, parts: frozenset[str]) -> None:
-        if self.want == "cpu":                              # keep ROCm off the GPU: even torch.cuda.is_available()
-            os.environ["HIP_VISIBLE_DEVICES"] = "-1"        # opens /dev/kfd. Set before torch is imported (in the
-            os.environ["ROCR_VISIBLE_DEVICES"] = "-1"       # worker process, so only it is affected)
-            os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        # EMBED_DEVICE=cpu never asks torch about the GPU, but a ROCm build of torch still opens /dev/kfd on its first
+        # CPU op (2026-10-20); to leave the GPU untouched, run the worker in a CPU-only torch (EMBED_WORKER_PYTHON).
         import torch                                        # imported on first load: health answers at once
         from sentence_transformers import SentenceTransformer
 

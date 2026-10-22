@@ -63,6 +63,8 @@ export const overlay = (rows, known) => {
   const by = new Map((known || []).map(t => [t.id, t]));
   return rows.map(t => (by.has(t.id) ? { ...t, ...pick(by.get(t.id)) } : t));
 };
+/** A section's rows: none once it's empty (its last chat moved, archived or deleted: nothing stale stays). */
+export const sectionChats = (row, loaded, known) => (row.count ? overlay(loaded || [], known) : []);
 const pick = t => Object.fromEntries(['title', 'state', 'running', 'updated', 'archived'].filter(k => k in t).map(k => [k, t[k]]));
 
 /** Environments from the workspace mod, or null without it (the list is then flat). */
@@ -84,7 +86,7 @@ export function ViewMenu({ view, onChange, grouped = true }) {
   const set = patch => onChange({ ...view, ...patch });
   return h('span', { style: { position: 'relative', flex: 'none' } },
     h(Btn, { kind: 'ghost', sm: true, icon: 'sliders', title: 'Group and order the chats', 'aria-label': 'View', 'aria-expanded': open ? 'true' : 'false', onClick: () => setOpen(!open) }),
-    h(Popover, { open, onClose: () => setOpen(false), width: 280, label: 'View', style: { gap: 10 } },
+    h(Popover, { open, onClose: () => setOpen(false), place: 'down-left', width: 280, label: 'View', style: { gap: 10 } },
       grouped ? h(Choice, { label: 'Group by', value: view.group, options: GROUP_BY, onPick: group => set({ group }) }) : null,
       grouped && view.group === 'environment' ? h(Choice, { label: 'Environments by', value: view.envOrder, options: ENV_ORDERS, onPick: envOrder => set({ envOrder }) }) : null,
       h(Choice, { label: 'Chats by', value: view.chatOrder, options: CHAT_ORDERS, onPick: chatOrder => set({ chatOrder }) })));
@@ -146,7 +148,7 @@ export function GroupedChats({ c, api, envs, archived, view, onView, known, relo
   return h('div', { style: { display: 'flex', flexDirection: 'column' } },
     !anything ? h('div', { style: { padding: '12px 10px 4px', color: T.mut, fontSize: 12, textAlign: 'center' } }, archived ? 'No archived chats.' : 'No chats yet. Start one →') : null,
     rows.filter(r => r.count || !archived).map(r => {
-      const id = r.env.id, open = !view.collapsed.includes(id), list = overlay(chats[id] || [], known);
+      const id = r.env.id, open = !view.collapsed.includes(id), list = sectionChats(r, chats[id], known);
       return h(Section, { key: id, row: r, open, chats: list, loading: !chats[id], more: list.length < r.count,
         onToggle: () => onView({ ...view, collapsed: toggled(view.collapsed, id) }),
         onMore: () => { const n = (shown[id] || FIRST) + MORE; setShown(s => ({ ...s, [id]: n })); want(r, n); },

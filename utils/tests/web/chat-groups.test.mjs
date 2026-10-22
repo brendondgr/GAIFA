@@ -72,6 +72,8 @@ test('a row shows the newest state the page knows', () => {
   const out = g.overlay(rows, [{ id: 't1', title: 'new', state: 'running', settings: { environment: 'art' } }]);
   assert.deepEqual(out[0], { id: 't1', title: 'new', state: 'running', settings: { environment: 'grants' } });
   assert.equal(out[1].title, 'x');
+  assert.deepEqual(g.sectionChats({ count: 0 }, rows, []), []);            // emptied by a move: the old rows go
+  assert.equal(g.sectionChats({ count: 2 }, rows, []).length, 2);
 });
 
 test('a section: its name and count, its chats, Show more with how many are left', () => {

@@ -3104,13 +3104,13 @@ Asked for 2026-10-21, after Claude Code's sidebar: the chat list grouped by **en
   - **A chat's ⋯ menu** gains **Move to…** (the environments), next to Rename, Archive and Delete; double-clicking a title renames it in place.
   - **Client:** `listThreads({environment, sort, offset, limit, archived})` and `threadGroups({archived})` in `chat-api.js`.
   *Done when:* `utils/tests/web/chat-groups.test.mjs` (the helpers, the sections and their paging, Move to, the flat list without the workspace mod), and the Node tests pass.
-- [ ] **41.3 Docs and the live check.** Brief §11.13 (the chat list), the agent's README routes, structure for `chat-groups.js`; the plan ticked. Live, on the installed hub when nothing else is using it: the groups match the chats, Show more pages, Move to and Rename work, the View choices survive a reload.
+- [x] **41.3 Docs and the live check.** *As built (2026-10-21):* the docs went with 41.1 and 41.2. Live on the installed hub (the agent restarted, the workspace mod started) with a throwaway environment and chat, removed afterwards: the sections and their counts, Show more, Environments by Name and Chats by Name (kept after a reload), Rename from the section's menu, Move to, a search's flat list naming each chat's environment, and archived chats grouped only with the toggle on. Two fixes from it: the View menu opens to the right of its button (it was cut off at the page's left edge), and a section emptied by a move drops its old rows (`sectionChats`).
 
 **Wire — Phase 41:** the Chat page's thread list, from flat to grouped by environment.
 
 **Checks & deliverables — Phase 41**
-- [ ] Live: a few environments with chats, ordered each way; a chat moved between them; an environment renamed from the sidebar; archived chats grouped only when the toggle is on.
-- [ ] Delivered: the agent's thread groups and filters, `web/chat/chat-groups.js`, the grouped `chat-list.js`, the tests.
+- [x] Live: a few environments with chats, ordered each way; a chat moved between them; an environment renamed from the sidebar; archived chats grouped only when the toggle is on.
+- [x] Delivered: the agent's thread groups and filters, `web/chat/chat-groups.js`, the grouped `chat-list.js`, the tests.
 
 ---
 

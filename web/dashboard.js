@@ -6,6 +6,7 @@ import { h, SERIES, OTHER, TONE, MONO, MUT, BD, fmtNum, useWidth, Frame, btnSt }
 import { AreaChart, LineChart, BarChart, HBarChart, Donut, Heatmap, Timeline, KpiTile, Sparkline } from './charts.js';
 import { useData, pollFor, chartState, Card, MemoryChart, StorageChart, svcColor, KIND_COLOR, KIND_LABEL } from './views.js';
 import { GpuQueueW, jobGpuText } from './gpu-queue.js';
+import { PoolBars } from './mem-pools.js';
 
 const R = () => globalThis.React;
 const RANGES = ['1h', '6h', '24h', '7d', '30d'];
@@ -42,13 +43,20 @@ function MemNowW({ ctx, table }) {
   const items = m.by_service.filter(x => x.used_bytes > 0.01e9).sort((a, b) => b.used_bytes - a.used_bytes)
     .map(x => ({ key: x.id, label: ctx.services.find(s => s.id === x.id)?.name || x.id, value: x.used_bytes, color: svcColor(ctx.services, x.id) }));
   items.push({ key: 'other', label: 'Other', value: m.other_bytes, color: OTHER }, { key: 'free', label: 'Free', value: Math.max(0, m.total_bytes - m.used_bytes), color: 'var(--row,#1A2130)' });
-  return h(Donut, { items, unit: 'bytes', center: (m.used_bytes / 1e9).toFixed(1) + ' GB', sub: `of ${(m.total_bytes / 1e9).toFixed(0)} GB`, label: 'Memory now', table, size: 124 });
+  const donut = h(Donut, { items, unit: 'bytes', center: (m.used_bytes / 1e9).toFixed(1) + ' GB', sub: `of ${(m.total_bytes / 1e9).toFixed(0)} GB`, label: 'Memory now', table, size: 124 });
+  if ((m.pools || []).length < 2) return donut;               // one pool: GPUs share the RAM
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 12 } }, donut, h(PoolBars, { memory: m, services: ctx.services }));   // plan 36.4
 }
 
 function GpuW({ ctx, range, table }) {
-  const d = useData(() => ctx.api.getMetrics({ series: ['gpu.gtt_used'], range }), [ctx.api, range], pollFor(range));
+  // Dedicated cards (plan 36.4): each one's VRAM; else the shared GPU's GTT, as before.
+  const cards = (ctx.memory?.pools || []).slice(1), names = cards.map(p => `gpu.${p.id.split(':')[1]}.mem_used`);
+  const series = names.length ? names : ['gpu.gtt_used'];
+  const d = useData(() => ctx.api.getMetrics({ series, range }), [ctx.api, range, series.join()], pollFor(range));
   if (d.state !== 'ok') return h(AreaChart, { ...chartState(d), height: 130 });
-  return h(AreaChart, { t: d.data.t, height: 130, unit: 'bytes', label: 'GPU memory (GTT)', table, series: [{ key: 'gtt', label: 'GTT used', values: d.data.series['gpu.gtt_used'] || [], color: SERIES[2] }] });
+  if (!names.length) return h(AreaChart, { t: d.data.t, height: 130, unit: 'bytes', label: 'GPU memory (GTT)', table, series: [{ key: 'gtt', label: 'GTT used', values: d.data.series['gpu.gtt_used'] || [], color: SERIES[2] }] });
+  return h(AreaChart, { t: d.data.t, height: 130, unit: 'bytes', label: 'GPU memory (VRAM)', table,
+    series: cards.map((p, i) => ({ key: p.id, label: p.name, values: d.data.series[names[i]] || [], color: SERIES[(i + 2) % SERIES.length] })) });
 }
 
 function OutDayW({ ctx, table }) {
@@ -176,7 +184,7 @@ const BASE = [
   { key: 'jobs', title: 'Jobs', span: 3, ranges: ['24h', '7d', '30d'], def: '7d', areas: ['metrics', 'events'], C: JobsW },
   { key: 'storage', title: 'Model storage', span: 3, href: '#/models', areas: ['models'], C: StorageW },
   { key: 'uptime', title: 'Service uptime (24 h)', span: 6, areas: ['metrics'], C: UptimeW },
-  { key: 'gpu', title: 'GPU memory (GTT)', span: 3, ranges: RANGES, def: '6h', areas: ['metrics'], C: GpuW },
+  { key: 'gpu', title: 'GPU memory', span: 3, ranges: RANGES, def: '6h', areas: ['metrics'], C: GpuW },
   { key: 'outputs-service', title: 'Outputs by service', span: 3, ranges: ['24h', '7d', '30d'], def: '7d', href: '#/outputs', areas: ['metrics'], C: OutSvcW },
   { key: 'recent', title: 'Recent outputs', span: 6, href: '#/outputs', areas: ['outputs'], C: RecentW, noTable: true },
   { key: 'activity', title: 'Activity feed', span: 6, areas: ['events'], C: ActivityW, noTable: true },

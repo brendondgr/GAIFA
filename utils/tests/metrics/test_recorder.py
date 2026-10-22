@@ -171,3 +171,13 @@ async def test_a_tick_that_wakes_early_keeps_its_bucket(db, rec, monkeypatch):
         pass
     rows = [ts for ts, _ in await series_values(db, "mem.used")]
     assert rows == [T0 + 10, T0 + 20, T0 + 30]  # one sample per bucket, none in the bucket before
+
+
+async def test_each_dedicated_gpu_gets_a_vram_series(db, rec):
+    r = rec(FakeSvc("a"))
+    r.memory.snapshot["pools"] = [{"id": "system", "name": "System memory", "total_bytes": 100 * GB, "used_bytes": 30 * GB, "available_bytes": 70 * GB},
+                                  {"id": "gpu:1", "name": "RTX 3090", "total_bytes": 24 * GB, "used_bytes": 7 * GB, "available_bytes": 17 * GB}]
+    samples = {i.name: v for i, v in await r.tick(T0 + 3)}
+    assert samples["gpu.1.mem_used"] == 7 * GB and "gpu.0.mem_used" not in samples      # plan 36.4
+    infos = {i.name: i.as_dict() for i in await r.store.series()}
+    assert infos["gpu.1.mem_used"]["label"] == "RTX 3090 VRAM used"

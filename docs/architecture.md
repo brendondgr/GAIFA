@@ -433,6 +433,8 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 - **Reservations and acquire:** reservations hold VRAM too, and `POST /api/memory/acquire` takes `vram_bytes` and `device`.
 - **Where VRAM can't be read** per process (WSL2, macOS), a mod's share is what it acquired or its `vram_gb`.
 
+The recorder keeps a `gpu.<index>.mem_used` series per dedicated GPU (plan 36.4), and the UI draws a bar per card under the system memory.
+
 With more than one GPU, the **GPU queue keeps one slot per device** (plan 36.3): a lease is for a `device` (default: the GPU its mod was started on), nested work runs on its parent's, and `GET /api/gpu` lists the other cards' slots under `devices`.
 
 **Load rule:**

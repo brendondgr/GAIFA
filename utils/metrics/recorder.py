@@ -161,6 +161,9 @@ class Recorder:
                 out.append((STATIC["gpu.gtt_used"], float(gpu.get("gtt_used_bytes") or 0)))
                 if gpu.get("vram_total_bytes"):
                     out.append((STATIC["gpu.vram_used"], float(gpu.get("vram_used_bytes") or 0)))
+            for pool in mem.get("pools", [])[1:]:       # each dedicated GPU's VRAM (plan 36.4)
+                n = pool["id"].split(":", 1)[1]
+                out.append((SeriesInfo(f"gpu.{n}.mem_used", f"{pool['name']} VRAM used", "bytes"), float(pool["used_bytes"])))
             for row in mem.get("by_service", []):
                 out.append((SeriesInfo(f"mem.svc.{row['id']}", self._name(row["id"]), "bytes", service=row["id"]), float(row["used_bytes"])))
         running = 0

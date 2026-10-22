@@ -332,7 +332,8 @@ export function createMockApi() {
     return { total_bytes: total, used_bytes: used, available_bytes: Math.max(0, total - used), reserve_bytes: reserve,
       gpu: { name: 'AMD Radeon 8060S (Strix Halo)', vram_total_bytes: 4.0 * GB, vram_used_bytes: 1.1 * GB, gtt_total_bytes: 121.5 * GB, gtt_used_bytes: Math.max(0, used - otherBytes) },
       by_service: services.filter(s => !s.manifest_errors.length).map(s => ({ id: s.id, used_bytes: s.used, estimate_bytes: s.estimate, load: s.load, idle_s: s.load === 'n/a' ? null : s.idle_s, auto_unload: s.config.auto_unload && !settings.memory.never_unload.includes(s.id), priority: s.config.priority })),
-      other_bytes: otherBytes };
+      other_bytes: otherBytes,
+      pools: [{ id: 'system', name: 'System memory', total_bytes: total, used_bytes: used, available_bytes: Math.max(0, total - used) }] };  // plan 36.1: one pool (unified)
   }
   function system() {
     return { hub: { version: '0.1.0', pid: 31337, uptime_s: Math.round(now() - T0 + 7200), rss_bytes: 92 * MB, port: settings.hub.port },

@@ -180,15 +180,19 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Config:** `[services.<id>] gpu` isn't part of `ServiceConfig`.
     - **Tests:** `test_queue_devices.py` (6), and `test_planner_pools.py` gains the pin and the freest card.
 
-- [ ] **36.4 The API and UI per pool.**
+- [x] **36.4 The API and UI per pool.**
   - **The API:** `GET /api/memory` gains `pools`, and the `Gpu` model gains `vendor`, `memory` and `index`. The AMD-only `gtt_*` fields stay for this release, so the UI and the contract keep working.
   - **Metrics:** for each dedicated pool, a `gpu.<i>.mem_used` series. This machine's series are unchanged.
   - **The UI:** the header's memory section and the Overview's memory widget show one bar per pool. On this machine that's one bar, as today (a `web/PATCHES.md` entry, brief §11.5).
   *Done when:* the contract test and `utils/tests/web/` pass; checked in a browser on a `--demo-mods` hub with the `linux-nvidia-2gpu` fixture (three bars) and on this machine (one bar, the same numbers as before).
+  - *As built:*
+    - **The `Gpu` model** (`memory.gpu`, AMD's GTT and VRAM) stays as it was. The pools (36.1) carry what other GPUs need, so neither the UI nor the contract changed shape.
+    - **The UI:** `web/mem-pools.js` (PATCHES #43) gives the popover's title and its bars per card, the Overview's Memory now widget the same bars, and the GPU memory widget each card's series. Checked in the browser on a second hub with the two-RTX-3090 fixture: "System memory" plus two card bars.
+    - **Tests:** `mem-pools.test.mjs` (3), `test_recorder.py` (the per-card series).
 
 **Checks & deliverables — Phase 36**
-- [ ] On this machine: a load still makes room as before (one pool), and the GPU queue still serializes jobs.
-- [ ] Delivered: `utils/memory/pools.py`, the planner and acquire changes, per-device queue slots, the per-pool UI.
+- [x] On this machine: a load still makes room as before (one pool), and the GPU queue still serializes jobs.
+- [x] Delivered: `utils/memory/pools.py`, the planner and acquire changes, per-device queue slots, the per-pool UI.
 
 ---
 

@@ -70,6 +70,15 @@ size_gb = 0.0
 good_for = "CubePart reads its architecture from this one file (371 bytes)"
 licence = "Apache-2.0"
 required = true
+
+[[variants]]                    # plan 39.7: where gen3d's base setup runs (ROCm image, or the host with CUDA)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]
+accel = "cuda"
+os = ["linux", "wsl"]
 -->
 
 # CubeArt (Cube3D and CubePart): setup

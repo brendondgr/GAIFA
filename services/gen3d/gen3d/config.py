@@ -38,6 +38,9 @@ class Settings:
     runtime: Path = _path("GEN3D_RUNTIME", str(ROOT / "runtime"))
     image: str = os.environ.get("GEN3D_IMAGE", "docker.io/kyuz0/amd-strix-halo-comfyui:latest")
     podman: str = os.environ.get("GEN3D_PODMAN", "podman")
+    # plan 39.7: the variant. rocm runs the workers in the ROCm image; cuda runs them on the host, in venvs
+    # with PyTorch's CUDA build (scripts/install-runtime.sh --accel cuda). Unset: this machine, rocm.
+    accel: str = os.environ.get("AIHUB_ACCEL") or "rocm"
     blender: str = os.path.expanduser(os.environ.get("GEN3D_BLENDER", "blender"))
     # Preview renders: cpu = Workbench under Mesa's llvmpipe, no GPU; gpu = the same on the GPU (OpenGL).
     # The default when the page has no saved choice (prefs.py: the saved choice wins).

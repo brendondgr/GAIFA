@@ -22,6 +22,22 @@ what = "the ROCm image for gfx1151 (15.1 GB, shared with the comfy mod, whose se
 [[steps]]
 run = "scripts/install-runtime.sh"
 what = "clones every local engine's code at its pinned commit (Roblox/cube, Hunyuan3D 2.1, SAM 3D Objects, DINOv2) and builds all three worker venvs inside the image (runtime/CubeArt, runtime/img3d, runtime/sam3do: about 6.5 GB, pytorch3d from source, no GPU devices passed); no weights: each engine's licence applies when you use that engine, and the engine's own setup asks about it before its weights download; time not measured here"
+
+[[variants]]                    # plan 39.7: the workers in the ROCm image (the block's steps)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]                    # the workers on the host, in venvs with PyTorch's CUDA build; the same shims
+accel = "cuda"
+os = ["linux", "wsl"]
+needs = ["git", "uv", "python3", "g++"]
+note = "built on the host with PyTorch's CUDA build (about 8 GB, pytorch3d from source)"
+check = "out=$(.venv/bin/python -m gen3d.doctor); for l in 'upstream clone' 'CubePart code' 'worker venv'; do grep -Eq \"ok +$l\" <<<\"$out\" || exit 1; done"
+steps = [
+  { run = "aihub install gen3d", what = "makes .venv/ in this folder with Python 3.12 from requirements.txt: the server only (about 50 MB, a minute)" },
+  { run = "scripts/install-runtime.sh --accel cuda", what = "clones every local engine's code at its pinned commit and builds the three worker venvs on the host (Python 3.13, PyTorch from the CUDA index, the same locks; pytorch3d from source, about 10 min)" },
+]
 -->
 
 # 3D Generate: setup
@@ -82,6 +98,10 @@ Builds all three worker venvs; it needs the image but not the weights. CubeArt: 
 ## Choosing models
 
 None here: each engine runs fixed weights, chosen in its own setup ([cubeart.md](cubeart.md#choosing-models), [img3d.md](img3d.md#choosing-models), [sam3do.md](sam3do.md#choosing-models)), and TRELLIS.2's and SAM 3D Body's belong to ComfyUI packs ([comfyui.md](../../comfy/setup/comfyui.md#choosing-models)). Without an engine's weights, the engine picker lists it with what's missing, and the others are unaffected. The weights go in `data/models/3d/<folder>/` (`GEN3D_WEIGHTS`, mounted read-only into the workers).
+
+### On other machines (plan 39.7)
+
+The engines run on ROCm or CUDA only: SAM 3D's extensions (spconv, gsplat, kaolin) are CUDA projects, and the shims in `workers/shims/` stand in for them on both. On a machine with an NVIDIA GPU (Linux or WSL2), `aihub setup gen3d` picks the CUDA variant: `scripts/install-runtime.sh --accel cuda` builds the three worker venvs **on the host** (Python 3.13 from uv, PyTorch from the CUDA index, the same locks and shims; pytorch3d from source, which needs `g++`), and the workers run there instead of in the ROCm image (`AIHUB_ACCEL`, `gen3d/worker.py`). Elsewhere (macOS, Intel, the CPU) 3D Generate is "not available on this machine". The CUDA path is untested until a field test reports on it.
 
 ## Configuration
 

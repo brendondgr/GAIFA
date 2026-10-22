@@ -25,6 +25,15 @@ size_gb = 8.02
 good_for = "the engine's shape model and VAE (the repo's texture model isn't used)"
 licence = "Tencent Hunyuan 3D 2.1 Community Licence (excludes the EU, the UK and South Korea)"
 required = true
+
+[[variants]]                    # plan 39.7: where gen3d's base setup runs (ROCm image, or the host with CUDA)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]
+accel = "cuda"
+os = ["linux", "wsl"]
 -->
 
 # Hunyuan3D 2.1: setup

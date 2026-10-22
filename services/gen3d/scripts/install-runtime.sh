@@ -6,8 +6,19 @@
 # Re-running is safe: finished steps are skipped. CubeArt's own scripts (cubeart, cube-run,
 # scripts/) come from the old ~/Models/3D/CubeArt and are kept as they are; the mod only needs
 # cube/, .venv/ and .cache/.
-#   scripts/install-runtime.sh
+#   scripts/install-runtime.sh [--accel rocm|cuda]
+# --accel (plan 39.7; default AIHUB_ACCEL, else rocm): rocm builds every venv inside the ROCm image, as above;
+# cuda builds them on the host (Python 3.13 from uv, PyTorch's CUDA build from scripts/torch_index.py,
+# the same locks and the same shims), and the workers then run there instead of in a container.
 set -euo pipefail
+ACCEL="${AIHUB_ACCEL:-rocm}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --accel) ACCEL="$2"; shift 2 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+case "$ACCEL" in rocm|cuda) ;; *) echo "install-runtime.sh: 3D Generate's engines run on ROCm or CUDA, not $ACCEL" >&2; exit 2 ;; esac
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HUB="$(cd "$ROOT/../.." && pwd)"
 CA="$ROOT/runtime/CubeArt"
@@ -22,6 +33,40 @@ if [ ! -d "$CA/cube/.git" ]; then
 fi
 mkdir -p "$HUB/data/models/3d"   # a fresh clone has no models yet: the link must not dangle
 [ -L "$CA/weights" ] || [ -e "$CA/weights" ] || ln -s ../../../../data/models/3d "$CA/weights"
+if [ "$ACCEL" = cuda ]; then
+  RT="$ROOT/runtime"; SP=lib/python3.13/site-packages
+  for cmd in uv git python3; do command -v "$cmd" >/dev/null || { echo "install-runtime.sh: needs $cmd" >&2; exit 1; }; done
+  clone() { [ -d "$2/.git" ] || git clone --quiet "$1" "$2"; git -C "$2" checkout --quiet "$3"; }
+  clone https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1.git "$RT/hunyuan3d-2.1" 82920d643c0dc2f7bfd7255f45f62d386edfe60c
+  clone https://github.com/facebookresearch/sam-3d-objects.git "$RT/sam3d-objects" f91db411c50efee93d8db7aeb323885650f6f722
+  clone https://github.com/facebookresearch/dinov2.git "$RT/sam3do/dinov2" 7764ea0f912e53c92e82eb78a2a1631e92725fc8
+  INDEX="$(python3 "$ROOT/scripts/torch_index.py" cuda)"
+  echo "== CubeArt venv on the host (PyTorch from $INDEX)"
+  [ -x "$CA/.venv/bin/python" ] || uv venv -q --python 3.13 --python-preference only-managed "$CA/.venv"
+  uv pip install -q --python "$CA/.venv/bin/python" --index-url "$INDEX" torch torchvision torchaudio
+  uv pip freeze --python "$CA/.venv/bin/python" | grep -iE "^(torch|torchvision|torchaudio|triton|numpy)==" > "$CA/.venv/constraints.txt"
+  uv pip install -q --python "$CA/.venv/bin/python" -c "$CA/.venv/constraints.txt" -r "$ROOT/locks/cubeart.txt"
+  layered() {   # dir, then the site-packages it reads too: like the image build, one .pth of layers
+    local d="$1"; shift
+    [ -x "$d/.venv/bin/python" ] || uv venv -q --python 3.13 --python-preference only-managed "$d/.venv"
+    printf "%s
+" "$@" > "$d/.venv/$SP/_layers.pth"
+    cp "$CA/.venv/constraints.txt" "$d/.venv/constraints.txt"
+  }
+  echo "== img3d and sam3do venvs on the host"
+  layered "$RT/img3d" "$CA/.venv/$SP"
+  uv pip install -q --python "$RT/img3d/.venv/bin/python" -c "$CA/.venv/constraints.txt" -r "$ROOT/locks/img3d.txt"
+  layered "$RT/sam3do" "$RT/img3d/.venv/$SP" "$CA/.venv/$SP"
+  uv pip install -q --python "$RT/sam3do/.venv/bin/python" -c "$CA/.venv/constraints.txt" -r "$ROOT/locks/sam3do.txt"
+  "$RT/sam3do/.venv/bin/python" -c "import pytorch3d" 2>/dev/null || FORCE_CUDA=0 MAX_JOBS=16 \
+    uv pip install -q --python "$RT/sam3do/.venv/bin/python" -c "$CA/.venv/constraints.txt" --no-build-isolation \
+    "git+https://github.com/facebookresearch/pytorch3d.git@75ebeeaea0908c5527e7b1e305fbc7681382db47"
+  "$CA/.venv/bin/python" -c "import torch, transformers, diffusers, trimesh; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+  PYTHONPATH="$RT/hunyuan3d-2.1/hy3dshape" "$RT/img3d/.venv/bin/python" -c "import hy3dshape, timm, fast_simplification; print('img3d ok')"
+  PYTHONPATH="$ROOT/workers/shims:$RT/sam3d-objects" LIDRA_SKIP_INIT=true "$RT/sam3do/.venv/bin/python" -c "import sam3d_objects.pipeline.inference_pipeline_pointmap, pytorch3d; print('sam3do ok')"
+  echo "installed CubeArt and the image engines for CUDA in $RT (weights: $(readlink -f "$CA/weights"))"
+  exit 0
+fi
 podman image exists "$IMAGE" || { echo "the ROCm image $IMAGE isn't pulled (podman pull $IMAGE)" >&2; exit 1; }
 
 echo "== venv (inside $IMAGE)"

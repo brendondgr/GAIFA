@@ -23,6 +23,8 @@ EXPECTED: dict[str, dict[str, str]] = {
            "wsl2-nvidia": "cuda", "wsl2-intel": "xpu", "macos-m3": "mps", "linux-cpu": "cpu"} for m in ("embed", "decide", "tts-kokoro", "comfyui")},
     "stt": {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "linux-intel-arc": "cpu",
             "wsl2-nvidia": "cuda", "wsl2-intel": "cpu", "macos-m3": "cpu", "linux-cpu": "cpu"},
+    **{g: {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "wsl2-nvidia": "cuda"}
+       for g in ("gen3d", "gen3d-cubeart", "gen3d-img3d", "gen3d-sam3do")},         # ROCm or CUDA only: elsewhere unavailable
     "tts-breeze": {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "linux-intel-arc": "cpu",
                    "wsl2-nvidia": "cuda", "wsl2-intel": "cpu", "macos-m3": "cpu", "linux-cpu": "cpu"},
 }

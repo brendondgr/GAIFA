@@ -46,6 +46,15 @@ size_gb = 1.26
 good_for = "the depth / point-map model SAM 3D Objects reads the picture with"
 licence = "MIT"
 required = true
+
+[[variants]]                    # plan 39.7: where gen3d's base setup runs (ROCm image, or the host with CUDA)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]
+accel = "cuda"
+os = ["linux", "wsl"]
 -->
 
 # SAM 3D Objects: setup

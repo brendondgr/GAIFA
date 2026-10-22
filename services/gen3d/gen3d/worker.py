@@ -1,4 +1,5 @@
-"""The GPU workers: a `podman run -i` of the ROCm image running one worker script.
+"""The GPU workers: a `podman run -i` of the ROCm image running one worker script (or, for the cuda variant,
+the script itself on the host, in its venv: plan 39.7).
 
 Each engine family has its own venv and script (SPECS): `cube` (Cube3D + CubePart, workers/cube_worker.py),
 `img3d` (Hunyuan3D 2.1) and `sam3do` (SAM 3D Objects). Only one container runs at a time: the pool
@@ -14,6 +15,7 @@ import itertools
 import json
 import logging
 import os
+import signal
 import time
 
 from .config import ROOT, settings
@@ -64,6 +66,25 @@ class CubeWorker:
                 "device": self.info.get("device"), "torch": self.info.get("torch"),
                 "uptime_s": round(time.time() - self.started_at, 1) if self.started_at and self.up else None}
 
+    @property
+    def native(self) -> bool:
+        """The cuda variant runs the worker on the host (plan 39.7); rocm in the image."""
+        return settings.accel != "rocm"
+
+    def native_command(self) -> tuple[list[str], dict[str, str]]:
+        """The worker script in its venv on the host, and its environment: the container's, without ROCm's."""
+        sp = specs()[self.family]
+        cache = str(sp["cache"])
+        env = {
+            "GEN3D_CUBEART": str(settings.cubeart), "GEN3D_WEIGHTS": str(settings.weights.resolve()), "HF_HUB_OFFLINE": "1",
+            "HF_HOME": str(sp.get("hf") or f"{cache}/hf"), "XDG_CACHE_HOME": cache, "TORCHINDUCTOR_CACHE_DIR": f"{cache}/inductor",
+            "TORCH_HOME": f"{cache}/torch", "TRITON_CACHE_DIR": f"{cache}/triton", "TMPDIR": f"{cache}/tmp",
+            "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+            "PYTHONPATH": ":".join(str(p) for p in sp["pythonpath"]), "PYTHONUNBUFFERED": "1", **sp["env"],
+        }
+        script = f"mkdir -p {cache}/tmp; source {sp['venv']}/bin/activate && exec python -u {sp['script']}"
+        return ["bash", "-c", script], env
+
     def command(self) -> list[str]:
         # Mount real paths, never symlinks: a link that points outside its mount is broken inside
         # the container (AIHub architecture §12.3). The jobs folder is the only writable mount
@@ -95,7 +116,7 @@ class CubeWorker:
 
     async def _cleanup_stale(self) -> None:
         """A server that crashed can leave a worker container holding GPU memory: remove it."""
-        if self._cleaned:
+        if self._cleaned or self.native:
             return
         self._cleaned = True
         p = await asyncio.create_subprocess_exec(settings.podman, "ps", "-aq", "--filter", f"name={NAME_PREFIX}",
@@ -135,10 +156,17 @@ class CubeWorker:
         t0 = time.time()
         if on_event:
             on_event({"event": "sub", "sub": "worker.start"})
-        log.info("starting worker container %s", self.name)
-        self.proc = await asyncio.create_subprocess_exec(
-            *self.command(), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-            stderr=None, limit=1 << 22, start_new_session=True)
+        if self.native:
+            argv, extra = self.native_command()
+            log.info("starting worker %s on the host (%s)", self.name, settings.accel)
+            self.proc = await asyncio.create_subprocess_exec(
+                *argv, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=None, limit=1 << 22,
+                start_new_session=True, cwd=str(ROOT / "workers"), env={**os.environ, **extra})
+        else:
+            log.info("starting worker container %s", self.name)
+            self.proc = await asyncio.create_subprocess_exec(
+                *self.command(), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+                stderr=None, limit=1 << 22, start_new_session=True)
         try:
             msg = await asyncio.wait_for(self._read(), settings.load_timeout_s)
         except Exception:
@@ -199,6 +227,14 @@ class CubeWorker:
         await self._kill()
 
     async def _kill(self) -> None:
+        if self.native:
+            if self.proc and self.proc.returncode is None:
+                try:
+                    os.killpg(self.proc.pid, signal.SIGKILL)     # the worker and anything it started
+                except ProcessLookupError:
+                    pass
+            self.state, self.loaded = "stopped", set()
+            return
         if self.name:
             p = await asyncio.create_subprocess_exec(settings.podman, "kill", self.name,
                                                      stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL)

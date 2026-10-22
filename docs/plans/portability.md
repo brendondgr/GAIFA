@@ -455,8 +455,13 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
     - **Tests:** `services/comfy/tests/test_runtime.py` (3), and a `requires` test in `test_tools.py`; comfy's 153 pass. The restarted adapter passes `aihub check comfy`.
     - **Seen on the way, not changed:** `comfyui workflows check --all` fails two packs whose models aren't on this machine (`ae.safetensors`, `z_image_turbo_bf16.safetensors`).
 
-- [ ] **39.7 gen3d: a CUDA path for the workers.** A `cuda` variant runs the workers in a pinned PyTorch CUDA image, with real spconv, gsplat and kaolin instead of the shims. The workers take `AIHUB_DEVICE`; the ROCm environment is set only for `rocm`; the container flags come from 37.4's helper.
+- [x] **39.7 gen3d: a CUDA path for the workers.** A `cuda` variant runs the workers in a pinned PyTorch CUDA image, with real spconv, gsplat and kaolin instead of the shims. The workers take `AIHUB_DEVICE`; the ROCm environment is set only for `rocm`; the container flags come from 37.4's helper.
   *Done when:* gen3d's tests cover the worker command per accel.
+  - *As built:*
+    - **No CUDA image:** the CUDA variant runs the workers **on the host**, from venvs that `scripts/install-runtime.sh --accel cuda` builds: Python 3.13 from uv, PyTorch from the CUDA index, the same locks and layering, and pytorch3d from source. Real spconv, gsplat and kaolin wheels aren't installed: the shims (pure PyTorch) work the same on CUDA as on ROCm, and the real wheels would be a later speed-up.
+    - **The worker** (`settings.accel` from `AIHUB_ACCEL`, default rocm) runs `bash -c 'source <venv> && exec python -u <worker>'` with the container's environment minus ROCm's, plus `PYTORCH_CUDA_ALLOC_CONF`. It's killed through its process group and skips the container cleanup. The workers' `"cuda"` device strings already fit both ROCm and CUDA.
+    - **The setup docs:** the base doc declares rocm (tested) and cuda, with its own steps and a check without the image. The three engine docs declare both.
+    - **Tests:** `services/gen3d/tests/test_worker_accel.py` (3), and the picks per machine. gen3d's 103 pass.
 
 - [ ] **39.8 vllm: a CUDA image (parked mod; declaration only).** A `cuda` variant uses `vllm/vllm-openai`, with the attention backends per accel and 37.4's flags.
   *Done when:* vllm's tests cover the container command per accel.

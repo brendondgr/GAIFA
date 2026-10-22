@@ -298,12 +298,26 @@ export function createMockClient(api, { speed = 1 } = {}) {
   return {
     live: false,
     async models() { await net(); return structuredClone(MODELS); },
-    async threads({ q, archived, limit = 200 } = {}) {
+    async threads({ q, archived, limit = 200, environment, sort = 'updated', offset = 0 } = {}) {
       await seed(); await net();
-      const qq = (q || '').toLowerCase();
+      const qq = (q || '').toLowerCase(), envs = environment ? String(environment).split(',') : null;
+      const order = { title: (a, b) => a.thread.title.toLowerCase().localeCompare(b.thread.title.toLowerCase()), created: (a, b) => b.thread.created - a.thread.created }[sort]
+        || ((a, b) => b.thread.updated - a.thread.updated);
       return [...threads.values()].filter(t => !!t.thread.archived === !!archived)
+        .filter(t => !envs || envs.includes(t.thread.settings?.environment || 'default'))
         .filter(t => !qq || t.thread.title.toLowerCase().includes(qq) || t.events.some(e => ['user', 'assistant'].includes(e.type) && String(e.payload.text).toLowerCase().includes(qq)))
-        .sort((a, b) => b.thread.updated - a.thread.updated).slice(0, limit).map(pub);
+        .sort(order).slice(offset, offset + limit).map(pub);
+    },
+    async threadGroups({ archived } = {}) {   // plan 41.1, as the agent's /v1/threads/groups
+      await seed(); await net();
+      const by = new Map();
+      for (const t of threads.values()) {
+        if (!!t.thread.archived !== !!archived) continue;
+        const env = t.thread.settings?.environment || 'default', g = by.get(env) || { environment: env, count: 0, updated: 0, running: 0 };
+        g.count += 1; g.updated = Math.max(g.updated, t.thread.updated); g.running += ['running', 'waiting'].includes(t.thread.state) ? 1 : 0;
+        by.set(env, g);
+      }
+      return [...by.values()].sort((a, b) => b.updated - a.updated);
     },
     // plan 28.5: chats by meaning; the mock gives a cosine-like score from shared words (0.3–0.8, no minimum,
     // like the embed mod) and uses the first reply as the summary

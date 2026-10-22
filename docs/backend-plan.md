@@ -3098,7 +3098,7 @@ Asked for 2026-10-21, after Claude Code's sidebar: the chat list grouped by **en
   - **`GET /v1/threads/groups?archived=`** → `[{environment, count, updated, running}]`: one row per environment id the chats use (`default` for none), with its chats' newest `updated` and how many are running or waiting.
   - **SQL:** `COALESCE(json_extract(settings, '$.environment'), 'default')`; `title` sorts case-insensitively.
   *Done when:* `services/agent/tests/test_thread_groups.py` (grouping, the default bucket, several ids, the three sorts, offset, archived kept apart, a search unchanged).
-- [ ] **41.2 The grouped list: `web/chat/chat-groups.js`, `chat-list.js`, `chat-api.js`.**
+- [x] **41.2 The grouped list: `web/chat/chat-groups.js`, `chat-list.js`, `chat-api.js`.**
   - **Pure helpers** (`chat-groups.js`): `groupRows(groups, envs)` (unknown ids fold into Default), `orderGroups(rows, by)`, `VIEW_DEFAULTS` and the saved view (`aihub.chat.list`: group by environment or none, environment order, chat order, collapsed groups).
   - **The list:** one section per environment: a caret (collapse), its name, the chat count, **New chat** in it (the chat starts with that environment), and a ⋯ menu (**Rename** inline through the workspace mod's `PUT /v1/environments/{id}`, **Manage folders…** to the Workspace page). Inside, its first 6 chats in the chosen order and **Show more**. A **View** button at the top: Group by (Environment · None), Environments by (Recent activity · Name · Created), Chats by (Recent activity · Name · Created).
   - **A chat's ⋯ menu** gains **Move to…** (the environments), next to Rename, Archive and Delete; double-clicking a title renames it in place.

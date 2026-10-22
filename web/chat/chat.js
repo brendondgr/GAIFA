@@ -17,7 +17,8 @@ import { buildView, applyTransient, settleLive, mergeEvents, todosOpen, threadOf
 import { groupTurns } from './chat-turn.js';
 import { TurnView, ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
-import { ThreadList, LIST_CSS, useEmbedUp } from './chat-list.js';
+import { ThreadList, Item, LIST_CSS, useEmbedUp } from './chat-list.js';
+import { GroupedChats, readView, saveView, loadEnvs } from './chat-groups.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
 import { EnvChip, decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
 import { Composer } from './chat-composer.js';
@@ -65,6 +66,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [fresh, setFresh] = useState(() => ({ model: null, mode: 'manual', settings: newChatSettings({}, lastEnv()) }));   // a chat not created yet; its environment: the last one picked (plan 34)
   const [folders, setFolders] = useState(null);   // the workspace mod's folders, for Bypass (plan 27.4)
   const [judge, setJudge] = useState(null);       // GET /api/judge/status: Auto is offered while its model answers (plan 30.5)
+  const [envs, setEnvs] = useState(null), [listView, setListViewState] = useState(readView), [listKey, setListKey] = useState(0);   // plan 41.2
+  const setListView = v => { setListViewState(v); saveView(v); };
+  const relist = () => setListKey(n => n + 1);
   const scrollRef = useRef(null), contentRef = useRef(null), stick = useRef(true), first = useRef(true), inputRef = useRef(null), loadRef = useRef(null), queue = useRef([]), flushT = useRef(0);
   const dkey = tid || 'new', draft = drafts[dkey] || '';
   const setDraft = v => setDrafts(d => ({ ...d, [dkey]: typeof v === 'function' ? v(d[dkey] || '') : v }));
@@ -73,11 +77,13 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
 
   // ---- data ----
   const loadList = async () => {
-    try { setThreads(await c.threads({ q, archived, limit })); setDown(null); } catch (e) { fail(e); }
+    try { setThreads(await c.threads({ q, archived, limit, sort: listView.chatOrder })); setDown(null); } catch (e) { fail(e); }
     setListLoading(false);
   };
   loadRef.current = loadList;
-  useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, archived, limit]);
+  useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, archived, limit, listView.chatOrder]);
+  const loadEnvList = () => loadEnvs(api).then(setEnvs);
+  useEffect(() => { loadEnvList(); }, []);
   useEffect(() => {                                     // plan 28.5: chats by meaning, through the embed mod
     if (!(meaning && embedUp && q.trim() && c.searchChats)) return;
     let live = true;
@@ -160,7 +166,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const ensureThread = async () => {
     if (tid) return tid;
     const th = await c.create({ model: fresh.model || undefined, mode: fresh.mode, settings: fresh.settings });
-    setThreads(l => [th, ...l]);
+    setThreads(l => [th, ...l]); relist();
     go('#/chat/' + th.id);
     return th.id;
   };
@@ -191,19 +197,27 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const setModel = m => { if (thread) c.patch(thread.id, { model: m }).then(t => { setThread(x => ({ ...x, ...t })); c.context(thread.id).then(mm => setLive(l => ({ ...l, meter: mm }))).catch(() => {}); }, fail); else setFresh(f => ({ ...f, model: m })); };
   const setMode = m => { if (thread) c.patch(thread.id, { mode: m }).then(t => setThread(x => ({ ...x, ...t })), fail); else setFresh(f => ({ ...f, mode: m })); };
   const setGroups = s => { if (thread) c.patch(thread.id, { settings: s }).then(t => setThread(x => ({ ...x, ...t })), fail); else setFresh(f => ({ ...f, settings: { ...f.settings, ...s } })); };
-  const setEnv = id => { rememberEnv(id); setGroups({ ...(thread ? thread.settings || {} : {}), environment: id }); };
+  const setEnv = id => { rememberEnv(id); setGroups({ ...(thread ? thread.settings || {} : {}), environment: id }); if (thread) setTimeout(relist, 300); };
   const rename = (t, title) => c.patch(t.id, { title }).then(n => { setThreads(l => l.map(x => (x.id === t.id ? { ...x, ...n } : x))); if (t.id === tid) setThread(x => ({ ...x, ...n })); }, fail);
-  const archive = t => c.patch(t.id, { archived: !t.archived }).then(() => { setThreads(l => l.filter(x => x.id !== t.id)); toast(t.archived ? 'Moved back to chats' : 'Archived', 'success'); }, fail);
+  const archive = t => c.patch(t.id, { archived: !t.archived }).then(() => { setThreads(l => l.filter(x => x.id !== t.id)); relist(); toast(t.archived ? 'Moved back to chats' : 'Archived', 'success'); }, fail);
+  const move = (t, env) => c.patch(t.id, { settings: { environment: env } }).then(n => {   // plan 41.2: Move to
+    setThreads(l => l.map(x => (x.id === t.id ? { ...x, ...n } : x))); if (t.id === tid) setThread(x => ({ ...x, ...n })); relist();
+    toast(`Moved to ${(envs || []).find(e => e.id === env)?.name || env}`, 'success');
+  }, fail);
+  const newIn = env => { rememberEnv(env); setFresh(f => ({ ...f, settings: { ...f.settings, environment: env } })); go('#/chat'); setDrawer(false); setTimeout(() => inputRef.current?.focus(), 50); };
+  const envName = id => { const list = envs || []; return (list.find(e => e.id === id) || list.find(e => e.default))?.name || null; };
+  const itemProps = (t, flat = false) => ({ moveTo: (envs || []).filter(e => e.id !== ((t.settings || {}).environment || (envs || []).find(x => x.default)?.id)),
+    onMove: envs ? env => move(t, env) : null, where: flat && envs ? envName((t.settings || {}).environment) : null });
   const remove = async t => {
     const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: 'The chat and its history are deleted. Its outputs stay in Outputs.', confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
     if (!ok) return;
-    try { await c.remove(t.id); setThreads(l => l.filter(x => x.id !== t.id)); if (t.id === tid) go('#/chat'); toast('Chat deleted', 'success'); } catch (e) { fail(e); }
+    try { await c.remove(t.id); setThreads(l => l.filter(x => x.id !== t.id)); relist(); if (t.id === tid) go('#/chat'); toast('Chat deleted', 'success'); } catch (e) { fail(e); }
   };
   const forkAt = async (seq, text, qs = []) => {   // qs: the message's quote-replies, as cards to edit (their seqs are the same in the branch)
     try {
       if (seq < 1) { go('#/chat'); setDrafts(d => ({ ...d, new: text || '' })); if (qs.length) setQuotes(qs.map(({ seq: _s, ...q }) => q), 'new'); return; }
       const th = await c.fork(tid, seq);
-      setThreads(l => [th, ...l]);
+      setThreads(l => [th, ...l]); relist();
       if (text != null) setDrafts(d => ({ ...d, [th.id]: text }));
       if (qs.length) setQuotes(qs, th.id);
       go('#/chat/' + th.id);
@@ -256,7 +270,11 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   // ---- render ----
   const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: v => { setQ(v); setLimit(LIST_PAGE); }, archived, onArchived: v => { setArchived(v); setLimit(LIST_PAGE); setListLoading(true); }, onMore: threads.length >= limit ? () => setLimit(n => n + LIST_PAGE) : null,
     onNew: () => { go('#/chat'); setDrawer(false); setTimeout(() => inputRef.current?.focus(), 50); }, onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
-    canMeaning: embedUp && !!c.searchChats, meaning, onMeaning: setMeaning, found });
+    canMeaning: embedUp && !!c.searchChats, meaning, onMeaning: setMeaning, found,
+    view: listView, onView: setListView, canGroup: !!envs, itemProps,
+    grouped: envs && listView.group === 'environment' && c.threadGroups ? h(GroupedChats, { c, api, envs, archived, view: listView, onView: setListView, known: threads, reloadKey: listKey,
+      renderItem: t => h(Item, { key: t.id, t, active: t.id === tid, onOpen: () => setDrawer(false), onRename: v => rename(t, v), onArchive: () => archive(t), onDelete: () => remove(t), ...itemProps(t) }),
+      onNewIn: newIn, onEnvsChanged: loadEnvList, onError: fail, go }) : null });
   const empty = !tid || (ready && !events.length && !running);
   const compacts = events.filter(e => e.type === 'compact').length;
   return h('div', { ref: rootRef, style: { display: 'flex', height: '100%', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.bg } },

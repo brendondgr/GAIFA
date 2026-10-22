@@ -1,14 +1,18 @@
-// The Chat page's thread list (plan 14.1): search, new chat, rename, archive, delete (with a
-// confirm), and the archived toggle. A drawer on narrow screens (chat.js decides). While the embed
-// mod is up, "By meaning" searches the chats' summaries instead of their titles (plan 28.5).
+// The Chat page's thread list (plan 14.1): search, new chat, rename (the ⋯ menu, or double-click a title),
+// archive, delete (with a confirm), Move to another environment, and the archived toggle. A drawer on narrow
+// screens (chat.js decides). While the embed mod is up, "By meaning" searches the chats' summaries instead of
+// their titles (plan 28.5). Grouped by environment (plan 41.2), the list's body is chat-groups.js's sections.
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, inputSt, fmtAgo, label11 } from './chat-ui.js';
 import { ScoreBadge } from '../score.js';
+import { ViewMenu } from './chat-groups.js';
 
 const R = () => globalThis.React;
 
-function Item({ t, active, onOpen, onRename, onArchive, onDelete }) {
-  const React = R(), [menu, setMenu] = React.useState(false), [edit, setEdit] = React.useState(null);
+/** One chat. `moveTo`: the other environments it can move to (plan 41.2); `where`: its environment's name,
+ * shown in a flat list (a search, or grouping off). */
+export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], onMove, where }) {
+  const React = R(), [menu, setMenu] = React.useState(false), [edit, setEdit] = React.useState(null), [moving, setMoving] = React.useState(false);
   const dot = t.running || t.state === 'running' ? T.acc : t.state === 'waiting' ? T.pu : t.state === 'error' ? T.rd : null;
   if (edit != null) {
     const save = () => { const v = edit.trim(); setEdit(null); if (v && v !== t.title) onRename(v); };
@@ -16,20 +20,28 @@ function Item({ t, active, onOpen, onRename, onArchive, onDelete }) {
       onKeyDown: e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { e.stopPropagation(); setEdit(null); } }, style: { ...inputSt, width: '100%', height: 28 } }));
   }
   return h('div', { className: 'aichat-item', style: { position: 'relative', display: 'flex', alignItems: 'center', borderRadius: 6, background: active ? T.hov : 'transparent' } },
-    h('a', { href: '#/chat/' + encodeURIComponent(t.id), onClick: onOpen, 'aria-current': active ? 'page' : undefined,
+    h('a', { href: '#/chat/' + encodeURIComponent(t.id), onClick: onOpen, onDoubleClick: e => { e.preventDefault(); setEdit(t.title || ''); }, 'aria-current': active ? 'page' : undefined,
       style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: 32, padding: '0 4px 0 10px', color: active ? T.tx : T.mut, fontWeight: active ? 500 : 400, textDecoration: 'none' } },
       dot ? h('span', { 'aria-label': t.state, style: { width: 6, height: 6, borderRadius: 99, background: dot, flex: 'none', animation: dot === T.acc ? 'aichatpulse 1.2s ease-in-out infinite' : 'none' } }) : null,
       h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, t.title || 'New chat'),
+      where ? h('span', { title: 'Environment', style: { fontSize: 10.5, color: T.dim, flex: 'none', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, where) : null,
       h('span', { className: 'aichat-ago', style: { fontFamily: MONO, fontSize: 10.5, color: T.dim, flex: 'none' } }, fmtAgo(t.updated))),
     h('span', { style: { position: 'relative', flex: 'none' } },
       h('button', { type: 'button', className: 'aichat-more', 'aria-label': `More for ${t.title || 'chat'}`, 'aria-haspopup': 'menu', 'aria-expanded': menu ? 'true' : 'false', onClick: () => setMenu(!menu),
         style: { width: 24, height: 24, marginRight: 4, display: 'grid', placeItems: 'center', border: 0, borderRadius: 5, background: 'transparent', color: T.mut, cursor: 'pointer' } }, h(Icon, { d: 'more', size: 14 })),
-      h(Popover, { open: menu, onClose: () => setMenu(false), width: 170, label: 'Chat actions', style: { padding: 4, gap: 0 } },
-        [['edit', 'Rename', () => setEdit(t.title || '')], ['archive', t.archived ? 'Unarchive' : 'Archive', onArchive], ['trash', 'Delete…', onDelete]].map(([ic, label, fn]) =>
-          h('button', { key: label, type: 'button', role: 'menuitem', onClick: () => { setMenu(false); fn(); },
-            style: { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: ic === 'trash' ? T.rd : T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' } },
-          h(Icon, { d: ic, size: 13 }), label)))));
+      h(Popover, { open: menu, onClose: () => { setMenu(false); setMoving(false); }, width: 190, label: 'Chat actions', style: { padding: 4, gap: 0 } },
+        moving
+          ? [h('span', { key: 'h', style: { ...label11, padding: '4px 9px' } }, 'Move to'),
+            ...moveTo.map(e => menuItem(e.id, 'home', e.name, () => { setMenu(false); setMoving(false); onMove(e.id); }))]
+          : [menuItem('rename', 'edit', 'Rename', () => { setMenu(false); setEdit(t.title || ''); }),
+            onMove && moveTo.length ? menuItem('move', 'folder', 'Move to…', () => setMoving(true)) : null,
+            menuItem('archive', 'archive', t.archived ? 'Unarchive' : 'Archive', () => { setMenu(false); onArchive(); }),
+            menuItem('delete', 'trash', 'Delete…', () => { setMenu(false); onDelete(); }, T.rd)])));
 }
+
+const menuItem = (key, ic, label, fn, color = T.tx) => h('button', { key, type: 'button', role: 'menuitem', onClick: fn,
+  style: { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' } },
+  h(Icon, { d: ic, size: 13 }), label);
 
 /** True while the embed mod is up (plan 28.5's "by meaning"); checked on mount and every 20 s. */
 export function useEmbedUp(api) {
@@ -68,11 +80,12 @@ export const LIST_CSS = `
 `;
 
 export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
-  canMeaning, meaning, onMeaning, found }) {
+  canMeaning, meaning, onMeaning, found, grouped = null, view = null, onView = null, canGroup = false, itemProps = () => ({}) }) {
   const showMeaning = canMeaning && meaning && !!q.trim();
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 10px 8px 12px' } },
       h('span', { style: { ...label11, flex: 1 } }, archived ? 'Archived chats' : 'Chats'),
+      view && onView ? h(ViewMenu, { view, onChange: onView, grouped: canGroup }) : null,
       h(Btn, { kind: 'pri', sm: true, icon: 'plus', label: 'New chat', onClick: onNew }),
       onClose ? h(Btn, { kind: 'ghost', sm: true, icon: 'x', title: 'Close', onClick: onClose }) : null),
     h('div', { style: { padding: '0 10px 8px' } },
@@ -84,11 +97,12 @@ export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArc
       canMeaning ? h('button', { type: 'button', 'aria-pressed': meaning ? 'true' : 'false', onClick: () => onMeaning(!meaning),
         title: 'Find chats by what they were about, not their titles (the Embeddings mod)', style: { ...chipSt(meaning, { sm: true }), marginTop: 6 } }, 'By meaning') : null),
     showMeaning ? h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, h(MeaningList, { found, activeId, onOpen: () => onOpen?.() })) :
+    grouped && !q.trim() ? h('nav', { 'aria-label': 'Chats by environment', style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },
       !threads.length ? h('div', { style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } },
         loading ? 'Loading…' : q ? `No chats match “${q}”.` : archived ? 'No archived chats.' : 'No chats yet. Start one →') : null,
       threads.map(t => h(Item, { key: t.id, t, active: t.id === activeId, onOpen: () => onOpen?.(t),
-        onRename: v => onRename(t, v), onArchive: () => onArchive(t), onDelete: () => onDelete(t) })),
+        onRename: v => onRename(t, v), onArchive: () => onArchive(t), onDelete: () => onDelete(t), ...itemProps(t, true) })),
       onMore ? h('button', { type: 'button', onClick: onMore, style: { ...chipSt(false, { sm: true }), alignSelf: 'center', margin: '8px 0 4px' } }, 'Show more') : null),
     h('div', { style: { padding: '8px 10px', borderTop: '1px solid ' + T.bd, display: 'flex', alignItems: 'center', gap: 6 } },
       h('button', { type: 'button', 'aria-pressed': archived ? 'true' : 'false', onClick: () => onArchived(!archived), style: chipSt(archived, { sm: true }) }, h(Icon, { d: 'archive', size: 12 }), archived ? 'Showing archived' : 'Archived'),

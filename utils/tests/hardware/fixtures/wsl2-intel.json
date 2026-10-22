@@ -1,0 +1,58 @@
+{
+ "cmds": {},
+ "dirs": {
+  "/dev": [
+   "dxg",
+   "null",
+   "tty"
+  ],
+  "/usr/lib/wsl/drivers": [
+   "iigd_dch.inf_amd64_8d4f6b0f2a7c1e55"
+  ],
+  "/usr/lib/wsl/lib": [
+   "libd3d12.so",
+   "libdxcore.so"
+  ]
+ },
+ "files": {
+  "/etc/os-release": "PRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\nID=ubuntu\nID_LIKE=debian\nVERSION_ID=\"24.04\"\n",
+  "/proc/cpuinfo": "processor\t: 0\nmodel name\t: Intel(R) Core(TM) Ultra 7 155H\n",
+  "/proc/meminfo": "MemTotal:       32505856 kB\nMemFree:        1000 kB\n",
+  "/proc/version": "Linux version 6.6.36.6-microsoft-standard-WSL2 (root@1c602f52c2e4) (gcc 11.2.0) #1 SMP PREEMPT_DYNAMIC"
+ },
+ "globs": {
+  "/opt/rocm/lib/libze_intel_gpu.so*": [],
+  "/opt/rocm/lib/libze_loader.so*": [],
+  "/usr/lib/aarch64-linux-gnu/libze_intel_gpu.so*": [],
+  "/usr/lib/aarch64-linux-gnu/libze_loader.so*": [],
+  "/usr/lib/libze_intel_gpu.so*": [
+   "/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so.1"
+  ],
+  "/usr/lib/libze_loader.so*": [
+   "/usr/lib/x86_64-linux-gnu/libze_loader.so.1",
+   "/usr/lib/x86_64-linux-gnu/libze_loader.so.1.17.6"
+  ],
+  "/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so*": [
+   "/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so.1"
+  ],
+  "/usr/lib/x86_64-linux-gnu/libze_loader.so*": [
+   "/usr/lib/x86_64-linux-gnu/libze_loader.so.1",
+   "/usr/lib/x86_64-linux-gnu/libze_loader.so.1.17.6"
+  ],
+  "/usr/lib64/libze_intel_gpu.so*": [],
+  "/usr/lib64/libze_loader.so*": [],
+  "/usr/local/lib/libze_intel_gpu.so*": [],
+  "/usr/local/lib/libze_loader.so*": []
+ },
+ "links": {},
+ "pci": {},
+ "platform": {
+  "cpus": 22,
+  "machine": "x86_64",
+  "release": "6.6.36.6-microsoft-standard-WSL2",
+  "system": "linux"
+ },
+ "which": {
+  "apt-get": "/usr/bin/apt-get"
+ }
+}

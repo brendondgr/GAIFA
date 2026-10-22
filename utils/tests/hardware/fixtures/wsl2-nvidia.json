@@ -1,0 +1,42 @@
+{
+ "cmds": {
+  "/usr/lib/wsl/lib/nvidia-smi": "+-----+\n| NVIDIA-SMI 570.86.15    Driver Version: 570.86.15    CUDA Version: 12.7     |\n+-----+\n",
+  "/usr/lib/wsl/lib/nvidia-smi --query-gpu=index,pci.bus_id,name,memory.total,compute_cap,driver_version --format=csv,noheader,nounits": "0, 00000000:01:00.0, NVIDIA GeForce RTX 4070, 12282, 8.9, 566.36\n"
+ },
+ "dirs": {
+  "/dev": [
+   "dxg",
+   "null",
+   "tty"
+  ],
+  "/usr/lib/wsl/drivers": [
+   "nv_dispi.inf_amd64_1f5d2a5f1d4c8a3e"
+  ],
+  "/usr/lib/wsl/lib": [
+   "libcuda.so",
+   "libcuda.so.1",
+   "libd3d12.so",
+   "libdxcore.so",
+   "nvidia-smi"
+  ]
+ },
+ "files": {
+  "/etc/os-release": "PRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\nID=ubuntu\nID_LIKE=debian\nVERSION_ID=\"24.04\"\n",
+  "/proc/cpuinfo": "processor\t: 0\nmodel name\t: AMD Ryzen 9 7950X 16-Core Processor\n",
+  "/proc/meminfo": "MemTotal:       65536000 kB\nMemFree:        1000 kB\n",
+  "/proc/version": "Linux version 6.6.36.6-microsoft-standard-WSL2 (root@1c602f52c2e4) (gcc 11.2.0) #1 SMP PREEMPT_DYNAMIC"
+ },
+ "globs": {},
+ "links": {},
+ "pci": {},
+ "platform": {
+  "cpus": 16,
+  "machine": "x86_64",
+  "release": "6.6.36.6-microsoft-standard-WSL2",
+  "system": "linux"
+ },
+ "which": {
+  "apt-get": "/usr/bin/apt-get",
+  "nvidia-smi": "/usr/lib/wsl/lib/nvidia-smi"
+ }
+}

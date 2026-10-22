@@ -1,0 +1,25 @@
+{
+ "cmds": {
+  "sw_vers -productVersion": "15.6\n",
+  "sysctl -n hw.memsize": "38654705664\n",
+  "sysctl -n machdep.cpu.brand_string": "Apple M3 Pro\n"
+ },
+ "dirs": {},
+ "files": {},
+ "globs": {},
+ "links": {},
+ "pci": {},
+ "platform": {
+  "cpus": 12,
+  "machine": "arm64",
+  "release": "24.6.0",
+  "system": "darwin"
+ },
+ "which": {
+  "apt-get": null,
+  "brew": "/opt/homebrew/bin/brew",
+  "dnf": null,
+  "pacman": null,
+  "zypper": null
+ }
+}

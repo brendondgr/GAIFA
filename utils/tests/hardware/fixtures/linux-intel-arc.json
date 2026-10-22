@@ -1,0 +1,72 @@
+{
+ "cmds": {},
+ "dirs": {
+  "/dev": [
+   "dri",
+   "null",
+   "tty"
+  ],
+  "/sys/bus/pci/devices": [
+   "0000:03:00.0"
+  ],
+  "/sys/bus/pci/devices/0000:03:00.0/drm": [
+   "card0",
+   "renderD120"
+  ],
+  "/usr/share/vulkan/icd.d": [
+   "intel_icd.x86_64.json",
+   "lvp_icd.x86_64.json"
+  ]
+ },
+ "files": {
+  "/etc/os-release": "PRETTY_NAME=\"Ubuntu 24.04.1 LTS\"\nID=ubuntu\nID_LIKE=debian\nVERSION_ID=\"24.04\"\n",
+  "/proc/cpuinfo": "processor\t: 0\nmodel name\t: AMD Ryzen 7 5800X 8-Core Processor\n",
+  "/proc/meminfo": "MemTotal:       32768000 kB\nMemFree:        1000 kB\n",
+  "/proc/version": "Linux version 6.8.0-45-generic (buildd@lcy02) (gcc 13.2.0) #45-Ubuntu SMP",
+  "/sys/bus/pci/devices/0000:03:00.0/class": "0x030000\n",
+  "/sys/bus/pci/devices/0000:03:00.0/device": "0x56a0\n",
+  "/sys/bus/pci/devices/0000:03:00.0/vendor": "0x8086\n",
+  "/sys/class/drm/card0/lmem_total_bytes": "17079205888\n"
+ },
+ "globs": {
+  "/opt/rocm/lib/libze_intel_gpu.so*": [],
+  "/opt/rocm/lib/libze_loader.so*": [],
+  "/usr/lib/aarch64-linux-gnu/libze_intel_gpu.so*": [],
+  "/usr/lib/aarch64-linux-gnu/libze_loader.so*": [],
+  "/usr/lib/libze_intel_gpu.so*": [
+   "/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so.1",
+   "/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so.1.3.30049"
+  ],
+  "/usr/lib/libze_loader.so*": [
+   "/usr/lib/x86_64-linux-gnu/libze_loader.so.1",
+   "/usr/lib/x86_64-linux-gnu/libze_loader.so.1.17.6"
+  ],
+  "/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so*": [
+   "/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so.1",
+   "/usr/lib/x86_64-linux-gnu/libze_intel_gpu.so.1.3.30049"
+  ],
+  "/usr/lib/x86_64-linux-gnu/libze_loader.so*": [
+   "/usr/lib/x86_64-linux-gnu/libze_loader.so.1",
+   "/usr/lib/x86_64-linux-gnu/libze_loader.so.1.17.6"
+  ],
+  "/usr/lib64/libze_intel_gpu.so*": [],
+  "/usr/lib64/libze_loader.so*": [],
+  "/usr/local/lib/libze_intel_gpu.so*": [],
+  "/usr/local/lib/libze_loader.so*": []
+ },
+ "links": {
+  "/sys/bus/pci/devices/0000:03:00.0/driver": "../../../../bus/pci/drivers/i915"
+ },
+ "pci": {
+  "8086:56a0": "DG2 [Arc A770]"
+ },
+ "platform": {
+  "cpus": 16,
+  "machine": "x86_64",
+  "release": "6.8.0-45-generic",
+  "system": "linux"
+ },
+ "which": {
+  "apt-get": "/usr/bin/apt-get"
+ }
+}

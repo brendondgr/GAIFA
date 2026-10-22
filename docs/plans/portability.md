@@ -71,7 +71,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
 
 ## Phase 35 — Know the machine: hardware detection (M)
 
-- [ ] **35.1 `utils/hardware/`: what this machine has (standard library only).**
+- [x] **35.1 `utils/hardware/`: what this machine has (standard library only).**
   - **Model:** `Machine {os: "linux"|"darwin", wsl: bool, distro, arch, cpu, ram_bytes, gpus: [Gpu], accels: [str]}`.
     - `Gpu {index, vendor: "amd"|"nvidia"|"intel"|"apple", name, arch (gfx1151, sm_89, xe2, m3), memory: "unified"|"dedicated", vram_bytes, driver, runtimes: {rocm?, cuda?, level_zero?, vulkan?, metal?}}`.
     - `accels` is the ordered list of what can run here, from `rocm`, `cuda`, `xpu`, `mps`, `vulkan` and `cpu`, best first; `cpu` is always last. Metal and SYCL aren't accels of their own: llama.cpp's Metal build is lcpp's `mps` variant, its SYCL build the `xpu` one.
@@ -86,6 +86,16 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - **Calling it:** `detect(root="/", run=…)` is cached, and `refresh()` reads again. Nothing runs at import.
   - **Why:** every later step decides from `Machine`, never from probing `/dev/kfd` itself.
   *Done when:* `utils/tests/hardware/test_detect.py` gives the expected `Machine` for every fixture, and this machine's live `detect()` matches the `strix-halo` fixture's GPU and accels (marked `linux`).
+  - *As built:*
+    - **Fixtures are recordings.** Every reader goes through a `Source`. A `Recorder` keeps what detection read (files, folder listings, links, globs, commands, pci.ids names; about 15 KB for this machine), and a `Snapshot` replays it, so the fixtures are such recordings and a field report can carry one.
+    - **The other machines' fixtures are written by hand** from the drivers' formats: NVIDIA with one card and with two (plus an Intel iGPU without its compute runtime), an Intel Arc A770, WSL2 with NVIDIA and with Intel, an M3 Pro Mac, and a VM without a GPU.
+    - **What's usable here:** `Gpu` gains `vendor_index` (what `CUDA_VISIBLE_DEVICES` and the like count), `accels` (what can run on that GPU here) and `problems` (why it can't run what it could: no `/dev/kfd`, nouveau instead of NVIDIA's driver, no Level Zero, no `/dev/dxg`). `memory` may be `unknown` (Intel through WSL).
+    - **Readers:**
+      - NVIDIA is read through `nvidia-smi` only, with no NVML binding.
+      - WSL's GPU vendors come from the Windows driver store (`/usr/lib/wsl/drivers`: `nv…`, `iigd…`, `u0…`).
+      - An AMD GPU is unified when its gfx target is an APU's, or its VRAM is at most 2 GiB with more GTT.
+      - `/dev/kfd` is looked for in `/dev`'s listing, never opened.
+    - Tests: `utils/tests/hardware/test_detect.py` (19), with a new `linux` marker.
 
 - [ ] **35.2 Show it: `GET /api/system/hardware`, `aihub hardware`, Settings → About.**
   - The route returns `Machine`. `aihub hardware [--json]` prints it (standard library only, no hub needed), and `aihub doctor` adds a Hardware section.

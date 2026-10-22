@@ -70,6 +70,7 @@ The existing apps come in with `git subtree add` (their history is kept), so mos
 | `plans/chat-uploads-and-fast-presets.md` | Sub-plan: `fast`/`draft` presets the agent can use, and uploading images in Chat |
 | `plans/capabilities-and-learning.md` | A pointer: Stage H (Phases 20–22) was planned here and moved into the master plan in 20.1 |
 | `plans/portability.md` | Stage N (Phases 35–40): AIHub on other GPUs and systems (NVIDIA, Intel, Apple; WSL2 and macOS) |
+| `platforms.md` | What AIHub runs on (plan Stage N): the targets, the mods by machine (plan 40.4) and what native Windows would need (37.6) |
 | `design-brief-ui.md` | UI brief for Claude Design; §6 and §11.7 are the UI-facing API contract |
 | `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures, setup docs (§9) |
 | `structure.md` | This file |

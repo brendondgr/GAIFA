@@ -269,7 +269,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **A long-standing flake fixed on the way:** `test_fake_mods.py` counted `fixtures/mods/__pycache__` (left by some runs) as a mod; folders starting with `_` are skipped now.
     - **Not run here:** the macOS job itself, until the next push.
 
-- [ ] **37.6 What native Windows would need: `docs/platforms.md` §Windows.**
+- [x] **37.6 What native Windows would need: `docs/platforms.md` §Windows.**
   - The list from the survey:
     - the `.venv\Scripts` layout;
     - PowerShell installers;
@@ -280,11 +280,12 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - the judge's POSIX-only shell rules;
     - no uvloop.
   *Done when:* the section exists and names files.
+  - *As built:* `docs/platforms.md` starts with the targets table and a placeholder for 40.4's matrix; the Windows section names the files for each item, and what already works.
 
 **Checks & deliverables — Phase 37**
-- [ ] On this machine: `aihub status`, `aihub logs`, `aihub setup host` and every mod behave as before (systemd backend).
-- [ ] On a second hub (port 7077) with `[hub] backend = "detached"`: mods start, survive a hub restart, and stop.
-- [ ] Delivered: `utils/backends/detached.py`, the CLI changes, the host checks per machine, `services/_template/containers.py`, the CI workflow, `docs/platforms.md`.
+- [x] On this machine: `aihub status`, `aihub logs`, `aihub setup host` and every mod behave as before (systemd backend).
+- [x] On a second hub (port 7077) with `[hub] backend = "detached"`: mods start, survive a hub restart, and stop. *(Checked in a test root instead: `test_a_fake_mod_survives_a_hub_restart` runs the hub's services manager twice on the detached backend; a second hub on this root would have adopted the real mods.)*
+- [x] Delivered: `utils/backends/detached.py`, the CLI changes, the host checks per machine, `services/_template/containers.py`, the CI workflow, `docs/platforms.md`.
 
 ---
 

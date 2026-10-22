@@ -118,3 +118,34 @@ def test_cpu_skips_the_slot(settings, hub):
     with TestClient(app) as c:
         assert c.post("/v1/decide", json=ASK).status_code == 200
     assert not [k for k, _ in gpu.log if k != "memory"]
+
+
+def test_answer_within_counts_from_the_slot(settings, hub):
+    """X-AIHub-Answer-Within: waiting for the GPU doesn't use the budget; a slow model past it answers 504, and the
+    slot is held until the model is done."""
+    class Slow(GpuFake):
+        def ask(self, *a, **k):
+            time.sleep(0.6)
+            return super().ask(*a, **k)
+
+    app, gpu, _ = make(settings, hub)
+    gpu.busy = True
+    with TestClient(app) as c:
+        out: dict = {}
+        t = threading.Thread(target=lambda: out.update(r=c.post("/v1/decide", json=ASK, headers={"X-AIHub-Answer-Within": "0.3"})))
+        t.start()
+        time.sleep(0.5)                                         # longer than the budget, all of it waiting
+        gpu.busy = False
+        t.join(5)
+        assert out["r"].status_code == 200, out["r"].text
+
+    app, gpu, _ = make(settings, hub, model=Slow)
+    with TestClient(app) as c:
+        r = c.post("/v1/decide", json=ASK, headers={"X-AIHub-Answer-Within": "0.2"})
+        assert r.status_code == 504 and r.json()["code"] == "answer_timeout"
+        assert gpu.held                                         # still running: the slot stays held
+        for _ in range(100):
+            if not gpu.held:
+                break
+            time.sleep(0.02)
+        assert gpu.held == set()

@@ -128,10 +128,29 @@ def test_malformed_answers_ask(reply):
     assert (j.verdict, j.source) == ("ask", "fail-closed")
 
 
+def test_the_budget_goes_with_the_call():
+    """timeout_s is the model's once it has the GPU: the relay and the decide mod read X-AIHub-Answer-Within."""
+    seen = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers.get("x-aihub-answer-within"))
+        if request.url.path.endswith("/v1/decide"):
+            return httpx.Response(200, json=decide_answers()(None))
+        return httpx.Response(200, json=chat('{"verdict":"allow","reason":"asked"}'))
+
+    run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="relay", url="http://relay", timeout_s=3), client_for(handler)))
+    run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide", timeout_s=2.5), client_for(handler)))
+    assert seen == ["3", "2.5"]
+
+
 def test_timeout_and_errors_ask():
     slow = Fake(lambda b: "sleep")
-    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide", timeout_s=0.2), client_for(slow.handler)))
-    assert (j.verdict, j.source) == ("ask", "fail-closed") and "longer than 0.2 s" in j.reason
+    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide", timeout_s=0.2, gpu_wait_s=0.1),
+                  client_for(slow.handler)))
+    assert (j.verdict, j.source) == ("ask", "fail-closed") and "didn't answer in 0.3 s" in j.reason
+    late = Fake(lambda b: httpx.Response(504, json={"detail": "no answer within 3 s (after the GPU slot)", "code": "answer_timeout"}))
+    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="relay", url="http://relay"), client_for(late.handler)))
+    assert (j.verdict, j.source) == ("ask", "fail-closed") and "longer than 3 s" in j.reason
     down = Fake(lambda b: httpx.Response(503, json={"detail": "not loaded", "code": "no_weights"}))
     j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide"), client_for(down.handler)))
     assert (j.verdict, j.source) == ("ask", "fail-closed") and "isn't available" in j.reason

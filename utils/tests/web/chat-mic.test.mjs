@@ -3,7 +3,7 @@
 // socket, microphone and AudioContext).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Resampler, toInt16, startMessage, initial, reduce, dictated, joinDraft, streamUrl, dictate, RATE,
+import { Resampler, toInt16, startMessage, initial, reduce, dictated, joinDraft, streamUrl, dictate, RATE, deviceNote,
   pickMic, nextMic, openMic, onRelease, levelOf, normLabel, BROWSER_DEFAULT, HOLD_MS } from '../../../web/chat/chat-mic.js';
 import { micRows } from '../../../web/chat/chat-speech-input.js';
 
@@ -67,6 +67,16 @@ test('the protocol: start, then committed text plus the replaceable tail', () =>
   assert.equal(s.done, true);
   assert.equal(dictated(s), 'Hello world. How are you?');
   assert.equal(reduce(initial(), { type: 'error', detail: 'nope' }).error, 'nope');
+});
+
+test('the mic says when dictation runs on the CPU, and why', () => {
+  let s = reduce(initial(), { type: 'ready', model: 'small', device: 'cuda' });
+  assert.equal(deviceNote(s), null);
+  s = reduce(s, { type: 'device', device: 'cpu', model: 'small', reason: 'on the CPU: Images & Video is using the GPU' });
+  assert.deepEqual(deviceNote(s), { text: 'on the CPU', title: 'On the CPU: Images & Video is using the GPU' });
+  s = reduce(initial(), { type: 'ready', model: 'small', device: 'cpu' });       // started on the CPU, no reason given
+  assert.equal(deviceNote(s).text, 'on the CPU');
+  assert.match(deviceNote(s).title, /GPU is busy/);
 });
 
 test('dictation joins what was typed', () => {

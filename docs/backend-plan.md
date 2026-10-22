@@ -2956,7 +2956,12 @@ The user asked (2026-10-21) for work to **wait for the GPU**: a queue, so only o
 - **Relay:** per-request `interactive` leases for local OpenAI endpoints on loopback (group = the registration key, service = its owner, thread = `X-AIHub-Thread`), held to the stream's last chunk; tunnels like skynet never take it; relay setting `gpu_slot` (default on).
 - **Agent:** `agent/gpuwait.py` polls `GET /api/gpu` from 1.5 s into a model call and shows "Waiting for the GPU: <mod> <label>, about N min left" as the live status (`gpu_wait`).
 - **UI:** the memory popover's GPU section and the Overview's **GPU queue** widget (`web/gpu-queue.js`), "Waiting for the GPU" on mod pages, the jobs popover and step rows.
-- **Open:** the hub's `[memory] triggers` (gen3d, tts, stt) still reserve memory when a request is proxied, before the mod waits for the slot; the Auto judge and page screening on a local model wait behind GPU jobs and time out to ask; a GPU wait over 30 min fails an agent turn (its 1800 s model timeout); the mic button doesn't yet say it moved to the CPU; `relay/…/proxy.py` is 801 lines (split it).
+- **Resolved 2026-10-21 (the user: "You can do it"):**
+  - **The judge and page screening wait for the GPU** instead of timing out to ask: their budget (`timeout_s`) goes along as `X-AIHub-Answer-Within`, which the relay and the decide mod count from the moment the slot is held (504 past it), and the hub waits up to 90 s for the slot itself (`judge.GPU_WAIT_S`: the agent gives a tool call 120 s); past that it asks, as before. They don't skip the queue: one GPU job at a time stays the rule.
+  - **Proxied memory triggers of a mod with `[gpu]`** (gen3d, tts, stt) that would wait for the slot get the room check at once (the 409 `needs_room` and its "Unload & continue" as before) and the room itself (unloads, the reservation) when the mod's lease is granted (`GpuQueue.on_grant`, called from `POST /api/gpu/acquire`).
+  - **The agent's 1800 s model timeout** counts silence from the model, not the wait for the GPU (`llm.GpuWait`, kept by `gpuwait.watch`), so a chat waits out a long job.
+  - **The mic** says "on the CPU" (why, as its title) while dictation runs there.
+  - `relay/…/proxy.py` was split (14.7: `admission.py`, `sse.py`).
 
 **Wire — Phase 31:** the header's GPU section, the Overview widget, waiting rows in Chat and on mod pages.
 

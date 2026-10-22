@@ -15,7 +15,10 @@
      when the lowest "safe" probability reaches `threshold` (default 0.35, DECIDE_CUTOFF).
    - `backend = "relay"`: a chat model (OpenAI-compatible, through the relay) answers `{verdict, reason}` as JSON at
      temperature 0.
-3. Fail closed: unsure, malformed, slower than `timeout_s` (3 s) or not reachable → ask. There is no deny. Arguments
+3. Fail closed: unsure, malformed, slower than `timeout_s` (3 s) or not reachable → ask. `timeout_s` counts from
+   when the model has the GPU: the call sends it as `X-AIHub-Answer-Within` and the relay or the decide mod keep it
+   (504 past it), so a judge on a local model waits for the GPU slot behind a job first, for up to `gpu_wait_s`
+   (90 s: the agent gives a tool call 120 s), and asks once that runs out. There is no deny. Arguments
    the model couldn't see whole (a string over 1,500 characters, a list or object over 50 items, deeper than 6, or
    over 6,000 characters in all) → ask without asking the model: what it can't read could hide anything.
 
@@ -122,6 +125,14 @@ VERDICT_SCHEMA = {"type": "object", "properties": {"verdict": {"type": "string",
                   "required": ["verdict", "reason"], "additionalProperties": False}
 
 
+GPU_WAIT_S = 90.0                        # the longest a judgement waits for the GPU slot behind a job
+WITHIN_HEADER = "X-AIHub-Answer-Within"   # the model's budget once it has the slot (the relay and decide keep it)
+
+
+def within(timeout_s: float) -> dict[str, str]:
+    return {WITHIN_HEADER: f"{timeout_s:g}"}
+
+
 @dataclass
 class JudgeConfig:
     """`config.toml [agent.judge]` (utils/config.py JudgeCfg); the default is the eval's pick (docs/agent-eval.md)."""
@@ -130,7 +141,8 @@ class JudgeConfig:
     url: str = "http://127.0.0.1:4000"   # the relay's base URL, or the decide mod's (e.g. the hub's /api/s/decide)
     threshold: float = 0.35          # decide: the lowest "safe" probability must reach it (DECIDE_CUTOFF)
     context: str = "none"                # none | trail | full: what it reads of the turn so far (judge_context.py)
-    timeout_s: float = 3.0
+    timeout_s: float = 3.0               # for the answer, once the model has the GPU (X-AIHub-Answer-Within)
+    gpu_wait_s: float = GPU_WAIT_S       # and before that, for the GPU slot
     api_key: str | None = None
     allow_commands: list[str] = field(default_factory=list)    # your rules (judge_user.py)
     ask_commands: list[str] = field(default_factory=list)
@@ -268,7 +280,8 @@ def _with_context(cfg: JudgeConfig) -> bool:
 async def ask_decide(state: str, cfg: JudgeConfig, client: httpx.AsyncClient) -> Judgement:
     questions = CONTEXT_QUESTIONS if _with_context(cfg) else QUESTIONS
     r = await client.post(f"{cfg.url.rstrip('/')}/v1/decide", json={
-        "input": state, "model": cfg.model, "questions": [{"id": q, **spec} for q, spec, _ in questions]})
+        "input": state, "model": cfg.model, "questions": [{"id": q, **spec} for q, spec, _ in questions]},
+        headers=within(cfg.timeout_s))
     r.raise_for_status()
     answers = r.json()["answers"]
     probs = {q: round(sum(float(((answers.get(q) or {}).get("probs") or {}).get(o, 0.0)) for o in safe), 4)
@@ -288,7 +301,7 @@ async def ask_relay(state: str, cfg: JudgeConfig, client: httpx.AsyncClient) -> 
             "response_format": {"type": "json_schema",
                                 "json_schema": {"name": "verdict", "strict": True, "schema": VERDICT_SCHEMA}},
             "chat_template_kwargs": {"enable_thinking": False}}
-    headers = {"Authorization": f"Bearer {cfg.api_key}"} if cfg.api_key else {}
+    headers = {**within(cfg.timeout_s), **({"Authorization": f"Bearer {cfg.api_key}"} if cfg.api_key else {})}
     r = await client.post(f"{cfg.url.rstrip('/')}/v1/chat/completions", json=body, headers=headers)
     r.raise_for_status()
     msg = (r.json().get("choices") or [{}])[0].get("message") or {}
@@ -328,12 +341,17 @@ async def judge(call: dict[str, Any], user_messages: list[Any], folder: dict[str
         state = describe(call, folder, r.reason if r.verdict == "unsure" else "(the rules weren't asked)",
                          own_words(user_messages), as_lines(cfg.context, so_far))
     own = client is None
-    client = client or httpx.AsyncClient(timeout=httpx.Timeout(cfg.timeout_s + 1))
+    client = client or httpx.AsyncClient(timeout=httpx.Timeout(cfg.timeout_s + cfg.gpu_wait_s + 1))
     try:
         backend = ask_decide if cfg.backend == "decide" else ask_relay
-        j = await asyncio.wait_for(backend(state, cfg, client), cfg.timeout_s)
+        j = await asyncio.wait_for(backend(state, cfg, client), cfg.timeout_s + cfg.gpu_wait_s)
     except asyncio.TimeoutError:
-        j = Judgement("ask", f"the judge took longer than {cfg.timeout_s:g} s", "fail-closed", model=cfg.model)
+        j = Judgement("ask", f"the judge didn't answer in {cfg.timeout_s + cfg.gpu_wait_s:g} s (the GPU stayed busy, "
+                      "or the model is slow)", "fail-closed", model=cfg.model)
+    except httpx.HTTPStatusError as e:
+        late = e.response.status_code == 504
+        j = Judgement("ask", f"the judge took longer than {cfg.timeout_s:g} s" if late else
+                      f"the judge isn't available (HTTP {e.response.status_code})", "fail-closed", model=cfg.model)
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as e:
         j = Judgement("ask", f"the judge isn't available ({type(e).__name__}: {str(e)[:120]})", "fail-closed",
                       model=cfg.model)

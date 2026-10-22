@@ -44,3 +44,45 @@ async def test_a_mod_with_a_request_in_flight_is_never_unloaded(memhub):
         assert r.status_code == 409 and r.json()["data"]["plan"]["unload"] == []
         assert app.state.hub.services.get("fake-mem").load == "loaded"
         app.state.hub.services.get("fake-mem").in_flight = 0
+
+
+async def test_a_gpu_mod_gets_its_room_at_its_gpu_turn():
+    """Plan 31: a mod that takes the GPU slot and would wait for it gets the check now and the room (unloads and
+    the reservation) when its lease is granted; with the slot free, the room comes at once as before."""
+    from types import SimpleNamespace
+
+    from utils.config import GpuCfg
+    from utils.events import Alerts, EventBus
+    from utils.gpu import GpuQueue
+    from utils.memory.triggers import hook
+
+    calls: list[tuple[str, str, bool]] = []
+    svc = SimpleNamespace(id="gen3d", load="unloaded",
+                          m=SimpleNamespace(memory=SimpleNamespace(triggers=["POST /v1/jobs"]), gpu=SimpleNamespace(group=None)))
+
+    class Mem:
+        mgr = SimpleNamespace(get=lambda sid: svc)
+
+        async def precheck(self, sid, make_room=False):
+            calls.append(("check", sid, make_room))
+
+        async def ensure_room(self, sid, make_room=False, ttl=0.0):
+            calls.append(("room", sid, make_room))
+
+    bus = EventBus()
+    q = GpuQueue(bus, Alerts(bus), cfg=GpuCfg)
+    before = hook(Mem(), lambda: q)
+    comfy = q.register("comfy", "job", "video")                     # holds the slot
+    await before(svc, "POST", "/v1/jobs", {"x-aihub-make-room": "1"})
+    assert calls == [("check", "gen3d", True)]                       # nothing unloaded or reserved while it waits
+    lease = q.register("gen3d", "job", "a model")
+    assert lease.state == "waiting"
+    q.release(comfy.id)
+    assert lease.state == "held"
+    await q.granted(lease)
+    assert calls[-1] == ("room", "gen3d", True)
+    await q.granted(lease)                                           # once
+    assert len(calls) == 2
+    q.release(lease.id)
+    await before(svc, "POST", "/v1/jobs", {})                        # a free slot: the room at once
+    assert calls[-1] == ("room", "gen3d", False) and len(calls) == 3

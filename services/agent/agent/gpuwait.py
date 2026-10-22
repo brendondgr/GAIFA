@@ -6,6 +6,7 @@ call, `watch` asks the hub's queue (`GET /api/gpu`) every `EVERY_S` for a waitin
 while there is one it sends the transient event `gpu_wait` `{text, eta_s, ahead}`; an empty `gpu_wait`
 clears it. The chat draws it on the turn's live header. It stops once the chat's lease holds the slot
 (generation started), or when no lease of the chat shows up within `GIVE_UP_S` (a remote model, or no queue).
+It also keeps the call's `llm.GpuWait` up to date, so the model client's stall limit skips the wait.
 
 Polling the hub keeps the relay's reply untouched (no SSE comments before the upstream answered, so its
 status code and failover stay as they were) and works for streamed and plain calls alike; a hub that
@@ -54,7 +55,7 @@ def holds(gpu: dict[str, Any], tid: str) -> bool:
 
 
 async def watch(client: httpx.AsyncClient, tid: str, send: Callable[[dict[str, Any]], None], delay: float = DELAY_S,
-                every: float = EVERY_S, give_up: float = GIVE_UP_S) -> None:
+                every: float = EVERY_S, give_up: float = GIVE_UP_S, waiting: Any = None) -> None:
     """Until cancelled (the model call ended): show this chat's GPU wait."""
     shown: str | None = None
     loop = asyncio.get_running_loop()
@@ -72,6 +73,8 @@ async def watch(client: httpx.AsyncClient, tid: str, send: Callable[[dict[str, A
             if holds(gpu, tid):
                 break                          # its turn came: the model is generating
             found = waiting_text(gpu, tid)
+            if waiting is not None:
+                waiting.set(found is not None)
             if found is None and shown is None and loop.time() > end_of_look:
                 break                          # never queued: a remote model, or no GPU queue
             text = found[0] if found else None
@@ -80,5 +83,7 @@ async def watch(client: httpx.AsyncClient, tid: str, send: Callable[[dict[str, A
                 shown = text
             await asyncio.sleep(every)
     finally:
+        if waiting is not None:
+            waiting.set(False)
         if shown:
             send({})

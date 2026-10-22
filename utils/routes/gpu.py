@@ -131,6 +131,8 @@ async def acquire(body: AcquireBody, request: Request,
                                 lease_id=body.lease)
     except GpuError as e:
         raise _error(e) from None
+    if lease.state == "held":
+        await q.granted(lease)              # a trigger's room, made now that the work can start (memory/triggers.py)
     return _answer(q, lease)
 
 

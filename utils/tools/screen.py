@@ -31,12 +31,12 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import httpx
 
-from .judge import SPECIAL_TOKENS, JudgeConfig, defuse
+from .judge import SPECIAL_TOKENS, JudgeConfig, defuse, within
 
 WORDS = re.compile(r"[^\W\d_]{2,}")                  # a passage without a word ("---", "| 1 | 2 |") instructs no one
 SENTENCE = re.compile(r"(?:^|\s)(?:[^\W\d_][\w'’,.:;!?-]*\s+){5,}[^\W\d_]")   # six words in a row: prose, not code
@@ -201,7 +201,7 @@ async def _relay(texts: list[str], idx: list[int], cfg: JudgeConfig, client: htt
            "response_format": {"type": "json_schema", "json_schema": {"name": "screen", "strict": True,
                                                                       "schema": FINDINGS_SCHEMA}},
            "chat_template_kwargs": {"enable_thinking": False}}
-    headers = {"Authorization": f"Bearer {cfg.api_key}"} if cfg.api_key else {}
+    headers = {**within(cfg.timeout_s), **({"Authorization": f"Bearer {cfg.api_key}"} if cfg.api_key else {})}
     r = await client.post(f"{cfg.url.rstrip('/')}/v1/chat/completions", json=req, headers=headers)
     r.raise_for_status()
     text = (r.json().get("choices") or [{}])[0].get("message", {}).get("content") or ""
@@ -230,7 +230,7 @@ async def _decide(texts: list[str], idx: list[int], cfg: JudgeConfig, client: ht
     for n in idx:
         r = await client.post(f"{cfg.url.rstrip('/')}/v1/decide", json={
             "input": defuse(texts[n]), "model": cfg.model,
-            "questions": [{"id": "aimed", "type": "yesno", "question": DECIDE_QUESTION}]})
+            "questions": [{"id": "aimed", "type": "yesno", "question": DECIDE_QUESTION}]}, headers=within(cfg.timeout_s))
         r.raise_for_status()
         p = float(r.json()["answers"]["aimed"]["probs"]["no"])
         if p < cfg.threshold:
@@ -336,10 +336,15 @@ async def screen(text: str, cfg: JudgeConfig | None = None, client: httpx.AsyncC
     flagged: dict[int, str] = {}
     if use_model and units:
         own = client is None
-        client = client or httpx.AsyncClient(timeout=httpx.Timeout(timeout_s + 1))
+        # `timeout_s` is the models' budget once they have the GPU (sent as X-AIHub-Answer-Within); before that a
+        # local model may wait up to `gpu_wait_s` for the slot behind a job (judge.py, Fail closed).
+        gpu_wait = getattr(cfg, "gpu_wait_s", 0.0)
+        client = client or httpx.AsyncClient(timeout=httpx.Timeout(timeout_s + gpu_wait + 1))
         try:
             decide = cfg.backend == "decide"
             confirm = getattr(cfg, "confirm", None)
+            cfg = replace(cfg, timeout_s=timeout_s)
+            confirm = replace(confirm, timeout_s=timeout_s) if confirm is not None else None
             sem = asyncio.Semaphore(max(1, parallel))
             unit_texts = [p for _, p in units]
 
@@ -360,7 +365,7 @@ async def screen(text: str, cfg: JudgeConfig | None = None, client: httpx.AsyncC
                         kept.update({ids[i]: why for i, why in part.items()})
                     got = kept
                 return got
-            for u, why in (await asyncio.wait_for(run(), timeout_s)).items():
+            for u, why in (await asyncio.wait_for(run(), timeout_s + gpu_wait)).items():
                 flagged.setdefault(units[u][0], why)
         except (asyncio.TimeoutError, httpx.HTTPError, ValueError, KeyError, TypeError):
             checked = "patterns"

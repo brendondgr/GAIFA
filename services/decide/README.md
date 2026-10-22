@@ -10,6 +10,8 @@ each in `decide/models/<id>.py`. Setup, the pinned revision and what its remote 
 - Agent tool: `decide_ask` (risk `read`)
 - Each ask takes an `interactive` lease from AIHub's GPU queue around the model call (plan 31.3; `decide/gpu_slot.py`
   is an identical copy of `services/_template/gpu_slot.py`), then asks for memory if it switches models. On the CPU it
-  takes none. A lease cancelled from the queue answers 409 `gpu_cancelled`.
+  takes none. A lease cancelled from the queue answers 409 `gpu_cancelled`. `X-AIHub-Answer-Within: <s>` gives the
+  model that long once it has the slot (the Auto judge, page screening): past it, 504 `answer_timeout`, while the
+  work finishes and keeps the slot until then.
 
 Tests: `.venv/bin/python -m pytest -q` (fake model); `-m gpu -s` for the real one.

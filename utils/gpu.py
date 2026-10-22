@@ -46,6 +46,7 @@ SWEEP_S = 2.0
 HISTORY = 20
 HOLDS_KEPT = 10          # per service, for the ETA of leases that don't give est_s
 WAIT_MAX_S = 60.0
+ROOM_PENDING_S = 3600.0   # a deferred trigger's room (on_grant) is dropped if the mod hasn't taken the slot by then
 
 
 class GpuError(Exception):
@@ -107,6 +108,7 @@ class GpuQueue:
         self._alerted: str | None = None             # the mod named in the expiry alert
         self._tasks: list[asyncio.Task[None]] = []
         self._sub: Any = None
+        self._on_grant: dict[str, tuple[float, Callable[[], Any]]] = {}   # service → (until, make its room)
 
     # lifecycle ---------------------------------------------------------------------
 
@@ -164,6 +166,30 @@ class GpuQueue:
     def waiting(self) -> list[Lease]:
         """In the order they would be granted: class, then arrival."""
         return sorted((x for x in self.leases.values() if x.state == "waiting"), key=lambda x: (RANK[x.cls], x.seq))
+
+    def busy_for(self, group: str) -> bool:
+        """Whether a new lease of `group` would wait: another group holds the slot, or work is waiting."""
+        if not self.enabled:
+            return False
+        return bool(self.waiting()) or any(x.group != group for x in self.held())
+
+    def on_grant(self, service: str, fn: Callable[[], Any]) -> None:
+        """Run `fn` (async) when `service` is next granted the slot: a proxied trigger's room, made when the mod's
+        GPU work can start instead of while it waits (utils/memory/triggers.py)."""
+        self._on_grant[service] = (self.clock() + ROOM_PENDING_S, fn)
+
+    async def granted(self, lease: Lease) -> None:
+        """The acquire route is about to answer `granted`: run what waited for this mod's turn."""
+        until, fn = self._on_grant.pop(lease.service, (0.0, None))
+        if fn is None or until < self.clock():
+            return
+        try:
+            await fn()
+        except Exception as e:  # noqa: BLE001: the work goes ahead; the mod asks for its own memory as it loads
+            log.warning("making room for %s at its GPU turn: %s", lease.service, e)
+            if self.activity:
+                await self.activity.add(f"Couldn't make room for {self.name_of(lease.service)} when its GPU turn came: {e}",
+                                        service=lease.service, level="warn")
 
     def estimate(self, lease: Lease) -> float | None:
         if lease.est_s is not None:

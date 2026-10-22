@@ -11,7 +11,7 @@ import time
 from datetime import date
 from typing import Any, Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 
@@ -24,6 +24,24 @@ from .worker import WorkerBackend, WorkerDied
 
 log = logging.getLogger("decide")
 MAX_BYTES = {"image": 16_000_000, "video": 256_000_000}
+WITHIN_HEADER = "X-AIHub-Answer-Within"
+
+
+def answer_within(headers: Any) -> float | None:
+    """`X-AIHub-Answer-Within: <seconds>`: how long the caller gives the model once the GPU slot is held (the
+    Auto judge and page screening, whose budget shouldn't run out while a job holds the GPU), or None."""
+    try:
+        s = float(headers.get(WITHIN_HEADER) or "")
+    except ValueError:
+        return None
+    return s if 0 < s <= 3600 else None
+
+
+def _quiet(task: asyncio.Task) -> None:
+    if not task.cancelled():
+        task.exception()
+
+
 VIDEO_MIME = {".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime", ".mkv": "video/x-matroska"}
 
 
@@ -234,7 +252,7 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
         return out
 
     @app.post("/v1/decide", summary="Ask questions about an input: a probability per answer, no generated text")
-    async def decide(body: DecideRequest) -> Any:
+    async def decide(body: DecideRequest, request: Request) -> Any:
         """yesno answers `{probs: {yes, no}, top, p}`; choice one probability per option; score one per level plus
         `value` (the expected level, 0 = the first). `p` is the top answer's probability: compare it with your own
         threshold. A question the model couldn't answer gets `{error, message}`; the others are still answered."""
@@ -260,10 +278,26 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
             return JSONResponse(e.body(), status_code=e.status)
         questions = [q.model_dump(exclude_none=True) for q in body.questions]
         label = f"{mid}: {len(questions)} question{'s' if len(questions) != 1 else ''}"
-        try:
+        within, started = answer_within(request.headers), asyncio.Event()
+
+        async def work() -> tuple[dict, float]:
             async with (contextlib.nullcontext() if on_cpu() else gpu.slot(label, est_s=1)):   # slot first, then memory
+                started.set()
                 await make_room(mid)
-                answers, ms = await asyncio.to_thread(dec.ask, mid, body.input, questions, images or None, videos or None)
+                return await asyncio.to_thread(dec.ask, mid, body.input, questions, images or None, videos or None)
+
+        task = asyncio.create_task(work())
+        try:
+            if within is not None:                  # the caller's budget starts once the slot is held
+                waiter = asyncio.ensure_future(started.wait())
+                await asyncio.wait({task, waiter}, return_when=asyncio.FIRST_COMPLETED)
+                waiter.cancel()
+                done, _ = await asyncio.wait({task}, timeout=within)
+                if not done:                        # it finishes in the background, holding the slot until then
+                    task.add_done_callback(_quiet)
+                    return _err(504, f"no answer within {within:g} s (after the GPU slot)", "answer_timeout",
+                                fix="give it more time, or ask again")
+            answers, ms = await task
         except GpuCancelled as e:
             return _err(409, str(e), "gpu_cancelled", fix="ask again")
         except HubError as e:

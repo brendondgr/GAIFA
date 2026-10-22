@@ -214,7 +214,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.memory = MemoryManager(hub.services, hub.db, hub.bus, hub.alerts, hub.activity,
                                        source=hub.memory_source, every=hub.memory_every_s)
             hub.services.memory = hub.memory
-            hub.services.before_proxy.append(memory_hook(hub.memory))
+            hub.services.before_proxy.append(memory_hook(hub.memory, lambda: hub.gpu))
             await hub.memory.start()
             stack.push_async_callback(hub.memory.close)
             # 7b. the GPU queue (plan 31.1): mods take the slot around their GPU work, then ask for memory.

@@ -9,9 +9,11 @@ import asyncio
 import json
 
 import httpx
+import pytest
 
 from agent import gpuwait
-from agent.llm import LLM, THREAD
+from agent import llm as llm_mod
+from agent.llm import GPU_WAIT, LLM, THREAD, GpuWait, LLMError
 
 HOLDER = {"id": "gl_c", "service": "comfy", "name": "Images & Video", "label": "portrait", "class": "job", "thread": None}
 
@@ -72,6 +74,51 @@ async def test_watch_shows_then_clears():
     assert sent[-1] == {} and len([s for s in sent if s.get("text")]) == 1
 
 
+async def test_watch_keeps_the_calls_gpu_wait():
+    state = {"phase": "waiting"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if state["phase"] == "waiting":
+            return httpx.Response(200, json=waiting_body("t_1"))
+        return httpx.Response(200, json={"holder": {"group": "lcpp", "leases": [{"id": "gl_r", "thread": "t_1"}]}, "waiting": []})
+
+    waiting = GpuWait()
+    async with httpx.AsyncClient(base_url="http://hub", transport=httpx.MockTransport(handler)) as c:
+        task = asyncio.create_task(gpuwait.watch(c, "t_1", lambda p: None, delay=0.01, every=0.02, waiting=waiting))
+        await asyncio.sleep(0.1)
+        assert waiting.on
+        state["phase"] = "held"
+        await asyncio.wait_for(task, 2)
+    assert not waiting.on
+
+
+async def test_the_stall_limit_skips_the_gpu_wait(monkeypatch):
+    """The model client's timeout counts silence from the model, not time spent waiting for the GPU slot."""
+    monkeypatch.setattr(llm_mod, "CHECK_S", 0.02)
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(0.6)
+        return httpx.Response(200, json={"choices": [{"index": 0, "message": {"role": "assistant", "content": "hi"},
+                                                      "finish_reason": "stop"}], "usage": {}})
+
+    llm = LLM("http://relay/v1", timeout=0.3)
+    llm.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    try:
+        with pytest.raises(LLMError, match="sent nothing for 0.3 s"):
+            await llm.chat("m", [{"role": "user", "content": "x"}], stream=False)
+        waiting = GpuWait()
+        token = GPU_WAIT.set(waiting)
+        try:
+            waiting.set(True)                            # behind a job for the first 0.5 s, then generating
+            asyncio.get_running_loop().call_later(0.5, waiting.set, False)
+            r = await llm.chat("m", [{"role": "user", "content": "x"}], stream=False)
+        finally:
+            GPU_WAIT.reset(token)
+        assert r.text == "hi"
+    finally:
+        await llm.close()
+
+
 async def test_watch_gives_up_when_nothing_queues():
     async with httpx.AsyncClient(base_url="http://hub", transport=httpx.MockTransport(
             lambda r: httpx.Response(200, json={"holder": None, "waiting": []}))) as c:
@@ -90,7 +137,7 @@ async def test_watch_survives_a_hub_that_does_not_answer():
 
 async def test_a_turn_shows_its_gpu_wait(env, monkeypatch):
     real = gpuwait.watch
-    monkeypatch.setattr(gpuwait, "watch", lambda c, tid, send: real(c, tid, send, delay=0.05, every=0.05, give_up=3))
+    monkeypatch.setattr(gpuwait, "watch", lambda c, tid, send, **kw: real(c, tid, send, delay=0.05, every=0.05, give_up=3, **kw))
     tid = await env.thread()
     state = {"phase": "waiting"}
 

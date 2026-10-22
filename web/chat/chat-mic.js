@@ -53,12 +53,13 @@ export function toInt16(f32) {
 export const startMessage = (o = {}) => ({ type: 'start', encoding: 'int16', sample_rate: RATE,
   ...(o.preset ? { preset: o.preset } : {}), ...(o.language ? { language: o.language } : {}) });
 
-export const initial = () => ({ committed: [], hypothesis: '', ready: false, done: false, error: null });
+export const initial = () => ({ committed: [], hypothesis: '', ready: false, done: false, error: null, device: null, reason: null });
 
 /** One server event → the next state (committed segments append; the hypothesis is replaced). */
 export function reduce(s, ev) {
   switch (ev?.type) {
-    case 'ready': return { ...s, ready: true };
+    case 'ready': return { ...s, ready: true, device: ev.device || null, reason: ev.reason || null };
+    case 'device': return { ...s, device: ev.device || null, reason: ev.reason || null };   // moved off the GPU mid-stream
     case 'committed': return { ...s, committed: [...s.committed, ev.segment.text] };
     case 'hypothesis': return { ...s, hypothesis: ev.text || '' };
     case 'done': return { ...s, done: true, hypothesis: '', committed: ev.text ? [ev.text] : s.committed };
@@ -66,6 +67,12 @@ export function reduce(s, ev) {
     default: return s;
   }
 }
+
+/** Dictation on the CPU (the stt mod moved it there while another mod's work holds the GPU, plan 31.3): the note
+ * beside "Listening", with why as its title; null on the GPU. */
+export const deviceNote = s => s?.device === 'cpu'
+  ? { text: 'on the CPU', title: s.reason ? s.reason[0].toUpperCase() + s.reason.slice(1) : 'Dictation runs on the CPU while the GPU is busy' }
+  : null;
 
 /** What goes into the draft: the committed text, then the live tail. */
 export const dictated = s => [...s.committed, s.hypothesis].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
@@ -248,7 +255,7 @@ export const LevelBar = ({ level, width = 46 }) => h('span', { 'aria-hidden': 't
  * holds the same microphone list and options as Settings → Speech input. */
 export function MicButton({ api, draft, setDraft, disabled }) {
   const React = R(), up = useSttUp(api);
-  const [on, setOn] = React.useState(false), [err, setErr] = React.useState(null), [live, setLive] = React.useState({ mic: null, level: 0 });
+  const [on, setOn] = React.useState(false), [err, setErr] = React.useState(null), [live, setLive] = React.useState({ mic: null, level: 0, note: null });
   const [menu, setMenu] = React.useState(false), mode = React.useRef('both');
   const sess = React.useRef(null), want = React.useRef(false), base = React.useRef(''), press = React.useRef({ t: 0, started: false });
   React.useEffect(() => () => { want.current = false; sess.current?.stop(); }, []);
@@ -262,7 +269,7 @@ export function MicButton({ api, draft, setDraft, disabled }) {
       let said = '';
       const s = await dictate({ mics: prefs.mics, preset: prefs.preset, language: prefs.language || undefined, onState: st => {
         if (st.error) setErr(st.error);
-        setLive({ mic: st.mic, level: st.level });
+        setLive({ mic: st.mic, level: st.level, note: deviceNote(st) });
         const now = dictated(st);
         if (now !== said) { said = now; setDraft(joinDraft(base.current, now)); }
         if (st.done || st.error) { setOn(false); sess.current = null; }
@@ -285,6 +292,7 @@ export function MicButton({ api, draft, setDraft, disabled }) {
     h(Btn, { kind: 'ghost', sm: true, icon: 'chevD', title: 'Microphone and dictation options', 'aria-expanded': menu ? 'true' : 'false', disabled: on, onClick: () => setMenu(!menu), style: { width: 18, padding: 0 } }),
     h(Popover, { open: menu, onClose: () => setMenu(false), place: 'up-left', width: 360, label: 'Speech input' }, menu ? h(SpeechInputPanel, { api, compact: true }) : null),
     on ? h('span', { role: 'status', title: live.mic || '', style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.rd, maxWidth: 220 } },
-      h(LevelBar, { level: live.level }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, live.mic ? `Listening · ${live.mic}` : 'Listening…')) : null,
+      h(LevelBar, { level: live.level }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, live.mic ? `Listening · ${live.mic}` : 'Listening…'),
+      live.note ? h('span', { title: live.note.title, style: { color: T.mut, whiteSpace: 'nowrap' } }, live.note.text) : null) : null,
     err ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, err) : null);
 }

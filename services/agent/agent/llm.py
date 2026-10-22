@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import json
 import re
 import time
@@ -30,6 +31,22 @@ Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", te
 # The chat a model call belongs to, sent as X-AIHub-Thread: the relay names it on the request's GPU lease (plan 31.4),
 # so the turn can say it is waiting for the GPU. Set for the length of one model call (`Agent._model`).
 THREAD: ContextVar[str | None] = ContextVar("aihub_thread", default=None)
+CHECK_S = 5.0          # how often a model call's stall clock is read
+
+
+class GpuWait:
+    """Whether this model call waits for AIHub's GPU slot (gpuwait.watch sets it, plan 31.4). The client's
+    timeout is a stall limit, and time spent waiting behind a GPU job doesn't count toward it."""
+
+    def __init__(self) -> None:
+        self.on, self.since = False, time.monotonic()
+
+    def set(self, on: bool) -> None:
+        if on != self.on:
+            self.on, self.since = on, time.monotonic()
+
+
+GPU_WAIT: ContextVar[GpuWait | None] = ContextVar("aihub_gpu_wait", default=None)
 
 
 def _headers() -> dict[str, str]:
@@ -300,7 +317,8 @@ def _python_calls(text: str, known: set[str]) -> list[tuple[str, dict[str, Any]]
 class LLM:
     def __init__(self, base_url: str, timeout: float = 1800) -> None:
         self.base = base_url.rstrip("/")
-        self.client = httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(timeout, connect=10))
+        self.timeout = timeout       # seconds without a byte from the model, not counting a wait for the GPU (_guarded)
+        self.client = httpx.AsyncClient(trust_env=False, timeout=httpx.Timeout(None, connect=10))
         self._models: tuple[float, list[dict[str, Any]]] = (0.0, [])
 
     async def close(self) -> None:
@@ -325,10 +343,31 @@ class LLM:
                 return m.get("meta") or {}
         return {}
 
+    async def _guarded(self, work: Awaitable[Any], progress: list[float]) -> Any:
+        """`work`, failed when nothing arrives for `timeout` s (`progress[0]`: the last byte). While the call waits
+        for the GPU slot the clock stops, so a chat waits out a long job instead of failing at 30 min."""
+        task = asyncio.ensure_future(work)
+        wait = GPU_WAIT.get()
+        try:
+            while True:
+                done, _ = await asyncio.wait({task}, timeout=min(CHECK_S, self.timeout))
+                if done:
+                    return task.result()
+                if wait is not None and wait.on:
+                    continue
+                last = max(progress[0], wait.since if wait is not None else 0.0)
+                if time.monotonic() - last > self.timeout:
+                    raise LLMError(f"the model sent nothing for {self.timeout:g} s", retryable=True)
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
     async def _once(self, body: dict[str, Any], reply: Reply) -> None:
         """A non-streaming request (the fallback when a streamed reply came back empty)."""
         try:
-            r = await self.client.post(self.base + "/chat/completions", json={**body, "stream": False}, headers=_headers())
+            r = await self._guarded(self.client.post(self.base + "/chat/completions", json={**body, "stream": False},
+                                                     headers=_headers()), [time.monotonic()])
         except httpx.HTTPError as e:
             raise LLMError(f"{type(e).__name__}: {e}"[:400], retryable=True) from None
         if r.status_code >= 400:
@@ -360,13 +399,17 @@ class LLM:
         calls: dict[int, dict[str, Any]] = {}
         t_think: float | None = None
         checked = 0          # length of thinking + text at the last `looping` check
-        try:
+        progress = [time.monotonic()]
+
+        async def consume() -> None:
+            nonlocal t_think, checked
             async with self.client.stream("POST", self.base + "/chat/completions", json=body, headers=_headers()) as r:
                 if r.status_code >= 400:
                     text = (await r.aread()).decode(errors="replace")[:600]
                     raise LLMError(f"HTTP {r.status_code}: {_detail(text)}", r.status_code,
                                    retryable=r.status_code in (404, 429, 500, 502, 503, 504))
                 async for line in r.aiter_lines():
+                    progress[0] = time.monotonic()
                     if not line.startswith("data:"):
                         continue
                     data = line[5:].strip()
@@ -412,6 +455,9 @@ class LLM:
                             reply.runaway = True
                             reply.finish = "runaway"
                             break       # leaving the stream closes it, and the server stops generating
+
+        try:
+            await self._guarded(consume(), progress)
         except httpx.HTTPError as e:
             raise LLMError(f"{type(e).__name__}: {e}"[:400] or type(e).__name__, retryable=True) from None
         if t_think and not reply.thinking_s:

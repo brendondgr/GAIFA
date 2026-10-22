@@ -14,6 +14,7 @@ export const FIRST = 6;          // chats shown in a section before Show more
 export const MORE = 20;          // and each Show more adds
 export const VIEW_DEFAULTS = { group: 'environment', envOrder: 'activity', chatOrder: 'updated', collapsed: [] };
 export const GROUP_BY = [['environment', 'Environment'], ['none', 'None']];
+export const SHOW = [['chats', 'Chats'], ['archived', 'Archived']];
 export const ENV_ORDERS = [['activity', 'Recent activity'], ['name', 'Name'], ['created', 'Created']];
 export const CHAT_ORDERS = [['updated', 'Recent activity'], ['title', 'Name'], ['created', 'Created']];
 
@@ -93,13 +94,14 @@ function Choice({ label, value, options, onPick }) {
       options.map(([k, l]) => h('button', { key: k, type: 'button', role: 'radio', 'aria-checked': k === value ? 'true' : 'false', onClick: () => onPick(k), style: chipSt(k === value, { sm: true }) }, l))));
 }
 
-export function ViewMenu({ view, onChange, grouped = true }) {
+export function ViewMenu({ view, onChange, grouped = true, archived = false, onArchived = null }) {
   const React = R(), [open, setOpen] = React.useState(false);
   const set = patch => onChange({ ...view, ...patch });
   return h('span', { style: { position: 'relative', flex: 'none' } },
     h(Btn, { sm: true, icon: 'sliders', title: 'View: group and order the chats', 'aria-label': 'View', 'aria-expanded': open ? 'true' : 'false', onClick: () => setOpen(!open),
       className: 'aichat-quiet', style: { width: 30, height: 30, borderRadius: 7, background: 'transparent', color: T.mut } }),
     h(Popover, { open, onClose: () => setOpen(false), place: 'down-left', width: 280, label: 'View', style: { gap: 10 } },   // opens over the chat, not behind the app's rail
+      onArchived ? h(Choice, { label: 'Show', value: archived ? 'archived' : 'chats', options: SHOW, onPick: v => onArchived(v === 'archived') }) : null,   // the user's ask: archived chats from here too
       grouped ? h(Choice, { label: 'Group by', value: view.group, options: GROUP_BY, onPick: group => set({ group }) }) : null,
       grouped && view.group === 'environment' ? h(Choice, { label: 'Environments by', value: view.envOrder, options: ENV_ORDERS, onPick: envOrder => set({ envOrder }) }) : null,
       h(Choice, { label: 'Chats by', value: view.chatOrder, options: CHAT_ORDERS, onPick: chatOrder => set({ chatOrder }) })));

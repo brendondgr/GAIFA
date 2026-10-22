@@ -3129,6 +3129,7 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
 - [x] **42.1 The sidebar: `web/chat/chat-list.js`, `chat-groups.js`.**
   - **Top:** the search box across, then **+ New** with the **View** button (the settings icon) on its right, no "Chats" heading (the user's mock-up, after Claude Code's: first built as "Chats" beside the search and a New chat bar). The By meaning chip and its list go.
   - **A chat's row:** the time sits at the right edge; hovering the row (or focusing it, or its menu being open) highlights it and shows ⋯ in the time's place.
+  - **Asked for while building it:** View gains Show (Chats · Archived); a chat's open menu takes R, M, A and D (Rename, Move to, Archive, Delete), each item showing its letter.
   - **Show more:** a full-width divider, a line on each side of "Show more · N" centred, in sections and in the flat list.
   *Done when:* `utils/tests/web/chat-groups.test.mjs` (the header's two rows, no By meaning, the row's time and ⋯ in one slot, the divider with its count).
 - [x] **42.2 The message box: `web/chat/chat-composer.js`.**

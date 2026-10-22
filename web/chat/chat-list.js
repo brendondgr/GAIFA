@@ -14,6 +14,14 @@ const R = () => globalThis.React;
  * shown in a flat list (a search, or grouping off). */
 export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], onMove, where }) {
   const React = R(), [menu, setMenu] = React.useState(false), [edit, setEdit] = React.useState(null), [moving, setMoving] = React.useState(false);
+  const act = { r: () => { setMenu(false); setEdit(t.title || ''); }, m: onMove && moveTo.length ? () => setMoving(true) : null,
+    a: () => { setMenu(false); onArchive(); }, d: () => { setMenu(false); onDelete(); } };
+  React.useEffect(() => {        // while the menu is open: R renames, M moves, A archives, D deletes (the user's ask)
+    if (!menu || moving) return undefined;
+    const k = e => { const f = menuKey(e) && act[menuKey(e)]; if (f) { e.preventDefault(); e.stopPropagation(); f(); } };
+    window.addEventListener('keydown', k, true);
+    return () => window.removeEventListener('keydown', k, true);
+  }, [menu, moving]);
   const dot = t.running || t.state === 'running' ? T.acc : t.state === 'waiting' ? T.pu : t.state === 'error' ? T.rd : null;
   if (edit != null) {
     const save = () => { const v = edit.trim(); setEdit(null); if (v && v !== t.title) onRename(v); };
@@ -35,15 +43,23 @@ export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo 
         moving
           ? [h('span', { key: 'h', style: { ...label11, padding: '4px 9px' } }, 'Move to'),
             ...moveTo.map(e => menuItem(e.id, 'home', e.name, () => { setMenu(false); setMoving(false); onMove(e.id); }))]
-          : [menuItem('rename', 'edit', 'Rename', () => { setMenu(false); setEdit(t.title || ''); }),
-            onMove && moveTo.length ? menuItem('move', 'folder', 'Move to…', () => setMoving(true)) : null,
-            menuItem('archive', 'archive', t.archived ? 'Unarchive' : 'Archive', () => { setMenu(false); onArchive(); }),
-            menuItem('delete', 'trash', 'Delete…', () => { setMenu(false); onDelete(); }, T.rd)])));
+          : [menuItem('rename', 'edit', 'Rename', act.r, T.tx, 'R'),
+            act.m ? menuItem('move', 'folder', 'Move to…', act.m, T.tx, 'M') : null,
+            menuItem('archive', 'archive', t.archived ? 'Unarchive' : 'Archive', act.a, T.tx, 'A'),
+            menuItem('delete', 'trash', 'Delete…', act.d, T.rd, 'D')])));
 }
 
-const menuItem = (key, ic, label, fn, color = T.tx) => h('button', { key, type: 'button', role: 'menuitem', onClick: fn,
+/** A menu letter from a key press: r, m, a or d alone (no modifier; not while typing in a box). */
+export const menuKey = e => {
+  if (!e || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '') || e.target?.isContentEditable) return null;
+  const k = String(e.key || '').toLowerCase();
+  return ['r', 'm', 'a', 'd'].includes(k) ? k : null;
+};
+
+const menuItem = (key, ic, label, fn, color = T.tx, letter = null) => h('button', { key, type: 'button', role: 'menuitem', onClick: fn, 'aria-keyshortcuts': letter || undefined,
   style: { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' } },
-  h(Icon, { d: ic, size: 13 }), label);
+  h(Icon, { d: ic, size: 13 }), h('span', { style: { flex: 1 } }, label),
+  letter ? h('kbd', { style: { fontFamily: MONO, fontSize: 10.5, color: T.dim, border: '1px solid ' + T.bd, borderRadius: 4, padding: '0 4px', lineHeight: '16px' } }, letter) : null);
 
 export const LIST_CSS = `
 .aichat-item .aichat-more{display:none}
@@ -72,7 +88,7 @@ export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArc
         style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, height: 30, padding: '0 6px', borderRadius: 7, border: 0, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, cursor: 'pointer', textAlign: 'left' } },
         h('span', { style: { width: 20, height: 20, borderRadius: 99, display: 'grid', placeItems: 'center', background: T.row, color: T.tx, flex: 'none' } }, h(Icon, { d: 'plus', size: 12 })),
         'New'),
-      view && onView ? h(ViewMenu, { view, onChange: onView, grouped: canGroup }) : null),
+      view && onView ? h(ViewMenu, { view, onChange: onView, grouped: canGroup, archived, onArchived }) : null),
     grouped && !q.trim() ? h('nav', { 'aria-label': 'Chats by environment', style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },
       !threads.length ? h('div', { style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } },

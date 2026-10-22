@@ -110,7 +110,7 @@ test('the View menu offers grouping only with environments', () => {
 test('a chat\'s menu: Rename, Move to (other environments), Archive, Delete; its environment in a flat list', () => {
   const t = { id: 't1', title: 'Report', settings: { environment: 'grants' } };
   // the menu's popover renders only while open (the stub's useState keeps it shut): read its children
-  const menu = el => all(el, n => n.props?.label === 'Chat actions')[0].props.children.filter(Boolean).map(text);
+  const menu = el => all(el, n => n.props?.label === 'Chat actions')[0].props.children.filter(Boolean).map(b => text(b.props.children.filter(c => c?.type !== 'kbd')));
   const raw = list.Item({ t, active: false, onRename() {}, onArchive() {}, onDelete() {}, moveTo: [ENVS[0], ENVS[2]], onMove() {}, where: 'Grants' });
   assert.deepEqual(menu(raw), ['Rename', 'Move to…', 'Archive', 'Delete…']);
   const el = expand(raw);
@@ -197,4 +197,26 @@ test('None\'s section has no ⋯ menu (nothing to rename or fill)', () => {
   const el = expand(g.Section({ row, open: true, chats: [], loading: false, more: false, renderItem: () => null, onToggle() {}, onNew() {}, onRename() {}, onManage() {} }));
   assert.equal(all(el, n => n.props?.['aria-label'] === 'More for None').length, 0);
   assert.equal(all(el, n => n.props?.['aria-label'] === 'New chat in None').length, 1);
+});
+
+test('the chat menu\'s letters: R renames, M moves, A archives, D deletes; not while typing', () => {
+  const key = (k, o = {}) => list.menuKey({ key: k, target: { tagName: 'BODY' }, ...o });
+  assert.deepEqual(['r', 'M', 'a', 'D', 'x'].map(k => key(k)), ['r', 'm', 'a', 'd', null]);
+  assert.equal(key('a', { ctrlKey: true }), null);
+  assert.equal(key('d', { target: { tagName: 'INPUT' } }), null);
+  const t = { id: 't1', title: 'Report' };
+  const items = all(list.Item({ t, active: false, onRename() {}, onArchive() {}, onDelete() {}, moveTo: [ENVS[2]], onMove() {} }), n => n.props?.label === 'Chat actions')[0]
+    .props.children.filter(Boolean);
+  assert.deepEqual(items.map(b => b.props['aria-keyshortcuts']), ['R', 'M', 'A', 'D']);
+});
+
+test('View shows archived chats too (Show: Chats · Archived)', () => {
+  const got = [];
+  const menu = g.ViewMenu({ view: g.readView({}), onChange() {}, grouped: true, archived: false, onArchived: v => got.push(v) });
+  const pop = all(menu, n => n.props?.label === 'View')[0];
+  const show = pop.props.children.filter(Boolean)[0];
+  assert.equal(show.props.label, 'Show');
+  assert.equal(show.props.value, 'chats');
+  show.props.onPick('archived');
+  assert.deepEqual(got, [true]);
 });

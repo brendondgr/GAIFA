@@ -1,7 +1,8 @@
 """Routes for environments (plan 34): named sets of folders, each with its own levels.
 
 `GET/POST /v1/environments`, `GET/PUT/DELETE /v1/environments/{id}`, and a folder in one:
-`POST /v1/environments/{id}/folders`, `PATCH/DELETE /v1/environments/{id}/folders/{fid}`.
+`POST /v1/environments/{id}/folders`, `PATCH/DELETE /v1/environments/{id}/folders/{fid}`; and `GET /v1/browse?path=`
+to pick a folder to add (browse.py).
 """
 
 from __future__ import annotations
@@ -42,6 +43,12 @@ class EnvFolderPatch(BaseModel):
 def mount(app: FastAPI, ctx: Any) -> None:
     envs = ctx.folders.envs
     caps = ctx.folders.caps
+
+    @app.get("/v1/browse", summary="The folders in a folder (the home folder by default), each with whether it can be added; "
+             "only the home folder and mounted drives, without hidden or secret-looking folders (plan 42.4)")
+    def browse_folders(path: str | None = None) -> dict[str, Any]:
+        from browse import browse
+        return browse(path)
 
     @app.get("/v1/environments", summary="The environments, each with its folders and their levels")
     def list_envs() -> dict[str, Any]:

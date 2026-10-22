@@ -1,9 +1,10 @@
 // The row under the message box (plan 42.3, after Claude Code's): the chat's environment, its mode and its model, as
 // plain buttons that open small menus (not selects). They were the header's selects and environment chip. The
-// environment menu also makes, renames and fills environments through the workspace mod (plan 42.4: EnvEditor,
-// envOps), so the Workspace page is needed only for Bypass and deleting. Written by us (web/PATCHES.md).
+// environment menu also makes, renames, fills and deletes environments through the workspace mod (plan 42.4: the editor
+// opens beside it, chat-envedit.js), so the Workspace page is needed only for Bypass. Written by us (web/PATCHES.md).
 
-import { h, T, MONO, Icon, Popover, label11, inputSt } from './chat-ui.js';
+import { h, T, MONO, Icon, Popover, label11, inputSt, SHADOW } from './chat-ui.js';
+import { EnvEditor, envOps, errLine } from './chat-envedit.js';
 import { modeChoices, modeTitle, modeOf, modelLabel, MODES } from './chat-header.js';
 import { envOf, allowedFolders, shortPath, LEVEL_WORD } from './chat-env.js';
 
@@ -48,100 +49,70 @@ export function ModelMenu({ models, value, onChange }) {
         h('span', { style: { fontSize: 11.5, color: T.mut } }, modelLabel(m).slice(m.id.length).replace(/^ · /, '') || ' ')))));
 }
 
-// ---------- environments from the chat (plan 42.4) ----------
-const enc = encodeURIComponent;
-export const LEVELS = ['read', 'edit', 'run', 'run_net'];
-/** The workspace mod's environment routes, through the hub's proxy; each resolves to its JSON or throws its error. */
-export function envOps(api) {
-  const call = (method, path, json) => api.callService('workspace', method, path, json ? { json } : {}).then(r => r.json);
-  const E = id => `/v1/environments/${enc(id)}`;
-  return {
-    create: name => call('POST', '/v1/environments', { name }),
-    rename: (id, name) => call('PUT', E(id), { name }),
-    addFolder: (id, path, level = 'read') => call('POST', `${E(id)}/folders`, { path, level }),
-    setLevel: (id, fid, level) => call('PATCH', `${E(id)}/folders/${enc(fid)}`, { level }),
-    removeFolder: (id, fid) => call('DELETE', `${E(id)}/folders/${enc(fid)}`),
-  };
-}
-/** An error from the mod as one line: what it says, and its fix. */
-export const errLine = e => [e?.detail || e?.message || String(e || 'failed'), e?.data?.fix || e?.fix].filter(Boolean).join(' — ');
-const LEVEL_ORDER = Object.fromEntries(LEVELS.map((l, i) => [l, i]));
-const segSt = (on, dis) => ({ height: 20, padding: '0 6px', border: 0, borderRadius: 4, font: 'inherit', fontSize: 11, cursor: dis ? 'not-allowed' : 'pointer', opacity: dis ? 0.4 : 1,
-  background: on ? T.hov : 'transparent', color: on ? T.tx : T.mut, boxShadow: on ? '0 0 0 1px ' + T.bds : 'none' });
-const fieldSt = { ...inputSt, height: 26, fontSize: 12, padding: '0 8px', minWidth: 0 };
+// ---------- environments from the chat (plan 42.4; the editor is chat-envedit.js) ----------
+const envRowSt = on => ({ display: 'flex', alignItems: 'center', gap: 6, minHeight: 28, padding: '0 4px 0 8px', borderRadius: 6, background: on ? T.tcy : 'transparent',
+  boxShadow: on ? 'inset 0 0 0 1px ' + T.cy : 'none' });
+const quietBtn = { height: 22, padding: '0 7px', border: '1px solid transparent', borderRadius: 5, background: 'transparent', color: T.mut, font: 'inherit', fontSize: 11.5, cursor: 'pointer' };
+export const ENV_MENU_W = 250;
 
-/** The chosen environment's name and folders, and New environment: all saved in the workspace mod at once. */
-export function EnvEditor({ api, env, onChanged, onCreated }) {
-  const React = R(), ops = envOps(api);
-  const [err, setErr] = React.useState(null), [busy, setBusy] = React.useState(false), [rename, setRename] = React.useState(null);
-  const [path, setPath] = React.useState(''), [level, setLevel] = React.useState('read'), [fresh, setFresh] = React.useState(null);
-  const run = async (f, after) => { setBusy(true); setErr(null); try { const r = await f(); after?.(r); onChanged?.(); } catch (e) { setErr(errLine(e)); } finally { setBusy(false); } };
-  const folders = env?.folders || [], none = !!env?.none;
-  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid ' + T.bd, paddingTop: 8 } },
-    none ? h('span', { style: { fontSize: 11.5, color: T.mut } }, 'None: no folders. The agent asks before it reads any folder, and you allow it in this chat only.') : null,
-    env && !none ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-      rename != null
-        ? h('input', { autoFocus: true, value: rename, 'aria-label': 'Environment name', onChange: e => setRename(e.target.value), style: { ...fieldSt, flex: 1 },
-            onKeyDown: e => { if (e.key === 'Enter' && rename.trim()) run(() => ops.rename(env.id, rename.trim()), () => setRename(null)); if (e.key === 'Escape') { e.stopPropagation(); setRename(null); } } })
-        : h('span', { style: { ...label11, flex: 1 } }, `Folders in ${env.name}`),
-      rename == null ? h('button', { type: 'button', onClick: () => setRename(env.name), style: segSt(false), title: 'Rename this environment' }, 'Rename') : null) : null,
-    env && !none ? folders.map(f => h('div', { key: f.id, style: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 } },
-      h(Icon, { d: 'folder', size: 12 }),
-      h('span', { title: f.capped ? `${f.path} (${f.capped})` : f.path, style: { fontFamily: MONO, fontSize: 11.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, shortPath(f.path)),
-      h('span', { role: 'group', 'aria-label': `Level of ${f.path}`, style: { display: 'inline-flex', padding: 1, borderRadius: 5, border: '1px solid ' + T.bd, flex: 'none' } },
-        LEVELS.map(l => { const dis = f.max_level && LEVEL_ORDER[l] > LEVEL_ORDER[f.max_level];
-          return h('button', { key: l, type: 'button', 'aria-pressed': f.level === l ? 'true' : 'false', disabled: busy || dis, title: dis ? `Up to ${LEVEL_WORD[f.max_level]} here${f.capped ? `: ${f.capped}` : ''}` : LEVEL_WORD[l],
-            onClick: () => f.level !== l && run(() => ops.setLevel(env.id, f.id, l)), style: segSt(f.level === l, dis) }, { read: 'Read', edit: 'Edit', run: 'Run', run_net: 'Net' }[l]); })),
-      h('button', { type: 'button', 'aria-label': `Remove ${f.path} from ${env.name}`, title: 'Remove from this environment (its files are left alone)', disabled: busy,
-        onClick: () => run(() => ops.removeFolder(env.id, f.id)), style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 2, display: 'flex' } }, h(Icon, { d: 'x', size: 12 })))) : null,
-    env && !none && !folders.length ? h('span', { style: { fontSize: 11.5, color: T.dim } }, 'No folders yet: add one below, or the agent asks for one when it needs it.') : null,
-    env && !none ? h('form', { onSubmit: e => { e.preventDefault(); if (path.trim()) run(() => ops.addFolder(env.id, path.trim(), level), () => setPath('')); }, style: { display: 'flex', gap: 4, alignItems: 'center' } },
-      h('input', { value: path, onChange: e => setPath(e.target.value), placeholder: '~/path/to/folder', 'aria-label': 'Folder to add', style: { ...fieldSt, flex: 1, fontFamily: MONO } }),
-      h('select', { value: level, onChange: e => setLevel(e.target.value), 'aria-label': 'Its level', style: { ...fieldSt, width: 74, paddingRight: 2 } },
-        LEVELS.map(l => h('option', { key: l, value: l }, LEVEL_WORD[l]))),
-      h('button', { type: 'submit', disabled: busy || !path.trim(), style: segSt(false, busy || !path.trim()) }, 'Add')) : null,
-    fresh == null
-      ? h('button', { type: 'button', onClick: () => setFresh(''), style: { display: 'flex', alignItems: 'center', gap: 6, border: 0, background: 'none', color: T.cy, font: 'inherit', fontSize: 12, cursor: 'pointer', padding: '2px 0' } },
-          h(Icon, { d: 'plus', size: 12 }), 'New environment')
-      : h('form', { onSubmit: e => { e.preventDefault(); if (fresh.trim()) run(() => ops.create(fresh.trim()), r => { setFresh(null); onCreated?.(r.id); }); }, style: { display: 'flex', gap: 4 } },
-          h('input', { autoFocus: true, value: fresh, onChange: e => setFresh(e.target.value), placeholder: 'Name, e.g. Grants', 'aria-label': 'New environment name', style: { ...fieldSt, flex: 1 },
-            onKeyDown: e => { if (e.key === 'Escape') { e.stopPropagation(); setFresh(null); } } }),
-          h('button', { type: 'submit', disabled: busy || !fresh.trim(), style: segSt(false, busy || !fresh.trim()) }, 'Create')),
-    err ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, err) : null);
-}
-
-/** The environment: the workspace folders this chat may use (plan 34), picked, made and changed here (plan 42.4);
- * without the workspace mod, no button. */
-export function EnvMenu({ api, thread, envs, value, onChange, stamp = 0, onEnvsChanged }) {
+/** The environment: the workspace folders this chat may use (plan 34). The menu (compact, the user's ask) lists the
+ * environments: a click picks one for this chat, **Edit** on its right opens the editor beside the menu (not for
+ * None); **New environment** makes one, which becomes the chat's and opens in the editor. Without the workspace mod,
+ * no button. */
+export function EnvMenu({ api, c, thread, envs, value, onChange, stamp = 0, onEnvsChanged, confirm, onDeleted }) {
   const React = R(), [open, setOpen] = React.useState(false), [grants, setGrants] = React.useState([]);
+  const [editing, setEditing] = React.useState(null), [fresh, setFresh] = React.useState(null), [err, setErr] = React.useState(null);
   const tid = thread?.id || null;
   React.useEffect(() => {
     if (!tid || !api?.listGrants) { setGrants([]); return; }
     api.listGrants({ thread: tid }).then(g => setGrants(allowedFolders(g, tid)), () => setGrants([]));
   }, [tid, stamp, open]);
   if (!envs) return null;
-  const env = envOf(envs, value);
+  const env = envOf(envs, value), editEnv = editing ? envs.find(e => e.id === editing) : null;
+  const close = () => { setOpen(false); setEditing(null); setFresh(null); setErr(null); };
   const revoke = async g => { try { await api.revokeGrant(g.grant); setGrants(l => l.filter(x => x.grant !== g.grant)); } catch { /* shown as still there */ } };
+  const create = async () => {
+    const name = (fresh || '').trim();
+    if (!name) return;
+    try { const r = await envOps(api).create(name); setFresh(null); setErr(null); await onEnvsChanged?.(); onChange(r.id); setEditing(r.id); }
+    catch (e) { setErr(errLine(e)); }
+  };
   return h('span', { style: { position: 'relative', flex: 'none' } },
     h(Control, { icon: 'home', label: (env?.name || 'No environment') + (grants.length ? ` +${grants.length}` : ''), title: 'Environment: the workspace folders this chat can use',
-      ariaLabel: `Environment: ${env?.name || 'none'}`, open, onClick: () => setOpen(!open) }),
-    h(Popover, { open, onClose: () => setOpen(false), place: 'up-left', width: 400, label: 'Environment' },
-      h('span', { style: label11 }, 'Environment'),
-      h('div', { role: 'menu', 'aria-label': 'Environments', style: { display: 'flex', flexDirection: 'column', gap: 2 } },
-        envs.map(e => h('button', { key: e.id, type: 'button', role: 'menuitemradio', 'aria-checked': e.id === env?.id ? 'true' : 'false',
-          onClick: () => { if (e.id !== env?.id) onChange(e.id); }, style: rowSt(e.id === env?.id) },
-          h('span', { style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500 } }, h(Icon, { d: 'home', size: 12 }), e.name,
-            h('span', { style: { marginLeft: 'auto', fontSize: 11.5, color: T.mut, fontWeight: 400 } }, `${(e.folders || []).length} folder${(e.folders || []).length === 1 ? '' : 's'}`))))),
-      api?.callService ? h(EnvEditor, { api, env, onChanged: () => onEnvsChanged?.(), onCreated: id => { onEnvsChanged?.(); onChange(id); } }) : null,
-      grants.length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, borderTop: '1px solid ' + T.bd, paddingTop: 8 } },
+      ariaLabel: `Environment: ${env?.name || 'none'}`, open, onClick: () => (open ? close() : setOpen(true)) }),
+    h(Popover, { open, onClose: close, place: 'up-left', width: ENV_MENU_W, label: 'Environment', style: { gap: 4, padding: 6 } },
+      h('span', { style: { ...label11, padding: '2px 4px' } }, 'Environment'),
+      h('div', { role: 'menu', 'aria-label': 'Environments', style: { display: 'flex', flexDirection: 'column', gap: 1 } },
+        envs.map(e => h('div', { key: e.id, className: 'aichat-envrow', style: envRowSt(e.id === env?.id) },
+          h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': e.id === env?.id ? 'true' : 'false', onClick: () => { if (e.id !== env?.id) onChange(e.id); },
+            title: (e.folders || []).map(f => f.path).join('\n') || (e.none ? 'No folders' : 'No folders yet'),
+            style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: 28, border: 0, background: 'none', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left', padding: 0 } },
+            h(Icon, { d: 'home', size: 12 }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: e.id === env?.id ? 500 : 400 } }, e.name),
+            h('span', { style: { fontSize: 11, color: T.dim, flex: 'none' } }, (e.folders || []).length)),
+          e.none ? null : h('button', { type: 'button', className: 'aichat-quiet', 'aria-label': `Edit ${e.name}`, 'aria-expanded': editing === e.id ? 'true' : 'false',
+            onClick: () => setEditing(editing === e.id ? null : e.id), style: quietBtn }, 'Edit')))),
+      fresh == null
+        ? h('button', { type: 'button', onClick: () => setFresh(''), style: { display: 'flex', alignItems: 'center', gap: 6, height: 26, padding: '0 8px', border: 0, borderRadius: 6, background: 'none', color: T.mut, font: 'inherit', fontSize: 12, cursor: 'pointer', textAlign: 'left' } },
+            h(Icon, { d: 'plus', size: 12 }), 'New environment')
+        : h('form', { onSubmit: e => { e.preventDefault(); create(); }, style: { display: 'flex', gap: 4, padding: '2px 2px' } },
+            h('input', { autoFocus: true, value: fresh, onChange: e => setFresh(e.target.value), placeholder: 'Name, e.g. Grants', 'aria-label': 'New environment name',
+              onKeyDown: e => { if (e.key === 'Escape') { e.stopPropagation(); setFresh(null); } }, style: { ...inputSt, flex: 1, minWidth: 0, height: 26, fontSize: 12, padding: '0 8px' } }),
+            h('button', { type: 'submit', disabled: !fresh.trim(), style: { ...quietBtn, borderColor: T.bds, color: T.tx } }, 'Create')),
+      env?.none ? h('span', { style: { fontSize: 11, color: T.dim, padding: '0 8px', lineHeight: 1.35 } }, 'None has no folders: the agent asks before it reads one, for this chat only.') : null,
+      err ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd, padding: '0 8px' } }, err) : null,
+      grants.length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, borderTop: '1px solid ' + T.bd, padding: '6px 4px 0' } },
         h('span', { style: label11 }, 'Allowed in this chat'),
         grants.map(g => h('div', { key: g.grant, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, minWidth: 0 } },
           h(Icon, { d: 'folder', size: 12 }),
           h('span', { title: g.path, style: { fontFamily: MONO, fontSize: 11.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, shortPath(g.path)),
           h('span', { style: { fontSize: 11, color: T.mut } }, LEVEL_WORD.read),
           h('button', { type: 'button', onClick: () => revoke(g), title: 'Take it back: this chat asks again', 'aria-label': `Stop allowing ${g.path} in this chat`,
-            style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 2, display: 'flex' } }, h(Icon, { d: 'x', size: 12 }))))) : null,
-      h('a', { href: '#/s/workspace/environments', onClick: () => setOpen(false), style: { fontSize: 12 } }, 'Bypass and more on the Workspace page…')));
+            style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 2, display: 'flex' } }, h(Icon, { d: 'x', size: 12 }))))) : null),
+    open && editEnv && api?.callService ? h('div', { role: 'dialog', 'aria-label': `Edit ${editEnv.name}`,   // beside the menu, extending it
+      style: { position: 'absolute', zIndex: 49, bottom: 'calc(100% + 6px)', left: ENV_MENU_W + 6, width: `min(340px, calc(100vw - ${ENV_MENU_W + 40}px))`, maxHeight: 'min(70vh, 520px)', overflow: 'auto',
+        background: T.card, border: '1px solid ' + T.bds, borderRadius: 10, boxShadow: SHADOW, padding: 10 } },
+      h(EnvEditor, { api, c, env: editEnv, confirm, onClose: () => setEditing(null), onChanged: () => onEnvsChanged?.(),
+        onDeleted: (id, ids) => { setEditing(null); onEnvsChanged?.(); onDeleted?.(id, ids); if (id === env?.id) onChange('none'); } })) : null);
 }
 
 /** The row: environment and mode on the left, the model on the right. */

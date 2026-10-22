@@ -44,6 +44,7 @@ Listings and searches skip `.git`, `node_modules`, `.venv`, caches and build fol
 | `GET /health` | 200 while the server is up |
 | `GET /v1/status` | folders, environments, edits and runs |
 | `GET /v1/environments` | every environment with its folders and their levels |
+| `GET /v1/browse?path=` | the folders in a folder (default: home), each with `addable`; the home folder and mounted drives only, without hidden or secret-looking folders; names only (plan 42.4) |
 | `POST /v1/environments` | `{name, id?}` creates one (no folders yet); 409 for a name in use |
 | `GET /v1/environments/{id}`, `PUT /v1/environments/{id}` `{name}`, `DELETE /v1/environments/{id}` | one environment; rename; delete (not Default or None: 422) |
 | `POST /v1/environments/{id}/folders` | `{path, level?, allow_bypass?, id?, name?}` adds a folder there (Read unless you say otherwise; capped as below) |

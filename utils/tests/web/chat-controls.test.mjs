@@ -71,54 +71,84 @@ test('the model and environment menus list their choices and call back', () => {
   models[1].props.onClick();
   const env = ctl.EnvMenu({ api: {}, thread: null, envs: ENVS, value: null, onChange: e => got.push(e) });
   const list = all(menuOf(env, 'Environment'), n => n.props?.role === 'menuitemradio');
-  assert.deepEqual(list.map(r => r.props.key), ['default', 'grants']);
+  assert.deepEqual(list.map(r => text(r).replace(/\d+$/, '')), ['Default', 'Grants']);
   assert.equal(list[0].props['aria-checked'], 'true');                                   // none set: Default
   list[1].props.onClick();
   assert.deepEqual(got, ['gemma4-26B', 'grants']);
 });
 
-// Plan 42.4: environments made and changed from the chat.
-test('the environment calls: create, rename, add a folder, its level, remove it', async () => {
+// Plan 42.4: environments made and changed from the chat (the editor beside the menu, chat-envedit.js).
+const ed = await load('chat/chat-envedit.js');
+
+test('the environment calls: create, rename, delete, add a folder, its level, remove it, browse', async () => {
   const seen = [];
-  const api = { callService: async (mod, method, p, o) => { seen.push([mod, method, p, o.json]); return { json: { id: 'grants', name: 'Grants' } }; } };
-  const ops = ctl.envOps(api);
+  const api = { callService: async (mod, method, p, o) => { seen.push([mod, method, p, o.json, o.query]); return { json: { id: 'grants', name: 'Grants' } }; } };
+  const ops = ed.envOps(api);
   await ops.create('Grants');
   await ops.rename('grants', 'Grant work');
-  await ops.addFolder('grants', '~/Docs', 'edit');
+  await ops.addFolder('grants', '/home/u/Docs', 'edit');
   await ops.setLevel('grants', 'docs', 'run');
   await ops.removeFolder('grants', 'docs');
+  await ops.remove('grants');
+  await ops.browse('/home/u');
+  await ops.browse(null);
   assert.deepEqual(seen, [
-    ['workspace', 'POST', '/v1/environments', { name: 'Grants' }],
-    ['workspace', 'PUT', '/v1/environments/grants', { name: 'Grant work' }],
-    ['workspace', 'POST', '/v1/environments/grants/folders', { path: '~/Docs', level: 'edit' }],
-    ['workspace', 'PATCH', '/v1/environments/grants/folders/docs', { level: 'run' }],
-    ['workspace', 'DELETE', '/v1/environments/grants/folders/docs', undefined]]);
-  assert.equal(ctl.errLine({ detail: '/etc is outside your home', data: { fix: 'pick a folder in your home' } }), '/etc is outside your home — pick a folder in your home');
-  assert.equal(ctl.errLine(new Error('boom')), 'boom');
+    ['workspace', 'POST', '/v1/environments', { name: 'Grants' }, undefined],
+    ['workspace', 'PUT', '/v1/environments/grants', { name: 'Grant work' }, undefined],
+    ['workspace', 'POST', '/v1/environments/grants/folders', { path: '/home/u/Docs', level: 'edit' }, undefined],
+    ['workspace', 'PATCH', '/v1/environments/grants/folders/docs', { level: 'run' }, undefined],
+    ['workspace', 'DELETE', '/v1/environments/grants/folders/docs', undefined, undefined],
+    ['workspace', 'DELETE', '/v1/environments/grants', undefined, undefined],
+    ['workspace', 'GET', '/v1/browse', undefined, { path: '/home/u' }],
+    ['workspace', 'GET', '/v1/browse', undefined, undefined]]);
+  assert.equal(ed.errLine({ detail: '/etc is outside your home', data: { fix: 'pick a folder in your home' } }), '/etc is outside your home — pick a folder in your home');
+  assert.equal(ed.errLine(new Error('boom')), 'boom');
 });
 
-test('the editor: each folder with its level (up to its cap) and Remove, Add a folder, New environment', () => {
-  const env = { id: 'default', name: 'Default', folders: [{ id: 'aihub', path: '/home/u/Agents/AIHub', level: 'read', max_level: 'read', capped: 'the AIHub folder stays at Read' },
+test('deleting an environment warns that its chats go too, archived ones included, then deletes them and it', async () => {
+  const w = ed.deleteWarning({ name: 'Grants' }, { open: 3, archived: 2 });
+  assert.match(w.body, /deletes its 5 chats, including 2 archived/);
+  assert.equal(w.danger, true);
+  assert.match(w.confirmLabel, /5 chats/);
+  assert.match(ed.deleteWarning({ name: 'X' }, { open: 0, archived: 0 }).body, /no chats/);
+  const chats = { false: ['t1', 't2'], true: ['t3'] }, removed = [], calls = [];
+  const c = {
+    threads: async ({ environment, archived }) => (environment === 'grants' ? chats[String(!!archived)].map(id => ({ id })) : []),
+    remove: async id => { removed.push(id); for (const k of ['false', 'true']) chats[k] = chats[k].filter(x => x !== id); },
+    threadGroups: async ({ archived } = {}) => [{ environment: 'grants', count: archived ? 1 : 2 }],
+  };
+  assert.deepEqual(await ed.chatCounts(c, 'grants'), { open: 2, archived: 1 });
+  const api = { callService: async (mod, method, p) => { calls.push([method, p]); return { json: {} }; } };
+  const ids = await ed.deleteEnvironment({ c, api, env: { id: 'grants', name: 'Grants' } });
+  assert.deepEqual(ids, ['t1', 't2', 't3']);
+  assert.deepEqual(removed, ['t1', 't2', 't3']);
+  assert.deepEqual(calls, [['DELETE', '/v1/environments/grants']]);                       // the environment last
+});
+
+test('the editor: name and Save, each folder with its level (up to its cap) and Remove, Add a folder…, Delete (not Default)', () => {
+  const api = { callService: async () => ({ json: {} }) };
+  const env = { id: 'work', name: 'Work', folders: [{ id: 'aihub', path: '/home/u/Agents/AIHub', level: 'read', max_level: 'read', capped: 'the AIHub folder stays at Read' },
     { id: 'a', path: '/home/u/a', level: 'edit', max_level: 'run_net' }] };
-  const el = expand(ctl.EnvEditor({ api: { callService: async () => ({ json: {} }) }, env }));
+  const el = expand(ed.EnvEditor({ api, env }));
   const groups = all(el, n => n.props?.role === 'group');
-  assert.equal(groups.length, 2);
-  const capped = groups[0].props.children.filter(Boolean);
-  assert.deepEqual(capped.map(b => b.props.disabled), [false, true, true, true]);           // only Read where it's capped
-  assert.equal(capped[0].props['aria-pressed'], 'true');
+  assert.deepEqual(groups[0].props.children.filter(Boolean).map(b => b.props.disabled), [false, true, true, true]);   // only Read where it's capped
   assert.equal(groups[1].props.children.filter(Boolean).find(b => b.props['aria-pressed'] === 'true').props.title, 'Edit');
   assert.equal(all(el, n => n.props?.['aria-label']?.startsWith('Remove ')).length, 2);
-  assert.equal(all(el, n => n.props?.['aria-label'] === 'Folder to add').length, 1);
-  assert.match(text(el), /New environment/);
-  assert.match(text(el), /Rename/);
-  const empty = expand(ctl.EnvEditor({ api: { callService: async () => ({ json: {} }) }, env: { id: 'x', name: 'X', folders: [] } }));
-  assert.match(text(empty), /No folders yet/);
+  assert.equal(all(el, n => n.props?.['aria-label'] === 'Environment name')[0].props.value, 'Work');
+  assert.match(text(el), /Save/);
+  assert.match(text(el), /Add a folder…/);
+  assert.equal(all(el, n => n.type === 'input' && /path/i.test(n.props?.placeholder || '')).length, 0);   // no typed paths: browse
+  assert.match(text(el), /Delete…/);
+  assert.doesNotMatch(text(expand(ed.EnvEditor({ api, env: { ...env, default: true } }))), /Delete…/);
 });
 
-test('None: no folders to change, only an explanation and New environment', () => {
-  const el = expand(ctl.EnvEditor({ api: { callService: async () => ({ json: {} }) }, env: { id: 'none', name: 'None', none: true, folders: [] } }));
-  assert.match(text(el), /None: no folders/);
-  assert.match(text(el), /New environment/);
-  assert.equal(all(el, n => n.props?.['aria-label'] === 'Folder to add').length, 0);
-  assert.doesNotMatch(text(el), /Rename/);
+test('the menu: compact rows that pick, Edit on each but None, New environment; None explains itself', () => {
+  const envs = [{ id: 'none', name: 'None', none: true, folders: [] }, ...ENVS];
+  const pop = all(ctl.EnvMenu({ api: {}, thread: null, envs, value: 'none', onChange() {} }), n => n.props?.label === 'Environment')[0];
+  assert.equal(pop.props.width, ctl.ENV_MENU_W);
+  const kids = expand(pop.props.children.filter(Boolean));
+  assert.deepEqual(all(kids, n => n.props?.role === 'menuitemradio').map(n => text(n).replace(/\d+$/, '')), ['None', 'Default', 'Grants']);
+  assert.deepEqual(all(kids, n => /^Edit /.test(n.props?.['aria-label'] || '')).map(n => n.props['aria-label']), ['Edit Default', 'Edit Grants']);
+  assert.match(text(kids), /New environment/);
+  assert.match(text(kids), /None has no folders/);
 });

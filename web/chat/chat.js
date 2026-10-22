@@ -296,7 +296,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
         settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quotes, setQuotes,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
         controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
-          env: h(EnvMenu, { api, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: loadEnvList }),
+          env: h(EnvMenu, { api, c, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: loadEnvList, confirm,
+            onDeleted: (id, ids) => { setThreads(l => l.filter(x => !ids.includes(x.id))); relist(); if (tid && ids.includes(tid)) go('#/chat');
+              toast(`Deleted the environment${ids.length ? ` and ${ids.length} chat${ids.length === 1 ? '' : 's'}` : ''}`, 'success'); } }),
           mode: h(ModeMenu, { value: thread?.mode || fresh.mode, onChange: setMode, bypass: bypassAllowed(folders, events), judge }),
           model: h(ModelMenu, { models, value: thread?.model || fresh.model || models?.default, onChange: setModel }) }) })),
     h(QuoteReplyBox, { scrollRef, resetKey: dkey, onAdd: q => setQuotes(l => addQuote(l, q)) }));

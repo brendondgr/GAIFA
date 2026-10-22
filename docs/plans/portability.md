@@ -516,7 +516,7 @@ The user builds AIHub on the other machines later, with an agent. The agent foll
     - **When things are missing:** a hub that doesn't answer becomes a line in the report.
     - **Tests:** `test_cli_report.py` (19). A trial on this machine read well.
 
-- [ ] **40.3 The field test, for an agent on another machine.**
+- [x] **40.3 The field test, for an agent on another machine.**
   - **The skill:** `.claude/skills/aihub-field-test/SKILL.md`, plus a "Testing on another machine" section in `AGENTS.md` for other agents:
     1. Record the machine (`aihub hardware`).
     2. Ask the person which mods to try, by default all that are available.
@@ -527,6 +527,11 @@ The user builds AIHub on the other machines later, with an agent. The agent foll
     7. Write `aihub report` and give the person its path.
   - **Docs:** `docs/setup/README.md` (a short section).
   *Done when:* a dry run on this machine (with a mod made to fail on purpose, in a test root) produces a report whose issue names the doc line, the command and a likely cause.
+  - *As built:*
+    - **The skill:** `.claude/skills/aihub-field-test/SKILL.md`, with a copy in `.agents/skills/` (plus the missing copy of `aihub-setup`).
+    - **The docs:** "Testing on another machine" in `CLAUDE.md` and `AGENTS.md` (`AGENTS.md` refreshed from `CLAUDE.md`), and a paragraph in `docs/setup/README.md`.
+    - **The dry run (2026-10-22):** an export of HEAD with a `failtest` mod whose one step runs `nvcc`. `aihub setup --json --yes --smoke failtest` stopped at the failure, then one note was added and `aihub report` written. The report's issue named `services/failtest/setup/env.md:12`, the command, exit 127, its log, and the causes `cuda-toolkit` and `missing-command`. The note carried its command, output and what was tried.
+    - **Fixed from it:** outside a git checkout, the report says so instead of an empty commit.
 
 - [ ] **40.4 The support matrix: `docs/platforms.md`.**
   - It lists, for each OS and accelerator, whether a mod is tested (where and when), CI only, or untested, from the variants' `tested` flags. `aihub docs` generates the table into it.

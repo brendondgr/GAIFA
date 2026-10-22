@@ -83,7 +83,7 @@ def render(data: dict[str, Any]) -> str:
            "names the setup doc line, the command and the files to change.", "",
            "## Summary", "",
            f"- **Machine:** {(m.get('distro') or {}).get('name') or m.get('os')}{' (WSL2)' if m.get('wsl') else ''}, {gpu_names}; accels `{', '.join(m.get('accels') or [])}`",
-           f"- **AIHub:** `{(data.get('aihub') or {}).get('describe')}`" + (f", **{data['aihub']['changed_count']} local change(s)**" if (data.get("aihub") or {}).get("changed_count") else ", no local changes"),
+           f"- **AIHub:** `{(data.get('aihub') or {}).get('describe') or 'not a git checkout'}`" + (f", **{data['aihub']['changed_count']} local change(s)**" if (data.get("aihub") or {}).get("changed_count") else ", no local changes"),
            f"- **Issues:** {len(issues)} ({counts['blocker']} blocker, {counts['major']} major, {counts['minor']} minor)"]
     if result:
         done = result.get("done") or (result.get("report") or {}).get("done") or []
@@ -94,7 +94,7 @@ def render(data: dict[str, Any]) -> str:
     out += [f"  - {i['id']} [{i['severity']}] {i['title']}" for i in issues]
     out += ["", "## Machine", "", *_machine(data.get("machine") or {}), ""]
     g = data.get("aihub") or {}
-    out += ["## AIHub", "", f"- **Commit:** `{g.get('commit')}` on `{g.get('branch')}`: {g.get('describe')}"]
+    out += ["## AIHub", "", (f"- **Commit:** `{g.get('commit')}` on `{g.get('branch')}`: {g.get('describe')}" if g.get("commit") else "- **Commit:** none (not a git checkout)")]
     if g.get("changed"):
         out += [f"- **Local changes** ({g['changed_count']}; the agent's workarounds, if any):", *_code(g["changed"])]
         if g.get("diff"):

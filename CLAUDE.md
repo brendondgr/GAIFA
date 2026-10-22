@@ -33,6 +33,9 @@ Full how-to: [docs/mods.md](docs/mods.md). A mod is done when `aihub check <id>`
 ## Setting up a new machine
 Run `bin/aihub setup`, or follow the `aihub-setup` skill to do it for someone: ask which mods and models they want, show `aihub setup --plan`, run it with their answers, hand them any `sudo` command or prompting step, and confirm every check. Guide: [docs/setup/README.md](docs/setup/README.md); each mod's setup is in `services/<id>/setup/*.md`.
 
+## Testing on another machine
+To find what breaks on a new kind of machine (another GPU, WSL2, macOS), follow the `aihub-field-test` skill: record the machine (`bin/aihub hardware`), ask which mods to try (by default all that are available), show `bin/aihub setup --plan --smoke`, run it with `--smoke`, try each failure's documented fixes for a short while and record every attempt with `bin/aihub report note "…" --setup <id> --cmd … --output <file> --tried …`, run `bin/aihub doctor`, then `bin/aihub report` and give the person its path. Change no tracked file unless asked; a local workaround is kept in the report's `git diff`. The report (`data/state/reports/<date>-<host>.md`) is written for whoever fixes AIHub: each issue names the setup doc line, the command, its log and a likely cause.
+
 ## Rules
 - **Never run `git clean -x` or `git clean -X`.** They delete ignored files, which here means ~190 GB of model weights.
 - Nothing is written outside the project root, except the allowlist in plan Phase 12.4 and folders the user set to Edit or above in the workspace mod (plan Phase 27). The allowlist includes SearXNG's `settings.yml`, its `settings.yml.aihub-<date>` backups (the newest 10) and the temporary `.settings.yml.aihub-new`, written by the `searxng` mod (plan 26.3). The AIHub folder and `data/models/` never go above Read.

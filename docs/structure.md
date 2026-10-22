@@ -16,6 +16,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `.claude/skills/aihub-mod/` | ✅ | Project skill: building or porting a mod (points at `docs/mods.md`, requires `aihub check` to pass) |
 | `.claude/skills/comfy-workflow/` | ✅ | Project skill: making and fixing ComfyUI workflow packs (points at `docs/workflows.md`) |
 | `.claude/skills/aihub-setup/` | ✅ | Project skill: setting AIHub up for someone with `aihub setup` (their mods, models and answers; root commands handed to them; plan 23.13) |
+| `.claude/skills/aihub-field-test/` | ✅ | Project skill: testing AIHub on another machine and writing the field report (`aihub setup --smoke`, `aihub report note`, `aihub report`; plan 40.3) |
 | `AGENTS.md`, `.agents/skills/` | ✅ | The same rules and skills for Codex and other agents that read `AGENTS.md`: copies of `CLAUDE.md` and `.claude/skills/` (refresh them when those change) |
 | `.gitignore` | ✅ | Keeps models, databases, outputs and venvs out of git |
 | `pyproject.toml` | ✅ | Hub dependencies (uv) |

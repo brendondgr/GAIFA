@@ -16,6 +16,8 @@ From a fresh clone, that's the whole process, in this order: choosing mods from 
 
 **Having an agent do it.** An AI agent follows the same process for you: it reads the plan (`bin/aihub setup --plan --json <mods>`), asks you the same questions, passes your answers (`--answers <file>`, or `--accept`, `--decline`, `--models`, `--set`), hands you any `sudo` command and any step that prompts (a login), and reads one JSON report. `bin/aihub setup --help` lists the exit codes and the report's shape; agents in this repo have the `aihub-setup` skill. The rest of this guide is what the wizard reads, for when you want to know what it does or do a step by hand.
 
+**Testing on another machine** (plan 40.3). To find out what breaks on a new kind of machine, run the setup with `--smoke` and keep notes as you go: `aihub report note "what happened" --setup <id> --cmd "<command>" --output <file> --tried "<what you tried>"`. Then `aihub report` writes `data/state/reports/<date>-<host>.md`: the machine (with a recording that replays its detection), the commit and any local changes, the host checks, the setup run with its variants, each failure with the setup doc line, the command, its log and a likely cause, the mods, the doctor. Hand that file to whoever fixes AIHub. Agents in this repo do all of it with the `aihub-field-test` skill.
+
 ## The order
 
 | Step | Doc | Time | Disk |

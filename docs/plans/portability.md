@@ -260,9 +260,14 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **The runtime:** `[containers] runtime` is resolved by `launch_spec` into `AIHUB_CONTAINER_RUNTIME`.
     - **Where the tests live:** `utils/tests/services/test_containers_helper.py` (6), not under `_template/`, so `aihub new` doesn't copy them.
 
-- [ ] **37.5 CI: `.github/workflows/tests.yml`.**
+- [x] **37.5 CI: `.github/workflows/tests.yml`.**
   - `uv run pytest` runs on `ubuntu-latest` and `macos-latest`, with the `linux` and `systemd` tests skipped on macOS. The Node tests use plain `node`.
   *Done when:* the workflow file parses and the suite passes locally with `-m "not linux and not systemd"`; the jobs run on the user's next push.
+  - *As built:*
+    - **Marked `linux`:** two tests that only make sense with `/proc`: a hub child's open sockets, and the real footprint.
+    - **Portable helpers:** `rss_kb` and `_alive` fall back to psutil.
+    - **A long-standing flake fixed on the way:** `test_fake_mods.py` counted `fixtures/mods/__pycache__` (left by some runs) as a mod; folders starting with `_` are skipped now.
+    - **Not run here:** the macOS job itself, until the next push.
 
 - [ ] **37.6 What native Windows would need: `docs/platforms.md` §Windows.**
   - The list from the survey:

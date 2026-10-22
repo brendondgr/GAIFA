@@ -7,6 +7,8 @@ import subprocess
 import sys
 import time
 
+import pytest
+
 from utils import proc
 
 KIB = 1024
@@ -73,6 +75,7 @@ def test_footprint_counts_rss_and_each_drm_client_once(tmp_path):
     assert proc.footprint([10, 12, 99], tmp_path) == total  # overlapping trees and a gone pid count once / not at all
 
 
+@pytest.mark.linux
 def test_real_process_tree_and_footprint():
     child = subprocess.Popen([sys.executable, "-c", "import time; b = bytearray(64 << 20); time.sleep(30)"])
     try:

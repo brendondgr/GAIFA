@@ -20,6 +20,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `.gitignore` | ✅ | Keeps models, databases, outputs and venvs out of git |
 | `pyproject.toml` | ✅ | Hub dependencies (uv) |
 | `uv.lock` | ✅ | Locked hub dependencies; `uv sync` builds `.venv/` (ignored) from it |
+| `.github/workflows/tests.yml` | ✅ | CI (plan 37.5): the hub's suite on Ubuntu (`-m "not systemd"`) and macOS (`-m "not linux and not systemd"`) |
 | `app.py` | ✅ | `python app.py [--port N] [--dev] [--no-autostart] [--demo-mods]` starts the hub on 127.0.0.1 and [::1] |
 | `config.example.toml` | ✅ | The defaults a fresh clone starts from (plan 23.11): copied to `config.toml` on the first `aihub` command or hub start |
 | `config.toml` | local | This machine's settings (architecture §9; gitignored), made from the example; the Settings page edits it |

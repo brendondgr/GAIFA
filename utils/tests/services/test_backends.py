@@ -242,6 +242,13 @@ def _alive(pid: int) -> bool:
     except ProcessLookupError:
         return False
     # A zombie still answers kill(0); count it as dead.
+    if not Path("/proc/self").exists():      # macOS (plan 37.5)
+        import psutil
+
+        try:
+            return psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
+        except psutil.NoSuchProcess:
+            return False
     try:
         return Path(f"/proc/{pid}/stat").read_text().split(")")[-1].split()[0] != "Z"
     except OSError:

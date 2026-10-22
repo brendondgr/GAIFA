@@ -17,13 +17,17 @@ ID_RE = re.compile(r"[a-z][a-z0-9-]{1,31}")
 
 
 def rss_kb(pid: int) -> int:
+    if not Path("/proc/self").exists():      # macOS (plan 37.5)
+        import psutil
+
+        return psutil.Process(pid).memory_info().rss // 1024
     for line in Path(f"/proc/{pid}/status").read_text().splitlines():
         if line.startswith("VmRSS:"):
             return int(line.split()[1])
     return 0
 
 
-@pytest.mark.parametrize("folder", sorted(p.name for p in FAKE_MODS.iterdir() if p.is_dir()))
+@pytest.mark.parametrize("folder", sorted(p.name for p in FAKE_MODS.iterdir() if p.is_dir() and not p.name.startswith("_")))
 def test_manifests_follow_the_contract(folder):
     m = tomllib.loads((FAKE_MODS / folder / "service.toml").read_text())
     assert m["id"] == folder and ID_RE.fullmatch(folder)
@@ -33,7 +37,7 @@ def test_manifests_follow_the_contract(folder):
 
 
 def test_all_four_exist():
-    assert {p.name for p in FAKE_MODS.iterdir() if p.is_dir()} == {"fake-ok", "fake-slow", "fake-crash", "fake-mem", "fake-tools", "fake-perms", "fake-ws"}
+    assert {p.name for p in FAKE_MODS.iterdir() if p.is_dir() and not p.name.startswith("_")} == {"fake-ok", "fake-slow", "fake-crash", "fake-mem", "fake-tools", "fake-perms", "fake-ws"}
 
 
 @pytest.mark.parametrize("name", ["tts", "gen3d", "lcpp", "relay"])

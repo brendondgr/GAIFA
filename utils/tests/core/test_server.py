@@ -137,6 +137,7 @@ def test_app_py_refuses_non_loopback(tmp_path):
     assert "hub.host" in r.stderr and "not loopback" in r.stderr
 
 
+@pytest.mark.linux
 def test_dev_mods_dont_inherit_the_hubs_port(services_dir, hub_process):
     """A child mod must not hold the hub's listening socket: it would keep the port bound after the hub exits."""
     import re

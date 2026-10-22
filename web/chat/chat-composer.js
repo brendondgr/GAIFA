@@ -7,9 +7,9 @@
 // (plan 30.8, chat-webpage.js): a pasted URL offers it, and the attach menu has "Add a web page".
 // Quote-replies (Select → Reply, chat-quote-reply.js) are cards in the box, any number of them, each opening its
 // Reply popup to edit; sending takes them with the message (the text may then be empty).
-// Laid out after Claude Code's (plan 42.2): the text on top, growing upward to 40% of the window (BOX_MAX), and one
-// row inside the box: + on the left (PLUS_ITEMS: upload, attach, tool groups, then the quick actions), the
-// microphone, Stop and Send on the right. No hint line under it; the chat's controls sit there (chat-controls.js).
+// Laid out after Claude Code's (plan 42.2): one line inside the box: + on the left (PLUS_ITEMS: upload, attach, tool
+// groups, then the quick actions), the text between, and the microphone, Stop and Send on the right; the text grows
+// upward to 40% of the window (boxMax) while the buttons stay on its bottom line. No hint line under it; the chat's controls sit there (chat-controls.js).
 
 import { h, T, MONO, Icon, Btn, Popover, label11, COL } from './chat-ui.js';
 import { actionsFor } from './chat-actions.js';
@@ -191,16 +191,12 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
         reading ? h('span', { role: 'status', style: { fontSize: 11.5, color: T.mut } }, `Reading ${reading > 1 ? `${reading} pages` : 'the page'} and screening it…`) : null,
         offer && !reading ? h(WebPageOffer, { url: offer, onAttach: attachPage, onDismiss: () => setOffer(null) }) : null,
         upErr ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, upErr) : null,
-        h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => setDraft(e.target.value), onKeyDown: onKey, 'aria-label': 'Message',
-          onPaste,
-          placeholder: running ? 'Add a message (it’s read after the current step)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
-          style: { width: '100%', minHeight: 22, maxHeight: boxMax(), resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 } },
+        h('div', { style: { display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0 } },   // + · the text · mic, Stop, Send: one line that grows upward
           h('input', { ref: picker, type: 'file', multiple: true, accept: ACCEPT, hidden: true, 'aria-hidden': 'true',
             onChange: e => { upload(e.target.files); e.target.value = ''; } }),
           h('span', { style: { position: 'relative' } },
             h(Btn, { sm: true, icon: 'plus', title: 'Add: upload, attach, tool groups', 'aria-label': 'Add', 'aria-haspopup': 'menu', 'aria-expanded': pop ? 'true' : 'false',
-              onClick: () => setPop(pop ? null : 'plus'), style: { width: 28, height: 28, borderRadius: 7, background: 'transparent', color: T.mut } }),
+              onClick: () => setPop(pop ? null : 'plus'), className: 'aichat-quiet', style: { width: 28, height: 28, borderRadius: 7, background: 'transparent', color: T.mut } }),
             h(Popover, { open: pop === 'plus', onClose: () => setPop(null), place: 'up-left', width: 260, label: 'Add', style: { padding: 4, gap: 0 } },
               PLUS_ITEMS.map(([k, ic, label, hint]) => h('button', { key: k, type: 'button', role: 'menuitem', title: hint, disabled: disabled && k === 'upload',
                 onClick: () => { if (k === 'upload') { setPop(null); picker.current?.click(); } else setPop(k === 'attach' ? 'att' : 'tools'); }, style: menuSt },
@@ -210,9 +206,12 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
                 h(Icon, { d: a.icon || 'wand', size: 13 }), a.label))),
             h(Popover, { open: pop === 'att', onClose: () => setPop(null), place: 'up-left', width: 340, label: 'Attach outputs' }, h(AttachPicker, { api, outputs, chosen: attachments, onToggle: toggleAtt, onReadPage: api.readWebPage ? url => { setPop(null); attachPage(url); } : null })),
             h(Popover, { open: pop === 'tools', onClose: () => setPop(null), place: 'up-left', width: 330, label: 'Tool groups' }, h(ToolGroups, { index, settings, onChange: onSettings }))),
-          h('span', { style: { flex: 1 } }),
+          h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => setDraft(e.target.value), onKeyDown: onKey, 'aria-label': 'Message',
+            onPaste,
+            placeholder: running ? 'Add a message (it’s read after the current step)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
+            style: { flex: 1, minWidth: 0, alignSelf: 'center', minHeight: 22, maxHeight: boxMax(), resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
           h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
-          running ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: onStop, title: 'Stop the turn (and its running tool)' }) : null,
+          running ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: onStop, title: 'Stop the turn (and its running tool)', className: 'aichat-quiet', style: { background: 'transparent' } }) : null,
           h(Btn, { kind: 'pri', sm: true, icon: 'send', title: running ? 'Queue this message' : 'Send (Enter)', disabled: !can, onClick: send,
             style: { width: 30, height: 28, padding: 0, justifyContent: 'center', borderRadius: 7 } }))),
       controls || null));

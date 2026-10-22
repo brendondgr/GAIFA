@@ -3132,7 +3132,7 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
   - **Show more:** a full-width divider, a line on each side of "Show more · N" centred, in sections and in the flat list.
   *Done when:* `utils/tests/web/chat-groups.test.mjs` (the header's two rows, no By meaning, the row's time and ⋯ in one slot, the divider with its count).
 - [x] **42.2 The message box: `web/chat/chat-composer.js`.**
-  - **One box:** the text on top, then one row inside the box: **+** on the left (a menu: Upload files, Attach an output or a web page, Tool groups, the quick actions), and on the right the microphone, Stop while a turn runs, and Send. The hint line under the box ("Enter sends · …") goes.
+  - **One box, one line:** **+** on the left (a menu: Upload files, Attach an output or a web page, Tool groups, the quick actions), the text between, and on the right the microphone, Stop while a turn runs, and Send (the user's correction: first built with the text above the row). Buttons show no outline until hovered or open. The hint line under the box ("Enter sends · …") goes.
   - **Growing:** as described above.
   *Done when:* `utils/tests/web/chat-composer-layout.test.mjs` (the + menu's items, the right side's buttons, no hint line, the height cap), and the existing composer tests pass.
 - [ ] **42.3 The controls under the box: `web/chat/chat-controls.js` (new), `chat-header.js`, `chat.js`.**

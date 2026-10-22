@@ -53,6 +53,7 @@ export const LIST_CSS = `
 .aichat-sechead .aichat-more{opacity:0}.aichat-sechead:hover .aichat-more,.aichat-sechead:focus-within .aichat-more,.aichat-sechead .aichat-more[aria-expanded="true"]{opacity:1}
 .aichat-morebar:hover{color:var(--tx,#E6EAF2)!important}
 .aichat-newbar:hover{background:var(--hov,#161C28)!important}
+.aichat-quiet{border-color:transparent!important}.aichat-quiet:hover,.aichat-quiet:focus-visible,.aichat-quiet[aria-expanded="true"]{border-color:var(--bds,#2A3547)!important;color:var(--tx,#E6EAF2)!important}
 @media (hover:none){.aichat-item .aichat-more{display:grid}.aichat-item .aichat-ago{display:none}.aichat-sechead .aichat-more{opacity:1}}
 `;
 

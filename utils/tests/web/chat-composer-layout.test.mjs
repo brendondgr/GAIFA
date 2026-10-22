@@ -1,5 +1,5 @@
-// Plan 42.2: the message box after Claude Code's: + on the left (upload, attach, tool groups, the quick actions),
-// the microphone, Stop and Send on the right, no hint line, the text growing to 40% of the window, and the
+// Plan 42.2: the message box after Claude Code's: one line of + (upload, attach, tool groups, the quick actions),
+// the text, then the microphone, Stop and Send, no hint line, the text growing to 40% of the window, and the
 // controls row under the box.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,15 +40,18 @@ test('the + menu: upload, attach, tool groups, then the quick actions', () => {
   assert.equal(all(tree, n => n.props?.label === 'Tool groups').length, 1);
 });
 
-test('the right side: the microphone, Stop while a turn runs, then Send; no hint line', () => {
+test('one line: + · the text · the microphone, Stop while a turn runs, Send; no hint line', () => {
   const idle = box({ draft: 'hi' });
   assert.doesNotMatch(text(idle), /Enter sends/);
-  const row = all(idle, n => n.type === 'div' && all(n, x => x.props?.['aria-label'] === 'Add').length && all(n, x => /^Send/.test(x.props?.title || '')).length)
-    .filter(n => n.props.style?.display === 'flex' && n.props.style?.alignItems === 'center').pop();
-  const kids = row.props.children.filter(Boolean);
-  const titles = kids.map(k => k.props?.title || (typeof k.type === 'function' ? k.type.name : k.type));
-  assert.ok(titles.indexOf('MicButton') > titles.findIndex(t => t === 'span'), 'the mic after the spacer');
-  assert.match(titles[titles.length - 1], /^Send/);
+  const row = all(idle, n => n.type === 'div' && n.props.style?.alignItems === 'flex-end')
+    .find(n => n.props.children.some(k => k?.type === 'textarea'));
+  assert.ok(row, 'the text sits in the buttons\' row');
+  const kinds = row.props.children.filter(Boolean).map(k => k.props?.title || (typeof k.type === 'function' ? k.type.name : k.type))
+    .filter(k => k !== 'input');                                    // the hidden file picker
+  assert.equal(kinds[0], 'span');                                   // + and its menus
+  assert.equal(kinds[1], 'textarea');
+  assert.equal(kinds[2], 'MicButton');
+  assert.match(kinds[kinds.length - 1], /^Send/);
   const busy = box({ draft: 'hi', running: true });
   assert.ok(all(busy, n => n.props?.title === 'Stop the turn (and its running tool)').length === 1);
   assert.ok(all(busy, n => n.props?.title === 'Queue this message').length === 1);

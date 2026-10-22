@@ -440,12 +440,20 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
     - **The setup doc:** rocm (tested), cuda, then cpu (tested on Linux). The CUDA and CPU variants don't need `curl` and `unzip`.
     - **Tests:** `services/stt/tests/test_accel.py` (3). stt's 82 pass, and its live check passes here.
 
-- [ ] **39.6 comfy: a native ComfyUI next to the toolbox.**
+- [x] **39.6 comfy: a native ComfyUI next to the toolbox.**
   - **The native install:** `bin/comfyui` gains a native mode: a venv in `services/comfy/runtime/ComfyUI/` at a pinned commit, with torch per accel (`cuda`, `xpu`, `mps`, `cpu`).
   - **This machine:** the `rocm` variant is today's toolbox, unchanged.
   - **The workarounds:** the gfx1151 ones apply only when `AIHUB_GPU_ARCH = gfx1151`.
   - **Packs:** they gain an optional `requires`.
   *Done when:* comfy's tests cover the launch per mode, and `requires` filtering.
+  - *As built:*
+    - **Native mode is its own script:** `bin/comfyui-native` (install, start, stop, quit, restart, status, logs, command) rather than a mode inside `bin/comfyui`. `bin/comfyui` dispatches to it unless the variant is ROCm on gfx1151, or `AIHUB_ACCEL` is unset as on this machine, and `bin/comfyui runtime` prints the choice.
+    - **What the native install makes:** ComfyUI at the toolbox's commit (0.37.0), and `runtime/venv` (gitignored) with PyTorch from the variant's index, ComfyUI-Manager, `gguf` and the custom nodes' requirements.
+    - **The gfx1151 workarounds:** the launch flags `--disable-mmap` and `--fp32-vae` stay with the toolbox. AIHub's nodes need no gating: their Qwen-VL matmul is exact on every GPU.
+    - **Packs:** `requires` in `workflow.toml` keeps a pack off the agent's tools where the comfy variant isn't listed.
+    - **The setup doc:** rocm (the toolbox, tested); cuda, xpu, mps and cpu run natively with their own steps (the adapter, the optional custom nodes, `bin/comfyui-native install`).
+    - **Tests:** `services/comfy/tests/test_runtime.py` (3), and a `requires` test in `test_tools.py`; comfy's 153 pass. The restarted adapter passes `aihub check comfy`.
+    - **Seen on the way, not changed:** `comfyui workflows check --all` fails two packs whose models aren't on this machine (`ae.safetensors`, `z_image_turbo_bf16.safetensors`).
 
 - [ ] **39.7 gen3d: a CUDA path for the workers.** A `cuda` variant runs the workers in a pinned PyTorch CUDA image, with real spconv, gsplat and kaolin instead of the shims. The workers take `AIHUB_DEVICE`; the ROCm environment is set only for `rocm`; the container flags come from 37.4's helper.
   *Done when:* gen3d's tests cover the worker command per accel.

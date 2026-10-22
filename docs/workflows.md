@@ -50,6 +50,7 @@ good_for = "photoreal pictures, quickly"      # one phrase: the agent and the ca
 # edit = "instruction"               # image-edit packs only: instruction | restyle | inpaint | refine (§3.1)
 tags = ["photo", "fast"]
 # agent = false                      # keep it off the agent's tools (it still runs from the page and API)
+# requires = ["cuda"]                 # plan 39.6: the accelerators it runs on (a CUDA-only custom node); empty: any
 # memory_gb = 18                     # set only to override: each run measures its peak
 
 [inputs.prompt]                      # a shared name (§4) when one fits
@@ -87,7 +88,8 @@ megapixels = 0.6
 - **Types, defaults, ranges and choices come from ComfyUI's node list** and the graph's current values. An input only needs to state what differs.
 - **Input fields:** `node` or `title`, `field`, `label`, `description`, `type` (`string`, `integer`, `number`, `boolean`, `file`, `files`), `default`, `min`, `max`, `step`, `choices`, `multiline`, `required`, `hidden` (mapped, but not shown or offered to the agent), `also`, and `template`. A `template` applies to string inputs: a value the caller gives of up to 8 words, not naming `<image…>`, fills its `{}`. For example, the remove-background packs turn "the storefront" into their whole instruction; longer text and the graph's own default are used as they are.
 - **Node ids inside subgraphs** are `outer:inner`, for example `"12:5"`.
-- **Pack fields:** `name`, `task`, `description`, `edit`, `good_for`, `speed`, `tags` (shown on the page only), `memory_gb`, `agent`, `inputs`, `outputs`, `presets` (input values plus `label` and `quality`), `set`.
+- **Pack fields:** `name`, `task`, `description`, `edit`, `good_for`, `speed`, `tags` (shown on the page only), `memory_gb`, `agent`, `requires`, `inputs`, `outputs`, `presets` (input values plus `label` and `quality`), `set`.
+- **`requires`** (plan 39.6) lists the accelerators a pack runs on (`rocm`, `cuda`, `xpu`, `mps`, `vulkan`, `cpu`): on a machine whose comfy variant isn't in it, the agent's tools don't offer it. Leave it out when the pack's nodes run anywhere.
 - **`agent = false`** keeps a pack off the agent's tools (task tools, `list_workflows`, `run_workflow`); it stays on the page and the API. The Qwen-Image 2.1 base packs use it, so the agent always gets Turbo.
 - **Unknown keys are errors**, so a typo is reported rather than ignored.
 - **Saving the form on the review screen rewrites `workflow.toml` without comments.** To keep comments, use "Edit as TOML" or edit the file directly.

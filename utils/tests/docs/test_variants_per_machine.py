@@ -20,7 +20,7 @@ EXPECTED: dict[str, dict[str, str]] = {
              "wsl2-nvidia": "cuda", "wsl2-intel": "cpu", "macos-m3": "mps", "linux-cpu": "cpu"},
     **{m: {k: "cpu" for k in MACHINES} for m in ("agent", "relay", "web", "searxng", "opencode", "workspace")},
     **{m: {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "linux-intel-arc": "xpu",
-           "wsl2-nvidia": "cuda", "wsl2-intel": "xpu", "macos-m3": "mps", "linux-cpu": "cpu"} for m in ("embed", "decide", "tts-kokoro")},
+           "wsl2-nvidia": "cuda", "wsl2-intel": "xpu", "macos-m3": "mps", "linux-cpu": "cpu"} for m in ("embed", "decide", "tts-kokoro", "comfyui")},
     "stt": {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "linux-intel-arc": "cpu",
             "wsl2-nvidia": "cuda", "wsl2-intel": "cpu", "macos-m3": "cpu", "linux-cpu": "cpu"},
     "tts-breeze": {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "linux-intel-arc": "cpu",

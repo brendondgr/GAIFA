@@ -12,6 +12,11 @@
 #   comfyui shell      drop into the toolbox  (toolbox enter)
 #   comfyui update     pull a newer toolbox image and recreate the container
 #   comfyui workflows  workflow packs: list, show, check, new, copy, run (comfyui workflows -h)
+#   comfyui runtime    which runtime this machine uses: toolbox or native
+#
+# Other machines (plan 39.6): unless the variant is ROCm on gfx1151 (AIHUB_ACCEL, AIHUB_GPU_ARCH; unset means
+# this machine), start, stop, quit, restart, status, logs and install go to bin/comfyui-native: ComfyUI in a
+# venv inside the mod. COMFY_RUNTIME=toolbox|native picks one by hand.
 #
 # Runtime: kyuz0/amd-strix-halo-comfyui (ROCm nightly + PyTorch, gfx1151-tuned, AOTriton).
 # ComfyUI lives at /opt/ComfyUI inside the container. Everything else is in this mod's
@@ -26,6 +31,18 @@ set -euo pipefail
 
 MOD="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 ROOT="$(cd "$MOD/../.." && pwd)"
+
+runtime() {
+  if [ -n "${COMFY_RUNTIME:-}" ]; then echo "$COMFY_RUNTIME"; return; fi
+  if [ -z "${AIHUB_ACCEL:-}" ] || { [ "$AIHUB_ACCEL" = rocm ] && [ "${AIHUB_GPU_ARCH:-gfx1151}" = gfx1151 ]; }; then echo toolbox; else echo native; fi
+}
+case "${1:-}" in
+  runtime) runtime; exit 0 ;;
+  start|stop|quit|restart|status|logs|install)
+    [ "$(runtime)" = native ] && exec "$MOD/bin/comfyui-native" "$@" ;;
+  shell|update)
+    [ "$(runtime)" = native ] && { echo "[comfyui] $1 is for the toolbox; this machine runs ComfyUI natively (bin/comfyui-native)"; exit 1; } ;;
+esac
 
 TOOLBOX="${COMFY_TOOLBOX:-strix-halo-comfyui}"
 IMAGE="docker.io/kyuz0/amd-strix-halo-comfyui:latest"

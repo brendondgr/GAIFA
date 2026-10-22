@@ -88,6 +88,7 @@ class Manifest(_Strict):
     tags: list[str] = []
     memory_gb: float | None = Field(None, ge=0)
     agent: bool = True                  # false: the page and API run it, the agent's tools don't offer it
+    requires: list[Literal["rocm", "cuda", "xpu", "mps", "vulkan", "cpu"]] = []   # plan 39.6: the accels it runs on (empty: any)
     inputs: dict[str, InputMap] = {}
     outputs: dict[str, OutputMap] = {}
     presets: dict[str, dict[str, Any]] = {}

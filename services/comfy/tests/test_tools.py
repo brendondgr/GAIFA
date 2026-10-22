@@ -201,3 +201,17 @@ def test_a_pack_of_another_task_names_its_tool(env):  # noqa: F811
     time.sleep(0.05)
     r = c.post("/v1/tools/generate_image/call", json={"arguments": {"prompt": "x", "workflow": "ed-words"}})
     assert r.status_code == 422 and "is an image-edit workflow, not text-to-image: call edit_image" in r.json()["detail"]
+
+
+def test_a_pack_that_needs_another_accel_isnt_offered(env, monkeypatch):  # noqa: F811
+    """39.6: `requires` in workflow.toml against the mod's variant (AIHUB_ACCEL)."""
+    c, fake, hub, s = env
+    toml = s.workflows / "zimage" / "workflow.toml"
+    toml.write_text(toml.read_text().replace("[inputs", 'requires = ["cuda"]\n\n[inputs', 1))
+    time.sleep(0.05)
+    monkeypatch.setenv("AIHUB_ACCEL", "rocm")
+    assert "generate_image" not in names(c)                                     # its only pack runs on CUDA
+    monkeypatch.setenv("AIHUB_ACCEL", "cuda")
+    assert names(c)["generate_image"]["function"]["parameters"]["properties"]["workflow"]["enum"] == ["zimage"]
+    monkeypatch.delenv("AIHUB_ACCEL")
+    assert "generate_image" in names(c)                                         # no variant recorded: anything runs

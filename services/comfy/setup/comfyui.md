@@ -62,6 +62,84 @@ size_gb = 12.65
 good_for = "picture to 3D: the trellis2-* packs, which are also 3D Generate's trellis2 engine; needs ComfyUI newer than the image's 0.22"
 licence = "MIT (TRELLIS.2); DINOv3 Licence (the image encoder)"
 next = "TRELLIS.2 (and SAM 3D Body) need ComfyUI 0.37.0, newer than the image's 0.22.0: after the first services/comfy/bin/comfyui start has made the toolbox, update ComfyUI inside it to commit 93810483a473 with the two commands in services/comfy/setup/comfyui.md (Install, Updating ComfyUI in the toolbox), then check the packs with services/comfy/bin/comfyui workflows check trellis2-shape sam3d-body"
+
+[[variants]]                    # plan 39.6: kyuz0's gfx1151 toolbox (the block's steps)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]                    # ComfyUI in a venv (bin/comfyui-native)
+accel = "cuda"
+os = ["linux", "wsl"]
+needs = ["git", "uv", "python3"]
+check = "aihub check comfy --start"
+steps = [
+  { run = "aihub install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
+  { run = '''
+clone() { [ -d "custom_nodes/$1/.git" ] || git clone "$2" "custom_nodes/$1"; git -C "custom_nodes/$1" checkout --quiet "$3"; }
+clone ComfyUI-GGUF https://github.com/leejet/ComfyUI-GGUF edd981b10e107d3b8f58e16c498f2d08f631bc47
+clone ComfyUI-KJNodes https://github.com/kijai/ComfyUI-KJNodes.git 7f43f2ce910a27971bdbbf3fb5a52081457f32e2
+clone ComfyUI-VideoHelperSuite https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git 4ee72c065db22c9d96c2427954dc69e7b908444b
+clone ComfyUI-WanVideoWrapper https://github.com/kijai/ComfyUI-WanVideoWrapper.git 088128b224242e110d3906c6750e9a3a348a659b
+clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127c29d5d8135ac1536ecbd4c383
+''', what = "clones the five custom nodes into custom_nodes/ at the pinned commits (about 85 MB); optional", ask = "Custom nodes are third-party code that runs inside ComfyUI. Clone ComfyUI-GGUF, KJNodes, VideoHelperSuite, WanVideoWrapper and rgthree at the pinned commits? A no skips only the nodes, not ComfyUI: then the qwen21-* packs (ComfyUI-GGUF; the Turbo ones also KJNodes) and the scail2-* video packs (VideoHelperSuite) won't run; packs with core nodes only, such as trellis2-* and sam3d-body, still do.", optional = true },
+  { run = "bin/comfyui-native install", what = "clones ComfyUI 0.37.0 (the commit the toolbox runs) into runtime/ComfyUI and makes runtime/venv with PyTorch for this machine's variant, ComfyUI's requirements, ComfyUI-Manager, gguf and the custom nodes' requirements (2 to 6 GB, 5 to 15 min)" },
+]
+
+[[variants]]                    # ComfyUI in a venv (bin/comfyui-native)
+accel = "xpu"
+os = ["linux", "wsl"]
+needs = ["git", "uv", "python3"]
+check = "aihub check comfy --start"
+steps = [
+  { run = "aihub install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
+  { run = '''
+clone() { [ -d "custom_nodes/$1/.git" ] || git clone "$2" "custom_nodes/$1"; git -C "custom_nodes/$1" checkout --quiet "$3"; }
+clone ComfyUI-GGUF https://github.com/leejet/ComfyUI-GGUF edd981b10e107d3b8f58e16c498f2d08f631bc47
+clone ComfyUI-KJNodes https://github.com/kijai/ComfyUI-KJNodes.git 7f43f2ce910a27971bdbbf3fb5a52081457f32e2
+clone ComfyUI-VideoHelperSuite https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git 4ee72c065db22c9d96c2427954dc69e7b908444b
+clone ComfyUI-WanVideoWrapper https://github.com/kijai/ComfyUI-WanVideoWrapper.git 088128b224242e110d3906c6750e9a3a348a659b
+clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127c29d5d8135ac1536ecbd4c383
+''', what = "clones the five custom nodes into custom_nodes/ at the pinned commits (about 85 MB); optional", ask = "Custom nodes are third-party code that runs inside ComfyUI. Clone ComfyUI-GGUF, KJNodes, VideoHelperSuite, WanVideoWrapper and rgthree at the pinned commits? A no skips only the nodes, not ComfyUI: then the qwen21-* packs (ComfyUI-GGUF; the Turbo ones also KJNodes) and the scail2-* video packs (VideoHelperSuite) won't run; packs with core nodes only, such as trellis2-* and sam3d-body, still do.", optional = true },
+  { run = "bin/comfyui-native install", what = "clones ComfyUI 0.37.0 (the commit the toolbox runs) into runtime/ComfyUI and makes runtime/venv with PyTorch for this machine's variant, ComfyUI's requirements, ComfyUI-Manager, gguf and the custom nodes' requirements (2 to 6 GB, 5 to 15 min)" },
+]
+
+[[variants]]                    # ComfyUI in a venv (bin/comfyui-native)
+accel = "mps"
+os = ["darwin"]
+needs = ["git", "uv", "python3"]
+check = "aihub check comfy --start"
+steps = [
+  { run = "aihub install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
+  { run = '''
+clone() { [ -d "custom_nodes/$1/.git" ] || git clone "$2" "custom_nodes/$1"; git -C "custom_nodes/$1" checkout --quiet "$3"; }
+clone ComfyUI-GGUF https://github.com/leejet/ComfyUI-GGUF edd981b10e107d3b8f58e16c498f2d08f631bc47
+clone ComfyUI-KJNodes https://github.com/kijai/ComfyUI-KJNodes.git 7f43f2ce910a27971bdbbf3fb5a52081457f32e2
+clone ComfyUI-VideoHelperSuite https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git 4ee72c065db22c9d96c2427954dc69e7b908444b
+clone ComfyUI-WanVideoWrapper https://github.com/kijai/ComfyUI-WanVideoWrapper.git 088128b224242e110d3906c6750e9a3a348a659b
+clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127c29d5d8135ac1536ecbd4c383
+''', what = "clones the five custom nodes into custom_nodes/ at the pinned commits (about 85 MB); optional", ask = "Custom nodes are third-party code that runs inside ComfyUI. Clone ComfyUI-GGUF, KJNodes, VideoHelperSuite, WanVideoWrapper and rgthree at the pinned commits? A no skips only the nodes, not ComfyUI: then the qwen21-* packs (ComfyUI-GGUF; the Turbo ones also KJNodes) and the scail2-* video packs (VideoHelperSuite) won't run; packs with core nodes only, such as trellis2-* and sam3d-body, still do.", optional = true },
+  { run = "bin/comfyui-native install", what = "clones ComfyUI 0.37.0 (the commit the toolbox runs) into runtime/ComfyUI and makes runtime/venv with PyTorch for this machine's variant, ComfyUI's requirements, ComfyUI-Manager, gguf and the custom nodes' requirements (2 to 6 GB, 5 to 15 min)" },
+]
+
+[[variants]]                    # ComfyUI in a venv (bin/comfyui-native)
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+needs = ["git", "uv", "python3"]
+check = "aihub check comfy --start"
+note = "very slow for images and video"
+steps = [
+  { run = "aihub install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
+  { run = '''
+clone() { [ -d "custom_nodes/$1/.git" ] || git clone "$2" "custom_nodes/$1"; git -C "custom_nodes/$1" checkout --quiet "$3"; }
+clone ComfyUI-GGUF https://github.com/leejet/ComfyUI-GGUF edd981b10e107d3b8f58e16c498f2d08f631bc47
+clone ComfyUI-KJNodes https://github.com/kijai/ComfyUI-KJNodes.git 7f43f2ce910a27971bdbbf3fb5a52081457f32e2
+clone ComfyUI-VideoHelperSuite https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git 4ee72c065db22c9d96c2427954dc69e7b908444b
+clone ComfyUI-WanVideoWrapper https://github.com/kijai/ComfyUI-WanVideoWrapper.git 088128b224242e110d3906c6750e9a3a348a659b
+clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127c29d5d8135ac1536ecbd4c383
+''', what = "clones the five custom nodes into custom_nodes/ at the pinned commits (about 85 MB); optional", ask = "Custom nodes are third-party code that runs inside ComfyUI. Clone ComfyUI-GGUF, KJNodes, VideoHelperSuite, WanVideoWrapper and rgthree at the pinned commits? A no skips only the nodes, not ComfyUI: then the qwen21-* packs (ComfyUI-GGUF; the Turbo ones also KJNodes) and the scail2-* video packs (VideoHelperSuite) won't run; packs with core nodes only, such as trellis2-* and sam3d-body, still do.", optional = true },
+  { run = "bin/comfyui-native install", what = "clones ComfyUI 0.37.0 (the commit the toolbox runs) into runtime/ComfyUI and makes runtime/venv with PyTorch for this machine's variant, ComfyUI's requirements, ComfyUI-Manager, gguf and the custom nodes' requirements (2 to 6 GB, 5 to 15 min)" },
+]
 -->
 
 # ComfyUI: setup
@@ -149,6 +227,12 @@ toolbox run -c strix-halo-comfyui bash -lc "for r in '$PWD'/custom_nodes/*/requi
 ```
 
 `/opt/venv` is the image's venv (`VIRTUAL_ENV`, first on its `PATH`), the one `bin/comfyui` launches ComfyUI with; the host's `$PWD` is the same path inside, since the toolbox shares your home. Then `bin/comfyui start` and `bin/comfyui workflows check trellis2-shape sam3d-body`. These commands weren't run for this doc (this machine's container was updated on 2026-09-24, with ComfyUI-Manager).
+
+### On other machines (plan 39.6)
+
+Only gfx1151 runs the toolbox above. On any other machine, `aihub setup comfy` picks the native variant: `bin/comfyui-native install` clones ComfyUI at the same commit (0.37.0) into `runtime/ComfyUI` and makes `runtime/venv`, with PyTorch for the machine's accelerator (CUDA, another AMD GPU's ROCm family, Intel's xpu, Apple's mps, or the CPU, from `scripts/torch_index.py`), ComfyUI's requirements, ComfyUI-Manager, `gguf` and the custom nodes' requirements. `bin/comfyui` then hands `start`, `stop`, `quit`, `status` and `logs` to it (`bin/comfyui runtime` says which runtime a machine uses; `COMFY_RUNTIME=native|toolbox` picks one by hand).
+
+The models, outputs, custom nodes, user folder and log stay where they are. The gfx1151 launch flags (`--disable-mmap`, `--fp32-vae`) and the toolbox's workarounds stay with the toolbox; AIHub's own nodes (`nodes/aihub_nodes`) are exact on every GPU. A pack whose nodes need one accelerator says so with `requires` in its `workflow.toml` (docs/workflows.md), and the agent isn't offered it elsewhere. The native variants are untested until a field test reports on them.
 
 ## Choosing models
 

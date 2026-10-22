@@ -10,6 +10,7 @@ route (`GET /v1/jobs/{id}?wait=`) gives its outputs.
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -41,11 +42,19 @@ def _fn(name: str, description: str, parameters: dict, job: bool = True, risk: s
     return out
 
 
+def runs_here(p) -> bool:
+    """A pack's `requires` (plan 39.6) against this mod's variant (AIHUB_ACCEL; unset: anything runs)."""
+    accel = os.environ.get("AIHUB_ACCEL")
+    return not (accel and p.manifest and p.manifest.requires and accel not in p.manifest.requires)
+
+
 def ready_by_task(lib: Library) -> dict[str, list]:
-    """The ready packs the agent may use, by task."""
+    """The ready packs the agent may use, by task: not the ones this machine's variant can't run."""
     out: dict[str, list] = {}
     for p in lib.packs.packs():
         if p.manifest and not p.manifest.agent:
+            continue
+        if not runs_here(p):
             continue
         _, issues = lib.analysed(p)
         if lib.state(p, issues) == "ready" and not (p.task == "image-edit" and p.manifest.edit is None):

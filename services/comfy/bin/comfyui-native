@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# comfyui-native — ComfyUI in a venv inside this mod (plan 39.6), for every machine but gfx1151, which runs
+# the kyuz0 toolbox (bin/comfyui). bin/comfyui hands its start, stop and status here when the variant
+# (AIHUB_ACCEL) isn't ROCm on gfx1151, or when COMFY_RUNTIME=native.
+#
+#   comfyui-native install    clone ComfyUI at the pinned commit into runtime/ComfyUI, make runtime/venv with
+#                             PyTorch for AIHUB_ACCEL (scripts/torch_index.py), ComfyUI's requirements,
+#                             ComfyUI-Manager, gguf, and the custom nodes' requirements
+#   comfyui-native start | stop | quit | restart | status | logs [N|-f]
+#   comfyui-native command    print the launch command (for tests and the curious)
+#
+# The same folders as the toolbox: models, outputs, custom_nodes, input, user, the log and pid in data/.
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+MOD="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+ROOT="$(cd "$MOD/../.." && pwd)"
+COMMIT=93810483a4739a1588236919a3128d3070244146     # ComfyUI 0.37.0: what the toolbox runs (setup/comfyui.md, Tested with)
+REPO=https://github.com/comfyanonymous/ComfyUI
+PORT="${COMFY_PORT_UI:-8199}"
+MODELS="${COMFY_MODELS:-$ROOT/data/models/comfyui}"
+OUTPUTS="${COMFY_OUTPUTS:-$ROOT/outputs/comfy}"
+DATA="${COMFY_DATA:-$MOD/data}"
+ACCEL="${AIHUB_ACCEL:-cpu}"
+SRC="$MOD/runtime/ComfyUI"
+VENV="$MOD/runtime/venv"
+PY="$VENV/bin/python"
+URL="http://127.0.0.1:${PORT}"
+YAML="$MOD/extra_model_paths.yaml"
+LOG="$DATA/comfyui.log"
+PIDFILE="$DATA/comfyui-native.pid"
+
+launch() {   # the command line, one word per line
+  local extra=()
+  [ "$ACCEL" = cpu ] && extra=(--cpu)
+  printf '%s\n' "$PY" main.py --listen 127.0.0.1 --port "$PORT" --extra-model-paths-config "$YAML" \
+    --output-directory "$OUTPUTS" --input-directory "$MOD/input" --user-directory "$MOD/user" \
+    --database-url "sqlite:///$MOD/user/comfyui.db" --enable-manager "${extra[@]}"
+}
+
+web_up()      { curl -fsS --max-time 2 "$URL/system_stats" >/dev/null 2>&1; }
+comfy_pid()   { cat "$PIDFILE" 2>/dev/null; }
+comfy_alive() { local p; p="$(comfy_pid)"; [ -n "$p" ] && kill -0 "$p" 2>/dev/null; }
+pipi()        { uv pip install --quiet --python "$PY" "$@"; }
+
+wait_for_ui() {
+  echo -n "[comfyui] Waiting for the web UI"
+  for _ in $(seq 1 150); do
+    if web_up; then echo ""; echo "[comfyui] UP  ->  $URL"; return 0; fi
+    if [ -s "$PIDFILE" ] && ! comfy_alive; then
+      echo ""; echo "[comfyui] ComfyUI process exited. Recent log:"; tail -n 40 "$LOG" 2>/dev/null; return 1
+    fi
+    echo -n "."; sleep 2
+  done
+  echo ""; echo "[comfyui] Not answering yet — check: comfyui logs"; return 1
+}
+
+stop_comfy() {
+  local pid; pid="$(comfy_pid)"
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    kill "$pid" 2>/dev/null || true
+    for _ in $(seq 1 30); do kill -0 "$pid" 2>/dev/null || break; sleep 0.5; done
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+  rm -f "$PIDFILE"
+}
+
+case "${1:-}" in
+  install)
+    for cmd in git uv python3; do command -v "$cmd" >/dev/null || { echo "comfyui-native: needs $cmd" >&2; exit 1; }; done
+    mkdir -p "$MOD/runtime"
+    [ -d "$SRC/.git" ] || git clone --quiet "$REPO" "$SRC"
+    git -C "$SRC" checkout --quiet "$COMMIT" 2>/dev/null || { git -C "$SRC" fetch --quiet origin; git -C "$SRC" checkout --quiet "$COMMIT"; }
+    uv venv --quiet --allow-existing --python 3.12 --python-preference only-managed "$VENV"
+    INDEX="$(python3 "$MOD/scripts/torch_index.py" "$ACCEL")"
+    echo "[comfyui] PyTorch for $ACCEL from $INDEX"
+    TORCH=(--index-url "$INDEX" --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match)
+    pipi "${TORCH[@]}" torch torchvision torchaudio
+    pipi "${TORCH[@]}" -r "$SRC/requirements.txt"          # the same index, so torch stays the variant's
+    pipi gguf
+    pipi --pre comfyui_manager
+    for req in "$MOD"/custom_nodes/*/requirements.txt; do
+      [ -f "$req" ] && { echo "[comfyui] $(basename "$(dirname "$req")")'s requirements"; pipi "${TORCH[@]}" -r "$req" || echo "[comfyui] ! $req failed: that node's packs won't run"; }
+    done
+    echo "[comfyui] installed ComfyUI $(git -C "$SRC" rev-parse --short HEAD) for $ACCEL in runtime/"
+    ;;
+  start)
+    mkdir -p "$DATA" "$OUTPUTS" "$MOD/input" "$MOD/user/default" "$MOD/custom_nodes" "$MOD/workflows"
+    if web_up; then echo "[comfyui] Already running -> $URL"; exit 0; fi
+    [ -x "$PY" ] && [ -f "$SRC/main.py" ] || { echo "[comfyui] not installed: bin/comfyui-native install (aihub setup comfy does it)"; exit 1; }
+    if comfy_alive; then wait_for_ui; exit $?; fi
+    : > "$LOG"; rm -f "$PIDFILE"
+    echo "[comfyui] Launching ComfyUI ($ACCEL, models: $MODELS) ..."
+    mapfile -t CMD < <(launch)
+    (cd "$SRC" && COMFY_MODELS="$MODELS" COMFY_MOD="$MOD" nohup "${CMD[@]}" >> "$LOG" 2>&1 & echo $! > "$PIDFILE")
+    wait_for_ui
+    ;;
+  stop|quit)
+    echo "[comfyui] Stopping ComfyUI ..."; stop_comfy; echo "[comfyui] Stopped."
+    ;;
+  restart)
+    "$0" stop || true
+    "$0" start
+    ;;
+  status)
+    echo "Runtime: native ($ACCEL)"
+    echo "Mod    : $MOD"
+    echo "Models : $MODELS"
+    echo "Outputs: $OUTPUTS"
+    if comfy_alive; then echo "ComfyUI: process up (pid $(comfy_pid))"; else echo "ComfyUI: not running"; fi
+    if web_up; then echo "Web UI : UP  ->  $URL"; else echo "Web UI : not responding"; fi
+    ;;
+  logs)
+    [ -f "$LOG" ] || { echo "[comfyui] No log yet at $LOG (start it first)."; exit 1; }
+    if [ "${2:-}" = "-f" ] || [ -z "${2:-}" ]; then tail -n 200 -f "$LOG"; else tail -n "$2" "$LOG"; fi
+    ;;
+  command)
+    launch | tr '\n' ' '; echo
+    ;;
+  *)
+    echo "Usage: comfyui-native {install|start|stop|quit|restart|status|logs|command}"; exit 1
+    ;;
+esac

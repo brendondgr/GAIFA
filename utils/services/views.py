@@ -46,6 +46,8 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "enabled": svc.eff.enabled,
         "autostart": svc.eff.autostart,
         "last_error": svc.last_error,
+        "accel": svc.eff.accel,
+        "unavailable": mgr.unavailable(svc),
         "manifest_errors": svc.errors,
     }
 

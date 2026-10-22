@@ -441,6 +441,8 @@ interface ServiceSummary {
   autostart: boolean;
   last_error: string | null;
   manifest_errors: string[];     // non-empty → state "failed", not startable
+  accel: string | null;          // plan 38.3: the variant installed (rocm, cuda, xpu, mps, vulkan, cpu); null: not recorded
+  unavailable: string | null;    // plan 38.3: why it can't start on this machine (its variant's accel isn't here); start answers 409 unavailable
 }
 
 interface ServiceDetail extends ServiceSummary {

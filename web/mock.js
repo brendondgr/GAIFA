@@ -256,6 +256,8 @@ const LOG_SEED = {
   example: ['example 0.1.0 listening on 127.0.0.1:5099', 'GET /health 200'],
 };
 
+const MOCK_ACCEL = { relay: 'cpu', lcpp: 'vulkan', tts: 'rocm', gen3d: 'rocm', comfy: 'rocm', embed: 'rocm', example: 'cuda' };   // plan 38.3: the variants this machine runs
+
 // ---------- the mock ----------
 export function createMockApi() {
   const T0 = Date.now() / 1000;
@@ -315,7 +317,8 @@ export function createMockApi() {
     return { id: s.id, name: s.name, description: s.description, icon: s.icon, version: s.version, kind: s.kind, port: s.config?.port ?? s.port, url: `http://127.0.0.1:${s.config?.port ?? s.port}`,
       state: s.state, state_since: s.state_since, load: s.load, idle_s: s.load === 'n/a' ? null : s.idle_s, memory: { used_bytes: s.used, estimate_bytes: s.estimate, peak_bytes: s.peak },
       stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, logo_url: ['relay', 'lcpp', 'tts', 'gen3d', 'comfy', 'opencode'].includes(s.id) ? `/ui/services/${s.id}/logo.svg` : null, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
-      last_error: s.last_error, manifest_errors: [...s.manifest_errors] };
+      last_error: s.last_error, manifest_errors: [...s.manifest_errors],
+      accel: MOCK_ACCEL[s.id] ?? null, unavailable: s.id === 'example' ? "its variant (cuda) needs a GPU this machine doesn't have (it has rocm, vulkan, cpu): run `aihub setup example` to pick another" : null };   // plan 38.3
   }
   function detail(s) {
     const manifest = s.manifest_errors.length ? { id: s.id, name: s.name } : { id: s.id, name: s.name, description: s.description, version: s.version, icon: s.icon,

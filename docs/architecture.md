@@ -164,6 +164,9 @@ after = ["relay"]                   # start ordering only, not a hard requiremen
 install = "install.sh"              # optional; run by `aihub new` / `aihub install <id>`
 installed = [".venv/bin/python"]   # optional: what exists once the mod is set up, any one of them (default: the command's first word); a mod whose command is a tracked script names its real dependency (opencode: its binary where run.sh looks), so the hub doesn't autostart it before setup
 
+[run.variants.cuda]                 # optional (plan 38.3): env for one variant (rocm | cuda | xpu | mps | vulkan | cpu), over [run].env
+env = { MYMOD_ATTENTION = "flash" }
+
 [memory]                            # only for mods that hold models in memory
 estimate_gb = 9.2
 vram_gb = 6.0                       # optional (plan 36.2): VRAM on a dedicated GPU; where GPUs share the RAM it adds to estimate_gb
@@ -246,7 +249,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 
 **Environment layers**, later ones winning: the hub's variables below → `env_file` → `[run].env` → `config.toml`'s `[services.<id>].env`.
 
-**Environment every mod gets:** `AIHUB_URL`, `AIHUB_SERVICE_ID`, `AIHUB_PORT`, `AIHUB_ROOT`, `AIHUB_MODELS`, `AIHUB_OUTPUTS`, `AIHUB_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`. A mod with `[memory]` also gets `AIHUB_IDLE_UNLOAD_S` (seconds, `0` = never) and the same value under its `idle_unload_env` name, after `[run].env` and before `config.toml`'s env. Every mod gets `AIHUB_CONTAINER_RUNTIME` (`podman` or `docker`, from `[containers] runtime`, plan 37.4) when one is installed. On a machine with more than one GPU that can compute, a mod started on one GPU (`[services.<id>] gpu = <index>`, or the freest card under `auto`, the default; plan 36.3) also gets `AIHUB_GPU_INDEX` and its vendor's visible-devices variable: `CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, or `ONEAPI_DEVICE_SELECTOR` and `ZE_AFFINITY_MASK`, counted among that vendor's GPUs.
+**Environment every mod gets:** `AIHUB_URL`, `AIHUB_SERVICE_ID`, `AIHUB_PORT`, `AIHUB_ROOT`, `AIHUB_MODELS`, `AIHUB_OUTPUTS`, `AIHUB_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`. A mod with `[memory]` also gets `AIHUB_IDLE_UNLOAD_S` (seconds, `0` = never) and the same value under its `idle_unload_env` name, after `[run].env` and before `config.toml`'s env. A mod whose variant `aihub setup` recorded (`[services.<id>] accel`, plan 38.3) gets `AIHUB_ACCEL` (that accel), `AIHUB_DEVICE` (torch's device string: `cuda` for CUDA and ROCm, `xpu`, `mps`, `cpu`) and `AIHUB_GPU_ARCH` (gfx1151, sm_89, …), and its `[run.variants.<accel>].env`, after `[run].env`. When that accel isn't on this machine, the mod is **unavailable**: autostart skips it and starting it answers `409 unavailable`, with the reason in `ServiceSummary.unavailable`. Every mod gets `AIHUB_CONTAINER_RUNTIME` (`podman` or `docker`, from `[containers] runtime`, plan 37.4) when one is installed. On a machine with more than one GPU that can compute, a mod started on one GPU (`[services.<id>] gpu = <index>`, or the freest card under `auto`, the default; plan 36.3) also gets `AIHUB_GPU_INDEX` and its vendor's visible-devices variable: `CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, or `ONEAPI_DEVICE_SELECTOR` and `ZE_AFFINITY_MASK`, counted among that vendor's GPUs.
 
 ### 4.5 Port rules
 - A mod keeps the port in its manifest unless `config.toml` overrides it.

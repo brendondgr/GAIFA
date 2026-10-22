@@ -327,7 +327,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **lcpp's doc** declares its Vulkan variant. On this machine the plan for every mod reads Vulkan for lcpp, ROCm for the GPU mods and CPU for the rest.
     - **Tests:** `test_cli_setup_variants.py` (6).
 
-- [ ] **38.3 The hub passes the choice to the mod.**
+- [x] **38.3 The hub passes the choice to the mod.**
   - **The environment:**
     - `AIHUB_ACCEL`: the chosen accel.
     - `AIHUB_DEVICE`: the torch device string (`cuda` for CUDA and ROCm, `xpu`, `mps` or `cpu`).
@@ -335,6 +335,12 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - **The manifest:** it gains `[run.variants.<accel>] env = {…}`, merged over `[run] env` (`utils/manifest.py`; architecture §4.3–4.4).
   - **When the recorded accel isn't on this machine:** the mod shows **unavailable** with the reason, instead of failing to start. Brief §6/§11.7, the services list and the mod card show it, plus a small variant badge (a `web/PATCHES.md` entry).
   *Done when:* `utils/tests/services/test_variants.py` (the environment, the merge, the unavailable state) and the contract test pass; the badge is checked in a browser on a `--demo-mods` hub.
+  - *As built:*
+    - **No new service state:** "unavailable" is a summary field, `ServiceSummary.unavailable`, with the reason, next to `accel`. `start` answers `409 unavailable`, and autostart leaves it with `last_error: "unavailable: …"`. The Services page draws it as a state.
+    - **Unrecorded mods:** a mod with no accel recorded (every mod here until `aihub setup` runs again) gets nothing new, so this machine is unchanged.
+    - **`[run.variants]`** keys are checked against the accels, so a bad one is a manifest error.
+    - **The badge** was checked in the browser on the mock (`?mock#/services`), since no mod here has a recorded variant yet (PATCHES #44).
+    - **Tests:** `test_variants.py` (6).
 
 - [ ] **38.4 The template and the docs.**
   - **The template:** `services/_template/` gains `device.py` (`AIHUB_DEVICE`, falling back `cuda` → `xpu` → `mps` → `cpu`) and `torch_index.py` (accel and runtime → the PyTorch wheel index, the table from `services/tts/engines/probe.py`). Its `install.sh` takes `--accel`.

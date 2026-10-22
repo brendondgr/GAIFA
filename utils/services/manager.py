@@ -100,6 +100,9 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
             raise ServiceError(409, "manifest_invalid", f"{svc.id} can't start: {svc.errors[0]}", {"errors": svc.errors})
         if not svc.eff.enabled:
             raise ServiceError(409, "service_disabled", f"{svc.id} is disabled; enable it in Settings or config.toml first")
+        why = self.unavailable(svc)
+        if why:
+            raise ServiceError(409, "unavailable", f"{svc.id} can't start here: {why}", {"accel": svc.eff.accel})
         async with svc.lock:
             if svc.state in ("starting", "ready", "degraded"):
                 pass  # already on its way
@@ -243,6 +246,18 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
             await self.backend.stop(svc.id, svc.m.run.stop_timeout_s if svc.m else 30)
         except BackendError as e:
             log.warning("stop %s: %s", svc.id, e)
+
+    def unavailable(self, svc: Service) -> str | None:
+        """Why the mod's recorded variant can't run here (plan 38.3), else None."""
+        accel = svc.eff.accel
+        if not accel:
+            return None
+        from utils import hardware
+        m = hardware.detect()
+        if accel in m.accels:
+            return None
+        return (f"its variant ({accel}) needs a GPU this machine doesn't have (it has {', '.join(m.accels)}): "
+                f"run `aihub setup {svc.id}` to pick another")
 
     def installed(self, svc: Service) -> bool:
         """The mod's command exists (its venv, binary or script): it has been set up (plan 23.12).

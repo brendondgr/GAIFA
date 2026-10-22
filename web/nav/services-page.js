@@ -7,6 +7,7 @@ import { CountPills } from './sidebar.js';
 
 const R = () => globalThis.React;
 const MONO = "'JetBrains Mono',ui-monospace,monospace";
+export const ACCEL = { rocm: 'ROCm', cuda: 'CUDA', xpu: 'Intel XPU', mps: 'Apple MPS', vulkan: 'Vulkan', cpu: 'CPU' };   // plan 38.3
 const fgb = b => b == null ? '—' : b < 1e8 ? `${Math.round(b / 1e6)} MB` : `${(b / 1e9).toFixed(1)} GB`;
 const seg = on => ({ height: 26, padding: '0 10px', border: 0, borderRadius: 5, fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', background: on ? 'var(--hov,#161C28)' : 'transparent', color: on ? 'var(--tx,#E6EAF2)' : 'var(--mut,#8A94A6)', boxShadow: on ? '0 0 0 1px var(--bds,#2A3547)' : 'none' });
 const btn = (pri, danger) => ({ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none',
@@ -20,8 +21,9 @@ function Switch({ on, onChange, label }) {
 
 function Card({ sv, listed, onListed, start, stop }) {
   const h = R().createElement, b = BUCKETS[bucket(sv)], broken = !!sv.manifest_errors?.length;
-  const stateText = broken ? 'manifest error' : sv.state, canStart = !broken && ['stopped', 'failed'].includes(sv.state), canStop = !broken && ['ready', 'degraded', 'starting'].includes(sv.state);
-  const meta = [['port', sv.port || '—'], ['memory', fgb(sv.memory?.used_bytes || 0)], ...(sv.version ? [['version', sv.version]] : [])];
+  const off = !broken && !!sv.unavailable && ['stopped', 'failed'].includes(sv.state);   // plan 38.3: its variant's accel isn't on this machine
+  const stateText = broken ? 'manifest error' : off ? 'unavailable' : sv.state, canStart = !broken && !off && ['stopped', 'failed'].includes(sv.state), canStop = !broken && ['ready', 'degraded', 'starting'].includes(sv.state);
+  const meta = [['port', sv.port || '—'], ['memory', fgb(sv.memory?.used_bytes || 0)], ...(sv.accel ? [['runs on', ACCEL[sv.accel] || sv.accel]] : []), ...(sv.version ? [['version', sv.version]] : [])];
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 14, borderRadius: 10, background: 'var(--card,#11151D)', border: '1px solid var(--bd,#1D2430)', minWidth: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 } },
       h(ServiceLogo, { sv, size: 32, dot: true, ring: 'var(--card,#11151D)' }),
@@ -30,7 +32,7 @@ function Card({ sv, listed, onListed, start, stop }) {
         h('div', { style: { fontFamily: MONO, fontSize: 11, color: 'var(--mut,#8A94A6)' } }, sv.id)),
       h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 6, height: 20, padding: '0 8px', borderRadius: 99, fontSize: 11, fontWeight: 500, color: b.color, background: b.tint, whiteSpace: 'nowrap' } },
         h('span', { style: { width: 6, height: 6, borderRadius: 99, background: b.color } }), stateText)),
-    h('div', { title: sv.description, style: { color: 'var(--mut,#8A94A6)', fontSize: 12, lineHeight: 1.45, minHeight: 35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, broken ? sv.manifest_errors[0] : (sv.description || 'No description')),
+    h('div', { title: off ? sv.unavailable : sv.description, style: { color: off ? 'var(--acc,#FFB224)' : 'var(--mut,#8A94A6)', fontSize: 12, lineHeight: 1.45, minHeight: 35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, broken ? sv.manifest_errors[0] : off ? 'Unavailable here: ' + sv.unavailable : (sv.description || 'No description')),
     h('div', { style: { display: 'flex', gap: 14, fontSize: 11.5, color: 'var(--mut,#8A94A6)' } },
       ...meta.map(([k, v]) => h('span', { key: k }, `${k} `, h('span', { style: { fontFamily: MONO, color: 'var(--tx,#E6EAF2)' } }, v)))),
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, paddingTop: 10, borderTop: '1px solid var(--bd,#1D2430)' } },

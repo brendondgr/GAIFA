@@ -357,6 +357,7 @@ async def test_every_change_is_published_with_a_full_summary(rig):
     expected = {
         "id", "name", "description", "icon", "version", "kind", "port", "url", "state", "state_since", "load", "idle_s",
         "busy", "memory", "stats", "has_page", "page_url", "logo_url", "has_outputs", "native_ui", "enabled", "autostart", "last_error", "manifest_errors",
+        "accel", "unavailable",
     }
     assert set(ev) == expected
     assert ev["url"] == f"http://127.0.0.1:{rig.ports['fake-ok']}" and ev["has_outputs"] is True

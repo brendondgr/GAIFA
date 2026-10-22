@@ -69,6 +69,8 @@ class ServiceSummary(_Model):
     autostart: bool
     last_error: str | None
     manifest_errors: list[str]
+    accel: str | None = Field(None, description="The variant installed (plan 38.3): rocm, cuda, xpu, mps, vulkan, cpu; null: not recorded")
+    unavailable: str | None = Field(None, description="Why it can't start on this machine (its variant's accel isn't here), else null")
 
 
 class Health(_Model):

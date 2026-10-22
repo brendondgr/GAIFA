@@ -69,6 +69,11 @@ class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class RunVariant(_Strict):
+    """`[run.variants.<accel>]` (plan 38.3): what changes when the mod runs that variant."""
+    env: dict[str, EnvValue] = {}
+
+
 class RunSpec(_Strict):
     kind: Literal["process", "external"] = "process"
     command: list[str] = []
@@ -85,6 +90,7 @@ class RunSpec(_Strict):
     after: list[str] = []
     install: str | None = None
     installed: list[str] = []   # what exists once the mod is set up: paths (~/… or in the mod folder) or commands, any one; default: the command's first word
+    variants: dict[Literal["rocm", "cuda", "xpu", "mps", "vulkan", "cpu"], RunVariant] = {}   # plan 38.3: env per accel, over [run].env
 
     @field_validator("installed", mode="before")
     @classmethod
@@ -636,6 +642,18 @@ def launch_spec(mod: Mod, cfg: Config, paths: Paths, hub_port: int, gpu_index: i
         if env_file.exists():  # optional: secrets that haven't been written yet
             env.update(read_env_file(env_file))
     env.update({k: expand(v, values, f"[run].env.{k}") for k, v in m.run.env.items()})
+    if eff.accel:          # plan 38.3: the variant `aihub setup` installed ([services.<id>] accel)
+        if machine is None:
+            from utils import hardware
+            machine = hardware.detect()
+        from utils.hardware import DEVICE
+        env["AIHUB_ACCEL"], env["AIHUB_DEVICE"] = eff.accel, DEVICE.get(eff.accel, "cpu")
+        arch = next((g.arch for g in machine.gpus if eff.accel in g.accels and g.arch), "")
+        if arch:
+            env["AIHUB_GPU_ARCH"] = arch
+        var = m.run.variants.get(eff.accel)
+        if var:
+            env.update({k: expand(v, values, f"[run.variants.{eff.accel}].env.{k}") for k, v in var.env.items()})
     if m.memory:  # idle unload stays inside the mod (plan 5.6): seconds, 0 = never
         idle = str(eff.idle_unload_s or 0)
         env["AIHUB_IDLE_UNLOAD_S"] = idle

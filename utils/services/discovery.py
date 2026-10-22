@@ -196,6 +196,11 @@ class DiscoveryMixin(_Base):
             svc = self.services[mod.id]
             if not (svc.startable and svc.eff.enabled and svc.eff.autostart) or svc.external or svc.state != "stopped":
                 continue
+            why = self.unavailable(svc)
+            if why:                       # plan 38.3: its variant's accel isn't on this machine
+                svc.last_error = f"unavailable: {why}"
+                log.info("autostart %s: unavailable (%s)", svc.id, svc.eff.accel)
+                continue
             if not self.installed(svc):   # a fresh clone: nothing to start until it's set up (plan 23.12)
                 svc.last_error = f"not installed: run `aihub setup {svc.id}`"
                 log.info("autostart %s: not installed", svc.id)

@@ -3148,13 +3148,13 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
   - **In the chat:** a new chat starts in None until you pick another (the last pick is still remembered); its menu explains that and offers New environment; a folder card in None has no "Add to None"; its sidebar section has no ⋯. Chats saved without an environment keep Default, so nothing they could read changes.
   - **Sections:** an environment with no chats in this view isn't shown.
   *Done when:* `services/workspace/tests/test_environments.py::test_none_is_built_in_with_no_folders`, `utils/tests/web/environments.test.mjs`, `chat-controls.test.mjs`, `chat-groups.test.mjs`. Checked live: a new chat shows None and its menu.
-- [ ] **42.6 Docs and the live check.** Brief §11.13 (the thread list, the composer, the controls row), structure for `chat-controls.js`, the plan. Live on the installed hub: the sidebar rows and divider, the box growing, the + menu, the controls row, an environment made, renamed, given a folder and removed from the chat.
+- [x] **42.6 Docs and the live check.** *As built (2026-10-21):* the docs went with each step. Checked live on the installed hub in the built-in browser, step by step: the sidebar's top, rows and divider, View with Show, the chat menu's letters, the one-line message box and its + menu, the controls row, None for a new chat, and the environment menu: a throwaway environment made, given and emptied of a folder, renamed, then deleted with its two chats (one archived) through the warning.
 
 **Wire — Phase 42:** the Chat page's sidebar, message box and the row under it.
 
 **Checks & deliverables — Phase 42**
-- [ ] Live: as 42.5.
-- [ ] Delivered: `web/chat/chat-controls.js`, the reworked `chat-list.js`, `chat-groups.js`, `chat-composer.js`, `chat-header.js`, the tests.
+- [x] Live: as 42.6.
+- [x] Delivered: `web/chat/chat-controls.js`, `chat-envedit.js`, the reworked `chat-list.js`, `chat-groups.js`, `chat-composer.js`, `chat-header.js`, the workspace mod's None and `browse.py`, the tests.
 
 ---
 

@@ -489,14 +489,19 @@ interface Memory {
          gtt_total_bytes: number; gtt_used_bytes: number } | null;
   by_service: { id: string; used_bytes: number; estimate_bytes: number | null; load: LoadState;
                 idle_s: number | null; auto_unload: boolean; priority: number;
-                gpu_busy_pct?: number }[];  // its busiest GPU engine's share since the last sample, 0–100 (plan 28.2)
+                gpu_busy_pct?: number;      // its busiest GPU engine's share since the last sample, 0–100 (plan 28.2)
+                vram_bytes?: number }[];    // its VRAM on dedicated GPUs (plan 36.1; only where there's one)
   other_bytes: number;           // OS, desktop, browser — anything the AIHub does not own
+  pools: { id: string; name: string; total_bytes: number; used_bytes: number; available_bytes: number }[];
+                                 // plan 36.1: "system" first, then "gpu:<index>" per dedicated GPU (one entry where GPUs share the RAM)
 }
 
 interface MakeRoomPlan {
   service: string; needs_bytes: number; available_bytes: number;   // available = MemAvailable − reserve − other loads' reservations
-  unload: { id: string; frees_bytes: number; reason: string }[];  // reason: "priority 1, idle 12m"
+  unload: { id: string; frees_bytes: number; reason: string; pool?: string }[];  // reason: "priority 1, idle 12m"; pool: a GPU's VRAM it frees
   enough: boolean;
+  pool: string;                  // plan 36.2: the pool that's short: "system" or "gpu:<index>"
+  pools: { pool: string; name: string; needs_bytes: number; available_bytes: number; enough: boolean }[];
 }
 
 type ModelKind = "llm" | "tts" | "stt" | "voice" | "3d" | "image" | "video" | "text-encoder"

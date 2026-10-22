@@ -153,9 +153,9 @@ def pss_bytes(pid: int, proc: Path = PROC) -> int:
     return rss_bytes(pid, proc)
 
 
-def gpu_bytes(pid: int, seen: set[str] | None = None, proc: Path = PROC) -> int:
-    """GTT + VRAM held by the process's DRM clients. A client already in `seen` (shared with
-    another process, e.g. after a fork) isn't counted again."""
+def gpu_bytes(pid: int, seen: set[str] | None = None, proc: Path = PROC, kinds: tuple[str, ...] = ("gtt", "vram")) -> int:
+    """GTT + VRAM held by the process's DRM clients (`kinds`: only these). A client already in `seen`
+    (shared with another process, e.g. after a fork) isn't counted again."""
     seen = set() if seen is None else seen
     total = 0
     try:
@@ -170,11 +170,39 @@ def gpu_bytes(pid: int, seen: set[str] | None = None, proc: Path = PROC) -> int:
         if not cid or cid.group(1) in seen:
             continue
         seen.add(cid.group(1))
-        total += sum(int(kib) * 1024 for _, kib in DRM_MEM_RE.findall(text))
+        total += sum(int(kib) * 1024 for kind, kib in DRM_MEM_RE.findall(text) if kind in kinds)
     return total
 
 
-def footprint(pids: Iterable[int], proc: Path = PROC) -> int:
+def drm_vram_by_pdev(pids: Iterable[int], proc: Path = PROC) -> dict[str, int]:
+    """VRAM held by these processes and their descendants, per GPU (`drm-pdev`, a PCI address), each
+    DRM client counted once: a dedicated AMD or Intel card's share of a mod (plan 36.1)."""
+    every: list[int] = []
+    for pid in pids:
+        every.extend(p for p in process_tree(pid, proc) if p not in every)
+    seen: set[str] = set()
+    out: dict[str, int] = {}
+    for pid in every:
+        try:
+            entries = list((proc / str(pid) / "fdinfo").iterdir())
+        except OSError:
+            continue
+        for f in entries:
+            text = _read(f)
+            if not text or "drm-client-id" not in text:
+                continue
+            cid = DRM_CLIENT_RE.search(text)
+            if not cid or cid.group(1) in seen:
+                continue
+            seen.add(cid.group(1))
+            pdev = re.search(r"^drm-pdev:\s+(\S+)", text, re.MULTILINE)
+            vram = sum(int(kib) * 1024 for kind, kib in DRM_MEM_RE.findall(text) if kind == "vram")
+            if pdev and vram:
+                out[pdev.group(1)] = out.get(pdev.group(1), 0) + vram
+    return out
+
+
+def footprint(pids: Iterable[int], proc: Path = PROC, kinds: tuple[str, ...] = ("gtt", "vram")) -> int:
     """PSS + GPU memory of these processes and all their descendants, each counted once.
     PSS rather than RSS: a mod with 30 forked compile workers would otherwise count the memory
     they share 30 times."""
@@ -184,7 +212,7 @@ def footprint(pids: Iterable[int], proc: Path = PROC) -> int:
     for pid in pids:
         every.extend(p for p in process_tree(pid, proc) if p not in every)
     seen: set[str] = set()
-    return sum(pss_bytes(p, proc) + gpu_bytes(p, seen, proc) for p in every)
+    return sum(pss_bytes(p, proc) + gpu_bytes(p, seen, proc, kinds) for p in every)
 
 
 def engine_ns(pids: Iterable[int], proc: Path = PROC) -> dict[str, int]:

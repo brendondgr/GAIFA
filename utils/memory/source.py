@@ -7,6 +7,8 @@ inject a fake with the same two methods.
 - `read(pids)`: blocking, run in a thread: meminfo, the GPU, and each mod's footprint.
 - `available()`: blocking and cheap: MemAvailable now (make-room waits poll it).
 - `engines(pids)` (optional): each mod's GPU engine busy nanoseconds, for `gpu_busy_pct` (plan 28.2).
+- `pools(pids)` (optional, plan 36.1): each dedicated GPU's pool and each mod's VRAM in it; empty on
+  a machine whose GPUs share the system's memory. `pool_available(pool)`: a pool's free bytes now.
 """
 
 from __future__ import annotations
@@ -15,7 +17,8 @@ import asyncio
 import time
 from typing import TYPE_CHECKING, Any, Protocol
 
-from utils import proc
+from utils import hardware, proc
+from utils.memory.pools import Pool, PoolReader
 
 if TYPE_CHECKING:
     from utils.services import ServiceManager
@@ -33,8 +36,16 @@ class Source(Protocol):
 
 
 class ProcSource:
-    def __init__(self) -> None:
+    def __init__(self, machine: hardware.Machine | None = None) -> None:
         self._cache: dict[tuple[str, str], tuple[float, list[int]]] = {}  # (kind, name) → (when, pids)
+        self._machine = machine
+        self._reader: PoolReader | None = None
+
+    @property
+    def reader(self) -> PoolReader:
+        if self._reader is None:
+            self._reader = PoolReader(self._machine or hardware.detect())
+        return self._reader
 
     def _cached(self, key: tuple[str, str]) -> list[int] | None:
         hit = self._cache.get(key)
@@ -85,7 +96,15 @@ class ProcSource:
         return out
 
     def read(self, pids: dict[str, list[int]]) -> tuple[dict[str, int], dict[str, Any] | None, dict[str, int]]:
-        return proc.meminfo(), proc.gpu(), {sid: proc.footprint(p) for sid, p in pids.items()}
+        # A dedicated AMD or Intel card's VRAM is its pool's, not the system's (plan 36.1): count only GTT here.
+        kinds = ("gtt",) if any(g.vendor in ("amd", "intel") for g in self.reader.gpus) else ("gtt", "vram")
+        return proc.meminfo(), proc.gpu(), {sid: proc.footprint(p, kinds=kinds) for sid, p in pids.items()}
+
+    def pools(self, pids: dict[str, list[int]]) -> tuple[list[Pool], dict[str, dict[str, int]]]:
+        return self.reader.read(pids)
+
+    def pool_available(self, pool: str) -> int | None:
+        return self.reader.available(pool)
 
     def engines(self, pids: dict[str, list[int]]) -> dict[str, dict[str, int]]:
         """Optional (a source without it reports no `gpu_busy_pct`): each mod's GPU engine nanoseconds."""

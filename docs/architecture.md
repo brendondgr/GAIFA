@@ -166,6 +166,7 @@ installed = [".venv/bin/python"]   # optional: what exists once the mod is set u
 
 [memory]                            # only for mods that hold models in memory
 estimate_gb = 9.2
+vram_gb = 6.0                       # optional (plan 36.2): VRAM on a dedicated GPU; where GPUs share the RAM it adds to estimate_gb
 load = "POST /v1/load"
 unload = "POST /v1/unload"
 triggers = ["POST /v1/speech", "POST /v1/audio/speech"]   # proxied calls that may load models
@@ -423,6 +424,14 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 - **GPU:** AMD sysfs `mem_info_gtt_*` / `mem_info_vram_*`.
 - **Per mod:** the processes in its unit's cgroup, plus its `extra_units` and `containers`. A container's processes are its main pid plus everything in its `libpod-*` cgroup: `podman exec` processes (how a toolbox runs ComfyUI) aren't children of the main pid, and toolbox containers share the host's PID namespace. For each process, count PSS (from `smaps_rollup`, so pages shared by forked workers count once; RSS if it can't be read) plus GPU memory from DRM fdinfo (`drm-memory-gtt` / `vram`). This logic comes from lcpp's `proc.py`. The same sample reads the processes' DRM engine counters (`drm-engine-*`), and `GET /api/memory` gives each mod's `gpu_busy_pct`: its busiest engine's share of the time since the last sample. It sees Vulkan and graphics work (lcpp), not ROCm compute, which goes through `/dev/kfd` and has no per-process busy time on this kernel (plan 28.2).
 - **Peaks:** each mod's observed peak is stored in `hub.db`, and used as the estimate when it's larger than the manifest's.
+
+**Pools (plan 36.1–36.2):** where every GPU shares the system's memory (this machine, Apple Silicon, an integrated GPU), there's one pool, `system`, and everything above holds as written. Each **dedicated** GPU adds a `gpu:<index>` pool with its own VRAM budget (`utils/memory/pools.py`):
+- **Reading the pools:** NVIDIA's totals and per-process use come from `nvidia-smi` (WSL2 doesn't report processes). For an AMD or Intel card, totals come from sysfs and per-process use from fdinfo's `drm-memory-vram` by `drm-pdev`; the system footprint then counts only GTT.
+- **Where a mod goes:** to the GPU asked for (`device`), else where it already holds VRAM, else the freest.
+- **What it needs:** its VRAM need is `max(vram_gb, its VRAM peak)`; VRAM peaks are kept in `service_peaks` as `<id>@gpu`.
+- **Making room:** the planner covers the system gap first, then the GPU's, counting what the chosen mods free there. Steps that only free VRAM carry `pool`. A plan names the pool that's short (`pool`, and `pools` with each one's need and room), and `needs_room`'s detail says "needs ~X on <card>, Y free there".
+- **Reservations and acquire:** reservations hold VRAM too, and `POST /api/memory/acquire` takes `vram_bytes` and `device`.
+- **Where VRAM can't be read** per process (WSL2, macOS), a mod's share is what it acquired or its `vram_gb`.
 
 **Load rule:**
 - `available = MemAvailable − reserve`.

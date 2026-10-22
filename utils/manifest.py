@@ -128,6 +128,7 @@ class RunSpec(_Strict):
 
 class MemorySpec(_Strict):
     estimate_gb: float | None = Field(None, ge=0)
+    vram_gb: float | None = Field(None, ge=0)   # plan 36.2: VRAM on a dedicated GPU (on a unified machine, added to estimate_gb)
     load: Op | None = None
     unload: Op | None = None
     triggers: list[Op] = []

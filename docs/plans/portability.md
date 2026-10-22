@@ -134,15 +134,20 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
 
 ## Phase 36 — Memory in pools (M–L)
 
-- [ ] **36.1 Pools: `utils/memory/pools.py`.**
+- [x] **36.1 Pools: `utils/memory/pools.py`.**
   - **What a pool is:** `Pool {id: "system"|"gpu:<i>", total, used, available}`. A machine with unified memory (this one, Apple Silicon, an integrated Intel GPU) has **one pool**, `system`, and GPU use counts against it, as today. Each dedicated GPU adds a `gpu:<i>` pool.
   - **Sampling**, every 2 s as now:
     - **VRAM:** `nvidia-smi`, amdgpu `mem_info_vram_*` or xe/i915 sysfs.
     - **GPU memory per process:** `nvidia-smi --query-compute-apps` on native Linux, and DRM fdinfo for amdgpu and Intel.
     - **Where it can't be read** (WSL2, macOS): a process's GPU memory is **unknown**, and a mod's share comes from what it acquired (36.2) or its estimate.
   *Done when:* `utils/tests/memory/test_pools.py` builds the right pools for every fixture, with the `strix-halo` fixture giving exactly today's single-pool numbers.
+  - *As built:*
+    - **Reading:** `PoolReader` (in `ProcSource.pools`) reads NVIDIA through `nvidia-smi` (`--query-gpu`, and `--query-compute-apps` matched to each mod's process tree) and an AMD or Intel card through sysfs plus `proc.drm_vram_by_pdev`. On such a card the system footprint counts only GTT (`proc.footprint(kinds=…)`).
+    - **No answer from `nvidia-smi`:** the cards' sizes, with nothing used.
+    - **Unified machines** (this one, the Mac, WSL's Intel) have no GPU pools, so nothing changes there.
+    - **Commit:** built and committed together with 36.2, which uses it.
 
-- [ ] **36.2 Making room per pool: manifest, acquire, planner.**
+- [x] **36.2 Making room per pool: manifest, acquire, planner.**
   - **Manifest:** `[memory] estimate_gb` stays the system estimate, and `vram_gb` is added (`utils/manifest.py` `MemorySpec`). On a unified machine the two add up.
   - **Acquire:** `POST /api/memory/acquire` takes `{needs_bytes, vram_bytes?, device?}`.
   - **Planner:** `utils/memory/planner.py` covers each pool's gap. A candidate frees what it holds in each pool, and `409 needs_room` names the pool that's short.
@@ -155,6 +160,12 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - the unified case unchanged.
 
   The existing memory tests pass unchanged.
+  - *As built:*
+    - **The API:** `GET /api/memory` always has `pools` (`system` first) and, where there are GPU pools, each row's `vram_bytes`. A plan always has `pool` and `pools`, and `unload` steps that free only VRAM carry `pool`.
+    - **Peaks:** VRAM peaks sit in `service_peaks` as `<id>@gpu` rows (mod ids have no `@`), so there's no migration that could collide with other work on `hub.db`.
+    - **The planner:** `planner.extend_plan` adds a GPU's pool to the system plan. Make-room waits on the pool's own free bytes when it can read them.
+    - **One pool:** `vram_gb` and `vram_bytes` add to the system need.
+    - **Tests:** `test_pools.py` (4), `test_planner_pools.py` (5), with a fake card.
 
 - [ ] **36.3 Which GPU a mod uses: devices and the GPU queue.**
   - **Choosing a GPU:** `[services.<id>] gpu = "auto" | <index>`. With `auto`, the mod gets the GPU with the most free VRAM when it starts.

@@ -335,6 +335,17 @@ class ServiceMemory(_Model):
     priority: int
     gpu_busy_pct: float | None = Field(None, description="How busy the mod kept the GPU since the last sample: its "
                                        "busiest engine's share of the time, 0–100 (DRM fdinfo; absent until two samples)")
+    vram_bytes: int | None = Field(None, description="Its VRAM on dedicated GPUs (plan 36.1; only on machines that have one)")
+
+
+class MemoryPool(_Model):
+    """A memory budget (plan 36.1): `system`, and `gpu:<index>` for each dedicated GPU."""
+
+    id: str
+    name: str
+    total_bytes: int
+    used_bytes: int
+    available_bytes: int
 
 
 class SystemMemory(_Model):
@@ -347,12 +358,22 @@ class SystemMemory(_Model):
     gpu: Gpu | None
     by_service: list[ServiceMemory]
     other_bytes: int = Field(description="OS, desktop, browser: anything AIHub doesn't own")
+    pools: list[MemoryPool] = Field(description="system first, then each dedicated GPU's VRAM (one pool where every GPU shares the system's memory)")
 
 
 class PlanStep(_Model):
     id: str
     frees_bytes: int
     reason: str
+    pool: str | None = Field(None, description="Set when the step frees a GPU's pool (its VRAM), not system memory")
+
+
+class PlanPool(_Model):
+    pool: str
+    name: str
+    needs_bytes: int
+    available_bytes: int
+    enough: bool
 
 
 class MakeRoomPlan(_Model):
@@ -361,6 +382,8 @@ class MakeRoomPlan(_Model):
     available_bytes: int
     unload: list[PlanStep]
     enough: bool
+    pool: str = Field("system", description="The pool that's short (system or gpu:<index>)")
+    pools: list[PlanPool] = Field(default_factory=list, description="Each pool the load needs: system, and its GPU's when it has dedicated VRAM")
 
 
 # ---- charts (Phase 6, brief §11.7) ----

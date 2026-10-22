@@ -21,11 +21,15 @@ def _mem(request: Request) -> MemoryManager:
 class PlanRequest(BaseModel):
     service: str
     needs_bytes: int | None = Field(None, ge=0, description="Default: the mod's estimate or learned peak, whichever is larger")
+    vram_bytes: int | None = Field(None, ge=0, description="VRAM on a dedicated GPU (plan 36.2); default: its vram_gb or learned VRAM peak")
+    device: int | None = Field(None, ge=0, description="Which GPU (hardware index); default: where it holds VRAM, else the freest")
 
 
 class AcquireRequest(BaseModel):
     service: str
     needs_bytes: int = Field(ge=0)
+    vram_bytes: int | None = Field(None, ge=0, description="VRAM on a dedicated GPU (plan 36.2); on a unified machine it adds to needs_bytes")
+    device: int | None = Field(None, ge=0)
     reason: str = ""
 
 
@@ -37,16 +41,20 @@ async def get_memory(request: Request) -> dict[str, Any]:
     return mem.view() if mem.snapshot else await mem.sample(publish=False)
 
 
-@router.post("/api/memory/plan", summary="What loading a mod would unload (nothing is changed)", response_model=MakeRoomPlan)
+@router.post("/api/memory/plan", summary="What loading a mod would unload (nothing is changed)", response_model=MakeRoomPlan,
+             response_model_exclude_none=True)
 async def plan_room(body: PlanRequest, request: Request) -> dict[str, Any]:
-    return await _mem(request).fresh_plan(body.service, body.needs_bytes)
+    return await _mem(request).fresh_plan(body.service, body.needs_bytes, body.vram_bytes, body.device)
 
 
-@router.post("/api/memory/acquire", summary="A mod asks for memory before it loads something; make_room=1 (or X-AIHub-Make-Room: 1) unloads others if needed", response_model=Grant)
+@router.post("/api/memory/acquire", summary="A mod asks for memory before it loads something; make_room=1 (or X-AIHub-Make-Room: 1) unloads others if needed", response_model=Grant,
+             response_model_exclude_none=True)
 async def acquire(body: AcquireRequest, request: Request, make_room: bool = False) -> dict[str, Any]:
     mem = _mem(request)
     allow = make_room or request.headers.get(HEADER, "").strip().lower() in YES
-    plan, freed = await mem.ensure_room(body.service, body.needs_bytes, make_room=allow, ttl=ACQUIRE_TTL_S)
+    needs = body.needs_bytes + (body.vram_bytes or 0 if not mem.pools else 0)     # one pool: VRAM is system memory
+    plan, freed = await mem.ensure_room(body.service, needs, make_room=allow, ttl=ACQUIRE_TTL_S,
+                                        vram_bytes=body.vram_bytes if mem.pools else None, device=body.device)
     if mem.activity and freed:
         svc = mem.mgr.get(body.service)
         await mem.activity.add(f"Made room for {svc.mod.name}" + (f" ({body.reason})" if body.reason else ""), service=svc.id)

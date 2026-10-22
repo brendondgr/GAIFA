@@ -22,6 +22,7 @@ async def test_shape_and_other(memhub):
                 {"id": "fake-mem2", "used_bytes": 0, "estimate_bytes": 40 * GB, "load": "unloaded", "idle_s": m["by_service"][1]["idle_s"], "auto_unload": True, "priority": 100},
             ],
             "other_bytes": 20 * GB,
+            "pools": [{"id": "system", "name": "System memory", "total_bytes": 100 * GB, "used_bytes": 20 * GB, "available_bytes": 80 * GB}],
         }
 
 

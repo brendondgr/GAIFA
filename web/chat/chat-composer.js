@@ -7,8 +7,11 @@
 // (plan 30.8, chat-webpage.js): a pasted URL offers it, and the attach menu has "Add a web page".
 // Quote-replies (Select → Reply, chat-quote-reply.js) are cards in the box, any number of them, each opening its
 // Reply popup to edit; sending takes them with the message (the text may then be empty).
+// Laid out after Claude Code's (plan 42.2): the text on top, growing upward to 40% of the window (BOX_MAX), and one
+// row inside the box: + on the left (PLUS_ITEMS: upload, attach, tool groups, then the quick actions), the
+// microphone, Stop and Send on the right. No hint line under it; the chat's controls sit there (chat-controls.js).
 
-import { h, T, MONO, Icon, Btn, Popover, chipSt, label11, COL } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Popover, label11, COL } from './chat-ui.js';
 import { actionsFor } from './chat-actions.js';
 import { MicButton } from './chat-mic.js';
 import { ACCEPT, uploadable, toChip, pasteFile, chipIcon, chipSize } from './chat-files.js';
@@ -18,6 +21,14 @@ import { QuoteCards, QuoteReplyDialog, editQuote, removeQuote, canSendQuotes, qu
 export { uploadable, toChip, pasteFile } from './chat-files.js';
 
 const R = () => globalThis.React;
+/** The box's tallest text: 40% of the window, at least 120 px; then it scrolls (plan 42.2). */
+export const boxMax = (vh = globalThis.innerHeight || 800) => Math.max(120, Math.floor(vh * 0.4));
+/** The + menu's items, then the quick actions (the registry's `composer` actions). */
+export const PLUS_ITEMS = [
+  ['upload', 'upload', 'Upload files', 'Images, video, audio, text, code, PDFs and documents (or drop or paste them on the box)'],
+  ['attach', 'clip', 'Attach an output or a web page', 'Something made here, or a page read and screened by the hub'],
+  ['tools', 'sliders', 'Tool groups', 'Which tool groups this chat loads'],
+];
 export const COMMANDS = [
   { cmd: 'compact', hint: 'Summarize earlier messages now' },
   { cmd: 'clear', hint: 'Start a new chat' },
@@ -92,7 +103,10 @@ function DocMode({ a, mode, onPick }) {
     b('card', 'Card', 'Send only its card (name, size, outline): the agent reads it in parts'));
 }
 
-export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes }) {
+const menuSt = { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' };
+
+// controls: the row under the box (chat-controls.js: environment, mode, model; plan 42.3)
+export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null }) {
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
@@ -129,7 +143,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
   };
   const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
   const matches = slashMatches(draft, skills);
-  React.useLayoutEffect(() => { const el = ref.current; if (!el) return; el.style.height = ''; if (draft && el.scrollHeight > el.clientHeight) el.style.height = Math.min(el.scrollHeight + 2, 220) + 'px'; }, [draft]);
+  React.useLayoutEffect(() => { const el = ref.current; if (!el) return; el.style.height = ''; if (draft && el.scrollHeight > el.clientHeight) el.style.height = Math.min(el.scrollHeight + 2, boxMax()) + 'px'; }, [draft]);
   React.useEffect(() => { setSel(0); }, [matches.length]);
   const qProblem = quotesProblem(quotes);
   const can = !disabled && !uploading && !reading && canSendQuotes(draft, attachments, quotes);
@@ -180,23 +194,26 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
         h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => setDraft(e.target.value), onKeyDown: onKey, 'aria-label': 'Message',
           onPaste,
           placeholder: running ? 'Add a message (it’s read after the current step)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
-          style: { width: '100%', minHeight: 22, maxHeight: 220, resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', minWidth: 0 } },
+          style: { width: '100%', minHeight: 22, maxHeight: boxMax(), resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 } },
           h('input', { ref: picker, type: 'file', multiple: true, accept: ACCEPT, hidden: true, 'aria-hidden': 'true',
             onChange: e => { upload(e.target.files); e.target.value = ''; } }),
-          h(Btn, { kind: 'ghost', sm: true, icon: 'upload', title: 'Upload files: images, video, audio, text, code, PDFs and documents (or drop or paste them here)', disabled, onClick: () => picker.current?.click() }),
-          h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
           h('span', { style: { position: 'relative' } },
-            h(Btn, { kind: 'ghost', sm: true, icon: 'clip', title: 'Attach an output or a web page', onClick: () => setPop(pop === 'att' ? null : 'att') }),
-            h(Popover, { open: pop === 'att', onClose: () => setPop(null), place: 'up-left', width: 340, label: 'Attach outputs' }, h(AttachPicker, { api, outputs, chosen: attachments, onToggle: toggleAtt, onReadPage: api.readWebPage ? url => { setPop(null); attachPage(url); } : null }))),
-          h('span', { style: { position: 'relative' } },
-            h(Btn, { kind: 'ghost', sm: true, icon: 'sliders', title: 'Tool groups', onClick: () => setPop(pop === 'tools' ? null : 'tools') }),
+            h(Btn, { sm: true, icon: 'plus', title: 'Add: upload, attach, tool groups', 'aria-label': 'Add', 'aria-haspopup': 'menu', 'aria-expanded': pop ? 'true' : 'false',
+              onClick: () => setPop(pop ? null : 'plus'), style: { width: 28, height: 28, borderRadius: 7, background: 'transparent', color: T.mut } }),
+            h(Popover, { open: pop === 'plus', onClose: () => setPop(null), place: 'up-left', width: 260, label: 'Add', style: { padding: 4, gap: 0 } },
+              PLUS_ITEMS.map(([k, ic, label, hint]) => h('button', { key: k, type: 'button', role: 'menuitem', title: hint, disabled: disabled && k === 'upload',
+                onClick: () => { if (k === 'upload') { setPop(null); picker.current?.click(); } else setPop(k === 'attach' ? 'att' : 'tools'); }, style: menuSt },
+                h(Icon, { d: ic, size: 13 }), label)),
+              quick.length ? h('span', { style: { ...label11, padding: '8px 9px 2px' } }, 'Quick actions') : null,
+              quick.map(a => h('button', { key: a.id, type: 'button', role: 'menuitem', onClick: () => { setPop(null); onQuick(a); }, title: `${a.label}: opens ${a.tool || 'it'} as a parameter card`, style: menuSt },
+                h(Icon, { d: a.icon || 'wand', size: 13 }), a.label))),
+            h(Popover, { open: pop === 'att', onClose: () => setPop(null), place: 'up-left', width: 340, label: 'Attach outputs' }, h(AttachPicker, { api, outputs, chosen: attachments, onToggle: toggleAtt, onReadPage: api.readWebPage ? url => { setPop(null); attachPage(url); } : null })),
             h(Popover, { open: pop === 'tools', onClose: () => setPop(null), place: 'up-left', width: 330, label: 'Tool groups' }, h(ToolGroups, { index, settings, onChange: onSettings }))),
-          h('span', { style: { width: 1, height: 16, background: T.bd, margin: '0 4px' } }),
-          quick.map(a => h('button', { key: a.id, type: 'button', onClick: () => onQuick(a), title: `${a.label}: opens ${a.tool || 'it'} as a parameter card`, style: chipSt(false, { sm: true }) },
-            a.icon ? h(Icon, { d: a.icon, size: 12 }) : null, a.label)),
           h('span', { style: { flex: 1 } }),
+          h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
           running ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: onStop, title: 'Stop the turn (and its running tool)' }) : null,
-          h(Btn, { kind: 'pri', sm: true, icon: 'send', title: running ? 'Queue this message' : 'Send (Enter)', disabled: !can, onClick: send }))),
-      h('div', { style: { textAlign: 'center', fontSize: 11, color: T.dim, paddingTop: 5 } }, 'Enter sends · Shift+Enter new line · / commands · drop or paste files or a link')));
+          h(Btn, { kind: 'pri', sm: true, icon: 'send', title: running ? 'Queue this message' : 'Send (Enter)', disabled: !can, onClick: send,
+            style: { width: 30, height: 28, padding: 0, justifyContent: 'center', borderRadius: 7 } }))),
+      controls || null));
 }

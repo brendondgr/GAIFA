@@ -93,8 +93,8 @@ export function ViewMenu({ view, onChange, grouped = true }) {
   const React = R(), [open, setOpen] = React.useState(false);
   const set = patch => onChange({ ...view, ...patch });
   return h('span', { style: { position: 'relative', flex: 'none' } },
-    h(Btn, { kind: 'ghost', sm: true, icon: 'sliders', title: 'View: group and order the chats', 'aria-label': 'View', 'aria-expanded': open ? 'true' : 'false', onClick: () => setOpen(!open),
-      style: { width: 30, height: 30, padding: 0, justifyContent: 'center', border: '1px solid ' + T.bds } }),
+    h(Btn, { sm: true, icon: 'sliders', title: 'View: group and order the chats', 'aria-label': 'View', 'aria-expanded': open ? 'true' : 'false', onClick: () => setOpen(!open),
+      style: { width: 30, height: 30, borderRadius: 7, background: T.card, color: T.mut } }),
     h(Popover, { open, onClose: () => setOpen(false), width: 280, label: 'View', style: { gap: 10 } },
       grouped ? h(Choice, { label: 'Group by', value: view.group, options: GROUP_BY, onPick: group => set({ group }) }) : null,
       grouped && view.group === 'environment' ? h(Choice, { label: 'Environments by', value: view.envOrder, options: ENV_ORDERS, onPick: envOrder => set({ envOrder }) }) : null,

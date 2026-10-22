@@ -41,7 +41,11 @@ REPAIR_OFF = "STT_NO_GPU_REPAIR"
 
 
 def detect_hardware() -> str:
-    """``cuda``, ``rocm`` or ``none``: what kind of GPU the kernel exposes."""
+    """``cuda``, ``rocm`` or ``none``: the variant the hub passes (AIHUB_ACCEL, plan 39.5), else what kind of
+    GPU the kernel exposes."""
+    accel = os.environ.get("AIHUB_ACCEL")
+    if accel:
+        return accel if accel in ("cuda", "rocm") else "none"
     if Path("/proc/driver/nvidia/version").exists():
         return "cuda"
     if KFD_NODE.exists():

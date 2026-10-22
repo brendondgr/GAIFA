@@ -424,13 +424,21 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
       - Variants other than gfx1151's get checks that don't compare the gfx1151 locks.
     - **Tests:** `services/tts/tests/test_install_runtime.py` (6 dry runs), and both docs' picks per machine. tts's 49 pass.
 
-- [ ] **39.5 stt: CTranslate2 per accel.**
+- [x] **39.5 stt: CTranslate2 per accel.**
   - **Variants:**
     - `cuda`: PyPI's wheel plus the cuBLAS/cuDNN pip packages.
     - `rocm`: today's overlay.
     - `cpu`: everywhere.
   - **Detection:** `stt/asr/acceleration.py` reads `AIHUB_ACCEL` first, before its own probe.
   *Done when:* stt's tests cover the device per accel.
+  - *As built:*
+    - **The installer:** `install.sh --accel` (default `AIHUB_ACCEL`, else rocm where `/dev/kfd` exists, else cpu, which is the old behaviour).
+      - **rocm** keeps the ROCm CTranslate2 overlay.
+      - **cuda** adds `nvidia-cublas-cu12` and `nvidia-cudnn-cu12` 9, found through `[run.variants.cuda]`'s `LD_LIBRARY_PATH`.
+      - **cpu** keeps PyPI's build.
+    - **The device:** `acceleration.detect_hardware()` reads `AIHUB_ACCEL` first, so the gfx1151 int8 guard applies only to the rocm variant.
+    - **The setup doc:** rocm (tested), cuda, then cpu (tested on Linux). The CUDA and CPU variants don't need `curl` and `unzip`.
+    - **Tests:** `services/stt/tests/test_accel.py` (3). stt's 82 pass, and its live check passes here.
 
 - [ ] **39.6 comfy: a native ComfyUI next to the toolbox.**
   - **The native install:** `bin/comfyui` gains a native mode: a venv in `services/comfy/runtime/ComfyUI/` at a pinned commit, with torch per accel (`cuda`, `xpu`, `mps`, `cpu`).

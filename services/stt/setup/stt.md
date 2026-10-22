@@ -11,7 +11,7 @@ check = "aihub check stt --start"
 
 [[steps]]
 run = "aihub install stt"
-what = "makes .venv/ (Python 3.14, about 250 MB); on a machine with a GPU (/dev/kfd) it puts the ROCm build of CTranslate2 in, downloading its release zip with curl and unpacking it with unzip (about 400 MB, from GitHub) when no wheel is kept in runtime/wheels/; it needs host.md's ROCm packages to use the GPU"
+what = "makes .venv/ (Python 3.14, about 250 MB), then for the variant: ROCm puts the ROCm build of CTranslate2 in (its release zip with curl and unzip, about 400 MB, from GitHub, unless a wheel is kept in runtime/wheels/; it needs host.md's ROCm packages), CUDA adds NVIDIA's cuBLAS and cuDNN 9 pip packages (about 1 GB), the CPU needs nothing more"
 
 [[suggest]]
 name = "Whisper small (the balanced preset)"
@@ -28,6 +28,23 @@ body = { preset = "accurate" }
 size_gb = 1.62
 good_for = "nearly large-v3's accuracy at about four times its speed; long or noisy recordings"
 licence = "MIT"
+
+[[variants]]                    # plan 39.5: the ROCm build of CTranslate2 (and host.md's ROCm packages)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]                    # PyPI's CTranslate2 is built with CUDA 12; cuBLAS and cuDNN come from pip
+accel = "cuda"
+os = ["linux", "wsl"]
+needs = ["uv", "ffmpeg"]
+
+[[variants]]                    # everywhere else (CTranslate2 has no Metal or xpu backend)
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+needs = ["uv", "ffmpeg"]
+tested = ["linux"]
+note = "Whisper small transcribes about as fast as real time on a modern CPU"
 -->
 
 # Speech to Text (faster-whisper): setup

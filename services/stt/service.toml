@@ -21,6 +21,9 @@ install = "install.sh"
 STT_DEVICE = "auto"                # auto | cpu | cuda
 HF_HUB_OFFLINE = "0"               # weights download into {models}/stt, never ~/.cache
 
+[run.variants.cuda]                # plan 39.5: CTranslate2 finds the pip-installed cuBLAS and cuDNN here
+env = { LD_LIBRARY_PATH = "{service_dir}/.venv/lib/python3.14/site-packages/nvidia/cublas/lib:{service_dir}/.venv/lib/python3.14/site-packages/nvidia/cudnn/lib" }
+
 [memory]
 estimate_gb = 1.5                  # small at float16 on the GPU, measured ~1.2 GB; large-v3 needs ~5
 load = "POST /v1/load"

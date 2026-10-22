@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from utils import cli, cli_setup, cli_setup_host
+from utils import cli, cli_setup, cli_setup_host, hardware
 
 
 def block(eid: str, title: str, **keys: str) -> str:
@@ -70,6 +70,8 @@ class FakeProbe(cli_setup_host.Probe):
     def gtt_bytes(self) -> int: return 130_000_000_000
     def mem_bytes(self) -> int: return 130_000_000_000
     def linger(self) -> bool: return True
+    def machine(self):   # this machine's recording (plan 37.3), so the checks don't depend on where tests run
+        return hardware.from_snapshot(json.loads((Path(__file__).resolve().parents[1] / "hardware" / "fixtures" / "strix-halo.json").read_text()))
 
 
 @pytest.fixture

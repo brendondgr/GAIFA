@@ -226,7 +226,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **The doctor** skips the unit and linger checks without systemd.
     - **Docs:** `docs/setup/hub.md`. Tests: `utils/tests/core/test_cli_platform.py` (7).
 
-- [ ] **37.3 Host checks per machine: `utils/cli_setup_gpu.py`, `utils/cli_setup_pkgs.py`.**
+- [x] **37.3 Host checks per machine: `utils/cli_setup_gpu.py`, `utils/cli_setup_pkgs.py`.**
   - **The checks:** `utils/cli_setup_host.py` keeps `Probe`, `Check` and the common checks, and asks `cli_setup_gpu.py` for the GPU checks of the detected machine:
     - **AMD:** today's checks, unchanged.
     - **NVIDIA:** the driver answers `nvidia-smi`, and the NVIDIA Container Toolkit's CDI spec exists when a chosen mod uses containers.
@@ -237,6 +237,13 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - **Kept from Phase 23:** fixes that need root are printed, never run.
   - **Docs:** the per-host docs (38.4).
   *Done when:* `utils/tests/core/test_setup_host.py` runs every fixture through the checks: the right ones apply, fixes are printed for the right package manager, and nothing runs as root; on this machine `aihub setup host` prints what it printed before.
+  - *As built:*
+    - **Which checks apply:** `Probe.machine()` (live: `hardware.detect()`) decides.
+      - Strix Halo's GTT, IOMMU and GTT-size checks apply only to an AMD GPU that shares the memory; an AMD card gets the groups and `/dev/kfd`.
+      - `clone-under-home` (the ComfyUI toolbox) applies only on such an AMD machine, and `linger` only on Linux.
+      - A machine without a GPU gets one note.
+    - **Fixes:** NVIDIA's driver fix is the distribution's package, or "update it on Windows" under WSL.
+    - **Tests:** `test_cli_setup.py`'s fake probe answers this machine's recording, so the tests don't depend on where they run. `test_setup_host.py` (8). On this machine `aihub setup host` prints the same nine checks as before.
 
 - [ ] **37.4 The GPU in containers: `services/_template/containers.py`.**
   - A mod-side helper, copied into mods the way `gpu_slot.py` is. `gpu_args(machine, runtime)` returns the GPU flags:

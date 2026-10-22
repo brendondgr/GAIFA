@@ -1,7 +1,8 @@
 """Which variant of a setup this machine gets (plan 38.2). Standard library only.
 
-A setup's variants (its doc's `[[variants]]`, or the one a version-2 block stands for) are tried in order:
-the first whose `accel` this machine has (`utils/hardware`, best first) and whose `os` matches wins. With
+A setup's variants (its doc's `[[variants]]`, or the one a version-2 block stands for) are tried in the
+doc's order, its author's preference: the first whose `accel` this machine has (`utils/hardware`) and whose
+`os` matches wins (lcpp lists its prebuilt Vulkan build before a CUDA build from source). With
 `--accel <setup or mod>=<accel>` a person picks another. A setup with none that fits is "not available on
 this machine" and is left out, with the reason. The chosen variant's steps, check and smoke replace the
 block's where it has its own, and they run with its `env` plus `AIHUB_ACCEL` and `AIHUB_DEVICE`.
@@ -44,10 +45,9 @@ def pick(e: Any, m: hardware.Machine, want: str | None = None) -> tuple[Any | No
             if v.accel == want and os_ in v.os:
                 return v, ""
         return None, f"it has no {want} variant for {OS_LABEL[os_]}"
-    for accel in m.accels:
-        for v in variants:
-            if v.accel == accel and os_ in v.os:
-                return v, ""
+    for v in variants:
+        if v.accel in m.accels and os_ in v.os:
+            return v, ""
     here = [v for v in variants if os_ in v.os]
     if not here:
         return None, f"it doesn't run on {OS_LABEL[os_]} (only {', '.join(sorted({OS_LABEL[o] for v in variants for o in v.os}))})"
@@ -70,6 +70,8 @@ def apply(e: Any, v: Any, m: hardware.Machine) -> Any:
         e.setup.check = v.check
     if v.smoke:
         e.setup.smoke = v.smoke
+    if v.needs is not None:
+        e.setup.needs = list(v.needs)
     e.variant = v
     e.run_env = env_of(v, m)
     return e

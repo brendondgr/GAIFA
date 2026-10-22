@@ -25,6 +25,9 @@ LCPP_MODELS_DIR = "{models}/llm"
 LCPP_BACKEND = "systemd"
 LCPP_STATE_DIR = "{root}/data/state/lcpp"   # instance records inside the project (plan 16.2)
 
+[run.variants.mps]                 # plan 39.2: macOS has no systemd, so instances run as lcpp's child processes
+env = { LCPP_BACKEND = "subprocess" }
+
 [memory]
 # No load/unload operations: instances are started and stopped on the Launcher page, and lcpp is
 # in [memory] never_unload. A launch asks AIHub for memory itself (POST /api/memory/acquire).

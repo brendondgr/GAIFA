@@ -390,10 +390,16 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
     - **The sandbox** takes its runtime from `AIHUB_CONTAINER_RUNTIME` (a copy of the template's `containers.py`). Docker runs as your uid and gid, gets `bridge`, and has no cache overlays, so the caches start empty. Podman off Linux gets `bridge` instead of `pasta`. `label=disable` applies only where SELinux is enforcing, so this machine's command line is unchanged.
     - **Tests:** `services/workspace/tests/test_sandbox_runtimes.py` (4), and the workspace's 116 pass.
 
-- [ ] **39.2 lcpp: llama.cpp per accel.**
+- [x] **39.2 lcpp: llama.cpp per accel.**
   - **The binary:** the setup step fetches ggml-org's release asset for the OS and accel when one exists (Vulkan and CPU on Linux, Metal on macOS). Otherwise it builds from source into `runtime/llama.cpp/bin/` with `-DGGML_CUDA=ON` or `-DGGML_SYCL=ON`.
   - **Instances:** they keep the systemd backend on Linux and WSL2, and use lcpp's subprocess backend on macOS.
   *Done when:* lcpp's tests pass; `aihub docs --check --strict` is clean; on this machine `aihub setup --plan lcpp` picks Vulkan.
+  - *As built:*
+    - **The variants**, in lcpp's order: Vulkan (the checksummed prebuilt asset, on Linux with any GPU vendor's Vulkan driver), CUDA (Linux and WSL2), Metal (`mps`, macOS) and CPU.
+    - **Source builds:** ggml-org publishes no Linux CUDA asset, so CUDA, Metal and CPU build from source with `scripts/build-llama-cpp.sh <accel> <tag>`: a static `llama-server` in `runtime/llama.cpp/bin/llama-<tag>-<accel>/`, with `current` pointed at it. The CPU build ran here in a scratch copy and printed its version.
+    - **macOS:** `[run.variants.mps]` sets `LCPP_BACKEND = "subprocess"`.
+    - **Two block changes on the way:** variants are tried in the doc's order (the author's preference), not the machine's accel order, so Linux with NVIDIA gets the prebuilt Vulkan build before a CUDA source build. And a variant may carry its own `needs`, so macOS isn't blocked by `systemd-run`.
+    - **Tests:** `utils/tests/docs/test_variants_per_machine.py` checks every real doc's pick on every recorded machine, and grows with each mod. lcpp's 91 tests pass.
 
 - [ ] **39.3 embed and decide: torch per accel.**
   - **Wheels:** `cuda` (a cu12x index), `xpu`, `mps` and `cpu` next to today's ROCm lock.

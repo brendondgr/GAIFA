@@ -18,7 +18,7 @@ from typing import Any
 
 TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config",
        "variants", "smoke"}
-VARIANT = {"accel", "os", "tested", "env", "steps", "check", "smoke", "note"}
+VARIANT = {"accel", "os", "tested", "env", "steps", "check", "smoke", "note", "needs"}
 ACCELS = ("rocm", "cuda", "xpu", "mps", "vulkan", "cpu")        # utils/hardware ACCELS, in the order they're tried
 OSES = ("linux", "wsl", "darwin")
 CONFIG = {"key", "text", "choices", "required", "restart"}
@@ -78,6 +78,7 @@ class Variant:
     check: str = ""                                            # its own check; "": the block's
     smoke: str = ""                                            # its own smoke; "": the block's
     note: str = ""                                             # one line for the plan ("slow on the CPU")
+    needs: list[str] | None = None                             # its own host commands; None: the block's
 
 
 @dataclass
@@ -250,8 +251,10 @@ def _variant(i: int, d: Any) -> tuple[Variant | None, str | None]:
     for key in ("check", "smoke", "note"):
         if not isinstance(d.get(key, ""), str):
             return None, f"{where}: `{key}` must be a string"
+    if "needs" in d and not (_strs(d["needs"]) or d["needs"] == []):
+        return None, f"{where}: `needs` must be a list of commands"
     return Variant(d["accel"], list(oses), list(tested), dict(env), steps, d.get("check", "").strip(), d.get("smoke", "").strip(),
-                   d.get("note", "").strip()), None
+                   d.get("note", "").strip(), [s.strip() for s in d["needs"]] if "needs" in d else None), None
 
 
 def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:

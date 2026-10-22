@@ -42,7 +42,13 @@ def test_version_2_blocks_stand_for_one_variant():
     ({"variants": [{"accel": "cuda", "gpu": True}]}, "unknown key(s) gpu"),
     ({"variants": {"accel": "cuda"}}, "`variants` must be an array"),
     ({"smoke": ""}, "`smoke` must be a non-empty command"),
+    ({"variants": [{"accel": "cpu", "needs": "uv"}]}, "`needs` must be a list"),
 ])
 def test_bad_variants(bad, msg):
     setup, problem = read(bad)
     assert setup is None and msg in problem
+
+
+def test_variant_needs():
+    s = ok({"needs": ["systemd-run"], "variants": [{"accel": "mps", "os": ["darwin"], "needs": ["uv"]}, {"accel": "cpu"}]})
+    assert s.variants[0].needs == ["uv"] and s.variants[1].needs is None

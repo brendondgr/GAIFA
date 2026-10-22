@@ -46,10 +46,41 @@ start_op = "POST /api/instances"
 start_body = { model_id = "gemma-4-26b-a4b-it" }
 next = "lcpp instances stop at a reboot: to bring back what was running, set [sessions] restore_on_boot = true in config.toml (Settings → Sessions), which restores the setup from before the restart, lcpp instances included; or launch it again on the LLM Launcher page"
 
-[[variants]]                    # plan 38.2: this doc's steps fetch the Vulkan build (plan 39.2 adds the others)
+[[variants]]                    # plan 39.2: the prebuilt Vulkan release (the steps above); AMD, NVIDIA and Intel on Linux
 accel = "vulkan"
 os = ["linux"]
 tested = true
+
+[[variants]]                    # NVIDIA under WSL2, or on Linux without Vulkan: built from source (no Linux CUDA asset)
+accel = "cuda"
+os = ["linux", "wsl"]
+needs = ["uv", "git", "cmake", "nvcc", "systemd-run"]
+note = "built from source with the CUDA toolkit (10–20 min)"
+steps = [
+  { run = "aihub install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
+  { run = "scripts/build-llama-cpp.sh cuda b11445", what = "clones llama.cpp b11445 and builds llama-server with CUDA (about 1 GB of source and build, 10–20 min), then points runtime/llama.cpp/bin/current at it" },
+]
+
+[[variants]]                    # Apple Silicon: Metal; instances run as lcpp's child processes (no systemd)
+accel = "mps"
+os = ["darwin"]
+needs = ["uv", "git", "cmake"]
+note = "built from source with Metal (5–10 min)"
+steps = [
+  { run = "aihub install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
+  { run = "scripts/build-llama-cpp.sh mps b11445", what = "clones llama.cpp b11445 and builds llama-server with Metal (5–10 min)" },
+]
+
+[[variants]]                    # no GPU llama.cpp can use: the CPU (slow for big models)
+accel = "cpu"
+os = ["linux", "wsl"]
+needs = ["uv", "git", "cmake", "systemd-run"]
+tested = ["linux"]
+note = "built from source for this CPU; slow for big models"
+steps = [
+  { run = "aihub install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
+  { run = "scripts/build-llama-cpp.sh cpu b11445", what = "clones llama.cpp b11445 and builds llama-server for this CPU (3–5 min)" },
+]
 -->
 
 # llama.cpp (LLM Launcher): setup
@@ -116,6 +147,19 @@ ln -sfn llama-b11445 services/lcpp/runtime/llama.cpp/bin/current
 ```
 
 `data/lcpp.json` runs `runtime/llama.cpp/bin/current/llama-server`, so moving `current` is how you upgrade or roll back (`aihub restart lcpp` afterwards; running instances keep their binary).
+
+### On other machines (plan 39.2)
+
+`aihub setup lcpp` picks the build from `aihub hardware`, in this order:
+
+| Variant | Where | How |
+|---|---|---|
+| Vulkan | Linux with an AMD, NVIDIA or Intel GPU that has a Vulkan driver | the prebuilt release asset above (checksummed) |
+| CUDA | WSL2 with NVIDIA, or Linux with NVIDIA but no Vulkan driver | `scripts/build-llama-cpp.sh cuda b11445`: a source build; needs `git`, `cmake` and the CUDA toolkit's `nvcc` |
+| Metal (`mps`) | macOS on Apple Silicon | `scripts/build-llama-cpp.sh mps b11445`; instances run as lcpp's child processes (`[run.variants.mps]`: no systemd) |
+| CPU | anything else | `scripts/build-llama-cpp.sh cpu b11445` |
+
+The script builds a static `llama-server` into `runtime/llama.cpp/bin/llama-b11445-<accel>/` and points `current` at it (`LCPP_NO_LINK=1` builds without switching). Only the Vulkan and CPU builds have run (the CPU one on this machine, as a test); the others are untested until a field test reports on them.
 
 ## Choosing models
 

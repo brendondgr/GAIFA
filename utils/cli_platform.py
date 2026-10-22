@@ -157,6 +157,18 @@ def _pidfile(root: Path) -> Path:
     return root / "data" / "state" / "hub" / "aihub.json"
 
 
+def _alive(pid: int) -> bool:
+    """The process exists and isn't a zombie (one that has exited but wasn't reaped yet)."""
+    try:
+        os.kill(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[-1].split()[0] != "Z"
+    except OSError:
+        return True      # no /proc (macOS): its liveness is all there is
+
+
 def hub_pid(root: Path) -> int | None:
     """The detached hub's pid while it runs (its pidfile, checked against the process's command)."""
     try:
@@ -164,9 +176,7 @@ def hub_pid(root: Path) -> int | None:
         pid = int(rec["pid"])
     except (OSError, ValueError, KeyError, TypeError):
         return None
-    try:
-        os.kill(pid, 0)
-    except (ProcessLookupError, PermissionError):
+    if not _alive(pid):
         return None
     try:
         cmd = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
@@ -199,12 +209,13 @@ def hub_stop(root: Path, timeout: float = 20) -> bool:
     os.kill(pid, signal.SIGTERM)
     end = time.monotonic() + timeout
     while time.monotonic() < end:
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
+        if not _alive(pid):
             break
         time.sleep(0.2)
     else:
-        os.kill(pid, signal.SIGKILL)
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
     _pidfile(root).unlink(missing_ok=True)
     return True

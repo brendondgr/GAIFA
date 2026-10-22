@@ -98,3 +98,17 @@ def test_without_the_hub_the_choice_goes_into_config_toml(root3, capsys):
     text = (root3 / "config.toml").read_text()
     assert '[services.tts]\naccel = "cuda"' in text
     assert any("restart the hub" in n for n in out(capsys)["next"])
+
+
+def test_the_docs_order_is_the_preference(root3, capsys):
+    pref = block("lcpp", "llama.cpp", summary='"LLMs"', disk_gb="1", needs='["systemd-run"]',
+                 _tables='[[variants]]\naccel = "vulkan"\nos = ["linux"]\n\n[[variants]]\naccel = "cuda"\nos = ["linux", "wsl"]\n\n'
+                         '[[variants]]\naccel = "mps"\nos = ["darwin"]\nneeds = ["curl"]')
+    d = root3 / "services" / "lcpp" / "setup"
+    d.mkdir(parents=True)
+    (d.parent / "service.toml").write_text('id = "lcpp"\n')
+    (d / "env.md").write_text(pref)
+    assert [v["accel"] for v in plan(capsys, "lcpp", probe=Probe("linux-nvidia-1gpu"))["variants"]] == ["vulkan"]   # before cuda: the doc's order
+    assert [v["accel"] for v in plan(capsys, "lcpp", probe=Probe("wsl2-nvidia"))["variants"]] == ["cuda"]           # no Vulkan under WSL
+    p = plan(capsys, "lcpp", probe=Probe("macos-m3"))
+    assert [v["accel"] for v in p["variants"]] == ["mps"] and "needs:systemd-run" not in {c["id"] for c in p["host"]}

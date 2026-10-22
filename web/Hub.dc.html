@@ -791,6 +791,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
                   <h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Versions</h2>
                   <dl style="margin:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;font-size:13px"><sc-for list="{{ se.versions }}" as="x" hint-placeholder-count="5"><dt>{{ x.k }}</dt><dd style="margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--mut,#8A94A6)">{{ x.v }}</dd></sc-for></dl>
                 </section>
+                {{ se.hwEl }}
                 <section aria-label="Doctor" style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
                   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Doctor</h2><sc-if value="{{ se.doc.has }}" hint-placeholder-val="{{ false }}"><span style="{{ se.doc.chipSt }}">{{ se.doc.summary }}</span></sc-if><span style="flex:1"></span><span style="font-size:12px;color:var(--mut,#8A94A6)">{{ se.doc.when }}</span><button onClick="{{ se.doc.run }}" disabled="{{ se.doc.runDis }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">{{ se.doc.runLabel }}</button></div>
                   <div style="font-size:12px;color:var(--mut,#8A94A6)">Models on disk, mod manifests, paths outside the project, ports, units, disk space and offline mods. The same report as <code>aihub doctor</code>.</div>
@@ -1153,6 +1154,7 @@ class Component extends DCLogic {
     this.pages = {}; this.modListeners = new Set();
     const imp = f => import(new URL(f, location.href).href);
     imp('gpu-queue.js').then(m => { this.Gpu = m; this.forceUpdate(); });  // plan 31.5: the GPU queue (memory popover, Overview widget, job rows)
+    imp('hardware.js').then(m => { this.Hw = m; this.forceUpdate(); });  // plan 35.2: Settings → About → Hardware
     Promise.all([imp('nav/sidebar.js'), imp('nav/services-page.js')]).then(([a, b]) => { this.Nav = a; this.SvcsPage = b; this.forceUpdate(); });  // plan 33: the sidebar and the Services page
     const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning, hidden, palMeaning] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
       imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js'), imp('outputs/meaning.js'), imp('outputs/hidden.js'), imp('palette-meaning.js')]);
@@ -2245,6 +2247,7 @@ class Component extends DCLogic {
     const v = { loaded: true, loading: false, nav: SECS.map(x => ({ label: cap(x), href: '#/settings/' + x, st: navSt(x === sec), cur: x === sec ? 'page' : undefined })), sec: Object.fromEntries(SECS.map(x => [x, x === sec])) };
     v.sessionsEl = sec === 'sessions' && this.Sess ? React.createElement('section', { style: { background: 'var(--card,#11151D)', border: '1px solid var(--bd,#1D2430)', borderRadius: 10, padding: 16 } },
       React.createElement(this.Sess.SessionsPanel, { api: this.api, toast: (t, l) => this.toast(t, l), on: this.modOn })) : null;
+    v.hwEl = sec === 'about' && this.Hw ? React.createElement(this.Hw.HardwareCard, { api: this.api }) : null;
     v.agentEl = sec === 'agent' && this.ChatSettings ? React.createElement(this.ChatSettings.AgentSettings, { api: this.api, toast: (t, l) => this.toast(t, l) }) : null;
     const miss = (SETTINGS_AREAS[sec] || []).filter(a => !this.api.isLive?.(a));
     v.mock = miss.length > 0; v.mockText = `Mock data: the ${miss.join(' and ')} ${miss.length > 1 ? 'areas aren’t' : 'area isn’t'} live yet.`;

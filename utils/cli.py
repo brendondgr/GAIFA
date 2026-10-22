@@ -204,6 +204,18 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return _setup().cmd_setup(args)
 
 
+def _hardware() -> Any:
+    """utils/cli_hardware.py (plan 35.2), loaded like cli_setup: as a script or as the package."""
+    if __package__:
+        from utils import cli_hardware
+    else:
+        here = str(Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import cli_hardware  # type: ignore[no-redef]
+    return cli_hardware
+
+
 def cmd_backup(args: argparse.Namespace) -> int:
     """utils/cli_backup.py (plan 12.5), loaded only when a backup runs."""
     try:
@@ -430,6 +442,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     checks.append(("config.toml", cfg_ok, cfg_note))
     checks.append(("systemd unit", unit_installed(), str(UNIT_DIR / UNIT) if unit_installed() else "run `aihub install`"))
     checks.append(("linger", linger(), "on" if linger() else f"loginctl enable-linger {os.environ.get('USER', '')}"))
+    try:
+        m = _hardware().hardware.detect()
+        gpus = "; ".join(f"{g.name}{f' ({g.arch})' if g.arch else ''}" for g in m.gpus) or "no GPU"
+        checks.append(("hardware", True, f"{gpus} · accels {', '.join(m.accels)} (aihub hardware)"))
+        checks += [(f"gpu {g.index}", False, p) for g in m.gpus for p in g.problems if not set(m.accels) & {"rocm", "cuda", "xpu", "mps"}]   # a problem matters when no GPU can compute
+    except Exception as e:  # noqa: BLE001: detection must never stop the doctor
+        checks.append(("hardware", False, f"couldn't read: {e}"))
     if getattr(args, "inventory", False):
         return cmd_inventory(args)
     report = None
@@ -527,6 +546,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--start", action="store_true", help="start it first if it isn't running")
     p.set_defaults(fn=cmd_check)
+    _hardware().add_parser(sub)
     _setup().add_parser(sub)
     sub.choices["setup"].set_defaults(fn=cmd_setup)
     p = sub.add_parser("docs", help="regenerate the mods index (docs/setup/README.md) and this machine's model inventory (data/state/setup/models/)")

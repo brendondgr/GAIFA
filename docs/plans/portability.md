@@ -97,11 +97,17 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
       - `/dev/kfd` is looked for in `/dev`'s listing, never opened.
     - Tests: `utils/tests/hardware/test_detect.py` (19), with a new `linux` marker.
 
-- [ ] **35.2 Show it: `GET /api/system/hardware`, `aihub hardware`, Settings → About.**
+- [x] **35.2 Show it: `GET /api/system/hardware`, `aihub hardware`, Settings → About.**
   - The route returns `Machine`. `aihub hardware [--json]` prints it (standard library only, no hub needed), and `aihub doctor` adds a Hardware section.
   - Settings → About gets a Hardware card listing each GPU's vendor, arch, memory and runtimes, and the accelerators found (a `web/PATCHES.md` entry).
   - Brief §6/§11.7 gain the route and its type, and the contract test covers it. `AIHUB_HARDWARE_FIXTURE=<dir>` (dev only) makes the hub read a fixture instead of the machine.
   *Done when:* `utils/tests/hardware/test_routes_hardware.py` covers the route and the fixture override; `utils/tests/core/test_cli.py` covers `aihub hardware --json`; the card is checked in a browser on a `--demo-mods` hub with the `linux-nvidia-2gpu` fixture.
+  - *As built:*
+    - **The CLI:** `aihub hardware` lives in `utils/cli_hardware.py`, loaded like `cli_setup`, so it stays standard library only when `bin/aihub` runs it as a script. `--snapshot FILE` writes the recording and `--from FILE` replays one; the field report (40.2) uses both.
+    - **The route:** `?refresh=true` reads the machine again.
+    - **The doctor:** a `hardware` line; GPU problems count as failures only when no GPU can compute (so an Intel iGPU without Level Zero on an NVIDIA box doesn't fail it).
+    - **Detection:** an integrated GPU with no size of its own may address the system's memory.
+    - **The card:** `web/hardware.js` (PATCHES #42), checked in the browser on a second hub with the two-RTX-3090 fixture. Tests: `test_routes_hardware.py` (6), `hardware.test.mjs` (2), and the contract's `Hardware` and `HardwareGpu`.
 
 - [ ] **35.3 Process and memory reads without `/proc`: `utils/proc.py` split.**
   - **The Linux file:** `utils/proc_linux.py` keeps today's reads: PSS from `smaps_rollup`, DRM fdinfo, cgroups, `/proc/net/tcp`.

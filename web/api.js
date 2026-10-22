@@ -9,7 +9,7 @@ export class ApiError extends Error {
 
 // Method → area (brief §6.1). getOverview and subscribe span areas and are handled separately.
 export const METHOD_AREA = {
-  getSystem: 'system', getDoctor: 'system',
+  getSystem: 'system', getDoctor: 'system', getHardware: 'system',
   listServices: 'services', getService: 'services', startService: 'services', stopService: 'services',
   restartService: 'services', loadService: 'services', unloadService: 'services', saveServiceConfig: 'services',
   getServiceLogs: 'logs', streamServiceLogs: 'logs',
@@ -138,6 +138,7 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     getOverview: () => req('GET', '/api/overview'),
     getSystem: () => req('GET', '/api/system'),
     getDoctor: () => req('GET', '/api/doctor'),
+    getHardware: (refresh = false) => req('GET', `/api/system/hardware${refresh ? '?refresh=true' : ''}`),
     getRecentEvents: (limit = 80) => req('GET', `/api/events/recent${qs({ limit })}`),  // not in the brief: getOverview's fill-in while `overview` is mocked
     listServices: () => req('GET', '/api/services'),
     getService: id => req('GET', `/api/services/${enc(id)}`),

@@ -277,7 +277,7 @@ One page with sections (hash `#/settings/<section>`), Save and Revert, an unsave
   - per service: enabled toggle, autostart toggle, and sidebar order (up/down)
   - an **"Add a mod"** card explaining the three steps (`bin/aihub new <id>`, edit `services/<id>/service.toml`, restart the AIHub), with a link to the template
 - **Interface**: theme (System/Light/Dark), density (Comfortable/Compact).
-- **About**: versions, and the CLI equivalents `bin/aihub status`, `bin/aihub start <id>`, `bin/aihub logs <id> -f`, `bin/aihub new <id>`. A **Doctor** panel (plan 12.4) runs `getDoctor()`: the counts, then the warn and fail checks with their fixes, the rest folded; a Run again button. `aihub doctor` prints the same report.
+- **About**: versions, and the CLI equivalents `bin/aihub status`, `bin/aihub start <id>`, `bin/aihub logs <id> -f`, `bin/aihub new <id>`. A **Hardware** card (plan 35.2) shows `getHardware()`: the system line (OS, CPU, memory), one row per GPU (name, arch, unified or dedicated memory, runtimes, what it can run, and any problem in amber), and the accelerators AIHub can use here, with Read again. A **Doctor** panel (plan 12.4) runs `getDoctor()`: the counts, then the warn and fail checks with their fixes, the rest folded; a Run again button. `aihub doctor` prints the same report.
 
 ---
 
@@ -867,6 +867,7 @@ What every chart must do:
 | `listWidgets()` | `GET /api/widgets` | `WidgetInfo[]` |
 | `getWidget(service, id, {range})` | `GET /api/widgets/{service}/{id}?range=` | `WidgetData` |
 | `getDoctor()` | `GET /api/doctor` | `Doctor` (plan 12.4; Settings → About) |
+| `getHardware(refresh?)` | `GET /api/system/hardware[?refresh=true]` | `Hardware` (plan 35.2; Settings → About): read once and cached; `refresh` reads the machine again |
 
 ```ts
 // Series names: "mem.total" "mem.used" "mem.available" "mem.reserve" "mem.other" "gpu.gtt_used"
@@ -888,6 +889,13 @@ interface WidgetInfo { service: string; id: string; title: string; kind: "line" 
                        ranges: string[]; span: 3 | 4 | 6 | 12 }
 interface DoctorCheck { area: "models" | "manifests" | "paths" | "ports" | "units" | "disk" | "offline";
                        level: "ok" | "note" | "warn" | "fail"; title: string; detail: string; fix?: string }
+interface Hardware { os: "linux" | "darwin" | "windows"; arch: string; wsl: boolean; container: string;   // plan 35.2
+                     distro: Record<string, string>; kernel: string; cpu: string; cpus: number; ram_bytes: number; pkg: string;
+                     gpus: HardwareGpu[]; accels: string[];   // rocm | cuda | xpu | mps | vulkan, best first; cpu last
+                     unified: boolean }                       // one memory pool: every GPU shares the system's RAM
+interface HardwareGpu { vendor: "amd" | "nvidia" | "intel" | "apple"; name: string; memory: "unified" | "dedicated" | "unknown";
+                        vram_bytes: number; arch: string; driver: string; pci: string; index: number; vendor_index: number;
+                        runtimes: Record<string, string>; accels: string[]; problems: string[] }
 interface Doctor { ts: number; ok: boolean;                                  // ok = no "fail" checks
                    counts: { ok: number; note: number; warn: number; fail: number }; checks: DoctorCheck[] }
 interface WidgetData { unit?: string; t?: number[]; categories?: string[];

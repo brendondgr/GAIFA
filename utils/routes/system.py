@@ -15,7 +15,8 @@ from pydantic import BaseModel, Field
 from fastapi.responses import Response
 
 from utils import doctor
-from utils.api_models import Doctor, SystemInfo
+from utils import hardware
+from utils.api_models import Doctor, Hardware, SystemInfo
 
 router = APIRouter(tags=["system"])
 
@@ -83,6 +84,12 @@ async def system_info(hub: Any) -> dict[str, Any]:
         "usage": await _usage(p.models, p.databases, p.outputs, p.logs, p.state),
         "disk": {"free_bytes": disk.free, "total_bytes": disk.total},
     }
+
+
+@router.get("/api/system/hardware", summary="What this machine has: OS, GPUs, their memory and runtimes, the usable accelerators", response_model=Hardware)
+async def get_hardware(refresh: bool = False) -> dict:
+    """Read once and cached; `?refresh=true` reads the machine again (plan 35.2)."""
+    return (await asyncio.to_thread(hardware.detect, refresh)).to_dict()
 
 
 @router.get("/api/doctor", summary="Install checks: models on disk, manifests, paths outside the project, ports, units, disk, offline mods", response_model=Doctor, response_model_exclude_none=True)

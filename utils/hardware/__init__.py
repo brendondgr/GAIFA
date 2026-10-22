@@ -53,6 +53,9 @@ def detect_from(src: Source) -> Machine:
         m.container = osinfo.container(src)
         m.wsl = wsl.is_wsl(src)
         m.gpus = wsl.gpus(src) if m.wsl else _gpus_linux(src)
+    for g in m.gpus:
+        if g.memory == "unified" and not g.vram_bytes:
+            g.vram_bytes = m.ram_bytes          # an integrated GPU may address the system's memory
     # Dedicated GPUs first (the bigger the better), then integrated ones; number them.
     m.gpus.sort(key=lambda g: (g.memory != "dedicated", -g.vram_bytes))
     seen: dict[str, int] = {}

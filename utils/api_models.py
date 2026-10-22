@@ -528,6 +528,41 @@ class SystemInfo(_Model):
     disk: Disk
 
 
+class HardwareGpu(_Model):
+    """One GPU (plan 35.2): `utils.hardware.Gpu`."""
+
+    vendor: Literal["amd", "nvidia", "intel", "apple"]
+    name: str
+    memory: Literal["unified", "dedicated", "unknown"] = Field(description="unified: shares the system's RAM; dedicated: its own VRAM")
+    vram_bytes: int = Field(description="dedicated: its VRAM; unified: what it may address")
+    arch: str = Field(description="gfx1151, sm_89, m3, … (empty when unknown)")
+    driver: str
+    pci: str
+    index: int
+    vendor_index: int = Field(description="Its place among this vendor's GPUs (what CUDA_VISIBLE_DEVICES and the like count)")
+    runtimes: dict[str, str]
+    accels: list[str] = Field(description="What can run on it here: rocm, cuda, xpu, mps, vulkan")
+    problems: list[str] = Field(description="Why an accel it could have isn't usable")
+
+
+class Hardware(_Model):
+    """What this machine has (plan 35.2): `utils.hardware.Machine`."""
+
+    os: Literal["linux", "darwin", "windows"]
+    arch: str
+    wsl: bool
+    container: str = Field(description="toolbox, podman or docker when the hub runs inside one")
+    distro: dict[str, str]
+    kernel: str
+    cpu: str
+    cpus: int
+    ram_bytes: int
+    pkg: str = Field(description="The package manager found: dnf, apt, zypper, pacman, brew")
+    gpus: list[HardwareGpu]
+    accels: list[str] = Field(description="Every accel usable here, best first; cpu last")
+    unified: bool = Field(description="One memory pool: every GPU shares the system's RAM (or there's none)")
+
+
 class DoctorCheck(_Model):
     area: Literal["models", "manifests", "paths", "ports", "units", "disk", "offline"]
     level: Literal["ok", "note", "warn", "fail"]

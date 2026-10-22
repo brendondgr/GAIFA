@@ -536,6 +536,14 @@ export function createMockApi() {
   const api = {
     async getOverview() { await net(); return { services: services.map(summary), memory: memory(), recent_outputs: outputs.filter(o => !o.hidden).slice(0, 8).map(clone), activity: activity.slice(0, 30).map(clone), alerts: [...alerts.values()].map(clone), jobs: [...jobs.values()].map(clone), system: system() }; },
     async getSystem() { await net(); return system(); },
+    async getHardware() {  // plan 35.2: GET /api/system/hardware, this machine's shape (the strix-halo fixture)
+      await net();
+      return { os: 'linux', arch: 'x86_64', wsl: false, container: '', distro: { id: 'fedora', version: '44', name: 'Fedora Linux 44 (KDE Plasma Desktop Edition)' },
+        kernel: '7.2.11-200.fc44.x86_64', cpu: 'AMD RYZEN AI MAX+ 395 w/ Radeon 8060S', cpus: 32, ram_bytes: 130446364672, pkg: 'dnf',
+        gpus: [{ vendor: 'amd', name: 'AMD Radeon 8060S Graphics', memory: 'unified', vram_bytes: 130446364672, arch: 'gfx1151', driver: 'amdgpu', pci: '0000:c4:00.0',
+          index: 0, vendor_index: 0, runtimes: { rocm: '7.1', vulkan: 'yes' }, accels: ['rocm', 'vulkan'], problems: [] }],
+        accels: ['rocm', 'vulkan', 'cpu'], unified: true };
+    },
     async getDoctor() {  // plan 12.4: the shape of GET /api/doctor, from the mock's own mods
       await net();
       const checks = [{ area: 'models', level: 'ok', title: 'models registry: 14 models, every file present', detail: '3 not checksummed yet (aihub models verify --all)' },

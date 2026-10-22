@@ -76,3 +76,41 @@ test('the model and environment menus list their choices and call back', () => {
   list[1].props.onClick();
   assert.deepEqual(got, ['gemma4-26B', 'grants']);
 });
+
+// Plan 42.4: environments made and changed from the chat.
+test('the environment calls: create, rename, add a folder, its level, remove it', async () => {
+  const seen = [];
+  const api = { callService: async (mod, method, p, o) => { seen.push([mod, method, p, o.json]); return { json: { id: 'grants', name: 'Grants' } }; } };
+  const ops = ctl.envOps(api);
+  await ops.create('Grants');
+  await ops.rename('grants', 'Grant work');
+  await ops.addFolder('grants', '~/Docs', 'edit');
+  await ops.setLevel('grants', 'docs', 'run');
+  await ops.removeFolder('grants', 'docs');
+  assert.deepEqual(seen, [
+    ['workspace', 'POST', '/v1/environments', { name: 'Grants' }],
+    ['workspace', 'PUT', '/v1/environments/grants', { name: 'Grant work' }],
+    ['workspace', 'POST', '/v1/environments/grants/folders', { path: '~/Docs', level: 'edit' }],
+    ['workspace', 'PATCH', '/v1/environments/grants/folders/docs', { level: 'run' }],
+    ['workspace', 'DELETE', '/v1/environments/grants/folders/docs', undefined]]);
+  assert.equal(ctl.errLine({ detail: '/etc is outside your home', data: { fix: 'pick a folder in your home' } }), '/etc is outside your home — pick a folder in your home');
+  assert.equal(ctl.errLine(new Error('boom')), 'boom');
+});
+
+test('the editor: each folder with its level (up to its cap) and Remove, Add a folder, New environment', () => {
+  const env = { id: 'default', name: 'Default', folders: [{ id: 'aihub', path: '/home/u/Agents/AIHub', level: 'read', max_level: 'read', capped: 'the AIHub folder stays at Read' },
+    { id: 'a', path: '/home/u/a', level: 'edit', max_level: 'run_net' }] };
+  const el = expand(ctl.EnvEditor({ api: { callService: async () => ({ json: {} }) }, env }));
+  const groups = all(el, n => n.props?.role === 'group');
+  assert.equal(groups.length, 2);
+  const capped = groups[0].props.children.filter(Boolean);
+  assert.deepEqual(capped.map(b => b.props.disabled), [false, true, true, true]);           // only Read where it's capped
+  assert.equal(capped[0].props['aria-pressed'], 'true');
+  assert.equal(groups[1].props.children.filter(Boolean).find(b => b.props['aria-pressed'] === 'true').props.title, 'Edit');
+  assert.equal(all(el, n => n.props?.['aria-label']?.startsWith('Remove ')).length, 2);
+  assert.equal(all(el, n => n.props?.['aria-label'] === 'Folder to add').length, 1);
+  assert.match(text(el), /New environment/);
+  assert.match(text(el), /Rename/);
+  const empty = expand(ctl.EnvEditor({ api: { callService: async () => ({ json: {} }) }, env: { id: 'x', name: 'X', folders: [] } }));
+  assert.match(text(empty), /No folders yet/);
+});

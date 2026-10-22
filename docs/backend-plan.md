@@ -3138,9 +3138,9 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
 - [x] **42.3 The controls under the box: `web/chat/chat-controls.js` (new), `chat-header.js`, `chat.js`.**
   - **A row under the message box**, as buttons that open small menus (not selects): the **environment** (its name), the **mode** (Plan · Manual · Accept edits · Auto · Bypass, each with its one line; Auto disabled with the reason while the judge doesn't answer, Bypass only where folders allow it), and the **model** (each with its window). The header loses the model, mode and environment controls.
   *Done when:* `utils/tests/web/chat-controls.test.mjs` (the three buttons and their labels, the mode list's rules from `ModeSelect`, picking calls back), and `environments.test.mjs` still passes.
-- [ ] **42.4 Environments from the chat: `chat-controls.js`, `chat-env.js`.**
+- [x] **42.4 Environments from the chat: `chat-controls.js` (`EnvEditor`, `envOps`).**
   - **The environment menu:** pick one for this chat; **New environment** (a name, then it's this chat's); and for the chosen one, **Rename**, its folders with their level (Read · Edit · Run · Run + network) and Remove, **Add a folder** by path, and the folders allowed in this chat only (as the chip's menu has them). All through the workspace mod's `/v1/environments` routes; "Manage on the Workspace page" stays as a link for Bypass and the rest.
-  *Done when:* `utils/tests/web/environments.test.mjs` (the calls each action makes, a refusal shown with its reason).
+  *Done when:* `utils/tests/web/chat-controls.test.mjs` (the calls each action makes, a refusal shown with its reason). Checked live with a throwaway environment (made, given ~/Agents, renamed, emptied, then deleted).
 - [ ] **42.5 Docs and the live check.** Brief §11.13 (the thread list, the composer, the controls row), structure for `chat-controls.js`, the plan. Live on the installed hub: the sidebar rows and divider, the box growing, the + menu, the controls row, an environment made, renamed, given a folder and removed from the chat.
 
 **Wire — Phase 42:** the Chat page's sidebar, message box and the row under it.

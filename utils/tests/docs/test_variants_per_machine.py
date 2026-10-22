@@ -25,6 +25,7 @@ EXPECTED: dict[str, dict[str, str]] = {
             "wsl2-nvidia": "cuda", "wsl2-intel": "cpu", "macos-m3": "cpu", "linux-cpu": "cpu"},
     **{g: {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "wsl2-nvidia": "cuda"}
        for g in ("gen3d", "gen3d-cubeart", "gen3d-img3d", "gen3d-sam3do")},         # ROCm or CUDA only: elsewhere unavailable
+    "vllm": {"strix-halo": "rocm"},                  # plan 39.8: no CUDA variant yet (its code waits on uncommitted work)
     "tts-breeze": {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "linux-intel-arc": "cpu",
                    "wsl2-nvidia": "cuda", "wsl2-intel": "cpu", "macos-m3": "cpu", "linux-cpu": "cpu"},
 }
@@ -59,3 +60,9 @@ def test_this_machine_keeps_its_backends():
         v, why = cv.pick(e, m)
         assert v is not None, (e.id, why)
         assert m.accels.index(v.accel) is not None and "linux" in v.tested, (e.id, v.accel)
+
+
+def test_every_gpu_mod_has_a_smoke():
+    """Phase 39: what a field test runs to prove the GPU path (vllm and gen3d excepted: no cheap real work)."""
+    have = {e.id for e in envs().values() if e.setup.smoke}
+    assert {"lcpp", "embed", "decide", "tts-kokoro", "stt", "comfyui"} <= have

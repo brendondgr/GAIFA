@@ -8,6 +8,7 @@ gpu = false
 disk_gb = 0.75
 needs = ["uv", "curl", "unzip", "ffmpeg"]
 check = "aihub check stt --start"
+smoke = "aihub start stt >/dev/null && curl -fsS -X POST -H 'content-type: application/json' -d '{\"preset\": \"fast\"}' \"$(aihub url api/s/stt/v1/load)\" >/dev/null && curl -fsS \"$(aihub url api/s/stt/v1/status)\" | tee /dev/stderr | grep -q '\"loaded\": *true'"   # plan 39: real work, run by aihub setup --smoke and the field test
 
 [[steps]]
 run = "aihub install stt"

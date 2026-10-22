@@ -8,6 +8,7 @@ gpu = true
 disk_gb = 6.6
 needs = ["uv"]
 check = "aihub start embed && aihub check embed"
+smoke = "aihub start embed >/dev/null && curl -fsS -H 'content-type: application/json' -d '{\"inputs\": [{\"text\": \"a red bicycle\"}]}' \"$(aihub url api/s/embed/v1/embed)\" | tee /dev/stderr | grep -q '\"dim\": *768'"   # plan 39: real work, run by aihub setup --smoke and the field test
 
 [[steps]]
 run = "aihub install embed"

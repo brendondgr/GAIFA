@@ -9,6 +9,7 @@ disk_gb = 6.6
 needs = ["uv", "espeak-ng", "ffmpeg"]
 after = []
 check = "diff -q <(uv pip freeze --python runtime/venvs/kokoro/bin/python | LC_ALL=C sort) <(LC_ALL=C sort locks/kokoro.txt) && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
+smoke = "aihub start tts >/dev/null && test \"$(curl -fsS -H 'content-type: application/json' -d '{\"model\": \"kokoro\", \"input\": \"Hello from AIHub.\", \"response_format\": \"wav\", \"no_save\": true}' \"$(aihub url api/s/tts/v1/audio/speech)\" | wc -c)\" -gt 10000"   # plan 39: real work, run by aihub setup --smoke and the field test
 
 [[steps]]
 run = "aihub install tts"

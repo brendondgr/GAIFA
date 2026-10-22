@@ -9,6 +9,7 @@ disk_gb = 0.15
 needs = ["uv", "curl", "tar", "sha256sum", "systemd-run"]
 after = ["relay"]
 check = "aihub check lcpp --start"
+smoke = "runtime/llama.cpp/bin/current/llama-server --list-devices 2>&1 | tee /dev/stderr | grep -Eq '^ +(Vulkan|CUDA|Metal|SYCL)[0-9]|CPU'"   # plan 39: real work, run by aihub setup --smoke and the field test
 
 [[steps]]
 run = "aihub install lcpp"

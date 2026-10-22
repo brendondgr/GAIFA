@@ -9,6 +9,7 @@ disk_gb = 4
 images = { "docker.io/kyuz0/amd-strix-halo-comfyui" = 15.1 }
 needs = ["podman", "toolbox", "git"]
 check = "aihub check comfy --start && podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest"
+smoke = "aihub start comfy >/dev/null && curl -fsS -X POST \"$(aihub url api/s/comfy/v1/load)\" >/dev/null && curl -fsS http://127.0.0.1:8199/system_stats | tee /dev/stderr | grep -q '\"devices\"'"   # plan 39: real work, run by aihub setup --smoke and the field test
 
 [[steps]]
 run = "aihub install comfy"

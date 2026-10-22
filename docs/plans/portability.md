@@ -465,9 +465,10 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
 
 - [ ] **39.8 vllm: a CUDA image (parked mod; declaration only).** A `cuda` variant uses `vllm/vllm-openai`, with the attention backends per accel and 37.4's flags.
   *Done when:* vllm's tests cover the container command per accel.
+  - *Not done (2026-10-22):* vllm's code (`vllm_mod/profiles.py`, `engine.py`, `settings.py`, `service.toml` and its tests) holds another session's uncommitted changes in this checkout. Editing it here would mix the two, so the CUDA variant waits until that work lands. Until then vllm keeps its single ROCm variant and is "not available" on other machines, rather than half-working.
 
 **Checks & deliverables — Phase 39**
-- [ ] On this machine: every mod still runs its ROCm or Vulkan variant, and the smokes that fit pass.
+- [x] On this machine: every mod still runs its ROCm or Vulkan variant, and the smokes that fit pass. *(Smokes added to the setup docs of lcpp (`llama-server --list-devices`), embed (one sentence), decide (one question), Kokoro (one wav), stt (load base on the GPU) and comfy (ComfyUI's `system_stats` after a load). All six ran here: Vulkan0 for lcpp; embed, decide and stt on `cuda` (ROCm); ComfyUI 0.37.0 in the toolbox. gen3d and vllm have none: no cheap real work.)*
 - [ ] Delivered: the variants, smokes and setup docs for every mod; the native ComfyUI path; gen3d's CUDA path.
 
 ---

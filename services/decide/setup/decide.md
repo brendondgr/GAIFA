@@ -8,6 +8,7 @@ gpu = true
 disk_gb = 6.6
 needs = ["uv"]
 check = "aihub start decide && aihub check decide"
+smoke = "aihub start decide >/dev/null && curl -fsS -H 'content-type: application/json' -d '{\"input\": \"The sky is blue.\", \"questions\": [{\"id\": \"q\", \"type\": \"yesno\", \"question\": \"Is this about the sky?\"}]}' \"$(aihub url api/s/decide/v1/decide)\" | tee /dev/stderr | grep -q '\"q\"'"   # plan 39: real work, run by aihub setup --smoke and the field test
 
 [[steps]]
 run = "aihub install decide"

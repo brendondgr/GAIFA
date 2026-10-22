@@ -154,18 +154,21 @@ test('the client asks the agent per environment, and the mock answers the same w
 });
 
 // Plan 42.1: the compact sidebar after Claude Code's.
-test('the top: Chats and the search on one line, then the New chat bar with View; no By meaning', () => {
+test('the top: the search across, then + New with View on its right; no Chats label, no By meaning', () => {
   const props = { threads: [], loading: false, activeId: null, q: '', onQ() {}, archived: false, onArchived() {}, onNew() {}, onRename() {}, onArchive() {}, onDelete() {},
     view: g.readView({}), onView() {}, canGroup: true };
   const el = expand(list.ThreadList(props));
   const rows = el.props.children.filter(Boolean);
   const first = rows[0], second = rows[1];
-  assert.match(text(first), /^Chats/);
-  assert.equal(all(first, n => n.type === 'input' && n.props['aria-label'] === 'Search chats').length, 1);
-  assert.match(text(second), /New chat/);
+  const search = all(first, n => n.type === 'input' && n.props['aria-label'] === 'Search chats');
+  assert.equal(search.length, 1);
+  assert.equal(search[0].props.placeholder, 'Search');
+  assert.equal(text(second).trim(), 'New');
   assert.equal(all(second, n => n.props?.['aria-label'] === 'View').length, 1);
-  assert.doesNotMatch(text(el), /By meaning/);
-  assert.match(text(expand(list.ThreadList({ ...props, archived: true }))), /^Archived/);
+  const kids = second.props.children.filter(Boolean);
+  assert.equal(all(kids[kids.length - 1], n => n.props?.['aria-label'] === 'View').length, 1);  // View on the right of New
+  assert.doesNotMatch(text(el), /By meaning|Chats/);
+  assert.equal(all(expand(list.ThreadList({ ...props, archived: true })), n => n.type === 'input')[0].props.placeholder, 'Search archived');
 });
 
 test('a row: its time at the right edge, and ⋯ in the same slot (shown on hover by LIST_CSS)', () => {

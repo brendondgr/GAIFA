@@ -1,5 +1,5 @@
-// The Chat page's thread list (plan 14.1, compact after Claude Code's in plan 42.1): "Chats" and the search on
-// one line, a New chat bar with the View button beside it, then the chats: rename (the ⋯ menu, or double-click a
+// The Chat page's thread list (plan 14.1, compact after Claude Code's in plan 42.1): the search across the top,
+// then "+ New" with the View button on its right, then the chats: rename (the ⋯ menu, or double-click a
 // title), archive, delete (with a confirm), Move to another environment; each row's time sits at its right edge and
 // ⋯ takes its place on hover. The archived toggle and Sessions at the bottom. A drawer on narrow screens (chat.js
 // decides). Grouped by environment (plan 41.2), the list's body is chat-groups.js's sections. Chats by meaning
@@ -52,24 +52,25 @@ export const LIST_CSS = `
 .aichat-item:hover,.aichat-item.open{background:var(--hov,#161C28)}
 .aichat-sechead .aichat-more{opacity:0}.aichat-sechead:hover .aichat-more,.aichat-sechead:focus-within .aichat-more,.aichat-sechead .aichat-more[aria-expanded="true"]{opacity:1}
 .aichat-morebar:hover{color:var(--tx,#E6EAF2)!important}
+.aichat-newbar:hover{background:var(--hov,#161C28)!important}
 @media (hover:none){.aichat-item .aichat-more{display:grid}.aichat-item .aichat-ago{display:none}.aichat-sechead .aichat-more{opacity:1}}
 `;
 
 export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
   grouped = null, view = null, onView = null, canGroup = false, itemProps = () => ({}) }) {
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
-    h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 10px 6px 12px' } },
-      h('span', { style: { ...label11, flex: 'none' } }, archived ? 'Archived' : 'Chats'),
-      h('label', { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, ...inputSt, height: 28, padding: '0 8px' } },
-        h('span', { style: { color: T.mut, display: 'flex' } }, h(Icon, { d: 'search', size: 12 })),
-        h('input', { value: q, onChange: e => onQ(e.target.value), placeholder: 'Search chats', 'aria-label': 'Search chats',
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 4px' } },
+      h('label', { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, ...inputSt, height: 30, padding: '0 9px', borderRadius: 7 } },
+        h('span', { style: { color: T.mut, display: 'flex' } }, h(Icon, { d: 'search', size: 13 })),
+        h('input', { value: q, onChange: e => onQ(e.target.value), placeholder: archived ? 'Search archived' : 'Search', 'aria-label': 'Search chats',
           style: { flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5 } }),
         q ? h('button', { type: 'button', 'aria-label': 'Clear search', onClick: () => onQ(''), style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 0, display: 'flex' } }, h(Icon, { d: 'x', size: 12 })) : null),
       onClose ? h(Btn, { kind: 'ghost', sm: true, icon: 'x', title: 'Close', onClick: onClose }) : null),
-    h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px 8px' } },
-      h('button', { type: 'button', onClick: onNew, className: 'aichat-newbar',
-        style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, height: 30, padding: '0 10px', borderRadius: 7, border: '1px solid ' + T.bds, background: T.card, color: T.tx, font: 'inherit', fontSize: 12.5, fontWeight: 500, cursor: 'pointer' } },
-        h(Icon, { d: 'plus', size: 13 }), 'New chat'),
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '2px 10px 8px 8px' } },
+      h('button', { type: 'button', onClick: onNew, className: 'aichat-newbar', 'aria-label': 'New chat',
+        style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, height: 30, padding: '0 6px', borderRadius: 7, border: 0, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, cursor: 'pointer', textAlign: 'left' } },
+        h('span', { style: { width: 20, height: 20, borderRadius: 99, display: 'grid', placeItems: 'center', background: T.row, color: T.tx, flex: 'none' } }, h(Icon, { d: 'plus', size: 12 })),
+        'New'),
       view && onView ? h(ViewMenu, { view, onChange: onView, grouped: canGroup }) : null),
     grouped && !q.trim() ? h('nav', { 'aria-label': 'Chats by environment', style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },

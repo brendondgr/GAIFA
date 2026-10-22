@@ -3127,7 +3127,7 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
 - **Folders in the environment popup:** typed as a path (the workspace mod checks it and says why it refuses one), with Read · Edit · Run · Run + network and Remove; Bypass stays on the Workspace page.
 
 - [x] **42.1 The sidebar: `web/chat/chat-list.js`, `chat-groups.js`.**
-  - **Top:** "Chats" and the search box on one line; under them a full-width **New chat** bar with the **View** button (the settings icon) on its right. The By meaning chip and its list go.
+  - **Top:** the search box across, then **+ New** with the **View** button (the settings icon) on its right, no "Chats" heading (the user's mock-up, after Claude Code's: first built as "Chats" beside the search and a New chat bar). The By meaning chip and its list go.
   - **A chat's row:** the time sits at the right edge; hovering the row (or focusing it, or its menu being open) highlights it and shows ⋯ in the time's place.
   - **Show more:** a full-width divider, a line on each side of "Show more · N" centred, in sections and in the flat list.
   *Done when:* `utils/tests/web/chat-groups.test.mjs` (the header's two rows, no By meaning, the row's time and ⋯ in one slot, the divider with its count).

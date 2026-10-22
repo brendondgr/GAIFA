@@ -2,8 +2,10 @@
 # Builds .venv/ for the decide mod (run by `aihub install decide`) and downloads d3-lite (1.7 GB) at its pinned
 # revision into data/models/decide/d3-lite when it isn't there, then checks every file against the model's
 # manifest. Re-running is safe.
-#   install.sh            on gfx1151: the exact packages in locks/decide.txt (ROCm nightlies, as tested here)
-#   install.sh --cpu      any other machine: requirements.txt with PyTorch's CPU wheels (slower)
+#   install.sh --accel rocm   (the default) on gfx1151: the exact packages in locks/decide.txt (ROCm nightlies, as tested here);
+#                             another AMD GPU: requirements.txt from AMD's index for its family (AIHUB_GPU_ARCH)
+#   install.sh --accel cuda|xpu|mps|cpu   requirements.txt with PyTorch's wheels for it (decide/torch_index.py; plan 39.3)
+#   install.sh --cpu      the same as --accel cpu: PyTorch's CPU wheels (slower)
 #   install.sh --no-weights
 #   install.sh --force    download the weights again (after `aihub check decide` reports changed files)
 set -euo pipefail
@@ -13,25 +15,29 @@ MODELS="${AIHUB_MODELS:-$HUB/data/models}"
 ROCM_INDEX=https://nightly.repo.amd.com/rocm/whl-next/      # tts's Breeze line, as embed
 REPO=vllm-sr/d3-lite
 REVISION=03560c26f5199c3c04129a2ccb38960c913635e0           # = decide/models/d3_lite.py REVISION (code read 2026-10-20)
-CPU=0 WEIGHTS=1 FORCE=0
-for a in "$@"; do
-  case "$a" in
-    --cpu) CPU=1 ;;
-    --no-weights) WEIGHTS=0 ;;
-    --force) FORCE=1 ;;
-    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
-    *) echo "unknown option: $a" >&2; exit 2 ;;
+WEIGHTS=1 FORCE=0
+ACCEL="${AIHUB_ACCEL:-rocm}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --accel) ACCEL="$2"; shift 2 ;;
+    --cpu) ACCEL=cpu; shift ;;
+    --no-weights) WEIGHTS=0; shift ;;
+    --force) FORCE=1; shift ;;
+    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
 cd "$ROOT"
 uv venv --quiet --allow-existing --python 3.12 --python-preference only-managed .venv
-if [ "$CPU" = 1 ]; then
-  uv pip install --quiet --python .venv/bin/python --index-url https://download.pytorch.org/whl/cpu \
-    --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match -r requirements.txt
-else
+if [ "$ACCEL" = rocm ] && { [ -z "${AIHUB_GPU_ARCH:-}" ] || [ "${AIHUB_GPU_ARCH:-}" = gfx1151 ]; }; then
   uv pip install --quiet --python .venv/bin/python --index-url "$ROCM_INDEX" --extra-index-url https://pypi.org/simple \
     --index-strategy unsafe-best-match -r locks/decide.txt
+else
+  INDEX="$(.venv/bin/python decide/torch_index.py "$ACCEL")"
+  uv pip install --quiet --python .venv/bin/python --index-url "$INDEX" \
+    --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match -r requirements.txt
 fi
+echo "PyTorch for $ACCEL"
 uv pip install --quiet --python .venv/bin/python pytest
 
 DEST="$MODELS/decide/d3-lite"

@@ -11,7 +11,7 @@ check = "aihub start embed && aihub check embed"
 
 [[steps]]
 run = "aihub install embed"
-what = "makes .venv/ from locks/embed.txt (ROCm nightly torch, about 4 GB of wheels, 6.6 GB installed) and downloads EmbeddingGemma 2 (1.5 GB)"
+what = "makes .venv/ with PyTorch for this machine's variant (on gfx1151 locks/embed.txt: ROCm nightly torch, about 4 GB of wheels, 6.6 GB installed; elsewhere requirements.txt from the variant's index) and downloads EmbeddingGemma 2 (1.5 GB)"
 
 [[suggest]]
 name = "EmbeddingGemma 2"
@@ -24,6 +24,28 @@ size_gb = 1.53
 good_for = "the encoder the mod runs: 768-d vectors for text, code, images, audio and video"
 licence = "Apache-2.0"
 required = true
+
+[[variants]]                    # plan 39.3: this machine's (gfx1151's exact lock)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]
+accel = "cuda"
+os = ["linux", "wsl"]
+
+[[variants]]
+accel = "xpu"
+os = ["linux", "wsl"]
+
+[[variants]]
+accel = "mps"
+os = ["darwin"]
+
+[[variants]]
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+note = "slower; fp32"
 -->
 
 # Embeddings: setup

@@ -11,7 +11,7 @@ check = "aihub start decide && aihub check decide"
 
 [[steps]]
 run = "aihub install decide"
-what = "makes .venv/ from locks/decide.txt (ROCm nightly torch, about 4 GB of wheels, 6.6 GB installed) and downloads d3-lite (1.7 GB) at its pinned revision"
+what = "makes .venv/ with PyTorch for this machine's variant (on gfx1151 locks/decide.txt: ROCm nightly torch, about 4 GB of wheels, 6.6 GB installed; elsewhere requirements.txt from the variant's index) and downloads d3-lite (1.7 GB) at its pinned revision"
 
 [[suggest]]
 name = "d3-lite"
@@ -24,6 +24,28 @@ size_gb = 1.73
 good_for = "the decision model the mod runs: yes/no, choice and score questions over text, images and video"
 licence = "Apache-2.0"
 required = true
+
+[[variants]]                    # plan 39.3: this machine's (gfx1151's exact lock)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]
+accel = "cuda"
+os = ["linux", "wsl"]
+
+[[variants]]
+accel = "xpu"
+os = ["linux", "wsl"]
+
+[[variants]]
+accel = "mps"
+os = ["darwin"]
+
+[[variants]]
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+note = "slower; fp32"
 -->
 
 # Decisions: setup

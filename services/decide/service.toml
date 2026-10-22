@@ -21,7 +21,7 @@ install = "install.sh"
 DECIDE_MODELS_DIR = "{models}/decide"
 DECIDE_STATE_DIR = "{root}/data/state/decide"
 DECIDE_MODEL = "d3-lite"
-DECIDE_DEVICE = "auto"              # auto | cuda | cpu (bf16 either way: the checkpoint fixes its numerics)
+DECIDE_DEVICE = "auto"              # auto (the variant: AIHUB_DEVICE) | cuda | xpu | mps | cpu (bf16 either way: the checkpoint fixes its numerics)
 HF_HOME = "{hf_home}"
 HF_HUB_OFFLINE = "1"
 # trust_remote_code copies the model's code into HF_MODULES_CACHE; Triton (the ROCm path) caches kernels; a video

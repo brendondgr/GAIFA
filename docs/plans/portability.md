@@ -401,10 +401,17 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
     - **Two block changes on the way:** variants are tried in the doc's order (the author's preference), not the machine's accel order, so Linux with NVIDIA gets the prebuilt Vulkan build before a CUDA source build. And a variant may carry its own `needs`, so macOS isn't blocked by `systemd-run`.
     - **Tests:** `utils/tests/docs/test_variants_per_machine.py` checks every real doc's pick on every recorded machine, and grows with each mod. lcpp's 91 tests pass.
 
-- [ ] **39.3 embed and decide: torch per accel.**
+- [x] **39.3 embed and decide: torch per accel.**
   - **Wheels:** `cuda` (a cu12x index), `xpu`, `mps` and `cpu` next to today's ROCm lock.
   - **The device:** it comes from `AIHUB_DEVICE`, and `EMBED_DEVICE`/`DECIDE_DEVICE` gain `xpu` and `mps`. d3's ROCm fast path runs only when `AIHUB_ACCEL = rocm`.
   *Done when:* both mods' tests cover the device per accel with a fake torch.
+  - *As built:*
+    - **The installer:** `install.sh --accel <accel>` (default `AIHUB_ACCEL`, else `rocm`; `--cpu` stays). ROCm on gfx1151 (or with no arch known) installs today's lock. Anything else installs `requirements.txt` from `torch_index.py`'s index, copied with `device.py` from the template. The setup's single step, `aihub install <mod>`, passes the variant through `AIHUB_ACCEL`.
+    - **The device:** embed's `encoder.choose` and decide's loader take it from `device.device(want)`: `auto` means `AIHUB_DEVICE`, else what torch reaches, falling back to the CPU when the variant's device is gone. bf16 runs on CUDA/ROCm and xpu, fp32 elsewhere. Caches are emptied per device.
+    - **Not changed:** d3's ROCm fast path lives in the model's own hashed code (`d3_fast.py`), and that code decides it.
+    - **The variants**, in order: rocm (tested), cuda, xpu, mps, cpu.
+    - **Checked live:** after a restart on the installed hub, embed encoded a sentence and decide loaded d3-lite, both on `cuda` (ROCm) in bf16, as before.
+    - **Tests:** `services/embed/tests/test_device.py` (3), `services/decide/tests/test_device.py` (2), and both docs' picks per machine.
 
 - [ ] **39.4 tts: the multi-backend planner becomes the install.** `scripts/install-runtime.sh` takes `--accel` and follows `engines/probe.py`'s plan for indexes other than gfx1151's. Kokoro runs on every accel. Breeze has `rocm` (tested), `cuda` (untested) and `cpu` behind its flag.
   *Done when:* tts's tests cover the plan per accel; `install-runtime.sh --accel cpu --dry-run` prints a CPU-only plan.

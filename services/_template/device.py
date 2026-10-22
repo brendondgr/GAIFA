@@ -38,3 +38,14 @@ def device(want: str | None = None) -> str:
         if choice and choice != "auto":
             return choice
     return next(d for d in ORDER if available(d))
+
+
+def empty_cache(name: str) -> None:
+    """Give the device's cached memory back (after a big batch, or when unloading)."""
+    try:
+        import torch
+    except ImportError:
+        return
+    mod = {"cuda": torch.cuda, "xpu": getattr(torch, "xpu", None), "mps": getattr(torch, "mps", None)}.get(name)
+    if mod is not None and hasattr(mod, "empty_cache"):
+        mod.empty_cache()

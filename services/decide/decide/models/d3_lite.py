@@ -14,6 +14,8 @@ import io
 from pathlib import Path
 from typing import Any
 
+from .. import device as devices
+
 ANSWER_ERRORS = ("invalid_question", "max_length_exceeded", "invalid_model_output")
 
 
@@ -114,18 +116,20 @@ class D3Lite:
         import torch
         from transformers import AutoModel
 
-        gpu = torch.cuda.is_available() and device in ("auto", "cuda")
-        if device == "cuda" and not gpu:
-            raise RuntimeError("DECIDE_DEVICE=cuda but torch sees no GPU")
+        dev = devices.device(device)       # plan 39.3: auto → AIHUB_DEVICE (the variant), else the first torch reaches
+        if dev != "cpu" and not devices.available(dev):
+            if device not in ("", "auto"):
+                raise RuntimeError(f"DECIDE_DEVICE={device} but torch can't reach {dev}")
+            dev = "cpu"
         # The Gated DeltaNet layers' short convolution went to MIOpen, which times its algorithms for every new
         # input length. On 2026-10-21 a worker's timings all read 0, so every length not timed before failed
         # ("No suitable algorithm"). PyTorch's own depthwise kernel does the same sum with no search (d3 already
         # runs its vision patch embedding without MIOpen, for the same search). This process runs only d3.
         torch.backends.cudnn.enabled = False
         self.model = AutoModel.from_pretrained(str(folder), trust_remote_code=True, local_files_only=True,
-                                               device="cuda:0" if gpu else "cpu", batch_size=batch_size,
+                                               device=f"{dev}:0" if dev in ("cuda", "xpu") else dev, batch_size=batch_size,
                                                verify=verify)
-        self.device = "cuda" if gpu else "cpu"
+        self.device = dev
         # The first question after a load takes about 2 s (kernel selection); pay it here, not on a caller's call.
         self.model.system_one(state="warm-up", questions={"q": {"type": "noul"}})
 
@@ -134,9 +138,8 @@ class D3Lite:
             return
         self.model = None
         gc.collect()
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        if self.device and self.device != "cpu":
+            devices.empty_cache(self.device)
 
     def ask(self, state: Any, questions: list[dict[str, Any]], images: list[bytes] | None = None,
             videos: list[tuple[str, bytes]] | None = None) -> dict[str, Any]:

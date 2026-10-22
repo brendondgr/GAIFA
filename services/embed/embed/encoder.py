@@ -22,6 +22,8 @@ from typing import Any, Protocol
 
 import numpy as np
 
+from . import device
+
 log = logging.getLogger("embed")
 
 DIMS = (768, 512, 256, 128)
@@ -53,6 +55,18 @@ def truncate(vectors: np.ndarray, dim: int) -> np.ndarray:
 def parts_for(kinds: set[str] | list[str]) -> frozenset[str]:
     return frozenset(PART[k] for k in kinds if k in PART)
 
+
+
+def choose(want: str, torch: Any) -> tuple[str, Any]:
+    """(device, dtype) for EMBED_DEVICE (`auto`: AIHUB_DEVICE, the variant the hub passes, else the first device
+    torch reaches; plan 39.3): bf16 on CUDA/ROCm cards that have it and on Intel's xpu, fp32 elsewhere (never fp16)."""
+    dev = device.device(want)
+    if dev != "cpu" and not device.available(dev):
+        if want not in ("", "auto"):
+            raise RuntimeError(f"EMBED_DEVICE={want} but torch can't reach {dev}")
+        dev = "cpu"
+    bf16 = (dev == "cuda" and torch.cuda.is_bf16_supported()) or dev == "xpu"
+    return dev, torch.bfloat16 if bf16 else torch.float32
 
 class Backend(Protocol):
     device: str
@@ -106,31 +120,26 @@ class GemmaBackend:
         if not (self.model_dir / "model.safetensors").is_file():
             raise FileNotFoundError(f"no weights in {self.model_dir}")
         self.unload()
-        gpu = self.want != "cpu" and torch.cuda.is_available()
-        if self.want == "cuda" and not gpu:
-            raise RuntimeError("EMBED_DEVICE=cuda but torch sees no GPU")
-        dtype = torch.bfloat16 if gpu and torch.cuda.is_bf16_supported() else torch.float32
+        dev, dtype = choose(self.want, torch)
         off = {"vision": "vision_config", "audio": "audio_config"}
         config = {off[p]: None for p in PARTS if p not in parts}
-        self.model = SentenceTransformer(str(self.model_dir), device="cuda" if gpu else "cpu", local_files_only=True,
+        self.model = SentenceTransformer(str(self.model_dir), device=dev, local_files_only=True,
                                          model_kwargs={"dtype": dtype}, config_kwargs=config)
-        self.device, self.dtype = ("cuda" if gpu else "cpu"), str(dtype).removeprefix("torch.")
+        self.device, self.dtype = dev, str(dtype).removeprefix("torch.")
 
     def unload(self) -> None:
         if self.model is None:
             return
         self.model = None
         gc.collect()
-        if self.device == "cuda":
-            import torch
-            torch.cuda.empty_cache()
+        if self.device != "cpu":
+            device.empty_cache(self.device)
 
     def encode(self, kind: str, items: list[Any], batch_size: int) -> np.ndarray:
         inputs = items if kind == "text" else [{kind: x} for x in items]
         out = self.model.encode(inputs, batch_size=batch_size, convert_to_numpy=True, show_progress_bar=False)
-        if self.device == "cuda":                       # long inputs leave GBs of activations in torch's cache
-            import torch
-            torch.cuda.empty_cache()
+        if self.device != "cpu":                        # long inputs leave GBs of activations in torch's cache
+            device.empty_cache(self.device)
         return np.asarray(out, dtype=np.float32).reshape(len(items), -1)
 
     def footprint_bytes(self) -> int:

@@ -19,6 +19,8 @@ EXPECTED: dict[str, dict[str, str]] = {
     "lcpp": {"strix-halo": "vulkan", "linux-nvidia-1gpu": "vulkan", "linux-nvidia-2gpu": "vulkan", "linux-intel-arc": "vulkan",
              "wsl2-nvidia": "cuda", "wsl2-intel": "cpu", "macos-m3": "mps", "linux-cpu": "cpu"},
     **{m: {k: "cpu" for k in MACHINES} for m in ("agent", "relay", "web", "searxng", "opencode", "workspace")},
+    **{m: {"strix-halo": "rocm", "linux-nvidia-1gpu": "cuda", "linux-nvidia-2gpu": "cuda", "linux-intel-arc": "xpu",
+           "wsl2-nvidia": "cuda", "wsl2-intel": "xpu", "macos-m3": "mps", "linux-cpu": "cpu"} for m in ("embed", "decide")},
 }
 
 

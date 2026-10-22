@@ -25,7 +25,7 @@ from utils.services import ServiceError, ServiceManager
 
 router = APIRouter(tags=["services"])
 LOG_LINES_MAX = 5000
-RESTART_KEYS = {"port", "env"}
+RESTART_KEYS = {"port", "env", "accel"}
 
 
 def _mgr(request: Request) -> ServiceManager:

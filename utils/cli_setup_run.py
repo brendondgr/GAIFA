@@ -393,6 +393,17 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
     kept.update(accept=sorted(answers.accept), decline=sorted(answers.decline), models={k: [s.name for s in v] for k, v in picked.items()}, values=dict(answers.values))
     save_state(root, state)
     report["hub"] = hub_stage(code, runner, stream=not args.json)
+    if __package__:
+        from utils import cli_setup_config as config_mod
+        from utils import cli_setup_variant as variant_mod
+    else:
+        import cli_setup_config as config_mod  # type: ignore[no-redef]
+        import cli_setup_variant as variant_mod  # type: ignore[no-redef]
+    with_variant = [e for e in live if getattr(e, "variant", None) is not None]
+    for mod, accel in variant_mod.mod_accels(with_variant).items():     # plan 38.2: what the hub passes the mod
+        env = {k: v for e in with_variant if e.mod == mod for k, v in e.variant.env.items()}
+        if not config_mod.record_accel(runner, root, mod, accel, env):
+            report["next"].append(f"{mod}: its variant ({accel}) is in config.toml; restart the hub (aihub restart) for it to take effect")
     for s in p["steps"]:
         e = by_id[s["setup"]]
         if e.id in skip:
@@ -405,7 +416,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         if s["id"] in optional_no:
             report["skipped"].append(f"{s['id']}: declined (optional)")
             continue
-        if step.skip_if and runner.run(step.skip_if, root / "services" / e.mod, stream=False)[0] == 0:
+        if step.skip_if and runner.run(step.skip_if, root / "services" / e.mod, env=getattr(e, "run_env", None), stream=False)[0] == 0:
             state["steps"][s["id"]] = "done"
             save_state(root, state)
             report["skipped"].append(f"{s['id']}: nothing to do ({step.skip_if})")
@@ -420,7 +431,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             raise Stop("interactive", id=s["id"], run=s["run"], cwd=f"services/{e.mod}", text=s["what"],
                        answer_with=f"run it yourself in services/{e.mod}, then again with --done {s['id']}", report=report)
         say(args, f"\n==> {s['id']}: {s['what']}\n    $ {s['run']}")
-        rc, out = runner.run(s["run"], root / "services" / e.mod, stream=not args.json or step.interactive, echo=args.json)
+        rc, out = runner.run(s["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=not args.json or step.interactive, echo=args.json)
         if rc:
             raise fail({"setup": e.id, "step": s["id"], "run": s["run"], "output": out, "doc": doc_of(e, root)})
         state["steps"][s["id"]] = "done"
@@ -461,10 +472,6 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             state["models"][key] = "done"
             save_state(root, state)
             report["done"].append(key)
-    if __package__:
-        from utils import cli_setup_config as config_mod
-    else:
-        import cli_setup_config as config_mod  # type: ignore[no-redef]
     try:
         config_mod.phase(live, args, answers, root, runner, report, state, started)
     except Stop as x:
@@ -478,10 +485,19 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         e = by_id[c["setup"]]
         if e.id in skip:
             continue
-        rc, out = runner.run(c["run"], root / "services" / e.mod, stream=False)   # in the mod's folder, like steps
+        rc, out = runner.run(c["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=False)   # in the mod's folder, like steps
         report["checks"].append({"setup": e.id, "run": c["run"], "ok": rc == 0, **({"output": out} if rc else {})})
         if rc:
             report["failed"].append({"setup": e.id, "step": "check", "run": c["run"], "output": out, "doc": doc_of(e, root)})
+    for sm in p.get("smokes", []):     # plan 38.1: real work, only with --smoke
+        e = by_id[sm["setup"]]
+        if e.id in skip:
+            continue
+        say(args, f"\n==> {e.id}: smoke\n    $ {sm['run']}")
+        rc, out = runner.run(sm["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=False)
+        report.setdefault("smokes", []).append({"setup": e.id, "run": sm["run"], "ok": rc == 0, **({"output": out} if rc else {})})
+        if rc:
+            report["failed"].append({"setup": e.id, "step": "smoke", "run": sm["run"], "output": out, "doc": doc_of(e, root)})
     config_mod.verify(live, root, runner, report)
     if report["failed"]:
         report["next"].append("open each failure's doc (What to look for, Known gaps), fix it, and run aihub setup again: it resumes")

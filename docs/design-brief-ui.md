@@ -464,6 +464,7 @@ interface ServiceConfig {
   auto_unload: boolean;          // AIHub may unload it to make room
   priority: number;              // lower = unloaded first
   env: Record<string, string>;
+  accel: string | null;          // plan 38.2: the variant installed (rocm, cuda, xpu, mps, vulkan, cpu); null: not recorded
 }
 
 interface Operation {

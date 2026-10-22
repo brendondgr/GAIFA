@@ -91,7 +91,7 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def args(*targets: str, **kw: Any) -> Namespace:
-    base = dict(targets=list(targets), plan=False, json=True, yes=False, answers=None, accept=None, decline=None, done=None, models=None, set=None, from_scratch=False)
+    base = dict(targets=list(targets), plan=False, json=True, yes=False, answers=None, accept=None, decline=None, done=None, models=None, set=None, from_scratch=False, accel=None, smoke=False)
     return Namespace(**{**base, **kw})
 
 

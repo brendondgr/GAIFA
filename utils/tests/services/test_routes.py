@@ -47,7 +47,7 @@ async def test_detail(hub, rig):
     assert d["folder"] == "services/fake-ok" and d["outputs_dir"] == "outputs/fake-ok"
     assert d["pid"] and d["command"][0] == "python3" and d["command"][1].endswith("services/_fakemod.py")
     assert d["health"]["ok"] and d["manifest"]["id"] == "fake-ok"
-    assert d["config"] == {"enabled": True, "autostart": True, "port": rig.ports["fake-ok"], "idle_unload_s": None, "auto_unload": True, "priority": 100, "env": {"KEEP": "1", "DROP": "2"}}
+    assert d["config"] == {"enabled": True, "autostart": True, "port": rig.ports["fake-ok"], "idle_unload_s": None, "auto_unload": True, "priority": 100, "env": {"KEEP": "1", "DROP": "2"}, "accel": None}
 
 
 async def test_start_stop_restart(hub):

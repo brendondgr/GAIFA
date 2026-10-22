@@ -86,6 +86,7 @@ class ServiceConfig(_Model):
     auto_unload: bool
     priority: int
     env: dict[str, str]
+    accel: str | None = Field(None, description="The variant installed (rocm, cuda, xpu, mps, vulkan, cpu; plan 38.2); null: not recorded")
 
 
 class ServiceDetail(ServiceSummary):
@@ -113,6 +114,7 @@ class ServiceConfigPatch(_Model):
     auto_unload: bool | None = None
     priority: int | None = None
     env: dict[str, str] | None = None
+    accel: Literal["rocm", "cuda", "xpu", "mps", "vulkan", "cpu"] | None = None
 
 
 class SavedConfig(_Model):

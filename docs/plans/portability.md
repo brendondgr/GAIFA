@@ -311,7 +311,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **The mods index** (`docs/setup/README.md`, regenerated) gains a "Runs on" column. Today every GPU doc reads "ROCm" until its variants are written (38.2 for lcpp, Phase 39 for the rest).
     - **Docs and tests:** `docs/mods.md` §9; `test_setup_variants.py` (12).
 
-- [ ] **38.2 The setup picks a variant: `utils/cli_setup.py`.**
+- [x] **38.2 The setup picks a variant: `utils/cli_setup.py`.**
   - **Picking:** for each chosen setup, the first variant whose `accel` is in `Machine.accels` and whose `os` matches.
     - **None fits:** the setup is "not available on this machine" with the reason, and is left out like a declined one.
     - **Untested:** a variant with `tested = false` is named as untested in the plan.
@@ -319,6 +319,13 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - **Recording:** the choice goes to `[services.<mod>] accel` in `config.toml`, through the same careful edit as `[[config]]`. The plan's JSON includes it, and so do the steps' and the check's environment (`AIHUB_ACCEL`).
   - **Docs:** `docs/setup/README.md`, the `aihub-setup` skill.
   *Done when:* `utils/tests/core/test_cli_setup_variants.py` covers choosing per fixture, the override, an unavailable setup, an untested variant and the recorded choice; `aihub setup --plan --json` on this machine picks today's backends for every mod.
+  - *As built:*
+    - **Choosing:** in `utils/cli_setup_variant.py`. A chosen setup is a copy of its `Env` with the variant's steps, check and smoke, plus `run_env`: its `env` with `AIHUB_ACCEL`, `AIHUB_DEVICE` and `AIHUB_GPU_ARCH`, used for steps, `skip_if`, checks and smokes.
+    - **When nothing fits:** a setup this machine can't run, and every setup whose `after` needs it, is listed in `unavailable`. If nothing chosen runs, the setup stops with `reason: "unavailable"`.
+    - **Recording the choice:** `[services.<mod>] accel` (one per mod: its base setup's) and the variant's `env` go through `PUT /api/services/<mod>/config`, which gains `accel` (`ServiceConfig.accel`, brief §6), or into `config.toml` when the hub doesn't take them, with a `next` to restart the hub.
+    - **Smokes:** `--smoke` runs them after the checks, and a failed one is a failure with its doc.
+    - **lcpp's doc** declares its Vulkan variant. On this machine the plan for every mod reads Vulkan for lcpp, ROCm for the GPU mods and CPU for the rest.
+    - **Tests:** `test_cli_setup_variants.py` (6).
 
 - [ ] **38.3 The hub passes the choice to the mod.**
   - **The environment:**

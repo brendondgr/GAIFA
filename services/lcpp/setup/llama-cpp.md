@@ -45,6 +45,11 @@ skip_if = "grep -Eq '\"gemma-4-26b-a4b-it\"[[:space:]]*:' data/models.json"
 start_op = "POST /api/instances"
 start_body = { model_id = "gemma-4-26b-a4b-it" }
 next = "lcpp instances stop at a reboot: to bring back what was running, set [sessions] restore_on_boot = true in config.toml (Settings → Sessions), which restores the setup from before the restart, lcpp instances included; or launch it again on the LLM Launcher page"
+
+[[variants]]                    # plan 38.2: this doc's steps fetch the Vulkan build (plan 39.2 adds the others)
+accel = "vulkan"
+os = ["linux"]
+tested = true
 -->
 
 # llama.cpp (LLM Launcher): setup

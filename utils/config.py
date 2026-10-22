@@ -104,6 +104,7 @@ class ServiceOverride(_Strict):
     auto_unload: bool | None = None
     priority: int | None = None
     gpu: int | Literal["auto"] | None = Field(None, description="Which GPU (hardware index) on a machine with more than one; auto: the freest at start (plan 36.3)")
+    accel: Literal["rocm", "cuda", "xpu", "mps", "vulkan", "cpu"] | None = Field(None, description="The variant `aihub setup` installed (plan 38.2): the mod gets AIHUB_ACCEL and AIHUB_DEVICE")
 
     @field_validator("gpu")
     @classmethod

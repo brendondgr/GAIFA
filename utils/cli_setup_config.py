@@ -54,6 +54,8 @@ def add_provider(runner: Runner, p: dict[str, Any]) -> str:
 def _table_and_key(key: str) -> tuple[str, str]:
     if key == "agent.judge.model":
         return "agent.judge", "model"
+    if key.startswith("services.") and key.endswith(".accel") and key.count(".") == 2:
+        return key.rsplit(".", 1)[0], "accel"
     _, mod, _, var = key.split(".", 3)
     return f"services.{mod}.env", var
 
@@ -110,6 +112,22 @@ def apply(runner: Runner, root: Path, key: str, value: str) -> bool:
         return True
     except Exception:  # noqa: BLE001: the hub is down, or refused it: the careful text edit
         set_value(root / "config.toml", key, value)
+        return False
+
+
+def record_accel(runner: Runner, root: Path, mod: str, accel: str, env: dict[str, str]) -> bool:
+    """Plan 38.2: `[services.<mod>] accel` and the variant's env, through the hub (applied at once) or, when
+    it doesn't take them, written into config.toml (read when the hub next starts). True: the hub took them."""
+    body: dict[str, Any] = {"accel": accel}
+    if env:
+        body["env"] = {**_override_env(root / "config.toml", mod), **env}
+    try:
+        runner.call("PUT", f"/api/services/{mod}/config", body)
+        return True
+    except Exception:  # noqa: BLE001: the hub is down, or doesn't know the key yet
+        set_value(root / "config.toml", f"services.{mod}.accel", accel)
+        for k, v in env.items():
+            set_value(root / "config.toml", f"services.{mod}.env.{k}", v)
         return False
 
 

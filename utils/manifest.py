@@ -383,6 +383,7 @@ class Effective:
     auto_unload: bool
     priority: int
     env: dict[str, str]
+    accel: str | None = None   # plan 38.2: the variant `aihub setup` installed ([services.<id>] accel)
 
     def as_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
@@ -504,6 +505,7 @@ def effective(mod: Mod, cfg: Config) -> Effective:
         "auto_unload": True,
         "priority": cfg.memory.priority.index(mod.id) if mod.id in cfg.memory.priority else DEFAULT_PRIORITY,
         "env": {},
+        "accel": None,
     }
     merged = cfg.service_override(mod.id, defaults)
     merged.pop("gpu", None)          # read by launch_spec and the memory manager, not part of ServiceConfig

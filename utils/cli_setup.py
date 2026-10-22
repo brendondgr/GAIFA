@@ -21,10 +21,12 @@ cli: Any = None   # utils/cli.py sets this before calling in
 if __package__:   # imported as utils.cli_setup (tests); as a script's helper it must not load the utils package
     from utils import cli_setup_host as host_mod
     from utils import cli_setup_run as run_mod
+    from utils import cli_setup_variant as variant_mod
     from utils import setupdocs
 else:
     import cli_setup_host as host_mod  # type: ignore[no-redef]
     import cli_setup_run as run_mod  # type: ignore[no-redef]
+    import cli_setup_variant as variant_mod  # type: ignore[no-redef]
     import setupdocs  # type: ignore[no-redef]
 
 Stop, Answers, Runner = run_mod.Stop, run_mod.Answers, run_mod.Runner
@@ -158,8 +160,16 @@ def plan_text(p: dict[str, Any]) -> str:
     values = [q for q in p["questions"] if q["kind"] == "value"]
     if values:
         out += ["", "After install, it asks (the choices exist only then):"] + [f"  {q['id']:24} {q['text']}{'' if q['required'] else ' (optional)'}" for q in values]
+    if p.get("variants"):
+        out += ["", "Variants (aihub hardware; --accel <setup>=<accel> to pick another):"]
+        for v in p["variants"]:
+            out.append(f"  {v['setup']:24} {v['label']}" + ("  [untested on this kind of machine]" if v["untested"] else "") + (f"  ({v['note']})" if v["note"] else ""))
+    if p.get("unavailable"):
+        out += ["", "Not available on this machine:"] + [f"  {u['setup']:24} {u['why']}" for u in p["unavailable"]]
     if p["checks"]:
         out += ["", "Then each check: " + "; ".join(c["run"] for c in p["checks"])]
+    if p.get("smokes"):
+        out += ["Then each smoke (real work): " + "; ".join(s["run"] for s in p["smokes"])]
     bad = [c for c in p["host"] if not c["ok"]]
     out += ["", f"Host: {len(p['host']) - len(bad)} checks ok" + (", to fix first: " + ", ".join(c["id"] for c in bad if c["id"] in p["blocking"]) if p["blocking"] else "")
             + ("" if not bad or p["blocking"] else f" ({', '.join(c['id'] for c in bad)}: advice)") + "  (aihub setup host)"]
@@ -200,10 +210,21 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             pick = input("Which? numbers or ids, comma-separated: ")
             targets = [ids[int(x) - 1] if x.strip().isdigit() else x.strip() for x in pick.split(",") if x.strip()]
         envs = resolve(targets, offered, root)
+        machine = probe.machine()
+        resolved = envs
+        envs, unavailable = variant_mod.choose(envs, machine, variant_mod.overrides(getattr(args, "accel", None)))
+        gone = run_mod.dependents(resolved, {u["setup"] for u in unavailable}) - {u["setup"] for u in unavailable}
+        unavailable += [{"setup": i, "mod": next(e.mod for e in resolved if e.id == i), "why": "it needs a setup this machine can't run"} for i in sorted(gone)]
+        envs = [e for e in envs if e.id not in gone]
+        if not envs:
+            raise Stop("unavailable", unavailable=unavailable, hardware=machine.to_dict()["accels"])
         expanded = {t: [e.id for e in envs if e.mod == t] for t in targets if len([e for e in envs if e.mod == t]) > 1}   # a mod id means all its setups
         env_gb, req_gb, _ = sizes(envs)
         found = host_mod.checks(probe, root, {n for e in envs for n in e.setup.needs}, env_gb + req_gb)
         p = plan(envs, found, run_mod.hub_needs(code, runner), expanded)
+        p["variants"] = [variant_mod.describe(e, machine) for e in envs]
+        p["unavailable"] = unavailable
+        p["smokes"] = [{"setup": e.id, "run": e.setup.smoke} for e in envs if e.setup.smoke] if getattr(args, "smoke", False) else []
         if args.plan:
             emit(args, {"stage": "plan", **p}, plan_text(p))
             return 0
@@ -228,7 +249,8 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
         lines = {"question": f"stopped: question {s.data.get('id')} needs an answer ({s.data.get('answer_with', '--answers')})",
                  "interactive": f"stopped: {s.data.get('id')} prompts, so run it yourself in {s.data.get('cwd')}:\n    {s.data.get('run')}\nthen: {s.data.get('answer_with')}",
                  "host": "stopped: fix the host first:\n" + host_mod.text([host_mod.Check(**c) for c in s.data.get("checks", [])]),
-                 "unknown": f"stopped: no setup doc {s.data.get('id')!r}; choose from: {', '.join(s.data.get('choices', []))}"}
+                 "unknown": f"stopped: no setup doc {s.data.get('id')!r}; choose from: {', '.join(s.data.get('choices', []))}",
+                 "unavailable": "stopped: nothing chosen runs on this machine:\n" + "\n".join(f"  {u['setup']}: {u['why']}" for u in s.data.get("unavailable", []))}
         emit(args, data, lines.get(s.reason, f"stopped: {s.reason} {json.dumps({k: v for k, v in s.data.items() if k != 'report'})[:600]}"))
         return 2 if s.reason in ("question", "interactive") else 1
 
@@ -247,3 +269,5 @@ def add_parser(sub: Any) -> None:
     p.add_argument("--done", action="append", metavar="ID", help="an interactive step you ran yourself (repeatable)")
     p.add_argument("--set", action="append", metavar="ID=VALUE", help="a value question's answer, by its id or config key, e.g. agent/config:services.agent.env.AGENT_MODEL=gpt-4o (repeatable)")
     p.add_argument("--from-scratch", action="store_true", help="forget which steps a previous run finished")
+    p.add_argument("--accel", action="append", metavar="ID=ACCEL", help="the variant for a setup or mod: rocm, cuda, xpu, mps, vulkan or cpu (repeatable; default: the best this machine has)")
+    p.add_argument("--smoke", action="store_true", help="after the checks, run each setup's smoke: real work (an image, a sentence spoken) that proves the GPU path")

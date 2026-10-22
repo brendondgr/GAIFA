@@ -114,3 +114,11 @@ test('the editor: each folder with its level (up to its cap) and Remove, Add a f
   const empty = expand(ctl.EnvEditor({ api: { callService: async () => ({ json: {} }) }, env: { id: 'x', name: 'X', folders: [] } }));
   assert.match(text(empty), /No folders yet/);
 });
+
+test('None: no folders to change, only an explanation and New environment', () => {
+  const el = expand(ctl.EnvEditor({ api: { callService: async () => ({ json: {} }) }, env: { id: 'none', name: 'None', none: true, folders: [] } }));
+  assert.match(text(el), /None: no folders/);
+  assert.match(text(el), /New environment/);
+  assert.equal(all(el, n => n.props?.['aria-label'] === 'Folder to add').length, 0);
+  assert.doesNotMatch(text(el), /Rename/);
+});

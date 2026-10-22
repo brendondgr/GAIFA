@@ -42,7 +42,7 @@ function environments(el, ctx) {
   name.style.flex = '0 1 220px';
   el.append(h('div', { style: 'display:flex;flex-direction:column;gap:12px;max-width:980px' },
     panel(header('Environments'),
-      ui.text('An environment is a set of folders the agent can use in a chat, each with its own level. Pick one in a chat’s header (⌂). In a chat the agent can also ask to read a folder you name; you allow it in that chat, or add it here.', { muted: true, small: true }),
+      ui.text('An environment is a set of folders the agent can use in a chat, each with its own level. Pick one under a chat’s message box (⌂), where you can also make one and add folders. New chats start in None (no folders). In a chat the agent can also ask to read a folder you name; you allow it in that chat, or add it here.', { muted: true, small: true }),
       chips,
       h('form', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center', onsubmit: async e => {
         e.preventDefault();
@@ -80,6 +80,8 @@ function environments(el, ctx) {
   }
 
   function envPanel(e) {
+    if (e.none) return panel(h('span', { style: 'font-size:14px;font-weight:600' }, e.name),   // plan 42.5: built in, nothing to change
+      ui.text('No folders. A chat in None reads only the folders you allow in it when the agent asks; it can’t be renamed, deleted or given folders. New chats start here until you pick another environment.', { muted: true, small: true }));
     const path = ui.input({ placeholder: '/home/you/Projects/my-app', name: 'path' });
     path.setAttribute('aria-label', `Folder path to add to ${e.name}`);
     path.style.flex = '1 1 320px';

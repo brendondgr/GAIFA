@@ -63,6 +63,10 @@ export const overlay = (rows, known) => {
   const by = new Map((known || []).map(t => [t.id, t]));
   return rows.map(t => (by.has(t.id) ? { ...t, ...pick(by.get(t.id)) } : t));
 };
+/** The sections the list shows: only environments with chats (in this view: an environment whose chats are all
+ * archived shows only under Archived); the user's ask, 2026-10-21. */
+export const shownRows = rows => rows.filter(r => r.count > 0);
+
 /** A section's rows: none once it's empty (its last chat moved, archived or deleted: nothing stale stays). */
 export const sectionChats = (row, loaded, known) => (row.count ? overlay(loaded || [], known) : []);
 const pick = t => Object.fromEntries(['title', 'state', 'running', 'updated', 'archived'].filter(k => k in t).map(k => [k, t[k]]));
@@ -121,7 +125,7 @@ export function Section({ row, open, onToggle, chats, loading, more, onMore, ren
             row.running ? h('span', { 'aria-label': `${row.running} running`, style: { width: 6, height: 6, borderRadius: 99, background: T.acc, flex: 'none' } }) : null,
             h('span', { style: { fontSize: 11, color: T.dim, fontWeight: 400, flex: 'none' } }, row.count)),
       h('button', { type: 'button', className: 'aichat-more', 'aria-label': `New chat in ${name}`, title: `New chat in ${name}`, onClick: onNew, style: iconBtn }, h(Icon, { d: 'plus', size: 13 })),
-      h('span', { style: { position: 'relative', flex: 'none' } },
+      env.none ? null : h('span', { style: { position: 'relative', flex: 'none' } },   // None: nothing to rename or fill
         h('button', { type: 'button', className: 'aichat-more', 'aria-label': `More for ${name}`, 'aria-haspopup': 'menu', 'aria-expanded': menu ? 'true' : 'false', onClick: () => setMenu(!menu), style: iconBtn }, h(Icon, { d: 'more', size: 13 })),
         h(Popover, { open: menu, onClose: () => setMenu(false), width: 180, label: 'Environment actions', style: { padding: 4, gap: 0 } },
           [['edit', 'Rename', () => setEdit(name)], ['folder', 'Manage folders…', onManage]].map(([ic, label, fn]) =>
@@ -156,7 +160,7 @@ export function GroupedChats({ c, api, envs, archived, view, onView, known, relo
   const anything = rows.some(r => r.count);
   return h('div', { style: { display: 'flex', flexDirection: 'column' } },
     !anything ? h('div', { style: { padding: '12px 10px 4px', color: T.mut, fontSize: 12, textAlign: 'center' } }, archived ? 'No archived chats.' : 'No chats yet. Start one →') : null,
-    rows.filter(r => r.count || !archived).map(r => {
+    shownRows(rows).map(r => {
       const id = r.env.id, open = !view.collapsed.includes(id), list = sectionChats(r, chats[id], known);
       return h(Section, { key: id, row: r, open, chats: list, loading: !chats[id], more: list.length < r.count,
         onToggle: () => onView({ ...view, collapsed: toggled(view.collapsed, id) }),

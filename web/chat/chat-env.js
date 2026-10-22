@@ -11,6 +11,7 @@ import { h, T, MONO, Icon, Popover, label11, getPref, setPref } from './chat-ui.
 
 const R = () => globalThis.React;
 export const DEFAULT_ENV = 'default';
+export const NONE_ENV = 'none';      // built in: no folders (plan 42.5); a new chat's environment until you pick one
 export const LAST_ENV = 'aihub.chat.environment';
 export const LEVEL_WORD = { read: 'Read', edit: 'Edit', run: 'Run', run_net: 'Run + network' };
 const enc = encodeURIComponent;
@@ -39,9 +40,9 @@ export function allowedFolders(grants, thread) {
 /** /home/<you>/x → ~/x (for reading only; the mod gets full paths). */
 export const shortPath = p => String(p || '').replace(/^\/home\/[^/]+(?=\/|$)/, '~');
 
-/** A new chat's settings: its own environment, else the last one picked in this browser. */
+/** A new chat's settings: its own environment, else the last one picked in this browser, else None (plan 42.5). */
 export function newChatSettings(settings = {}, last = null) {
-  return settings.environment || !last ? settings : { ...settings, environment: last };
+  return settings.environment ? settings : { ...settings, environment: last || NONE_ENV };
 }
 export const lastEnv = () => getPref(LAST_ENV, null);
 export const rememberEnv = id => setPref(LAST_ENV, id);
@@ -50,7 +51,7 @@ export const rememberEnv = id => setPref(LAST_ENV, id);
 export function folderChoices(ask) {
   const env = ask?.environment;
   return [{ remember: 'thread', label: 'Allow for this chat', primary: true },
-    ...(env?.id ? [{ remember: 'environment', label: `Add to “${env.name || env.id}”` }] : [])];
+    ...(env?.id && env.id !== NONE_ENV ? [{ remember: 'environment', label: `Add to “${env.name || env.id}”` }] : [])];   // None takes no folders
 }
 
 /** What the card's choice sends: "environment" adds the folder there first (Read), then allows this call once. */

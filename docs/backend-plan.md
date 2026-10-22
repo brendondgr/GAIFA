@@ -3086,7 +3086,7 @@ Asked for 2026-10-21, after Claude Code's sidebar: the chat list grouped by **en
 
 **Simple gaps (assumed):**
 - **Where a chat belongs:** its `settings.environment`; none, or an environment that was deleted, is Default (as the header chip already treats it). Moving a chat changes that setting, as the chip does.
-- **Which environments show:** all of them, Default first when it has chats; an empty one shows "No chats yet" and its New chat button. Without the workspace mod (or while it's stopped), the list is flat, as today.
+- **Which environments show:** those with chats in this view (the user's ask after 42.4: an environment whose chats are all archived shows only under Archived; first built showing every environment). Without the workspace mod (or while it's stopped), the list is flat, as today.
 - **Orders:** environments by recent activity (the newest chat's `updated`, else the environment's own `updated`), by name, or by when they were made; chats by recent activity, name, or when they were made. Saved per browser (`getPref`), like the last environment.
 - **Paging:** 6 chats per group, then **Show more** adds 20 from the agent (`limit`/`offset` per environment), so a big environment never loads all its chats.
 - **Search:** a search shows one flat list (each row says its environment), as today's search does; by meaning stays as it is.
@@ -3141,7 +3141,12 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
 - [x] **42.4 Environments from the chat: `chat-controls.js` (`EnvEditor`, `envOps`).**
   - **The environment menu:** pick one for this chat; **New environment** (a name, then it's this chat's); and for the chosen one, **Rename**, its folders with their level (Read · Edit · Run · Run + network) and Remove, **Add a folder** by path, and the folders allowed in this chat only (as the chip's menu has them). All through the workspace mod's `/v1/environments` routes; "Manage on the Workspace page" stays as a link for Bypass and the rest.
   *Done when:* `utils/tests/web/chat-controls.test.mjs` (the calls each action makes, a refusal shown with its reason). Checked live with a throwaway environment (made, given ~/Agents, renamed, emptied, then deleted).
-- [ ] **42.5 Docs and the live check.** Brief §11.13 (the thread list, the composer, the controls row), structure for `chat-controls.js`, the plan. Live on the installed hub: the sidebar rows and divider, the box growing, the + menu, the controls row, an environment made, renamed, given a folder and removed from the chat.
+- [x] **42.5 None: a built-in environment with no folders: `services/workspace/environments.py`, `chat-env.js`, `chat-controls.js`, `chat-groups.js`, the Workspace page.** Asked for 2026-10-21 ("a default workspace of None").
+  - **In the workspace mod:** `none` is listed first (`none: true`), never stored, and refuses rename, delete and folders (422 `none`, with the fix "make an environment"); "None" can't be another environment's name. A chat in it sees only the folders allowed in it, each asked for (34.3).
+  - **In the chat:** a new chat starts in None until you pick another (the last pick is still remembered); its menu explains that and offers New environment; a folder card in None has no "Add to None"; its sidebar section has no ⋯. Chats saved without an environment keep Default, so nothing they could read changes.
+  - **Sections:** an environment with no chats in this view isn't shown.
+  *Done when:* `services/workspace/tests/test_environments.py::test_none_is_built_in_with_no_folders`, `utils/tests/web/environments.test.mjs`, `chat-controls.test.mjs`, `chat-groups.test.mjs`. Checked live: a new chat shows None and its menu.
+- [ ] **42.6 Docs and the live check.** Brief §11.13 (the thread list, the composer, the controls row), structure for `chat-controls.js`, the plan. Live on the installed hub: the sidebar rows and divider, the box growing, the + menu, the controls row, an environment made, renamed, given a folder and removed from the chat.
 
 **Wire — Phase 42:** the Chat page's sidebar, message box and the row under it.
 

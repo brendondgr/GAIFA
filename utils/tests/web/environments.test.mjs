@@ -61,7 +61,7 @@ test('the folders allowed in this chat come from its folder grants', () => {
 test('a new chat starts in the last environment picked', () => {
   assert.deepEqual(env.newChatSettings({}, 'grants'), { environment: 'grants' });
   assert.deepEqual(env.newChatSettings({ environment: 'default' }, 'grants'), { environment: 'default' });
-  assert.deepEqual(env.newChatSettings({ no_learn: true }, null), { no_learn: true });
+  assert.deepEqual(env.newChatSettings({ no_learn: true }, null), { no_learn: true, environment: 'none' });   // nothing picked yet: None (plan 42.5)
 });
 
 const ASK = { path: '/home/u/Agents/Mycelium', level: 'read', environment: { id: 'grants', name: 'Grants' } };
@@ -71,6 +71,7 @@ test('the folder card offers this chat or the environment, never Always', () => 
   assert.deepEqual(b.map(x => [x.remember, x.label]), [['thread', 'Allow for this chat'], ['environment', 'Add to “Grants”']]);
   assert.deepEqual(risk.approvalButtons('read', { thread: false, folder: ASK }).map(x => x.remember), ['once', 'environment']);
   assert.deepEqual(env.folderChoices(ASK).map(x => x.remember), ['thread', 'environment']);
+  assert.deepEqual(env.folderChoices({ ...ASK, environment: { id: 'none', name: 'None' } }).map(x => x.remember), ['thread']);   // None takes no folders
   assert.equal(risk.limitsCover({ key: 'folder:/home/u/Agents/Mycelium' }), 'in ~/Agents/Mycelium');
   const t = expand(forms.ParamCard({ spec: { tool: 'workspace_tree', risk: 'read', arguments: { folder: '~/Agents/Mycelium' }, schema: { properties: { folder: { type: 'string' } } },
     limits: { action: 'read', key: 'folder:' + ASK.path, ask_folder: ASK } }, api: {}, outputs: [], mods: [], onRun: async () => {}, onCancel: async () => {}, cancelLabel: 'Deny',

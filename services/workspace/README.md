@@ -4,9 +4,9 @@ An AIHub mod (plan Phase 27): folders on this machine that the chat agent reads,
 
 ## Environments
 
-An environment is a named set of folders, each with its own level there (a folder can be Read in one and Edit in another), after Claude's. They live in `data/state/workspace/environments.json`. **Default** always exists (rename it, never delete it); Phase 27's `folders.json` became Default on first load, ids and levels kept (the old file is left as it was). A folder's id is the same in every environment, and no two folders share one.
+An environment is a named set of folders, each with its own level there (a folder can be Read in one and Edit in another), after Claude's. They live in `data/state/workspace/environments.json`. **Default** always exists (rename it, never delete it); **None** (`none`, plan 42.5) is built in and never stored: no folders, listed first, never renamed, deleted or given folders (422 `none`); Phase 27's `folders.json` became Default on first load, ids and levels kept (the old file is left as it was). A folder's id is the same in every environment, and no two folders share one.
 
-A chat picks its environment in its header (⌂ chip; saved as the thread's `settings.environment`; a new chat starts with the last one picked in that browser, else Default). The agent sends it in each call's origin (`environment`); a chat without one, or whose environment was deleted, uses Default. Every tool call sees only:
+A chat picks its environment under its message box (⌂, plan 42.3; saved as the thread's `settings.environment`; a new chat starts with the last one picked in that browser, else None). The agent sends it in each call's origin (`environment`); a chat without one, or whose environment was deleted, uses Default. Every tool call sees only:
 - the folders of the chat's environment, and
 - the folders the user allowed **in that chat** (the hub passes them as `origin.folders`, from the chat's folder grants; only the hub sets it). These are always Read here, whatever the origin says, and are checked again as below.
 
@@ -45,7 +45,7 @@ Listings and searches skip `.git`, `node_modules`, `.venv`, caches and build fol
 | `GET /v1/status` | folders, environments, edits and runs |
 | `GET /v1/environments` | every environment with its folders and their levels |
 | `POST /v1/environments` | `{name, id?}` creates one (no folders yet); 409 for a name in use |
-| `GET /v1/environments/{id}`, `PUT /v1/environments/{id}` `{name}`, `DELETE /v1/environments/{id}` | one environment; rename; delete (not Default: 422) |
+| `GET /v1/environments/{id}`, `PUT /v1/environments/{id}` `{name}`, `DELETE /v1/environments/{id}` | one environment; rename; delete (not Default or None: 422) |
 | `POST /v1/environments/{id}/folders` | `{path, level?, allow_bypass?, id?, name?}` adds a folder there (Read unless you say otherwise; capped as below) |
 | `PATCH /v1/environments/{id}/folders/{fid}`, `DELETE …/folders/{fid}` | its level, Bypass or name there; remove it from that environment (its files are left alone) |
 | `GET /v1/folders` | the folders a chat can use: its environment's (`?environment=` or the origin's, else Default) and, for a chat's call, those allowed in it (`granted: true`); `max_level` and `capped` say why one is held at Read; also `environment: {id, name}` |

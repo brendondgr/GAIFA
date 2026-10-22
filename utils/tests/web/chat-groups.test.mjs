@@ -58,6 +58,7 @@ test('sections: one per environment, a deleted one folds into Default', () => {
   assert.equal(by.grants.running, 1);
   assert.equal(by.art.count, 0);                                   // an empty environment still has its section
   assert.deepEqual(g.groupRows(null, ENVS).map(r => r.count), [0, 0, 0]);
+  assert.deepEqual(g.shownRows(rows).map(r => r.env.id), ['default', 'grants']);    // an environment with no chats here isn't shown
 });
 
 test('sections in order: activity (empty ones last), name, created', () => {
@@ -189,4 +190,11 @@ test('Show more is a full-width divider with its count', () => {
   assert.equal(text(bar), 'Show more · 7');
   assert.equal(bar.props.children.filter(c => c?.props?.style?.height === 1).length, 2);      // a line on each side
   assert.equal(text(expand(g.MoreBar({ onClick() {} }))), 'Show more');
+});
+
+test('None\'s section has no ⋯ menu (nothing to rename or fill)', () => {
+  const row = { env: { id: 'none', name: 'None', none: true, folders: [] }, ids: ['none'], count: 1, updated: 1, running: 0 };
+  const el = expand(g.Section({ row, open: true, chats: [], loading: false, more: false, renderItem: () => null, onToggle() {}, onNew() {}, onRename() {}, onManage() {} }));
+  assert.equal(all(el, n => n.props?.['aria-label'] === 'More for None').length, 0);
+  assert.equal(all(el, n => n.props?.['aria-label'] === 'New chat in None').length, 1);
 });

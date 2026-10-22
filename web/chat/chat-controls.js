@@ -76,15 +76,16 @@ export function EnvEditor({ api, env, onChanged, onCreated }) {
   const [err, setErr] = React.useState(null), [busy, setBusy] = React.useState(false), [rename, setRename] = React.useState(null);
   const [path, setPath] = React.useState(''), [level, setLevel] = React.useState('read'), [fresh, setFresh] = React.useState(null);
   const run = async (f, after) => { setBusy(true); setErr(null); try { const r = await f(); after?.(r); onChanged?.(); } catch (e) { setErr(errLine(e)); } finally { setBusy(false); } };
-  const folders = env?.folders || [];
+  const folders = env?.folders || [], none = !!env?.none;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid ' + T.bd, paddingTop: 8 } },
-    env ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+    none ? h('span', { style: { fontSize: 11.5, color: T.mut } }, 'None: no folders. The agent asks before it reads any folder, and you allow it in this chat only.') : null,
+    env && !none ? h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
       rename != null
         ? h('input', { autoFocus: true, value: rename, 'aria-label': 'Environment name', onChange: e => setRename(e.target.value), style: { ...fieldSt, flex: 1 },
             onKeyDown: e => { if (e.key === 'Enter' && rename.trim()) run(() => ops.rename(env.id, rename.trim()), () => setRename(null)); if (e.key === 'Escape') { e.stopPropagation(); setRename(null); } } })
         : h('span', { style: { ...label11, flex: 1 } }, `Folders in ${env.name}`),
       rename == null ? h('button', { type: 'button', onClick: () => setRename(env.name), style: segSt(false), title: 'Rename this environment' }, 'Rename') : null) : null,
-    env ? folders.map(f => h('div', { key: f.id, style: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 } },
+    env && !none ? folders.map(f => h('div', { key: f.id, style: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 } },
       h(Icon, { d: 'folder', size: 12 }),
       h('span', { title: f.capped ? `${f.path} (${f.capped})` : f.path, style: { fontFamily: MONO, fontSize: 11.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, shortPath(f.path)),
       h('span', { role: 'group', 'aria-label': `Level of ${f.path}`, style: { display: 'inline-flex', padding: 1, borderRadius: 5, border: '1px solid ' + T.bd, flex: 'none' } },
@@ -93,8 +94,8 @@ export function EnvEditor({ api, env, onChanged, onCreated }) {
             onClick: () => f.level !== l && run(() => ops.setLevel(env.id, f.id, l)), style: segSt(f.level === l, dis) }, { read: 'Read', edit: 'Edit', run: 'Run', run_net: 'Net' }[l]); })),
       h('button', { type: 'button', 'aria-label': `Remove ${f.path} from ${env.name}`, title: 'Remove from this environment (its files are left alone)', disabled: busy,
         onClick: () => run(() => ops.removeFolder(env.id, f.id)), style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 2, display: 'flex' } }, h(Icon, { d: 'x', size: 12 })))) : null,
-    env && !folders.length ? h('span', { style: { fontSize: 11.5, color: T.dim } }, 'No folders yet: add one below, or the agent asks for one when it needs it.') : null,
-    env ? h('form', { onSubmit: e => { e.preventDefault(); if (path.trim()) run(() => ops.addFolder(env.id, path.trim(), level), () => setPath('')); }, style: { display: 'flex', gap: 4, alignItems: 'center' } },
+    env && !none && !folders.length ? h('span', { style: { fontSize: 11.5, color: T.dim } }, 'No folders yet: add one below, or the agent asks for one when it needs it.') : null,
+    env && !none ? h('form', { onSubmit: e => { e.preventDefault(); if (path.trim()) run(() => ops.addFolder(env.id, path.trim(), level), () => setPath('')); }, style: { display: 'flex', gap: 4, alignItems: 'center' } },
       h('input', { value: path, onChange: e => setPath(e.target.value), placeholder: '~/path/to/folder', 'aria-label': 'Folder to add', style: { ...fieldSt, flex: 1, fontFamily: MONO } }),
       h('select', { value: level, onChange: e => setLevel(e.target.value), 'aria-label': 'Its level', style: { ...fieldSt, width: 74, paddingRight: 2 } },
         LEVELS.map(l => h('option', { key: l, value: l }, LEVEL_WORD[l]))),

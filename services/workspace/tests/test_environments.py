@@ -41,7 +41,7 @@ def test_phase27_folders_become_default_keeping_ids_and_levels(client, ctx, repo
     legacy.parent.mkdir(parents=True, exist_ok=True)
     legacy.write_text(json.dumps({"folders": [{"id": "calc", "path": str(repo), "level": "edit", "allow_bypass": True, "name": "Calc"}]}))
     e = envs(client)
-    assert list(e) == ["default"] and e["default"]["name"] == "Default" and e["default"]["default"] is True
+    assert list(e) == ["none", "default"] and e["default"]["name"] == "Default" and e["default"]["default"] is True
     f = e["default"]["folders"][0]
     assert (f["id"], f["level"], f["allow_bypass"], f["name"]) == ("calc", "edit", True, "Calc")
     assert ctx.folders.envs.file.exists() and json.loads(legacy.read_text())["folders"][0]["id"] == "calc"   # left as it was
@@ -61,7 +61,30 @@ def test_environments_crud(client):
     assert client.delete("/v1/environments/grants").json() == {"deleted": "grants"}
     assert client.get("/v1/environments/grants").status_code == 404
     assert client.delete("/v1/environments/grants").status_code == 404
-    assert list(envs(client)) == ["default"]
+    assert list(envs(client)) == ["none", "default"]
+
+
+def test_none_is_built_in_with_no_folders(client, home, repo, other):
+    """Plan 42.5: None is listed first, can't be renamed, deleted or given folders, and a chat in it reads only what it
+    was allowed (each folder asked for)."""
+    client.post("/v1/environments/default/folders", json={"path": str(repo)})
+    listed = envs(client)
+    assert list(listed)[0] == "none" and listed["none"]["none"] is True and listed["none"]["folders"] == []
+    assert listed["default"]["none"] is False
+    for r in (client.put("/v1/environments/none", json={"name": "Nothing"}), client.delete("/v1/environments/none"),
+              client.post("/v1/environments/none/folders", json={"path": str(other)})):
+        assert r.status_code == 422 and r.json()["code"] == "none", r.text
+    assert client.post("/v1/environments", json={"name": "none"}).json()["code"] == "exists"
+    assert client.put("/v1/environments/default", json={"name": "None"}).json()["code"] == "exists"
+    assert client.get("/v1/environments/none").json()["name"] == "None"
+    read = client.post("/v1/read", json={"folder": "proj", "path": "README.md"}, headers=origin(thread="t1", environment="none"))
+    assert read.status_code == 404 and read.json()["code"] == "unknown_folder"           # Default's folder isn't there
+    out = limits(client, "read", {"folder": str(other), "path": "core/net.py"}, thread="t1", environment="none")
+    assert out["ask_folder"]["environment"] == {"id": "none", "name": "None"}            # asked for, as anywhere
+    out = limits(client, "read", {"folder": str(other), "path": "core/net.py"}, thread="t1", environment="none",
+                 folders=[{"path": str(other), "level": "read"}])
+    assert "refuse" not in out and out["level"] == "read"                                 # allowed in this chat
+    assert client.get("/v1/folders?environment=none").json()["folders"] == []
 
 
 def test_a_folders_level_is_per_environment_and_its_id_is_shared(client, repo, tmp_path):

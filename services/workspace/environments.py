@@ -4,7 +4,8 @@
 Each folder is `{id, path, level, allow_bypass, name}` as in Phase 27, and its level belongs to that
 environment: a folder can be Read in one and Edit in another. The first environment is **Default**
 (`id = "default"`), which can be renamed but not deleted; a chat without an environment, or with one
-that was deleted, uses it.
+that was deleted, uses it. **None** (`id = "none"`, plan 42.5) is built in and never stored: no folders, listed first, and it
+can't be renamed, deleted or given folders; a chat in it reads only the folders allowed in it (each asked for).
 
 **Migration.** On first load, the Phase 27 `folders.json` becomes Default (ids and levels kept); the
 old file is left as it was.
@@ -29,6 +30,9 @@ from typing import Any
 from folders import ID_RE, LEVEL_WORD, LEVELS, Caps, Folder, Refused, at_least, check_folder, new_id
 
 DEFAULT = "default"
+NONE = "none"           # built in: no folders (plan 42.5)
+NONE_REFUSED = ("none", "None has no folders, so it can't be renamed, deleted or given folders",
+                "make an environment for that (New environment)", 422)
 ENV_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,47}$")
 FOLDER_KEYS = ("id", "path", "level", "allow_bypass", "name")
 
@@ -42,7 +46,7 @@ class Env:
     updated: float = 0.0
 
     def public(self, caps: Caps) -> dict[str, Any]:
-        return {"id": self.id, "name": self.name, "default": self.id == DEFAULT, "created": self.created,
+        return {"id": self.id, "name": self.name, "default": self.id == DEFAULT, "none": self.id == NONE, "created": self.created,
                 "updated": self.updated, "folders": [f.public(caps) for f in self.folders]}
 
     def raw(self) -> dict[str, Any]:
@@ -111,17 +115,20 @@ class Environments:
     # ---- environments ------------------------------------------------------------------------
 
     def all(self) -> list[Env]:
-        return self._load()
+        """None first, then the stored ones."""
+        return [_none(), *self._load()]
 
     def get(self, eid: str | None) -> Env:
         """An environment by id; unknown → 404."""
-        for e in self._load():
+        for e in self.all():
             if e.id == eid:
                 return e
         raise Refused("unknown_environment", f"there is no environment {eid!r}", "pick one on the Workspace page", 404)
 
     def of(self, eid: str | None) -> Env:
         """The chat's environment: its id, or Default when it has none or it was deleted."""
+        if eid == NONE:
+            return _none()
         envs = self._load()
         return next((e for e in envs if eid and e.id == eid), None) or next(e for e in envs if e.id == DEFAULT)
 
@@ -129,10 +136,10 @@ class Environments:
         name = _name(name)
         with self._lock:
             envs = self._load()
-            if any(e.name.lower() == name.lower() for e in envs):
+            if any(e.name.lower() == name.lower() for e in envs) or name.lower() == NONE:
                 raise Refused("exists", f"there is already an environment called {name!r}", "pick another name", 409)
-            eid = eid or _slug(name, {e.id for e in envs})
-            if not ENV_ID.match(eid) or any(e.id == eid for e in envs):
+            eid = eid or _slug(name, {e.id for e in envs} | {NONE})
+            if not ENV_ID.match(eid) or eid == NONE or any(e.id == eid for e in envs):
                 raise Refused("bad_id", f"{eid!r} is taken or isn't a valid id", "use lowercase letters, digits, . _ -", 422)
             now = time.time()
             env = Env(eid, name, [], now, now)
@@ -145,13 +152,15 @@ class Environments:
         with self._lock:
             envs = self._load()
             env = _find(envs, eid)
-            if any(e.name.lower() == name.lower() and e.id != eid for e in envs):
+            if any(e.name.lower() == name.lower() and e.id != eid for e in envs) or name.lower() == NONE:
                 raise Refused("exists", f"there is already an environment called {name!r}", "pick another name", 409)
             env.name, env.updated = name, time.time()
             self._save(envs)
             return env
 
     def delete(self, eid: str) -> None:
+        if eid == NONE:
+            raise Refused(*NONE_REFUSED)
         if eid == DEFAULT:
             raise Refused("default", "Default can't be deleted (chats without an environment use it)", "rename it instead", 422)
         with self._lock:
@@ -226,7 +235,13 @@ class Environments:
             return True
 
 
+def _none() -> Env:
+    return Env(NONE, "None", [], 0.0, 0.0)
+
+
 def _find(envs: list[Env], eid: str) -> Env:
+    if eid == NONE:
+        raise Refused(*NONE_REFUSED)
     env = next((e for e in envs if e.id == eid), None)
     if env is None:
         raise Refused("unknown_environment", f"there is no environment {eid!r}", "pick one on the Workspace page", 404)

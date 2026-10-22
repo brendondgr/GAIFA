@@ -32,7 +32,7 @@ DISK_WARN_GB = 50
 DISK_FAIL_GB = 10
 HOME = Path.home()
 ALLOW = [Path("/usr"), HOME / ".config" / "tts-engines", HOME / ".local" / "bin"]
-STAGE_D = [Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")]
+STAGE_D = [Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{getattr(os, 'getuid', lambda: 0)()}")]   # no getuid on Windows (plan 37.6)
 PATHLIKE = re.compile(r"(?:^|(?<=[:=\s]))(~/[^:\s]*|~|/[^:\s]*)")
 SKIP_ENV = {"PATH", "HOME", "PYTHONUNBUFFERED"}
 URL = re.compile(r"[a-z][a-z0-9+.-]*://\S*", re.I)

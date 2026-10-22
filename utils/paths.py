@@ -110,8 +110,13 @@ def write_atomic(path: Path, data: str | bytes) -> None:
     except BaseException:
         Path(tmp).unlink(missing_ok=True)
         raise
-    dfd = os.open(path.parent, os.O_RDONLY)
+    try:                      # the rename itself, made durable; not every OS lets a folder be opened (plan 35.3)
+        dfd = os.open(path.parent, os.O_RDONLY)
+    except OSError:
+        return
     try:
         os.fsync(dfd)
+    except OSError:
+        pass
     finally:
         os.close(dfd)

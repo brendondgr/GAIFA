@@ -419,7 +419,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 ## 7. Memory manager
 
 **Sampling** (every 2 s):
-- **System:** `/proc/meminfo` (`MemTotal`, `MemAvailable`).
+- **System:** `/proc/meminfo` (`MemTotal`, `MemAvailable`); where there's no `/proc` (macOS), psutil's totals, and the process reads below go through psutil too (`utils/proc_portable.py`, plan 35.3: no per-process GPU memory or engine time there).
 - **GPU:** AMD sysfs `mem_info_gtt_*` / `mem_info_vram_*`.
 - **Per mod:** the processes in its unit's cgroup, plus its `extra_units` and `containers`. A container's processes are its main pid plus everything in its `libpod-*` cgroup: `podman exec` processes (how a toolbox runs ComfyUI) aren't children of the main pid, and toolbox containers share the host's PID namespace. For each process, count PSS (from `smaps_rollup`, so pages shared by forked workers count once; RSS if it can't be read) plus GPU memory from DRM fdinfo (`drm-memory-gtt` / `vram`). This logic comes from lcpp's `proc.py`. The same sample reads the processes' DRM engine counters (`drm-engine-*`), and `GET /api/memory` gives each mod's `gpu_busy_pct`: its busiest engine's share of the time since the last sample. It sees Vulkan and graphics work (lcpp), not ROCm compute, which goes through `/dev/kfd` and has no per-process busy time on this kernel (plan 28.2).
 - **Peaks:** each mod's observed peak is stored in `hub.db`, and used as the estimate when it's larger than the manifest's.

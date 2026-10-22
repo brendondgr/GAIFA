@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from fastapi.responses import Response
 
 from utils import doctor
-from utils import hardware
+from utils import hardware, proc
 from utils.api_models import Doctor, Hardware, SystemInfo
 
 router = APIRouter(tags=["system"])
@@ -37,14 +37,7 @@ def dir_bytes(path: Path) -> int:
 
 
 def rss_bytes(pid: int | None = None) -> int:
-    try:
-        with open(f"/proc/{pid or os.getpid()}/status") as f:
-            for line in f:
-                if line.startswith("VmRSS:"):
-                    return int(line.split()[1]) * 1024
-    except OSError:
-        pass
-    return 0
+    return proc.rss_bytes(pid or os.getpid())
 
 
 USAGE_KEYS = ("models_bytes", "databases_bytes", "outputs_bytes", "logs_bytes", "state_bytes")

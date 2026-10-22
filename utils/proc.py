@@ -32,6 +32,17 @@ DRM_CLIENT_RE = re.compile(r"^drm-client-id:\s+(\d+)", re.MULTILINE)
 DRM_ENGINE_RE = re.compile(r"^drm-engine-([\w-]+):\s+(\d+)\s*ns", re.MULTILINE)
 
 
+def _portable(proc: Path) -> bool:
+    """No /proc here (macOS): the default-path readers go through psutil instead (plan 35.3)."""
+    return proc is PROC and not (PROC / "meminfo").exists()
+
+
+def _pp():
+    from utils import proc_portable
+
+    return proc_portable
+
+
 def _read(path: str | Path) -> str | None:
     try:
         return Path(path).read_text()
@@ -44,6 +55,8 @@ def _read(path: str | Path) -> str | None:
 
 def meminfo(proc: Path = PROC) -> dict[str, int]:
     """`total_bytes`, `used_bytes` (MemTotal − MemAvailable) and `available_bytes`."""
+    if _portable(proc):
+        return _pp().meminfo()
     fields: dict[str, int] = {}
     for line in (_read(proc / "meminfo") or "").splitlines():
         key, _, rest = line.partition(":")
@@ -105,6 +118,8 @@ def gpu(sys: Path = SYS) -> dict[str, object] | None:
 
 def process_tree(pid: int, proc: Path = PROC) -> list[int]:
     """`pid` and every descendant that still exists."""
+    if _portable(proc):
+        return _pp().process_tree(pid)
     out, stack, seen = [], [pid], set()
     while stack:
         p = stack.pop()
@@ -118,6 +133,8 @@ def process_tree(pid: int, proc: Path = PROC) -> list[int]:
 
 
 def rss_bytes(pid: int, proc: Path = PROC) -> int:
+    if _portable(proc):
+        return _pp().rss_bytes(pid)
     for line in (_read(proc / str(pid) / "status") or "").splitlines():
         if line.startswith("VmRSS:"):
             return int(line.split()[1]) * 1024
@@ -128,6 +145,8 @@ def pss_bytes(pid: int, proc: Path = PROC) -> int:
     """The process's proportional share of its memory (`Pss` in `smaps_rollup`): pages shared
     with other processes (forked workers, shared libraries) are split between them, so a sum
     over many processes counts each page once. Falls back to RSS when `smaps_rollup` can't be read."""
+    if _portable(proc):
+        return _pp().pss_bytes(pid)
     for line in (_read(proc / str(pid) / "smaps_rollup") or "").splitlines():
         if line.startswith("Pss:"):
             return int(line.split()[1]) * 1024
@@ -159,6 +178,8 @@ def footprint(pids: Iterable[int], proc: Path = PROC) -> int:
     """PSS + GPU memory of these processes and all their descendants, each counted once.
     PSS rather than RSS: a mod with 30 forked compile workers would otherwise count the memory
     they share 30 times."""
+    if _portable(proc):
+        return _pp().footprint(pids)
     every: list[int] = []
     for pid in pids:
         every.extend(p for p in process_tree(pid, proc) if p not in every)
@@ -305,6 +326,8 @@ def port_owner(port: int) -> dict[str, object] | None:
     Only processes this user can inspect are found; for others the socket is
     seen but the owner isn't, and `{"pid": None, "name": "another user's process"}` is returned.
     """
+    if _portable(PROC):
+        return _pp().port_owner(port)
     inodes = _listen_inodes(port)
     if not inodes:
         return None
@@ -325,6 +348,8 @@ def port_owner(port: int) -> dict[str, object] | None:
 
 
 def describe(pid: int) -> dict[str, object]:
+    if _portable(PROC):
+        return _pp().describe(pid)
     try:
         name = (PROC / str(pid) / "comm").read_text().strip()
     except OSError:

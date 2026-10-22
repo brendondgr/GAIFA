@@ -109,7 +109,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Detection:** an integrated GPU with no size of its own may address the system's memory.
     - **The card:** `web/hardware.js` (PATCHES #42), checked in the browser on a second hub with the two-RTX-3090 fixture. Tests: `test_routes_hardware.py` (6), `hardware.test.mjs` (2), and the contract's `Hardware` and `HardwareGpu`.
 
-- [ ] **35.3 Process and memory reads without `/proc`: `utils/proc.py` split.**
+- [x] **35.3 Process and memory reads without `/proc`: `utils/proc.py` split.**
   - **The Linux file:** `utils/proc_linux.py` keeps today's reads: PSS from `smaps_rollup`, DRM fdinfo, cgroups, `/proc/net/tcp`.
   - **The fallback:** `utils/proc_portable.py` uses `psutil` (a new hub dependency) for memory totals, RSS, the process tree, a port's owner and the command line.
   - **Choosing one:** `utils/proc.py` stays the facade, with the same function names. It picks the Linux file when `/proc/meminfo` is readable and the portable one otherwise. The hub's own RSS (`utils/routes/system.py`) goes through it.
@@ -117,10 +117,18 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - `utils/doctor.py` reads the uid lazily, so nothing runs at import (an invariant).
     - `paths.write_atomic` skips the directory fsync where the OS doesn't allow it.
   *Done when:* `utils/tests/memory/test_proc_portable.py` runs the portable reads on the real machine and agrees with the Linux ones within a sample's noise; the existing `/proc` tests pass unchanged.
+  - *As built:*
+    - **No `proc_linux.py`:** `utils/proc.py` keeps its Linux reads and becomes the facade itself. Each default-path reader (`meminfo`, `process_tree`, `rss_bytes`, `pss_bytes`, `footprint`, `port_owner`, `describe`) checks for `/proc/meminfo` when called and otherwise answers through `utils/proc_portable.py`. The fake-`/proc` tests keep passing their own paths.
+    - **The portable reads:** psutil gives PSS on Linux and USS elsewhere, and a port's owner among this user's processes (all an unprivileged user may list on macOS).
+    - **Fixed on the way:**
+      - The hub's own RSS goes through `proc`.
+      - `doctor.STAGE_D` doesn't call `os.getuid` where it's missing.
+      - `write_atomic` skips the folder fsync where a folder can't be opened.
+    - **Dependencies:** `psutil` 7.2.2. Tests: `test_proc_portable.py` (5).
 
 **Checks & deliverables — Phase 35**
-- [ ] On this machine, `aihub hardware` shows one AMD GPU, gfx1151, unified memory, and `rocm, vulkan, cpu`.
-- [ ] Delivered: `utils/hardware/`, `utils/proc_linux.py`, `utils/proc_portable.py`, the route, the CLI command, the About card, the fixtures.
+- [x] On this machine, `aihub hardware` shows one AMD GPU, gfx1151, unified memory, and `rocm, vulkan, cpu`.
+- [x] Delivered: `utils/hardware/`, `utils/proc_portable.py` (with `utils/proc.py` as the facade), the route, the CLI command, the About card, the fixtures.
 
 ---
 

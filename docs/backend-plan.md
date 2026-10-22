@@ -31,7 +31,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | L — Replies you can act on | 32 | Under a reply, the pages it read (with their icons) and Copy in three ways; Select → Reply with the quote as markdown | Chat, the agent's send API, the web mod (a favicon route); additive |
 | M — Navigation | 33 | The sidebar in three groups, services shown as a list, a button or counts, a thin rail with state colours, a logo per mod, a Services page | the UI shell, `[ui.nav]`, a `[ui] logo` per mod; additive |
 | N — Other machines | 35–40 | AIHub beyond this machine: hardware detection, memory in pools (RAM and each GPU's VRAM), running without systemd, a variant per accelerator for every mod chosen by `aihub setup`, smokes, and field reports an agent writes while building on another machine (Linux with NVIDIA, Windows WSL2 with Intel); macOS by CI. Plan: [plans/portability.md](plans/portability.md) | Additive: this machine keeps its backends; every step's tests include its recorded hardware |
-| O — Chats by workspace | 41 | The chat list grouped by environment (Phase 34's workspaces), with orders, paging per group, Move to and renaming from the sidebar | the agent's thread list (additive filters), `web/chat/` |
+| O — Chats by workspace | 41–42 | The chat list grouped by environment (Phase 34's workspaces), with orders, paging per group, Move to and renaming from the sidebar; then the Chat page after Claude Code: a compact sidebar, the message box with + and its controls (environment, mode, model) under it, environments made and changed from the chat | the agent's thread list (additive filters), `web/chat/` |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -77,6 +77,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 39 | The mods on other machines | L | — |
 | 40 | Field reports and the support matrix | M | — |
 | 41 | The chat list by environment | M | `chat`: the thread list in sections per environment, the View menu, Show more per section, Move to |
+| 42 | The Chat page after Claude Code: the sidebar, the message box and its controls | M | `chat`: the sidebar's top rows and Show more divider, the message box with +, the environment, mode and model buttons under it, the environment menu |
 
 # Stage A — Foundation
 
@@ -3111,6 +3112,42 @@ Asked for 2026-10-21, after Claude Code's sidebar: the chat list grouped by **en
 **Checks & deliverables — Phase 41**
 - [x] Live: a few environments with chats, ordered each way; a chat moved between them; an environment renamed from the sidebar; archived chats grouped only when the toggle is on.
 - [x] Delivered: the agent's thread groups and filters, `web/chat/chat-groups.js`, the grouped `chat-list.js`, the tests.
+
+---
+
+## Phase 42 — The Chat page after Claude Code: the sidebar, the message box and its controls
+
+Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the message box laid out like Claude Code's, with the chat's controls under it instead of at the top right, and environments made and changed from the chat instead of the Workspace page.
+
+**Simple gaps (assumed):**
+- **By meaning:** its chip leaves the sidebar ("it looks stupid"); finding chats by meaning stays in the header's Search, which already has it (plan 28.5).
+- **What the + menu holds:** Upload files, Attach an output or a web page, Tool groups, and the composer's quick actions (the registry's `composer` actions); slash commands stay as they are.
+- **How tall the box grows:** up to 40% of the window (at least 120 px), then it scrolls; it grows upward because the conversation above it shrinks.
+- **The header keeps:** the drawer button on narrow screens, the title (click to rename), the running state, the context meter, Learning and Branch.
+- **Folders in the environment popup:** typed as a path (the workspace mod checks it and says why it refuses one), with Read · Edit · Run · Run + network and Remove; Bypass stays on the Workspace page.
+
+- [ ] **42.1 The sidebar: `web/chat/chat-list.js`, `chat-groups.js`.**
+  - **Top:** "Chats" and the search box on one line; under them a full-width **New chat** bar with the **View** button (the settings icon) on its right. The By meaning chip and its list go.
+  - **A chat's row:** the time sits at the right edge; hovering the row (or focusing it, or its menu being open) highlights it and shows ⋯ in the time's place.
+  - **Show more:** a full-width divider, a line on each side of "Show more · N" centred, in sections and in the flat list.
+  *Done when:* `utils/tests/web/chat-groups.test.mjs` (the header's two rows, no By meaning, the row's time and ⋯ in one slot, the divider with its count).
+- [ ] **42.2 The message box: `web/chat/chat-composer.js`.**
+  - **One box:** the text on top, then one row inside the box: **+** on the left (a menu: Upload files, Attach an output or a web page, Tool groups, the quick actions), and on the right the microphone, Stop while a turn runs, and Send. The hint line under the box ("Enter sends · …") goes.
+  - **Growing:** as described above.
+  *Done when:* `utils/tests/web/chat-composer.test.mjs` (the + menu's items, the right side's buttons, no hint line, the height cap), and the existing composer tests pass.
+- [ ] **42.3 The controls under the box: `web/chat/chat-controls.js` (new), `chat-header.js`, `chat.js`.**
+  - **A row under the message box**, as buttons that open small menus (not selects): the **environment** (its name), the **mode** (Plan · Manual · Accept edits · Auto · Bypass, each with its one line; Auto disabled with the reason while the judge doesn't answer, Bypass only where folders allow it), and the **model** (each with its window). The header loses the model, mode and environment controls.
+  *Done when:* `utils/tests/web/chat-controls.test.mjs` (the three buttons and their labels, the mode list's rules from `ModeSelect`, picking calls back), and `environments.test.mjs` still passes.
+- [ ] **42.4 Environments from the chat: `chat-controls.js`, `chat-env.js`.**
+  - **The environment menu:** pick one for this chat; **New environment** (a name, then it's this chat's); and for the chosen one, **Rename**, its folders with their level (Read · Edit · Run · Run + network) and Remove, **Add a folder** by path, and the folders allowed in this chat only (as the chip's menu has them). All through the workspace mod's `/v1/environments` routes; "Manage on the Workspace page" stays as a link for Bypass and the rest.
+  *Done when:* `utils/tests/web/environments.test.mjs` (the calls each action makes, a refusal shown with its reason).
+- [ ] **42.5 Docs and the live check.** Brief §11.13 (the thread list, the composer, the controls row), structure for `chat-controls.js`, the plan. Live on the installed hub: the sidebar rows and divider, the box growing, the + menu, the controls row, an environment made, renamed, given a folder and removed from the chat.
+
+**Wire — Phase 42:** the Chat page's sidebar, message box and the row under it.
+
+**Checks & deliverables — Phase 42**
+- [ ] Live: as 42.5.
+- [ ] Delivered: `web/chat/chat-controls.js`, the reworked `chat-list.js`, `chat-groups.js`, `chat-composer.js`, `chat-header.js`, the tests.
 
 ---
 

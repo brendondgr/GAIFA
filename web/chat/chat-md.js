@@ -97,7 +97,8 @@ export function renderMarkdown(text) {
   const out = [];
   let para = [], list = null, quote = [];
   const flushPara = () => { if (para.length) { out.push(`<p>${para.map(inline).join('<br>')}</p>`); para = []; } };
-  const flushList = () => { if (list) { out.push(`<${list.tag}>${list.items.map(i => `<li>${inline(i)}</li>`).join('')}</${list.tag}>`); list = null; } };
+  // An ordered list keeps its first number, so items split by a paragraph or a sub-list count on.
+  const flushList = () => { if (list) { out.push(`<${list.tag}${list.start !== 1 ?` start="${list.start}"` : ''}>${list.items.map(i => `<li>${inline(i)}</li>`).join('')}</${list.tag}>`); list = null; } };
   const flushQuote = () => { if (quote.length) { out.push(`<blockquote>${quote.map(inline).join('<br>')}</blockquote>`); quote = []; } };
   const flush = () => { flushPara(); flushList(); flushQuote(); };
   for (let i = 0; i < lines.length; i++) {
@@ -122,13 +123,13 @@ export function renderMarkdown(text) {
     const hd = line.match(/^(#{1,6})\s+(.*)$/);
     if (hd) { flush(); const n = Math.min(6, hd[1].length + 2); out.push(`<h${n}>${inline(hd[2])}</h${n}>`); continue; }
     if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); out.push('<hr>'); continue; }
-    const ul = line.match(/^\s*[-*+]\s+(.*)$/), ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    const ul = line.match(/^\s*[-*+]\s+(.*)$/), ol = line.match(/^\s*(\d{1,9})[.)]\s+(.*)$/);
     if (ul || ol) {
       flushPara(); flushQuote();
       const tag = ul ? 'ul' : 'ol';
       if (list && list.tag !== tag) flushList();
-      if (!list) list = { tag, items: [] };
-      list.items.push((ul || ol)[1]);
+      if (!list) list = { tag, items: [], start: ol ? Number(ol[1]) : 1 };
+      list.items.push(ul ? ul[1] : ol[2]);
       continue;
     }
     const q = line.match(/^\s*>\s?(.*)$/);

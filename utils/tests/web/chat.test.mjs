@@ -35,6 +35,9 @@ test('markdown escapes HTML and keeps only safe links', () => {
 test('markdown blocks and inline spans', () => {
   assert.equal(md.renderMarkdown('**bold** and *it* and `a<b`'), '<p><strong>bold</strong> and <em>it</em> and <code>a&lt;b</code></p>');
   assert.equal(md.renderMarkdown('- one\n- two\n\n1. a\n2. b'), '<ul><li>one</li><li>two</li></ul><ol><li>a</li><li>b</li></ol>');
+  // numbered items split by bullets, a paragraph or blank lines keep counting
+  assert.equal(md.renderMarkdown('1. a\n- x\n\nNote.\n\n2. b\n\n3. c'), '<ol><li>a</li></ol><ul><li>x</li></ul><p>Note.</p><ol start="2"><li>b</li></ol><ol start="3"><li>c</li></ol>');
+  assert.equal(md.renderMarkdown('0. zero\n7) seven'), '<ol start="0"><li>zero</li><li>seven</li></ol>');
   assert.equal(md.renderMarkdown('```js\nconst x = "<b>";\n```'), '<div class="aichat-code"><div class="aichat-code-bar"><span>js</span><button type="button" class="aichat-copy" title="Copy code">Copy</button></div>'
     + '<pre data-lang="js"><code><span class="k">const</span> x = <span class="s">&quot;&lt;b&gt;&quot;</span>;</code></pre></div>');
   assert.equal(md.renderMarkdown('`**not bold**`'), '<p><code>**not bold**</code></p>');

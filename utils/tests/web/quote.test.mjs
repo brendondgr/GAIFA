@@ -92,6 +92,8 @@ test('lists: a numbered list keeps its numbers from where the selection starts; 
   assert.equal(sel(md, ['beta', 0], ['gamma', 5]), '2. beta\n3. gamma');
   assert.equal(sel(md, ['alpha', 5], ['beta', 4]), '2. beta');                // nothing of "alpha" was selected
   assert.equal(sel('- a\n- b\n- c', ['b', 0], ['c', 1]), '- b\n- c');
+  assert.equal(sel('Note.\n\n4. delta\n5. epsilon', ['delta', 0], ['epsilon', 7]), '4. delta\n5. epsilon');   // a list that starts past 1
+  assert.equal(sel('Note.\n\n4. delta\n5. epsilon', ['epsilon', 0], ['epsilon', 7]), '5. epsilon');
   const nested = parse('<ul><li>top<ul><li>inner <strong>one</strong></li><li>inner two</li></ul></li><li>next</li></ul><ol><li>x<ol><li>y</li></ol></li></ol>');
   assert.equal(Q.htmlToMarkdown(nested), '- top\n  - inner **one**\n  - inner two\n- next\n\n1. x\n   1. y');
 });

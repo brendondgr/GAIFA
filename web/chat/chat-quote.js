@@ -72,7 +72,7 @@ function fixClip(n) {
   if (n.tag === 'ul' || n.tag === 'ol') n.children = n.children.filter(c => c.tag !== 'li' || textOf(c).trim());
   if (n.tag === 'ol' && n.orig && n.children[0]?.orig) {
     const i = origKids(n.orig, ['li']).indexOf(n.children[0].orig);
-    if (i > 0) n.attrs = { ...n.attrs, start: String(i + 1) };
+    if (i > 0) n.attrs = { ...n.attrs, start: String((parseInt(n.attrs?.start, 10) || 1) + i) };
   }
   if (n.tag === 'table' && n.orig) {
     const cells = all(n, x => (x.tag === 'td' || x.tag === 'th') && textOf(x).trim());

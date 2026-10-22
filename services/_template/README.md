@@ -28,8 +28,10 @@ Every mod also gets, for free: start/stop/restart, health monitoring with restar
 aihub check __ID__        # validates the manifest, health, OpenAPI, status shape, widgets and page
 aihub restart __ID__      # after editing server.py
 aihub logs __ID__ -f
-./install.sh              # after changing requirements.txt
+./install.sh              # after changing requirements.txt (--accel cuda|rocm|xpu|mps|cpu: PyTorch from requirements-torch.txt for it)
 ```
+
+**Helpers to keep as they are** (mods never import the hub, so each keeps a copy): `gpu_slot.py` (take the GPU slot around GPU work), `containers.py` (the GPU flags for a podman or docker container), `device.py` (the PyTorch device from `AIHUB_DEVICE`) and `torch_index.py` (the PyTorch wheel index for an accelerator). Delete the ones you don't use.
 
 - Calls through AIHub: `http://127.0.0.1:7000/api/s/__ID__/v1/hello?name=you`
 - Directly: `http://127.0.0.1:__PORT__/v1/hello`

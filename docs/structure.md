@@ -27,7 +27,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `bin/` | ✅ | `aihub` (bash wrapper → `utils/cli.py` with the hub venv) and `aihub.service.in` (unit template; `aihub install` fills in `@ROOT@`) |
 | `docs/` | ✅ | Design, plan, UI brief, this file, `reference/` UI exports |
 | `utils/` | ✅ | The hub's Python package (below) |
-| `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js`, `setup/env.md` (the setup doc a new mod starts from; docs/mods.md §9), and two helpers mods copy unchanged: `gpu_slot.py` (plan 31.2) and `containers.py` (plan 37.4: the GPU flags for a container per vendor and runtime) |
+| `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js`, `setup/env.md` (the setup doc a new mod starts from; docs/mods.md §9), and helpers mods copy unchanged: `gpu_slot.py` (plan 31.2), `containers.py` (plan 37.4: the GPU flags for a container per vendor and runtime), `device.py` and `torch_index.py` (plan 38.4: the PyTorch device from `AIHUB_DEVICE`, the wheel index per accel); `install.sh --accel` |
 | `data/` | ✅ | Models, databases, logs, runtime state and the agent's files (below) |
 | `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…` (+ `.trash/`), ignored by git; indexed into `hub.db` |
 | `web/` | ✅ | The UI (below) |
@@ -71,6 +71,7 @@ The existing apps come in with `git subtree add` (their history is kept), so mos
 | `plans/capabilities-and-learning.md` | A pointer: Stage H (Phases 20–22) was planned here and moved into the master plan in 20.1 |
 | `plans/portability.md` | Stage N (Phases 35–40): AIHub on other GPUs and systems (NVIDIA, Intel, Apple; WSL2 and macOS) |
 | `platforms.md` | What AIHub runs on (plan Stage N): the targets, the mods by machine (plan 40.4) and what native Windows would need (37.6) |
+| `setup/host-linux-nvidia.md`, `host-linux-intel.md`, `host-wsl2.md`, `host-macos.md` | The host for other machines (plan 38.4): drivers, runtimes, groups, packages; `setup/host.md` stays Linux with AMD Strix Halo and the shared sections |
 | `design-brief-ui.md` | UI brief for Claude Design; §6 and §11.7 are the UI-facing API contract |
 | `mods.md` | Writing a mod: the contract, the new → check → restart loop, the four UI levels, outputs/memory/tools, porting an app, fixing `aihub check` failures, setup docs (§9) |
 | `structure.md` | This file |

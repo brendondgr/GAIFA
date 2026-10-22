@@ -2,7 +2,7 @@
 
 How to install AIHub on a new machine: the host, the hub, then **the mods you want**, each with the models **you** choose for it. It's written for the hardware AIHub is built on: an **AMD Strix Halo** (Ryzen AI MAX+ 395, Radeon 8060S, `gfx1151`) with 128 GB of unified memory, on **Fedora Linux**. Everything in the repository (the container images, the PyTorch wheels, the engines' settings) is built and tuned for that chip, so on that hardware these docs should be all you need.
 
-**Other hardware.** The hub and the CPU-only mods (LLM Relay, OpenCode, Chat) run on any Linux with systemd. The GPU mods don't run elsewhere without changes: an NVIDIA or another AMD GPU needs its own images, wheels and model choices, which these docs don't cover. macOS and Windows aren't supported (AIHub runs on systemd user services).
+**Other hardware.** AIHub was built on Linux with an AMD Strix Halo, and runs elsewhere through each mod's variants (plan 38): `bin/aihub hardware` shows what your machine has, and the setup picks the variant that fits, says which ones haven't been tested on that kind of machine, and lists the mods it can't run. Windows works through WSL2; macOS is checked in CI only. What runs where: [platforms.md](../platforms.md); the host for your machine: the table below.
 
 ## The quick way
 
@@ -20,7 +20,7 @@ From a fresh clone, that's the whole process, in this order: choosing mods from 
 
 | Step | Doc | Time | Disk |
 |---|---|---|---|
-| 1. The machine | [host.md](host.md): kernel parameters, groups, packages, accounts | 30 min and a reboot | — |
+| 1. The machine | [host.md](host.md) (Linux with AMD), or [NVIDIA](host-linux-nvidia.md), [Intel](host-linux-intel.md), [WSL2](host-wsl2.md), [macOS](host-macos.md): drivers, groups, packages, accounts | 30 min and a reboot | — |
 | 2. The hub | [hub.md](hub.md): clone, `uv sync`, `aihub install`, `aihub doctor` | 5 min | 100 MB |
 | 3. The mods you want | their setup docs (below), in the order in [hub.md](hub.md#installing-the-mods) | 10 min to an hour each | up to about 22 GB each (images, runtimes, containers; the ComfyUI image, 15.1 GB, is shared by Images & Video and 3D Generate and counted once) |
 | 4. Their models | each mod's setup doc: what kind of model it runs, a few optional suggestions, how to add your own | the downloads | from nothing to hundreds of GB: your choice |

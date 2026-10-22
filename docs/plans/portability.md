@@ -342,14 +342,20 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **The badge** was checked in the browser on the mock (`?mock#/services`), since no mod here has a recorded variant yet (PATCHES #44).
     - **Tests:** `test_variants.py` (6).
 
-- [ ] **38.4 The template and the docs.**
+- [x] **38.4 The template and the docs.**
   - **The template:** `services/_template/` gains `device.py` (`AIHUB_DEVICE`, falling back `cuda` → `xpu` → `mps` → `cpu`) and `torch_index.py` (accel and runtime → the PyTorch wheel index, the table from `services/tts/engines/probe.py`). Its `install.sh` takes `--accel`.
   - **The host docs:** `docs/setup/host.md` becomes an index of `host-linux-amd.md` (today's text), `host-linux-nvidia.md`, `host-linux-intel.md`, `host-wsl2.md` and `host-macos.md`.
   *Done when:* `aihub new demo` gives a mod whose `install.sh --accel cpu` and `aihub check demo` pass (in a test root); `aihub docs --check --strict` passes.
+  - *As built:*
+    - **`host.md` keeps its name and text** (Linux with AMD Strix Halo, plus the sections every Linux shares), since generated model docs link its anchors. It opens with links to `host-linux-nvidia.md`, `host-linux-intel.md`, `host-wsl2.md` and `host-macos.md`, each marked as not yet run on such a machine.
+    - **The installer:** the template's `install.sh --accel` installs `requirements-torch.txt`, when there is one, from `torch_index.py`'s index.
+    - **Checked for real:** a copy of the template with `torch` in `requirements-torch.txt` installed torch 2.14.1+cpu, and `device()` answered `cpu`.
+    - **Docs:** `docs/mods.md` gains "Variants: one mod, several accelerators", and `docs/setup/README.md` no longer says other hardware is out of scope.
+    - **Tests:** `test_template_helpers.py` (4), and `test_new.py`'s install and check pass.
 
 **Checks & deliverables — Phase 38**
-- [ ] On this machine: every installed mod shows its variant badge, and nothing restarts differently.
-- [ ] Delivered: setup block v3, the variant choice in `aihub setup`, `AIHUB_ACCEL`/`AIHUB_DEVICE`, the unavailable state, the template's helpers, the per-host docs.
+- [ ] On this machine: every installed mod shows its variant badge, and nothing restarts differently. *(Nothing restarts differently: no mod here has a recorded variant until `aihub setup` runs again, which is the person's call; the badge was checked on the mock.)*
+- [x] Delivered: setup block v3, the variant choice in `aihub setup`, `AIHUB_ACCEL`/`AIHUB_DEVICE`, the unavailable state, the template's helpers, the per-host docs.
 
 ---
 

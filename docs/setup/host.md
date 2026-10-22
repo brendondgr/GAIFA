@@ -1,6 +1,8 @@
 # The host: the machine before AIHub
 
-What the machine needs before you clone AIHub. Every value here was read from the machine AIHub is built on (2026-10-20). Where it differs from the upstream guide, both are given.
+What the machine needs before you clone AIHub. **This page is Linux with an AMD Strix Halo**, the machine AIHub is built on; every value here was read from it (2026-10-20), and where it differs from the upstream guide, both are given. Sections 3–6 (packages, services, disk, accounts) apply to every Linux machine.
+
+**Other machines** (plan 38.4): [Linux with NVIDIA](host-linux-nvidia.md) · [Linux with Intel](host-linux-intel.md) · [Windows through WSL2](host-wsl2.md) · [macOS on Apple Silicon](host-macos.md). On any of them, `bin/aihub hardware` shows what AIHub finds and `bin/aihub setup host` checks what that machine needs. What runs where: [platforms.md](../platforms.md).
 
 ## Tested with
 
@@ -14,7 +16,7 @@ What the machine needs before you clone AIHub. Every value here was read from th
 | Containers | podman 5.8.9, toolbox 0.3 |
 | Tools | uv 0.12.23, git 2.56.0, Node 22.23.1 (`nodejs22`), npm 10.9.8, espeak-ng 1.52.0, ffmpeg 8.1.3 (RPM Fusion), Blender 5.2.2 (optional) |
 
-Other Strix Halo machines (the Framework Desktop, the HP Z2 Mini G1a, the GMKtec EVO-X2, …) have the same chip and should work the same way. Other GPUs are out of scope: the container images, the PyTorch wheels and the engines' settings are all built for `gfx1151`.
+Other Strix Halo machines (the Framework Desktop, the HP Z2 Mini G1a, the GMKtec EVO-X2, …) have the same chip and should work the same way. Other GPUs get each mod's variant for them (plan 38–39): see the pages for other machines above.
 
 ## 1. Let the GPU use the memory
 

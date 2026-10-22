@@ -32,13 +32,15 @@ Hook = Callable[[Profile], Awaitable[None]]
 STAGES = [
     (re.compile(r"Initializing a V1 LLM engine|non-default args"), "initializing"),
     (re.compile(r"Starting to load model|Loading weights|Loading safetensors"), "loading weights"),
-    (re.compile(r"torch\.compile|Compiling a graph|Dynamo bytecode"), "compiling"),
+    # vLLM's memory profiling run; on a first start Triton autotunes kernels here (minutes for hybrid models)
+    (re.compile(r"Model loading took"), "profiling"),
+    (re.compile(r"torch\.compile took|Compiling a graph|Dynamo bytecode transform"), "compiling"),
     (re.compile(r"Capturing CUDA graphs"), "capturing graphs"),
     (re.compile(r"Available KV cache memory|GPU KV cache size"), "allocating KV cache"),
-    (re.compile(r"JIT kernel warmup|Warming up"), "warming up"),
-    (re.compile(r"Application startup complete|Starting vLLM API server"), "starting server"),
+    (re.compile(r"JIT kernel warmup \("), "warming up"),
+    (re.compile(r"Starting vLLM API server|Application startup complete"), "starting server"),
 ]
-STAGE_ORDER = ["starting container", "initializing", "loading weights", "compiling", "capturing graphs",
+STAGE_ORDER = ["starting container", "initializing", "loading weights", "profiling", "compiling", "capturing graphs",
                "allocating KV cache", "warming up", "starting server"]
 
 
@@ -204,7 +206,7 @@ class Engine:
             log.warning("log follower: %s", e)
 
     async def _monitor(self, p: Profile) -> None:
-        deadline = (self.started_at or time.time()) + self.s.start_timeout_s
+        deadline = time.time() + self.s.start_timeout_s       # from the container's start, not the download
         last_check = 0.0
         while self.state in ("starting", "ready"):
             await asyncio.sleep(self.poll_s)

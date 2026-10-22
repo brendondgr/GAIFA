@@ -26,6 +26,9 @@ VLLM_STATE_DIR = "{root}/data/state/vllm"
 HF_HOME = "{hf_home}"
 
 
+[ui]
+page = "ui/page.js"
+
 [memory]
 # Each load acquires its profile's own memory_gb (+ the processes' overhead) from AIHub first.
 estimate_gb = 16

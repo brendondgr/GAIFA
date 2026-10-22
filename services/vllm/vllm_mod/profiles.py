@@ -145,6 +145,9 @@ def engine_env(profile: Profile, settings: Settings) -> dict[str, str]:
         "VLLM_ROCM_USE_AITER": "0", "VLLM_ROCM_USE_AITER_LINEAR": "0",
         # rocprofiler-sdk attaches to every process and polls its queues; nothing here profiles.
         "ROCPROFILER_REGISTER_ENABLED": "0",
+        # Triton's autotune results on disk (in TRITON_CACHE_DIR), so a model tunes its kernels once;
+        # engine_site/sitecustomize.py makes the tuning itself sane on gfx1151 (broken GPU event timing).
+        "TRITON_CACHE_AUTOTUNING": "1", "PYTHONPATH": str(settings.site_dir),
         "PYTHONUNBUFFERED": "1", **profile.env,
     }
 
@@ -158,17 +161,37 @@ def engine_command(profile: Profile, settings: Settings, gtt_total: int) -> list
            "--network", "host", "--ipc", "host",
            "--device", "/dev/kfd", "--device", "/dev/dri", "--group-add", "keep-groups",
            "--security-opt", "label=disable", "--security-opt", "seccomp=unconfined",
-           "-v", f"{hf}:{hf}", "-v", f"{cache}:{cache}"]
+           "-v", f"{hf}:{hf}", "-v", f"{cache}:{cache}", "-v", f"{settings.site_dir}:{settings.site_dir}:ro"]
     for k, v in engine_env(profile, settings).items():
         cmd += ["-e", f"{k}={v}"]
     return cmd + [settings.image] + serve_args(profile, settings.engine_port, gtt_total)
 
 
+TITLES = {"memory_gb": "Memory (GB)", "max_model_len": "Context (tokens)", "max_num_seqs": "Requests at once",
+          "served_name": "Served name", "attention_backend": "Attention backend", "enforce_eager": "Eager mode",
+          "trust_remote_code": "Trust remote code", "tool_parser": "Tool-call parser",
+          "reasoning_parser": "Reasoning parser", "extra_args": "Extra flags",
+          "env": "Environment", "model": "Hugging Face repo"}
+
+
 def schema() -> dict:
-    """The profile's JSON Schema for the page's form (without the id, which is the file name)."""
+    """The profile as a form for the page (/mod-form.js): no id (it's the file name), optional strings
+    as plain strings, the attention backends as a list, and `env` (KEY=value lines) and `extra_args`
+    (flags separated by spaces) as text the page converts."""
     s = Profile.model_json_schema()
     s["properties"].pop("id", None)
     s["required"] = [r for r in s.get("required", []) if r != "id"]
+    for k, prop in s["properties"].items():
+        if "anyOf" in prop:
+            prop.pop("anyOf")
+            prop["type"] = "string"
+        prop["title"] = TITLES.get(k, prop.get("title", k))
+    s["properties"]["attention_backend"]["enum"] = ["TRITON_ATTN", "ROCM_ATTN", "ROCM_AITER_UNIFIED_ATTN"]
+    s["properties"]["env"] = {"type": "string", "x-multiline": True, "title": TITLES["env"],
+                              "description": "One KEY=value per line, e.g. VLLM_ROCM_USE_AITER=1"}
+    s["properties"]["extra_args"] = {"type": "string", "title": TITLES["extra_args"],
+                                     "description": "More `vllm serve` flags, e.g. --seed 1 --kv-cache-dtype fp8"}
+    s["properties"]["notes"]["x-multiline"] = True
     return s
 
 

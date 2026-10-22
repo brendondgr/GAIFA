@@ -38,11 +38,15 @@ class FakeRunner(cli_setup.Runner):
         self.fail, self.up, self.refuse = set(fail), up, set(refuse)
         self.jobs = list(jobs or [])          # successive answers of GET /api/services/<mod>'s jobs
 
-    def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True, echo: bool = False) -> tuple[int, str]:
+    def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True, echo: bool = False, log: Path | None = None) -> tuple[int, str]:
         self.ran.append((cmd, cwd.name, env))
         if cmd == "bin/aihub install":
             self.up = True
-        return (1, f"{cmd}: boom") if cmd in self.fail else (0, "")
+        out = f"{cmd}: boom" if cmd in self.fail else ""
+        if log is not None:                    # plan 40.1: the whole output goes to the step's log
+            log.parent.mkdir(parents=True, exist_ok=True)
+            log.write_text(f"$ {cmd}\n{out}\n")
+        return (1, out) if cmd in self.fail else (0, "")
 
     def call(self, method: str, path: str, body: Any = None) -> Any:
         self.calls.append((method, path, body))
@@ -181,7 +185,7 @@ def test_a_full_run_with_answers(root: Path, capsys) -> None:
     reg = next(b for m, p, b in runner.calls if p == "/api/models")
     assert reg["path"] == "hf-cache/hub/models--hexgrad--Kokoro-82M" and reg["kind"] == "tts" and reg["source"]["revision"].startswith("f3ff357")
     assert ("POST", "/api/s/tts/v1/load", {"preset": "small"}) in runner.calls and ("aihub start tts", "", None) in [(c, "" if c.startswith("aihub start") else cwd, e) for c, cwd, e in runner.ran]
-    assert r["checks"] == [{"setup": "tts-kokoro", "run": "aihub check tts", "ok": True}]
+    assert r["checks"] == [{"setup": "tts-kokoro", "run": "aihub check tts", "ok": True, "log": "data/state/setup/logs/tts-kokoro_check.log"}]
     assert ("aihub check tts", "tts") in cmds or ("aihub check tts", "tts") in [(c, cwd) for c, cwd, _ in runner.ran]   # checks run in the mod's folder
 
 
@@ -662,12 +666,12 @@ class Downloading(FakeRunner):
         self.looks = 0
         self.there_after = there_after
 
-    def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True, echo: bool = False) -> tuple[int, str]:
+    def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True, echo: bool = False, log: Path | None = None) -> tuple[int, str]:
         if cmd == "grep -q w catalog.json":
             self.ran.append((cmd, cwd.name, env))
             self.looks += 1
             return (0, "") if self.looks > self.there_after else (1, "")
-        return super().run(cmd, cwd, env, stream, echo)
+        return super().run(cmd, cwd, env, stream, echo, log)
 
     def call(self, method: str, path: str, body: Any = None) -> Any:
         if method == "POST" and path == "/api/s/tts/v1/load":

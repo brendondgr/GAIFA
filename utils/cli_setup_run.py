@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -15,6 +16,9 @@ from typing import Any
 cli: Any = None   # utils/cli.py, set by cli_setup.cmd_setup
 
 STATE = Path("data") / "state" / "setup" / "run.json"
+LOGS = Path("data") / "state" / "setup" / "logs"        # plan 40.1: every step's, check's and smoke's full output
+LAST_RUN = Path("data") / "state" / "setup" / "last-run.json"
+LOG_CAP = 2 * 1024 * 1024
 TERMINAL = {"done", "finished", "ok", "ready", "completed", "failed", "error", "cancelled", "canceled"}
 FAILED = {"failed", "error"}
 JOB_TIMEOUT_S = 6 * 3600
@@ -43,23 +47,46 @@ class Answers:
 class Runner:
     """Commands, hub calls and waiting; tests pass a fake."""
 
-    def run(self, cmd: str, cwd: Path, env: dict[str, str] | None = None, stream: bool = True, echo: bool = False) -> tuple[int, str]:
+    def run(self, cmd: str, cwd: Path, env: dict[str, str] | None = None, stream: bool = True, echo: bool = False,
+            log: Path | None = None) -> tuple[int, str]:
         """`stream`: output straight to the terminal; else captured (its tail returned), and with
-        `echo` also copied to stderr as it comes (--json: progress for an agent, stdout stays JSON)."""
+        `echo` also copied to stderr as it comes (--json: progress for an agent, stdout stays JSON).
+        `log` (plan 40.1): the whole output also goes to that file (cut at 2 MB), streamed or not."""
         import os
         full = {**os.environ, **(env or {})}
         full["PATH"] = f"{Path(cli.CODE) / 'bin'}:{full.get('PATH', '')}"   # `aihub` before ~/.local/bin is on PATH
-        if stream:
+        if stream and log is None:
             return subprocess.run(["bash", "-c", cmd], cwd=cwd, env=full).returncode, ""
-        if not echo:
+        if not echo and log is None:
             p = subprocess.run(["bash", "-c", cmd], cwd=cwd, env=full, capture_output=True, text=True)
             return p.returncode, (p.stdout + p.stderr)[-4000:]
         tail: list[str] = []
-        with subprocess.Popen(["bash", "-c", cmd], cwd=cwd, env=full, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as p:
-            for line in p.stdout or []:
-                sys.stderr.write("    " + line)
-                tail.append(line)
-                del tail[:-200]
+        f = None
+        if log is not None:
+            log.parent.mkdir(parents=True, exist_ok=True)
+            f = log.open("w", errors="replace")
+            f.write(f"$ {cmd}\n# in {cwd}\n")
+        written = 0
+        try:
+            with subprocess.Popen(["bash", "-c", cmd], cwd=cwd, env=full, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                  text=True, errors="replace") as p:
+                for line in p.stdout or []:
+                    if stream:
+                        sys.stdout.write(line)
+                        sys.stdout.flush()
+                    elif echo:
+                        sys.stderr.write("    " + line)
+                    if f is not None and written < LOG_CAP:
+                        f.write(line)
+                        written += len(line)
+                        if written >= LOG_CAP:
+                            f.write("[the log stops here: 2 MB]\n")
+                    tail.append(line)
+                    del tail[:-200]
+        finally:
+            if f is not None:
+                f.write(f"# exit {p.returncode}\n" if "p" in locals() and p.returncode is not None else "")
+                f.close()
         return p.returncode, "".join(tail)[-4000:]
 
     def call(self, method: str, path: str, body: Any = None) -> Any:
@@ -215,6 +242,34 @@ def save_state(root: Path, state: dict[str, Any]) -> None:
 
 def doc_of(e: Any, root: Path) -> str:
     return e.path.relative_to(root).as_posix() if e.path.is_relative_to(root) else str(e.path)
+
+
+def logfile(root: Path, name: str) -> Path:
+    """data/state/setup/logs/<name>.log, with the name made safe ("tts-kokoro/3" → tts-kokoro_3)."""
+    return root / LOGS / (re.sub(r"[^A-Za-z0-9._-]+", "_", name) + ".log")
+
+
+def _flat(s: str) -> str:
+    return re.sub(r"[\\\"'\s]+", " ", s).strip()
+
+
+def source_of(e: Any, root: Path, cmd: str) -> str:
+    """Where a command comes from (plan 40.1): its setup doc and the line its text starts on, for the fixer;
+    the doc alone when it can't be found. Quotes, backslashes and spacing are ignored (TOML escapes them)."""
+    doc = doc_of(e, root)
+    want = _flat(cmd.strip().splitlines()[0] if cmd.strip() else "")[:60]
+    try:
+        lines = e.path.read_text().splitlines()
+    except OSError:
+        return doc
+    for i, line in enumerate(lines, 1):
+        if want and want in _flat(line):
+            return f"{doc}:{i}"
+    return doc
+
+
+def rel(root: Path, p: Path) -> str:
+    return p.relative_to(root).as_posix() if p.is_relative_to(root) else str(p)
 
 
 def hub_needs(code: Path, runner: Runner) -> list[str]:
@@ -431,9 +486,13 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
             raise Stop("interactive", id=s["id"], run=s["run"], cwd=f"services/{e.mod}", text=s["what"],
                        answer_with=f"run it yourself in services/{e.mod}, then again with --done {s['id']}", report=report)
         say(args, f"\n==> {s['id']}: {s['what']}\n    $ {s['run']}")
-        rc, out = runner.run(s["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=not args.json or step.interactive, echo=args.json)
+        log = None if step.interactive else logfile(root, s["id"])     # a prompting step keeps the terminal
+        rc, out = runner.run(s["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=not args.json or step.interactive,
+                             echo=args.json, **({"log": log} if log else {}))
         if rc:
-            raise fail({"setup": e.id, "step": s["id"], "run": s["run"], "output": out, "doc": doc_of(e, root)})
+            raise fail({"setup": e.id, "step": s["id"], "run": s["run"], "output": out, "doc": doc_of(e, root),
+                        "source": source_of(e, root, s["run"]), "cwd": f"services/{e.mod}", "exit": rc,
+                        "env": dict(getattr(e, "run_env", None) or {}), **({"log": rel(root, log)} if log else {})})
         state["steps"][s["id"]] = "done"
         save_state(root, state)
         report["done"].append(s["id"])
@@ -485,19 +544,25 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         e = by_id[c["setup"]]
         if e.id in skip:
             continue
-        rc, out = runner.run(c["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=False)   # in the mod's folder, like steps
-        report["checks"].append({"setup": e.id, "run": c["run"], "ok": rc == 0, **({"output": out} if rc else {})})
+        log = logfile(root, f"{e.id}/check")
+        rc, out = runner.run(c["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=False, log=log)   # in the mod's folder, like steps
+        report["checks"].append({"setup": e.id, "run": c["run"], "ok": rc == 0, "log": rel(root, log), **({"output": out} if rc else {})})
         if rc:
-            report["failed"].append({"setup": e.id, "step": "check", "run": c["run"], "output": out, "doc": doc_of(e, root)})
+            report["failed"].append({"setup": e.id, "step": "check", "run": c["run"], "output": out, "doc": doc_of(e, root),
+                                     "source": source_of(e, root, c["run"]), "cwd": f"services/{e.mod}", "exit": rc,
+                                     "env": dict(getattr(e, "run_env", None) or {}), "log": rel(root, log)})
     for sm in p.get("smokes", []):     # plan 38.1: real work, only with --smoke
         e = by_id[sm["setup"]]
         if e.id in skip:
             continue
         say(args, f"\n==> {e.id}: smoke\n    $ {sm['run']}")
-        rc, out = runner.run(sm["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=False)
-        report.setdefault("smokes", []).append({"setup": e.id, "run": sm["run"], "ok": rc == 0, **({"output": out} if rc else {})})
+        log = logfile(root, f"{e.id}/smoke")
+        rc, out = runner.run(sm["run"], root / "services" / e.mod, env=getattr(e, "run_env", None), stream=False, log=log)
+        report.setdefault("smokes", []).append({"setup": e.id, "run": sm["run"], "ok": rc == 0, "log": rel(root, log), **({"output": out} if rc else {})})
         if rc:
-            report["failed"].append({"setup": e.id, "step": "smoke", "run": sm["run"], "output": out, "doc": doc_of(e, root)})
+            report["failed"].append({"setup": e.id, "step": "smoke", "run": sm["run"], "output": out, "doc": doc_of(e, root),
+                                     "source": source_of(e, root, sm["run"]), "cwd": f"services/{e.mod}", "exit": rc,
+                                     "env": dict(getattr(e, "run_env", None) or {}), "log": rel(root, log)})
     config_mod.verify(live, root, runner, report)
     if report["failed"]:
         report["next"].append("open each failure's doc (What to look for, Known gaps), fix it, and run aihub setup again: it resumes")

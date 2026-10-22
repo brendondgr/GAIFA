@@ -477,11 +477,16 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
 
 The user builds AIHub on the other machines later, with an agent. The agent follows a procedure, records every problem as it goes, and ends with one markdown file, written for a fixer working in this repo. That file says which file and line to change, with the exact command, output and versions behind each issue.
 
-- [ ] **40.1 The setup keeps what it saw: full logs and the saved report.**
+- [x] **40.1 The setup keeps what it saw: full logs and the saved report.**
   - **Full logs:** `aihub setup` writes each step's, check's and smoke's full output to `data/state/setup/logs/<step-id>.log` (capped at 2 MB each), alongside the 4000-character tail it keeps today (`utils/cli_setup_run.py` `Runner.run`).
   - **The saved report:** every run saves its report, the plan and the chosen variants to `data/state/setup/last-run.json`, whether it ended done, failed or stopped.
   - **Where each failure comes from:** a failure item gains `log` (its log file) and `source`, the setup doc's path and the line of its step, read when the doc is parsed (`utils/setupdocs/envs.py`).
   *Done when:* `utils/tests/core/test_cli_setup.py` covers a failed step's log file, `source` line and the saved report.
+  - *As built:*
+    - **Logs:** `Runner.run(log=…)` writes `$ <command>`, `# in <folder>`, the merged output and `# exit <code>` to `data/state/setup/logs/<id>.log` (cut at 2 MB), streamed to the terminal as well when it streams. Steps that prompt (logins) keep the terminal and have no log.
+    - **A failure item** gains `log`, `source` (the doc line where the command's text starts, quotes and escapes ignored), `cwd`, `exit` and `env` (the variant's).
+    - **The last run:** `data/state/setup/last-run.json` (machine, targets, plan with variants, the report or the stop) is written for runs, not for `--plan`.
+    - **Tests:** `utils/tests/core/test_setup_logs.py` (4).
 
 - [ ] **40.2 `aihub report`: the field report (`utils/cli_report.py`, standard library only).**
   - **Notes:** `aihub report note "<what happened>" [--cmd "<command>"] [--output <file>] [--setup <id>] [--severity blocker|major|minor] [--tried "<what was tried>"]` appends an observation to `data/state/reports/notes.jsonl`.

@@ -88,7 +88,7 @@ def test_steps_run_with_the_variant_env_and_the_choice_is_recorded(root3, capsys
     assert env == {"TTS_FAST": "1", "AIHUB_ACCEL": "rocm", "AIHUB_DEVICE": "cuda", "AIHUB_GPU_ARCH": "gfx1151"}
     assert ("PUT", "/api/services/tts/config", {"accel": "rocm", "env": {"TTS_FAST": "1"}}) in runner.calls
     r = out(capsys)
-    assert r["smokes"] == [{"setup": "tts-kokoro", "run": "scripts/smoke.sh", "ok": True}]
+    assert r["smokes"] == [{"setup": "tts-kokoro", "run": "scripts/smoke.sh", "ok": True, "log": "data/state/setup/logs/tts-kokoro_smoke.log"}]
     assert any(c == "scripts/smoke.sh" for c, _, _ in runner.ran)
 
 

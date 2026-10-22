@@ -27,7 +27,7 @@ description: Use when asked to set up, install or bootstrap AIHub, or some of it
      - `models`: which suggestions for one setup (`choices`, with the `required` ones); `--models "<setup id>=<names>"`, or `none`.
      - `value`: a setting after install (`choices`: the relay's models, a list, or `"folder"`); `--set "<id>=<value>"`. When the relay has **no chat models yet**, the `answer_with` hint says where one comes from: set up `lcpp` with a model (setup launches it), add a hosted provider (`"providers"` in the answers), or set up `opencode`. Don't invent a name.
    - `interactive`: a step that prompts (a login). Give the person its `run` and `cwd`; once they've run it, run again with `--done <id>`. (A step whose `skip_if` passes, such as an existing login, never stops here.)
-   - `failed`: a step, a download, a model launch or a config write failed; read the failure's `doc` (What to look for, Known gaps) and its `output`, fix what you can, tell them what you can't, run again.
+   - `failed`: a step, a download, a model launch or a config write failed; read the failure's `doc` (What to look for, Known gaps), its `source` (the doc line the command comes from), its `output` and its whole `log` (`data/state/setup/logs/`), fix what you can, tell them what you can't, run again.
    - `host`: a blocking host check failed: back to step 2.
    - `unavailable`: nothing they chose runs on this machine (`unavailable` says why: no such accel here, or another OS). Offer another variant with `--accel`, or other mods.
    - `unknown`: a setup or mod id that has no setup doc (a typo, or a mod that isn't in this clone); its `choices` lists the real ids. Ask which they meant.

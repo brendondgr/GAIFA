@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+import time
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -179,7 +181,24 @@ def plan_text(p: dict[str, Any]) -> str:
 # ---- the command -------------------------------------------------------------------------------
 
 
+_last: dict[str, Any] = {}     # plan 40.1: what this run saw, saved with its outcome (data/state/setup/last-run.json)
+
+
+def save_last_run(data: dict[str, Any]) -> None:
+    """The run's outcome, its plan, variants and machine, for `aihub report` (plan 40.2). Never fails the run."""
+    try:
+        p = Path(cli.ROOT) / run_mod.LAST_RUN
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".tmp")
+        tmp.write_text(json.dumps({**_last, "ts": time.time(), "argv": sys.argv[1:], "result": data}, indent=1, default=str))
+        tmp.replace(p)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def emit(args: argparse.Namespace, data: dict[str, Any], text: str) -> None:
+    if data.get("stage") in ("report", "stopped"):
+        save_last_run(data)
     print(json.dumps(data, indent=1) if args.json else text, flush=True)
 
 
@@ -211,6 +230,8 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             targets = [ids[int(x) - 1] if x.strip().isdigit() else x.strip() for x in pick.split(",") if x.strip()]
         envs = resolve(targets, offered, root)
         machine = probe.machine()
+        _last.clear()
+        _last.update(machine=machine.to_dict(), targets=targets)
         resolved = envs
         envs, unavailable = variant_mod.choose(envs, machine, variant_mod.overrides(getattr(args, "accel", None)))
         gone = run_mod.dependents(resolved, {u["setup"] for u in unavailable}) - {u["setup"] for u in unavailable}
@@ -225,6 +246,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
         p["variants"] = [variant_mod.describe(e, machine) for e in envs]
         p["unavailable"] = unavailable
         p["smokes"] = [{"setup": e.id, "run": e.setup.smoke} for e in envs if e.setup.smoke] if getattr(args, "smoke", False) else []
+        _last["plan"] = p
         if args.plan:
             emit(args, {"stage": "plan", **p}, plan_text(p))
             return 0

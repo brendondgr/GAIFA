@@ -112,8 +112,8 @@ def test_the_mods_index_shows_the_block(tmp_path: Path) -> None:
     readme.write_text(f"# Setup\n\n{render.START}\n{render.END}\n")
     setupdocs.sync(tmp_path)
     text = readme.read_text()
-    assert "| `tts` | Speech: fast English voices | yes | 14.0 GB | [Kokoro](../../services/tts/setup/env.md) |" in text
-    assert "| `web` | Search | no | 50 MB | [Web](../../services/web/setup/env.md) |" in text
+    assert "| `tts` | Speech: fast English voices | yes | ROCm | 14.0 GB | [Kokoro](../../services/tts/setup/env.md) |" in text
+    assert "| `web` | Search | no | CPU | 50 MB | [Web](../../services/web/setup/env.md) |" in text
 
 
 def test_the_template_parses_once_filled_in(tmp_path: Path) -> None:

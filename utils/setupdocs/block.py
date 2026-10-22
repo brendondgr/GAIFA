@@ -1,7 +1,12 @@
-"""The `aihub-setup` block, version 2 (plan 23.7): what `aihub setup` reads from a setup doc.
+"""The `aihub-setup` block, versions 2 and 3 (plans 23.7, 38.1): what `aihub setup` reads from a setup doc.
 
 Every key past `id` and `title` is optional, so a doc without them still parses; the wizard lists
 only docs with a `summary`. Unknown keys are errors, at the top and inside `[[steps]]` and `[[suggest]]`.
+
+Version 3 adds `[[variants]]`, one per accelerator the setup can run on (`accel`, `os`, `tested`, `env`,
+and optionally its own `steps`, `check` and `smoke`), and `smoke`: a command that does real work, run
+by `aihub setup --smoke` and the field test. A block without variants has one: `cpu` when `gpu = false`,
+`rocm` on Linux when `gpu = true` (what the version-2 docs were written on).
 """
 
 from __future__ import annotations
@@ -11,7 +16,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config"}
+TOP = {"id", "title", "models", "scan", "summary", "gpu", "disk_gb", "images", "needs", "after", "check", "steps", "suggest", "config",
+       "variants", "smoke"}
+VARIANT = {"accel", "os", "tested", "env", "steps", "check", "smoke", "note"}
+ACCELS = ("rocm", "cuda", "xpu", "mps", "vulkan", "cpu")        # utils/hardware ACCELS, in the order they're tried
+OSES = ("linux", "wsl", "darwin")
 CONFIG = {"key", "text", "choices", "required", "restart"}
 CONFIG_KEY = re.compile(r"^(services\.[a-z][a-z0-9-]{1,31}\.env\.[A-Z][A-Z0-9_]*|agent\.judge\.model)$")
 STEP = {"run", "what", "ask", "interactive", "skip_if", "optional", "next"}
@@ -60,6 +69,18 @@ class Config:
 
 
 @dataclass
+class Variant:
+    accel: str                      # rocm | cuda | xpu | mps | vulkan | cpu
+    os: list[str] = field(default_factory=lambda: ["linux"])   # linux (native) | wsl | darwin
+    tested: list[str] = field(default_factory=list)            # where it has run for real (os names); else "untested here"
+    env: dict[str, str] = field(default_factory=dict)          # for its steps, check and smoke, and the mod ([services.<id>.env])
+    steps: list[Step] | None = None                            # its own steps; None: the block's
+    check: str = ""                                            # its own check; "": the block's
+    smoke: str = ""                                            # its own smoke; "": the block's
+    note: str = ""                                             # one line for the plan ("slow on the CPU")
+
+
+@dataclass
 class Setup:
     summary: str = ""
     gpu: bool | None = None
@@ -71,6 +92,21 @@ class Setup:
     steps: list[Step] = field(default_factory=list)
     suggest: list[Suggest] = field(default_factory=list)
     config: list[Config] = field(default_factory=list)   # values asked after install (choices come from it)
+    variants: list[Variant] = field(default_factory=list)   # version 3; empty: see `effective_variants`
+    smoke: str = ""                                          # version 3: real work, run with --smoke
+
+    def effective_variants(self) -> list[Variant]:
+        """The declared variants, or the one a version-2 block stands for."""
+        if self.variants:
+            return self.variants
+        if self.gpu:
+            return [Variant("rocm", ["linux"], ["linux"])]
+        return [Variant("cpu", list(OSES), ["linux"])]
+
+    def runs_on(self) -> list[str]:
+        """Its accels, in ACCELS order."""
+        have = {v.accel for v in self.effective_variants()}
+        return [a for a in ACCELS if a in have]
 
 
 def _strs(v: Any) -> bool:
@@ -181,6 +217,43 @@ def _config(i: int, d: Any) -> tuple[Config | None, str | None]:
     return Config(key=d["key"], text=d["text"].strip(), choices=choices, required=d.get("required", False), restart=d.get("restart", "").strip()), None
 
 
+def _variant(i: int, d: Any) -> tuple[Variant | None, str | None]:
+    where = f"variants[{i}]"
+    if not isinstance(d, dict):
+        return None, f"{where} must be a table ([[variants]])"
+    unknown = sorted(set(d) - VARIANT)
+    if unknown:
+        return None, f"{where}: unknown key(s) {', '.join(unknown)} (allowed: {', '.join(sorted(VARIANT))})"
+    if d.get("accel") not in ACCELS:
+        return None, f"{where}: `accel` must be one of {', '.join(ACCELS)}"
+    oses = d.get("os", ["linux"])
+    if not _strs(oses) or not oses or any(o not in OSES for o in oses):
+        return None, f"{where}: `os` must be a list of {', '.join(OSES)}"
+    tested = d.get("tested", False)
+    if isinstance(tested, bool):
+        tested = list(oses) if tested else []
+    elif not (_strs(tested) and all(o in OSES for o in tested)):
+        return None, f"{where}: `tested` must be true, false or a list of {', '.join(OSES)}"
+    env = d.get("env", {})
+    if not isinstance(env, dict) or not all(isinstance(k, str) and k and isinstance(v, str) for k, v in env.items()):
+        return None, f"{where}: `env` must be a table of NAME = \"value\" strings"
+    steps: list[Step] | None = None
+    if "steps" in d:
+        if not isinstance(d["steps"], list):
+            return None, f"{where}: `steps` must be an array of tables"
+        steps = []
+        for j, s in enumerate(d["steps"]):
+            step, problem = _step(j, s)
+            if problem:
+                return None, f"{where}.{problem}"
+            steps.append(step)
+    for key in ("check", "smoke", "note"):
+        if not isinstance(d.get(key, ""), str):
+            return None, f"{where}: `{key}` must be a string"
+    return Variant(d["accel"], list(oses), list(tested), dict(env), steps, d.get("check", "").strip(), d.get("smoke", "").strip(),
+                   d.get("note", "").strip()), None
+
+
 def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
     """The version-2 keys of an already-parsed block → (Setup, None) or (None, problem)."""
     out = Setup()
@@ -210,7 +283,12 @@ def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
         if not isinstance(data["check"], str) or not data["check"].strip():
             return None, "`check` must be a non-empty command"
         out.check = data["check"].strip()
-    for key, fn, into in (("steps", _step, out.steps), ("suggest", _suggest, out.suggest), ("config", _config, out.config)):
+    if "smoke" in data:
+        if not isinstance(data["smoke"], str) or not data["smoke"].strip():
+            return None, "`smoke` must be a non-empty command"
+        out.smoke = data["smoke"].strip()
+    for key, fn, into in (("steps", _step, out.steps), ("suggest", _suggest, out.suggest), ("config", _config, out.config),
+                          ("variants", _variant, out.variants)):
         v = data.get(key, [])
         if not isinstance(v, list):
             return None, f"`{key}` must be an array of tables ([[{key}]])"
@@ -219,4 +297,6 @@ def read(data: dict[str, Any]) -> tuple[Setup | None, str | None]:
             if problem:
                 return None, problem
             into.append(item)
+    if out.variants and out.gpu is None:
+        out.gpu = any(v.accel != "cpu" for v in out.variants)
     return out, None

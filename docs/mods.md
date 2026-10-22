@@ -233,6 +233,7 @@ images = { "docker.io/org/image" = 15.1 }   # container images it pulls, in GB: 
 needs = ["podman", "espeak-ng"]             # host commands that must exist
 after = ["tts"]                             # setup ids to do first
 check = "aihub check tts"                   # proves it works
+smoke = "scripts/smoke.sh"                  # version 3: real work (one clip spoken); run by `aihub setup --smoke` and the field test
 
 [[steps]]                                   # run in order, with bash, in the mod's folder
 run = "scripts/install-runtime.sh"
@@ -258,6 +259,15 @@ next = ""                                   # what's left to do once it's chosen
 skip_if = ""                                # a command: exit 0 means it's on disk already (a step fetched it): registered, not downloaded
 # start_op = "POST /api/instances"          # a mod route run after the download (launching it), with
 # start_body = { model_id = "qwen3-8b" }    # its body
+
+[[variants]]                                # version 3 (plan 38): one per accelerator it runs on, in your order of preference
+accel = "rocm"                              # rocm | cuda | xpu | mps | vulkan | cpu (what `aihub hardware` lists)
+os = ["linux"]                              # linux (native) | wsl | darwin
+tested = true                               # where it has run for real: true (all its os), false, or a list of os
+env = { MYMOD_DEVICE = "cuda" }             # for its steps, check and smoke, and the mod itself
+# steps = [ { run = "./install.sh --accel rocm", what = "…" } ]   # its own steps instead of the block's
+# check = "…"                               # its own check; smoke = "…" its own smoke
+# note = "slow on the CPU"                  # one line shown in the plan
 -->
 ```
 
@@ -266,7 +276,8 @@ skip_if = ""                                # a command: exit 0 means it's on di
 - `scan`: tracked files in the mod (globs relative to its folder, e.g. `workflows/*/workflow.json`) whose mentions of a model's file name or Hugging Face repo are listed in its inventory doc as "referenced by".
 - `[[suggest]]` can name a mod route instead of a repo, for mods with their own downloader: `op = "POST /v1/load"` and `body = { preset = "balanced" }` (no `dest`, `files` or `revision`). Mark weights an engine can't run without `required = true`; everything else is optional, and the default is to download nothing. A route that refuses because an earlier run's download is still going (a Ctrl-C) is waited out, and the suggestion's `skip_if` then decides; give such suggestions one (lcpp's check its catalog).
 - `[[config]]` asks for a setting after install, when its choices exist: `key` (`services.<id>.env.<VAR>` or `agent.judge.model`, written to `config.toml`), `text`, `choices` (`"relay-models"`, the relay's chat models then, without its `auto` router and OpenCode's `agent`; `"folder"`, an absolute folder outside AIHub, made if missing; or a list), `required`, `restart` (mod ids, or `"hub"`, restarted in order once it's set; `"opencode relay"`). Values are saved through the hub, which applies them at once; the questions about the relay's models come after the others, since a folder or list value can bring the relay new models. The agent's doc asks for its model this way; an agent answers with `--set "<id or key>=<value>"`, and can add a hosted provider first (`"providers"` in `--answers`).
-- Unknown keys are errors, at the top and inside `[[steps]]`, `[[suggest]]` and `[[config]]`; `aihub docs --check` reports them.
+- `[[variants]]` (version 3, plan 38): `aihub setup` picks the first whose `accel` this machine has (`aihub hardware`) and whose `os` matches, runs its steps (or the block's) with its `env`, and records the choice. A setup with no fitting variant is "not available on this machine". One that isn't `tested` on this kind of machine is named as untested in the plan. A block without variants is one: `cpu` on every system for `gpu = false`, `rocm` on Linux for `gpu = true`. The mods index's "Runs on" column comes from them.
+- Unknown keys are errors, at the top and inside `[[steps]]`, `[[suggest]]`, `[[config]]` and `[[variants]]`; `aihub docs --check` reports them.
 - `aihub setup` runs `[[steps]]` and `check` in the mod's folder, asks every `ask` question and every model choice before it runs anything (the hub stage included); a "no" skips that setup and every chosen setup whose `after` names it, and the report lists them. An `interactive` step runs in the terminal for a person; under `--json` the run stops with its command, the person runs it, and `--done <step id>` continues. A `[[suggest]]` with an `op` is followed until the job it starts ends (the mod's jobs in `GET /api/services/<id>`), and a failed job fails the step. The wizard downloads the chosen `[[suggest]]` models after the steps (a step may fetch weights its installer needs offline first: the wizard's download then finds them and only registers them). A `repo` suggestion in `hf-cache` pinned to a commit also gets `refs/main` pointed at it, for engines that load by `main`.
 
 Then these sections, in this order. Leave a section out only when it has nothing to say:
@@ -278,5 +289,5 @@ Then these sections, in this order. Leave a section out only when it has nothing
 5. **Choosing models**: what kind of model the mod runs, where the files go, and how to add your own (the mod's page, its downloader, or a command); the suggestions with their sizes and licences; weights an engine needs, if any.
 6. **Configuration**: `.env` and `service.toml` keys, marked required or optional.
 7. **Check it works**: commands and the output to expect.
-8. **What to look for**: what's specific to `gfx1151`, known errors and their fixes, what breaks quietly.
+8. **What to look for**: what's specific to each variant (`gfx1151`, CUDA versions, …), known errors and their fixes, what breaks quietly.
 9. **Known gaps**: steps no script does yet.

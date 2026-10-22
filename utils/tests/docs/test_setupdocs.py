@@ -78,7 +78,7 @@ def test_writes_the_mods_index_and_the_local_inventory(root: Path) -> None:
     assert doc(root, "ae").endswith(render.HAND_NO_SOURCE)            # no source: a "Where to get it" to fill in
     readme = (root / "docs" / "setup" / "README.md").read_text()
     assert readme.startswith("# Setup\n\nHand text.\n\n") and readme.endswith("\n\nMore hand text.\n")
-    assert "| `img` | — | — | — | [Image engine](../../services/img/setup/img.md) |" in readme
+    assert "| `img` | — | — | — | — | [Image engine](../../services/img/setup/img.md) |" in readme
     assert "big" not in readme                                        # the committed index names mods, never models
     inventory = (root / INV / "README.md").read_text()
     assert "[big.safetensors](big.md)" in inventory and "2 models, 5.0 GB in all." in inventory

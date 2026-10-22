@@ -291,7 +291,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
 
 ## Phase 38 — Mods choose a backend (M)
 
-- [ ] **38.1 Variants and smokes in the setup block, version 3: `utils/setupdocs/block.py`.**
+- [x] **38.1 Variants and smokes in the setup block, version 3: `utils/setupdocs/block.py`.**
   - **Variants:** a block may have `[[variants]]`:
     ```toml
     [[variants]]
@@ -305,6 +305,11 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - **Smokes:** `smoke` is a command that does real work (one image, one sentence spoken, one transcript). It runs with `aihub setup --smoke` and in the field test, never by default.
   - The mods index shows a "Runs on" column. **Docs:** `docs/mods.md` §9.
   *Done when:* `utils/tests/docs/test_setup_block.py` covers parsing, the defaults, bad accels and the smoke; `aihub docs --check --strict` is clean.
+  - *As built:*
+    - **`tested`:** a list of the systems where the variant ran (`true` means all of its `os`, `false` none), since "tested" differs per system.
+    - **The block:** a variant may also carry a `note`. `Setup.effective_variants()` gives the declared variants or a version-2 block's one, `runs_on()` its accels, and `gpu` follows the variants when it isn't set.
+    - **The mods index** (`docs/setup/README.md`, regenerated) gains a "Runs on" column. Today every GPU doc reads "ROCm" until its variants are written (38.2 for lcpp, Phase 39 for the rest).
+    - **Docs and tests:** `docs/mods.md` §9; `test_setup_variants.py` (12).
 
 - [ ] **38.2 The setup picks a variant: `utils/cli_setup.py`.**
   - **Picking:** for each chosen setup, the first variant whose `accel` is in `Machine.accels` and whose `os` matches.

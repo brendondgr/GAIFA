@@ -323,9 +323,18 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
 
     # ---- threads -----------------------------------------------------------------------------
 
-    @app.get("/v1/threads", summary="Threads, newest first; ?q= searches titles and messages")
-    def list_threads(request: Request, q: str | None = None, archived: bool = False, limit: int = Query(200, ge=1, le=1000)) -> list[dict]:
-        return A(request).store.threads(q, archived, limit)
+    @app.get("/v1/threads", summary="Threads, newest first; ?q= searches titles and messages; ?environment= only those "
+             "environments' chats (comma-separated; `default` also matches chats without one)")
+    def list_threads(request: Request, q: str | None = None, archived: bool = False, limit: int = Query(200, ge=1, le=1000),
+                     environment: str | None = Query(None, description="Environment ids, comma-separated (plan 41.1)"),
+                     sort: Literal["updated", "created", "title"] = "updated", offset: int = Query(0, ge=0)) -> list[dict]:
+        envs = [e for e in (environment or "").split(",") if e.strip()] or None
+        return A(request).store.threads(q, archived, limit, environment=envs, sort=sort, offset=offset)
+
+    @app.get("/v1/threads/groups", summary="Per environment the chats use: how many, the newest activity, and how many "
+             "are running or waiting (`default` for chats without one)")
+    def thread_groups(request: Request, archived: bool = False) -> list[dict]:
+        return A(request).store.groups(archived)
 
     @app.post("/v1/threads", status_code=201, summary="Start a thread")
     def new_thread(body: NewThread, request: Request) -> dict:

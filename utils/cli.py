@@ -204,6 +204,18 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return _setup().cmd_setup(args)
 
 
+def _plat() -> Any:
+    """utils/cli_platform.py (plan 37.2): WSL2, macOS and no-systemd differences, loaded like cli_setup."""
+    if __package__:
+        from utils import cli_platform
+    else:
+        here = str(Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import cli_platform  # type: ignore[no-redef]
+    return cli_platform
+
+
 def _hardware() -> Any:
     """utils/cli_hardware.py (plan 35.2), loaded like cli_setup: as a script or as the package."""
     if __package__:
@@ -237,12 +249,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     return _mods().cmd_check(args)
 
 
-def cmd_install(args: argparse.Namespace) -> int:
-    if args.id:
-        return _mods().cmd_install_mod(args.id)
-    UNIT_DIR.mkdir(parents=True, exist_ok=True)
-    (UNIT_DIR / UNIT).write_text(render_unit())
-    print(f"wrote {UNIT_DIR / UNIT}")
+def _link() -> None:
     LINK.parent.mkdir(parents=True, exist_ok=True)
     target = CODE / "bin" / "aihub"
     if LINK.is_symlink() or LINK.exists():
@@ -251,6 +258,31 @@ def cmd_install(args: argparse.Namespace) -> int:
     else:
         LINK.symlink_to(target)
         print(f"linked {LINK} -> {target}")
+
+
+def cmd_install(args: argparse.Namespace) -> int:
+    if args.id:
+        return _mods().cmd_install_mod(args.id)
+    plat = _plat()
+    if plat.is_macos():          # plan 37.2: a launchd agent, placed by the person (nothing written outside the project)
+        _link()
+        here, cmds = plat.launchd_install(CODE, ROOT)
+        print(f"wrote {here}\nTo run AIHub at login, run:\n" + "\n".join("  " + c for c in cmds)
+              + "\nUntil then, `aihub start` runs it in the background (it stops when you log out).")
+        return 0
+    if plat.is_wsl() and plat.wsl_systemd_fix():
+        _link()
+        print("aihub: " + plat.wsl_systemd_fix(), file=sys.stderr)
+        return 1
+    if not plat.systemd_running():
+        _link()
+        print("aihub: no systemd here, so AIHub can't be installed as a service. `aihub start` runs it in the background;"
+              " mods run as detached processes that outlive it.", file=sys.stderr)
+        return 1
+    UNIT_DIR.mkdir(parents=True, exist_ok=True)
+    (UNIT_DIR / UNIT).write_text(render_unit())
+    print(f"wrote {UNIT_DIR / UNIT}")
+    _link()
     if systemctl("daemon-reload") or systemctl("enable", UNIT, quiet=True):
         return 1
     active = systemctl("is-active", "--quiet", UNIT) == 0
@@ -295,8 +327,31 @@ def services_or_none() -> list[dict[str, Any]] | None:
         raise
 
 
+def _no_unit() -> bool:
+    """No systemd unit to drive the hub with, and none possible here (macOS, no systemd): use the pidfile."""
+    return not unit_installed() and not _plat().systemd_running()
+
+
+def _detached_hub(action: str) -> int:
+    """The hub without systemd (plan 37.2): started in the background with a pidfile."""
+    plat = _plat()
+    if action in ("stop", "restart"):
+        stopped = plat.hub_stop(ROOT)
+        if action == "stop":
+            print("hub stopped" if stopped else "the hub wasn't running")
+            return 0
+    pid = plat.hub_start(CODE, ROOT)
+    if not wait_up(60):
+        print(f"aihub: the hub didn't answer at {hub_url()}; see data/state/hub/aihub.out", file=sys.stderr)
+        return 1
+    print(f"AIHub is up at {hub_url()}/ (pid {pid}, without a service)")
+    return 0
+
+
 def _lifecycle(action: str, target: str | None) -> int:
     if target is None:  # the hub itself
+        if _no_unit():
+            return _detached_hub(action)
         if not unit_installed():
             print("aihub: the hub isn't installed as a service; run `aihub install` (or `aihub serve`)", file=sys.stderr)
             return 1
@@ -309,6 +364,8 @@ def _lifecycle(action: str, target: str | None) -> int:
         if action == "start" and unit_installed():
             systemctl("start", UNIT)
             wait_up()
+        elif action == "start" and _no_unit():
+            _detached_hub("start")
         services = services_or_none() or []
         rc = 0
         for s in services:
@@ -323,6 +380,8 @@ def _lifecycle(action: str, target: str | None) -> int:
                 rc = 1
         if action == "stop" and unit_installed():
             systemctl("stop", UNIT)
+        elif action == "stop" and _no_unit():
+            _plat().hub_stop(ROOT)
         return rc
     return _report(target, call("POST", f"/api/services/{q(target)}/{action}?wait=1", timeout=WAIT_S))
 
@@ -362,6 +421,9 @@ def cmd_unload(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     unit = "installed" if unit_installed() else "not installed"
+    if _no_unit():
+        pid = _plat().hub_pid(ROOT)
+        unit = f"running without a service (pid {pid})" if pid else "no service here: `aihub start` runs the hub in the background"
     if unit_installed():
         state = subprocess.run(["systemctl", "--user", "is-active", UNIT], capture_output=True, text=True).stdout.strip()
         unit = f"{UNIT} {state}"
@@ -394,11 +456,7 @@ def cmd_logs(args: argparse.Namespace) -> int:
     root = Path(os.environ.get("AIHUB_ROOT") or CODE)
     f = root / "data" / "logs" / f"{args.id or 'aihub'}.log"
     if f.is_file() and not getattr(args, "journal", False):
-        cmd = ["tail", "-n", str(args.n)] + (["-F"] if args.follow else []) + [str(f)]
-        try:
-            return subprocess.run(cmd).returncode
-        except KeyboardInterrupt:
-            return 0
+        return _plat().tail(f, args.n, args.follow)
     unit = UNIT if args.id is None else f"aihub-{args.id}.service"
     cmd = ["journalctl", "--user", "-u", unit, "-n", str(args.n), "--no-pager", "-o", "short-iso"]
     if args.follow:
@@ -415,12 +473,7 @@ def cmd_url(args: argparse.Namespace) -> int:
 
 
 def cmd_open(args: argparse.Namespace) -> int:
-    url = hub_url() + "/" + (args.route or "").lstrip("/")
-    opener = shutil.which("xdg-open")
-    if not opener:
-        print(url)
-        return 0
-    return subprocess.run([opener, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+    return _plat().open_url(hub_url() + "/" + (args.route or "").lstrip("/"))
 
 
 DOCTOR_MARK = {"ok": "ok ", "note": "·  ", "warn": "!  ", "fail": "BAD"}
@@ -440,8 +493,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         except tomllib.TOMLDecodeError as e:
             cfg_ok, cfg_note = False, f"not valid TOML: {e}"
     checks.append(("config.toml", cfg_ok, cfg_note))
-    checks.append(("systemd unit", unit_installed(), str(UNIT_DIR / UNIT) if unit_installed() else "run `aihub install`"))
-    checks.append(("linger", linger(), "on" if linger() else f"loginctl enable-linger {os.environ.get('USER', '')}"))
+    if _plat().systemd_running():
+        checks.append(("systemd unit", unit_installed(), str(UNIT_DIR / UNIT) if unit_installed() else "run `aihub install`"))
+        checks.append(("linger", linger(), "on" if linger() else f"loginctl enable-linger {os.environ.get('USER', '')}"))
+    else:
+        checks.append(("service", True, "no systemd here: `aihub start` runs the hub in the background" + ("; `aihub install` prints the launchd agent" if _plat().is_macos() else "")))
     try:
         m = _hardware().hardware.detect()
         gpus = "; ".join(f"{g.name}{f' ({g.arch})' if g.arch else ''}" for g in m.gpus) or "no GPU"

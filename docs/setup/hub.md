@@ -1,6 +1,6 @@
 # The hub
 
-The hub is the FastAPI app on `127.0.0.1:7000` that starts the mods, proxies their APIs, keeps the models registry and serves the UI. It needs no GPU, and it's the one part you can install on any Linux machine with systemd.
+The hub is the FastAPI app on `127.0.0.1:7000` that starts the mods, proxies their APIs, keeps the models registry and serves the UI. It needs no GPU, and it's the one part you can install on any Linux machine; with systemd it runs as a user service, and on WSL2 and macOS as described below.
 
 Do [the host](host.md) first.
 
@@ -30,6 +30,12 @@ bin/aihub install
 4. warns if lingering is off (see [host §4](host.md#4-keep-your-services-running)).
 
 Open <http://127.0.0.1:7000>. The Overview lists the mods it found in `services/`; none of them are installed yet.
+
+**On other systems** (plan 37.2):
+- **WSL2 (Windows):** the same, once WSL runs systemd. If it doesn't, `aihub install` prints the fix: `[boot] systemd=true` in `/etc/wsl.conf`, then `wsl --shutdown` in Windows. The Windows browser reaches the hub at <http://127.0.0.1:7000> through WSL's localhost forwarding, and `aihub open` opens it there.
+- **macOS:** `aihub install` writes the launchd agent to `data/state/hub/com.aihub.hub.plist`. It then prints the commands that copy it to `~/Library/LaunchAgents/` and load it, so AIHub runs at login; nothing outside the project is written for you.
+- **Without systemd:** `aihub start`, `stop` and `status` run the hub in the background with a pidfile (`data/state/hub/aihub.json`, its output in `aihub.out`). Mods then run detached and outlive it (`[hub] backend = "auto"`, plan 37.1).
+- **Logs:** `aihub logs [-f]` reads `data/logs/` the same way everywhere.
 
 ## Check it works
 

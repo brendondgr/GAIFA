@@ -210,7 +210,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Choosing the backend:** `default_backend(options, config, paths)` reads `[hub] backend`; `auto` without a user manager now means detached, not child processes.
     - **Tests:** `test_backend_detached.py` (8), including fake-ok adopted by a second manager.
 
-- [ ] **37.2 The CLI on every target: `utils/cli.py`.**
+- [x] **37.2 The CLI on every target: `utils/cli.py`.**
   - **`aihub open`** uses `webbrowser`. On WSL2 it opens the Windows browser (`wslview`, else `explorer.exe`).
   - **`aihub logs`** follows the file in Python instead of `tail -F`.
   - **`aihub install`:**
@@ -219,6 +219,12 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Without systemd:** `start`, `stop` and `status` work through a pidfile for the hub itself.
   - **Docs:** `docs/setup/hub.md`.
   *Done when:* `utils/tests/core/test_cli.py` covers `open` (WSL and not), `logs`, `install` on WSL with systemd off, and the macOS plist.
+  - *As built:*
+    - **Where the code lives:** the platform parts are in `utils/cli_platform.py`, loaded like `cli_setup`, since `cli.py` was near 600 lines.
+    - **The hub without a unit:** `aihub start`, `stop`, `restart`, `status` and `start all` use the pidfile only where there's no unit and no systemd running. A machine with systemd but no unit still says to install.
+    - **The macOS plist:** it keeps the hub alive (`KeepAlive`) and logs to `data/logs/aihub.launchd.log`.
+    - **The doctor** skips the unit and linger checks without systemd.
+    - **Docs:** `docs/setup/hub.md`. Tests: `utils/tests/core/test_cli_platform.py` (7).
 
 - [ ] **37.3 Host checks per machine: `utils/cli_setup_gpu.py`, `utils/cli_setup_pkgs.py`.**
   - **The checks:** `utils/cli_setup_host.py` keeps `Probe`, `Check` and the common checks, and asks `cli_setup_gpu.py` for the GPU checks of the detected machine:

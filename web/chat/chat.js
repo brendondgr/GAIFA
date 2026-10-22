@@ -17,7 +17,7 @@ import { buildView, applyTransient, settleLive, mergeEvents, todosOpen, threadOf
 import { groupTurns } from './chat-turn.js';
 import { TurnView, ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
-import { ThreadList, Item, LIST_CSS, useEmbedUp } from './chat-list.js';
+import { ThreadList, Item, LIST_CSS } from './chat-list.js';
 import { GroupedChats, readView, saveView, loadEnvs } from './chat-groups.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
 import { EnvChip, decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
@@ -57,7 +57,6 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const c = getChatClient(api), tid = route?.parts?.[1] || null;
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
   const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [archived, setArchived] = useState(false), [limit, setLimit] = useState(LIST_PAGE);
-  const embedUp = useEmbedUp(api), [meaning, setMeaning] = useState(false), [found, setFound] = useState({ busy: false, rows: [], err: '' });  // plan 28.5
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [thread, setThread] = useState(null), [events, setEvents] = useState([]), [live, setLive] = useState(EMPTY_LIVE), [running, setRunning] = useState(false), [conn, setConn] = useState('open'), [ready, setReady] = useState(false);
   const [quoteDrafts, setQuoteDrafts] = useState({});   // Select → Reply: the quote-reply cards waiting in each chat's composer
@@ -84,14 +83,6 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, archived, limit, listView.chatOrder]);
   const loadEnvList = () => loadEnvs(api).then(setEnvs);
   useEffect(() => { loadEnvList(); }, []);
-  useEffect(() => {                                     // plan 28.5: chats by meaning, through the embed mod
-    if (!(meaning && embedUp && q.trim() && c.searchChats)) return;
-    let live = true;
-    setFound(f => ({ ...f, busy: true, err: '' }));
-    const t = setTimeout(() => c.searchChats(q.trim(), 12).then(rows => live && setFound({ busy: false, rows, err: '' }),
-      e => live && setFound({ busy: false, rows: [], err: e?.detail || String(e?.message || e) })), 400);
-    return () => { live = false; clearTimeout(t); };
-  }, [q, meaning, embedUp]);
   useEffect(() => {
     injectCss();
     c.models().then(setModels).catch(fail);
@@ -270,7 +261,6 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   // ---- render ----
   const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: v => { setQ(v); setLimit(LIST_PAGE); }, archived, onArchived: v => { setArchived(v); setLimit(LIST_PAGE); setListLoading(true); }, onMore: threads.length >= limit ? () => setLimit(n => n + LIST_PAGE) : null,
     onNew: () => { go('#/chat'); setDrawer(false); setTimeout(() => inputRef.current?.focus(), 50); }, onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
-    canMeaning: embedUp && !!c.searchChats, meaning, onMeaning: setMeaning, found,
     view: listView, onView: setListView, canGroup: !!envs, itemProps,
     grouped: envs && listView.group === 'environment' && c.threadGroups ? h(GroupedChats, { c, api, envs, archived, view: listView, onView: setListView, known: threads, reloadKey: listKey,
       renderItem: t => h(Item, { key: t.id, t, active: t.id === tid, onOpen: () => setDrawer(false), onRename: v => rename(t, v), onArchive: () => archive(t), onDelete: () => remove(t), ...itemProps(t) }),

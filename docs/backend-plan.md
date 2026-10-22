@@ -3126,7 +3126,7 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
 - **The header keeps:** the drawer button on narrow screens, the title (click to rename), the running state, the context meter, Learning and Branch.
 - **Folders in the environment popup:** typed as a path (the workspace mod checks it and says why it refuses one), with Read · Edit · Run · Run + network and Remove; Bypass stays on the Workspace page.
 
-- [ ] **42.1 The sidebar: `web/chat/chat-list.js`, `chat-groups.js`.**
+- [x] **42.1 The sidebar: `web/chat/chat-list.js`, `chat-groups.js`.**
   - **Top:** "Chats" and the search box on one line; under them a full-width **New chat** bar with the **View** button (the settings icon) on its right. The By meaning chip and its list go.
   - **A chat's row:** the time sits at the right edge; hovering the row (or focusing it, or its menu being open) highlights it and shows ⋯ in the time's place.
   - **Show more:** a full-width divider, a line on each side of "Show more · N" centred, in sections and in the flat list.

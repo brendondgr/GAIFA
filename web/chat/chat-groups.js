@@ -73,6 +73,14 @@ export async function loadEnvs(api) {
   try { return (await api.callService('workspace', 'GET', '/v1/environments')).json?.environments || null; } catch { return null; }
 }
 
+// ---------- Show more: a full-width divider, a line each side of the words (plan 42.1) ----------
+export function MoreBar({ n, onClick }) {
+  const line = h('span', { 'aria-hidden': 'true', style: { flex: 1, height: 1, background: T.bd } });
+  return h('button', { type: 'button', onClick, className: 'aichat-morebar', 'aria-label': n ? `Show ${n} more` : 'Show more',
+    style: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 24, margin: '2px 0 4px', padding: '0 6px', border: 0, background: 'transparent', color: T.mut, font: 'inherit', fontSize: 11.5, cursor: 'pointer' } },
+    line, h('span', { style: { flex: 'none', whiteSpace: 'nowrap' } }, n ? `Show more · ${n}` : 'Show more'), line);
+}
+
 // ---------- the View menu ----------
 function Choice({ label, value, options, onPick }) {
   return h('div', { role: 'radiogroup', 'aria-label': label, style: { display: 'flex', flexDirection: 'column', gap: 4 } },
@@ -85,8 +93,9 @@ export function ViewMenu({ view, onChange, grouped = true }) {
   const React = R(), [open, setOpen] = React.useState(false);
   const set = patch => onChange({ ...view, ...patch });
   return h('span', { style: { position: 'relative', flex: 'none' } },
-    h(Btn, { kind: 'ghost', sm: true, icon: 'sliders', title: 'Group and order the chats', 'aria-label': 'View', 'aria-expanded': open ? 'true' : 'false', onClick: () => setOpen(!open) }),
-    h(Popover, { open, onClose: () => setOpen(false), place: 'down-left', width: 280, label: 'View', style: { gap: 10 } },
+    h(Btn, { kind: 'ghost', sm: true, icon: 'sliders', title: 'View: group and order the chats', 'aria-label': 'View', 'aria-expanded': open ? 'true' : 'false', onClick: () => setOpen(!open),
+      style: { width: 30, height: 30, padding: 0, justifyContent: 'center', border: '1px solid ' + T.bds } }),
+    h(Popover, { open, onClose: () => setOpen(false), width: 280, label: 'View', style: { gap: 10 } },
       grouped ? h(Choice, { label: 'Group by', value: view.group, options: GROUP_BY, onPick: group => set({ group }) }) : null,
       grouped && view.group === 'environment' ? h(Choice, { label: 'Environments by', value: view.envOrder, options: ENV_ORDERS, onPick: envOrder => set({ envOrder }) }) : null,
       h(Choice, { label: 'Chats by', value: view.chatOrder, options: CHAT_ORDERS, onPick: chatOrder => set({ chatOrder }) })));
@@ -100,7 +109,7 @@ export function Section({ row, open, onToggle, chats, loading, more, onMore, ren
   const env = row.env, name = env.name || env.id;
   const save = () => { const v = (edit || '').trim(); setEdit(null); if (v && v !== name) onRename(v); };
   return h('section', { 'aria-label': name, className: 'aichat-sec', style: { display: 'flex', flexDirection: 'column', gap: 1, marginTop: 4 } },
-    h('div', { style: { display: 'flex', alignItems: 'center', gap: 4, height: 28, padding: '0 2px 0 4px', borderRadius: 6 } },
+    h('div', { className: 'aichat-sechead', style: { display: 'flex', alignItems: 'center', gap: 4, height: 28, padding: '0 2px 0 4px', borderRadius: 6 } },
       edit != null
         ? h('input', { autoFocus: true, value: edit, 'aria-label': 'Environment name', onChange: e => setEdit(e.target.value), onBlur: save,
             onKeyDown: e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { e.stopPropagation(); setEdit(null); } }, style: { ...inputSt, flex: 1, height: 24 } })
@@ -123,7 +132,7 @@ export function Section({ row, open, onToggle, chats, loading, more, onMore, ren
       !row.count ? h('div', { style: { padding: '4px 10px 6px', color: T.dim, fontSize: 11.5 } }, 'No chats yet') : null,
       row.count && !chats.length && loading ? h('div', { role: 'status', style: { padding: '4px 10px', color: T.dim, fontSize: 11.5 } }, 'Loading…') : null,
       chats.map(t => renderItem(t)),
-      more ? h('button', { type: 'button', onClick: onMore, style: { ...chipSt(false, { sm: true }), alignSelf: 'flex-start', margin: '2px 0 4px 8px' } }, `Show more (${row.count - chats.length})`) : null) : null);
+      more ? h(MoreBar, { n: row.count - chats.length, onClick: onMore }) : null) : null);
 }
 
 /** The sections and their chats. `known`: the page's flat list, whose live state (a turn running, a new title)

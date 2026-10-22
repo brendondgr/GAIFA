@@ -83,7 +83,7 @@ test('a section: its name and count, its chats, Show more with how many are left
     onToggle() {}, onNew() {}, onRename() {}, onManage() {} }));
   assert.match(text(el), /Grants/);
   assert.match(text(el), /One.*Two/);
-  assert.match(text(el), /Show more \(7\)/);
+  assert.match(text(el), /Show more · 7/);
   assert.ok(all(el, n => n.props?.['aria-label'] === 'New chat in Grants').length === 1);
   const closed = expand(g.Section({ row, open: false, chats, loading: false, more: true, onMore() {}, renderItem: t => ({ type: 'li', props: { children: [t.title] } }),
     onToggle() {}, onNew() {}, onRename() {}, onManage() {} }));
@@ -151,4 +151,39 @@ test('the client asks the agent per environment, and the mock answers the same w
   assert.deepEqual((await m.threads({ environment: 'grants', sort: 'title' })).map(t => t.title), ['A chat', 'b chat']);
   assert.ok((await m.threads({ environment: 'default' })).every(t => (t.settings?.environment || 'default') === 'default'));
   assert.equal((await m.threads({ environment: 'grants', limit: 1, offset: 1, sort: 'title' }))[0].id, a.id);
+});
+
+// Plan 42.1: the compact sidebar after Claude Code's.
+test('the top: Chats and the search on one line, then the New chat bar with View; no By meaning', () => {
+  const props = { threads: [], loading: false, activeId: null, q: '', onQ() {}, archived: false, onArchived() {}, onNew() {}, onRename() {}, onArchive() {}, onDelete() {},
+    view: g.readView({}), onView() {}, canGroup: true };
+  const el = expand(list.ThreadList(props));
+  const rows = el.props.children.filter(Boolean);
+  const first = rows[0], second = rows[1];
+  assert.match(text(first), /^Chats/);
+  assert.equal(all(first, n => n.type === 'input' && n.props['aria-label'] === 'Search chats').length, 1);
+  assert.match(text(second), /New chat/);
+  assert.equal(all(second, n => n.props?.['aria-label'] === 'View').length, 1);
+  assert.doesNotMatch(text(el), /By meaning/);
+  assert.match(text(expand(list.ThreadList({ ...props, archived: true }))), /^Archived/);
+});
+
+test('a row: its time at the right edge, and ⋯ in the same slot (shown on hover by LIST_CSS)', () => {
+  const t = { id: 't1', title: 'Report', updated: Date.now() / 1000 - 3600 };
+  const el = expand(list.Item({ t, active: false, onRename() {}, onArchive() {}, onDelete() {} }));
+  const slot = all(el, n => n.type === 'span' && all(n, x => x.props?.className === 'aichat-ago').length && all(n, x => x.props?.className === 'aichat-more').length)
+    .filter(n => n.props.style?.width === 34);
+  assert.equal(slot.length, 1);
+  assert.equal(slot[0].props.style.justifyContent, 'flex-end');
+  assert.match(list.LIST_CSS, /\.aichat-item:hover \.aichat-ago[^{]*\{display:none\}/);
+  assert.match(list.LIST_CSS, /\.aichat-item:hover \.aichat-more[^{]*\{display:grid\}/);
+});
+
+test('Show more is a full-width divider with its count', () => {
+  const bar = expand(g.MoreBar({ n: 7, onClick() {} }));
+  assert.equal(bar.type, 'button');
+  assert.equal(bar.props.style.width, '100%');
+  assert.equal(text(bar), 'Show more · 7');
+  assert.equal(bar.props.children.filter(c => c?.props?.style?.height === 1).length, 2);      // a line on each side
+  assert.equal(text(expand(g.MoreBar({ onClick() {} }))), 'Show more');
 });

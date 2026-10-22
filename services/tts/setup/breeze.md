@@ -21,7 +21,7 @@ what = "Whisper large-v3-turbo into the project's Hugging Face cache (1.6 GB, re
 
 [[steps]]
 run = "scripts/install-runtime.sh --accept-breeze-license"
-what = "re-checks Kokoro (its smoke test loads Kokoro on the GPU again), then builds runtime/venvs/breeze-tts from locks/breeze-tts.txt (about 7 GB of wheels, 10 to 15 min), clones and patches Breeze's source, and runs a smoke test that loads Breeze on the GPU and compiles its fast stages (about 50 s); the engine is recorded only when the test passes"
+what = "re-checks Kokoro, then builds runtime/venvs/breeze-tts for this machine's variant (gfx1151: locks/breeze-tts.txt, about 7 GB of wheels, 10 to 15 min; CUDA: PyTorch 2.9.1 from its index), clones and patches Breeze's source, and runs a smoke test that loads Breeze on the GPU and compiles its fast stages (about 50 s); the engine is recorded only when the test passes"
 
 [[suggest]]
 name = "Breeze TTS 2"
@@ -47,6 +47,27 @@ size_gb = 1.62
 good_for = "transcripts of new voice clips and word timings (Breeze's timings, /v1/align)"
 licence = "MIT"
 required = true
+
+[[variants]]                    # plan 39.4: gfx1151's exact locks, fast stages (the block's check)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]                    # upstream's own path; fp16 on cards before sm_80 isn't handled yet
+accel = "cuda"
+os = ["linux", "wsl"]
+check = "runtime/venvs/breeze-tts/bin/python -c 'import torch' && grep -q '\"breeze\"' ~/.config/tts-engines/engines.json"
+
+[[variants]]                    # no GPU Breeze can use: very slow, only on purpose
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+note = "many times slower than real time: Kokoro is the better choice here"
+check = "runtime/venvs/breeze-tts/bin/python -c 'import torch' && grep -q '\"breeze\"' ~/.config/tts-engines/engines.json"
+steps = [
+  { run = "uvx --from huggingface_hub hf download BreezeBlue/Breeze-TTS-2 --revision 3e28c5151381a722f1d8661b4118c298caa77aa4 --local-dir ../../data/models/tts/breeze-tts-2", what = "Breeze TTS 2's weights (7.7 GB)", ask = "Breeze TTS 2's weights and everything it makes are licensed for research and non-commercial use only (https://huggingface.co/BreezeBlue/Breeze-TTS-2). Accept that licence and install Breeze? (This answer is also the installer's --accept-breeze-license below.)" },
+  { run = "HF_HOME=../../data/models/hf-cache uvx --from huggingface_hub hf download openai/whisper-base.en --include '*.json' --include '*.safetensors' --include '*.txt'", what = "Whisper base.en for word timings on the CPU (0.3 GB)" },
+  { run = "scripts/install-runtime.sh --accept-breeze-license --allow-cpu-breeze", what = "builds runtime/venvs/breeze-tts with PyTorch's CPU build, clones and patches Breeze, and runs its smoke test on the CPU (slow)" },
+]
 -->
 
 # Breeze TTS 2 and Whisper: setup

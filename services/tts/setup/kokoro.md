@@ -20,7 +20,7 @@ what = "Kokoro's weights and its 28 English voices into the project's Hugging Fa
 
 [[steps]]
 run = "scripts/install-runtime.sh"
-what = "builds runtime/venvs/kokoro from locks/kokoro.txt (about 6.5 GB of ROCm wheels, about 10 min), writes ~/.local/bin/kokoro-tts and ~/.config/tts-engines/engines.json, and ends with a smoke test that loads Kokoro on the GPU; it stops before Breeze"
+what = "builds runtime/venvs/kokoro for this machine's variant (gfx1151: locks/kokoro.txt, about 6.5 GB of ROCm wheels, about 10 min; elsewhere PyTorch from the variant's index), writes ~/.local/bin/kokoro-tts and ~/.config/tts-engines/engines.json, and ends with a smoke test that loads Kokoro on its device; it stops before Breeze"
 
 [[suggest]]
 name = "Kokoro 82M with the English voices"
@@ -40,6 +40,32 @@ size_gb = 0.34
 good_for = "the engine's weights and its 28 American and British English voices"
 licence = "Apache-2.0"
 required = true
+
+[[variants]]                    # plan 39.4: gfx1151's exact locks (the block's check compares them)
+accel = "rocm"
+os = ["linux"]
+tested = true
+
+[[variants]]
+accel = "cuda"
+os = ["linux", "wsl"]
+check = "runtime/venvs/kokoro/bin/python -c 'import kokoro, torch' && grep -q '\"kokoro\"' ~/.config/tts-engines/engines.json && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
+
+[[variants]]
+accel = "xpu"
+os = ["linux", "wsl"]
+check = "runtime/venvs/kokoro/bin/python -c 'import kokoro, torch' && grep -q '\"kokoro\"' ~/.config/tts-engines/engines.json && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
+
+[[variants]]
+accel = "mps"
+os = ["darwin"]
+check = "runtime/venvs/kokoro/bin/python -c 'import kokoro, torch' && grep -q '\"kokoro\"' ~/.config/tts-engines/engines.json && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
+
+[[variants]]
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+note = "Kokoro is small: about real time on a CPU"
+check = "runtime/venvs/kokoro/bin/python -c 'import kokoro, torch' && grep -q '\"kokoro\"' ~/.config/tts-engines/engines.json && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
 -->
 
 # Kokoro-82M: setup
@@ -95,6 +121,10 @@ services/tts/scripts/install-runtime.sh
 Builds `runtime/venvs/kokoro` with uv (Python 3.12) and installs exactly `locks/kokoro.txt` from the index above (a few GB of wheels). Then it runs `engines/install.sh --gpu rocm --rocm-index … --prefix runtime/venvs/kokoro`, which keeps that torch, copies `kokoro_tts.py` into the venv, writes the `~/.local/bin/kokoro-tts` launcher, records the engine in `~/.config/tts-engines/engines.json`, and ends with a smoke test (`kokoro-tts --check`), **which loads Kokoro on the GPU**. Without `--accept-breeze-license` it stops there with a note about Breeze; with it, it goes on to [breeze.md](breeze.md). Re-running is safe. It wasn't re-run for this doc.
 
 The two files outside the project (`~/.local/bin/kokoro-tts`, `~/.config/tts-engines/engines.json`) are on AIHub's allowlist. video-maker reads them too.
+
+### On other machines (plan 39.4)
+
+`scripts/install-runtime.sh` installs for the variant `aihub setup` picked (`--accel`, else `AIHUB_ACCEL`). ROCm on gfx1151 installs this doc's locks. Anything else goes through the engines' own installers with PyTorch from that accelerator's index: CUDA (the newest build the driver runs), another AMD GPU's TheRock family index, Intel's xpu, Apple's mps or the CPU. Kokoro runs on all of them. Breeze runs on ROCm and CUDA, and on the CPU only with `--allow-cpu-breeze` ([breeze.md](breeze.md)). `--dry-run` prints what it would run. Everything except gfx1151 is untested here.
 
 ## Choosing models
 

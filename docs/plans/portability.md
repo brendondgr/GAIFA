@@ -413,8 +413,16 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
     - **Checked live:** after a restart on the installed hub, embed encoded a sentence and decide loaded d3-lite, both on `cuda` (ROCm) in bf16, as before.
     - **Tests:** `services/embed/tests/test_device.py` (3), `services/decide/tests/test_device.py` (2), and both docs' picks per machine.
 
-- [ ] **39.4 tts: the multi-backend planner becomes the install.** `scripts/install-runtime.sh` takes `--accel` and follows `engines/probe.py`'s plan for indexes other than gfx1151's. Kokoro runs on every accel. Breeze has `rocm` (tested), `cuda` (untested) and `cpu` behind its flag.
+- [x] **39.4 tts: the multi-backend planner becomes the install.** `scripts/install-runtime.sh` takes `--accel` and follows `engines/probe.py`'s plan for indexes other than gfx1151's. Kokoro runs on every accel. Breeze has `rocm` (tested), `cuda` (untested) and `cpu` behind its flag.
   *Done when:* tts's tests cover the plan per accel; `install-runtime.sh --accel cpu --dry-run` prints a CPU-only plan.
+  - *As built:*
+    - **The installer:** `install-runtime.sh` takes `--accel` (default `AIHUB_ACCEL`, else `rocm`), `--allow-cpu-breeze` and `--dry-run`. gfx1151 runs today's lock commands unchanged. Elsewhere it calls `engines/install.sh` and `engines/breeze/install.sh` with the accelerator's index from a copy of `torch_index.py`.
+    - **The probe stays as it was:** its choices live in the script's flags, not in a call to `probe.py`, which reads the machine itself and can't be told an accel.
+    - **The setup docs:**
+      - Kokoro declares rocm (tested), cuda, xpu, mps and cpu.
+      - Breeze declares rocm (tested), cuda and cpu. Its CPU variant has its own steps: Whisper base.en, and the installer with `--allow-cpu-breeze`.
+      - Variants other than gfx1151's get checks that don't compare the gfx1151 locks.
+    - **Tests:** `services/tts/tests/test_install_runtime.py` (6 dry runs), and both docs' picks per machine. tts's 49 pass.
 
 - [ ] **39.5 stt: CTranslate2 per accel.**
   - **Variants:**

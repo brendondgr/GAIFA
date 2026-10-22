@@ -488,7 +488,7 @@ The user builds AIHub on the other machines later, with an agent. The agent foll
     - **The last run:** `data/state/setup/last-run.json` (machine, targets, plan with variants, the report or the stop) is written for runs, not for `--plan`.
     - **Tests:** `utils/tests/core/test_setup_logs.py` (4).
 
-- [ ] **40.2 `aihub report`: the field report (`utils/cli_report.py`, standard library only).**
+- [x] **40.2 `aihub report`: the field report (`utils/cli_report.py`, standard library only).**
   - **Notes:** `aihub report note "<what happened>" [--cmd "<command>"] [--output <file>] [--setup <id>] [--severity blocker|major|minor] [--tried "<what was tried>"]` appends an observation to `data/state/reports/notes.jsonl`.
   - **The report:** `aihub report [--out <file>]` writes `data/state/reports/<date>-<host>.md` (and `.json`). In order:
     1. **Summary:** counts by severity, and the stages that passed.
@@ -510,6 +510,11 @@ The user builds AIHub on the other machines later, with an agent. The agent foll
     9. **For the fixer:** how to reproduce each issue, and the files most likely to change.
   - **Redaction:** tokens and keys are redacted (`hf_…`, `sk-…`, `ghp_…`, values of `*_TOKEN`, `*_KEY`, `*_SECRET`), and the home folder is written as `~`.
   *Done when:* `utils/tests/core/test_cli_report.py` builds a report from a fake failed run, notes and fake hardware: every section is present, the patterns classify sample outputs, secrets are redacted, and the markdown is stable for a fixed input.
+  - *As built:*
+    - **Where the code lives:** `utils/cli_report.py` (notes, gathering, the command), `utils/report_md.py` (the markdown) and `utils/report_hints.py` (18 known patterns, each with a likely cause and where a fix goes; redaction).
+    - **Next to the report:** the hardware recording (`<name>.hardware.json`, which `aihub hardware --from` replays) and the JSON, redacted value by value.
+    - **When things are missing:** a hub that doesn't answer becomes a line in the report.
+    - **Tests:** `test_cli_report.py` (19). A trial on this machine read well.
 
 - [ ] **40.3 The field test, for an agent on another machine.**
   - **The skill:** `.claude/skills/aihub-field-test/SKILL.md`, plus a "Testing on another machine" section in `AGENTS.md` for other agents:

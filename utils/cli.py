@@ -216,6 +216,19 @@ def _plat() -> Any:
     return cli_platform
 
 
+def _reporter() -> Any:
+    """utils/cli_report.py (plan 40.2), loaded like cli_setup."""
+    if __package__:
+        from utils import cli_report
+    else:
+        here = str(Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import cli_report  # type: ignore[no-redef]
+    cli_report.cli = sys.modules[__name__]
+    return cli_report
+
+
 def _hardware() -> Any:
     """utils/cli_hardware.py (plan 35.2), loaded like cli_setup: as a script or as the package."""
     if __package__:
@@ -603,6 +616,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--start", action="store_true", help="start it first if it isn't running")
     p.set_defaults(fn=cmd_check)
     _hardware().add_parser(sub)
+    _reporter().add_parser(sub)
     _setup().add_parser(sub)
     sub.choices["setup"].set_defaults(fn=cmd_setup)
     p = sub.add_parser("docs", help="regenerate the mods index (docs/setup/README.md) and this machine's model inventory (data/state/setup/models/)")

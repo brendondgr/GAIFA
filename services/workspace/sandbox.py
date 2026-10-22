@@ -10,6 +10,10 @@
   unless asked for (Run + network: full internet), memory and process limits, a timeout (120 s by
   default, 600 s at most). SELinux labels are left alone (`label=disable`) rather than relabelling
   your folder.
+- **Other runtimes and systems** (plan 39.1): the runtime is `AIHUB_CONTAINER_RUNTIME` (podman, else
+  docker; `containers.py`). Docker runs as your uid and gid (`--user`) instead of `keep-id`, gets
+  `bridge` for the network, and no cache overlays (docker has none: the caches start empty). Podman off
+  Linux (macOS's VM) uses `bridge` instead of `pasta`. `label=disable` only where SELinux is enforcing.
 - **Records:** `$WORKSPACE_STATE/runs/<id>.json` with the command, where, exit code, timing and the
   last 32 KB of stdout and stderr; the whole output in `<id>.out` / `<id>.err` (1 MB each kept).
 """
@@ -22,11 +26,13 @@ import os
 import secrets
 import shlex
 import shutil
+import sys
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import containers
 from folders import Refused
 
 HERE = Path(__file__).resolve().parent
@@ -133,8 +139,12 @@ async def _pump(stream: asyncio.StreamReader, path: Path) -> tuple[str, bool]:
 
 
 class Sandbox:
-    def __init__(self, state: Path, image: str = IMAGE, podman: str = "podman", home: Path | None = None) -> None:
-        self.state, self.image_name, self.podman = state, image, podman
+    def __init__(self, state: Path, image: str = IMAGE, podman: str | None = None, home: Path | None = None,
+                 linux: bool | None = None, selinux: bool | None = None) -> None:
+        self.state, self.image_name, self.podman = state, image, podman or containers.runtime()
+        self.docker = Path(self.podman).name == "docker"
+        self.linux = sys.platform.startswith("linux") if linux is None else linux
+        self.selinux = containers._selinux_enforcing() if selinux is None else selinux
         self.home = home or Path.home()
         self.records = Records(state)
         self.live: dict[str, asyncio.subprocess.Process] = {}
@@ -193,12 +203,15 @@ class Sandbox:
         """The podman command line for a run: `mounts` are (path, "rw" | "ro"), each at its own path."""
         name = f"aihub-ws-{run.id}"
         home = str(self.home)
-        args = [self.podman, "run", "--rm", "--name", name, "--userns=keep-id", "--security-opt", "label=disable",
+        user = [f"--user={os.getuid()}:{os.getgid()}"] if self.docker else ["--userns=keep-id"]
+        label = ["--security-opt", "label=disable"] if self.selinux else []
+        online = "pasta" if (self.linux and not self.docker) else "bridge"
+        args = [self.podman, "run", "--rm", "--name", name, *user, *label,
                 "--read-only", f"--memory={MEMORY}", f"--memory-swap={MEMORY}", f"--pids-limit={PIDS}",
-                "--network=" + ("pasta" if run.network else "none"),
+                "--network=" + (online if run.network else "none"),
                 "--tmpfs", "/tmp:rw,size=2g,mode=1777", "--tmpfs", f"{home}:rw,size=2g,mode=0777",
                 "--label", "aihub.workspace=1"]
-        for rel in CACHES:
+        for rel in CACHES if not self.docker else ():      # docker has no overlay mounts: the caches start empty
             src = self.home / rel
             if src.is_dir():
                 args += ["-v", f"{src}:{src}:O"]

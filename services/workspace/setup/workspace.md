@@ -16,6 +16,11 @@ what = "makes .venv/ from requirements-dev.txt (about 26 MB, under a minute)"
 [[steps]]
 run = "podman build -t localhost/aihub-workspace-sandbox:2 -f sandbox/Containerfile sandbox"
 what = "builds the sandbox image from base images pinned by digest (1.06 GB, a few minutes; needs the internet once)"
+
+[[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+tested = ["linux"]
 -->
 
 # Workspace: setup

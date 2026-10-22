@@ -12,6 +12,11 @@ check = "aihub start web && aihub check web"
 [[steps]]
 run = "aihub install web"
 what = "makes .venv/ from requirements-dev.txt (about 70 MB, under a minute); SearXNG, for search, runs outside AIHub (this doc's Install)"
+
+[[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+tested = ["linux"]
 -->
 
 # Web: setup

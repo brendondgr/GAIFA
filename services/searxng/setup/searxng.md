@@ -12,6 +12,11 @@ check = "aihub start searxng && aihub check searxng"
 [[steps]]
 run = "aihub install searxng"
 what = "makes .venv/ from requirements-dev.txt (about 28 MB, under a minute); SearXNG itself is set up as in the web mod's setup doc"
+
+[[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+tested = ["linux"]
 -->
 
 # SearXNG watcher: setup

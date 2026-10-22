@@ -34,6 +34,11 @@ text = "Which folder should OpenCode work in? Its shell, edit and write tools ac
 choices = "folder"
 required = true
 restart = "opencode relay"
+
+[[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
+accel = "cpu"
+os = ["linux", "wsl", "darwin"]
+tested = ["linux"]
 -->
 
 # OpenCode: setup

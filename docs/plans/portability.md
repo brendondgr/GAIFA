@@ -381,10 +381,14 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
 | gen3d | yes (today) | yes | — | — | — | — |
 | vllm | yes (parked) | yes | — | — | — | — |
 
-- [ ] **39.1 The mods without GPU work: agent, relay, web, searxng, opencode, workspace.**
+- [x] **39.1 The mods without GPU work: agent, relay, web, searxng, opencode, workspace.**
   - Their setup docs declare `os = ["linux", "wsl", "darwin"]`.
   - **The workspace sandbox:** `--userns=keep-id` and `--network=pasta` are used only with rootless podman on Linux; docker gets its own equivalents (`services/workspace/sandbox.py`).
   *Done when:* each mod's tests pass; `services/workspace/tests/` covers the flags per runtime.
+  - *As built:*
+    - **The setup docs:** the six declare one `cpu` variant on every system, tested on Linux.
+    - **The sandbox** takes its runtime from `AIHUB_CONTAINER_RUNTIME` (a copy of the template's `containers.py`). Docker runs as your uid and gid, gets `bridge`, and has no cache overlays, so the caches start empty. Podman off Linux gets `bridge` instead of `pasta`. `label=disable` applies only where SELinux is enforcing, so this machine's command line is unchanged.
+    - **Tests:** `services/workspace/tests/test_sandbox_runtimes.py` (4), and the workspace's 116 pass.
 
 - [ ] **39.2 lcpp: llama.cpp per accel.**
   - **The binary:** the setup step fetches ggml-org's release asset for the OS and accel when one exists (Vulkan and CPU on Linux, Metal on macOS). Otherwise it builds from source into `runtime/llama.cpp/bin/` with `-DGGML_CUDA=ON` or `-DGGML_SYCL=ON`.

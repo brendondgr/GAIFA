@@ -198,12 +198,17 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
 
 ## Phase 37 — Running without this machine's setup (M)
 
-- [ ] **37.1 A supervisor that outlives the hub without systemd: `utils/backends/detached.py`.**
+- [x] **37.1 A supervisor that outlives the hub without systemd: `utils/backends/detached.py`.**
   - **Starting a mod:** in its own session, with its output appended to `data/logs/<id>.log`. A pidfile `data/state/hub/pids/<id>.json` holds `{pid, create_time, port, command_hash}`.
   - **After a hub restart:** a pidfile is adopted when the pid's start time and command still match; otherwise it's stale and is removed.
   - **Stopping:** SIGTERM to the process group, then SIGKILL after the timeout. `pids` walks the process tree.
   - **Choosing the backend:** `[hub] backend = "auto" | "systemd" | "detached" | "subprocess"` in `config.example.toml`. `auto` is systemd when available, else detached, and `--dev` stays subprocess (`utils/server.py` `default_backend`; architecture §2 and §5).
   *Done when:* `utils/tests/services/test_backend_detached.py` covers start, stop, a hub restart that adopts a running mod, a stale pidfile, a mod that ignores SIGTERM, and logs.
+  - *As built:*
+    - **Output:** a mod's output goes to `data/state/hub/pids/<id>.out` (truncated at each start). `follow` tails it, so the hub's shipper writes `data/logs/<id>.log` as for every backend, with stdout and stderr merged.
+    - **Adoption:** a pidfile is adopted when psutil gives the same start time. A mod adopted after a restart that later ends has no exit status, so it reads as failed, `gone`.
+    - **Choosing the backend:** `default_backend(options, config, paths)` reads `[hub] backend`; `auto` without a user manager now means detached, not child processes.
+    - **Tests:** `test_backend_detached.py` (8), including fake-ok adopted by a second manager.
 
 - [ ] **37.2 The CLI on every target: `utils/cli.py`.**
   - **`aihub open`** uses `webbrowser`. On WSL2 it opens the Windows browser (`wslview`, else `explorer.exe`).

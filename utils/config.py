@@ -33,6 +33,7 @@ class _Strict(BaseModel):
 class HubCfg(_Strict):
     host: str = "127.0.0.1"
     port: int = Field(7000, ge=1, le=65535)
+    backend: Literal["auto", "systemd", "detached", "subprocess"] = "auto"   # how mods run (plan 37.1)
 
     @field_validator("host")
     @classmethod

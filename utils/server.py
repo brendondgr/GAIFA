@@ -119,17 +119,24 @@ def hub_version() -> str:
         return "0.0.0"
 
 
-def default_backend(options: Options) -> Any:
-    """systemd units normally; child processes with `--dev` or where there is no systemd user manager."""
+def default_backend(options: Options, config: Config | None = None, paths: Paths | None = None) -> Any:
+    """`[hub] backend` (plan 37.1): `auto` is systemd units where there's a systemd user manager, else
+    detached processes that outlive the hub (macOS); `--dev` always runs mods as child processes."""
     from utils.backends import systemd
+    from utils.backends.detached import DetachedBackend
     from utils.backends.subprocess import SubprocessBackend
 
-    if options.dev:
+    want = config.hub.backend if config else "auto"
+    if options.dev or want == "subprocess":
         return SubprocessBackend()
-    if systemd.available():
+    if want == "systemd" or (want == "auto" and systemd.available()):
         return systemd.SystemdBackend()
-    log.warning("no systemd user manager: running mods as child processes (they stop with the hub)")
-    return SubprocessBackend()
+    if paths is None:
+        log.warning("no state folder for detached mods: running them as child processes (they stop with the hub)")
+        return SubprocessBackend()
+    if want == "auto":
+        log.info("no systemd user manager: mods run as detached processes (data/state/hub/pids/)")
+    return DetachedBackend(paths.state / "hub" / "pids")
 
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
@@ -137,7 +144,7 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     from utils.routes import events, gpu, mcp, memory, metrics, models, outputs, overview, prefs, services, sessions, settings, skills, system, tools, web, webpages, widgets
 
     options = options or Options()
-    hub = Hub(paths=paths, config=config, backend=backend or default_backend(options), options=options, version=hub_version())
+    hub = Hub(paths=paths, config=config, backend=backend or default_backend(options, config, paths), options=options, version=hub_version())
     hub.listen_port = hub.port
     hub.allowed_hosts = LOOPBACK_HOSTS | {h.lower() for h in options.extra_hosts}
 

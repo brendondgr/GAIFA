@@ -6,6 +6,7 @@
 [hub]
 host = "127.0.0.1"          # loopback only; anything else is refused at startup
 port = 7000
+backend = "auto"            # how mods run: auto (systemd units where there's a user manager, else detached processes), systemd, detached, subprocess
 
 [paths]                     # relative to this file; must stay inside the project
 models = "data/models"

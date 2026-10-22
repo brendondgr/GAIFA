@@ -29,7 +29,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Shape | A **hub in front of mods**. Each mod is its own process. | The apps' torch/Python stacks conflict: Kokoro and Breeze need different ROCm torch builds, gen3d runs in a Python 3.13 container, and lcpp and relay use 3.14. Stopping a process is how GPU memory is freed. relay's event loop is tuned for concurrency, and lcpp's model instances must survive restarts. |
 | Hub stack | Python ≥ 3.12, FastAPI + uvicorn + httpx, SQLite, uv | same as all four apps |
 | Hub address | `127.0.0.1:7000`, no auth | only reachable from this machine |
-| Running mods | Each mod runs as a **temporary systemd user service** (`aihub-<id>.service`), started with `systemd-run` | the pattern lcpp already uses for models: survives hub restarts, logs go to journald, no unit files per mod |
+| Running mods | Each mod runs as a **temporary systemd user service** (`aihub-<id>.service`), started with `systemd-run`; where there's no systemd user manager (macOS), a **detached process** with a pidfile in `data/state/hub/pids/` that is adopted after a hub restart (`[hub] backend`, plan 37.1) | the pattern lcpp already uses for models: survives hub restarts, logs go to journald, no unit files per mod |
 | Installed services | Only `aihub.service` (runs `app.py`) | today there are four separate ones |
 | Mod contract | `service.toml` + an HTTP server on 127.0.0.1 + a health check | any language; all four apps already fit with small changes |
 | API | Hub routes at `/api/*`, plus **every mod's own API at `/api/s/<id>/*`**, plus an operations list built from each mod's OpenAPI | generic UI pages and the future agent's tools come from the same source |
@@ -521,6 +521,7 @@ Sizes in GB (`reserve_gb`, a manifest's `estimate_gb`, a status's `memory_estima
 [hub]
 host = "127.0.0.1"          # loopback only; anything else is refused at startup
 port = 7000
+backend = "auto"            # plan 37.1: auto (systemd where there's a user manager, else detached), systemd, detached, subprocess
 
 [paths]                     # relative to this file; must stay inside the project
 models = "data/models"

@@ -533,10 +533,16 @@ The user builds AIHub on the other machines later, with an agent. The agent foll
     - **The dry run (2026-10-22):** an export of HEAD with a `failtest` mod whose one step runs `nvcc`. `aihub setup --json --yes --smoke failtest` stopped at the failure, then one note was added and `aihub report` written. The report's issue named `services/failtest/setup/env.md:12`, the command, exit 127, its log, and the causes `cuda-toolkit` and `missing-command`. The note carried its command, output and what was tried.
     - **Fixed from it:** outside a git checkout, the report says so instead of an empty commit.
 
-- [ ] **40.4 The support matrix: `docs/platforms.md`.**
+- [x] **40.4 The support matrix: `docs/platforms.md`.**
   - It lists, for each OS and accelerator, whether a mod is tested (where and when), CI only, or untested, from the variants' `tested` flags. `aihub docs` generates the table into it.
   - The README's and `docs/setup/README.md`'s "macOS and Windows aren't supported" become a pointer to the matrix, and CLAUDE.md's status line is updated.
   *Done when:* `aihub docs --check` passes, and the matrix agrees with every variant's `tested` flag.
+  - *As built:*
+    - **The generator:** `render.platforms_matrix`, written by `setupdocs.sync` between markers in `docs/platforms.md`. It has one row per setup and one column per system (Linux, Windows (WSL2), macOS). Each cell lists its accels, marked ✓ tested, ○ untested, or — when the setup isn't available there.
+    - **Where "where and when" lives:** each setup doc's *Tested with*.
+    - **macOS:** described as CI only, for the hub's tests.
+    - **The tests:** `test_setup_docs_are_current` now covers the matrix too (`--check`). `test_the_matrix_agrees_with_every_variant` reads the table back against every variant.
+    - **The other docs:** the README's requirements and known gaps point to the matrix and the host page for each machine; CLAUDE.md and AGENTS.md have the Stage N status; the `aihub-setup` skill names the host pages.
 
 - [ ] **40.5 Linux with NVIDIA: the field test** (the user, later). The report comes back here; its fixes land as follow-up steps, and passing variants flip to `tested = true`.
 

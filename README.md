@@ -12,7 +12,9 @@ keeps one index of everything they make, and serves a single UI for all of it. A
 means adding a folder; the hub needs no code change.
 
 It was built for one machine, an AMD Strix Halo box with about 121 GB of GPU-addressable unified memory,
-where the services' Python and ROCm stacks conflict and can't share one environment.
+where the services' Python and ROCm stacks conflict and can't share one environment. Each mod now declares
+variants for other hardware too (NVIDIA CUDA, Intel XPU, Apple MPS, Vulkan, CPU), and setup picks the one your
+machine can run: what runs where, and what has been tested, is in [docs/platforms.md](docs/platforms.md).
 
 ## What it does
 
@@ -74,8 +76,8 @@ to 3D) all pass. Details and the remaining failures: [docs/agent-eval.md](docs/a
 
 ## Requirements
 
-- Linux with systemd user services (the hub and every mod run as `systemd --user` units), Python 3.11 or newer for the setup command, git and [uv](https://docs.astral.sh/uv/) (it fetches the Python 3.12+ that the hub and mods run on).
-- For the GPU mods, the hardware AIHub is built on: an AMD Strix Halo (gfx1151), with the kernel settings and packages in [docs/setup/host.md](docs/setup/host.md). Images & Video and 3D Generate run in the [`kyuz0/amd-strix-halo-comfyui`](https://hub.docker.com/r/kyuz0/amd-strix-halo-comfyui) image through podman/toolbox.
+- Linux (systemd user services, or detached processes without systemd), Windows 11 through WSL2, or macOS on Apple Silicon ([docs/platforms.md](docs/platforms.md)); Python 3.11 or newer for the setup command, git and [uv](https://docs.astral.sh/uv/) (it fetches the Python 3.12+ that the hub and mods run on). Native Windows isn't supported.
+- For the GPU mods, a GPU your mods' variants support: `aihub hardware` shows what AIHub finds, and [docs/platforms.md](docs/platforms.md) which variants are tested where. The host setup per machine is in [docs/setup/](docs/setup/README.md): [AMD Strix Halo](docs/setup/host.md) (where AIHub is built and tested; Images & Video and 3D Generate run there in the [`kyuz0/amd-strix-halo-comfyui`](https://hub.docker.com/r/kyuz0/amd-strix-halo-comfyui) image through podman/toolbox), [NVIDIA](docs/setup/host-linux-nvidia.md), [Intel](docs/setup/host-linux-intel.md), [WSL2](docs/setup/host-wsl2.md), [macOS](docs/setup/host-macos.md).
 - The hub, and the relay, OpenCode, agent, web and workspace mods, need no GPU; Speech to Text (stt) runs without one too, only slower.
 - Models are your choice, per mod: each mod's setup doc says what it runs, suggests a few, and says how to add your own. None are in the repository.
 
@@ -193,8 +195,9 @@ A personal project, in daily use on the machine it was built for. As of October 
 through Phase 22: the hub, the eight mods, the tool catalog and MCP endpoint, the chat agent and its
 learner, sessions, and logs and runtime state kept inside the project folder. Known gaps:
 
-- The GPU mods assume a Strix Halo with ROCm and the kyuz0 container image; other hardware would
-  need its own images and model choices.
+- The GPU mods are tested on a Strix Halo with ROCm; their variants for NVIDIA, Intel, Apple and the CPU
+  are written but untested until a field test (`aihub report`) runs them on that hardware
+  ([docs/platforms.md](docs/platforms.md)). vLLM runs on ROCm only.
 - Two paths still live outside the project folder: OpenCode's working directory
   (`OPENCODE_PROJECT_DIR`) and the LLM Launcher's CLI, installed as a uv tool.
 - The memory manager schedules memory, not GPU compute: two mods can still compute at the same time

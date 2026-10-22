@@ -1,6 +1,6 @@
-"""Setup docs (plan 23): the mods index in `docs/setup/README.md` (committed), and a local inventory
-of this machine's models in `data/state/setup/models/` (gitignored: which models to set up is each
-person's choice, plan 23.6). Standard library only, so `aihub docs` runs without the hub. A model
+"""Setup docs (plan 23): the mods index in `docs/setup/README.md` and the support matrix in
+`docs/platforms.md` (plan 40.4), both committed, and a local inventory of this machine's models in
+`data/state/setup/models/` (gitignored: which models to set up is each person's choice, plan 23.6). Standard library only, so `aihub docs` runs without the hub. A model
 doc's generated part sits between markers; everything outside them is hand-written and kept byte
 for byte. Setup docs (`services/<id>/setup/*.md`) are read, never written.
 """
@@ -184,4 +184,9 @@ def sync(root: Path, ids: list[str] | None = None, check: bool = False) -> Repor
         text = readme.read_text()
         if BLOCK.search(text):
             _put(readme, BLOCK.sub(lambda _m: render.mods_index(envs, readme), text, count=1), check, report, readme.relative_to(root).as_posix())
+    page = root / "docs" / "platforms.md"
+    if page.exists():
+        text = page.read_text()
+        if BLOCK.search(text):
+            _put(page, BLOCK.sub(lambda _m: render.platforms_matrix(envs, page), text, count=1), check, report, page.relative_to(root).as_posix())
     return report

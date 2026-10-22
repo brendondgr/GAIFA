@@ -505,6 +505,7 @@ def effective(mod: Mod, cfg: Config) -> Effective:
         "env": {},
     }
     merged = cfg.service_override(mod.id, defaults)
+    merged.pop("gpu", None)          # read by launch_spec and the memory manager, not part of ServiceConfig
     if merged["idle_unload_s"] == 0:
         merged["idle_unload_s"] = None  # config.toml writes "never" as 0 (TOML has no null)
     return Effective(**merged)
@@ -607,8 +608,15 @@ def resolve_arg(arg: str, base: Path, first: bool) -> str:
     return arg
 
 
-def launch_spec(mod: Mod, cfg: Config, paths: Paths, hub_port: int) -> LaunchSpec:
-    """What a backend starts: argv, cwd and env with placeholders expanded. Raises ManifestError."""
+def gpu_pin(mod_id: str, cfg: Config) -> int | str | None:
+    """`[services.<id>] gpu`: an index, "auto", or None (plan 36.3)."""
+    ov = cfg.services.overrides.get(mod_id)
+    return ov.gpu if ov else None
+
+
+def launch_spec(mod: Mod, cfg: Config, paths: Paths, hub_port: int, gpu_index: int | None = None, machine: Any = None) -> LaunchSpec:
+    """What a backend starts: argv, cwd and env with placeholders expanded. Raises ManifestError.
+    `gpu_index`: the GPU the hub picked for it ("auto" on a machine with more than one)."""
     if not mod.manifest or mod.errors:
         raise ManifestError("; ".join(mod.errors) or f"{mod.id}: no manifest")
     m = mod.manifest
@@ -633,6 +641,14 @@ def launch_spec(mod: Mod, cfg: Config, paths: Paths, hub_port: int) -> LaunchSpe
     if m.gpu:  # plan 31.2: the defaults the mod's gpu_slot client reads
         env["AIHUB_GPU_CLASS"] = m.gpu.cls
         env["AIHUB_GPU_GROUP"] = m.gpu.group or mod.id
+    pin = gpu_pin(mod.id, cfg)
+    index = pin if isinstance(pin, int) and not isinstance(pin, bool) else gpu_index
+    if index is not None:          # plan 36.3: only on machines with more than one GPU to choose from
+        if machine is None:
+            from utils import hardware
+            machine = hardware.detect()
+        if len(machine.compute_gpus()) > 1:
+            env.update(machine.visible_env(index))
     env.update({k: expand(v, values, f"config.toml [services.{mod.id}].env.{k}") for k, v in eff.env.items()})
     return LaunchSpec(
         id=mod.id,

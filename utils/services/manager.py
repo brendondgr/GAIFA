@@ -109,12 +109,25 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
             await self._wait_settled(svc)
         return svc
 
+    def _pick_gpu(self, svc: Service) -> int | None:
+        """The GPU a mod starts on (plan 36.3): `[services.<id>] gpu` pinned, else on a machine with more
+        than one dedicated GPU the freest one, else None (the mod sees every GPU, as before)."""
+        pin = mf.gpu_pin(svc.id, self.config)
+        if isinstance(pin, int) and not isinstance(pin, bool):
+            return pin
+        pools = getattr(self.memory, "pools", None) or []
+        if len(pools) > 1:
+            best = max(pools, key=lambda p: p.available_bytes)
+            return int(best.id.split(":")[1])
+        return None
+
     async def _launch(self, svc: Service) -> None:
         svc.gen += 1
         gen = svc.gen
         self._cancel_tasks(svc)
         try:
-            spec = mf.launch_spec(svc.mod, self.config, self.paths, self.hub_port)
+            svc.gpu_index = self._pick_gpu(svc)
+            spec = mf.launch_spec(svc.mod, self.config, self.paths, self.hub_port, gpu_index=svc.gpu_index)
         except mf.ManifestError as e:
             self._set(svc, "failed", error=str(e))
             raise ServiceError(409, "manifest_invalid", f"{svc.id} can't start: {e}") from None

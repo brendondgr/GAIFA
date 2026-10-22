@@ -73,6 +73,7 @@ class Service:
     misses: int = 0
     restarts: deque[float] = field(default_factory=lambda: deque(maxlen=10))
     gen: int = 0
+    gpu_index: int | None = None   # plan 36.3: the GPU the hub started it on (machines with more than one), else None
     tasks: set[asyncio.Task[Any]] = field(default_factory=set)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 

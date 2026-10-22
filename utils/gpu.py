@@ -18,6 +18,9 @@ work, so only one group's work runs at a time.
   held if the slot is free or held by its group, else waiting.
 - **`[gpu] queue = false`:** every lease is granted at once (memory-only admission, as before Phase 31);
   leases are still listed.
+- **One slot per GPU (plan 36.3).** A lease is for a `device` (the hardware index; default 0); each
+  device has its own slot, holder group and queue, so two cards run two jobs at once. Nested work runs
+  on its parent's device. With one GPU this is the queue above, unchanged.
 """
 
 from __future__ import annotations
@@ -66,6 +69,7 @@ class Lease:
     thread: str | None = None
     call_id: str | None = None
     parent: str | None = None
+    device: int = 0
     seq: int = 0
     created_ts: float = field(default_factory=time.time)
     granted_ts: float | None = None
@@ -83,6 +87,8 @@ class Lease:
         for k in ("est_s", "thread", "call_id", "parent", "granted_ts", "ended_ts"):
             if getattr(self, k) is not None:
                 d[k] = getattr(self, k)
+        if self.device:
+            d["device"] = self.device
         return d
 
 
@@ -100,7 +106,7 @@ class GpuQueue:
         self.cfg: Callable[[], GpuCfg] = cfg or GpuCfg
         self.name_of, self.sweep_s, self.clock = name_of, sweep_s, clock
         self.leases: dict[str, Lease] = {}       # held and waiting
-        self.group: str | None = None            # the group holding the slot
+        self.groups: dict[int, str] = {}           # device → the group holding its slot
         self.history: deque[dict[str, Any]] = deque(maxlen=HISTORY)
         self.holds: dict[str, deque[float]] = {}
         self.stats: list[tuple[str, str, float]] = []   # (service, "wait" | "hold", seconds), drained by metrics
@@ -160,18 +166,23 @@ class GpuQueue:
 
     # reading ---------------------------------------------------------------------------
 
-    def held(self) -> list[Lease]:
-        return sorted((x for x in self.leases.values() if x.state == "held"), key=lambda x: x.seq)
+    @property
+    def group(self) -> str | None:
+        """The group holding the first GPU's slot (the only slot on a one-GPU machine)."""
+        return self.groups.get(0)
 
-    def waiting(self) -> list[Lease]:
+    def held(self, device: int | None = None) -> list[Lease]:
+        return sorted((x for x in self.leases.values() if x.state == "held" and device in (None, x.device)), key=lambda x: x.seq)
+
+    def waiting(self, device: int | None = None) -> list[Lease]:
         """In the order they would be granted: class, then arrival."""
-        return sorted((x for x in self.leases.values() if x.state == "waiting"), key=lambda x: (RANK[x.cls], x.seq))
+        return sorted((x for x in self.leases.values() if x.state == "waiting" and device in (None, x.device)), key=lambda x: (RANK[x.cls], x.seq))
 
-    def busy_for(self, group: str) -> bool:
+    def busy_for(self, group: str, device: int = 0) -> bool:
         """Whether a new lease of `group` would wait: another group holds the slot, or work is waiting."""
         if not self.enabled:
             return False
-        return bool(self.waiting()) or any(x.group != group for x in self.held())
+        return bool(self.waiting(device)) or any(x.group != group for x in self.held(device))
 
     def on_grant(self, service: str, fn: Callable[[], Any]) -> None:
         """Run `fn` (async) when `service` is next granted the slot: a proxied trigger's room, made when the mod's
@@ -208,8 +219,8 @@ class GpuQueue:
     def ahead_of(self, lease: Lease) -> list[dict[str, Any]]:
         """What runs before a waiting lease: the holders, then the waiting leases before it."""
         out = [{"id": x.id, "service": x.service, "label": x.label, "state": "held", "eta_s": self.remaining(x)}
-               for x in self.held() if x.parent is None]
-        for x in self.waiting():
+               for x in self.held(lease.device) if x.parent is None]
+        for x in self.waiting(lease.device):
             if x is lease:
                 break
             out.append({"id": x.id, "service": x.service, "label": x.label, "state": "waiting", "eta_s": self.estimate(x)})
@@ -237,13 +248,18 @@ class GpuQueue:
         return d
 
     def view(self) -> dict[str, Any]:
-        held = self.held()
-        return {
+        held = self.held(0)
+        out = {
             "queue": self.enabled, "lease_ttl_s": self.ttl,
             "holder": {"group": self.group, "leases": [self.lease_view(x) for x in held]} if held else None,
-            "waiting": [self.lease_view(x) for x in self.waiting()],
+            "waiting": [self.lease_view(x) for x in self.waiting(0)],
             "recent": list(reversed(self.history)),
         }
+        others = sorted({x.device for x in self.leases.values()} - {0})
+        if others:     # plan 36.3: the other GPUs' slots (the first stays in holder and waiting)
+            out["devices"] = [{"device": d, "holder": {"group": self.groups.get(d), "leases": [self.lease_view(x) for x in self.held(d)]} if self.held(d) else None,
+                               "waiting": [self.lease_view(x) for x in self.waiting(d)]} for d in others]
+        return out
 
     def get(self, lease_id: str) -> Lease:
         lease = self.leases.get(lease_id)
@@ -255,7 +271,7 @@ class GpuQueue:
 
     def register(self, service: str, cls: str = "job", label: str = "", group: str | None = None,
                  est_s: float | None = None, parent: str | None = None, thread: str | None = None,
-                 call_id: str | None = None, lease_id: str | None = None) -> Lease:
+                 call_id: str | None = None, lease_id: str | None = None, device: int = 0) -> Lease:
         """Add a lease (or find the caller's own, to keep its place) and grant what can be granted."""
         if cls not in RANK:
             raise GpuError(422, "invalid_request", f"class must be one of {', '.join(CLASSES)}")
@@ -263,8 +279,10 @@ class GpuQueue:
             lease = self.leases[lease_id]
             lease.touched = self.clock()
             return lease
+        par = self.leases.get(parent or "")
         lease = Lease(id=lease_id or new_id(), service=service, group=group or service, cls=cls, label=label or service,
-                      est_s=est_s, thread=thread, call_id=call_id, parent=parent, seq=next(self._seq), touched=self.clock())
+                      est_s=est_s, thread=thread, call_id=call_id, parent=parent, device=par.device if par else device,
+                      seq=next(self._seq), touched=self.clock())
         self.leases[lease.id] = lease
         self.pump()
         if lease.state == "waiting":
@@ -301,14 +319,18 @@ class GpuQueue:
             raise GpuError(422, "invalid_request", f"class must be one of {', '.join(CLASSES)}")
         lease = Lease(id=lease_id, service=info["service"], group=info.get("group") or info["service"], cls=cls,
                       label=info.get("label") or info["service"], est_s=info.get("est_s"), thread=info.get("thread"),
-                      call_id=info.get("call_id"), parent=info.get("parent"), seq=next(self._seq), touched=self.clock())
+                      call_id=info.get("call_id"), parent=info.get("parent"), device=int(info.get("device") or 0),
+                      seq=next(self._seq), touched=self.clock())
         parent = self.leases.get(lease.parent or "")
+        if parent:
+            lease.device = parent.device
         self.leases[lease.id] = lease
-        if not self.enabled or not self.held() or self.group == lease.group or (parent and parent.state == "held"):
+        d = lease.device
+        if not self.enabled or not self.held(d) or self.groups.get(d) == lease.group or (parent and parent.state == "held"):
             self._grant(lease, note="re-registered")
         else:
             self._publish("waiting", lease)
-            log.warning("re-registered GPU lease %s (%s) waits: %s holds the slot", lease.id, lease.service, self.group)
+            log.warning("re-registered GPU lease %s (%s) waits: %s holds GPU %d's slot", lease.id, lease.service, self.groups.get(d), d)
         return lease
 
     def release(self, lease_id: str) -> Lease | None:
@@ -345,7 +367,7 @@ class GpuQueue:
                 self._end(lease, "expired")
 
     def pump(self) -> None:
-        """Grant every lease that may run now."""
+        """Grant every lease that may run now, on each device."""
         waiting = self.waiting()
         if not self.enabled:
             for x in waiting:
@@ -355,22 +377,23 @@ class GpuQueue:
             parent = self.leases.get(x.parent or "")
             if parent is not None and parent.state == "held":
                 self._grant(x)
-        waiting = self.waiting()
-        if not self.held():
-            self.group = None
-            if not waiting:
-                return
-            self._grant(waiting[0])
-            waiting = self.waiting()
-        for x in waiting:                                    # the holder's group shares, unless that would jump the queue
-            if x.group == self.group and not any(o.group != self.group and RANK[o.cls] <= RANK[x.cls] for o in waiting):
-                self._grant(x)
+        for d in sorted({x.device for x in self.waiting()} | set(self.groups)):
+            waiting = self.waiting(d)
+            if not self.held(d):
+                self.groups.pop(d, None)
+                if not waiting:
+                    continue
+                self._grant(waiting[0])
+                waiting = self.waiting(d)
+            group = self.groups.get(d)
+            for x in waiting:                                # the holder's group shares, unless that would jump the queue
+                if x.group == group and not any(o.group != group and RANK[o.cls] <= RANK[x.cls] for o in waiting):
+                    self._grant(x)
 
     def _grant(self, lease: Lease, note: str = "") -> None:
         lease.state, lease.granted_ts, lease.renewed_ts = "held", time.time(), time.time()
         lease.touched = self.clock()
-        if self.group is None:
-            self.group = lease.group
+        self.groups.setdefault(lease.device, lease.group)
         lease.granted.set()
         self.stats.append((lease.service, "wait", lease.granted_ts - lease.created_ts))
         if self.alerts and self._alerted == lease.service:      # the mod is back: its old lease's alert is done
@@ -392,8 +415,8 @@ class GpuQueue:
             if how == "released" and lease.parent is None:
                 self.holds.setdefault(lease.service, deque(maxlen=HOLDS_KEPT)).append(rec["run_s"])
         self.history.append(rec)
-        if not self.held():
-            self.group = None
+        if not self.held(lease.device):
+            self.groups.pop(lease.device, None)
         self._publish(how, lease)
         self.pump()
 

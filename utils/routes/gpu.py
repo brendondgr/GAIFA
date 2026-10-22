@@ -42,6 +42,7 @@ class GpuLease(_Model):
     thread: str | None = None
     call_id: str | None = None
     parent: str | None = None
+    device: int | None = Field(None, description="The GPU it's for, when not the first (plan 36.3)")
     granted_ts: float | None = None
     ended_ts: float | None = None
     elapsed_s: float | None = Field(None, description="Held: seconds since it was granted")
@@ -57,12 +58,19 @@ class GpuHolder(_Model):
     leases: list[GpuLease]
 
 
+class GpuDevice(_Model):
+    device: int
+    holder: GpuHolder | None
+    waiting: list[GpuLease]
+
+
 class GpuState(_Model):
     queue: bool = Field(description="config.toml [gpu] queue; false = every lease is granted at once")
     lease_ttl_s: float
-    holder: GpuHolder | None
+    holder: GpuHolder | None = Field(description="The first GPU's slot (the only one on a one-GPU machine)")
     waiting: list[GpuLease]
     recent: list[GpuLease] = Field(description="The last 20 finished leases, newest first")
+    devices: list[GpuDevice] | None = Field(None, description="The other GPUs' slots, when any has a lease (plan 36.3)")
 
 
 class GpuGrant(_Model):
@@ -82,6 +90,7 @@ class AcquireBody(_Model):
     thread: str | None = None
     call_id: str | None = None
     lease: str | None = Field(None, description="Repeat the waiting lease's id to keep its place")
+    device: int | None = Field(None, ge=0, description="Which GPU's slot (plan 36.3); default: the GPU the mod was started on, else the first")
 
 
 class RenewBody(_Model):
@@ -94,10 +103,26 @@ class RenewBody(_Model):
     parent: str | None = None
     thread: str | None = None
     call_id: str | None = None
+    device: int | None = None
 
 
 def _q(request: Request) -> GpuQueue:
     return request.app.state.hub.gpu
+
+
+def _device(request: Request, service: str, asked: int | None) -> int:
+    """The GPU a lease is for: as asked, else the mod's (its launch's or `[services.<id>] gpu`), else 0."""
+    if asked is not None:
+        return asked
+    hub = request.app.state.hub
+    try:
+        svc = hub.services.get(service)
+    except Exception:  # noqa: BLE001: an unknown mod still gets the first GPU
+        return 0
+    if getattr(svc, "gpu_index", None) is not None:
+        return svc.gpu_index
+    pin = getattr(hub.config.services.overrides.get(service), "gpu", None)
+    return pin if isinstance(pin, int) else 0
 
 
 def _error(e: GpuError) -> ServiceError:
@@ -128,7 +153,7 @@ async def acquire(body: AcquireBody, request: Request,
     try:
         lease = await q.acquire(wait, service=body.service, cls=body.cls, label=body.label, group=body.group,
                                 est_s=body.est_s, parent=body.parent, thread=body.thread, call_id=body.call_id,
-                                lease_id=body.lease)
+                                lease_id=body.lease, device=_device(request, body.service, body.device))
     except GpuError as e:
         raise _error(e) from None
     if lease.state == "held":
@@ -141,6 +166,8 @@ async def acquire(body: AcquireBody, request: Request,
 async def renew(lease: str, request: Request, body: RenewBody | None = None) -> Any:
     q = _q(request)
     info = body.model_dump(by_alias=True, exclude_none=True) if body else None
+    if info and info.get("service") and "device" not in info:
+        info["device"] = _device(request, info["service"], None)
     try:
         got = q.renew(lease, info)
     except GpuError as e:

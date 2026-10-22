@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from utils import manifest as mf
 from utils import proc
 from utils.memory.planner import GB, Candidate, describe, extend_plan, fmt_gb, make_plan, why_not
 from utils.memory.pools import Pool
@@ -174,9 +175,10 @@ class MemoryManager:
         if not self.pools:
             return None
         ids = [p.id for p in self.pools]
-        pinned = getattr(svc.eff, "gpu", None) if device is None else device
-        if pinned is not None and f"gpu:{pinned}" in ids:
-            return f"gpu:{pinned}"
+        pin = mf.gpu_pin(svc.id, self.mgr.config)
+        for want in (device, pin if isinstance(pin, int) and not isinstance(pin, bool) else None, svc.gpu_index):
+            if want is not None and f"gpu:{want}" in ids:
+                return f"gpu:{want}"
         held = self.vram.get(svc.id)
         if held:
             return max(held, key=lambda k: held[k])

@@ -102,6 +102,14 @@ class ServiceOverride(_Strict):
     idle_unload_s: int | None = Field(None, ge=0)
     auto_unload: bool | None = None
     priority: int | None = None
+    gpu: int | Literal["auto"] | None = Field(None, description="Which GPU (hardware index) on a machine with more than one; auto: the freest at start (plan 36.3)")
+
+    @field_validator("gpu")
+    @classmethod
+    def _gpu_index(cls, v: Any) -> Any:
+        if isinstance(v, int) and not isinstance(v, bool) and v < 0:
+            raise ValueError("gpu is a GPU index (0, 1, …) or \"auto\"")
+        return v
 
 
 class ServicesCfg(BaseModel):

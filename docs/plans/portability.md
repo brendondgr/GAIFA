@@ -167,12 +167,18 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **One pool:** `vram_gb` and `vram_bytes` add to the system need.
     - **Tests:** `test_pools.py` (4), `test_planner_pools.py` (5), with a fake card.
 
-- [ ] **36.3 Which GPU a mod uses: devices and the GPU queue.**
+- [x] **36.3 Which GPU a mod uses: devices and the GPU queue.**
   - **Choosing a GPU:** `[services.<id>] gpu = "auto" | <index>`. With `auto`, the mod gets the GPU with the most free VRAM when it starts.
   - **The environment:** the hub sets `AIHUB_GPU_INDEX` plus the vendor's visible-devices variable (`CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, or `ONEAPI_DEVICE_SELECTOR`), and only on machines with more than one GPU.
   - **The queue:** `utils/gpu.py` keeps **one slot per device**. On a single-GPU machine, nothing changes.
   - **Docs:** architecture §4.4 and §7, `config.example.toml`.
   *Done when:* `utils/tests/gpu/test_queue_devices.py` (two devices: two jobs at once, one per device; a nested lease stays on its parent's device) and the environment tests pass; the Phase 31 tests pass unchanged.
+  - *As built:*
+    - **Choosing a GPU:** `ServiceManager._pick_gpu` decides when the mod launches: the pin, else the freest dedicated pool when there are two or more, else none. The choice is kept as `Service.gpu_index`, which the memory manager (`gpu_pool`) and the acquire route's default device both use.
+    - **The environment:** `manifest.launch_spec` sets the variables only when the machine has more than one GPU that can compute. `Machine.visible_env` and `compute_gpus` are new.
+    - **The queue:** a lease's `device` comes from the body, else the mod's GPU, else 0. `GET /api/gpu` keeps `holder` and `waiting` for the first GPU and adds `devices` for the others, only when one of them has a lease. `GpuQueue.group` reads the first GPU's group, as before.
+    - **Config:** `[services.<id>] gpu` isn't part of `ServiceConfig`.
+    - **Tests:** `test_queue_devices.py` (6), and `test_planner_pools.py` gains the pin and the freest card.
 
 - [ ] **36.4 The API and UI per pool.**
   - **The API:** `GET /api/memory` gains `pools`, and the `Gpu` model gains `vendor`, `memory` and `index`. The AMD-only `gtt_*` fields stay for this release, so the UI and the contract keep working.

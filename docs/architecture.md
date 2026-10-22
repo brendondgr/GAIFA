@@ -246,7 +246,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 
 **Environment layers**, later ones winning: the hub's variables below → `env_file` → `[run].env` → `config.toml`'s `[services.<id>].env`.
 
-**Environment every mod gets:** `AIHUB_URL`, `AIHUB_SERVICE_ID`, `AIHUB_PORT`, `AIHUB_ROOT`, `AIHUB_MODELS`, `AIHUB_OUTPUTS`, `AIHUB_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`. A mod with `[memory]` also gets `AIHUB_IDLE_UNLOAD_S` (seconds, `0` = never) and the same value under its `idle_unload_env` name, after `[run].env` and before `config.toml`'s env.
+**Environment every mod gets:** `AIHUB_URL`, `AIHUB_SERVICE_ID`, `AIHUB_PORT`, `AIHUB_ROOT`, `AIHUB_MODELS`, `AIHUB_OUTPUTS`, `AIHUB_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`. A mod with `[memory]` also gets `AIHUB_IDLE_UNLOAD_S` (seconds, `0` = never) and the same value under its `idle_unload_env` name, after `[run].env` and before `config.toml`'s env. On a machine with more than one GPU that can compute, a mod started on one GPU (`[services.<id>] gpu = <index>`, or the freest card under `auto`, the default; plan 36.3) also gets `AIHUB_GPU_INDEX` and its vendor's visible-devices variable: `CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, or `ONEAPI_DEVICE_SELECTOR` and `ZE_AFFINITY_MASK`, counted among that vendor's GPUs.
 
 ### 4.5 Port rules
 - A mod keeps the port in its manifest unless `config.toml` overrides it.
@@ -432,6 +432,8 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 - **Making room:** the planner covers the system gap first, then the GPU's, counting what the chosen mods free there. Steps that only free VRAM carry `pool`. A plan names the pool that's short (`pool`, and `pools` with each one's need and room), and `needs_room`'s detail says "needs ~X on <card>, Y free there".
 - **Reservations and acquire:** reservations hold VRAM too, and `POST /api/memory/acquire` takes `vram_bytes` and `device`.
 - **Where VRAM can't be read** per process (WSL2, macOS), a mod's share is what it acquired or its `vram_gb`.
+
+With more than one GPU, the **GPU queue keeps one slot per device** (plan 36.3): a lease is for a `device` (default: the GPU its mod was started on), nested work runs on its parent's, and `GET /api/gpu` lists the other cards' slots under `devices`.
 
 **Load rule:**
 - `available = MemAvailable − reserve`.

@@ -40,6 +40,26 @@ class Machine:
     gpus: list[Gpu] = field(default_factory=list)
     accels: list[str] = field(default_factory=list)          # every accel usable here, best first; cpu last
 
+    def compute_gpus(self) -> list[Gpu]:
+        """GPUs with an accel beyond Vulkan (what a mod would pick a device among)."""
+        return [g for g in self.gpus if set(g.accels) & {"rocm", "cuda", "xpu", "mps"}]
+
+    def visible_env(self, index: int) -> dict[str, str]:
+        """The variables that show a mod only GPU `index` (plan 36.3), counted the vendor's way."""
+        g = next((x for x in self.gpus if x.index == index), None)
+        if g is None:
+            return {}
+        env = {"AIHUB_GPU_INDEX": str(index)}
+        n = str(g.vendor_index)
+        if g.vendor == "nvidia":
+            env["CUDA_VISIBLE_DEVICES"] = n
+        elif g.vendor == "amd":
+            env["HIP_VISIBLE_DEVICES"] = n
+        elif g.vendor == "intel":
+            env["ONEAPI_DEVICE_SELECTOR"] = f"level_zero:{n}"
+            env["ZE_AFFINITY_MASK"] = n
+        return env
+
     @property
     def unified(self) -> bool:
         """Every GPU shares the system's memory (one memory pool), or there's no GPU."""

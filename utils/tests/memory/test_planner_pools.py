@@ -28,7 +28,7 @@ class GpuSource(FakeSource):
                 use[s.id] = {self.on.get(s.id, "gpu:0"): self.vram_sizes[s.id]}
         out = []
         for pid, total in self.cards.items():
-            used = sum(v.get(pid, 0) for v in use.values())
+            used = sum(v.get(pid, 0) for v in use.values()) + getattr(self, "extra_cards_used", {}).get(pid, 0)
             out.append(Pool(pid, f"Card {pid[-1]}", total, used, total - used))
         return out, use
 
@@ -94,15 +94,25 @@ async def test_a_vram_gap_unloads_the_other_gpu_mod(rig, make_app):
 
 async def test_each_card_is_its_own_pool(rig, make_app):
     src = two_mods(cards={"gpu:0": 24 * GB, "gpu:1": 24 * GB}, on={"fake-mem": "gpu:0", "fake-mem2": "gpu:1"})
-    async with gpu_rig(rig, make_app, src) as (app, c):
+    async with gpu_rig(rig, make_app, src, config="[services.fake-mem]\ngpu = 0\n[services.fake-mem2]\ngpu = 1\n") as (app, c):
         await c.post("/api/services/fake-mem/load")
         await loaded(app, "fake-mem")
         await until(lambda: app.state.hub.memory.vram.get("fake-mem") == {"gpu:0": 20 * GB})
         plan = (await c.post("/api/memory/plan", json={"service": "fake-mem2"})).json()
-        assert plan["pool"] == "system" and plan["enough"] and not plan["unload"]       # the freest card: gpu:1
+        assert plan["pool"] == "system" and plan["enough"] and not plan["unload"]       # its own card: gpu:1
         assert plan["pools"][1]["pool"] == "gpu:1"
         plan = (await c.post("/api/memory/plan", json={"service": "fake-mem2", "device": 0})).json()
         assert plan["pool"] == "gpu:0" and [u["id"] for u in plan["unload"]] == ["fake-mem"]
+
+
+async def test_auto_starts_a_mod_on_the_freest_card(rig, make_app):
+    src = two_mods(cards={"gpu:0": 24 * GB, "gpu:1": 24 * GB})
+    src.extra_cards_used = {"gpu:0": 10 * GB}
+    async with gpu_rig(rig, make_app, src) as (app, c):
+        svc = app.state.hub.services
+        assert svc.get("fake-mem").gpu_index == 1 and svc.get("fake-mem2").gpu_index == 1     # gpu:0 has 10 GB in use
+        plan = (await c.post("/api/memory/plan", json={"service": "fake-mem"})).json()
+        assert plan["pools"][1]["pool"] == "gpu:1"
 
 
 async def test_acquire_vram_and_reservations(rig, make_app):

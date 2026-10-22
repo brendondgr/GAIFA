@@ -30,6 +30,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | K — One GPU job at a time | 31 | A hub-wide GPU slot that mods take around their GPU work: a queue, groups for LLM engines, leases that expire, the queue in the UI | comfy, gen3d, tts, stt, decide, embed and the relay (each takes the slot); nothing is removed |
 | L — Replies you can act on | 32 | Under a reply, the pages it read (with their icons) and Copy in three ways; Select → Reply with the quote as markdown | Chat, the agent's send API, the web mod (a favicon route); additive |
 | M — Navigation | 33 | The sidebar in three groups, services shown as a list, a button or counts, a thin rail with state colours, a logo per mod, a Services page | the UI shell, `[ui.nav]`, a `[ui] logo` per mod; additive |
+| N — Chats by workspace | 35 | The chat list grouped by environment (Phase 34's workspaces), with orders, paging per group, Move to and renaming from the sidebar | the agent's thread list (additive filters), `web/chat/` |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -68,6 +69,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 32 | The reply bar and Select → Reply | M | `chat`: Sources, Copy and thumbs under a reply; the Reply button on a selection, the quote chip and the quote on a message |
 | 34 | Environments: the folders a chat may use, and asking for more | M | the chat header's environment chip, the folder card, the Workspace page's Environments |
 | 33 | The sidebar: groups, a thin rail and service logos | M | the sidebar (groups, the rail, the Services menu), the Services page, a logo per mod |
+| 35 | The chat list by environment | M | `chat`: the thread list in sections per environment, the View menu, Show more per section, Move to |
 
 # Stage A — Foundation
 
@@ -3067,6 +3069,41 @@ Asked for 2026-10-21, after Claude's: named **environments** (sets of folders, e
 **Checks & deliverables — Phase 34**
 - [ ] Live with the user: a chat in an environment named Grants reads its folders; "check out ~/Agents/Mycelium" asks, and Allow for this chat lets that chat (only) read it.
 - [x] Delivered: `services/workspace/environments.py`, `api_env.py`, the hub's folder grants, the agent's folder note, `web/chat/chat-env.js`, the tests.
+
+---
+
+# Stage N — Chats by workspace
+
+Asked for 2026-10-21, after Claude Code's sidebar: the chat list grouped by **environment** (Phase 34's workspaces: named sets of folders a chat may use), so chats are sectored off by the work they belong to, with more control than Claude Code gives. Already there and kept: renaming a chat (its ⋯ menu, or the header title), archiving and the Archived toggle (archived chats load only when it's on), renaming an environment (the Workspace page), and the folder limits a chat works under (34.2–34.3: edits stay inside the environment's folders, and anything outside asks). What's new: groups, orders, paging per group, and doing it all from the sidebar.
+
+**Simple gaps (assumed):**
+- **Where a chat belongs:** its `settings.environment`; none, or an environment that was deleted, is Default (as the header chip already treats it). Moving a chat changes that setting, as the chip does.
+- **Which environments show:** all of them, Default first when it has chats; an empty one shows "No chats yet" and its New chat button. Without the workspace mod (or while it's stopped), the list is flat, as today.
+- **Orders:** environments by recent activity (the newest chat's `updated`, else the environment's own `updated`), by name, or by when they were made; chats by recent activity, name, or when they were made. Saved per browser (`getPref`), like the last environment.
+- **Paging:** 6 chats per group, then **Show more** adds 20 from the agent (`limit`/`offset` per environment), so a big environment never loads all its chats.
+- **Search:** a search shows one flat list (each row says its environment), as today's search does; by meaning stays as it is.
+- **Archived:** the toggle shows archived chats grouped the same way, loaded only when it's on.
+
+## Phase 35 — The chat list by environment
+
+- [ ] **35.1 The agent lists threads per environment: `agent/store.py`, `agent/server.py`.**
+  - **`GET /v1/threads`** gains `environment` (one id or several, comma-separated; `default` also matches chats without one), `sort` (`updated` | `title` | `created`, newest first except `title`) and `offset`. Unchanged without them.
+  - **`GET /v1/threads/groups?archived=`** → `[{environment, count, updated, running}]`: one row per environment id the chats use (`default` for none), with its chats' newest `updated` and how many are running or waiting.
+  - **SQL:** `COALESCE(json_extract(settings, '$.environment'), 'default')`; `title` sorts case-insensitively.
+  *Done when:* `services/agent/tests/test_thread_groups.py` (grouping, the default bucket, several ids, the three sorts, offset, archived kept apart, a search unchanged).
+- [ ] **35.2 The grouped list: `web/chat/chat-groups.js`, `chat-list.js`, `chat-api.js`.**
+  - **Pure helpers** (`chat-groups.js`): `groupRows(groups, envs)` (unknown ids fold into Default), `orderGroups(rows, by)`, `VIEW_DEFAULTS` and the saved view (`aihub.chat.list`: group by environment or none, environment order, chat order, collapsed groups).
+  - **The list:** one section per environment: a caret (collapse), its name, the chat count, **New chat** in it (the chat starts with that environment), and a ⋯ menu (**Rename** inline through the workspace mod's `PUT /v1/environments/{id}`, **Manage folders…** to the Workspace page). Inside, its first 6 chats in the chosen order and **Show more**. A **View** button at the top: Group by (Environment · None), Environments by (Recent activity · Name · Created), Chats by (Recent activity · Name · Created).
+  - **A chat's ⋯ menu** gains **Move to…** (the environments), next to Rename, Archive and Delete; double-clicking a title renames it in place.
+  - **Client:** `listThreads({environment, sort, offset, limit, archived})` and `threadGroups({archived})` in `chat-api.js`.
+  *Done when:* `utils/tests/web/chat-groups.test.mjs` (the helpers, the sections and their paging, Move to, the flat list without the workspace mod), and the Node tests pass.
+- [ ] **35.3 Docs and the live check.** Brief §11.13 (the chat list), the agent's README routes, structure for `chat-groups.js`; the plan ticked. Live, on the installed hub when nothing else is using it: the groups match the chats, Show more pages, Move to and Rename work, the View choices survive a reload.
+
+**Wire — Phase 35:** the Chat page's thread list, from flat to grouped by environment.
+
+**Checks & deliverables — Phase 35**
+- [ ] Live: a few environments with chats, ordered each way; a chat moved between them; an environment renamed from the sidebar; archived chats grouped only when the toggle is on.
+- [ ] Delivered: the agent's thread groups and filters, `web/chat/chat-groups.js`, the grouped `chat-list.js`, the tests.
 
 ---
 

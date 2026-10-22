@@ -3135,7 +3135,7 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
   - **One box, one line:** **+** on the left (a menu: Upload files, Attach an output or a web page, Tool groups, the quick actions), the text between, and on the right the microphone, Stop while a turn runs, and Send (the user's correction: first built with the text above the row). Buttons show no outline until hovered or open. The hint line under the box ("Enter sends · …") goes.
   - **Growing:** as described above.
   *Done when:* `utils/tests/web/chat-composer-layout.test.mjs` (the + menu's items, the right side's buttons, no hint line, the height cap), and the existing composer tests pass.
-- [ ] **42.3 The controls under the box: `web/chat/chat-controls.js` (new), `chat-header.js`, `chat.js`.**
+- [x] **42.3 The controls under the box: `web/chat/chat-controls.js` (new), `chat-header.js`, `chat.js`.**
   - **A row under the message box**, as buttons that open small menus (not selects): the **environment** (its name), the **mode** (Plan · Manual · Accept edits · Auto · Bypass, each with its one line; Auto disabled with the reason while the judge doesn't answer, Bypass only where folders allow it), and the **model** (each with its window). The header loses the model, mode and environment controls.
   *Done when:* `utils/tests/web/chat-controls.test.mjs` (the three buttons and their labels, the mode list's rules from `ModeSelect`, picking calls back), and `environments.test.mjs` still passes.
 - [ ] **42.4 Environments from the chat: `chat-controls.js`, `chat-env.js`.**

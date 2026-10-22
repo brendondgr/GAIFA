@@ -1,5 +1,6 @@
-// The thread header (plan 14.1): title (click to rename), model picker with each model's context
-// window, the mode (plan 27.4), the environment (plan 34, chat-env.js), the context meter with its breakdown popover, and Branch.
+// The thread header (plan 14.1): title (click to rename), the running state, the context meter with its breakdown
+// popover, Learning and Branch. The model, the mode (plan 27.4) and the environment (plan 34) moved to the row under the
+// message box (chat-controls.js, plan 42.3); ModelSelect and ModeSelect stay for other pages.
 
 import { h, T, MONO, Icon, Btn, Popover, inputSt, fmtTokens, label11 } from './chat-ui.js';
 
@@ -30,15 +31,21 @@ export function ModelSelect({ models, value, onChange }) {
 // bypass: offer Bypass (every workspace folder this chat uses allows it); a chat already in Bypass keeps it listed.
 // judge (plan 30.5): GET /api/judge/status; while its model doesn't answer, Auto is offered disabled with the reason
 // (a chat already in Auto keeps it: its calls ask until the judge is back).
-export function ModeSelect({ value, onChange, bypass = false, judge = null }) {
+/** The modes a chat may pick (shared by ModeSelect and the controls row's mode menu, plan 42.3): Bypass only where
+ * the folders allow it (or the chat is in it), Auto disabled with the reason while the judge doesn't answer. */
+export function modeChoices(value, bypass = false, judge = null) {
   const cur = modeOf(value), down = judge && !judge.available;
-  const label = (k, l) => (k === 'auto' && down ? l + ' (judge unavailable)' : l);
-  const title = cur === 'auto' && down ? `The judge's model doesn't answer (${judge.detail || judge.model}): calls ask until it's back`
-    : MODES.find(m => m[0] === cur)?.[2];
-  return h('select', { value: cur, onChange: e => onChange(e.target.value), 'aria-label': 'Mode', title, style: selSt },
-    MODES.filter(([k]) => k !== 'bypass' || bypass || cur === 'bypass').map(([k, l]) => h('option', {
-      key: k, value: k, disabled: k === 'auto' && down && cur !== 'auto',
-      title: k === 'auto' && down ? `Not available: ${judge.detail || "the judge's model doesn't answer"}` : undefined }, label(k, l))));
+  return MODES.filter(([k]) => k !== 'bypass' || bypass || cur === 'bypass').map(([k, l, d]) => ({
+    key: k, label: k === 'auto' && down ? l + ' (judge unavailable)' : l, desc: d, disabled: k === 'auto' && down && cur !== 'auto',
+    why: k === 'auto' && down ? `Not available: ${judge.detail || "the judge's model doesn't answer"}` : undefined }));
+}
+export const modeTitle = (value, judge = null) => (modeOf(value) === 'auto' && judge && !judge.available
+  ? `The judge's model doesn't answer (${judge.detail || judge.model}): calls ask until it's back` : MODES.find(m => m[0] === modeOf(value))?.[2]);
+
+export function ModeSelect({ value, onChange, bypass = false, judge = null }) {
+  const cur = modeOf(value);
+  return h('select', { value: cur, onChange: e => onChange(e.target.value), 'aria-label': 'Mode', title: modeTitle(value, judge), style: selSt },
+    modeChoices(value, bypass, judge).map(m => h('option', { key: m.key, value: m.key, disabled: m.disabled, title: m.why }, m.label)));
 }
 
 /** Bypass is offered when the workspace folders this chat has used all allow it (or, before it used any, one does). */
@@ -91,22 +98,14 @@ function Title({ title, onRename }) {
   title || 'New chat');
 }
 
-// envChip (plan 34): the chat's environment (chat-env.js EnvChip), next to the mode
-export function ThreadHeader({ thread, models, model, mode, bypass, judge, onModel, onMode, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn, envChip }) {
-  const React = R(), [more, setMore] = React.useState(false);
+export function ThreadHeader({ thread, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn }) {
   const st = running ? ['running', T.acc] : state === 'waiting' ? ['waiting for you', T.pu] : null;
-  const controls = [h(ModelSelect, { key: 'm', models, value: model, onChange: onModel }), h(ModeSelect, { key: 'a', value: mode, onChange: onMode, bypass, judge })];
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, height: 44, padding: '0 12px', borderBottom: '1px solid ' + T.bd, background: T.bg, flex: 'none', minWidth: 0 } },
     onMenu ? h(Btn, { kind: 'ghost', sm: true, icon: 'menu', title: 'Chats', onClick: onMenu }) : null,
     h(Title, { title: thread?.title, onRename: thread ? onRename : null }),
     st ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: st[1], whiteSpace: 'nowrap', flex: 'none' } },
       h('span', { style: { width: 6, height: 6, borderRadius: 99, background: st[1], animation: running ? 'aichatpulse 1.2s ease-in-out infinite' : 'none' } }), narrow ? null : st[0]) : null,
     h('span', { style: { flex: 1 } }),
-    narrow ? h('span', { style: { position: 'relative', flex: 'none' } },
-      h(Btn, { kind: 'ghost', sm: true, icon: 'sliders', title: 'Model and mode', onClick: () => setMore(!more) }),
-      h(Popover, { open: more, onClose: () => setMore(false), width: 260, label: 'Model and mode' }, h('span', { style: label11 }, 'Model'), controls[0], h('span', { style: label11 }, 'Mode'), controls[1]))
-      : controls,
-    envChip || null,
     thread || meter ? h(ContextMeter, { meter, open: meterOpen, onOpen: () => setMeterOpen(true), onClose: () => setMeterOpen(false), onCompact: thread ? onCompact : null, compacts, running, compact: narrow }) : null,
     onLearn ? h(Btn, { kind: 'ghost', sm: true, icon: 'bulb', 'aria-pressed': learn ? 'true' : 'false',   // plan 21.7: this chat teaches the agent, or not
       title: learn ? 'Learning from this chat: your choices here become preferences. Click to stop.' : 'Not learning from this chat. Click to learn from it again.',

@@ -20,7 +20,8 @@ import { createChatClient } from './chat-api.js';
 import { ThreadList, Item, LIST_CSS } from './chat-list.js';
 import { GroupedChats, readView, saveView, loadEnvs } from './chat-groups.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
-import { EnvChip, decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
+import { decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
+import { ControlsRow, ModeMenu, ModelMenu, EnvMenu, CONTROLS_CSS } from './chat-controls.js';
 import { Composer } from './chat-composer.js';
 import { QUOTE_CSS } from './chat-quote.js';
 import { QuoteReplyBox, QREPLY_CSS, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
@@ -47,7 +48,7 @@ function injectCss() {
   if (typeof document === 'undefined' || document.getElementById('aichat-css')) return;
   installCopy();
   const s = document.createElement('style');
-  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + QUOTE_CSS + QREPLY_CSS + PAGE_CSS;
+  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + CONTROLS_CSS + QUOTE_CSS + QREPLY_CSS + PAGE_CSS;
   document.head.appendChild(s);
 }
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
@@ -273,8 +274,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       h('div', { onClick: () => setDrawer(false), 'aria-hidden': true, style: { position: 'absolute', inset: 0, zIndex: 40, background: T.ov } }),
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
     h('section', { 'aria-label': 'Chat', style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 } },
-      h(ThreadHeader, { thread, models, model: thread?.model || fresh.model || models?.default, mode: thread?.mode || fresh.mode, bypass: bypassAllowed(folders, events), judge, onModel: setModel, onMode: setMode,
-        envChip: h(EnvChip, { key: 'env', api, thread, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), narrow: (narrow ? width : width - 248) < 700 }),
+      h(ThreadHeader, { thread,
         onRename: title => rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
         learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,
         running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: narrow ? () => setDrawer(true) : null, narrow: (narrow ? width : width - 248) < 700 }),
@@ -294,7 +294,11 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
         dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
         settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quotes, setQuotes,
-        onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }) })),
+        onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
+        controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
+          env: h(EnvMenu, { api, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: loadEnvList }),
+          mode: h(ModeMenu, { value: thread?.mode || fresh.mode, onChange: setMode, bypass: bypassAllowed(folders, events), judge }),
+          model: h(ModelMenu, { models, value: thread?.model || fresh.model || models?.default, onChange: setModel }) }) })),
     h(QuoteReplyBox, { scrollRef, resetKey: dkey, onAdd: q => setQuotes(l => addQuote(l, q)) }));
 }
 

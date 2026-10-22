@@ -294,3 +294,35 @@ async def test_calls_ask_the_memory_triggers_to_make_room(th):
     th.hub.services.before_proxy.append(hook)
     r = await th.call("fake_tools_make_image", {"prompt": "x"}, mode="auto")
     assert r["status"] == "done" and seen == ["1"]
+
+
+async def test_dry_run_with_nothing_to_stand_in_makes_a_stub(th):
+    """With no real audio yet (a fresh install, or after the outputs were cleared), a dry run of a
+    speech tool writes a second of silence instead of failing."""
+    import wave
+
+    r = (await th.client.post("/api/tools/fake_tools_say/call?wait=10", json={"arguments": {"text": "pretend clip"}, "mode": "auto",
+                                                                             "origin": {"dry_run": True}})).json()
+    assert r["status"] == "done" and r["outputs"][0]["kind"] == "audio"
+    [wav] = (th.root / "outputs" / "eval").rglob("*.wav")
+    with wave.open(str(wav)) as w:
+        assert w.getnframes() == w.getframerate()
+
+
+def test_stand_in_stubs_and_links(tmp_path):
+    import os
+    import struct
+
+    from PIL import Image
+
+    from utils.tools import results
+
+    pic = Image.new("RGB", (64, 36))
+    glb = tmp_path / "m.glb"
+    assert results._stub("model3d", glb, pic)
+    magic, version, length = struct.unpack("<4sII", glb.read_bytes()[:12])
+    assert (magic, version, length) == (b"glTF", 2, glb.stat().st_size)
+    src, dst = tmp_path / "big.bin", tmp_path / "link.bin"
+    src.write_bytes(b"x" * 100)
+    results._link(src, dst)
+    assert os.stat(src).st_ino == os.stat(dst).st_ino        # a hard link: no second copy

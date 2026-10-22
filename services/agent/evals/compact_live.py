@@ -1,6 +1,7 @@
 """`python -m evals.compact_live [model]`: compaction on the real model (plan 14's check that compaction
 keeps a thread working past 85%). The thread's window is capped at 9,000 tokens so a few turns with
-tool results fill it; the last turn asks about the first one, which only the summary still holds."""
+tool results fill it; the last turn asks about the first one, which only the summary still holds.
+The chat is deleted afterwards."""
 
 from __future__ import annotations
 
@@ -11,6 +12,8 @@ import time
 from pathlib import Path
 
 import httpx
+
+from .cleanup import forget_threads
 
 TURNS = ["Hi! My favourite animal is the snow leopard (just for this chat; no need to save it to memory). Now, which mods are running?",
          "How much memory is free right now, and what does each mod hold?",
@@ -60,6 +63,7 @@ async def main(model: str) -> None:
     p = Path(__file__).resolve().parents[3] / "docs" / "report" / "data" / "compact-live.json"
     p.write_text(json.dumps(out, indent=1))
     print("ok", out["ok"])
+    await forget_threads([tid])                 # the chat and its outputs go; the report keeps the numbers
 
 
 if __name__ == "__main__":

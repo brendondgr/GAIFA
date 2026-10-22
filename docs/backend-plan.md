@@ -68,8 +68,8 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 30 | Auto mode: a small local judge, and a `decide` mod for decision models | M–L | Auto in the mode picker; judged calls with their reasons; the decide page |
 | 31 | The GPU queue: one generative GPU job at a time | L | the header's GPU section, the Overview widget, waiting rows in Chat and on mod pages |
 | 32 | The reply bar and Select → Reply | M | `chat`: Sources, Copy and thumbs under a reply; the Reply button on a selection, the quote chip and the quote on a message |
-| 34 | Environments: the folders a chat may use, and asking for more | M | the chat header's environment chip, the folder card, the Workspace page's Environments |
 | 33 | The sidebar: groups, a thin rail and service logos | M | the sidebar (groups, the rail, the Services menu), the Services page, a logo per mod |
+| 34 | Environments: the folders a chat may use, and asking for more | M | the chat header's environment chip, the folder card, the Workspace page's Environments |
 | 35 | Know the machine: hardware detection | M | the Hardware card in Settings → About |
 | 36 | Memory in pools: RAM and each GPU's VRAM | M–L | one memory bar per pool in the header and the Overview |
 | 37 | Running without systemd, Fedora or AMD | M | — |
@@ -1895,7 +1895,7 @@ Every tool attempt gets a complete record: which fields the hub filled, which yo
     - `utils/tests/core/test_db.py`'s version numbers move to 6.
   - **`utils/tools/edits.py`:** `edited(schema, proposed, final) -> list[field]` normalises booleans, empties and absent values against the schema default (see the gaps). It is written in `Calls.decide`.
   - **Metrics:** `utils/metrics/recorder.py` counts the bus `tool_call` events into `tools.calls.<mod>` and `tools.errors.<mod>` series.
-  - **Retention:** rows with `origin.dry_run` older than 30 days are pruned by the recorder's hourly maintenance loop; real rows are kept. The agent prunes its archived dry-run threads (`settings.dry_run`) on the same schedule (`store.prune_dry_runs(days)`, run hourly from its lifespan).
+  - **Retention:** rows with `origin.dry_run` older than 30 days are pruned by the recorder's hourly maintenance loop; real rows are kept. The agent prunes its archived dry-run threads (`settings.dry_run`) on the same schedule (`store.prune_dry_runs(days)`, run hourly from its lifespan). Since 2026-10-20 the harness deletes each run's threads and outputs when it ends (architecture §14.6), so the prune is only a backstop.
   *Done when:* `utils/tests/tools/test_records.py` covers a refused call's row, `filled` and `edited` (including the all-checkboxes case), `duration_ms`, and the dry-run prune; `services/agent/tests/test_store.py` covers the thread prune; architecture §13's retention table is updated.
   - *As built:*
     - **`utils/tools/records.py`** holds `prune_dry_runs` and `usage(db, since)` (per tool: calls, errors, refusals, cards, edited, denied, mean time; for 21.7).

@@ -194,6 +194,42 @@ def test_library_cases_grade_what_they_should():
     assert b"Saffron" not in station_report(1) and len(station_report(ANSWER_DOC)) > 40_000
 
 
+async def test_runs_leave_no_chats_behind(env, tmp_path):
+    """A run's chats are deleted when it ends (the grade reads the events it kept), with their turn
+    records; `keep` leaves them. Seeds a task's setup wrote go when the harness closes."""
+    from evals import cleanup
+
+    t = httpx.ASGITransport(app=env.app)
+    h = Harness("http://agent", "main", dry_run=True, transport=t)
+    env.model.queue({"text": "ok"})
+    run = await h.run(Task("c1", "single", ["hi"], []))
+    tid = run.extra["thread"]
+    assert run.events and (await h.c.get(f"/v1/threads/{tid}")).status_code == 404
+    assert env.agent.store._all("SELECT * FROM turns WHERE thread_id = ?", [tid]) == []
+    (tmp_path / "eval").mkdir()
+    seed = tmp_path / "eval" / "120000-seed.png"
+    seed.write_bytes(b"png")
+    seed.with_name(seed.name + ".json").write_text("{}")
+    cleanup.SEEDED.append(seed)
+    await h.close()
+    assert list((tmp_path / "eval").iterdir()) == [] and cleanup.SEEDED == []
+    kept = Harness("http://agent", "main", dry_run=True, transport=t, keep=True)
+    env.model.queue({"text": "ok"})
+    run = await kept.run(Task("c2", "single", ["hi"], []))
+    assert (await kept.c.get(f"/v1/threads/{run.extra['thread']}")).status_code == 200
+    await kept.close()
+
+
+def test_outputs_of_a_run_and_the_hub_behind_the_proxy():
+    from evals import cleanup
+
+    assert cleanup.hub_of("http://127.0.0.1:7000/api/s/agent/") == "http://127.0.0.1:7000"
+    assert cleanup.hub_of("http://agent") is None
+    evs = [{"type": "tool_result", "payload": {"outputs": [{"output_id": "a1"}, {"output_id": "a1"}, {"output_id": "b2"}]}},
+           {"type": "assistant", "payload": {"text": "#1"}}]
+    assert cleanup.output_ids(evs) == ["a1", "b2"]
+
+
 async def test_a_task_that_cant_run_here_is_skipped_not_failed(env):
     """Overnight 2026-10-21: tasks whose tools or workflows aren't offered (models removed) are skipped
     and kept out of the pass rates."""

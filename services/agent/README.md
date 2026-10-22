@@ -23,7 +23,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 | `ui/page.js` | The Learning page: Preferences, Review, Tool usage, Harness, Runs, Library |
 | `agent/hubapi.py` | AIHub over HTTP: tools, calls, approvals, outputs, skills, the event stream |
 | `agent/server.py` | The HTTP API (`create_app`) |
-| `evals/` | The eval (plan 13.5): `python -m evals.run --model skynet --runs 3` (`--live` for real outputs), `python -m evals.vision` |
+| `evals/` | The eval (plan 13.5): `python -m evals.run --model skynet --runs 3` (`--live` for real outputs; each run's chats and outputs are deleted afterwards unless `--keep`, `evals/cleanup.py`), `python -m evals.vision` |
 | `tests/` | `.venv/bin/python -m pytest`: a scripted model (`fakemodel.py`) and a stand-in hub (`fakehub.py`); no model or GPU needed |
 
 ## API (through the hub: `/api/s/agent/…`)

@@ -26,7 +26,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `bin/` | ✅ | `aihub` (bash wrapper → `utils/cli.py` with the hub venv) and `aihub.service.in` (unit template; `aihub install` fills in `@ROOT@`) |
 | `docs/` | ✅ | Design, plan, UI brief, this file, `reference/` UI exports |
 | `utils/` | ✅ | The hub's Python package (below) |
-| `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js`, `setup/env.md` (the setup doc a new mod starts from; docs/mods.md §9) |
+| `services/` | ✅ | One folder per mod. `_template/` is the mod `aihub new` copies: `service.toml`, `server.py` (FastAPI: health, status, hello, echo, note → outputs, a widget route), `requirements.txt`, `install.sh`, `README.md` (the contract on one page), `ui/page.js`, `setup/env.md` (the setup doc a new mod starts from; docs/mods.md §9), and two helpers mods copy unchanged: `gpu_slot.py` (plan 31.2) and `containers.py` (plan 37.4: the GPU flags for a container per vendor and runtime) |
 | `data/` | ✅ | Models, databases, logs, runtime state and the agent's files (below) |
 | `outputs/` | 🧱 | `<mod>/<YYYY-MM-DD>/…` (+ `.trash/`), ignored by git; indexed into `hub.db` |
 | `web/` | ✅ | The UI (below) |

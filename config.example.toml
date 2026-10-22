@@ -38,6 +38,9 @@ idle_unload_s = 600
 # On a machine with more than one GPU, `gpu = <index>` (as `aihub hardware` numbers them) pins a mod to one;
 # the default, "auto", starts it on the freest card (plan 36.3).
 
+[containers]
+runtime = "auto"            # the runtime mods run their containers with: auto (podman if installed, else docker), podman, docker
+
 [docs]
 regenerate = false          # true keeps this machine's model inventory (data/state/setup/models/, local) current as the registry changes
 

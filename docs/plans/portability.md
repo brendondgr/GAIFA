@@ -245,7 +245,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Fixes:** NVIDIA's driver fix is the distribution's package, or "update it on Windows" under WSL.
     - **Tests:** `test_cli_setup.py`'s fake probe answers this machine's recording, so the tests don't depend on where they run. `test_setup_host.py` (8). On this machine `aihub setup host` prints the same nine checks as before.
 
-- [ ] **37.4 The GPU in containers: `services/_template/containers.py`.**
+- [x] **37.4 The GPU in containers: `services/_template/containers.py`.**
   - A mod-side helper, copied into mods the way `gpu_slot.py` is. `gpu_args(machine, runtime)` returns the GPU flags:
     - **AMD:** `--device /dev/kfd --device /dev/dri --group-add keep-groups`.
     - **NVIDIA:** `--device nvidia.com/gpu=all` (podman CDI) or `--gpus all` (docker).
@@ -255,6 +255,10 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - **The runtime:** `[containers] runtime = "auto" | "podman" | "docker"`, passed to mods as `AIHUB_CONTAINER_RUNTIME`.
   - **Docs:** `docs/mods.md`, architecture §4.4.
   *Done when:* `services/_template/tests/test_containers.py` gives the right flags for every fixture and both runtimes.
+  - *As built:*
+    - **The helper:** standard library only (`hardware()` uses urllib). It narrows to the hub's `AIHUB_GPU_INDEX` (NVIDIA's CDI device `nvidia.com/gpu=<n>`, docker's `--gpus device=<n>`). Docker gets the `video` and `render` groups, since it has no `keep-groups`. NVIDIA under WSL2 goes through CDI; WSL's AMD and Intel go through `/dev/dxg`.
+    - **The runtime:** `[containers] runtime` is resolved by `launch_spec` into `AIHUB_CONTAINER_RUNTIME`.
+    - **Where the tests live:** `utils/tests/services/test_containers_helper.py` (6), not under `_template/`, so `aihub new` doesn't copy them.
 
 - [ ] **37.5 CI: `.github/workflows/tests.yml`.**
   - `uv run pytest` runs on `ubuntu-latest` and `macos-latest`, with the `linux` and `systemd` tests skipped on macOS. The Node tests use plain `node`.

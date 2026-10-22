@@ -283,6 +283,12 @@ class DocsCfg(_Strict):
 
 
 
+class ContainersCfg(_Strict):
+    """`[containers]` (plan 37.4): the runtime mods run their engines' containers with."""
+
+    runtime: Literal["auto", "podman", "docker"] = "auto"   # auto: podman if installed, else docker
+
+
 class Config(_Strict):
     hub: HubCfg = HubCfg()
     paths: PathsCfg = PathsCfg()
@@ -297,6 +303,7 @@ class Config(_Strict):
     docs: DocsCfg = DocsCfg()
     outputs: OutputsCfg = OutputsCfg()
     gpu: GpuCfg = GpuCfg()
+    containers: ContainersCfg = ContainersCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

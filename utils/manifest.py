@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import shlex
 import tomllib
 from dataclasses import dataclass, field
@@ -641,6 +642,11 @@ def launch_spec(mod: Mod, cfg: Config, paths: Paths, hub_port: int, gpu_index: i
     if m.gpu:  # plan 31.2: the defaults the mod's gpu_slot client reads
         env["AIHUB_GPU_CLASS"] = m.gpu.cls
         env["AIHUB_GPU_GROUP"] = m.gpu.group or mod.id
+    rt = cfg.containers.runtime        # plan 37.4: the runtime a mod's containers use (services/_template/containers.py)
+    if rt == "auto":
+        rt = "podman" if shutil.which("podman") else "docker" if shutil.which("docker") else ""
+    if rt:
+        env["AIHUB_CONTAINER_RUNTIME"] = rt
     pin = gpu_pin(mod.id, cfg)
     index = pin if isinstance(pin, int) and not isinstance(pin, bool) else gpu_index
     if index is not None:          # plan 36.3: only on machines with more than one GPU to choose from

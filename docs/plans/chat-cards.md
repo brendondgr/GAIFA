@@ -63,10 +63,11 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **Theme tokens only** (`T`), so both themes work; `prefers-reduced-motion` turns the shimmer and the fades off.
   *Done when:* `utils/tests/web/live-kit.test.mjs` (the wait text from a note, the chips from `stages`, a new `seq` fetches once, reduced motion), and the prototype's look reproduced in `?mock` (44.4).
   *As built:* in Chat, live cards sit under the activity fold (`web/chat/chat-live.js` `LiveCards`, drawn by `ActivityFold`), running or done; a tool with a `live:<tool>` card keeps its outputs out of the strip (`shownLive`); a running tool without one shows `LivePreview` while its job reports a frame. Checked in `?mock` in the built-in browser.
-- [ ] **44.5 Running jobs preview everywhere: `web/dashboard.js`, `web/mod-kit.js`.**
+- [x] **44.5 Running jobs preview everywhere: `web/dashboard.js`, `web/mod-kit.js`.**
   - **The Overview's Jobs** list shows a `LiveThumb` for a running job with a preview, its step and time left; the thumbnail links to the job's route.
   - **Page modules** get `ctx.live` (the kit) and the mod's own running jobs with their `live`, so a mod page draws the same previews for runs started there.
   *Done when:* `utils/tests/web/dashboard-jobs.test.mjs` (a job with a preview, one without) and the mock's comfy job shows a thumbnail on the Overview.
+  *As built:* page modules import `/live-kit.js` themselves (as they import `/mod-kit.js`) and draw it with `mountReact`, so `ctx` is unchanged; the Overview's Jobs shows a `LiveThumb` and the job's step (`jobStatusText`); the mock's 3D jobs carry `live`.
 - [x] **44.4 The template, the mock and the docs: `services/_template/ui/chat.js`, `web/chat/chat-mock.js`, `docs/mods.md`.**
   - **The template** ships a small commented `ui/chat.js` (one step card using `chat.live`) and `[ui] chat` commented out in its `service.toml`.
   - **The mock** (`?mock`) plays a job with `live` (queued → loading → steps with preview frames from a bundled small image → done), so the frame is checkable without a GPU.

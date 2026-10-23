@@ -7,6 +7,7 @@ import { AreaChart, LineChart, BarChart, HBarChart, Donut, Heatmap, Timeline, Kp
 import { useData, pollFor, chartState, Card, MemoryChart, StorageChart, svcColor, KIND_COLOR, KIND_LABEL } from './views.js';
 import { GpuQueueW, jobGpuText } from './gpu-queue.js';
 import { PoolBars } from './mem-pools.js';
+import { LiveThumb } from './live-kit.js';
 
 const R = () => globalThis.React;
 const RANGES = ['1h', '6h', '24h', '7d', '30d'];
@@ -99,15 +100,24 @@ function ModW({ ctx, info, range, table }) {
   return h(Comp, { t: w.t, categories: w.t ? undefined : w.categories, series, unit, height: 150, label, table });
 }
 
+/** A running job's words on the Overview: GPU wait, queued, its step (plan 44.5), its percent, or running. */
+export function jobStatusText(j) {
+  if (j.stage === 'waiting_gpu') return 'GPU wait';
+  if (j.state === 'queued') return 'queued';
+  if (j.live?.step != null && j.live?.steps) return `${Math.min(j.live.step, j.live.steps)}/${j.live.steps}`;
+  return j.progress != null ? Math.round(j.progress * 100) + '%' : 'running';
+}
+
 function JobsW({ ctx, range, table }) {
   const d = useData(() => ctx.api.getJobStats({ range }), [ctx.api, range], 120000);
   const now = ctx.jobs.filter(j => j.state === 'running' || j.state === 'queued');
   const name = id => ctx.services.find(s => s.id === id)?.name || id;
   const live = h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
     now.length ? now.slice(0, 3).map(j => h('a', { key: j.id, href: j.route || '#/s/' + j.service, style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--tx,#E6EAF2)', minWidth: 0 } },
+      j.live?.preview ? h(LiveThumb, { live: j.live, size: 30 }) : null,    // plan 44.5: any job's preview, whoever started it
       h('span', { title: jobGpuText(j, name) || undefined, style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, j.label),
       h('span', { style: { width: 60, height: 5, borderRadius: 9, background: 'var(--row,#1A2130)', overflow: 'hidden', display: 'block', flex: 'none' } }, h('span', { style: { display: 'block', height: '100%', width: (j.progress || 0) * 100 + '%', background: TONE.accent } })),
-      h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: MUT, width: 48, textAlign: 'right' } }, j.stage === 'waiting_gpu' ? 'GPU wait' : j.state === 'queued' ? 'queued' : j.progress != null ? Math.round(j.progress * 100) + '%' : 'running')))
+      h('span', { style: { fontFamily: MONO, fontSize: 10.5, color: MUT, width: 48, textAlign: 'right' } }, jobStatusText(j))))
       : h('div', { style: { fontSize: 11.5, color: MUT } }, 'No jobs running'));
   let chart;
   if (d.state !== 'ok') chart = h(HBarChart, { ...chartState(d), height: 90 });

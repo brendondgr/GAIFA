@@ -486,7 +486,10 @@ export function createMockApi() {
           return;
         }
         const st = stages[Math.floor(i / 5)]; if (st !== job.stage) { job.stage = st; log('gen3d', `job ${id}: stage ${st}`); }
-        job.progress = i / 20; job.label = `3D: ${prompt} — ${st}`; emit({ type: 'job', job: clone(job) }); i++; later(1000, step);
+        job.progress = i / 20; job.label = `3D: ${prompt} — ${st}`;
+        job.live = { stage: st, eta_s: 20 - i, stages: stages.map((x, k) => ({ id: x, label: x[0].toUpperCase() + x.slice(1), state: k < Math.floor(i / 5) ? 'done' : k === Math.floor(i / 5) ? 'running' : 'waiting' })),
+          preview: { url: '/chat/mock-live/final.jpg', seq: 1, w: 480, h: 360 } };   // plan 44.5: the Overview's thumbnail
+        emit({ type: 'job', job: clone(job) }); i++; later(1000, step);
       };
       later(s.load === 'loaded' ? 300 : 4000, step);
     };

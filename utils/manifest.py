@@ -280,6 +280,7 @@ class ToolSpec(_Strict):
     core: bool = False            # always loaded in the chat (plan 14.6)
     hide: list[str] = []          # parameters the agent doesn't see (the mod's default applies)
     fixed: dict[str, Any] = {}    # values always sent, hidden from the agent (e.g. stream = false)
+    view: dict[str, Any] | None = None   # plan 46.1: how its result draws in Chat (utils/tools/views.py)
     job: bool = False             # the call returns a job id; the agent API waits for the job (plan 13.2)
     job_status: Op | None = None  # "GET /v1/jobs/{id}": `{id}` (or any one placeholder) is the job id
     job_cancel: Op | None = None

@@ -32,6 +32,7 @@ class Tool(ToolIndexItem):
     job: bool
     source: Literal["manifest", "tools_source", "hub"]
     grant_key: str | None = None
+    view: dict[str, Any] | None = Field(None, description="Plan 46.1: how its result draws in Chat: {kind: table|bar|hbar|line|area|donut, rows, columns? | x, y}")
 
 
 class ToolOutput(_Model):

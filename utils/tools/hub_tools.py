@@ -162,8 +162,8 @@ async def list_preferences(hub: Hub, args: dict[str, Any]) -> Any:
 
 
 def tools() -> list[ToolDef]:
-    def t(name: str, desc: str, params: dict[str, Any], fn: Any, risk: str = "read", cap: int | None = None) -> ToolDef:
-        return ToolDef(f"hub_{name}", None, name, desc, params, risk=risk, core=True, source="hub", handler=fn, cap_bytes=cap)
+    def t(name: str, desc: str, params: dict[str, Any], fn: Any, risk: str = "read", cap: int | None = None, view: Any = None) -> ToolDef:
+        return ToolDef(f"hub_{name}", None, name, desc, params, risk=risk, core=True, source="hub", handler=fn, cap_bytes=cap, view=view)
 
     kinds = {"type": "string", "enum": list(KINDS)}
     return [
@@ -185,10 +185,14 @@ def tools() -> list[ToolDef]:
           for name, desc, props, fn in doc_tools.specs()),
         t("list_models", "The models on disk (registry): kind, size, status and which mods use them.",
           _obj({"kind": {"type": "string"}, "q": {"type": "string"},
-                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 30}}), list_models),
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 30}}), list_models,
+          view={"kind": "table", "rows": "models", "columns": [{"key": "name", "label": "Model"}, {"key": "kind", "label": "Kind"},
+                {"key": "size_gb", "label": "GB"}, {"key": "status", "label": "Status"}, {"key": "used_by", "label": "Used by", "format": "list"}]}),
         t("save_session", "Save what runs and what's loaded now as a named session (e.g. 'LLM work').",
           _obj({"name": {"type": "string"}}, ["name"]), save_session, "write"),
-        t("list_sessions", "The saved sessions (named setups) with what each has running and loaded.", _obj({}), list_sessions),
+        t("list_sessions", "The saved sessions (named setups) with what each has running and loaded.", _obj({}), list_sessions,
+          view={"kind": "table", "rows": "sessions", "columns": [{"key": "name", "label": "Session"}, {"key": "summary", "label": "What it has"},
+                {"key": "saved", "label": "Saved", "format": "time"}]}),
         t("restore_session", "Switch to a saved session: stops, unloads, starts and loads mods to match it (through the "
           "memory manager). dry_run shows the steps only.",
           _obj({"name": {"type": "string", "description": "The session's name or id"}, "dry_run": {"type": "boolean", "default": False}},

@@ -12,6 +12,7 @@ import { h } from './chat-ui.js';
 import { Card, hasCard } from './chat-cards.js';
 import * as kit from '../live-kit.js';
 import { FixCards } from './chat-fix.js';
+import { viewOf, ViewCard } from './chat-view.js';
 
 const R = () => globalThis.React;
 
@@ -21,10 +22,13 @@ const ran = r => r.status === 'running' || r.status === 'done'
   || ((r.status === 'error' || r.status === 'failed') && !NEVER_RAN.has(r.item?.result?.error?.code) && r.item?.result?.status !== 'denied'
       && !r.item?.result?.error?.fixes?.length && !r.item?.result?.error?.log?.length);   // a fix-it card stands in for it
 
-/** The tool rows of a turn that draw a live card: [{row, own}] (own: the tool registered `live:<name>`). */
-export function liveRows(turn) {
+/** The tool rows of a turn that draw a live card: [{row, own, view?}] (own: the tool registered `live:<name>`;
+ *  view: the tool declares a default view, plan 46.1, drawn once it's done). */
+export function liveRows(turn, tools = null) {
   return (turn.steps || []).flatMap(s => s.rows).filter(r => r.type === 'tool' && ran(r)).flatMap(r => {
     if (hasCard('live:' + r.name)) return [{ row: r, own: true }];
+    const view = viewOf(tools, r.name);
+    if (view && r.status === 'done') return [{ row: r, own: false, view }];
     if (r.status === 'running' && r.progress?.live?.preview) return [{ row: r, own: false }];
     return [];
   });
@@ -38,10 +42,11 @@ function outputsOf(row, ctx) {
 }
 
 export function LiveCards({ turn, ctx }) {
-  const rows = liveRows(turn), fix = h(FixCards, { key: 'fixes', turn, ctx });      // plan 46.5: failed steps' fixes
+  const rows = liveRows(turn, ctx.tools), fix = h(FixCards, { key: 'fixes', turn, ctx });      // plan 46.5: failed steps' fixes
   if (!rows.length) return fix;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 } }, fix,
-    rows.map(({ row, own }) => {
+    rows.map(({ row, own, view }) => {
+      if (view) return h(ViewCard, { key: row.key, row, view, ctx });                   // plan 46.1: a tool's default view
       const live = row.progress?.live || null, note = row.progress?.note || null;
       if (!own) return h(kit.LivePreview, { key: row.key, live, note, title: 'Working', pct: row.progress?.progress });
       const item = { ...row.item, kind: 'live', key: 'live:' + row.key };

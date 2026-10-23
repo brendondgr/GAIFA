@@ -41,7 +41,7 @@ idle_unload_s = 0                   # a reload takes minutes; unload by hand
 class = "interactive"
 
 [tools]
-list_profiles = { op = "GET /v1/profiles", description = "vLLM's model profiles: model, memory, context, whether downloaded, and which is loaded" }
+list_profiles = { op = "GET /v1/profiles", view = { kind = "table", rows = "profiles", columns = [{ key = "id", label = "Profile" }, { key = "model", label = "Model" }, { key = "memory_gb", label = "Memory (GB)" }, { key = "max_model_len", label = "Context" }] }, description = "vLLM's model profiles: model, memory, context, whether downloaded, and which is loaded" }
 engine_status = { op = "GET /v1/engine", description = "The vLLM engine: state (unloaded, starting with its stage, ready, failed), the loaded profile, its endpoint and relay alias" }
 load_llm = { op = "POST /v1/load", risk = "write", ask = ["profile"], fixed = { wait = false }, hide = ["make_room"], description = "Start vLLM with a profile (stops the running one first). Returns at once; a start takes 1–5 minutes (longer when it downloads), so check engine_status until it is ready." }
 unload_llm = { op = "POST /v1/unload", confirm = true, description = "Stop vLLM and free its memory" }

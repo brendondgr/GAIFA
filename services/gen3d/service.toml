@@ -79,7 +79,7 @@ make_3d = { op = "POST /v1/jobs", risk = "generate", ask = ["engine", "preset", 
 - Fewer polygons: set target_faces in the engine's group, e.g. {"trellis2": {"target_faces": 50000}} (0 keeps the raw mesh, which can be millions of faces).
 Stages: shape (the mesh), then optional parts, rig, preview. `parent_id` continues from an earlier job's mesh.""", examples = [{ prompt = "a low-poly red fox sitting", stages = ["shape", "preview"], preset = "fast" }, { engine = "trellis2", image = "output:<id of a picture>", stages = ["shape", "preview"] }] }
 job_status = { op = "GET /v1/jobs/{jid}", description = "One job's state, stages, ETA and files" }
-list_jobs = { op = "GET /v1/jobs", description = "Recent jobs, newest first" }
+list_jobs = { op = "GET /v1/jobs", view = { kind = "table", rows = "jobs", columns = [{ key = "title", label = "Job" }, { key = "request.engine", label = "Engine" }, { key = "status", label = "State" }, { key = "created", label = "Made", format = "time" }] }, description = "Recent jobs, newest first" }
 cancel_job = { op = "POST /v1/jobs/{jid}/cancel", description = "Cancel a queued or running job", confirm = true }
 delete_job = { op = "DELETE /v1/jobs/{jid}", description = "Delete a job and its files (permanent)", confirm = true }
 

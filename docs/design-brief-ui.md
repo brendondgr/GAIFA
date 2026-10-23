@@ -1116,7 +1116,9 @@ interface Tool extends ToolIndexItem { description: string;
                           grant_key?: string;                       // "url:host" | "arg:<name>" | "const:<x>" (plan 25.2)
                           parameters: JSONSchema;                   // one flat object; file inputs carry "x-kind": image|video|audio|mesh|file
                           ask: string[];                            // inputs the user chooses: editable on the parameter card
-                          examples: object[]; job: boolean; source: "manifest" | "tools_source" | "hub" }
+                          examples: object[]; job: boolean; source: "manifest" | "tools_source" | "hub";
+                          view?: { kind: "table" | "bar" | "hbar" | "line" | "area" | "donut"; rows: string; columns?: { key: string; label: string; format?: string }[];
+                                   x?: string; y?: string[]; unit?: string; title?: string } }   // plan 46.1: its result's default view in Chat
 interface ToolOutput { output_id: string; ref: string;              // "output:<id>": what file inputs take
                        kind: string; title: string; url: string; preview?: string; summary: string; prompt?: string }
 interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "done" | "error" | "cancelled";

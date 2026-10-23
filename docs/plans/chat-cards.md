@@ -126,11 +126,12 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 
 ## Phase 46 — Status cards and fix-it cards
 
-- [ ] **46.1 Default views for tools: `utils/manifest.py` (`ToolSpec.view`), `utils/tools/` (the catalog), `web/chat/chat-view.js` (new).**
+- [x] **46.1 Default views for tools: `utils/manifest.py` (`ToolSpec.view`), `utils/tools/` (the catalog), `web/chat/chat-view.js` (new).**
   - **`view`** on a tool says how its result draws when no card is registered: `{kind = "table", rows = "jobs", columns = ["label", "state", "seconds"]}`, or a chart (`kind = "bar" | "line" | …`, `x`, `y`, `rows`), using `show`'s view names and column rules (47.1). Tools listed at runtime (`tools_source`) may carry it too. Invalid views fail `aihub check`.
   - **The card** draws with 47.2's table and chart parts; the raw JSON stays one click away.
   - **Declared at first:** `gen3d_list_jobs`, `stt_list_models`, `hub_list_models`, `lcpp_list_llms`, `vllm_list_profiles`, `relay_relay_stats`, `searxng_engines`, `hub_list_sessions`.
   *Done when:* `utils/tests/tools/test_tool_view.py` (validation, carried in the catalog) and `utils/tests/web/chat-view.test.mjs`. 46.1 lands after 47.2 if 47 is built first; otherwise 47.2's parts are built here.
+  *As built:* `utils/tools/views.py` checks a view (kinds table, bar, hbar, line, area, donut; dotted `rows` and column keys; formats time, bytes, seconds, gb, list, yesno); `ToolDef.view` comes from the manifest, a `tools_source` item or a hub tool, is kept with a stopped mod's tools, and is in `/api/tools` (`Tool.view`). With `?view=model` the description adds "the user sees its result as a table…". In Chat a done step of such a tool draws `web/chat/chat-view.js`'s card under the fold, reading a result over 8 KB whole from `GET /api/tools/calls/{id}/result`. Views declared: gen3d's jobs, stt's models, lcpp's catalog, SearXNG's engines, vLLM's profiles, the hub's models and sessions (`relay_relay_stats` has none: its stats aren't one list). Checked live: "List my 3D jobs" drew all 25 jobs as a table.
 - [x] **46.2 New hub tools: `utils/tools/hub_tools.py`, `web/chat/chat-composer.js`.**
   - **`hub_gpu_status`** (`GET /api/gpu`: the holder, the queue, each wait's time), **`hub_doctor`** (`GET /api/doctor`), **`hub_free_gpu({services?})`** (unloads as in the gaps; the result lists what was freed and how much).
   - **`/clear-gpu [service…]`:** one built-in slash command (the user's maybe) that runs `hub_free_gpu` as a user call.

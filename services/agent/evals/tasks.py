@@ -364,6 +364,16 @@ def show_view(view: str):
     return (f"show as {view}", lambda r: (any(a.get("view") == view for a in r.final_args("show")), str([a.get("view") for a in r.final_args("show")])))
 
 
+def table_shown(view_tool: str):
+    """A table is drawn: by `show`, or by a tool whose default view is a table (plan 46.1)."""
+    return ("a table is shown", lambda r: (any(a.get("view") == "table" for a in r.final_args("show")) or bool(r.final_args(view_tool)), ""))
+
+
+def no_markdown_table():
+    """The reply doesn't repeat a drawn table as a markdown table."""
+    return ("no markdown table in the reply", lambda r: (not re.search(r"(?m)^\s*\|.*\|\s*$\n^\s*\|?\s*:?-{3,}", r.final()), r.final()[:120]))
+
+
 def show_from_file(x: str, y: str, values: list[float]):
     """`show` drew the attached file's numbers: by its columns, or copied exactly (a short file is in the message)."""
     def c(r: Run):
@@ -545,7 +555,7 @@ TASKS: list[Task] = [
          attach=upload_files(lambda: [("weekly-renders.csv", b"day,images,videos\nMon,4,1\nTue,6,2\nWed,3,0\nThu,8,1\nFri,5,3\n")]),
          note="plan 47.4: a file's numbers by its columns, not copied"),
     Task("show_jobs_table", "capability", ["Show my 3D jobs as a table: name, engine and state."],
-         [used_any("gen3d_list_jobs", "gen3d_job_status"), show_view("table")]),
+         [used_any("gen3d_list_jobs", "gen3d_job_status"), table_shown("gen3d_list_jobs")]),
     Task("show_memory_day", "capability", ["Show me how memory was used over the last day, as a chart."],
          [show_hub("memory"), not_called("hub_free_gpu")]),
     Task("show_picture_inline", "capability", ["Make an image of a red kite over a hill.", "Write a one-line caption for it and put the picture in your reply."],

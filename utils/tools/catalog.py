@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable
 
 from utils import operations
-from utils.tools import options
+from utils.tools import options, views
 from utils.tools.grants import GRANT_KEY
 from utils.tools.grants import problems as grant_problems
 from utils.tools.schema import Route, clean, flatten, mark_files
@@ -64,6 +64,7 @@ class ToolDef:
     grant_key: str | None = None     # plan 25.2: what "allow in this chat" covers (utils/tools/grants.py)
     mod_dry_run: bool = False        # plan 26.2: in a dry run the call still goes to the mod, which answers it itself
     limits: str | None = None        # plan 27.4: the mod's preflight op ("POST /v1/limits"), asked before deciding
+    view: dict[str, Any] | None = None  # plan 46.1: how its result draws in Chat (utils/tools/views.py)
 
     def public(self, full: bool = True, view: str = "full") -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "mod": self.mod or "hub", "risk": self.risk, "core": self.core,
@@ -72,10 +73,16 @@ class ToolDef:
             out["why"] = self.why
         if full:
             params = options.for_model(self.parameters) if view == "model" else self.parameters
-            out.update({"description": self.description, "parameters": params, "ask": self.ask,
+            desc = self.description
+            if view == "model" and self.view:          # plan 46.1: the chat already draws the result
+                shown = "a table" if self.view["kind"] == "table" else "a chart"
+                desc += f"\nThe user sees its result as {shown} in the chat: sum it up in a sentence or two; don't repeat it as a table."
+            out.update({"description": desc, "parameters": params, "ask": self.ask,
                         "examples": self.examples, "job": self.job is not None, "source": self.source})
             if self.grant_key:
                 out["grant_key"] = self.grant_key
+            if self.view:
+                out["view"] = self.view
         return out
 
     def function(self) -> dict[str, Any]:
@@ -213,10 +220,12 @@ class Catalog:
             if job:
                 desc += "\nRuns as a job: the call returns when it has finished, with its outputs."
             problems += grant_problems(spec.grant_key, params)
+            view, vp = views.check(spec.view)
+            problems += vp
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=list(spec.examples), core=spec.core, route=route, response=op["response"],
                                job=job, problems=problems, grant_key=spec.grant_key, mod_dry_run=spec.dry_run,
-                               cap_bytes=spec.cap_kb * 1024 if spec.cap_kb else None))
+                               cap_bytes=spec.cap_kb * 1024 if spec.cap_kb else None, view=view))
         if svc.m.agent.tools_source:
             out += await self._source(svc)
         for t in out:
@@ -250,10 +259,11 @@ class Catalog:
                 desc += "\nRuns as a job: the call returns when it has finished, with its outputs."
             ask = [a for a in it.get("ask") or [] if a in params.get("properties", {})]
             gk = it.get("grant_key") if isinstance(it.get("grant_key"), str) and GRANT_KEY.match(it["grant_key"]) else None
+            view, vp = views.check(it.get("view"))
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=[e for e in it.get("examples") or [] if isinstance(e, dict)],
                                core=bool(it.get("core")), source="tools_source", route=route, job=job,
-                               problems=grant_problems(gk, params), grant_key=gk))
+                               problems=grant_problems(gk, params) + vp, grant_key=gk, view=view))
         return out
 
     # ---- persistence (a stopped mod keeps its tools listed) ----------------------------------
@@ -286,14 +296,15 @@ class Catalog:
                                    core=bool(r.get("core")), source=r.get("source", "manifest"), route=route,
                                    response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key"),
                                    mod_dry_run=bool(r.get("mod_dry_run")),
-                                   cap_bytes=r.get("cap_bytes"), limits=svc.m.agent.limits if svc.m else r.get("limits")))
+                                   cap_bytes=r.get("cap_bytes"), limits=svc.m.agent.limits if svc.m else r.get("limits"), view=r.get("view")))
             return out
         assert svc.m
         return [ToolDef(tool_name(svc.id, n), svc.id, n, s.description or s.op, {"type": "object"},
                         risk=s.risk or default_risk(s.op.split(" ", 1)[0], s.confirm), ask=list(s.ask),
                         examples=list(s.examples), core=s.core,
                         job=_job_ops(s.job_status, s.job_cancel) if s.job else None, grant_key=s.grant_key,
-                        mod_dry_run=s.dry_run, cap_bytes=s.cap_kb * 1024 if s.cap_kb else None, limits=svc.m.agent.limits)
+                        mod_dry_run=s.dry_run, cap_bytes=s.cap_kb * 1024 if s.cap_kb else None, limits=svc.m.agent.limits,
+                        view=views.check(s.view)[0])
                 for n, s in svc.m.tools.items()]
 
     # ---- lookups -----------------------------------------------------------------------------

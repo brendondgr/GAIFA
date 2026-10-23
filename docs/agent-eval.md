@@ -364,7 +364,7 @@ Four tasks (capability), skynet, dry run, against the installed hub:
 | `show_memory_day` | 3/3 | `show` from `hub:memory` over 24 h at once |
 | `show_picture_inline` | 3/3 | the reply wrote `![caption](#1)` under its caption |
 | `show_csv_chart` | 3/3 (after two fixes) | the 5-row CSV is in the message, so the model copies its numbers inline (right ones) and once sent `x` as JSON text; `show` now reads such lists, and the check accepts the file's numbers inline or by its columns. Its first try with the file named no columns: the error listed them and the next call used them |
-| `show_jobs_table` | 0/3 → see 46.1 | the model wrote a markdown table after `gen3d_list_jobs` despite the prompt; 46.1 gives that tool a default table view, so the list draws as a table either way |
+| `show_jobs_table` | 0/3, then 3/3 with 46.1 | the model writes its own markdown table after `gen3d_list_jobs` rather than calling `show`; with 46.1 the tool's default view draws the whole list as a table (its result is over 8 KB, so the card reads it from the hub), and the check is that a table is shown. Asked "as a table", the model still adds its own markdown table under it (cosmetic), though the tool's description now says the user already sees one |
 
 ## Gate
 

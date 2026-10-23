@@ -37,7 +37,7 @@ export default function setup(chat) {
   const { h } = chat.ui, kit = chat.live, { ActionBar, nameOf } = chat.parts || {};
 
   function MediaCard({ ctx, video }) {
-    const { row, live, note, status, outputs } = ctx.live;
+    const { row, live, note, status, outputs } = ctx.liveCard;
     const args = row.item.call?.arguments || {}, out = outputs[0];
     const st = cardState(row.name, status, live, row.seconds, kit);
     const outAspect = out?.width > 0 && out?.height > 0 ? out.width / out.height : null;

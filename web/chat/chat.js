@@ -30,7 +30,7 @@ import { QuoteReplyBox, QREPLY_CSS, addQuote, draftQuotes, quotesPayload, messag
 import * as chatUi from './chat-ui.js';
 import { registerCard } from './chat-cards.js';
 import { registerAction } from './chat-actions.js';
-import { registerPreview, ActionBar } from './chat-results.js';
+import { registerPreview, ActionBar, Model3DPreview } from './chat-results.js';
 import { registerStep, nameOf } from './chat-steps.js';
 import { loadChatModules } from './chat-mods.js';
 import * as liveKit from '../live-kit.js';
@@ -62,7 +62,7 @@ function injectCss() {
 }
 /** What a mod's chat module gets (plan 44.1). */
 export function chatModuleApi(api) {
-  return { registerCard, registerPreview, registerAction, registerStep, ui: chatUi, api, live: liveKit, parts: { ActionBar, nameOf } };
+  return { registerCard, registerPreview, registerAction, registerStep, ui: chatUi, api, live: liveKit, parts: { ActionBar, nameOf, Model3DPreview } };
 }
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
 

@@ -16,6 +16,7 @@ import logging
 import time
 from pathlib import Path
 
+from .live import live_of
 from .config import settings
 from .engines import ENGINES
 from .eta import Estimator, substages
@@ -364,6 +365,9 @@ class Runner:
         out = {k: v for k, v in job.items()}
         out["files"] = files
         out["eta"] = sched.get(job["id"])
+        lv = live_of(job, sched.get(job["id"]), jdir)          # plan 45.3: stages, time left, the cut-out, the views
+        if lv:
+            out["live"] = lv
         w = self.gpu_wait.get(job["id"]) if job.get("status") == "queued" else None
         if w is not None:                                   # plan 31.3: what runs on the GPU before it
             out.update(stage="waiting_gpu", ahead=w["ahead"], eta_s=w["eta_s"])

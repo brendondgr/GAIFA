@@ -15,11 +15,11 @@ export default function setup(chat) {
 
   // While it runs: the job's live progress (stage, step, a preview frame); when done: what it made.
   chat.registerCard('live:_template_hello', ({ ctx }) => {
-    const { live, status, outputs } = ctx.live;
+    const { live, status, outputs } = ctx.liveCard;
     const done = status === 'done';
     return h(kit.LiveCard, { icon: 'job', title: done ? 'Said hello' : 'Saying hello', meta: kit.metaText(live, status), pct: done ? 1 : (live?.step || 0) / (live?.steps || 1), done },
       h(kit.Stage, { aspect: kit.aspectOf(live, 16 / 9), max: 200 },
         h(kit.PreviewLayers, { src: kit.previewSrc(live), final: done ? outputs[0]?.url : null }),
-        done ? null : h(kit.Waiting, { ...(kit.waitInfo(live, ctx.live.note) || {}), quiet: !!live?.preview })));
+        done ? null : h(kit.Waiting, { ...(kit.waitInfo(live, ctx.liveCard.note) || {}), quiet: !!live?.preview })));
   });
 }

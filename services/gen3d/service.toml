@@ -51,6 +51,7 @@ kinds = ["model3d"]
 
 [ui]
 page = "ui/page.js"
+chat = "ui/chat.js"                 # the live 3D card in Chat (plan 45.3)
 native = "/ui/"
 
 [[ui.widgets]]

@@ -1,8 +1,9 @@
 // Live cards in Chat (plan 44.3): under a turn's activity fold, each tool step that has a live card shows it, running
 // or done; a running step of a tool without one shows the kit's generic preview while its job reports a frame.
 //
-//   registerCard('live:comfy_generate_image', ({ row, item, live, note, status, outputs, ctx, kit }) => …)
+//   registerCard('live:comfy_generate_image', ({ item, ctx }) => …)
 //
+// The card's ctx.liveCard = { row, live, note, status, outputs, kit } (ctx.live stays "connected to the live hub"):
 // `live` is the job's live progress (plan 44.2), `note` the GPU queue's words, `status` running | done | failed |
 // queued | waiting, `outputs` the call's outputs with their #n, `kit` web/live-kit.js. The output strip leaves out
 // the outputs of a tool with a live card: its card shows them where they were made.
@@ -38,6 +39,6 @@ export function LiveCards({ turn, ctx }) {
       if (!own) return h(kit.LivePreview, { key: row.key, live, note, title: 'Working', pct: row.progress?.progress });
       const item = { ...row.item, kind: 'live', key: 'live:' + row.key };
       return h('div', { key: row.key, style: { minWidth: 0 } },
-        h(Card, { item, ctx: { ...ctx, live: { row, live, note, status: row.status, outputs: outputsOf(row, ctx), kit } } }));
+        h(Card, { item, ctx: { ...ctx, liveCard: { row, live, note, status: row.status, outputs: outputsOf(row, ctx), kit } } }));
     }));
 }

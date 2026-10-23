@@ -8,6 +8,7 @@ import time
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from . import prefs
+from .live import live_of
 from .options import STAGE_ORDER
 
 router = APIRouter()
@@ -31,9 +32,13 @@ def progress(job: dict) -> float | None:
     return round(total / len(stages), 3)
 
 
-def _job(job: dict, runner=None) -> dict:
+def _job(job: dict, runner=None, sched: dict | None = None) -> dict:
     out = {"id": job["id"], "label": (job.get("title") or job["id"])[:80], "progress": progress(job),
            "state": STATE.get(job["status"], job["status"]), "route": f"#/s/gen3d/jobs?id={job['id']}"}
+    if runner is not None:                              # plan 45.3: previews wherever AIHub shows jobs
+        lv = live_of(job, (sched or {}).get(job["id"]), runner.store.job_dir(job["id"]))
+        if lv:
+            out["live"] = lv
     w = runner.gpu_wait.get(job["id"]) if runner is not None and job["status"] == "queued" else None
     if w is not None:                                   # waiting for the GPU slot (plan 31.3)
         out.update(stage="waiting_gpu", ahead=w["ahead"], eta_s=w["eta_s"])
@@ -52,6 +57,7 @@ def status(request: Request):
     done = store.list_jobs(status="done", limit=20)
     secs = [j["finished"] - j["started"] for j in done if j.get("started") and j.get("finished")]
     total = store.count("done")
+    sched = runner.schedule() if active else {}
     return {
         "loaded": bool(w.up and w.loaded),
         "busy": runner.current is not None,
@@ -63,7 +69,7 @@ def status(request: Request):
             {"label": "Avg time", "value": round(sum(secs) / len(secs)) if secs else None, "unit": "s"},
             {"label": "Previews", "value": prefs.preview_device().upper(), "hint": "where Blender draws preview renders"},
         ],
-        "jobs": [_job(j, runner) for j in sorted(active, key=lambda j: j["created"])] + [_job(j) for j in recent],
+        "jobs": [_job(j, runner, sched) for j in sorted(active, key=lambda j: j["created"])] + [_job(j) for j in recent],
     }
 
 

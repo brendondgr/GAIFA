@@ -35,7 +35,7 @@ function VideoPreview({ output, cap }) {
 function AudioPreview({ output }) {
   return output.url ? h('audio', { src: output.url, controls: true, preload: 'metadata', style: { width: '100%', height: 36 } }) : h(NoPreview, { output });
 }
-function Model3DPreview({ output, ctx, cap }) {
+export function Model3DPreview({ output, ctx, cap, autoOpen }) {
   const React = R(), ref = React.useRef(null), [state, setState] = React.useState('poster'), [err, setErr] = React.useState(null);
   const open = async () => {
     setState('loading'); setErr(null);
@@ -49,6 +49,7 @@ function Model3DPreview({ output, ctx, cap }) {
       await mountViewer(ref.current, { files: glbs, height: 380, url: async f => `/api/outputs/${encodeURIComponent(o.id)}/files/${f.split('/').map(encodeURIComponent).join('/')}` });
     } catch (e) { setErr(e.detail || e.message || String(e)); setState('poster'); }
   };
+  React.useEffect(() => { if (autoOpen && ctx.live) open(); }, []);   // a live card's View in 3D (plan 45.3)
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 } },
     h('div', { ref, style: { display: state === 'viewer' ? 'block' : 'none' } }),
     state !== 'viewer' ? h('div', { style: { position: 'relative' } },

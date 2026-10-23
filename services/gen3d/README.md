@@ -6,6 +6,7 @@ A chat-style web UI and HTTP API for local 3D asset generation on **http://127.0
 - **CubePart** (Roblox): mesh → up to 8 separate, named part meshes
 - **Rig**: parts → a game-ready GLB with a motor joint and a telescoping slide per limb
 - **Preview**: a Blender 4-view render of the result
+- **Live progress** (plan 45.3): a job's `live` (on `/v1/jobs/{id}` and the status jobs) lists its stages with their state and time left, the running stage's steps, and a preview: the cut-out while the shape is made, then the rendered views. `ui/chat.js` draws it in Chat: the picture turning into its cut-out, a point cloud from its outline while the shape is made, the views, then View in 3D.
 - **From a picture** (plan 17): **Hunyuan3D 2.1** and **SAM 3D Objects** in gen3d's own worker,
   **TRELLIS.2** and **SAM 3D Body** through AIHub's Images & Video mod (ComfyUI). See [Image to 3D](#image-to-3d).
 

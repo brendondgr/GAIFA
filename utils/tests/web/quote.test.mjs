@@ -197,12 +197,12 @@ test('composer: one card per quote-reply, in order; × removes it; sending takes
   const sent = [], t2 = composer({ draft: '', quotes: qs, onSend: (...a) => sent.push(a) });
   assert.equal(sendBtn(t2).props.disabled, false);
   sendBtn(t2).props.onClick();
-  assert.deepEqual(sent, [['', [], qs]]);
+  assert.deepEqual(sent, [['', [], qs, []]]);   // the last: the message's @-mentions (plan 48.2)
   const t3 = composer({ draft: '', quotes: QR.addQuote([], { text: 'x', reply: '' }) });   // nothing said: can't send
   assert.equal(sendBtn(t3).props.disabled, true);
   const t4 = composer({ onSend: (...a) => sent.push(a) });                           // without cards: an empty list
   sendBtn(t4).props.onClick();
-  assert.deepEqual(sent[1], ['why?', [], []]);
+  assert.deepEqual(sent[1], ['why?', [], [], []]);
 });
 
 test('composer: 25 cards wrap in a row that scrolls; too much in all says why and blocks Send', () => {

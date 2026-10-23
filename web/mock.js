@@ -668,6 +668,14 @@ export function createMockApi() {
       return { hits: hits.slice(0, limit), total: hits.length }; },
     outputPageUrl(id) { return outputs.find(x => x.id === id)?.preview || ''; },
     // Plan 30.8: a web page read for the user: saved as a web output and screened (here: a canned page).
+    async listMentions({ q = '', kind } = {}) {   // plan 48.1: the mock's voices, workflows and engines
+      await net();
+      const all = [...['Hope', 'Brendon', 'af_heart', 'am_adam'].map(v => ({ kind: 'voice', id: v, label: v, sub: 'Speech', fills: ['tts_speak.name'] })),
+        ...[['zimage-turbo', 'Z-Image Turbo'], ['qwen21-turbo-t2i', 'Qwen-Image 2.1 Turbo']].map(([id, label]) => ({ kind: 'workflow', id, label, sub: 'Images & Video', fills: ['comfy_generate_image.workflow'] })),
+        ...[['trellis2', 'TRELLIS.2'], ['cube3d', 'Cube3D']].map(([id, label]) => ({ kind: 'engine', id, label, sub: '3D Generate', fills: ['gen3d_make_3d.engine'] }))];
+      const ql = q.toLowerCase();
+      return all.filter(m => (!kind || m.kind === kind) && (!ql || m.label.toLowerCase().includes(ql) || m.id.toLowerCase().includes(ql) || (!kind && m.kind.startsWith(ql)))).slice(0, 20);
+    },
     async readWebPage(url, { text = false } = {}) {
       await net(); if (!/^https?:\/\/[^/\s]+\.[^/\s]+/.test(String(url || '').trim())) throw err(422, 'bad_url', `${url} isn't a URL that can be fetched`, { fix: 'pass a full http:// or https:// URL' });
       const u = new URL(String(url).trim()), host = u.hostname.replace(/^www\./, ''), title = `A page on ${host}`, ts = now();

@@ -75,6 +75,6 @@ async def mentions(request: Request, q: str = Query("", description="Words to ma
             out += await _list(request, svc, spec)
     ql = q.strip().lower()
     if ql:
-        out = [m for m in out if ql in m["label"].lower() or ql in m["id"].lower()]
+        out = [m for m in out if ql in m["label"].lower() or ql in m["id"].lower() or (not kind and m["kind"].startswith(ql))]   # "voi": every voice
         out.sort(key=lambda m: (not m["label"].lower().startswith(ql), m["label"].lower()))
     return out[:limit]

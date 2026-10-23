@@ -30,6 +30,7 @@ export const METHOD_AREA = {
   listSessions: 'sessions', saveSession: 'sessions', renameSession: 'sessions', deleteSession: 'sessions',
   restoreSession: 'sessions', getSessionState: 'sessions',
   readWebPage: 'webpages', getWebReading: 'webpages',
+  listMentions: 'mentions',
 };
 
 // HubEvent type → area, for merging live and mock event streams.
@@ -174,6 +175,8 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     outputPageUrl: (id, n, { width } = {}) => url(`/api/outputs/${enc(id)}/page/${n}.png${qs({ width })}`),
     // Plan 30.8: a web page read for the user (saved as a web output, screened whole); text: also its markdown
     readWebPage: (pageUrl, { text } = {}) => req('POST', '/api/web/read', { json: { url: pageUrl, text: !!text } }),
+    // Plan 48.1: what the user can @-mention (the mods' kinds: voices, workflows, engines), each with the fields it fills
+    listMentions: ({ q, kind } = {}) => req('GET', `/api/mentions${qs({ q, kind })}`),
     // How pages are read and screened, for Settings → Agent: the models each backend offers, what relevance uses now
     getWebReading: () => req('GET', '/api/web/reading'),
     getSettings: () => req('GET', '/api/settings'),

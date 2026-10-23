@@ -87,8 +87,9 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     stream,
     // quotes: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each (Select → Reply);
     // `text` may be empty when a reply says something
-    send: (tid, text, attachments = [], doc_modes = {}, quotes = []) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),
-      ...(quotes?.length ? { quotes: quotes.map(q => ({ text: q.text, reply: q.reply || '', ...(q.seq != null ? { seq: q.seq } : {}) })) } : {}) }),
+    send: (tid, text, attachments = [], doc_modes = {}, quotes = [], mentions = []) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),
+      ...(quotes?.length ? { quotes: quotes.map(q => ({ text: q.text, reply: q.reply || '', ...(q.seq != null ? { seq: q.seq } : {}) })) } : {}),
+      ...(mentions?.length ? { mentions } : {}) }),   // plan 48.2: [{kind, id, label, fills}]
     answer: (tid, question_id, answers) => req('POST', `${T(tid)}/answer`, { question_id, answers }),
     approval: (tid, body) => req('POST', `${T(tid)}/approval`, body),
     action: (tid, tool, args = {}) => req('POST', `${T(tid)}/action`, { tool, arguments: args }),

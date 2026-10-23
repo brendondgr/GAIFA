@@ -39,3 +39,4 @@ async def test_the_route_lists_and_searches(rig, serve):
         assert {m["id"] for m in all_} == {"Requests", "Outputs today"} and all_[0]["fills"] == ["fake-ok_hello.name"]
         assert [m["id"] for m in (await c.get("/api/mentions", params={"q": "out"})).json()] == ["Outputs today"]
         assert (await c.get("/api/mentions", params={"kind": "voice"})).json() == []
+        assert len((await c.get("/api/mentions", params={"q": "sta"})).json()) == 2        # the start of a kind lists them all

@@ -209,14 +209,14 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     if (skill) return `Use the ${skill.id || skill.name} skill: ${arg}`.trim();
     return text;
   };
-  const send = async (text, atts = [], qs = null) => {   // qs: the composer's quote-reply cards (null: a suggestion or a button)
+  const send = async (text, atts = [], qs = null, mentions = []) => {   // qs: the composer's quote-reply cards (null: a suggestion or a button); mentions: plan 48.2
     let t = text.trim();
     const k = dkey, cards = qs || [];
     if (t.startsWith('/')) { t = await slash(t); setDrafts(d => ({ ...d, [k]: '' })); if (t == null) return; }   // the cards stay for the next message
     t = messageText(t, atts, cards);
     if (!t && !cards.some(q => q.reply.trim())) return;
     setDrafts(d => ({ ...d, [k]: '' })); setAttachments([]); if (cards.length) setQuotes([], k); stick.current = true;
-    try { const id = await ensureThread(); await c.send(id, t, atts.map(a => a.id), Object.fromEntries(atts.filter(a => a.mode).map(a => [a.id, a.mode])), quotesPayload(cards)); }
+    try { const id = await ensureThread(); await c.send(id, t, atts.map(a => a.id), Object.fromEntries(atts.filter(a => a.mode).map(a => [a.id, a.mode])), quotesPayload(cards), mentions); }
     catch (e) { setDrafts(d => ({ ...d, [k]: text })); if (cards.length) setQuotes(l => [...cards, ...l], k); fail(e); }
   };
   const setModel = m => { if (thread) c.patch(thread.id, { model: m }).then(t => { setThread(x => ({ ...x, ...t })); c.context(thread.id).then(mm => setLive(l => ({ ...l, meter: mm }))).catch(() => {}); }, fail); else setFresh(f => ({ ...f, model: m })); };
@@ -327,7 +327,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
           blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))))),
       h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
         dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
-        settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quotes, setQuotes,
+        settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
         controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
           env: h(EnvMenu, { api, c, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: loadEnvList, confirm,

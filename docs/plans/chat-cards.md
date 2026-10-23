@@ -216,9 +216,10 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **`GET /api/mentions?q=&kind=&chat=`** → `[{kind, id, label, sub, fills}]`, at most 20, each kind's list cached for 30 s.
   *Done when:* `utils/tests/tools/test_mentions.py` (declared kinds, validation of `fills` against the tool's parameters, the built-ins, the search).
   *As built:* `MentionSpec` (kind, list, rows, value, label, fills) in `[[agent.mentions]]`; `utils/routes/mentions.py`. Outputs and folders are listed by the chat itself (its own `#n` and folders), so the route holds only the mods' kinds. tts declares voices (yours and the built-in ones, two entries of one kind), comfy workflows (filling every task tool's `workflow`; a pin that isn't one of a tool's choices is skipped), gen3d engines. The tests are in `utils/tests/services/test_mentions.py` (they need a running fake mod).
-- [ ] **48.2 The picker: `web/chat/chat-mentions.js` (new), `chat-composer.js`.**
+- [x] **48.2 The picker: `web/chat/chat-mentions.js` (new), `chat-composer.js`.**
   - **`@`** in the message box opens a list grouped by kind, narrowed as you type (`@voice:Bre`, `@#3`); a pick becomes a chip in the text; Backspace removes it whole. The message goes with `mentions: [{kind, id, label, fills}]`.
   *Done when:* `utils/tests/web/chat-mentions.test.mjs` (opening, narrowing by kind, the chip, what's sent).
+  *As built:* the box is a plain text area, so a pick writes `@kind:name` into the text (not a chip) and rides with the message while that text is still there; a picked output becomes an attachment chip instead. `@voi` lists every voice (the start of a kind matches, in the hub's route too). `api.listMentions` (area `mentions`, with a mock). Checked in `?mock`: `@voi` → the voices, Tab picks, `@tre` → TRELLIS.2.
 - [ ] **48.3 Mentions in the turn: `services/agent/agent/server.py`, `loop.py`, `utils/prefs.py`.**
   - **The agent** keeps `mentions` on the user event, says them to the model as one line ("For this message: voice = Brendon for tts_speak"), attaches mentioned outputs as attachments are, and passes the fills with that turn's calls.
   - **The hub** fills them as it fills preferences (`filled` = `mention`) when the model's call leaves them out; a call that sets another value gets a card showing both. The card's badge reads "from your message".

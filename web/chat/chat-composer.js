@@ -11,6 +11,7 @@
 // groups, then the quick actions), the text between, and the microphone, Stop and Send on the right; the text grows
 // upward to 40% of the window (boxMax) while the buttons stay on its bottom line. No hint line under it; the chat's controls sit there (chat-controls.js).
 
+import { atToken, filterChoices, insertMention, mentionsIn, localChoices, useHubMentions, MentionList } from './chat-mentions.js';
 import { h, T, MONO, Icon, Btn, Popover, label11, COL } from './chat-ui.js';
 import { actionsFor } from './chat-actions.js';
 import { MicButton } from './chat-mic.js';
@@ -107,7 +108,7 @@ function DocMode({ a, mode, onPick }) {
 const menuSt = { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' };
 
 // controls: the row under the box (chat-controls.js: environment, mode, model; plan 42.3)
-export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null }) {
+export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [] }) {
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
@@ -144,15 +145,33 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
   };
   const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
   const matches = slashMatches(draft, skills);
+  // @-mentions (plan 48.2): the token at the caret, its choices, and what was picked for this message
+  const [picked, setPicked] = React.useState([]), [mSel, setMSel] = React.useState(0), [caret, setCaret] = React.useState(null);
+  const tok = matches.length ? null : atToken(draft, caret ?? draft.length);
+  const hubM = useHubMentions(api, tok);
+  const mItems = tok ? filterChoices([...localChoices(outputs, folders), ...hubM], tok) : [];
+  React.useEffect(() => { setMSel(0); }, [mItems.length, tok?.query]);
+  const pickM = m => {
+    if (m.kind === 'output') setAttachments(a => a.some(x => x.id === m.id) ? a : [...a, { id: m.id, kind: m.output.kind, title: m.output.title, preview: m.output.preview, n: m.n }]);
+    else setPicked(l => [...l.filter(x => !(x.kind === m.kind && x.id === m.id)), m]);
+    const r = insertMention(draft, tok, m);
+    setDraft(r.text); setCaret(r.caret);
+    requestAnimationFrame(() => { const el = ref.current; if (el) { el.focus(); el.setSelectionRange(r.caret, r.caret); } });
+  };
   React.useLayoutEffect(() => { const el = ref.current; if (!el) return; el.style.height = ''; if (draft && el.scrollHeight > el.clientHeight) el.style.height = Math.min(el.scrollHeight + 2, boxMax()) + 'px'; }, [draft]);
   React.useEffect(() => { setSel(0); }, [matches.length]);
   const qProblem = quotesProblem(quotes);
   const can = !disabled && !uploading && !reading && canSendQuotes(draft, attachments, quotes);
-  const send = () => { if (can) { setOffer(null); onSend(draft, attachments, quotes); } };   // the page clears the cards (and puts them back if it fails)
+  const send = () => { if (can) { setOffer(null); onSend(draft, attachments, quotes, mentionsIn(draft, picked)); setPicked([]); } };   // the page clears the cards (and puts them back if it fails)
   const complete = c => { setDraft('/' + c.cmd + (c.arg ? ' ' : '')); ref.current?.focus(); };
   const onKey = e => {
     if (e.nativeEvent?.isComposing) return;
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'v' || e.key === 'V')) plain.current = true;
+    if (mItems.length && !e.shiftKey) {        // the @-mention list
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setMSel(i => (i + (e.key === 'ArrowDown' ? 1 : mItems.length - 1)) % mItems.length); return; }
+      if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); pickM(mItems[Math.min(mSel, mItems.length - 1)]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); setCaret(-1); return; }
+    }
     if (matches.length) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setSel(i => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length); return; }
       if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && draft !== '/' + matches[sel].cmd)) { e.preventDefault(); const c = matches[sel]; if (c.arg || e.key === 'Tab') complete(c); else onSend('/' + c.cmd, []); return; }
@@ -165,6 +184,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
     h('div', { style: { maxWidth: COL, margin: '0 auto', position: 'relative' } },
       dock && dock.length ? h('div', { role: 'region', 'aria-label': 'Waiting for you', style: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8, maxHeight: '50vh', overflowY: 'auto', minWidth: 0 } },
         dock.length > 1 ? h('div', { style: { ...label11, color: T.pu } }, `Waiting for you · ${dock.length}`) : null, dock) : null,
+      mItems.length ? h(MentionList, { items: mItems, sel: Math.min(mSel, mItems.length - 1), onPick: pickM }) : null,
       matches.length ? h('div', { role: 'listbox', 'aria-label': 'Commands', style: { position: 'absolute', left: 0, right: 0, bottom: 'calc(100% + 6px)', zIndex: 30, background: T.card, border: '1px solid ' + T.bds, borderRadius: 9, boxShadow: '0 12px 30px rgba(0,0,0,.3)', padding: 4 } },
         matches.map((c, i) => h('button', { key: c.cmd, type: 'button', role: 'option', 'aria-selected': i === sel ? 'true' : 'false', onMouseDown: e => { e.preventDefault(); complete(c); },
           style: { display: 'flex', alignItems: 'baseline', gap: 10, width: '100%', padding: '6px 9px', border: 0, borderRadius: 6, background: i === sel ? T.hov : 'transparent', color: T.tx, font: 'inherit', cursor: 'pointer', textAlign: 'left' } },
@@ -207,7 +227,8 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
                 h(Icon, { d: a.icon || 'wand', size: 13 }), a.label))),
             h(Popover, { open: pop === 'att', onClose: () => setPop(null), place: 'up-left', width: 340, label: 'Attach outputs' }, h(AttachPicker, { api, outputs, chosen: attachments, onToggle: toggleAtt, onReadPage: api.readWebPage ? url => { setPop(null); attachPage(url); } : null })),
             h(Popover, { open: pop === 'tools', onClose: () => setPop(null), place: 'up-left', width: 330, label: 'Tool groups' }, h(ToolGroups, { index, settings, onChange: onSettings }))),
-          h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => setDraft(e.target.value), onKeyDown: onKey, 'aria-label': 'Message',
+          h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => { setDraft(e.target.value); setCaret(e.target.selectionStart); }, onKeyDown: onKey, 'aria-label': 'Message',
+            onSelect: e => setCaret(e.target.selectionStart),
             onPaste,
             placeholder: running ? 'Add a message (it’s read after the current step)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
             style: { flex: 1, minWidth: 0, alignSelf: 'center', minHeight: 22, maxHeight: boxMax(), resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),

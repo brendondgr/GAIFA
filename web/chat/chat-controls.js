@@ -1,10 +1,10 @@
 // The row under the message box (plan 42.3, after Claude Code's): the chat's environment, its mode and its model, as
 // plain buttons that open small menus (not selects). They were the header's selects and environment chip. The
-// environment menu also makes, renames, fills and deletes environments through the workspace mod (plan 42.4: the editor
-// opens beside it, chat-envedit.js), so the Workspace page is needed only for Bypass. Written by us (web/PATCHES.md).
+// environment menu's Edit and New environment open the environment dialog (plan 43.2, chat-envedit.js), which makes,
+// renames, fills and deletes environments through the workspace mod. Written by us (web/PATCHES.md).
 
-import { h, T, MONO, Icon, Popover, label11, inputSt, SHADOW } from './chat-ui.js';
-import { EnvEditor, envOps, errLine } from './chat-envedit.js';
+import { h, T, MONO, Icon, Popover, label11 } from './chat-ui.js';
+import { EnvDialog } from './chat-envedit.js';
 import { modeChoices, modeTitle, modeOf, modelLabel, MODES } from './chat-header.js';
 import { envOf, allowedFolders, shortPath, LEVEL_WORD } from './chat-env.js';
 
@@ -55,32 +55,25 @@ const envRowSt = on => ({ display: 'flex', alignItems: 'center', gap: 6, minHeig
 const quietBtn = { height: 22, padding: '0 7px', border: '1px solid transparent', borderRadius: 5, background: 'transparent', color: T.mut, font: 'inherit', fontSize: 11.5, cursor: 'pointer' };
 export const ENV_MENU_W = 250;
 
-/** The environment: the workspace folders this chat may use (plan 34). The menu (compact, the user's ask) lists the
- * environments: a click picks one for this chat, **Edit** on its right opens the editor beside the menu (not for
- * None); **New environment** makes one, which becomes the chat's and opens in the editor. Without the workspace mod,
- * no button. */
+/** The environment: the workspace folders this chat may use (plan 34). The menu (compact) lists the environments: a
+ * click picks one for this chat; **Edit** on a row (not None) and **New environment** open the dialog (plan 43.2,
+ * chat-envedit.js). Without the workspace mod, no button. */
 export function EnvMenu({ api, c, thread, envs, value, onChange, stamp = 0, onEnvsChanged, confirm, onDeleted }) {
   const React = R(), [open, setOpen] = React.useState(false), [grants, setGrants] = React.useState([]);
-  const [editing, setEditing] = React.useState(null), [fresh, setFresh] = React.useState(null), [err, setErr] = React.useState(null);
+  const [dialog, setDialog] = React.useState(null);               // {env} to edit, {env: null} for New environment
   const tid = thread?.id || null;
   React.useEffect(() => {
     if (!tid || !api?.listGrants) { setGrants([]); return; }
     api.listGrants({ thread: tid }).then(g => setGrants(allowedFolders(g, tid)), () => setGrants([]));
   }, [tid, stamp, open]);
   if (!envs) return null;
-  const env = envOf(envs, value), editEnv = editing ? envs.find(e => e.id === editing) : null;
-  const close = () => { setOpen(false); setEditing(null); setFresh(null); setErr(null); };
+  const env = envOf(envs, value);
   const revoke = async g => { try { await api.revokeGrant(g.grant); setGrants(l => l.filter(x => x.grant !== g.grant)); } catch { /* shown as still there */ } };
-  const create = async () => {
-    const name = (fresh || '').trim();
-    if (!name) return;
-    try { const r = await envOps(api).create(name); setFresh(null); setErr(null); await onEnvsChanged?.(); onChange(r.id); setEditing(r.id); }
-    catch (e) { setErr(errLine(e)); }
-  };
+  const openDialog = e => { setOpen(false); setDialog({ env: e }); };
   return h('span', { style: { position: 'relative', flex: 'none' } },
     h(Control, { icon: 'home', label: (env?.name || 'No environment') + (grants.length ? ` +${grants.length}` : ''), title: 'Environment: the workspace folders this chat can use',
-      ariaLabel: `Environment: ${env?.name || 'none'}`, open, onClick: () => (open ? close() : setOpen(true)) }),
-    h(Popover, { open, onClose: close, place: 'up-left', width: ENV_MENU_W, label: 'Environment', style: { gap: 4, padding: 6 } },
+      ariaLabel: `Environment: ${env?.name || 'none'}`, open, onClick: () => setOpen(!open) }),
+    h(Popover, { open, onClose: () => setOpen(false), place: 'up-left', width: ENV_MENU_W, label: 'Environment', style: { gap: 4, padding: 6 } },
       h('span', { style: { ...label11, padding: '2px 4px' } }, 'Environment'),
       h('div', { role: 'menu', 'aria-label': 'Environments', style: { display: 'flex', flexDirection: 'column', gap: 1 } },
         envs.map(e => h('div', { key: e.id, className: 'aichat-envrow', style: envRowSt(e.id === env?.id) },
@@ -89,17 +82,10 @@ export function EnvMenu({ api, c, thread, envs, value, onChange, stamp = 0, onEn
             style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: 28, border: 0, background: 'none', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left', padding: 0 } },
             h(Icon, { d: 'home', size: 12 }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: e.id === env?.id ? 500 : 400 } }, e.name),
             h('span', { style: { fontSize: 11, color: T.dim, flex: 'none' } }, (e.folders || []).length)),
-          e.none ? null : h('button', { type: 'button', className: 'aichat-quiet', 'aria-label': `Edit ${e.name}`, 'aria-expanded': editing === e.id ? 'true' : 'false',
-            onClick: () => setEditing(editing === e.id ? null : e.id), style: quietBtn }, 'Edit')))),
-      fresh == null
-        ? h('button', { type: 'button', onClick: () => setFresh(''), style: { display: 'flex', alignItems: 'center', gap: 6, height: 26, padding: '0 8px', border: 0, borderRadius: 6, background: 'none', color: T.mut, font: 'inherit', fontSize: 12, cursor: 'pointer', textAlign: 'left' } },
-            h(Icon, { d: 'plus', size: 12 }), 'New environment')
-        : h('form', { onSubmit: e => { e.preventDefault(); create(); }, style: { display: 'flex', gap: 4, padding: '2px 2px' } },
-            h('input', { autoFocus: true, value: fresh, onChange: e => setFresh(e.target.value), placeholder: 'Name, e.g. Grants', 'aria-label': 'New environment name',
-              onKeyDown: e => { if (e.key === 'Escape') { e.stopPropagation(); setFresh(null); } }, style: { ...inputSt, flex: 1, minWidth: 0, height: 26, fontSize: 12, padding: '0 8px' } }),
-            h('button', { type: 'submit', disabled: !fresh.trim(), style: { ...quietBtn, borderColor: T.bds, color: T.tx } }, 'Create')),
+          e.none || !api?.callService ? null : h('button', { type: 'button', className: 'aichat-quiet', 'aria-label': `Edit ${e.name}`, onClick: () => openDialog(e), style: quietBtn }, 'Edit')))),
+      api?.callService ? h('button', { type: 'button', onClick: () => openDialog(null), style: { display: 'flex', alignItems: 'center', gap: 6, height: 26, padding: '0 8px', border: 0, borderRadius: 6, background: 'none', color: T.mut, font: 'inherit', fontSize: 12, cursor: 'pointer', textAlign: 'left' } },
+        h(Icon, { d: 'plus', size: 12 }), 'New environment') : null,
       env?.none ? h('span', { style: { fontSize: 11, color: T.dim, padding: '0 8px', lineHeight: 1.35 } }, 'None has no folders: the agent asks before it reads one, for this chat only.') : null,
-      err ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd, padding: '0 8px' } }, err) : null,
       grants.length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 3, borderTop: '1px solid ' + T.bd, padding: '6px 4px 0' } },
         h('span', { style: label11 }, 'Allowed in this chat'),
         grants.map(g => h('div', { key: g.grant, style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, minWidth: 0 } },
@@ -108,11 +94,9 @@ export function EnvMenu({ api, c, thread, envs, value, onChange, stamp = 0, onEn
           h('span', { style: { fontSize: 11, color: T.mut } }, LEVEL_WORD.read),
           h('button', { type: 'button', onClick: () => revoke(g), title: 'Take it back: this chat asks again', 'aria-label': `Stop allowing ${g.path} in this chat`,
             style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 2, display: 'flex' } }, h(Icon, { d: 'x', size: 12 }))))) : null),
-    open && editEnv && api?.callService ? h('div', { role: 'dialog', 'aria-label': `Edit ${editEnv.name}`,   // beside the menu, extending it
-      style: { position: 'absolute', zIndex: 49, bottom: 'calc(100% + 6px)', left: ENV_MENU_W + 6, width: `min(340px, calc(100vw - ${ENV_MENU_W + 40}px))`, maxHeight: 'min(70vh, 520px)', overflow: 'auto',
-        background: T.card, border: '1px solid ' + T.bds, borderRadius: 10, boxShadow: SHADOW, padding: 10 } },
-      h(EnvEditor, { api, c, env: editEnv, confirm, onClose: () => setEditing(null), onChanged: () => onEnvsChanged?.(),
-        onDeleted: (id, ids) => { setEditing(null); onEnvsChanged?.(); onDeleted?.(id, ids); if (id === env?.id) onChange('none'); } })) : null);
+    dialog ? h(EnvDialog, { key: dialog.env?.id || 'new', api, c, env: dialog.env, confirm, onClose: () => setDialog(null),
+      onSaved: async (id, created) => { await onEnvsChanged?.(); if (created && id) onChange(id); },
+      onDeleted: (id, ids) => { onEnvsChanged?.(); onDeleted?.(id, ids); if (id === env?.id) onChange('none'); } }) : null);
 }
 
 /** The row: environment and mode on the left, the model on the right. */

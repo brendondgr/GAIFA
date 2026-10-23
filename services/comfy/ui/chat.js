@@ -18,7 +18,7 @@ const WORDS = {
 
 /** The box's shape from the call's arguments: "16:9", "4:3 (Standard)", or width and height; null when it doesn't say. */
 export function aspectFromArgs(a) {
-  const m = /(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/.exec(String(a?.aspect || ''));
+  const m = /(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/.exec(String(a?.aspect || a?.aspect_ratio || ''));
   if (m && +m[2] > 0) return +m[1] / +m[2];
   if (a?.width > 0 && a?.height > 0) return a.width / a.height;
   return null;
@@ -40,8 +40,9 @@ export default function setup(chat) {
     const { row, live, note, status, outputs } = ctx.liveCard;
     const args = row.item.call?.arguments || {}, out = outputs[0];
     const st = cardState(row.name, status, live, row.seconds, kit);
+    const React = globalThis.React, [seen, setSeen] = React.useState(null);   // the frames' or the result's own shape
     const outAspect = out?.width > 0 && out?.height > 0 ? out.width / out.height : null;
-    const aspect = aspectFromArgs(args) || kit.aspectOf(live, outAspect || (video ? 16 / 9 : 1));
+    const aspect = aspectFromArgs(args) || (live?.preview?.w ? kit.aspectOf(live) : null) || seen || outAspect || (video ? 16 / 9 : 1);
     const wf = args.workflow && nameOf ? nameOf(args.workflow, { tool: row.name, key: 'workflow', ctx }) : null;
     const wait = st.done || st.failed ? null : kit.waitInfo(live, note, { model: wf || null, starting: 'Starting ComfyUI' });
     const final = st.done && out ? (video ? out.url : out.url || out.preview) : null;
@@ -56,7 +57,7 @@ export default function setup(chat) {
     ] : null;
     return h(kit.LiveCard, { icon: video ? 'video' : 'image', title: st.title, meta: st.meta, pct: row.progress?.progress, done: st.done, failed: st.failed, foot },
       h(kit.Stage, { aspect },
-        h(kit.PreviewLayers, { src: st.done ? null : kit.previewSrc(live), final, finalKind: video ? 'video' : 'image', alt: out?.title || '' }),
+        h(kit.PreviewLayers, { src: st.done ? null : kit.previewSrc(live), final, finalKind: video ? 'video' : 'image', alt: out?.title || '', onSize: (w, hh) => setSeen(w / hh) }),
         st.done || st.failed ? null : h(kit.Waiting, { title: wait?.title, sub: wait?.sub, quiet: !wait }),
         badge ? h(kit.Badge, null, badge) : null,
         st.done && out && ctx.openOutput ? h('button', { type: 'button', title: 'Open in Outputs', onClick: () => ctx.openOutput(out.output_id),

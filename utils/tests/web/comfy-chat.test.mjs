@@ -12,6 +12,7 @@ test('the box follows the call: an aspect, width and height, or nothing', () => 
   assert.equal(mod.aspectFromArgs({ aspect: '16:9' }), 16 / 9);
   assert.equal(mod.aspectFromArgs({ aspect: '4:3 (Standard)' }), 4 / 3);
   assert.equal(mod.aspectFromArgs({ width: 832, height: 480 }), 832 / 480);
+  assert.equal(mod.aspectFromArgs({ aspect_ratio: '16:9' }), 16 / 9);   // as a model wrote it
   assert.equal(mod.aspectFromArgs({ prompt: 'x' }), null);
 });
 

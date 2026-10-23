@@ -165,16 +165,17 @@ export function Badge({ children }) {
 }
 
 /** Frames that fade in over the one before; `final` (the result) fades in over them all. */
-export function PreviewLayers({ src, final, finalKind = 'image', fit = 'contain', alt = '' }) {
+export function PreviewLayers({ src, final, finalKind = 'image', fit = 'contain', alt = '', onSize }) {
   const React = R(), [frames, setFrames] = React.useState([]), [shown, setShown] = React.useState({}), [finalOn, setFinalOn] = React.useState(false);
   React.useEffect(() => { setFrames(f => nextFrames(f, src)); }, [src]);
+  const size = e => { const t = e.target, w = t.naturalWidth || t.videoWidth, hh = t.naturalHeight || t.videoHeight; if (onSize && w > 0 && hh > 0) onSize(w, hh); };   // the picture's own shape, for the box
   const img = { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit };
   return h(R().Fragment, null,
-    frames.map((f, i) => h('img', { key: f.key, src: f.src, alt: '', className: 'lk-fade', onLoad: () => setShown(s => ({ ...s, [f.key]: true })),
+    frames.map((f, i) => h('img', { key: f.key, src: f.src, alt: '', className: 'lk-fade', onLoad: e => { setShown(s => ({ ...s, [f.key]: true })); size(e); },
       style: { ...img, zIndex: 1 + i, opacity: shown[f.key] ? 1 : 0, filter: 'saturate(.9)' } })),
     final ? (finalKind === 'video'
-      ? h('video', { key: 'final', src: final, autoPlay: true, loop: true, muted: true, playsInline: true, className: 'lk-final', onLoadedData: () => setFinalOn(true), style: { ...img, zIndex: 4, opacity: finalOn ? 1 : 0, background: '#000' } })
-      : h('img', { key: 'final', src: final, alt, className: 'lk-final', onLoad: () => setFinalOn(true), style: { ...img, zIndex: 4, opacity: finalOn ? 1 : 0 } })) : null);
+      ? h('video', { key: 'final', src: final, autoPlay: true, loop: true, muted: true, playsInline: true, className: 'lk-final', onLoadedData: e => { setFinalOn(true); size(e); }, style: { ...img, zIndex: 4, opacity: finalOn ? 1 : 0, background: '#000' } })
+      : h('img', { key: 'final', src: final, alt, className: 'lk-final', onLoad: e => { setFinalOn(true); size(e); }, style: { ...img, zIndex: 4, opacity: finalOn ? 1 : 0 } })) : null);
 }
 
 /** ✓ Background · ● Shape · 42 s left · ○ Views */

@@ -31,7 +31,7 @@ async def test_harness_answers_and_grades(env):
 
 
 def test_eval_tasks_in_eight_groups():
-    assert len(TASKS) == 56 and len({t.id for t in TASKS}) == 56
+    assert len(TASKS) == 60 and len({t.id for t in TASKS}) == 60
     assert {t.group for t in TASKS} == {"single", "chain", "capability", "preference", "must-ask", "no-ask", "safety", "context"}
 
 

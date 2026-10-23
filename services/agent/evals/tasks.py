@@ -358,6 +358,38 @@ def has_references(name: str):
     return (f"{name} got references", lambda r: (any(a.get("references") for a in r.final_args(name)), ""))
 
 
+
+def show_view(view: str):
+    """`show` ran with that view."""
+    return (f"show as {view}", lambda r: (any(a.get("view") == view for a in r.final_args("show")), str([a.get("view") for a in r.final_args("show")])))
+
+
+def show_from_file(x: str, y: str, values: list[float]):
+    """`show` drew the attached file's numbers: by its columns, or copied exactly (a short file is in the message)."""
+    def c(r: Run):
+        args = r.final_args("show")
+
+        def inline_ok(a: dict) -> bool:
+            series = a.get("series")
+            if isinstance(series, str):
+                try:
+                    series = json.loads(series)
+                except ValueError:
+                    return False
+            return any(isinstance(s, dict) and s.get("values") == values for s in series or [])
+        ok = any((a.get("source") and a.get("x") == x and y in (a.get("y") or [])) or inline_ok(a) for a in args)
+        return ok, json.dumps(args)[:200]
+    return (f"show has the file's {y}", c)
+
+
+def show_hub(name: str):
+    return (f"show from hub:{name}", lambda r: (any(a.get("source") == f"hub:{name}" for a in r.final_args("show")), json.dumps(r.final_args("show"))[:160]))
+
+
+def final_has_picture():
+    """The last reply puts an output in its text: ![caption](#n)."""
+    return ("the reply shows the picture", lambda r: (bool(re.search(r"!\[[^\]]*\]\((#\d+|output:[0-9a-f]{12})\)", r.final())), r.final()[:160]))
+
 # ---- the tasks -----------------------------------------------------------------------------------
 
 IMG, VID, I2V, EDIT, BG = "comfy_generate_image", "comfy_generate_video", "comfy_animate_image", "comfy_edit_image", "comfy_remove_background"
@@ -507,6 +539,17 @@ TASKS: list[Task] = [
          settings={"dry_run": True}, note="plan 26.2: search runs on the shipped grant; fetching what it found runs without a card; "
                                           "the web mod's fake web answers (fakeweb/)"),
     # Grounding: a question about the real world, without "look it up": search, fetch what it found (no card), answer from it.
+    # plan 47.4: show, and pictures in the reply
+    Task("show_csv_chart", "capability", ["Chart the images and videos made per day from the attached file."],
+         [ran("show"), show_from_file("day", "images", [4, 6, 3, 8, 5]), not_asked()],
+         attach=upload_files(lambda: [("weekly-renders.csv", b"day,images,videos\nMon,4,1\nTue,6,2\nWed,3,0\nThu,8,1\nFri,5,3\n")]),
+         note="plan 47.4: a file's numbers by its columns, not copied"),
+    Task("show_jobs_table", "capability", ["Show my 3D jobs as a table: name, engine and state."],
+         [used_any("gen3d_list_jobs", "gen3d_job_status"), show_view("table")]),
+    Task("show_memory_day", "capability", ["Show me how memory was used over the last day, as a chart."],
+         [show_hub("memory"), not_called("hub_free_gpu")]),
+    Task("show_picture_inline", "capability", ["Make an image of a red kite over a hill.", "Write a one-line caption for it and put the picture in your reply."],
+         [ran(IMG), final_has_picture()]),
     Task("ground_trek_gear", "context", ["I'm hiking in Torres del Paine for 8 days in March. Should I get leather or synthetic boots, "
                                          "and what about gaiters?"],
          [no_card("web_search"), fetched_found(), cites_fetched(), final_mentions("9 of 14", "nine of 14", "17 of 31", "1,180", "1180", "1 180", "26 hours", "drying room")],

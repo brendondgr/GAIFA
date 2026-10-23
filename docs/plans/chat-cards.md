@@ -187,10 +187,11 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **`![caption](#n)`** (or `output:<id>`) of an output of this chat draws that output in the reply where it's written, at most 360 px tall, with its caption; any other image source stays as text (no outside images). The output stays in the turn's strip too.
   *Done when:* `utils/tests/web/chat.test.mjs` (a picture, a video, a reference from another chat left as text, an `https:` image left as text), and `quote.test.mjs` (quoting a reply with a picture gives back its markdown).
   *As built:* the renderer gets the chat's outputs from `chat.js` (`setChatOutputs`), so the reply card's file is untouched; the picture is a block-styled span (a `<figure>` would end the paragraph it sits in) with its markdown in `data-src` for quoting; a click opens it in Outputs (an `aihub:open-output` event from the page's click handler); only the hub's own paths are used as sources. Checked live: the agent wrote `![The lighthouse](#1)` and the picture showed in its reply with "#1 The lighthouse".
-- [ ] **47.4 Teaching the agent, and the eval: `services/agent/harness/`, `services/agent/evals/`.**
+- [x] **47.4 Teaching the agent, and the eval: `services/agent/harness/`, `services/agent/evals/`.**
   - **The tool's text and the harness** say when to use it: numbers worth comparing → a chart; a list with several fields → a table; outputs worth seeing together → a gallery or a picture in the text; a file's data → `source`, never copied numbers.
   - **Eval tasks:** chart a CSV output's columns; table of gen3d's jobs; GPU memory over the last day; a gallery of the chat's pictures.
   *Done when:* `services/agent/tests/test_evals.py` covers the new tasks, and a live eval run is recorded in [agent-eval.md](../agent-eval.md).
+  *As built:* the guidance is one bullet in `harness/systemprompt.md` (the learned harness versions only add tool notes, so it applies at once). Results in agent-eval.md: memory, pictures and the CSV chart pass 3/3; the jobs table fails until 46.1's default view.
 - [ ] **47.5 Docs and the live check.** Architecture §14 (the local tool), brief §11.13 (the show card, pictures in replies). Live: each view once, a table saved and used as `#n` by the next turn, a picture placed in a reply.
 
 **Wire — Phase 47:** charts, tables and pictures in the agent's replies.

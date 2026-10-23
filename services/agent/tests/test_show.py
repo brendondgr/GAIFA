@@ -44,6 +44,11 @@ def test_inline_views():
     assert hm["data"]["values"] == [[1, 2]]
 
 
+def test_a_list_sent_as_json_text_is_read():
+    s = run({"view": "bar", "x": '["Mon", "Tue"]', "series": '[{"name": "n", "values": [1, 2]}]'})
+    assert s["data"]["x"] == ["Mon", "Tue"]
+
+
 def test_errors_name_the_field_and_the_fix():
     e = err({"view": "line", "x": ["a", "b"], "series": [{"name": "s", "values": [1]}]})
     assert e.field == "series[0].values" and "one value per x" in e.fix

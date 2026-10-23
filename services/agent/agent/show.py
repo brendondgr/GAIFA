@@ -63,6 +63,19 @@ def _num(v: Any) -> bool:
     return v is None or (isinstance(v, (int, float)) and not isinstance(v, bool))
 
 
+def _lists(a: dict[str, Any]) -> dict[str, Any]:
+    """Models sometimes send a list as its JSON text (\"[\\\"Mon\\\", …]\"): read those as lists."""
+    out = dict(a)
+    for k in ("x", "y", "series", "items", "columns", "rows", "values", "outputs"):
+        v = out.get(k)
+        if isinstance(v, str) and v.strip().startswith("["):
+            try:
+                out[k] = json.loads(v)
+            except ValueError:
+                pass
+    return out
+
+
 def _inline(view: str, a: dict[str, Any]) -> dict[str, Any]:
     if view in CHARTS:
         x, series = a.get("x"), a.get("series")
@@ -147,6 +160,7 @@ def _number(v: Any) -> bool:
 async def check(args: dict[str, Any], resolve: Callable[[str], str | None],
                 read: Callable[[str], Awaitable[tuple[bytes, dict[str, Any]]]]) -> dict[str, Any]:
     """The checked spec, or ShowError naming the field and the fix."""
+    args = _lists(args)
     view = args.get("view")
     if view not in VIEWS:
         raise ShowError("view", f"{view!r} isn't a view", "one of " + ", ".join(VIEWS))

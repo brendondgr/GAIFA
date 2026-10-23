@@ -355,6 +355,17 @@ The cascade is as accurate as the chat model alone, and d3-lite's false flags ar
 
 Three `context` tasks in `evals/tasks.py` (56 tasks in all), dry runs against the web mod's fake web. `ground_trek_gear` ("I'm hiking in Torres del Paine for 8 days in March. Should I get leather or synthetic boots, and what about gaiters?") and `ground_product_fact` ("Will an 18650 battery work in my Brightfield K7 headlamp?", a made-up lamp with an out-of-date forum post saying no) never say "look it up". They pass when `web_search` ran with no card, a page it returned was fetched with no card, the reply names a fetched page's host, and it gives a fact only that page has ("9 of 14" days of mud, the 1,180 m snowline or the 26-hour drying time; the BF-S18 adapter). `no_search_needed` (a greeting, then how to reverse a Python list in place) passes when neither web tool was called and the reply gives `.reverse()`. `web_two_sources` now fetches its pages without cards, since they are pages its search found. On skynet (MiniCPM-V 4.7), 3 runs each: 12/12, after two fixes. The fake web's results said engine `fakeweb`, so the model treated them as placeholders and searched up to 24 times; they now say `duckduckgo`, with hosts still under `.example`, which never resolves. And the rule now asks for links and a Sources list: before, the answers used the pages' facts but named no page.
 
+### Show and pictures in replies (plan 47.4, 2026-10-23)
+
+Four tasks (capability), skynet, dry run, against the installed hub:
+
+| Task | Result | Notes |
+|---|---|---|
+| `show_memory_day` | 3/3 | `show` from `hub:memory` over 24 h at once |
+| `show_picture_inline` | 3/3 | the reply wrote `![caption](#1)` under its caption |
+| `show_csv_chart` | 3/3 (after two fixes) | the 5-row CSV is in the message, so the model copies its numbers inline (right ones) and once sent `x` as JSON text; `show` now reads such lists, and the check accepts the file's numbers inline or by its columns. Its first try with the file named no columns: the error listed them and the next call used them |
+| `show_jobs_table` | 0/3 → see 46.1 | the model wrote a markdown table after `gen3d_list_jobs` despite the prompt; 46.1 gives that tool a default table view, so the list draws as a table either way |
+
 ## Gate
 
 Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

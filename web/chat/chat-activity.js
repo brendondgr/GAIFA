@@ -9,6 +9,7 @@ import { h, T, MONO, Icon, Badge } from './chat-ui.js';
 import { Card, ProgressBar, hasCard, cardFor } from './chat-cards.js';
 import { renderMarkdown } from './chat-md.js';
 import { stepText, stepSentence, errorText } from './chat-steps.js';
+import { LiveCards } from './chat-live.js';
 import { OutputStrip } from './chat-results.js';
 import { judgeOf } from './chat-turn.js';
 
@@ -196,7 +197,8 @@ export function ActivityFold({ turn, ctx }) {
       style: { display: 'block', width: turn.running ? 'calc(100% + 12px)' : 'auto', alignSelf: 'flex-start', padding: '4px 6px', margin: '0 -6px', border: 0, borderRadius: 6, background: 'none', color: 'inherit', font: 'inherit', textAlign: 'left', cursor: 'pointer', minWidth: 0 } },
     h(Header, { turn, ctx, open })),
     open ? h('div', { style: { marginLeft: 6, paddingLeft: 12, borderLeft: '1px solid ' + T.bds } },
-      turn.steps.length ? h(StepList, { turn, ctx }) : h('div', { style: { fontSize: 12.5, color: T.mut, padding: '3px 0' } }, 'Nothing yet.')) : null);
+      turn.steps.length ? h(StepList, { turn, ctx }) : h('div', { style: { fontSize: 12.5, color: T.mut, padding: '3px 0' } }, 'Nothing yet.')) : null,
+    h(LiveCards, { turn, ctx }));   // plan 44.3: live cards under the fold, open or not
 }
 
 /** "You ran Upscale image": the head of a turn a result button or quick action started. */

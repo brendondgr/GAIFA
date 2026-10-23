@@ -33,6 +33,7 @@ import { registerAction } from './chat-actions.js';
 import { registerPreview } from './chat-results.js';
 import { registerStep } from './chat-steps.js';
 import { loadChatModules } from './chat-mods.js';
+import * as liveKit from '../live-kit.js';
 
 export { registerCard } from './chat-cards.js';
 export { registerAction, actionsFor } from './chat-actions.js';
@@ -61,7 +62,7 @@ function injectCss() {
 }
 /** What a mod's chat module gets (plan 44.1). */
 export function chatModuleApi(api) {
-  return { registerCard, registerPreview, registerAction, registerStep, ui: chatUi, api, live: null };
+  return { registerCard, registerPreview, registerAction, registerStep, ui: chatUi, api, live: liveKit };
 }
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
 

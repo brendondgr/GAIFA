@@ -8,6 +8,7 @@
 import { h, T, MONO, Icon, Btn, Badge, cardSt } from './chat-ui.js';
 import { registerCard, hasCard, Card, Thumbs } from './chat-cards.js';
 import { actionsFor } from './chat-actions.js';
+import { shownLive } from './chat-live.js';
 
 const R = () => globalThis.React;
 const previews = new Map();
@@ -112,8 +113,9 @@ function Thumb({ o, on, onPick }) {
   h('span', { style: { position: 'absolute', left: 3, bottom: 3, fontFamily: MONO, fontSize: 10, fontWeight: 600, padding: '0 4px', borderRadius: 3, background: T.card, color: T.pu } }, '#' + o.n));
 }
 /** Thumbnails when there's more than one output, the picked one (by default the newest) as the result card, its preview capped. */
-export function OutputStrip({ outputs, ctx }) {
+export function OutputStrip({ outputs: all, ctx }) {
   const React = R(), [picked, setPicked] = React.useState(null);
+  const outputs = all.filter(o => !shownLive(o));    // plan 44.3: a tool's live card shows its own outputs
   const big = shownOutput(outputs, picked);
   if (!big) return null;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 } },

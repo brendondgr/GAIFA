@@ -157,13 +157,15 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **The card:** the failed step opens to the cause in a sentence, the log lines, and the fixes as buttons; a fix runs as a user call, then Retry re-runs the call with the same arguments. The agent sees the same `fixes` and may use them.
   *Done when:* `utils/tests/tools/test_fixes.py` (each code's fixes, the log excerpt) and `utils/tests/web/chat-fix.test.mjs`.
   *As built:* a fix is `{label, tool, arguments}` (a hub tool), `{label, service, action: "restart"}` (a hub route: the chat calls it, the agent can't), `{label, retry}` or `{label, command}` (copied); `needs_room` offers Free the GPU rather than the plan's unloads. The card stands in for the step's live card and sits under the fold (`chat-live.js`); a fix runs as your own step (the chat's `ctx.act`). The mock has a failing turn ("… fail"). Checked in `?mock`: the cause, the log, Free the GPU, Retry with the fast preset (it ran and made the model), Retry.
-- [ ] **46.6 Docs and the live check.** Brief §11.12–11.13 (the new hub tools, `view`, `fixes`), mods.md (`view`), architecture §14. Live: memory and services cards with Unload and Start; a vLLM load card; a job on a stopped mod → Start → Retry; `/clear-gpu`.
+- [x] **46.6 Docs and the live check.** Brief §11.12–11.13 (the new hub tools, `view`, `fixes`), mods.md (`view`), architecture §14. Live: memory and services cards with Unload and Start; a vLLM load card; a job on a stopped mod → Start → Retry; `/clear-gpu`.
+
+  *As built (2026-10-23):* live on the installed hub: the memory card from a question, Unload (refreshed to "now"), `/clear-gpu` ("Freed 3.3 GB"), the jobs table (25 jobs), the voices and workflows; the fix-it card in `?mock` with Retry with the fast preset run through. A real job on a stopped mod wasn't run (the hub starts a stopped mod before the call); its fixes are tested in `test_fixes.py` through a real failed job of a fake mod.
 
 **Wire — Phase 46:** status results and errors in Chat draw as cards with actions.
 
 **Checks & deliverables — Phase 46**
-- [ ] Live: as 46.6.
-- [ ] Delivered: `ToolSpec.view`, `chat-view.js`, the three hub tools and `/clear-gpu`, `web/chat/status/`, the mods' status cards, `utils/tools/fixes.py`, `chat-fix.js`, the tests.
+- [x] Live: as 46.6.
+- [x] Delivered: `ToolSpec.view`, `chat-view.js`, the three hub tools and `/clear-gpu`, `web/chat/status/`, the mods' status cards, `utils/tools/fixes.py`, `chat-fix.js`, the tests.
 
 ---
 

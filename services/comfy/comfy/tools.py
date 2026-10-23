@@ -18,7 +18,7 @@ from .library import Library
 from .schema import input_schema
 
 CALL_OP = "POST /v1/tools/{name}/call"
-JOB = {"status": "GET /v1/jobs/{job_id}?wait=60", "cancel": "POST /v1/queue/{job_id}/cancel"}
+JOB = {"status": "GET /v1/jobs/{job_id}?wait=60&live=true", "cancel": "POST /v1/queue/{job_id}/cancel"}   # live: answer at each new step or frame (plan 45.5)
 
 
 ASK = ("workflow", "preset", "aspect", "megapixels", "seconds")   # choices shown on the parameter card (plan 13.1)

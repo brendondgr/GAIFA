@@ -56,8 +56,9 @@ def jobs(request: Request, limit: int = Query(50, ge=1, le=500), workflow: str |
 
 
 @router.get("/v1/jobs/{job_id}", summary="One run; ?wait=<seconds> waits until it finishes (up to that long)")
-async def job(request: Request, job_id: str, wait: float = Query(0, ge=0, le=1800)) -> dict:
-    r = await request.app.state.runner.wait(job_id, wait)
+async def job(request: Request, job_id: str, wait: float = Query(0, ge=0, le=1800),
+              live: bool = Query(False, description="With wait: also answer at the run's next step or preview frame (plan 45.5)")) -> dict:
+    r = await request.app.state.runner.wait(job_id, wait, live)
     if r is None:
         raise HTTPException(404, f"no job {job_id!r}")
     return _job(r, request.app.state.runner)

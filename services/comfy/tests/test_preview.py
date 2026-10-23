@@ -67,6 +67,9 @@ def test_a_run_previews_through_the_route(env):  # noqa: F811
     assert image_size(r.content)[0] % 8 == 0
     st = c.get("/v1/status").json()
     assert any(j.get("live") for j in st["jobs"] if j["state"] == "running") or st["jobs"][0]["state"] == "done"
+    t1 = time.monotonic()
+    step = c.get(f"/v1/jobs/{rid}", params={"wait": 10, "live": "true"}).json()      # answers at the next step or frame
+    assert time.monotonic() - t1 < 2 and (step["state"] == "running" or step["state"] == "done")
     done = c.get(f"/v1/jobs/{rid}", params={"wait": 10}).json()
     assert done["state"] == "done" and "live" not in done
     assert c.get(f"/v1/runs/{rid}/preview", params={"after": 999, "wait": 0}).status_code == 204

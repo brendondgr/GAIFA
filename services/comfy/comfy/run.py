@@ -520,15 +520,19 @@ class Runner:
         except Exception as e:  # noqa: BLE001
             log.error("couldn't unload a stuck ComfyUI: %s", e)
 
-    async def wait(self, rid: str, secs: float) -> dict | None:
+    async def wait(self, rid: str, secs: float, live: bool = False) -> dict | None:
+        """The run once it ends (or after `secs`); with `live`, also at its next step or preview frame (plan 45.5)."""
         run = self.db.run(rid)
         if run is None or run["state"] not in ACTIVE or secs <= 0:
             return run
-        ev = self.events.setdefault(rid, asyncio.Event())
+        waits = [asyncio.ensure_future(self.events.setdefault(rid, asyncio.Event()).wait())]
+        if live:
+            waits.append(asyncio.ensure_future(self.previews.changed.setdefault(rid, asyncio.Event()).wait()))
         try:
-            await asyncio.wait_for(ev.wait(), secs)
-        except TimeoutError:
-            pass
+            await asyncio.wait(waits, timeout=secs, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            for w in waits:
+                w.cancel()
         return self.db.run(rid)
 
     async def loop(self) -> None:

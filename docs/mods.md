@@ -151,7 +151,7 @@ export default function setup(chat) {
   });
 }
 ```
-- `chat` = `{version, registerCard, registerPreview, registerAction, registerStep, live, ui, api}`. Card kinds: `live:<tool>` (under the fold, running or done: its outputs then stay out of the output strip), `step:<tool>` (a step's opened detail), `result:<tool>`, `approval:<tool>`. A tool's name is `<mod id>_<key>`.
+- `chat` = `{version, registerCard, registerPreview, registerAction, registerStep, live, ui, api, parts}`; `parts` are the chat's own pieces a card may reuse (`ActionBar`: an output's buttons; `nameOf`: a value's name, such as a workflow's). `services/comfy/ui/chat.js` is a full example. Card kinds: `live:<tool>` (under the fold, running or done: its outputs then stay out of the output strip), `step:<tool>` (a step's opened detail), `result:<tool>`, `approval:<tool>`. A tool's name is `<mod id>_<key>`.
 - A `live:` card gets `ctx.live` = `{row, live, note, status, outputs, kit}`: the job's live progress (§4 "Live progress"), the GPU queue's words, running · done · failed · queued · waiting, the call's outputs with their `#n`.
 - A tool without a `live:` card still shows the kit's generic preview while its job reports a `preview`.
 - A module that throws is skipped and what it registered is undone; `aihub check` fails a declared file that's missing or has no default export. Deleting the mod removes its cards.

@@ -47,6 +47,7 @@ kinds = ["image", "video", "model3d"]
 
 [ui]
 page = "ui/page.js"
+chat = "ui/chat.js"                 # live cards in Chat for the picture and video tools (plan 45.2)
 native = "http://127.0.0.1:8199/"
 
 [[ui.widgets]]

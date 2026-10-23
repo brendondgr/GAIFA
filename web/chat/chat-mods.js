@@ -6,7 +6,8 @@
 //     chat.registerCard('step:comfy_generate_image', MyLiveCard); // a tool's opened step, its result, …
 //   }
 //
-// `chat` = { version, registerCard, registerPreview, registerAction, registerStep, live, ui, api }. A module that
+// `chat` = { version, registerCard, registerPreview, registerAction, registerStep, live, ui, api, parts }; `parts` are
+// the chat's own pieces a card may reuse: ActionBar (an output's buttons), nameOf (a value's name, e.g. a workflow's). A module that
 // fails to load or throws in setup is logged and skipped, and whatever it registered before throwing is undone.
 // Deleting the mod's folder removes its module (and so its cards) with it.
 

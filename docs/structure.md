@@ -21,7 +21,6 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `.gitignore` | ✅ | Keeps models, databases, outputs and venvs out of git |
 | `pyproject.toml` | ✅ | Hub dependencies (uv) |
 | `uv.lock` | ✅ | Locked hub dependencies; `uv sync` builds `.venv/` (ignored) from it |
-| `.github/workflows/tests.yml` | ✅ | CI (plan 37.5): the hub's suite on Ubuntu (`-m "not systemd"`) and macOS (`-m "not linux and not systemd"`) |
 | `app.py` | ✅ | `python app.py [--port N] [--dev] [--no-autostart] [--demo-mods]` starts the hub on 127.0.0.1 and [::1] |
 | `config.example.toml` | ✅ | The defaults a fresh clone starts from (plan 23.11): copied to `config.toml` on the first `aihub` command or hub start |
 | `config.toml` | local | This machine's settings (architecture §9; gitignored), made from the example; the Settings page edits it |
@@ -93,6 +92,7 @@ Small subsystems are single files directly in `utils/`; anything that grows into
 | `db.py` | ✅ | `Database`: `hub.db` (WAL), migrations by `user_version` (001 activity/peaks/kv, 002 outputs, 003 metrics, 004 approvals and tool calls, 005 sessions, 006 tool records: refusals, filled, edited, duration, 007 prefs, 008 output feedback, 009 grants), one writer thread, locked per-thread readers, async helpers |
 | `events.py` | ✅ | `EventBus` (per-subscriber queue, overflow → resync), `ActivityLog`, `Alerts`, `sse_stream()` |
 | `server.py` | ✅ | `create_app()`, `Hub` (app state, live-area registry), lifespan, `HubError` + error envelope, static `web/` |
+| `live.py` | ✅ | A job's live progress (plan 44.2): `clean` (a mod's `live` → known fields, paths on the hub's proxy, 4 KB at most) and `key` (what a change is worth publishing for); used by the status poll and tool calls |
 | `cli.py` | ✅ | Standard-library CLI behind `bin/aihub`: serve, install, start/stop/restart, status, logs, load/unload, open, url, doctor (local checks + the hub's `/api/doctor`) |
 | `doctor.py` | ✅ | `GET /api/doctor` (plan 12.4): models on disk, manifests, paths outside the project and the allowlist, Stage D notes, ports, units, disk, offline mods |
 | `cli_models.py` | ✅ | `aihub models list \| show \| scan [--add] \| verify` (standard library only, loaded on demand by `cli.py`) |

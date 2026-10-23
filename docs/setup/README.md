@@ -2,7 +2,7 @@
 
 How to install AIHub on a new machine: the host, the hub, then **the mods you want**, each with the models **you** choose for it. It's written for the hardware AIHub is built on: an **AMD Strix Halo** (Ryzen AI MAX+ 395, Radeon 8060S, `gfx1151`) with 128 GB of unified memory, on **Fedora Linux**. Everything in the repository (the container images, the PyTorch wheels, the engines' settings) is built and tuned for that chip, so on that hardware these docs should be all you need.
 
-**Other hardware.** AIHub was built on Linux with an AMD Strix Halo, and runs elsewhere through each mod's variants (plan 38): `bin/aihub hardware` shows what your machine has, and the setup picks the variant that fits, says which ones haven't been tested on that kind of machine, and lists the mods it can't run. Windows works through WSL2; macOS is checked in CI only. What runs where: [platforms.md](../platforms.md); the host for your machine: the table below.
+**Other hardware.** AIHub was built on Linux with an AMD Strix Halo, and runs elsewhere through each mod's variants (plan 38): `bin/aihub hardware` shows what your machine has, and the setup picks the variant that fits, says which ones haven't been tested on that kind of machine, and lists the mods it can't run. Windows works through WSL2; macOS is untested (CI was turned off on 2026-10-22). What runs where: [platforms.md](../platforms.md); the host for your machine: the table below.
 
 ## The quick way
 

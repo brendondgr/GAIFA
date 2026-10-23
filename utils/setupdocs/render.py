@@ -174,7 +174,7 @@ def platforms_matrix(envs: list[Env], page: Path) -> str:
     out = [START, "",
            "✓ tested: the variant has run for real on that system (where and when: its setup doc's *Tested with*). "
            "○ untested: declared, not run there yet; the field test (plan 40.5, 40.6) checks it. "
-           "—: not available there. On macOS only the hub's tests run, in CI; no mod has run on a Mac. "
+           "—: not available there. Nothing has run on a Mac (CI, which ran the hub's tests there, was turned off on 2026-10-22). "
            "`aihub hardware` shows a machine's accels; `aihub setup --plan` names the variant it picks.", ""]
     if not envs:
         out += ["*No setup docs yet.*", END]

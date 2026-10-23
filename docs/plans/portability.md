@@ -261,6 +261,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Where the tests live:** `utils/tests/services/test_containers_helper.py` (6), not under `_template/`, so `aihub new` doesn't copy them.
 
 - [x] **37.5 CI: `.github/workflows/tests.yml`.**
+  *Removed 2026-10-22 (the user): CI ran on every push and kept running. The workflow is disabled on GitHub, the file is gone and `.github/workflows/` is gitignored; macOS is no longer checked by CI.*
   - `uv run pytest` runs on `ubuntu-latest` and `macos-latest`, with the `linux` and `systemd` tests skipped on macOS. The Node tests use plain `node`.
   *Done when:* the workflow file parses and the suite passes locally with `-m "not linux and not systemd"`; the jobs run on the user's next push.
   - *As built:*

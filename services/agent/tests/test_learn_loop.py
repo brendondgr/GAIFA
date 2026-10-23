@@ -138,3 +138,43 @@ async def test_a_run_stopped_from_outside_is_interrupted_not_running(env):
     old = dict(lr.runs()[0], id="old", state="running", stage="running")   # a record an older agent left behind
     (lr.dir / "runs" / "old.json").write_text(json.dumps(old))
     assert {r["id"]: r["state"] for r in lr.runs()}["old"] == "interrupted"
+
+
+def test_the_gate_runs_no_live_task():
+    from agent.learn.loop import CORE, gate_tasks
+    from evals.harness import is_live
+
+    for full in (False, True):
+        assert not [t.id for t in gate_tasks("comfy", full) if is_live(t)]
+    ids = {t.id for t in gate_tasks("comfy")}
+    assert set(CORE) <= ids and "img_full" in ids and "ws_csv_chart" not in ids and "transcribe_summary" not in ids
+
+
+async def test_the_gate_runs_gpu_tasks_one_at_a_time(env, monkeypatch):
+    """Tasks that reach this machine's GPU (stt, embed, the decide screener) never overlap; the rest run 8 at a time."""
+    import asyncio
+
+    import evals.harness as eh
+
+    now = {"gpu": 0, "llm": 0}
+    most = {"gpu": 0, "llm": 0}
+
+    class FakeHarness:
+        def __init__(self, *a, **k):
+            pass
+
+        async def run(self, t):
+            kind = "gpu" if eh.reaches_gpu(t) else "llm"
+            now[kind] += 1
+            most[kind] = max(most[kind], now[kind])
+            await asyncio.sleep(0.005)
+            now[kind] -= 1
+            return None
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(eh, "Harness", FakeHarness)
+    monkeypatch.setattr(eh, "grade", lambda t, run: {"ok": True})
+    g = await Learner(env.agent, "http://agent", model="main", gate_runs=1).gate("comfy", 0, 1, full=True)
+    assert g["ok"] and most["gpu"] == 1 and 1 < most["llm"] <= 8

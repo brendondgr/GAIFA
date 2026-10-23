@@ -133,5 +133,5 @@ TASKS: list[Task] = [
          note="plan 28.3: ten 24-page reports (~96k tokens together); the answer is on #7 p.15, worded differently"),
     Task("library_red_car", "context", ["Find the picture of the red car among my outputs."],
          [_used("embed_library_search"), found_first(CAR), points_to(CAR)],
-         setup=seed_pictures(), note="plan 28.3: four pictures with camera names; only what they show tells them apart"),
+         setup=seed_pictures(), local_gpu=True, note="plan 28.3: four pictures with camera names; only what they show tells them apart"),
 ]

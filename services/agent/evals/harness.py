@@ -122,6 +122,18 @@ class Task:
     note: str = ""
     needs: tuple[str, ...] = ()   # what must exist to run it: a tool ("comfy_animate_image") or one of its choices
     #                               ("comfy_generate_image.workflow=zimage-intorealism"); else it is skipped, not failed
+    local_gpu: bool = False       # reaches this machine's GPU even in a dry run (stt, embed, the decide screener): one at a time
+
+
+def reaches_gpu(task: Task) -> bool:
+    """Runs one at a time: the GPU here does one thing at a time. A task with attachments counts, since its
+    uploads are indexed by embed and read through the screener."""
+    return task.local_gpu or task.attach is not None
+
+
+def is_live(task: Task) -> bool:
+    """A task that makes real outputs whatever the run asks (`settings.dry_run = False`, the workspace ones)."""
+    return task.settings.get("dry_run") is False
 
 
 def first_option(q: dict[str, Any]) -> dict[str, Any]:

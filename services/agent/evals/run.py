@@ -1,6 +1,7 @@
 """`python -m evals.run [--model skynet] [--runs 3] [--live] [--all-tools] [--only a,b] [--out file.json] [--keep]`
 
-Runs the eval tasks against the agent (through the hub's proxy by default) and writes every run,
+Runs the eval tasks against the agent (through the hub's proxy by default), `--concurrency` at a time
+but the ones that reach this machine's GPU (stt, embed, the decide screener) one at a time, and writes every run,
 its checks and a pass^k summary as JSON. `--live` makes real outputs (no dry run). Each run's chats
 and outputs are deleted when it ends; `--keep` leaves them to look at.
 """
@@ -12,7 +13,7 @@ import asyncio
 import json
 import time
 
-from .harness import Harness, dump, grade, summary
+from .harness import Harness, dump, grade, reaches_gpu, summary
 from .tasks import TASKS
 
 
@@ -20,11 +21,11 @@ async def main(a: argparse.Namespace) -> int:
     tasks = [t for t in TASKS if not a.only or t.id in a.only.split(",")]
     h = Harness(a.base, a.model, dry_run=not a.live, all_tools=a.all_tools, keep=a.keep)
     rows: list[dict] = []
-    sem = asyncio.Semaphore(a.concurrency)
+    sem, gpu = asyncio.Semaphore(a.concurrency), asyncio.Semaphore(1)   # the GPU here does one thing at a time
     started = time.time()
 
     async def one(t, i):
-        async with sem:
+        async with (gpu if reaches_gpu(t) else sem):
             run = await h.run(t)
             row = grade(t, run)
             row["run"] = i

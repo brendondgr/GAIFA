@@ -275,3 +275,38 @@ def test_a_chart_drawn_with_show_counts_and_pdf_page7_goes_as_a_card():
     assert not check(table)[0] and not check(Run("ws_csv_chart", "m"))[0]
     assert {t.id: t for t in TASKS}["pdf_page7"].settings == {"doc_mode": "card"}
 
+
+
+async def test_the_runner_runs_gpu_tasks_one_at_a_time(monkeypatch, tmp_path):
+    """`--concurrency` is for the tasks that only need the LLM; those that reach this machine's GPU never overlap."""
+    import argparse
+    import asyncio
+
+    import evals.run as er
+    from evals.harness import Run, reaches_gpu
+
+    now, most = {True: 0, False: 0}, {True: 0, False: 0}
+
+    class FakeHarness:
+        glitches: list = []
+
+        def __init__(self, *a, **k):
+            pass
+
+        async def run(self, t):
+            g = reaches_gpu(t)
+            now[g] += 1
+            most[g] = max(most[g], now[g])
+            await asyncio.sleep(0.005)
+            now[g] -= 1
+            return Run(t.id, "m")
+
+        async def close(self):
+            pass
+
+    monkeypatch.setattr(er, "Harness", FakeHarness)
+    monkeypatch.setattr(er, "grade", lambda t, run: {"task": t.id, "group": t.group, "ok": True, "checks": [], "seconds": 0, "tools": []})
+    a = argparse.Namespace(only=None, base="x", model="m", live=False, all_tools=False, keep=False, concurrency=16, runs=1,
+                           out=str(tmp_path / "o.json"))
+    assert await er.main(a) == 0
+    assert most[True] == 1 and most[False] > 1

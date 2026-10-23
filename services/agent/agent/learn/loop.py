@@ -10,7 +10,8 @@ One run, per domain with new real chats since its last run:
 4. probe: replay chats under the current harness and each candidate (dry runs, agent/learn/replay.py);
 5. compose: one call that merges what the replays support, adopts one candidate, or keeps the harness;
 6. gate: the eval tasks for the domain's tools plus a core set, no worse than the current version
-   (the full suite when what every chat reads changed);
+   (the full suite when what every chat reads changed); dry runs only, 8 at a time, and the tasks that
+   reach this machine's GPU (stt, embed, the decide screener) one at a time;
 7. adopt: the domain's tool notes and skill bodies go live at once; a change to the prompt, the
    guardrails, hooks.toml or a skill's description (listed in every prompt; harness.needs_approval)
    becomes a proposal you approve (Learning → Review); a failed gate keeps the current version.
@@ -42,6 +43,18 @@ log = logging.getLogger("agent.learn")
 DOMAINS: dict[str, tuple[str, ...]] = {"comfy": ("comfy_",), "gen3d": ("gen3d_",), "tts": ("tts_",),
                                        "llms": ("lcpp_", "vllm_", "relay_"), "hub": ("hub_",)}
 CORE = ["img_full", "model3d", "speech_named", "whats_running", "read_only", "injection"]
+GATE_CONCURRENCY = 8      # tasks that only need the LLM; those that reach this machine's GPU go one at a time
+
+
+def gate_tasks(domain: str, full: bool = False) -> list[Any]:
+    """The eval tasks a gate runs: the domain's (a check names one of its tools) and the core set, or every
+    task for the full suite. Never a live task (`settings.dry_run = False`): the gate runs dry."""
+    from evals.harness import is_live
+    from evals.tasks import TASKS
+
+    pre = DOMAINS[domain]
+    tasks = TASKS if full else [t for t in TASKS if t.id in CORE or any(any(p in name for p in pre) for name, _ in t.checks)]
+    return [t for t in tasks if not is_live(t)]
 
 
 class Paused(Exception):
@@ -372,18 +385,16 @@ class Learner:
         if self._gate:
             return await self._gate(domain, cur, cand, full)
         from evals.harness import Harness as EvalHarness
-        from evals.harness import grade
-        from evals.tasks import TASKS
+        from evals.harness import grade, reaches_gpu
 
-        pre = DOMAINS[domain]
-        tasks = TASKS if full else [t for t in TASKS if t.id in CORE or any(any(p in name for p in pre) for name, _ in t.checks)]
+        tasks = gate_tasks(domain, full)
 
         async def rate(version: int) -> float:
             h = EvalHarness(self.base, self.model, dry_run=True, transport=self.transport, log=lambda _m: None)
-            sem = asyncio.Semaphore(8)
+            llm, gpu = asyncio.Semaphore(GATE_CONCURRENCY), asyncio.Semaphore(1)
 
             async def one(t: Any) -> bool:
-                async with sem:
+                async with (gpu if reaches_gpu(t) else llm):
                     from dataclasses import replace
                     oks = []
                     for _ in range(self.gate_runs):

@@ -258,6 +258,18 @@ async def test_recent_events(hub):
     assert r["alerts"] == [] and r["jobs"][0]["service"] == "fake-ok" and r["jobs"][0]["state"] == "running"
 
 
+async def test_status_jobs_carry_live(hub):
+    """44.2: a mod's status job may carry `live`; the hub keeps it with the mod's paths on its proxy."""
+    svc = hub.services.get("fake-ok")
+    async with httpx.AsyncClient(base_url=hub.url) as c:
+        await c.post(f"{svc.url}/v1/jobs", json={"label": "live picture", "seconds": 30})
+        await c.post(f"{svc.url}/v1/jobs", json={"label": "plain", "seconds": 30})
+        await until(lambda: len(svc.jobs) == 2)
+        jobs = {j["label"]: j for j in (await c.get("/api/events/recent")).json()["jobs"]}
+    assert jobs["live picture"]["live"]["preview"]["url"].startswith("/api/s/fake-ok/v1/jobs/")
+    assert "live" not in jobs["plain"]
+
+
 async def test_saving_defaults_writes_nothing(hub, rig):
     cfg_file = rig.root / "config.toml"
     async with httpx.AsyncClient(base_url=hub.url) as c:

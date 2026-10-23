@@ -63,10 +63,11 @@ async def call_tool(name: str, body: CallRequest, request: Request,
 
 @router.get("/api/tools/calls/{call_id}", summary="A call's state, and its result when done", response_model=ToolCallResult,
             response_model_exclude_none=True)
-async def get_call(call_id: str, request: Request, wait: float = Query(0, ge=0, le=WAIT_MAX)) -> dict[str, Any]:
+async def get_call(call_id: str, request: Request, wait: float = Query(0, ge=0, le=WAIT_MAX),
+                   changed: bool = Query(False, description="With wait: return at the call's next progress, not only at its end (plan 44.2)")) -> dict[str, Any]:
     from utils.server import HubError
 
-    out = await _hub(request).calls.status(call_id, wait)
+    out = await _hub(request).calls.status(call_id, wait, changed)
     if (out.get("error") or {}).get("code") == "unknown_call":
         raise HubError(404, "not_found", out["error"]["detail"])
     return out

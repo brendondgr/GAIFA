@@ -92,8 +92,11 @@ class HubAPI:
         except HubCallError as e:
             return {"status": "error", "tool": name, "error": {"code": e.code, "detail": e.detail}}
 
-    async def call_status(self, call_id: str, wait: float = 20) -> dict[str, Any]:
-        return await self._json("GET", f"/api/tools/calls/{call_id}", params={"wait": wait})
+    async def call_status(self, call_id: str, wait: float = 20, changed: bool = False) -> dict[str, Any]:
+        params: dict[str, Any] = {"wait": wait}
+        if changed:
+            params["changed"] = "true"      # plan 44.2: answer at the next progress, for live cards
+        return await self._json("GET", f"/api/tools/calls/{call_id}", params=params)
 
     async def cancel_call(self, call_id: str) -> dict[str, Any]:
         return await self._json("POST", f"/api/tools/calls/{call_id}/cancel")

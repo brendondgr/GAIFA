@@ -181,7 +181,12 @@ def render_state(r: dict) -> dict:
                 r.update(state="done", outputs=[{"path": str(f.relative_to(OUTPUTS.parent)), "kind": "image"}])
         else:
             r["progress"] = round(p, 2)
-    return {k: v for k, v in r.items() if k not in ("start",)}
+    out = {k: v for k, v in r.items() if k not in ("start",)}
+    if r["state"] == "running":           # plan 44.2: a live shape with a new preview frame per quarter
+        step = min(4, int(p * 4) + 1)
+        out["live"] = {"stage": "sampling", "step": step, "steps": 4, "eta_s": round(r["seconds"] * (1 - p), 1),
+                       "preview": {"url": f"/v1/render/{r['id']}/preview", "seq": step, "w": 64, "h": 48}, "junk": "x" * 10}
+    return out
 
 
 def tone(seconds: float = 0.25, hz: float = 440.0, rate: int = 16000) -> bytes:
@@ -433,7 +438,10 @@ def jobs() -> list[dict]:
     out = []
     for j in JOBS.values():
         p = min(1.0, (time.time() - j["start"]) / j["seconds"])
-        out.append({"id": j["id"], "label": j["label"], "progress": round(p, 3), "state": "done" if p >= 1 else "running"})
+        job = {"id": j["id"], "label": j["label"], "progress": round(p, 3), "state": "done" if p >= 1 else "running"}
+        if j["label"].startswith("live") and p < 1:     # plan 44.2: any job may carry live progress
+            job["live"] = {"stage": "sampling", "preview": {"url": f"/v1/jobs/{j['id']}/preview", "seq": int(p * 10)}}
+        out.append(job)
     return out
 
 

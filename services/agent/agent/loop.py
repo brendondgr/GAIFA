@@ -522,9 +522,11 @@ class Agent(Compaction):
 
     async def _wait_call(self, tid: str, cid: str, call_id: str) -> dict[str, Any]:
         last = None
+        first = True              # the state now (a job's first preview), then each change as it comes (plan 44.2)
         while True:
             try:
-                st = await self.hub.call_status(call_id, wait=POLL_S)
+                st = await self.hub.call_status(call_id, wait=0 if first else POLL_S, changed=not first)
+                first = False
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001 - the hub restarting: try again
@@ -533,11 +535,12 @@ class Agent(Compaction):
                 continue
             if st.get("status") != "running":
                 return st
-            key = (st.get("progress"), st.get("note"))
+            key = (st.get("progress"), st.get("note"), json.dumps(st.get("live"), sort_keys=True))   # live: plan 44.2
             if key != last:
                 last = key
                 self.transient(tid, "progress", {"id": cid, "progress": st.get("progress"), "note": st.get("note"),
-                                                 "elapsed_s": st.get("elapsed_s"), "job_id": st.get("job_id")})
+                                                 "elapsed_s": st.get("elapsed_s"), "job_id": st.get("job_id"),
+                                                 **({"live": st["live"]} if st.get("live") else {})})
 
     def _turn_of(self, tid: str) -> tuple[int, str]:
         """This turn's number (the seq of its user message: checkpoints and undo are per turn) and what the user said."""

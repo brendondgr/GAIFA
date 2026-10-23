@@ -40,6 +40,8 @@ TOOLS = [
       ["prompt"], ask=["aspect"], desc="Make an image from text"),
     T("fake_render", "fake", "generate", {"prompt": {"type": "string"}, "seconds": {"type": "number"}}, ["prompt"], job=True,
       desc="Render a video job"),
+    T("fake_live", "fake", "generate", {"prompt": {"type": "string"}}, ["prompt"], job=True,
+      desc="A job that reports live progress (plan 44.2)"),
     T("fake_wipe", "fake", "destructive", {"id": {"type": "string"}}, ["id"], desc="Delete an item"),
     T("fake_fail", "fake", "read", {}, desc="Always fails"),
     T("gen3d_make_3d", "gen3d", "generate", {
@@ -155,6 +157,8 @@ class FakeHub:
         if name == "tts_speak":
             return {"status": "done", "call_id": cid, "tool": name, "result": {"voice": args.get("name")},
                     "outputs": [self._output("audio", args["text"][:40], args["text"])]}
+        if name == "fake_live":
+            return {"status": "done", "call_id": cid, "tool": name, "result": {"state": "done"}, "outputs": [self._output("image", args["prompt"], args["prompt"])]}
         if name in ("fake_render", "gen3d_make_3d"):
             await asyncio.sleep(float(args.get("seconds") or 0.3))
             kind = "video" if name == "fake_render" else "model3d"
@@ -193,10 +197,17 @@ class FakeHub:
 
     def _start(self, name: str, args: dict[str, Any], mode: str) -> dict[str, Any]:
         cid = f"call_{len(self.running) + len(self.calls) + 1}_{int(time.time() * 1000) % 100000}"
-        st: dict[str, Any] = {"status": "running", "call_id": cid, "tool": name, "progress": 0.0}
+        st: dict[str, Any] = {"status": "running", "call_id": cid, "tool": name, "progress": 0.0, "changed": asyncio.Event()}
 
         async def run() -> None:
             try:
+                if name == "fake_live":                       # plan 44.2: three steps, each with a new preview frame
+                    for i in range(1, 4):
+                        st["progress"], st["live"] = i / 4, {"stage": "sampling", "step": i, "steps": 3,
+                                                             "preview": {"url": "/api/s/fake/v1/p", "seq": i}}
+                        st["changed"].set()
+                        st["changed"] = asyncio.Event()
+                        await asyncio.sleep(1.5)
                 st.update(await self._execute(cid, name, args, mode))
             except asyncio.CancelledError:
                 st.update({"status": "cancelled"})
@@ -208,7 +219,7 @@ class FakeHub:
 
     @staticmethod
     def public(st: dict[str, Any]) -> dict[str, Any]:
-        return {k: v for k, v in st.items() if k != "task"}
+        return {k: v for k, v in st.items() if k not in ("task", "changed")}
 
     async def _wait(self, st: dict[str, Any], wait: float) -> dict[str, Any]:
         try:
@@ -279,10 +290,16 @@ class FakeHub:
             return await self._wait(self._start(name, args, mode), wait)
 
         @app.get("/api/tools/calls/{cid}")
-        async def call_status(cid: str, wait: float = 0) -> dict:
+        async def call_status(cid: str, wait: float = 0, changed: bool = False) -> dict:
             st = self.running.get(cid)
             if st is None:
                 raise HTTPException(404, "no call")
+            if changed and st["status"] == "running":        # plan 44.2: answer at the next progress
+                waits = [asyncio.ensure_future(asyncio.shield(st["task"])), asyncio.ensure_future(st["changed"].wait())]
+                await asyncio.wait(waits, timeout=wait, return_when=asyncio.FIRST_COMPLETED)
+                for w in waits:
+                    w.cancel()
+                return self.public(st)
             return await self._wait(st, wait)
 
         @app.post("/api/tools/calls/{cid}/cancel")

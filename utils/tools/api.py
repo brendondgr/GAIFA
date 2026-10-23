@@ -125,6 +125,7 @@ class ToolCallResult(_Model):
     error: ToolErrorBody | None = None
     progress: float | None = None
     note: str | None = None
+    live: dict[str, Any] | None = Field(None, description="A running job's live progress (plan 44.2): stage, stages, step, steps, eta_s, preview {url, seq, w, h}, lines, audio")
     job_id: str | None = None
     elapsed_s: float | None = None
     arguments: dict[str, Any] | None = None

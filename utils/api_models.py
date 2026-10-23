@@ -42,6 +42,7 @@ class Job(_Model):
     stage: str | None = Field(None, description='"waiting_gpu" while it waits for the GPU slot (plan 31.3)')
     ahead: list[dict[str, Any]] | None = Field(None, description="waiting_gpu: what runs before it ({service, label, eta_s})")
     eta_s: float | None = Field(None, description="waiting_gpu: seconds until it starts, when known")
+    live: dict[str, Any] | None = Field(None, description="Live progress (plan 44.2): stage, stages, step, steps, eta_s, preview {url, seq, w, h}, lines, audio; paths on the hub")
 
 
 class ServiceSummary(_Model):

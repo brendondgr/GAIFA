@@ -31,6 +31,7 @@ from urllib.parse import quote
 
 import httpx
 
+from utils import live as live_mod
 from utils.gpu import gpu_note
 from utils.services import ServiceError
 from utils.tools import results
@@ -67,6 +68,7 @@ class Call:
     progress: float | None = None
     note: str | None = None
     job_id: str | None = None
+    live: dict[str, Any] | None = None    # plan 44.2: the job's live progress (utils/live.py), paths on the hub
     result: Any = None
     outputs: list[dict[str, Any]] = field(default_factory=list)
     error: dict[str, Any] | None = None
@@ -74,6 +76,7 @@ class Call:
     finished: float | None = None
     task: asyncio.Task[Any] | None = None
     done: asyncio.Event = field(default_factory=asyncio.Event)
+    changed: asyncio.Event = field(default_factory=asyncio.Event)   # set (and replaced) on every publish (plan 44.2)
 
     def public(self) -> dict[str, Any]:
         out: dict[str, Any] = {"status": self.state, "call_id": self.id, "tool": self.tool.name}
@@ -81,6 +84,8 @@ class Call:
             out["progress"] = self.progress
             if self.note:
                 out["note"] = self.note
+            if self.live:
+                out["live"] = self.live
             if self.job_id:
                 out["job_id"] = self.job_id
             out["elapsed_s"] = round(time.time() - self.started, 1)
@@ -289,14 +294,17 @@ class Calls:
         out = await self._launch(tool, args, origin, aid, wait, call_id, filled=filled)
         return {**out, "grant": grant} if grant else out
 
-    async def status(self, call_id: str, wait: float = 0) -> dict[str, Any]:
+    async def status(self, call_id: str, wait: float = 0, changed: bool = False) -> dict[str, Any]:
+        """A call's state. `wait`: up to that long for it to end, or with `changed`, for its next progress (plan 44.2)."""
         c = self.live.get(call_id)
         if c is not None:
             if wait and c.state == "running":
+                waits = [asyncio.ensure_future(c.done.wait())] + ([asyncio.ensure_future(c.changed.wait())] if changed else [])
                 try:
-                    await asyncio.wait_for(asyncio.shield(c.done.wait()), timeout=wait)
-                except asyncio.TimeoutError:
-                    pass
+                    await asyncio.wait(waits, timeout=wait, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    for w in waits:
+                        w.cancel()
             return c.public()
         row = await self.hub.db.fetchone("SELECT * FROM tool_calls WHERE id = ?", (call_id,))
         if row is None:
@@ -441,6 +449,8 @@ class Calls:
         return svc.mod.name if svc else sid
 
     def _publish(self, c: Call) -> None:
+        c.changed.set()
+        c.changed = asyncio.Event()
         ev = {k: v for k, v in c.public().items() if k != "result"}
         ev["origin"] = c.origin
         self.hub.bus.publish({"type": "tool_call", "call": ev})
@@ -635,6 +645,7 @@ class Calls:
         body = first
         last_progress: float | None = None
         gpu_was: str | None = None
+        live_was: Any = None
         while True:
             st = _state_of(body) if body is not None and body is not first else None
             if st in DONE | FAILED | CANCELLED:
@@ -650,10 +661,12 @@ class Calls:
             body = r.json()
             p = _progress(body)
             note = gpu_note(body, self._name_of)        # plan 31.3: "Waiting for the GPU: …" on the chat's step row
-            if p != last_progress or note != gpu_was:
+            lv = live_mod.clean(body.get("live"), svc.id) if isinstance(body, dict) else None   # plan 44.2
+            if p != last_progress or note != gpu_was or live_mod.key(lv) != live_was:
                 if note or gpu_was:
                     c.note = note
                 c.progress, last_progress, gpu_was = p, p, note
+                c.live, live_was = lv, live_mod.key(lv)
                 self._publish(c)
         if st in FAILED:
             err = body.get("error") if isinstance(body, dict) else None

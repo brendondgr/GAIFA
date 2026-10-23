@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
+from utils import live
+
 if TYPE_CHECKING:
     from utils.services import Service, ServiceManager
 
@@ -103,6 +105,8 @@ def validate(body: Any) -> tuple[dict[str, Any], list[str]]:
                 job["ahead"] = [a for a in j["ahead"][:10] if isinstance(a, dict)]
             if _number(j.get("eta_s")):
                 job["eta_s"] = float(j["eta_s"])
+        if isinstance(j.get("live"), dict):                       # plan 44.2: cleaned with the mod's id in _publish_jobs
+            job["live"] = j["live"]
         if isinstance(j.get("route"), str):
             if j["route"].startswith("#/"):              # a page in the UI; it becomes a link's href
                 job["route"] = j["route"]
@@ -166,12 +170,12 @@ def apply(mgr: ServiceManager, svc: Service, st: dict[str, Any], asked_at: float
 
 
 def _job_view(jobs: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
-    return [(j["id"], j["state"], j["progress"], j["label"], j.get("stage")) for j in jobs]
+    return [(j["id"], j["state"], j["progress"], j["label"], j.get("stage"), live.key(j.get("live"))) for j in jobs]
 
 
 def _publish_jobs(mgr: ServiceManager, svc: Service, jobs: list[dict[str, Any]]) -> None:
     old = {j["id"]: j for j in svc.jobs}
-    new = {j["id"]: {**j, "service": svc.id} for j in jobs}
+    new = {j["id"]: _with_live({**j, "service": svc.id}, svc.id) for j in jobs}
     for jid, job in new.items():
         if old.get(jid) != job:
             mgr.bus.publish({"type": "job", "job": job})
@@ -180,6 +184,11 @@ def _publish_jobs(mgr: ServiceManager, svc: Service, jobs: list[dict[str, Any]])
             # Gone from the list while still active: the mod finished it without reporting a final state.
             mgr.bus.publish({"type": "job", "job": {**job, "state": "done", "progress": 1.0 if job["progress"] is not None else None}})
     svc.jobs = list(new.values())
+
+
+def _with_live(job: dict[str, Any], sid: str) -> dict[str, Any]:
+    lv = live.clean(job.pop("live", None), sid)
+    return {**job, "live": lv} if lv else job
 
 
 def interval(mgr: ServiceManager, svc: Service) -> float:

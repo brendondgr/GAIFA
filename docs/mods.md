@@ -84,6 +84,7 @@ after = ["relay"]                   # start after these (ordering only)
 - Up to 4 stats show on the mod's tile, and numeric ones are charted over time automatically.
 - `jobs` appear in the header's jobs chip. Report finished jobs with their final state: `done`, `failed` or `cancelled`.
 - AIHub polls every 2 s while you're busy, loading or running jobs, otherwise every 10 s.
+- **Live progress** (plan 44.2): a job (in `jobs`, and on the status route a tool's `job_status` follows) may add `live`: `{"stage": "sampling", "step": 3, "steps": 8, "eta_s": 6.5, "stages": [{"id", "label", "state", "eta_s"}], "preview": {"url": "/v1/runs/r_1/preview", "seq": 3, "w": 1024, "h": 768}, "lines": [5, 16], "audio": "/v1/…"}`, every field optional. Give `preview.url` as a path on your mod that answers with the newest frame (an image), and bump `seq` when there's a new one; the hub rewrites the path to its proxy, and the chat, the Overview and your page fetch the frame themselves. Report it for every job, whoever started it (your page, the agent, the API), so previews show everywhere.
 
 **Level 2: dashboard widgets.**
 ```toml

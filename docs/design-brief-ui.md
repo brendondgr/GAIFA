@@ -581,7 +581,14 @@ interface Activity { id: string; ts: number; service: string | null;
 interface Alert { id: string; level: "warn" | "error"; text: string; service?: string;
                   action?: { label: string; route: string } }
 interface Job { id: string; service: string; label: string; progress: number | null;  // 0..1
-                state: "queued" | "running" | "done" | "failed" | "cancelled"; route?: string }
+                state: "queued" | "running" | "done" | "failed" | "cancelled"; route?: string;
+                live?: Live }                 // plan 44.2: live progress, the same for any job (from the agent, a mod page, ComfyUI's own page, the API)
+
+// plan 44.2: a job's live progress (utils/live.py). Paths are on the hub (/api/s/<id>/…): whatever shows the job pulls
+// the preview frame itself when `preview.seq` changes. Every field is optional.
+interface Live { stage?: string; stages?: { id: string; label: string; state: "waiting" | "running" | "done" | "failed" | "skipped"; eta_s?: number }[];
+                 step?: number; steps?: number; eta_s?: number; frames?: number; lines?: [number, number]; audio?: string;
+                 preview?: { url: string; seq: number; w?: number; h?: number } }
 
 interface System {
   hub: { version: string; pid: number; uptime_s: number; rss_bytes: number; port: number };
@@ -1118,6 +1125,7 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            outputs?: ToolOutput[];
                            error?: { code: string; detail: string; fix?: string; problems?: object[] };
                            progress?: number; note?: string; job_id?: string; elapsed_s?: number;
+                           live?: Live;                             // running: the job's live progress (plan 44.2); GET …/calls/{id}?wait=&changed=true answers at its next change
                            arguments?: object; ask_fields?: string[]; risk?: Risk; schema?: JSONSchema; description?: string;
                            filled?: string[];                       // needs_approval; filled: arguments the hub chose
                            filled_by?: { [field: string]: "default" | "carried" | string };  // how, an x-options default, carried in this chat, or a preference ("pref" + its id, plan 21.7)

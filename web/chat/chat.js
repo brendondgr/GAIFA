@@ -16,6 +16,7 @@ import './chat-forms.js';
 import './chat-results.js';
 import './chat-status.js';
 import './chat-show.js';
+import './chat-save.js';
 import { runAction } from './chat-actions.js';
 import { buildView, applyTransient, settleLive, mergeEvents, todosOpen, threadOf } from './chat-thread.js';
 import { groupTurns } from './chat-turn.js';
@@ -267,7 +268,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     cancel: () => c.cancel(tid).catch(fail),
     branch: it => forkAt(it.ev.seq - 1, it.ev.payload.text, draftQuotes(it.ev.payload)),
     copy: text => navigator.clipboard?.writeText(text).then(() => toast('Copied', 'success'), () => {}),
-    openOutput, runAction: (a, o) => runAction(a, o, { openTool, attach, sendPrompt: t => send(t) }),
+    openOutput, runAction: (a, o) => runAction(a, o, { openTool, attach, sendPrompt: t => send(t), api, toast, environment: envId, thread: tid }),   // api…thread: Save to… (plan 48.4)
     // plan 24.7: a citation in a reply (#n p.14, #n:88, output:<id> …) opens the viewer there
     openCite: ({ ref, page, line }) => {
       const id = String(ref).startsWith('output:') ? String(ref).slice(7) : view.outputs.find(o => o.n === +String(ref).replace('#', ''))?.output_id;

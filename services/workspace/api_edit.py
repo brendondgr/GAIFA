@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,7 @@ from pydantic import BaseModel, Field
 
 import editing
 import reading
+import saving
 
 
 class EditIn(BaseModel):
@@ -36,6 +38,14 @@ class MoveIn(BaseModel):
 class DeleteIn(BaseModel):
     folder: str = Field(description="The workspace folder: its id, name or path")
     path: str = Field(min_length=1, description="The file to delete, relative to the folder")
+
+
+class SaveIn(BaseModel):
+    output_id: str = Field(min_length=12, max_length=12, description="The output to save")
+    folder: str = Field(min_length=1, description="Where: a folder of the chat's environment (id, name or path), or a path inside one")
+    name: str | None = Field(None, description="The file's name (default: the output's own; numbered when taken)")
+    environment: str | None = Field(None, description="The chat's environment (default: the request's origin)")
+    thread: str | None = Field(None, description="The chat, for its checkpoints (Undo)")
 
 
 class CommitIn(BaseModel):
@@ -80,6 +90,20 @@ def mount(app: FastAPI, ctx: Any) -> None:
     @app.post("/v1/delete", summary="Delete a file")
     def delete(body: DeleteIn, request: Request) -> dict[str, Any]:
         return run("delete", body, request)
+
+    @app.post("/v1/save-output", summary="Save an output into a folder of the chat's environment (Edit or above), with Undo (plan 48.4)")
+    async def save_output(body: SaveIn, request: Request) -> dict[str, Any]:
+        o = origin(request)
+        if body.environment:
+            o = {**o, "environment": body.environment}
+        o = {**o, "thread": body.thread or o.get("thread") or "saves", "turn": f"save-{int(time.time())}"}
+        data, name = await saving.fetch_output(ctx.hub_url, body.output_id)
+        v = ctx.folders.view(o)
+        ch = saving.plan(v, body.folder, body.name or name, data)
+        out = editing.apply(v, ctx.checkpoints, ch, o)
+        out.pop("diff", None)
+        ctx.recent("edit", {"tool": "save_output", "folder": ch.folder.id, "summary": ch.summary, "thread": o.get("thread"), "undo": out.get("undo")})
+        return {**out, "path": str(ch.writes[0][0])}
 
     @app.post("/v1/git/commit", summary="Commit changes (git hooks don't run)")
     def commit(body: CommitIn, request: Request) -> dict[str, Any]:

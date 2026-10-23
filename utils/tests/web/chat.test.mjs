@@ -151,7 +151,7 @@ const TOOLS = [
 test('actions: built-ins by kind, hidden without their tool, plus ones derived from the catalog', () => {
   const ids = (kind, tools) => acts.actionsFor(kind, { tools }).map(a => a.id);
   // no catalog yet: only prompt and attach actions
-  assert.deepEqual(ids('image', null), ['image.describe', 'image.reference']);
+  assert.deepEqual(ids('image', null), ['image.describe', 'image.reference', 'image.download', 'image.copy']);   // + plan 48.4's (Save to… needs the workspace)
   const img = ids('image', TOOLS);
   assert.deepEqual(img.slice(0, 2), ['image.animate', 'image.edit']);
   assert.ok(!img.includes('image.removebg'), 'its tool is not in the catalog');
@@ -159,8 +159,8 @@ test('actions: built-ins by kind, hidden without their tool, plus ones derived f
   assert.ok(img.includes('tool:comfy_upscale_image'), 'derived from the x-kind file input');
   assert.ok(!img.includes('tool:comfy_animate_image') && !img.includes('tool:comfy_edit_image'), 'deduped with built-ins');
   assert.ok(!img.includes('tool:hub_get_output'), 'hub tools are not result actions');
-  assert.deepEqual(ids('audio', TOOLS), ['tool:tts_clone_voice']);
-  assert.deepEqual(ids('model3d', TOOLS), ['model3d.rig'], 'destructive tools are never derived');
+  assert.deepEqual(ids('audio', TOOLS), ['tool:tts_clone_voice', 'audio.download', 'audio.copy']);
+  assert.deepEqual(ids('model3d', TOOLS), ['model3d.rig', 'model3d.download', 'model3d.copy'], 'destructive tools are never derived');
   assert.deepEqual(ids('composer', TOOLS), ['quick.image', 'quick.3d', 'quick.edit'], 'quick actions whose tool is missing are hidden');
   const up = acts.actionsFor('image', { tools: TOOLS }).find(a => a.id === 'tool:comfy_upscale_image');
   assert.equal(up.label, 'Upscale image');

@@ -88,3 +88,7 @@ Before any change, the file's bytes (or "didn't exist") go to `data/state/worksp
 cd services/workspace && .venv/bin/python -m pytest -q
 aihub check workspace
 ```
+
+## Save to… (AIHub plan 48.4)
+
+`POST /v1/save-output {output_id, folder, name?, environment?, thread?}` saves an AIHub output into a folder of the chat's environment at Edit or above (or a path inside one), under the output's own name (numbered when taken), with a checkpoint so Undo puts it back. A folder outside the environment is refused with how to add it. The Chat page's Save to… opens the desktop's folder chooser (`POST /v1/pick-folder`) and then calls it.

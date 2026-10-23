@@ -185,6 +185,16 @@ def test_library_cases_grade_what_they_should():
     assert grade(car, good)["ok"]
     bad = Run("library_red_car", "m", events=[ev("assistant", text="I couldn't find it.")])
     assert not grade(car, bad)["ok"]
+
+    def ranked(*titles):            # one search whose hits come in this order
+        res = {"results": [{"output": f"output:{i:012x}", "title": t, "kind": "image"} for i, t in enumerate(titles)]}
+        return {k: ok for k, ok in ((c["check"], c["ok"]) for c in grade(car, Run("library_red_car", "m", events=[
+            ev("tool_call", id="1", name="embed_library_search", arguments={"query": "red car"}, by="model"),
+            ev("tool_result", id="1", name="embed_library_search", status="done", content=_json.dumps({"result": res})),
+            ev("assistant", text="IMG_2041.png")]))["checks"])}
+    first = "the search ranks IMG_2041 above the other seeds"
+    assert ranked("A glossy red sports car", "IMG_2041.png", "IMG_2042.png")[first]   # another real red car first: fine
+    assert not ranked("IMG_2042.png", "IMG_2041.png")[first]                          # a seed above the car: not
     answer = Run("library_ten_docs", "m", events=[
         ev("user", text="…", docs=[{"ref": f"#{i}", "id": f"d{i}"} for i in range(1, 11)]),
         ev("tool_call", id="1", name="embed_library_search", arguments={"query": "pet", "thread_only": True}, by="model"),
@@ -246,3 +256,22 @@ async def test_a_task_that_cant_run_here_is_skipped_not_failed(env):
     s = summary([row, {"task": "t2", "group": "single", "ok": True, "checks": [], "seconds": 1.0}], 1)
     assert s["tasks"] == 1 and s["pass_k"] == 1 and s["skipped"] == [{"task": "v1", "why": row["skipped"]}]
     await h.close()
+
+
+def test_a_chart_drawn_with_show_counts_and_pdf_page7_goes_as_a_card():
+    """ws_csv_chart takes a chart image from the sandbox or a `show` chart (plan 47.1); pdf_page7 sends its PDF
+    as a card on every machine, so reading it with tools is what it tests (here inline_tokens may be "window")."""
+    from evals.harness import Run
+    from evals.workspace import made_chart
+
+    def ev(t, **p):
+        return {"type": t, "payload": p}
+    _, check = made_chart()
+    shown = Run("ws_csv_chart", "m", events=[ev("tool_call", id="1", name="show", arguments={"view": "bar", "x": ["Jan"]}, by="model"),
+                                             ev("tool_result", id="1", name="show", status="done", content="{}")])
+    assert check(shown)[0]
+    table = Run("ws_csv_chart", "m", events=[ev("tool_call", id="1", name="show", arguments={"view": "table"}, by="model"),
+                                             ev("tool_result", id="1", name="show", status="done", content="{}")])
+    assert not check(table)[0] and not check(Run("ws_csv_chart", "m"))[0]
+    assert {t.id: t for t in TASKS}["pdf_page7"].settings == {"doc_mode": "card"}
+

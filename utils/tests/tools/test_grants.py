@@ -226,3 +226,19 @@ async def test_dry_run_reaches_a_mod_that_answers_it(ph):
     out = await approve(ph, r)
     assert out["result"] == {"dry_run": True, "arguments": {"query": "x"}}
     assert (await ph.call(FETCH, {"url": "https://example.org/b"}, thread="t1", service="agent"))["status"] == "needs_approval"
+
+
+async def test_a_dry_run_ignores_a_persons_always_grants(ph):
+    """In a dry run (the agent eval) only the grants AIHub ships and the chat's own count, so a card the
+    eval means to test still shows on a machine where someone chose "always allow"."""
+    from utils.tools.catalog import ToolDef
+
+    r = await ph.call(FETCH, {"url": "https://docs.python.org/3/"})
+    await approve(ph, r, remember="always")
+    assert (await ph.call(FETCH, {"url": "https://docs.python.org/x"}, thread="t1", service="agent"))["status"] == "done"
+    r = await ph.call(FETCH, {"url": "https://docs.python.org/y"}, thread="t2", dry_run=True, service="agent")
+    assert r["status"] == "needs_approval"
+    await approve(ph, r, remember="thread")
+    assert (await ph.call(FETCH, {"url": "https://docs.python.org/z"}, thread="t2", dry_run=True, service="agent"))["status"] == "done"
+    search = ToolDef("web_search", "web", "search", "", {}, risk="network", grant_key="const:search")
+    assert (await ph.hub.grants.match(search, {"query": "x"}, {"thread": "t3", "dry_run": True}))["id"] == SHIPPED

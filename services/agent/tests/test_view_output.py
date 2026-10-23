@@ -77,3 +77,19 @@ async def test_read_tool_results_are_text_and_hash_refs_resolve(env):
     assert {c["arguments"]["ref"] for c in reads} == {f"output:{img}", f"output:{oid}"}   # #1 became output:<id>
     page = next(r for r in env.payloads(tid, "tool_result") if r["name"] == "hub_read_document" and r["status"] == "done")
     assert page["content"].startswith(f"output:{oid}\n<untrusted") and "Page 2 text" in page["content"]  # text, not escaped JSON
+
+
+async def test_a_stand_in_is_described_not_shown_in_a_dry_run(env):
+    stand_in = env.hub._output("image", "Lighthouse at dusk", "a lighthouse at dusk")["output_id"]
+    env.hub.outputs[stand_in]["meta"]["dry_run"] = True
+    tid = await env.thread(mode="auto", settings={"dry_run": True})
+    env.model.queue({"tool_calls": [{"name": "view_output", "arguments": {"ref": f"output:{stand_in}"}}]}, {"text": "ok"})
+    await env.send(tid, "look at it")
+    res = json.loads(env.payloads(tid, "tool_result")[-1]["content"])
+    assert res["note"].startswith("a dry-run stand-in") and res["meta"]["prompt"] == "a lighthouse at dusk"
+    assert not [m for m in env.model.received[-1]["messages"] if m["role"] == "user" and isinstance(m["content"], list)]
+    # an ordinary chat that opens the same output sees its picture
+    tid = await env.thread(mode="auto")
+    env.model.queue({"tool_calls": [{"name": "view_output", "arguments": {"ref": f"output:{stand_in}"}}]}, {"text": "ok"})
+    await env.send(tid, "look at it")
+    assert json.loads(env.payloads(tid, "tool_result")[-1]["content"])["note"] == "the picture follows"

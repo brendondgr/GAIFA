@@ -20,6 +20,10 @@ if TYPE_CHECKING:
 MAX_SIDE = 1024
 REF = re.compile(r"^#?(\d+)$")
 TEXT_PEEK = 2000  # view_output on a text or document output: this many characters, then hub_read_document
+# view_output on a dry run's stand-in, in a dry-run chat (the eval): its picture is a labelled card or another
+# output's preview, and a model that looks at it retries or gives up on a chain the eval means to test
+STAND_IN = ("a dry-run stand-in: this chat is an evaluation, so nothing was generated and there is no picture to "
+            "look at. Treat it as a good result of its prompt and carry on as you would with the real output")
 
 
 class Local:
@@ -198,6 +202,8 @@ class Local:
         info = {"title": ctx.label(o["title"]), "kind": o["kind"], "meta": {k: v for k, v in (o.get("meta") or {}).items()
                                                                   if k in ("prompt", "model", "params", "seed", "voice", "source")},
                 "dims": o.get("dims"), "duration_s": o.get("duration_s")}
+        if (thread.get("settings") or {}).get("dry_run") and (o.get("meta") or {}).get("dry_run"):
+            return self.ok(tid, cid, "view_output", {"note": STAND_IN, **info})
         model = thread.get("model") or self.a.cfg.model
         meta = await self.a.llm.meta(model)
         if o["kind"] in ("text", "document"):

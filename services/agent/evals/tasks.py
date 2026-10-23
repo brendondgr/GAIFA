@@ -541,7 +541,8 @@ TASKS: list[Task] = [
          [final_mentions("Sam"), final_mentions("hik")]),
     Task("pdf_page7", "context", ["In the attached report, what is the name of the lighthouse keeper's cat, and on which page is it?"],
          [final_mentions("Biscuit"), final_mentions("7"), used_any("hub_read_document", "hub_search_document")],
-         attach=upload_files(lambda: [("north-rock-inspection.pdf", lighthouse_report())]), note="plan 24.5: a 20-page PDF as a card, read with tools"),
+         attach=upload_files(lambda: [("north-rock-inspection.pdf", lighthouse_report())]),
+         settings={"doc_mode": "card"}, note="plan 24.5: a 20-page PDF as a card, read with tools"),
     Task("web_two_sources", "context", ["This winter, what time is the first Sunday ferry from Kestrel Point, and how much is a return ticket "
                                         "for an adult with a bike? Look it up on the web and cite your sources."],
          [no_card("web_search"), fetched(WINTER, FARES), final_mentions("08:40", "8:40"), final_mentions("11.90"),

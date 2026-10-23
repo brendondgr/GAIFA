@@ -106,11 +106,16 @@ def ran_ok(name: str):
     return (f"{name} ran cleanly", c)
 
 
-def made_image():
+CHART_VIEWS = ("line", "area", "bar", "hbar", "donut", "heatmap")
+
+
+def made_chart():
+    """A chart: an image output (a plot the sandbox saved), or a chart drawn in the reply with `show` (plan 47.1)."""
     def c(r: Run):
         got = [o["kind"] for o in r.outputs()]
-        return "image" in got, f"outputs {got}"
-    return ("made a chart (an image output)", c)
+        shown = [a.get("view") for a in r.final_args("show")] if r.done("show") else []
+        return "image" in got or any(v in CHART_VIEWS for v in shown), f"outputs {got}, show views {shown}"
+    return ("made a chart (an image output or a show chart)", c)
 
 
 def says(*words: str):
@@ -128,7 +133,7 @@ TASKS = [
          note="plan 27.6: edit + run in Accept edits; the run's card is approved by the harness"),
     Task("ws_csv_chart", "capability",
          ["Make a bar chart of total revenue per month from the attached sales CSV, and tell me which month had the most revenue."],
-         [ran_ok("workspace_python"), made_image(), says("July 2025", "2025-07", "Jul 2025", "July of 2025")],
+         [ran_ok("workspace_python"), made_chart(), says("July 2025", "2025-07", "Jul 2025", "July of 2025")],
          mode="accept_edits", settings={"dry_run": False}, attach=csv_upload(), timeout=900,
          note="plan 27.6: workspace_python with an attached CSV; the chart becomes an output"),
 ]

@@ -82,11 +82,15 @@ def _hits(res: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def found_first(stem: str):
-    """A library search ranked the seeded picture first."""
+    """A library search ranked the seeded picture above the other seeds. Not above everything: the hub's own
+    outputs may hold another picture of a red car, and the task is telling the four seeds apart by what they show."""
+    seeds = [t for t, _ in PICTURES]
+
     def c(r: Run):
-        firsts = [h[0].get("title") for res in r.results("embed_library_search") if (h := _hits(res))]
-        return any(stem in str(t) for t in firsts), f"first hits {firsts[:3]}"
-    return (f"the search ranks {stem} first", c)
+        firsts = [s[0] for res in r.results("embed_library_search")
+                  if (s := [t for h in _hits(res) for t in seeds if t in str(h.get("title"))])]
+        return any(t == stem for t in firsts), f"first seeds {firsts[:3]}"
+    return (f"the search ranks {stem} above the other seeds", c)
 
 
 def points_to(stem: str):

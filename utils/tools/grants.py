@@ -43,6 +43,7 @@ GRANT_KEY = re.compile(r"^(url:host|arg:[A-Za-z_][A-Za-z0-9_.-]{0,63}|const:[A-Z
 REMEMBER = ("once", "thread", "always")
 FOLDER_KIND = "folder"      # plan 34: a folder the user allowed in one chat (key "folder:<path>", tool "<mod>_*")
 CONFIRM_RISKS = ("execute", "destructive")   # an `always` grant for these needs a second confirm
+SHIPPED_PREFIX = "gr_default_"   # the grants AIHub ships (utils/db.py migration 010); a person's are gr_<hex>
 
 
 def key_of(grant_key: str | None, arguments: Any) -> str | None:
@@ -91,12 +92,17 @@ class Grants:
 
     async def match(self, tool: ToolDef, arguments: Any, origin: dict[str, Any] | None,
                     key: str | None = None) -> dict[str, Any] | None:
-        """The newest live grant that covers this call, or None. Counts the use. `key`: the mod's own (27.4)."""
+        """The newest live grant that covers this call, or None. Counts the use. `key`: the mod's own (27.4).
+        In a dry run (the agent eval) a person's `always` grants don't count, only the ones AIHub ships and
+        the chat's own: the eval measures AIHub's defaults, not this machine's choices."""
         key, thread = key or key_of(tool.grant_key, arguments), _thread(origin)
         rows = await self.db.fetchall(
             "SELECT * FROM grants WHERE (expires_ts IS NULL OR expires_ts > ?) AND (scope = 'always' OR thread = ?) "
             "ORDER BY created_ts DESC", (time.time(), thread or "\0"))
+        dry = bool((origin or {}).get("dry_run"))
         for r in rows:
+            if dry and r["scope"] == "always" and not r["id"].startswith(SHIPPED_PREFIX):
+                continue
             if fnmatch.fnmatchcase(tool.name, r["tool"]) and (r["key"] is None or r["key"] == key):
                 await self.db.execute("UPDATE grants SET used = used + 1, last_used_ts = ? WHERE id = ?", (time.time(), r["id"]))
                 return r

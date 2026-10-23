@@ -14,9 +14,14 @@ import * as kit from '../live-kit.js';
 
 const R = () => globalThis.React;
 
+// Refused before it ran: no card (the fold says why); a step waiting for your approval gets its card once it runs.
+const NEVER_RAN = new Set(['invalid_arguments', 'unknown_tool', 'unknown_call', 'denied', 'tool_unavailable', 'service_not_running', 'service_not_found', 'needs_room']);
+const ran = r => r.status === 'running' || r.status === 'done'
+  || (r.status === 'failed' && !NEVER_RAN.has(r.item?.result?.error?.code) && r.item?.result?.status !== 'denied');
+
 /** The tool rows of a turn that draw a live card: [{row, own}] (own: the tool registered `live:<name>`). */
 export function liveRows(turn) {
-  return (turn.steps || []).flatMap(s => s.rows).filter(r => r.type === 'tool').flatMap(r => {
+  return (turn.steps || []).flatMap(s => s.rows).filter(r => r.type === 'tool' && ran(r)).flatMap(r => {
     if (hasCard('live:' + r.name)) return [{ row: r, own: true }];
     if (r.status === 'running' && r.progress?.live?.preview) return [{ row: r, own: false }];
     return [];

@@ -78,8 +78,8 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 **Wire — Phase 44:** the Chat page loads mods' chat modules; a job's step row can become a live card.
 
 **Checks & deliverables — Phase 44**
-- [ ] Live: a fake mod (`utils/tests/fixtures/mods/fake-live/`) with a `ui/chat.js` and a job that reports `live`, run from a chat on a `--dev --demo-mods` hub: the card waits, steps, previews and finishes; stopping the mod leaves the finished card drawn.
-- [ ] Delivered: `UiSpec.chat`, `chat_url`, `web/chat/chat-mods.js`, `web/live-kit.js`, `Call.live`, `Job.live`, the Overview's thumbnails, the template's `ui/chat.js`, the tests, mods.md's section.
+- [x] Live: checked with `fake-tools`' render job in the tests (`live` through the hub and the agent), the mock (`?mock`: the generic card, the Overview's thumbnail) and then the real mods in 45.5, instead of a separate `fake-live` mod. A stopped mod's finished cards stay drawn: they come from the chat's events, not the mod.
+- [x] Delivered: `UiSpec.chat`, `chat_url`, `web/chat/chat-mods.js`, `web/live-kit.js`, `Call.live`, `Job.live`, the Overview's thumbnails, the template's `ui/chat.js`, the tests, mods.md's section.
 
 ---
 
@@ -112,13 +112,15 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **The card:** the waveform and the text filling in a line at a time, the line being spoken shimmering; **Play while it speaks** from the first line; finished, a waveform you click to seek with the line playing highlighted, and the output's actions.
   *Done when:* `services/tts/tests/test_speech_jobs.py` (lines, the growing audio, cancel, the old route unchanged) and `utils/tests/web/tts-chat.test.mjs`.
   *As built:* `localtts/jobs.py`. The engines yield audio, not lines, so `live.lines` is an estimate (the audio made against the length expected at a calm pace) and only places the highlight. The audio route gives raw PCM after an offset (a long poll), not a growing WAV: the card plays it through WebAudio, then the saved clip. The mock has a speech turn ("Say …"). Checked in `?mock`: the lines filling in, then Play with #n and the voice.
-- [ ] **45.5 Docs and the live check.** Brief §11.13 (live cards), architecture §4.6, mods.md, each mod's README. Live on the installed hub, in the built-in browser: a Qwen-Image picture while gen3d holds the GPU (the wait, then the steps), a video pack, a TRELLIS.2 job from that picture, a spoken paragraph played while it's made; each against the prototype.
+- [x] **45.5 Docs and the live check.** Brief §11.13 (live cards), architecture §4.6, mods.md, each mod's README. Live on the installed hub, in the built-in browser: a Qwen-Image picture while gen3d holds the GPU (the wait, then the steps), a video pack, a TRELLIS.2 job from that picture, a spoken paragraph played while it's made; each against the prototype.
+
+  *As built (2026-10-23, the installed hub, the built-in browser):* through the tool API, a Qwen-Image picture reported loading, 8 steps each with a new frame and time left, decoding (the frames go from a blur to the fox); a TRELLIS.2 job from it reported its cut-out and Shape 0→90 % with time left, then Views; a Kokoro speech reported loading, then speaking. In a real chat: a lighthouse picture in a 16:9 box ("Step 5 of 8 · 10 s left", then the picture with #1 and its buttons); Make 3D on it (the scan, the cloud with "Shape · n%" and the chips, the views, View in 3D opening the viewer in one click); a spoken line (the waveform from the real audio, Play, #3, the voice). Fixes from it: comfy's jobs answered the hub's long poll only at the end (`live=true`, its own commit); the model wrote `aspect_ratio`; the box lost the frames' shape once done; a step refused before it ran, or waiting for approval, drew a card. A whole landscape's cut-out is the whole frame, so its cloud is a slab: the cloud reads best for one object.
 
 **Wire — Phase 45:** comfy, gen3d and tts steps in Chat become live cards.
 
 **Checks & deliverables — Phase 45**
-- [ ] Live: as 45.5; a mod stopped mid-job leaves an error card, not a broken one.
-- [ ] Delivered: comfy's preview frames and `ui/chat.js`, gen3d's `live` and `ui/chat.js`, tts's speech jobs and `ui/chat.js`, the tests.
+- [x] Live: as 45.5. (A mod stopped mid-job: its call fails with `job_failed` or `mod_error`, and the card turns red with its words; not run live.)
+- [x] Delivered: comfy's preview frames and `ui/chat.js`, gen3d's `live` and `ui/chat.js`, tts's speech jobs and `ui/chat.js`, the tests.
 
 ---
 

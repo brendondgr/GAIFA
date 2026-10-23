@@ -187,6 +187,11 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     if (cmd === 'compact') { if (!tid) toast('Nothing to compact yet'); else c.compact(tid).then(() => toast('Compacted: earlier messages summarized', 'success'), fail); return null; }
     if (cmd === 'clear') { go('#/chat'); return null; }
     if (cmd === 'context') { setMeterOpen(true); return null; }
+    if (cmd === 'clear-gpu') {      // plan 46.2: hub_free_gpu as your own step, drawn as its status card
+      const services = arg ? arg.split(/[\s,]+/).filter(Boolean) : [];
+      ensureThread().then(id => c.action(id, 'hub_free_gpu', services.length ? { services } : {})).catch(fail);
+      return null;
+    }
     if (cmd === 'model') {
       if (!arg) { toast('Usage: /model <id>. ' + (models?.models || []).map(m => m.id).join(', ')); return null; }
       if (models && !models.models.some(m => m.id === arg)) { toast(`No model “${arg}”`, 'error'); return null; }

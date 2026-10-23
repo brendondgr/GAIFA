@@ -34,6 +34,7 @@ export const COMMANDS = [
   { cmd: 'clear', hint: 'Start a new chat' },
   { cmd: 'model', hint: 'Switch this chat’s model', arg: '<id>' },
   { cmd: 'context', hint: 'Show the context meter' },
+  { cmd: 'clear-gpu', hint: 'Free the GPU: unload what is loaded (LLM engines only when named)', arg: '[mod…]' },   // plan 46.2
 ];
 /** The slash commands for a draft like "/mo": built-ins, then skills. */
 export function slashMatches(draft, skills = []) {

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from utils.outputs.entries import KINDS
 from utils.services import loading
-from utils.tools import doc_tools
+from utils.tools import doc_tools, hub_status_tools
 from utils.tools.catalog import ToolDef
 
 if TYPE_CHECKING:
@@ -203,6 +203,7 @@ def tools() -> list[ToolDef]:
                 "cue": {"type": "string", "description": "When it applies, in a few words"}}, ["value"]), set_preference, "write"),
         t("list_preferences", "The user's saved preferences (active), optionally for one tool.",
           _obj({"tool": {"type": "string"}}), list_preferences),
+        *(t(name, desc, params, fn, risk) for name, desc, params, fn, risk in hub_status_tools.specs(_obj, SERVICE)),   # plan 46.2
         t("job_status", "The state of an earlier tool call that is still running (by its call_id), with its result when done.",
           _obj({"call_id": {"type": "string"}, "wait": {"type": "number", "minimum": 0, "maximum": 600,
                                                          "description": "Seconds to wait for it to finish"}}, ["call_id"]),

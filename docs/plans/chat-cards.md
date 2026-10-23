@@ -129,10 +129,11 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **The card** draws with 47.2's table and chart parts; the raw JSON stays one click away.
   - **Declared at first:** `gen3d_list_jobs`, `stt_list_models`, `hub_list_models`, `lcpp_list_llms`, `vllm_list_profiles`, `relay_relay_stats`, `searxng_engines`, `hub_list_sessions`.
   *Done when:* `utils/tests/tools/test_tool_view.py` (validation, carried in the catalog) and `utils/tests/web/chat-view.test.mjs`. 46.1 lands after 47.2 if 47 is built first; otherwise 47.2's parts are built here.
-- [ ] **46.2 New hub tools: `utils/tools/hub_tools.py`, `web/chat/chat-composer.js`.**
+- [x] **46.2 New hub tools: `utils/tools/hub_tools.py`, `web/chat/chat-composer.js`.**
   - **`hub_gpu_status`** (`GET /api/gpu`: the holder, the queue, each wait's time), **`hub_doctor`** (`GET /api/doctor`), **`hub_free_gpu({services?})`** (unloads as in the gaps; the result lists what was freed and how much).
   - **`/clear-gpu [service…]`:** one built-in slash command (the user's maybe) that runs `hub_free_gpu` as a user call.
   *Done when:* `utils/tests/tools/test_hub_status_tools.py` (new: the three tools, the chat's own model kept), `utils/tests/web/chat-composer.test.mjs` (the command).
+  *As built:* a hub tool doesn't know which chat calls it, so `hub_free_gpu` keeps the LLM engines (lcpp, vllm) unless they're named, which keeps a local chat model; the result lists what was freed (with GB), kept and failed. `/clear-gpu [mod…]` runs it as your own step (`POST /v1/threads/{id}/action`). The command's test is in `chat.test.mjs`.
 - [ ] **46.3 The hub's status cards: `web/chat/status/` (new: `memory.js`, `services.js`, `gpu.js`, `jobs.js`, `doctor.js`).**
   - **Memory** (`hub_memory_status`): one bar per pool (Phase 36), what's loaded with its size, **Unload** on each. **Services** (`hub_list_services`): each mod's logo, state colour and memory, **Start**/**Stop**. **GPU** (`hub_gpu_status`): the holder and the queue in order, with times, **Cancel** on waits. **Jobs** (`hub_job_status`): its state, progress and stages. **Doctor** (`hub_doctor`): passes folded, problems open with their fix. **Free GPU** (`hub_free_gpu`): what was freed.
   - **Buttons call the hub's routes directly** (the user is acting, not the agent) and refresh the card; Stop and Unload of something in use ask first.

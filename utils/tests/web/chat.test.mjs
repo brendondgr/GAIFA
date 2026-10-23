@@ -182,7 +182,8 @@ test('actions: registering, running and validation', () => {
 });
 
 test('slash commands: built-ins and skills', () => {
-  assert.deepEqual(composer.slashMatches('/', []).map(c => c.cmd), ['compact', 'clear', 'model', 'context']);
+  assert.deepEqual(composer.slashMatches('/', []).map(c => c.cmd), ['compact', 'clear', 'model', 'context', 'clear-gpu']);
+  assert.deepEqual(composer.slashMatches('/clear', []).map(c => c.cmd), ['clear', 'clear-gpu']);   // plan 46.2
   assert.deepEqual(composer.slashMatches('/co', [{ name: 'comfy', description: 'workflows' }]).map(c => c.cmd), ['compact', 'context', 'comfy']);
   assert.deepEqual(composer.slashMatches('/model gemma', []), []);
   assert.deepEqual(composer.slashMatches('hello /c', []), []);

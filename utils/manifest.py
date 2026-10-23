@@ -302,12 +302,38 @@ class ToolSpec(_Strict):
         return self
 
 
+class MentionSpec(_Strict):
+    """[[agent.mentions]] (plan 48.1): a kind of thing the user can @-mention, listed from the mod, filling tool fields."""
+    kind: str                       # voice, workflow, engine…: what the user types after @
+    list: Op                        # "GET /v1/voices": the mod's route that lists them
+    rows: str = ""                  # dotted path to the list in its answer ("" = the answer itself)
+    value: str = "name"             # the key of an item's value ("" for items that are plain strings)
+    label: str | None = None        # the key shown (default: the value)
+    fills: list[str] = []           # "<tool>.<field>" in this mod, e.g. "speak.name"
+
+    @field_validator("kind")
+    @classmethod
+    def _kind(cls, v: str) -> str:
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{1,23}", v):
+            raise ValueError(f"{v!r} must be a short lowercase word (voice, workflow…)")
+        return v
+
+    @field_validator("fills")
+    @classmethod
+    def _fills(cls, v: list[str]) -> list[str]:
+        bad = [f for f in v if not re.fullmatch(r"[a-z][a-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*", f)]
+        if bad:
+            raise ValueError(f"fills {bad} must be <tool>.<field>, e.g. speak.name")
+        return v
+
+
 class AgentSpec(_Strict):
     """[agent]: tools a mod lists at runtime (comfy's task tools), read by the tool catalog (plan 13.1),
     and the mod's skills folder (plan 14.9)."""
     tools_source: Op | None = None
     skills: str | None = None     # a folder inside the mod: skills/<name>/SKILL.md
     limits: Op | None = None      # plan 27.4: "POST /v1/limits", the preflight the hub asks before deciding a call
+    mentions: list[MentionSpec] = []   # plan 48.1: what the user can @-mention (utils/routes/mentions.py)
 
     @field_validator("skills")
     @classmethod

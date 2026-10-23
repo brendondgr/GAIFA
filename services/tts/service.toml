@@ -83,3 +83,17 @@ delete_voice = { op = "DELETE /v1/voices/{name}", description = "Delete a saved 
 
 [agent]
 skills = "skills"            # skills/<name>/SKILL.md for the chat agent (plan 14.9)
+
+# @-mentions (plan 48.1): @voice:<name> in a message picks the voice for that turn's speech
+[[agent.mentions]]
+kind = "voice"
+list = "GET /v1/voices"
+rows = "custom"
+fills = ["speak.name"]
+
+[[agent.mentions]]
+kind = "voice"
+list = "GET /v1/voices"
+rows = "kokoro"
+value = ""
+fills = ["speak.name"]

@@ -72,3 +72,12 @@ tools_source = "GET /v1/tools"    # one tool per task (generate_image, animate_i
 [tools]
 job = { op = "GET /v1/jobs/{job_id}", description = "A run's state and its output files" }
 cancel = { op = "POST /v1/queue/{job_id}/cancel", description = "Cancel a waiting or running run", confirm = true }
+
+# @-mentions (plan 48.1): @workflow:<pack> picks the workflow for that turn's pictures and videos
+[[agent.mentions]]
+kind = "workflow"
+list = "GET /v1/workflows"
+rows = "workflows"
+value = "id"
+label = "name"
+fills = ["generate_image.workflow", "edit_image.workflow", "animate_image.workflow", "generate_video.workflow", "upscale_image.workflow", "remove_background.workflow", "run_workflow.workflow"]

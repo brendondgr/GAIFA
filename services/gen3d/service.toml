@@ -85,3 +85,12 @@ delete_job = { op = "DELETE /v1/jobs/{jid}", description = "Delete a job and its
 
 [agent]
 skills = "skills"            # skills/<name>/SKILL.md for the chat agent (plan 14.9)
+
+# @-mentions (plan 48.1): @engine:<id> picks the 3D engine for that turn
+[[agent.mentions]]
+kind = "engine"
+list = "GET /v1/options"
+rows = "engines"
+value = "id"
+label = "label"
+fills = ["make_3d.engine"]

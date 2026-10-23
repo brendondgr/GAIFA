@@ -59,6 +59,7 @@ async def test_idle_needs_something_new(env):
     assert await s.tick() == "idle"
     await asyncio.sleep(0)
     now[0] += 3 * 3600
+    s.last_nightly = time.strftime("%Y-%m-%d", time.localtime(now[0]))   # run late in the evening, +3 h is tomorrow: its nightly ran
     assert await s.tick() is None                               # nothing new since that run
 
 

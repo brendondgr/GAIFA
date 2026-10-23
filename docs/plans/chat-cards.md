@@ -9,6 +9,8 @@ Asked for on 2026-10-22: make the Chat page easier to extend, and nicer to use. 
 - **Save to…** and Copy on every output.
 - **Read replies aloud**, and a hands-free **voice mode**.
 
+**Previews for everything** (the user, when starting the build): live image, video and 3D previews are for anything being made, not only what the agent makes. A picture queued from the comfy page, from ComfyUI's own page, over MCP or the API previews the same way, wherever AIHub shows running jobs (the Overview, the mod pages, the chat). So the live shape is part of a mod's status `jobs`, not only of a tool call, and the preview parts are a shared kit in `web/`, not chat code.
+
 Turned down: slash commands for mods' tools ("we don't need"), and side panels of any kind (pinned output, jobs, memory and the rest). The user's one maybe: `/clear-gpu`, which natural language can do too (46.2 has both).
 
 **How it fits:** `chat.js` already exports the registries (`registerCard`, `registerPreview`, `registerAction`, `registerStep`; brief §11.13), but only the hub's own `web/chat/` calls them. Mod UI files are already served at `/ui/services/<id>/…` (`utils/services/views.py`, `page_url`). Job progress already travels mod → hub (`utils/tools/calls.py` `_follow`, polled every 2 s) → `GET /api/tools/calls/{id}` → the agent (`agent/loop.py` `_wait_call`, a transient `progress` event) → the chat (`chat-thread.js` `live.progress`) as `{progress, note}`. This stage widens that pipe and lets mods draw what comes through it. Touches architecture §4.2 (a mod's optional extras), §4.6, §14; brief §11.12–11.13; [mods.md](../mods.md).
@@ -19,9 +21,9 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 
 **Simple gaps (assumed):**
 - **Which chat modules load:** every installed mod's that declares one, running or not, so an old chat still draws its cards while the mod is stopped. A module that fails to load is logged and skipped. Its cards then fall back to the generic ones.
-- **What a module gets:** one call, `export default function setup(chat)`, with `chat = {version, registerCard, registerPreview, registerAction, registerStep, live, ui, api}`. `ui` is `chat-ui.js`'s parts (h, T, Btn, Badge, Icon…), `live` the live-card frame (44.3), `api` the page's client. No `registerCommand`, no `registerPanel` (declined).
+- **What a module gets:** one call, `export default function setup(chat)`, with `chat = {version, registerCard, registerPreview, registerAction, registerStep, live, ui, api}`. `ui` is `chat-ui.js`'s parts (h, T, Btn, Badge, Icon…), `live` the live kit (44.3), `api` the page's client. No `registerCommand`, no `registerPanel` (declined).
 - **The live shape is optional.** A job without `live` draws as today: the step row and its bar.
-- **Preview frames are pulled by the card,** not pushed through the agent: the agent's event carries the frame's `seq` and URL, and the card fetches the image from the mod through the hub's proxy. Events stay small, and a chat that isn't open costs nothing.
+- **Preview frames are pulled by whatever shows them** (a card, a thumbnail), not pushed through the agent: the agent's event carries the frame's `seq` and URL, and the card fetches the image from the mod through the hub's proxy. Events stay small, and a chat that isn't open costs nothing.
 - **ComfyUI's previews:** `--preview-method auto` (TAESD when its decoders are on disk, latent2rgb otherwise). Core ComfyUI previews one frame of a video. The looping clip of the prototype needs VideoHelperSuite's animated latent preview where a pack uses it; otherwise the video card loops the one frame it has.
 - **The 3D card's point cloud is decoration.** gen3d sends no geometry until the shape is done, so the cloud is built in the browser from the cut-out picture's outline. The card says "Shape · n%", never that the cloud is the model.
 - **Speech becomes a job** so it can report lines done and stream its audio as it's made. `tts_speak` keeps its arguments; its op moves to the job routes.
@@ -52,12 +54,17 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **The hub** keeps it on the call (`Call.live`), publishes when it changes (by `stage`, `step` and `preview.seq`, not every poll), adds it to `public()` with the mod's paths rewritten to `/api/s/<id>/…`, and caps it at 4 KB.
   - **The agent** passes `live` in its transient `progress` event, and counts it in the change key.
   - **The chat** keeps `live` on the step's `progress`.
+  - **Every job, not just tool calls:** a mod's status `jobs[]` entries may carry the same `live`; the hub's status poll (`utils/services/status.py`) keeps it with paths rewritten, and `Job.live` goes out in `/api/events/recent`, `/api/overview` and the `jobs` events.
   - **Docs:** architecture §4.6 (the `live` shape), §14 (the event), brief §11.12 (`GET /api/tools/calls/{id}`), mods.md (a new "Live progress" section).
   *Done when:* `utils/tests/tools/test_live_progress.py` (a fake job's `live` reaches the call's status, paths rewritten, published on change only, capped), `services/agent/tests/test_progress_live.py`, and `utils/tests/web/chat-turn.test.mjs` (the row carries it).
-- [ ] **44.3 The live-card frame: `web/chat/live-card.js` (new).**
-  - **The parts the prototype's four cards share**, exported to modules as `chat.live`: `LiveCard` (header with icon, title, meta and the pulsing dot; the progress line; the footer with `#n`, title and actions), `Stage` (a box at an aspect ratio, at most 420 px tall, centred), `Waiting` (shimmer and grain; "Waiting for the GPU · 1 ahead · …" from the call's `note`, "Loading <model>" from `stage`), `PreviewLayers` (fetches `preview.url` when `seq` changes, fades the new frame in over the old one, then fades the result in over both), `StageChips` (✓ done · ● running with time left · ○ waiting), `usePreview(live)`.
+- [ ] **44.3 The live kit: `web/live-kit.js` (new), shared by the chat, the Overview and mod pages.**
+  - **The parts the prototype's four cards share**, exported to chat modules as `chat.live` and to page modules as `ctx.live`: `LiveCard` (header with icon, title, meta and the pulsing dot; the progress line; the footer with `#n`, title and actions), `Stage` (a box at an aspect ratio, at most 420 px tall, centred), `Waiting` (shimmer and grain; "Waiting for the GPU · 1 ahead · …" from the call's `note`, "Loading <model>" from `stage`), `PreviewLayers` (fetches `preview.url` when `seq` changes, fades the new frame in over the old one, then fades the result in over both), `StageChips` (✓ done · ● running with time left · ○ waiting), `usePreview(live)`, and `LiveThumb` (a small preview with the step, for lists of jobs).
   - **Theme tokens only** (`T`), so both themes work; `prefers-reduced-motion` turns the shimmer and the fades off.
-  *Done when:* `utils/tests/web/live-card.test.mjs` (the wait text from a note, the chips from `stages`, a new `seq` fetches once, reduced motion), and the prototype's look reproduced in `?mock` (44.4).
+  *Done when:* `utils/tests/web/live-kit.test.mjs` (the wait text from a note, the chips from `stages`, a new `seq` fetches once, reduced motion), and the prototype's look reproduced in `?mock` (44.4).
+- [ ] **44.5 Running jobs preview everywhere: `web/dashboard.js`, `web/mod-kit.js`.**
+  - **The Overview's Jobs** list shows a `LiveThumb` for a running job with a preview, its step and time left; the thumbnail links to the job's route.
+  - **Page modules** get `ctx.live` (the kit) and the mod's own running jobs with their `live`, so a mod page draws the same previews for runs started there.
+  *Done when:* `utils/tests/web/dashboard-jobs.test.mjs` (a job with a preview, one without) and the mock's comfy job shows a thumbnail on the Overview.
 - [ ] **44.4 The template, the mock and the docs: `services/_template/ui/chat.js`, `web/chat/chat-mock.js`, `docs/mods.md`.**
   - **The template** ships a small commented `ui/chat.js` (one step card using `chat.live`) and `[ui] chat` commented out in its `service.toml`.
   - **The mock** (`?mock`) plays a job with `live` (queued → loading → steps with preview frames from a bundled small image → done), so the frame is checkable without a GPU.
@@ -68,7 +75,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 
 **Checks & deliverables — Phase 44**
 - [ ] Live: a fake mod (`utils/tests/fixtures/mods/fake-live/`) with a `ui/chat.js` and a job that reports `live`, run from a chat on a `--dev --demo-mods` hub: the card waits, steps, previews and finishes; stopping the mod leaves the finished card drawn.
-- [ ] Delivered: `UiSpec.chat`, `chat_url`, `web/chat/chat-mods.js`, `web/chat/live-card.js`, `Call.live`, the template's `ui/chat.js`, the tests, mods.md's section.
+- [ ] Delivered: `UiSpec.chat`, `chat_url`, `web/chat/chat-mods.js`, `web/live-kit.js`, `Call.live`, `Job.live`, the Overview's thumbnails, the template's `ui/chat.js`, the tests, mods.md's section.
 
 ---
 
@@ -76,7 +83,8 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 
 - [ ] **45.1 Preview frames from ComfyUI: `services/comfy/bin/comfyui`, `bin/comfyui-native`, the runtime variants' launch lines, `comfy/run.py`, `comfy/api_run.py`.**
   - **Launch:** `--preview-method auto` on every launch line (`test_runtime.py`'s expected command changes with it). The setup doc says TAESD's decoders are optional and sharpen the previews.
-  - **The websocket:** binary messages, event 1 (`PREVIEW_IMAGE`: 4-byte type, 4-byte format, the JPEG or PNG) and event 4 (with metadata: its `prompt_id`). The newest frame per run is kept in memory with a `seq`, dropped when the run ends. Frames of event 1 go to the run that is executing.
+  - **The websocket:** binary messages, event 1 (`PREVIEW_IMAGE`: 4-byte type, 4-byte format, the JPEG or PNG) and event 4 (with metadata: its `prompt_id`). The newest frame **per prompt** is kept in memory with a `seq`, for every prompt ComfyUI runs, including ones queued from ComfyUI's own page, and dropped a minute after it ends. Frames of event 1 go to the prompt that is executing.
+  - **`GET /v1/prompts/{prompt_id}/preview?after=`** serves any prompt's frame; the status job of a prompt from ComfyUI's page carries `live` with it.
   - **`GET /v1/runs/{id}/preview?after=<seq>`** → the image (headers `X-Seq`, cache off), 204 when there's none newer after waiting up to 5 s.
   - **`live` on the run's status:** `stage` (queued · loading · sampling · decoding · saving, from the queue, `execution_start`, the sampler node's `progress` and the save node), `step`/`steps` from the sampler's `progress`, `eta_s` from the step rate, `preview`.
   *Done when:* `services/comfy/tests/test_preview.py`, with `fakecomfy.py` sending binary previews (both events, a frame for another prompt ignored, the long poll, 204, dropped at the end, `live` through a run).
@@ -84,10 +92,12 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **Steps** for `comfy_generate_image`, `comfy_edit_image`, `comfy_run_workflow` and the task tools from `tools_source` (image and video tasks), using `chat.live`.
   - **Image:** the box at the call's aspect (from `aspect`/`width`/`height`, else 1:1), waiting and loading text, previews with "Step k of n", "Decoding", then the picture fades in; the footer has `#n`, the title, the workflow's name and size, and the output's actions.
   - **Video:** 16:9 (or the pack's size), the preview looping when frames are animated, a strip of 8 frames under it, "Encoding MP4", then the clip plays in the same box.
+  - **The comfy page** draws its running runs with the same image and video stages (`ctx.live`).
   *Done when:* `utils/tests/web/comfy-chat.test.mjs` (aspect from arguments, the stages' words, image vs video by task) and a real run on the installed hub (45.5).
 - [ ] **45.3 The 3D card: `services/gen3d/gen3d/` (job status), `services/gen3d/ui/chat.js` (new).**
   - **`live` on a job's status:** `stages` from `eta.py`'s plan (background, shape, parts, rig, preview: each with its state and `eta_s`), `stage`, and `preview` for the background step (the cut-out, `GET /v1/jobs/{jid}/preview`).
   - **The card:** the scan line that turns the input into the cut-out over a checkerboard; during the shape, a point cloud built from the cut-out's outline that turns slowly, with the cut-out small in a corner and "Shape · n%"; the four rendered views appearing one by one; then the finished preview with View in 3D (the existing viewer).
+  - **The 3D page** shows a running job the same way (`ctx.live`), and the status job carries `live`.
   *Done when:* `services/gen3d/tests/test_live.py` (stages and their times, the preview route) and `utils/tests/web/gen3d-chat.test.mjs` (the chips, the outline points from a small alpha image).
 - [ ] **45.4 Speech as a job, and the speech card: `services/tts/localtts/server.py`, `engines.py`, `services/tts/service.toml`, `services/tts/ui/chat.js` (new).**
   - **`POST /v1/speech/jobs`** (the body of `POST /v1/speech`) → `{id}`; **`GET /v1/speech/jobs/{id}`** with `live.lines` (done, of how many: the text split as the engine splits it) and `live.audio`; **`GET /v1/speech/jobs/{id}/audio`**: a WAV that grows while it's made (chunked), complete when done; cancel. `POST /v1/speech` stays for the Speech page and other callers.
@@ -233,7 +243,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 | --- | --- | --- |
 | Chat modules | `[ui] chat`, `chat_url`, the loader | `utils/manifest.py`, `utils/services/views.py`, `web/chat/chat-mods.js` |
 | Live progress | a job's `live` through the hub and the agent | `utils/tools/calls.py`, `services/agent/agent/loop.py`, `web/chat/chat-thread.js` |
-| Live-card frame | the shared parts of a live card | `web/chat/live-card.js` |
+| Live kit | the shared parts of a live card and `LiveThumb`, for the chat, the Overview and mod pages | `web/live-kit.js` |
 | Live cards | image and video, 3D, speech | `services/comfy/ui/chat.js`, `services/gen3d/ui/chat.js`, `services/tts/ui/chat.js` |
 | Preview frames | ComfyUI's previews, gen3d's cut-out, speech jobs | `services/comfy/comfy/run.py`, `services/gen3d/gen3d/`, `services/tts/localtts/` |
 | Status cards | the hub's and the mods' | `web/chat/status/`, the mods' `ui/chat.js` |

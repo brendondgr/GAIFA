@@ -93,7 +93,8 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
   React.useEffect(() => { forms.main.current?.refilter?.(); forms.rest.current?.refilter?.(); }, [JSON.stringify(fileVals)]);
   const by = spec.filled_by || {}, shown = k => `${k}: ${labelOf(props[k], args[k])}`;
   const mine = (spec.filled || []).filter(k => props[k] && /^pref:|^carried$/.test(by[k] || ''));
-  const filledNote = (spec.filled || []).filter(k => props[k] && !mine.includes(k)).map(shown).join(', ');
+  const named = (spec.filled || []).filter(k => props[k] && by[k] === 'mention');          // plan 48.3: an @-mention filled it
+  const filledNote = (spec.filled || []).filter(k => props[k] && !mine.includes(k) && !named.includes(k)).map(shown).join(', ');
   const prefNote = mine.map(k => shown(k) + (by[k] === 'carried' ? ' (as on your last card)' : '')).join(', ');
   const [err, setErr] = React.useState(null), [busy, setBusy] = React.useState(false);
   const key = spec.tool + JSON.stringify(Object.keys(props));
@@ -155,6 +156,8 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
     codes.map(k => h(CodeBox, { key: 'code:' + k, name: k, prop: props[k], value: codeVals[k], disabled: !!busy, onChange: v => setCodeVals(s => ({ ...s, [k]: v })) })),
     prefNote ? h('div', { title: 'Learned from what you chose before (Learning page). Change it here and it learns again.', style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.pu } },
       h(Icon, { d: 'bulb', size: 12 }), 'From your preferences: ' + prefNote) : null,
+    named.length ? h('div', { title: 'You named it with @ in your message', style: { display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.pu } },
+      '@', 'From your message: ' + named.map(shown).join(', ')) : null,
     filledNote ? h('div', { style: { fontSize: 11.5, color: T.mut } }, 'Chosen for these inputs: ' + filledNote) : null,
     main.length ? h(SchemaFormHost, { formKey: key + ':main', schema: pick(schema, main), values: args, order: main, api, context: others, formRef: forms.main, onChange: v => { vals.current.main = v; } }) : null,
     rest.length ? h('details', { style: { borderTop: '1px solid ' + T.bd, paddingTop: 8 } },

@@ -124,7 +124,8 @@ class Agent(Compaction):
         self.tasks[tid] = asyncio.create_task(self._turn(tid))
 
     async def send(self, tid: str, text: str, attachments: list[str] | None = None,
-                   doc_modes: dict[str, str] | None = None, quotes: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                   doc_modes: dict[str, str] | None = None, quotes: list[dict[str, Any]] | None = None,
+                   mentions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """`quotes`: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each, in order
         (Select → Reply). `text` may be empty when a reply says something."""
         thread = self.store.thread(tid)
@@ -140,6 +141,7 @@ class Agent(Compaction):
         for i, d in enumerate(docs):
             d["ref"] = f"#{n0 + i + 1}"
         ev = self.emit(tid, "user", {"text": text, **({"quotes": quotes} if quotes else {}),
+                                     **({"mentions": mentions} if mentions else {}),     # plan 48.3
                                      **({"attachments": attachments} if attachments else {}),
                                      **({"docs": docs} if docs else {}), **({"queued": True} if queued else {})})
         for d in docs:
@@ -472,6 +474,8 @@ class Agent(Compaction):
                 return "ok"
             turn, said = self._turn_of(tid)
             origin = {"service": "agent", "thread": tid, "tool_call_id": cid, "turn": turn}
+            if pins := self._pins(tid):
+                origin["pins"] = pins       # plan 48.3: what the user's message @-mentioned fills this turn's calls
             named = ctx.named_files(said)
             if named:
                 origin["named"] = named     # secret-looking files the user named: the workspace mod opens only these
@@ -541,6 +545,11 @@ class Agent(Compaction):
                 self.transient(tid, "progress", {"id": cid, "progress": st.get("progress"), "note": st.get("note"),
                                                  "elapsed_s": st.get("elapsed_s"), "job_id": st.get("job_id"),
                                                  **({"live": st["live"]} if st.get("live") else {})})
+
+    def _pins(self, tid: str) -> dict[str, dict[str, str]]:
+        """The last user message's mentions as {tool: {field: value}} (plan 48.3)."""
+        evs = self.store.events(tid, types=("user",))
+        return ctx.pins((evs[-1] if evs else {}).get("payload"))
 
     def _turn_of(self, tid: str) -> tuple[int, str]:
         """This turn's number (the seq of its user message: checkpoints and undo are per turn) and what the user said."""

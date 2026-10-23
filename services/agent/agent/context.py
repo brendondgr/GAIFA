@@ -104,6 +104,26 @@ def quotes_of(payload: dict[str, Any] | None) -> list[dict[str, Any]]:
     return out
 
 
+def pins(payload: dict[str, Any] | None) -> dict[str, dict[str, str]]:
+    """A user event's @-mentions (plan 48.3) as {tool: {field: value}}: what that turn's calls get filled with."""
+    out: dict[str, dict[str, str]] = {}
+    for m in (payload or {}).get("mentions") or []:
+        for f in m.get("fills") or []:
+            tool, _, field = str(f).partition(".")
+            if tool and field:
+                out.setdefault(tool, {})[field] = str(m.get("id"))
+    return out
+
+
+def mentions_line(payload: dict[str, Any] | None) -> str:
+    """What a message @-mentioned, said to the model in a line: "(Named in this message: voice Brendon (tts_speak.name).)"""
+    ms = (payload or {}).get("mentions") or []
+    if not ms:
+        return ""
+    parts = [f"{m.get('kind')} {m.get('label') or m.get('id')}" + (f" ({', '.join(m.get('fills') or [])})" if m.get("fills") else "") for m in ms]
+    return "(Named in this message: " + "; ".join(parts) + ". Use them for those tool fields.)"
+
+
 def said(payload: dict[str, Any] | None) -> str:
     """The user's own words in a message: each quote-reply's reply, then the text. Never the quoted parts:
     they are the model's words (the Auto judge and `named_files` read only what the user wrote)."""
@@ -342,6 +362,8 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
         if t == "user":
             flush()
             text = with_quotes(p.get("text") or "", quotes_of(p))
+            if line := mentions_line(p):
+                text += "\n\n" + line                 # plan 48.3: the @-mentions, plainly
             docs = p.get("docs") or []
             rest = [a for a in p.get("attachments") or [] if a not in {d["id"] for d in docs}]
             if rest:

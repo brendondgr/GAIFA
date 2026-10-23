@@ -34,7 +34,7 @@ import httpx
 from utils import live as live_mod
 from utils.gpu import gpu_note
 from utils.services import ServiceError
-from utils.tools import fixes, results
+from utils.tools import fixes, pins, results
 from utils.tools.approvals import Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.doc_tools import untrusted
@@ -174,6 +174,7 @@ class Calls:
             arguments, mine = await self.hub.prefs.apply(tool, arguments, origin, filled)
             how.update(mine)
             filled = [*[k for k in filled if k not in mine], *mine]
+        arguments, filled, pinned_over = pins.apply(tool, arguments, origin, filled, how)   # @-mentions (plan 48.3)
         problems = validate(tool.parameters, arguments) or options.problems(tool.parameters, arguments)
         if problems:
             out = self._invalid(tool, await self._elsewhere(tool, arguments, problems))
@@ -198,6 +199,8 @@ class Calls:
         if verdict == "judge":                         # Auto mode (plan 30.3): allow or ask, with its reason
             verdict, why, judged = await judge(self.hub, tool, arguments, origin, limits, why)
             judged = {**judged, "why": why}
+        if pinned_over and verdict == "allow":         # the model chose other than your message named: you decide
+            verdict, why = "ask", f"your message named {', '.join(pinned_over)}; the model chose something else"
         if tool.name == webread.FETCH_TOOL:
             webread.note_question(origin)              # what the page is read for (in memory only)
         origin = webread.private_out(origin)           # the user's words (said, question, links): never stored

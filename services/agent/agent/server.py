@@ -59,6 +59,13 @@ class QuoteReply(BaseModel):
     seq: int | None = Field(None, ge=1, description="the assistant event it came from")
 
 
+class Mention(BaseModel):
+    kind: str = Field(max_length=24)
+    id: str = Field(max_length=300)
+    label: str = Field("", max_length=300)
+    fills: list[str] = Field(default_factory=list, max_length=12, description="<tool>.<field>, e.g. tts_speak.name")
+
+
 class Message(BaseModel):
     text: str = Field("", max_length=100_000, description="may be empty when a quote-reply says something")
     quotes: list[QuoteReply] | None = Field(None, description="parts of earlier replies and the user's reply to each, in order "
@@ -67,6 +74,8 @@ class Message(BaseModel):
     attachments: list[str] = Field(default_factory=list, description="output ids")
     doc_modes: dict[str, Literal["auto", "whole", "card"]] = Field(default_factory=dict,
                                                                    description="per attached document: whole, card, or auto (plan 24.9)")
+    mentions: list[Mention] = Field(default_factory=list, max_length=20,
+                                    description="plan 48.3: what the message @-mentions; fills that turn's calls")
 
 
 class Answer(BaseModel):
@@ -414,7 +423,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         if not body.text.strip() and not any(q["reply"].strip() for q in quotes):
             raise HTTPException(422, {"code": "empty_message" if not quotes else "invalid_quote",
                                       "detail": "the message is empty" if not quotes else "say something: a reply to a quoted part or a message"})
-        return await agent.send(tid, body.text, body.attachments, body.doc_modes, quotes=quotes)
+        return await agent.send(tid, body.text, body.attachments, body.doc_modes, quotes=quotes,
+                                mentions=[m.model_dump() for m in body.mentions])
 
     @app.post("/v1/threads/{tid}/answer", status_code=202, summary="Answer an ask_user question card")
     async def answer(tid: str, body: Answer, request: Request) -> dict:

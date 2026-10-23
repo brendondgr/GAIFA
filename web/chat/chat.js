@@ -15,6 +15,7 @@ import { Card, CARD_CSS, TodoList } from './chat-cards.js';
 import './chat-forms.js';
 import './chat-results.js';
 import './chat-status.js';
+import './chat-show.js';
 import { runAction } from './chat-actions.js';
 import { buildView, applyTransient, settleLive, mergeEvents, todosOpen, threadOf } from './chat-thread.js';
 import { groupTurns } from './chat-turn.js';

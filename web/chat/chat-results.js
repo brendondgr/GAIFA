@@ -78,7 +78,7 @@ export function ActionBar({ output, ctx }) {
       onClick: () => ctx.runAction(a, output) })));
 }
 
-function OutputBlock({ output, ctx, cap }) {
+export function OutputBlock({ output, ctx, cap }) {
   const P = previews.get(output.kind) || NoPreview;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 } },

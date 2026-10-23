@@ -177,11 +177,12 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **The result** is the checked spec (the event the card draws) and, for the model, a one-line summary ("Shown: a line chart of 3 series, 48 points"), never the data back.
   *Done when:* `services/agent/tests/test_show.py` (each view, each source, each error's field and fix, limits).
   *As built:* the spec is `{view, title?, caption?, unit?}` plus one of `data` (inline), `file` ({output_id, rows, columns, x, y | show}), `hub` ({name, range, mod?, stat?}) or `outputs` (ids); it rides on the tool_result as `data.show`.
-- [ ] **47.2 The card: `web/chat/chat-show.js` and `web/chat/chat-table.js` (new).**
+- [x] **47.2 The card: `web/chat/chat-show.js` and `web/chat/chat-table.js` (new).**
   - **Charts** with `web/charts.js` (`LineChart`, `AreaChart`, `BarChart`, `HBarChart`, `Donut`, `Heatmap`, `KpiTile`) and its frame: the site's series colours, tooltips, "View as table", loading and error states. Hub sources load through `api.js` and refresh every 30 s while on screen.
   - **Tables:** sort by a column, a filter box, 50 rows a page, **Copy as CSV**, **Save as output** (a CSV through `POST /api/outputs/upload`; the card then shows its `#n`).
   - **Pictures:** `image` and `gallery` use the preview registry (an image, a video, audio, a 3D model), a gallery as a grid that opens one large.
   *Done when:* `utils/tests/web/chat-show.test.mjs` and `chat-table.test.mjs` (each view from a spec, sorting, filtering, CSV, the save call).
+  *As built:* `chat-show.js` draws in the `live:` slot (`live:show`); hub:memory is the mods' memory stacked (mem.svc.*), hub:outputs_per_day the outputs by kind per day, hub:job_times p50 and p90 per mod; ranges shorter than a day become 7 d for the daily ones. The table's tests are in `chat-show.test.mjs` with the card's. The mock has a stats turn ("… chart"). Checked in `?mock`: a bar chart, a table (filter, Copy as CSV, Save as output) and the live memory chart.
 - [ ] **47.3 Pictures inside the reply's text: `web/chat/chat-md.js`.**
   - **`![caption](#n)`** (or `output:<id>`) of an output of this chat draws that output in the reply where it's written, at most 360 px tall, with its caption; any other image source stays as text (no outside images). The output stays in the turn's strip too.
   *Done when:* `utils/tests/web/chat.test.mjs` (a picture, a video, a reference from another chat left as text, an `https:` image left as text), and `quote.test.mjs` (quoting a reply with a picture gives back its markdown).

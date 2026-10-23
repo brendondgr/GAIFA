@@ -66,6 +66,7 @@ const W = {
   view_output: { running: 'Looking at the output', done: 'Looked at the output', icon: 'eye', lookup: true, detail: (a, ctx) => ref(a.output || a.id || a.ref, ctx) || a.output || '' },
   read_result: { running: 'Reading an earlier result', done: 'Read an earlier result', icon: 'search', lookup: true },
   comfy_list_workflows: { running: 'Listing workflows', done: 'Listed the workflows', icon: 'search', lookup: true },
+  show: { running: 'Drawing it', done: a => ({ table: 'Made a table', image: 'Showed a picture', gallery: 'Showed a gallery' }[a.view] || 'Drew a chart'), icon: 'chart', detail: a => a.title || '' },   // plan 47.2
   hub_gpu_status: { running: 'Checking the GPU', done: 'Checked the GPU', icon: 'search', lookup: true },        // plan 46.2
   hub_doctor: { running: 'Checking the install', done: 'Checked the install', icon: 'search', lookup: true },
   hub_free_gpu: { running: 'Freeing the GPU', done: 'Freed the GPU', icon: 'tool', detail: a => (a.services || []).join(', ') },

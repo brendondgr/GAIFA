@@ -252,6 +252,24 @@ export function createMockClient(api, { speed = 1 } = {}) {
     if (/^(please\s+)?(search|look up)\b|\b(the web|sources?)\b/i.test(text)) return webTurn(t, run, text, { emit, say, usage, rid });   // the reply bar's Sources
     if (/\b3d\b/i.test(text) && /then|and turn|into/i.test(text)) return chainTurn(t, run, text);
     if (/image|picture|photo|draw|fox|paint/i.test(text)) return imageTurn(t, run, text);
+    if (/\b(chart|graph|plot|table|stats)\b/i.test(text)) {          // show: a chart, a table and AIHub's own data (plan 47.2)
+      const s = await say(t, run, 'Here is what you made this week, and how memory looked today.', 'Use show: inline numbers, a table, and hub:memory.', 2);
+      const shows = [
+        { view: 'bar', title: 'Made per day', x: ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'], series: [{ name: 'Images', values: [4, 7, 2, 0, 9, 5, 6] }, { name: 'Speech', values: [1, 0, 3, 2, 1, 4, 2] }] },
+        { view: 'table', title: 'Longest jobs', columns: ['Job', 'Mod', 'Seconds'], rows: [['Lighthouse 3D', 'gen3d', 241], ['Fox portrait', 'comfy', 53], ['Sonnet 18', 'tts', 22], ['Samurai', 'comfy', 49], ['Lantern 3D', 'gen3d', 118]] },
+        { view: 'area', title: 'Memory by mod', source: 'hub:memory', range: '24h' },
+      ];
+      for (const sh of shows) {
+        const cid = rid('tc_'), { source, range, ...rest } = sh;
+        emit(t, 'tool_call', { id: cid, name: 'show', arguments: sh, step: s, by: 'model' });
+        await run.sleep(300);
+        const spec = source ? { view: sh.view, title: sh.title, hub: { name: source.slice(4), range } } : { view: rest.view, title: rest.title, data: rest.view === 'table' ? { columns: rest.columns, rows: rest.rows } : { x: rest.x, series: rest.series } };
+        emit(t, 'tool_result', { id: cid, name: 'show', status: 'done', content: 'Shown.', data: { show: spec } });
+      }
+      await say(t, run, 'Mondays are your busiest day; the 3D jobs take the longest.', '', 1);
+      usage(t);
+      return 'idle';
+    }
     if (/\b(fail|broken|break)\b/i.test(text)) {        // a step that fails with the hub's fixes (plan 46.5)
       const s = await say(t, run, 'Making it at the quality preset.', 'Run gen3d_make_3d.', 2);
       const cid = rid('tc_'), fargs = { prompt: 'a dragon', engine: 'trellis2', preset: 'quality' };

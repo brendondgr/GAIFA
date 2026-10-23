@@ -146,6 +146,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
           : i >= 2 ? { preview: { url: '/chat/mock-live/input_rgba.png', seq: 1, w: 480, h: 360 } } : {}),
         ...(i >= 4 && i < 12 ? { step: i - 3, steps: 8 } : {}) };
     }
+    if (name === 'tts_speak') return i < 2 ? { stage: 'loading' } : { stage: 'speaking', lines: [Math.min(3, Math.floor((i - 2) / 2)), 4], eta_s: (total - i) * 0.32 };
     if (i < 3) return { stage: 'loading', eta_s: (total - i) * 0.32 };
     const k = Math.min(6, i - 2), steps = Math.min(6, total - 3);
     return i >= total ? { stage: 'decoding', step: steps, steps } : { stage: 'sampling', step: k, steps, eta_s: (total - i) * 0.32,
@@ -251,6 +252,14 @@ export function createMockClient(api, { speed = 1 } = {}) {
     if (/^(please\s+)?(search|look up)\b|\b(the web|sources?)\b/i.test(text)) return webTurn(t, run, text, { emit, say, usage, rid });   // the reply bar's Sources
     if (/\b3d\b/i.test(text) && /then|and turn|into/i.test(text)) return chainTurn(t, run, text);
     if (/image|picture|photo|draw|fox|paint/i.test(text)) return imageTurn(t, run, text);
+    if (/^(please\s+)?(say|speak|read|narrate)\b/i.test(text)) {     // a speech step with its live card (plan 45.4)
+      const s = await say(t, run, 'Here it is in that voice.', 'Speak it with tts_speak.', 2);
+      const cid = rid('tc_'), sargs = { text: 'Welcome to AIHub.\nEvery model on this machine, in one place.\nPictures, video, 3D and speech.\nAsk for anything.', name: 'Hope' };
+      emit(t, 'tool_call', { id: cid, name: 'tts_speak', arguments: sargs, step: s, by: 'model' });
+      await runTool(t, run, cid, 'tts_speak', sargs);
+      usage(t);
+      return 'idle';
+    }
     await say(t, run, MD_REPLY, 'A general question: answer directly and point at what I can do. No tool call needed.', 2);
     usage(t);
     return 'idle';

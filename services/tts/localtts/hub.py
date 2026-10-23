@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Query
 from . import outputs, voices
 from .config import settings
 from .engines import ENGINES, WAITING
+from .jobs import JOBS
 
 router = APIRouter()
 WIDGET_RANGES = {"7d": 7, "30d": 30}
@@ -31,8 +32,20 @@ def status():
             {"label": "Clips today", "value": outputs.clips_today(settings.outputs_dir), "reset": "daily"},
         ],
         # Requests waiting for AIHub's GPU slot (plan 31.3): stage waiting_gpu, with what runs before them.
-        "jobs": [{**j, "route": "#/s/tts"} for j in list(WAITING.values())],
+        "jobs": [{**j, "route": "#/s/tts"} for j in list(WAITING.values())] + _speech_jobs(),
     }
+
+
+def _speech_jobs() -> list[dict]:
+    """Speech jobs (plan 45.4) making audio now, with their live progress; a waiting one is listed by WAITING."""
+    out = []
+    for jid, j in list(JOBS.jobs.items()):
+        if j["state"] not in ("queued", "running") or jid in WAITING:
+            continue
+        p = JOBS.public(j)
+        out.append({"id": f"speech-{jid}", "label": p["label"], "progress": p["progress"], "state": p["state"],
+                    "route": "#/s/tts", **({"live": p["live"]} if p.get("live") else {})})
+    return out
 
 
 @router.get("/v1/hub/widgets/clips")

@@ -54,6 +54,7 @@ kinds = ["audio"]
 
 [ui]
 page = "ui/page.js"
+chat = "ui/chat.js"                 # the live speech card in Chat (plan 45.4)
 native = "/ui/"
 
 [[ui.widgets]]
@@ -74,7 +75,7 @@ hide = ["GET /", "GET /ui/*", "GET /v1/hub/*"]
 "GET /v1/outputs/{filename}" = "audio"
 
 [tools]
-speak = { op = "POST /v1/speech", risk = "generate", ask = ["name", "engine"], hide = ["stream", "timings", "no_save", "save_dir", "request_id", "format"], description = """Speak text aloud; the clip is saved to Outputs. `name` is a saved voice (tts_list_voices lists them) or a Kokoro voice such as af_heart; omit it for the default voice. With engine breeze, `instruction` describes the voice (when no name is given) or the delivery ("slow and warm").""", examples = [{ text = "Good morning, everyone.", name = "af_heart" }] }
+speak = { op = "POST /v1/speech/jobs", risk = "generate", job = true, job_status = "GET /v1/speech/jobs/{jid}", job_cancel = "POST /v1/speech/jobs/{jid}/cancel", ask = ["name", "engine"], hide = ["stream", "timings", "no_save", "save_dir", "request_id", "format"], description = """Speak text aloud; the clip is saved to Outputs. `name` is a saved voice (tts_list_voices lists them) or a Kokoro voice such as af_heart; omit it for the default voice. With engine breeze, `instruction` describes the voice (when no name is given) or the delivery ("slow and warm").""", examples = [{ text = "Good morning, everyone.", name = "af_heart" }] }
 list_voices = { op = "GET /v1/voices", core = true, fixed = { brief = true }, description = "List saved (Breeze) voices and Kokoro's built-in voices" }
 design_voice = { op = "POST /v1/voices/design", risk = "generate", ask = ["name", "instruction"], hide = ["overwrite"], description = "Invent a voice from a description and save it under a name" }
 clone_voice = { op = "POST /v1/voices", risk = "write", description = "Save a voice cloned from a 3-60 s reference clip" }

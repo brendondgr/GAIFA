@@ -6,7 +6,7 @@ import { createToolMocks } from './mock-tools.js';
 import { createSessionMocks } from './mock-sessions.js';
 import { TEXT_EXT, DOC_EXT } from './chat/chat-files.js';
 const GB = 1e9, MB = 1e6;
-const CHAT_MODS = ['comfy', 'gen3d'];   // mods whose chat module (plan 44.1) the mock lists: they're served from services/<id>/ui/ as in the live hub
+const CHAT_MODS = ['comfy', 'gen3d', 'tts'];   // mods whose chat module (plan 44.1) the mock lists: they're served from services/<id>/ui/ as in the live hub
 export class ApiError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
 }

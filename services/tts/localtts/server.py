@@ -22,7 +22,8 @@ from pydantic import AliasChoices, BaseModel, Field
 
 from . import __version__, audio, enhance, outputs, uploads, voices
 from .config import settings
-from .engines import ENGINES, EngineError, align_clips, transcribe
+from .engines import ENGINES, WAITING, EngineError, align_clips, transcribe
+from .jobs import JOBS
 
 log = logging.getLogger("localtts")
 
@@ -482,6 +483,52 @@ async def speech(req: SpeechRequest):
     else:
         _by_request_id[req.request_id] = (now, asyncio.create_task(_speak(req)))
     return await asyncio.shield(_by_request_id[req.request_id][1])
+
+
+# ---- speech as a job (plan 45.4): progress, and the audio while it's made ------------------------------
+
+@app.post("/v1/speech/jobs", status_code=202, summary="Speak as a job: poll GET /v1/speech/jobs/{id}; hear it while it's made at …/audio")
+async def speech_job(req: SpeechRequest):
+    engine_name, voice, params = _resolve(req)
+    engine = ENGINES[engine_name]
+    fmt = req.format if req.format != "pcm" else "wav"
+    out = None if req.no_save else _output_path(req.text, voice, fmt, req.save_dir)   # fail before generating
+
+    def finish(pcm: bytes, stats: dict, sr: int) -> dict | None:
+        _log_done(engine_name, voice, stats, out, streamed=True)
+        if out is None:
+            return None
+        _save(out, audio.encode(pcm, sr, fmt), req, engine_name, voice, fmt, stats)
+        return {"path": str(out), "kind": "audio", "duration_s": stats.get("audio_s")}
+
+    return JOBS.start(req.text, voice, engine, params, finish)
+
+
+def _speech_job(jid: str) -> dict:
+    j = JOBS.get(jid)
+    if j is None:
+        raise HTTPException(404, f"no speech job {jid!r}")
+    return j
+
+
+@app.get("/v1/speech/jobs/{jid}", summary="A speech job: state, progress, live (lines spoken, the audio's path), outputs when done")
+async def speech_job_status(jid: str):
+    return JOBS.public(_speech_job(jid), WAITING.get(jid))
+
+
+@app.get("/v1/speech/jobs/{jid}/audio", summary="The PCM (s16le, mono) made after `offset` bytes, waiting up to `wait` s; X-Done: 1 once it's all here")
+async def speech_job_audio(jid: str, offset: int = Query(0, ge=0), wait: float = Query(5, ge=0, le=20)):
+    j = _speech_job(jid)
+    data, finished = await JOBS.audio(j, offset, wait)
+    return Response(data, media_type="audio/pcm", headers={"X-Sample-Rate": str(j["sr"]), "X-Sample-Format": "s16le", "X-Channels": "1",
+                                                          "X-Offset": str(offset), "X-Done": "1" if finished else "0", "Cache-Control": "no-store"})
+
+
+@app.post("/v1/speech/jobs/{jid}/cancel", summary="Cancel a speech job")
+async def speech_job_cancel(jid: str):
+    j = _speech_job(jid)
+    await JOBS.cancel(j)
+    return JOBS.public(j)
 
 
 class OpenAISpeech(BaseModel):

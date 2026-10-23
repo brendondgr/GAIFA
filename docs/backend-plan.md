@@ -32,6 +32,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | M — Navigation | 33 | The sidebar in three groups, services shown as a list, a button or counts, a thin rail with state colours, a logo per mod, a Services page | the UI shell, `[ui.nav]`, a `[ui] logo` per mod; additive |
 | N — Other machines | 35–40 | AIHub beyond this machine: hardware detection, memory in pools (RAM and each GPU's VRAM), running without systemd, a variant per accelerator for every mod chosen by `aihub setup`, smokes, and field reports an agent writes while building on another machine (Linux with NVIDIA, Windows WSL2 with Intel); macOS by CI. Plan: [plans/portability.md](plans/portability.md) | Additive: this machine keeps its backends; every step's tests include its recorded hardware |
 | O — Chats by workspace | 41–43 | The chat list grouped by environment (Phase 34's workspaces), with orders, paging per group, Move to and renaming from the sidebar; then the Chat page after Claude Code: a compact sidebar, the message box with + and its controls (environment, mode, model) under it, environments made and changed from the chat, in a dialog with the desktop's folder chooser | the agent's thread list (additive filters), `web/chat/` |
+| P — Chat cards | 44–49 | Mods ship their own chat cards (`[ui] chat`), and jobs report live progress with preview frames: live cards for image, video, 3D and speech; status and fix-it cards; `show` for charts, tables and pictures in replies; @-mentions; Save to…; read aloud and voice mode. Plan: [plans/chat-cards.md](plans/chat-cards.md) | `web/chat/`, the tool call path (additive `live`, `view`, `fixes`), comfy, gen3d, tts (speech as a job), workspace (save into a folder); additive |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -79,6 +80,12 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 41 | The chat list by environment | M | `chat`: the thread list in sections per environment, the View menu, Show more per section, Move to |
 | 42 | The Chat page after Claude Code: the sidebar, the message box and its controls | M | `chat`: the sidebar's top rows and Show more divider, the message box with +, the environment, mode and model buttons under it, the environment menu |
 | 43 | The environment dialog and the system's folder chooser | S–M | `chat`: New environment and Edit open a dialog; Add folder… opens the desktop's chooser |
+| 44 | Mod chat modules and live progress | M | `chat`: mods' cards load; a job's step can be a live card |
+| 45 | Live cards for image, video, 3D and speech | L | `chat`: comfy, gen3d and tts steps as live cards |
+| 46 | Status cards and fix-it cards | M–L | `chat`: status results as cards with actions; errors with their fixes |
+| 47 | `show`: charts, tables and pictures in replies | M–L | `chat`: charts, tables, galleries and pictures in replies |
+| 48 | @-mentions and Save to… | M | `chat`: the `@` picker; Download, Copy and Save to folder on outputs |
+| 49 | Read aloud and voice mode | M | `chat`: the reply bar's speaker, voice mode, Settings → Agent → Voice |
 
 # Stage A — Foundation
 

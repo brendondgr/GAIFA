@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live cards prototype</title>
+<link rel="stylesheet" href="../../../web/vendor/fonts.css">
+<style>
+:root{--bg:#0B0E14;--card:#11151D;--inset:#131926;--bd:#1D2430;--tx:#E6EAF2;--mut:#8A94A6;--dim:#737D90;--acc:#FFB224;--cy:#58C4DD;--gr:#3FB950;--pu:#BC8CFF;--rd:#F85149;--mono:'JetBrains Mono',ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 Inter,system-ui,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:0 16px 80px}
+.bar{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 0;background:var(--bg);border-bottom:1px solid var(--bd)}
+.bar h1{font-size:15px;margin:0 auto 0 0}
+.bar label{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:12.5px}
+.note{color:var(--mut);font-size:12.5px;margin:12px 0 0}
+.btn{border:1px solid var(--bd);background:transparent;color:var(--tx);border-radius:6px;padding:3px 10px;font:12px Inter,system-ui,sans-serif;cursor:pointer;display:inline-flex;gap:5px;align-items:center}
+.btn:hover{background:var(--inset)} .btn.pri{border-color:transparent;background:var(--acc);color:#14161b;font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+select{background:var(--inset);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:2px 6px}
+.turn{display:flex;flex-direction:column;gap:10px;margin:30px 0}
+.user{margin-left:auto;max-width:80%;background:var(--inset);border:1px solid var(--bd);border-radius:12px;padding:7px 12px}
+.answer{opacity:0;transition:opacity .5s}.answer.on{opacity:1}
+.ref{font:600 11px var(--mono);color:var(--pu)}
+.lc{border:1px solid var(--bd);background:var(--card);border-radius:10px;overflow:hidden}
+.lc-head{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13px}
+.lc-head .t{font-weight:600}
+.lc-head .m{margin-left:auto;color:var(--mut);font:11.5px var(--mono);white-space:nowrap}
+.lc-head svg{flex:none;color:var(--acc)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--acc);animation:pulse 1.2s ease-in-out infinite}
+.lc.done .dot{display:none}
+@keyframes pulse{50%{opacity:.25}}
+.stage{position:relative;background:var(--inset);overflow:hidden;width:min(100%,calc(420px * var(--ar)));margin:0 auto;border-radius:6px}
+.lc>.stage{margin:0 auto 10px}
+.stage>canvas,.stage>img,.stage>.layer{position:absolute;inset:0;width:100%;height:100%}
+.stage img{object-fit:contain}
+.shim{position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.055) 50%,transparent 70%);background-size:250% 100%;animation:sh 1.7s linear infinite;transition:opacity .5s}
+@keyframes sh{from{background-position:150% 0}to{background-position:-100% 0}}
+.grain{position:absolute;inset:0;opacity:.5;background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1.2px);background-size:9px 9px;transition:opacity .5s}
+.wait{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;padding:16px;transition:opacity .4s}
+.wait b{font-weight:500;font-size:13.5px}.wait span{color:var(--mut);font-size:12px}
+.badge{position:absolute;top:8px;left:8px;padding:2px 9px;border-radius:99px;background:rgba(11,14,20,.72);font:11px var(--mono);color:var(--tx);backdrop-filter:blur(6px);transition:opacity .4s}
+.fadeable{transition:opacity .45s ease}
+.final{transition:opacity .9s ease, filter .9s ease}
+.prog{height:2px;background:var(--bd)}.prog>i{display:block;height:100%;width:0;background:var(--acc);transition:width .25s linear}
+.lc.done .prog>i{background:var(--gr)}
+.foot{padding:9px 12px;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font-size:12.5px;color:var(--mut);min-height:40px}
+.foot .title{color:var(--tx)}
+.foot .acts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.strip{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;padding:6px 12px 0;background:var(--card)}
+.strip canvas{width:100%;aspect-ratio:16/9;border-radius:3px;background:var(--inset)}
+.stages{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;gap:5px;align-items:center;padding:1px 8px;border-radius:99px;border:1px solid var(--bd);font-size:11.5px;color:var(--dim)}
+.chip.run{color:var(--tx);border-color:var(--acc)}.chip.ok{color:var(--gr)}
+.check{background:repeating-conic-gradient(#1a2130 0 25%,#151b27 0 50%) 0 0/18px 18px}
+.scan{position:absolute;top:0;bottom:0;width:2px;background:var(--cy);box-shadow:0 0 12px var(--cy)}
+.quad{position:absolute;width:50%;height:50%;background:url(assets/views.png) no-repeat;background-size:200% 200%;opacity:0;transition:opacity .5s}
+.wave{display:block;width:100%;height:64px;cursor:pointer}
+.lines{position:relative;max-height:168px;overflow:auto;padding:4px 12px 8px;font-size:13px;line-height:1.55}
+.lines div{color:var(--dim);transition:color .3s}
+.lines div.ready{color:var(--tx)}
+.lines div.now{color:var(--acc)}
+.lines div.say{background:linear-gradient(90deg,var(--mut) 0%,var(--tx) 50%,var(--mut) 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sh 1.4s linear infinite}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <h1>Live cards · prototype</h1>
+    <label><input type="checkbox" id="busy" checked> GPU busy when the picture starts</label>
+    <label>Speed <select id="speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+    <button class="btn pri" id="replay">Replay all</button>
+  </div>
+  <p class="note">Each card is what a mod would ship in its <code>ui/chat.js</code>. The pictures, 3D views and the voice are real outputs from this machine; the timings and in-between previews are simulated here (the real cards read the job's progress events and the mod's preview frames).</p>
+
+  <div class="turn" id="t-image">
+    <div class="user">Make me a picture of a tri-red Aussie shepherd puppy in a sunny meadow</div>
+    <div class="lc" data-card="image"></div>
+    <div class="answer">Here's your puppy <span class="ref">#1</span>. Want a 3D model of it, or a short clip?</div>
+  </div>
+  <div class="turn" id="t-video">
+    <div class="user">Animate <span class="ref">#1</span>: the puppy turns toward the camera</div>
+    <div class="lc" data-card="video"></div>
+    <div class="answer">Done: <span class="ref">#2</span>, three seconds at 16 fps.</div>
+  </div>
+  <div class="turn" id="t-3d">
+    <div class="user">Now turn <span class="ref">#1</span> into a 3D model</div>
+    <div class="lc" data-card="model3d"></div>
+    <div class="answer">The shape is in <span class="ref">#3</span>. It's untextured; I can add parts or a rig next.</div>
+  </div>
+  <div class="turn" id="t-speech">
+    <div class="user">Read Sonnet 18 in pirate voice, with my voice</div>
+    <div class="lc" data-card="speech"></div>
+    <div class="answer">Here it is <span class="ref">#4</span>, 1:03 in your voice.</div>
+  </div>
+</div>
+<script src="assets/data.js"></script>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const ICON = {
+  image: '<path d="M3 5h18v14H3z M3 16l5-5 4 4 3-3 6 6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="9" r="1.6" fill="currentColor"/>',
+  video: '<path d="M3 6h13v12H3z M16 10l5-3v10l-5-3" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  model3d: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z M12 12l8-4.5 M12 12v9 M12 12L4 7.5" fill="none" stroke="currentColor" stroke-width="1.6"/>',
+  speech: '<path d="M4 10v4 M8 7v10 M12 4v16 M16 8v8 M20 11v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+};
+const icon = k => `<svg width="16" height="16" viewBox="0 0 24 24">${ICON[k]}</svg>`;
+const fmt = s => s < 60 ? Math.ceil(s) + ' s' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+const img = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
+
+// A card's shell: header (icon, title, meta), a stage, a progress line, a footer.
+function shell(root, kind) {
+  root.innerHTML = '';
+  root.classList.remove('done');
+  const head = el('div', 'lc-head', `${icon(kind)}<span class="t"></span><span class="dot"></span><span class="m"></span>`);
+  const prog = el('div', 'prog', '<i></i>'), foot = el('div', 'foot');
+  root.append(head);
+  return {
+    head, prog, foot,
+    title: t => { $('.t', head).textContent = t; },
+    meta: t => { $('.m', head).textContent = t; },
+    pct: p => { $('i', prog).style.width = (Math.max(0, Math.min(1, p)) * 100).toFixed(1) + '%'; },
+    done: () => root.classList.add('done'),
+  };
+}
+
+// Runs phases [{id, dur}] on the clock; calls frame(id, fraction, elapsed). Returns a stop function.
+function run(phases, frame) {
+  const speed = +$('#speed').value, t0 = performance.now(); let raf;
+  const total = phases.reduce((a, p) => a + p.dur, 0);
+  const tick = now => {
+    const t = (now - t0) / 1000 * speed; let acc = 0;
+    for (const p of phases) {
+      if (t < acc + p.dur) { frame(p.id, (t - acc) / p.dur, t, total); raf = requestAnimationFrame(tick); return; }
+      acc += p.dur;
+    }
+    frame('done', 1, total, total);
+  };
+  raf = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(raf);
+}
+
+// A picture as a diffusion preview at quality q (0 → 1): low resolution, soft, desaturated, with latent noise.
+const noise = (() => { const c = document.createElement('canvas'); c.width = 96; c.height = 72; const x = c.getContext('2d'); const d = x.createImageData(96, 72);
+  for (let i = 0; i < d.data.length; i += 4) { d.data[i] = Math.random() * 255; d.data[i + 1] = Math.random() * 255; d.data[i + 2] = Math.random() * 255; d.data[i + 3] = 255; }
+  x.putImageData(d, 0, 0); return c; })();
+const small = document.createElement('canvas');
+function drawPreview(ctx, src, q, crop) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const r = Math.round(5 + Math.pow(q, 2.2) * 260), rh = Math.max(3, Math.round(r * H / W));
+  small.width = r; small.height = rh;
+  const s = small.getContext('2d'); s.imageSmoothingQuality = 'low';
+  const [sx, sy, sw, sh] = crop || [0, 0, src.width, src.height];
+  s.drawImage(src, sx, sy, sw, sh, 0, 0, r, rh);
+  ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.filter = `saturate(${0.35 + 0.65 * q}) contrast(${0.8 + 0.2 * q}) blur(${(1 - q) * 5}px)`;
+  ctx.drawImage(small, 0, 0, W, H);
+  ctx.filter = 'none'; ctx.globalAlpha = 0.5 * Math.pow(1 - q, 1.5); ctx.globalCompositeOperation = 'overlay';
+  ctx.drawImage(noise, 0, 0, W, H); ctx.restore();
+}
+
+// ---------- the image card (comfy) ----------
+async function imageCard(root, answer) {
+  const c = shell(root, 'image'), busy = $('#busy').checked;
+  const pic = await img('assets/puppy.png');
+  const stage = el('div', 'stage'); stage.style.aspectRatio = '1184 / 896'; stage.style.setProperty('--ar', 1184 / 896);
+  const A = el('canvas', 'fadeable'), B = el('canvas', 'fadeable');
+  for (const cv of [A, B]) { cv.width = 740; cv.height = 560; cv.style.opacity = 0; }
+  const fin = el('img', 'final'); fin.src = pic.src; fin.style.opacity = 0;
+  const grain = el('div', 'grain'), shim = el('div', 'shim'), wait = el('div', 'wait', '<b></b><span></span>'), badge = el('div', 'badge'); badge.style.opacity = 0;
+  stage.append(grain, A, B, fin, shim, wait, badge);
+  root.append(stage, c.prog, c.foot);
+  const say = (b, s) => { $('b', wait).textContent = b; $('span', wait).textContent = s; };
+  const STEPS = 8; let shown = -1, front = A, layer = 1;
+  const phases = [...(busy ? [{ id: 'queue', dur: 3.2 }] : []), { id: 'load', dur: 2.2 }, { id: 'sample', dur: 8 }, { id: 'decode', dur: 1.1 }];
+  return run(phases, (id, f, t, total) => {
+    c.pct(t / total);
+    if (id === 'queue') { c.title('Making a picture'); c.meta('queued'); say('Waiting for the GPU', `1 ahead · Making a 3D model (gen3d) · about ${Math.ceil(3.2 * (1 - f) * 6)} s`); }
+    if (id === 'load') { c.title('Making a picture'); c.meta('loading'); say('Loading Qwen-Image 2.1 Turbo', '19.6 GB from disk'); }
+    if (id === 'sample') {
+      const k = Math.min(STEPS - 1, Math.floor(f * STEPS));
+      wait.style.opacity = 0; shim.style.opacity = 0.35; badge.style.opacity = 1;
+      badge.textContent = `Step ${k + 1} of ${STEPS}`;
+      c.meta(`step ${k + 1}/${STEPS} · ${fmt((1 - f) * 8 + 1.1)} left`);
+      if (k !== shown) {   // a new preview frame arrives: draw it on the hidden canvas and cross-fade
+        shown = k; const back = front === A ? B : A;
+        drawPreview(back.getContext('2d'), pic, (k + 1) / STEPS * 0.92);
+        back.style.transition = 'none'; back.style.opacity = 0; back.style.zIndex = ++layer; void back.offsetWidth;
+        back.style.transition = ''; back.style.opacity = 1; front = back;   // the new frame fades in over the old one
+      }
+    }
+    if (id === 'decode') { badge.textContent = 'Decoding'; c.meta('decoding'); }
+    if (id === 'done' && !root.classList.contains('done')) {
+      c.done(); c.title('Made a picture'); c.meta('53 s'); shim.style.opacity = 0; grain.style.opacity = 0; badge.style.opacity = 0;
+      fin.style.zIndex = ++layer; fin.style.opacity = 1; setTimeout(() => { A.style.opacity = B.style.opacity = 0; }, 900);
+      c.foot.innerHTML = `<span class="ref">#1</span><span class="title">Tri-red Aussie puppy in a meadow</span><span>Qwen-Image 2.1 Turbo · 1184×896</span>
+        <span class="acts"><button class="btn">Make 3D</button><button class="btn">Animate</button><button class="btn">Upscale</button><button class="btn">Pin</button></span>`;
+      answer.classList.add('on');
+    }
+  });
+}
+
+// ---------- the video card (comfy, a video pack) ----------
+async function videoCard(root, answer) {
+  const c = shell(root, 'video');
+  const pic = await img('assets/puppy.png');
+  const F = 16, crop = i => { const w = 1040 - i * 14, h = w * 9 / 16; return [70 + i * 4, 120 + i * 9 - Math.sin(i / F * Math.PI) * 30, w, h]; };
+  const stage = el('div', 'stage'); stage.style.aspectRatio = '16 / 9'; stage.style.setProperty('--ar', 16 / 9);
+  const cv = el('canvas'); cv.width = 736; cv.height = 414;
+  const shim = el('div', 'shim'), wait = el('div', 'wait', '<b></b><span></span>'), badge = el('div', 'badge'); badge.style.opacity = 0;
+  stage.append(el('div', 'grain'), cv, shim, wait, badge);
+  const strip = el('div', 'strip'), thumbs = [...Array(8)].map(() => { const t = el('canvas'); t.width = 96; t.height = 54; strip.append(t); return t; });
+  root.append(stage, strip, c.prog, c.foot);
+  const ctx = cv.getContext('2d'); const STEPS = 6; let shown = -1, playing = true, frameAt = 0;
+  const say = (b, s) => { $('b', wait).textContent = b; $('span', wait).textContent = s; };
+  const phases = [{ id: 'load', dur: 2.2 }, { id: 'sample', dur: 10 }, { id: 'encode', dur: 1.3 }];
+  return run(phases, (id, f, t, total) => {
+    c.pct(t / total);
+    if (id === 'load') { c.title('Making a video'); c.meta('loading'); say('Loading Wan 2.2 (image to video)', 'from #1 · 49 frames at 832×480'); }
+    const frame = Math.floor(t * 8) % F;   // the clip loops while it forms: every frame sharpens together
+    if (id === 'sample' || id === 'encode') {
+      const k = Math.min(STEPS - 1, Math.floor((id === 'sample' ? f : 1) * STEPS)), q = (k + 1) / STEPS * 0.9;
+      wait.style.opacity = 0; shim.style.opacity = 0.3; badge.style.opacity = 1;
+      badge.textContent = id === 'encode' ? 'Encoding MP4' : `Step ${k + 1} of ${STEPS} · all frames at once`;
+      c.meta(id === 'encode' ? 'encoding' : `step ${k + 1}/${STEPS} · ${fmt((1 - f) * 10 + 1.3)} left`);
+      drawPreview(ctx, pic, q, crop(frame));
+      if (k !== shown) { shown = k; thumbs.forEach((tc, i) => drawPreview(tc.getContext('2d'), pic, q, crop(i * 2))); }
+    }
+    if (id === 'done') {
+      if (!root.classList.contains('done')) {
+        c.done(); c.title('Made a video'); c.meta('2 m 41 s'); shim.style.opacity = 0; badge.style.opacity = 0;
+        thumbs.forEach((tc, i) => tc.getContext('2d').drawImage(pic, ...crop(i * 2), 0, 0, 96, 54));
+        c.foot.innerHTML = `<span class="ref">#2</span><span class="title">The puppy turns toward the camera</span><span>3.1 s · Wan 2.2</span>
+          <span class="acts"><button class="btn" id="vplay">Pause</button><button class="btn">Extend</button><button class="btn">Pin</button></span>`;
+        $('#vplay', c.foot).onclick = e => { playing = !playing; e.target.textContent = playing ? 'Pause' : 'Play'; };
+        answer.classList.add('on');
+        const loop = now => { if (!root.isConnected || !root.classList.contains('done')) return; if (playing) frameAt = Math.floor(now / 1000 * 12) % F; ctx.drawImage(pic, ...crop(frameAt), 0, 0, cv.width, cv.height); requestAnimationFrame(loop); };
+        requestAnimationFrame(loop);
+      }
+    }
+  });
+}
+
+// ---------- the 3D card (gen3d) ----------
+async function model3dCard(root, answer) {
+  const c = shell(root, 'model3d');
+  const stage = el('div', 'stage'); stage.style.aspectRatio = '4 / 3'; stage.style.setProperty('--ar', 4 / 3);
+  const before = el('img'); before.src = 'assets/puppy.png';
+  const after = el('div', 'layer check'); const cut = el('img'); cut.src = 'assets/cutout.png'; cut.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain'; after.append(cut);
+  const scan = el('div', 'scan');
+  const cv = el('canvas', 'fadeable'); cv.width = 800; cv.height = 600; cv.style.opacity = 0;
+  const quads = [0, 1, 2, 3].map(i => { const q = el('div', 'quad'); q.style.left = (i % 2) * 50 + '%'; q.style.top = Math.floor(i / 2) * 50 + '%'; q.style.backgroundPosition = `${(i % 2) * 100}% ${Math.floor(i / 2) * 100}%`; return q; });
+  const thumb = el('img'); thumb.src = 'assets/cutout.png'; thumb.style.cssText = 'position:absolute;left:10px;bottom:10px;width:22%;height:auto;inset:auto auto 10px 10px;border-radius:6px;border:1px solid var(--bd);background:var(--card);opacity:0;transition:opacity .5s';
+  const badge = el('div', 'badge');
+  stage.append(before, after, scan, cv, ...quads, thumb, badge);
+  const stages = el('div', 'stages');
+  c.foot.append(stages); root.append(stage, c.prog, c.foot);
+  const ctx = cv.getContext('2d'), P = window.CLOUD;
+  const chips = (cur, left) => { const L = [['bg', 'Background'], ['shape', 'Shape'], ['preview', 'Views']], ix = L.findIndex(x => x[0] === cur);
+    stages.innerHTML = L.map(([k, n], i) => `<span class="chip ${i < ix || cur === 'done' ? 'ok' : i === ix ? 'run' : ''}">${i < ix || cur === 'done' ? '✓' : i === ix ? '●' : '○'} ${n}${i === ix && left ? ' · ' + left : ''}</span>`).join(''); };
+  const phases = [{ id: 'bg', dur: 2.6 }, { id: 'shape', dur: 9 }, { id: 'preview', dur: 2.6 }];
+  return run(phases, (id, f, t, total) => {
+    c.pct(t / total);
+    if (id === 'bg') {
+      c.title('Making a 3D model'); c.meta('TRELLIS.2 · fast'); chips('bg', fmt((1 - f) * 2.6));
+      badge.textContent = 'Removing the background';
+      after.style.clipPath = `inset(0 ${100 - f * 100}% 0 0)`; scan.style.left = f * 100 + '%';
+    }
+    if (id === 'shape') {
+      chips('shape', fmt((1 - f) * 9) + ' left'); badge.textContent = `Shape · ${Math.round(f * 100)}%`;
+      before.style.opacity = 0; after.style.opacity = 0; scan.style.opacity = 0; cv.style.opacity = 1; thumb.style.opacity = 1;
+      const n = Math.floor(P.length * Math.min(1, 0.04 + f * 1.05)), a = Math.sin(t * 0.7) * 1.1, ca = Math.cos(a), sa = Math.sin(a);
+      ctx.clearRect(0, 0, 800, 600);
+      const S = 280, cx = 400, cy = 300, pts = [];
+      for (let i = 0; i < n; i++) { const p = P[i]; const x = p[0] * ca + p[2] * sa, z = -p[0] * sa + p[2] * ca; pts.push([x, p[1], z, (p[3] * .3 + p[4] * .59 + p[5] * .11) / 255]); }
+      pts.sort((u, v) => u[2] - v[2]);
+      for (const [x, y, z, l] of pts) {
+        const d = 0.55 + 0.45 * (z + 1) / 2, g = Math.round(110 + 140 * l * d);
+        ctx.fillStyle = `rgba(${Math.round(g * .78)},${Math.round(g * .95)},${g},${0.35 + 0.55 * d})`;
+        ctx.fillRect(cx + x * S, cy + y * S, 2.2, 2.2);
+      }
+    }
+    if (id === 'preview') {
+      chips('preview'); badge.textContent = 'Rendering views'; cv.style.opacity = 1 - f; thumb.style.opacity = 0;
+      quads.forEach((q, i) => { q.style.opacity = f * 4 > i ? 1 : 0; });
+    }
+    if (id === 'done' && !root.classList.contains('done')) {
+      c.done(); c.title('Made a 3D model'); c.meta('1 m 54 s'); chips('done'); badge.textContent = '3D'; cv.style.opacity = 0;
+      c.foot.insertAdjacentHTML('beforeend', `<span class="ref">#3</span><span class="title">Puppy · untextured mesh</span>
+        <span class="acts"><button class="btn pri">View in 3D</button><button class="btn">Add rig</button><button class="btn">Texture</button></span>`);
+      answer.classList.add('on');
+    }
+  });
+}
+
+// ---------- the speech card (tts) ----------
+const POEM = `Arr, matey! Here be Sonnet 18, reworded in pirate tongue:
+Shall I compare thee to a summer's day?
+Ye be more lovely and more temperate, arr!
+Rough winds do shake the darling buds of May,
+And summer's lease be all too short a date;
+Sometime too hot the eye o' heaven shines,
+And often is his gold complexion dimm'd;
+And every fair from fair sometime declines,
+By chance or nature's changin' course untrimm'd;
+But thy eternal summer shall not fade,
+Nor lose possession o' that fair thou ow'st;
+Nor shall death brag thou wander'st in his shade,
+When in eternal lines to time thou grow'st:
+So long as men can breathe or eyes can see,
+So long lives this, and this gives life to thee.
+Yarrr! Even in pirate speak, the beauty of Shakespeare's words endures across the seven seas!`.split('\n');
+async function speechCard(root, answer) {
+  const c = shell(root, 'speech');
+  const wave = el('canvas', 'wave'); wave.width = 1456; wave.height = 128;
+  const lines = el('div', 'lines'); POEM.forEach(l => lines.append(el('div', '', l)));
+  const audio = new Audio('assets/speech.wav');
+  root.append(wave, lines, c.prog, c.foot);
+  const ctx = wave.getContext('2d'), PK = window.PEAKS, N = PK.length;
+  const lens = POEM.map(l => l.length + 6), sum = lens.reduce((a, b) => a + b, 0);
+  const edges = lens.reduce((a, l) => (a.push(a[a.length - 1] + l / sum), a), [0]);   // where each line starts, 0 → 1
+  const draw = (made, played, pending) => {
+    ctx.clearRect(0, 0, wave.width, wave.height); const bw = wave.width / N;
+    for (let i = 0; i < N; i++) {
+      const x = i / N, v = PK[i], h = Math.max(4, v * 104);
+      ctx.fillStyle = x < played ? '#FFB224' : x < made ? '#8A94A6' : x < pending ? 'rgba(138,148,166,.22)' : 'rgba(138,148,166,.1)';
+      const hh = x < made ? h : 4; ctx.fillRect(i * bw + 1.5, 64 - hh / 2, bw - 3, hh);
+    }
+  };
+  const mark = (ready, now, say) => [...lines.children].forEach((d, i) => { d.className = i === now ? 'now' : i === say ? 'say' : i < ready ? 'ready' : ''; });
+  const phases = [{ id: 'load', dur: 1.4 }, { id: 'synth', dur: 10 }];
+  let finished = false;
+  const stop = run(phases, (id, f, t, total) => {
+    c.pct(t / total);
+    if (id === 'load') { c.title('Speaking'); c.meta('loading Breeze'); draw(0, 0, 0); mark(0, -1, 0); }
+    if (id === 'synth') {
+      const ready = Math.floor(f * POEM.length);   // chunks arrive a line at a time; the stream can play from the first
+      c.meta(`line ${Math.min(POEM.length, ready + 1)}/${POEM.length} · ${fmt((1 - f) * 10)} left`);
+      draw(edges[ready], 0, edges[ready + 1] || 1);
+      const ln = lines.children[ready]; if (ln) lines.scrollTop = Math.max(0, ln.offsetTop - lines.offsetTop - 60);
+      if (!audio.paused) { const p = audio.currentTime / 63.14; mark(ready, edges.findIndex(e => e > p) - 1, ready); }
+      else mark(ready, -1, ready);
+      if (!c.foot.firstChild) {
+        c.foot.innerHTML = `<button class="btn" id="spplay">▶ Play while it speaks</button><span>Brendon · breeze-tts-2</span>`;
+        $('#spplay', c.foot).onclick = e => { audio.paused ? audio.play() : audio.pause(); };
+      }
+    }
+    if (id === 'done' && !finished) {
+      finished = true; c.done(); c.title('Spoke'); c.meta('1:03 · made in 22 s');
+      c.foot.innerHTML = `<button class="btn pri" id="spplay">${audio.paused ? '▶ Play' : '❚❚ Pause'}</button><span class="ref">#4</span><span class="title">Sonnet 18, pirate</span><span>Brendon · breeze-tts-2</span>
+        <span class="acts"><button class="btn">Another take</button><button class="btn">Pin</button></span>`;
+      const b = $('#spplay', c.foot);
+      b.onclick = () => { audio.paused ? audio.play() : audio.pause(); };
+      audio.onplay = () => { b.textContent = '❚❚ Pause'; }; audio.onpause = () => { b.textContent = '▶ Play'; };
+      wave.onclick = e => { const r = wave.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * 63.14; if (audio.paused) audio.play(); };
+      answer.classList.add('on');
+      const tick = () => { if (!root.isConnected || stopped) return; const p = audio.currentTime / 63.14; draw(1, p, 1); mark(POEM.length, audio.paused && !p ? -1 : edges.findIndex(e => e > p) - 1, -1); requestAnimationFrame(tick); };
+      tick();
+    }
+  });
+  let stopped = false;
+  return () => { stopped = true; stop(); audio.pause(); };
+}
+
+// ---------- the page ----------
+const CARDS = { image: imageCard, video: videoCard, model3d: model3dCard, speech: speechCard };
+let stops = [];
+async function replay() {
+  stops.forEach(s => s()); stops = [];
+  for (const root of document.querySelectorAll('.lc')) {
+    const answer = root.parentElement.querySelector('.answer'); answer.classList.remove('on');
+    stops.push(await CARDS[root.dataset.card](root, answer));
+  }
+}
+$('#replay').onclick = replay;
+replay();
+</script>
+</body>
+</html>

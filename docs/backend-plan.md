@@ -31,7 +31,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | L — Replies you can act on | 32 | Under a reply, the pages it read (with their icons) and Copy in three ways; Select → Reply with the quote as markdown | Chat, the agent's send API, the web mod (a favicon route); additive |
 | M — Navigation | 33 | The sidebar in three groups, services shown as a list, a button or counts, a thin rail with state colours, a logo per mod, a Services page | the UI shell, `[ui.nav]`, a `[ui] logo` per mod; additive |
 | N — Other machines | 35–40 | AIHub beyond this machine: hardware detection, memory in pools (RAM and each GPU's VRAM), running without systemd, a variant per accelerator for every mod chosen by `aihub setup`, smokes, and field reports an agent writes while building on another machine (Linux with NVIDIA, Windows WSL2 with Intel); macOS by CI. Plan: [plans/portability.md](plans/portability.md) | Additive: this machine keeps its backends; every step's tests include its recorded hardware |
-| O — Chats by workspace | 41–42 | The chat list grouped by environment (Phase 34's workspaces), with orders, paging per group, Move to and renaming from the sidebar; then the Chat page after Claude Code: a compact sidebar, the message box with + and its controls (environment, mode, model) under it, environments made and changed from the chat | the agent's thread list (additive filters), `web/chat/` |
+| O — Chats by workspace | 41–43 | The chat list grouped by environment (Phase 34's workspaces), with orders, paging per group, Move to and renaming from the sidebar; then the Chat page after Claude Code: a compact sidebar, the message box with + and its controls (environment, mode, model) under it, environments made and changed from the chat, in a dialog with the desktop's folder chooser | the agent's thread list (additive filters), `web/chat/` |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -78,6 +78,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 40 | Field reports and the support matrix | M | — |
 | 41 | The chat list by environment | M | `chat`: the thread list in sections per environment, the View menu, Show more per section, Move to |
 | 42 | The Chat page after Claude Code: the sidebar, the message box and its controls | M | `chat`: the sidebar's top rows and Show more divider, the message box with +, the environment, mode and model buttons under it, the environment menu |
+| 43 | The environment dialog and the system's folder chooser | S–M | `chat`: New environment and Edit open a dialog; Add folder… opens the desktop's chooser |
 
 # Stage A — Foundation
 
@@ -3155,6 +3156,32 @@ Asked for 2026-10-21, after trying Phase 41: a more compact sidebar, and the mes
 **Checks & deliverables — Phase 42**
 - [x] Live: as 42.6.
 - [x] Delivered: `web/chat/chat-controls.js`, `chat-envedit.js`, the reworked `chat-list.js`, `chat-groups.js`, `chat-composer.js`, `chat-header.js`, the workspace mod's None and `browse.py`, the tests.
+
+---
+
+## Phase 43 — The environment dialog and the system's folder chooser
+
+Asked for 2026-10-22, after trying 42.4: New environment and Edit open a **dialog** (as Claude Code's), not a name typed in the menu and a panel beside it; and **Add folder** opens the desktop's own folder chooser, starting at `/`, not a browser of our own that starts in the home folder.
+
+**Simple gaps (assumed):**
+- **Which chooser:** the desktop's: KDE's (`kdialog --getexistingdirectory`) under KDE, GNOME's (`zenity --file-selection --directory`) elsewhere, whichever is installed; it opens on the machine AIHub runs on (a later SSH setup needs its own way, out of scope). Without one, or without a display, the dialog takes a typed path instead.
+- **Its own settings:** the desktop's dialog may remember its last folder in its own config (KDE's `kdialogrc`); that is the desktop's, as when the dialog opens from any app, not a file AIHub writes.
+- **Saving:** the dialog keeps its changes (the name, folders added or removed, levels) until **Create** or **Save**; Cancel drops them.
+- **The folder browser of 42.4** (`GET /v1/browse`, `browse.py`) goes.
+
+- [ ] **43.1 The folder chooser in the workspace mod: `services/workspace/picker.py`, `api_env.py`.**
+  - **`POST /v1/pick-folder {start?: "/", title?}`** → `{path, addable, why?}` or `{cancelled: true}`: runs the chooser and waits for it (up to 10 min); one at a time (409 `busy`); 501 `no_picker` (with what to install) when there is none or no display; `addable` from `check_folder` (not `/`, the home folder or above it).
+  - **Removes** `browse.py`, `GET /v1/browse` and its tests.
+  *Done when:* `services/workspace/tests/test_picker.py` (the command per desktop, a pick, a cancel, no chooser, busy, a folder that can't be added), with the chooser faked.
+- [ ] **43.2 The dialog: `web/chat/chat-envedit.js`, `chat-controls.js`.**
+  - **`EnvDialog`** (centred, over the page): the title (New environment · Edit environment), **Name**, **Folders** (each with Read · Edit · Run · Net up to its cap, and Remove), **Add folder…** (the chooser; while it's open, "Choose a folder in the window that opened"; without one, a path box), and **Cancel** with **Create** or **Save**; when editing, **Delete…** with 42.4's warning (its chats go too, archived ones included). Escape cancels.
+  - **The menu:** rows pick the chat's environment; **Edit** and **New environment** open the dialog; the panel beside the menu and the folder browser go.
+  *Done when:* `utils/tests/web/chat-controls.test.mjs` (the staged changes become the right calls on Save and on Create, the chooser's answers, the fallback box, Delete's warning), and the Node tests pass.
+- [ ] **43.3 Docs and the live check.** Brief (environments), the workspace README, structure (`picker.py` in, `browse.py` out), the plan. Live: New environment → the dialog → Add folder… opens the desktop's chooser at `/` → the folder is listed → Create; Edit → change a level, Save; Delete with its warning.
+
+**Checks & deliverables — Phase 43**
+- [ ] Live: as 43.3.
+- [ ] Delivered: `services/workspace/picker.py`, `EnvDialog`, the tests.
 
 ---
 

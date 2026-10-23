@@ -48,3 +48,9 @@ async def test_chat_url_served_and_checked(rig, serve):
     assert statuses(await check(served, "fake-ok"))["chat"] == "ok"
     rep = await check(served, "missing")
     assert statuses(rep)["chat"] == "fail" and rep["ok"] is False
+
+
+def test_the_templates_chat_module_passes_the_check():
+    from utils.tests.conftest import REPO
+
+    assert chat_check(REPO / "services" / "_template" / "ui" / "chat.js")[0] == "ok"

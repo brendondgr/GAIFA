@@ -137,6 +137,27 @@ Rules for page modules:
 
 After editing `page.js`, reload the browser tab. A page can also import `/mod-kit.js` (the Start button state, calls that may need memory, a segmented control, panels), `/mod-form.js` (`schemaForm`: a form from a JSON Schema, with file inputs) and `/mod-charts.js` (the dashboard's charts as DOM elements: `chartCard({title, ranges, load, draw})`); `services/tts/ui/page.js` uses both. `/chat/chat-md.js` is the chat's safe Markdown renderer (`renderMarkdown`, `MD_CSS`, `installCopy`); `services/web/ui/page.js` uses it. Pages for the built-in apps can instead be Claude Design components (`ui/Page.dc.html`; brief §5).
 
+**Level 4: your own cards in Chat** (plan 44). `[ui] chat = "ui/chat.js"`: the Chat page imports it once and calls its default export with the chat's registries (`services/_template/ui/chat.js` is a working example):
+```js
+export default function setup(chat) {
+  const { h } = chat.ui, kit = chat.live;          // chat.live is /live-kit.js
+  chat.registerStep('my_mod_render', { running: 'Rendering', done: 'Rendered', icon: 'image' });
+  chat.registerCard('live:my_mod_render', ({ ctx }) => {          // under the fold while the job runs, and after
+    const { live, note, status, outputs } = ctx.live;
+    return h(kit.LiveCard, { icon: 'image', title: 'Rendering', meta: kit.metaText(live, status), done: status === 'done' },
+      h(kit.Stage, { aspect: kit.aspectOf(live, 1) },
+        h(kit.PreviewLayers, { src: kit.previewSrc(live), final: status === 'done' ? outputs[0]?.url : null }),
+        h(kit.Waiting, { ...(kit.waitInfo(live, note) || {}), quiet: !!live?.preview })));
+  });
+}
+```
+- `chat` = `{version, registerCard, registerPreview, registerAction, registerStep, live, ui, api}`. Card kinds: `live:<tool>` (under the fold, running or done: its outputs then stay out of the output strip), `step:<tool>` (a step's opened detail), `result:<tool>`, `approval:<tool>`. A tool's name is `<mod id>_<key>`.
+- A `live:` card gets `ctx.live` = `{row, live, note, status, outputs, kit}`: the job's live progress (§4 "Live progress"), the GPU queue's words, running · done · failed · queued · waiting, the call's outputs with their `#n`.
+- A tool without a `live:` card still shows the kit's generic preview while its job reports a `preview`.
+- A module that throws is skipped and what it registered is undone; `aihub check` fails a declared file that's missing or has no default export. Deleting the mod removes its cards.
+
+**Live previews on your page.** The same kit works in a page module: `import * as kit from '/live-kit.js'` and draw with `/mod-charts.js`'s `mountReact(el, rh(kit.LivePreview, { live }))` (or `LiveCard`, `Stage`, `PreviewLayers`, `StageChips`, `LiveThumb`), fed from your own job route's `live`. The Overview's Jobs shows a `LiveThumb` for any running job with a preview.
+
 ## 6. Outputs, memory, models, tools
 
 - **Outputs:** write to `$AIHUB_OUTPUTS/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext>`.

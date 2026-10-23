@@ -67,11 +67,12 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **The Overview's Jobs** list shows a `LiveThumb` for a running job with a preview, its step and time left; the thumbnail links to the job's route.
   - **Page modules** get `ctx.live` (the kit) and the mod's own running jobs with their `live`, so a mod page draws the same previews for runs started there.
   *Done when:* `utils/tests/web/dashboard-jobs.test.mjs` (a job with a preview, one without) and the mock's comfy job shows a thumbnail on the Overview.
-- [ ] **44.4 The template, the mock and the docs: `services/_template/ui/chat.js`, `web/chat/chat-mock.js`, `docs/mods.md`.**
+- [x] **44.4 The template, the mock and the docs: `services/_template/ui/chat.js`, `web/chat/chat-mock.js`, `docs/mods.md`.**
   - **The template** ships a small commented `ui/chat.js` (one step card using `chat.live`) and `[ui] chat` commented out in its `service.toml`.
   - **The mock** (`?mock`) plays a job with `live` (queued → loading → steps with preview frames from a bundled small image → done), so the frame is checkable without a GPU.
   - **mods.md:** "Chat cards": the `setup(chat)` contract, the lookup order (`step:<tool>` → `step`), the `live` shape, and that deleting the mod removes its cards.
   *Done when:* `aihub check _template` passes with `[ui] chat` turned on in a test copy (`utils/tests/services/test_chat_module.py`), and the mock's live card is checked in the built-in browser.
+  *As built:* the mock's frames are `web/chat/mock-live/` (a dusk landscape drawn for it, six frames from noisy and soft to sharp); a picture step reports loading, then sampling with a frame per step, then decoding; a 3D step reports its stages. mods.md's section is "Level 4: your own cards in Chat", with "Live previews on your page".
 
 **Wire — Phase 44:** the Chat page loads mods' chat modules; a job's step row can become a live card.
 

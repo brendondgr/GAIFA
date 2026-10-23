@@ -24,6 +24,7 @@ kinds = ["text"]
 
 [ui]
 page = "ui/page.js"                # its own tab(s) inside the AIHub page
+# chat = "ui/chat.js"              # its own cards in Chat: a live card while its job runs (plan 44.1, docs/mods.md)
 
 [[ui.widgets]]                     # charts on the Overview dashboard (Phase 6 draws them)
 id = "calls"

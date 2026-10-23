@@ -137,13 +137,26 @@ export function createMockClient(api, { speed = 1 } = {}) {
     usage(t);
     return 'waiting';
   }
+  // Live progress (plan 44.2) the way the mods report it: frames from web/chat/mock-live/ for pictures, stages for 3D.
+  function mockLive(name, i, total) {
+    if (name.startsWith('gen3d')) {
+      const st = (id, label, from, to) => ({ id, label, state: i >= to ? 'done' : i >= from ? 'running' : 'waiting', eta_s: Math.max(0, (to - i) * 0.32) });
+      return { stage: i < 4 ? 'background' : i < 12 ? 'shape' : 'preview', stages: [st('background', 'Background', 1, 4), st('shape', 'Shape', 4, 12), st('preview', 'Views', 12, total)],
+        eta_s: (total - i) * 0.32, ...(i >= 2 ? { preview: { url: '/chat/mock-live/final.jpg', seq: 1, w: 480, h: 360 } } : {}) };
+    }
+    if (i < 3) return { stage: 'loading', eta_s: (total - i) * 0.32 };
+    const k = Math.min(6, i - 2), steps = Math.min(6, total - 3);
+    return i >= total ? { stage: 'decoding', step: steps, steps } : { stage: 'sampling', step: k, steps, eta_s: (total - i) * 0.32,
+      preview: { url: `/chat/mock-live/frame-${k}.jpg`, seq: k, w: 480, h: 360 } };
+  }
   async function runTool(t, run, cid, name, args) {
     const callId = rid('call_');
     emit(t, 'call', { id: cid, call_id: callId });
     const total = name.startsWith('gen3d') ? 14 : 10;
     for (let i = 1; i <= total; i++) {
       await run.sleep(320);
-      transient(t, 'progress', { id: cid, progress: i / total, note: i < total ? (i < 3 ? 'loading the model' : `step ${i}/${total}`) : 'saving', elapsed_s: i * 0.32, job_id: 'j_mock' });
+      transient(t, 'progress', { id: cid, progress: i / total, note: i < total ? (i < 3 ? 'loading the model' : `step ${i}/${total}`) : 'saving', elapsed_s: i * 0.32, job_id: 'j_mock',
+        live: mockLive(name, i, total) });
     }
     const kind = KIND_OF[name];
     const out = kind ? [await makeOutput(t, kind, args.prompt || args.text)] : [];

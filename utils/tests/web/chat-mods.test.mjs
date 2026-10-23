@@ -46,3 +46,13 @@ test('a module that throws is skipped and its registrations undone; a missing fi
   assert.match(r[0].error, /boom/);
   assert.equal(cards.has('step:bad'), false);
 });
+
+test("the template's chat module registers its step and live card", async () => {
+  resetChatModules();
+  const { chat, cards, steps } = registries();
+  chat.ui = { h: () => null }; chat.live = {};
+  const url = pathToFileURL(path.join(root, 'services/_template/ui/chat.js')).href;
+  const r = await loadChatModules([{ id: '_template', chat_url: url }], chat, u => import(u));
+  assert.deepEqual(r, [{ mod: '_template', ok: true }]);
+  assert.ok(steps.has('_template_hello') && cards.has('live:_template_hello'));
+});

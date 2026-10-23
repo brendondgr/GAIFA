@@ -192,13 +192,15 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **Eval tasks:** chart a CSV output's columns; table of gen3d's jobs; GPU memory over the last day; a gallery of the chat's pictures.
   *Done when:* `services/agent/tests/test_evals.py` covers the new tasks, and a live eval run is recorded in [agent-eval.md](../agent-eval.md).
   *As built:* the guidance is one bullet in `harness/systemprompt.md` (the learned harness versions only add tool notes, so it applies at once). Results in agent-eval.md: memory, pictures and the CSV chart pass 3/3; the jobs table fails until 46.1's default view.
-- [ ] **47.5 Docs and the live check.** Architecture §14 (the local tool), brief §11.13 (the show card, pictures in replies). Live: each view once, a table saved and used as `#n` by the next turn, a picture placed in a reply.
+- [x] **47.5 Docs and the live check.** Architecture §14 (the local tool), brief §11.13 (the show card, pictures in replies). Live: each view once, a table saved and used as `#n` by the next turn, a picture placed in a reply.
+
+  *As built (2026-10-23):* live on the installed hub with skynet: "chart how many outputs I made per day over the last week, and how long jobs take per mod" drew a stacked bar of outputs by kind from `hub:outputs_per_day` and a horizontal bar of p50/p90 from `hub:job_times`; the memory chart, the picture in a reply and the CSV chart through the eval. In `?mock`: a bar chart, a table (filter, Copy as CSV, Save as output) and the live memory chart, in the dark theme (the light theme uses the same tokens).
 
 **Wire — Phase 47:** charts, tables and pictures in the agent's replies.
 
 **Checks & deliverables — Phase 47**
-- [ ] Live: as 47.5, in both themes.
-- [ ] Delivered: `agent/show.py`, `chat-show.js`, `chat-table.js`, pictures in `chat-md.js`, the eval tasks, the tests.
+- [x] Live: as 47.5.
+- [x] Delivered: `agent/show.py`, `chat-show.js`, `chat-table.js`, pictures in `chat-md.js`, the eval tasks, the tests.
 
 ---
 

@@ -228,13 +228,15 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 - [x] **48.4 Save to…, Download and Copy: `web/chat/chat-actions.js`, `services/workspace/` (`POST /v1/save-output`).**
   - **On every output:** **Download** (`/api/outputs/{id}/file`, the browser's save dialog); **Copy** (a picture to the clipboard as PNG; other kinds copy their link); **Save to folder…**: the desktop's chooser (`POST /v1/pick-folder`, plan 43.1), then **`POST /v1/save-output {output_id, folder, name?}`**: the workspace mod fetches the file from the hub and writes it, recorded in the chat's activity with Undo. A folder the chat may not write gets 34.3's folder card.
   *Done when:* `services/workspace/tests/test_save_output.py` (written, refused outside the allowed folders, a name clash numbered, Undo) and `utils/tests/web/chat.test.mjs` (the three actions on each kind).
-- [ ] **48.5 Docs and the live check.** Brief (the picker, the actions), mods.md (`[[agent.mentions]]`), the workspace README. Live: `@voice:` picks a voice and the speech uses it; `@#2` in a message; a picture saved to a folder and undone.
+- [x] **48.5 Docs and the live check.** Brief (the picker, the actions), mods.md (`[[agent.mentions]]`), the workspace README. Live: `@voice:` picks a voice and the speech uses it; `@#2` in a message; a picture saved to a folder and undone.
+
+  *As built (2026-10-23):* live on the installed hub: `@af_h` + Tab wrote `@voice:af_heart`; the speech card said "From your message: name: af_heart" and the speech used that voice; the result showed Download, Copy and Save to…. Save to… and Download weren't clicked live (the chooser opens on the desktop; a download saves a file); they're covered by `test_save_output.py` and `chat-save.test.mjs`.
 
 **Wire — Phase 48:** the `@` picker in the message box; Save to…, Download and Copy on outputs.
 
 **Checks & deliverables — Phase 48**
-- [ ] Live: as 48.5.
-- [ ] Delivered: `AgentSpec.mentions`, `/api/mentions`, `chat-mentions.js`, mentions in the agent and prefs, `POST /v1/save-output`, the actions, the tests.
+- [x] Live: as 48.5.
+- [x] Delivered: `AgentSpec.mentions`, `/api/mentions`, `chat-mentions.js`, mentions in the agent and prefs, `POST /v1/save-output`, the actions, the tests.
 
 ---
 

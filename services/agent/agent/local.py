@@ -10,6 +10,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from . import context as ctx
+from . import show
 from .knowledge import Knowledge
 
 if TYPE_CHECKING:
@@ -157,6 +158,19 @@ class Local:
         return res
 
     # ---- outputs -----------------------------------------------------------------------------
+
+    async def t_show(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        """Plan 47.1: a chart, table or pictures in the reply, checked here; the chat draws `data.show`."""
+        async def read(oid: str) -> tuple[bytes, dict[str, Any]]:
+            o = await self.a.hub.output(oid)
+            data, _ = await self.a.hub.output_bytes(oid, preview=False)
+            return data, {"name": (o.get("url") or o.get("title") or ""), "kind": o.get("kind")}
+
+        try:
+            spec = await show.check(args, lambda r: self.resolve_ref(tid, r), read)
+        except show.ShowError as e:
+            return self.err(tid, cid, "show", "invalid_arguments", f"{e.field}: {e.detail}", e.fix)
+        return self.ok(tid, cid, "show", show.summary(spec), data={"show": spec})
 
     def resolve_ref(self, tid: str, ref: str) -> str | None:
         ref = ref.strip()

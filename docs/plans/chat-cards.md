@@ -167,7 +167,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 
 ## Phase 47 — `show`: charts, tables and pictures in replies
 
-- [ ] **47.1 The `show` tool: `services/agent/agent/show.py` (new), `local.py`, the harness's tool text.**
+- [x] **47.1 The `show` tool: `services/agent/agent/show.py` (new), `local.py`, the harness's tool text.**
   - **Arguments:** `view` (`line` · `area` · `bar` · `hbar` · `donut` · `heatmap` · `kpi` · `table` · `image` · `gallery`), `title`, `caption`, and the data, one of:
     - **inline:** `{x: [...], series: [{name, values, unit?}]}` for charts, `{columns, rows}` for tables, `{items: [{label, value}]}` for donut and kpi;
     - **a file:** `source: "#5"` (a CSV or JSON output, or a workspace file the chat may read) with `x`, `y: [columns]` or `columns`;
@@ -176,6 +176,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **Checks** before anything shows, each error naming the field and the fix as hub tool errors do: lengths match, numbers are numbers, columns exist (the file is read to check), limits (the gaps), a `#n` is in this chat.
   - **The result** is the checked spec (the event the card draws) and, for the model, a one-line summary ("Shown: a line chart of 3 series, 48 points"), never the data back.
   *Done when:* `services/agent/tests/test_show.py` (each view, each source, each error's field and fix, limits).
+  *As built:* the spec is `{view, title?, caption?, unit?}` plus one of `data` (inline), `file` ({output_id, rows, columns, x, y | show}), `hub` ({name, range, mod?, stat?}) or `outputs` (ids); it rides on the tool_result as `data.show`.
 - [ ] **47.2 The card: `web/chat/chat-show.js` and `web/chat/chat-table.js` (new).**
   - **Charts** with `web/charts.js` (`LineChart`, `AreaChart`, `BarChart`, `HBarChart`, `Donut`, `Heatmap`, `KpiTile`) and its frame: the site's series colours, tooltips, "View as table", loading and error states. Hub sources load through `api.js` and refresh every 30 s while on screen.
   - **Tables:** sort by a column, a filter box, 50 rows a page, **Copy as CSV**, **Save as output** (a CSV through `POST /api/outputs/upload`; the card then shows its `#n`).

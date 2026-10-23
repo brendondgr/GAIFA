@@ -26,6 +26,8 @@ QUESTION = {
     "required": ["question", "options"],
 }
 
+from .show import TOOL as SHOW_TOOL  # noqa: E402 - plan 47.1
+
 LOCAL: list[dict[str, Any]] = [
     {"name": "ask_user", "description": "Ask the user 1–4 multiple-choice questions and wait for the answers. Use it for open "
      "choices about the content you can't guess (subject, which output, what to say). Each question has 2–4 options; "
@@ -64,6 +66,7 @@ LOCAL: list[dict[str, Any]] = [
      "parameters": {"type": "object", "properties": {"query": {"type": "string"},
                                                     "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5}},
                     "required": ["query"]}},
+    SHOW_TOOL,
     {"name": "remember", "description": "Save a lasting fact or preference about the user (e.g. 'prefers 16:9 images'). "
      "Optional `topic` files it under a topic.",
      "parameters": {"type": "object", "properties": {"text": {"type": "string"}, "topic": {"type": "string"}},

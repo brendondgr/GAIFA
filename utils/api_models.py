@@ -769,6 +769,15 @@ class OutputsSettings(_Model):
                                     "go to the outputs trash; 0 keeps them")
 
 
+class SpeechOutputSettings(_Model):
+    """Plan 49.1: reading replies aloud, and voice mode (49.2)."""
+    voice: str = Field(description="A saved voice or a Kokoro voice; empty for the tts mod's default")
+    engine: Literal["auto", "breeze", "kokoro"]
+    speed: float = Field(ge=0.5, le=2.0, description="Kokoro only")
+    auto_read: bool = Field(description="Read every reply aloud when it's finished")
+    pause_ms: int = Field(ge=400, le=5000, description="Voice mode: the quiet that ends what you said")
+
+
 class Settings(_Model):
     hub: HubSettings
     memory: MemorySettings
@@ -776,6 +785,7 @@ class Settings(_Model):
     ui: UiSettings
     learning: LearningSettings
     speech_input: SpeechInputSettings
+    speech_output: SpeechOutputSettings
     judge: JudgeSettings
     screen: ScreenSettings
     permissions: PermissionsSettings
@@ -792,6 +802,7 @@ class SettingsPatch(_Model):
     ui: dict[str, Any] | None = None
     learning: dict[str, Any] | None = None
     speech_input: dict[str, Any] | None = None
+    speech_output: dict[str, Any] | None = None
     judge: dict[str, Any] | None = None
     screen: dict[str, Any] | None = None
     permissions: dict[str, Any] | None = None

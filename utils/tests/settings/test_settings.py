@@ -36,6 +36,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
                    "nav": {"collapsed": False, "services": "list", "hidden": [], "folded": False}},
             "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
             "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
+            "speech_output": {"voice": "", "engine": "auto", "speed": 1.0, "auto_read": False, "pause_ms": 1200},
             "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.35, "timeout_s": 3.0, "context": "none",
                       "allow_commands": [], "ask_commands": []},
             "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800,
@@ -217,3 +218,15 @@ async def test_command_rules_and_tool_permissions_are_edited_in_settings(rig, se
         r = await c.put("/api/settings", json={"judge": {"allow_commands": [], "ask_commands": []},
                                                "permissions": {"deny": [], "ask": ["hub_set_preference"]}})
         assert r.status_code == 200 and "agent" not in tomllib.loads(_file(served))
+
+
+async def test_speech_output_is_saved_in_config_toml(rig, serve):
+    """Plan 49.1: the voice that reads replies aloud, auto-read and voice mode's pause."""
+    served = await serve()
+    async with httpx.AsyncClient(base_url=served.url) as c:
+        r = await c.put("/api/settings", json={"speech_output": {"voice": "af_heart", "auto_read": True}})
+        assert r.status_code == 200, r.text
+        assert r.json()["settings"]["speech_output"] == {"voice": "af_heart", "engine": "auto", "speed": 1.0, "auto_read": True, "pause_ms": 1200}
+        assert tomllib.loads(_file(served))["speech_output"] == {"voice": "af_heart", "auto_read": True}
+        r = await c.put("/api/settings", json={"speech_output": {"speed": 9}})
+        assert r.status_code == 422

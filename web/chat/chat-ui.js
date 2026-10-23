@@ -22,6 +22,7 @@ export const COL = 760;            // the thread column's max width
 export const ICONS = {
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',   // plan 27.7: Undo this turn
   chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',        // plan 47.2: show
+  speaker: 'M4 10v4h4l5 4V6L8 10zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11',   // plan 49.1: read aloud
   home: 'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6', folder: 'M3 6h6l2 2h10v11H3z',   // plan 33: environments, folders
   reply: 'M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z',   // plan 32.2: Reply to a selected part
   code: 'M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16', globe: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',   // plan 25.3: execute, network

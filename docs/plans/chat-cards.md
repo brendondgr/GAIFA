@@ -242,11 +242,12 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 
 ## Phase 49 — Read aloud and voice mode
 
-- [ ] **49.1 Read aloud: `web/chat/chat-speak.js` (new), `chat-replybar.js`, `utils/settings.py`, `utils/config.py`, `chat-settings.js`.**
+- [x] **49.1 Read aloud: `web/chat/chat-speak.js` (new), `chat-replybar.js`, `utils/settings.py`, `utils/config.py`, `chat-settings.js`.**
   - **A speaker button** in the reply bar: the reply as plain text (`chat-copy.js`'s Text only: no citations, no code blocks read out, "code block" said instead), streamed from tts (`POST /api/s/tts/v1/speech` with `stream`, not saved) and played through WebAudio as it arrives; clicking again stops. Shown only while the tts mod is installed.
   - **Settings → Agent → Voice:** `speech_output` (voice, engine, speed, read replies aloud automatically), next to `speech_input`.
   - **While a reply is being written**, the reading follows it sentence by sentence when the chat's model isn't on this GPU; otherwise it starts when the reply ends (the gaps).
   *Done when:* `utils/tests/web/chat-speak.test.mjs` (plain text from markdown, sentence splitting, the PCM player's queue, stop) and `utils/tests/settings/test_settings.py` (`speech_output`).
+  *As built:* the whole reply goes to tts in one streaming request (the engine streams as it makes it), so there's no sentence splitting in the page; the reply bar shows the speaker only after a reply ends, and the GPU rule applies on its own (tts waits for the slot). `speech_output` = {voice, engine, speed, auto_read, pause_ms}; Settings → Agent → Voice shows only while the tts mod answers. Auto-read speaks the turn's last message when it ends.
 - [ ] **49.2 Voice mode: `web/chat/chat-voice.js` (new), `chat-composer.js`, `chat-mic.js`.**
   - **A button by the microphone** starts it: listen (the stt stream, as dictation) → after the pause the gaps name, send → read the reply aloud → listen again. Speaking while it reads stops the reading (barge-in: the mic stays open with echo cancellation). A bar over the message box shows listening · thinking · speaking, with the words so far; Escape or the button ends it.
   - **Approvals and questions** still wait on screen; voice mode says "Waiting for you on screen" and pauses.

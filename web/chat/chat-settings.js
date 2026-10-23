@@ -9,6 +9,7 @@ import { getChatClient } from './chat.js';
 import { MODES } from './chat-header.js';
 import { RISK_TONE, grantText } from './chat-risk.js';
 import { SpeechInputSection } from './chat-speech-input.js';
+import { SpeechOutputSection } from './chat-speak.js';
 import { JudgedList } from './chat-judge.js';
 import { PermissionRules } from './chat-rules.js';
 import { WebReadingSection } from './chat-webprefs.js';
@@ -67,6 +68,7 @@ export function AgentSettings({ api, toast = () => {} }) {
         h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 90 } }, '/' + k.name), h('span', { style: { flex: 1, color: T.mut } }, k.description), h(Badge, null, k.source)))),
     h(LearningSection, { api, toast }),
     h(SpeechInputSection, { api, toast }),   // plan 29.4: only while the stt mod is up
+    h(SpeechOutputSection, { api, toast }),  // plan 49.1: Voice, only while the tts mod answers
     section('Permissions',
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, MODES.map(([k, l, d]) => h('div', { key: k, style: { display: 'flex', gap: 10, fontSize: 12.5, alignItems: 'baseline' } },
         h('span', { style: { minWidth: 130, fontWeight: 500 } }, l), h('span', { style: { color: T.mut } }, d)))),

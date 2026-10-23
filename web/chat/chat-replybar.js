@@ -3,6 +3,7 @@
 // the reply streams or its turn still runs. `ctx.turn` is the reply's turn (chat-activity.js's TurnView
 // passes it); a reply outside a turn gets Copy and the thumbs only.
 
+import { SpeakButton } from './chat-speak.js';
 import { h } from './chat-ui.js';
 import { turnSources, SourcesPill, useAttachedPages } from './chat-sources.js';
 import { CopyButton } from './chat-copy.js';
@@ -17,5 +18,5 @@ export function ReplyBar({ text, ctx, thumbs }) {
   return h('div', { role: 'group', 'aria-label': 'Reply actions', style: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, minWidth: 0, marginTop: 4 } },
     src && (src.read.length || src.found.length) ? h(SourcesPill, { src, ctx }) : null,
     h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 2 } },   // no opacity here: it would make the menus see-through
-      h(CopyButton, { text, turn, src, ctx }), thumbs || null));
+      h(CopyButton, { text, turn, src, ctx }), h(SpeakButton, { text, ctx }), thumbs || null));   // SpeakButton: plan 49.1
 }

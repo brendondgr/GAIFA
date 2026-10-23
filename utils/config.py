@@ -266,6 +266,15 @@ class SpeechInputCfg(_Strict):
     _labels = field_validator("mics")(lambda cls, v: mic_labels(v))
 
 
+class SpeechOutputCfg(_Strict):
+    """Plan 49.1: reading replies aloud in Chat (the tts mod) and voice mode's answers."""
+    voice: str = Field("", max_length=120)   # a saved voice or a Kokoro voice; "" = the tts mod's default
+    engine: Literal["auto", "breeze", "kokoro"] = "auto"
+    speed: float = Field(1.0, ge=0.5, le=2.0)   # Kokoro only
+    auto_read: bool = False                     # read every reply aloud when it's finished
+    pause_ms: int = Field(1200, ge=400, le=5000)   # voice mode: the quiet that ends what you said (plan 49.2)
+
+
 class OutputsCfg(_Strict):
     """Plan 30.9: hidden outputs (the web mod's saved pages) older than this go to the outputs trash; 0 keeps them."""
     hidden_keep_days: float = Field(0, ge=0)
@@ -301,6 +310,7 @@ class Config(_Strict):
     sessions: SessionsCfg = SessionsCfg()
     learning: LearningCfg = LearningCfg()
     speech_input: SpeechInputCfg = SpeechInputCfg()
+    speech_output: SpeechOutputCfg = SpeechOutputCfg()
     docs: DocsCfg = DocsCfg()
     outputs: OutputsCfg = OutputsCfg()
     gpu: GpuCfg = GpuCfg()

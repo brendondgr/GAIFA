@@ -36,6 +36,7 @@ import { registerAction } from './chat-actions.js';
 import { registerPreview, ActionBar, Model3DPreview } from './chat-results.js';
 import { registerStep, nameOf } from './chat-steps.js';
 import { loadChatModules } from './chat-mods.js';
+import { speak, speakable } from './chat-speak.js';
 import * as liveKit from '../live-kit.js';
 
 export { registerCard } from './chat-cards.js';
@@ -148,6 +149,18 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   useEffect(() => {      // its folders (and those allowed in this chat), for Bypass (plan 27.4)
     api.callService?.('workspace', 'GET', '/v1/folders', envId ? { query: { environment: envId } } : {}).then(r => setFolders(r.json?.folders || [])).catch(() => setFolders([]));
   }, [envId]);
+  const [speechOut, setSpeechOut] = useState(null);   // plan 49.1: the voice that reads replies (hub settings' speech_output)
+  useEffect(() => { api.getSettings?.().then(s => setSpeechOut(s.speech_output || null)).catch(() => {}); }, []);
+  const wasRunning = useRef(false), reading = useRef(null);
+  useEffect(() => {      // read every reply aloud (auto_read): when a turn ends, its last message
+    if (wasRunning.current && !running && speechOut?.auto_read && c.live) {
+      const last = [...events].reverse().find(e => e.type === 'assistant' && e.payload?.text);
+      const words = last ? speakable(last.payload.text) : '';
+      if (words) { reading.current?.stop(); reading.current = speak(words, speechOut); reading.current.done.catch(() => {}); }
+    }
+    wasRunning.current = running;
+  }, [running]);
+  useEffect(() => () => reading.current?.stop(), [tid]);
   const [, setModTick] = useState(0);    // mods' chat modules (plan 44.1): draw again once they've registered
   useEffect(() => {
     let alive = true;
@@ -258,7 +271,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   };
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
   const ctx = {
-    api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running, dock: true, confirm, toast,
+    api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running, dock: true, confirm, toast, speechOutput: speechOut,
     act: (tool, args) => ensureThread().then(id => c.action(id, tool, args)),   // plan 46.5: a fix runs as your own step
     answer: (qid, answers) => c.answer(tid, qid, answers),
     // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying

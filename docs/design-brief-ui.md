@@ -613,6 +613,8 @@ interface Settings {
               nightly_at: string; idle_min: number; infer_after: number; fade_days: number };
   speech_input: { mics: string[];   // plan 29.4: microphone labels, most preferred first; the first one present is used
                   language: string; preset: "fast" | "balanced" | "accurate" | "best"; mode: "both" | "toggle" | "hold" };
+  speech_output: { voice: string; engine: "auto" | "breeze" | "kokoro"; speed: number;   // plan 49.1: reading replies aloud ("" = tts's default voice)
+                   auto_read: boolean; pause_ms: number };   // auto_read: every finished reply; pause_ms: voice mode's turn end (plan 49.2)
   judge: { backend: "relay" | "decide"; model: string;   // config.toml [agent.judge] (plan 30.3); picked in Settings → Agent
            url: string; threshold: number; timeout_s: number;
            allow_commands: string[]; ask_commands: string[];   // your command rules for Auto (`pytest *`; judge_user.py, plan 30.7)
@@ -1262,6 +1264,8 @@ registerAction({ id: 'audio.transcribe', on: 'audio', label: 'Transcribe', promp
 // How results of a new output kind are shown:
 registerPreview('pointcloud', ({ output, ctx }) => h(MyViewer, { src: output.url }));
 ```
+
+**Read aloud (plan 49.1).** A speaker beside Copy under each finished reply reads it in the voice set in Settings → Agent → Voice (`speech_output`): the reply as plain text (no citations, links' addresses or code: "a code block"), streamed from the tts mod (not saved), so it starts in a moment; again stops it, and one reply reads at a time. Voice also sets the speed (Kokoro), "Read every reply aloud" (when a turn ends) and voice mode's pause.
 
 **@-mentions (plan 48).** Typing `@` in the message box lists what you can name: this chat's outputs (`#n`: a pick becomes an attachment chip), its folders, and the mods' kinds (`api.listMentions`: voices, workflows, engines). `@voice:` narrows to a kind; `@voi` matches the kind too. ↑↓ and Tab or Enter pick, Esc closes. A pick writes `@voice:Brendon` into the text and goes with the message as a mention; the agent says it to the model and the hub fills that turn's calls with it (the card's field is marked "from your message"), asking when the model chose otherwise.
 

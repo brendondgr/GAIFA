@@ -28,6 +28,7 @@ import { ThreadHeader, bypassAllowed } from './chat-header.js';
 import { decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
 import { ControlsRow, ModeMenu, ModelMenu, EnvMenu, CONTROLS_CSS } from './chat-controls.js';
 import { Composer } from './chat-composer.js';
+import { VoiceButton, lastAnswer } from './chat-voice.js';
 import { QUOTE_CSS } from './chat-quote.js';
 import { QuoteReplyBox, QREPLY_CSS, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
 import * as chatUi from './chat-ui.js';
@@ -151,11 +152,10 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   }, [envId]);
   const [speechOut, setSpeechOut] = useState(null);   // plan 49.1: the voice that reads replies (hub settings' speech_output)
   useEffect(() => { api.getSettings?.().then(s => setSpeechOut(s.speech_output || null)).catch(() => {}); }, []);
-  const wasRunning = useRef(false), reading = useRef(null);
+  const wasRunning = useRef(false), reading = useRef(null), voiceOn = useRef(false);
   useEffect(() => {      // read every reply aloud (auto_read): when a turn ends, its last message
-    if (wasRunning.current && !running && speechOut?.auto_read && c.live) {
-      const last = [...events].reverse().find(e => e.type === 'assistant' && e.payload?.text);
-      const words = last ? speakable(last.payload.text) : '';
+    if (wasRunning.current && !running && speechOut?.auto_read && c.live && !voiceOn.current) {   // voice mode reads its own
+      const words = speakable(lastAnswer(events));
       if (words) { reading.current?.stop(); reading.current = speak(words, speechOut); reading.current.done.catch(() => {}); }
     }
     wasRunning.current = running;
@@ -341,6 +341,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
           blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))))),
       h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
         dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
+        voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, lastAnswer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
         settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
         controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box

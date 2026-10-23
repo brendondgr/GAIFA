@@ -108,7 +108,7 @@ function DocMode({ a, mode, onPick }) {
 const menuSt = { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' };
 
 // controls: the row under the box (chat-controls.js: environment, mode, model; plan 42.3)
-export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [] }) {
+export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [], voice = null }) {
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
@@ -233,6 +233,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
             placeholder: running ? 'Add a message (it’s read after the current step)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
             style: { flex: 1, minWidth: 0, alignSelf: 'center', minHeight: 22, maxHeight: boxMax(), resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
           h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
+          voice,                                               // voice mode (plan 49.2)
           running ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: onStop, title: 'Stop the turn (and its running tool)', className: 'aichat-quiet', style: { background: 'transparent' } }) : null,
           h(Btn, { kind: 'pri', sm: true, icon: 'send', title: running ? 'Queue this message' : 'Send (Enter)', disabled: !can, onClick: send,
             style: { width: 30, height: 28, padding: 0, justifyContent: 'center', borderRadius: 7 } }))),

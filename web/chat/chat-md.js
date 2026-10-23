@@ -4,9 +4,13 @@
 // is HTML-escaped first; the only tags in the output are the ones made here, and links keep
 // only http(s), mailto, `#…` and `/…` targets. Citations of documents (plan 24.7: `#3 p.14`, `#3:88`,
 // `output:<id> p.14`, `output:<id>:88`) become links with `data-cite`, `data-page` / `data-line` that the
-// chat opens in the viewer. Pure (no DOM), tested in utils/tests/web/chat.test.mjs and citations.test.mjs.
+// chat opens in the viewer. A bracketed group of them as models write it (`[eecs.berkeley.edu #1:112]`,
+// `[coursera.org #6:16; BLS]`, `[resume #8 p.1]`) becomes a row of chips: the site's icon, the source's
+// name and a dim place; a part without a `#n` is a plain chip. `data-src` keeps what the model wrote (for
+// quoting, chat-quote.js). Pure (no DOM), tested in utils/tests/web/chat.test.mjs and citations.test.mjs.
 
 import { highlight } from './highlight.js';
+import { faviconUrl } from './chat-sources.js';
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 export const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
@@ -14,7 +18,7 @@ export const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
 const SAFE_URL = /^(https?:\/\/|mailto:|#|\/(?!\/))/i;
 
 // `#n` or `output:<12 hex>`, then `:line`, ` p.N` / ` pp.N-M` / ` page N`, or ` line N` / ` lines N-M`
-const CITE = /(^|[^\w&#/:])(#(\d{1,4})|output:([0-9a-f]{12}))(?::(\d{1,7})\b|,?\s+(?:pp?\.\s?|pages?\s)(\d{1,5})(?:\s?[-–]\s?\d{1,5})?\b|,?\s+(?:lines?\s|l\.\s?)(\d{1,7})(?:\s?[-–]\s?\d{1,7})?\b)/g;
+const CITE = /(^|[^\w&#/:])(#(\d{1,4})|output:([0-9a-f]{12}))(?::(\d{1,7})(?:\s?[-–]\s?\d{1,7})?\b|,?\s+(?:pp?\.\s?|pages?\s)(\d{1,5})(?:\s?[-–]\s?\d{1,5})?\b|,?\s+(?:lines?\s|l\.\s?)(\d{1,7})(?:\s?[-–]\s?\d{1,7})?\b)/g;
 
 /** The document citations in a text: [{text, ref ('#3' | 'output:<id>'), n?, id?, page?, line?}]. */
 export function parseCitations(text) {
@@ -26,6 +30,43 @@ export function parseCitations(text) {
     out.push(c);
   }
   return out;
+}
+
+// One part of a bracketed group: `name #n`, `name #n:9-35`, `name #n p.1`, `#n`, or `output:<id> …`.
+const PART = /^(?:(.*?)\s+)?(#(\d{1,4})|output:([0-9a-f]{12}))(?:(?::\s?|,?\s+(?:lines?\s|l\.\s?))(\d{1,7})|,?\s+(pp?\.\s?|pages?\s)(\d{1,5}))?([\d\s,–-]*)$/;
+const dash = s => s.trim().replace(/\s*[-–]\s*/g, '–').replace(/\s*,\s*/g, ', ');
+
+/** A bracketed group's text → its parts ({ref, n?, id?, name, page?, line?, at} or {name} for a part with no
+ *  `#n`), or null when no part cites anything (`[x]`, `[Medium]` stay as written). */
+export function citeGroup(inner) {
+  const parts = String(inner ?? '').split(';').map(p => p.trim()).filter(Boolean);
+  const out = parts.map(p => {
+    const m = PART.exec(p);
+    if (!m || (m[8].trim() && !m[5] && !m[7])) return { name: p };
+    const c = { ref: m[2], name: (m[1] || '').trim() };
+    if (m[3]) c.n = +m[3]; else c.id = m[4];
+    if (m[5]) { c.line = +m[5]; c.at = 'L' + dash(m[5] + m[8]); }
+    else if (m[7]) { c.page = +m[7]; c.at = (/^pp|^pages/.test(m[6]) || /[-–,]/.test(m[8]) ? 'pp. ' : 'p. ') + dash(m[7] + m[8]); }
+    return c;
+  });
+  return out.some(c => c.ref) ? out : null;
+}
+
+// The titles of the chat's sources while a message renders (renderMarkdown's `cites`): '#3' → title.
+let titles = null;
+const clipName = (s, n = 32) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s);
+
+/** A citation chip (escaped text in, HTML out): the icon when the name is a hostname, the name, the place. */
+function chip(c, src) {
+  const title = titles?.(c.ref);
+  const name = c.name || (title ? escapeHtml(clipName(title)) : c.ref);
+  const at = c.line ? ` data-line="${c.line}"` : c.page ? ` data-page="${c.page}"` : '';
+  const where = c.line ? `line ${c.line}` : c.page ? `page ${c.page}` : '';
+  const tip = `Open ${title ? escapeHtml(title) + ' (' + c.ref + ')' : c.ref}${where ? ' at ' + where : ''}`;
+  const icon = faviconUrl(c.name.replace(/&amp;/g, '&'));
+  return `<a href="#" class="aichat-cite" data-cite="${c.ref}"${at}${src ? ` data-src="${src}"` : ''} title="${tip}">`
+    + (icon ? `<img class="aichat-cite-ico" src="${icon}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '')
+    + `<span class="aichat-cite-name">${name}</span>${c.at ? `<span class="aichat-cite-at">${c.at}</span>` : ''}</a>`;
 }
 
 // Inline spans on already-escaped text. Code spans are cut out first so nothing inside them changes.
@@ -40,11 +81,16 @@ function inline(src) {
     return stash(`<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`);
   });
   s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:!?])/g, (_, pre, url) => pre + stash(`<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`));
+  s = s.replace(/\[([^\[\]\n\u0000]+)\](?!\()/g, (m, inner) => {
+    const parts = citeGroup(inner);
+    if (!parts) return m;
+    return stash(`<span class="aichat-cites" data-src="${inner}">${parts.map(c => (c.ref ? chip(c) : `<span class="aichat-cite aichat-cite-plain">${c.name}</span>`)).join('')}</span>`);
+  });
   s = s.replace(CITE, (m, pre) => {
     const [c] = parseCitations(m.slice(pre.length));
     if (!c) return m;
-    const at = c.line ? ` data-line="${c.line}"` : ` data-page="${c.page}"`;
-    return pre + stash(`<a href="#" class="aichat-cite" data-cite="${c.ref}"${at} title="Open ${c.ref} at ${c.line ? 'line ' + c.line : 'page ' + c.page}">${c.text}</a>`);
+    const [p] = citeGroup(c.text) || [];
+    return pre + stash(chip(p?.ref ? p : { ...c, name: '' }, c.text));
   });
   s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>').replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
   s = s.replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<em>$2</em>').replace(/(^|[^_\w])_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>');
@@ -91,8 +137,12 @@ function table(head, delim, rows) {
   return `<div class="aichat-table"><table><thead><tr>${th.map((t, j) => td('th', t, j)).join('')}</tr></thead>${body ? `<tbody>${body}</tbody>` : ''}</table></div>`;
 }
 
-/** Markdown → an HTML string that is safe to set as innerHTML. */
-export function renderMarkdown(text) {
+/** Markdown → an HTML string that is safe to set as innerHTML. `cites(ref)` names a citation's source ('#3' → its title). */
+export function renderMarkdown(text, { cites } = {}) {
+  titles = cites || null;
+  try { return blocks(text); } finally { titles = null; }
+}
+function blocks(text) {
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
   const out = [];
   let para = [], list = null, quote = [];
@@ -163,13 +213,22 @@ export const MD_CSS = `
 .aichat-md th+th,.aichat-md td+td{border-left:1px solid var(--bd,#1D2430)}
 .aichat-md th{background:var(--inset,#131926);font-weight:600}.aichat-md tbody tr:last-child td{border-bottom:0}
 .aichat-md blockquote{margin:0 0 8px;padding:2px 10px;border-left:3px solid var(--bds,#2A3547);color:var(--mut,#8A94A6)}
-.aichat-md a{color:var(--cy,#58C4DD)}.aichat-md a.aichat-cite{text-decoration:none;border-bottom:1px dotted currentColor;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.92em}.aichat-md hr{border:0;border-top:1px solid var(--bd,#1D2430);margin:10px 0}
+.aichat-md a{color:var(--cy,#58C4DD)}.aichat-md hr{border:0;border-top:1px solid var(--bd,#1D2430);margin:10px 0}
+.aichat-md .aichat-cites>.aichat-cite+.aichat-cite{margin-left:3px}
+.aichat-md .aichat-cite{display:inline-flex;align-items:center;gap:4px;max-width:240px;height:18px;padding:0 7px;margin:0 1px;border-radius:9px;vertical-align:1px;box-sizing:border-box;border:1px solid var(--bd,#1D2430);background:var(--hov,#161C28);color:var(--mut,#8A94A6);font-size:11px;font-weight:500;line-height:1;text-decoration:none;white-space:nowrap;transition:color .12s,border-color .12s,background .12s}
+.aichat-md a.aichat-cite{cursor:pointer}.aichat-md a.aichat-cite:hover,.aichat-md a.aichat-cite:focus-visible{color:var(--tx,#E6EAF2);border-color:var(--cy,#58C4DD);background:var(--tcy,rgba(88,196,221,.13));outline:none}
+.aichat-md .aichat-cite-plain{color:var(--dim,#737D90);background:none}
+.aichat-md .aichat-cite-ico{width:12px;height:12px;border-radius:3px;flex:none;object-fit:contain}
+.aichat-md .aichat-cite-name{overflow:hidden;text-overflow:ellipsis}
+.aichat-md .aichat-cite-at{flex:none;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--dim,#737D90)}
 `;
 
 /** One click handler for every Copy button in rendered Markdown (chat replies, activity rows, the viewer); safe to call more than once. */
 export function installCopy(doc = globalThis.document) {
   if (!doc || doc.__aichatCopy) return;
   doc.__aichatCopy = true;
+  // a citation chip whose site has no icon drops it (error doesn't bubble, so listen while capturing)
+  doc.addEventListener('error', e => { if (e.target?.classList?.contains('aichat-cite-ico')) e.target.remove(); }, true);
   doc.addEventListener('click', async e => {
     const b = e.target?.closest?.('.aichat-copy');
     const code = b?.closest('.aichat-code')?.querySelector('code');

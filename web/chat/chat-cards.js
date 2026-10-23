@@ -120,7 +120,10 @@ export function Thumbs({ ctx, target, label = 'this' }) {
 
 function AssistantCard({ item, ctx }) {
   const React = R(), text = item.ev.payload.text || '';
-  const html = React.useMemo(() => renderMarkdown(text), [text]);
+  const outs = ctx?.outputs || [];
+  // a citation chip names its source: '#3' or 'output:<id>' → that output's title
+  const html = React.useMemo(() => renderMarkdown(text, { cites: ref => outs.find(o => (ref[0] === '#' ? o.n === +ref.slice(1) : o.output_id === ref.slice(7)))?.title }),
+    [text, outs.length]);
   const onClick = e => {   // plan 24.7: citation links open the viewer
     const a = e.target?.closest?.('a[data-cite]');
     if (!a) return;

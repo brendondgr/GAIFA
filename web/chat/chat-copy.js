@@ -6,7 +6,7 @@
 // Pure part tested in utils/tests/web/chat-copy.test.mjs.
 
 import { h, T, Icon, Popover, getPref, setPref } from './chat-ui.js';
-import { parseCitations } from './chat-md.js';
+import { parseCitations, citeGroup } from './chat-md.js';
 import { stepText, errorText } from './chat-steps.js';
 import { SEARCH_TOOLS, FETCH_TOOLS, turnSources, placeFor } from './chat-sources.js';
 
@@ -53,7 +53,7 @@ export function cutSources(md) {
 }
 
 const isCite = s => /^\s*(#\d{1,4}|output:[0-9a-f]{12})\b/.test(s);
-/** Text only: links become their words, citations (`#3 p.14`, `[#2](url)`, `(#2)`) go, and so does a Sources list. */
+/** Text only: links become their words, citations (`#3 p.14`, `[site #2:9]`, `[#2](url)`, `(#2)`) go, and so does a Sources list. */
 export function textOnly(md) {
   let s = cutSources(md);
   // keep code as it is: cut fenced blocks and code spans out first
@@ -63,6 +63,7 @@ export function textOnly(md) {
   s = s.replace(/!\[([^\]]*)\]\([^)\s]*\)/g, '$1');
   s = s.replace(/\[([^\]\n]+)\]\([^)\s]+\)/g, (_, text) => (isCite(text) ? '' : text));
   s = s.replace(/<(https?:\/\/[^>\s]+)>/g, '$1');
+  s = s.replace(/\[([^\[\]\n]+)\](?!\()/g, (m, inner) => (citeGroup(inner) ? '' : m));     // [site #1:12; BLS]
   s = s.split('\n').map(line => {
     for (const c of parseCitations(line)) line = line.replace(c.text, '');
     return line;

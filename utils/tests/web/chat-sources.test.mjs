@@ -98,6 +98,7 @@ test('copy: text only drops links, citations and the Sources list', () => {
   assert.equal(cp.textOnly('Read [the guide](https://a.example/x) and <https://b.example/y> (#3 p.14). `[#1](u)` stays.\n\n```\n[x](y) #2 p.3\n```'),
     'Read the guide and https://b.example/y. `[#1](u)` stays.\n\n```\n[x](y) #2 p.3\n```');
   assert.equal(cp.textOnly('A fact [#2](https://x.example/p), another (#1, #3).\n\n## Sources\n1. [X](https://x.example/p)\n2. https://y.example'), 'A fact, another.');
+  assert.equal(cp.textOnly('They passed [eecs.berkeley.edu #1:112; BLS], and [Medium] says so [resume #8 p.1].'), 'They passed, and [Medium] says so.');
   assert.equal(cp.cutSources('Sources matter.\n\nSources: we read many.'), 'Sources matter.\n\nSources: we read many.', 'not a list: kept');
 });
 

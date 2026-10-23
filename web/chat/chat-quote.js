@@ -4,7 +4,8 @@
 //   word inside a list item stays `- **word**`), then written as markdown (`htmlToMarkdown`) for the renderer's
 //   own tags: paragraphs and line breaks, bold, italic, strikethrough, inline code, fenced code with its language
 //   (the header bar left out), lists (numbered from where the selection starts), quotes, headings (h3 → `#`: the
-//   renderer shifts levels by 2), rules, links, citations (as written: `#3 p.14`) and pipe tables with alignment.
+//   renderer shifts levels by 2), rules, links, citations (as written: `#3 p.14`, `[site #1:12]`, from the chips'
+//   `data-src`) and pipe tables with alignment.
 //   A selection across table cells quotes the rows it touches, whole, under the table's header; one inside a
 //   single cell quotes just the text. Part of one line of a code block is inline code.
 // - `scrollToReply`: back to the reply a quote came from, flashed.
@@ -14,7 +15,7 @@ export const QUOTE_MAX = 8000;         // characters (the agent refuses longer)
 export const QUOTE_ICON = 'M9.5 7H6.5A1.5 1.5 0 0 0 5 8.5v3A1.5 1.5 0 0 0 6.5 13H9v1c0 1.5-1 2.5-2.5 3M18.5 7h-3A1.5 1.5 0 0 0 14 8.5v3a1.5 1.5 0 0 0 1.5 1.5H18v1c0 1.5-1 2.5-2.5 3';
 
 // ---------- a DOM (or a stand-in) → a plain tree: {tag, attrs, children, orig} | {text, orig} ----------
-const ATTRS = ['class', 'href', 'style', 'data-lang', 'data-cite', 'start'];
+const ATTRS = ['class', 'href', 'style', 'data-lang', 'data-cite', 'data-src', 'start'];
 const attrsOf = n => {
   const a = {};
   for (const k of ATTRS) { const v = n.getAttribute?.(k); if (v != null) a[k] = v; }
@@ -105,6 +106,7 @@ function inline(n) {
   if (n.text !== undefined) return n.text;
   if (skip(n)) return '';
   const inner = () => n.children.map(inline).join('');
+  if (cls(n).includes(' aichat-cites ')) return `[${n.attrs['data-src'] ?? inner()}]`;
   switch (n.tag) {
     case 'br': return '\n';
     case 'strong': case 'b': return wrap(inner(), '**');
@@ -113,7 +115,8 @@ function inline(n) {
     case 'code': { const t = textOf(n); if (!t) return ''; const f = t.includes('`') ? '``' : '`'; return f + (f === '``' ? ` ${t} ` : t) + f; }
     case 'a': {
       const text = inner(), href = n.attrs?.href;
-      if (cls(n).includes(' aichat-cite ') || !href || href === '#') return text;
+      if (cls(n).includes(' aichat-cite ')) return n.attrs['data-src'] ?? text;
+      if (!href || href === '#') return text;
       return text === href ? href : text.trim() ? `[${text}](${href})` : '';
     }
     default: return BLOCK.has(n.tag) ? blocks(n).join(' ') : inner();

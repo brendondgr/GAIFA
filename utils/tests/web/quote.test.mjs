@@ -56,6 +56,7 @@ const CORPUS = [
   'Before\n\n---\n\nAfter',
   'See [the docs](https://example.com/a?b=1&c=2) and https://example.org/x for more.',
   'As the report says (#3 p.14), and the code at #2:88 and output:0123456789ab pp.3-5.',
+  'Many passed [eecs.berkeley.edu #1:112-113; BLS] and [resume #8 p.1], not [Medium].',
   '```python\ndef f(x):\n    return x * 2  # double\n```',
   '```\nplain block\n  indented\n```',
   '| Name | Count | Price |\n| --- | :---: | ---: |\n| apples | 3 | $1.50 |\n| `pears` | 10 | **$2** |',
@@ -83,7 +84,8 @@ test('partial selections keep what is selected, with its formatting', () => {
   assert.equal(sel(md, ['quick', 0], ['quick', 5]), '**quick**');             // inside one bold word
   assert.equal(sel('## Heading words', ['Heading', 0], ['Heading', 7]), '## Heading');
   assert.equal(sel('A [link text](https://a.b/c) here', ['link', 0], ['text', 4]), '[link text](https://a.b/c)');
-  assert.equal(sel('See #3 p.14 now', ['#3', 0], ['p.14', 4]), '#3 p.14');
+  assert.equal(sel('See #3 p.14 now', ['#3', 0], ['p. 14', 5]), '#3 p.14');      // the chip shows "#3 p. 14"
+  assert.equal(sel('Passed [bu.edu #3:9-35] then', ['Passed', 0], ['then', 4]), 'Passed [bu.edu #3:9-35] then');
   assert.equal(sel('> quoted one\n> quoted two', ['one', 0], ['two', 3]), '> one\n> quoted two');
 });
 

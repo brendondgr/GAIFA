@@ -435,6 +435,7 @@ interface ServiceSummary {
   has_page: boolean;
   page_url: string | null;       // where the shell loads the page: /ui/services/<id>/page.js or /Mod_<id>.dc.html
   logo_url: string | null;       // plan 33.1: the mod's logo ([ui] logo, else ui/logo.svg), or null: the UI draws a monogram
+  chat_url?: string | null;      // plan 44.1: the mod's chat module ([ui] chat), which the Chat page loads; null without one
   has_outputs: boolean;
   native_ui: string | null;      // URL of the service's own UI, if any
   enabled: boolean;

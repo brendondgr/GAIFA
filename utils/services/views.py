@@ -41,6 +41,7 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "has_page": has_page(svc),
         "page_url": page_url(svc),
         "logo_url": logo_url(svc),
+        "chat_url": chat_url(svc),
         "has_outputs": bool(m and m.outputs),
         "native_ui": native,
         "enabled": svc.eff.enabled,
@@ -89,6 +90,14 @@ def page_url(svc: Service) -> str | None:
     if page.endswith(".dc.html"):
         return f"/Mod_{svc.id}.dc.html"
     return f"/ui/services/{svc.id}/{page.removeprefix('ui/')}"
+
+
+def chat_url(svc: Service) -> str | None:
+    """The mod's chat module (plan 44.1): `[ui] chat`, served from its `ui/` folder; null without one (or a missing file)."""
+    m = svc.m
+    if not (m and m.ui.chat and (svc.mod.dir / m.ui.chat).is_file()):
+        return None
+    return f"/ui/services/{svc.id}/{m.ui.chat.removeprefix('ui/')}"
 
 
 def logo_url(svc: Service) -> str | None:

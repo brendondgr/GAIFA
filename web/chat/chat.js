@@ -6,6 +6,8 @@
 //   registerCard(kind, Component)     a card for an event type, or 'tool:<name>' / 'result:<name>'
 //   registerAction({...})             a result button or a composer quick action
 //   registerPreview(kind, Component)  how a result of a new output kind is shown
+//   registerStep(name, words)         a tool's step words in the activity fold
+// A mod gives its own with `[ui] chat = "ui/chat.js"` (plan 44.1, chat-mods.js): its setup(chat) gets these.
 
 import { h, T, Icon, Btn, COL, useWidth, chipSt, label11 } from './chat-ui.js';
 import { MD_CSS, installCopy } from './chat-md.js';
@@ -25,6 +27,12 @@ import { ControlsRow, ModeMenu, ModelMenu, EnvMenu, CONTROLS_CSS } from './chat-
 import { Composer } from './chat-composer.js';
 import { QUOTE_CSS } from './chat-quote.js';
 import { QuoteReplyBox, QREPLY_CSS, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
+import * as chatUi from './chat-ui.js';
+import { registerCard } from './chat-cards.js';
+import { registerAction } from './chat-actions.js';
+import { registerPreview } from './chat-results.js';
+import { registerStep } from './chat-steps.js';
+import { loadChatModules } from './chat-mods.js';
 
 export { registerCard } from './chat-cards.js';
 export { registerAction, actionsFor } from './chat-actions.js';
@@ -50,6 +58,10 @@ function injectCss() {
   const s = document.createElement('style');
   s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + CONTROLS_CSS + QUOTE_CSS + QREPLY_CSS + PAGE_CSS;
   document.head.appendChild(s);
+}
+/** What a mod's chat module gets (plan 44.1). */
+export function chatModuleApi(api) {
+  return { registerCard, registerPreview, registerAction, registerStep, ui: chatUi, api, live: null };
 }
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
 
@@ -132,6 +144,13 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   useEffect(() => {      // its folders (and those allowed in this chat), for Bypass (plan 27.4)
     api.callService?.('workspace', 'GET', '/v1/folders', envId ? { query: { environment: envId } } : {}).then(r => setFolders(r.json?.folders || [])).catch(() => setFolders([]));
   }, [envId]);
+  const [, setModTick] = useState(0);    // mods' chat modules (plan 44.1): draw again once they've registered
+  useEffect(() => {
+    let alive = true;
+    Promise.resolve(api.listServices?.()).then(s => loadChatModules(s || [], chatModuleApi(api)))
+      .then(r => { if (alive && r.some(x => x.ok)) setModTick(t => t + 1); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
   const view = useMemo(() => buildView(events, live), [events, live]);
   const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
   const [now, setNow] = useState(() => Date.now() / 1000);   // ticks while a turn runs, so the fold's timers count

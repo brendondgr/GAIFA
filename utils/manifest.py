@@ -199,7 +199,18 @@ class UiSpec(_Strict):
     page: str | None = None
     native: str | None = None
     logo: str | None = None   # plan 33.1: unset = ui/logo.svg when that file exists
+    chat: str | None = None   # plan 44.1: a chat module (`export default function setup(chat)`) inside ui/
     widgets: list[WidgetSpec] = []
+
+    @field_validator("chat")
+    @classmethod
+    def _chat(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        p = Path(v)
+        if p.is_absolute() or ".." in p.parts or p.parts[:1] != ("ui",) or p.suffix != ".js":
+            raise ValueError(f"{v!r} must be a .js file inside the mod's ui/ folder")
+        return v
 
     @field_validator("logo")
     @classmethod

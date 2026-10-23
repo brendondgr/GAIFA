@@ -193,6 +193,10 @@ async def run(mgr: ServiceManager, svc: Service, start: bool = False, tools: Any
     if m.ui.page:
         r.add("page", *page_check(svc.mod.dir / m.ui.page))
 
+    # 11b. the chat module (plan 44.1)
+    if m.ui.chat:
+        r.add("chat", *chat_check(svc.mod.dir / m.ui.chat))
+
     # 12. the GPU slot (plan 31.2)
     gpu = gpu_check(m, svc.status if live else None)
     if gpu:
@@ -274,6 +278,16 @@ def widget_problems(data: Any, kind: str) -> list[str]:
         elif axis is not None and len(vals) != len(axis):
             out.append(f"series[{i}] ({s['name']}): {len(vals)} values for {len(axis)} points")
     return out
+
+
+def chat_check(path: Path) -> tuple[str, str]:
+    """`[ui] chat`: the file exists and exports `setup(chat)` as its default."""
+    if not path.is_file():
+        return "fail", f"{path.name} is declared in [ui] chat but doesn't exist"
+    text = path.read_text(errors="replace")
+    if not re.search(r"export\s+default\b", text):
+        return "fail", f"{path.name} has no `export default function setup(chat)`"
+    return "ok", f"{path.name}: a chat module"
 
 
 def page_check(path: Path) -> tuple[str, str]:

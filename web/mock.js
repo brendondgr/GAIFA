@@ -6,6 +6,7 @@ import { createToolMocks } from './mock-tools.js';
 import { createSessionMocks } from './mock-sessions.js';
 import { TEXT_EXT, DOC_EXT } from './chat/chat-files.js';
 const GB = 1e9, MB = 1e6;
+const CHAT_MODS = [];   // mods whose chat module (plan 44.1) the mock lists: they're served from services/<id>/ui/ as in the live hub
 export class ApiError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
 }
@@ -316,7 +317,7 @@ export function createMockApi() {
   function summary(s) {
     return { id: s.id, name: s.name, description: s.description, icon: s.icon, version: s.version, kind: s.kind, port: s.config?.port ?? s.port, url: `http://127.0.0.1:${s.config?.port ?? s.port}`,
       state: s.state, state_since: s.state_since, load: s.load, idle_s: s.load === 'n/a' ? null : s.idle_s, memory: { used_bytes: s.used, estimate_bytes: s.estimate, peak_bytes: s.peak },
-      stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, logo_url: ['relay', 'lcpp', 'tts', 'gen3d', 'comfy', 'opencode'].includes(s.id) ? `/ui/services/${s.id}/logo.svg` : null, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
+      stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, chat_url: CHAT_MODS.includes(s.id) ? `/ui/services/${s.id}/chat.js` : null, logo_url: ['relay', 'lcpp', 'tts', 'gen3d', 'comfy', 'opencode'].includes(s.id) ? `/ui/services/${s.id}/logo.svg` : null, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
       last_error: s.last_error, manifest_errors: [...s.manifest_errors],
       accel: MOCK_ACCEL[s.id] ?? null, unavailable: s.id === 'example' ? "its variant (cuda) needs a GPU this machine doesn't have (it has rocm, vulkan, cpu): run `aihub setup example` to pick another" : null };   // plan 38.3
   }

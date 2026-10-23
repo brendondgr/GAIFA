@@ -42,7 +42,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 
 ## Phase 44 — Mod chat modules and live progress
 
-- [ ] **44.1 `[ui] chat` and the loader: `utils/manifest.py`, `utils/services/views.py`, `web/chat/chat-mods.js` (new), `chat.js`.**
+- [x] **44.1 `[ui] chat` and the loader: `utils/manifest.py`, `utils/services/views.py`, `web/chat/chat-mods.js` (new), `chat.js`.**
   - **Manifest:** `UiSpec.chat: str | None`, validated as `page` is (a `.js` file inside `ui/`).
   - **Services view:** `chat_url` next to `page_url` (`/ui/services/<id>/<file>`), in `GET /api/services` (`utils/api_models.py`). `api.js` and the contract test (6.6) learn the field.
   - **Loader:** `loadChatModules(services, chat)` imports each `chat_url` once per page load (with the service's `updated` as a cache-buster), calls its `setup(chat)` inside a try, and keeps what each module registered so a module that throws in `setup` unregisters cleanly. `chat.version = 1`.

@@ -132,6 +132,7 @@ AIHub/
 | Outputs | write into `{outputs}` (§4.7) | shows on the Outputs page automatically |
 | Models | `[models] dirs` | registry entries in those folders (or deeper, e.g. `comfyui/loras`) are listed as "used by" this mod, and their files can't be deleted while it holds them |
 | Custom page | `ui/page.js` or `ui/Page.dc.html` (UI brief §5) | own tabs inside the AIHub shell |
+| Chat module | `[ui] chat = "ui/chat.js"` (plan 44.1, [mods.md](mods.md)): `export default function setup(chat)` registers the mod's step words and cards; listed as `chat_url` | its own cards in Chat (a live card while its job runs, its result) |
 | Dashboard widgets | `[[ui.widgets]]` pointing at a route that returns `WidgetData` (UI brief §11.7) | its charts on the Overview dashboard |
 | Charts for free | numeric values in `stats` (§4.6) | each one is recorded as a series `svc.<id>.stat.<slug>` and drawn as sparklines and charts |
 | API polish | `[api]` hide list and response-kind overrides | a cleaner API tab |
@@ -186,6 +187,7 @@ kinds = ["audio"]
 
 [ui]
 page = "ui/page.js"                 # optional custom page (or "ui/Page.dc.html")
+chat = "ui/chat.js"                 # optional chat module: its own cards in Chat (plan 44.1)
 native = "/ui/"                     # optional: the mod's own UI, linked from its page header
 logo = "ui/logo.svg"                # optional (plan 33.1): .svg, .png or .webp inside ui/; unset = ui/logo.svg if it exists
 

@@ -66,6 +66,9 @@ const W = {
   view_output: { running: 'Looking at the output', done: 'Looked at the output', icon: 'eye', lookup: true, detail: (a, ctx) => ref(a.output || a.id || a.ref, ctx) || a.output || '' },
   read_result: { running: 'Reading an earlier result', done: 'Read an earlier result', icon: 'search', lookup: true },
   comfy_list_workflows: { running: 'Listing workflows', done: 'Listed the workflows', icon: 'search', lookup: true },
+  hub_gpu_status: { running: 'Checking the GPU', done: 'Checked the GPU', icon: 'search', lookup: true },        // plan 46.2
+  hub_doctor: { running: 'Checking the install', done: 'Checked the install', icon: 'search', lookup: true },
+  hub_free_gpu: { running: 'Freeing the GPU', done: 'Freed the GPU', icon: 'tool', detail: a => (a.services || []).join(', ') },
   comfy_generate_image: { running: 'Generating an image', done: 'Generated an image', icon: 'image',
     detail: (a, ctx) => join([a.workflow && nameOf(a.workflow, { tool: 'comfy_generate_image', key: 'workflow', ctx }), a.aspect, a.preset]),
     sentence: (a, ctx) => ({ parts: ['Generated with ', b(nameOf(a.workflow || 'the default workflow', { tool: 'comfy_generate_image', key: 'workflow', ctx })),

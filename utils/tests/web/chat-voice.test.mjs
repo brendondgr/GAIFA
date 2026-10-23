@@ -33,9 +33,13 @@ test('talking over the reply stops it and listens', () => {
   const loud = v.bargeTracker(0.5, 300);
   assert.equal(loud(0.9, 0), false);
   assert.equal(loud(0.9, 200), false);
-  assert.equal(loud(0.2, 250), false);       // a dip starts it over
-  assert.equal(loud(0.9, 300), false);
-  assert.equal(loud(0.9, 620), true);
+  assert.equal(loud(0.2, 250), false);       // a short dip between syllables keeps counting
+  assert.equal(loud(0.9, 310), true);
+  const l2 = v.bargeTracker(0.5, 300, 250);
+  l2(0.9, 0); l2(0.9, 100);
+  assert.equal(l2(0.9, 500), false);         // a long gap starts it over
+  l2(0.9, 650);
+  assert.equal(l2(0.9, 810), true);
 });
 
 test('a waiting card pauses it; answering carries on', () => {
@@ -55,6 +59,12 @@ test('stop and errors end it', () => {
 
 test('the last reply', () => {
   const evs = [{ type: 'user', payload: { text: 'hi' } }, { type: 'assistant', payload: { text: 'one' } }, { type: 'tool_call', payload: {} }, { type: 'assistant', payload: { text: 'two' } }, { type: 'assistant', payload: {} }];
-  assert.equal(v.lastAnswer(evs), 'two');
-  assert.equal(v.lastAnswer([]), '');
+  assert.deepEqual(v.lastAnswer(evs.map((e, i) => ({ ...e, seq: i + 1 }))), { seq: 4, text: 'two' });
+  assert.deepEqual(v.lastAnswer([]), { seq: 0, text: '' });
+});
+
+test('the turn has ended only with a newer reply and nothing running', () => {
+  assert.equal(v.turnEnded(false, { seq: 4, text: 'old' }, 4), false);    // running blinked off before the reply
+  assert.equal(v.turnEnded(true, { seq: 9, text: 'partial' }, 4), false);
+  assert.equal(v.turnEnded(false, { seq: 9, text: 'new' }, 4), true);
 });

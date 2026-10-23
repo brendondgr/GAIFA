@@ -155,7 +155,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const wasRunning = useRef(false), reading = useRef(null), voiceOn = useRef(false);
   useEffect(() => {      // read every reply aloud (auto_read): when a turn ends, its last message
     if (wasRunning.current && !running && speechOut?.auto_read && c.live && !voiceOn.current) {   // voice mode reads its own
-      const words = speakable(lastAnswer(events));
+      const words = speakable(lastAnswer(events).text);
       if (words) { reading.current?.stop(); reading.current = speak(words, speechOut); reading.current.done.catch(() => {}); }
     }
     wasRunning.current = running;
@@ -341,7 +341,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
           blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))))),
       h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
         dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
-        voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, lastAnswer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
+        voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
         settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
         onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
         controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box

@@ -9,7 +9,7 @@ import { dictate, dictated, levelOf, speechSettings, useSttUp } from './chat-mic
 import { speak, speakable } from './chat-speak.js';
 
 const R = () => globalThis.React;
-export const BARGE_LEVEL = 0.55, BARGE_MS = 350;
+export const BARGE_LEVEL = 0.5, BARGE_MS = 350, BARGE_GAP = 250, SETTLE_MS = 700;
 
 /** The voice loop's next state: {mode, text, error}. Modes: off, listening, sending, thinking, speaking, paused. */
 export function voiceStep(s, ev) {
@@ -29,24 +29,32 @@ export function voiceStep(s, ev) {
   }
 }
 
-/** True once the mic has been loud for `ms` (barge-in while the reply is read). */
-export function bargeTracker(level = BARGE_LEVEL, ms = BARGE_MS) {
-  let since = null;
+/** True once the mic has been loud for `ms` (barge-in while the reply is read); dips under `gap` ms between
+ * syllables don't start it over. */
+export function bargeTracker(level = BARGE_LEVEL, ms = BARGE_MS, gap = BARGE_GAP) {
+  let since = null, last = -Infinity;
   return (lv, now) => {
-    if (lv < level) { since = null; return false; }
-    if (since == null) since = now;
+    if (lv < level) return false;
+    if (since == null || now - last > gap) since = now;
+    last = now;
     return now - since >= ms;
   };
 }
 
-/** The text of the chat's last reply. */
-export const lastAnswer = events => ([...(events || [])].reverse().find(e => e.type === 'assistant' && e.payload?.text)?.payload.text || '');
+/** The chat's last reply: {seq, text} ({seq: 0, text: ''} before any). */
+export const lastAnswer = events => {
+  const e = [...(events || [])].reverse().find(x => x.type === 'assistant' && x.payload?.text);
+  return e ? { seq: e.seq || 0, text: e.payload.text } : { seq: 0, text: '' };
+};
+
+/** A turn voice mode sent has ended: not running, and a reply newer than what it saw when it sent. */
+export const turnEnded = (running, answer, sentSeq) => !running && answer.seq > sentSeq;
 
 const WORDS = { listening: 'Listening…', sending: 'Sending…', thinking: 'Thinking…', speaking: 'Speaking (talk to interrupt)', paused: 'Waiting for you on screen' };
 
-export function VoiceButton({ api, onSend, running, waiting, lastAnswer, speechOutput, disabled, onMode }) {
+export function VoiceButton({ api, onSend, running, waiting, answer = { seq: 0, text: '' }, speechOutput, disabled, onMode }) {
   const React = R(), up = useSttUp(api), [s, setS] = React.useState({ mode: 'off', text: '', error: null });
-  const st = React.useRef(s), dict = React.useRef(null), reading = React.useRef(null), timers = React.useRef({});
+  const st = React.useRef(s), sentSeq = React.useRef(0), dict = React.useRef(null), reading = React.useRef(null), timers = React.useRef({});
   const go = ev => setS(prev => { const n = voiceStep(prev, ev); st.current = n; return n; });
   const pause = speechOutput?.pause_ms || 1200;
 
@@ -73,10 +81,10 @@ export function VoiceButton({ api, onSend, running, waiting, lastAnswer, speechO
     if (m === 'listening' && !dict.current) listen();
     if (m === 'sending') {
       const text = s.text.trim();
-      stopListening().then(() => { onSend(text); go({ type: 'sent' }); });
+      stopListening().then(() => { sentSeq.current = answer.seq; onSend(text); go({ type: 'sent' }); });
     }
     if (m === 'speaking' && !reading.current) {
-      const words = speakable(lastAnswer || '');
+      const words = speakable(answer.text);
       const r = speak(words, speechOutput || {});
       reading.current = r;
       r.done.then(() => { if (reading.current === r) { reading.current = null; go({ type: 'spoken' }); } }, () => { if (reading.current === r) { reading.current = null; go({ type: 'spoken' }); } });
@@ -88,7 +96,8 @@ export function VoiceButton({ api, onSend, running, waiting, lastAnswer, speechO
   const watchBarge = async () => {    // a loud, sustained voice while it reads: stop and listen
     try {
       const media = globalThis.navigator.mediaDevices, stream = await media.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      const ctx = new AudioContext(), an = ctx.createAnalyser(), buf = new Float32Array(1024), loud = bargeTracker();
+      const ctx = new AudioContext(); ctx.resume?.().catch(() => {});
+      const an = ctx.createAnalyser(), buf = new Float32Array(1024), loud = bargeTracker();
       ctx.createMediaStreamSource(stream).connect(an);
       timers.current.bargeMic = { stop: () => { stream.getTracks().forEach(t => t.stop()); ctx.close().catch(() => {}); } };
       timers.current.barge = setInterval(() => { an.getFloatTimeDomainData(buf); if (loud(levelOf(buf), Date.now())) { stopReading(); go({ type: 'barge' }); } }, 60);
@@ -96,11 +105,11 @@ export function VoiceButton({ api, onSend, running, waiting, lastAnswer, speechO
   };
 
   // the turn: thinking → speaking when it ends; a waiting card pauses
-  const was = React.useRef(running);
-  React.useEffect(() => {
-    if (was.current && !running && st.current.mode === 'thinking') go({ type: 'turn_end', text: speakable(lastAnswer || '') });
-    was.current = running;
-  }, [running]);
+  React.useEffect(() => {     // it settles first: `running` can blink off as the turn starts
+    if (s.mode !== 'thinking' || !turnEnded(running, answer, sentSeq.current)) return undefined;
+    const t = setTimeout(() => go({ type: 'turn_end', text: speakable(answer.text) }), SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [running, answer.seq, s.mode]);
   React.useEffect(() => { go({ type: waiting ? 'card' : 'card_done', running }); }, [waiting]);
   React.useEffect(() => {
     if (s.mode === 'off') return undefined;

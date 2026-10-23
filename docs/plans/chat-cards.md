@@ -252,14 +252,15 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **A button by the microphone** starts it: listen (the stt stream, as dictation) → after the pause the gaps name, send → read the reply aloud → listen again. Speaking while it reads stops the reading (barge-in: the mic stays open with echo cancellation). A bar over the message box shows listening · thinking · speaking, with the words so far; Escape or the button ends it.
   - **Approvals and questions** still wait on screen; voice mode says "Waiting for you on screen" and pauses.
   *Done when:* `utils/tests/web/chat-voice.test.mjs` (the state machine: turn end, barge-in, a waiting card pausing it, ending it).
-  *As built:* `voiceStep` is the loop (off, listening, sending, thinking, speaking, paused); a fresh dictation per round, sent after `speech_output.pause_ms` of no new words; barge-in is a second echo-cancelled mic stream whose level stays loud for 350 ms (`bargeTracker`). The button shows while both the stt mod and Settings' `speech_output` answer; auto-read stays quiet while voice mode is on (it reads for itself). Chat passes the last reply (`lastAnswer`) and whether a card waits (`view.pending`); `chat-mic.js` is unchanged.
-- [ ] **49.3 Docs and the live check.** Brief (read aloud, voice mode), architecture §14 (`speech_output`). Live: a reply read aloud with the local model and with a remote one; three spoken turns hands-free, one interrupted.
+  *As built:* `voiceStep` is the loop (off, listening, sending, thinking, speaking, paused); a fresh dictation per round, sent after `speech_output.pause_ms` of no new words; barge-in is a second echo-cancelled mic stream whose level stays loud for 350 ms (`bargeTracker`). The button shows while both the stt mod and Settings' `speech_output` answer; auto-read stays quiet while voice mode is on (it reads for itself). Chat passes the last reply (`lastAnswer`: {seq, text}) and whether a card waits (`view.pending`); `chat-mic.js` is unchanged. The live check found two things, fixed in 49.3: `running` can blink off as a turn starts, so a turn has ended only with a reply newer than the message sent and after 700 ms settled (`turnEnded`); and barge-in counts through dips under 250 ms between syllables.
+- [x] **49.3 Docs and the live check.** Brief (read aloud, voice mode), architecture §14 (`speech_output`). Live: a reply read aloud with the local model and with a remote one; three spoken turns hands-free, one interrupted.
+  *As built:* checked live on the installed hub (2026-10-23) with the chat's model on skynet. Read aloud: first sound 0.4 s after the click, 8.5 s of speech, the button back to Read aloud when it ended. Voice mode, with a stand-in microphone (the browser pane blocks the real one) playing speech made by the tts mod: "What is seven times eight?" → "56" read aloud; five facts about the Moon; "How far away is it?" answered in context; a long Eiffel Tower paragraph interrupted 2 s in (listening again 0.8 s later), its rest ("who designed it") sent and answered. Not checked: a real microphone with speakers (echo cancellation) and reading with the chat's model on this GPU.
 
 **Wire — Phase 49:** the reply bar's speaker; voice mode in the message box; Settings → Agent → Voice.
 
 **Checks & deliverables — Phase 49**
-- [ ] Live: as 49.3.
-- [ ] Delivered: `chat-speak.js`, `chat-voice.js`, `speech_output`, the tests.
+- [x] Live: as 49.3 (see its note).
+- [x] Delivered: `chat-speak.js`, `chat-voice.js`, `speech_output`, the tests.
 
 ---
 

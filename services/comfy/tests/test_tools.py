@@ -21,6 +21,7 @@ def test_task_tools_follow_packs(env):  # noqa: F811
     c, fake, hub, s = env
     t = names(c)
     assert set(t) == {"generate_image", "animate_image", "list_workflows", "run_workflow"}
+    assert t["list_workflows"]["view"]["rows"] == "workflows"        # plan 46.4: drawn as a table in Chat
     gi = t["generate_image"]
     params = gi["function"]["parameters"]
     assert params["required"] == ["prompt"] and params["properties"]["workflow"]["enum"] == ["zimage"]

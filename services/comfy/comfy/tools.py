@@ -166,8 +166,12 @@ def catalog(lib: Library, defaults: dict[str, str]) -> list[dict]:
                                                      "additionalProperties": False}))
     all_ready = sorted(p.id for ps in by_task.values() for p in ps)
     every = {p.id: p for ps in by_task.values() for p in ps}
-    tools.append(_fn("list_workflows", "List the image and video workflows, with their tasks and inputs.",
-                     {"type": "object", "properties": {}}, job=False, risk="read"))
+    lw = _fn("list_workflows", "List the image and video workflows, with their tasks and inputs.",
+             {"type": "object", "properties": {}}, job=False, risk="read")
+    lw["view"] = {"kind": "table", "rows": "workflows", "columns": [{"key": "name", "label": "Workflow"}, {"key": "task", "label": "Task"},
+                                                                  {"key": "presets", "label": "Presets", "format": "list"},
+                                                                  {"key": "description", "label": "What it's for"}]}   # plan 46.4: drawn as a table in Chat
+    tools.append(lw)
     tools.append(_fn("run_workflow", "Run a workflow by id with its own inputs (see list_workflows). Only for workflows the "
                      "task tools don't cover: for images, edits, animation, video and background removal use generate_image, "
                      "edit_image, animate_image, generate_video and remove_background (they take a `workflow` too).",

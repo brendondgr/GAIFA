@@ -38,5 +38,5 @@ test("a WAV's samples", () => {
 test('it registers the live card for speak', () => {
   const kinds = [];
   mod.default({ ui: { h: () => null }, live: {}, parts: {}, registerCard: k => kinds.push(k) });
-  assert.deepEqual(kinds, ['live:tts_speak']);
+  assert.deepEqual(kinds, ['live:tts_speak', 'live:tts_list_voices']);
 });

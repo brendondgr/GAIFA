@@ -41,6 +41,7 @@ dirs = ["llm"]
 
 [ui]
 page = "ui/page.js"
+chat = "ui/chat.js"                 # the start card in Chat (plan 46.4)
 native = "/"
 
 [api]
@@ -52,6 +53,6 @@ hide = ["GET /", "GET /config.js", "GET /assets/*", "GET /api/docs"]
 
 [tools]
 list_llms = { op = "GET /api/models", view = { kind = "table", rows = "models", columns = [{ key = "id", label = "Model" }, { key = "size_bytes", label = "Size", format = "bytes" }, { key = "ok", label = "Ready", format = "yesno" }, { key = "running", label = "Running", format = "list" }] }, description = "The model catalog: GGUFs, sizes, capabilities and which are running" }
-list_instances = { op = "GET /api/instances", description = "Running llama.cpp instances with port, model, state and relay publishing" }
+list_instances = { op = "GET /api/instances", view = { kind = "table", rows = "", columns = [{ key = "name", label = "Instance" }, { key = "model_id", label = "Model" }, { key = "state", label = "State" }, { key = "port", label = "Port" }, { key = "rss_bytes", label = "Memory", format = "bytes" }] }, description = "Running llama.cpp instances with port, model, state and relay publishing" }
 start_llm = { op = "POST /api/instances", risk = "write", description = "Launch a model (asks AIHub for memory first)" }
 stop_llm = { op = "DELETE /api/instances/{name}", description = "Stop an instance", confirm = true }

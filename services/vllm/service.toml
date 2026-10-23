@@ -28,6 +28,7 @@ HF_HOME = "{hf_home}"
 
 [ui]
 page = "ui/page.js"
+chat = "ui/chat.js"                 # the load card in Chat: the engine's stages (plan 46.4)
 
 [memory]
 # Each load acquires its profile's own memory_gb (+ the processes' overhead) from AIHub first.

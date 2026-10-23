@@ -172,6 +172,36 @@ export default function setup(chat) {
   }
 
   chat.registerCard('live:tts_speak', ({ ctx }) => h(SpeechCard, { ctx }));
+
+  // The voices (plan 46.4): each with Play sample (a short line in that voice, not saved).
+  function VoicesCard({ ctx }) {
+    const React = R(), { row } = ctx.liveCard, [busy, setBusy] = React.useState(null), audio = React.useRef(null);
+    let r = null;
+    try { r = JSON.parse(row.item.result?.content || 'null')?.result; } catch { r = null; }
+    if (!r) return null;
+    const voices = [...(r.custom || []).map(v => ({ name: v.name, engine: v.engine || 'breeze', note: v.instruction || 'your voice' })),
+      ...(r.kokoro || []).map(n => ({ name: n, engine: 'kokoro', note: 'built in' }))];
+    const play = async v => {
+      setBusy(v.name);
+      try {
+        const res = await fetch('/api/s/tts/v1/speech', { method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: `Hello, this is ${v.name.replace(/_/g, ' ')}.`, name: v.name, no_save: true, format: 'wav' }) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const url = URL.createObjectURL(await res.blob());
+        if (audio.current) { audio.current.pause(); URL.revokeObjectURL(audio.current.src); }
+        audio.current = new Audio(url); await audio.current.play();
+      } catch (e) { ctx.toast?.(`Couldn't play ${v.name}: ${e.message || e}`, 'error'); }
+      setBusy(null);
+    };
+    const [all, setAll] = React.useState(false), shown = all ? voices : voices.slice(0, 8);
+    return h(kit.LiveCard, { icon: 'audio', title: 'Voices', meta: `${(r.custom || []).length} yours · ${(r.kokoro || []).length} built in`, done: true,
+      foot: voices.length > 8 ? h('button', { type: 'button', onClick: () => setAll(!all), style: { background: 'none', border: 0, color: 'var(--mut,#8A94A6)', cursor: 'pointer', fontSize: 12, padding: 0 } }, all ? 'Show fewer' : `Show all ${voices.length}`) : null },
+      shown.map(v => h('div', { key: v.engine + v.name, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px', borderTop: '1px solid var(--bd,#1D2430)', fontSize: 12.5 } },
+        h('span', { style: { flex: 1, minWidth: 0 } }, v.name, h('span', { style: { color: 'var(--dim,#737D90)', marginLeft: 6, fontSize: 11.5 } }, `${v.engine} · ${v.note}`)),
+        h('button', { type: 'button', disabled: busy != null, onClick: () => play(v), style: { border: '1px solid var(--bds,#2A3547)', borderRadius: 6, padding: '2px 9px', fontSize: 11.5, background: 'transparent', color: 'var(--tx,#E6EAF2)', cursor: busy != null ? 'default' : 'pointer' } },
+          busy === v.name ? 'Playing…' : '▶ Play sample'))));
+  }
+  chat.registerCard('live:tts_list_voices', ({ ctx }) => h(VoicesCard, { ctx }));
 }
 
 function fmt(s) {

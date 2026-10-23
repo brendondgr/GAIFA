@@ -36,7 +36,7 @@ launch() {   # the command line, one word per line
   [ "$ACCEL" = cpu ] && extra=(--cpu)
   printf '%s\n' "$PY" main.py --listen 127.0.0.1 --port "$PORT" --extra-model-paths-config "$YAML" \
     --output-directory "$OUTPUTS" --input-directory "$MOD/input" --user-directory "$MOD/user" \
-    --database-url "sqlite:///$MOD/user/comfyui.db" --enable-manager "${extra[@]}"
+    --database-url "sqlite:///$MOD/user/comfyui.db" --enable-manager --preview-method auto "${extra[@]}"
 }
 
 web_up()      { curl -fsS --max-time 2 "$URL/system_stats" >/dev/null 2>&1; }

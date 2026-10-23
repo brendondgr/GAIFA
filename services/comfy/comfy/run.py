@@ -29,6 +29,7 @@ from .db import DB
 from .detect import memory_estimate
 from .gpu_slot import GpuSlot
 from .library import Library
+from .previews import Previews
 from .resolve import InputError, patch, resolve, slugify
 from .schema import input_schema
 
@@ -84,6 +85,7 @@ class Runner:
         self.by_prompt: dict[str, str] = {}      # ComfyUI prompt id → run id
         self._peaks: dict[str, float] = {}
         self._ws_connected = False
+        self.previews = Previews()               # plan 45.1: preview frames and steps, a run's `live`
 
     # ---- submitting -------------------------------------------------------------------------
     async def submit(self, workflow: str, inputs: dict | None, preset: str | None = None, make_room: bool = False,
@@ -212,7 +214,12 @@ class Runner:
 
     def annotate(self, run: dict | None) -> dict | None:
         """A run waiting for the GPU slot: `stage: "waiting_gpu"`, `ahead`, `eta_s` (plan 31.3)."""
-        w = self.gpu_wait.get(run["id"]) if run else None
+        if not run:
+            return run
+        lv = self.previews.live(run)              # plan 45.1: stage, steps, the newest preview frame
+        if lv:
+            run = {**run, "live": lv}
+        w = self.gpu_wait.get(run["id"])
         if w is None or run.get("state") != "queued":
             return run
         return {**run, "stage": "waiting_gpu", "ahead": w["ahead"], "eta_s": w["eta_s"]}
@@ -322,6 +329,8 @@ class Runner:
                     async for raw in ws:
                         if isinstance(raw, str):
                             await self.on_message(json.loads(raw))
+                        else:                                   # a preview frame (plan 45.1)
+                            self.previews.on_binary(raw, self.by_prompt)
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001
@@ -335,6 +344,7 @@ class Runner:
         if rid is None:
             return
         live = self.live.setdefault(rid, {"total": 1, "done": set(), "frac": 0.0, "cached": set()})
+        self.previews.on_event(rid, t, d)
         if t == "execution_start":
             self.db.update_run(rid, state="running", started=time.time())
             self._peaks[rid] = 0.0
@@ -395,6 +405,7 @@ class Runner:
         run = self.db.run(rid)
         if run is None or run["state"] not in ACTIVE:
             return
+        self.previews.end(rid)
         if entry is None and prompt_id:
             for _ in range(10):                  # history lands a moment after the websocket says so
                 try:

@@ -85,13 +85,14 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 
 ## Phase 45 — Live cards for image, video, 3D and speech
 
-- [ ] **45.1 Preview frames from ComfyUI: `services/comfy/bin/comfyui`, `bin/comfyui-native`, the runtime variants' launch lines, `comfy/run.py`, `comfy/api_run.py`.**
+- [x] **45.1 Preview frames from ComfyUI: `services/comfy/bin/comfyui`, `bin/comfyui-native`, the runtime variants' launch lines, `comfy/run.py`, `comfy/api_run.py`.**
   - **Launch:** `--preview-method auto` on every launch line (`test_runtime.py`'s expected command changes with it). The setup doc says TAESD's decoders are optional and sharpen the previews.
   - **The websocket:** binary messages, event 1 (`PREVIEW_IMAGE`: 4-byte type, 4-byte format, the JPEG or PNG) and event 4 (with metadata: its `prompt_id`). The newest frame **per prompt** is kept in memory with a `seq`, for every prompt ComfyUI runs, including ones queued from ComfyUI's own page, and dropped a minute after it ends. Frames of event 1 go to the prompt that is executing.
   - **`GET /v1/prompts/{prompt_id}/preview?after=`** serves any prompt's frame; the status job of a prompt from ComfyUI's page carries `live` with it.
   - **`GET /v1/runs/{id}/preview?after=<seq>`** → the image (headers `X-Seq`, cache off), 204 when there's none newer after waiting up to 5 s.
   - **`live` on the run's status:** `stage` (queued · loading · sampling · decoding · saving, from the queue, `execution_start`, the sampler node's `progress` and the save node), `step`/`steps` from the sampler's `progress`, `eta_s` from the step rate, `preview`.
   *Done when:* `services/comfy/tests/test_preview.py`, with `fakecomfy.py` sending binary previews (both events, a frame for another prompt ignored, the long poll, 204, dropped at the end, `live` through a run).
+  *As built:* `comfy/previews.py` (`Previews`). ComfyUI sends frames and steps only to the websocket client that queued a prompt, so prompts from ComfyUI's own page show as queued or running without frames; the gaps' "every prompt" holds for every prompt AIHub queues (the agent's, the page's, MCP's, the API's). `?wait=` (default 5 s) bounds the long poll.
 - [ ] **45.2 The image and video cards: `services/comfy/ui/chat.js` (new), `[ui] chat` in comfy's `service.toml`.**
   - **Steps** for `comfy_generate_image`, `comfy_edit_image`, `comfy_run_workflow` and the task tools from `tools_source` (image and video tasks), using `chat.live`.
   - **Image:** the box at the call's aspect (from `aspect`/`width`/`height`, else 1:1), waiting and loading text, previews with "Step k of n", "Decoding", then the picture fades in; the footer has `#n`, the title, the workflow's name and size, and the output's actions.

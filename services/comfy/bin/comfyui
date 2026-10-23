@@ -68,7 +68,7 @@ LAUNCH="cd /opt/ComfyUI && exec python main.py \
   --user-directory ${MOD}/user \
   --database-url sqlite:///${MOD}/user/comfyui.db \
   --disable-mmap --fp32-vae \
-  --enable-manager"
+  --enable-manager --preview-method auto"
 
 web_up()      { curl -fsS --max-time 2 "$URL/system_stats" >/dev/null 2>&1; }
 ctr_exists()  { podman container exists "$TOOLBOX"; }

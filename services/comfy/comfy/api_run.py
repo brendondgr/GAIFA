@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 router = APIRouter()
@@ -33,6 +33,8 @@ def _job(run: dict, runner=None) -> dict:
                                    "created", "started", "finished", "peak_gb", "prompt_id")}
     if run.get("stage"):                          # "waiting_gpu", with what runs before it (plan 31.3)
         out.update(stage=run["stage"], ahead=run.get("ahead") or [], eta_s=run.get("eta_s"))
+    if run.get("live"):                           # plan 45.1: steps and the newest preview frame
+        out["live"] = run["live"]
     return out
 
 
@@ -59,6 +61,15 @@ async def job(request: Request, job_id: str, wait: float = Query(0, ge=0, le=180
     if r is None:
         raise HTTPException(404, f"no job {job_id!r}")
     return _job(r, request.app.state.runner)
+
+
+@router.get("/v1/runs/{run_id}/preview", summary="A running run's newest preview frame; ?after=<seq> waits up to 5 s for a newer one (204: none)",
+            responses={200: {"content": {"image/jpeg": {}, "image/png": {}}}, 204: {"description": "No newer frame"}})
+async def preview(request: Request, run_id: str, after: int = Query(0, ge=0), wait: float = Query(5, ge=0, le=20)) -> Response:
+    fr = await request.app.state.runner.previews.wait(run_id, after, wait)
+    if fr is None:
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
+    return Response(fr["data"], media_type=fr["mime"], headers={"X-Seq": str(fr["seq"]), "Cache-Control": "no-store"})
 
 
 @router.get("/v1/queue", summary="Runs waiting or running, and ComfyUI's own queue")

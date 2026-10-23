@@ -13,6 +13,15 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 
 
+def PNG_1x1(w: int, h: int) -> bytes:
+    """A PNG header with the given size (enough for the adapter, which reads only the size)."""
+    import struct
+    import zlib
+
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" + ihdr + struct.pack(">I", zlib.crc32(b"IHDR" + ihdr))
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -36,6 +45,7 @@ class FakeComfy:
         self.uploads: dict[str, bytes] = {}
         self.interrupted: list = []
         self.stuck = False      # ignore interrupts (a GPU kernel that never returns)
+        self.previews = False   # plan 45.1: send preview frames (event 1, event 4 with metadata, one for another prompt)
         self.deleted: list = []
         self.app = self._app()
         self.port = free_port()
@@ -138,6 +148,27 @@ class FakeComfy:
             except Exception:  # noqa: BLE001
                 pass
 
+    async def _send_bytes(self, data: bytes) -> None:
+        for s in list(self.sockets):
+            try:
+                await s.send_bytes(data)
+            except Exception:  # noqa: BLE001
+                pass
+
+    async def _preview(self, pid: str, n: int) -> None:
+        """A frame for this prompt (event 1 on odd nodes, event 4 on even ones), then one for a prompt that isn't ours."""
+        import json as _json
+        import struct
+
+        png = PNG_1x1(8 * n, 6 * n)
+        if n % 2:
+            await self._send_bytes(struct.pack(">II", 1, 2) + png)
+        else:
+            meta = _json.dumps({"prompt_id": pid, "node_id": str(n), "image_type": "image/png"}).encode()
+            await self._send_bytes(struct.pack(">II", 4, len(meta)) + meta + png)
+        meta = _json.dumps({"prompt_id": "not-ours", "image_type": "image/png"}).encode()
+        await self._send_bytes(struct.pack(">II", 4, len(meta)) + meta + PNG_1x1(2, 2))
+
     async def _execute(self, pid: str, graph: dict) -> None:
         """Run a prompt: start, each node with a progress tick, files from save nodes, history."""
         await asyncio.sleep(0.05)
@@ -153,6 +184,8 @@ class FakeComfy:
                 break
             await self._send("executing", {"node": nid, "prompt_id": pid})
             await self._send("progress", {"value": 1, "max": 2, "node": nid, "prompt_id": pid})
+            if self.previews:
+                await self._preview(pid, list(graph).index(nid) + 1)
             await asyncio.sleep(self.step_s)
             if nid == self.fail_node:
                 error = {"node_id": nid, "node_type": node["class_type"], "exception_message": "boom"}

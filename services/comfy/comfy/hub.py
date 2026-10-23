@@ -38,6 +38,8 @@ def _run_jobs(db, runner=None) -> tuple[list[dict], set[str]]:
              "route": f"#/s/comfy/run?job={r['id']}"}
         if r.get("stage"):                       # waiting for the GPU slot (plan 31.3)
             j.update(stage=r["stage"], ahead=r.get("ahead") or [], eta_s=r.get("eta_s"))
+        if r.get("live") and r["state"] in ("queued", "running"):   # plan 45.1: previews wherever jobs show
+            j["live"] = r["live"]
         jobs.append(j)
     return jobs, {r["prompt_id"] for r in rows if r.get("prompt_id")}
 

@@ -27,7 +27,7 @@ def test_runtime_per_variant():
 
 def test_native_command():
     cpu = sh("comfyui-native", "command", AIHUB_ACCEL="cpu", COMFY_PORT_UI="8299")
-    assert "runtime/venv/bin/python main.py --listen 127.0.0.1 --port 8299" in cpu and cpu.endswith("--enable-manager --cpu")
+    assert "runtime/venv/bin/python main.py --listen 127.0.0.1 --port 8299" in cpu and cpu.endswith("--enable-manager --preview-method auto --cpu")
     assert not sh("comfyui-native", "command", AIHUB_ACCEL="cuda").endswith("--cpu")
     assert "--disable-mmap" not in cpu and "--fp32-vae" not in cpu           # gfx1151's flags stay with the toolbox
 

@@ -202,10 +202,10 @@ The toolbox is created by the first `bin/comfyui start` (or the first load from 
 ```
 python main.py --listen 127.0.0.1 --port 8199 --extra-model-paths-config <mod>/extra_model_paths.yaml
   --output-directory <AIHub>/outputs/comfy --input-directory <mod>/input --user-directory <mod>/user
-  --database-url sqlite:///<mod>/user/comfyui.db --disable-mmap --fp32-vae --enable-manager
+  --database-url sqlite:///<mod>/user/comfyui.db --disable-mmap --fp32-vae --enable-manager --preview-method auto
 ```
 
-with `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1`. `--disable-mmap` avoids ROCm's slow mmap path above 64 GB, which hangs model loading (kyuz0's default for gfx1151); `--fp32-vae` keeps the FLUX.2 small-decoder VAE numerically safe; `--enable-manager` loads ComfyUI-Manager 4.x (a pip package, not a `custom_nodes` checkout). `--listen` must stay a loopback address: ComfyUI-Manager refuses node installs otherwise.
+with `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1`. `--disable-mmap` avoids ROCm's slow mmap path above 64 GB, which hangs model loading (kyuz0's default for gfx1151); `--fp32-vae` keeps the FLUX.2 small-decoder VAE numerically safe; `--enable-manager` loads ComfyUI-Manager 4.x (a pip package, not a `custom_nodes` checkout). `--preview-method auto` sends a picture of each step to AIHub for the live previews in Chat, the Overview and the page (TAESD when its decoders are in `models/vae_approx`, which sharpens them; a cheap colour preview otherwise). `--listen` must stay a loopback address: ComfyUI-Manager refuses node installs otherwise.
 
 **Custom nodes.** They run code, so nothing in AIHub installs them without asking: `aihub setup` asks before the block's third step clones them. By hand, for each row of the custom-node table in Tested with:
 

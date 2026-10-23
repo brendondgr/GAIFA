@@ -11,13 +11,15 @@
 import { h } from './chat-ui.js';
 import { Card, hasCard } from './chat-cards.js';
 import * as kit from '../live-kit.js';
+import { FixCards } from './chat-fix.js';
 
 const R = () => globalThis.React;
 
 // Refused before it ran: no card (the fold says why); a step waiting for your approval gets its card once it runs.
 const NEVER_RAN = new Set(['invalid_arguments', 'unknown_tool', 'unknown_call', 'denied', 'tool_unavailable', 'service_not_running', 'service_not_found', 'needs_room']);
 const ran = r => r.status === 'running' || r.status === 'done'
-  || (r.status === 'failed' && !NEVER_RAN.has(r.item?.result?.error?.code) && r.item?.result?.status !== 'denied');
+  || ((r.status === 'error' || r.status === 'failed') && !NEVER_RAN.has(r.item?.result?.error?.code) && r.item?.result?.status !== 'denied'
+      && !r.item?.result?.error?.fixes?.length && !r.item?.result?.error?.log?.length);   // a fix-it card stands in for it
 
 /** The tool rows of a turn that draw a live card: [{row, own}] (own: the tool registered `live:<name>`). */
 export function liveRows(turn) {
@@ -36,9 +38,9 @@ function outputsOf(row, ctx) {
 }
 
 export function LiveCards({ turn, ctx }) {
-  const rows = liveRows(turn);
-  if (!rows.length) return null;
-  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 } },
+  const rows = liveRows(turn), fix = h(FixCards, { key: 'fixes', turn, ctx });      // plan 46.5: failed steps' fixes
+  if (!rows.length) return fix;
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 } }, fix,
     rows.map(({ row, own }) => {
       const live = row.progress?.live || null, note = row.progress?.note || null;
       if (!own) return h(kit.LivePreview, { key: row.key, live, note, title: 'Working', pct: row.progress?.progress });

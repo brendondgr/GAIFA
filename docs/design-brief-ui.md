@@ -1123,7 +1123,9 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            tool: string | null; call_id?: string; approval_id?: string;
                            result?: any;                            // JSON over 8 KB: {truncated, preview, full}
                            outputs?: ToolOutput[];
-                           error?: { code: string; detail: string; fix?: string; problems?: object[] };
+                           error?: { code: string; detail: string; fix?: string; problems?: object[];
+                                     fixes?: ({ label: string; tool?: string; arguments?: object; service?: string; action?: "restart"; retry?: object; command?: string })[];   // plan 46.5
+                                     log?: string[] };                // plan 46.5: the mod's lines around the failure
                            progress?: number; note?: string; job_id?: string; elapsed_s?: number;
                            live?: Live;                             // running: the job's live progress (plan 44.2); GET …/calls/{id}?wait=&changed=true answers at its next change
                            arguments?: object; ask_fields?: string[]; risk?: Risk; schema?: JSONSchema; description?: string;

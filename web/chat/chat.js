@@ -251,6 +251,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
   const ctx = {
     api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running, dock: true, confirm, toast,
+    act: (tool, args) => ensureThread().then(id => c.action(id, tool, args)),   // plan 46.5: a fix runs as your own step
     answer: (qid, answers) => c.answer(tid, qid, answers),
     // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying
     // plan 34: "Add to <environment>" adds the folder there first (chat-env.js), then allows the call once

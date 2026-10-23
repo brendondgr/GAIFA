@@ -252,6 +252,20 @@ export function createMockClient(api, { speed = 1 } = {}) {
     if (/^(please\s+)?(search|look up)\b|\b(the web|sources?)\b/i.test(text)) return webTurn(t, run, text, { emit, say, usage, rid });   // the reply bar's Sources
     if (/\b3d\b/i.test(text) && /then|and turn|into/i.test(text)) return chainTurn(t, run, text);
     if (/image|picture|photo|draw|fox|paint/i.test(text)) return imageTurn(t, run, text);
+    if (/\b(fail|broken|break)\b/i.test(text)) {        // a step that fails with the hub's fixes (plan 46.5)
+      const s = await say(t, run, 'Making it at the quality preset.', 'Run gen3d_make_3d.', 2);
+      const cid = rid('tc_'), fargs = { prompt: 'a dragon', engine: 'trellis2', preset: 'quality' };
+      emit(t, 'tool_call', { id: cid, name: 'gen3d_make_3d', arguments: fargs, step: s, by: 'model' });
+      emit(t, 'call', { id: cid, call_id: rid('call_') });
+      await run.sleep(900);
+      const error = { code: 'job_failed', detail: 'the job failed: HIP out of memory', fix: 'read the error; change the inputs or try again',
+        fixes: [{ label: 'Free the GPU', tool: 'hub_free_gpu', arguments: {} }, { label: 'Retry with the fast preset', retry: { preset: 'fast' } }, { label: 'Retry', retry: {} }],
+        log: ['trellis2: refine 1536, 24 steps', 'Traceback (most recent call last):', 'torch.OutOfMemoryError: HIP out of memory. Tried to allocate 18.00 GiB'] };
+      emit(t, 'tool_result', { id: cid, name: 'gen3d_make_3d', status: 'error', error, content: JSON.stringify({ status: 'error', error }) });
+      await say(t, run, 'It ran out of memory. Free the GPU or retry with the fast preset (buttons above).', '', 1);
+      usage(t);
+      return 'idle';
+    }
     if (/^(please\s+)?(say|speak|read|narrate)\b/i.test(text)) {     // a speech step with its live card (plan 45.4)
       const s = await say(t, run, 'Here it is in that voice.', 'Speak it with tts_speak.', 2);
       const cid = rid('tc_'), sargs = { text: 'Welcome to AIHub.\nEvery model on this machine, in one place.\nPictures, video, 3D and speech.\nAsk for anything.', name: 'Hope' };

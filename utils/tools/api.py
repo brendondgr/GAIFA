@@ -50,6 +50,8 @@ class ToolErrorBody(_Model):
     detail: str
     fix: str | None = None
     problems: list[dict[str, str]] | None = None
+    fixes: list[dict[str, Any]] | None = Field(None, description="Plan 46.5: what fixes it: {label, tool, arguments} | {label, service, action} | {label, retry} | {label, command}")
+    log: list[str] | None = Field(None, description="Plan 46.5: the mod's log lines around the failure")
 
 
 class Grant(_Model):

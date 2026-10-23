@@ -34,7 +34,7 @@ import httpx
 from utils import live as live_mod
 from utils.gpu import gpu_note
 from utils.services import ServiceError
-from utils.tools import results
+from utils.tools import fixes, results
 from utils.tools.approvals import Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.doc_tools import untrusted
@@ -501,6 +501,8 @@ class Calls:
             c.state, c.error = "error", {"code": "hub_error", "detail": f"{type(e).__name__}: {e}"[:400]}
         finally:
             c.finished = time.time()
+            if c.state == "error" and c.error:                      # plan 46.5: what fixes it, and the mod's log lines
+                await fixes.attach(self.hub, c.tool, c.arguments, c.error)
             payload: dict[str, Any] = {"result": c.result, "outputs": c.outputs} if c.state == "done" else {"error": c.error}
             try:
                 await asyncio.shield(self._store_end(c.id, c.state if c.state != "running" else "error", payload))

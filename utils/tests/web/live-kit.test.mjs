@@ -55,7 +55,7 @@ test('which steps draw a live card, and which outputs the strip leaves out', () 
   const turn = { steps: [{ rows: [row('x_image', 'done'), row('y_other', 'running', { preview: { url: '/p', seq: 1 } }), row('z_plain', 'running', { stage: 'loading' }), { type: 'update' }] }] };
   assert.deepEqual(chatLive.liveRows(turn).map(r => [r.row.name, r.own]), [['x_image', true], ['y_other', false]]);
   const never = { steps: [{ rows: [{ ...row('x_image', 'failed'), item: { result: { status: 'error', error: { code: 'invalid_arguments' } } } },
-    { ...row('x_image', 'waiting') }, { ...row('x_image', 'failed'), key: 'k2', item: { result: { status: 'error', error: { code: 'job_failed' } } } }] }] };
+    { ...row('x_image', 'waiting') }, { ...row('x_image', 'error'), key: 'k2', item: { result: { status: 'error', error: { code: 'job_failed' } } } }] }] };
   assert.deepEqual(chatLive.liveRows(never).map(r => r.row.key), ['k2']);   // refused before it ran, or waiting for you: no card
   assert.equal(chatLive.shownLive({ tool: 'x_image' }), true);
   assert.equal(chatLive.shownLive({ tool: 'y_other' }), false);

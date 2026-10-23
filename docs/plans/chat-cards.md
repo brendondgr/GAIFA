@@ -145,7 +145,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **Model loads** (`vllm_load_llm`, `lcpp_start_llm`): a live card through 44.2 (vLLM's stages: starting container, loading weights, compiling, capturing graphs, allocating KV cache, warming up; lcpp's load progress), with the memory it takes. vllm and lcpp report `live` on their load status.
   - **Instances** (`lcpp_list_instances`, `vllm_engine_status`): each with its state, memory, speed and Stop. **Voices** (`tts_list_voices`): each with Play sample. **Workflows** (`comfy_list_workflows`): each pack's task, model and whether its models are on disk. **Git** (`workspace_git`): the branch and the changed files.
   *Done when:* each mod's `utils/tests/web/<mod>-chat.test.mjs`, and vllm's and lcpp's tests for `live` on load.
-- [ ] **46.5 Fix-it cards: `utils/tools/fixes.py` (new), `calls.py`, `web/chat/chat-fix.js` (new).**
+- [x] **46.5 Fix-it cards: `utils/tools/fixes.py` (new), `calls.py`, `web/chat/chat-fix.js` (new).**
   - **The hub adds `fixes`** to a tool's error: `[{label, call: {tool, arguments}} | {label, retry: {arguments}}]`, and `log` (the mod's last lines around the failure, from `GET /api/services/{id}/logs`, the lines that name the error marked):
     - `service_not_running` → Start <mod>;
     - `needs_room` → the memory plan's unloads, then Retry;
@@ -154,6 +154,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
     - `tool_unavailable` → how to set it up (`aihub setup <mod>`).
   - **The card:** the failed step opens to the cause in a sentence, the log lines, and the fixes as buttons; a fix runs as a user call, then Retry re-runs the call with the same arguments. The agent sees the same `fixes` and may use them.
   *Done when:* `utils/tests/tools/test_fixes.py` (each code's fixes, the log excerpt) and `utils/tests/web/chat-fix.test.mjs`.
+  *As built:* a fix is `{label, tool, arguments}` (a hub tool), `{label, service, action: "restart"}` (a hub route: the chat calls it, the agent can't), `{label, retry}` or `{label, command}` (copied); `needs_room` offers Free the GPU rather than the plan's unloads. The card stands in for the step's live card and sits under the fold (`chat-live.js`); a fix runs as your own step (the chat's `ctx.act`). The mock has a failing turn ("… fail"). Checked in `?mock`: the cause, the log, Free the GPU, Retry with the fast preset (it ran and made the model), Retry.
 - [ ] **46.6 Docs and the live check.** Brief §11.12–11.13 (the new hub tools, `view`, `fixes`), mods.md (`view`), architecture §14. Live: memory and services cards with Unload and Start; a vLLM load card; a job on a stopped mod → Start → Retry; `/clear-gpu`.
 
 **Wire — Phase 46:** status results and errors in Chat draw as cards with actions.

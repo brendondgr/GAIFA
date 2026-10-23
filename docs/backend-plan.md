@@ -3169,7 +3169,7 @@ Asked for 2026-10-22, after trying 42.4: New environment and Edit open a **dialo
 - **Saving:** the dialog keeps its changes (the name, folders added or removed, levels) until **Create** or **Save**; Cancel drops them.
 - **The folder browser of 42.4** (`GET /v1/browse`, `browse.py`) goes.
 
-- [ ] **43.1 The folder chooser in the workspace mod: `services/workspace/picker.py`, `api_env.py`.**
+- [x] **43.1 The folder chooser in the workspace mod: `services/workspace/picker.py`, `api_env.py`.**
   - **`POST /v1/pick-folder {start?: "/", title?}`** → `{path, addable, why?}` or `{cancelled: true}`: runs the chooser and waits for it (up to 10 min); one at a time (409 `busy`); 501 `no_picker` (with what to install) when there is none or no display; `addable` from `check_folder` (not `/`, the home folder or above it).
   - **Removes** `browse.py`, `GET /v1/browse` and its tests.
   *Done when:* `services/workspace/tests/test_picker.py` (the command per desktop, a pick, a cancel, no chooser, busy, a folder that can't be added), with the chooser faked.

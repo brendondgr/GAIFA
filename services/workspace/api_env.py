@@ -1,8 +1,8 @@
 """Routes for environments (plan 34): named sets of folders, each with its own levels.
 
 `GET/POST /v1/environments`, `GET/PUT/DELETE /v1/environments/{id}`, and a folder in one:
-`POST /v1/environments/{id}/folders`, `PATCH/DELETE /v1/environments/{id}/folders/{fid}`; and `GET /v1/browse?path=`
-to pick a folder to add (browse.py).
+`POST /v1/environments/{id}/folders`, `PATCH/DELETE /v1/environments/{id}/folders/{fid}`; and `POST /v1/pick-folder`,
+the desktop's folder chooser to pick one to add (picker.py).
 """
 
 from __future__ import annotations
@@ -34,6 +34,11 @@ class EnvFolderIn(BaseModel):
     name: str = Field("", max_length=64, description="A display name")
 
 
+class PickIn(BaseModel):
+    start: str = Field("/", max_length=4096, description="Where the chooser opens")
+    title: str = Field("Add a folder", max_length=120, description="The chooser's title")
+
+
 class EnvFolderPatch(BaseModel):
     level: Level | None = None
     allow_bypass: bool | None = None
@@ -44,11 +49,12 @@ def mount(app: FastAPI, ctx: Any) -> None:
     envs = ctx.folders.envs
     caps = ctx.folders.caps
 
-    @app.get("/v1/browse", summary="The folders in a folder (the home folder by default), each with whether it can be added; "
-             "only the home folder and mounted drives, without hidden or secret-looking folders (plan 42.4)")
-    def browse_folders(path: str | None = None) -> dict[str, Any]:
-        from browse import browse
-        return browse(path)
+    @app.post("/v1/pick-folder", summary="Open the desktop's folder chooser (KDE's or GNOME's) at `start` (default /) and wait: "
+              "the picked folder and whether an environment can take it, or cancelled (plan 43.1)")
+    async def pick(body: PickIn | None = None) -> dict[str, Any]:
+        from picker import pick_folder
+        b = body or PickIn()
+        return await pick_folder(b.start, b.title)
 
     @app.get("/v1/environments", summary="The environments, each with its folders and their levels")
     def list_envs() -> dict[str, Any]:

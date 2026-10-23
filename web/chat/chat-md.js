@@ -54,6 +54,25 @@ export function citeGroup(inner) {
 
 // The titles of the chat's sources while a message renders (renderMarkdown's `cites`): '#3' → title.
 let titles = null;
+// Plan 47.3: the open chat's outputs, so `![caption](#3)` draws output #3 in the reply (chat.js keeps it current).
+let chatOutputs = [];
+export function setChatOutputs(list) { chatOutputs = Array.isArray(list) ? list : []; }
+const SAFE_MEDIA = /^\/(?!\/)[\w\-./%?=&;:]*$/;   // the hub's own paths only (/api/outputs/…)
+/** `![caption](#n)` or `(output:<id>)` → the output drawn inline, or null when it isn't one of this chat's. */
+export function mediaHtml(ref, caption, src = '') {
+  const o = ref.startsWith('#') ? chatOutputs.find(x => x.n === +ref.slice(1)) : chatOutputs.find(x => x.output_id === ref.slice(7));
+  if (!o) return null;
+  const url = o.url && SAFE_MEDIA.test(o.url) ? o.url : null, poster = o.preview && SAFE_MEDIA.test(o.preview) ? o.preview : null;
+  const cap = escapeHtml(caption || o.title || ''), n = o.n ? `<span class="aichat-fig-n">#${o.n}</span>` : '';
+  let media;
+  if (o.kind === 'image' && (url || poster)) media = `<img src="${url || poster}" alt="${cap}" loading="lazy" data-open="${o.output_id}">`;
+  else if (o.kind === 'video' && url) media = `<video src="${url}"${poster ? ` poster="${poster}"` : ''} controls preload="metadata"></video>`;
+  else if (o.kind === 'audio' && url) media = `<audio src="${url}" controls preload="metadata"></audio>`;
+  else if (poster) media = `<img src="${poster}" alt="${cap}" loading="lazy" data-open="${o.output_id}">`;
+  else return null;
+  // spans, not <figure>: the picture sits inside a paragraph, and a block there would end it
+  return `<span class="aichat-fig" data-src="${escapeHtml(src)}">${media}<span class="aichat-fig-cap">${n}${cap}</span></span>`;
+}
 const clipName = (s, n = 32) => (s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s);
 
 /** A citation chip (escaped text in, HTML out): the icon when the name is a hostname, the name, the place. */
@@ -75,6 +94,12 @@ function inline(src) {
   const stash = html => `\u0000${keep.push(html) - 1}\u0000`;
   let s = escapeHtml(src);
   s = s.replace(/`([^`\n]+)`/g, (_, c) => stash(`<code>${c}</code>`));
+  // ![caption](#n): this chat's output drawn here; any other image stays as text (no pictures from elsewhere)
+  s = s.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, (m, cap, ref) => {
+    const raw = x => x.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+    const html = /^(#\d{1,4}|output:[0-9a-f]{12})$/.test(ref) ? mediaHtml(ref, raw(cap), raw(m)) : null;
+    return stash(html || m);
+  });
   s = s.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, text, url) => {
     const raw = url.replace(/&amp;/g, '&');
     if (!SAFE_URL.test(raw)) return m;
@@ -194,6 +219,7 @@ function blocks(text) {
 
 // The CSS for rendered messages, scoped to `.aichat-md` (injected once by the page).
 export const MD_CSS = `
+.aichat-fig{margin:8px 0;display:flex;flex-direction:column;gap:4px;max-width:100%}.aichat-fig-cap{font-size:12px;color:var(--mut,#8A94A6)}.aichat-fig img,.aichat-fig video{max-width:100%;max-height:360px;border-radius:6px;background:var(--inset,#131926);object-fit:contain;align-self:flex-start}.aichat-fig img[data-open]{cursor:zoom-in}.aichat-fig audio{width:100%;max-width:420px}.aichat-fig-n{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:600;font-size:11px;color:var(--pu,#BC8CFF);margin-right:6px}
 .aichat-md{line-height:1.55;overflow-wrap:anywhere;min-width:0}
 .aichat-md>*:first-child{margin-top:0}.aichat-md>*:last-child{margin-bottom:0}
 .aichat-md p{margin:0 0 8px}.aichat-md ul,.aichat-md ol{margin:0 0 8px;padding-left:20px}.aichat-md li{margin:2px 0}
@@ -230,6 +256,8 @@ export function installCopy(doc = globalThis.document) {
   // a citation chip whose site has no icon drops it (error doesn't bubble, so listen while capturing)
   doc.addEventListener('error', e => { if (e.target?.classList?.contains('aichat-cite-ico')) e.target.remove(); }, true);
   doc.addEventListener('click', async e => {
+    const fig = e.target?.closest?.('img[data-open]');   // plan 47.3: a picture in a reply opens in Outputs
+    if (fig && fig.closest('.aichat-md')) { doc.dispatchEvent(new CustomEvent('aihub:open-output', { detail: fig.dataset.open })); return; }
     const b = e.target?.closest?.('.aichat-copy');
     const code = b?.closest('.aichat-code')?.querySelector('code');
     if (!code) return;

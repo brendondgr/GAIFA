@@ -10,7 +10,7 @@
 // A mod gives its own with `[ui] chat = "ui/chat.js"` (plan 44.1, chat-mods.js): its setup(chat) gets these.
 
 import { h, T, Icon, Btn, COL, useWidth, chipSt, label11 } from './chat-ui.js';
-import { MD_CSS, installCopy } from './chat-md.js';
+import { MD_CSS, installCopy, setChatOutputs } from './chat-md.js';
 import { Card, CARD_CSS, TodoList } from './chat-cards.js';
 import './chat-forms.js';
 import './chat-results.js';
@@ -155,6 +155,12 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     return () => { alive = false; };
   }, []);
   const view = useMemo(() => buildView(events, live), [events, live]);
+  setChatOutputs(view.outputs);    // plan 47.3: ![caption](#n) in a reply draws that output
+  useEffect(() => {
+    const on = e => openOutput?.(e.detail);
+    document.addEventListener('aihub:open-output', on);
+    return () => document.removeEventListener('aihub:open-output', on);
+  }, [openOutput]);
   const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
   const [now, setNow] = useState(() => Date.now() / 1000);   // ticks while a turn runs, so the fold's timers count
   useEffect(() => { setNow(Date.now() / 1000); if (!running) return undefined; const t = setInterval(() => setNow(Date.now() / 1000), 1000); return () => clearInterval(t); }, [running]);

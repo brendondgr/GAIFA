@@ -283,3 +283,10 @@ test('send carries quotes: the live client in the body, the mock validates and s
   const ev3 = await m.send(th.id, 'why?', [], {}, { text: 'old style' });              // an older single quote
   assert.deepEqual(ev3.payload.quotes, [{ text: 'old style', reply: '' }]);
 });
+
+test('a picture in a reply quotes as its markdown (plan 47.3)', async () => {
+  const mdm = await load('chat/chat-md.js');
+  mdm.setChatOutputs([{ n: 1, output_id: 'aaaaaaaaaaaa', kind: 'image', title: 'Fox', url: '/api/outputs/aaaaaaaaaaaa/file' }]);
+  assert.equal(md2md('Look: ![The fox](#1) there'), 'Look: ![The fox](#1) there');
+  mdm.setChatOutputs([]);
+});

@@ -107,6 +107,7 @@ function inline(n) {
   if (skip(n)) return '';
   const inner = () => n.children.map(inline).join('');
   if (cls(n).includes(' aichat-cites ')) return `[${n.attrs['data-src'] ?? inner()}]`;
+  if (cls(n).includes(' aichat-fig ')) return n.attrs['data-src'] ?? '';   // plan 47.3: a picture quotes as its markdown
   switch (n.tag) {
     case 'br': return '\n';
     case 'strong': case 'b': return wrap(inner(), '**');

@@ -306,3 +306,18 @@ test('the mock agent plays the design study turn: lookups, an image, a 3D approv
   assert.match(events.filter(e => e.type === 'assistant').at(-1).payload.text, /#1.*#2/s);
   s.close();
 });
+
+test('pictures in a reply: this chat\'s outputs only (plan 47.3)', async () => {
+  const mdm = await import(pathToFileURL(path.join(root, 'web/chat/chat-md.js')).href);
+  mdm.setChatOutputs([{ n: 1, output_id: 'aaaaaaaaaaaa', kind: 'image', title: 'Fox', url: '/api/outputs/aaaaaaaaaaaa/file' },
+    { n: 2, output_id: 'bbbbbbbbbbbb', kind: 'video', title: 'Clip', url: '/api/outputs/bbbbbbbbbbbb/file', preview: '/api/outputs/bbbbbbbbbbbb/preview' },
+    { n: 3, output_id: 'cccccccccccc', kind: 'image', title: 'Evil', url: 'https://evil.example/x.png' }]);
+  const img = mdm.renderMarkdown('Here: ![The fox](#1) done');
+  assert.ok(img.includes('<img src="/api/outputs/aaaaaaaaaaaa/file" alt="The fox"') && img.includes('data-open="aaaaaaaaaaaa"') && img.includes('#1</span>The fox'), img);
+  assert.ok(img.includes('data-src="![The fox](#1)"'));
+  assert.ok(mdm.renderMarkdown('![](output:bbbbbbbbbbbb)').includes('<video src="/api/outputs/bbbbbbbbbbbb/file" poster='));
+  assert.ok(!mdm.renderMarkdown('![x](#9)').includes('<img'));                                    // not this chat's
+  assert.ok(!mdm.renderMarkdown('![x](https://evil.example/a.png)').includes('<img'));            // no outside pictures
+  assert.ok(!mdm.renderMarkdown('![x](#3)').includes('evil.example'));                            // an output's outside URL isn't used
+  mdm.setChatOutputs([]);
+});

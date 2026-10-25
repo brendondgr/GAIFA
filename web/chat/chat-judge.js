@@ -60,7 +60,25 @@ export function JudgeContext({ api, cfg, onSaved }) {
     msg ? h('span', { role: 'status', style: { color: T.mut } }, msg) : null);
 }
 
-export function JudgedList({ api, limit = 30 }) {
+/** The judge's backend and model as a controlled picker (Settings → Permissions → Auto judge, on the page's draft). */
+export function JudgeModelPick({ st, value, onChange }) {
+  const backend = value?.backend || 'relay', model = value?.model || '';
+  const choices = [...new Set([...(st && backend === st.backend ? st.choices || [] : []), ...(model ? [model] : [])])];
+  const sel = { height: 30, fontSize: 12.5, background: T.sb, color: 'inherit', border: '1px solid ' + T.bds, borderRadius: 6 };
+  return h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12.5 } },
+    h('select', { 'aria-label': 'Judge backend', value: backend, style: sel, onChange: e => onChange({ backend: e.target.value, model: '', url: URLS[e.target.value] }) },
+      h('option', { value: 'relay' }, 'a chat model (relay)'), h('option', { value: 'decide' }, 'a decision model (decide mod)')),
+    choices.length ? h('select', { 'aria-label': 'Judge model', value: model, style: sel, onChange: e => onChange({ backend, model: e.target.value, url: URLS[backend] }) },
+      model ? null : h('option', { value: '' }, 'pick one'), choices.map(c => h('option', { key: c, value: c }, c)))
+      : h('input', { 'aria-label': 'Judge model', value: model, placeholder: backend === 'decide' ? 'd3-lite' : 'a model name', style: { ...sel, padding: '0 6px', width: 180 },
+          onChange: e => onChange({ backend, model: e.target.value, url: URLS[backend] }) }));
+}
+export const judgeStatusText = st => (st.available ? `Judge: ${st.model} (${st.backend}), answering.`
+  : `Judge: ${st.model} (${st.backend}) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`);
+
+/** The judged calls. With `onAllow` (the Settings page) "Always allow" adds the rule to the page's draft and the
+ *  judge's own controls are rows of the page (`controls: false`); without it, it saves at once as before. */
+export function JudgedList({ api, limit = 30, onAllow, allowed: allowedList, controls = true }) {
   const React = R(), [rows, setRows] = React.useState(null), [st, setSt] = React.useState(null), [err, setErr] = React.useState(null);
   const [cfg, setCfg] = React.useState(null), [note, setNote] = React.useState(null);
   const load = () => {
@@ -69,11 +87,12 @@ export function JudgedList({ api, limit = 30 }) {
     api.getSettings?.().then(setCfg, () => setCfg(null));
   };
   const always = async p => {     // the "Always allow" shortcut: one more allow rule, after a confirm
+    if (onAllow) { if (globalThis.confirm?.(allowConfirm(p))) { onAllow(p); setNote({ ok: `Added “${p}” to your command rules: save the page to keep it.` }); } return; }
     if (!cfg?.judge || !globalThis.confirm?.(allowConfirm(p))) return;
     try { const r = await api.saveSettings({ judge: { allow_commands: withRule(cfg.judge.allow_commands, p) } }); setCfg(r.settings); setNote({ ok: `Added “${p}” to your command rules.` }); }
     catch (e) { setNote({ error: `Couldn’t add “${p}”: ${errText(e)}` }); }
   };
-  const allowed = new Set(cfg?.judge?.allow_commands || []);
+  const allowed = new Set(allowedList || cfg?.judge?.allow_commands || []);
   React.useEffect(() => { if (api?.listJudged) load(); }, []);
   if (!api?.listJudged) return null;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid ' + T.bd, paddingTop: 10 } },
@@ -82,9 +101,9 @@ export function JudgedList({ api, limit = 30 }) {
       h('span', { style: { flex: 1 } }), h(Btn, { sm: true, kind: 'ghost', icon: 'refresh', label: 'Refresh', onClick: load })),
     st ? h('div', { role: 'status', style: { fontSize: 12, color: st.available ? T.mut : T.acct } },
       st.available ? `Judge: ${st.model} (${st.backend}), answering.` : `Judge: ${st.model} (${st.backend}) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`) : null,
-    st ? h(JudgePicker, { api, st, onSaved: () => setTimeout(load, 300) }) : null,
-    h(JudgeContext, { api, cfg, onSaved: setCfg }),
-    h(CommandRules, { api, cfg, onSaved: setCfg }),
+    st && controls ? h(JudgePicker, { api, st, onSaved: () => setTimeout(load, 300) }) : null,
+    controls ? h(JudgeContext, { api, cfg, onSaved: setCfg }) : null,
+    controls ? h(CommandRules, { api, cfg, onSaved: setCfg }) : null,
     note ? h('span', { role: note.error ? 'alert' : 'status', style: { fontSize: 12, color: note.error ? T.rd : T.mut } }, note.error || note.ok) : null,
     err ? h('span', { role: 'alert', style: { fontSize: 12, color: T.rd } }, `Couldn’t load the judged calls: ${err.detail || err.message}`) : null,
     rows?.length ? h('span', { style: { fontWeight: 500, marginTop: 4 } }, 'Recent calls') : null,
@@ -96,7 +115,7 @@ export function JudgedList({ api, limit = 30 }) {
       h('span', { style: { fontSize: 11.5, color: T.dim } }, [SOURCE[r.source] || r.source, r.ms != null ? `${Math.round(r.ms)} ms` : null,
         fmtAgo(r.ts) === 'now' ? 'just now' : fmtAgo(r.ts) + ' ago'].filter(Boolean).join(' · ')),
       r.thread ? h('a', { href: '#/chat/' + encodeURIComponent(r.thread), style: { fontSize: 11.5 } }, 'the chat →') : null,
-      cfg?.judge && api.saveSettings ? (r.suggest || []).filter(p => !allowed.has(p)).map(p => h(Btn, { key: p, sm: true, kind: 'ghost', icon: 'check',
+      (onAllow || (cfg?.judge && api.saveSettings)) ? (r.suggest || []).filter(p => !allowed.has(p)).map(p => h(Btn, { key: p, sm: true, kind: 'ghost', icon: 'check',
         title: 'Add it to “Always allow these commands in Auto”', onClick: () => always(p) },
         'Always allow ', h('code', { style: { fontFamily: MONO, fontSize: 11.5 } }, p))) : null)));
 }

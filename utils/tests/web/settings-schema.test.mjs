@@ -58,3 +58,66 @@ test('dirty and the save body: ui applies at once and is never sent', () => {
   const body = S.saveBody(d);
   assert.equal(body.hub.port, 7001); assert.equal('ui' in body, false);
 });
+
+// ---------- 2.1: the regrouped sections ----------
+const FULL = {
+  ...DRAFT,
+  learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
+  speech_input: { mics: ['USB mic'], language: '', preset: 'balanced', mode: 'both' },
+  speech_output: { voice: 'Hope', engine: 'auto', speed: 1, auto_read: false, pause_ms: 1200 },
+  judge: { backend: 'decide', model: 'gemma4-26B', url: 'u', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: ['pytest *', 'ls *'], ask_commands: ['git push *'] },
+  screen: { pages: true, documents: false, transcripts: false, timeout_s: 30, window_chars: 6000, backend: null, model: null, url: null, threshold: null, confirm: true, parallel: 4 },
+  permissions: { deny: [], ask: ['hub_set_preference'], allow: ['hub_start_service'] },
+  web: { relevance: 'auto', model: 'd3-lite', url: 'u', candidates: 24, timeout_s: 8 },
+  outputs: { hidden_keep_days: 7 },
+};
+const ALL = [...services, { id: 'agent', name: 'Agent', manifest_errors: [] }, { id: 'stt', name: 'Speech to Text', manifest_errors: [] }];
+
+test('2.1: eight sections in order, with their groups', () => {
+  const secs = S.sections({ services: ALL, draft: FULL, hasSessions: true });
+  assert.deepEqual(secs.map(s => s.id), ['general', 'machine', 'services', 'agent', 'permissions', 'speech', 'sessions', 'about']);
+  const groups = Object.fromEntries(secs.map(s => [s.id, s.groups.map(g => g.id)]));
+  assert.deepEqual(groups, {
+    general: ['hub', 'interface', 'outputs'], machine: ['memory', 'storage', 'hardware'], services: ['services'],
+    agent: ['model', 'documents', 'web', 'instructions', 'memory', 'skills', 'learning'],
+    permissions: ['modes', 'rules', 'grants', 'judge', 'screening', 'judged'], speech: ['dictation', 'voice'], sessions: ['sessions'], about: ['versions', 'cli', 'doctor'] });
+  assert.ok(secs.every(s => s.groups.length >= 1 && s.groups.length <= 7));
+  const rows = S.rowsOf(secs);
+  assert.equal(S.rowFor(secs, 'outputs.hidden_keep_days').ref, 'general/outputs/hiddenDays');
+  assert.equal(S.rowFor(secs, 'memory.reserve_gb').ref, 'machine/memory/reserve');
+  assert.equal(rows.find(r => r.block === 'HardwareCard').section, 'machine');
+  for (const k of ['hub.port', 'memory.reserve_gb', 'memory.auto_make_room', 'memory.never_unload', 'memory.priority', 'ui.theme', 'ui.density'])
+    assert.ok(rows.some(r => r.key === k), k);   // every Phase 1 row still has a home
+  for (const b of ['ProcessCard', 'PathsList', 'MemoryHistory', 'ServicesTable', 'AddModCard', 'Versions', 'CliList', 'DoctorPanel', 'SessionsPanel', 'HardwareCard',
+    'ModelsCard', 'DocumentsCard', 'InstructionsCard', 'MemoryCard', 'SkillsCard', 'LearningSection', 'SpeechInputSection', 'SpeechOutputSection', 'GrantsList', 'JudgedList'])
+    assert.ok(rows.some(r => r.block === b), b);
+  assert.equal(S.rowFor(secs, 'permissions.deny').key, 'agent.permissions.deny');
+  assert.equal(S.rowFor(secs, 'judge.allow_commands').control, 'list');
+  assert.match(S.rowFor(secs, 'judge.allow_commands').check('rm -rf; x').error, /^No shell/);
+});
+
+test('2.1: which sections show', () => {
+  const ids = c => S.sections(c).map(s => s.id);
+  assert.deepEqual(ids({ services: services.filter(s => s.id !== 'tts'), hasSessions: false }), ['general', 'machine', 'services', 'about']);   // no agent, no speech mods, no sessions
+  assert.ok(ids({ services: [...services, { id: 'tts', name: 'Speech', manifest_errors: [] }] }).includes('speech'));
+});
+
+test('2.1: the summaries render from a fixed draft', () => {
+  const ctx = { services: ALL, draft: FULL, theme: 'dark', density: 'compact', nav: { services: 'counts' }, system: { hub: { version: '0.1.0' }, disk: { free_bytes: 500e9, total_bytes: 2000e9 } } };
+  const secs = S.sections(ctx), sum = ref => { const [s, g] = ref.split('/'); return S.summaryOf(secs.find(x => x.id === s).groups.find(x => x.id === g), ctx); };
+  assert.equal(sum('machine/memory'), 'Reserve 12 GB · auto make room off · 1 never unloaded');
+  assert.equal(sum('permissions/judge'), 'gemma4-26B via decide · 3 command rules');
+  assert.equal(sum('permissions/rules'), '0 never · 1 ask · 1 allow');
+  assert.equal(sum('general/interface'), 'Dark theme · compact · sidebar counts');
+  assert.equal(sum('general/outputs'), 'Saved web pages kept 7 days');
+  assert.equal(sum('machine/storage'), '500 GB free of 2.0 TB');
+  assert.equal(sum('speech/voice'), 'Hope · read every reply off');
+  for (const s of secs) for (const g of s.groups) assert.ok(S.summaryOf(g, ctx), `${s.id}/${g.id}`);
+});
+
+test('2.1: Save sends only what changed', () => {
+  const secs = S.sections({ services: ALL, draft: FULL });
+  const d = JSON.parse(JSON.stringify(FULL));
+  d.judge.threshold = '0.5'; d.memory.reserve_gb = '14';
+  assert.deepEqual(S.saveBody(d, FULL, secs), { memory: { reserve_gb: 14 }, judge: { threshold: 0.5 } });
+});

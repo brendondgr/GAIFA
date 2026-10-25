@@ -284,6 +284,9 @@ export function createMockApi() {
     judge: { backend: 'relay', model: 'minicpm-5-2B', url: 'http://127.0.0.1:4000', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: [], ask_commands: [] },
     screen: { pages: true, documents: false, transcripts: false, timeout_s: 30, window_chars: 800, backend: null, model: null, url: null, threshold: null, confirm: true },
     permissions: { deny: [], ask: ['hub_set_preference'], allow: ['hub_start_service'] },
+    speech_output: { voice: '', engine: 'auto', speed: 1, auto_read: false, pause_ms: 1200 },
+    web: { relevance: 'auto', model: 'd3-lite', url: 'http://127.0.0.1:7000/api/s/decide', candidates: 24, timeout_s: 8 },
+    outputs: { hidden_keep_days: 0 },
   };
   // LocalTTS's own voice shape (GET /v1/voices → { custom, kokoro }), so the Speech page works on the mock.
   const voice = (name, source, duration_s, transcript, extra = {}) => ({ engine: 'breeze', name, transcript, duration_s, created: '2026-09-26T10:30:00-0400', source, instruction: null, language: null, transcript_auto: false, ...extra });

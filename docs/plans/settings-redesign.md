@@ -57,7 +57,7 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
 
 ## Phase 2 — Regrouped sections, the sticky strip and groups (M)
 
-- [ ] **2.1 The new sections, in `web/settings/schema.js`.**
+- [x] **2.1 The new sections, in `web/settings/schema.js`.**
   - **General:** groups *Hub* (port, the process card), *Interface* (theme, density, the sidebar's `ui.nav.services` mode and `ui.nav.folded` as rows, a "Reset the dashboard layout" block that clears `ui.dashboard`), *Outputs* (`outputs.hidden_keep_days`, moved out of Reading web pages).
   - **Machine:** groups *Memory* (the chart, reserve, auto make room, never unload, unload order), *Storage* (the paths list with sizes and the disk bar, renamed from Paths), *Hardware* (`HardwareCard`, moved from About).
   - **Services:** as today (the table, Add a mod), plus a *Tools* column (each mod's tool count from `listTools`, or "—").
@@ -66,6 +66,7 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   - **Speech:** groups *Dictation* (`SpeechInputSection`) and *Voice* (`SpeechOutputSection`); the section shows under the gap's rule.
   - **Sessions** and **About** (GAIFA line, versions, CLI, Doctor) as today.
   - **Summaries:** every group has `summary(ctx)`, one line for its closed state ("Reserve 8 GB · auto make room on · 2 never unloaded", "gemma4-26B via decide · 3 command rules").
+  *As built:* the rows the plan lists by key (the permission and command lists, `judge.context`, `threshold`, `timeout_s`, `screen.*`, `web.relevance` and `web.model`, `outputs.hidden_keep_days`) are draft rows from this step, so their cards' instant saves for them went now rather than in 4.3 (`JudgedList` takes `controls: false` and `onAllow`, which adds an "Always allow" rule to the draft; "Screen pages with" is `ScreenModelPick` on the draft; the judge's backend and model are `JudgeModelPick` on the draft). Learning, Dictation and Voice stay their cards until 4.3. Save sends only the keys that changed (`saveBody(draft, orig, sections)`), so a card that saved its own section meanwhile isn't overwritten. "The steps layout" in Agent → Model is the models card's max steps (there is no other steps setting). The Tools column counts `getToolIndex()` by mod (same `tools` area as `listTools`, smaller). Sessions shows while the api has `listSessions` (the mock serves it too). The mock's settings gained `speech_output`, `web` and `outputs`.
   *Done when:* `settings-schema.test.mjs` lists the eight sections in this order with these group ids, every row from Phase 1 still has a home, `outputs.hidden_keep_days` lives in `general/outputs`, and the summaries render from a fixed draft.
 
 - [ ] **2.2 Routes and aliases: `web/settings/route.js`.**

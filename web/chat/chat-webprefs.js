@@ -124,3 +124,23 @@ export function WebReadingSection({ api, toast = () => {} }) {
         !dd.error && dd.value === 0 ? h(Badge, { tone: 'dim' }, 'kept') : null)) : null,
     msg ? h('span', { role: msg.error ? 'alert' : 'status', style: { fontSize: 12, color: msg.error ? T.rd : T.mut } }, msg.error || msg.ok) : null);
 }
+
+/** "Screen pages with" on the Settings page's draft (settings-redesign 2.1): the way (the judge, a decision model,
+ *  another chat model), its model from GET /api/web/reading's choices, and for a decision model its threshold and
+ *  whether the judge's chat model confirms. `screen` is the draft's [agent.screen]; `onChange(patch)` merges into it. */
+export function ScreenModelPick({ screen, reading, onChange }) {
+  const sc = screen || {}, way = screenWay(sc);
+  const judge = reading?.judge ? `${reading.judge.model} (${reading.judge.backend === 'decide' ? 'decision model' : 'chat model'})` : '';
+  const now = reading?.screen ? `Now: ${reading.screen.model}${reading.screen.confirm ? `, confirmed by ${reading.screen.confirm}` : ''}.` : '';
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 0' } },
+    row('Screen pages with', [judge ? `The judge is ${judge}.` : '', now].filter(Boolean).join(' '),
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
+        h('select', { 'aria-label': 'Screen pages with', value: way, style: sel, onChange: e => onChange(screenPatch(e.target.value, { threshold: sc.threshold, confirm: sc.confirm })) },
+          SCREEN_WAYS.map(([k, l]) => h('option', { key: k, value: k }, l))),
+        way === 'judge' ? null : h(ModelPick, { label: 'Screening model', value: sc.model || '', choices: reading?.choices?.[way], placeholder: way === 'decide' ? 'd3-lite' : 'a model name', onChange: v => onChange({ model: v || null }) }))),
+    way === 'decide' ? row('Threshold', 'A passage passes when the decision model is at least this sure it’s for a human reader.',
+      h('input', { type: 'number', min: 0.5, max: 1, step: 0.01, value: sc.threshold ?? 0.95, 'aria-label': 'Screening threshold', style: { ...sel, width: 80, fontFamily: MONO }, onChange: e => onChange({ threshold: Number(e.target.value) }) })) : null,
+    way === 'decide' ? row('Confirm with the judge’s chat model', 'Decision models flag many ordinary passages; the judge’s chat model reads what it flags again and has the final say.',
+      check('Let the judge’s chat model confirm what it flags', sc.confirm !== false, v => onChange({ confirm: v }))) : null,
+    way === 'decide' && reading && !reading.decide_up ? h('span', { role: 'note', style: { fontSize: 12, color: T.acct } }, 'The decide mod isn’t running: start it on its page, or pages are screened by fixed patterns only.') : null);
+}

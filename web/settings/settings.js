@@ -32,6 +32,10 @@ export function SettingsPage(props) {
   React.useEffect(() => {
     let live = true;
     Promise.all([api.getSettings(), api.getSystem()]).then(([s, sys]) => live && up({ orig: s, draft: clone(s), sys }), e => live && up({ loadErr: e }));
+    // what choices and columns read: the judge's status, the screening and relevance models, each mod's tool count
+    api.getJudgeStatus?.().then(x => live && up({ judgeStatus: x }), () => {});
+    api.getWebReading?.().then(x => live && up({ reading: x }), () => {});
+    api.getToolIndex?.().then(ix => live && up({ toolCounts: ix.reduce((m, t) => ({ ...m, [t.mod]: (m[t.mod] || 0) + 1 }), {}) }), () => {});
     return () => { live = false; };
   }, []);
   const dirty = isDirty(st.orig, st.draft);
@@ -47,7 +51,8 @@ export function SettingsPage(props) {
   if (!st.draft) return h('div', { style: { color: T.mut } }, 'Loading settings…');
 
   const setDraft = fn => setSt(s => { const d = clone(s.draft); fn(d); return { ...s, draft: d, err: null }; });
-  const ctx = { ...props, api, services: props.services || [], system: st.sys, draft: st.draft, orig: st.orig, setDraft };
+  const ctx = { ...props, api, services: props.services || [], system: st.sys, draft: st.draft, orig: st.orig, setDraft,
+    judgeStatus: st.judgeStatus, reading: st.reading, toolCounts: st.toolCounts, hasSessions: !!api.listSessions };
   const secs = sections(ctx);
   const cur = secs.find(x => x.id === route?.parts?.[1]) || secs[0];
   const problems = validateDraft(secs, st.draft), invalid = Object.keys(problems).length > 0;
@@ -55,7 +60,7 @@ export function SettingsPage(props) {
   const save = async () => {
     up({ saving: true });
     try {
-      const r = await api.saveSettings(saveBody(st.draft));
+      const r = await api.saveSettings(saveBody(st.draft, st.orig, secs));
       up(s => ({ orig: r.settings, draft: { ...clone(r.settings), ui: s.draft.ui }, saving: false, restart: r.restart_required, err: null }));
       props.toast?.('Settings saved', 'success');
       props.onSaved?.(r);
@@ -74,7 +79,7 @@ export function SettingsPage(props) {
     const shown = g.rows.filter(r => !r.when || r.when(ctx));
     let firstPlain = true;
     const items = shown.map(r => { const row = { ...r, ref: `${cur.id}/${g.id}/${r.id}` }, first = !row.card && firstPlain; if (!row.card) firstPlain = false; return { row, el: rowEl(row, first) }; });
-    return h(Group, { key: g.id, group: { ...g, ref: `${cur.id}/${g.id}` } }, cardsOf(items));
+    return h(Group, { key: g.id, group: { ...g, ref: `${cur.id}/${g.id}` }, title: cur.groups.length > 1 }, cardsOf(items));
   };
   const miss = (cur.areas || []).filter(a => !isLive(a));
 

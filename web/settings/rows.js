@@ -122,8 +122,10 @@ export function Row({ row, value, onChange, error, ctx = {}, first }) {
 }
 
 /** A group: a card holding its rows. Blocks with `card: true` stand as their own cards between them. */
-export function Group({ group, children }) {
-  return h('div', { 'data-group': group.ref, style: { display: 'flex', flexDirection: 'column', gap: 14 } }, children);
+export function Group({ group, children, title = true }) {
+  return h('div', { 'data-group': group.ref, id: 'grp-' + String(group.ref).replace(/\//g, '-'), style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+    title && group.label ? h('h2', { style: { ...label11, padding: '4px 2px 0' } }, group.label) : null,
+    h('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } }, children));
 }
 /** Plain rows share one card; a `card` block is its own. `items` is [{row, el}]. */
 export function cardsOf(items) {

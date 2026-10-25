@@ -1,11 +1,12 @@
 """13.1: the tool catalog: manifest tools, a tools_source, metadata defaults, merged schemas,
-search, the index, hub tools and a stopped mod's tools."""
+search, the index, hub tools, a stopped mod's tools, and a tools_source that changes (plan 51.1)."""
 
 from __future__ import annotations
 
 import asyncio
 import json
 
+from utils.services import status
 from utils.tools.schema import flatten
 
 
@@ -95,3 +96,28 @@ async def test_hidden_and_fixed_parameters(th):
     assert r["result"] == {"id": "z", "verbose": "true"}
     r = await th.call("fake_tools_get_item_quiet", {"item_id": "z", "verbose": False})
     assert r["status"] == "error" and r["error"]["code"] == "invalid_arguments"
+
+
+async def test_a_tools_source_list_follows_the_mods_tools_rev(th):
+    """51.1: a tool the mod adds while it runs appears once its status reports a new tools_rev, not before."""
+    mgr = th.hub.services
+    svc = mgr.get("fake-tools")
+
+    async def poll() -> None:                   # one round of the status poller
+        st, problems = await status.fetch(mgr, svc)
+        assert st is not None and not problems, problems
+        status.apply(mgr, svc, st)
+
+    async def names() -> set[str]:
+        return {t["name"] for t in (await th.client.get("/api/tools/index")).json()}
+
+    await poll()
+    assert svc.tools_rev == "1" and "fake_tools_doodle" not in await names()
+    assert (await th.client.post("/api/s/fake-tools/v1/tools/doodle")).status_code == 200
+    assert "fake_tools_doodle" not in await names()     # the same revision: the cached list stays
+    await poll()
+    assert svc.tools_rev == "2" and "fake_tools_doodle" in await names()
+    row = await th.hub.db.fetchone("SELECT value FROM kv WHERE key = 'tools:fake-tools'")
+    assert "fake_tools_doodle" in row["value"]          # kept for when the mod stops
+    r = await th.call("fake_tools_doodle", {})
+    assert r["status"] == "done", r

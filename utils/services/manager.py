@@ -147,7 +147,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         self._prepare_dirs(svc, spec)
         svc.command = spec.argv
         svc.live_port = spec.port
-        svc.health = svc.status = None
+        svc.health = svc.status = svc.tools_rev = None
         svc.misses = 0
         self._set(svc, "starting")
         try:
@@ -297,7 +297,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         for job in svc.jobs:  # jobs can't outlive their process
             if job["state"] in status.ACTIVE_JOBS:
                 self.bus.publish({"type": "job", "job": {**job, "state": jobs_end}})
-        svc.health = svc.status = svc.status_ts = None
+        svc.health = svc.status = svc.status_ts = svc.tools_rev = None
         svc.stats = []
         svc.memory_estimate_gb = None
         svc.busy, svc.idle_s, svc.jobs = False, None, []

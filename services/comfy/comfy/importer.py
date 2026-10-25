@@ -272,8 +272,9 @@ def history_list(history: dict) -> list[dict]:
         p = h.get("prompt") or []
         graph = p[2] if len(p) > 2 else {}
         extra = p[3] if len(p) > 3 and isinstance(p[3], dict) else {}
-        editor = (extra.get("extra_pnginfo") or {}).get("workflow")
-        gaifa = (extra.get("extra_pnginfo") or {}).get("gaifa")
+        info = extra.get("extra_pnginfo") or {}
+        editor = info.get("workflow")
+        gaifa = info.get("gaifa") or info.get("aihub")   # prompts from before the rename say "aihub" (plan 51.3)
         files = [it.get("filename") for o in (h.get("outputs") or {}).values() for v in o.values() if isinstance(v, list)
                  for it in v if isinstance(it, dict) and it.get("type") == "output"]
         types = sorted({n.get("class_type") for n in graph.values() if isinstance(n, dict)})

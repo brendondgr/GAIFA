@@ -6,6 +6,8 @@ import time
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
+from .tools import revision
+
 router = APIRouter()
 RANGES = {"24h": 1, "7d": 7, "30d": 30, "90d": 90}
 
@@ -65,6 +67,7 @@ def status(request: Request) -> dict:
             {"label": "Made today", "value": made, "reset": "daily"},
         ],
         "jobs": runs + _queue_jobs(ctl, ours),
+        "tools_rev": revision(st.library, st.db.defaults()),   # plan 51.2: GAIFA reads /v1/tools again when it changes
     }
 
 

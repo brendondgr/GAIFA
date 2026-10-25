@@ -10,6 +10,8 @@ route (`GET /v1/jobs/{id}?wait=`) gives its outputs.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 from typing import Any
@@ -117,6 +119,19 @@ def preset_options(packs: list) -> dict[str, dict]:
                 o["when"] = QUICK
             out[name] = o
     return out
+
+
+def revision(lib: Library, defaults: dict[str, str]) -> str:
+    """A short hash of what `catalog` returns, for the status's `tools_rev` (plan 51.2): GAIFA reads the
+    tools again when it changes. Recomputed only when what the tools depend on changes: the packs, ComfyUI's
+    node list, the models GAIFA knows, the task defaults and this machine's accelerator."""
+    lib.packs.scan()
+    key = (tuple(sorted((p.id, p.sig) for p in lib.packs.packs())), lib.catalog.version, len(lib.models),
+           json.dumps(defaults, sort_keys=True, default=str), os.environ.get("GAIFA_ACCEL"))
+    if lib.tools_rev is None or lib.tools_rev[0] != key:
+        body = json.dumps(catalog(lib, defaults), sort_keys=True, default=str)
+        lib.tools_rev = (key, hashlib.sha256(body.encode()).hexdigest()[:16])
+    return lib.tools_rev[1]
 
 
 def catalog(lib: Library, defaults: dict[str, str]) -> list[dict]:

@@ -216,7 +216,7 @@ delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
 # job = true + job_status = "GET /v1/jobs/{id}" (+ job_cancel): the hub follows the job to its outputs
 
 [agent]                             # optional: tools the mod lists at runtime (comfy: one per task)
-tools_source = "GET /v1/tools"      # → {"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST …", "job": {…}|null, "risk", "ask", "examples", "core", "grant_key"}]}
+tools_source = "GET /v1/tools"      # read at start and whenever status's tools_rev changes (§4.6) → {"tools": [{"type": "function", "function": {name, description, parameters}, "op": "POST …", "job": {…}|null, "risk", "ask", "examples", "core", "grant_key"}]}
 skills = "skills"                   # optional: skills/<name>/SKILL.md for the agent (plan 14.9)
 ```
 
@@ -266,6 +266,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
   "busy": false,
   "idle_s": 42.0,
   "memory_estimate_gb": 9.2,
+  "tools_rev": "a41c09e2",
   "stats": [{"label": "Voices", "value": 3}, {"label": "Clips today", "value": 12}],
   "jobs": [{"id": "j_1", "label": "low-poly fox", "progress": 0.4, "state": "running", "route": "#/s/gen3d/jobs?id=j_1"}]
 }
@@ -273,6 +274,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 
 - **`loaded`**: models are in memory; omit or set `null` if the mod has none.
 - **`memory_estimate_gb`**: optional; overrides the manifest estimate, for example per workflow.
+- **`tools_rev`** (plan 51.1, optional): a string or integer (1–64 characters) that changes whenever the mod's tools do. The tool catalog reads a mod's tools once per process start, and again on the next read after its `tools_rev` changes, so a `tools_source` that grows while the mod runs (comfy's, as packs become ready) reaches the agent, `/api/tools` and `/mcp` without a restart. Without it, a changed list waits for the next start.
 - **Polling:** every 2 s while loading, busy or running jobs, otherwise every 10 s, only while the mod is ready. Invalid parts of the body are ignored (`gaifa check` lists them).
 - **`jobs`**: each `{id, label, progress (0–1 or null), state, route?, live?}`, with `state` one of queued, running, done, failed, cancelled. Report finished jobs with their final state; a job that just disappears is shown as `done`. `route` must start with `#/` (a page in GAIFA); anything else is dropped and reported.
 - **`live`** (plan 44.2, optional, on a status job and on a job's own status route that a tool follows): `{stage, stages: [{id, label, state, eta_s}], step, steps, eta_s, frames, preview: {url, seq, w, h}, lines: [done, of], audio}`, every field optional. `preview.url` and `audio` are paths on the mod; the hub rewrites them to `/api/s/<id>/…` and caps the object at 4 KB (`utils/live.py`). A running tool call carries it (`GET /api/tools/calls/{id}`, which with `?wait=&changed=true` answers at the next change), the agent passes it on its transient `progress` event, and `Job.live` goes out with the jobs. Whatever shows the job (a chat card, the Overview, a mod page) fetches the preview frame when `seq` changes.

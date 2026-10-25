@@ -9,6 +9,7 @@ crash  like ok, but the process exits with status 1 after FAKE_CRASH_S (1) secon
 mem    like ok, plus /v1/load allocates FAKE_MEM_MB (64) MB and /v1/unload frees it
 tools  like ok, plus routes for agent tools (plan 13): items, an image output, speech with a saved
        path, a render job (GET /v1/render/{rid}, cancel), multipart upload, and GET /v1/tools
+       (POST /v1/tools/doodle adds a tool there, and status's tools_rev goes 1 → 2; plan 51.1)
 perms  like ok, plus network and execute tools (plan 25): POST /v1/search, /v1/fetch, /v1/python
        and /v1/run echo what they were sent as {"ran": <route>, "arguments": {...}}
 ws     like ok, plus a workspace mod in miniature with its preflight /v1/limits (plan 27.4; _fakews.py)
@@ -44,7 +45,7 @@ MODE = sys.argv[1] if len(sys.argv) > 1 else "ok"
 PORT = int(os.environ.get("FAKE_PORT", "5190"))
 OUTPUTS = Path(os.environ.get("FAKE_OUTPUTS") or os.environ.get("GAIFA_OUTPUTS") or "outputs")
 STARTED = time.time()
-STATE = {"last_used": time.time(), "requests": 0, "outputs": 0, "memory": None}
+STATE = {"last_used": time.time(), "requests": 0, "outputs": 0, "memory": None, "doodle": False}
 JOBS: dict[str, dict] = {}
 MB = 1024 * 1024
 
@@ -281,7 +282,10 @@ class Handler(BaseHTTPRequestHandler):
                      "op": "POST /v1/tools/shape/call", "job": None, "risk": "read"},
                     {"type": "function", "function": {"name": "strict", "description": "Always refused, with the mod's own fix.",
                                                       "parameters": {"type": "object", "properties": {}}},
-                     "op": "POST /v1/tools/strict/call", "job": None, "risk": "read"}]})
+                     "op": "POST /v1/tools/strict/call", "job": None, "risk": "read"}] + ([
+                    {"type": "function", "function": {"name": "doodle", "description": "Doodle (appears after POST /v1/tools/doodle).",
+                                                      "parameters": {"type": "object", "properties": {}}},
+                     "op": "POST /v1/tools/styles/call", "job": None, "risk": "read"}] if STATE["doodle"] else [])})
         if url.path == "/v1/redirect":
             self.send_response(307)
             self.send_header("Location", "/v1/status")
@@ -337,6 +341,9 @@ class Handler(BaseHTTPRequestHandler):
                 out["results"] = [{"title": "x", "url": u} for u in urls]
             return self.send(200, out)
         if MODE == "tools":
+            if url.path == "/v1/tools/doodle":         # plan 51.1: a tool that appears while the mod runs
+                STATE["doodle"] = True
+                return self.send(200, {"ok": True})
             if url.path == "/v1/images":
                 b = self.body()
                 f = save(b.get("prompt", "image") + ".png", png(), {"title": b.get("prompt"), "prompt": b.get("prompt"), "kind": "image",
@@ -460,6 +467,8 @@ def status() -> dict:
         ],
         "jobs": js,
     }
+    if MODE == "tools" and not os.environ.get("FAKE_NO_TOOLS_REV"):
+        s["tools_rev"] = "2" if STATE["doodle"] else "1"    # plan 51.1
     if MODE == "mem":
         s["memory_estimate_gb"] = float(os.environ.get("FAKE_ESTIMATE_GB") or round(int(os.environ.get("FAKE_MEM_MB", "64")) / 1024, 3))
     return s

@@ -118,6 +118,12 @@ def test_import_from_history(env):
     r = c.post("/v1/import/history/abc123", json={"id": "from-history"}).json()
     assert r["id"] == "from-history" and (s.workflows / "from-history" / "workflow.json").exists()
     assert c.post("/v1/import/history/nope", json={}).status_code == 404
+    # 51.3: GAIFA's own prompts from before the rename carry "aihub" instead of "gaifa"
+    for key, pid in (("gaifa", "new1"), ("aihub", "old1")):
+        fake.history[pid] = {"prompt": [6, pid, API, {"extra_pnginfo": {key: {"workflow": "zimage", "run": "r-1"}}}, []],
+                             "outputs": {}, "status": {"status_str": "success"}}
+    made = {i["prompt_id"]: i["from_gaifa"] for i in c.get("/v1/import/history").json()["items"]}
+    assert made["new1"] == made["old1"] == "zimage" and made["abc123"] is None
 
 
 def test_reimport_of_a_result_png_gives_the_same_graph(tmp_path):

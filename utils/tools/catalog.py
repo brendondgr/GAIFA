@@ -2,7 +2,8 @@
 functions, and the hub's own tools, as OpenAI-style functions with risk levels.
 
 - **Names** are `<mod>_<tool>` (a `-` in the mod id becomes `_`); hub tools are `hub_<tool>`.
-- **Schemas** come from the mod's OpenAPI (`flatten`), read once per process start. The last
+- **Schemas** come from the mod's OpenAPI (`flatten`), read once per process start, and again whenever
+  the mod's status reports a new `tools_rev` (plan 51.1: comfy's tools follow its ready packs). The last
   good list of each mod is kept in `hub.db` (`kv`), so a stopped mod's tools stay listed, marked
   `available: false` with the reason (a call starts the mod first).
 - **Risk** (plan 25.1): `read`, `write`, `generate`, `network` (reaches the internet), `execute`
@@ -168,7 +169,7 @@ class Catalog:
         if not svc.m.tools and not svc.m.agent.tools_source:
             return []
         if svc.up:
-            key = operations.cache_key(svc)
+            key = (*operations.cache_key(svc), svc.tools_rev)   # plan 51.1: a new revision reads them again
             cached = self._mods.get(svc.id)
             if cached and cached[0] == key:
                 return cached[1]

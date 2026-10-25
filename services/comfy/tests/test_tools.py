@@ -216,3 +216,18 @@ def test_a_pack_that_needs_another_accel_isnt_offered(env, monkeypatch):  # noqa
     assert names(c)["generate_image"]["function"]["parameters"]["properties"]["workflow"]["enum"] == ["zimage"]
     monkeypatch.delenv("GAIFA_ACCEL")
     assert "generate_image" in names(c)                                         # no variant recorded: anything runs
+
+
+def test_status_tools_rev_follows_the_tools(env):  # noqa: F811
+    """51.2: status's tools_rev changes when /v1/tools would, and only then."""
+    c, fake, hub, s = env
+    rev = c.get("/v1/status").json()["tools_rev"]
+    assert isinstance(rev, str) and 0 < len(rev) <= 64
+    assert c.get("/v1/status").json()["tools_rev"] == rev          # nothing changed
+    shutil.copytree(s.workflows / "zimage", s.workflows / "zimage-2")   # a second ready text-to-image pack
+    time.sleep(0.05)
+    rev2 = c.get("/v1/status").json()["tools_rev"]
+    assert rev2 != rev
+    shutil.rmtree(s.workflows / "zimage-2")
+    time.sleep(0.05)
+    assert c.get("/v1/status").json()["tools_rev"] == rev          # the same tools as before, the same revision

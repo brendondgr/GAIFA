@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from utils.services import Service, ServiceManager
 
 MAX_STATS = 4
+MAX_REV = 64
 JOB_STATES = {"queued", "running", "done", "failed", "cancelled"}
 ACTIVE_JOBS = {"queued", "running"}
 
@@ -31,7 +32,8 @@ def slug(label: str) -> str:
 
 def validate(body: Any) -> tuple[dict[str, Any], list[str]]:
     """A status body → (normalized fields, problems). Unknown keys are ignored."""
-    out: dict[str, Any] = {"loaded": None, "busy": False, "idle_s": None, "memory_estimate_gb": None, "stats": [], "jobs": []}
+    out: dict[str, Any] = {"loaded": None, "busy": False, "idle_s": None, "memory_estimate_gb": None, "stats": [], "jobs": [],
+                           "tools_rev": None}
     problems: list[str] = []
     if not isinstance(body, dict):
         return out, [f"status must be a JSON object, got {type(body).__name__}"]
@@ -56,6 +58,13 @@ def validate(body: Any) -> tuple[dict[str, Any], list[str]]:
             out[key] = float(v)
         else:
             problems.append(f"{key} must be a number ≥ 0 or null")
+
+    rev = body.get("tools_rev")              # plan 51.1: the mod's tools changed when this does
+    if rev is not None:
+        if isinstance(rev, (str, int)) and not isinstance(rev, bool) and 0 < len(str(rev)) <= MAX_REV:
+            out["tools_rev"] = str(rev)
+        else:
+            problems.append(f"tools_rev must be a string or an integer of 1–{MAX_REV} characters")
 
     stats = body.get("stats", [])
     if not isinstance(stats, list):
@@ -164,6 +173,7 @@ def apply(mgr: ServiceManager, svc: Service, st: dict[str, Any], asked_at: float
     svc.idle_s = st["idle_s"]
     svc.stats = st["stats"]
     svc.memory_estimate_gb = st["memory_estimate_gb"]
+    svc.tools_rev = st.get("tools_rev")
     _publish_jobs(mgr, svc, st["jobs"])
     after = (svc.load, svc.busy, svc.stats, svc.memory_estimate_gb, _job_view(svc.jobs))
     return before != after

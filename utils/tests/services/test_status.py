@@ -46,6 +46,16 @@ def test_validate_keeps_the_good_parts_and_lists_the_rest():
     ]
 
 
+def test_validate_tools_rev():
+    """51.1: tools_rev is kept as a string; anything else is a problem, not used."""
+    assert status.validate({"tools_rev": 7})[0]["tools_rev"] == "7"
+    assert status.validate({"tools_rev": "a1b2"})[0]["tools_rev"] == "a1b2"
+    assert status.validate({})[0]["tools_rev"] is None
+    for bad in (True, "", "x" * 65, [1], {"v": 1}):
+        st, problems = status.validate({"tools_rev": bad})
+        assert st["tools_rev"] is None and any("tools_rev" in p for p in problems), bad
+
+
 def test_validate_rejects_non_objects():
     assert status.validate([1, 2])[1] == ["status must be a JSON object, got list"]
 

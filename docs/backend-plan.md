@@ -34,6 +34,7 @@ How GAIFA gets built, step by step: the backend described in [architecture.md](a
 | O — Chats by workspace | 41–43 | The chat list grouped by environment (Phase 34's workspaces), with orders, paging per group, Move to and renaming from the sidebar; then the Chat page after Claude Code: a compact sidebar, the message box with + and its controls (environment, mode, model) under it, environments made and changed from the chat, in a dialog with the desktop's folder chooser | the agent's thread list (additive filters), `web/chat/` |
 | P — Chat cards | 44–49 | Mods ship their own chat cards (`[ui] chat`), and jobs report live progress with preview frames: live cards for image, video, 3D and speech; status and fix-it cards; `show` for charts, tables and pictures in replies; @-mentions; Save to…; read aloud and voice mode. Plan: [plans/chat-cards.md](plans/chat-cards.md) | `web/chat/`, the tool call path (additive `live`, `view`, `fixes`), comfy, gen3d, tts (speech as a job), workspace (save into a folder); additive |
 | Q — The name | 50 | AIHub becomes GAIFA ("Great, Another Interface For Agents", said guy-fuh): every identifier, the docs, the README and its banner, the folder and the GitHub repository. Plan: [plans/gaifa-rename.md](plans/gaifa-rename.md) | Everything by name; nothing by behavior. The installed hub moves once, in 50.5 |
+| R — Upkeep | 51 | Fixes found in use: a mod's tool list follows the mod while it runs (comfy's tools appear when a pack becomes ready), and the rename's leftovers in comfy | the tool catalog, comfy; additive |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -88,6 +89,7 @@ How GAIFA gets built, step by step: the backend described in [architecture.md](a
 | 48 | @-mentions and Save to… | M | `chat`: the `@` picker; Download, Copy and Save to folder on outputs |
 | 49 | Read aloud and voice mode | M | `chat`: the reply bar's speaker, voice mode, Settings → Agent → Voice |
 | 50 | The rename to GAIFA | M–L | the whole UI shows GAIFA |
+| 51 | Tool lists that follow the mod | S | — (the agent, `/api/tools` and `/mcp` see a mod's new tools without a restart) |
 
 # Stage A — Foundation
 
@@ -3191,6 +3193,31 @@ Asked for 2026-10-22, after trying 42.4: New environment and Edit open a **dialo
 **Checks & deliverables — Phase 43**
 - [ ] Live: as 43.3.
 - [ ] Delivered: `services/workspace/picker.py`, `EnvDialog`, the tests.
+
+---
+
+## Phase 51 — Tool lists that follow the mod (S)
+
+Found on 2026-10-25 by an MCP test after the rename: comfy came up with its packs read as broken (a stale node cache), so it listed only `list_workflows` and `run_workflow`. Once ComfyUI started and the packs were ready again, comfy's own `GET /v1/tools` had `generate_image`, `edit_image` and `remove_background`, but the hub kept the old list until `gaifa restart comfy`: the catalog reads a mod's tools once per process start (`utils/operations.py` `cache_key`). The same happens whenever a pack becomes ready later (a model downloaded, a pack imported or saved).
+
+- [x] **51.1 `tools_rev` in a mod's status: `utils/tools/catalog.py`, `utils/services/status.py`.**
+  - **Status:** an optional `tools_rev` (a string or number, at most 64 characters) in the body of `[run] status`. `validate()` keeps it; a bad one is a problem `gaifa check` reports.
+  - **Catalog:** a mod's cache key is `cache_key(svc)` plus its last reported `tools_rev`, so the next read after a change (`/api/tools`, `/api/tools/index`, `/mcp`, the agent's turn) rebuilds that mod's list and persists it for when it stops. The status poller doesn't call the mod's tool route itself; a change costs one rebuild on the next read.
+  - **Why status:** the hub already polls it (every 2–10 s), so a mod needs no new route or callback, and it works across hub restarts.
+  *Done when:* `utils/tests/tools/test_catalog.py` (a fake mod whose `tools_source` list changes while it runs: the new tool appears once its status reports a new `tools_rev`, not before; without `tools_rev`, one read per process start as before; a bad `tools_rev` is reported, not used). Docs: architecture §4.6 (the field) and the `[agent]` block in §4.3, docs/mods.md (the `tools_source` paragraph).
+- [x] **51.2 comfy reports its revision: `services/comfy/comfy/hub.py`, `tools.py`.**
+  - `/v1/status` carries `tools_rev`: a short hash of what `GET /v1/tools` would return, computed only when its inputs change (the packs' signatures, the node catalog's version, the models it knows, the task defaults).
+  *Done when:* `services/comfy/tests/test_tools.py` (the revision changes when a pack goes from broken to ready, and stays the same otherwise).
+- [x] **51.3 The rename's leftovers in comfy: `services/comfy/comfy/importer.py`.**
+  - ComfyUI history from before the rename marks GAIFA's own prompts with `extra_pnginfo.aihub`: read it as well as `gaifa`, so those prompts still show which workflow made them.
+  - On this machine (no code): `input/aihub/` moved to `input/gaifa/`, the 19 comfy runs and one output whose inputs named `aihub/…` rewritten to `gaifa/…`, the leftover `nodes/aihub_nodes/__pycache__` (ComfyUI tried to import it) removed.
+  *Done when:* `services/comfy/tests/test_import.py` (a history entry with the old key is recognised).
+
+*As checked (2026-10-25):* on the installed hub, a copy of a ready pack added while comfy ran was in `comfy_generate_image`'s workflow choices within 2 s and gone 11 s after it was removed, with no restart; `/mcp` lists 70 tools (comfy's three task tools among them); in Chat, on skynet, the agent searched the web (8 results), summed up MCP in a sentence and made the picture (52 s).
+
+**Checks & deliverables — Phase 51**
+- [x] Live: a pack going from broken to ready while comfy runs (or a ComfyUI start that refreshes the node cache) makes its tool appear in `GET /api/tools` and over `/mcp` without a restart; the chat agent searches the web and makes a picture.
+- [x] Delivered: `tools_rev` in the catalog and status, comfy's revision, the importer's old key, the tests.
 
 ---
 

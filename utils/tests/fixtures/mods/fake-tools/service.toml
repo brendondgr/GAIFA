@@ -8,6 +8,7 @@ description = "agent tools of every kind"
 command = ["python3", "../_fakemod.py", "tools"]
 port = 5195
 health = "/health"
+status = "/v1/status"
 env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
 start_timeout_s = 15
 stop_timeout_s = 5

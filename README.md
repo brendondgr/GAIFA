@@ -276,8 +276,8 @@ cd services/agent && .venv/bin/python -m pytest        # each mod has its own su
 ```
 
 The hub's suite has 1,890 tests, and each mod has its own suite on top. Fakes stand in for
-real mods and models, so none of them need a GPU. The build plan, with every step and its checks,
-is [docs/backend-plan.md](docs/backend-plan.md). The UI is plain ES modules on React with no build
+real mods and models, so none of them need a GPU. The plans, with every step and its checks, are
+in [docs/plans/](docs/plans/README.md), one file per piece of work; [docs/backend-plan.md](docs/backend-plan.md) is the original build plan. The UI is plain ES modules on React with no build
 step (`web/`), and [docs/design-brief-ui.md](docs/design-brief-ui.md) describes it. The banner at the
 top of this page is generated from the logo by `docs/assets/make_header.py`.
 

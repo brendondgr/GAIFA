@@ -1,7 +1,7 @@
 # GAIFA — Architecture
 
 > Agreed design, 2026-10-04. Companion docs:
-> - [backend-plan.md](backend-plan.md): step-by-step build of the backend
+> - [backend-plan.md](backend-plan.md): step-by-step build of the backend (Phases 0–51, closed); newer work has one plan per file in [plans/](plans/README.md)
 > - [design-brief-ui.md](design-brief-ui.md): UI brief for Claude Design (its Sections 6 and 11.7 are the UI-facing API contract)
 > - [reference/ui-export-2026-10-04/](reference/ui-export-2026-10-04/README.md): Claude Design's Part A v1, the UI baseline
 

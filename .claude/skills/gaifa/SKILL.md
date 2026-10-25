@@ -1,6 +1,6 @@
 ---
 name: gaifa
-description: Project guide for GAIFA. Use before any work in this repo — implementing a plan step, adding or changing a mod, touching the hub API or UI wiring, or answering "where does X go / how does X work". Maps every question to the doc section that answers it, lists the invariants, and gives the step-by-step workflow for working docs/backend-plan.md.
+description: Project guide for GAIFA. Use before any work in this repo — implementing a plan step, adding or changing a mod, touching the hub API or UI wiring, or answering "where does X go / how does X work". Maps every question to the doc section that answers it, lists the invariants, and gives the step-by-step workflow for working a plan in docs/plans/.
 ---
 
 # Working on GAIFA
@@ -26,11 +26,12 @@ The docs are the source of truth. Read the section you need before acting; don't
 | Memory sampling and make-room rule | architecture §7 |
 | Models registry format | architecture §8 |
 | `config.toml` | architecture §9 |
-| Each existing app → mod (ports, paths, changes) | architecture §10, plan Phases 7–11 |
+| Each existing app → mod (ports, paths, changes) | architecture §10, backend-plan Phases 7–11 |
 | Risks and gotchas | architecture §12 |
 | Metrics tables, retention, widgets | architecture §13, brief §11.5–11.7 |
-| Chat agent, approvals, sessions | architecture §14, plan Phases 14–16 |
-| What to build next, and its checks | backend-plan (first unticked step) |
+| Chat agent, approvals, sessions | architecture §14, backend-plan Phases 14–16 |
+| What to build next, and its checks | [docs/plans/README.md](../../../docs/plans/README.md) (the open plans), then that plan's first unticked step |
+| Why something was built the way it was (Phases 0–51) | [docs/backend-plan.md](../../../docs/backend-plan.md) (closed: history only) |
 | Mod page modules (`page.js`, `Page.dc.html`) | brief §5 |
 | UI states that must be reachable | brief §8, §11.10 |
 | The UI baseline | `docs/reference/ui-export-2026-10-04/README.md` |
@@ -50,17 +51,17 @@ The docs are the source of truth. Read the section you need before acting; don't
 - **The existing apps keep running until their cutover step.** Stopping their services, moving models, or deleting anything in the old repos needs the user's approval.
 
 ## Working a plan step
-1. Find the first unticked step in `docs/backend-plan.md`. Check its phase's earlier steps are ticked.
+1. Find the plan in `docs/plans/README.md` (the user names it, or it's the one in progress) and its first unticked step. Check its phase's earlier steps are ticked.
 2. Read the architecture and brief sections the step cites.
 3. Build it, with tests in `utils/tests/<area>/test_<behavior>.py` (fake mods in `utils/tests/fixtures/mods/`).
 4. `uv run pytest` must be green. It includes the Node tests for `web/api.js` (`utils/tests/web/`); inside the toolbox they use the host's Node via `flatpak-spawn --host node`.
    To check against the installed hub, run `gaifa restart` and reload the page (changing only the `#/…` hash doesn't reload it).
    For UI checks with fake mods, run a second hub: `uv run python app.py --port 7077 --dev --demo-mods` (child processes; the installed hub on 7000 and its units are untouched). Tests never touch the real root or hub: `conftest.py` points `GAIFA_ROOT`/`GAIFA_URL` at throwaway values.
-5. In the same commit: tick the step in the plan, update `docs/structure.md` for new files, and update architecture / brief §6 / §11.7 if behavior differs from what they say.
-6. Commit as `GAIFA (<phase>.<step>): <what was done>`. Push when the user asks or at the end of a phase.
+5. In the same commit: tick the step in the plan, keep its status in `docs/plans/README.md` current, update `docs/structure.md` for new files, and update architecture / brief §6 / §11.7 if behavior differs from what they say.
+6. Commit as `GAIFA (<plan-slug> <phase>.<step>): <what was done>`. Push when the user asks or at the end of a phase.
 7. At the end of a phase, run its **Wire** and **Checks & deliverables** lists before starting the next phase.
 
-To write or change a plan, use the `plan` skill.
+To write or change a plan, use the `plan` skill. New work always gets a new file in `docs/plans/`; `docs/backend-plan.md` is closed and never gains phases.
 
 ## Code conventions
 - Python ≥ 3.12, FastAPI + uvicorn + httpx, pydantic v2, SQLite; dependencies via `uv` only.

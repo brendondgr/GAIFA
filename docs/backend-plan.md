@@ -3,6 +3,8 @@
 How GAIFA gets built, step by step: the backend described in [architecture.md](architecture.md), and the UI from [design-brief-ui.md](design-brief-ui.md) **wired in as each piece of the backend lands**. The visual and structural reference throughout is Claude Design's Part A v1 export in [reference/ui-export-2026-10-04/](reference/ui-export-2026-10-04/README.md).
 
 > This is a plan. Ticked steps have landed; the rest is not implemented yet.
+>
+> **Closed at Phase 51 (2026-10-25).** New work gets its own plan, one file each in [plans/](plans/README.md); don't add phases, stages or steps here. Open steps below may still be finished and ticked.
 
 **How to work this plan**
 - **Every phase has three parts:**

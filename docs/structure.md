@@ -65,7 +65,8 @@ The existing apps come in with `git subtree add` (their history is kept), so mos
 | `agent-eval.md` | Plan 13.5 and 14.12: the eval's and the live runs' results in short (the full account is the overnight report) |
 | `report/` | The overnight report (Phases 13–16): `report.tex` and its parts, `build.py` (turns `data/*.json` from the eval, live and test runs into `gen/` tables and thumbnails), `gen/` (tracked). Local only, gitignored: `data/` (the runs' records), `img/` (UI screenshots, live outputs) and the built `report.pdf` |
 | `test-plan.md` | The checks and edge cases for Phases 13–16, written before building them; results go in the overnight report |
-| `backend-plan.md` | The build plan: Phases 0–23 with steps, checks and deliverables; steps are ticked as they land |
+| `backend-plan.md` | The original build plan: Phases 0–51 with steps, checks and deliverables; closed on 2026-10-25 (open steps may still be ticked), new work goes in `plans/` |
+| `plans/README.md` | The plans index: one file per plan, how they're numbered and committed, and each plan's status |
 | `plans/comfy-qwen21-turbo.md` | Sub-plan: the Qwen-Image 2.1 Turbo packs (models, builder, packs, live runs, tests) |
 | `plans/chat-uploads-and-fast-presets.md` | Sub-plan: `fast`/`draft` presets the agent can use, and uploading images in Chat |
 | `plans/capabilities-and-learning.md` | A pointer: Stage H (Phases 20–22) was planned here and moved into the master plan in 20.1 |

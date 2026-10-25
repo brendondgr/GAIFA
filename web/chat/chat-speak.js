@@ -84,7 +84,7 @@ export function SpeakButton({ text, ctx }) {
     h(Icon, { d: state === 'idle' ? 'speaker' : 'stop', size: 13 }));
 }
 
-/** Settings → Agent → Voice: the voice that reads replies, its engine and speed, auto-read, voice mode's pause. */
+/** Settings → Speech → Voice: the voice that reads replies, its engine and speed, auto-read, voice mode's pause. */
 export function SpeechOutputSection({ api, toast = () => {} }) {
   const React = R(), [so, setSo] = React.useState(null), [voices, setVoices] = React.useState(null), [saving, setSaving] = React.useState(false);
   React.useEffect(() => {

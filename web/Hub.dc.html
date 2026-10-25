@@ -1066,7 +1066,7 @@ class Component extends DCLogic {
       const d = this.svcMap?.[r.parts[1]];
       if (d) { const tabs = this.tabsFor(d); const t = tabs.find(x => x.id === r.parts[2]) || tabs[0]; if (t && tabs.length > 1) parts.push(t.label); }
       parts.push(d?.name || r.parts[1] || 'Service');
-    } else if (r.page === 'settings') { if (r.parts[1]) parts.push(cap(r.parts[1])); parts.push('Settings'); }
+    } else if (r.page === 'settings') { parts.push(...this.settingsPlace(r).reverse(), 'Settings'); }
     else if (r.page === 'outputs' && r.parts[1]) parts.push((s.out?.detail?.id === r.parts[1] && s.out.detail.title) || (s.out?.items || []).find(o => o.id === r.parts[1])?.title || 'Output', 'Outputs');
     else parts.push({ overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', services: 'Services' }[r.page] || cap(r.page));
     const n = s.approvals?.length || 0;
@@ -1624,6 +1624,8 @@ class Component extends DCLogic {
 
   // ---------- settings (plan settings-redesign: the page is web/settings/settings.js) ----------
   settingsDirty() { return !!this.settingsRef?.current?.dirty?.(); }
+  settingsCtx() { return { services: this.state.services, hasSessions: !!this.api?.listSessions }; }
+  settingsPlace(r) { return this.Settings && r.parts[1] ? this.Settings.settingsPlace(r.parts.slice(1), this.Settings.settingsSections(this.settingsCtx())) : []; }
 
   // ---------- palette / keys ----------
   togglePalette() {
@@ -1647,7 +1649,7 @@ class Component extends DCLogic {
       if (sv.load === 'loaded') out.push({ label: `Unload ${sv.name}`, sub: 'Action', d: ICON.down, run: run(() => this.unload(sv)) });
       out.push({ label: `${sv.name} › API`, sub: 'Tab', d, run: nav(`#/s/${sv.id}/api`) }, { label: `${sv.name} › Logs`, sub: 'Tab', d, run: nav(`#/s/${sv.id}/logs`) });
     });
-    ['general', 'paths', 'memory', 'services', 'interface', 'agent', 'sessions', 'about'].forEach(x => out.push({ label: `Settings › ${cap(x)}`, sub: 'Page', d: ICON.gear, run: nav('#/settings/' + x) }));
+    (this.Settings?.settingsSections(this.settingsCtx()) || []).forEach(x => out.push({ label: `Settings › ${x.label}`, sub: 'Page', d: ICON.gear, run: nav('#/settings/' + x.id) }));  // plan settings-redesign 2.2
     if (this.api.listSessions) {  // Wire 15: sessions from the palette
       out.push({ label: 'Save session…', sub: 'Action', d: ICON.download, run: () => this.openSessions('save') }, { label: 'Switch to session…', sub: 'Action', d: ICON.refresh, run: () => this.openSessions() });
       this.state.sessions.forEach(x => out.push({ label: `Switch to ${x.name}`, sub: 'Session', d: ICON.refresh, run: () => this.openSessions(x.id) }));
@@ -1789,7 +1791,7 @@ class Component extends DCLogic {
     const h = React.createElement, d = r.page === 'service' ? this.svcMap?.[r.parts[1]] : null;
     let sub = '';
     if (d) { const tabs = this.tabsFor(d), t = tabs.find(x => x.id === r.parts[2]) || tabs[0]; sub = t && tabs.length > 1 ? t.label : ''; }
-    else if (r.page === 'settings' && r.parts[1]) sub = cap(r.parts[1]);
+    else if (r.page === 'settings') sub = this.settingsPlace(r).join(' / ');  // plan settings-redesign 2.2: "Machine / Memory"
     const ic = { overview: ICON.grid, chat: ICON.chat, outputs: ICON.folder, models: ICON.layers, settings: ICON.gear, services: this.Nav?.ICONS.apps || ICON.puzzle }[r.page];
     const iconEl = d && this.Nav ? h(this.Nav.ServiceLogo, { sv: d, size: 20 })
       : ic ? h('svg', { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true, style: { flex: 'none', color: 'var(--mut,#8A94A6)' } }, h('path', { d: ic })) : null;

@@ -234,7 +234,7 @@ class Calls:
 
     async def _judged(self, tool: str, j: dict[str, Any], origin: dict[str, Any] | None,
                       call_id: str | None = None, approval_id: str | None = None) -> None:
-        """Settings → Agent lists recent judged calls (plan 30.5); a failure here never breaks the call."""
+        """Settings → Permissions lists recent judged calls (plan 30.5); a failure here never breaks the call."""
         try:
             await self.hub.db.execute(
                 "INSERT INTO judged (ts, tool, verdict, reason, source, rule, ms, model, summary, thread, call_id, approval_id)"

@@ -1,4 +1,4 @@
-// Settings → About → Hardware (plan 35.2, brief §11.7 `Hardware`): what this machine has, from
+// Settings → Machine → Hardware (plan 35.2, brief §11.7 `Hardware`): what this machine has, from
 // `GET /api/system/hardware`: the system line, one row per GPU (memory, runtimes, what it can run,
 // problems), and the accelerators GAIFA can use here. Written by us (web/PATCHES.md).
 

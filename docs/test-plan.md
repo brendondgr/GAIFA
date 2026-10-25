@@ -205,7 +205,7 @@ The checks run while Phases 13–16 are built (written 2026-10-07, before any of
 | 13.3 | The Logs tab and `gaifa logs` read the files | Unit, Live |
 | 13.4 | lcpp state in `data/state/lcpp`; records of gone units are dropped | Unit, Live |
 | 13.5 | `gaifa doctor --inventory` lists only allowlisted paths, each with a reason | Unit, Live |
-| 13.6 | Settings → Paths shows `data/logs` and `data/state` with sizes | UI |
+| 13.6 | Settings → Machine → Storage shows `data/logs` and `data/state` with sizes | UI |
 
 ## 14. Regression and safety
 

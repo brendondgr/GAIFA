@@ -1,5 +1,5 @@
 // Voice mode (plan 49.2): talk to the agent hands-free. The button by the microphone starts it: listen (the stt
-// mod's live stream, as dictation) → after a pause (Settings → Agent → Voice, `pause_ms`) send what you said →
+// mod's live stream, as dictation) → after a pause (Settings → Speech → Voice, `pause_ms`) send what you said →
 // read the reply aloud (chat-speak.js) → listen again. Speaking while it reads stops the reading and listens (the
 // mic has echo cancellation; a sustained loud level counts). A card waiting for you (an approval, a question)
 // pauses it: the bar says so, and it carries on once you've answered on screen. Escape or the button ends it.

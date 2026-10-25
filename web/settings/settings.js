@@ -6,11 +6,37 @@
 import { h, T, MONO } from '../chat/chat-ui.js';
 import { sections, rowsOf, validateDraft, saveBody, isDirty } from './schema.js';
 import { Row, Group, cardsOf } from './rows.js';
+import { parseSettingsRoute, settingsPlace } from './route.js';
 import { HUB_BLOCKS } from './blocks-hub.js';
 import { AGENT_BLOCKS } from './blocks-agent.js';
 
 const R = () => globalThis.React;
 const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS };
+// The flash on a row or group a hash names (2.2): a short accent ring, 1.2 s.
+const FLASH_CSS = '@keyframes gaifaFlash{0%{box-shadow:0 0 0 2px var(--acc,#FFB224);background:var(--tacc,rgba(255,178,36,.13))}100%{box-shadow:0 0 0 2px transparent;background:transparent}}.gaifa-flash{animation:gaifaFlash 1.2s ease-out;border-radius:8px}';
+function useFlashCss() {
+  R().useEffect(() => {
+    if (typeof document === 'undefined' || document.getElementById('gaifa-settings-css')) return;
+    const s = document.createElement('style'); s.id = 'gaifa-settings-css'; s.textContent = FLASH_CSS; document.head.appendChild(s);
+  }, []);
+}
+/** Scroll the element for a place into view (below the sticky header and strip) and flash it. */
+export function flashPlace(section, group, row) {
+  if (typeof document === 'undefined') return false;
+  const id = row ? `row-${section}-${group}-${row}` : group ? `grp-${section}-${group}` : null;
+  const el = id && document.getElementById(id);
+  if (!el) return false;
+  const strip = document.querySelector('[data-strip]'), head = document.querySelector('header');
+  const top = el.getBoundingClientRect().top + window.scrollY - (head?.offsetHeight || 0) - (strip?.offsetHeight || 0) - 12;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  el.classList.remove('gaifa-flash'); void el.offsetWidth; el.classList.add('gaifa-flash');
+  setTimeout(() => el.classList.remove('gaifa-flash'), 1300);
+  return true;
+}
+/** The sections for the shell (palette rows, the header's "where you are"). */
+export function settingsSections(ctx) { return sections(ctx); }
+export { settingsPlace };
+
 const clone = o => (o == null ? o : JSON.parse(JSON.stringify(o)));
 const navSt = on => ({ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, height: 32, padding: '0 10px', borderRadius: 6, fontSize: 13, fontWeight: on ? 600 : 400,
   textDecoration: 'none', color: on ? T.tx : T.mut, background: on ? T.hov : 'transparent' });
@@ -38,6 +64,16 @@ export function SettingsPage(props) {
     api.getToolIndex?.().then(ix => live && up({ toolCounts: ix.reduce((m, t) => ({ ...m, [t.mod]: (m[t.mod] || 0) + 1 }), {}) }), () => {});
     return () => { live = false; };
   }, []);
+  useFlashCss();
+  const hash = route?.hash || '';
+  React.useEffect(() => {
+    if (!st.draft) return undefined;
+    const parts = (route?.parts || []).slice(1);
+    const p = parseSettingsRoute(parts, sections({ ...props, draft: st.draft, hasSessions: !!api.listSessions }));
+    if (!p.group) return undefined;
+    const t = setTimeout(() => flashPlace(p.section, p.group, p.row), 120);
+    return () => clearTimeout(t);
+  }, [hash, !!st.draft]);
   const dirty = isDirty(st.orig, st.draft);
   if (pageRef) pageRef.current = { dirty: () => dirty };
   React.useEffect(() => {
@@ -54,7 +90,8 @@ export function SettingsPage(props) {
   const ctx = { ...props, api, services: props.services || [], system: st.sys, draft: st.draft, orig: st.orig, setDraft,
     judgeStatus: st.judgeStatus, reading: st.reading, toolCounts: st.toolCounts, hasSessions: !!api.listSessions };
   const secs = sections(ctx);
-  const cur = secs.find(x => x.id === route?.parts?.[1]) || secs[0];
+  const place = parseSettingsRoute((route?.parts || []).slice(1), secs);
+  const cur = secs.find(x => x.id === place.section) || secs[0];
   const problems = validateDraft(secs, st.draft), invalid = Object.keys(problems).length > 0;
   const errField = st.err?.data?.field;
   const save = async () => {

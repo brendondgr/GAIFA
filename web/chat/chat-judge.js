@@ -1,4 +1,4 @@
-// The Auto mode's judge in Settings → Agent (plan 30.5): whether its model answers, what it reads, your command rules
+// The Auto mode's judge in Settings → Permissions (plan 30.5): whether its model answers, what it reads, your command rules
 // (chat-rules.js), and the calls it decided, newest first: what ran and what asked, with the reason, a link to the
 // chat and, for a command the model asked about, "Always allow <rule>". GET /api/judge/status, GET /api/judge/recent
 // and GET/PUT /api/settings (api.getJudgeStatus, api.listJudged, api.getSettings, api.saveSettings).

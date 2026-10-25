@@ -1,4 +1,4 @@
-// Settings → Speech input, and the composer microphone's menu (plan 29.4). The microphones in order of
+// Settings → Speech → Dictation, and the composer microphone's menu (plan 29.4). The microphones in order of
 // preference (matched by label, because browsers change device ids), the one that would be used now, a
 // level meter to test it, and the dictation language, stt preset and button mode. Everything is saved in
 // the hub's settings (`speech_input`, config.toml), so it survives restarts and works in any browser on
@@ -96,7 +96,7 @@ export function SpeechInputPanel({ api, compact = false, toast = () => {}, media
     err ? h('span', { role: 'alert', style: { color: T.rd, fontSize: 12 } }, err) : null);
 }
 
-/** Settings → Speech input: shown while the stt mod is up. */
+/** Settings → Speech → Dictation: shown while the stt mod is up. */
 export function SpeechInputSection({ api, toast }) {
   const up = useSttUp(api);
   if (!up) return null;

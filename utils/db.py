@@ -252,7 +252,7 @@ MIGRATIONS: list[str] = [
     CREATE INDEX grants_thread ON grants (thread);
     """,
     # 010: the grant GAIFA ships (plan 26.2; the user's decision, 2026-10-20): web searches run without
-    # asking. It is an ordinary `always` grant, so Settings → Agent lists it and revoking it deletes
+    # asking. It is an ordinary `always` grant, so Settings → Permissions lists it and revoking it deletes
     # it; the migration runs once per database, so a revoked grant stays revoked.
     """
     INSERT OR IGNORE INTO grants (id, tool, key, kind, risk, scope, thread, created_ts, note)
@@ -260,7 +260,7 @@ MIGRATIONS: list[str] = [
             CAST(strftime('%s', 'now') AS REAL),
             'Shipped with GAIFA: web searches run without asking. Revoke it to be asked each time.');
     """,
-    # 011: the Auto mode's judged calls (plan 30.3, 30.5): utils/tools/judge.py. Settings → Agent lists them.
+    # 011: the Auto mode's judged calls (plan 30.3, 30.5): utils/tools/judge.py. Settings → Permissions lists them.
     """
     CREATE TABLE judged (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,

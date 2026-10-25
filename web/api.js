@@ -177,7 +177,7 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     readWebPage: (pageUrl, { text } = {}) => req('POST', '/api/web/read', { json: { url: pageUrl, text: !!text } }),
     // Plan 48.1: what the user can @-mention (the mods' kinds: voices, workflows, engines), each with the fields it fills
     listMentions: ({ q, kind } = {}) => req('GET', `/api/mentions${qs({ q, kind })}`),
-    // How pages are read and screened, for Settings → Agent: the models each backend offers, what relevance uses now
+    // How pages are read and screened, for Settings → Permissions → Screening and Agent → Reading web pages: the models each backend offers, what relevance uses now
     getWebReading: () => req('GET', '/api/web/reading'),
     getSettings: () => req('GET', '/api/settings'),
     saveSettings: s => req('PUT', '/api/settings', { json: s }),

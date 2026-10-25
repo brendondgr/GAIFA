@@ -252,7 +252,7 @@ export const LevelBar = ({ level, width = 46 }) => h('span', { 'aria-hidden': 't
   h('span', { style: { display: 'block', height: '100%', width: `${Math.round((level || 0) * 100)}%`, background: (level || 0) > 0.9 ? T.rd : T.gr, transition: 'width 80ms linear' } }));
 
 /** The composer's microphone: dictation goes into the draft after what was already typed. The menu (▾)
- * holds the same microphone list and options as Settings → Speech input. */
+ * holds the same microphone list and options as Settings → Speech → Dictation. */
 export function MicButton({ api, draft, setDraft, disabled }) {
   const React = R(), up = useSttUp(api);
   const [on, setOn] = React.useState(false), [err, setErr] = React.useState(null), [live, setLive] = React.useState({ mic: null, level: 0, note: null });

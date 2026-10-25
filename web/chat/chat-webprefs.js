@@ -1,4 +1,4 @@
-// Settings → Agent → Reading web pages: which model screens pages for instructions aimed at an AI
+// Settings → Permissions → Screening and Agent → Reading web pages: which model screens pages for instructions aimed at an AI
 // (config.toml [agent.screen], utils/tools/screen.py), how web_fetch returns a long page ([agent.web] relevance,
 // utils/tools/webread.py), and when saved web pages are cleaned up ([outputs] hidden_keep_days, plan 30.9).
 // Reads GET /api/web/reading (api.getWebReading: the models each backend offers, what relevance uses now) and saves

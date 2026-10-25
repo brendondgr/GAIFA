@@ -188,6 +188,7 @@ utils/tests/
 | `outputs/hidden.js` | Ours (plan 30.9): the Outputs page's Saved web pages chip and the live-event rules for hidden outputs (`toggle`, `belongs`, `place`, `addTo`; tested in `utils/tests/web/hidden.test.mjs`) |
 | `outputs/viewer.js` | Ours (plan 24.7): the text and PDF viewer in the Outputs drawer (`DocViewer`): text and code with line numbers and the highlighter in `chat/highlight.js`, markdown rendered or as source, PDF pages as images with their text, search, opened at a page or line from a chat citation |
 | `outputs/meaning.js` | Ours (plan 28.4): the Outputs page's **By meaning** search (`MeaningResults`: the embed mod's ranked hits, one row per output; `canSearch`, `rows`, `plainSnippet`, `matchLabel` tested in `utils/tests/web/meaning.test.mjs`) |
+| `settings/` | Ours (plan settings-redesign): the Settings page. `schema.js` (pure: the sections, groups and rows as data, each row's `config.toml` key, label, hint, control and keywords; `rowsOf`, `rowAt`, `validateDraft`; tested in `utils/tests/web/settings-schema.test.mjs`) |
 | `views.js` | Ours: the widget card and data hook, the Overview Table and Timeline views, and the charts on the other pages (memory, storage, outputs histogram, a mod's stat charts) |
 | `dashboard.js` | Ours: the Overview Dashboard (KPI strip, widgets, Customize; brief §11.5) |
 | `mock.js` | `createMockApi()`: the brief §6 contract on simulated data |

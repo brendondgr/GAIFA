@@ -1,6 +1,6 @@
 # Plan: the Settings page, regrouped, with a sticky strip, search and row details
 
-**Asked for:** 2026-10-25 · **Status:** Planned
+**Asked for:** 2026-10-25 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -23,7 +23,7 @@ This plan moves Settings into its own module, `web/settings/`, where every row i
 
 Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly as today, with every hub row declared as data.
 
-- [ ] **1.1 The schema: `web/settings/schema.js`.**
+- [x] **1.1 The schema: `web/settings/schema.js`.**
   - **Shape:** `sections(ctx)` returns `[{id, label, icon, areas, groups: [{id, label, summary(ctx), rows: [...]}]}]`. A row is `{id, key, label, hint, keywords, control, restart, get(draft), set(draft, v), validate(v), when(ctx)}`, where `control` is one of `number` (with `min`, `max`, `unit`), `toggle`, `segmented` (with `choices`), `chips` (multi-select over `choices`), `order` (an up/down list), `text`, `time`, `list` (one line per entry, for the permission and command lists), or `block` (a React element made by `render(ctx)`, for anything that isn't a plain value: the memory chart, the paths list, the services table, the process card, the versions, the CLI list, Doctor, Hardware, Sessions and the agent's cards). `key` is the dotted `config.toml` key (`memory.reserve_gb`, `ui.theme`); `areas` is the `SETTINGS_AREAS` map, moved here, for the mock note.
   - **Content:** the eight sections as they are today (General, Paths, Memory, Services, Interface, Agent, Sessions, About), one group each, with every hub-owned control from `vmSettings` as a row and every custom piece as a `block`.
   - **Pure parts:** `rowsOf(sections)` (flat, with the section and group ids), `rowAt(sections, 'section/group/row')`, `validateDraft(sections, draft)` → `{field: message}` (the port and reserve rules from `vmSettings`).

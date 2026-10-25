@@ -29,10 +29,11 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   - **Pure parts:** `rowsOf(sections)` (flat, with the section and group ids), `rowAt(sections, 'section/group/row')`, `validateDraft(sections, draft)` → `{field: message}` (the port and reserve rules from `vmSettings`).
   *Done when:* `utils/tests/web/settings-schema.test.mjs` imports the module without a DOM, lists the rows (every `Settings` key of brief §6 that the page edits has a row with that `key`), finds `memory.reserve_gb`, and `validateDraft` rejects port 80 and reserve 99 with the same messages the page shows today.
 
-- [ ] **1.2 Row renderers: `web/settings/rows.js`.**
+- [x] **1.2 Row renderers: `web/settings/rows.js`.**
   - **Components:** `Row({row, value, onChange, error, query})` draws the row anatomy (label, hint, control on the right, as the current template does) and one component per control (`NumberInput`, `Toggle`, `Segmented`, `Chips`, `OrderList`, `TextInput`, `TimeInput`, `ListEditor`); `Group({group, open, onToggle, children})` draws a card with the group's title. Styles come from `web/chat/chat-ui.js` (`T`, `MONO`, `inputSt`, `chipSt`, `Badge`) and match the current template's values.
   - **Why:** the toggle, chip, segmented and order-list markup exists three times in `Hub.dc.html`; once here.
   *Done when:* each control renders in the browser against the mock and the live hub with the same look as today (a screenshot pair per section in `docs/reference/settings-2026-10/`, before and after), and the toggles keep `role="switch"` and `aria-checked`.
+  *As built:* the rows render only once the page mounts them (1.4), so the browser check and the after screenshots were taken with 1.4; `settings-blocks.test.mjs` renders each control with a minimal React stand-in. A `select` control was added for choices too many for a segmented control (used from Phase 2 on).
 
 - [ ] **1.3 The blocks: `web/settings/blocks-hub.js` and `web/settings/blocks-agent.js`.**
   - **Hub blocks** (moved out of `Hub.dc.html`'s template and `vmSettings`, as React components): `ProcessCard` (version, PID, uptime, RSS from `getSystem`), `PathsList` (the folders with sizes, Copy path, the disk bar), `MemoryHistory` (`views.js`'s `MemoryChart` with the draft reserve), `ServicesTable` (enabled, autostart, order, the broken mods' errors, the link to each mod's own Settings tab), `AddModCard`, `Versions`, `CliList`, `DoctorPanel` (`getDoctor`, Show all, Run again), and `hardware.js`'s `HardwareCard` and `sessions.js`'s `SessionsPanel` used as they are.

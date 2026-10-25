@@ -122,10 +122,29 @@ export function Row({ row, value, onChange, error, ctx = {}, first }) {
 }
 
 /** A group: a card holding its rows. Blocks with `card: true` stand as their own cards between them. */
-export function Group({ group, children, title = true }) {
-  return h('div', { 'data-group': group.ref, id: 'grp-' + String(group.ref).replace(/\//g, '-'), style: { display: 'flex', flexDirection: 'column', gap: 8 } },
-    title && group.label ? h('h2', { style: { ...label11, padding: '4px 2px 0' } }, group.label) : null,
-    h('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } }, children));
+/** Which groups are open (2.4): `saved` is {'section/group': false} for the ones you closed (everything is open by
+ *  default); `forced` lists the ones that open regardless (the hash's group, a validation error, a search match). */
+export function openGroups(saved, forced, refs) {
+  const f = new Set(forced || []);
+  return new Set((refs || []).filter(r => f.has(r) || (saved || {})[r] !== false));
+}
+/** `saved` after opening or closing groups (only closed ones are kept). */
+export function setOpen(saved, refs, open) {
+  const s = { ...(saved || {}) };
+  for (const r of [].concat(refs)) { if (open) delete s[r]; else s[r] = false; }
+  return s;
+}
+
+/** A group: its title (a button that opens and closes it), its one-line summary while closed, then its rows. */
+export function Group({ group, children, open = true, onToggle, summary }) {
+  const id = 'grp-' + String(group.ref).replace(/\//g, '-');
+  return h('div', { 'data-group': group.ref, id, style: { display: 'flex', flexDirection: 'column', gap: 8 } },
+    group.label ? h('button', { type: 'button', 'aria-expanded': open ? 'true' : 'false', 'aria-controls': id + '-body', onClick: () => onToggle?.(!open),
+      style: { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px 0', border: 0, background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left', minWidth: 0 } },
+      h('span', { style: { display: 'inline-flex', transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .12s', color: T.mut } }, svg(CHEV_D, 13)),
+      h('h2', { style: { ...label11, flex: 'none' } }, h(Hl, { text: group.label, query: group.query, parts: group.hlParts })),
+      !open && summary ? h('span', { style: { fontSize: 12, color: T.mut, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, summary) : null) : null,
+    open ? h('div', { id: id + '-body', style: { display: 'flex', flexDirection: 'column', gap: 14 } }, children) : null);
 }
 /** Plain rows share one card; a `card` block is its own. `items` is [{row, el}]. */
 export function cardsOf(items) {

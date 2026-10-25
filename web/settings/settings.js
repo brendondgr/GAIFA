@@ -3,9 +3,9 @@
 // draws the current section's groups from schema.js with rows.js and the blocks. Hub.dc.html mounts it and
 // asks `ref.current.dirty()` before leaving with unsaved changes. Written by us (web/PATCHES.md).
 
-import { h, T, MONO } from '../chat/chat-ui.js';
-import { sections, rowsOf, validateDraft, saveBody, isDirty } from './schema.js';
-import { Row, Group, cardsOf } from './rows.js';
+import { h, T, MONO, usePref } from '../chat/chat-ui.js';
+import { sections, rowsOf, validateDraft, saveBody, isDirty, summaryOf } from './schema.js';
+import { Row, Group, cardsOf, openGroups, setOpen } from './rows.js';
 import { parseSettingsRoute, settingsPlace } from './route.js';
 import { SectionStrip } from './strip.js';
 import { HUB_BLOCKS } from './blocks-hub.js';
@@ -64,6 +64,7 @@ export function SettingsPage(props) {
     return () => { live = false; };
   }, []);
   useFlashCss();
+  const [closed, setClosed] = usePref('gaifa.settings.open', {});
   const hash = route?.hash || '';
   React.useEffect(() => {
     if (!st.draft) return undefined;
@@ -111,12 +112,22 @@ export function SettingsPage(props) {
     const error = problems[row.path] || (errField && errField === row.path ? st.err.detail : null);
     return h(Row, { key: row.id, row, value, onChange, error, first, ctx });
   };
+  // 2.4: open groups: what you left open, plus the hash's group and any group with a problem
+  const refs = cur.groups.map(g => `${cur.id}/${g.id}`);
+  const forced = [place.group ? `${cur.id}/${place.group}` : null,
+    ...cur.groups.filter(g => g.rows.some(r => problems[r.path] || (errField && r.path === errField))).map(g => `${cur.id}/${g.id}`)].filter(Boolean);
+  const openSet = openGroups(closed, forced, refs);
   const groupEl = g => {
-    const shown = g.rows.filter(r => !r.when || r.when(ctx));
+    const ref = `${cur.id}/${g.id}`, shown = g.rows.filter(r => !r.when || r.when(ctx));
     let firstPlain = true;
-    const items = shown.map(r => { const row = { ...r, ref: `${cur.id}/${g.id}/${r.id}` }, first = !row.card && firstPlain; if (!row.card) firstPlain = false; return { row, el: rowEl(row, first) }; });
-    return h(Group, { key: g.id, group: { ...g, ref: `${cur.id}/${g.id}` }, title: cur.groups.length > 1 }, cardsOf(items));
+    const open = openSet.has(ref);
+    const items = open ? shown.map(r => { const row = { ...r, ref: `${ref}/${r.id}` }, first = !row.card && firstPlain; if (!row.card) firstPlain = false; return { row, el: rowEl(row, first) }; }) : [];
+    return h(Group, { key: g.id, group: { ...g, ref }, open, summary: summaryOf(g, ctx), onToggle: on => setClosed(setOpen(closed, ref, on)) }, cardsOf(items));
   };
+  const allOpen = refs.every(r => openSet.has(r)), allClosed = refs.every(r => !openSet.has(r));
+  const linkBtn = (label, on, dis) => h('button', { type: 'button', disabled: dis, onClick: () => setClosed(setOpen(closed, refs, on)),
+    style: { border: 0, background: 'transparent', padding: 0, color: dis ? T.dim : T.cy, fontSize: 12.5, cursor: dis ? 'default' : 'pointer', font: 'inherit' } }, label);
+  const expandBar = refs.length > 1 ? h('div', { style: { display: 'flex', gap: 14, justifyContent: 'flex-end', fontSize: 12.5 } }, linkBtn('Expand all', true, allOpen), linkBtn('Collapse all', false, allClosed)) : null;
   const miss = (cur.areas || []).filter(a => !isLive(a));
 
   const pick = id => (props.go ? props.go('#/settings/' + id) : (location.hash = '#/settings/' + id));
@@ -130,6 +141,7 @@ export function SettingsPage(props) {
       miss.length ? h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } },
         h('span', { style: { height: 18, padding: '0 6px', borderRadius: 4, border: '1px solid ' + T.pu, background: T.tpu, color: T.pu, fontSize: 10, fontWeight: 600, letterSpacing: '.06em', display: 'inline-flex', alignItems: 'center' } }, 'MOCK'),
         h('span', null, `Mock data: the ${miss.join(' and ')} ${miss.length > 1 ? 'areas aren’t' : 'area isn’t'} live yet.`)) : null,
+      expandBar,
       cur.groups.map(groupEl),
       dirty ? h('div', { role: 'region', 'aria-label': 'Unsaved changes', style: { position: 'sticky', bottom: 12, zIndex: 20, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px',
         borderRadius: 10, background: T.card, border: '1px solid ' + T.acc, boxShadow: '0 10px 30px rgba(0,0,0,.35)' } },

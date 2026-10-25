@@ -7,3 +7,6 @@ Screenshots of the Settings page at 1280 px, dark, on a second hub (`--port 7077
 | `before-<section>.jpg` | The page as `Hub.dc.html`'s template drew it, before Phase 1: General, Paths, Memory, Services, Interface, Agent, Sessions, About |
 | `after-<section>.jpg` | After Phase 1: the same eight sections drawn by `web/settings/` from the row schema (same heights, same look) |
 | `after-mock-memory.jpg` | Phase 1, `?mock#/settings/memory`: the mock note and the mock's history |
+| `phase2-machine.jpg` | Phase 2: Machine (Memory, Storage, Hardware) under the section strip |
+| `phase2-permissions-collapsed.jpg` | Phase 2: Permissions with Collapse all, a list of group summaries |
+| `phase2-strip-360.jpg` | Phase 2: 360 px wide, scrolled: the strip pinned under the header, its tabs scrolled to Permissions |

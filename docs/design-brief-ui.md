@@ -261,24 +261,23 @@ The real backend indexes `outputs/<service>/<YYYY-MM-DD>/…`. This page is the 
 
 ### 4.5 Settings
 
-One page with sections (hash `#/settings/<section>`), Save and Revert, an unsaved-changes guard, and restart-required notes. As built it is `web/settings/` (plan settings-redesign): `schema.js` declares every section, group and row as data (label, hint, `config.toml` key, control, keywords), `rows.js` draws the rows, `blocks-hub.js` and `blocks-agent.js` the pieces that aren't one value, and `settings.js` is the page (`SettingsPage`, mounted by `Hub.dc.html`):
+One page, `web/settings/` (plan settings-redesign): `schema.js` declares every section, group and row as data (label, hint, `config.toml` key, control, keywords; or a named block for anything that isn't one value), `rows.js` draws the rows and groups, `blocks-hub.js` and `blocks-agent.js` the blocks, `strip.js` the section strip, `route.js` the hashes, and `settings.js` is the page (`SettingsPage`, mounted by `Hub.dc.html`, which asks it `dirty()` for the unsaved-changes guard).
 
-- **General**:
-  - GAIFA port (default 7000), with the note "Bound to 127.0.0.1 — this machine only"
-  - GAIFA version, PID, uptime and memory
-- **Paths** (read-only, with sizes and disk free): project root, `data/models`, `data/databases`, `outputs`.
-- **Memory**:
-  - reserve (GB kept free)
-  - "Automatically make room when a service needs memory" toggle; when off, the Make-room dialog asks
-  - "Never auto-unload" service multi-select
-  - a priority list of services, reordered with up/down buttons (lower is unloaded first)
-- **Services**:
-  - every folder found in `services/`, including broken mods with their errors
-  - per service: enabled toggle, autostart toggle, and sidebar order (up/down)
-  - an **"Add a mod"** card explaining the three steps (`bin/gaifa new <id>`, edit `services/<id>/service.toml`, restart the GAIFA), with a link to the template
-- **Interface**: theme (System/Light/Dark), density (Comfortable/Compact).
-- **About**: versions, and the CLI equivalents `bin/gaifa status`, `bin/gaifa start <id>`, `bin/gaifa logs <id> -f`, `bin/gaifa new <id>`. A **Hardware** card (plan 35.2) shows `getHardware()`: the system line (OS, CPU, memory), one row per GPU (name, arch, unified or dedicated memory, runtimes, what it can run, and any problem in amber), and the accelerators GAIFA can use here, with Read again. A **Doctor** panel (plan 12.4) runs `getDoctor()`: the counts, then the warn and fail checks with their fixes, the rest folded; a Run again button. `gaifa doctor` prints the same report.
+- **Hash:** `#/settings/<section>[/<group>[/<row>]]`; a group or row named by the hash opens and flashes. The old `paths`, `memory`, `interface`, `agent/permissions` and `about/hardware` are aliases to their new places.
+- **The strip:** the title and the sections as tabs (arrow keys move along them), pinned under the header (44 px compact, 52 px comfortable), scrolling sideways when narrow; a tab can carry a count.
+- **Groups:** each section is one to seven groups, each a title that opens and closes it, with a one-line summary while closed ("Reserve 12 GB · auto make room off · 1 never unloaded"); Expand all and Collapse all; what you close is remembered in this browser (`gaifa.settings.open`); the hash's group and a group with a problem open regardless.
+- **Saving:** the hub's settings (brief §6 `Settings`) are one draft with one Save bar (Save sends only what changed, Revert, a restart note when the port changed); theme, density and the sidebar rows apply at once; the agent's own settings (AGENT.md, MEMORY.md, documents) keep a Save in their card, marked "saved by the agent".
 
+The sections:
+
+- **General:** *Hub* (the port, "Bound to 127.0.0.1 — this machine only", restart to apply; the process card: version, PID, uptime, memory), *Interface* (theme System/Light/Dark, density, services in the sidebar as list/button/counts, fold the list, Reset the dashboard layout), *Outputs* (delete saved web pages after N days).
+- **Machine:** *Memory* (the 24 h chart with the draft reserve line; reserve; "Automatically make room when a service needs memory"; Never auto-unload; the unload order with up/down), *Storage* (the folders with sizes and Copy path, the disk bar), *Hardware* (plan 35.2: the system line, one row per GPU with memory, runtimes, what it can run and any problem, the accelerators GAIFA can use, Read again).
+- **Services:** every folder in `services/`, broken mods with their errors; per mod enabled, autostart, its tool count and sidebar order (up/down); the **Add a mod** card (`gaifa new <id>`, edit `services/<id>/service.toml`, restart), linking the Example mod.
+- **Agent** (while the agent mod is installed): *Model*, *Documents*, *Reading web pages* (long pages and the relevance model), *Instructions* (AGENT.md), *Memory* (MEMORY.md and topics), *Skills*, *Learning*.
+- **Permissions** (while the agent mod is installed): *Modes*, *Tool rules* (never run, always ask, run without asking), *Grants* (with Revoke), *Auto judge* (backend and model, what it reads, threshold, time limit, your command rules), *Screening* (pages, documents, transcripts, the screening model, text per call, calls at once), *Judged calls* (with "Always allow", added to the draft).
+- **Speech** (while the stt or tts mod is installed): *Dictation* (microphones in order, language, model, the button), *Voice* (the voice that reads replies, speed, read every reply, voice mode's pause).
+- **Sessions:** the Sessions panel (brief §11.14).
+- **About:** *Versions* (with "GAIFA · Great, Another Interface For Agents · say “guy-fuh”"), *Command line* (`gaifa status`, `start <id>`, `logs <id> -f`, `new <id>`, `doctor`), *Doctor* (plan 12.4: `getDoctor()`, the counts, the warn and fail checks with fixes, Show all, Run again).
 ---
 
 ## 5. The page-module contract (how a service brings its own UI)
@@ -950,7 +949,7 @@ interface WidgetData { unit?: string; t?: number[]; categories?: string[];
 - **New `Shift+D` scenarios:** "Empty history" (a fresh install) and "Gaps" (the hub was down for 2 h, so the series contain nulls).
 
 ### 11.10 New states and acceptance
-- **States:** every widget loading, empty and in error; a range switch; a legend toggle; "View as table"; the Customize panel; each of the four Overview views in compact and comfortable; and every chart at 360 px (Timeline scrolls sideways inside its card; widgets stack).
+- **States:** every widget loading, empty and in error; a range switch; a legend toggle; "View as table"; the Customize panel; each of the four Overview views in compact and comfortable; and every chart at 360 px (Timeline scrolls sideways inside its card; widgets stack); the Settings strip at 360 px (pinned under the header, its tabs scrolling sideways with the current one in view) and a Settings section with every group collapsed (a list of summaries).
 - **Acceptance:**
   - The above-the-fold rule in Section 11.3 holds.
   - The Dashboard opens in under 1 s with mock data.

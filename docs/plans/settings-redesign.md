@@ -81,16 +81,17 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   *As built:* checked on the second hub with Permissions scrolled 1,200–1,500 px: the strip's top is 44 px (compact) and 52 px (comfortable), right under the header; at 360 px it scrolls sideways with Permissions in view; ArrowRight from Permissions moves to Speech and focuses its tab. The content column is up to 900 px wide now that the left list is gone; segmented controls wrap when narrow. `stepTab` and `headerHeight` are tested in `settings-route.test.mjs`.
   *Done when:* in the browser the strip stays pinned while a long section (Permissions) scrolls, in both densities and at 360 px; keyboard focus moves along the tabs with the arrow keys (`role="tablist"`).
 
-- [ ] **2.4 Collapsible groups, in `rows.js` and `settings.js`.**
+- [x] **2.4 Collapsible groups, in `rows.js` and `settings.js`.**
   - **Behaviour:** each group is a `<details>`-like card with its title, summary and a chevron; open state per group in `localStorage` (`gaifa.settings.open`, a list of `section/group` ids; everything open by default). "Expand all" and "Collapse all" at the section's top. A group named by the hash or holding a validation error or a search match opens regardless.
+  *As built:* `gaifa.settings.open` keeps `{'section/group': false}` for the groups you closed (absent means open, so everything is open by default); `openGroups(saved, forced, refs)` and `setOpen` are in `rows.js`. A closed group renders only its title and summary. Checked on the second hub: Machine → Memory closed shows its summary and is still closed after a reload; Permissions with Collapse all reads as six summaries (`docs/reference/settings-2026-10/phase2-permissions-collapsed.jpg`).
   *Done when:* `settings-route.test.mjs` (or a small `settings-groups.test.mjs`) covers the pure `openGroups(saved, forced)`; in the browser a collapsed group shows its one-line summary and reopens on reload as left.
 
 **Wire — Phase 2:** no new areas; the Services section reads `listTools` for its Tools column (area `tools`, live since plan 13).
 
 **Checks & deliverables — Phase 2**
-- [ ] Each section is between one and seven groups; the longest page (Permissions) reads as a list of summaries when collapsed.
-- [ ] The brief's §4.5 is rewritten to the new sections and groups; §11.10 lists the strip at 360 px among the states.
-- [ ] Delivered: `web/settings/route.js`, `strip.js`; the regrouped `schema.js`; tests `settings-route.test.mjs`, `settings-groups.test.mjs`.
+- [x] Each section is between one and seven groups; the longest page (Permissions) reads as a list of summaries when collapsed.
+- [x] The brief's §4.5 is rewritten to the new sections and groups; §11.10 lists the strip at 360 px among the states.
+- [x] Delivered: `web/settings/route.js`, `strip.js`; the regrouped `schema.js`; tests `settings-route.test.mjs`, `settings-groups.test.mjs`.
 
 ## Phase 3 — Search with highlighting (M)
 

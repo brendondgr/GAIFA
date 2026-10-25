@@ -10,7 +10,7 @@
 image and video generation, 3D models, speech, search, and a chat agent that chains them together.
 The name stands for *Great, Another Interface For Agents*, and it's said "guy-fuh".
 
-![The GAIFA Overview page: memory used, services ready, outputs and LLM tokens today, memory over time and memory now by service, outputs per day, LLM traffic, an activity heatmap, jobs and model storage](docs/assets/overview.png)
+![The GAIFA Overview page: memory used, services ready, models loaded, jobs running, outputs and LLM tokens today; the fourteen mods with their memory; memory over time and memory now by service; the GPU queue and outputs per day](docs/assets/overview.png)
 
 GAIFA is a small FastAPI server (the *hub*) on `127.0.0.1:7000` in front of a set of **mods**.
 A mod is one AI service in its own folder under `services/`, running as its own process, with its

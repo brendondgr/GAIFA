@@ -17,3 +17,4 @@ Each piece of work GAIFA builds has its own plan here: one file per plan, `docs/
 | [portability.md](portability.md) | Stage N (Phases 35–40): other GPUs and systems | In progress: the field tests (40.5, 40.6) are the user's |
 | [chat-cards.md](chat-cards.md) | Stage P (Phases 44–49): mods' chat cards, live progress, `show`, @-mentions, Save to…, voice | Done |
 | [gaifa-rename.md](gaifa-rename.md) | Stage Q (Phase 50): AIHub becomes GAIFA | Done |
+| [settings-redesign.md](settings-redesign.md) | The Settings page in `web/settings/`: eight regrouped sections, a sticky strip, search with highlighting, keys, defaults and Reset on every row | Planned |

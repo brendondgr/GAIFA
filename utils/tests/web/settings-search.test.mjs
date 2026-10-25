@@ -38,3 +38,13 @@ test('highlight keeps the case and splits around each match', () => {
   assert.deepEqual(Q.highlight('Never', 'x'), [{ text: 'Never', hit: false }]);
   assert.deepEqual(Q.highlight('Reserve reserve', 'reserve').map(p => p.hit), [true, false, true]);
 });
+
+test('3.3: the palette’s rows, one per group and per setting, with the hash', () => {
+  const rows = Q.paletteRows(ix);
+  const reserve = rows.find(r => r.id === 'machine/memory/reserve');
+  assert.deepEqual(reserve, { label: 'Reserve', sub: 'Settings › Machine › Memory · memory.reserve_gb', hash: '#/settings/machine/memory/reserve', id: 'machine/memory/reserve' });
+  const judge = rows.find(r => r.id === 'permissions/judge');
+  assert.deepEqual(judge, { label: 'Settings › Permissions › Auto judge', sub: 'Settings', hash: '#/settings/permissions/judge', id: 'permissions/judge' });
+  assert.equal(rows.find(r => r.id === 'general/hub/process').sub, 'Settings › General › Hub');   // a block: no key
+  assert.equal(new Set(rows.map(r => r.hash)).size, rows.length);
+});

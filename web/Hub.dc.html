@@ -1658,6 +1658,7 @@ class Component extends DCLogic {
       out.push({ label: `${sv.name} › API`, sub: 'Tab', d, run: nav(`#/s/${sv.id}/api`) }, { label: `${sv.name} › Logs`, sub: 'Tab', d, run: nav(`#/s/${sv.id}/logs`) });
     });
     (this.Settings?.settingsSections(this.settingsCtx()) || []).forEach(x => out.push({ label: `Settings › ${x.label}`, sub: 'Page', d: ICON.gear, run: nav('#/settings/' + x.id) }));  // plan settings-redesign 2.2
+    (this.Settings?.settingsPaletteRows(this.settingsCtx()) || []).forEach(x => out.push({ label: x.label, sub: x.sub, d: ICON.gear, run: nav(x.hash) }));  // 3.3: every group and setting
     if (this.api.listSessions) {  // Wire 15: sessions from the palette
       out.push({ label: 'Save session…', sub: 'Action', d: ICON.download, run: () => this.openSessions('save') }, { label: 'Switch to session…', sub: 'Action', d: ICON.refresh, run: () => this.openSessions() });
       this.state.sessions.forEach(x => out.push({ label: `Switch to ${x.name}`, sub: 'Session', d: ICON.refresh, run: () => this.openSessions(x.id) }));

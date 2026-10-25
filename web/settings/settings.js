@@ -8,7 +8,7 @@ import { sections, rowsOf, validateDraft, saveBody, isDirty, summaryOf } from '.
 import { Row, Group, cardsOf, openGroups, setOpen } from './rows.js';
 import { parseSettingsRoute, settingsPlace } from './route.js';
 import { SectionStrip, SearchBox } from './strip.js';
-import { indexRows, matches, highlight } from './search.js';
+import { indexRows, matches, highlight, paletteRows } from './search.js';
 import { HUB_BLOCKS } from './blocks-hub.js';
 import { AGENT_BLOCKS } from './blocks-agent.js';
 
@@ -38,6 +38,8 @@ export function flashPlace(section, group, row) {
 /** The sections for the shell (palette rows, the header's "where you are"). */
 export function settingsSections(ctx) { return sections(ctx); }
 export { settingsPlace };
+/** The palette's rows for every group and setting (3.3), each with its hash. */
+export function settingsPaletteRows(ctx) { const secs = sections(ctx); return paletteRows(indexRows(secs, ctx)); }
 
 const clone = o => (o == null ? o : JSON.parse(JSON.stringify(o)));
 const h1St = { margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: '-.01em' };

@@ -107,14 +107,15 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   *As built:* checked on the second hub: "memory" gives "7 matches in 2 sections" with Machine → Memory's title and rows and Agent → Memory highlighted and open; "judge" shows Permissions only (10 matches), Enter lands on Auto judge (its title's mark in full accent, the group flashed); Esc clears, back on General with the box still focused. The search state is the page's; typing only filters the schema (no request). A row's own match is what decides dimming: when only a group's title matched, its rows aren't dimmed. Shift+Enter also goes back.
   *Done when:* in the browser, typing "memory" highlights "Memory" in Machine → Memory's title and rows and in Agent → Memory (MEMORY.md), keeps both groups open and collapses the rest; "judge" lands on Permissions → Auto judge; Enter walks the matches; clearing returns to where you were. No new network requests on typing.
 
-- [ ] **3.3 The palette: `Hub.dc.html`'s `palItems()`.**
+- [x] **3.3 The palette: `Hub.dc.html`'s `palItems()`.**
   - **Rows:** besides the eight "Settings › <Section>" rows, one per group ("Settings › Permissions › Auto judge") and one per hub row ("Reserve · Settings › Machine › Memory", with the key as the sub line), read from `web/settings/search.js`'s `indexRows` on the loaded schema; each navigates to `#/settings/<section>/<group>/<row>` so the page opens the group and flashes the row (2.2).
+  *As built:* `settings.js` gives the shell `settingsPaletteRows(ctx)`; checked on the second hub: Ctrl+K, "reserve" lists Reserve first ("Settings › Machine › Memory · memory.reserve_gb"), Enter opens `#/settings/machine/memory/reserve` with the row flashed. While checking this, the Overview turned out broken since 1.4 (the shell's `STATE`, `LOAD`, `MSTAT`, `KINDS`, `OKINDS`, `METHOD` had been cut with `SETTINGS_AREAS`); a separate commit restores them, and every page was opened again.
   *Done when:* the palette finds "reserve" and lands on the row with the flash; `settings-search.test.mjs` covers `paletteRows(index)` (label, sub, hash).
 
 **Checks & deliverables — Phase 3**
-- [ ] Search is keyboard-complete: `/`, type, Enter, ↑/↓, Esc, with focus never lost.
-- [ ] The brief's §4.5 describes the search; `docs/structure.md` lists `search.js`.
-- [ ] Delivered: `web/settings/search.js`; the box and the filtered view; the palette rows; `settings-search.test.mjs`.
+- [x] Search is keyboard-complete: `/`, type, Enter, ↑/↓, Esc, with focus never lost.
+- [x] The brief's §4.5 describes the search; `docs/structure.md` lists `search.js`.
+- [x] Delivered: `web/settings/search.js`; the box and the filtered view; the palette rows; `settings-search.test.mjs`.
 
 ## Phase 4 — Row details: keys, defaults, reset and changes (M)
 

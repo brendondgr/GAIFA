@@ -55,13 +55,13 @@ The name's meaning and pronunciation are said once in the README's first lines, 
   - Retake `docs/assets/overview.png` (it shows the name in the sidebar); the chat screenshots too where the same chats still exist. Commit.
   *As done (2026-10-25):* the hub and its 11 running mods came back as `gaifa.service` and `gaifa-<id>.service` from `~/Agents/GAIFA`; 536 files in 21 venvs relocated (the drama3-lab venv left alone: it reads with I/O errors since the 2026-10-20 disk damage); `gaifa install` removed the old unit and link; the wrappers, the desktop file (from its template), lcpp's uv tool and the sandbox image's tag moved over; `gaifa doctor` 48 ok, 1 warning (OpenCode's folder, as before); the inventory lists the same two outside paths as before; a chat on skynet answered "This app is called GAIFA" through the hub's status tool. The chat screenshots never show the name, so only the Overview was retaken (through Chromium's DevTools protocol: its `--screenshot` never settles on the live page). Old Claude Code worktrees in `.claude/worktrees/` were re-pointed with `git worktree repair`.
   *Done when:* everything above checks out, and no running process or wrapper points at `~/Agents/AIHub`.
-- [ ] **50.6 The GitHub repository.** `gh repo rename GAIFA`, `git remote set-url origin git@github.com:brendondgr/GAIFA.git`, the description set to what GAIFA is, push `main`.
+- [x] **50.6 The GitHub repository.** `gh repo rename GAIFA`, `git remote set-url origin git@github.com:brendondgr/GAIFA.git`, the description set to what GAIFA is, push `main`.
   *Done when:* `git push` reaches `brendondgr/GAIFA`, and the old URL redirects.
 
 **Checks & deliverables — Phase 50**
-- [ ] `git grep -i aihub` finds only the lines that describe the rename (this plan, the Stage Q row, its structure and patch rows, the name notes in CLAUDE.md, AGENTS.md and architecture §1) and the compatibility lines.
-- [ ] The installed hub runs from `~/Agents/GAIFA` as `gaifa.service`, its mods as `gaifa-<id>.service`, and `gaifa doctor` passes.
-- [ ] Delivered: the renamed tree, `bin/gaifa`, `docs/assets/make_header.py` and `header.svg`, the new README.
+- [x] `git grep -i aihub` finds only the lines that describe the rename (this plan, the Stage Q row, its structure and patch rows, the name notes in CLAUDE.md, AGENTS.md and architecture §1) and the compatibility lines.
+- [x] The installed hub runs from `~/Agents/GAIFA` as `gaifa.service`, its mods as `gaifa-<id>.service`, and `gaifa doctor` passes.
+- [x] Delivered: the renamed tree, `bin/gaifa`, `docs/assets/make_header.py` and `header.svg`, the new README.
 
 | Deliverable | Description | Location |
 | --- | --- | --- |

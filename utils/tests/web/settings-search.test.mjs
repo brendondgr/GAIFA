@@ -48,3 +48,17 @@ test('3.3: the palette’s rows, one per group and per setting, with the hash', 
   assert.equal(rows.find(r => r.id === 'general/hub/process').sub, 'Settings › General › Hub');   // a block: no key
   assert.equal(new Set(rows.map(r => r.hash)).size, rows.length);
 });
+
+test('5.2: the mods in search: "tts" offers its Settings tab under Mods', () => {
+  const svcs = [{ id: 'tts', name: 'LocalTTS', manifest_errors: [] }, { id: 'relay', name: 'LLM Relay', manifest_errors: [] }];
+  const index = Q.indexRows(S.sections({ services: svcs, draft }), { services: svcs, draft });
+  const m = Q.matches(index, 'tts');
+  const mod = index.find(e => e.id === 'mods/tts');
+  assert.ok(m.ids.has('mods/tts'));
+  assert.equal(mod.label, 'LocalTTS settings'); assert.equal(mod.hash, '#/s/tts/settings'); assert.equal(mod.section, 'mods');
+  assert.equal(m.perSection.mods, 1);
+  assert.ok(Q.matches(index, 'services/relay').ids.has('mods/relay'));
+  assert.ok(Q.matches(index, 'localtts').ids.has('mods/tts'));
+  assert.deepEqual(Q.paletteRows(index).find(r => r.id === 'mods/tts'), { label: 'LocalTTS settings', sub: 'Settings › Mods', hash: '#/s/tts/settings', id: 'mods/tts' });
+  assert.ok(!S.sections({ services: svcs }).some(s => s.id === 'mods'));   // never in the section list
+});

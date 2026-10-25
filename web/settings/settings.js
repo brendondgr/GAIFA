@@ -183,6 +183,12 @@ export function SettingsPage(props) {
       h('h2', { style: { margin: '6px 0 0', fontSize: 15, fontWeight: 600 } }, sec.label, h('span', { style: { marginLeft: 8, fontSize: 12, fontWeight: 400, color: T.mut } }, `${m.perSection[sec.id]} match${m.perSection[sec.id] === 1 ? '' : 'es'}`)),
       sec.groups.map(g => groupEl(sec, g)))
     : h(R().Fragment, { key: sec.id }, sec.groups.map(g => groupEl(sec, g)))));
+  const modHits = sm.query ? index.filter(e => e.kind === 'mod' && m.ids.has(e.id)) : [];
+  if (modHits.length) body.push(h('section', { key: 'mods', 'aria-label': 'Mods', style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+    h('h2', { style: { margin: '6px 0 0', fontSize: 15, fontWeight: 600 } }, 'Mods', h('span', { style: { marginLeft: 8, fontSize: 12, fontWeight: 400, color: T.mut } }, 'their own Settings tabs')),
+    h('div', { style: { background: T.card, border: '1px solid ' + T.bd, borderRadius: 10, padding: '6px 16px' } },
+      modHits.map(e => h('a', { key: e.id, id: 'grp-' + e.id.replace('/', '-'), href: e.hash, style: { display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 0', color: T.tx, textDecoration: 'none' } },
+        h('span', { style: { fontWeight: 500 } }, h(Hk, { text: e.label, q: m.query })), h('span', { style: { fontFamily: MONO, fontSize: 11.5, color: T.mut } }, h(Hk, { text: `services/${e.group}`, q: m.query })), h('span', { style: { marginLeft: 'auto', color: T.cy, fontSize: 12.5 } }, 'Open →'))))));
   const nSecs = Object.keys(m.perSection).length;
   const status = sm.query ? (m.rows.length ? `${m.rows.length} match${m.rows.length === 1 ? '' : 'es'} in ${nSecs} section${nSecs === 1 ? '' : 's'}` : 'No settings match') : '';
   const search = h(SearchBox, { inputRef: boxRef, value: q, status, onChange: v => { setQ(v); setHit(-1); }, onClear: () => { setQ(''); setHit(-1); }, onNext: () => walk(1), onPrev: () => walk(-1) });

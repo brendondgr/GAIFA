@@ -16,6 +16,12 @@ export function indexRows(sections, ctx = {}) {
         key: r.key || null, sectionLabel: s.label, groupLabel: g.label, text });
     }
   }
+  // 5.2: each installed mod's own Settings tab, found by its name, id or folder ("Mods" in the results, never in the list)
+  for (const m of ctx.services || []) {
+    const label = `${m.name || m.id} settings`;
+    out.push({ id: `mods/${m.id}`, kind: 'mod', section: 'mods', group: m.id, row: null, label, sectionLabel: 'Mods', groupLabel: m.name || m.id,
+      hash: `#/s/${encodeURIComponent(m.id)}/settings`, text: [label, m.id, m.name || '', `services/${m.id}`].filter(Boolean) });
+  }
   return out;
 }
 
@@ -57,7 +63,7 @@ export function highlight(text, query) {
 /** The command palette's rows: one per group ("Settings › Permissions › Auto judge") and one per row ("Reserve",
  *  sub "Settings › Machine › Memory · memory.reserve_gb"), each with its hash. */
 export function paletteRows(index) {
-  return index.filter(e => e.label).map(e => (e.kind === 'group'
+  return index.filter(e => e.label).map(e => (e.kind === 'mod' ? { label: e.label, sub: 'Settings › Mods', hash: e.hash, id: e.id } : e.kind === 'group'
     ? { label: `Settings › ${e.sectionLabel} › ${e.label}`, sub: 'Settings', hash: settingsHash(e.section, e.group), id: e.id }
     : { label: e.label, sub: `Settings › ${e.sectionLabel} › ${e.groupLabel}${e.key ? ' · ' + e.key : ''}`, hash: settingsHash(e.section, e.group, e.row), id: e.id }));
 }

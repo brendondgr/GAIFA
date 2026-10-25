@@ -11,3 +11,4 @@ Screenshots of the Settings page at 1280 px, dark, on a second hub (`--port 7077
 | `phase2-permissions-collapsed.jpg` | Phase 2: Permissions with Collapse all, a list of group summaries |
 | `phase2-permissions-scrolled.jpg`, `-comfortable.jpg` | Phase 2: Permissions scrolled 1,400 px: the section list still in view under the header, compact and comfortable |
 | `phase2-nav-360.jpg` | Phase 2: 360 px wide: the search box and the list above the content |
+| `phase5-search-memory.jpg` | Done: a search for "memory": the counts in the list, Machine → Memory open with the matches marked in labels, hints and keys |

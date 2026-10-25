@@ -1,6 +1,6 @@
 # Plan: the Settings page, regrouped, with a sticky section list, search and row details
 
-**Asked for:** 2026-10-25 · **Status:** In progress
+**Asked for:** 2026-10-25 · **Status:** Done (2026-10-25)
 
 ## 1. Introduction
 
@@ -148,13 +148,14 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   *As built:* the card is the first block of General → Hub; it lists the rows with a single value (blocks such as the services table aren't listed) and copies them as TOML grouped by table (`[memory]`, `[agent.judge]`). Checked on the second hub: with `reserve_gb = 20` saved the card shows "memory.reserve_gb · 20 GB (default 12 GB)" and its link lands on the reserve, flashed.
   *Done when:* the card lists this machine's overrides and each link lands on its row with the flash; `settings-schema.test.mjs` covers `overrideLines(rows)` → the TOML text.
 
-- [ ] **5.2 Mods in search, in `search.js` and `schema.js`.**
+- [x] **5.2 Mods in search, in `search.js` and `schema.js`.**
   - **Rows:** each installed mod contributes a jump row to the index ("<name> settings", keywords: its id, name and `services/<id>`), navigating to `#/s/<id>/settings`; shown in a "Mods" pseudo-section at the end of the search results and the palette, never in the strip.
+  *As built:* the jump rows are `kind: 'mod'` entries of `indexRows` (section `mods`), shown after the sections in the results as "<name> settings" with `services/<id>` and Open →, and in the palette with "Settings › Mods". Checked on the second hub, where the tts mod is named Speech: "tts" offers "Speech settings" under Mods.
   *Done when:* typing "tts" in the box offers "LocalTTS settings" under Mods; `settings-search.test.mjs` covers the mod rows.
 
 **Checks & deliverables — Phase 5**
-- [ ] CLAUDE.md's status line and `docs/plans/README.md` say the plan is done; the brief's §4.5 is final.
-- [ ] Delivered: `OverridesCard`, the mod jump rows; tests.
+- [x] CLAUDE.md's status line and `docs/plans/README.md` say the plan is done; the brief's §4.5 is final.
+- [x] Delivered: `OverridesCard`, the mod jump rows; tests.
 
 ## Deliverables
 

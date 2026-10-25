@@ -95,8 +95,9 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
 
 ## Phase 3 — Search with highlighting (M)
 
-- [ ] **3.1 The index and the matcher: `web/settings/search.js` (pure).**
+- [x] **3.1 The index and the matcher: `web/settings/search.js` (pure).**
   - **Functions:** `indexRows(sections, ctx)` → `[{id: 'section/group/row', section, group, text: [label, hint, key, ...keywords]}]` (blocks contribute their `keywords` and label); `matches(index, query)` → `{rows: [{id, section, group}], perSection: {section: n}, perGroup: {…}}`, case-insensitive substring over each text, `query` trimmed, two characters or more; `highlight(text, query)` → `[{text, hit: bool}]` parts for the renderer. A small synonym list per row through `keywords` ("dark mode" on theme, "RAM" and "unified" on the reserve, "VRAM" and "GPU" on Hardware, "MCP" on sessions).
+  *As built:* the index holds the groups too (their titles match, so "memory" finds both Memory groups), and rows a `when` hides aren't indexed; `matches` also returns the matching ids as a set for the renderer.
   *Done when:* `utils/tests/web/settings-search.test.mjs` finds `memory.reserve_gb` by "reserve", by "RAM" and by "reserve_gb", counts per section, returns nothing for one character, and `highlight('Memory reserve', 'mem')` splits as expected (one hit, case kept).
 
 - [ ] **3.2 The search box and the filtered view, in `strip.js`, `rows.js` and `settings.js`.**

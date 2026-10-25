@@ -11,7 +11,7 @@
 // Props: { item, ctx } — ctx is the page's context (see chat.js `cardCtx`).
 
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11 } from './chat-ui.js';
-import { renderMarkdown } from './chat-md.js';
+import { renderMarkdown, splitFigures, outputByRef } from './chat-md.js';
 import { todosOpen } from './chat-thread.js';
 import { SentQuotes, quotesOf } from './chat-quote-reply.js';
 import { ReplyBar } from './chat-replybar.js';
@@ -118,19 +118,35 @@ export function Thumbs({ ctx, target, label = 'this' }) {
   return h('span', { style: { display: 'inline-flex', gap: 2 } }, b('up', `Good: more like ${label}`), b('down', `Not good: less like ${label}`));
 }
 
+// A reply's pictures: a line that is only `![caption](#n)` is that output's result card (its buttons: Edit, Make 3D,
+// Describe, …) where the agent put it, unless a tool in this chat made it (`ctx.made`, chat.js; else the reply's own
+// turn): that one is shown at the top of the turn that made it, so it's left out here and a picture is drawn once.
+// Any other `![…](#n)` stays an inline picture, left out the same way.
 function AssistantCard({ item, ctx }) {
   const React = R(), text = item.ev.payload.text || '';
-  const outs = ctx?.outputs || [];
+  const outs = ctx?.outputs || [], made = ctx?.made || new Set((ctx?.turn?.outputs || []).map(o => o.output_id));
+  const madeKey = [...made].join(',');
   // a citation chip names its source: '#3' or 'output:<id>' → that output's title
-  const html = React.useMemo(() => renderMarkdown(text, { cites: ref => outs.find(o => (ref[0] === '#' ? o.n === +ref.slice(1) : o.output_id === ref.slice(7)))?.title }),
-    [text, outs.length]);
+  const parts = React.useMemo(() => {
+    const cites = ref => outputByRef(ref, outs)?.title;
+    return splitFigures(text).flatMap((p, i) => {
+      if (p.text != null) return [{ key: 't' + i, html: renderMarkdown(p.text, { cites, hide: made }) }];
+      const o = outputByRef(p.ref, outs);
+      if (!o) return [{ key: 't' + i, html: renderMarkdown(p.src, { cites, hide: made }) }];   // not this chat's: stays as text
+      return made.has(o.output_id) ? [] : [{ key: 'f' + i, output: o }];
+    });
+  }, [text, outs.length, madeKey]);
   const onClick = e => {   // plan 24.7: citation links open the viewer
     const a = e.target?.closest?.('a[data-cite]');
     if (!a) return;
     e.preventDefault();
     ctx?.openCite?.({ ref: a.dataset.cite, page: a.dataset.page, line: a.dataset.line });
   };
-  const md = h('div', { className: 'aichat-md' + (item.streaming ? ' aichat-caret' : ''), style: { fontSize: 13, padding: '0 2px' }, onClick, dangerouslySetInnerHTML: { __html: html } });
+  const mdOf = (html, key, caret) => h('div', { key, className: 'aichat-md' + (caret ? ' aichat-caret' : ''), style: { fontSize: 13, padding: '0 2px' }, onClick, dangerouslySetInnerHTML: { __html: html } });
+  const md = parts.length === 1 && parts[0].html != null ? mdOf(parts[0].html, null, item.streaming)
+    : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 } }, parts.map((p, i) => p.output
+      ? h(Card, { key: p.key, item: { key: p.key, kind: 'figure', output: p.output }, ctx })
+      : mdOf(p.html, p.key, item.streaming && i === parts.length - 1)));
   if (item.streaming || item.ev.seq == null || !text.trim() || ctx?.turn?.running) return md;
   // the reply bar: Sources, Copy (three ways), thumbs (chat-replybar.js)
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2 } }, md,

@@ -8,10 +8,15 @@ import * as kit from '../live-kit.js';
 
 const R = () => globalThis.React;
 
-/** The failed tool rows of a turn whose error carries fixes or log lines. */
+/** The failed tool rows of a turn whose error carries fixes or log lines, while they still matter: only in the chat's
+ *  newest turn (`turn.latest`, chat.js), and not once a later call of the same tool in it worked (the agent got past
+ *  it). The fold's step row keeps the error either way. */
 export function fixRows(turn) {
-  return (turn.steps || []).flatMap(s => s.rows).filter(r => r.type === 'tool' && (r.status === 'error' || r.status === 'failed')
-    && (r.item?.result?.error?.fixes?.length || r.item?.result?.error?.log?.length));
+  if (!turn.latest) return [];
+  const rows = (turn.steps || []).flatMap(s => s.rows).filter(r => r.type === 'tool');
+  return rows.filter((r, i) => (r.status === 'error' || r.status === 'failed')
+    && (r.item?.result?.error?.fixes?.length || r.item?.result?.error?.log?.length)
+    && !rows.slice(i + 1).some(l => l.name === r.name && l.status === 'done'));
 }
 
 /** What a fix does when clicked: {kind: 'tool'|'service'|'retry'|'copy', …}. */

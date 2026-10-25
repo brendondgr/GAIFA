@@ -57,11 +57,14 @@ let titles = null;
 // Plan 47.3: the open chat's outputs, so `![caption](#3)` draws output #3 in the reply (chat.js keeps it current).
 let chatOutputs = [];
 export function setChatOutputs(list) { chatOutputs = Array.isArray(list) ? list : []; }
+// Outputs the reply's own turn already shows (renderMarkdown's `hide`): a `![caption](#n)` of one is left out, not drawn twice.
+let hidden = null;
 const SAFE_MEDIA = /^\/(?!\/)[\w\-./%?=&;:]*$/;   // the hub's own paths only (/api/outputs/…)
 /** `![caption](#n)` or `(output:<id>)` → the output drawn inline, or null when it isn't one of this chat's. */
 export function mediaHtml(ref, caption, src = '') {
   const o = ref.startsWith('#') ? chatOutputs.find(x => x.n === +ref.slice(1)) : chatOutputs.find(x => x.output_id === ref.slice(7));
   if (!o) return null;
+  if (hidden?.has(o.output_id)) return '';
   const url = o.url && SAFE_MEDIA.test(o.url) ? o.url : null, poster = o.preview && SAFE_MEDIA.test(o.preview) ? o.preview : null;
   const cap = escapeHtml(caption || o.title || ''), n = o.n ? `<span class="aichat-fig-n">#${o.n}</span>` : '';
   let media;
@@ -98,7 +101,7 @@ function inline(src) {
   s = s.replace(/!\[([^\]\n]*)\]\(([^)\s]+)\)/g, (m, cap, ref) => {
     const raw = x => x.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
     const html = /^(#\d{1,4}|output:[0-9a-f]{12})$/.test(ref) ? mediaHtml(ref, raw(cap), raw(m)) : null;
-    return stash(html || m);
+    return stash(html ?? m);
   });
   s = s.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, text, url) => {
     const raw = url.replace(/&amp;/g, '&');
@@ -162,10 +165,36 @@ function table(head, delim, rows) {
   return `<div class="aichat-table"><table><thead><tr>${th.map((t, j) => td('th', t, j)).join('')}</tr></thead>${body ? `<tbody>${body}</tbody>` : ''}</table></div>`;
 }
 
-/** Markdown → an HTML string that is safe to set as innerHTML. `cites(ref)` names a citation's source ('#3' → its title). */
-export function renderMarkdown(text, { cites } = {}) {
-  titles = cites || null;
-  try { return blocks(text); } finally { titles = null; }
+/** Markdown → an HTML string that is safe to set as innerHTML. `cites(ref)` names a citation's source ('#3' → its title);
+ *  `hide` is a Set of output ids whose `![caption](#n)` is left out (the turn shows them already). */
+export function renderMarkdown(text, { cites, hide } = {}) {
+  titles = cites || null; hidden = hide || null;
+  try { return blocks(text); } finally { titles = null; hidden = null; }
+}
+
+const FIGURE = /^\s*!\[([^\]\n]*)\]\((#\d{1,4}|output:[0-9a-f]{12})\)\s*$/;
+/** A reply cut at each line that is only `![caption](#n)` (outside code fences): [{text} | {ref, caption, src}], so
+ *  the reply can draw that output as its result card, with its buttons, where the agent put it. */
+export function splitFigures(text) {
+  const parts = [];
+  let buf = [], fence = null;
+  for (const line of String(text ?? '').replace(/\r\n?/g, '\n').split('\n')) {
+    const f = line.match(FENCE);
+    if (fence) { if (new RegExp(`^\\s*${fence[0] === '`' ? '`' : '~'}{${fence.length},}\\s*$`).test(line)) fence = null; }
+    else if (f) fence = f[1];
+    const m = !fence && !f && line.match(FIGURE);
+    if (!m) { buf.push(line); continue; }
+    if (buf.join('').trim()) parts.push({ text: buf.join('\n') });
+    buf = [];
+    parts.push({ ref: m[2], caption: m[1], src: line.trim() });
+  }
+  if (buf.join('').trim()) parts.push({ text: buf.join('\n') });
+  return parts;
+}
+
+/** `#n` or `output:<id>` → one of the open chat's outputs, or null. */
+export function outputByRef(ref, outputs = chatOutputs) {
+  return (outputs || []).find(o => (ref[0] === '#' ? o.n === +ref.slice(1) : o.output_id === ref.slice(7))) || null;
 }
 function blocks(text) {
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');

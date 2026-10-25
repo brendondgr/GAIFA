@@ -99,6 +99,9 @@ function ResultCard({ item, ctx }) {
   return h('div', { style: cardSt({ pad: '10px 12px', gap: 14 }) }, outs.map(o => h(OutputBlock, { key: o.output_id + ':' + o.n, output: o, ctx })));
 }
 registerCard('result', ResultCard);
+// A picture the agent put in its reply (`![caption](#n)` on a line of its own; chat-cards.js AssistantCard): the same
+// result card as the strip's, with its buttons.
+registerCard('figure', ({ item, ctx }) => h('div', { style: cardSt({ pad: '10px 12px', gap: 14 }) }, h(OutputBlock, { output: item.output, ctx, cap: STRIP_CAP })));
 
 // ---------- the output strip (plan 19.5): a turn's outputs under its activity fold ----------
 export const STRIP_CAP = 300;   // the big preview's height cap, px

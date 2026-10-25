@@ -9,13 +9,17 @@ the agent may take, and the mod's log lines around the failure.
 
 A `tool` fix is a hub tool call; a `service` fix is a hub route (the chat calls it; the agent can't); `retry` runs the
 same call again with those arguments changed. Never fixes for a call refused before it ran (bad arguments, an
-unknown tool, a denial): the agent fixes those itself.
+unknown tool, a denial): the agent fixes those itself. Nor when the mod answered and explained the failure with its
+own `fix` (web's "answered HTTP 403 … try another source"): restarting it wouldn't help, so no Restart, no Retry and
+no log, unless the log shows it ran out of memory.
 """
 
 from __future__ import annotations
 
 import re
 from typing import TYPE_CHECKING, Any
+
+from utils.tools.modcall import HUB_FIXES
 
 if TYPE_CHECKING:
     from utils.server import Hub
@@ -51,11 +55,19 @@ def log_excerpt(lines: list[dict[str, Any]], n: int = 8) -> list[str]:
     return [texts[i][:300] for i in sorted(keep)][-n:]
 
 
+def explained(error: dict[str, Any]) -> bool:
+    """Did the mod answer and say what to do (its own `fix`, not the hub's default words)?"""
+    fix = error.get("fix")
+    return error.get("code") in ("mod_error", "upstream_error") and isinstance(fix, str) and bool(fix.strip()) and fix not in HUB_FIXES
+
+
 def fixes_for(tool: ToolDef, args: dict[str, Any], error: dict[str, Any], name: str, log: list[str]) -> list[dict[str, Any]]:
     code, mod = error.get("code"), tool.mod
     text = " ".join([str(error.get("detail", "")), *log])
     out: list[dict[str, Any]] = []
     if code in NO_FIX or code is None:
+        return out
+    if explained(error) and not OOM.search(text):
         return out
     if code == "service_not_running" and mod and mod != "hub":
         out.append({"label": f"Start {name}", "tool": "hub_start_service", "arguments": {"id": mod}})
@@ -82,7 +94,7 @@ async def attach(hub: Hub, tool: ToolDef, args: dict[str, Any], error: dict[str,
         log: list[str] = []
         mod = tool.mod
         svc = hub.services.services.get(mod) if mod and hub.services else None
-        if svc is not None and error.get("code") not in NO_FIX:
+        if svc is not None and error.get("code") not in NO_FIX and not explained(error):
             try:
                 log = log_excerpt(await hub.services.logs(mod, 60))
             except Exception:  # noqa: BLE001 - no log is fine

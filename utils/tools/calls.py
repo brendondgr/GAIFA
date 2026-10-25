@@ -38,7 +38,7 @@ from utils.tools import fixes, pins, results
 from utils.tools.approvals import Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.doc_tools import untrusted
-from utils.tools.modcall import ToolError, dry_run, mod_error
+from utils.tools.modcall import FIX_NO_ANSWER, ToolError, dry_run, mod_error
 from utils.tools import edits, options, searched, webread
 from utils.tools.schema import coerce, validate
 
@@ -498,7 +498,7 @@ class Calls:
                 c.error["fix"] = "free memory first (hub_unload_service, or stop an LLM), or turn on agent.make_room"
         except httpx.HTTPError as e:
             c.state, c.error = "error", {"code": "upstream_error", "detail": f"{type(e).__name__}: {e}"[:400],
-                                         "fix": "the mod didn't answer; check its Logs tab, then try again"}
+                                         "fix": FIX_NO_ANSWER}
         except Exception as e:  # noqa: BLE001
             log.exception("tool call %s failed", c.id)
             c.state, c.error = "error", {"code": "hub_error", "detail": f"{type(e).__name__}: {e}"[:400]}

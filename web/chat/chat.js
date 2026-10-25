@@ -178,7 +178,14 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
   const [now, setNow] = useState(() => Date.now() / 1000);   // ticks while a turn runs, so the fold's timers count
   useEffect(() => { setNow(Date.now() / 1000); if (!running) return undefined; const t = setInterval(() => setNow(Date.now() / 1000), 1000); return () => clearInterval(t); }, [running]);
-  const blocks = useMemo(() => groupTurns(view, { running, now, tools }), [view, running, now, tools]);
+  const blocks = useMemo(() => {
+    const b = groupTurns(view, { running, now, tools }), last = b.findLast(x => x.kind === 'turn');
+    if (last) last.latest = true;   // fix-it cards show on the newest turn only (chat-fix.js)
+    return b;
+  }, [view, running, now, tools]);
+  // what this chat's tools made: shown at the top of the turn that made it, never drawn again in a reply or by show
+  const madeKey = blocks.flatMap(b => (b.outputs || []).map(o => o.output_id)).join(',');
+  const made = useMemo(() => new Set(madeKey ? madeKey.split(',') : []), [madeKey]);
   useLayoutEffect(() => {
     const el = scrollRef.current; if (!el) return undefined;
     if (first.current && events.length) { el.scrollTop = el.scrollHeight; first.current = false; return undefined; }
@@ -271,7 +278,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   };
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
   const ctx = {
-    api, live: c.live, tid, thread, outputs: view.outputs, tools, mods, running, dock: true, confirm, toast, speechOutput: speechOut,
+    api, live: c.live, tid, thread, outputs: view.outputs, made, tools, mods, running, dock: true, confirm, toast, speechOutput: speechOut,
     act: (tool, args) => ensureThread().then(id => c.action(id, tool, args)),   // plan 46.5: a fix runs as your own step
     answer: (qid, answers) => c.answer(tid, qid, answers),
     // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying

@@ -125,7 +125,10 @@ function ShowCard({ ctx }) {
   if (!spec) return null;
   let body;
   if (spec.outputs) {
-    const outs = spec.outputs.map(id => (ctx.outputs || []).find(o => o.output_id === id)).filter(Boolean);
+    // a picture this chat's tools made is shown where it was made (the output strip or its live card), not again here
+    const made = ctx.made || new Set((ctx.liveCard.turnOutputs || []).map(o => o.output_id));
+    const outs = spec.outputs.filter(id => !made.has(id)).map(id => (ctx.outputs || []).find(o => o.output_id === id)).filter(Boolean);
+    if (!outs.length) return null;
     body = spec.view === 'image' && outs[0] ? h(OutputBlock, { output: outs[0], ctx, cap: 420 })
       : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 } },
         outs.map(o => h('button', { key: o.output_id, type: 'button', title: `#${o.n} ${o.title || ''}`, onClick: () => ctx.openOutput?.(o.output_id),

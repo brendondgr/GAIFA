@@ -321,3 +321,21 @@ test('pictures in a reply: this chat\'s outputs only (plan 47.3)', async () => {
   assert.ok(!mdm.renderMarkdown('![x](#3)').includes('evil.example'));                            // an output's outside URL isn't used
   mdm.setChatOutputs([]);
 });
+
+test('a reply\'s pictures are drawn once: a figure line is its result card, the turn\'s own outputs left out', async () => {
+  // seen 2026-10-25 (chat t_e07a0ebfb485): the picture just made was in the output strip and again in the reply
+  const mdm = await import(pathToFileURL(path.join(root, 'web/chat/chat-md.js')).href);
+  const text = 'Made it.\n\n![The robot](#1)\n\nAnd the older one: ![Fox](output:bbbbbbbbbbbb) here.\n\n```\n![not a figure](#1)\n```\n![x](#2)';
+  assert.deepEqual(mdm.splitFigures(text).map(p => p.ref ?? p.text.trim().split('\n')[0]), ['Made it.', '#1', 'And the older one: ![Fox](output:bbbbbbbbbbbb) here.', '#2']);
+  assert.deepEqual(mdm.splitFigures(text)[1], { ref: '#1', caption: 'The robot', src: '![The robot](#1)' });
+  assert.equal(mdm.splitFigures('![a](#1)')[0].ref, '#1');
+  mdm.setChatOutputs([{ n: 1, output_id: 'aaaaaaaaaaaa', kind: 'image', title: 'Robot', url: '/api/outputs/aaaaaaaaaaaa/file' },
+    { n: 2, output_id: 'bbbbbbbbbbbb', kind: 'image', title: 'Fox', url: '/api/outputs/bbbbbbbbbbbb/file' }]);
+  assert.equal(mdm.outputByRef('output:bbbbbbbbbbbb').n, 2);
+  const hide = new Set(['bbbbbbbbbbbb']);
+  assert.ok(!mdm.renderMarkdown('see ![Fox](#2) here', { hide }).includes('<img'), 'a picture the turn shows is left out');
+  assert.ok(!mdm.renderMarkdown('see ![Fox](#2) here', { hide }).includes('![Fox]'), 'not left as text either');
+  assert.ok(mdm.renderMarkdown('see ![Robot](#1) here', { hide }).includes('<img'));
+  assert.ok(mdm.renderMarkdown('see ![Fox](#2) here').includes('<img'), 'hide lasts one render');
+  mdm.setChatOutputs([]);
+});

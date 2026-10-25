@@ -15,6 +15,13 @@ if TYPE_CHECKING:
     from utils.server import Hub
 
 
+# The hub's own words when a mod gave no fix; any other `fix` on a mod_error/upstream_error is the mod's (utils/tools/fixes.py).
+FIX_FAILED = "check the mod's Logs tab; try again or change the inputs"
+FIX_REFUSED = "fix the arguments the message names, then call again"
+FIX_NO_ANSWER = "the mod didn't answer; check its Logs tab, then try again"
+HUB_FIXES = frozenset({FIX_FAILED, FIX_REFUSED, FIX_NO_ANSWER})
+
+
 class ToolError(Exception):
     def __init__(self, code: str, detail: str, fix: str | None = None, problems: list[dict[str, Any]] | None = None) -> None:
         super().__init__(detail)
@@ -89,6 +96,6 @@ def mod_error(svc: Any, r: httpx.Response) -> ToolError:
         detail = detail["detail"] if isinstance(detail.get("detail"), str) else json.dumps(detail)[:400]
     if r.status_code >= 500:
         return ToolError("upstream_error", f"{svc.mod.name} failed (HTTP {r.status_code}): {detail}"[:600],
-                         fix or "check the mod's Logs tab; try again or change the inputs", probs)
+                         fix or FIX_FAILED, probs)
     return ToolError("mod_error", f"{svc.mod.name} refused it (HTTP {r.status_code}): {detail}"[:600],
-                     fix or "fix the arguments the message names, then call again", probs)
+                     fix or FIX_REFUSED, probs)

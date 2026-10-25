@@ -17,6 +17,16 @@ def kinds(fx):
     return [f["label"] for f in fx]
 
 
+def test_a_mod_that_explained_it_gets_no_restart():
+    # seen 2026-10-25 (chat t_380bd8fbc0ec): a site's HTTP 403 offered "Restart Web" and "Retry"
+    t = tool()
+    err = {"code": "upstream_error", "detail": "Web failed (HTTP 502): https://x/ answered HTTP 403", "fix": "try another source"}
+    assert fixes_for(t, {}, err, "Web", []) == []
+    assert kinds(fixes_for(t, {}, {**err, "fix": "check the mod's Logs tab; try again or change the inputs"}, "Web", [])) == ["Restart Web", "Retry"]
+    assert kinds(fixes_for(t, {}, {"code": "upstream_error", "detail": "x"}, "Web", [])) == ["Restart Web", "Retry"]
+    assert "Free the GPU" in kinds(fixes_for(t, {}, {**err, "detail": "CUDA error: out of memory"}, "Web", []))
+
+
 def test_each_code_gets_its_fix():
     t = tool()
     assert kinds(fixes_for(t, {}, {"code": "service_not_running", "detail": "x"}, "3D Generate", [])) == ["Start 3D Generate", "Retry"]

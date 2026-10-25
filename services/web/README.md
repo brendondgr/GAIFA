@@ -1,6 +1,6 @@
 # Web
 
-An AIHub mod (plan Phase 26): web search through a SearXNG on this machine, and pages fetched and saved as hidden outputs so the chat agent can read and cite them. Setup: [setup/web.md](setup/web.md). The mod guide is [docs/mods.md](../../docs/mods.md).
+A GAIFA mod (plan Phase 26): web search through a SearXNG on this machine, and pages fetched and saved as hidden outputs so the chat agent can read and cite them. Setup: [setup/web.md](setup/web.md). The mod guide is [docs/mods.md](../../docs/mods.md).
 
 | Route | What it does |
 |---|---|
@@ -10,11 +10,11 @@ An AIHub mod (plan Phase 26): web search through a SearXNG on this machine, and 
 | `POST /v1/fetch` | `{url, max_chars?, focus?}` → the page saved as an output, its final URL, title, `description` (its meta description, when it has one) and first `max_chars` of markdown. `focus` is for the hub (below); the mod ignores it |
 | `GET /v1/favicon?host=<host>` | A site's icon for Chat's Sources (`favicons.py`): ICO, PNG, GIF, JPEG or WebP, with `nosniff` and a week's browser cache; 404 `no_favicon` when there is none, 422 `bad_host` for an IP, a local name or anything that isn't a DNS name |
 
-The agent's tools are `web_search` and `web_fetch`, both risk `network` (plan 25.1). `web_search` runs without asking: AIHub ships an `always` grant for it (hub.db migration 010), listed in Settings → Agent, where revoking it makes searches ask (`grant_key = "const:search"`, so one answer covers every search). `web_fetch` asks; its `grant_key = "url:host"`, so "allow in this chat" covers one site. It runs without a card, in every mode but Plan, for a URL the chat's own search returned and for a **link the user typed** in the chat (the agent sends the links of the user's own messages as `origin.links`; the hub compares the exact URL and never stores them; `utils/tools/searched.py`).
+The agent's tools are `web_search` and `web_fetch`, both risk `network` (plan 25.1). `web_search` runs without asking: GAIFA ships an `always` grant for it (hub.db migration 010), listed in Settings → Agent, where revoking it makes searches ask (`grant_key = "const:search"`, so one answer covers every search). `web_fetch` asks; its `grant_key = "url:host"`, so "allow in this chat" covers one site. It runs without a card, in every mode but Plan, for a URL the chat's own search returned and for a **link the user typed** in the chat (the agent sends the links of the user's own messages as `origin.links`; the hub compares the exact URL and never stores them; `utils/tools/searched.py`).
 
 **What the model reads of a fetched page** (the hub's `utils/tools/webread.py`, after this mod answers). The text carries the saved page's line numbers (`  120| …`, blank lines left out), and the result's `cite` says how to cite it: the page as a link to its URL, a passage as `#n:<line>` (the agent puts in the output's real `#n`), which opens the viewer at that line. A page longer than `max_chars` comes back as its passages most relevant to `focus` (or the user's message this turn), most relevant first, each under `── lines a–b of N · under "<heading>" ──`, with an "About this page" line (the description, else the first paragraph), up to `max_chars`; `relevance` in the result says how many and by what. `[agent.web] relevance` (Settings → Agent → Reading web pages): `auto` (the decide mod when it's up with its model loaded, else `lexical`), `decide` (d3-lite answers "does this passage help answer …?" for lexical's best 24, four at once), `lexical` (BM25 on the words in common), `off` (the page's start). Only what is shown is screened. The whole page stays the output for `hub_read_document` and `hub_search_document`. The skill [skills/researching](skills/researching/SKILL.md) tells the agent how to research and cite.
 
-**Dry runs (the agent eval).** Both tools say `dry_run = true` in `[tools]`, so in a dry run the hub still calls this mod, with `"dry_run": true` in `X-AIHub-Origin`. The mod then answers from its **fake web**, [fakeweb/](fakeweb/) (`fakeweb.py`): canned search results and pages on `.example` hosts, which never resolve, and never the internet or SearXNG. The pages go through the same conversion and are saved as outputs with `"dry_run": true` in their sidecar. The eval task `web_two_sources` uses them.
+**Dry runs (the agent eval).** Both tools say `dry_run = true` in `[tools]`, so in a dry run the hub still calls this mod, with `"dry_run": true` in `X-GAIFA-Origin`. The mod then answers from its **fake web**, [fakeweb/](fakeweb/) (`fakeweb.py`): canned search results and pages on `.example` hosts, which never resolve, and never the internet or SearXNG. The pages go through the same conversion and are saved as outputs with `"dry_run": true` in their sidecar. The eval task `web_two_sources` uses them.
 
 **Reading a page for the user** (plan 30.8). The mod's page, **Read a page**, and Chat's composer (a pasted link, or "Add a web page" in the attach menu) go through the hub's `POST /api/web/read {url, text?}`, not a tool call: the user asked for the page, so there is no approval card, but every fetch rule below applies. The hub calls `/v1/fetch`, then screens the **whole** saved text for instructions aimed at an AI (patterns, then the `[agent.screen]` model, in pieces; architecture §14.8), keeps the report with the output (`outputs/.text/<id>.screening.json`) and answers `{output, url, final_url, title, kind, chars, screening: {removed, checked, ms, model, covered, findings: [{passage, why, by, excerpt, line}]}}`, plus `markdown` and `screened` with `text: true`. The agent's later reads of that output (`hub_read_document`, an attachment sent whole) reuse the report instead of screening again. The page shows the markdown rendered as the agent reads it (or as it was), what was removed and why, Copy markdown and Open in Outputs.
 
@@ -37,8 +37,8 @@ Every saved page is a **hidden** output (plan 30.9): its sidecar says `"hidden":
 - `http` and `https` only.
 - No loopback, private, link-local, carrier-grade NAT, multicast or reserved addresses, and no `localhost`, `.local`, `.localhost`, `.internal`, `.lan` or `.home.arpa` names. The check runs where the connection is made: the name is resolved once, **every** address it resolves to must be public, and the socket connects to the address that was checked. Redirects are followed by hand (at most 5), so every hop goes through the same check; so does `robots.txt`.
 - 10 MB per response (by `Content-Length`, and counted while reading) and 20 s for the whole fetch, redirects included.
-- `robots.txt` is honoured for the user agent `AIHub-web`, cached per site for an hour. A missing one (4xx) allows everything; one that fails (5xx, no answer) allows nothing (RFC 9309).
-- No proxies from the environment; the user agent is `AIHub-web/0.1 (…)`.
+- `robots.txt` is honoured for the user agent `GAIFA-web`, cached per site for an hour. A missing one (4xx) allows everything; one that fails (5xx, no answer) allows nothing (RFC 9309).
+- No proxies from the environment; the user agent is `GAIFA-web/0.1 (…)`.
 
 ## Why trafilatura
 
@@ -52,7 +52,7 @@ Pages become markdown with [trafilatura](https://trafilatura.readthedocs.io/) ra
 
 ```bash
 .venv/bin/python -m pytest      # the tests: a fake SearXNG and local web server, no network
-aihub check web --start
-aihub restart web               # after editing server.py, pages.py or htmlmd.py
+gaifa check web --start
+gaifa restart web               # after editing server.py, pages.py or htmlmd.py
 ./install.sh                    # after changing requirements.txt
 ```

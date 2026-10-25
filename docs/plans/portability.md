@@ -1,25 +1,25 @@
-# Plan: AIHub on other machines (NVIDIA, Intel, Apple; WSL2 and macOS)
+# Plan: GAIFA on other machines (NVIDIA, Intel, Apple; WSL2 and macOS)
 
-Asked for on 2026-10-21: people with other hardware and other systems should be able to use AIHub, from NVIDIA to AMD to Intel GPUs, on Linux, macOS and Windows. Answers from the user the same day:
+Asked for on 2026-10-21: people with other hardware and other systems should be able to use GAIFA, from NVIDIA to AMD to Intel GPUs, on Linux, macOS and Windows. Answers from the user the same day:
 - **Windows** goes through WSL2 first; native Windows isn't planned.
-- **Order:** this stage runs **after Phase 23** (the setup), and makes `aihub setup` choose backends.
+- **Order:** this stage runs **after Phase 23** (the setup), and makes `gaifa setup` choose backends.
 - **Where the plan lives:** here, with one stage row in `backend-plan.md`.
 - **Machines to check on:** **this one** (Linux, AMD Strix Halo), **a Linux machine with an NVIDIA GPU**, and **a Windows PC with an Intel GPU** (through WSL2). There is no Mac, so macOS is checked by CI only.
 
 **Revised the same evening** (the user: "update the plans, then build everything; commit after each step with full checks"). Phase 23 had finished in the meantime, which changes several things here:
-- `aihub setup` runs from a bare clone and is **standard library only**. `utils/hardware/` must be standard library only too, so the setup can detect the machine before the hub's dependencies exist. `psutil` stays in the hub's process reads.
+- `gaifa setup` runs from a bare clone and is **standard library only**. `utils/hardware/` must be standard library only too, so the setup can detect the machine before the hub's dependencies exist. `psutil` stays in the hub's process reads.
 - `config.toml` is each machine's own (gitignored), made from the tracked `config.example.toml`. New defaults go in the example.
 - The setup block grew `[[config]]` and steps with `skip_if`, `optional` and `interactive`.
 - gen3d is a base setup plus one setup per engine, and stt runs on the CPU unless the host has ROCm.
 
-The user also asked for **field reports**: an agent builds AIHub on another machine, records every problem it meets, and writes a markdown file detailed enough that the fixes are simple edits when the file is fed back here (Phase 40, 40.1–40.3). The user runs those builds on the other machines later.
+The user also asked for **field reports**: an agent builds GAIFA on another machine, records every problem it meets, and writes a markdown file detailed enough that the fixes are simple edits when the file is fed back here (Phase 40, 40.1–40.3). The user runs those builds on the other machines later.
 
-Today AIHub runs on one kind of machine. The surveys (2026-10-21) found:
+Today GAIFA runs on one kind of machine. The surveys (2026-10-21) found:
 - **The hub:**
   - **systemd:** the hub needs it for its own unit and for running mods (`utils/backends/systemd.py`). The subprocess backend is for tests and `--dev`, so its mods die with the hub.
   - **Memory:** it's read from `/proc` and **AMD's sysfs only** (`utils/proc.py`), as **one unified pool** (`utils/memory/manager.py`). On macOS `MemAvailable` reads as 0, so every load answers `needs_room`.
   - **An import-time call:** `utils/doctor.py` calls `os.getuid()` at import time.
-  - **Host checks:** `aihub setup host` (`utils/cli_setup_host.py`) checks GTT kernel parameters, the IOMMU, the `video`/`render` groups and Fedora packages.
+  - **Host checks:** `gaifa setup host` (`utils/cli_setup_host.py`) checks GTT kernel parameters, the IOMMU, the `video`/`render` groups and Fedora packages.
   - **The GPU queue** (`utils/gpu.py`) is vendor-neutral but has one slot.
 - **The mods:**
   - **Tied to ROCm on gfx1151:** comfy, gen3d and vllm through kyuz0's images; tts through AMD wheel indexes; stt through a ROCm CTranslate2 wheel; embed and decide through the AMD nightly index, with a `--cpu` fallback.
@@ -47,7 +47,7 @@ Touches:
 
 ## Gaps & unanswered questions
 
-- **Native Windows.** *Answered:* not planned. Windows users run AIHub in WSL2 (Ubuntu), which is Linux with systemd; the browser on Windows reaches `127.0.0.1:7000` through WSL's localhost forwarding. 37.6 lists what native Windows would need, so it isn't lost.
+- **Native Windows.** *Answered:* not planned. Windows users run GAIFA in WSL2 (Ubuntu), which is Linux with systemd; the browser on Windows reaches `127.0.0.1:7000` through WSL's localhost forwarding. 37.6 lists what native Windows would need, so it isn't lost.
 - **macOS.** No Mac to test on. *Assumption:*
   - Apple Silicon only; Intel Macs aren't targeted.
   - The hub and the mods without GPU work are checked in CI.
@@ -56,14 +56,14 @@ Touches:
 - **Containers on NVIDIA.** *Assumption:* podman with the NVIDIA Container Toolkit's CDI (`--device nvidia.com/gpu=all`), and docker with `--gpus all`, both from the same helper. On WSL2, `/dev/dxg` and `/usr/lib/wsl` are mounted.
 - **Partial offload on a discrete GPU** (llama.cpp's `-ngl`). *Assumption:* lcpp acquires both pools in one call (36.2), and its catalog's per-model `ngl` defaults to "all that fits".
 - **Workflow packs and weights that differ per backend** (fp8, CUDA-only custom nodes). *Assumption:* a pack declares `requires = ["cuda"]` and similar in `workflow.toml`, and Phase 20's `x-options` hides packs that don't fit.
-- **The launchd agent on macOS** would be written outside the project root. *Assumption* (decided while revising, so nothing is written outside the folder without asking): `aihub install` on macOS **prints** the plist and the `launchctl` command for the person to place, the way root fixes are printed. Until they do, the hub runs in the foreground.
+- **The launchd agent on macOS** would be written outside the project root. *Assumption* (decided while revising, so nothing is written outside the folder without asking): `gaifa install` on macOS **prints** the plist and the `launchctl` command for the person to place, the way root fixes are printed. Until they do, the hub runs in the foreground.
 - **Pushing the CI workflow** to GitHub is the user's call. *Assumption:* the workflow is committed and pushed with the next push the user asks for.
 - **Field reports may contain private data** (paths, user names, tokens in the environment). *Assumption:* the report redacts known secret shapes (`hf_…`, `sk-…`, `ghp_…`, `*_TOKEN`/`*_KEY` values) and writes the home folder as `~`. It's written inside the project (`data/state/reports/`, gitignored) and goes nowhere by itself.
 - **The NVIDIA box and the Intel PC.** Their details aren't known yet. *Assumption:* the user runs the field test there (40.5, 40.6), and each report's detection becomes a fixture when its fixes land.
 
 ## How to work this plan
 
-The same rules as `backend-plan.md`: one commit per step after `uv run pytest` passes, `AIHub (<phase>.<step>): <sentence>`, with docs in the same commit and an *As built* note under the step. Tests that need Linux-only files are marked `linux` (`pyproject.toml` markers), like `systemd` today.
+The same rules as `backend-plan.md`: one commit per step after `uv run pytest` passes, `GAIFA (<phase>.<step>): <sentence>`, with docs in the same commit and an *As built* note under the step. Tests that need Linux-only files are marked `linux` (`pyproject.toml` markers), like `systemd` today.
 
 Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a recorded tree: sysfs, `/proc` snippets, `nvidia-smi` output, `sysctl` output and WSL markers. There's one per machine: `strix-halo` (this one), `linux-nvidia-1gpu`, `linux-nvidia-2gpu`, `linux-intel-arc`, `wsl2-nvidia`, `wsl2-intel`, `macos-m3`, `linux-cpu`.
 
@@ -97,13 +97,13 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
       - `/dev/kfd` is looked for in `/dev`'s listing, never opened.
     - Tests: `utils/tests/hardware/test_detect.py` (19), with a new `linux` marker.
 
-- [x] **35.2 Show it: `GET /api/system/hardware`, `aihub hardware`, Settings → About.**
-  - The route returns `Machine`. `aihub hardware [--json]` prints it (standard library only, no hub needed), and `aihub doctor` adds a Hardware section.
+- [x] **35.2 Show it: `GET /api/system/hardware`, `gaifa hardware`, Settings → About.**
+  - The route returns `Machine`. `gaifa hardware [--json]` prints it (standard library only, no hub needed), and `gaifa doctor` adds a Hardware section.
   - Settings → About gets a Hardware card listing each GPU's vendor, arch, memory and runtimes, and the accelerators found (a `web/PATCHES.md` entry).
-  - Brief §6/§11.7 gain the route and its type, and the contract test covers it. `AIHUB_HARDWARE_FIXTURE=<dir>` (dev only) makes the hub read a fixture instead of the machine.
-  *Done when:* `utils/tests/hardware/test_routes_hardware.py` covers the route and the fixture override; `utils/tests/core/test_cli.py` covers `aihub hardware --json`; the card is checked in a browser on a `--demo-mods` hub with the `linux-nvidia-2gpu` fixture.
+  - Brief §6/§11.7 gain the route and its type, and the contract test covers it. `GAIFA_HARDWARE_FIXTURE=<dir>` (dev only) makes the hub read a fixture instead of the machine.
+  *Done when:* `utils/tests/hardware/test_routes_hardware.py` covers the route and the fixture override; `utils/tests/core/test_cli.py` covers `gaifa hardware --json`; the card is checked in a browser on a `--demo-mods` hub with the `linux-nvidia-2gpu` fixture.
   - *As built:*
-    - **The CLI:** `aihub hardware` lives in `utils/cli_hardware.py`, loaded like `cli_setup`, so it stays standard library only when `bin/aihub` runs it as a script. `--snapshot FILE` writes the recording and `--from FILE` replays one; the field report (40.2) uses both.
+    - **The CLI:** `gaifa hardware` lives in `utils/cli_hardware.py`, loaded like `cli_setup`, so it stays standard library only when `bin/gaifa` runs it as a script. `--snapshot FILE` writes the recording and `--from FILE` replays one; the field report (40.2) uses both.
     - **The route:** `?refresh=true` reads the machine again.
     - **The doctor:** a `hardware` line; GPU problems count as failures only when no GPU can compute (so an Intel iGPU without Level Zero on an NVIDIA box doesn't fail it).
     - **Detection:** an integrated GPU with no size of its own may address the system's memory.
@@ -127,7 +127,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Dependencies:** `psutil` 7.2.2. Tests: `test_proc_portable.py` (5).
 
 **Checks & deliverables — Phase 35**
-- [x] On this machine, `aihub hardware` shows one AMD GPU, gfx1151, unified memory, and `rocm, vulkan, cpu`.
+- [x] On this machine, `gaifa hardware` shows one AMD GPU, gfx1151, unified memory, and `rocm, vulkan, cpu`.
 - [x] Delivered: `utils/hardware/`, `utils/proc_portable.py` (with `utils/proc.py` as the facade), the route, the CLI command, the About card, the fixtures.
 
 ---
@@ -169,7 +169,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
 
 - [x] **36.3 Which GPU a mod uses: devices and the GPU queue.**
   - **Choosing a GPU:** `[services.<id>] gpu = "auto" | <index>`. With `auto`, the mod gets the GPU with the most free VRAM when it starts.
-  - **The environment:** the hub sets `AIHUB_GPU_INDEX` plus the vendor's visible-devices variable (`CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, or `ONEAPI_DEVICE_SELECTOR`), and only on machines with more than one GPU.
+  - **The environment:** the hub sets `GAIFA_GPU_INDEX` plus the vendor's visible-devices variable (`CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, or `ONEAPI_DEVICE_SELECTOR`), and only on machines with more than one GPU.
   - **The queue:** `utils/gpu.py` keeps **one slot per device**. On a single-GPU machine, nothing changes.
   - **Docs:** architecture §4.4 and §7, `config.example.toml`.
   *Done when:* `utils/tests/gpu/test_queue_devices.py` (two devices: two jobs at once, one per device; a nested lease stays on its parent's device) and the environment tests pass; the Phase 31 tests pass unchanged.
@@ -211,9 +211,9 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Tests:** `test_backend_detached.py` (8), including fake-ok adopted by a second manager.
 
 - [x] **37.2 The CLI on every target: `utils/cli.py`.**
-  - **`aihub open`** uses `webbrowser`. On WSL2 it opens the Windows browser (`wslview`, else `explorer.exe`).
-  - **`aihub logs`** follows the file in Python instead of `tail -F`.
-  - **`aihub install`:**
+  - **`gaifa open`** uses `webbrowser`. On WSL2 it opens the Windows browser (`wslview`, else `explorer.exe`).
+  - **`gaifa logs`** follows the file in Python instead of `tail -F`.
+  - **`gaifa install`:**
     - **Under WSL2:** it checks that systemd is on (`/etc/wsl.conf`) and prints the fix if it isn't.
     - **On macOS:** it prints the launchd plist and the `launchctl` command.
     - **Without systemd:** `start`, `stop` and `status` work through a pidfile for the hub itself.
@@ -221,8 +221,8 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   *Done when:* `utils/tests/core/test_cli.py` covers `open` (WSL and not), `logs`, `install` on WSL with systemd off, and the macOS plist.
   - *As built:*
     - **Where the code lives:** the platform parts are in `utils/cli_platform.py`, loaded like `cli_setup`, since `cli.py` was near 600 lines.
-    - **The hub without a unit:** `aihub start`, `stop`, `restart`, `status` and `start all` use the pidfile only where there's no unit and no systemd running. A machine with systemd but no unit still says to install.
-    - **The macOS plist:** it keeps the hub alive (`KeepAlive`) and logs to `data/logs/aihub.launchd.log`.
+    - **The hub without a unit:** `gaifa start`, `stop`, `restart`, `status` and `start all` use the pidfile only where there's no unit and no systemd running. A machine with systemd but no unit still says to install.
+    - **The macOS plist:** it keeps the hub alive (`KeepAlive`) and logs to `data/logs/gaifa.launchd.log`.
     - **The doctor** skips the unit and linger checks without systemd.
     - **Docs:** `docs/setup/hub.md`. Tests: `utils/tests/core/test_cli_platform.py` (7).
 
@@ -236,14 +236,14 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - **Packages:** they're printed for the detected package manager (`dnf`, `apt`, `zypper`, `pacman`, `brew`), from one table of package names per tool (`cli_setup_pkgs.py`).
   - **Kept from Phase 23:** fixes that need root are printed, never run.
   - **Docs:** the per-host docs (38.4).
-  *Done when:* `utils/tests/core/test_setup_host.py` runs every fixture through the checks: the right ones apply, fixes are printed for the right package manager, and nothing runs as root; on this machine `aihub setup host` prints what it printed before.
+  *Done when:* `utils/tests/core/test_setup_host.py` runs every fixture through the checks: the right ones apply, fixes are printed for the right package manager, and nothing runs as root; on this machine `gaifa setup host` prints what it printed before.
   - *As built:*
     - **Which checks apply:** `Probe.machine()` (live: `hardware.detect()`) decides.
       - Strix Halo's GTT, IOMMU and GTT-size checks apply only to an AMD GPU that shares the memory; an AMD card gets the groups and `/dev/kfd`.
       - `clone-under-home` (the ComfyUI toolbox) applies only on such an AMD machine, and `linger` only on Linux.
       - A machine without a GPU gets one note.
     - **Fixes:** NVIDIA's driver fix is the distribution's package, or "update it on Windows" under WSL.
-    - **Tests:** `test_cli_setup.py`'s fake probe answers this machine's recording, so the tests don't depend on where they run. `test_setup_host.py` (8). On this machine `aihub setup host` prints the same nine checks as before.
+    - **Tests:** `test_cli_setup.py`'s fake probe answers this machine's recording, so the tests don't depend on where they run. `test_setup_host.py` (8). On this machine `gaifa setup host` prints the same nine checks as before.
 
 - [x] **37.4 The GPU in containers: `services/_template/containers.py`.**
   - A mod-side helper, copied into mods the way `gpu_slot.py` is. `gpu_args(machine, runtime)` returns the GPU flags:
@@ -252,13 +252,13 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Intel:** `--device /dev/dri`.
     - **WSL2:** `--device /dev/dxg -v /usr/lib/wsl:/usr/lib/wsl:ro`.
   - The mod reads the machine from `GET /api/system/hardware`.
-  - **The runtime:** `[containers] runtime = "auto" | "podman" | "docker"`, passed to mods as `AIHUB_CONTAINER_RUNTIME`.
+  - **The runtime:** `[containers] runtime = "auto" | "podman" | "docker"`, passed to mods as `GAIFA_CONTAINER_RUNTIME`.
   - **Docs:** `docs/mods.md`, architecture §4.4.
   *Done when:* `services/_template/tests/test_containers.py` gives the right flags for every fixture and both runtimes.
   - *As built:*
-    - **The helper:** standard library only (`hardware()` uses urllib). It narrows to the hub's `AIHUB_GPU_INDEX` (NVIDIA's CDI device `nvidia.com/gpu=<n>`, docker's `--gpus device=<n>`). Docker gets the `video` and `render` groups, since it has no `keep-groups`. NVIDIA under WSL2 goes through CDI; WSL's AMD and Intel go through `/dev/dxg`.
-    - **The runtime:** `[containers] runtime` is resolved by `launch_spec` into `AIHUB_CONTAINER_RUNTIME`.
-    - **Where the tests live:** `utils/tests/services/test_containers_helper.py` (6), not under `_template/`, so `aihub new` doesn't copy them.
+    - **The helper:** standard library only (`hardware()` uses urllib). It narrows to the hub's `GAIFA_GPU_INDEX` (NVIDIA's CDI device `nvidia.com/gpu=<n>`, docker's `--gpus device=<n>`). Docker gets the `video` and `render` groups, since it has no `keep-groups`. NVIDIA under WSL2 goes through CDI; WSL's AMD and Intel go through `/dev/dxg`.
+    - **The runtime:** `[containers] runtime` is resolved by `launch_spec` into `GAIFA_CONTAINER_RUNTIME`.
+    - **Where the tests live:** `utils/tests/services/test_containers_helper.py` (6), not under `_template/`, so `gaifa new` doesn't copy them.
 
 - [x] **37.5 CI: `.github/workflows/tests.yml`.**
   *Removed 2026-10-22 (the user): CI ran on every push and kept running. The workflow is disabled on GitHub, the file is gone and `.github/workflows/` is gitignored; macOS is no longer checked by CI.*
@@ -284,7 +284,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
   - *As built:* `docs/platforms.md` starts with the targets table and a placeholder for 40.4's matrix; the Windows section names the files for each item, and what already works.
 
 **Checks & deliverables — Phase 37**
-- [x] On this machine: `aihub status`, `aihub logs`, `aihub setup host` and every mod behave as before (systemd backend).
+- [x] On this machine: `gaifa status`, `gaifa logs`, `gaifa setup host` and every mod behave as before (systemd backend).
 - [x] On a second hub (port 7077) with `[hub] backend = "detached"`: mods start, survive a hub restart, and stop. *(Checked in a test root instead: `test_a_fake_mod_survives_a_hub_restart` runs the hub's services manager twice on the detached backend; a second hub on this root would have adopted the real mods.)*
 - [x] Delivered: `utils/backends/detached.py`, the CLI changes, the host checks per machine, `services/_template/containers.py`, the CI workflow, `docs/platforms.md`.
 
@@ -303,9 +303,9 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     steps = [...]               # replaces the block's [[steps]] for this variant (optional)
     ```
   - **Defaults:** a block without variants is one variant: `cpu` if `gpu = false`, else this machine's accelerator. So version 2 docs keep working on this machine, and are "untested" elsewhere.
-  - **Smokes:** `smoke` is a command that does real work (one image, one sentence spoken, one transcript). It runs with `aihub setup --smoke` and in the field test, never by default.
+  - **Smokes:** `smoke` is a command that does real work (one image, one sentence spoken, one transcript). It runs with `gaifa setup --smoke` and in the field test, never by default.
   - The mods index shows a "Runs on" column. **Docs:** `docs/mods.md` §9.
-  *Done when:* `utils/tests/docs/test_setup_block.py` covers parsing, the defaults, bad accels and the smoke; `aihub docs --check --strict` is clean.
+  *Done when:* `utils/tests/docs/test_setup_block.py` covers parsing, the defaults, bad accels and the smoke; `gaifa docs --check --strict` is clean.
   - *As built:*
     - **`tested`:** a list of the systems where the variant ran (`true` means all of its `os`, `false` none), since "tested" differs per system.
     - **The block:** a variant may also carry a `note`. `Setup.effective_variants()` gives the declared variants or a version-2 block's one, `runs_on()` its accels, and `gpu` follows the variants when it isn't set.
@@ -317,11 +317,11 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **None fits:** the setup is "not available on this machine" with the reason, and is left out like a declined one.
     - **Untested:** a variant with `tested = false` is named as untested in the plan.
   - **Overriding:** `--accel <setup>=<accel>` picks another (for example `stt=cpu`).
-  - **Recording:** the choice goes to `[services.<mod>] accel` in `config.toml`, through the same careful edit as `[[config]]`. The plan's JSON includes it, and so do the steps' and the check's environment (`AIHUB_ACCEL`).
-  - **Docs:** `docs/setup/README.md`, the `aihub-setup` skill.
-  *Done when:* `utils/tests/core/test_cli_setup_variants.py` covers choosing per fixture, the override, an unavailable setup, an untested variant and the recorded choice; `aihub setup --plan --json` on this machine picks today's backends for every mod.
+  - **Recording:** the choice goes to `[services.<mod>] accel` in `config.toml`, through the same careful edit as `[[config]]`. The plan's JSON includes it, and so do the steps' and the check's environment (`GAIFA_ACCEL`).
+  - **Docs:** `docs/setup/README.md`, the `gaifa-setup` skill.
+  *Done when:* `utils/tests/core/test_cli_setup_variants.py` covers choosing per fixture, the override, an unavailable setup, an untested variant and the recorded choice; `gaifa setup --plan --json` on this machine picks today's backends for every mod.
   - *As built:*
-    - **Choosing:** in `utils/cli_setup_variant.py`. A chosen setup is a copy of its `Env` with the variant's steps, check and smoke, plus `run_env`: its `env` with `AIHUB_ACCEL`, `AIHUB_DEVICE` and `AIHUB_GPU_ARCH`, used for steps, `skip_if`, checks and smokes.
+    - **Choosing:** in `utils/cli_setup_variant.py`. A chosen setup is a copy of its `Env` with the variant's steps, check and smoke, plus `run_env`: its `env` with `GAIFA_ACCEL`, `GAIFA_DEVICE` and `GAIFA_GPU_ARCH`, used for steps, `skip_if`, checks and smokes.
     - **When nothing fits:** a setup this machine can't run, and every setup whose `after` needs it, is listed in `unavailable`. If nothing chosen runs, the setup stops with `reason: "unavailable"`.
     - **Recording the choice:** `[services.<mod>] accel` (one per mod: its base setup's) and the variant's `env` go through `PUT /api/services/<mod>/config`, which gains `accel` (`ServiceConfig.accel`, brief §6), or into `config.toml` when the hub doesn't take them, with a `next` to restart the hub.
     - **Smokes:** `--smoke` runs them after the checks, and a failed one is a failure with its doc.
@@ -330,23 +330,23 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
 
 - [x] **38.3 The hub passes the choice to the mod.**
   - **The environment:**
-    - `AIHUB_ACCEL`: the chosen accel.
-    - `AIHUB_DEVICE`: the torch device string (`cuda` for CUDA and ROCm, `xpu`, `mps` or `cpu`).
-    - `AIHUB_GPU_ARCH`: the GPU's arch.
+    - `GAIFA_ACCEL`: the chosen accel.
+    - `GAIFA_DEVICE`: the torch device string (`cuda` for CUDA and ROCm, `xpu`, `mps` or `cpu`).
+    - `GAIFA_GPU_ARCH`: the GPU's arch.
   - **The manifest:** it gains `[run.variants.<accel>] env = {…}`, merged over `[run] env` (`utils/manifest.py`; architecture §4.3–4.4).
   - **When the recorded accel isn't on this machine:** the mod shows **unavailable** with the reason, instead of failing to start. Brief §6/§11.7, the services list and the mod card show it, plus a small variant badge (a `web/PATCHES.md` entry).
   *Done when:* `utils/tests/services/test_variants.py` (the environment, the merge, the unavailable state) and the contract test pass; the badge is checked in a browser on a `--demo-mods` hub.
   - *As built:*
     - **No new service state:** "unavailable" is a summary field, `ServiceSummary.unavailable`, with the reason, next to `accel`. `start` answers `409 unavailable`, and autostart leaves it with `last_error: "unavailable: …"`. The Services page draws it as a state.
-    - **Unrecorded mods:** a mod with no accel recorded (every mod here until `aihub setup` runs again) gets nothing new, so this machine is unchanged.
+    - **Unrecorded mods:** a mod with no accel recorded (every mod here until `gaifa setup` runs again) gets nothing new, so this machine is unchanged.
     - **`[run.variants]`** keys are checked against the accels, so a bad one is a manifest error.
     - **The badge** was checked in the browser on the mock (`?mock#/services`), since no mod here has a recorded variant yet (PATCHES #44).
     - **Tests:** `test_variants.py` (6).
 
 - [x] **38.4 The template and the docs.**
-  - **The template:** `services/_template/` gains `device.py` (`AIHUB_DEVICE`, falling back `cuda` → `xpu` → `mps` → `cpu`) and `torch_index.py` (accel and runtime → the PyTorch wheel index, the table from `services/tts/engines/probe.py`). Its `install.sh` takes `--accel`.
+  - **The template:** `services/_template/` gains `device.py` (`GAIFA_DEVICE`, falling back `cuda` → `xpu` → `mps` → `cpu`) and `torch_index.py` (accel and runtime → the PyTorch wheel index, the table from `services/tts/engines/probe.py`). Its `install.sh` takes `--accel`.
   - **The host docs:** `docs/setup/host.md` becomes an index of `host-linux-amd.md` (today's text), `host-linux-nvidia.md`, `host-linux-intel.md`, `host-wsl2.md` and `host-macos.md`.
-  *Done when:* `aihub new demo` gives a mod whose `install.sh --accel cpu` and `aihub check demo` pass (in a test root); `aihub docs --check --strict` passes.
+  *Done when:* `gaifa new demo` gives a mod whose `install.sh --accel cpu` and `gaifa check demo` pass (in a test root); `gaifa docs --check --strict` passes.
   - *As built:*
     - **`host.md` keeps its name and text** (Linux with AMD Strix Halo, plus the sections every Linux shares), since generated model docs link its anchors. It opens with links to `host-linux-nvidia.md`, `host-linux-intel.md`, `host-wsl2.md` and `host-macos.md`, each marked as not yet run on such a machine.
     - **The installer:** the template's `install.sh --accel` installs `requirements-torch.txt`, when there is one, from `torch_index.py`'s index.
@@ -355,8 +355,8 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
     - **Tests:** `test_template_helpers.py` (4), and `test_new.py`'s install and check pass.
 
 **Checks & deliverables — Phase 38**
-- [ ] On this machine: every installed mod shows its variant badge, and nothing restarts differently. *(Nothing restarts differently: no mod here has a recorded variant until `aihub setup` runs again, which is the person's call; the badge was checked on the mock.)*
-- [x] Delivered: setup block v3, the variant choice in `aihub setup`, `AIHUB_ACCEL`/`AIHUB_DEVICE`, the unavailable state, the template's helpers, the per-host docs.
+- [ ] On this machine: every installed mod shows its variant badge, and nothing restarts differently. *(Nothing restarts differently: no mod here has a recorded variant until `gaifa setup` runs again, which is the person's call; the badge was checked on the mock.)*
+- [x] Delivered: setup block v3, the variant choice in `gaifa setup`, `GAIFA_ACCEL`/`GAIFA_DEVICE`, the unavailable state, the template's helpers, the per-host docs.
 
 ---
 
@@ -365,7 +365,7 @@ Fake hardware lives in `utils/tests/hardware/fixtures/<machine>/`. Each is a rec
 Each step:
 - adds the mod's variants and a `smoke` to its setup docs;
 - adds a lock or wheel index per variant where torch is involved;
-- replaces hard-coded `"cuda"` and ROCm env with `AIHUB_DEVICE` and per-variant env;
+- replaces hard-coded `"cuda"` and ROCm env with `GAIFA_DEVICE` and per-variant env;
 - runs the mod's tests with fake hardware.
 
 Variants not run on real hardware ship `tested = false`, until a field report (40.5, 40.6) says they work. The expected result:
@@ -388,13 +388,13 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
   *Done when:* each mod's tests pass; `services/workspace/tests/` covers the flags per runtime.
   - *As built:*
     - **The setup docs:** the six declare one `cpu` variant on every system, tested on Linux.
-    - **The sandbox** takes its runtime from `AIHUB_CONTAINER_RUNTIME` (a copy of the template's `containers.py`). Docker runs as your uid and gid, gets `bridge`, and has no cache overlays, so the caches start empty. Podman off Linux gets `bridge` instead of `pasta`. `label=disable` applies only where SELinux is enforcing, so this machine's command line is unchanged.
+    - **The sandbox** takes its runtime from `GAIFA_CONTAINER_RUNTIME` (a copy of the template's `containers.py`). Docker runs as your uid and gid, gets `bridge`, and has no cache overlays, so the caches start empty. Podman off Linux gets `bridge` instead of `pasta`. `label=disable` applies only where SELinux is enforcing, so this machine's command line is unchanged.
     - **Tests:** `services/workspace/tests/test_sandbox_runtimes.py` (4), and the workspace's 116 pass.
 
 - [x] **39.2 lcpp: llama.cpp per accel.**
   - **The binary:** the setup step fetches ggml-org's release asset for the OS and accel when one exists (Vulkan and CPU on Linux, Metal on macOS). Otherwise it builds from source into `runtime/llama.cpp/bin/` with `-DGGML_CUDA=ON` or `-DGGML_SYCL=ON`.
   - **Instances:** they keep the systemd backend on Linux and WSL2, and use lcpp's subprocess backend on macOS.
-  *Done when:* lcpp's tests pass; `aihub docs --check --strict` is clean; on this machine `aihub setup --plan lcpp` picks Vulkan.
+  *Done when:* lcpp's tests pass; `gaifa docs --check --strict` is clean; on this machine `gaifa setup --plan lcpp` picks Vulkan.
   - *As built:*
     - **The variants**, in lcpp's order: Vulkan (the checksummed prebuilt asset, on Linux with any GPU vendor's Vulkan driver), CUDA (Linux and WSL2), Metal (`mps`, macOS) and CPU.
     - **Source builds:** ggml-org publishes no Linux CUDA asset, so CUDA, Metal and CPU build from source with `scripts/build-llama-cpp.sh <accel> <tag>`: a static `llama-server` in `runtime/llama.cpp/bin/llama-<tag>-<accel>/`, with `current` pointed at it. The CPU build ran here in a scratch copy and printed its version.
@@ -404,11 +404,11 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
 
 - [x] **39.3 embed and decide: torch per accel.**
   - **Wheels:** `cuda` (a cu12x index), `xpu`, `mps` and `cpu` next to today's ROCm lock.
-  - **The device:** it comes from `AIHUB_DEVICE`, and `EMBED_DEVICE`/`DECIDE_DEVICE` gain `xpu` and `mps`. d3's ROCm fast path runs only when `AIHUB_ACCEL = rocm`.
+  - **The device:** it comes from `GAIFA_DEVICE`, and `EMBED_DEVICE`/`DECIDE_DEVICE` gain `xpu` and `mps`. d3's ROCm fast path runs only when `GAIFA_ACCEL = rocm`.
   *Done when:* both mods' tests cover the device per accel with a fake torch.
   - *As built:*
-    - **The installer:** `install.sh --accel <accel>` (default `AIHUB_ACCEL`, else `rocm`; `--cpu` stays). ROCm on gfx1151 (or with no arch known) installs today's lock. Anything else installs `requirements.txt` from `torch_index.py`'s index, copied with `device.py` from the template. The setup's single step, `aihub install <mod>`, passes the variant through `AIHUB_ACCEL`.
-    - **The device:** embed's `encoder.choose` and decide's loader take it from `device.device(want)`: `auto` means `AIHUB_DEVICE`, else what torch reaches, falling back to the CPU when the variant's device is gone. bf16 runs on CUDA/ROCm and xpu, fp32 elsewhere. Caches are emptied per device.
+    - **The installer:** `install.sh --accel <accel>` (default `GAIFA_ACCEL`, else `rocm`; `--cpu` stays). ROCm on gfx1151 (or with no arch known) installs today's lock. Anything else installs `requirements.txt` from `torch_index.py`'s index, copied with `device.py` from the template. The setup's single step, `gaifa install <mod>`, passes the variant through `GAIFA_ACCEL`.
+    - **The device:** embed's `encoder.choose` and decide's loader take it from `device.device(want)`: `auto` means `GAIFA_DEVICE`, else what torch reaches, falling back to the CPU when the variant's device is gone. bf16 runs on CUDA/ROCm and xpu, fp32 elsewhere. Caches are emptied per device.
     - **Not changed:** d3's ROCm fast path lives in the model's own hashed code (`d3_fast.py`), and that code decides it.
     - **The variants**, in order: rocm (tested), cuda, xpu, mps, cpu.
     - **Checked live:** after a restart on the installed hub, embed encoded a sentence and decide loaded d3-lite, both on `cuda` (ROCm) in bf16, as before.
@@ -417,7 +417,7 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
 - [x] **39.4 tts: the multi-backend planner becomes the install.** `scripts/install-runtime.sh` takes `--accel` and follows `engines/probe.py`'s plan for indexes other than gfx1151's. Kokoro runs on every accel. Breeze has `rocm` (tested), `cuda` (untested) and `cpu` behind its flag.
   *Done when:* tts's tests cover the plan per accel; `install-runtime.sh --accel cpu --dry-run` prints a CPU-only plan.
   - *As built:*
-    - **The installer:** `install-runtime.sh` takes `--accel` (default `AIHUB_ACCEL`, else `rocm`), `--allow-cpu-breeze` and `--dry-run`. gfx1151 runs today's lock commands unchanged. Elsewhere it calls `engines/install.sh` and `engines/breeze/install.sh` with the accelerator's index from a copy of `torch_index.py`.
+    - **The installer:** `install-runtime.sh` takes `--accel` (default `GAIFA_ACCEL`, else `rocm`), `--allow-cpu-breeze` and `--dry-run`. gfx1151 runs today's lock commands unchanged. Elsewhere it calls `engines/install.sh` and `engines/breeze/install.sh` with the accelerator's index from a copy of `torch_index.py`.
     - **The probe stays as it was:** its choices live in the script's flags, not in a call to `probe.py`, which reads the machine itself and can't be told an accel.
     - **The setup docs:**
       - Kokoro declares rocm (tested), cuda, xpu, mps and cpu.
@@ -430,37 +430,37 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
     - `cuda`: PyPI's wheel plus the cuBLAS/cuDNN pip packages.
     - `rocm`: today's overlay.
     - `cpu`: everywhere.
-  - **Detection:** `stt/asr/acceleration.py` reads `AIHUB_ACCEL` first, before its own probe.
+  - **Detection:** `stt/asr/acceleration.py` reads `GAIFA_ACCEL` first, before its own probe.
   *Done when:* stt's tests cover the device per accel.
   - *As built:*
-    - **The installer:** `install.sh --accel` (default `AIHUB_ACCEL`, else rocm where `/dev/kfd` exists, else cpu, which is the old behaviour).
+    - **The installer:** `install.sh --accel` (default `GAIFA_ACCEL`, else rocm where `/dev/kfd` exists, else cpu, which is the old behaviour).
       - **rocm** keeps the ROCm CTranslate2 overlay.
       - **cuda** adds `nvidia-cublas-cu12` and `nvidia-cudnn-cu12` 9, found through `[run.variants.cuda]`'s `LD_LIBRARY_PATH`.
       - **cpu** keeps PyPI's build.
-    - **The device:** `acceleration.detect_hardware()` reads `AIHUB_ACCEL` first, so the gfx1151 int8 guard applies only to the rocm variant.
+    - **The device:** `acceleration.detect_hardware()` reads `GAIFA_ACCEL` first, so the gfx1151 int8 guard applies only to the rocm variant.
     - **The setup doc:** rocm (tested), cuda, then cpu (tested on Linux). The CUDA and CPU variants don't need `curl` and `unzip`.
     - **Tests:** `services/stt/tests/test_accel.py` (3). stt's 82 pass, and its live check passes here.
 
 - [x] **39.6 comfy: a native ComfyUI next to the toolbox.**
   - **The native install:** `bin/comfyui` gains a native mode: a venv in `services/comfy/runtime/ComfyUI/` at a pinned commit, with torch per accel (`cuda`, `xpu`, `mps`, `cpu`).
   - **This machine:** the `rocm` variant is today's toolbox, unchanged.
-  - **The workarounds:** the gfx1151 ones apply only when `AIHUB_GPU_ARCH = gfx1151`.
+  - **The workarounds:** the gfx1151 ones apply only when `GAIFA_GPU_ARCH = gfx1151`.
   - **Packs:** they gain an optional `requires`.
   *Done when:* comfy's tests cover the launch per mode, and `requires` filtering.
   - *As built:*
-    - **Native mode is its own script:** `bin/comfyui-native` (install, start, stop, quit, restart, status, logs, command) rather than a mode inside `bin/comfyui`. `bin/comfyui` dispatches to it unless the variant is ROCm on gfx1151, or `AIHUB_ACCEL` is unset as on this machine, and `bin/comfyui runtime` prints the choice.
+    - **Native mode is its own script:** `bin/comfyui-native` (install, start, stop, quit, restart, status, logs, command) rather than a mode inside `bin/comfyui`. `bin/comfyui` dispatches to it unless the variant is ROCm on gfx1151, or `GAIFA_ACCEL` is unset as on this machine, and `bin/comfyui runtime` prints the choice.
     - **What the native install makes:** ComfyUI at the toolbox's commit (0.37.0), and `runtime/venv` (gitignored) with PyTorch from the variant's index, ComfyUI-Manager, `gguf` and the custom nodes' requirements.
-    - **The gfx1151 workarounds:** the launch flags `--disable-mmap` and `--fp32-vae` stay with the toolbox. AIHub's nodes need no gating: their Qwen-VL matmul is exact on every GPU.
+    - **The gfx1151 workarounds:** the launch flags `--disable-mmap` and `--fp32-vae` stay with the toolbox. GAIFA's nodes need no gating: their Qwen-VL matmul is exact on every GPU.
     - **Packs:** `requires` in `workflow.toml` keeps a pack off the agent's tools where the comfy variant isn't listed.
     - **The setup doc:** rocm (the toolbox, tested); cuda, xpu, mps and cpu run natively with their own steps (the adapter, the optional custom nodes, `bin/comfyui-native install`).
-    - **Tests:** `services/comfy/tests/test_runtime.py` (3), and a `requires` test in `test_tools.py`; comfy's 153 pass. The restarted adapter passes `aihub check comfy`.
+    - **Tests:** `services/comfy/tests/test_runtime.py` (3), and a `requires` test in `test_tools.py`; comfy's 153 pass. The restarted adapter passes `gaifa check comfy`.
     - **Seen on the way, not changed:** `comfyui workflows check --all` fails two packs whose models aren't on this machine (`ae.safetensors`, `z_image_turbo_bf16.safetensors`).
 
-- [x] **39.7 gen3d: a CUDA path for the workers.** A `cuda` variant runs the workers in a pinned PyTorch CUDA image, with real spconv, gsplat and kaolin instead of the shims. The workers take `AIHUB_DEVICE`; the ROCm environment is set only for `rocm`; the container flags come from 37.4's helper.
+- [x] **39.7 gen3d: a CUDA path for the workers.** A `cuda` variant runs the workers in a pinned PyTorch CUDA image, with real spconv, gsplat and kaolin instead of the shims. The workers take `GAIFA_DEVICE`; the ROCm environment is set only for `rocm`; the container flags come from 37.4's helper.
   *Done when:* gen3d's tests cover the worker command per accel.
   - *As built:*
     - **No CUDA image:** the CUDA variant runs the workers **on the host**, from venvs that `scripts/install-runtime.sh --accel cuda` builds: Python 3.13 from uv, PyTorch from the CUDA index, the same locks and layering, and pytorch3d from source. Real spconv, gsplat and kaolin wheels aren't installed: the shims (pure PyTorch) work the same on CUDA as on ROCm, and the real wheels would be a later speed-up.
-    - **The worker** (`settings.accel` from `AIHUB_ACCEL`, default rocm) runs `bash -c 'source <venv> && exec python -u <worker>'` with the container's environment minus ROCm's, plus `PYTORCH_CUDA_ALLOC_CONF`. It's killed through its process group and skips the container cleanup. The workers' `"cuda"` device strings already fit both ROCm and CUDA.
+    - **The worker** (`settings.accel` from `GAIFA_ACCEL`, default rocm) runs `bash -c 'source <venv> && exec python -u <worker>'` with the container's environment minus ROCm's, plus `PYTORCH_CUDA_ALLOC_CONF`. It's killed through its process group and skips the container cleanup. The workers' `"cuda"` device strings already fit both ROCm and CUDA.
     - **The setup docs:** the base doc declares rocm (tested) and cuda, with its own steps and a check without the image. The three engine docs declare both.
     - **Tests:** `services/gen3d/tests/test_worker_accel.py` (3), and the picks per machine. gen3d's 103 pass.
 
@@ -476,10 +476,10 @@ Variants not run on real hardware ship `tested = false`, until a field report (4
 
 ## Phase 40 — Field reports and the support matrix (M)
 
-The user builds AIHub on the other machines later, with an agent. The agent follows a procedure, records every problem as it goes, and ends with one markdown file, written for a fixer working in this repo. That file says which file and line to change, with the exact command, output and versions behind each issue.
+The user builds GAIFA on the other machines later, with an agent. The agent follows a procedure, records every problem as it goes, and ends with one markdown file, written for a fixer working in this repo. That file says which file and line to change, with the exact command, output and versions behind each issue.
 
 - [x] **40.1 The setup keeps what it saw: full logs and the saved report.**
-  - **Full logs:** `aihub setup` writes each step's, check's and smoke's full output to `data/state/setup/logs/<step-id>.log` (capped at 2 MB each), alongside the 4000-character tail it keeps today (`utils/cli_setup_run.py` `Runner.run`).
+  - **Full logs:** `gaifa setup` writes each step's, check's and smoke's full output to `data/state/setup/logs/<step-id>.log` (capped at 2 MB each), alongside the 4000-character tail it keeps today (`utils/cli_setup_run.py` `Runner.run`).
   - **The saved report:** every run saves its report, the plan and the chosen variants to `data/state/setup/last-run.json`, whether it ended done, failed or stopped.
   - **Where each failure comes from:** a failure item gains `log` (its log file) and `source`, the setup doc's path and the line of its step, read when the doc is parsed (`utils/setupdocs/envs.py`).
   *Done when:* `utils/tests/core/test_cli_setup.py` covers a failed step's log file, `source` line and the saved report.
@@ -489,69 +489,69 @@ The user builds AIHub on the other machines later, with an agent. The agent foll
     - **The last run:** `data/state/setup/last-run.json` (machine, targets, plan with variants, the report or the stop) is written for runs, not for `--plan`.
     - **Tests:** `utils/tests/core/test_setup_logs.py` (4).
 
-- [x] **40.2 `aihub report`: the field report (`utils/cli_report.py`, standard library only).**
-  - **Notes:** `aihub report note "<what happened>" [--cmd "<command>"] [--output <file>] [--setup <id>] [--severity blocker|major|minor] [--tried "<what was tried>"]` appends an observation to `data/state/reports/notes.jsonl`.
-  - **The report:** `aihub report [--out <file>]` writes `data/state/reports/<date>-<host>.md` (and `.json`). In order:
+- [x] **40.2 `gaifa report`: the field report (`utils/cli_report.py`, standard library only).**
+  - **Notes:** `gaifa report note "<what happened>" [--cmd "<command>"] [--output <file>] [--setup <id>] [--severity blocker|major|minor] [--tried "<what was tried>"]` appends an observation to `data/state/reports/notes.jsonl`.
+  - **The report:** `gaifa report [--out <file>]` writes `data/state/reports/<date>-<host>.md` (and `.json`). In order:
     1. **Summary:** counts by severity, and the stages that passed.
-    2. **Machine:** `aihub hardware --json`, the OS, kernel, Python, uv, podman and docker versions, driver versions, WSL.
-    3. **AIHub:** the commit, and `git status` and `git diff` of any local changes the agent made.
+    2. **Machine:** `gaifa hardware --json`, the OS, kernel, Python, uv, podman and docker versions, driver versions, WSL.
+    3. **GAIFA:** the commit, and `git status` and `git diff` of any local changes the agent made.
     4. **Host checks:** the failed ones, with their fixes.
     5. **The setup run:** the plan, the chosen variants and the last report.
     6. **Issues:** one section per failure and per note, with:
        - an id;
        - where (the setup, the step, `source`: doc path and line, the files the step runs);
        - the command and its working folder;
-       - the environment (`AIHUB_*`);
+       - the environment (`GAIFA_*`);
        - the exit code;
        - the log's last 120 lines, plus its path;
        - a **likely cause**, from a table of known patterns (a missing wheel for the index, a CUDA/driver mismatch, a missing shared library, a permission on `/dev/*`, command not found, a port in use, out of memory, a container toolkit missing, a network failure);
        - what the agent tried.
-    7. **Mods:** each mod's state, `aihub check <id>`'s output for the failing ones, and the last 80 lines of their logs.
+    7. **Mods:** each mod's state, `gaifa check <id>`'s output for the failing ones, and the last 80 lines of their logs.
     8. **The doctor's output.**
     9. **For the fixer:** how to reproduce each issue, and the files most likely to change.
   - **Redaction:** tokens and keys are redacted (`hf_…`, `sk-…`, `ghp_…`, values of `*_TOKEN`, `*_KEY`, `*_SECRET`), and the home folder is written as `~`.
   *Done when:* `utils/tests/core/test_cli_report.py` builds a report from a fake failed run, notes and fake hardware: every section is present, the patterns classify sample outputs, secrets are redacted, and the markdown is stable for a fixed input.
   - *As built:*
     - **Where the code lives:** `utils/cli_report.py` (notes, gathering, the command), `utils/report_md.py` (the markdown) and `utils/report_hints.py` (18 known patterns, each with a likely cause and where a fix goes; redaction).
-    - **Next to the report:** the hardware recording (`<name>.hardware.json`, which `aihub hardware --from` replays) and the JSON, redacted value by value.
+    - **Next to the report:** the hardware recording (`<name>.hardware.json`, which `gaifa hardware --from` replays) and the JSON, redacted value by value.
     - **When things are missing:** a hub that doesn't answer becomes a line in the report.
     - **Tests:** `test_cli_report.py` (19). A trial on this machine read well.
 
 - [x] **40.3 The field test, for an agent on another machine.**
-  - **The skill:** `.claude/skills/aihub-field-test/SKILL.md`, plus a "Testing on another machine" section in `AGENTS.md` for other agents:
-    1. Record the machine (`aihub hardware`).
+  - **The skill:** `.claude/skills/gaifa-field-test/SKILL.md`, plus a "Testing on another machine" section in `AGENTS.md` for other agents:
+    1. Record the machine (`gaifa hardware`).
     2. Ask the person which mods to try, by default all that are available.
-    3. Show `aihub setup --plan`.
+    3. Show `gaifa setup --plan`.
     4. Run it with `--smoke`.
-    5. On each failure, read its doc's What to look for, try the documented fixes within a time limit, and record each attempt with `aihub report note`. Change no tracked file unless asked; if a local workaround is needed to go on, the report's `git diff` keeps it.
-    6. Run `aihub doctor`.
-    7. Write `aihub report` and give the person its path.
+    5. On each failure, read its doc's What to look for, try the documented fixes within a time limit, and record each attempt with `gaifa report note`. Change no tracked file unless asked; if a local workaround is needed to go on, the report's `git diff` keeps it.
+    6. Run `gaifa doctor`.
+    7. Write `gaifa report` and give the person its path.
   - **Docs:** `docs/setup/README.md` (a short section).
   *Done when:* a dry run on this machine (with a mod made to fail on purpose, in a test root) produces a report whose issue names the doc line, the command and a likely cause.
   - *As built:*
-    - **The skill:** `.claude/skills/aihub-field-test/SKILL.md`, with a copy in `.agents/skills/` (plus the missing copy of `aihub-setup`).
+    - **The skill:** `.claude/skills/gaifa-field-test/SKILL.md`, with a copy in `.agents/skills/` (plus the missing copy of `gaifa-setup`).
     - **The docs:** "Testing on another machine" in `CLAUDE.md` and `AGENTS.md` (`AGENTS.md` refreshed from `CLAUDE.md`), and a paragraph in `docs/setup/README.md`.
-    - **The dry run (2026-10-22):** an export of HEAD with a `failtest` mod whose one step runs `nvcc`. `aihub setup --json --yes --smoke failtest` stopped at the failure, then one note was added and `aihub report` written. The report's issue named `services/failtest/setup/env.md:12`, the command, exit 127, its log, and the causes `cuda-toolkit` and `missing-command`. The note carried its command, output and what was tried.
+    - **The dry run (2026-10-22):** an export of HEAD with a `failtest` mod whose one step runs `nvcc`. `gaifa setup --json --yes --smoke failtest` stopped at the failure, then one note was added and `gaifa report` written. The report's issue named `services/failtest/setup/env.md:12`, the command, exit 127, its log, and the causes `cuda-toolkit` and `missing-command`. The note carried its command, output and what was tried.
     - **Fixed from it:** outside a git checkout, the report says so instead of an empty commit.
 
 - [x] **40.4 The support matrix: `docs/platforms.md`.**
-  - It lists, for each OS and accelerator, whether a mod is tested (where and when), CI only, or untested, from the variants' `tested` flags. `aihub docs` generates the table into it.
+  - It lists, for each OS and accelerator, whether a mod is tested (where and when), CI only, or untested, from the variants' `tested` flags. `gaifa docs` generates the table into it.
   - The README's and `docs/setup/README.md`'s "macOS and Windows aren't supported" become a pointer to the matrix, and CLAUDE.md's status line is updated.
-  *Done when:* `aihub docs --check` passes, and the matrix agrees with every variant's `tested` flag.
+  *Done when:* `gaifa docs --check` passes, and the matrix agrees with every variant's `tested` flag.
   - *As built:*
     - **The generator:** `render.platforms_matrix`, written by `setupdocs.sync` between markers in `docs/platforms.md`. It has one row per setup and one column per system (Linux, Windows (WSL2), macOS). Each cell lists its accels, marked ✓ tested, ○ untested, or — when the setup isn't available there.
     - **Where "where and when" lives:** each setup doc's *Tested with*.
     - **macOS:** described as CI only, for the hub's tests.
     - **The tests:** `test_setup_docs_are_current` now covers the matrix too (`--check`). `test_the_matrix_agrees_with_every_variant` reads the table back against every variant.
-    - **The other docs:** the README's requirements and known gaps point to the matrix and the host page for each machine; CLAUDE.md and AGENTS.md have the Stage N status; the `aihub-setup` skill names the host pages.
+    - **The other docs:** the README's requirements and known gaps point to the matrix and the host page for each machine; CLAUDE.md and AGENTS.md have the Stage N status; the `gaifa-setup` skill names the host pages.
 
 - [ ] **40.5 Linux with NVIDIA: the field test** (the user, later). The report comes back here; its fixes land as follow-up steps, and passing variants flip to `tested = true`.
 
 - [ ] **40.6 Windows 11, WSL2 and an Intel GPU: the field test** (the user, later). As 40.5.
 
 **Checks & deliverables — Phase 40**
-- [ ] On this machine, `aihub setup --plan` and `aihub report` work end to end, and the report reads cleanly.
-- [ ] Delivered: full setup logs and the saved run, `aihub report`, the field-test skill, `docs/platforms.md`.
+- [ ] On this machine, `gaifa setup --plan` and `gaifa report` work end to end, and the report reads cleanly.
+- [ ] Delivered: full setup logs and the saved run, `gaifa report`, the field-test skill, `docs/platforms.md`.
 
 ---
 
@@ -566,10 +566,10 @@ The user builds AIHub on the other machines later, with an agent. The agent foll
 | Detached backend | mods that outlive the hub without systemd | `utils/backends/detached.py` |
 | Host checks | per vendor and OS, fixes printed per package manager | `utils/cli_setup_gpu.py`, `utils/cli_setup_pkgs.py` |
 | Container GPU flags | per vendor and runtime, for mods | `services/_template/containers.py` |
-| Variants and smokes | setup block v3, the choice in `aihub setup`, `AIHUB_ACCEL`/`AIHUB_DEVICE` | `utils/setupdocs/block.py`, `utils/cli_setup.py`, `utils/manifest.py` |
+| Variants and smokes | setup block v3, the choice in `gaifa setup`, `GAIFA_ACCEL`/`GAIFA_DEVICE` | `utils/setupdocs/block.py`, `utils/cli_setup.py`, `utils/manifest.py` |
 | Template helpers | the torch device and the wheel index per accel | `services/_template/device.py`, `torch_index.py` |
 | Per-host docs | AMD, NVIDIA, Intel, WSL2, macOS | `docs/setup/host-*.md` |
-| Field reports | full setup logs, notes, a detailed markdown report for the fixer; the agent's procedure | `utils/cli_report.py`, `.claude/skills/aihub-field-test/` |
+| Field reports | full setup logs, notes, a detailed markdown report for the fixer; the agent's procedure | `utils/cli_report.py`, `.claude/skills/gaifa-field-test/` |
 | Support matrix | what runs where, and what was tested | `docs/platforms.md` |
 | CI | Linux and macOS test jobs | `.github/workflows/tests.yml` |
 | Tests | hardware fixtures per machine; detection, pools, devices, backends, variants, host checks, reports | `utils/tests/hardware/`, `utils/tests/memory/`, `utils/tests/gpu/`, `utils/tests/services/`, `utils/tests/core/`, each mod's `tests/` |

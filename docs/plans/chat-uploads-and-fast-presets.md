@@ -6,9 +6,9 @@ Asked for on 2026-10-10. There are three wants:
 2. The agent can use those presets, and does so when you ask in plain words ("a quick draft of…").
 3. You can upload an image from your computer in Chat and ask the agent to edit it.
 
-Today Chat attaches only existing AIHub outputs (the 📎 picker; the agent sees `output:<id>`), and the agent's task tools take only shared inputs, so `preset` is refused.
+Today Chat attaches only existing GAIFA outputs (the 📎 picker; the agent sees `output:<id>`), and the agent's task tools take only shared inputs, so `preset` is refused.
 
-The approach is to make an uploaded file an ordinary AIHub output. The picker, the agent's context, the edit tools and `output:<id>` resolution then work unchanged. The comfy task tools get one new argument, `preset`.
+The approach is to make an uploaded file an ordinary GAIFA output. The picker, the agent's context, the edit tools and `output:<id>` resolution then work unchanged. The comfy task tools get one new argument, `preset`.
 
 It touches the comfy mod (architecture §11, [workflows.md](../workflows.md)), the outputs index (§4.7) and a new hub route (§6, UI brief §6), plus the Chat composer (plan 14.1).
 
@@ -55,7 +55,7 @@ It touches the comfy mod (architecture §11, [workflows.md](../workflows.md)), t
     - **A scene cut-out left out what to keep.** The model guesses the subject, and on a frame-filling storefront it kept only the window frames. A bare noun as the instruction returns the photo unchanged. So the remove-bg packs have a `template` on `prompt` ("the storefront" → "Extract the storefront in <image1> and remove everything else. Output a PNG image."), and `[tasks.remove-background.inputs]` tells the agent what `prompt` means there.
     - **This model still often omits `prompt` for remove-bg.** The card shows the field with that hint, and typing "the storefront" there gave a clean cut-out in 69 s.
 
-Commits: one per step once its tests pass, `AIHub (chat/comfy U.k): <sentence>`.
+Commits: one per step once its tests pass, `GAIFA (chat/comfy U.k): <sentence>`.
 
 ## Deliverables
 
@@ -64,6 +64,6 @@ Commits: one per step once its tests pass, `AIHub (chat/comfy U.k): <sentence>`.
 | Presets | `fast` / `draft` on the Turbo packs | `services/comfy/workflows/qwen21-turbo-*/workflow.toml` |
 | Preset argument | task tools take `preset` | `services/comfy/comfy/tools.py`, `api_run.py` |
 | Agent guide | plain words → preset | `services/comfy/skills/choosing-a-workflow/SKILL.md` |
-| Upload route | a file → an AIHub output | `utils/outputs/upload.py`, `utils/routes/outputs.py`, `web/api.js` |
+| Upload route | a file → a GAIFA output | `utils/outputs/upload.py`, `utils/routes/outputs.py`, `web/api.js` |
 | Composer upload | button, drop, paste | `web/chat/chat-composer.js`, `web/chat/chat.js` |
 | Tests | presets, tool schema and calls, uploads, the UI helper | `services/comfy/tests/`, `utils/tests/outputs/test_upload.py`, `utils/tests/web/` |

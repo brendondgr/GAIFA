@@ -1,6 +1,6 @@
-# Claude Design Brief: AIHub — one control panel for every local AI service
+# Claude Design Brief: GAIFA — one control panel for every local AI service
 
-> Companion docs: [architecture.md](architecture.md) (how AIHub works) and [backend-plan.md](backend-plan.md) (backend build steps). Section 6 of this brief, plus the additions in Section 11.7, is the authoritative contract for the UI-facing API.
+> Companion docs: [architecture.md](architecture.md) (how GAIFA works) and [backend-plan.md](backend-plan.md) (backend build steps). Section 6 of this brief, plus the additions in Section 11.7, is the authoritative contract for the UI-facing API.
 >
 > **Status (2026-10-04):** **Part A v1 is delivered.** Claude Design exported it in its `.dc.html` format; the reference copy is in [reference/ui-export-2026-10-04/](reference/ui-export-2026-10-04/README.md). It is the visual and structural baseline for everything else.
 > - **Part A revision 2** (Section 11) was built by hand in this repo (backend-plan 6.5, 2026-10-05); what differs from Section 11 is under §11.11. `web/` is now the baseline.
@@ -13,13 +13,13 @@
 
 ## 0. What you are building
 
-AIHub is a **fully working, interactive single-page web app**. It is the one control panel for every AI service on one Linux workstation: a relay with an analytics dashboard for language models, a llama.cpp model launcher, a text-to-speech server with voice cloning, a 3D asset generator, and later ComfyUI for image and video generation, plus a chat agent that drives all of them.
+GAIFA is a **fully working, interactive single-page web app**. It is the one control panel for every AI service on one Linux workstation: a relay with an analytics dashboard for language models, a llama.cpp model launcher, a text-to-speech server with voice cloning, a 3D asset generator, and later ComfyUI for image and video generation, plus a chat agent that drives all of them.
 
-Each service is a **mod**: a folder in `services/` that runs as its own local HTTP server. The AIHub backend (`app.py`, at `http://127.0.0.1:7000/`) discovers the mods, starts and stops them, proxies their APIs, tracks memory, indexes everything they produce, and serves this UI. **Anyone can add a mod by dropping a folder into `services/`.** The UI must therefore work for services it has never heard of. That is the most important design requirement in this brief.
+Each service is a **mod**: a folder in `services/` that runs as its own local HTTP server. The GAIFA backend (`app.py`, at `http://127.0.0.1:7000/`) discovers the mods, starts and stops them, proxies their APIs, tracks memory, indexes everything they produce, and serves this UI. **Anyone can add a mod by dropping a folder into `services/`.** The UI must therefore work for services it has never heard of. That is the most important design requirement in this brief.
 
-**Everything runs on this one machine.** The AIHub binds to 127.0.0.1 only. There is no login, no accounts and no multi-user handling.
+**Everything runs on this one machine.** The GAIFA binds to 127.0.0.1 only. There is no login, no accounts and no multi-user handling.
 
-The page must work on its own in the browser **against a built-in mock API** that behaves like the real AIHub (Section 7). One switch (Section 6.1) changes it to the real API without touching any UI code.
+The page must work on its own in the browser **against a built-in mock API** that behaves like the real GAIFA (Section 7). One switch (Section 6.1) changes it to the real API without touching any UI code.
 
 ---
 
@@ -29,7 +29,7 @@ The page must work on its own in the browser **against a built-in mock API** tha
 2. **No framework.** Vanilla JS (`fetch`, `EventSource`, `<template>`, `<dialog>`, custom elements where helpful). No React, Vue, Tailwind or component libraries.
 3. **External requests**: only Google Fonts (**IBM Plex Sans**, **JetBrains Mono**), with good system fallbacks. No CDNs, no analytics, no icon fonts, no remote images. Icons are inline SVG.
 4. **All data access goes through one `api` object** (Section 6) with exactly the listed method names. UI code never calls `fetch` directly.
-5. **Mock mode is the default** in the design environment. Live mode is chosen by `window.AIHUB_API_BASE` being set, or by the URL query `?live`.
+5. **Mock mode is the default** in the design environment. Live mode is chosen by `window.GAIFA_API_BASE` being set, or by the URL query `?live`.
 6. Works in current Chromium and Firefox from **360 px to 2560 px** wide.
 7. **File layout** (exactly this; it becomes the project's `web/` folder):
 
@@ -44,7 +44,7 @@ web/
 ├── js/
 │   ├── app.js            boot, shell, hash router, shortcuts, command palette
 │   ├── api.js            ApiError + createHttpApi(base): the contract in Section 6
-│   ├── mock.js           createMockApi(): in-memory AIHub + services with simulated time
+│   ├── mock.js           createMockApi(): in-memory GAIFA + services with simulated time
 │   ├── store.js          state, SSE subscription, polling fallback
 │   ├── components.js     the design system (ES module exporting DOM factories)
 │   ├── charts.js         dependency-free SVG charts
@@ -71,7 +71,7 @@ Claude Design delivers its own `.dc.html` format:
 - the generated runtime `support.js`, which renders through React 18
 
 We keep this format as the **source of truth**, so Claude Design can keep iterating on the real UI rather than on a hand-port. The rules that still apply:
-- **React and ReactDOM load from `web/vendor/`.** AIHub serves `Hub.dc.html` with local `react` and `react-dom` scripts placed before `support.js`; the runtime then skips its unpkg download. No other CDN is allowed, and nothing needs `.jsx`/`.tsx` (so no Babel).
+- **React and ReactDOM load from `web/vendor/`.** GAIFA serves `Hub.dc.html` with local `react` and `react-dom` scripts placed before `support.js`; the runtime then skips its unpkg download. No other CDN is allowed, and nothing needs `.jsx`/`.tsx` (so no Babel).
 - **All data goes through the `api` object** (Section 6).
 - **`mock.js` stays a plain ES module** exporting `createMockApi()`.
 - **New shared components go in their own `X.dc.html` files,** like `OutputCard` and `JsonView`. This includes every chart in Section 11.6.
@@ -81,7 +81,7 @@ We keep this format as the **source of truth**, so Claude Design can keep iterat
 
 ## 2. Visual direction
 
-AIHub belongs to the same product family as the existing Relay dashboard and lcpp: a **dense, calm operator console, dark-first**. Use the attached lcpp `tokens.css` / `components.css` / `components.js` as the starting point. Keep the token names, convert `components.js` to an ES module, and add the new components listed in Section 2.1.
+GAIFA belongs to the same product family as the existing Relay dashboard and lcpp: a **dense, calm operator console, dark-first**. Use the attached lcpp `tokens.css` / `components.css` / `components.js` as the starting point. Keep the token names, convert `components.js` to an ES module, and add the new components listed in Section 2.1.
 
 | Token | Dark | Use |
 | --- | --- | --- |
@@ -138,13 +138,13 @@ Keep lcpp's set (Button, Badge, Chip, StatusDot, Toggle, Segmented, Field, Memor
 **Desktop (≥ 1024 px)**: left sidebar + main content. **Tablet and phone**: top bar with a menu button, one-column content, dialogs become full-screen sheets.
 
 **Sidebar**, top to bottom:
-1. Logo + "AIHub"
+1. Logo + "GAIFA"
 2. **Overview** (default view)
 3. **Chat**: present but **disabled** with a "Coming later" tooltip. The shell must leave room for a full-height chat view with a right-hand side panel later, without a redesign.
 4. Section label **SERVICES**: **one nav item per service, generated from `api.listServices()`**, in the configured order. Each item has the service icon, its name and a status dot. Mods that failed to load show a red dot and still appear.
 5. Section label **LIBRARY**: **Models**, **Outputs**
 6. **Settings**
-7. Footer: AIHub status dot + version, and a `MOCK` badge in mock mode.
+7. Footer: GAIFA status dot + version, and a `MOCK` badge in mock mode.
 
 **As built (plan 33, 2026-10-21; `web/nav/`):** the sidebar has three groups. **Overview**, **Chat**, **Outputs** sit on top; the services are in the middle; **Learning** (while the agent mod is installed), **Models** and **Settings** are at the bottom. The top and bottom groups stay put and only the services scroll. The services show in one of three ways (`Settings.ui.nav.services`):
 - `list`: a **SERVICES** header that folds the list (its counts show while folded), one item per listed mod (its logo, name and a state dot), then **See all**, always.
@@ -160,7 +160,7 @@ Every mod has a logo (`ServiceSummary.logo_url`); one without gets a monogram on
 **See all** opens the **Services page** `#/services`. It has the counts, filter chips (All · Active · Inactive · Failed), a search, *Sidebar shows* (List · Button · Button with counts), and a card per mod (listed or not): logo, name, id, state, description, port, memory, version, Open, Start or Stop, and an *In sidebar* switch. The header Search has the page and **Collapse / Expand the sidebar**.
 
 **Persistent header** (every view):
-- **Where you are** (plan 33.5): the page's icon (a mod's logo on its page) and its name, then `/` and the tab or Settings section ("Speech / Voices"). The AIHub mark and name are only in the sidebar.
+- **Where you are** (plan 33.5): the page's icon (a mod's logo on its page) and its name, then `/` and the tab or Settings section ("Speech / Voices"). The GAIFA mark and name are only in the sidebar.
 - **Memory meter**: unified memory used / total (this machine shares one memory pool between CPU and GPU). It turns amber above 80% and red above 92%. Clicking it opens a popover with the `MemoryBar` broken down by service.
 - **Running jobs chip** ("2 running"), shown only when a service reports jobs. Clicking opens a popover listing them with progress and links.
 - **Activity bell**: an unread count, and a popover with the last 30 activity items.
@@ -185,7 +185,7 @@ Every mod has a logo (`ServiceSummary.logo_url`); one without gets a monogram on
   - Up to 4 **stats** supplied by the service (e.g. "Voices 3", "Requests today 1,284").
   - Quick actions: Start/Stop, Load/Unload, Open. Destructive actions confirm.
   - A tile for a mod with a manifest error shows the error and a "Show details" link instead of actions.
-- **Memory panel**: `MemoryBar` (services + other + free, with the reserve marked), a total line ("33.1 / 121.0 GB · 12 GB reserved"), and a table of services sorted by memory with used, estimate, idle time and whether the AIHub may auto-unload them.
+- **Memory panel**: `MemoryBar` (services + other + free, with the reserve marked), a total line ("33.1 / 121.0 GB · 12 GB reserved"), and a table of services sorted by memory with used, estimate, idle time and whether the GAIFA may auto-unload them.
 - **Recent outputs**: horizontal strip of the 8 newest `OutputCard`s, plus "View all".
 - **Activity**: the latest 15 activity items (time, service icon, text, link).
 
@@ -203,16 +203,16 @@ Every mod has a logo (`ServiceSummary.logo_url`); one without gets a monogram on
    - Operations come from `api.listOperations(id)`, grouped by tag, with a filter box. Each row shows the method badge, path (mono) and summary. It also shows a purple **tool** badge when the operation is exposed to the future agent, and a red **destructive** badge.
    - Selecting an operation opens a panel: description, a `SchemaForm` for path/query params and the body, and a **Send** button (destructive operations confirm first).
    - The **response viewer** is chosen by `response` kind: `json` → `JsonView`, `audio` → `AudioPlayer`, `image` → `ImageView`, `video` → `VideoPlayer`, `model3d` → `Viewer3D`, `file` → download link, `stream` → a live log of SSE lines with a Stop button, `empty` → status only. It always shows the HTTP status and timing.
-   - A **Copy as curl** button for the request, using the AIHub URL `http://127.0.0.1:7000/api/s/<id><path>`.
+   - A **Copy as curl** button for the request, using the GAIFA URL `http://127.0.0.1:7000/api/s/<id><path>`.
 5. **Logs**: a live tail with the same behavior as lcpp's logs drawer. Follow toggle (auto-off when the user scrolls up, with a "↓ N new" pill), filter, wrap, copy, download, and a line-count select (200/1000/5000). Lines containing `error`/`failed` are red and `warn` lines are amber.
 6. **Settings**: a form for this service's section of `config.toml`.
-   - Enabled, autostart, port, idle-unload seconds (or "never"), "AIHub may auto-unload this service to make room", priority (lower is unloaded first), environment overrides (`KeyValueEditor`).
+   - Enabled, autostart, port, idle-unload seconds (or "never"), "GAIFA may auto-unload this service to make room", priority (lower is unloaded first), environment overrides (`KeyValueEditor`).
    - Save and Revert, with a "restart required" note where relevant.
    - A read-only **Manifest** card shows the parsed `service.toml` and any manifest errors.
 
-**Service unreachable** (AIHub up, service down): an inline banner on the page ("Speech is not responding on 127.0.0.1:5040") with Start/Restart and a link to Logs. Custom tabs show their own empty state rather than crashing.
+**Service unreachable** (GAIFA up, service down): an inline banner on the page ("Speech is not responding on 127.0.0.1:5040") with Start/Restart and a link to Logs. Custom tabs show their own empty state rather than crashing.
 
-**Make room dialog**: when `loadService` is rejected with `needs_room`, show the `plan`. Example: "Loading **3D Generate** needs ~52 GB, 31 GB available. AIHub will unload: **Speech** (frees 9.2 GB, idle 12m) and **Images & Video** (frees 24.0 GB, idle 40m)."
+**Make room dialog**: when `loadService` is rejected with `needs_room`, show the `plan`. Example: "Loading **3D Generate** needs ~52 GB, 31 GB available. GAIFA will unload: **Speech** (frees 9.2 GB, idle 12m) and **Images & Video** (frees 24.0 GB, idle 40m)."
 - Buttons: [Cancel] and [Unload & continue].
 - If `enough` is false, explain what is still missing and offer only [Cancel].
 
@@ -264,8 +264,8 @@ The real backend indexes `outputs/<service>/<YYYY-MM-DD>/…`. This page is the 
 One page with sections (hash `#/settings/<section>`), Save and Revert, an unsaved-changes guard, and restart-required notes:
 
 - **General**:
-  - AIHub port (default 7000), with the note "Bound to 127.0.0.1 — this machine only"
-  - AIHub version, PID, uptime and memory
+  - GAIFA port (default 7000), with the note "Bound to 127.0.0.1 — this machine only"
+  - GAIFA version, PID, uptime and memory
 - **Paths** (read-only, with sizes and disk free): project root, `data/models`, `data/databases`, `outputs`.
 - **Memory**:
   - reserve (GB kept free)
@@ -275,15 +275,15 @@ One page with sections (hash `#/settings/<section>`), Save and Revert, an unsave
 - **Services**:
   - every folder found in `services/`, including broken mods with their errors
   - per service: enabled toggle, autostart toggle, and sidebar order (up/down)
-  - an **"Add a mod"** card explaining the three steps (`bin/aihub new <id>`, edit `services/<id>/service.toml`, restart the AIHub), with a link to the template
+  - an **"Add a mod"** card explaining the three steps (`bin/gaifa new <id>`, edit `services/<id>/service.toml`, restart the GAIFA), with a link to the template
 - **Interface**: theme (System/Light/Dark), density (Comfortable/Compact).
-- **About**: versions, and the CLI equivalents `bin/aihub status`, `bin/aihub start <id>`, `bin/aihub logs <id> -f`, `bin/aihub new <id>`. A **Hardware** card (plan 35.2) shows `getHardware()`: the system line (OS, CPU, memory), one row per GPU (name, arch, unified or dedicated memory, runtimes, what it can run, and any problem in amber), and the accelerators AIHub can use here, with Read again. A **Doctor** panel (plan 12.4) runs `getDoctor()`: the counts, then the warn and fail checks with their fixes, the rest folded; a Run again button. `aihub doctor` prints the same report.
+- **About**: versions, and the CLI equivalents `bin/gaifa status`, `bin/gaifa start <id>`, `bin/gaifa logs <id> -f`, `bin/gaifa new <id>`. A **Hardware** card (plan 35.2) shows `getHardware()`: the system line (OS, CPU, memory), one row per GPU (name, arch, unified or dedicated memory, runtimes, what it can run, and any problem in amber), and the accelerators GAIFA can use here, with Read again. A **Doctor** panel (plan 12.4) runs `getDoctor()`: the counts, then the warn and fail checks with their fixes, the rest folded; a Run again button. `gaifa doctor` prints the same report.
 
 ---
 
 ## 5. The page-module contract (how a service brings its own UI)
 
-A service may ship `services/<id>/ui/page.js`. The real AIHub serves it at `/ui/services/<id>/page.js`, and the shell loads it with a dynamic `import()` when `has_page` is true. A page module is plain ES and imports the design system from the AIHub:
+A service may ship `services/<id>/ui/page.js`. The real GAIFA serves it at `/ui/services/<id>/page.js`, and the shell loads it with a dynamic `import()` when `has_page` is true. A page module is plain ES and imports the design system from the GAIFA:
 
 ```js
 // services/<id>/ui/page.js
@@ -305,11 +305,11 @@ export default {
 | `ctx.service` | the current `ServiceDetail` (kept fresh by the shell) |
 | `ctx.tab`, `ctx.params` | current tab id and hash query params (`#/s/tts/voices?edit=hope`) |
 | `ctx.call(method, path, opts)` | shorthand for `api.callService(ctx.service.id, method, path, opts)` |
-| `ctx.api` | the full AIHub `api` object (e.g. to list outputs or models) |
+| `ctx.api` | the full GAIFA `api` object (e.g. to list outputs or models) |
 | `ctx.ui` | the components module |
 | `ctx.toast(msg, level)`, `ctx.confirm({title, body, danger})` | shell helpers |
 | `ctx.navigate(route)` | change the hash route |
-| `ctx.on(eventType, fn)` | subscribe to AIHub events; returns an unsubscribe function; auto-cleaned on unmount |
+| `ctx.on(eventType, fn)` | subscribe to GAIFA events; returns an unsubscribe function; auto-cleaned on unmount |
 
 Rules: a page module never calls `fetch` directly, never styles with raw colors, and handles "service not running" by showing an `EmptyState` with a Start button.
 
@@ -322,23 +322,23 @@ Rules: a page module never calls `fetch` directly, never styles with raw colors,
 | Format | Who uses it | How it loads |
 |---|---|---|
 | **`ui/page.js`**, the ES module above | any mod, with no Claude Design needed | The shell hosts it in a `ModPage.dc.html` component, which calls `mount(el, ctx)` on a ref and runs the cleanup on unmount. |
-| **`ui/Page.dc.html`**, a dc component | the built-in mods, whose pages Claude Design draws in Part B | AIHub serves `services/<id>/ui/Page.dc.html` at `./Mod_<id>.dc.html`, and the shell's `<dc-import>` loads it like any other component. backend-plan step 2.9 checks whether `dc-import` accepts a dynamic name. If it doesn't, the shell keeps a small static list of built-in pages. |
+| **`ui/Page.dc.html`**, a dc component | the built-in mods, whose pages Claude Design draws in Part B | GAIFA serves `services/<id>/ui/Page.dc.html` at `./Mod_<id>.dc.html`, and the shell's `<dc-import>` loads it like any other component. backend-plan step 2.9 checks whether `dc-import` accepts a dynamic name. If it doesn't, the shell keeps a small static list of built-in pages. |
 
 The Example mod's **Hello** tab, which v1 built into `Hub.dc.html`, moves out to `services/_template/ui/page.js` as the reference `page.js` module.
 
-**Part A delivers one example module**, `services/_template/ui/page.js`, for the mock service **Example** (Section 7). It has one tab, **Hello**: a name field, a call to `GET /v1/hello?name=…`, and the JSON result in a `Card`. It also shows a toast on errors. This file becomes the template that `bin/aihub new` copies, so keep it short and commented.
+**Part A delivers one example module**, `services/_template/ui/page.js`, for the mock service **Example** (Section 7). It has one tab, **Hello**: a name field, a call to `GET /v1/hello?name=…`, and the JSON result in a `Card`. It also shows a toast on errors. This file becomes the template that `bin/gaifa new` copies, so keep it short and commented.
 
 ---
 
 ## 6. The `api` object (exact contract)
 
-These are also the real AIHub's HTTP routes. All methods return Promises that resolve to the documented JSON, or reject with `ApiError { status, detail, code, data }`.
+These are also the real GAIFA's HTTP routes. All methods return Promises that resolve to the documented JSON, or reject with `ApiError { status, detail, code, data }`.
 
 ### 6.1 Mode switch
 
 ```js
-const LIVE = !!window.AIHUB_API_BASE || new URLSearchParams(location.search).has('live');
-const BASE = window.AIHUB_API_BASE || '';
+const LIVE = !!window.GAIFA_API_BASE || new URLSearchParams(location.search).has('live');
+const BASE = window.GAIFA_API_BASE || '';
 export const api = LIVE ? createHttpApi(BASE) : createMockApi();
 ```
 
@@ -347,16 +347,16 @@ export const api = LIVE ? createHttpApi(BASE) : createMockApi();
 ```js
 import { createMockApi } from './mock.js';
 import { createApi } from './api.js';
-// The real AIHub serves /config.js, which sets AIHUB_API_BASE and AIHUB_LIVE_AREAS.
-const areas = window.AIHUB_LIVE_AREAS || [];      // e.g. ['system','services','logs','operations','proxy','events']
+// The real GAIFA serves /config.js, which sets GAIFA_API_BASE and GAIFA_LIVE_AREAS.
+const areas = window.GAIFA_LIVE_AREAS || [];      // e.g. ['system','services','logs','operations','proxy','events']
 const forceMock = new URLSearchParams(location.search).has('mock');
-export const api = createApi({ base: window.AIHUB_API_BASE ?? null, liveAreas: forceMock ? [] : areas, mock: createMockApi() });
+export const api = createApi({ base: window.GAIFA_API_BASE ?? null, liveAreas: forceMock ? [] : areas, mock: createMockApi() });
 ```
 
 - **Methods in a live area** call HTTP. Everything else answers from the mock.
 - **`subscribe`** merges live events for live areas with mock events for the rest.
 - **`api.liveAreas`** says which areas are live, so each page section can show a small **MOCK** badge while its area is still mocked. `api.isLive(area)` answers the same for one area.
-- **Errors in `callService`:** a non-2xx from the mod rejects with `upstream_error` (`detail` = the mod's message, `data.body` = its body). Hub errors carry an `X-AIHub-Error` header and reject with their own code.
+- **Errors in `callService`:** a non-2xx from the mod rejects with `upstream_error` (`detail` = the mod's message, `data.body` = its body). Hub errors carry an `X-GAIFA-Error` header and reject with their own code.
 
 Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `memory`, `models`, `outputs`, `settings`, `events`, `metrics` (Section 11.7), `widgets` (Section 11.7) and `tools`. The hub also lists `overview` once `GET /api/overview` exists (`getOverview` uses it then).
 
@@ -422,7 +422,7 @@ interface ServiceSummary {
   description: string;
   icon: string;                  // icon key from components.js
   version: string | null;
-  kind: "process" | "external";  // external = AIHub does not launch it; it only health-checks and proxies it
+  kind: "process" | "external";  // external = GAIFA does not launch it; it only health-checks and proxies it
   port: number;
   url: string;                   // "http://127.0.0.1:5040"
   state: ServiceState;
@@ -464,7 +464,7 @@ interface ServiceDetail extends ServiceSummary {
 interface ServiceConfig {
   enabled: boolean; autostart: boolean; port: number;
   idle_unload_s: number | null;  // null = never
-  auto_unload: boolean;          // AIHub may unload it to make room
+  auto_unload: boolean;          // GAIFA may unload it to make room
   priority: number;              // lower = unloaded first
   env: Record<string, string>;
   accel: string | null;          // plan 38.2: the variant installed (rocm, cuda, xpu, mps, vulkan, cpu); null: not recorded
@@ -495,7 +495,7 @@ interface Memory {
                 idle_s: number | null; auto_unload: boolean; priority: number;
                 gpu_busy_pct?: number;      // its busiest GPU engine's share since the last sample, 0–100 (plan 28.2)
                 vram_bytes?: number }[];    // its VRAM on dedicated GPUs (plan 36.1; only where there's one)
-  other_bytes: number;           // OS, desktop, browser — anything the AIHub does not own
+  other_bytes: number;           // OS, desktop, browser — anything the GAIFA does not own
   pools: { id: string; name: string; total_bytes: number; used_bytes: number; available_bytes: number }[];
                                  // plan 36.1: "system" first, then "gpu:<index>" per dedicated GPU (one entry where GPUs share the RAM)
 }
@@ -603,7 +603,7 @@ interface Overview {
 }
 
 interface Settings {
-  hub: { port: number };          // 1024–65535; a change applies after AIHub restarts (restart_required)
+  hub: { port: number };          // 1024–65535; a change applies after GAIFA restarts (restart_required)
   memory: { reserve_gb: number; auto_make_room: boolean; never_unload: string[]; priority: string[] };
   services: { order: string[]; enabled: Record<string, boolean>; autostart: Record<string, boolean> };
   ui: { theme: "system" | "light" | "dark"; density: "comfortable" | "compact";   // compact is the default
@@ -650,7 +650,7 @@ interface LogLine { ts: number; text: string; stream: "stdout" | "stderr" }
 
 The mock keeps in-memory state, applies the same validation rules, emits `HubEvent`s through `subscribe`, and simulates time. **The seed data is this real machine; use it.**
 
-**System**: AMD Ryzen AI MAX+ 395. Unified memory 121.0 GB total (~33 GB used at start). GPU "AMD Radeon 8060S (Strix Halo)": VRAM 4.0 GB, GTT 121.5 GB. Disk 952 GB with 450 GB free. AIHub v0.1.0 on port 7000, RSS ~90 MB.
+**System**: AMD Ryzen AI MAX+ 395. Unified memory 121.0 GB total (~33 GB used at start). GPU "AMD Radeon 8060S (Strix Halo)": VRAM 4.0 GB, GTT 121.5 GB. Disk 952 GB with 450 GB free. GAIFA v0.1.0 on port 7000, RSS ~90 MB.
 
 **Services** (sidebar order as listed):
 
@@ -724,7 +724,7 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 - **Delete output** removes it and emits `output_deleted`.
 
 **Mock scenario panel** (mock only, `Shift+D`):
-- AIHub down: every call rejects; show a full-width banner "AIHub not responding at 127.0.0.1:7000" with a retry countdown and the hint `bin/aihub start`.
+- GAIFA down: every call rejects; show a full-width banner "GAIFA not responding at 127.0.0.1:7000" with a retry countdown and the hint `bin/gaifa start`.
 - Fail a service: pick one; it goes to `failed` with an error and log lines.
 - Memory pressure: preload `comfy` and `tts` so the make-room path triggers.
 - Install a broken mod: add service `broken` with `manifest_errors: ["service.toml: missing [run].port"]`.
@@ -736,7 +736,7 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 
 ## 8. States checklist (each must be designed and reachable)
 
-- First load: skeleton, then data. AIHub down banner and its recovery. A dropped event stream while the hub still answers is not "down": the UI checks with `GET /api/overview`, reopens the stream and refetches without the banner (Firefox drops quiet connections whenever a network interface changes); a failed check or a second drop within 10 s shows the banner.
+- First load: skeleton, then data. GAIFA down banner and its recovery. A dropped event stream while the hub still answers is not "down": the UI checks with `GET /api/overview`, reopens the stream and refetches without the banner (Firefox drops quiet connections whenever a network interface changes); a failed check or a second drop within 10 s shows the banner.
 - Overview: alerts present and absent; every service state and load state; manifest-error tile; empty recent outputs.
 - Service page: custom page (Example), generic page (Transcribe), service stopped, service unreachable, starting, failed with log excerpt, service with a native UI link (Images & Video → ComfyUI).
 - API tab: JSON response, audio response, image response, stream response with Stop, error response (`upstream_error`), destructive confirm, multipart file upload form.
@@ -753,7 +753,7 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 ## 9. Acceptance criteria
 
 1. Opening `index.html` from any static server shows the seeded app in mock mode, and every control does something real against the mock.
-2. Setting `window.AIHUB_API_BASE = ''` (or `?live`) switches to the HTTP endpoints in Section 6 with no other code changes.
+2. Setting `window.GAIFA_API_BASE = ''` (or `?live`) switches to the HTTP endpoints in Section 6 with no other code changes.
 3. **Adding a seventh service to the mock seed with no page module produces a fully usable sidebar item, overview tile and service page with zero UI code changes.**
 4. The Example page module uses only `ctx` and `components.js`; it never calls `fetch` and uses no raw colors.
 5. No console errors in normal use. No horizontal page scroll at 360 px.
@@ -771,7 +771,7 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 
 ## 11. Part A revision 2 — compact and graphical (built by hand in plan 6.5)
 
-> Give Claude Design the **current `web/` folder** (the v1 export with AIHub's edits, listed in `web/PATCHES.md`), Section 6 and this section. **Change only what this section asks for.** Everything the current UI already does stays as it is.
+> Give Claude Design the **current `web/` folder** (the v1 export with GAIFA's edits, listed in `web/PATCHES.md`), Section 6 and this section. **Change only what this section asks for.** Everything the current UI already does stays as it is.
 
 ### 11.1 Keep from v1
 - **Layout:** the shell (sidebar, header with memory meter, jobs chip, activity bell and search), routes, the command palette, toasts, dialogs and the `Shift+D` mock panel.
@@ -781,9 +781,9 @@ Thumbnails and posters are generated client-side (SVG gradients or canvas with a
 - **Look:** the light and dark tokens, and the accessibility work.
 
 ### 11.2 Housekeeping
-- **Fold in AIHub's edits:** everything listed in `web/PATCHES.md` (edits 1–9: the hybrid API switch, the real version, MOCK notes, page modules through `ModPage`, model events and verify progress, live outputs in the drawer, Make room from the API tab) becomes part of the export, so that list can go back to empty. Keep `api.js`, `mod-ui.js` and `ModPage.dc.html` as they are (they are AIHub's, not the export's), and never change `support.js`.
+- **Fold in GAIFA's edits:** everything listed in `web/PATCHES.md` (edits 1–9: the hybrid API switch, the real version, MOCK notes, page modules through `ModPage`, model events and verify progress, live outputs in the drawer, Make room from the API tab) becomes part of the export, so that list can go back to empty. Keep `api.js`, `mod-ui.js` and `ModPage.dc.html` as they are (they are GAIFA's, not the export's), and never change `support.js`.
 - **No raw-template requests:** markup with `{{ … }}` in `src`, `poster` or SVG `d` attributes makes the browser fetch or parse it before `support.js` renders it (404s and console errors today). Avoid it, for example by wrapping such markup in `<template>`.
-- **Renames:** "Hub" → **AIHub** everywhere (logo text, titles, the down banner). `bin/hub` → `aihub` (CLI hints in the banner, Settings → About, and the "Add a mod" card).
+- **Renames:** "Hub" → **GAIFA** everywhere (logo text, titles, the down banner). `bin/hub` → `gaifa` (CLI hints in the banner, Settings → About, and the "Add a mod" card).
 - **Data source:** replace the hard-coded `import('mock.js')` with the hybrid switch in Section 6.1.
 - **MOCK badges:** show a small **MOCK** badge on any page section whose area isn't in `api.liveAreas`. The footer MOCK button stays, for the scenario panel.
 - **Example mod:** move its Hello tab out to the page-module mechanism (Section 5).
@@ -921,7 +921,7 @@ interface WidgetData { unit?: string; t?: number[]; categories?: string[];
                        rows?: Record<string, string | number>[] }   // for kind "table"
 ```
 
-**Mods declare widgets in their `service.toml`** (see architecture §4), and AIHub proxies and caches them for 30 s. Each `ServiceSummary.stats[i]` also gains an optional `series` field (the metric name), so tiles can draw sparklines.
+**Mods declare widgets in their `service.toml`** (see architecture §4), and GAIFA proxies and caches them for 30 s. Each `ServiceSummary.stats[i]` also gains an optional `series` field (the metric name), so tiles can draw sparklines.
 
 **As built (plan 6.2):**
 - `getMetrics`: `series` is required; unknown names come back all `null`. Default `step` per range: 1h → 10 s, 6h → 60 s, 24h → 5 min, 7d → 30 min, 30d → 2 h (any `step` is rounded to the table's resolution, at most 2000 points). Ranges are `1h 6h 24h 7d 14d 30d` or any `<n>m|h|d` up to 400 d.
@@ -995,7 +995,7 @@ Revision 2 was built by hand in this repo, not in a Claude Design pass. Where it
 
 # Part B — Service pages (build after Part A is approved, one per pass)
 
-Each page lives in its mod's folder, as `services/<id>/ui/Page.dc.html` (a Claude Design component) or `ui/page.js` (a page module); see Section 5. It calls its service's native API through `ctx.call(...)`, which reaches the AIHub proxy at `/api/s/<id>/…`. Each pass:
+Each page lives in its mod's folder, as `services/<id>/ui/Page.dc.html` (a Claude Design component) or `ui/page.js` (a page module); see Section 5. It calls its service's native API through `ctx.call(...)`, which reaches the GAIFA proxy at `/api/s/<id>/…`. Each pass:
 - extends `mock.js` with that service's native endpoints
 - sets `has_page: true`
 - keeps the generic Outputs / API / Logs / Settings tabs
@@ -1004,7 +1004,7 @@ Each page lives in its mod's folder, as `services/<id>/ui/Page.dc.html` (a Claud
 
 ### B1. LLM Launcher (`lcpp`): port the existing lcpp UI
 
-The attached lcpp UI was built from an earlier Claude Design brief. Its views become tabs: **Instances**, **Catalog**, **Playground**, **Relay publishing**. Its Settings view folds into a "Launcher settings" section under the generic Settings tab. The AIHub shell supplies the sidebar, header and memory meter, so drop lcpp's own. Its `api.js` method list stays the same, with every path prefixed by `/api/s/lcpp`. **Charts:**
+The attached lcpp UI was built from an earlier Claude Design brief. Its views become tabs: **Instances**, **Catalog**, **Playground**, **Relay publishing**. Its Settings view folds into a "Launcher settings" section under the generic Settings tab. The GAIFA shell supplies the sidebar, header and memory meter, so drop lcpp's own. Its `api.js` method list stays the same, with every path prefixed by `/api/s/lcpp`. **Charts:**
 - memory per instance over time (from `mem.svc.lcpp` plus each instance's RSS)
 - tokens/s per Playground reply
 - a catalog size treemap
@@ -1047,7 +1047,7 @@ Native API: `/v1/voices*`, `/v1/voices/design`, `/v1/speech`, `/v1/enhance`, `/v
 
 - **Create**:
   - engine (a dropdown): Cube3D from text, or an image engine (Hunyuan3D 2.1, TRELLIS.2, SAM 3D Objects, SAM 3D Body; plan 17)
-  - for an image engine: the picture (Upload, which becomes an AIHub output, or Recent outputs), the engine's presets (Fast default, Base, TRELLIS.2 Draft) and every setting from `/v1/options` `engines`, face-budget shortcuts (Raw / 200k / 100k / 50k), its licence and where it runs
+  - for an image engine: the picture (Upload, which becomes a GAIFA output, or Recent outputs), the engine's presets (Fast default, Base, TRELLIS.2 Draft) and every setting from `/v1/options` `engines`, face-budget shortcuts (Raw / 200k / 100k / 50k), its licence and where it runs
   - prompt (Cube3D)
   - preset (Low-poly / Fast / Balanced / Quality; Cube3D)
   - stage toggles (shape → parts → rig → preview)
@@ -1207,7 +1207,7 @@ Built by hand in `web/chat/` (plain ES modules on the page's React, like the das
 
 **The page**
 - **Similarity badge** (`web/score.js`, 2026-10-21): every result of a search by meaning (the chat list's By meaning, the Outputs page's By meaning, the header Search) shows its score on the right: a small muted badge with the score to two places ("0.58") and a tiny bar filled to it, tooltip "Similarity to your search: 0.58 (higher is closer)": the embed mod's cosine similarity; there's no minimum, so a search always lists its nearest matches and the badge shows how close each is. The header Search (Ctrl K), while the embed mod runs, also searches by meaning after a 350 ms pause on 3+ characters (outputs through `POST /api/s/embed/v1/search`, chats through `GET /api/s/agent/v1/chats/search`; `web/palette-meaning.js`): up to 8, best first, under the name matches, as "Output · by meaning" / "Chat · by meaning" with the badge; name matches carry no score. The footer reads "n results · k by meaning".
-- **Thread list** (248 px; a drawer under 760 px of page width): at the top the search box across ("Search", or "Search archived"), then **+ New** (a round + and the word, as Claude Code's) with the **View** button (sliders) on its right; no "Chats" heading (plan 42.1; chats by meaning are in the header's Search, plan 28.5), and per chat Rename (also a double-click on its title) / Move to… (another environment) / Archive / Delete (with a confirm); while a chat's menu is open its letters work: **R** Rename, **M** Move to, **A** Archive (or Unarchive), **D** Delete (each item shows its letter; not while typing); an Archived toggle (the heading then reads "Archived chats"; archived chats load only while it's on), a dot for running (amber) or waiting (purple) chats; each row's time sits at its right edge, and hovering the row (or focusing it, or its open menu) highlights it and shows ⋯ in the time's place. **By environment** (plan 41.2, `chat-groups.js`; while the workspace mod is up): one section per environment with a caret (collapse), its name (its folders as the title), a running dot, the chat count, **New chat in** it (`+`) and a ⋯ menu (**Rename** in place, **Manage folders…**); inside, its first 6 chats and *Show more · N* adding 20 (a full-width divider: a line on each side of the words) (`GET /v1/threads?environment=`; a deleted environment's chats show under Default); an environment with no chats in this view isn't shown (all of them archived: only under Archived). The **View** button: Show (Chats · Archived, as the toggle at the bottom), Group by (Environment · None), Environments by (Recent activity · Name · Created), Chats by (Recent activity · Name · Created), saved in this browser (`aihub.chat.list`, with the collapsed sections). A search, or grouping off, shows one flat list (200 at a time with *Show more*), each chat with its environment's name.
+- **Thread list** (248 px; a drawer under 760 px of page width): at the top the search box across ("Search", or "Search archived"), then **+ New** (a round + and the word, as Claude Code's) with the **View** button (sliders) on its right; no "Chats" heading (plan 42.1; chats by meaning are in the header's Search, plan 28.5), and per chat Rename (also a double-click on its title) / Move to… (another environment) / Archive / Delete (with a confirm); while a chat's menu is open its letters work: **R** Rename, **M** Move to, **A** Archive (or Unarchive), **D** Delete (each item shows its letter; not while typing); an Archived toggle (the heading then reads "Archived chats"; archived chats load only while it's on), a dot for running (amber) or waiting (purple) chats; each row's time sits at its right edge, and hovering the row (or focusing it, or its open menu) highlights it and shows ⋯ in the time's place. **By environment** (plan 41.2, `chat-groups.js`; while the workspace mod is up): one section per environment with a caret (collapse), its name (its folders as the title), a running dot, the chat count, **New chat in** it (`+`) and a ⋯ menu (**Rename** in place, **Manage folders…**); inside, its first 6 chats and *Show more · N* adding 20 (a full-width divider: a line on each side of the words) (`GET /v1/threads?environment=`; a deleted environment's chats show under Default); an environment with no chats in this view isn't shown (all of them archived: only under Archived). The **View** button: Show (Chats · Archived, as the toggle at the bottom), Group by (Environment · None), Environments by (Recent activity · Name · Created), Chats by (Recent activity · Name · Created), saved in this browser (`gaifa.chat.list`, with the collapsed sections). A search, or grouping off, shows one flat list (200 at a time with *Show more*), each chat with its environment's name.
 - **Header:** the title (click to rename), the running / waiting state, the **context meter** (`8.6k / 131k` with a bar; a popover with the breakdown, the 70% and 85% compaction marks and Compact now), Learning, and Branch (copy the chat).
 - **Controls row** (plan 42.3, `chat-controls.js`, after Claude Code's): under the message box, quiet buttons (no outline until hovered) that open small menus, not selects: the **environment** (⌂ its name, +n for folders allowed in this chat only), the **mode** (its name; the menu lists Plan / Manual / Accept edits / Auto / Bypass with a line each, plan 27.4: Bypass only when the workspace folders this chat used allow it, or before it used one, when one does; Auto disabled with the reason while the judge's model doesn't answer), and on the right the **model** (each with its window, from the agent's `/v1/models`).
 - **Thread (Phase 19):** a 760 px column of **turns**. A turn is your message (or "You ran …" for a result button or quick action), its **activity fold**, any agent errors, the **output strip** and the answer. A sticky **Plan** bar shows while any todo isn't done. The view stays at the bottom while you are there (new events, images loading, forms mounting).
@@ -1222,7 +1222,7 @@ Built by hand in `web/chat/` (plain ES modules on the page's React, like the das
 - **Undo this turn** (plan 27.7): a turn whose tool results name an `undo` route (the workspace mod's edits) ends with an "Undo this turn" button: every file the turn changed goes back as it was; if one changed since, nothing is restored and a toast points to the Workspace page's Activity tab.
 - **The reply bar (plan 32.1; `chat-replybar.js`):** under a finished reply, a row: the **Sources** pill (when the turn searched or read the web), **Copy**, then the thumbs; hidden while the reply streams or its turn runs. The answer card gets its turn as `ctx.turn`.
   - **Sources pill:** up to three overlapping site icons and "N sources" (pages the turn read with `web_fetch`, deduplicated by URL; "N results" when it only searched). It opens a popover above or below, whichever fits: "Sources" with a close button, `Results for "<query>"` (two queries, then "and n more"), "Read N pages", then a row per page (icon, host and `#n`, the title on 2 lines, a 3-line snippet: the search result's snippet, else the start of the page), linking to the page in a new tab, with a button that opens the saved page in the viewer; then **Also found (n) · not opened**, folded. Escape or a click outside closes it. Everything comes from the turn's events (`chat-sources.js` `turnSources`); nothing new is stored. Icons are `/api/s/web/v1/favicon?host=…`, else the host's first letter on a tinted circle.
-  - **Copy** is a split button: the main part copies with the default; the chevron opens **Text only** (links become their words; citations and the Sources list go), **Including citations** (the reply as written, with "Sources" listing the pages read in place of the model's own list) and **Including thinking and steps** (the turn's thinking, updates and steps in words, then the answer with its sources). Picking from the menu copies and is remembered: the default is the way picked most in the last 24 hours (a tie goes to the latest; none means Text only), kept in this browser (`aihub.chat.copyModes`, `chat-copy.js`). It says "Copied" or "Copy failed".
+  - **Copy** is a split button: the main part copies with the default; the chevron opens **Text only** (links become their words; citations and the Sources list go), **Including citations** (the reply as written, with "Sources" listing the pages read in place of the model's own list) and **Including thinking and steps** (the turn's thinking, updates and steps in words, then the answer with its sources). Picking from the menu copies and is remembered: the default is the way picked most in the last 24 hours (a tie goes to the latest; none means Text only), kept in this browser (`gaifa.chat.copyModes`, `chat-copy.js`). It says "Copied" or "Copy failed".
 - **Reply to parts of a reply (plan 32.2; `chat-quote.js`, `chat-quote-reply.js`):** selecting text inside one of the agent's replies (`[data-quote-seq]`: the answer or an update row) shows a small **Reply** button next to it (nothing opens by itself); clicking it opens a small box: the selection (2 lines, muted) over a "Reply to this…" input with a send button. Enter adds a **quote-reply card** to the composer's card row; Shift+Enter is a new line; Esc or a click elsewhere closes it and adds nothing; Ctrl+C in the empty input copies the quote; the next selection opens a new box at once. Cards (~112 px: the quote with a left bar, the reply, a "Reply" label, × on hover) are unlimited: the row wraps and scrolls past about two rows, and a red alert disables Send past 200,000 characters. A card opens the **Reply** popup: the quote rendered as markdown, read-only, and the reply, editable (Save or Ctrl+Enter, Cancel, Remove); the popup keeps Tab and Escape inside and returns focus on close. Send works with only cards (empty text) when a reply says something. The quote is the selection as markdown: code with its language (the header bar left out), lists numbered from where the selection starts, headings, links, citations as written, pipe tables with alignment; across table cells the touched rows are quoted whole.
 - **Web pages (plan 30.8):** a paste that is one http(s) URL is pasted as text and offers **Attach as a web page** under the box; the attach menu starts with **Add a web page (URL)**. While reading: "Reading the page and screening it…"; the chip has a globe icon and a badge: "n removed" (accent), "checked" (green), "patterns only" (accent) or "not screened". The web mod's page (`services/web/ui/page.js`) has one tab, **Read a page**: a URL box, then the title, final URL, a screening badge, characters, screening time and model, the removed passages (line, why, by, start), Copy markdown, Open in Outputs, and Show (as the agent reads it / as it was) over the rendered markdown.
 - **Composer** (laid out after Claude Code's, plan 42.2): one box with one line inside it: **+** on the left (a menu: Upload files, Attach an output or a web page, Tool groups, then the quick actions), the text between, and the microphone, Stop (during a turn) and Send on the right; the text grows upward to 40% of the window (at least 120 px, then it scrolls) while the buttons stay on its bottom line. Its quiet buttons (+, Stop, and the sidebar's View) show no outline until hovered, focused or open (`.aichat-quiet`); no hint line under it; the chat's controls row sits under the box (plan 42.3). A growing text box (Enter sends, Shift+Enter is a new line, a message sent during a turn is queued and marked), attachment chips (a picker of this chat's and recent outputs; files uploaded with the Upload button, dropped or pasted: images, video, audio, text, code and documents, plan 24.6; each chip shows a kind icon, the name and, for text and documents, the pages or lines and **Whole / Card** (plan 24.9: Whole sends all of it if it fits the window after the reply reserve, Card only its card, neither is auto; the last choice is the chat's default, `settings.doc_mode`), and a text or document chip opens the output; a sent message's attachment chips say `whole` or `card`, and a document asked for whole that didn't fit says how much didn't, under the message), long pastes as files (over 2000 characters or 40 lines a paste is uploaded as `pasted-<HHMMSS>.md`, or `.py`, `.json`, … when the whole paste is one fenced block with a language or parses as JSON; Ctrl+Shift+V pastes it into the box as text), tool-group toggles (Auto / Pinned / Off per mod → the thread's `settings.pinned` / `disabled`), the quick actions, Stop, and slash commands with a suggestion list: `/compact`, `/clear`, `/model <id>`, `/context`, and `/<skill>` (sends "Use the <id> skill: …").
@@ -1275,7 +1275,7 @@ registerPreview('pointcloud', ({ output, ctx }) => h(MyViewer, { src: output.url
 
 **Pictures in a reply (plan 47.3).** `![caption](#n)` (or `output:<id>`) of an output of this chat draws it where it's written: a picture or a 3D model's preview (click: Outputs), a video or audio with its controls, at most 360 px tall, with "#n caption" under it. Anything else stays as text, outside pictures included; quoting gives the markdown back; Text only keeps the caption.
 
-**Show (plan 47.2).** The agent's `show` tool draws under the fold in the dashboard's own chart style (`chat-show.js`, `charts.js`): line, area, bar, horizontal bar, donut, heatmap and KPI tiles from inline data, a CSV/JSON output (read and sampled to 500 points) or AIHub's own data (memory by mod, outputs per day, job times, a mod's stat; refreshed every 30 s); tables sort by a column, filter, page by 50, copy as CSV and save as an output (`chat-table.js`); image and gallery show the chat's outputs. A title, a caption, and "live · 24h" on AIHub's data.
+**Show (plan 47.2).** The agent's `show` tool draws under the fold in the dashboard's own chart style (`chat-show.js`, `charts.js`): line, area, bar, horizontal bar, donut, heatmap and KPI tiles from inline data, a CSV/JSON output (read and sampled to 500 points) or GAIFA's own data (memory by mod, outputs per day, job times, a mod's stat; refreshed every 30 s); tables sort by a column, filter, page by 50, copy as CSV and save as an output (`chat-table.js`); image and gallery show the chat's outputs. A title, a caption, and "live · 24h" on GAIFA's data.
 
 **Live cards (plan 44.3).** Under a turn's activity fold (open or folded), each tool step with a `live:<tool>` card draws it, while its job runs and after it ends (`chat-live.js` `LiveCards`); the output strip leaves out that tool's outputs, since its card shows them where they were made. A running step of a tool without one shows the kit's generic preview (`LivePreview`) while its job reports a frame. The card gets `ctx.liveCard = {row, live, note, status, outputs, kit}` (`ctx.live` stays "connected to the live hub"). The kit (`web/live-kit.js`, shared with the Overview and mod pages) draws the prototype's look ([reference/live-cards-2026-10/](reference/live-cards-2026-10/prototype.html)): a header with a pulsing dot and the step and time left, a box at the output's aspect (at most 420 px tall) with shimmer and grain and "Waiting for the GPU · …" / "Loading …" before frames, frames fading in over each other with "Step k of n", the result fading in over them, a progress line (green when done), and the footer. Mods bring theirs in their own `ui/chat.js` (plan 44.1).
 

@@ -8,7 +8,7 @@ A chat-style web UI and HTTP API for local 3D asset generation on **http://127.0
 - **Preview**: a Blender 4-view render of the result
 - **Live progress** (plan 45.3): a job's `live` (on `/v1/jobs/{id}` and the status jobs) lists its stages with their state and time left, the running stage's steps, and a preview: the cut-out while the shape is made, then the rendered views. `ui/chat.js` draws it in Chat: the picture turning into its cut-out, a point cloud from its outline while the shape is made, the views, then View in 3D.
 - **From a picture** (plan 17): **Hunyuan3D 2.1** and **SAM 3D Objects** in gen3d's own worker,
-  **TRELLIS.2** and **SAM 3D Body** through AIHub's Images & Video mod (ComfyUI). See [Image to 3D](#image-to-3d).
+  **TRELLIS.2** and **SAM 3D Body** through GAIFA's Images & Video mod (ComfyUI). See [Image to 3D](#image-to-3d).
 
 Jobs queue up and run one at a time on the GPU. Every job reports live progress, its place in
 the queue and **when it will be done**, and keeps its files on the server. It runs in the
@@ -226,7 +226,7 @@ but low values make decoding much faster: Cube3D at 5 still looks clean.
 ## Image to 3D
 
 A job with `engine` set to an image engine makes its `shape` stage's mesh from one picture instead of a
-prompt; parts, rig and preview then work as for Cube3D. The picture is an AIHub output (`"image":
+prompt; parts, rig and preview then work as for Cube3D. The picture is a GAIFA output (`"image":
 "output:<id>"`, fetched from the hub) or a file sent to `POST /v1/jobs/image`. The job folder keeps it as
 `input.png`, plus the cut-out every engine reads, `input_rgba.png`: alpha from the picture, else
 everything that isn't near-white. A transparent or plain white background works best.
@@ -248,7 +248,7 @@ own remesh (512) + decimate (10–24 s, clean down to 50k); its raw mesh is too 
 alone. SAM 3D Body's mesh is fixed (36,874 faces, rigged).
 
 ```bash
-# a picture already in AIHub's outputs, the fast preset, 50k faces
+# a picture already in GAIFA's outputs, the fast preset, 50k faces
 curl -s localhost:5050/v1/jobs -H 'content-type: application/json' \
   -d '{"engine": "trellis2", "image": "output:<id>", "trellis2": {"target_faces": 50000}}'
 # a picture from disk
@@ -257,7 +257,7 @@ curl -s localhost:5050/v1/jobs/image -F image=@vase.png -F 'job={"engine": "huny
 
 `GET /v1/options` lists every engine with its presets and settings (`engines`). The local engines run
 one container at a time with Cube3D's (`gen3d-worker-<family>-…`; switching stops the other) and ask
-AIHub for their memory first (Hunyuan3D 14 GB, SAM 3D Objects 22 GB). TRELLIS.2 and SAM 3D Body stop
+GAIFA for their memory first (Hunyuan3D 14 GB, SAM 3D Objects 22 GB). TRELLIS.2 and SAM 3D Body stop
 gen3d's worker, then run their pack in the comfy mod through the hub (`gen3d/comfy_engine.py`); comfy's
 copies of the meshes go to the hub's trash, so each job shows once on the Outputs page. The engines
 were measured on this machine first: `runtime/lab/` (gitignored; `RESULTS.md`, `report/`).
@@ -286,11 +286,11 @@ browser / curl ──HTTP──> gen3d (FastAPI, .venv)  ──stdin/stdout JSON
   after the time shown when it was sent.
 - **Queue**: SQLite (`data/gen3d.db`), one job on the GPU at a time. A job interrupted by a
   restart goes back to the front and resumes at the stage it was in (finished stages are kept).
-- **The GPU slot** (AIHub plan 31.3): a job takes AIHub's GPU slot (`gen3d/gpu_slot.py`) before its
+- **The GPU slot** (GAIFA plan 31.3): a job takes GAIFA's GPU slot (`gen3d/gpu_slot.py`) before its
   first stage and holds it across all its stages, the Blender preview included; memory is asked for
   after it. While another mod holds the slot the job stays `queued` with `stage: "waiting_gpu"`,
   `ahead` and `eta_s`, and Cancel stops the wait. TRELLIS.2 and SAM 3D Body get the job's lease in
-  `X-AIHub-GPU-Lease`, so comfy runs them under it. Without AIHub the slot is skipped.
+  `X-GAIFA-GPU-Lease`, so comfy runs them under it. Without GAIFA the slot is skipped.
 - **Files**: `data/jobs/<id>/` (`mesh.glb`, `parts/`, `parts.glb`, `rigged.glb`, `rig.json`,
   `preview.png`, `input.*`). Deletes are permanent.
 
@@ -326,7 +326,7 @@ copies of CubeArt's scripts (the preview script since changed: see Preview rende
 
 ## Install / reinstall
 
-> **Under AIHub** this is the `gen3d` mod: `aihub install gen3d`, `podman pull` the ROCm image, `scripts/install-runtime.sh`, then the weights. Setup: [setup/gen3d.md](setup/gen3d.md) (the base), then each engine: [setup/cubeart.md](setup/cubeart.md), [setup/img3d.md](setup/img3d.md), [setup/sam3do.md](setup/sam3do.md). The steps below are the old standalone 3DGenerate install.
+> **Under GAIFA** this is the `gen3d` mod: `gaifa install gen3d`, `podman pull` the ROCm image, `scripts/install-runtime.sh`, then the weights. Setup: [setup/gen3d.md](setup/gen3d.md) (the base), then each engine: [setup/cubeart.md](setup/cubeart.md), [setup/img3d.md](setup/img3d.md), [setup/sam3do.md](setup/sam3do.md). The steps below are the old standalone 3DGenerate install.
 
 ```bash
 git clone git@github.com:brendondgr/3DGenerate.git ~/Projects/3DGenerate && cd ~/Projects/3DGenerate
@@ -353,7 +353,7 @@ Edit `~/.config/gen3d/gen3d.env`, then `gen3d restart`:
 | `GEN3D_IMAGE` | `docker.io/kyuz0/amd-strix-halo-comfyui:latest` | the ROCm image the worker runs in |
 | `GEN3D_BLENDER` | `blender` | empty disables previews |
 | `GEN3D_PREVIEW_DEVICE` | `cpu` | `cpu` renders previews with Mesa's software rasterizer (llvmpipe), `gpu` on the GPU (faster); a choice saved on the page wins; see below |
-| `GEN3D_STATE_DIR` | `GEN3D_DATA` | where the page's settings live (`settings.json`); AIHub sets `data/state/gen3d` |
+| `GEN3D_STATE_DIR` | `GEN3D_DATA` | where the page's settings live (`settings.json`); GAIFA sets `data/state/gen3d` |
 | `GEN3D_PREVIEW_MAX_FACES` | 300000 | meshes above this are simplified for the preview only (the saved mesh is untouched); 0 = never |
 | `GEN3D_PREVIEW_TIMEOUT_S` | 180 | a preview render that runs longer is killed and the stage fails |
 | `GEN3D_KEEP_ALIVE_S` | 330 | HTTP keep-alive; keep it above the browser's |
@@ -365,11 +365,11 @@ Edit `~/.config/gen3d/gen3d.env`, then `gen3d restart`:
 sheet; at most 512 a view), flat shading, no shadows or cavity. Workbench draws through OpenGL, so
 **it uses the GPU even with `blender -b`** (`gpu`). With `cpu`, the default, Blender starts with
 `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe --gpu-backend opengl`, and the script refuses to render unless the GL context is llvmpipe/softpipe, so it never falls back to the GPU.
-The switch is on AIHub's 3D Generate page, Create tab (**Preview renders: CPU (safer) / GPU
+The switch is on GAIFA's 3D Generate page, Create tab (**Preview renders: CPU (safer) / GPU
 (faster)**), and in the API:
 `curl -X PUT http://127.0.0.1:5050/v1/settings -H 'content-type: application/json' -d '{"preview_device": "gpu"}'`
 (`GET` shows it; `null` forgets the choice). It is saved in `settings.json` in `GEN3D_STATE_DIR`
-(`data/state/gen3d/` under AIHub, so `aihub backup` keeps it) and read for each preview, so it applies to
+(`data/state/gen3d/` under GAIFA, so `gaifa backup` keeps it) and read for each preview, so it applies to
 the next one without a restart: the saved choice, else `GEN3D_PREVIEW_DEVICE`, else `cpu`. The mod's
 status shows it as **Previews**.
 Meshes over `GEN3D_PREVIEW_MAX_FACES` are simplified in memory by vertex clustering (a Weld modifier at

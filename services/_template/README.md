@@ -1,12 +1,12 @@
 # __NAME__
 
-An AIHub mod, made with `aihub new __ID__`. The full guide is [docs/mods.md](../../docs/mods.md).
+A GAIFA mod, made with `gaifa new __ID__`. The full guide is [docs/mods.md](../../docs/mods.md).
 
 ## The contract on one page
 
 **Required:**
 1. **This folder**, `services/__ID__/`, with a `service.toml` whose `id` is the folder name.
-2. **An HTTP server on `127.0.0.1:$AIHUB_PORT`**, in any language (here: `server.py`, FastAPI).
+2. **An HTTP server on `127.0.0.1:$GAIFA_PORT`**, in any language (here: `server.py`, FastAPI).
 3. **A health route**, `/health`, that answers 2xx once the mod is ready. Plain binaries can use `health = "tcp"` instead.
 
 **Optional; each one unlocks more of the UI:**
@@ -14,8 +14,8 @@ An AIHub mod, made with `aihub new __ID__`. The full guide is [docs/mods.md](../
 | Add | You get |
 |---|---|
 | `status = "/v1/status"` returning `{loaded, busy, idle_s, stats, jobs}` | load state, a busy dot, KPIs on the Overview tile (numeric stats are charted over time), jobs in the header |
-| Files written to `$AIHUB_OUTPUTS/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext>` (+ `[outputs]`) | they appear on the Outputs page |
-| `[memory]` with `load` / `unload` operations and `estimate_gb` | the memory panel; AIHub can unload it to make room |
+| Files written to `$GAIFA_OUTPUTS/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext>` (+ `[outputs]`) | they appear on the Outputs page |
+| `[memory]` with `load` / `unload` operations and `estimate_gb` | the memory panel; GAIFA can unload it to make room |
 | `[[ui.widgets]]` pointing at a route that returns `WidgetData` | charts on the Overview dashboard |
 | `ui/page.js` (`[ui] page`) | its own tab(s) inside the mod's page |
 | `[tools]` | operations the agent may call |
@@ -25,14 +25,14 @@ Every mod also gets, for free: start/stop/restart, health monitoring with restar
 ## Working on it
 
 ```bash
-aihub check __ID__        # validates the manifest, health, OpenAPI, status shape, widgets and page
-aihub restart __ID__      # after editing server.py
-aihub logs __ID__ -f
+gaifa check __ID__        # validates the manifest, health, OpenAPI, status shape, widgets and page
+gaifa restart __ID__      # after editing server.py
+gaifa logs __ID__ -f
 ./install.sh              # after changing requirements.txt (--accel cuda|rocm|xpu|mps|cpu: PyTorch from requirements-torch.txt for it)
 ```
 
-**Helpers to keep as they are** (mods never import the hub, so each keeps a copy): `gpu_slot.py` (take the GPU slot around GPU work), `containers.py` (the GPU flags for a podman or docker container), `device.py` (the PyTorch device from `AIHUB_DEVICE`) and `torch_index.py` (the PyTorch wheel index for an accelerator). Delete the ones you don't use.
+**Helpers to keep as they are** (mods never import the hub, so each keeps a copy): `gpu_slot.py` (take the GPU slot around GPU work), `containers.py` (the GPU flags for a podman or docker container), `device.py` (the PyTorch device from `GAIFA_DEVICE`) and `torch_index.py` (the PyTorch wheel index for an accelerator). Delete the ones you don't use.
 
-- Calls through AIHub: `http://127.0.0.1:7000/api/s/__ID__/v1/hello?name=you`
+- Calls through GAIFA: `http://127.0.0.1:7000/api/s/__ID__/v1/hello?name=you`
 - Directly: `http://127.0.0.1:__PORT__/v1/hello`
-- Deleting this folder removes the mod completely (then `aihub restart`).
+- Deleting this folder removes the mod completely (then `gaifa restart`).

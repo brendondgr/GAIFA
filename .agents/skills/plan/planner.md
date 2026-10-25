@@ -1,4 +1,4 @@
-# Plan format reference (AIHub)
+# Plan format reference (GAIFA)
 
 Plans are explicit, hierarchical and checkable. They name **where** work happens and **how we know it's done**; they never contain implementations.
 
@@ -34,7 +34,7 @@ Rules for every step:
 - **Order matters:** each step only depends on earlier steps. Say so when a step needs something from the user (a running service, an approval).
 - **No large code blocks.** Names, signatures and data shapes (a JSON or TOML snippet of a few lines) are fine; implementations aren't.
 - **A `Done when` line on every step** that names the tests (in `utils/tests/<area>/test_<behavior>.py`) or the check.
-- **Commit line:** each step ends with tests passing and a commit `AIHub (N.k): <sentence>`; the plan doesn't repeat this per step, it's stated once in "How to work this plan".
+- **Commit line:** each step ends with tests passing and a commit `GAIFA (N.k): <sentence>`; the plan doesn't repeat this per step, it's stated once in "How to work this plan".
 - **Docs in sync:** if the step changes behavior described in `architecture.md` or the brief's §6 / §11.7, say which section to update.
 - **Sizes:** keep files under ~500 lines (hard limit 800); split a step if it would produce a larger file.
 

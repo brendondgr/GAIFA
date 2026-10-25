@@ -41,11 +41,11 @@ Run on 6–7 October 2026. The full account, with every prompt, transcript notes
 (Each live case shows its latest run; the report lists every earlier failure and its cause.)
 
 **Other live checks:**
-- **Pending card and question survive restarts.** A pending parameter card and a pending question both survived `aihub restart` plus `aihub restart agent`, then finished (`evals/restart_live.py`): pass.
+- **Pending card and question survive restarts.** A pending parameter card and a pending question both survived `gaifa restart` plus `gaifa restart agent`, then finished (`evals/restart_live.py`): pass.
 - **Context meter.** It was within 1.1% of the 31B's own prompt-token count (`evals/meter_check.py`).
 - **Compaction.** In a thread capped at 6k tokens, 5 clears and a model-written summary still answered a question about the first turn (`evals/compact_live.py`): pass.
 - **Sessions.** "LLM work", "3D work" and "Video work" were saved on the real mods, and switching between them peaked at 46 GB of a 118 GB limit; the 26B relaunched with its settings (`evals/sessions_live.py`).
-- **MCP.** Claude Code listed 41 AIHub tools and called two. Its `tts_speak` call became a denied approval, and nothing ran.
+- **MCP.** Claude Code listed 41 GAIFA tools and called two. Its `tts_speak` call became a denied approval, and nothing ran.
 
 **Image to 3D (plan 17.10, 2026-10-11).** Two cases joined the set, so it has 32 tasks:
 - `picture_object_to_3d`: a vase picture should go to TRELLIS.2.
@@ -117,7 +117,7 @@ Five `preference` tasks (46 in all). A task's preferences are seeded for its own
 - `explicit_beats_pref`: the user's words win over a preference;
 - `answer_learned`: a seeded answer stops the 3D question.
 
-**Documents (plan 24.5).** `pdf_page7` (group `context`, 48 tasks in all) attaches a 20-page PDF (`evals/docs.py`, about 9,600 tokens, so it arrives as a card) and asks for a name that is only on page 7; it passes when the reply names it and the page and the agent used `hub_read_document` or `hub_search_document`. The harness uploads a task's `attach` files to the hub (`AIHUB_URL`) and sends them with the first turn. Live on 2026-10-20 (`skynet`, a test hub with this agent): 3/3, each with one or two `hub_search_document` calls.
+**Documents (plan 24.5).** `pdf_page7` (group `context`, 48 tasks in all) attaches a 20-page PDF (`evals/docs.py`, about 9,600 tokens, so it arrives as a card) and asks for a name that is only on page 7; it passes when the reply names it and the page and the agent used `hub_read_document` or `hub_search_document`. The harness uploads a task's `attach` files to the hub (`GAIFA_URL`) and sends them with the first turn. Live on 2026-10-20 (`skynet`, a test hub with this agent): 3/3, each with one or two `hub_search_document` calls.
 
 | Run | Tasks × runs | pass@1 | pass^k | Mean time |
 |---|---|---|---|---|
@@ -346,7 +346,7 @@ The cascade is as accurate as the chat model alone, and d3-lite's false flags ar
 **Scenarios on the real hub** (scripts kept with the night's notes, not in the repo):
 - Documents: an injected PDF, a scanned invoice, three files with citations, and a 40-page PDF cited at p.33. All 15/15 on skynet; Gemma 26B passed all of them too.
 - A CSV charted in the sandbox plus a web search: 3/3.
-- The workspace modes: Plan, Manual, Accept edits, Bypass, AIHub at Read, an escape attempt, and web search plus an edit. Every behaviour passes. The only misses are citation format: MiniCPM writes "line 3" where the prompt asks for `calc.py:3`.
+- The workspace modes: Plan, Manual, Accept edits, Bypass, GAIFA at Read, an escape attempt, and web search plus an edit. Every behaviour passes. The only misses are citation format: MiniCPM writes "line 3" where the prompt asks for `calc.py:3`.
 - Auto with the local judge (Gemma 26B): safe test runs go through, while commands planted in a README, `rm -rf` and unasked fetches all ask (2/2 each).
 - A 10-minute meeting summarised with [mm:ss] citations, and a fox image turned into 3D and speech: 5 full chains, live.
 ### Swift 1.5 (2026-10-23)

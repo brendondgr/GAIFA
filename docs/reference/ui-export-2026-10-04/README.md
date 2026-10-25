@@ -19,7 +19,7 @@ Opening it with `file://` doesn't work, because the runtime `fetch`es its compon
 | `thumbnail.webp` | A preview image |
 
 How it differs from what the brief asked for. The plan already accounts for all of this:
-- **React is loaded from unpkg at runtime.** `support.js` skips that download if `window.React` and `window.ReactDOM` already exist, so AIHub serves local copies from `web/vendor/`. Babel is only needed for `.jsx`/`.tsx` imports, and this UI has none.
+- **React is loaded from unpkg at runtime.** `support.js` skips that download if `window.React` and `window.ReactDOM` already exist, so GAIFA serves local copies from `web/vendor/`. Babel is only needed for `.jsx`/`.tsx` imports, and this UI has none.
 - **The page always runs on the mock** (`import('mock.js')` → `createMockApi()`). There's no `?live` switch yet. Step 1.9 adds the switch between mock and live data, area by area, and revision 2 builds it in.
-- **It still says "Hub" and `bin/hub`**, so it needs renaming to AIHub and `aihub`.
+- **It still says "Hub" and `bin/hub`**, so it needs renaming to GAIFA and `gaifa`.
 - **The density setting defaults to "comfortable".** Revision 2 makes the UI compact by default and adds charts and multiple Overview views.

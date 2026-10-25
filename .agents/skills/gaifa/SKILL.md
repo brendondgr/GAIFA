@@ -1,11 +1,11 @@
 ---
-name: aihub
-description: Project guide for AIHub. Use before any work in this repo — implementing a plan step, adding or changing a mod, touching the hub API or UI wiring, or answering "where does X go / how does X work". Maps every question to the doc section that answers it, lists the invariants, and gives the step-by-step workflow for working docs/backend-plan.md.
+name: gaifa
+description: Project guide for GAIFA. Use before any work in this repo — implementing a plan step, adding or changing a mod, touching the hub API or UI wiring, or answering "where does X go / how does X work". Maps every question to the doc section that answers it, lists the invariants, and gives the step-by-step workflow for working docs/backend-plan.md.
 ---
 
-# Working on AIHub
+# Working on GAIFA
 
-AIHub is one local app (FastAPI hub on `127.0.0.1:7000`, no auth) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/` with a `service.toml`, run as its own process (a transient systemd user unit `aihub-<id>.service`). The hub supervises mods, proxies their APIs at `/api/s/<id>/*`, keeps a models registry, indexes outputs, manages the 121 GB of shared memory, records metrics, and serves the UI from `web/`.
+GAIFA is one local app (FastAPI hub on `127.0.0.1:7000`, no auth) that controls every AI service on this machine. Each service is a **mod**: a folder in `services/<id>/` with a `service.toml`, run as its own process (a transient systemd user unit `gaifa-<id>.service`). The hub supervises mods, proxies their APIs at `/api/s/<id>/*`, keeps a models registry, indexes outputs, manages the 121 GB of shared memory, records metrics, and serves the UI from `web/`.
 
 The docs are the source of truth. Read the section you need before acting; don't work from memory of them.
 
@@ -15,7 +15,7 @@ The docs are the source of truth. Read the section you need before acting; don't
 | --- | --- |
 | Why is it built this way? | architecture §2 (decisions table) |
 | Where does a file go? | architecture §3, then [docs/structure.md](../../../docs/structure.md) for what exists today |
-| Building, porting or fixing a mod (how-to) | [docs/mods.md](../../../docs/mods.md) and the `aihub-mod` skill; `aihub check <id>` |
+| Building, porting or fixing a mod (how-to) | [docs/mods.md](../../../docs/mods.md) and the `gaifa-mod` skill; `gaifa check <id>` |
 | What must a mod provide? `service.toml` fields? | architecture §4.1–4.3 |
 | Placeholders, env vars, ports | architecture §4.4–4.5 |
 | Status route shape, stats → charts | architecture §4.6 |
@@ -52,10 +52,10 @@ The docs are the source of truth. Read the section you need before acting; don't
 2. Read the architecture and brief sections the step cites.
 3. Build it, with tests in `utils/tests/<area>/test_<behavior>.py` (fake mods in `utils/tests/fixtures/mods/`).
 4. `uv run pytest` must be green. It includes the Node tests for `web/api.js` (`utils/tests/web/`); inside the toolbox they use the host's Node via `flatpak-spawn --host node`.
-   To check against the installed hub, run `aihub restart` and reload the page (changing only the `#/…` hash doesn't reload it).
-   For UI checks with fake mods, run a second hub: `uv run python app.py --port 7077 --dev --demo-mods` (child processes; the installed hub on 7000 and its units are untouched). Tests never touch the real root or hub: `conftest.py` points `AIHUB_ROOT`/`AIHUB_URL` at throwaway values.
+   To check against the installed hub, run `gaifa restart` and reload the page (changing only the `#/…` hash doesn't reload it).
+   For UI checks with fake mods, run a second hub: `uv run python app.py --port 7077 --dev --demo-mods` (child processes; the installed hub on 7000 and its units are untouched). Tests never touch the real root or hub: `conftest.py` points `GAIFA_ROOT`/`GAIFA_URL` at throwaway values.
 5. In the same commit: tick the step in the plan, update `docs/structure.md` for new files, and update architecture / brief §6 / §11.7 if behavior differs from what they say.
-6. Commit as `AIHub (<phase>.<step>): <what was done>`. Push when the user asks or at the end of a phase.
+6. Commit as `GAIFA (<phase>.<step>): <what was done>`. Push when the user asks or at the end of a phase.
 7. At the end of a phase, run its **Wire** and **Checks & deliverables** lists before starting the next phase.
 
 To write or change a plan, use the `plan` skill.

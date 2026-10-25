@@ -123,10 +123,10 @@
 | Workflow | Runs? | Notes |
 |---|---|---|
 | qwen21-t2i | **yes**: 236 s, peak 40.6 GB | A 3:2 photo through its resolution picker (1248×832) |
-| qwen21-edit-multi | **yes**: 608 s, peak 43.0 GB | Two AIHub outputs as `image` and `image_2` (`output:<id>`): the fox from one placed in front of the cabin from the other |
+| qwen21-edit-multi | **yes**: 608 s, peak 43.0 GB | Two GAIFA outputs as `image` and `image_2` (`output:<id>`): the fox from one placed in front of the cabin from the other |
 | qwen21-remove-bg | **yes**: 367 s, peak 43.1 GB | The fox cut out, with real transparency |
 | qwen21-turbo-t2i (2026-10-09) | **yes**: 59 s cold, 42 s warm, peak 40.3 GB | The same 3:2 size (1248×832); a storefront with two signs of text, both spelled right. The FP8 side of the switch too (42 s), once its file was fixed (below) |
-| qwen21-turbo-edit-multi (2026-10-09) | **yes**: 204 s, peak 54.6 GB | An AIHub output as `image` and a result path as `image_2`: the cat from one placed at the shop door of the other, signs and light unchanged. The higher peak is the prefix KV cache using spare memory (`auto`) |
+| qwen21-turbo-edit-multi (2026-10-09) | **yes**: 204 s, peak 54.6 GB | A GAIFA output as `image` and a result path as `image_2`: the cat from one placed at the shop door of the other, signs and light unchanged. The higher peak is the prefix KV cache using spare memory (`auto`) |
 | qwen21-turbo-remove-bg (2026-10-09) | **yes**: 118 s, peak 38.8 GB | The cat cut out (68% fully transparent, soft fur edges) |
 | klein9b-* (3) | no: 3 model files missing each | The official templates record their download URLs, so the review screen offers Download buttons. Downloading needs your go-ahead |
 | scail2-basic | no: 2 model files missing | `wan2.1_14B_SCAIL_2_fp8_scaled.safetensors`, and the LightX2V LoRA under a `Wan2.1/` subfolder (you have it without the subfolder: one `[set]` line) |
@@ -140,7 +140,7 @@
 
 The Turbo edit took 200 s for 8 steps, and the sampler was only 80 s of it. Per-node timings (ComfyUI's websocket `executing` events, one run each, the same inputs and seed, a unique prompt per run so no node is cached) found three costs that don't change the image:
 
-- **The text encoder read the references twice.** `TextEncodeQwenImage21` runs the prompt and every reference image through Qwen3-VL for the positive, then again for the negative. At cfg 1 the sampler never uses the negative. `AIHubTextEncodeQwenImage21` (`services/comfy/nodes/`, [workflows.md §9](workflows.md#9-aihubs-own-nodes)) encodes once.
+- **The text encoder read the references twice.** `TextEncodeQwenImage21` runs the prompt and every reference image through Qwen3-VL for the positive, then again for the negative. At cfg 1 the sampler never uses the negative. `GAIFATextEncodeQwenImage21` (`services/comfy/nodes/`, [workflows.md §9](workflows.md#9-gaifas-own-nodes)) encodes once.
 - **The vision patch-embed is a Conv3d that ROCm runs very slowly.** Its kernel equals its stride, so it is one matmul. It took 17.5 s of a 33 s encode of one 1024² image, and as a matmul the encode takes 14.5 s, with the output equal to 1e-5. The patch applies to every Qwen-VL text encoder, so the base packs get it too.
 - **The VAE ran in fp32.** ComfyUI starts with `--fp32-vae` for FLUX.2's small decoder. The Turbo edit and remove-bg packs load the Qwen VAE (a bf16 file) in bf16 through `VAELoaderKJ`. Decode went from 12 s to 2 s.
 

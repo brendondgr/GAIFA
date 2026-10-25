@@ -196,14 +196,14 @@ curl http://127.0.0.1:5040/v1/outputs/<file> -o out.wav   # fetch
 curl -X DELETE http://127.0.0.1:5040/v1/outputs/<file>    # permanent (no trash)
 ```
 
-### Speech as a job (AIHub plan 45.4)
+### Speech as a job (GAIFA plan 45.4)
 
 `POST /v1/speech/jobs` takes the body of `POST /v1/speech` and answers `202 {id}` at once. `GET /v1/speech/jobs/{id}`
 reports its state, progress and, while it runs, `live`: the lines spoken so far (an estimate, from the audio made
 against the length expected) and the path of its audio. `GET /v1/speech/jobs/{id}/audio?offset=<bytes>&wait=<s>`
 returns the PCM (s16le, mono, `X-Sample-Rate`) made after that offset, so a player can start from the first chunk;
 `X-Done: 1` once it's all there. When it ends the clip is saved as usual and the job's `outputs` names it.
-`POST /v1/speech/jobs/{id}/cancel` stops it. AIHub's `speak` tool uses these routes, and its Chat card
+`POST /v1/speech/jobs/{id}/cancel` stops it. GAIFA's `speak` tool uses these routes, and its Chat card
 (`ui/chat.js`) draws the waveform growing, the text filling in, and Play while it speaks.
 
 ## Performance (Strix Halo, gfx1151)
@@ -246,18 +246,18 @@ client ──HTTP──> localtts (FastAPI, .venv)  ──stdin/stdout──> br
 - Voice uploads are converted by ffmpeg to 24 kHz mono WAV; missing transcripts come from
   a one-shot Whisper large-v3-turbo process that exits right after.
 - Deletes use `unlink`/`rmtree`: permanent, never the desktop Trash.
-- Under AIHub, each synthesis and each one-shot Whisper run takes AIHub's **GPU slot** first
+- Under GAIFA, each synthesis and each one-shot Whisper run takes GAIFA's **GPU slot** first
   (`[gpu]` in service.toml, `localtts/gpu_slot.py`, plan 31.3): while another mod's GPU work holds
   it, the request waits and `/v1/status` lists it as a job in stage `waiting_gpu` (with what runs
   before it). An engine set to the CPU (`BREEZE_DEVICE=cpu`, or Kokoro without CUDA) doesn't take
-  it. Without `AIHUB_URL` nothing waits.
+  it. Without `GAIFA_URL` nothing waits.
 
 Saved voices live in `data/voices/<name>/{reference.wav,voice.json}` (git-ignored).
 Generated audio goes to `~/Music/TTS/` (`LOCALTTS_OUTPUTS_DIR`) unless `no_save` is set.
 
 ## Install / reinstall
 
-> **Under AIHub** this is the `tts` mod: `aihub install tts`, then the engines with `scripts/install-runtime.sh --accept-breeze-license` (weights first: the script runs offline). Setup: [setup/kokoro.md](setup/kokoro.md) and [setup/breeze.md](setup/breeze.md). The steps below are the old standalone LocalTTS install.
+> **Under GAIFA** this is the `tts` mod: `gaifa install tts`, then the engines with `scripts/install-runtime.sh --accept-breeze-license` (weights first: the script runs offline). Setup: [setup/kokoro.md](setup/kokoro.md) and [setup/breeze.md](setup/breeze.md). The steps below are the old standalone LocalTTS install.
 
 ```bash
 git clone https://github.com/brendondgr/LocalTTS && cd LocalTTS

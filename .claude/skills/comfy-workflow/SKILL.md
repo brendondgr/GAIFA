@@ -1,6 +1,6 @@
 ---
 name: comfy-workflow
-description: Use when asked to add, import, adjust, fix or remove a ComfyUI workflow in AIHub ("add this workflow", "make a pack for X", "why won't this workflow run", "expose the LoRA strength", "use the fp8 model instead"), or to make a workflow available to the agent. Covers workflow packs in services/comfy/workflows/, workflow.toml, tasks, the comfyui workflows CLI and the check problems.
+description: Use when asked to add, import, adjust, fix or remove a ComfyUI workflow in GAIFA ("add this workflow", "make a pack for X", "why won't this workflow run", "expose the LoRA strength", "use the fp8 model instead"), or to make a workflow available to the agent. Covers workflow packs in services/comfy/workflows/, workflow.toml, tasks, the comfyui workflows CLI and the check problems.
 ---
 
 # Working with ComfyUI workflow packs

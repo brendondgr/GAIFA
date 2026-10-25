@@ -1,4 +1,4 @@
-# Agent: AIHub's chat agent
+# Agent: GAIFA's chat agent
 
 One Claude-Code-style loop, written for a local model: call the model, run its tool calls, append the results, repeat until a reply has no tool calls. Design and research: [docs/agent-architecture.md](../../docs/agent-architecture.md); plan Phases 13–14.
 
@@ -18,10 +18,10 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 | `agent/harness.py`, `harness/` | The harness as versioned files (plan 22.1): the base in git, learned versions in `data/agent/harness/`, rollback |
 | `agent/hooks.py` | Declarative hooks in the tool loop: hint_after_error, cap, require_first, trim (plan 22.2) |
 | `agent/records.py` | Turn records (`turns` in agent.db, plan 21.4) |
-| `agent/gpuwait.py` | "Waiting for the GPU" on the turn (plan 31.4): each model call names its chat (`X-AIHub-Thread`); while the relay holds it in AIHub's GPU queue, the hub's `GET /api/gpu` shows a waiting lease of that chat and the agent sends the transient `gpu_wait` `{text, eta_s, ahead}` (an empty one clears it) |
+| `agent/gpuwait.py` | "Waiting for the GPU" on the turn (plan 31.4): each model call names its chat (`X-GAIFA-Thread`); while the relay holds it in GAIFA's GPU queue, the hub's `GET /api/gpu` shows a waiting lease of that chat and the agent sends the transient `gpu_wait` `{text, eta_s, ahead}` (an empty one clears it) |
 | `agent/learn/` | Learning: `mine.py` preferences from card edits, answers and thumbs (21.5); `replay.py`, `loop.py`, `prompts.py`, `library.py`, `schedule.py` the harness learner (Phase 22) |
 | `ui/page.js` | The Learning page: Preferences, Review, Tool usage, Harness, Runs, Library |
-| `agent/hubapi.py` | AIHub over HTTP: tools, calls, approvals, outputs, skills, the event stream |
+| `agent/hubapi.py` | GAIFA over HTTP: tools, calls, approvals, outputs, skills, the event stream |
 | `agent/server.py` | The HTTP API (`create_app`) |
 | `evals/` | The eval (plan 13.5): `python -m evals.run --model skynet --runs 3` (`--live` for real outputs; each run's chats and outputs are deleted afterwards unless `--keep`, `evals/cleanup.py`), `python -m evals.vision` |
 | `tests/` | `.venv/bin/python -m pytest`: a scripted model (`fakemodel.py`) and a stand-in hub (`fakehub.py`); no model or GPU needed |

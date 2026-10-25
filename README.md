@@ -1,11 +1,11 @@
-# AIHub
+# GAIFA
 
 One local web app that runs and controls every AI service on a single machine: local LLMs,
 image and video generation, 3D models, speech, and a chat agent that chains them together.
 
-![The AIHub Overview page: memory used, services ready, outputs and LLM tokens today, memory over time and memory now by service, outputs per day, LLM traffic, an activity heatmap, jobs and model storage](docs/assets/overview.png)
+![The GAIFA Overview page: memory used, services ready, outputs and LLM tokens today, memory over time and memory now by service, outputs per day, LLM traffic, an activity heatmap, jobs and model storage](docs/assets/overview.png)
 
-AIHub is a small FastAPI server (the *hub*) on `127.0.0.1:7000` in front of a set of **mods**.
+GAIFA is a small FastAPI server (the *hub*) on `127.0.0.1:7000` in front of a set of **mods**.
 A mod is one AI service in its own folder under `services/`, running as its own process, with its
 own Python environment. The hub starts and stops the mods, shares the GPU's memory between them,
 keeps one index of everything they make, and serves a single UI for all of it. Adding a service
@@ -34,7 +34,7 @@ Around the mods, the hub provides:
 - **A memory manager** that unloads idle mods to make room before a model loads, so jobs don't run
   out of memory (it never stops an LLM on its own).
 - **One outputs index** of every image, video, 3D model and audio clip, with search and previews.
-- **A models registry** of the weights on disk (`aihub models`).
+- **A models registry** of the weights on disk (`gaifa models`).
 - **Sessions:** named setups ("LLM work", "Video work") that save what runs and what's loaded, and
   switch between them through the memory manager.
 - **A tool catalog** with risk levels and approvals, also served over MCP at `/mcp`, so Claude
@@ -42,9 +42,9 @@ Around the mods, the hub provides:
 
 ### The chat agent
 
-![A chat in AIHub: asked for a 3D teapot, the agent made a picture first and then a 3D model from it with TRELLIS.2. The open activity fold lists each step and its time, a strip shows both outputs, and the 3D model card shows four views with a View in 3D button](docs/assets/chat-picture-to-3d.png)
+![A chat in GAIFA: asked for a 3D teapot, the agent made a picture first and then a 3D model from it with TRELLIS.2. The open activity fold lists each step and its time, a strip shows both outputs, and the 3D model card shows four views with a View in 3D button](docs/assets/chat-picture-to-3d.png)
 
-The Chat page talks to the agent mod, a Claude-Code-style loop written for AIHub. Ask for
+The Chat page talks to the agent mod, a Claude-Code-style loop written for GAIFA. Ask for
 something ("make a 3D model of a ceramic teapot, picture first") and it picks the tools and chains
 them, one output feeding the next. Each turn folds into one tidy line ("Ran 2 tools · 3m 47s") that
 opens into its steps, with the outputs in a strip underneath. Result cards have buttons for the
@@ -77,21 +77,21 @@ to 3D) all pass. Details and the remaining failures: [docs/agent-eval.md](docs/a
 ## Requirements
 
 - Linux (systemd user services, or detached processes without systemd), Windows 11 through WSL2, or macOS on Apple Silicon ([docs/platforms.md](docs/platforms.md)); Python 3.11 or newer for the setup command, git and [uv](https://docs.astral.sh/uv/) (it fetches the Python 3.12+ that the hub and mods run on). Native Windows isn't supported.
-- For the GPU mods, a GPU your mods' variants support: `aihub hardware` shows what AIHub finds, and [docs/platforms.md](docs/platforms.md) which variants are tested where. The host setup per machine is in [docs/setup/](docs/setup/README.md): [AMD Strix Halo](docs/setup/host.md) (where AIHub is built and tested; Images & Video and 3D Generate run there in the [`kyuz0/amd-strix-halo-comfyui`](https://hub.docker.com/r/kyuz0/amd-strix-halo-comfyui) image through podman/toolbox), [NVIDIA](docs/setup/host-linux-nvidia.md), [Intel](docs/setup/host-linux-intel.md), [WSL2](docs/setup/host-wsl2.md), [macOS](docs/setup/host-macos.md).
+- For the GPU mods, a GPU your mods' variants support: `gaifa hardware` shows what GAIFA finds, and [docs/platforms.md](docs/platforms.md) which variants are tested where. The host setup per machine is in [docs/setup/](docs/setup/README.md): [AMD Strix Halo](docs/setup/host.md) (where GAIFA is built and tested; Images & Video and 3D Generate run there in the [`kyuz0/amd-strix-halo-comfyui`](https://hub.docker.com/r/kyuz0/amd-strix-halo-comfyui) image through podman/toolbox), [NVIDIA](docs/setup/host-linux-nvidia.md), [Intel](docs/setup/host-linux-intel.md), [WSL2](docs/setup/host-wsl2.md), [macOS](docs/setup/host-macos.md).
 - The hub, and the relay, OpenCode, agent, web and workspace mods, need no GPU; Speech to Text (stt) runs without one too, only slower.
 - Models are your choice, per mod: each mod's setup doc says what it runs, suggests a few, and says how to add your own. None are in the repository.
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/brendondgr/AIHub.git
-cd AIHub
-bin/aihub setup
+git clone https://github.com/brendondgr/GAIFA.git
+cd GAIFA
+bin/gaifa setup
 ```
 
-`aihub setup` does the whole install: the hub (`uv sync`, then `aihub install`, which writes and starts the `aihub` systemd user service and links `aihub` into `~/.local/bin`), the host checks (it prints any `sudo` fixes for you to run; it never runs them), then the mods you pick from a list. It asks every question first (licences, which models), installs each mod, downloads the models you chose, asks for the agent's model once your relay has some, and checks each mod. If it stops, run it again: it resumes. Open <http://127.0.0.1:7000> when it's done.
+`gaifa setup` does the whole install: the hub (`uv sync`, then `gaifa install`, which writes and starts the `gaifa` systemd user service and links `gaifa` into `~/.local/bin`), the host checks (it prints any `sudo` fixes for you to run; it never runs them), then the mods you pick from a list. It asks every question first (licences, which models), installs each mod, downloads the models you chose, asks for the agent's model once your relay has some, and checks each mod. If it stops, run it again: it resumes. Open <http://127.0.0.1:7000> when it's done.
 
-To set up only some mods: `bin/aihub setup relay agent tts`; to see the plan first: `--plan`. An AI agent can run the same process for you (`--plan --json`, answers in a file, one JSON report; the `aihub-setup` skill): the steps and questions are the same as yours. The guide behind it, and each mod's own setup doc, are in [docs/setup/](docs/setup/README.md).
+To set up only some mods: `bin/gaifa setup relay agent tts`; to see the plan first: `--plan`. An AI agent can run the same process for you (`--plan --json`, answers in a file, one JSON report; the `gaifa-setup` skill): the steps and questions are the same as yours. The guide behind it, and each mod's own setup doc, are in [docs/setup/](docs/setup/README.md).
 
 ## Usage
 
@@ -100,16 +100,16 @@ from its OpenAPI), Chat, Models, Outputs and Settings. The command line covers t
 
 | Command | What it does |
 |---------|--------------|
-| `aihub status` | The hub and each mod: state, load, port, memory |
-| `aihub setup [<mod>…] [--plan] [--json]` | Set up the hub, the host checks and the mods you choose with their models (`docs/setup/`); `--plan` only shows the plan, `--json` is for an agent; it resumes after a stop |
-| `aihub check <id> [--start]` | Check a mod against the contract (manifest, port, health, status, widgets, tools); `--start` starts it first, since a stopped mod's live checks are skipped |
-| `aihub start \| stop \| restart [id \| all]` | The hub (no id), one mod, or every mod |
-| `aihub load \| unload <id>` | Load a mod's models into memory, or free them |
-| `aihub logs [id] [-f]` | A mod's log (`data/logs/<id>.log`), or the hub's |
-| `aihub doctor [--inventory]` | Check the install; `--inventory` lists every path used outside the project |
-| `aihub models list \| show <id> \| scan [--add] \| verify <id>…` | The models registry |
-| `aihub backup <folder>` | Databases, registry, `config.toml` and the mods' `.env` files in a dated archive |
-| `aihub open` | Open the UI in a browser |
+| `gaifa status` | The hub and each mod: state, load, port, memory |
+| `gaifa setup [<mod>…] [--plan] [--json]` | Set up the hub, the host checks and the mods you choose with their models (`docs/setup/`); `--plan` only shows the plan, `--json` is for an agent; it resumes after a stop |
+| `gaifa check <id> [--start]` | Check a mod against the contract (manifest, port, health, status, widgets, tools); `--start` starts it first, since a stopped mod's live checks are skipped |
+| `gaifa start \| stop \| restart [id \| all]` | The hub (no id), one mod, or every mod |
+| `gaifa load \| unload <id>` | Load a mod's models into memory, or free them |
+| `gaifa logs [id] [-f]` | A mod's log (`data/logs/<id>.log`), or the hub's |
+| `gaifa doctor [--inventory]` | Check the install; `--inventory` lists every path used outside the project |
+| `gaifa models list \| show <id> \| scan [--add] \| verify <id>…` | The models registry |
+| `gaifa backup <folder>` | Databases, registry, `config.toml` and the mods' `.env` files in a dated archive |
+| `gaifa open` | Open the UI in a browser |
 
 The hub's own API is documented at <http://127.0.0.1:7000/api/docs>, and each mod's API is proxied
 at `/api/s/<id>/`.
@@ -120,7 +120,7 @@ at `/api/s/<id>/`.
 flowchart LR
   UI["Web UI<br/>(Overview, Chat, mod pages)"] --> Hub
   MCP["MCP clients<br/>(Claude Code)"] --> Hub
-  Hub["AIHub hub :7000<br/>memory manager · outputs · models<br/>tool catalog · approvals · sessions"]
+  Hub["GAIFA hub :7000<br/>memory manager · outputs · models<br/>tool catalog · approvals · sessions"]
   Hub -- "HTTP proxy at /api/s/id/" --> Mods
   subgraph Mods["Mods (one systemd unit each)"]
     relay["relay :4000"] --> lcpp["lcpp :7710<br/>llama.cpp servers"]
@@ -168,11 +168,11 @@ Mods with secrets or machine-specific paths read a `.env` in their folder; the t
 ## Adding a mod
 
 ```bash
-aihub new my-mod
+gaifa new my-mod
 ```
 
 This creates `services/my-mod/` from the template, installs it and loads it. Edit its `server.py`
-and `service.toml`, then run `aihub restart my-mod` and `aihub check my-mod` until the check reports
+and `service.toml`, then run `gaifa restart my-mod` and `gaifa check my-mod` until the check reports
 "all checks passed". Any language works as long as it serves HTTP on the given port with a health
 route. The contract and the optional extras are in [docs/mods.md](docs/mods.md). ComfyUI workflows
 are added as packs under `services/comfy/workflows/`, described in [docs/workflows.md](docs/workflows.md).
@@ -196,7 +196,7 @@ through Phase 22: the hub, the eight mods, the tool catalog and MCP endpoint, th
 learner, sessions, and logs and runtime state kept inside the project folder. Known gaps:
 
 - The GPU mods are tested on a Strix Halo with ROCm; their variants for NVIDIA, Intel, Apple and the CPU
-  are written but untested until a field test (`aihub report`) runs them on that hardware
+  are written but untested until a field test (`gaifa report`) runs them on that hardware
   ([docs/platforms.md](docs/platforms.md)). vLLM runs on ROCm only.
 - Two paths still live outside the project folder: OpenCode's working directory
   (`OPENCODE_PROJECT_DIR`) and the LLM Launcher's CLI, installed as a uv tool.

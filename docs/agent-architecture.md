@@ -16,7 +16,7 @@ Why the Stage D agent (plan Phases 13–14, architecture §14) is one hand-writt
 | Instructions | `AGENT.md`, skills loaded only when needed, a memory index | Claude Code's CLAUDE.md, skills and auto memory |
 | Model | Gemma 4 31B via the relay's `skynet` endpoint (131,072 tokens), local Gemma 4 26B as the fallback | *Vendor* τ²-bench Retail: Gemma 4 31B 86.4%, 26B A4B 85.5%; Gemma 3 27B 6.6%. Thinking adds 6–10 BFCL points (Qwen3 report) |
 | Evaluation | 30 real tasks, each run 3 times (pass^3), graded on outcomes | τ-bench: consistency is where models fail. Anthropic's eval guidance |
-| Learning (2026-10-19, plans 21–22) | Preferences as hub data filled into cards (from what you say, card edits seen twice in two chats, carried within a chat); the harness as versioned files improved by a learner after Harness² (two scoped editors, replays as probes, a composer, the eval as gate, a library), on the same model as the chat | Harness² ([arXiv 2610.14224](https://arxiv.org/abs/2610.14224)): one contrastive step gave the largest gain, scoping and the library helped, editing without execution evidence hurt; card edits give AIHub the label the paper lacks |
+| Learning (2026-10-19, plans 21–22) | Preferences as hub data filled into cards (from what you say, card edits seen twice in two chats, carried within a chat); the harness as versioned files improved by a learner after Harness² (two scoped editors, replays as probes, a composer, the eval as gate, a library), on the same model as the chat | Harness² ([arXiv 2610.14224](https://arxiv.org/abs/2610.14224)): one contrastive step gave the largest gain, scoping and the library helped, editing without execution evidence hurt; card edits give GAIFA the label the paper lacks |
 
 ## 2. How Claude Code is built
 
@@ -77,7 +77,7 @@ The sources are Anthropic's docs and engineering posts. The paper "Dive into Cla
 | Pydantic AI 2.x | The fallback if we stop wanting to own the loop: deferred-tool approvals and capabilities loaded on demand fit this design |
 | LangGraph / LangChain 1.x | The strongest middleware (approval, summarization, tool selection), but heavy abstraction sitting between us and the model server. It was the earlier plan |
 | OpenAI Agents SDK | Good approval design, still pre-1.0, and its tracing must be turned off for local models |
-| Claude Agent SDK | Runs the Claude Code binary and is tuned for Claude models. Not the engine here, but **Claude Code can use AIHub as an MCP client** (plan 13.4) |
+| Claude Agent SDK | Runs the Claude Code binary and is tuned for Claude models. Not the engine here, but **Claude Code can use GAIFA as an MCP client** (plan 13.4) |
 | smolagents, Google ADK | Code-as-action defeats per-call approval; ADK is Gemini-first and heavy |
 
 ## 5. Facts checked on this machine (2026-10-06)

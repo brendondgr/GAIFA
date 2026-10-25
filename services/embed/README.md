@@ -1,6 +1,6 @@
 # Embeddings (`embed`)
 
-EmbeddingGemma 2 as an AIHub mod (plan Phase 28): text, code, images, audio and video in one 768-d space, for search by meaning. Setup, versions and measurements: [setup/embed.md](setup/embed.md).
+EmbeddingGemma 2 as a GAIFA mod (plan Phase 28): text, code, images, audio and video in one 768-d space, for search by meaning. Setup, versions and measurements: [setup/embed.md](setup/embed.md).
 
 ```
 POST /v1/embed  {"inputs": [{"text": "…", "title": "…"} | {"image": "output:<id>"} | {"audio": "output:<id>"} | {"video": "output:<id>"}],
@@ -8,9 +8,9 @@ POST /v1/embed  {"inputs": [{"text": "…", "title": "…"} | {"image": "output:
              →  {"vectors": [[…]], "inputs": [{kind, output?, seconds?, frames?, …}], "dim", "device", "dtype", "ms"}
 ```
 
-The library indexes every output in AIHub except hidden ones (the web mod's saved pages, plan 30.9: not the user's; one that becomes hidden is dropped) as background work in AIHub's GPU queue (`GET /v1/library`; collections at `/v1/collections`), and `POST /v1/search` searches it by meaning: the agent's `embed_library_search` and `embed_library_collections`.
+The library indexes every output in GAIFA except hidden ones (the web mod's saved pages, plan 30.9: not the user's; one that becomes hidden is dropped) as background work in GAIFA's GPU queue (`GET /v1/library`; collections at `/v1/collections`), and `POST /v1/search` searches it by meaning: the agent's `embed_library_search` and `embed_library_collections`.
 
-Vectors are unit length (cosine = dot product), in input order. Media are AIHub outputs, read through the hub. A video's soundtrack can be embedded as `{"audio": <video output>}`. Also `POST /v1/load {"kinds": […]}`, `POST /v1/unload`, `GET /v1/info`, `GET /v1/status`.
+Vectors are unit length (cosine = dot product), in input order. Media are GAIFA outputs, read through the hub. A video's soundtrack can be embedded as `{"audio": <video output>}`. Also `POST /v1/load {"kinds": […]}`, `POST /v1/unload`, `GET /v1/info`, `GET /v1/status`.
 
 | File | What it does |
 |---|---|
@@ -22,7 +22,7 @@ Vectors are unit length (cosine = dot product), in input order. Media are AIHub 
 | `embed/store.py` | `embed.db`: indexed outputs, chunks with float16 vectors, collections; the vector matrix for search |
 | `embed/chunks.py` | ~800-token chunks with 100 of overlap, keeping offset, page and line |
 | `embed/gpu.py` | the GPU slot around each encode (plan 31.3): `interactive` for `/v1/embed` and searches, `background` for indexing; none on the CPU |
-| `embed/gpu_slot.py` | AIHub's reference GPU client, an identical copy of `services/_template/gpu_slot.py` |
+| `embed/gpu_slot.py` | GAIFA's reference GPU client, an identical copy of `services/_template/gpu_slot.py` |
 | `embed/api_library.py` | `/v1/search`, `/v1/library`, `/v1/library/reindex`, `/v1/collections` |
 | `embed/search.py` | search: the query against every chunk, filters, a chat's or collection's scope indexed first |
 | `embed/hubclient.py` | outputs, memory acquire and the models registry over HTTP |

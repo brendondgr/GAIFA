@@ -1,4 +1,4 @@
-# AIHub — Architecture
+# GAIFA — Architecture
 
 > Agreed design, 2026-10-04. Companion docs:
 > - [backend-plan.md](backend-plan.md): step-by-step build of the backend
@@ -7,14 +7,14 @@
 
 ## 1. Goal
 
-AIHub is **one local app that controls every AI service on this machine**, from one UI and one API:
+GAIFA (*Great, Another Interface For Agents*, said "guy-fuh"; AIHub until the rename in plan Phase 50) is **one local app that controls every AI service on this machine**, from one UI and one API:
 - the LLM relay and analytics (DashLLM)
 - the llama.cpp launcher (lcpp)
 - text to speech (LocalTTS)
 - 3D generation (3DGenerate)
 - later, image and video generation (ComfyUI) and a chat agent
 
-It is built so that **anyone can add a service ("mod") by dropping a folder into `services/`**, with no changes to AIHub's own code.
+It is built so that **anyone can add a service ("mod") by dropping a folder into `services/`**, with no changes to GAIFA's own code.
 
 **Not goals, for now:**
 - Access from anywhere but 127.0.0.1, accounts, or a login.
@@ -25,12 +25,12 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 
 | Topic | Choice | Why |
 |---|---|---|
-| Location | `/home/bdgr/Agents/AIHub`, one git repo | requested |
+| Location | `/home/bdgr/Agents/GAIFA`, one git repo | requested |
 | Shape | A **hub in front of mods**. Each mod is its own process. | The apps' torch/Python stacks conflict: Kokoro and Breeze need different ROCm torch builds, gen3d runs in a Python 3.13 container, and lcpp and relay use 3.14. Stopping a process is how GPU memory is freed. relay's event loop is tuned for concurrency, and lcpp's model instances must survive restarts. |
 | Hub stack | Python ≥ 3.12, FastAPI + uvicorn + httpx, SQLite, uv | same as all four apps |
 | Hub address | `127.0.0.1:7000`, no auth | only reachable from this machine |
-| Running mods | Each mod runs as a **temporary systemd user service** (`aihub-<id>.service`), started with `systemd-run`; where there's no systemd user manager (macOS), a **detached process** with a pidfile in `data/state/hub/pids/` that is adopted after a hub restart (`[hub] backend`, plan 37.1) | the pattern lcpp already uses for models: survives hub restarts, logs go to journald, no unit files per mod |
-| Installed services | Only `aihub.service` (runs `app.py`) | today there are four separate ones |
+| Running mods | Each mod runs as a **temporary systemd user service** (`gaifa-<id>.service`), started with `systemd-run`; where there's no systemd user manager (macOS), a **detached process** with a pidfile in `data/state/hub/pids/` that is adopted after a hub restart (`[hub] backend`, plan 37.1) | the pattern lcpp already uses for models: survives hub restarts, logs go to journald, no unit files per mod |
+| Installed services | Only `gaifa.service` (runs `app.py`) | today there are four separate ones |
 | Mod contract | `service.toml` + an HTTP server on 127.0.0.1 + a health check | any language; all four apps already fit with small changes |
 | API | Hub routes at `/api/*`, plus **every mod's own API at `/api/s/<id>/*`**, plus an operations list built from each mod's OpenAPI | generic UI pages and the future agent's tools come from the same source |
 | Models | `data/models/<kind>/…`, with `data/models/registry.json` tracked in git | self-contained; recorded sources make lost files re-downloadable |
@@ -44,7 +44,7 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 | Mod UIs | Optional `services/<id>/ui/page.js` or `ui/Page.dc.html`, plus optional dashboard widgets (`[[ui.widgets]]`). Without them, a mod still gets a full generic page, and its numeric stats are charted automatically. | adding a mod needs no UI work |
 | Chat, agent, save states | **Built last** (backend-plan Stage D): the agent is a mod with **its own loop, modelled on Claude Code** (no agent framework): tools load on demand, it asks for choices with question and parameter cards, threads are an append-only event log in SQLite; sessions can be saved and restored; logs and runtime state move inside the folder | requested: do these once everything else is built. Research: [agent-architecture.md](agent-architecture.md). A framework (LangGraph) was the earlier plan; a hand-written loop gives the control a local model needs (thinking fields, leaked tool calls, tool loading) |
 | Git history | The existing repos are merged in with `git subtree` | keeps every app's history |
-| Writing outside the folder | Nothing is written outside the project root, except the allowlist (plan 12.4) and **workspace folders the user set to Edit or above** (plan Phase 27). The AIHub folder and `data/models/` are capped at Read. | requested 2026-10-20: the agent edits your projects in place, and only where you raised the folder's level |
+| Writing outside the folder | Nothing is written outside the project root, except the allowlist (plan 12.4) and **workspace folders the user set to Edit or above** (plan Phase 27). The GAIFA folder and `data/models/` are capped at Read. | requested 2026-10-20: the agent edits your projects in place, and only where you raised the folder's level |
 | Heavy runtimes (engine venvs, CubeArt, the ROCm image) | Referenced where they are first, moved inside later | Python venvs can't be moved, so they must be recreated; don't break working GPU stacks while migrating |
 | Mod ids | `relay`, `opencode`, `lcpp`, `tts`, `gen3d`, `comfy` | They become URLs (`/api/s/tts/…`, `#/s/tts`), so they are fixed once chosen. |
 | Ports | Keep 4000 / 4096 / 7710 / 5040 / 5050. comfy adapter 5070 (ComfyUI itself on 8199). New mods use 5100–5199: `web` 5102, `workspace` 5103, `embed` 5104, `stt` 5105, `searxng` 5106, `decide` 5107. | clients such as video-maker keep working |
@@ -52,14 +52,14 @@ It is built so that **anyone can add a service ("mod") by dropping a folder into
 ## 3. Directory layout
 
 ```
-AIHub/
+GAIFA/
 ├── CLAUDE.md                short, only rules that are true today
-├── app.py                   `python app.py` starts the hub (same as `aihub serve`)
+├── app.py                   `python app.py` starts the hub (same as `gaifa serve`)
 ├── config.toml              your settings: hub, paths, memory rules, per-mod overrides
 ├── pyproject.toml, uv.lock  hub dependencies (uv); the hub's venv is the hidden `.venv/`
 ├── bin/
-│   ├── aihub                the command: start · stop · status · logs · new · install · doctor · backup …
-│   └── aihub.service.in     systemd unit template, used by `aihub install`
+│   ├── gaifa                the command: start · stop · status · logs · new · install · doctor · backup …
+│   └── gaifa.service.in     systemd unit template, used by `gaifa install`
 ├── docs/                    this file, backend-plan.md, design-brief-ui.md, structure.md (what exists today), reference/ (UI exports)
 ├── utils/                   the hub's code (Python package)
 │   ├── server.py            create_app(): FastAPI app, lifespan, static web/, error envelope
@@ -77,11 +77,11 @@ AIHub/
 │   ├── registry/            models registry: storage, status, scan, verify, add, delete
 │   ├── outputs/             outputs index: what counts, rows, media details and previews, watcher, trash
 │   ├── tools.py             (later) agent tool catalog and approvals
-│   ├── cli.py               standard-library-only CLI behind bin/aihub
+│   ├── cli.py               standard-library-only CLI behind bin/gaifa
 │   ├── routes/              one FastAPI router per area
 │   └── tests/               pytest, grouped by area (<area>/test_<behavior>.py); fixtures/mods/ holds fake mods
 ├── services/                one folder per mod (see §4)
-│   ├── _template/           what `aihub new <id>` copies
+│   ├── _template/           what `gaifa new <id>` copies
 │   ├── relay/  opencode/  lcpp/  tts/  gen3d/  comfy/
 ├── data/
 │   ├── models/
@@ -131,13 +131,13 @@ AIHub/
 | Status | `status` route returning the shape in §4.6 | load state, busy/idle, KPIs on its Overview tile, jobs in the header |
 | Outputs | write into `{outputs}` (§4.7) | shows on the Outputs page automatically |
 | Models | `[models] dirs` | registry entries in those folders (or deeper, e.g. `comfyui/loras`) are listed as "used by" this mod, and their files can't be deleted while it holds them |
-| Custom page | `ui/page.js` or `ui/Page.dc.html` (UI brief §5) | own tabs inside the AIHub shell |
+| Custom page | `ui/page.js` or `ui/Page.dc.html` (UI brief §5) | own tabs inside the GAIFA shell |
 | Chat module | `[ui] chat = "ui/chat.js"` (plan 44.1, [mods.md](mods.md)): `export default function setup(chat)` registers the mod's step words and cards; listed as `chat_url` | its own cards in Chat (a live card while its job runs, its result) |
 | Dashboard widgets | `[[ui.widgets]]` pointing at a route that returns `WidgetData` (UI brief §11.7) | its charts on the Overview dashboard |
 | Charts for free | numeric values in `stats` (§4.6) | each one is recorded as a series `svc.<id>.stat.<slug>` and drawn as sparklines and charts |
 | API polish | `[api]` hide list and response-kind overrides | a cleaner API tab |
 | Agent tools | `[tools]` | operations the future agent may call, with optional approval |
-| Call back into the hub | `AIHUB_URL` env | register models, ask for memory |
+| Call back into the hub | `GAIFA_URL` env | register models, ask for memory |
 
 ### 4.3 `service.toml` reference
 
@@ -162,7 +162,7 @@ start_timeout_s = 60
 stop_timeout_s = 180
 restart = "on-failure"              # "no" | "on-failure"
 after = ["relay"]                   # start ordering only, not a hard requirement
-install = "install.sh"              # optional; run by `aihub new` / `aihub install <id>`
+install = "install.sh"              # optional; run by `gaifa new` / `gaifa install <id>`
 installed = [".venv/bin/python"]   # optional: what exists once the mod is set up, any one of them (default: the command's first word); a mod whose command is a tracked script names its real dependency (opencode: its binary where run.sh looks), so the hub doesn't autostart it before setup
 
 [run.variants.cuda]                 # optional (plan 38.3): env for one variant (rocm | cuda | xpu | mps | vulkan | cpu), over [run].env
@@ -177,7 +177,7 @@ triggers = ["POST /v1/speech", "POST /v1/audio/speech"]   # proxied calls that m
 extra_units = []                    # other systemd units counted as this mod's memory, e.g. "lcpp-*.service"
 containers = []                     # podman containers counted as this mod's memory (globs allowed)
 idle_unload_s = 180                 # the mod's default; config.toml may override (0 = never)
-idle_unload_env = "LOCALTTS_IDLE_UNLOAD_S"   # the variable the mod reads it from (AIHUB_IDLE_UNLOAD_S is always set too)
+idle_unload_env = "LOCALTTS_IDLE_UNLOAD_S"   # the variable the mod reads it from (GAIFA_IDLE_UNLOAD_S is always set too)
 
 [models]
 dirs = ["tts", "voices"]            # data/models subfolders this mod uses
@@ -230,7 +230,7 @@ skills = "skills"                   # optional: skills/<name>/SKILL.md for the a
 - Operations (`[memory]`, `[[ui.widgets]].source`, `[tools]`, `[api.responses]` keys) are written `"METHOD /path"`.
 - `[ui].page` must be inside the mod's `ui/` folder, and so must `[ui].logo` (an `.svg`, `.png` or `.webp`). The summary's `logo_url` is `/ui/services/<id>/<file>`, or null when the file is missing.
 - Two mods can't share a port, and no mod may use the hub's port.
-- Mods not mentioned in `config.toml` are enabled and autostart, once they're installed: a mod whose command doesn't exist yet (no venv, binary or script) isn't autostarted and shows `not installed: run aihub setup <id>` as its last error (plan 23.12).
+- Mods not mentioned in `config.toml` are enabled and autostart, once they're installed: a mod whose command doesn't exist yet (no venv, binary or script) isn't autostarted and shows `not installed: run gaifa setup <id>` as its last error (plan 23.12).
 
 ### 4.4 Placeholders and environment
 
@@ -251,11 +251,11 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 
 **Environment layers**, later ones winning: the hub's variables below → `env_file` → `[run].env` → `config.toml`'s `[services.<id>].env`.
 
-**Environment every mod gets:** `AIHUB_URL`, `AIHUB_SERVICE_ID`, `AIHUB_PORT`, `AIHUB_ROOT`, `AIHUB_MODELS`, `AIHUB_OUTPUTS`, `AIHUB_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`. A mod with `[memory]` also gets `AIHUB_IDLE_UNLOAD_S` (seconds, `0` = never) and the same value under its `idle_unload_env` name, after `[run].env` and before `config.toml`'s env. A mod whose variant `aihub setup` recorded (`[services.<id>] accel`, plan 38.3) gets `AIHUB_ACCEL` (that accel), `AIHUB_DEVICE` (torch's device string: `cuda` for CUDA and ROCm, `xpu`, `mps`, `cpu`) and `AIHUB_GPU_ARCH` (gfx1151, sm_89, …), and its `[run.variants.<accel>].env`, after `[run].env`. When that accel isn't on this machine, the mod is **unavailable**: autostart skips it and starting it answers `409 unavailable`, with the reason in `ServiceSummary.unavailable`. Every mod gets `AIHUB_CONTAINER_RUNTIME` (`podman` or `docker`, from `[containers] runtime`, plan 37.4) when one is installed. On a machine with more than one GPU that can compute, a mod started on one GPU (`[services.<id>] gpu = <index>`, or the freest card under `auto`, the default; plan 36.3) also gets `AIHUB_GPU_INDEX` and its vendor's visible-devices variable: `CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, or `ONEAPI_DEVICE_SELECTOR` and `ZE_AFFINITY_MASK`, counted among that vendor's GPUs.
+**Environment every mod gets:** `GAIFA_URL`, `GAIFA_SERVICE_ID`, `GAIFA_PORT`, `GAIFA_ROOT`, `GAIFA_MODELS`, `GAIFA_OUTPUTS`, `GAIFA_DATABASES`, `HF_HOME` (unless the mod sets its own) and `PYTHONUNBUFFERED=1`. A mod with `[memory]` also gets `GAIFA_IDLE_UNLOAD_S` (seconds, `0` = never) and the same value under its `idle_unload_env` name, after `[run].env` and before `config.toml`'s env. A mod whose variant `gaifa setup` recorded (`[services.<id>] accel`, plan 38.3) gets `GAIFA_ACCEL` (that accel), `GAIFA_DEVICE` (torch's device string: `cuda` for CUDA and ROCm, `xpu`, `mps`, `cpu`) and `GAIFA_GPU_ARCH` (gfx1151, sm_89, …), and its `[run.variants.<accel>].env`, after `[run].env`. When that accel isn't on this machine, the mod is **unavailable**: autostart skips it and starting it answers `409 unavailable`, with the reason in `ServiceSummary.unavailable`. Every mod gets `GAIFA_CONTAINER_RUNTIME` (`podman` or `docker`, from `[containers] runtime`, plan 37.4) when one is installed. On a machine with more than one GPU that can compute, a mod started on one GPU (`[services.<id>] gpu = <index>`, or the freest card under `auto`, the default; plan 36.3) also gets `GAIFA_GPU_INDEX` and its vendor's visible-devices variable: `CUDA_VISIBLE_DEVICES`, `HIP_VISIBLE_DEVICES`, or `ONEAPI_DEVICE_SELECTOR` and `ZE_AFFINITY_MASK`, counted among that vendor's GPUs.
 
 ### 4.5 Port rules
 - A mod keeps the port in its manifest unless `config.toml` overrides it.
-- `aihub new` picks the first free port in 5100–5199.
+- `gaifa new` picks the first free port in 5100–5199.
 - If the port is taken by something other than the mod's own unit, the start fails with `port_in_use` and names the process holding it.
 
 ### 4.6 Status shape (optional `[run] status` route)
@@ -273,8 +273,8 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 
 - **`loaded`**: models are in memory; omit or set `null` if the mod has none.
 - **`memory_estimate_gb`**: optional; overrides the manifest estimate, for example per workflow.
-- **Polling:** every 2 s while loading, busy or running jobs, otherwise every 10 s, only while the mod is ready. Invalid parts of the body are ignored (`aihub check` lists them).
-- **`jobs`**: each `{id, label, progress (0–1 or null), state, route?, live?}`, with `state` one of queued, running, done, failed, cancelled. Report finished jobs with their final state; a job that just disappears is shown as `done`. `route` must start with `#/` (a page in AIHub); anything else is dropped and reported.
+- **Polling:** every 2 s while loading, busy or running jobs, otherwise every 10 s, only while the mod is ready. Invalid parts of the body are ignored (`gaifa check` lists them).
+- **`jobs`**: each `{id, label, progress (0–1 or null), state, route?, live?}`, with `state` one of queued, running, done, failed, cancelled. Report finished jobs with their final state; a job that just disappears is shown as `done`. `route` must start with `#/` (a page in GAIFA); anything else is dropped and reported.
 - **`live`** (plan 44.2, optional, on a status job and on a job's own status route that a tool follows): `{stage, stages: [{id, label, state, eta_s}], step, steps, eta_s, frames, preview: {url, seq, w, h}, lines: [done, of], audio}`, every field optional. `preview.url` and `audio` are paths on the mod; the hub rewrites them to `/api/s/<id>/…` and caps the object at 4 KB (`utils/live.py`). A running tool call carries it (`GET /api/tools/calls/{id}`, which with `?wait=&changed=true` answers at the next change), the agent passes it on its transient `progress` event, and `Job.live` goes out with the jobs. Whatever shows the job (a chat card, the Overview, a mod page) fetches the preview frame when `seq` changes.
 - **Fixes on errors** (plan 46.5, `utils/tools/fixes.py`): a tool call that fails after it ran gets `error.fixes` (start or restart the mod, free the GPU, retry, retry with a lighter preset, the setup command) and `error.log` (the mod's log lines that name the error). The agent reads them with the error; Chat shows them as a fix-it card. A call refused before it ran (bad arguments, an unknown tool, a denial) gets none.
 - **`stats`**: at most 4 entries. **Numeric `value`s are recorded** each time status is polled, as the series `svc.<id>.stat.<slug(label)>`. That powers tile sparklines and the mod's charts with no extra work. Counters that reset ("… today") should say so with `"reset": "daily"`, so charts don't show the reset as a drop.
@@ -321,9 +321,9 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 - **Deleting** an output from the UI moves it, with its sidecar and preview, to `outputs/.trash/<YYYY-MM-DD>/` (its cached text and page images are deleted); the hub empties trash days older than 30 days. Dotfiles and dot-folders are never indexed.
 
 ### 4.8 Adding a mod
-1. Run `aihub new <id>`. It copies `services/_template/`, fills in the id, name and a free port, runs its `install.sh`, and asks the running hub to pick it up (`POST /api/services/rescan`). The mod appears in the sidebar, with an Overview tile, a working API tab and its Hello tab, and starts.
-2. Edit `services/<id>/server.py` and `service.toml`, then `aihub restart <id>` (a code change) or `aihub rescan` (a manifest change, applied at the mod's next start).
-3. A mod copied in by hand, or a folder deleted, is picked up the same way with `aihub rescan` (or a hub restart).
+1. Run `gaifa new <id>`. It copies `services/_template/`, fills in the id, name and a free port, runs its `install.sh`, and asks the running hub to pick it up (`POST /api/services/rescan`). The mod appears in the sidebar, with an Overview tile, a working API tab and its Hello tab, and starts.
+2. Edit `services/<id>/server.py` and `service.toml`, then `gaifa restart <id>` (a code change) or `gaifa rescan` (a manifest change, applied at the mod's next start).
+3. A mod copied in by hand, or a folder deleted, is picked up the same way with `gaifa rescan` (or a hub restart).
 
 ## 5. Runtime
 
@@ -334,7 +334,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 4. models registry (load the registry, cheap status check)
 5. services:
    - find all manifests
-   - adopt running `aihub-*` units
+   - adopt running `gaifa-*` units
    - autostart enabled mods in `after` order
 6. outputs (watch `outputs/`, with a background rescan of what changed while the hub was down)
 7. memory sampler
@@ -343,7 +343,7 @@ An unknown `{lowercase_name}` is an error when the mod starts. Other braces (JSO
 **A request from the UI:**
 ```
 browser ──► 127.0.0.1:7000
-            ├─ /                     web/ (static) + /config.js (sets AIHUB_API_BASE)
+            ├─ /                     web/ (static) + /config.js (sets GAIFA_API_BASE)
             ├─ /ui/services/<id>/…   services/<id>/ui/… (page modules)
             ├─ /api/…                hub routes (services, memory, models, outputs, settings, events)
             └─ /api/s/<id>/…  ──►    127.0.0.1:<port>/…   (streamed; memory triggers run first)
@@ -351,25 +351,25 @@ browser ──► 127.0.0.1:7000
 
 **Processes:**
 ```
-aihub.service                        app.py (hub)
-aihub-relay.service                  relay (DashLLM)          :4000
-aihub-opencode.service               opencode serve           :4096
-aihub-lcpp.service                   lcppd                    :7710
+gaifa.service                        app.py (hub)
+gaifa-relay.service                  relay (DashLLM)          :4000
+gaifa-opencode.service               opencode serve           :4096
+gaifa-lcpp.service                   lcppd                    :7710
   lcpp-<name>.service …              llama-server instances   :7071–7199 (owned by lcpp)
-aihub-tts.service                    LocalTTS                 :5040  (+ engine worker subprocesses)
-aihub-gen3d.service                  gen3d                    :5050  (+ podman worker container)
-aihub-comfy.service                  comfy adapter            :5070  (+ ComfyUI in the strix-halo toolbox :8199)
-aihub-stt.service                    stt (faster-whisper)     :5105  (+ its model's worker process)
-aihub-decide.service                 decide (d3-lite)         :5107  (+ its model's worker process)
+gaifa-tts.service                    LocalTTS                 :5040  (+ engine worker subprocesses)
+gaifa-gen3d.service                  gen3d                    :5050  (+ podman worker container)
+gaifa-comfy.service                  comfy adapter            :5070  (+ ComfyUI in the strix-halo toolbox :8199)
+gaifa-stt.service                    stt (faster-whisper)     :5105  (+ its model's worker process)
+gaifa-decide.service                 decide (d3-lite)         :5107  (+ its model's worker process)
 ```
 
-`Ctrl+C` on `python app.py` stops only the hub; mods keep running. `aihub stop all` stops everything.
+`Ctrl+C` on `python app.py` stops only the hub; mods keep running. `gaifa stop all` stops everything.
 
 **Service states** (`utils/services.py`): `stopped → starting → ready ⇄ degraded`, with `failed` and `stopping`.
 - **starting:** health is polled every 0.5 s up to `start_timeout_s`. A mod that exits, or never gets healthy (it is then stopped), goes to `failed` with the last 20 log lines in `last_error`.
 - **ready:** health every 5 s. 2 misses → `degraded`; 5 misses → stopped and `failed`; the process exiting → `failed`.
 - **failed:** `restart = "on-failure"` retries after 2 / 4 / 8 s, at most 3 times in 5 minutes, then gives up. A failure raises an alert and an activity item.
-- **On boot:** running `aihub-*` units started from this root are adopted (`starting` until healthy); one whose folder is gone is stopped. Then enabled mods with autostart start in the background, each after the mods in its `after` list.
+- **On boot:** running `gaifa-*` units started from this root are adopted (`starting` until healthy); one whose folder is gone is stopped. Then enabled mods with autostart start in the background, each after the mods in its `after` list.
 - **Settings changes while running:** a new port or env applies at the mod's next start. Until then, health checks and the proxy keep using the port the process was started with.
 - **External mods** (`kind = "external"`): health only. Never reachable = `stopped`; reachable = `ready`; lost = `degraded`, then `failed`. Start and stop are refused (`external_service`).
 - `python app.py --dev` runs mods as child processes instead of units; they stop with the hub.
@@ -382,7 +382,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 
 | Route | Purpose |
 |---|---|
-| `GET /config.js` | sets `window.AIHUB_API_BASE = ""` and `window.AIHUB_LIVE_AREAS = [...]` (the areas whose backend exists), so the served UI is live area by area |
+| `GET /config.js` | sets `window.GAIFA_API_BASE = ""` and `window.GAIFA_LIVE_AREAS = [...]` (the areas whose backend exists), so the served UI is live area by area |
 | `GET /` | `web/Hub.dc.html`, with `vendor/react*.js` and `/config.js` script tags added before `support.js` as it's served, so a fresh export works unchanged |
 | `GET /ui/services/{id}/{path}`, `GET /Mod_<id>.dc.html` | a mod's `ui/` folder (page modules), and its `Page.dc.html` under a name `dc-import` can find |
 | `GET /api/metrics`, `/api/metrics/series`, `/api/timeline`, `/api/outputs/stats`, `/api/activity/stats`, `/api/jobs/stats`, `/api/widgets`, `/api/widgets/{service}/{id}` | chart data; shapes in UI brief §11.7 |
@@ -395,10 +395,10 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/outputs/{id}/search?q=&limit=` | hits in that text: words in one line or paragraph, a `"phrase"`, or a `/regex/` run in a separate Python with a 1 s limit (`search_timeout`); at most 5,000 matches are counted, past that the answer has `capped: true` |
 | `GET /api/outputs/{id}/page/{n}.png?width=` | page `n` of a PDF, rendered by `pypdfium2`, cached under `outputs/.previews/<id>/`; `width` at most 2400, and at most 25 MP and 10,000 px a side (a very tall page comes out narrower) |
 | `GET /api/events/recent?limit=` | recent activity, current alerts and running jobs (the activity, alerts and jobs parts of `GET /api/overview`, with a larger `limit`) |
-| `GET /api/services/{id}/check[?start=1]` | the mod self-test behind `aihub check`: `{ok, checks: [{name, status: ok\|fail\|warn\|skip, ok, detail}]}` |
-| `GET /api/doctor` | the checks behind `aihub doctor` and Settings → About → Doctor (plan 12.4): models on disk, manifests, paths outside the project (allowlist: `/usr`, `~/.config/tts-engines`, `~/.local/bin`, podman images; Stage D items are notes), ports, units, disk, offline mods. Shape: UI brief §11.7 `Doctor` |
+| `GET /api/services/{id}/check[?start=1]` | the mod self-test behind `gaifa check`: `{ok, checks: [{name, status: ok\|fail\|warn\|skip, ok, detail}]}` |
+| `GET /api/doctor` | the checks behind `gaifa doctor` and Settings → About → Doctor (plan 12.4): models on disk, manifests, paths outside the project (allowlist: `/usr`, `~/.config/tts-engines`, `~/.local/bin`, podman images; Stage D items are notes), ports, units, disk, offline mods. Shape: UI brief §11.7 `Doctor` |
 | `POST /api/services/rescan` | pick up added, removed and edited mod folders without restarting the hub: `{added, removed, changed}`; new mods autostart |
-| `POST /api/memory/acquire[?make_room=1]` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[], plan}` or `409 needs_room {plan}`. `make_room=1` (or `X-AIHub-Make-Room: 1`, or `auto_make_room`) unloads first; the grant is reserved for 120 s |
+| `POST /api/memory/acquire[?make_room=1]` | a mod asks for memory: `{service, needs_bytes, reason}` → `200 {granted, freed[], plan}` or `409 needs_room {plan}`. `make_room=1` (or `X-GAIFA-Make-Room: 1`, or `auto_make_room`) unloads first; the grant is reserved for 120 s |
 | `GET /api/tools[?q=][?names=]`, `GET /api/tools/index` | the agent's tool catalog (plan 13.1): every mod's `[tools]` and `tools_source` functions plus the hub's own `hub_*` tools, with risk, `ask` fields, examples and `core`; a stopped mod's tools stay listed (`available: false`; a call starts it) |
 | `POST /api/tools/{name}/call {arguments, origin, mode}?wait=`, `GET /api/tools/calls/{id}[/result]`, `POST …/cancel` | a tool call (plan 13.2): validated (errors name the field and the fix), checked in §14.7's order (deny list → thread mode → the mod's own limits → grants → ask list → pages the chat's search found → allow list → risk default), run as a hub task (jobs followed to the end; outputs mapped to `output:<id>`; JSON capped at 8 KB). Shapes: UI brief §11.12 |
 | `GET /api/approvals`, `GET/POST /api/approvals/{id} {approve, arguments?, remember?, confirm?, grant_hours?}` | approvals (plan 13.2): a call that must ask is stored in `approvals` (hub.db) and runs nothing; the decision may carry edited arguments, which are validated and are what runs; `remember: thread \| always` also writes a grant (plan 25.2, §14.7) |
@@ -409,8 +409,8 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET/POST /api/prefs`, `PATCH/DELETE /api/prefs/{id}`, `POST /api/prefs/{id}/approve\|reject` | preferences (plan 21.2, §14.5): saved only when they fit the tool's schema and choices; applied to every caller's card |
 | `GET /api/mentions?q=&kind=` | what the user can @-mention (plan 48.1): the kinds the mods declare in `[[agent.mentions]]` (a voice, a workflow, an engine), listed from each running mod (cached 30 s), each with the tool fields it fills |
 | `GET /api/doctor/inventory` | every path outside the project that anything uses, with its reason (plan 16.3) |
-| `GET /api/system/hardware[?refresh=true]` | what this machine has (plan 35.2, `utils/hardware/`): the OS, WSL, each GPU's vendor, arch, memory (unified or dedicated), runtimes, what it can run and its problems, and the accels usable here (`rocm`, `cuda`, `xpu`, `mps`, `vulkan`, `cpu`); read once and cached. `aihub hardware` prints the same without the hub |
-| `POST /mcp` | the agent's tools over MCP (plan 13.4; streamable HTTP, stateless, JSON responses; 2026-07-28 per-request `_meta` plus the 2025 `initialize` era). Annotations from `risk`; `ask` calls return `input_required` (an elicitation form of the ask fields) to clients that declare elicitation, else an explanation with `_meta["aihub/approval"]`; the MCP-only tool `aihub_wait_approval` waits for a decision (never approves). `GET`/`DELETE` → 405; an `Origin` other than the hub's own page, or `Sec-Fetch-Site: cross-site` → 403 (JSON-RPC error). Claude Code: `claude mcp add --transport http aihub http://127.0.0.1:7000/mcp` |
+| `GET /api/system/hardware[?refresh=true]` | what this machine has (plan 35.2, `utils/hardware/`): the OS, WSL, each GPU's vendor, arch, memory (unified or dedicated), runtimes, what it can run and its problems, and the accels usable here (`rocm`, `cuda`, `xpu`, `mps`, `vulkan`, `cpu`); read once and cached. `gaifa hardware` prints the same without the hub |
+| `POST /mcp` | the agent's tools over MCP (plan 13.4; streamable HTTP, stateless, JSON responses; 2026-07-28 per-request `_meta` plus the 2025 `initialize` era). Annotations from `risk`; `ask` calls return `input_required` (an elicitation form of the ask fields) to clients that declare elicitation, else an explanation with `_meta["gaifa/approval"]`; the MCP-only tool `gaifa_wait_approval` waits for a decision (never approves). `GET`/`DELETE` → 405; an `Origin` other than the hub's own page, or `Sec-Fetch-Site: cross-site` → 403 (JSON-RPC error). Claude Code: `claude mcp add --transport http gaifa http://127.0.0.1:7000/mcp` |
 
 **Alerts** (plan 6.4) are the banner items above the Overview grid. Each has a stable id, so it is raised once and cleared when its cause goes away:
 
@@ -423,7 +423,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `memory-high` | warn | memory is over 92% used | it drops under 90% |
 | `outputs-watch` | error | the outputs watcher stopped | it recovers |
 
-**Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-AIHub-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all. **WebSockets** pass through the same path (plan 29.2): messages both ways until either side closes, the mod's close code included. A page from another origin is refused at the handshake (403); otherwise a missing, stopped or unreachable mod is reported as a close code the browser can read (4404, 4503, 4502). An open socket counts as a request in flight.
+**Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-GAIFA-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all. **WebSockets** pass through the same path (plan 29.2): messages both ways until either side closes, the mod's close code included. A page from another origin is refused at the handshake (403); otherwise a missing, stopped or unreachable mod is reported as a close code the browser can read (4404, 4503, 4502). An open socket counts as a request in flight.
 
 ## 7. Memory manager
 
@@ -464,13 +464,13 @@ With more than one GPU, the **GPU queue keeps one slot per device** (plan 36.3):
 
 **Reservations:** planning and unloading happen under one lock, which isn't held while a mod loads (that can take minutes). Instead, each grant reserves its bytes, and other plans subtract what's still reserved. A reservation shrinks as the mod's measured use grows, and ends shortly after the load finishes (or when the mod unloads, or after 30 min / 120 s for acquire / 300 s for a trigger).
 
-**Proxy triggers:** a trigger in `[memory] triggers` is `"METHOD /path"`, where `{name}` matches one path segment and a trailing `*` matches the rest. A matching call to an unloaded mod makes room first, then goes through (the mod loads itself). Without room it returns `409 needs_room` with the plan, and the caller retries with `X-AIHub-Make-Room: 1`.
+**Proxy triggers:** a trigger in `[memory] triggers` is `"METHOD /path"`, where `{name}` matches one path segment and a trailing `*` matches the rest. A matching call to an unloaded mod makes room first, then goes through (the mod loads itself). Without room it returns `409 needs_room` with the plan, and the caller retries with `X-GAIFA-Make-Room: 1`.
 
 **Known limit:** clients that call a mod's port directly (e.g. video-maker → `:5040`) bypass the hub. Their loads aren't managed unless the mod itself calls `acquire`.
 
 ### GPU queue (plan 31)
 
-One GPU slot (`utils/gpu.py`, `[gpu] queue = true`, `lease_ttl_s = 60`). A mod with `[gpu] class = "job" | "interactive" | "background"` (and an optional `group`) takes the slot around its GPU work with `POST /api/gpu/acquire` (200 granted, 202 waiting with `ahead` and `eta_s`), renews it every 10 s and releases it (`services/_template/gpu_slot.py`). Order: interactive, then job, then background (only when nothing waits); FIFO within a class; nothing is pre-empted. A lease of the holder's group joins it unless another group's lease of the same or a higher class waits. `X-AIHub-GPU-Lease` runs nested work under its caller (gen3d → comfy). A held lease not renewed for `lease_ttl_s` expires with the `gpu_lease_expired` alert; a mod that fails or stops frees its leases at once; after a hub restart, renewals re-register leases. Slot first, then memory. Routes: `GET /api/gpu`, `POST /api/gpu/acquire?wait=`, `POST /api/gpu/{lease}/renew`, `POST /api/gpu/{lease}/release`, `DELETE /api/gpu/{lease}` (cancel a waiting lease); `gpu` events. The relay takes a lease per request to a local engine, so a chat on a local model waits behind a job; live dictation moves to the CPU instead. Clients of an engine's own port bypass the queue. A caller with a short budget (the Auto judge, page screening) sends `X-AIHub-Answer-Within: <s>`: the relay and the decide mod give the model that long once the slot is held (504 past it), and the caller waits up to 90 s for the slot itself. A proxied `[memory] trigger` of a mod with `[gpu]` that would wait gets its room check at once and its room (unloads, reservation) when its lease is granted. The agent's model timeout counts silence from the model, not the GPU wait.
+One GPU slot (`utils/gpu.py`, `[gpu] queue = true`, `lease_ttl_s = 60`). A mod with `[gpu] class = "job" | "interactive" | "background"` (and an optional `group`) takes the slot around its GPU work with `POST /api/gpu/acquire` (200 granted, 202 waiting with `ahead` and `eta_s`), renews it every 10 s and releases it (`services/_template/gpu_slot.py`). Order: interactive, then job, then background (only when nothing waits); FIFO within a class; nothing is pre-empted. A lease of the holder's group joins it unless another group's lease of the same or a higher class waits. `X-GAIFA-GPU-Lease` runs nested work under its caller (gen3d → comfy). A held lease not renewed for `lease_ttl_s` expires with the `gpu_lease_expired` alert; a mod that fails or stops frees its leases at once; after a hub restart, renewals re-register leases. Slot first, then memory. Routes: `GET /api/gpu`, `POST /api/gpu/acquire?wait=`, `POST /api/gpu/{lease}/renew`, `POST /api/gpu/{lease}/release`, `DELETE /api/gpu/{lease}` (cancel a waiting lease); `gpu` events. The relay takes a lease per request to a local engine, so a chat on a local model waits behind a job; live dictation moves to the CPU instead. Clients of an engine's own port bypass the queue. A caller with a short budget (the Auto judge, page screening) sends `X-GAIFA-Answer-Within: <s>`: the relay and the decide mod give the model that long once the slot is held (504 past it), and the caller waits up to 90 s for the slot itself. A proxied `[memory] trigger` of a mod with `[gpu]` that would wait gets its room check at once and its room (unloads, reservation) when its lease is granted. The agent's model timeout counts silence from the model, not the GPU wait.
 
 ## 8. Models registry
 
@@ -514,16 +514,16 @@ One GPU slot (`utils/gpu.py`, `[gpu] queue = true`, `lease_ttl_s = 60`). A mod w
   - the scanner suggests entries and you confirm them
   - mods can register what they download (`POST /api/models` with their source)
   - lcpp's Hugging Face downloader does this first
-- **The model inventory follows the registry** (plan 23.6): with `[docs] regenerate = true`, every change (an add, edit, delete or verify, or a reload of `registry.json` after a hand edit) reaches the registry's listeners (`Registry.subscribe`: the alerts and `utils/registry/docs_hook.py`), which rewrites that model's doc in `data/state/setup/models/<id>.md` (local, gitignored: which models to set up is each person's choice) 2 s after the last change, off the event loop. `aihub docs` does the same without the hub, and also writes the mods index in `docs/setup/README.md` (`utils/setupdocs/`). Setup docs live in the mods, `services/<id>/setup/*.md` (docs/mods.md §9).
+- **The model inventory follows the registry** (plan 23.6): with `[docs] regenerate = true`, every change (an add, edit, delete or verify, or a reload of `registry.json` after a hand edit) reaches the registry's listeners (`Registry.subscribe`: the alerts and `utils/registry/docs_hook.py`), which rewrites that model's doc in `data/state/setup/models/<id>.md` (local, gitignored: which models to set up is each person's choice) 2 s after the last change, off the event loop. `gaifa docs` does the same without the hub, and also writes the mods index in `docs/setup/README.md` (`utils/setupdocs/`). Setup docs live in the mods, `services/<id>/setup/*.md` (docs/mods.md §9).
 
 ## 9. `config.toml`
 
-`config.toml` is each machine's own and not in git: on the first `aihub` command or hub start it's copied from the tracked `config.example.toml`, which holds the defaults a fresh clone starts from (no autostarts, no judge model; plan 23.11). With neither file, the code's defaults apply.
+`config.toml` is each machine's own and not in git: on the first `gaifa` command or hub start it's copied from the tracked `config.example.toml`, which holds the defaults a fresh clone starts from (no autostarts, no judge model; plan 23.11). With neither file, the code's defaults apply.
 
-Sizes in GB (`reserve_gb`, a manifest's `estimate_gb`, a status's `memory_estimate_gb`) are decimal: 1 GB = 10⁹ bytes, as the UI and `aihub` show them.
+Sizes in GB (`reserve_gb`, a manifest's `estimate_gb`, a status's `memory_estimate_gb`) are decimal: 1 GB = 10⁹ bytes, as the UI and `gaifa` show them.
 
 ```toml
-# AIHub settings. Each mod ships defaults in services/<id>/service.toml; values here override them.
+# GAIFA settings. Each mod ships defaults in services/<id>/service.toml; values here override them.
 # The Settings page edits this file and keeps comments.
 
 [hub]
@@ -625,11 +625,11 @@ regenerate = false       # true: keep this machine's model inventory (data/state
 | `opencode` | DashLLM's `opencode.service` | 4096 | — | — | none: a manifest-only mod |
 | `lcpp` | `~/Models/LLMs` | 7710 | `models/*` → `data/models/llm/` | — (its JSON state stays in `services/lcpp/data/`) | `LCPP_MODELS_DIR`, catalog paths relative to it, downloads register in the hub, memory acquire, status route, `pidfd_open` fallback |
 | `comfy` | `~/Models/ComfyUI*` + `~/.local/bin/comfyui` | 5070 (ComfyUI 8199) | `~/Models/ComfyUI/models/*` → `data/models/comfyui/` | — | new adapter mod (§11) |
-| `web` | new (plan Phase 26); searches through the SearXNG on 8080 that runs outside AIHub (`SEARXNG_URL`); `GET /v1/favicon?host=` gives a site's own icon for Chat's Sources (plan 32.1: `/favicon.ico`, else the home page's `<link rel=icon>` when robots.txt allows; the fetch rules, 8 s, 100 KB, ICO/PNG/GIF/JPEG/WebP by their bytes, never SVG; `nosniff`; cached in `data/state/web/favicons/`, hits 30 days, misses 1 day, at most 2000 files / 20 MB). Showing a reply's sources contacts each shown site for its icon at most monthly, including search results the agent didn't open | 5102 | — | — | new mod: `POST /v1/search`, `POST /v1/fetch` (pages → markdown `text` outputs, PDFs → `document` outputs, with sidecars); fetches only public http(s) addresses, checked after DNS and on every redirect, 10 MB / 20 s, `robots.txt`; tools `web_search` and `web_fetch` (risk `network`) |
-| `workspace` | new (plan Phase 27): folders on this machine at a level each (Read · Edit · Run · Run + network) | 5103 | — | — (folders, checkpoints and run records in `data/state/workspace/`) | new mod: reading tools, edits in place with checkpoints and undo per turn, commands and Python in a rootless podman sandbox (`localhost/aihub-workspace-sandbox:2`) or, asking each time, on the host; the hub's preflight `POST /v1/limits` (`[agent] limits`, §14.7) |
-| `searxng` | new (plan 26.3); SearXNG itself runs in Docker outside AIHub | 5106 | — | — | new mod: finds SearXNG (`SEARXNG_URL`, a probe of 8080 and 8888, a `searxng/*` container), publishes its URL for `web` (`GET /v1/endpoint`), watches `/healthz`, its engines (`/config`, `/stats/errors`) and a test search, and changes engines, timeouts, safe search, the default language and the JSON format: each change backs up `settings.yml` (keeping the newest 10 of its backups), writes it through the container (a checked copy renamed over it), restarts it and checks a search, rolling back when the check fails. A `settings.yml` that doesn't parse is reported in status and as `409 settings_invalid` with its line and column; changes wait until it's fixed. Its only writes outside the root are that `settings.yml` and its backups (§14.4) |
+| `web` | new (plan Phase 26); searches through the SearXNG on 8080 that runs outside GAIFA (`SEARXNG_URL`); `GET /v1/favicon?host=` gives a site's own icon for Chat's Sources (plan 32.1: `/favicon.ico`, else the home page's `<link rel=icon>` when robots.txt allows; the fetch rules, 8 s, 100 KB, ICO/PNG/GIF/JPEG/WebP by their bytes, never SVG; `nosniff`; cached in `data/state/web/favicons/`, hits 30 days, misses 1 day, at most 2000 files / 20 MB). Showing a reply's sources contacts each shown site for its icon at most monthly, including search results the agent didn't open | 5102 | — | — | new mod: `POST /v1/search`, `POST /v1/fetch` (pages → markdown `text` outputs, PDFs → `document` outputs, with sidecars); fetches only public http(s) addresses, checked after DNS and on every redirect, 10 MB / 20 s, `robots.txt`; tools `web_search` and `web_fetch` (risk `network`) |
+| `workspace` | new (plan Phase 27): folders on this machine at a level each (Read · Edit · Run · Run + network) | 5103 | — | — (folders, checkpoints and run records in `data/state/workspace/`) | new mod: reading tools, edits in place with checkpoints and undo per turn, commands and Python in a rootless podman sandbox (`localhost/gaifa-workspace-sandbox:2`) or, asking each time, on the host; the hub's preflight `POST /v1/limits` (`[agent] limits`, §14.7) |
+| `searxng` | new (plan 26.3); SearXNG itself runs in Docker outside GAIFA | 5106 | — | — | new mod: finds SearXNG (`SEARXNG_URL`, a probe of 8080 and 8888, a `searxng/*` container), publishes its URL for `web` (`GET /v1/endpoint`), watches `/healthz`, its engines (`/config`, `/stats/errors`) and a test search, and changes engines, timeouts, safe search, the default language and the JSON format: each change backs up `settings.yml` (keeping the newest 10 of its backups), writes it through the container (a checked copy renamed over it), restarts it and checks a search, rolling back when the check fails. A `settings.yml` that doesn't parse is reported in status and as `409 settings_invalid` with its line and column; changes wait until it's fixed. Its only writes outside the root are that `settings.yml` and its backups (§14.4) |
 
-**Moves are instant:** every source path and AIHub are on the same btrfs subvolume (`/home`), so `mv` is a rename, not a copy. Old paths keep a symlink until everything that uses them has been updated.
+**Moves are instant:** every source path and GAIFA are on the same btrfs subvolume (`/home`), so `mv` is a rename, not a copy. Old paths keep a symlink until everything that uses them has been updated.
 
 ## 11. Later pieces
 
@@ -640,7 +640,7 @@ regenerate = false       # true: keep this machine's model inventory (data/state
 - **Running one:** `POST /v1/run {workflow, inputs}` acquires memory, patches the graph (including dated `filename_prefix` values), queues it, reports progress from ComfyUI's websocket, and writes a sidecar per result. Cancelling interrupts ComfyUI; an interrupt only lands between steps, so if the prompt is still running 90 s later the adapter unloads ComfyUI as stuck, and the next job starts it fresh.
 - **Tasks:** `tasks.toml` defines tasks such as `text-to-image` and `image-to-video`. The agent gets one tool per task (`generate_image`, …) from the mod's `GET /v1/tools`, with an optional `workflow` choice, rather than one tool per workflow.
 
-**Agent-ready API** (Phase 13): `[tools]` sections become `/api/tools` (JSON-schema function definitions). Calls go through `/api/tools/{name}/call`, and tools marked `confirm` wait for an approval that the hub enforces. The same catalog can later be exposed as an MCP server, so Claude Code can drive AIHub too.
+**Agent-ready API** (Phase 13): `[tools]` sections become `/api/tools` (JSON-schema function definitions). Calls go through `/api/tools/{name}/call`, and tools marked `confirm` wait for an approval that the hub enforces. The same catalog can later be exposed as an MCP server, so Claude Code can drive GAIFA too.
 
 **Chat, agent and save states:** §14, built last.
 
@@ -655,10 +655,10 @@ regenerate = false       # true: keep this machine's model inventory (data/state
 7. **Audio and video seeking need HTTP Range** on output files.
 8. **Clients that call a mod's port directly bypass memory management** (§7).
 9. **`git clean -x` would delete the models** (§3).
-10. **Some UIs use absolute paths:** mods' own UIs keep working on their own ports and are linked as "native UI". AIHub's UI never loads them inside its own pages.
+10. **Some UIs use absolute paths:** mods' own UIs keep working on their own ports and are linked as "native UI". GAIFA's UI never loads them inside its own pages.
 11. **The UI runtime is Claude Design's generated `support.js` (React 18).** Don't edit it. Any change a new export needs goes in `web/PATCHES.md`, and the brief asks Claude Design to fold those changes in on its next pass.
 12. **Metric storage grows over time.** Rollups and retention (§13) keep `hub.db` small: roughly 30 series × 10 s for 48 h is about 0.5 M rows, pruned hourly.
-13. **Workspace folders are written in place** (plan Phase 27). Only folders at Edit or above, never the AIHub folder or `data/models/`, and never through a symlink out of the folder (`services/workspace/folders.py`).
+13. **Workspace folders are written in place** (plan Phase 27). Only folders at Edit or above, never the GAIFA folder or `data/models/`, and never through a symlink out of the folder (`services/workspace/folders.py`).
 
 ## 13. Metrics and charts
 
@@ -734,7 +734,7 @@ It works the way Claude Code does, scaled to a local model. The reasons and sour
   - **Attachments (plan 24.5):** at `send`, each attached text or document is described once (`GET /api/outputs/{id}` and `/text`) into the user event's `docs` (`#n`, name, kind, subtype, tokens, pages or lines, the first 30 headings, `inline`, and the text itself when inline), so a rebuild never refetches. Attached documents are numbered with the outputs. How much goes in whole is the user's (plan 24.9, `agent/docs.py`): **Settings → Agent → Documents** sets *Whole documents up to* (default `AGENT_INLINE_TOKENS`, 6000 tokens, or "the model's window") and a *reply reserve* (default `AGENT_REPLY_RESERVE`, 4096), kept in `data/agent/documents.json`. The room is the window less the reserve and what the chat already holds (the meter); documents attached together share it. Each attachment is `auto` (whole up to the setting and the room), `whole` (whole if it fits the room; otherwise the user event's `fallback` says how much didn't fit, shown on the user's message and as a note, and it goes as a card) or `card`, from the chip's Whole / Card (`doc_modes` on `POST /v1/threads/{id}/messages`), else the chat's `settings.doc_mode`, which the last chip choice sets. A whole document goes into the message inside `<untrusted source="#n name">` (fetched in 48,000-character windows); a card is (size, outline, "read it with hub_read_document or hub_search_document"). A card for a document over 50 pages also says "too large to read whole: search it by meaning with embed_library_search (thread_only=true)" when that tool is in the catalog (plan 28.3). Pictures attach as before (`(attached: output:<id>)`). The meter has a "Documents" part. Clearing drops an inline document's text once it is older than the last two user turns, leaving its card.
   - **Speech out (plan 49.1):** `config.toml [speech_output]` (Settings → Agent → Voice): the voice that reads replies aloud, its engine and speed, `auto_read`, and voice mode's `pause_ms`. The page reads a reply through the tts mod's `POST /v1/speech` with `stream` (raw PCM as it's made, not saved). Voice mode (plan 49.2) is the page alone: the stt mod's live stream to listen, `pause_ms` of quiet to send, the same streaming speech to answer.
   - **@-mentions (plan 48.3):** a message's `mentions` ([{kind, id, label, fills}], from the chat's `@` picker) are kept on its user event, said to the model in one line under the message, and pinned on that turn's calls as `origin.pins` ({tool: {field: value}}). The hub (`utils/tools/pins.py`) fills a pinned field the model left out (marked `filled` = mention on the card), skips a value that isn't one of the field's choices, and asks with a card when the model chose otherwise. Nothing is remembered past the turn.
-  - **`show` (plan 47.1, `agent/show.py`):** a local tool that puts a chart, a table or pictures in the reply: views line, area, bar, hbar, donut, heatmap, kpi, table, image, gallery; data inline (≤ 500 points per series, ≤ 200 rows), from a CSV or JSON output of the chat (`source: "#n"` with its columns; the card reads the file itself, ≤ 5 MB and 50,000 rows), from AIHub (`hub:memory`, `hub:outputs_per_day`, `hub:job_times`, `hub:mod_stat`, with a range; the card keeps it current), or outputs (`image`, `gallery`). It's checked before anything shows (errors name the field and the fix); the tool_result carries the spec as `data.show` and the model reads only a one-line summary.
+  - **`show` (plan 47.1, `agent/show.py`):** a local tool that puts a chart, a table or pictures in the reply: views line, area, bar, hbar, donut, heatmap, kpi, table, image, gallery; data inline (≤ 500 points per series, ≤ 200 rows), from a CSV or JSON output of the chat (`source: "#n"` with its columns; the card reads the file itself, ≤ 5 MB and 50,000 rows), from GAIFA (`hub:memory`, `hub:outputs_per_day`, `hub:job_times`, `hub:mod_stat`, with a range; the card keeps it current), or outputs (`image`, `gallery`). It's checked before anything shows (errors name the field and the fix); the tool_result carries the spec as `data.show` and the model reads only a one-line summary.
   - **Conversations you can look up (plan 28.5, `agent/summaries.py`):** a chat quiet for `AGENT_SUMMARY_IDLE_MIN` (30) minutes gets a 3–6 sentence summary from its model, written from the learner's view of the chat (documents as cards, tool results as status: never a file's, page's or transcript's text), kept in `agent.db` `thread_summaries` and rewritten when the chat continues and goes quiet again; dry runs and `no_learn` chats are skipped. It goes to the embed mod's `chats` (`PUT /api/s/embed/v1/chats/{id}`, retried until it arrives), which embeds it under its idle rule; deleting a chat deletes both. The Chat list's *By meaning* and the local tool `chat_search(query, limit)` find chats through `GET /v1/chats/search` (title, date, summary, link). Nothing here reaches a prompt unless a chat is looked up.
   - **Untrusted text:** the base prompt says text inside `<untrusted>` is data, never instructions (report it, don't follow it), and asks for citations as `#n p.14` (a PDF page) or `#n:88` (a line). Inline text and `hub_read_document` windows of text without pages come with numbered lines (`  88| …`) so a line can be cited; the Chat page turns citations into links that open the viewer there (plan 24.7).
 - **Instructions, skills, memory.**
@@ -775,7 +775,7 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   - **Restore** replays a snapshot through the memory manager, so it never overcommits memory.
   - Optionally, the last session is restored at boot. At each start the previous run's auto-saved "Last session" is copied to "Before restart", which the auto-save never overwrites; the boot restore and the unclean-shutdown offer use that copy (before this, an auto-save five minutes after a reboot replaced the setup worth restoring).
   - Named setups ("LLM work", "3D work") can be switched with one action.
-- **Backups.** `aihub backup` (Phase 12.5) also covers `agent.db` and the session snapshots.
+- **Backups.** `gaifa backup` (Phase 12.5) also covers `agent.db` and the session snapshots.
 
 ### 14.5 Records and preferences (plan Phase 21)
 - **Records.** Every tool attempt from every caller is in `hub.db`:
@@ -807,7 +807,7 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   7. keep one lesson per round in that area's library, which only the improver reads. A lesson whose change went live is withdrawn (the editors stop reading it, Learning → Library marks it) once its version is rejected or rolled back; activating that version again brings it back.
 - **Who adopts what:** the area's own tool notes and skill bodies are adopted automatically once the gate passes. Changes to the prompt, the guardrails, `hooks.toml` or a skill's description (listed in every prompt, at most 200 characters) wait for the user. A run may change tool notes only for its own area's tools. Chats that read a page, a file or a transcript never teach the learner; in the others the agent's own words, arguments and errors reach it inside `<untrusted>`, as does the review it passes to the editors. Hook hints are at most 300 characters, and `trim` closes an `<untrusted>` block it cuts (overnight 2026-10-21: a page's text could make the learner auto-adopt a skill whose description went into every later chat's prompt).
 - **When it runs:** nightly, after `[learning] idle_min` without a chat, or on Learn now. It pauses while you chat.
-- **Dry runs change nothing:** generating tools make stand-ins (a picture drawn from the prompt, a hard link to the newest real output of that kind, or a small stub when there is none), and write and destructive tools return a stand-in success. In a dry-run chat, `view_output` on a stand-in describes it (its prompt and settings, and that it stands in for a good result) instead of showing its picture, so a model that checks its work carries on. A person's `always` grants don't apply to dry-run calls (only the shipped ones and the chat's own), so the eval measures AIHub's defaults on any machine.
+- **Dry runs change nothing:** generating tools make stand-ins (a picture drawn from the prompt, a hard link to the newest real output of that kind, or a small stub when there is none), and write and destructive tools return a stand-in success. In a dry-run chat, `view_output` on a stand-in describes it (its prompt and settings, and that it stands in for a good result) instead of showing its picture, so a model that checks its work carries on. A person's `always` grants don't apply to dry-run calls (only the shipped ones and the chat's own), so the eval measures GAIFA's defaults on any machine.
 - **Eval and test runs leave nothing behind:** when a run ends, the harness deletes its chats (with their events and turn records) and the outputs it made, dry-run stand-ins and live results alike, for good (`DELETE /api/outputs/{id}?permanent=true`, not the trash); seeds a task wrote to `outputs/eval/` go when the harness closes; the one-off live checks (`compact_live`, `meter_check`, `restart_live`) delete theirs too (`evals/cleanup.py`). `--keep` leaves them to look at. Only chats and outputs a person made stay.
 
 ### 14.7 Permissions: risks, the order, grants (plan Phase 25)
@@ -815,11 +815,11 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
 - **Modes** (plan 27.4, after Claude Code's): `plan` (reads only), `manual` (everything that changes something asks), `accept_edits` (edits and generations apply; commands, the internet and deletes ask), `auto` (as Accept edits, with a judge for commands, network calls and deletes, plan Phase 30) and `bypass` (edits and sandbox commands run; only in workspace folders that allow it). The old names map over: `ask` → `manual`, `read_only` → `plan`; `auto` is the Auto mode (the agent migrated stored `auto` threads, which meant "Use defaults", to `accept_edits`).
 - **The order** in which a call is decided is fixed (`utils/tools/approvals.py` `decide`); the first that answers wins:
   1. the **deny** list of `[agent.permissions]`;
-  2. a **mod's limits**: a mod with `[agent] limits` (the workspace mod) answers a preflight before each call: what it would do (`action`), the folder's level and Bypass, a diff or the command, and a refusal for hard limits (paths out of the folder, secrets, `.git/`, `sudo`, the AIHub folder above Read) or a level too low ("needs the folder at Run"). A refusal ends the call in every mode; the mod checks again when the call arrives; a preflight that fails refuses;
+  2. a **mod's limits**: a mod with `[agent] limits` (the workspace mod) answers a preflight before each call: what it would do (`action`), the folder's level and Bypass, a diff or the command, and a refusal for hard limits (paths out of the folder, secrets, `.git/`, `sudo`, the GAIFA folder above Read) or a level too low ("needs the folder at Run"). A refusal ends the call in every mode; the mod checks again when the call arrives; a preflight that fails refuses;
   3. the thread's **mode**: with limits, the cell of the table below for the call's action (Bypass in a folder that doesn't allow it counts as Accept edits); without, `plan` denies everything but `read`;
   - *Between 3 and 4:* a lasting preference (`hub_set_preference`, and the agent's `remember`, which runs as it) asks when the call's `origin.untrusted` says its chat has read a page, a file or a transcript, whatever a grant, the allow list or the mode says (overnight 2026-10-21: an injected page could save a preference that went into every later chat's prompt).
-  4. a **grant** that covers the call allows it, keyed by the mod's `key` when it gives one (the folder, its subfolder `cwd` and the exact command line, plus whether it has internet or runs on this machine; a compound command (`;`, `&&`, `||`, `|`, `&`, backticks, `$(`, newlines, redirections) has no key and is allowed one call at a time); never for actions that ask every time (`host`, `remote`, `commit`); in a dry run (the agent eval) only the grants AIHub ships (`gr_default_*`) and the chat's own count;
-  - *With limits (plan 34):* a preflight may answer `ask_folder: {path, level, max_level, capped?, environment}` (a read in a folder outside the chat's environment). That asks in every mode; no grant, list or judge lifts it. "Allow for this chat" writes a folder grant (`kind = "folder"`, `tool = "<mod>_*"`, `key = "folder:<path>"`, thread scope only; "always" is refused with `folder_always`). For every call to a mod with a preflight, the hub drops any `origin.folders` the caller sent and fills it from the chat's folder grants (always Read). The agent sends `origin.environment` (the chat's `settings.environment`); its prompt lists the chat's folders. Workspace folders belong to **environments** (`data/state/workspace/environments.json`; `folders.json` migrated into Default): a folder's level is per environment, its id the same in every one; the agent may ask only for folders inside the home folder or a mounted drive, not hidden or secret-looking, symlinks resolved; the AIHub folder and `data/models` stay at Read everywhere.
+  4. a **grant** that covers the call allows it, keyed by the mod's `key` when it gives one (the folder, its subfolder `cwd` and the exact command line, plus whether it has internet or runs on this machine; a compound command (`;`, `&&`, `||`, `|`, `&`, backticks, `$(`, newlines, redirections) has no key and is allowed one call at a time); never for actions that ask every time (`host`, `remote`, `commit`); in a dry run (the agent eval) only the grants GAIFA ships (`gr_default_*`) and the chat's own count;
+  - *With limits (plan 34):* a preflight may answer `ask_folder: {path, level, max_level, capped?, environment}` (a read in a folder outside the chat's environment). That asks in every mode; no grant, list or judge lifts it. "Allow for this chat" writes a folder grant (`kind = "folder"`, `tool = "<mod>_*"`, `key = "folder:<path>"`, thread scope only; "always" is refused with `folder_always`). For every call to a mod with a preflight, the hub drops any `origin.folders` the caller sent and fills it from the chat's folder grants (always Read). The agent sends `origin.environment` (the chat's `settings.environment`); its prompt lists the chat's folders. Workspace folders belong to **environments** (`data/state/workspace/environments.json`; `folders.json` migrated into Default): a folder's level is per environment, its id the same in every one; the agent may ask only for folders inside the home folder or a mounted drive, not hidden or secret-looking, symlinks resolved; the GAIFA folder and `data/models` stay at Read everywhere.
   5. the **ask** list; then a **page the chat's search found**: a `web_fetch` whose URL a `web_search` earlier in the same chat (`origin.thread`) returned runs without a card in every mode but Plan, with no judge in Auto (`utils/tools/searched.py`, 2026-10-21): the same URL after trivial normalisation only (scheme and host in lower case, no default port, no fragment, an empty path as "/"; no prefix matches, another query is another URL), from the chat's last 50 finished searches read back from `tool_calls` (so it holds across restarts), and only when the judge's URL rules don't flag it (credentials, a long encoded value, a private address take the usual way). The URL came from the search engine, so the model can't hide data in it; the record says `origin.found_by`. Then the **allow** list (`execute` ignores the allow list: only a grant skips its card). Defaults: `ask = ["hub_set_preference"]` (a lasting preference reaches every later chat, so it asks in every mode, Bypass too, unless you chose "Always allow" on its card), `allow = ["hub_start_service"]`. A preference that couldn't be saved (an unknown tool or field, a value the tool doesn't take, learning off) is refused before a card;
   6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `accept_edits`, `auto` and `bypass`; `network` asks (in `auto` the judge decides); `execute` and `destructive` ask in every mode.
 
@@ -849,5 +849,5 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
 ### 14.4 Everything inside the folder
 - **Logs.** Each mod's output is also written to `data/logs/<id>.log`, rotated. journald stays as a second copy, and the Logs tab reads the file.
 - **Runtime state.** lcpp's instance records move from `$XDG_RUNTIME_DIR/lcpp` to `data/state/lcpp` via `LCPP_STATE_DIR`. Instances are still systemd units, so after a reboot they come back through session restore, not by adoption.
-- **What's left outside.** `aihub doctor` then reports only the allowlist: the systemd unit file, podman images, system tools (ffmpeg, blender, podman), and the `~/.local/bin` wrappers. One mod writes outside the root: `searxng` changes SearXNG's `settings.yml` and keeps its backups next to it (plan 26.3).
-- **As built (plan 16):** a shipper per mod follows the backend into `data/logs/<id>.log` (rotated 10 MB × 5) and the hub logs to `data/logs/aihub.log`; the Logs tab and `aihub logs` read the files. lcpp runs with `LCPP_STATE_DIR=data/state/lcpp` and forgets records from before the last boot. `aihub doctor --inventory` lists every outside path with its reason.
+- **What's left outside.** `gaifa doctor` then reports only the allowlist: the systemd unit file, podman images, system tools (ffmpeg, blender, podman), and the `~/.local/bin` wrappers. One mod writes outside the root: `searxng` changes SearXNG's `settings.yml` and keeps its backups next to it (plan 26.3).
+- **As built (plan 16):** a shipper per mod follows the backend into `data/logs/<id>.log` (rotated 10 MB × 5) and the hub logs to `data/logs/gaifa.log`; the Logs tab and `gaifa logs` read the files. lcpp runs with `LCPP_STATE_DIR=data/state/lcpp` and forgets records from before the last boot. `gaifa doctor --inventory` lists every outside path with its reason.

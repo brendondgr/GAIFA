@@ -1,11 +1,11 @@
 # vLLM
 
-An AIHub mod (plan Phase 18) that serves Hugging Face models with [vLLM](https://github.com/vllm-project/vllm) on this machine, a Ryzen AI Max+ 395 (Strix Halo, gfx1151). Upstream vLLM doesn't support gfx1151, so vLLM runs in kyuz0's patched image, [`kyuz0/vllm-therock-gfx1151`](https://github.com/kyuz0/amd-strix-halo-vllm-toolboxes), pinned by digest in `service.toml` (`VLLM_IMAGE`). llama.cpp (the `lcpp` mod) stays the engine for GGUF files.
+A GAIFA mod (plan Phase 18) that serves Hugging Face models with [vLLM](https://github.com/vllm-project/vllm) on this machine, a Ryzen AI Max+ 395 (Strix Halo, gfx1151). Upstream vLLM doesn't support gfx1151, so vLLM runs in kyuz0's patched image, [`kyuz0/vllm-therock-gfx1151`](https://github.com/kyuz0/amd-strix-halo-vllm-toolboxes), pinned by digest in `service.toml` (`VLLM_IMAGE`). llama.cpp (the `lcpp` mod) stays the engine for GGUF files.
 
 **Parking a profile** on one machine (its model deleted, so loading it would download it again): list its id in `profiles/.parked.json` (gitignored), and the adapter skips it. Setup: [setup/vllm.md](setup/vllm.md).
 
-- **The adapter** (`vllm_mod/`, port 5101) is what AIHub runs. It starts one vLLM container at a time and stops it again.
-- **The engine** is `vllm serve` in a container named `aihub-vllm-<profile>`, listening on `127.0.0.1:7801` (`VLLM_ENGINE_PORT`, host network, nothing published).
+- **The adapter** (`vllm_mod/`, port 5101) is what GAIFA runs. It starts one vLLM container at a time and stops it again.
+- **The engine** is `vllm serve` in a container named `gaifa-vllm-<profile>`, listening on `127.0.0.1:7801` (`VLLM_ENGINE_PORT`, host network, nothing published).
 
 ## Profiles
 

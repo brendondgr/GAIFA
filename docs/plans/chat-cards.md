@@ -9,7 +9,7 @@ Asked for on 2026-10-22: make the Chat page easier to extend, and nicer to use. 
 - **Save to…** and Copy on every output.
 - **Read replies aloud**, and a hands-free **voice mode**.
 
-**Previews for everything** (the user, when starting the build): live image, video and 3D previews are for anything being made, not only what the agent makes. A picture queued from the comfy page, from ComfyUI's own page, over MCP or the API previews the same way, wherever AIHub shows running jobs (the Overview, the mod pages, the chat). So the live shape is part of a mod's status `jobs`, not only of a tool call, and the preview parts are a shared kit in `web/`, not chat code.
+**Previews for everything** (the user, when starting the build): live image, video and 3D previews are for anything being made, not only what the agent makes. A picture queued from the comfy page, from ComfyUI's own page, over MCP or the API previews the same way, wherever GAIFA shows running jobs (the Overview, the mod pages, the chat). So the live shape is part of a mod's status `jobs`, not only of a tool call, and the preview parts are a shared kit in `web/`, not chat code.
 
 Turned down: slash commands for mods' tools ("we don't need"), and side panels of any kind (pinned output, jobs, memory and the rest). The user's one maybe: `/clear-gpu`, which natural language can do too (46.2 has both).
 
@@ -46,7 +46,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **Manifest:** `UiSpec.chat: str | None`, validated as `page` is (a `.js` file inside `ui/`).
   - **Services view:** `chat_url` next to `page_url` (`/ui/services/<id>/<file>`), in `GET /api/services` (`utils/api_models.py`). `api.js` and the contract test (6.6) learn the field.
   - **Loader:** `loadChatModules(services, chat)` imports each `chat_url` once per page load (with the service's `updated` as a cache-buster), calls its `setup(chat)` inside a try, and keeps what each module registered so a module that throws in `setup` unregisters cleanly. `chat.version = 1`.
-  - **Check:** `aihub check <id>` (`utils/services/check.py`) fails when `[ui] chat` names a missing file, and loads nothing else.
+  - **Check:** `gaifa check <id>` (`utils/services/check.py`) fails when `[ui] chat` names a missing file, and loads nothing else.
   *Done when:* `utils/tests/services/test_chat_module.py` (validation, `chat_url`, the check) and `utils/tests/web/chat-mods.test.mjs` (a module registers a card and a step, a throwing module is skipped and its partial registrations undone, a missing file is skipped).
 - [x] **44.2 The live shape: `utils/tools/calls.py`, `utils/tools/api.py`, `services/agent/agent/loop.py`, `web/chat/chat-thread.js`.**
   - **A job's status may carry `live`:**
@@ -72,7 +72,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **The template** ships a small commented `ui/chat.js` (one step card using `chat.live`) and `[ui] chat` commented out in its `service.toml`.
   - **The mock** (`?mock`) plays a job with `live` (queued → loading → steps with preview frames from a bundled small image → done), so the frame is checkable without a GPU.
   - **mods.md:** "Chat cards": the `setup(chat)` contract, the lookup order (`step:<tool>` → `step`), the `live` shape, and that deleting the mod removes its cards.
-  *Done when:* `aihub check _template` passes with `[ui] chat` turned on in a test copy (`utils/tests/services/test_chat_module.py`), and the mock's live card is checked in the built-in browser.
+  *Done when:* `gaifa check _template` passes with `[ui] chat` turned on in a test copy (`utils/tests/services/test_chat_module.py`), and the mock's live card is checked in the built-in browser.
   *As built:* the mock's frames are `web/chat/mock-live/` (a dusk landscape drawn for it, six frames from noisy and soft to sharp); a picture step reports loading, then sampling with a frame per step, then decoding; a 3D step reports its stages. mods.md's section is "Level 4: your own cards in Chat", with "Live previews on your page".
 
 **Wire — Phase 44:** the Chat page loads mods' chat modules; a job's step row can become a live card.
@@ -92,7 +92,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
   - **`GET /v1/runs/{id}/preview?after=<seq>`** → the image (headers `X-Seq`, cache off), 204 when there's none newer after waiting up to 5 s.
   - **`live` on the run's status:** `stage` (queued · loading · sampling · decoding · saving, from the queue, `execution_start`, the sampler node's `progress` and the save node), `step`/`steps` from the sampler's `progress`, `eta_s` from the step rate, `preview`.
   *Done when:* `services/comfy/tests/test_preview.py`, with `fakecomfy.py` sending binary previews (both events, a frame for another prompt ignored, the long poll, 204, dropped at the end, `live` through a run).
-  *As built:* `comfy/previews.py` (`Previews`). ComfyUI sends frames and steps only to the websocket client that queued a prompt, so prompts from ComfyUI's own page show as queued or running without frames; the gaps' "every prompt" holds for every prompt AIHub queues (the agent's, the page's, MCP's, the API's). `?wait=` (default 5 s) bounds the long poll.
+  *As built:* `comfy/previews.py` (`Previews`). ComfyUI sends frames and steps only to the websocket client that queued a prompt, so prompts from ComfyUI's own page show as queued or running without frames; the gaps' "every prompt" holds for every prompt GAIFA queues (the agent's, the page's, MCP's, the API's). `?wait=` (default 5 s) bounds the long poll.
 - [x] **45.2 The image and video cards: `services/comfy/ui/chat.js` (new), `[ui] chat` in comfy's `service.toml`.**
   - **Steps** for `comfy_generate_image`, `comfy_edit_image`, `comfy_run_workflow` and the task tools from `tools_source` (image and video tasks), using `chat.live`.
   - **Image:** the box at the call's aspect (from `aspect`/`width`/`height`, else 1:1), waiting and loading text, previews with "Step k of n", "Decoding", then the picture fades in; the footer has `#n`, the title, the workflow's name and size, and the output's actions.
@@ -127,7 +127,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 ## Phase 46 — Status cards and fix-it cards
 
 - [x] **46.1 Default views for tools: `utils/manifest.py` (`ToolSpec.view`), `utils/tools/` (the catalog), `web/chat/chat-view.js` (new).**
-  - **`view`** on a tool says how its result draws when no card is registered: `{kind = "table", rows = "jobs", columns = ["label", "state", "seconds"]}`, or a chart (`kind = "bar" | "line" | …`, `x`, `y`, `rows`), using `show`'s view names and column rules (47.1). Tools listed at runtime (`tools_source`) may carry it too. Invalid views fail `aihub check`.
+  - **`view`** on a tool says how its result draws when no card is registered: `{kind = "table", rows = "jobs", columns = ["label", "state", "seconds"]}`, or a chart (`kind = "bar" | "line" | …`, `x`, `y`, `rows`), using `show`'s view names and column rules (47.1). Tools listed at runtime (`tools_source`) may carry it too. Invalid views fail `gaifa check`.
   - **The card** draws with 47.2's table and chart parts; the raw JSON stays one click away.
   - **Declared at first:** `gen3d_list_jobs`, `stt_list_models`, `hub_list_models`, `lcpp_list_llms`, `vllm_list_profiles`, `relay_relay_stats`, `searxng_engines`, `hub_list_sessions`.
   *Done when:* `utils/tests/tools/test_tool_view.py` (validation, carried in the catalog) and `utils/tests/web/chat-view.test.mjs`. 46.1 lands after 47.2 if 47 is built first; otherwise 47.2's parts are built here.
@@ -153,7 +153,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
     - `needs_room` → the memory plan's unloads, then Retry;
     - `job_failed` that reads as out of memory → Retry with the lighter preset (from the tool's `preset` choices);
     - `mod_error` / `upstream_error` → Restart <mod>, then Retry;
-    - `tool_unavailable` → how to set it up (`aihub setup <mod>`).
+    - `tool_unavailable` → how to set it up (`gaifa setup <mod>`).
   - **The card:** the failed step opens to the cause in a sentence, the log lines, and the fixes as buttons; a fix runs as a user call, then Retry re-runs the call with the same arguments. The agent sees the same `fixes` and may use them.
   *Done when:* `utils/tests/tools/test_fixes.py` (each code's fixes, the log excerpt) and `utils/tests/web/chat-fix.test.mjs`.
   *As built:* a fix is `{label, tool, arguments}` (a hub tool), `{label, service, action: "restart"}` (a hub route: the chat calls it, the agent can't), `{label, retry}` or `{label, command}` (copied); `needs_room` offers Free the GPU rather than the plan's unloads. The card stands in for the step's live card and sits under the fold (`chat-live.js`); a fix runs as your own step (the chat's `ctx.act`). The mock has a failing turn ("… fail"). Checked in `?mock`: the cause, the log, Free the GPU, Retry with the fast preset (it ran and made the model), Retry.
@@ -190,7 +190,7 @@ Turned down: slash commands for mods' tools ("we don't need"), and side panels o
 - [x] **47.3 Pictures inside the reply's text: `web/chat/chat-md.js`.**
   - **`![caption](#n)`** (or `output:<id>`) of an output of this chat draws that output in the reply where it's written, at most 360 px tall, with its caption; any other image source stays as text (no outside images). The output stays in the turn's strip too.
   *Done when:* `utils/tests/web/chat.test.mjs` (a picture, a video, a reference from another chat left as text, an `https:` image left as text), and `quote.test.mjs` (quoting a reply with a picture gives back its markdown).
-  *As built:* the renderer gets the chat's outputs from `chat.js` (`setChatOutputs`), so the reply card's file is untouched; the picture is a block-styled span (a `<figure>` would end the paragraph it sits in) with its markdown in `data-src` for quoting; a click opens it in Outputs (an `aihub:open-output` event from the page's click handler); only the hub's own paths are used as sources. Checked live: the agent wrote `![The lighthouse](#1)` and the picture showed in its reply with "#1 The lighthouse".
+  *As built:* the renderer gets the chat's outputs from `chat.js` (`setChatOutputs`), so the reply card's file is untouched; the picture is a block-styled span (a `<figure>` would end the paragraph it sits in) with its markdown in `data-src` for quoting; a click opens it in Outputs (a `gaifa:open-output` event from the page's click handler); only the hub's own paths are used as sources. Checked live: the agent wrote `![The lighthouse](#1)` and the picture showed in its reply with "#1 The lighthouse".
 - [x] **47.4 Teaching the agent, and the eval: `services/agent/harness/`, `services/agent/evals/`.**
   - **The tool's text and the harness** say when to use it: numbers worth comparing → a chart; a list with several fields → a table; outputs worth seeing together → a gallery or a picture in the text; a file's data → `source`, never copied numbers.
   - **Eval tasks:** chart a CSV output's columns; table of gen3d's jobs; GPU memory over the last day; a gallery of the chat's pictures.

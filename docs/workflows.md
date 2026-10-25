@@ -30,7 +30,7 @@ services/comfy/workflows/<id>/
 | Something you ran in ComfyUI | Import → **From ComfyUI's history**. This takes the exact graph that ran, so it works even when the editor file won't convert. |
 | Another pack | `comfyui workflows copy <id> <new-id>` |
 
-Every import becomes a **draft**. It is checked against your installed nodes and models, and AIHub suggests its inputs. Review it on the page, or run `comfyui workflows suggest <id>`. Saving the review (or `--write`) writes `workflow.toml`, and the draft becomes a pack.
+Every import becomes a **draft**. It is checked against your installed nodes and models, and GAIFA suggests its inputs. Review it on the page, or run `comfyui workflows suggest <id>`. Saving the review (or `--write`) writes `workflow.toml`, and the draft becomes a pack.
 
 **From a zip:** each workflow JSON in it becomes its own draft (`<id>-1`, `<id>-2`, … when there are several, as Civitai packs often ship variants). The zip's other files (LUTs, example images) are kept in each pack's `assets/`. An editor file is preferred over an API graph; the API graph is kept as `workflow.api.json` only when the editor file is missing or doesn't convert. Entry names are kept inside the pack's `assets/`; a zip with symlinks or backslash names is refused.
 
@@ -136,7 +136,7 @@ A pack's `task` says what it does. The agent gets **one tool per task** that has
 - `seconds` sets `frames`, kept at 4k+1 when the graph's own frame count is (Wan)
 
 **File inputs** (`image`, `mask`, `video`) take any of these:
-- `output:<id>`: an AIHub output
+- `output:<id>`: a GAIFA output
 - `upload:<name>`: from `POST /v1/uploads`, or the Upload button
 - a result's path, such as `comfy/2026-10-06/….png` (the "Use as input" button)
 - a file already in ComfyUI's input folder
@@ -173,7 +173,7 @@ These commands work while ComfyUI is down: they use ComfyUI's node list as cache
 
 | Problem | Meaning | Fix |
 |---|---|---|
-| `missing_node` | A node type isn't installed. The package is named when the workflow recorded it. | Install that custom-node package with ComfyUI-Manager (in ComfyUI), then reload comfy. AIHub never installs custom nodes, because they run code. |
+| `missing_node` | A node type isn't installed. The package is named when the workflow recorded it. | Install that custom-node package with ComfyUI-Manager (in ComfyUI), then reload comfy. GAIFA never installs custom nodes, because they run code. |
 | `missing_model` | A loader names a file ComfyUI can't see | Download it into `data/models/comfyui/<folder>/`. The review screen has a Download button when the workflow recorded a URL. Or use `[set]` to point at a file you have. |
 | `missing_input_file` | A LoadImage names a file that isn't in ComfyUI's input folder | Map it as an input (`image`), or put the file in `assets/` |
 | `invalid_choice` | A setting's value isn't one of its options any more | Pick one in ComfyUI, or set it with `[set]` |
@@ -205,19 +205,19 @@ For anything it can't follow, it names the node.
   ```
 - **The agent:** `GET /api/s/comfy/v1/tools` lists the task tools; `POST /v1/tools/<name>/call {"arguments": {…}}` runs one as a job.
 
-**Memory.** A run asks AIHub for memory first. The amount is:
+**Memory.** A run asks GAIFA for memory first. The amount is:
 1. `memory_gb` if the pack sets it
 2. otherwise the last 10 runs' peak + 5%
 3. otherwise the model files × 1.2
 
 If other mods have to be unloaded, the page asks first. ComfyUI starts on the first run (about 15 s), and stops after 10 minutes idle.
 
-## 9. AIHub's own nodes
+## 9. GAIFA's own nodes
 
-`services/comfy/nodes/aihub_nodes/` is a ComfyUI node package that AIHub owns and tracks in git. It loads through `extra_model_paths.yaml` next to `custom_nodes/`, which holds the third-party packages and is gitignored. It holds fixes and nodes the packs need, measured in [comfy-transfer-report.md](comfy-transfer-report.md):
+`services/comfy/nodes/gaifa_nodes/` is a ComfyUI node package that GAIFA owns and tracks in git. It loads through `extra_model_paths.yaml` next to `custom_nodes/`, which holds the third-party packages and is gitignored. It holds fixes and nodes the packs need, measured in [comfy-transfer-report.md](comfy-transfer-report.md):
 
 - **The Qwen-VL vision patch-embed runs as a matmul.** The Qwen2.5-VL, Qwen3-VL and Qwen3.5 vision towers embed patches with a Conv3d whose kernel equals its stride, which is one matrix multiply. ROCm runs that Conv3d about 100× slower, so it was half of every Qwen-Image 2.1 text encode with images. The patch applies when ComfyUI loads the package, and the result is the same to rounding.
-- **`AIHubTextEncodeQwenImage21`** is `TextEncodeQwenImage21` that reads the prompt and reference images once. The core node encodes them a second time for the negative, which the sampler never uses at cfg 1. Turn on `encode_negative` when a pack's cfg is above 1.
+- **`GAIFATextEncodeQwenImage21`** is `TextEncodeQwenImage21` that reads the prompt and reference images once. The core node encodes them a second time for the negative, which the sampler never uses at cfg 1. Turn on `encode_negative` when a pack's cfg is above 1.
 
 - **SAM 3D Body's hand refinement runs.** Its keypoint pass fed the float32 body estimate into fp16 decoder layers ("mat1 and mat2 must have the same dtype"); the estimate and prompts are cast to the image embeddings' dtype, as the first pass already does.
 

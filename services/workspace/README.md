@@ -1,6 +1,6 @@
 # Workspace
 
-An AIHub mod (plan Phase 27): folders on this machine that the chat agent reads, edits in place and runs code in. Each folder has a **level**, and the chat's **mode** decides what asks first; the stricter of the two wins. Folders are grouped in **environments** (plan 34): a chat works in one. Setup: [setup/workspace.md](setup/workspace.md). The mod guide is [docs/mods.md](../../docs/mods.md).
+A GAIFA mod (plan Phase 27): folders on this machine that the chat agent reads, edits in place and runs code in. Each folder has a **level**, and the chat's **mode** decides what asks first; the stricter of the two wins. Folders are grouped in **environments** (plan 34): a chat works in one. Setup: [setup/workspace.md](setup/workspace.md). The mod guide is [docs/mods.md](../../docs/mods.md).
 
 ## Environments
 
@@ -12,7 +12,7 @@ A chat picks its environment under its message box (⌂, plan 42.3; saved as the
 
 **Asking for a folder.** When the agent reads (tree, read, search, git) a full path (`~/…`, `/home/…`) that is in no folder of the chat, the preflight answers `ask_folder: {path, level: "read", max_level, capped?, environment: {id, name}}` with `key = "folder:<path>"` instead of a refusal. The hub turns it into a card in every mode: **Allow for this chat** (a thread-scoped folder grant in the hub; Settings → Agent and the chip's menu can take it back), **Add to "<environment>"** (the page adds it to the environment at Read through `POST /v1/environments/{id}/folders`, then the call runs once) or **Deny**. Editing or running in such a folder is never asked for: it needs the folder in the environment at a higher level. A path inside a folder the chat already has is refused with which folder and path to use instead.
 
-Folders that are never asked for (the Workspace page can still add them): anything outside the user's home or a mounted drive (`/mnt`, `/media/<you>`, `/run/media/<you>`); `/`, the home folder and anything above it; a hidden or secret-looking folder on the way (`~/.ssh`, `~/.config`, `secrets/`); a path that isn't a folder or doesn't exist. Symlinks are resolved first, so one can't lead out. The AIHub folder and `data/models/` stay at Read in every environment.
+Folders that are never asked for (the Workspace page can still add them): anything outside the user's home or a mounted drive (`/mnt`, `/media/<you>`, `/run/media/<you>`); `/`, the home folder and anything above it; a hidden or secret-looking folder on the way (`~/.ssh`, `~/.config`, `secrets/`); a path that isn't a folder or doesn't exist. Symlinks are resolved first, so one can't lead out. The GAIFA folder and `data/models/` stay at Read in every environment.
 
 ## Levels
 
@@ -23,7 +23,7 @@ Folders that are never asked for (the Workspace page can still add them): anythi
 | **Run** (`run`) | also run commands in the sandbox (no network) |
 | **Run + network** (`run_net`) | the sandbox with full internet |
 
-The AIHub folder (and anything inside it) and `data/models/` never go above Read. A folder that *contains* AIHub keeps its level for its other files, but nothing inside AIHub is ever written: the edit tools refuse it, and the sandbox mounts AIHub and the models read-only inside such a folder.
+The GAIFA folder (and anything inside it) and `data/models/` never go above Read. A folder that *contains* GAIFA keeps its level for its other files, but nothing inside GAIFA is ever written: the edit tools refuse it, and the sandbox mounts GAIFA and the models read-only inside such a folder.
 
 ## Hard limits
 
@@ -64,7 +64,7 @@ Listings and searches skip `.git`, `node_modules`, `.venv`, caches and build fol
 
 ## The sandbox
 
-Commands and Python run in `localhost/aihub-workspace-sandbox:2` (rootless podman, `sandbox.py`): only Python 3.12, uv, Node LTS, git, ripgrep, build-essential and the data libraries. Your user inside, the folder at its own absolute path (read-write from Run), the rest of `$HOME` an empty tmpfs (the uv, pip and npm caches are overlays: read, never written back), a read-only root, no network unless the folder is at Run + network and the call asks for it (then full internet), 8 GB of memory and 1024 processes at most, 120 s by default (600 s at most). Every run is a record in `data/state/workspace/runs/` (`<id>.json` with the last 32 KB of output, `.out` and `.err` with the first 1 MB).
+Commands and Python run in `localhost/gaifa-workspace-sandbox:2` (rootless podman, `sandbox.py`): only Python 3.12, uv, Node LTS, git, ripgrep, build-essential and the data libraries. Your user inside, the folder at its own absolute path (read-write from Run), the rest of `$HOME` an empty tmpfs (the uv, pip and npm caches are overlays: read, never written back), a read-only root, no network unless the folder is at Run + network and the call asks for it (then full internet), 8 GB of memory and 1024 processes at most, 120 s by default (600 s at most). Every run is a record in `data/state/workspace/runs/` (`<id>.json` with the last 32 KB of output, `.out` and `.err` with the first 1 MB).
 
 | Route | What it does |
 |---|---|
@@ -73,22 +73,22 @@ Commands and Python run in `localhost/aihub-workspace-sandbox:2` (rootless podma
 | `GET /v1/runs?thread=`, `GET /v1/runs/{id}` | run records |
 | `POST /v1/runs/{id}/cancel` | stop a run |
 | `POST /v1/run` | `workspace_run`: `{folder, command, where: sandbox \| host, network?, cwd?, timeout_s?}` → `{run, state, exit_code, seconds, where, network, stdout, stderr, note?}` (output inside `<untrusted>`; `stdout` is `(no output)` when the command printed nothing); Run for the sandbox and the host, Run + network for `network` and git remotes |
-| `POST /v1/python` | `workspace_python`: `{code, inputs?, folder?, network?, timeout_s?}`; inputs (outputs) are fetched from the hub into `inputs/` (`$AIHUB_INPUTS`); without a folder every file the code writes becomes an output in `outputs/workspace/<date>/<HHMMSS>-<name>` with a sidecar (the run and the code); with a folder, files in `$AIHUB_OUT` do. Only regular files become outputs: a symlink the code leaves is skipped |
+| `POST /v1/python` | `workspace_python`: `{code, inputs?, folder?, network?, timeout_s?}`; inputs (outputs) are fetched from the hub into `inputs/` (`$GAIFA_INPUTS`); without a folder every file the code writes becomes an output in `outputs/workspace/<date>/<HHMMSS>-<name>` with a sidecar (the run and the code); with a folder, files in `$GAIFA_OUT` do. Only regular files become outputs: a symlink the code leaves is skipped |
 | `POST /v1/limits` | the hub's preflight before each call (plan 27.4): `{action, folder, level, allow_bypass, key, once, preview, refuse?, ask_folder?}` (`ask_folder`: plan 34, above). A command's `key`, what "allow in this chat" covers, is the folder (and `cwd`) plus the exact command line, with " (with internet)" or " (on this machine)": `proj pytest -q`. A compound command (`;`, `&&`, `\|\|`, `\|`, `&`, backticks, `$(`, newlines, redirections) has no key and is `once` |
 
 A call that goes away (the hub cancelled it) stops its run. Host runs (`where = "host"`) run `bash -c` in the folder on your machine, with your files and network, and are only reached after you allowed that one call: no grant covers them.
 
 ## Checkpoints
 
-Before any change, the file's bytes (or "didn't exist") go to `data/state/workspace/checkpoints/<thread>/<turn>/` (`entries.json`, `NNN.bin` before, `NNN.after` as the agent left it). The thread and turn come from the call's `X-AIHub-Origin`; a call from outside a chat is its own turn (`_direct`). Undo restores a whole turn, newest change first, and restores nothing if any file changed since or now leads outside its folder (a folder on the way became a symlink: 409 with "it now leads outside its folder" and no diff). Kept 14 days or 2 GB, oldest turns first. Commits aren't checkpointed (git keeps them). A chat's first change in a folder reports a dirty working tree (`dirty_before`), so the agent knows which changes were the user's.
+Before any change, the file's bytes (or "didn't exist") go to `data/state/workspace/checkpoints/<thread>/<turn>/` (`entries.json`, `NNN.bin` before, `NNN.after` as the agent left it). The thread and turn come from the call's `X-GAIFA-Origin`; a call from outside a chat is its own turn (`_direct`). Undo restores a whole turn, newest change first, and restores nothing if any file changed since or now leads outside its folder (a folder on the way became a symlink: 409 with "it now leads outside its folder" and no diff). Kept 14 days or 2 GB, oldest turns first. Commits aren't checkpointed (git keeps them). A chat's first change in a folder reports a dirty working tree (`dirty_before`), so the agent knows which changes were the user's.
 
 ## Working on it
 
 ```bash
 cd services/workspace && .venv/bin/python -m pytest -q
-aihub check workspace
+gaifa check workspace
 ```
 
-## Save to… (AIHub plan 48.4)
+## Save to… (GAIFA plan 48.4)
 
-`POST /v1/save-output {output_id, folder, name?, environment?, thread?}` saves an AIHub output into a folder of the chat's environment at Edit or above (or a path inside one), under the output's own name (numbered when taken), with a checkpoint so Undo puts it back. A folder outside the environment is refused with how to add it. The Chat page's Save to… opens the desktop's folder chooser (`POST /v1/pick-folder`) and then calls it.
+`POST /v1/save-output {output_id, folder, name?, environment?, thread?}` saves a GAIFA output into a folder of the chat's environment at Edit or above (or a path inside one), under the output's own name (numbered when taken), with a checkpoint so Undo puts it back. A folder outside the environment is refused with how to add it. The Chat page's Save to… opens the desktop's folder chooser (`POST /v1/pick-folder`) and then calls it.

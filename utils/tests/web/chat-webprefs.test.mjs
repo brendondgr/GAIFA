@@ -36,3 +36,16 @@ test('the relevance choices match [agent.web] relevance', () => {
   assert.deepEqual(w.RELEVANCE.map(r => r[0]), ['auto', 'decide', 'lexical', 'off']);
   assert.deepEqual(w.SCREEN_WAYS.map(r => r[0]), ['judge', 'decide', 'relay']);
 });
+
+test('settings-redesign 4.3: screening and reading are rows of the Settings page; the screening model edits its draft', async () => {
+  assert.equal(w.WebReadingSection, undefined);   // no card that saves on its own any more
+  const { render, all } = await import('./tinyreact.mjs');
+  let patch = null;
+  const t = render(w.ScreenModelPick({ screen: { backend: 'decide', model: 'd3-lite', threshold: 0.9, confirm: true }, reading: { choices: { decide: ['d3-lite', 'd3'] }, decide_up: true }, onChange: p => { patch = p; } }));
+  const way = all(t, n => n.type === 'select' && n.props['aria-label'] === 'Screen pages with')[0];
+  assert.equal(way.props.value, 'decide');
+  way.props.onChange({ target: { value: 'judge' } });
+  assert.deepEqual(patch, { backend: null, model: null, url: null, threshold: null });
+  all(t, n => n.type === 'select' && n.props['aria-label'] === 'Screening model')[0].props.onChange({ target: { value: 'd3' } });
+  assert.deepEqual(patch, { model: 'd3' });
+});

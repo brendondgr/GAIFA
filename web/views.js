@@ -1,6 +1,6 @@
 // Chart-backed pieces the shell uses outside the dashboard grid (brief §11.4, §11.8): the widget
 // card, the data hook, the Overview's Table and Timeline views, the memory history chart (header
-// popover, Settings → Memory, dashboard), model storage, the outputs histogram, and the generic
+// popover, Settings → Machine → Memory, dashboard), model storage, the outputs histogram, and the generic
 // Overview tab's stat charts. Written by us (web/PATCHES.md).
 
 import { h, SERIES, OTHER, TONE, MONO, MUT, BD, fmtBytes, fmtDur, srOnly, Frame } from './chart-kit.js';

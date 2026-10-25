@@ -31,7 +31,7 @@ export function pageChip(r) {
 /** The chip's screening badge: [label, tone, title]. */
 export function screenBadge(web) {
   if (!web) return null;
-  if (web.checked === 'off') return ['not screened', 'dim', 'Screening of pages is off (Settings → Agent)'];
+  if (web.checked === 'off') return ['not screened', 'dim', 'Screening of pages is off (Settings → Permissions → Screening)'];
   if (web.removed) return [`${web.removed} removed`, 'accent', `Screening removed ${web.removed} passage${web.removed === 1 ? '' : 's'} that looked like instructions aimed at an AI; the agent reads the page without them. The full page is the output.`];
   if (web.checked === 'patterns') return ['patterns only', 'accent', 'Checked by fixed patterns only: the screening model didn’t answer'];
   return ['checked', 'green', 'Screened: nothing aimed at an AI found'];

@@ -110,7 +110,7 @@ AGENT_FALLBACK_MODEL = "<another-model>"   # optional; "" (the default) for none
 
 **Use names your relay has** (Choosing models, above). For example, on the machine these docs were written on, `AGENT_MODEL` is `skynet` (a remote GPU box reached through an SSH tunnel that exists only there) and the fallback was `gemma4-26B` (lcpp's nickname for the Gemma 4 26B-A4B GGUF); neither name exists on yours.
 
-**Settings → Agent** holds the Auto mode's judge model: `config.toml [agent.judge]`, `model = "<your-model>"` with `backend = "relay"` (on the machine these docs were written on, for example, `gemma4-26B`). The default in code is `minicpm-5-2B`, which a relay rarely has: pick one of yours there, or the `decide` mod's models with `backend = "decide"`. The same page has the document defaults and speech input.
+**Settings → Permissions → Auto judge** holds the Auto mode's judge model: `config.toml [agent.judge]`, `model = "<your-model>"` with `backend = "relay"` (on the machine these docs were written on, for example, `gemma4-26B`). The default in code is `minicpm-5-2B`, which a relay rarely has: pick one of yours there, or the `decide` mod's models with `backend = "decide"`. The same page has the document defaults and speech input.
 
 ## Check it works
 

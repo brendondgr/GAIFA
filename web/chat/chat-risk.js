@@ -1,7 +1,7 @@
 // Risks and grants on the approval card (plan 25.3): the risk's word and colour, the grant key in
 // words ("on github.com", "in ~/Projects/foo"), which buttons a card offers, and which arguments of
 // an `execute` tool are its code. Pure functions (no React), shared by the chat's card, the
-// Approvals popover, the API tab and Settings → Agent. Written by us (web/PATCHES.md).
+// Approvals popover, the API tab and Settings → Permissions. Written by us (web/PATCHES.md).
 
 // Badge tones (chat-ui.js Badge): new in plan 25 are network (cyan) and execute (amber).
 export const RISK_TONE = { read: 'green', write: 'purple', generate: 'purple', network: 'cyan', execute: 'accent', destructive: 'red' };
@@ -66,7 +66,7 @@ export function approvalButtons(risk, { thread = false, once = false, folder = n
 /** The text of the second confirm for an `always` grant. */
 export function confirmText(tool, risk, cover) {
   const what = risk === 'execute' ? 'run code with' : 'delete with';
-  return `Always let the agent ${what} ${tool}${cover ? ` (${cover})` : ''}, in every chat and from MCP, without asking? You can revoke it in Settings → Agent.`;
+  return `Always let the agent ${what} ${tool}${cover ? ` (${cover})` : ''}, in every chat and from MCP, without asking? You can revoke it in Settings → Permissions → Grants.`;
 }
 
 /** The decided card's words for how it was allowed. */

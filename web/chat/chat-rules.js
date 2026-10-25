@@ -1,4 +1,4 @@
-// Your own rules in Settings → Agent: the Auto judge's command rules (config.toml [agent.judge] allow_commands /
+// Your own rules in Settings → Permissions: the Auto judge's command rules (config.toml [agent.judge] allow_commands /
 // ask_commands, utils/tools/judge_user.py) and the tool permissions ([agent.permissions]: tool-name globs, the order
 // in architecture §14.7). Both save through PUT /api/settings (api.saveSettings); a 422 invalid_config names the field.
 

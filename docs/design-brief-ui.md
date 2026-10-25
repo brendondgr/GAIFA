@@ -261,24 +261,25 @@ The real backend indexes `outputs/<service>/<YYYY-MM-DD>/…`. This page is the 
 
 ### 4.5 Settings
 
-One page with sections (hash `#/settings/<section>`), Save and Revert, an unsaved-changes guard, and restart-required notes:
+One page, `web/settings/` (plan settings-redesign): `schema.js` declares every section, group and row as data (label, hint, `config.toml` key, control, keywords; or a named block for anything that isn't one value), `rows.js` draws the rows and groups, `blocks-hub.js` and `blocks-agent.js` the blocks, `settings-nav.js` the section list and search box, `route.js` the hashes, and `settings.js` is the page (`SettingsPage`, mounted by `Hub.dc.html`, which asks it `dirty()` for the unsaved-changes guard).
 
-- **General**:
-  - GAIFA port (default 7000), with the note "Bound to 127.0.0.1 — this machine only"
-  - GAIFA version, PID, uptime and memory
-- **Paths** (read-only, with sizes and disk free): project root, `data/models`, `data/databases`, `outputs`.
-- **Memory**:
-  - reserve (GB kept free)
-  - "Automatically make room when a service needs memory" toggle; when off, the Make-room dialog asks
-  - "Never auto-unload" service multi-select
-  - a priority list of services, reordered with up/down buttons (lower is unloaded first)
-- **Services**:
-  - every folder found in `services/`, including broken mods with their errors
-  - per service: enabled toggle, autostart toggle, and sidebar order (up/down)
-  - an **"Add a mod"** card explaining the three steps (`bin/gaifa new <id>`, edit `services/<id>/service.toml`, restart the GAIFA), with a link to the template
-- **Interface**: theme (System/Light/Dark), density (Comfortable/Compact).
-- **About**: versions, and the CLI equivalents `bin/gaifa status`, `bin/gaifa start <id>`, `bin/gaifa logs <id> -f`, `bin/gaifa new <id>`. A **Hardware** card (plan 35.2) shows `getHardware()`: the system line (OS, CPU, memory), one row per GPU (name, arch, unified or dedicated memory, runtimes, what it can run, and any problem in amber), and the accelerators GAIFA can use here, with Read again. A **Doctor** panel (plan 12.4) runs `getDoctor()`: the counts, then the warn and fail checks with their fixes, the rest folded; a Run again button. `gaifa doctor` prints the same report.
+- **Hash:** `#/settings/<section>[/<group>[/<row>]]`; a group or row named by the hash opens and flashes. The old `paths`, `memory`, `interface`, `agent/permissions` and `about/hardware` are aliases to their new places.
+- **The section list:** the sections as plain links in a left column with the search box at its top, sticky under the header (44 px compact, 52 px comfortable) so it stays in view while a long section scrolls; a link can carry a small count at its end. Under 760 px it sits above the content, not pinned.
+- **Groups:** each section is one to seven groups, each a title that opens and closes it, with a one-line summary while closed ("Reserve 12 GB · auto make room off · 1 never unloaded"); Expand all and Collapse all; what you close is remembered in this browser (`gaifa.settings.open`); the hash's group and a group with a problem open regardless.
+- **Search:** a box at the top of the section list (`/` focuses it, Esc or × clears) finds settings by label, hint, `config.toml` key or a synonym ("dark mode", "RAM", "VRAM", "MCP"), from two characters on, with no request; each installed mod's own Settings tab is found too ("<name> settings", under **Mods** after the sections). With a query the page shows every section that has a match, only matching groups open, other rows dimmed and matches in `<mark>`; the list counts matches per section and dims the rest; "12 matches in 4 sections" is announced. Enter and ↓ go to the next match (scrolled to and flashed, its mark in full accent), ↑ to the previous; clearing returns to the section you were on.
+- **Row details:** under each hint the row's `config.toml` key in 11 px mono; when a value differs from its default (`getSettingsDefaults()`, from `config.example.toml`) a "Reset to default (<value>)" link beside the control sets the draft back; a row that needs a restart (the port) shows a "restart" badge while changed, and the Save bar says "Save and restart later". The section list counts the changed rows per section, and a **Changed** chip filters the page to them, as a search does.
+- **Saving:** the hub's settings (brief §6 `Settings`) are one draft with one Save bar (Save sends only what changed, Revert, a restart note when the port changed); theme, density and the sidebar rows apply at once; the agent's own settings (AGENT.md, MEMORY.md, documents) keep a Save in their card, marked "saved by the agent".
 
+The sections:
+
+- **General:** *Hub* (**Set on this machine**: the saved values that differ from the defaults as "key · value (default x)" links to their rows, with Copy as TOML; the port, "Bound to 127.0.0.1 — this machine only", restart to apply; the process card: version, PID, uptime, memory), *Interface* (theme System/Light/Dark, density, services in the sidebar as list/button/counts, fold the list, Reset the dashboard layout), *Outputs* (delete saved web pages after N days).
+- **Machine:** *Memory* (the 24 h chart with the draft reserve line; reserve; "Automatically make room when a service needs memory"; Never auto-unload; the unload order with up/down), *Storage* (the folders with sizes and Copy path, the disk bar), *Hardware* (plan 35.2: the system line, one row per GPU with memory, runtimes, what it can run and any problem, the accelerators GAIFA can use, Read again).
+- **Services:** every folder in `services/`, broken mods with their errors; per mod enabled, autostart, its tool count and sidebar order (up/down); the **Add a mod** card (`gaifa new <id>`, edit `services/<id>/service.toml`, restart), linking the Example mod.
+- **Agent** (while the agent mod is installed): *Model*, *Documents*, *Reading web pages* (long pages and the relevance model), *Instructions* (AGENT.md), *Memory* (MEMORY.md and topics), *Skills*, *Learning*.
+- **Permissions** (while the agent mod is installed): *Modes*, *Tool rules* (never run, always ask, run without asking), *Grants* (with Revoke), *Auto judge* (backend and model, what it reads, threshold, time limit, your command rules), *Screening* (pages, documents, transcripts, the screening model, text per call, calls at once), *Judged calls* (with "Always allow", added to the draft).
+- **Speech** (while the stt or tts mod is installed): *Dictation* (microphones in order, language, model, the button), *Voice* (the voice that reads replies, speed, read every reply, voice mode's pause).
+- **Sessions:** the Sessions panel (brief §11.14).
+- **About:** *Versions* (with "GAIFA · Great, Another Interface For Agents · say “guy-fuh”"), *Command line* (`gaifa status`, `start <id>`, `logs <id> -f`, `new <id>`, `doctor`), *Doctor* (plan 12.4: `getDoctor()`, the counts, the warn and fail checks with fixes, Show all, Run again).
 ---
 
 ## 5. The page-module contract (how a service brings its own UI)
@@ -398,6 +399,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `outputPageUrl(id, n, {width})` | `GET /api/outputs/{id}/page/{n}.png?width=` (a URL, not a request) | A PDF page as a PNG (`width` 1200 px by default, 64–2400), cached under `outputs/.previews/<id>/`; `no_page` 404 |
 | `getSettings()` | `GET /api/settings` | `Settings` (`services.order` and `memory.priority` list every installed mod: the configured ids first, then the rest in sidebar order) |
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written) |
+| `getSettingsDefaults()` | `GET /api/settings/defaults` | `Settings`: the values of `config.example.toml`, what each row of the Settings page returns to with Reset (plan settings-redesign 4.1) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
 
 File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used directly in `<img>`, `<audio>`, `<video>` and download links.
@@ -615,7 +617,7 @@ interface Settings {
                   language: string; preset: "fast" | "balanced" | "accurate" | "best"; mode: "both" | "toggle" | "hold" };
   speech_output: { voice: string; engine: "auto" | "breeze" | "kokoro"; speed: number;   // plan 49.1: reading replies aloud ("" = tts's default voice)
                    auto_read: boolean; pause_ms: number };   // auto_read: every finished reply; pause_ms: voice mode's turn end (plan 49.2)
-  judge: { backend: "relay" | "decide"; model: string;   // config.toml [agent.judge] (plan 30.3); picked in Settings → Agent
+  judge: { backend: "relay" | "decide"; model: string;   // config.toml [agent.judge] (plan 30.3); picked in Settings → Permissions → Auto judge
            url: string; threshold: number; timeout_s: number;
            allow_commands: string[]; ask_commands: string[];   // your command rules for Auto (`pytest *`; judge_user.py, plan 30.7)
            context: "none" | "trail" | "full" };   // what the judge reads of the turn besides your words (judge_context.py, 2026-10-21)
@@ -937,7 +939,7 @@ interface WidgetData { unit?: string; t?: number[]; categories?: string[];
 - **Memory popover (header):** a 1 h stacked area above the existing bar.
 - **Models:** a size-by-kind treemap above the table, replacing the plain stacked bar, plus a disk-free gauge.
 - **Outputs:** a per-day histogram above the grid. Dragging across it sets the date filter.
-- **Settings → Memory:** a 24 h memory chart with the reserve line drawn, which updates live as you edit the reserve value.
+- **Settings → Machine → Memory:** a 24 h memory chart with the reserve line drawn, which updates live as you edit the reserve value.
 
 ### 11.9 Mock additions
 - **7 days of metric history.** 10 s samples for the last hour, 1 min for 24 h and 1 h beyond, following realistic patterns:
@@ -950,7 +952,7 @@ interface WidgetData { unit?: string; t?: number[]; categories?: string[];
 - **New `Shift+D` scenarios:** "Empty history" (a fresh install) and "Gaps" (the hub was down for 2 h, so the series contain nulls).
 
 ### 11.10 New states and acceptance
-- **States:** every widget loading, empty and in error; a range switch; a legend toggle; "View as table"; the Customize panel; each of the four Overview views in compact and comfortable; and every chart at 360 px (Timeline scrolls sideways inside its card; widgets stack).
+- **States:** every widget loading, empty and in error; a range switch; a legend toggle; "View as table"; the Customize panel; each of the four Overview views in compact and comfortable; and every chart at 360 px (Timeline scrolls sideways inside its card; widgets stack); the Settings section list while a long section scrolls (in view under the header) and at 360 px (above the content), and a Settings section with every group collapsed (a list of summaries).
 - **Acceptance:**
   - The above-the-fold rule in Section 11.3 holds.
   - The Dashboard opens in under 1 s with mock data.
@@ -1148,7 +1150,7 @@ interface Judged { verdict: "allow" | "ask"; reason: string;
 interface JudgedCall extends Judged { id: number; ts: number; tool: string; thread?: string; call_id?: string; approval_id?: string;
                                       suggest?: string[] }   // allow rules that would cover a command the model asked about (plan 30.7)
 interface JudgeStatus { available: boolean; backend: string; model: string; detail: string;   // Auto is offered only when available
-                       choices: string[] }   // models the backend offers that the judge could use (the picker in Settings → Agent)
+                       choices: string[] }   // models the backend offers that the judge could use (the picker in Settings → Permissions → Auto judge)
 interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote";
                        folder?: string; level?: string; allow_bypass?: boolean; path?: string;
                        key?: string;                                // what "allow in this chat" covers: the folder and the exact command
@@ -1235,11 +1237,11 @@ Built by hand in `web/chat/` (plain ES modules on the page's React, like the das
   - **Allow once · Allow in this chat · Always allow**, then **Deny**. "Allow in this chat" shows only for a call from a chat (`origin.thread`); "Always allow…" on `execute` and `destructive` opens a second confirm ("Always let the agent run code with … in every chat and from MCP, without asking?") before it decides with `confirm: true`. Deny opens a reason box (optional; Enter denies, the agent reads the reason). Ctrl+Enter allows once;
   - for `execute`, the code or command (a string argument named `code`, `command`, `script`, `cmd`, `source` or `shell`, or with `format: "code"` / `x-code`) shows whole in a monospaced, scrollable, editable box: what's in it is what runs;
   - decided: the fold's row says "Approved by you, and allowed in this chat" (or "always allowed").
-- **Settings → Agent → Permissions** lists the grants (tool, risk, what it covers, "always" or a link to its chat, uses, age, expiry) with **Revoke** (plan 25.2), then **Tool permissions** (plan 30.7): "Never run", "Always ask" and "Run without asking", tool-name globs saved to `[agent.permissions]` (the defaults, `hub_set_preference` asks and `hub_start_service` runs, show as entries).
-- **Settings → Agent → Reading web pages** (2026-10-21; `chat-webprefs.js`): screen pages, your documents, transcripts; "Screen pages with" (Same as the judge / A decision model (decide) / Another chat model, with a model picker from each backend's choices; for decide, the threshold and "Let the judge's chat model confirm what it flags"); characters per call × calls at once; "Long pages" (`[agent.web] relevance`: auto, decide, lexical, off) and its model; "Saved web pages: delete after N days (0 keeps them)".
+- **Settings → Permissions** lists the grants (tool, risk, what it covers, "always" or a link to its chat, uses, age, expiry) with **Revoke** (plan 25.2), then **Tool permissions** (plan 30.7): "Never run", "Always ask" and "Run without asking", tool-name globs saved to `[agent.permissions]` (the defaults, `hub_set_preference` asks and `hub_start_service` runs, show as entries).
+- **Settings → Agent → Reading web pages and Permissions → Screening** (2026-10-21; `chat-webprefs.js`): screen pages, your documents, transcripts; "Screen pages with" (Same as the judge / A decision model (decide) / Another chat model, with a model picker from each backend's choices; for decide, the threshold and "Let the judge's chat model confirm what it flags"); characters per call × calls at once; "Long pages" (`[agent.web] relevance`: auto, decide, lexical, off) and its model; "Saved web pages: delete after N days (0 keeps them)".
 - **Environments (plan 34; `chat-env.js`, the menu in `chat-controls.js` since plan 42.3):** the controls row shows the chat's environment (+n for folders allowed in this chat; **None**, built in with no folders, is where a new chat starts until you pick another, plan 42.5); its menu (compact, 250 px) lists the environments as rows: a click picks one for this chat; **Edit** on a row's right (not None) and **New environment** open the **environment dialog** (plan 43.2, `chat-envedit.js`, as Claude Code's): centred over the page, **Name**, **Folders** (each with Read · Edit · Run · Net, levels above its cap disabled with the reason, and Remove), **Add folder…** (the desktop's own folder chooser, opened at `/` by the workspace mod: "Choose a folder in the window that opened…" while it's open; without a chooser, a path box), and Cancel with **Create** or **Save** (the dialog keeps its changes until then; Save is off while nothing changed); when editing (not Default or None), **Delete…**, whose warning says its chats go too, archived ones included ("This also deletes its 5 chats, including 2 archived. Their outputs stay in Outputs."). The mod's refusals show in the dialog with their fix. Under the rows, "Allowed in this chat" (each removable: that revokes its grant). A new chat starts in the last environment picked in this browser, else None (no folders: the agent asks for each one; its menu explains that and offers New environment; no Add to "None" on a folder card); the chip is hidden while the workspace mod is down. A folder card reads "Let this chat read ~/x?" with the path, a Read badge and "not in this chat's environment (<name>)"; its buttons are **Allow for this chat**, **Add to "<env>"** and **Deny** (in the Approvals popover with no chat, Allow once replaces the first). The Workspace page's Environments view: a switcher, New environment, Rename, Delete (not Default), add a folder (path and level), and the folder rows (level up to its cap, allow Bypass, Remove).
 - **Sources you shared:** pages attached with "Add a web page" and links you typed that the agent read come first in the reply's Sources, labelled "you shared".
-- **Settings → Agent → Judged calls** (plan 30.7): under the judge picker, **The judge reads** (`[agent.judge] context`, 2026-10-21): "Your words and the call", "+ the agent’s earlier calls this turn" or "+ their results and the agent’s text", saved when picked; then **Your command rules**: "Always allow these commands in Auto" and "Always ask before these", each a list with add and remove and Save; errors show inline, and a 422 names the list. Each recent call the judge's model asked about offers **Always allow `<rule>`** (`suggest`), which confirms and then adds the rule. A verdict from your rules has the source `user`, shown as "your rule".
+- **Settings → Permissions → Judged calls** (plan 30.7): under the judge picker, **The judge reads** (`[agent.judge] context`, 2026-10-21): "Your words and the call", "+ the agent’s earlier calls this turn" or "+ their results and the agent’s text", saved when picked; then **Your command rules**: "Always allow these commands in Auto" and "Always ask before these", each a list with add and remove and Save; errors show inline, and a 422 names the list. Each recent call the judge's model asked about offers **Always allow `<rule>`** (`suggest`), which confirms and then adds the rule. A verdict from your rules has the source `user`, shown as "your rule".
 - **Settings → Agent:** the models, AGENT.md and MEMORY.md editors, topic files, skills, the modes and how permissions work.
 
 **Events → turns.** `chat-thread.js` `buildView(events, live)` folds the log into items, then `chat-turn.js` `groupTurns(view, {running, now, tools})` groups them into turns of steps by the `step` id the agent puts on thinking, text and tool calls; the last step's text is the answer when that step called no tools. `buildView` folds the log into items as follows. A `tool_call` becomes a **tool** item (its `call`, live `progress` and `tool_result` folded in), or an **approval** item when an `approval` event names it (with its `decision`); `ask_user` becomes a **question** item with its `answer`; a result with outputs adds a **result** item; `update_todos` and `remember` calls are hidden (their `todos` / `memory` events have cards); `usage`, `state`, `call`, `answer`, `decision` are folded. Every other event type is an item of its own kind. Live `delta` events show streaming text and thinking until the stored `assistant` / `thinking` event of that step replaces them.
@@ -1266,7 +1268,7 @@ registerAction({ id: 'audio.transcribe', on: 'audio', label: 'Transcribe', promp
 registerPreview('pointcloud', ({ output, ctx }) => h(MyViewer, { src: output.url }));
 ```
 
-**Read aloud (plan 49.1).** A speaker beside Copy under each finished reply reads it in the voice set in Settings → Agent → Voice (`speech_output`): the reply as plain text (no citations, links' addresses or code: "a code block"), streamed from the tts mod (not saved), so it starts in a moment; again stops it, and one reply reads at a time. Voice also sets the speed (Kokoro), "Read every reply aloud" (when a turn ends) and voice mode's pause.
+**Read aloud (plan 49.1).** A speaker beside Copy under each finished reply reads it in the voice set in Settings → Speech → Voice (`speech_output`): the reply as plain text (no citations, links' addresses or code: "a code block"), streamed from the tts mod (not saved), so it starts in a moment; again stops it, and one reply reads at a time. Voice also sets the speed (Kokoro), "Read every reply aloud" (when a turn ends) and voice mode's pause.
 
 **Voice mode (plan 49.2).** A speaker button beside the microphone (shown while the stt mod is up and Voice can be set) talks with the agent hands-free: it listens, sends what you said once you've been quiet for Voice's pause, reads the reply aloud, then listens again. A bar over the message box says where it is (Listening… with the words so far · Sending… · Thinking… · Speaking (talk to interrupt) · Waiting for you on screen) and "Esc ends". Talking over the reading stops it and listens; an approval or question waiting on screen pauses it until you've answered; Escape or the button ends it, and a refused microphone shows its reason by the button. "Read every reply aloud" stays quiet while voice mode is on.
 

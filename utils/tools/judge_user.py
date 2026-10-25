@@ -1,5 +1,5 @@
 """Your own command rules for the Auto judge: `config.toml [agent.judge] allow_commands / ask_commands`, edited in
-Settings → Agent (validated by `utils/config.py command_patterns`).
+Settings → Permissions (validated by `utils/config.py command_patterns`).
 
 A rule is a command and its words, with `*` globs: `pytest *`, `make -C * test`, `uv run pytest *`. Each word of the
 rule matches one word of the command (`*` inside a word matches any text, `?` one character); a last word of just
@@ -95,7 +95,7 @@ def line_verdict(v: Verdict, ctx: Ctx, network: bool) -> Verdict:
 
 
 def suggest(command: str, limit: int = 3) -> list[str]:
-    """Allow rules that would cover a command the judge asked about, for Settings → Agent's "Always allow": the
+    """Allow rules that would cover a command the judge asked about, for Settings → Permissions's "Always allow": the
     command's name and `*` (two words for runners: `npm run *`, `git log *`), for each command in the line the
     rules weren't sure about (a fixed rule's ask can't be lifted, so none for those). Judged in a stand-in folder:
     the real one isn't stored with the judged call."""

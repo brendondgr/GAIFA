@@ -84,34 +84,7 @@ export function SpeakButton({ text, ctx }) {
     h(Icon, { d: state === 'idle' ? 'speaker' : 'stop', size: 13 }));
 }
 
-/** Settings → Agent → Voice: the voice that reads replies, its engine and speed, auto-read, voice mode's pause. */
-export function SpeechOutputSection({ api, toast = () => {} }) {
-  const React = R(), [so, setSo] = React.useState(null), [voices, setVoices] = React.useState(null), [saving, setSaving] = React.useState(false);
-  React.useEffect(() => {
-    api.getSettings?.().then(s => setSo(s.speech_output || null)).catch(() => {});
-    api.callService?.('tts', 'GET', '/v1/voices').then(r => setVoices(r.json)).catch(() => setVoices(null));
-  }, []);
-  if (!so || !voices) return null;      // no tts mod: nothing to set
-  const save = async patch => {
-    const next = { ...so, ...patch };
-    setSo(next); setSaving(true);
-    try { await api.saveSettings({ speech_output: next }); } catch (e) { toast(e.detail || 'Not saved', 'error'); }
-    setSaving(false);
-  };
-  const names = [...(voices.custom || []).map(v => v.name), ...(voices.kokoro || [])];
-  const sel = { height: 30, padding: '0 8px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.sb, color: T.tx, font: 'inherit', fontSize: 12.5 };
-  const row = (label, hint, ctl) => h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
-    h('div', { style: { flex: '1 1 240px', minWidth: 0 } }, h('div', { style: { fontSize: 13 } }, label), h('div', { style: { fontSize: 12, color: T.mut } }, hint)), ctl);
-  return h('section', { style: { background: T.card, border: '1px solid ' + T.bd, borderRadius: 10, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 } },
-    h('h2', { style: { fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: T.mut, margin: 0 } }, 'Voice', saving ? ' · saving…' : ''),
-    row('Read replies in', 'The voice under each reply’s speaker, and voice mode’s answers.',
-      h('select', { value: so.voice, onChange: e => save({ voice: e.target.value }), style: sel },
-        h('option', { value: '' }, 'The speech mod’s default'), names.map(n => h('option', { key: n, value: n }, n)))),
-    row('Speed', 'Built-in (Kokoro) voices only.',
-      h('input', { type: 'range', min: 0.5, max: 2, step: 0.1, value: so.speed, onChange: e => save({ speed: +e.target.value }), 'aria-label': 'Speed' }), ),
-    row('Read every reply aloud', 'When a reply is finished. With a model on this GPU it waits for the reply to end.',
-      h('input', { type: 'checkbox', checked: !!so.auto_read, onChange: e => save({ auto_read: e.target.checked }), 'aria-label': 'Read every reply aloud' })),
-    row('Voice mode: end of what you said', 'The quiet that sends your message.',
-      h('select', { value: so.pause_ms, onChange: e => save({ pause_ms: +e.target.value }), style: sel },
-        [800, 1200, 1600, 2400].map(ms => h('option', { key: ms, value: ms }, (ms / 1000) + ' s')))));
+/** The voices the tts mod offers (GET /v1/voices → {custom, kokoro}) as choices for Settings → Speech → Voice. */
+export function voiceChoices(voices) {
+  return [{ value: '', label: 'The speech mod’s default' }, ...(voices?.custom || []).map(v => ({ value: v.name, label: v.name })), ...(voices?.kokoro || []).map(n => ({ value: n, label: n }))];
 }

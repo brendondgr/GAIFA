@@ -138,7 +138,7 @@ class Prefs:
     async def check(self, body: dict[str, Any]) -> None:
         """Whether `create(body)` would be refused (PrefError), without saving: the call path asks this before a card."""
         if not self.on:
-            raise PrefError(409, "learning_off", "learning is turned off (Settings → Learning)")
+            raise PrefError(409, "learning_off", "learning is turned off (Settings → Agent → Learning)")
         p = {"scope": body.get("scope") or ("agent" if not body.get("tool") else "tool"), "tool": body.get("tool"),
              "field": body.get("field"), "thread": body.get("thread"), "value": body.get("value"), "when": body.get("when") or {},
              "source": body.get("source") or "stated", "state": body.get("state") or "active"}
@@ -153,7 +153,7 @@ class Prefs:
 
     async def create(self, body: dict[str, Any]) -> dict[str, Any]:
         if not self.on:
-            raise PrefError(409, "learning_off", "learning is turned off (Settings → Learning)")
+            raise PrefError(409, "learning_off", "learning is turned off (Settings → Agent → Learning)")
         now = time.time()
         p = {"id": "pref_" + secrets.token_hex(6), "scope": body.get("scope") or ("agent" if not body.get("tool") else "tool"),
              "tool": body.get("tool"), "field": body.get("field"), "thread": body.get("thread"), "value": body.get("value"),

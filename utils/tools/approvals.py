@@ -94,7 +94,7 @@ def decide(name: str, risk: str, config: Config, mode: str = "manual",
     p = config.agent.permissions
     mode = canonical(mode)
     if any(fnmatch.fnmatchcase(name, g) for g in p.deny):
-        return "deny", "denied by your permissions (Settings → Agent)"
+        return "deny", "denied by your permissions (Settings → Permissions)"
     if limits is not None:
         return _with_limits(name, risk, p, mode, grant, limits)
     if mode == "plan" and risk != "read":

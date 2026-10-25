@@ -33,6 +33,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | N — Other machines | 35–40 | AIHub beyond this machine: hardware detection, memory in pools (RAM and each GPU's VRAM), running without systemd, a variant per accelerator for every mod chosen by `aihub setup`, smokes, and field reports an agent writes while building on another machine (Linux with NVIDIA, Windows WSL2 with Intel); macOS was checked by CI until it was turned off (2026-10-22). Plan: [plans/portability.md](plans/portability.md) | Additive: this machine keeps its backends; every step's tests include its recorded hardware |
 | O — Chats by workspace | 41–43 | The chat list grouped by environment (Phase 34's workspaces), with orders, paging per group, Move to and renaming from the sidebar; then the Chat page after Claude Code: a compact sidebar, the message box with + and its controls (environment, mode, model) under it, environments made and changed from the chat, in a dialog with the desktop's folder chooser | the agent's thread list (additive filters), `web/chat/` |
 | P — Chat cards | 44–49 | Mods ship their own chat cards (`[ui] chat`), and jobs report live progress with preview frames: live cards for image, video, 3D and speech; status and fix-it cards; `show` for charts, tables and pictures in replies; @-mentions; Save to…; read aloud and voice mode. Plan: [plans/chat-cards.md](plans/chat-cards.md) | `web/chat/`, the tool call path (additive `live`, `view`, `fixes`), comfy, gen3d, tts (speech as a job), workspace (save into a folder); additive |
+| Q — The name | 50 | AIHub becomes GAIFA ("Great, Another Interface For Agents", said guy-fuh): every identifier, the docs, the README and its banner, the folder and the GitHub repository. Plan: [plans/gaifa-rename.md](plans/gaifa-rename.md) | Everything by name; nothing by behavior. The installed hub moves once, in 50.5 |
 
 | Phase | What | Size | UI that goes live |
 |---|---|---|---|
@@ -86,6 +87,7 @@ How AIHub gets built, step by step: the backend described in [architecture.md](a
 | 47 | `show`: charts, tables and pictures in replies | M–L | `chat`: charts, tables, galleries and pictures in replies |
 | 48 | @-mentions and Save to… | M | `chat`: the `@` picker; Download, Copy and Save to folder on outputs |
 | 49 | Read aloud and voice mode | M | `chat`: the reply bar's speaker, voice mode, Settings → Agent → Voice |
+| 50 | The rename to GAIFA | M–L | the whole UI shows GAIFA |
 
 # Stage A — Foundation
 

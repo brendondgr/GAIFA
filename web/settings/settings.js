@@ -7,6 +7,7 @@ import { h, T, MONO } from '../chat/chat-ui.js';
 import { sections, rowsOf, validateDraft, saveBody, isDirty } from './schema.js';
 import { Row, Group, cardsOf } from './rows.js';
 import { parseSettingsRoute, settingsPlace } from './route.js';
+import { SectionStrip } from './strip.js';
 import { HUB_BLOCKS } from './blocks-hub.js';
 import { AGENT_BLOCKS } from './blocks-agent.js';
 
@@ -38,8 +39,6 @@ export function settingsSections(ctx) { return sections(ctx); }
 export { settingsPlace };
 
 const clone = o => (o == null ? o : JSON.parse(JSON.stringify(o)));
-const navSt = on => ({ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, height: 32, padding: '0 10px', borderRadius: 6, fontSize: 13, fontWeight: on ? 600 : 400,
-  textDecoration: 'none', color: on ? T.tx : T.mut, background: on ? T.hov : 'transparent' });
 const h1St = { margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: '-.01em' };
 const btnSt = (pri, dis) => ({ height: 32, padding: '0 12px', borderRadius: 6, font: 'inherit', fontSize: 12.5, fontWeight: pri ? 600 : 500, cursor: dis ? 'not-allowed' : 'pointer', opacity: dis ? 0.5 : 1,
   border: pri ? '1px solid transparent' : '1px solid ' + T.bds, background: pri ? T.acc : T.inset, color: pri ? '#1A1200' : T.tx });
@@ -120,25 +119,23 @@ export function SettingsPage(props) {
   };
   const miss = (cur.areas || []).filter(a => !isLive(a));
 
+  const pick = id => (props.go ? props.go('#/settings/' + id) : (location.hash = '#/settings/' + id));
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 } },
-    h('h1', { style: props.h1St || h1St }, 'Settings'),
+    h(SectionStrip, { sections: secs, current: cur.id, onPick: pick, density: props.density, h1St: props.h1St || h1St, counts: props.stripCounts?.(secs) || {}, search: null }),
     st.restart ? h('div', { role: 'status', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '12px 14px', borderRadius: 10, background: T.tacc, border: '1px solid ' + T.acc } },
       h('span', { style: { flex: 1, minWidth: 200 } }, h('strong', null, 'Saved.'), ' Restart GAIFA to apply the new port: ', h('code', { style: { fontFamily: MONO } }, 'gaifa restart')),
       h('button', { type: 'button', onClick: () => up({ restart: false }), style: { ...btnSt(false), height: 28, fontSize: 12, background: T.card } }, 'Dismiss')) : null,
     st.err && !errField ? h('div', { role: 'alert', style: { padding: '10px 12px', borderRadius: 8, background: T.trd, color: T.rd } }, st.err.detail || String(st.err.message || st.err)) : null,
-    h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' } },
-      h('nav', { 'aria-label': 'Settings sections', style: { flex: '0 1 190px', display: 'flex', flexDirection: 'column', gap: 2, minWidth: 160 } },
-        secs.map(x => h('a', { key: x.id, href: '#/settings/' + x.id, 'aria-current': x.id === cur.id ? 'page' : undefined, style: navSt(x.id === cur.id) }, x.label))),
-      h('div', { style: { flex: '1 1 480px', minWidth: 0, maxWidth: 820, display: 'flex', flexDirection: 'column', gap: 14 } },
-        miss.length ? h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } },
-          h('span', { style: { height: 18, padding: '0 6px', borderRadius: 4, border: '1px solid ' + T.pu, background: T.tpu, color: T.pu, fontSize: 10, fontWeight: 600, letterSpacing: '.06em', display: 'inline-flex', alignItems: 'center' } }, 'MOCK'),
-          h('span', null, `Mock data: the ${miss.join(' and ')} ${miss.length > 1 ? 'areas aren’t' : 'area isn’t'} live yet.`)) : null,
-        cur.groups.map(groupEl),
-        dirty ? h('div', { role: 'region', 'aria-label': 'Unsaved changes', style: { position: 'sticky', bottom: 12, zIndex: 20, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px',
-          borderRadius: 10, background: T.card, border: '1px solid ' + T.acc, boxShadow: '0 10px 30px rgba(0,0,0,.35)' } },
-          h('span', { style: { flex: 1, minWidth: 160, fontWeight: 500 } }, 'Unsaved changes'),
-          h('button', { type: 'button', onClick: revert, style: btnSt(false) }, 'Revert'),
-          h('button', { type: 'button', onClick: save, disabled: invalid || st.saving, style: btnSt(true, invalid || st.saving) }, st.saving ? 'Saving…' : 'Save changes')) : null)));
+    h('div', { role: 'tabpanel', 'aria-labelledby': 'stab-' + cur.id, style: { width: '100%', maxWidth: 900, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 } },
+      miss.length ? h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } },
+        h('span', { style: { height: 18, padding: '0 6px', borderRadius: 4, border: '1px solid ' + T.pu, background: T.tpu, color: T.pu, fontSize: 10, fontWeight: 600, letterSpacing: '.06em', display: 'inline-flex', alignItems: 'center' } }, 'MOCK'),
+        h('span', null, `Mock data: the ${miss.join(' and ')} ${miss.length > 1 ? 'areas aren’t' : 'area isn’t'} live yet.`)) : null,
+      cur.groups.map(groupEl),
+      dirty ? h('div', { role: 'region', 'aria-label': 'Unsaved changes', style: { position: 'sticky', bottom: 12, zIndex: 20, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px',
+        borderRadius: 10, background: T.card, border: '1px solid ' + T.acc, boxShadow: '0 10px 30px rgba(0,0,0,.35)' } },
+        h('span', { style: { flex: 1, minWidth: 160, fontWeight: 500 } }, 'Unsaved changes'),
+        h('button', { type: 'button', onClick: revert, style: btnSt(false) }, 'Revert'),
+        h('button', { type: 'button', onClick: save, disabled: invalid || st.saving, style: btnSt(true, invalid || st.saving) }, st.saving ? 'Saving…' : 'Save changes')) : null));
 }
 
 export { rowsOf };

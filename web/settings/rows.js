@@ -25,7 +25,7 @@ export function Toggle({ on, onChange, label, disabled }) {
   h('span', { style: { position: 'absolute', top: 3, left: on ? 17 : 3, width: 14, height: 14, borderRadius: 99, background: '#fff', transition: 'left .15s' } }));
 }
 export function Segmented({ value, choices, onChange, label }) {
-  return h('div', { role: 'group', 'aria-label': label, style: { display: 'inline-flex', padding: 2, borderRadius: 7, border: '1px solid ' + T.bd, background: T.sb } },
+  return h('div', { role: 'group', 'aria-label': label, style: { display: 'inline-flex', flexWrap: 'wrap', maxWidth: '100%', padding: 2, borderRadius: 7, border: '1px solid ' + T.bd, background: T.sb } },
     choices.map(c => h('button', { key: String(c.value), type: 'button', 'aria-pressed': c.value === value ? 'true' : 'false', onClick: () => onChange(c.value), style: segSt(c.value === value) }, c.label)));
 }
 export function Chips({ value = [], choices, onChange, label }) {

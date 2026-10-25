@@ -119,9 +119,10 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
 
 ## Phase 4 — Row details: keys, defaults, reset and changes (M)
 
-- [ ] **4.1 Defaults from the hub: `GET /api/settings/defaults` in `utils/routes/settings.py` and `utils/settings.py`.**
+- [x] **4.1 Defaults from the hub: `GET /api/settings/defaults` in `utils/routes/settings.py` and `utils/settings.py`.**
   - **Route:** returns the `Settings` shape (brief §6) built from `config.example.toml` through `utils.config.validate` and `settings_mod.view`'s shaping (the `services.order` and `memory.priority` lists are the installed mods in sidebar order, as `view` does for an empty config), read once per process and cached. `api.js` gets `getSettingsDefaults()` (area `settings`); the mock returns its seed's defaults.
   - **Docs:** architecture §6 (hub-only routes) and the brief's §6 method table.
+  *As built:* `utils/settings.py` shapes both answers with one `_shape(cfg, services, effective)`; the per-mod `enabled` and `autostart` defaults are each manifest's under the example (`manifest.effective`). The parsed example is cached per path (`lru_cache`); a hub without the file answers GAIFA's built-in defaults. The mock's defaults are its seed.
   *Done when:* `utils/tests/settings/test_defaults.py` checks the shape validates as `Settings`, `hub.port` is 7000 and `memory.reserve_gb` is the example's value, and a changed `config.toml` does not change the answer; `test_contract.py` sees the new method.
 
 - [ ] **4.2 Keys, defaults and Reset, in `rows.js` and `settings.js`.**

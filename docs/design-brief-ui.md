@@ -398,6 +398,7 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `outputPageUrl(id, n, {width})` | `GET /api/outputs/{id}/page/{n}.png?width=` (a URL, not a request) | A PDF page as a PNG (`width` 1200 px by default, 64–2400), cached under `outputs/.previews/<id>/`; `no_page` 404 |
 | `getSettings()` | `GET /api/settings` | `Settings` (`services.order` and `memory.priority` list every installed mod: the configured ids first, then the rest in sidebar order) |
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written) |
+| `getSettingsDefaults()` | `GET /api/settings/defaults` | `Settings`: the values of `config.example.toml`, what each row of the Settings page returns to with Reset (plan settings-redesign 4.1) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
 
 File and preview URLs (`Output.url`, `Output.preview`) are plain GETs used directly in `<img>`, `<audio>`, `<video>` and download links.

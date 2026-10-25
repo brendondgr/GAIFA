@@ -288,6 +288,7 @@ export function createMockApi() {
     web: { relevance: 'auto', model: 'd3-lite', url: 'http://127.0.0.1:7000/api/s/decide', candidates: 24, timeout_s: 8 },
     outputs: { hidden_keep_days: 0 },
   };
+  const defaults = clone(settings);   // the seed is the mock's config.example.toml (getSettingsDefaults)
   // LocalTTS's own voice shape (GET /v1/voices → { custom, kokoro }), so the Speech page works on the mock.
   const voice = (name, source, duration_s, transcript, extra = {}) => ({ engine: 'breeze', name, transcript, duration_s, created: '2026-09-26T10:30:00-0400', source, instruction: null, language: null, transcript_auto: false, ...extra });
   const voices = [voice('Brendon', 'upload', 22.2, 'This morning, my refrigerator asked me to stop calling it a refrigerator.'),
@@ -695,6 +696,7 @@ export function createMockApi() {
     },
     async deleteOutput(id) { await net(); const i = outputs.findIndex(x => x.id === id); if (i < 0) throw err(404, 'output_not_found', `No output "${id}"`); outputs.splice(i, 1); emit({ type: 'output_deleted', id }); return null; },
     async getSettings() { await net(); return clone(settings); },
+    async getSettingsDefaults() { await net(); return { ...clone(defaults), services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) } }; },
     async saveSettings(patch) { await net();
       // Like utils/settings.py: sections merge key by key; services.enabled/autostart merge per mod.
       const s = clone(settings);

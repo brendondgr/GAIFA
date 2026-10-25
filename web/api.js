@@ -21,7 +21,7 @@ export const METHOD_AREA = {
   scanModels: 'models', addModel: 'models',
   listOutputs: 'outputs', getOutput: 'outputs', deleteOutput: 'outputs', uploadOutput: 'outputs',
   outputText: 'outputs', outputSearch: 'outputs', outputPageUrl: 'outputs',
-  getSettings: 'settings', saveSettings: 'settings',
+  getSettings: 'settings', saveSettings: 'settings', getSettingsDefaults: 'settings',
   getMetrics: 'metrics', listMetricSeries: 'metrics', getTimeline: 'metrics', getOutputStats: 'metrics',
   getActivityStats: 'metrics', getJobStats: 'metrics',
   listWidgets: 'widgets', getWidget: 'widgets',
@@ -181,6 +181,7 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     getWebReading: () => req('GET', '/api/web/reading'),
     getSettings: () => req('GET', '/api/settings'),
     saveSettings: s => req('PUT', '/api/settings', { json: s }),
+    getSettingsDefaults: () => req('GET', '/api/settings/defaults'),   // plan settings-redesign 4.1: config.example.toml's values
     getMetrics: ({ series, range, step } = {}) => req('GET', `/api/metrics${qs({ series, range, step })}`),
     listMetricSeries: () => req('GET', '/api/metrics/series'),
     getTimeline: ({ range, services } = {}) => req('GET', `/api/timeline${qs({ range, services })}`),

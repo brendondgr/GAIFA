@@ -17,6 +17,11 @@ async def get_settings(request: Request) -> dict[str, Any]:
     return settings_mod.view(request.app.state.hub)
 
 
+@router.get("/api/settings/defaults", summary="The defaults every row returns to (config.example.toml)", response_model=Settings)
+async def get_settings_defaults(request: Request) -> dict[str, Any]:
+    return settings_mod.defaults(request.app.state.hub)
+
+
 @router.put("/api/settings", summary="Save settings: the whole form or any part; only real overrides are written", response_model=SavedSettings)
 async def save_settings(body: SettingsPatch, request: Request) -> dict[str, Any]:
     settings, restart = await settings_mod.save(request.app.state.hub, body.model_dump(exclude_none=True))

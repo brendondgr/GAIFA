@@ -8,11 +8,15 @@ An unchanged value is never rewritten. Everything applies at once except the hub
 
 from __future__ import annotations
 
+import tomllib
+from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
 from utils import config as config_mod
+from utils import manifest as mf
 from utils.api_models import Settings
 from utils.services.model import ServiceError
 
@@ -25,8 +29,11 @@ MOD_DEFAULTS = {"enabled": True, "autostart": True}  # manifest.effective()'s de
 
 
 def view(hub: Hub) -> dict[str, Any]:
-    cfg = hub.config
     svcs = hub.services.list() if hub.services else []
+    return _shape(hub.config, svcs, lambda s: s.eff)
+
+
+def _shape(cfg: config_mod.Config, svcs: list[Any], eff: Any) -> dict[str, Any]:
     # Every installed mod appears in `order` and `priority` (the page reorders what it is given):
     # the configured ids first, then the rest in sidebar order. Unchanged, nothing is written.
     rest = lambda ids: list(ids) + [s.id for s in svcs if s.id not in ids]  # noqa: E731
@@ -35,8 +42,8 @@ def view(hub: Hub) -> dict[str, Any]:
         "memory": {"reserve_gb": cfg.memory.reserve_gb, "auto_make_room": cfg.memory.auto_make_room,
                    "never_unload": list(cfg.memory.never_unload), "priority": rest(cfg.memory.priority)},
         "services": {"order": rest(cfg.services.order),
-                     "enabled": {s.id: s.eff.enabled for s in svcs},
-                     "autostart": {s.id: s.eff.autostart for s in svcs}},
+                     "enabled": {s.id: eff(s).enabled for s in svcs},
+                     "autostart": {s.id: eff(s).autostart for s in svcs}},
         "ui": {"theme": cfg.ui.theme, "density": cfg.ui.density, "dashboard": cfg.ui.dashboard.model_dump(),
                "nav": cfg.ui.nav.model_dump()},
         "learning": cfg.learning.model_dump(),
@@ -48,6 +55,23 @@ def view(hub: Hub) -> dict[str, Any]:
         "web": cfg.agent.web.model_dump(),          # [agent.web]: a long page's relevant passages first (webread.py)
         "outputs": cfg.outputs.model_dump(),        # [outputs]: saved web pages' clean-up (plan 30.9)
     }
+
+
+@lru_cache(maxsize=4)
+def _example(path: Path) -> config_mod.Config:
+    """config.example.toml, the defaults everyone gets (plan 23.11), read once per process; GAIFA's own defaults without it."""
+    if not path.is_file():
+        return config_mod.Config()
+    return config_mod.validate(tomllib.loads(path.read_text()), config_mod.EXAMPLE)
+
+
+def defaults(hub: Hub) -> dict[str, Any]:
+    """`GET /api/settings/defaults` (plan settings-redesign 4.1): the `Settings` shape built from config.example.toml, so the
+    page can show each row's default and offer Reset. The installed mods fill `order`, `priority` and the per-mod switches
+    (their manifest's defaults) as `view` does; this machine's config.toml never changes the answer."""
+    ex = _example(hub.paths.root / config_mod.EXAMPLE)
+    svcs = hub.services.list() if hub.services else []
+    return _shape(ex, svcs, lambda s: mf.effective(s.mod, ex))
 
 
 def _invalid(detail: str, field: str | None = None) -> ServiceError:

@@ -1,4 +1,4 @@
-"""11.7: running packs against a fake ComfyUI (and a fake AIHub for memory and outputs)."""
+"""11.7: running packs against a fake ComfyUI (and a fake GAIFA for memory and outputs)."""
 
 import json
 import random
@@ -47,7 +47,7 @@ def env(tmp_path):
         s = Settings.from_env({"COMFY_DATA": str(tmp_path / "data"), "COMFY_OUTPUTS": str(out),
                                "COMFY_WORKFLOWS": str(tmp_path / "wf"), "COMFY_VIEW": str(tmp_path / "view"),
                                "COMFY_INPUT": str(tmp_path / "input"), "COMFY_MODELS": str(tmp_path / "models"),
-                               "COMFY_URL": fake.url, "AIHUB_URL": hub.url,
+                               "COMFY_URL": fake.url, "GAIFA_URL": hub.url,
                                "COMFY_CONTROL": str(fake_control(tmp_path / "comfyui", fake.url))})
         for pid, fx, toml in (("zimage", "zit-workflow", ZIT), ("wan", "wan21-i2v", WAN)):
             d = s.workflows / pid
@@ -106,16 +106,16 @@ def test_upload_and_output_inputs(env):
     job = run(c, {"workflow": "wan", "inputs": {"prompt": "it walks", "image": up["value"], "frames": 33}})
     assert job["state"] == "done" and job["outputs"][0]["kind"] == "video"
     g = fake.prompts[-1]["prompt"]
-    assert g["10"]["inputs"]["image"] == f"aihub/{up['name']}" and g["14"]["inputs"]["length"] == 33
+    assert g["10"]["inputs"]["image"] == f"gaifa/{up['name']}" and g["14"]["inputs"]["length"] == 33
     hub.files["o42"] = ("comfy/2026-10-06/x.png", b"OUT")
     run(c, {"workflow": "wan", "inputs": {"prompt": "again", "image": "output:o42"}})
-    assert fake.prompts[-1]["prompt"]["10"]["inputs"]["image"] == "aihub/o42-x.png"
-    assert (s.input / "aihub" / "o42-x.png").read_bytes() == b"OUT"
+    assert fake.prompts[-1]["prompt"]["10"]["inputs"]["image"] == "gaifa/o42-x.png"
+    assert (s.input / "gaifa" / "o42-x.png").read_bytes() == b"OUT"
     r = c.post("/v1/run", json={"workflow": "wan", "inputs": {"prompt": "x", "image": "output:missing"}})
     assert r.status_code == 422
     first = run(c, {"workflow": "zimage", "inputs": {"prompt": "a still"}})["outputs"][0]["path"]   # "Use as input"
     run(c, {"workflow": "wan", "inputs": {"prompt": "moves", "image": first}})
-    assert fake.prompts[-1]["prompt"]["10"]["inputs"]["image"] == "aihub/" + first.rsplit("/", 1)[1]
+    assert fake.prompts[-1]["prompt"]["10"]["inputs"]["image"] == "gaifa/" + first.rsplit("/", 1)[1]
     assert c.post("/v1/run", json={"workflow": "wan", "inputs": {"prompt": "x", "image": "../etc/passwd"}}).status_code == 422
 
 
@@ -159,7 +159,7 @@ def test_needs_room_is_relayed(env, monkeypatch):
     r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "x"}})
     assert r.status_code == 409 and r.json()["code"] == "needs_room" and r.json()["data"]["plan"]["unload"] == ["gen3d"]
     assert fake.freed >= 1 and len(hub.acquires) == 7     # it freed its own models and kept asking (30 s) before giving up
-    r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "x"}}, headers={"X-AIHub-Make-Room": "1"})
+    r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "x"}}, headers={"X-GAIFA-Make-Room": "1"})
     assert r.status_code == 202 and hub.acquires[-1]["make_room"] == "1"
 
 
@@ -299,7 +299,7 @@ def test_a_file_input_cant_leave_the_input_folder(env, value):
     secret.parent.mkdir(parents=True)
     secret.write_bytes(b"SECRET")
     (s.input.parent / "secret.png").write_bytes(b"SECRET")
-    (s.input / "aihub").mkdir(parents=True, exist_ok=True)
+    (s.input / "gaifa").mkdir(parents=True, exist_ok=True)
     (s.input / "link").symlink_to(secret.parent)                      # a folder link inside input/ that leads out
     hub.files["o42"] = ("comfy/2026-10-06/x.png", b"OUT")
     n = len(fake.prompts)

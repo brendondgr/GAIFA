@@ -15,8 +15,8 @@ from .settings import Settings
 
 log = logging.getLogger("vllm")
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
-NAME_PREFIX = "aihub-vllm-"
-LABEL = "aihub.mod=vllm"
+NAME_PREFIX = "gaifa-vllm-"
+LABEL = "gaifa.mod=vllm"
 MAX_UTILIZATION = 0.95
 
 
@@ -157,7 +157,7 @@ def engine_command(profile: Profile, settings: Settings, gtt_total: int) -> list
     devices, the HF cache and compile caches at the same paths inside, labels for adoption."""
     hf, cache = str(settings.hf_home), str(settings.cache_dir)
     cmd = [settings.podman, "run", "-d", "--name", profile.container,
-           "--label", LABEL, "--label", f"aihub.profile={profile.id}",
+           "--label", LABEL, "--label", f"gaifa.profile={profile.id}",
            "--network", "host", "--ipc", "host",
            "--device", "/dev/kfd", "--device", "/dev/dri", "--group-add", "keep-groups",
            "--security-opt", "label=disable", "--security-opt", "seccomp=unconfined",

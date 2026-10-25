@@ -66,7 +66,7 @@ HINTS: list[Hint] = [
        "your user may not use the GPU device",
        "the groups (video, render): utils/cli_setup_gpu.py's gpu-groups fix"),
     _h("port", r"address already in use|port \d+ is already in use|Errno 98",
-       "a port is taken by another program", "`aihub doctor` names the owner; [services.<id>] port in config.toml"),
+       "a port is taken by another program", "`gaifa doctor` names the owner; [services.<id>] port in config.toml"),
     _h("network", r"Temporary failure in name resolution|Could not resolve host|Connection (refused|timed out|reset)|"
        r"Network is unreachable|SSL(Error|: )|Read timed out|curl: \(\d+\)",
        "a download failed (network, a moved URL, or a server that refused)",

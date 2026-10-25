@@ -1,6 +1,6 @@
 """13.4: the MCP endpoint. Both eras (2026-07-28 per-request `_meta`; the 2025 `initialize` era),
 tool annotations from risk, calls, approvals that can't be skipped (the explanation +
-`aihub_wait_approval`, and the 2026-07-28 `input_required` form), Origin, JSON-RPC errors, and the
+`gaifa_wait_approval`, and the 2026-07-28 `input_required` form), Origin, JSON-RPC errors, and the
 official `mcp` client against a real hub process."""
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ async def test_legacy_initialize_negotiates_and_pings(th):
                                                     "clientInfo": {"name": "t", "version": "1"}})
         assert status == 200 and body["result"]["protocolVersion"] == asked
     res = body["result"]
-    assert res["serverInfo"]["name"] == "aihub" and res["capabilities"] == {"tools": {"listChanged": False}}
+    assert res["serverInfo"]["name"] == "gaifa" and res["capabilities"] == {"tools": {"listChanged": False}}
     _, body = await rpc(th, "initialize", {"protocolVersion": "2024-11-05", "capabilities": {}})
     assert body["result"]["protocolVersion"] == "2025-11-25"
     assert await rpc(th, "notifications/initialized", notify=True) == (202, None)
@@ -62,7 +62,7 @@ async def test_modern_discover_and_envelope_rules(th):
     status, body = await rpc(th, "server/discover", version=MODERN)
     res = body["result"]
     assert status == 200 and res["resultType"] == "complete" and MODERN in res["supportedVersions"]
-    assert res["capabilities"] == {"tools": {}} and res["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "aihub"
+    assert res["capabilities"] == {"tools": {}} and res["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "gaifa"
     status, body = await rpc(th, "tools/list", version=MODERN, headers={"Mcp-Method": "tools/call"})
     assert status == 400 and body["error"]["code"] == -32020
     status, body = await rpc(th, "tools/call", {"name": "hub_list_services"}, version=MODERN, headers={"Mcp-Name": "x"})
@@ -86,10 +86,10 @@ async def test_tools_list_annotations_follow_risk(th):
         get, wipe, make = tools["fake_tools_get_item"], tools["fake_tools_wipe"], tools["fake_tools_make_image"]
         assert get["annotations"]["readOnlyHint"] is True and get["annotations"]["destructiveHint"] is False
         assert wipe["annotations"]["readOnlyHint"] is False and wipe["annotations"]["destructiveHint"] is True
-        assert make["annotations"]["readOnlyHint"] is False and make["_meta"]["aihub/ask"] == ["aspect", "steps"]
+        assert make["annotations"]["readOnlyHint"] is False and make["_meta"]["gaifa/ask"] == ["aspect", "steps"]
         assert make["title"] == "Fake Tools: make image" and make["inputSchema"]["properties"]["aspect"]["enum"]
         assert "Example arguments" in make["description"]
-        assert tools["aihub_wait_approval"]["annotations"]["readOnlyHint"] is True and "hub_list_services" in tools
+        assert tools["gaifa_wait_approval"]["annotations"]["readOnlyHint"] is True and "hub_list_services" in tools
     assert body["result"]["resultType"] == "complete" and body["result"]["cacheScope"] == "private"
     _, body = await rpc(th, "tools/list", version="2025-03-26")
     assert "title" not in body["result"]["tools"][0] and "resultType" not in body["result"]
@@ -110,36 +110,36 @@ async def test_read_tool_runs_and_returns_json(th):
 async def test_ask_tool_waits_for_the_user_then_wait_approval_returns_the_result(th):
     res = await call(th, "fake_tools_make_image", {"prompt": "x"}, version="2025-06-18",
                      headers={"User-Agent": "claude-code/9.9"})
-    ap = res["_meta"]["aihub/approval"]
+    ap = res["_meta"]["gaifa/approval"]
     assert res["isError"] is False and res["structuredContent"]["status"] == "needs_approval"
     assert ap["approval_id"].startswith("ap_") and ap["arguments"] == {"prompt": "x"} and ap["ask_fields"] == ["aspect", "steps"]
-    assert "has not run" in text(res) and "aihub_wait_approval" in text(res)
+    assert "has not run" in text(res) and "gaifa_wait_approval" in text(res)
     assert not list((th.root / "outputs").rglob("*.png"))   # nothing ran
     pending = (await th.client.get("/api/approvals")).json()
     assert [a["id"] for a in pending] == [ap["approval_id"]]
     assert pending[0]["origin"] == {"service": "mcp", "client": "claude-code/9.9"}
     # calling again doesn't skip it: another approval, still nothing run
     again = await call(th, "fake_tools_make_image", {"prompt": "x"})
-    assert again["_meta"]["aihub/approval"]["approval_id"] != ap["approval_id"]
+    assert again["_meta"]["gaifa/approval"]["approval_id"] != ap["approval_id"]
     assert len((await th.client.get("/api/approvals")).json()) == 2 and not list((th.root / "outputs").rglob("*.png"))
     # waiting doesn't approve
-    res = await call(th, "aihub_wait_approval", {"approval_id": ap["approval_id"], "wait": 0.6})
+    res = await call(th, "gaifa_wait_approval", {"approval_id": ap["approval_id"], "wait": 0.6})
     assert res["isError"] is False and "Still waiting" in text(res)
     assert (await th.client.get(f"/api/approvals/{ap['approval_id']}")).json()["state"] == "pending"
-    # the user approves in AIHub (with an edit); the wait tool returns the call's result
+    # the user approves in GAIFA (with an edit); the wait tool returns the call's result
     r = await th.client.post(f"/api/approvals/{ap['approval_id']}?wait=0", json={"approve": True, "arguments": {"prompt": "x", "aspect": "16:9"}})
     assert r.status_code == 200
-    res = await call(th, "aihub_wait_approval", {"approval_id": ap["approval_id"], "wait": 20}, version="2025-06-18")
+    res = await call(th, "gaifa_wait_approval", {"approval_id": ap["approval_id"], "wait": 20}, version="2025-06-18")
     assert res["isError"] is False, text(res)
     body = json.loads(text(res))
     assert body["result"]["aspect"] == "16:9" and body["outputs"][0]["kind"] == "image"
     assert [c for c in res["content"] if c["type"] == "resource_link"][0]["uri"].startswith("http://hub/api/outputs/")
     # a denied one
-    other = again["_meta"]["aihub/approval"]["approval_id"]
+    other = again["_meta"]["gaifa/approval"]["approval_id"]
     await th.client.post(f"/api/approvals/{other}", json={"approve": False, "reason": "not now"})
-    res = await call(th, "aihub_wait_approval", {"approval_id": other, "wait": 5})
+    res = await call(th, "gaifa_wait_approval", {"approval_id": other, "wait": 5})
     assert res["isError"] is True and "not now" in text(res)
-    res = await call(th, "aihub_wait_approval", {"approval_id": "ap_nope", "wait": 0})
+    res = await call(th, "gaifa_wait_approval", {"approval_id": "ap_nope", "wait": 0})
     assert res["isError"] is True and "not_found" in text(res)
 
 
@@ -152,7 +152,7 @@ async def test_modern_input_required_form_is_the_parameter_card(th):
     assert el["method"] == "elicitation/create" and el["params"]["mode"] == "form"
     props = el["params"]["requestedSchema"]["properties"]
     assert set(props) == {"aspect", "steps"} and props["aspect"]["default"] == "1:1" and "16:9" in props["aspect"]["enum"]
-    aid = res["_meta"]["aihub/approval"]["approval_id"]
+    aid = res["_meta"]["gaifa/approval"]["approval_id"]
     assert not list((th.root / "outputs").rglob("*.png"))
     # a retry without an answer asks again; a tampered or mismatched state is refused
     params = {"name": "fake_tools_make_image", "arguments": args, "requestState": res["requestState"]}
@@ -182,7 +182,7 @@ async def test_modern_input_required_form_is_the_parameter_card(th):
                                                 "requestState": res["requestState"],
                                                 "inputResponses": {"approval": {"action": "decline"}}}, version=MODERN, caps=caps)
     assert body["result"]["isError"] is True
-    assert (await th.client.get(f"/api/approvals/{res['_meta']['aihub/approval']['approval_id']}")).json()["state"] == "denied"
+    assert (await th.client.get(f"/api/approvals/{res['_meta']['gaifa/approval']['approval_id']}")).json()["state"] == "denied"
     # a modern client without elicitation gets the explanation instead
     res = await call(th, "fake_tools_make_image", {"prompt": "c"}, version=MODERN)
     assert res["resultType"] == "complete" and res["structuredContent"]["status"] == "needs_approval"
@@ -234,7 +234,7 @@ def test_the_mcp_client_lists_and_calls_hub_tools(hub_process):
     for mode, version in (("auto", "2026-07-28"), ("legacy", "2025-11-25")):
         out = runs[mode]
         assert out["version"] == version
-        assert {"hub_list_services", "hub_job_status", "aihub_wait_approval"} <= out["names"], out["names"]
+        assert {"hub_list_services", "hub_job_status", "gaifa_wait_approval"} <= out["names"], out["names"]
         assert out["listed"].is_error is False and "result" in json.loads(out["listed"].content[0].text)
         ask = out["ask"]   # no elicitation: the explanation; nothing ran
         assert ask.is_error is False and "has not run" in ask.content[0].text

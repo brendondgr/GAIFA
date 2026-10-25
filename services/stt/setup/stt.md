@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "stt"
 title = "Speech to Text (faster-whisper)"
 models = ["stt/**"]
@@ -7,11 +7,11 @@ summary = "Speech to text: transcribe audio and video files, live dictation and 
 gpu = false
 disk_gb = 0.75
 needs = ["uv", "curl", "unzip", "ffmpeg"]
-check = "aihub check stt --start"
-smoke = "aihub start stt >/dev/null && curl -fsS -X POST -H 'content-type: application/json' -d '{\"preset\": \"fast\"}' \"$(aihub url api/s/stt/v1/load)\" >/dev/null && curl -fsS \"$(aihub url api/s/stt/v1/status)\" | tee /dev/stderr | grep -q '\"loaded\": *true'"   # plan 39: real work, run by aihub setup --smoke and the field test
+check = "gaifa check stt --start"
+smoke = "gaifa start stt >/dev/null && curl -fsS -X POST -H 'content-type: application/json' -d '{\"preset\": \"fast\"}' \"$(gaifa url api/s/stt/v1/load)\" >/dev/null && curl -fsS \"$(gaifa url api/s/stt/v1/status)\" | tee /dev/stderr | grep -q '\"loaded\": *true'"   # plan 39: real work, run by gaifa setup --smoke and the field test
 
 [[steps]]
-run = "aihub install stt"
+run = "gaifa install stt"
 what = "makes .venv/ (Python 3.14, about 250 MB), then for the variant: ROCm puts the ROCm build of CTranslate2 in (its release zip with curl and unzip, about 400 MB, from GitHub, unless a wheel is kept in runtime/wheels/; it needs host.md's ROCm packages), CUDA adds NVIDIA's cuBLAS and cuDNN 9 pip packages (about 1 GB), the CPU needs nothing more"
 
 [[suggest]]
@@ -87,7 +87,7 @@ Read from this machine on 2026-10-20 (Radeon 8060S, gfx1151, Fedora 44):
 ## Install
 
 ```bash
-aihub install stt
+gaifa install stt
 ```
 
 Runs `install.sh`: makes `.venv/` with uv-managed Python 3.14 from `requirements-dev.txt` (about 250 MB, a minute), then, on a machine with `/dev/kfd`, reinstalls CTranslate2 from the ROCm wheel kept in `runtime/wheels/` (gitignored). When no wheel is kept there it downloads `rocm-python-wheels-Linux.zip` (about 400 MB) from the [CTranslate2 v4.8.1 release](https://github.com/OpenNMT/CTranslate2/releases/tag/v4.8.1) and keeps the `cp314-cp314` wheel.
@@ -125,7 +125,7 @@ On the CPU every model runs at int8.
 ## Check it works
 
 ```bash
-aihub check stt --start
+gaifa check stt --start
 ```
 
 Starts the mod if it's stopped (a stopped mod's live checks are skipped), then checks it. Expect `all checks passed`. Then the tests (the GPU test loads `small` and unloads it):
@@ -144,7 +144,7 @@ Expect `small on the GPU: 25.3 s of audio in 0.9 s, real-time factor 0.036` or c
 cd services/stt && .venv/bin/python -c "import ctranslate2; print(ctranslate2.get_cuda_device_count())"
 ```
 
-Expect `1`; `0` means the PyPI build is installed (rerun `aihub install stt`).
+Expect `1`; `0` means the PyPI build is installed (rerun `gaifa install stt`).
 
 ## What to look for
 
@@ -153,11 +153,11 @@ Expect `1`; `0` means the PyPI build is installed (rerun `aihub install stt`).
 - **A GPU fault costs a restart, not the server.** `GET /v1/status` → `engine.notices` lists each restart; after three in ten minutes `engine.fell_back` is true and `device` is `cpu`.
 - **Garbage text in many languages at 10–30× the normal time** means the GPU's arithmetic is wrong, not the model: on 2026-10-20 it appeared together with a kernel oops and btrfs checksum errors, and a clean run of the same file minutes earlier. Check `journalctl -k -b` before blaming the mod.
 - **One model at a time, and a model in use stays.** An open live stream or a running file job holds its model: asking for another one answers `409 busy` (`/v1/load`) or closes the stream with 4409 `busy`, and a queued job waits in stage `waiting` until the stream ends. `POST /v1/unload` still unloads; a stream that is still open loads the model again on its next word.
-- **AIHub's GPU slot** (`[gpu]`, `stt/gpu.py`, plan 31.3). A file job on the GPU waits in stage `waiting_gpu` (state `queued`, with `ahead` and `eta_s`) while another mod's work holds the GPU. Live dictation never waits: when another mod holds the slot at its start, it runs on the CPU (`small` at most, int8; `ready.reason` says why); otherwise it holds an `interactive` lease and, once another mod's work waits, loads the CPU model, moves to it between two frames (`{"type": "device", "device": "cpu", "reason"}`) and gives the slot back. `GET /v1/status` → `streams` lists each open stream's device and reason.
+- **GAIFA's GPU slot** (`[gpu]`, `stt/gpu.py`, plan 31.3). A file job on the GPU waits in stage `waiting_gpu` (state `queued`, with `ahead` and `eta_s`) while another mod's work holds the GPU. Live dictation never waits: when another mod holds the slot at its start, it runs on the CPU (`small` at most, int8; `ready.reason` says why); otherwise it holds an `interactive` lease and, once another mod's work waits, loads the CPU model, moves to it between two frames (`{"type": "device", "device": "cpu", "reason"}`) and gives the slot back. `GET /v1/status` → `streams` lists each open stream's device and reason.
 - **Uploads wait in `runtime/tmp/`** (up to 4 GB each) until their job ends, cancelled or not. At most 8 wait at once (then `429 queue_full`); a full disk answers `507 no_space`; files older than an hour are swept when the mod starts.
 - Whisper invents text over silence ("thank you", "bye"). The ported hallucination filter (`stt/asr/hallucination.py`) and Whisper's own VAD filter drop it; a silent file gives an empty transcript.
 
 ## Known gaps
 
-- `aihub install stt` doesn't check the ROCm packages; a missing `libhiprand.so.1` shows up as the CPU being used.
+- `gaifa install stt` doesn't check the ROCm packages; a missing `libhiprand.so.1` shows up as the CPU being used.
 - The wheel is pinned to CTranslate2 4.8.1 and Python 3.14; a newer faster-whisper that needs another CTranslate2 needs a new wheel.

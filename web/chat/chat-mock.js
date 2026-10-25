@@ -252,7 +252,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
     if (/^(please\s+)?(search|look up)\b|\b(the web|sources?)\b/i.test(text)) return webTurn(t, run, text, { emit, say, usage, rid });   // the reply bar's Sources
     if (/\b3d\b/i.test(text) && /then|and turn|into/i.test(text)) return chainTurn(t, run, text);
     if (/image|picture|photo|draw|fox|paint/i.test(text)) return imageTurn(t, run, text);
-    if (/\b(chart|graph|plot|table|stats)\b/i.test(text)) {          // show: a chart, a table and AIHub's own data (plan 47.2)
+    if (/\b(chart|graph|plot|table|stats)\b/i.test(text)) {          // show: a chart, a table and GAIFA's own data (plan 47.2)
       const s = await say(t, run, 'Here is what you made this week, and how memory looked today.', 'Use show: inline numbers, a table, and hub:memory.', 2);
       const shows = [
         { view: 'bar', title: 'Made per day', x: ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'], series: [{ name: 'Images', values: [4, 7, 2, 0, 9, 5, 6] }, { name: 'Speech', values: [1, 0, 3, 2, 1, 4, 2] }] },
@@ -286,7 +286,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
     }
     if (/^(please\s+)?(say|speak|read|narrate)\b/i.test(text)) {     // a speech step with its live card (plan 45.4)
       const s = await say(t, run, 'Here it is in that voice.', 'Speak it with tts_speak.', 2);
-      const cid = rid('tc_'), sargs = { text: 'Welcome to AIHub.\nEvery model on this machine, in one place.\nPictures, video, 3D and speech.\nAsk for anything.', name: 'Hope' };
+      const cid = rid('tc_'), sargs = { text: 'Welcome to GAIFA.\nEvery model on this machine, in one place.\nPictures, video, 3D and speech.\nAsk for anything.', name: 'Hope' };
       emit(t, 'tool_call', { id: cid, name: 'tts_speak', arguments: sargs, step: s, by: 'model' });
       await runTool(t, run, cid, 'tts_speak', sargs);
       usage(t);
@@ -343,7 +343,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       emit(t, 'assistant', { text: `Here it is (#${out.n}). I can animate it, make a 3D model from it, or remove the background.`, step: rid('s_'), model: 'skynet' });
       usage(t); t.thread.state = 'idle'; t.thread.updated = now() - 3600;
       const old = newThread({ title: 'Narrate the product blurb' });
-      emit(old, 'user', { text: 'Read this in Brendon’s voice: “AIHub runs every model on this machine.”' });
+      emit(old, 'user', { text: 'Read this in Brendon’s voice: “GAIFA runs every model on this machine.”' });
       emit(old, 'assistant', { text: 'Done: the clip is below.', step: rid('s_'), model: 'skynet' });
       old.thread.updated = now() - 86400 * 2; old.thread.archived = true;
     })();

@@ -10,7 +10,7 @@ const ORDER = ['prompt', 'prompt_2', 'negative', 'image', 'image_2', 'image_3', 
 const ADVANCED = ['width', 'height', 'megapixels', 'frames', 'fps', 'seed', 'steps', 'cfg'];
 const some = (...a) => a.filter(x => x != null && x !== false);   // replaceChildren would print null
 const JOB_TONE = { done: 'green', failed: 'red', cancelled: 'dim', running: 'accent', queued: 'dim' };
-// Plan 31.3: a run waiting for AIHub's GPU slot (another mod's work runs first).
+// Plan 31.3: a run waiting for GAIFA's GPU slot (another mod's work runs first).
 const gpuWait = j => {
   if (j.stage !== 'waiting_gpu') return null;
   const a = (j.ahead || [])[0], eta = j.eta_s > 0 ? (j.eta_s >= 90 ? `, about ${Math.round(j.eta_s / 60)} min` : `, about ${Math.round(j.eta_s)} s`) : '';

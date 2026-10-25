@@ -1,5 +1,5 @@
 # Web: search the web through SearXNG and read pages as outputs (plan Phase 26).
-# Fields: docs/mods.md and architecture §4.3. SearXNG runs outside AIHub (setup/web.md).
+# Fields: docs/mods.md and architecture §4.3. SearXNG runs outside GAIFA (setup/web.md).
 id = "web"
 name = "Web"
 description = "Web search through SearXNG; pages saved as outputs"

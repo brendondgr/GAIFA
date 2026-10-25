@@ -1,5 +1,5 @@
-"""lcpp as AIHub's `lcpp` mod: the models folder (LCPP_MODELS_DIR), memory acquire before a launch,
-downloads registered in AIHub, and /api/status. Without AIHUB_URL none of it does anything."""
+"""lcpp as GAIFA's `lcpp` mod: the models folder (LCPP_MODELS_DIR), memory acquire before a launch,
+downloads registered in GAIFA, and /api/status. Without GAIFA_URL none of it does anything."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from lcpp import aihub
+from lcpp import gaifa
 from lcpp.catalog import Catalog
 from lcpp.instances import LcppError
 from lcpp.paths import Paths
@@ -45,13 +45,13 @@ def _hub(handler):
     return httpx.MockTransport(handler)
 
 
-def test_acquire_is_a_no_op_without_aihub(monkeypatch):
-    monkeypatch.delenv("AIHUB_URL", raising=False)
-    assert asyncio.run(aihub.acquire(10, False, "x")) is None
+def test_acquire_is_a_no_op_without_gaifa(monkeypatch):
+    monkeypatch.delenv("GAIFA_URL", raising=False)
+    assert asyncio.run(gaifa.acquire(10, False, "x")) is None
 
 
-def test_acquire_asks_aihub_and_turns_a_409_into_needs_room(monkeypatch):
-    monkeypatch.setenv("AIHUB_URL", "http://hub")
+def test_acquire_asks_gaifa_and_turns_a_409_into_needs_room(monkeypatch):
+    monkeypatch.setenv("GAIFA_URL", "http://hub")
     seen = []
 
     def handler(req: httpx.Request):
@@ -61,33 +61,33 @@ def test_acquire_asks_aihub_and_turns_a_409_into_needs_room(monkeypatch):
         return httpx.Response(409, json={"detail": "Needs 20 GB", "code": "needs_room",
                                          "data": {"plan": {"unload": [{"id": "tts", "frees_bytes": 13e9}], "enough": True}}})
     with pytest.raises(LcppError) as e:
-        asyncio.run(aihub.acquire(20_000, False, "launch a", transport=_hub(handler)))
+        asyncio.run(gaifa.acquire(20_000, False, "launch a", transport=_hub(handler)))
     assert e.value.code == "needs_room" and e.value.status == 409 and e.value.data["plan"]["unload"][0]["id"] == "tts"
-    assert asyncio.run(aihub.acquire(20_000, True, "launch a", transport=_hub(handler)))["freed"] == ["tts"]
+    assert asyncio.run(gaifa.acquire(20_000, True, "launch a", transport=_hub(handler)))["freed"] == ["tts"]
     assert seen[0][0] == "/api/memory/acquire" and seen[0][2] == {"service": "lcpp", "needs_bytes": 20000, "reason": "launch a"}
     assert seen[1][1] == {"make_room": "1"}
 
 
 def test_an_unreachable_hub_does_not_block_a_launch(monkeypatch):
-    monkeypatch.setenv("AIHUB_URL", "http://hub")
+    monkeypatch.setenv("GAIFA_URL", "http://hub")
 
     def handler(req):
         raise httpx.ConnectError("refused")
-    assert asyncio.run(aihub.acquire(1, False, "x", transport=_hub(handler))) is None
+    assert asyncio.run(gaifa.acquire(1, False, "x", transport=_hub(handler))) is None
 
 
-def test_a_download_is_registered_in_aihub(monkeypatch, tmp_path):
+def test_a_download_is_registered_in_gaifa(monkeypatch, tmp_path):
     models = tmp_path / "data/models"
     dest = models / "llm/Mini-1B"
     dest.mkdir(parents=True)
-    monkeypatch.setenv("AIHUB_URL", "http://hub")
-    monkeypatch.setenv("AIHUB_MODELS", str(models))
+    monkeypatch.setenv("GAIFA_URL", "http://hub")
+    monkeypatch.setenv("GAIFA_MODELS", str(models))
     bodies = []
 
     def handler(req):
         bodies.append(json.loads(req.content))
         return httpx.Response(201, json={"id": "mini-1b"})
-    warn = asyncio.run(aihub.register_download(dest, model_id="Mini-1B", name="Mini-1B", repo="o/Mini-GGUF", revision="main",
+    warn = asyncio.run(gaifa.register_download(dest, model_id="Mini-1B", name="Mini-1B", repo="o/Mini-GGUF", revision="main",
                                                files=[(dest / "Mini-1B.Q4_K_M.gguf", "ab" * 32), (dest / "mmproj.gguf", None)],
                                                transport=_hub(handler)))
     assert warn is None
@@ -99,15 +99,15 @@ def test_a_download_is_registered_in_aihub(monkeypatch, tmp_path):
 
     def refuse(req):
         return httpx.Response(409, json={"detail": "already registered", "code": "conflict"})
-    assert "already registered" in asyncio.run(aihub.register_download(dest, model_id=None, name="x", repo="o/r", revision="main",
+    assert "already registered" in asyncio.run(gaifa.register_download(dest, model_id=None, name="x", repo="o/r", revision="main",
                                                                       files=[], transport=_hub(refuse)))
 
 
-def test_the_relay_links_to_the_aihub_page(monkeypatch):
-    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:7000")
-    assert aihub.page_url() == "http://127.0.0.1:7000/#/s/lcpp"
-    monkeypatch.delenv("AIHUB_URL")
-    assert aihub.page_url() is None
+def test_the_relay_links_to_the_gaifa_page(monkeypatch):
+    monkeypatch.setenv("GAIFA_URL", "http://127.0.0.1:7000")
+    assert gaifa.page_url() == "http://127.0.0.1:7000/#/s/lcpp"
+    monkeypatch.delenv("GAIFA_URL")
+    assert gaifa.page_url() is None
 
 
 def test_status_and_needs_room_through_the_api(fake_home, monkeypatch):
@@ -122,7 +122,7 @@ def test_status_and_needs_room_through_the_api(fake_home, monkeypatch):
         if not make_room:
             raise LcppError("needs_room", "Needs 9 GB", 409, data={"plan": {"enough": True, "unload": []}})
         return {"granted": True}
-    monkeypatch.setattr(aihub, "acquire", acquire)
+    monkeypatch.setattr(gaifa, "acquire", acquire)
     with TestClient(create_app(fake_home, SubprocessBackend(fake_home.state / "logs"))) as c:
         s = c.get("/api/status").json()
         assert s["loaded"] is False and s["busy"] is False and s["jobs"] == []
@@ -130,7 +130,7 @@ def test_status_and_needs_room_through_the_api(fake_home, monkeypatch):
         assert s["stats"][1]["value"] == 5 and s["stats"][2]["unit"] == "GB"
         r = c.post("/api/instances", json={"model_id": "minicpm-5-2B", "port": 17072})
         assert r.status_code == 409 and r.json()["code"] == "needs_room" and r.json()["data"]["plan"]["enough"] is True
-        r = c.post("/api/instances", json={"model_id": "minicpm-5-2B", "port": 17072}, headers={"X-AIHub-Make-Room": "1"})
+        r = c.post("/api/instances", json={"model_id": "minicpm-5-2B", "port": 17072}, headers={"X-GAIFA-Make-Room": "1"})
         assert r.status_code == 201, r.text
         assert calls == [False, True]
         c.post("/api/instances/stop-all")

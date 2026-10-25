@@ -2,10 +2,10 @@
 with sidecars, cancel. Runs are rows in comfy.db; a run that was going when the adapter restarted is
 finished from ComfyUI's history.
 
-The GPU slot (plan 31.3): a run takes AIHub's slot (`gpu_slot.py`) before it asks for memory and queues
+The GPU slot (plan 31.3): a run takes GAIFA's slot (`gpu_slot.py`) before it asks for memory and queues
 its prompt, and holds it until the prompt finishes, fails or is cancelled. A run that has to wait is
 answered at once as `queued` with `stage: "waiting_gpu"` (`ahead`, `eta_s`); a request that carries
-`X-AIHub-GPU-Lease` (gen3d handing over TRELLIS.2 or SAM 3D Body) runs under that lease instead."""
+`X-GAIFA-GPU-Lease` (gen3d handing over TRELLIS.2 or SAM 3D Body) runs under that lease instead."""
 
 from __future__ import annotations
 
@@ -104,8 +104,8 @@ class Runner:
             raise InputError(f"{workflow} has problems: " + "; ".join(i.detail for i in errors), [i.detail for i in errors])
         schema = input_schema(pack, conv, lib.catalog, lib.tasks)
         values = resolve(pack, schema, inputs, preset)
-        files = {k for k, p in schema["properties"].items() if p.get("format") == "aihub-file" or
-                 (p.get("type") == "array" and (p.get("items") or {}).get("format") == "aihub-file")}
+        files = {k for k, p in schema["properties"].items() if p.get("format") == "gaifa-file" or
+                 (p.get("type") == "array" and (p.get("items") or {}).get("format") == "gaifa-file")}
         for k in files & set(values):
             values[k] = await self.materialize(values[k])
         label = str(values.get("prompt") or pack.name)[:80]
@@ -143,7 +143,7 @@ class Runner:
                 add()
                 done = self.events[rid]
                 try:
-                    r = await self.client.prompt(graph, self.client_id, {"extra_pnginfo": {"aihub": {"workflow": pack.id, "run": rid}}})
+                    r = await self.client.prompt(graph, self.client_id, {"extra_pnginfo": {"gaifa": {"workflow": pack.id, "run": rid}}})
                 except ComfyError as e:
                     self.db.update_run(rid, state="failed", error=_node_errors(e.data) or e.detail, finished=time.time())
                     self._done(rid)
@@ -174,7 +174,7 @@ class Runner:
     async def _prepare(self, pack, needs: float, make_room: bool) -> None:
         """Memory (after the slot: holding a reservation while waiting would unload others for nothing), ComfyUI up."""
         if self.last_pack and self.last_pack != pack.id and await self.client.up():
-            # Another workflow's models are still loaded: free them, so AIHub sees the room and this
+            # Another workflow's models are still loaded: free them, so GAIFA sees the room and this
             # run's measured peak is its own (not the two added together).
             log.info("switching %s → %s: freeing ComfyUI's models first", self.last_pack, pack.id)
             await self.client.free()
@@ -183,7 +183,7 @@ class Runner:
         try:
             await self.acquire(needs, make_room, f"{pack.name}")
         except NeedsRoom:
-            # ComfyUI may still hold models AIHub counts as used: free them (this mod can't be
+            # ComfyUI may still hold models GAIFA counts as used: free them (this mod can't be
             # unloaded to make room for itself) and ask again while the memory comes back (up to 30 s).
             if not await self.client.up():
                 raise
@@ -241,7 +241,7 @@ class Runner:
                 r = await c.post(f"{self.s.hub_url}/api/memory/acquire", params={"make_room": "1"} if make_room else None,
                                  json={"service": "comfy", "needs_bytes": int(gb * 1e9), "reason": reason})
         except httpx.HTTPError as e:
-            log.warning("AIHub not reachable for memory acquire (%s); running anyway", e)
+            log.warning("GAIFA not reachable for memory acquire (%s); running anyway", e)
             return
         if r.status_code == 409:
             body = r.json()
@@ -261,11 +261,11 @@ class Runner:
             raise InputError(f"{v!r}: {OUTSIDE}")
         if v.startswith("upload:"):
             name = v[len("upload:"):]
-            if not inside(inp / "aihub", name):
+            if not inside(inp / "gaifa", name):
                 raise InputError(f"{v!r}: {OUTSIDE}")
-            if not (inp / "aihub" / name).is_file():
+            if not (inp / "gaifa" / name).is_file():
                 raise InputError(f"no uploaded file {name!r}")
-            return f"aihub/{name}"
+            return f"gaifa/{name}"
         oid = v[len("output:"):] if v.startswith("output:") else None
         if oid is None and v.startswith("/api/outputs/"):
             oid = v.split("/")[3]
@@ -273,7 +273,7 @@ class Runner:
             raise InputError(f"{v!r}: not an output id (output:<id>, as hub_search_outputs or a job's result gives it)")
         if oid:
             if not self.s.hub_url:
-                raise InputError("output ids need AIHub")
+                raise InputError("output ids need GAIFA")
             async with httpx.AsyncClient(timeout=60) as c:
                 meta = await c.get(f"{self.s.hub_url}/api/outputs/{oid}")
                 if meta.status_code != 200:
@@ -282,24 +282,24 @@ class Runner:
             if r.status_code != 200:
                 raise InputError(f"output {oid!r}: its file couldn't be read ({r.status_code})")
             name = f"{oid}-{Path(meta.json().get('main') or meta.json().get('path') or 'image.png').name}"
-            (inp / "aihub").mkdir(parents=True, exist_ok=True)
-            (inp / "aihub" / name).write_bytes(r.content)
-            return f"aihub/{name}"
+            (inp / "gaifa").mkdir(parents=True, exist_ok=True)
+            (inp / "gaifa" / name).write_bytes(r.content)
+            return f"gaifa/{name}"
         p = Path(v)
         if p.is_absolute():
             outputs_root = self.s.outputs.parent.resolve()
             if not p.resolve().is_relative_to(outputs_root) or not p.is_file():
-                raise InputError(f"{v}: only files under AIHub's outputs can be used")
-            (inp / "aihub").mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(p, inp / "aihub" / p.name)
-            return f"aihub/{p.name}"
+                raise InputError(f"{v}: only files under GAIFA's outputs can be used")
+            (inp / "gaifa").mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(p, inp / "gaifa" / p.name)
+            return f"gaifa/{p.name}"
         if not inside(inp, v):
             raise InputError(f"{v!r}: {OUTSIDE}")
         rel = self.s.outputs.parent / v                    # a result's path, as jobs report it ("comfy/<date>/…")
         if inside(self.s.outputs.parent, v) and rel.is_file():
-            (inp / "aihub").mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(rel, inp / "aihub" / p.name)
-            return f"aihub/{p.name}"
+            (inp / "gaifa").mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(rel, inp / "gaifa" / p.name)
+            return f"gaifa/{p.name}"
         if (inp / v).is_file():
             return v
         raise InputError(f"{v!r}: not an output id (output:<id>), an upload (upload:<name>) or a file in ComfyUI's input folder")

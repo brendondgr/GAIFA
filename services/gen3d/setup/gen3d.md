@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "gen3d"
 title = "3D Generate: the server, the image and the runtimes"
 models = []
@@ -12,7 +12,7 @@ after = ["comfyui"]
 check = "out=$(.venv/bin/python -m gen3d.doctor); for l in 'podman' 'ROCm image' 'upstream clone' 'CubePart code' 'worker venv'; do grep -Eq \"ok +$l\" <<<\"$out\" || exit 1; done; ! grep 'image engine)' <<<\"$out\" | grep -q ' runtime/'"
 
 [[steps]]
-run = "aihub install gen3d"
+run = "gaifa install gen3d"
 what = "makes .venv/ in this folder with Python 3.12 from requirements.txt: the server only (about 50 MB, a minute)"
 
 [[steps]]
@@ -35,7 +35,7 @@ needs = ["git", "uv", "python3", "g++"]
 note = "built on the host with PyTorch's CUDA build (about 8 GB, pytorch3d from source)"
 check = "out=$(.venv/bin/python -m gen3d.doctor); for l in 'upstream clone' 'CubePart code' 'worker venv'; do grep -Eq \"ok +$l\" <<<\"$out\" || exit 1; done"
 steps = [
-  { run = "aihub install gen3d", what = "makes .venv/ in this folder with Python 3.12 from requirements.txt: the server only (about 50 MB, a minute)" },
+  { run = "gaifa install gen3d", what = "makes .venv/ in this folder with Python 3.12 from requirements.txt: the server only (about 50 MB, a minute)" },
   { run = "scripts/install-runtime.sh --accel cuda", what = "clones every local engine's code at its pinned commit and builds the three worker venvs on the host (Python 3.13, PyTorch from the CUDA index, the same locks; pytorch3d from source, about 10 min)" },
 ]
 -->
@@ -55,7 +55,7 @@ The 3D Generate mod (`gen3d`, port 5050) has a server and GPU workers. The serve
 | SAM 3D Objects (one picture, the quickest) | [sam3do.md](sam3do.md) | here, `runtime/sam3do/` |
 | TRELLIS.2, SAM 3D Body | [ComfyUI](../../comfy/setup/comfyui.md) | ComfyUI packs in the comfy mod |
 
-**Licences:** `install-runtime.sh` always clones the code of all three local engines, each under its own licence (Roblox's Cube3D Research-Only RAIL-MS, Tencent's Hunyuan 3D 2.1 Community License, Meta's SAM Licence). Each applies when you use that engine; its setup quotes it and asks before downloading its weights. Choosing `gen3d` in `aihub setup` means the mod: this base and every engine, each asking its licence question first; a "no" skips only that engine (`--decline gen3d-cubeart/1`), so declining all three leaves the base, which with ComfyUI still runs TRELLIS.2 and SAM 3D Body. One engine alone is its setup id (`gen3d-cubeart`, `gen3d-img3d`, `gen3d-sam3do`), which brings the base along.
+**Licences:** `install-runtime.sh` always clones the code of all three local engines, each under its own licence (Roblox's Cube3D Research-Only RAIL-MS, Tencent's Hunyuan 3D 2.1 Community License, Meta's SAM Licence). Each applies when you use that engine; its setup quotes it and asks before downloading its weights. Choosing `gen3d` in `gaifa setup` means the mod: this base and every engine, each asking its licence question first; a "no" skips only that engine (`--decline gen3d-cubeart/1`), so declining all three leaves the base, which with ComfyUI still runs TRELLIS.2 and SAM 3D Body. One engine alone is its setup id (`gen3d-cubeart`, `gen3d-img3d`, `gen3d-sam3do`), which brings the base along.
 
 ## Tested with
 
@@ -73,15 +73,15 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 
 - [host.md](../../../docs/setup/host.md): podman, the `video` and `render` groups, the kernel settings in [§1](../../../docs/setup/host.md#1-let-the-gpu-use-the-memory) with the IOMMU on, and optionally Blender at `~/.local/bin/blender` for previews.
 - git, uv, and about 6.5 GB for the server and the venvs (the image is 15.1 GB more, counted once with ComfyUI's).
-- [ComfyUI](../../comfy/setup/comfyui.md) first (`after = ["comfyui"]`): two of 3D Generate's engines, TRELLIS.2 and SAM 3D Body, run as ComfyUI packs in the comfy mod, and its setup pulls the image this one shares. So choosing 3D Generate in `aihub setup` sets up ComfyUI too.
+- [ComfyUI](../../comfy/setup/comfyui.md) first (`after = ["comfyui"]`): two of 3D Generate's engines, TRELLIS.2 and SAM 3D Body, run as ComfyUI packs in the comfy mod, and its setup pulls the image this one shares. So choosing 3D Generate in `gaifa setup` sets up ComfyUI too.
 
 ## Install
 
 ```bash
-aihub install gen3d
+gaifa install gen3d
 ```
 
-Runs `aihub-install.sh`: makes `.venv/` with Python 3.12 from `requirements.txt` (the server only).
+Runs `gaifa-install.sh`: makes `.venv/` with Python 3.12 from `requirements.txt` (the server only).
 
 ```bash
 podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest || { podman pull docker.io/kyuz0/amd-strix-halo-comfyui@sha256:0066678ae9043f69a1c8c7699e70626ceffd35c1a8ca03227a05640ad0241ed2 && podman tag docker.io/kyuz0/amd-strix-halo-comfyui@sha256:0066678ae9043f69a1c8c7699e70626ceffd35c1a8ca03227a05640ad0241ed2 docker.io/kyuz0/amd-strix-halo-comfyui:latest; }
@@ -101,7 +101,7 @@ None here: each engine runs fixed weights, chosen in its own setup ([cubeart.md]
 
 ### On other machines (plan 39.7)
 
-The engines run on ROCm or CUDA only: SAM 3D's extensions (spconv, gsplat, kaolin) are CUDA projects, and the shims in `workers/shims/` stand in for them on both. On a machine with an NVIDIA GPU (Linux or WSL2), `aihub setup gen3d` picks the CUDA variant: `scripts/install-runtime.sh --accel cuda` builds the three worker venvs **on the host** (Python 3.13 from uv, PyTorch from the CUDA index, the same locks and shims; pytorch3d from source, which needs `g++`), and the workers run there instead of in the ROCm image (`AIHUB_ACCEL`, `gen3d/worker.py`). Elsewhere (macOS, Intel, the CPU) 3D Generate is "not available on this machine". The CUDA path is untested until a field test reports on it.
+The engines run on ROCm or CUDA only: SAM 3D's extensions (spconv, gsplat, kaolin) are CUDA projects, and the shims in `workers/shims/` stand in for them on both. On a machine with an NVIDIA GPU (Linux or WSL2), `gaifa setup gen3d` picks the CUDA variant: `scripts/install-runtime.sh --accel cuda` builds the three worker venvs **on the host** (Python 3.13 from uv, PyTorch from the CUDA index, the same locks and shims; pytorch3d from source, which needs `g++`), and the workers run there instead of in the ROCm image (`GAIFA_ACCEL`, `gen3d/worker.py`). Elsewhere (macOS, Intel, the CPU) 3D Generate is "not available on this machine". The CUDA path is untested until a field test reports on it.
 
 ## Configuration
 
@@ -115,7 +115,7 @@ The engines run on ROCm or CUDA only: SAM 3D's extensions (spconv, gsplat, kaoli
 | `GEN3D_PREVIEW_DEVICE` | `service.toml` | optional | `cpu` (set): previews on Mesa llvmpipe; `gpu` is faster. A choice saved on the page wins |
 | `GEN3D_IDLE_UNLOAD_S` | from `[memory] idle_unload_s` | optional | stop the worker after this many idle seconds (600) |
 
-`gen3d.env.example` lists the rest for standalone use; under AIHub, `service.toml` and `config.toml` set them.
+`gen3d.env.example` lists the rest for standalone use; under GAIFA, `service.toml` and `config.toml` set them.
 
 ## Check it works
 
@@ -126,7 +126,7 @@ cd services/gen3d && .venv/bin/python -m gen3d.doctor
 Checks files and podman only; nothing loads. For this base, expect `ok` on `upstream clone (cube/)`, `CubePart code`, `worker venv (.venv)`, `podman` and `ROCm image`, and no `runtime/…` in a `MISSING … (image engine)` line (those lines also list the engine's weights, which come with its setup). The setup's `check` reads exactly that. The weight lines are `MISSING` until the engines' setups run; with every engine set up, expect 17 `ok` lines and exit 0 (2026-10-21).
 
 ```bash
-aihub check gen3d --start
+gaifa check gen3d --start
 ```
 
 Starts the server if it's stopped (a stopped mod's live checks are skipped; the server never touches the GPU) and checks it. Expect `gen3d: all checks passed` (2026-10-21, with every engine set up).

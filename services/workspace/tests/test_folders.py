@@ -118,31 +118,31 @@ def test_skip_rules_size_and_binaries(ctx, repo):
     assert e.value.code == "binary"
 
 
-def test_the_aihub_folder_and_models_stay_at_read(client, ctx, aihub):
-    f = add(client, aihub)
-    assert f["max_level"] == "read" and "AIHub" in f["capped"]
+def test_the_gaifa_folder_and_models_stay_at_read(client, ctx, gaifa):
+    f = add(client, gaifa)
+    assert f["max_level"] == "read" and "GAIFA" in f["capped"]
     r = client.patch(f"/v1/folders/{f['id']}", json={"level": "edit"})
     assert r.status_code == 422 and r.json()["code"] == "capped"
-    assert client.post("/v1/folders", json={"path": str(aihub / "data" / "models"), "level": "edit"}).json()["code"] == "capped"
-    sub = add(client, aihub / "utils")
+    assert client.post("/v1/folders", json={"path": str(gaifa / "data" / "models"), "level": "edit"}).json()["code"] == "capped"
+    sub = add(client, gaifa / "utils")
     assert sub["max_level"] == "read"
-    # a folder that contains AIHub keeps its level, but nothing inside AIHub can be written
-    outer = add(client, aihub.parent, level="edit")
+    # a folder that contains GAIFA keeps its level, but nothing inside GAIFA can be written
+    outer = add(client, gaifa.parent, level="edit")
     assert outer["level"] == "edit"
     o = ctx.folders.get(outer["id"])
     ctx.folders.resolve(o, "proj_new.txt", write=True)
     with pytest.raises(Refused) as e:
-        ctx.folders.resolve(o, "AIHub/utils/proxy.py", write=True)
+        ctx.folders.resolve(o, "GAIFA/utils/proxy.py", write=True)
     assert e.value.code == "protected"
-    ctx.folders.resolve(o, "AIHub/utils/proxy.py")                    # reading it is fine
+    ctx.folders.resolve(o, "GAIFA/utils/proxy.py")                    # reading it is fine
 
 
-def test_a_stored_level_above_the_cap_reads_as_read(ctx, aihub):
+def test_a_stored_level_above_the_cap_reads_as_read(ctx, gaifa):
     import json
 
     legacy = ctx.folders.envs.legacy            # Phase 27's folders.json, migrated into Default on first load (plan 34)
     legacy.parent.mkdir(parents=True, exist_ok=True)
-    legacy.write_text(json.dumps({"folders": [{"id": "hub", "path": str(aihub), "level": "run_net", "allow_bypass": True}]}))
+    legacy.write_text(json.dumps({"folders": [{"id": "hub", "path": str(gaifa), "level": "run_net", "allow_bypass": True}]}))
     f = ctx.folders.get("hub")
     assert ctx.folders.level(f) == "read"
     pub = ctx.folders.public()[0]
@@ -159,18 +159,18 @@ def test_folders_are_found_by_id_path_or_name(ctx, repo):
     assert e.value.code == "unknown_folder" and "proj" in e.value.detail
 
 
-def test_a_folder_holding_aihub_mounts_it_read_only_in_the_sandbox(ctx, aihub, tmp_path):
-    """The caps stop the edit tools; a sandbox command can write anywhere it's mounted, so the AIHub
+def test_a_folder_holding_gaifa_mounts_it_read_only_in_the_sandbox(ctx, gaifa, tmp_path):
+    """The caps stop the edit tools; a sandbox command can write anywhere it's mounted, so the GAIFA
     folder and its models inside a Run folder are mounted read-only on top of it."""
     import running
     from sandbox import Run
 
     outer = tmp_path
     mounts = running.mounts_for(ctx.folders, outer)
-    assert mounts == [(outer, "rw"), (aihub / "data" / "models", "ro"), (aihub, "ro")]
+    assert mounts == [(outer, "rw"), (gaifa / "data" / "models", "ro"), (gaifa, "ro")]
     argv = ctx.sandbox.argv(Run("run_x", "true", "sandbox", str(outer)), outer, list(reversed(mounts)), {})
     vs = [argv[i + 1] for i, a in enumerate(argv) if a == "-v" and not argv[i + 1].endswith(":O")]     # not the caches
-    assert vs == [f"{outer}:{outer}:rw", f"{aihub}:{aihub}:ro", f"{aihub}/data/models:{aihub}/data/models:ro"]
+    assert vs == [f"{outer}:{outer}:rw", f"{gaifa}:{gaifa}:ro", f"{gaifa}/data/models:{gaifa}/data/models:ro"]
     assert running.mounts_for(ctx.folders, tmp_path / "proj") == [(tmp_path / "proj", "rw")]
     for bad in ("a:b", "a,b"):
         with pytest.raises(Refused) as e:

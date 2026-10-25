@@ -98,7 +98,7 @@ export function PermissionRules({ api }) {
   if (!cfg?.permissions || !api?.saveSettings) return null;
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid ' + T.bd, paddingTop: 10 } },
     h('div', { style: { display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' } }, h('span', { style: { fontWeight: 500 } }, 'Tool permissions'),
-      h('span', { style: { fontSize: 12, color: T.mut } }, 'Tool names or globs (', h('code', { style: { fontFamily: MONO } }, 'comfy_*'), '). Never run wins over everything; Always ask asks in every mode unless you granted the tool (Grants, below); Run without asking never skips the card of a tool that runs code. AIHub ships with hub_set_preference asking and hub_start_service running.')),
+      h('span', { style: { fontSize: 12, color: T.mut } }, 'Tool names or globs (', h('code', { style: { fontFamily: MONO } }, 'comfy_*'), '). Never run wins over everything; Always ask asks in every mode unless you granted the tool (Grants, below); Run without asking never skips the card of a tool that runs code. GAIFA ships with hub_set_preference asking and hub_start_service running.')),
     h(RulesEditor, { api, section: 'permissions', value: cfg.permissions, check: checkToolGlob, onSaved: setCfg, lists: [
       { key: 'deny', label: 'Never run', placeholder: 'tts_delete_voice' },
       { key: 'ask', label: 'Always ask', placeholder: 'hub_set_preference' },

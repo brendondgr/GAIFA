@@ -3,7 +3,7 @@
 - `POST /mcp`: one JSON-RPC message → one `application/json` response (202 for a notification)
 - `GET`/`DELETE /mcp`: 405 (no server-initiated stream, no sessions)
 
-Add it to Claude Code with `claude mcp add --transport http aihub http://127.0.0.1:7000/mcp`.
+Add it to Claude Code with `claude mcp add --transport http gaifa http://127.0.0.1:7000/mcp`.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ def _server(request: Request) -> Any:
     return srv
 
 
-@router.post("/mcp", summary="MCP endpoint (streamable HTTP, stateless): AIHub's tools for Claude Code and other MCP clients",
+@router.post("/mcp", summary="MCP endpoint (streamable HTTP, stateless): GAIFA's tools for Claude Code and other MCP clients",
              response_class=JSONResponse,
              responses={200: {"description": "A JSON-RPC response", **RPC},
                         202: {"description": "A notification, accepted"},

@@ -6,7 +6,7 @@ description = "Qwen-Image 2.1 Turbo (official 8-step distill): text to image, st
 tags = ["photo", "text", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
 
-[inputs.prompt]          # AIHubTextEncodeQwenImage21 "Prompt"
+[inputs.prompt]          # GAIFATextEncodeQwenImage21 "Prompt"
 node = "8"
 field = "prompt"
 

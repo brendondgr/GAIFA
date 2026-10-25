@@ -1,5 +1,5 @@
-"""Settings changed on gen3d's page, kept in `<state>/settings.json` (under AIHub `data/state/gen3d/`,
-which `aihub backup` saves; standalone, the data folder). Read on every use, so a change applies to the
+"""Settings changed on gen3d's page, kept in `<state>/settings.json` (under GAIFA `data/state/gen3d/`,
+which `gaifa backup` saves; standalone, the data folder). Read on every use, so a change applies to the
 next preview without a restart. Precedence: the saved value, else `GEN3D_PREVIEW_DEVICE`, else cpu."""
 
 from __future__ import annotations

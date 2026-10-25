@@ -1,7 +1,7 @@
 """Status polling for mods with `[run] status` (plan 2.4, architecture §4.6).
 
 `validate()` normalizes a status body and lists what is wrong with it, so the
-poller keeps the good parts and `aihub check` (2.10) can report the rest.
+poller keeps the good parts and `gaifa check` (2.10) can report the rest.
 """
 
 from __future__ import annotations
@@ -111,7 +111,7 @@ def validate(body: Any) -> tuple[dict[str, Any], list[str]]:
             if j["route"].startswith("#/"):              # a page in the UI; it becomes a link's href
                 job["route"] = j["route"]
             else:
-                problems.append(f"jobs[{i}] ({j['id']}): route must start with \"#/\" (a page in AIHub)")
+                problems.append(f"jobs[{i}] ({j['id']}): route must start with \"#/\" (a page in GAIFA)")
         out["jobs"].append(job)
     return out, problems
 

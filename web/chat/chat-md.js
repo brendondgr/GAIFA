@@ -257,7 +257,7 @@ export function installCopy(doc = globalThis.document) {
   doc.addEventListener('error', e => { if (e.target?.classList?.contains('aichat-cite-ico')) e.target.remove(); }, true);
   doc.addEventListener('click', async e => {
     const fig = e.target?.closest?.('img[data-open]');   // plan 47.3: a picture in a reply opens in Outputs
-    if (fig && fig.closest('.aichat-md')) { doc.dispatchEvent(new CustomEvent('aihub:open-output', { detail: fig.dataset.open })); return; }
+    if (fig && fig.closest('.aichat-md')) { doc.dispatchEvent(new CustomEvent('gaifa:open-output', { detail: fig.dataset.open })); return; }
     const b = e.target?.closest?.('.aichat-copy');
     const code = b?.closest('.aichat-code')?.querySelector('code');
     if (!code) return;

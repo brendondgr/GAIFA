@@ -1,6 +1,6 @@
-"""Speech to Text: the stt mod (plan Phase 29). AIHub runs `.venv/bin/python server.py`.
+"""Speech to Text: the stt mod (plan Phase 29). GAIFA runs `.venv/bin/python server.py`.
 
-Reads AIHUB_PORT, AIHUB_OUTPUTS, AIHUB_MODELS and AIHUB_URL (architecture §4.4), plus STT_DEVICE
+Reads GAIFA_PORT, GAIFA_OUTPUTS, GAIFA_MODELS and GAIFA_URL (architecture §4.4), plus STT_DEVICE
 (auto | cpu | cuda), STT_BACKEND (faster-whisper | mock) and STT_IDLE_UNLOAD_S. The routes are in
 stt/server.py.
 """
@@ -14,7 +14,7 @@ import uvicorn
 
 
 class _QuietPolls(logging.Filter):
-    """AIHub polls health and status every few seconds; keep them out of the log."""
+    """GAIFA polls health and status every few seconds; keep them out of the log."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()

@@ -12,7 +12,7 @@ Every call answers with one shape, `{status, tool, …}`:
 
 A call runs as a task in the hub, so a client that disconnects doesn't stop it; its state and full
 result are kept in `tool_calls`. Calls that were following a job when the hub stopped are picked up
-again at the next start. A stopped mod is started first. Requests carry `X-AIHub-Make-Room: 1`
+again at the next start. A stopped mod is started first. Requests carry `X-GAIFA-Make-Room: 1`
 (when `agent.make_room`), so a model that needs memory unloads idle mods instead of failing.
 """
 
@@ -45,7 +45,7 @@ from utils.tools.schema import coerce, validate
 if TYPE_CHECKING:
     from utils.server import Hub
 
-log = logging.getLogger("aihub.tools")
+log = logging.getLogger("gaifa.tools")
 DONE = {"done", "complete", "completed", "succeeded", "success", "finished"}
 FAILED = {"failed", "error", "errored"}
 CANCELLED = {"cancelled", "canceled"}
@@ -530,13 +530,13 @@ class Calls:
         if not svc.up:
             if not svc.startable or not svc.eff.enabled:
                 raise ToolError("service_not_running", f"{svc.mod.name} is {svc.state} and can't be started",
-                                f"fix it on its page (aihub check {svc.id})")
+                                f"fix it on its page (gaifa check {svc.id})")
             c.note = f"starting {svc.mod.name}"
             self._publish(c)
             svc = await mgr.start(svc.id, wait=True)
             if not svc.up:
                 raise ToolError("service_not_running", f"{svc.mod.name} didn't start: {svc.last_error or svc.state}",
-                                f"see its Logs tab (aihub logs {svc.id})")
+                                f"see its Logs tab (gaifa logs {svc.id})")
             c.note = None
             await self.catalog.tools()  # its schemas may have changed with the new process
         return svc
@@ -595,9 +595,9 @@ class Calls:
         if PLACEHOLDER.search(path):
             raise ToolError("invalid_arguments", f"missing path value(s): {', '.join(PLACEHOLDER.findall(path))}",
                             "add them to the arguments")
-        headers = {"X-AIHub-Origin": origin_header({"tool_call": c.id, **c.origin})}
+        headers = {"X-GAIFA-Origin": origin_header({"tool_call": c.id, **c.origin})}
         if self.hub.config.agent.make_room:
-            headers["X-AIHub-Make-Room"] = "1"
+            headers["X-GAIFA-Make-Room"] = "1"
         for hook in self.hub.services.before_proxy:       # the memory triggers read headers case-insensitively
             await hook(svc, route.method, path, httpx.Headers(headers))
         kw: dict[str, Any] = {"params": query, "headers": headers}
@@ -694,7 +694,7 @@ class Calls:
 
 
 def origin_header(origin: dict[str, Any], limit: int = 2000) -> str:
-    """X-AIHub-Origin as valid JSON: the largest keys are dropped until it fits."""
+    """X-GAIFA-Origin as valid JSON: the largest keys are dropped until it fits."""
     o = dict(origin)
     text = json.dumps(o, default=str)
     while len(text) > limit and o:

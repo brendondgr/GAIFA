@@ -113,7 +113,7 @@ test('schemaForm: a list field shows "a, b" and gives back an array', async () =
 });
 
 const SHAPE = { properties: {
-  prompt: { type: 'string' }, image: { type: 'string', format: 'aihub-file', 'x-kind': 'image' },
+  prompt: { type: 'string' }, image: { type: 'string', format: 'gaifa-file', 'x-kind': 'image' },
   engine: { type: 'string', enum: ['cube3d', 'trellis2', 'sam3d_body'], 'x-options': {
     cube3d: { label: 'Cube3D', excludes: ['image'], default: true, good_for: 'from text', allows: { preset: ['fast', 'balanced'] } },
     trellis2: { label: 'TRELLIS.2', needs: ['image'], default: true, good_for: 'objects', speed: '2 min', allows: { preset: ['fast', 'base'] } },

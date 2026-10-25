@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from utils.memory import MemoryManager
     from utils.services import ServiceManager
 
-log = logging.getLogger("aihub.metrics")
+log = logging.getLogger("gaifa.metrics")
 
 HEARTBEAT = "metrics.heartbeat"
 LOADED = {"loaded", "unloading"}  # models are in memory until the unload finishes
@@ -87,9 +87,9 @@ class Recorder:
             await self.store.rollup(self.clock())
         except Exception:  # noqa: BLE001
             log.exception("metrics rollup")
-        self._tasks = [asyncio.create_task(self._tick_loop(), name="aihub-metrics"),
-                       asyncio.create_task(self._event_loop(), name="aihub-metrics-events"),
-                       asyncio.create_task(self._maintain_loop(), name="aihub-metrics-rollup")]
+        self._tasks = [asyncio.create_task(self._tick_loop(), name="gaifa-metrics"),
+                       asyncio.create_task(self._event_loop(), name="gaifa-metrics-events"),
+                       asyncio.create_task(self._maintain_loop(), name="gaifa-metrics-rollup")]
 
     async def close(self) -> None:
         for t in self._tasks:
@@ -194,7 +194,7 @@ class Recorder:
         out += self.gpu_samples()
         tools, self._tools = self._tools, {}
         for (mod, what), n in sorted(tools.items()):       # finished tool calls in this tick, per mod (plan 21.1)
-            out.append((SeriesInfo(f"tools.{what}.{mod}", f"{self._name(mod) if mod != 'hub' else 'AIHub'} tool {what}", "count",
+            out.append((SeriesInfo(f"tools.{what}.{mod}", f"{self._name(mod) if mod != 'hub' else 'GAIFA'} tool {what}", "count",
                                    service=None if mod == "hub" else mod), float(n)))
         return out
 

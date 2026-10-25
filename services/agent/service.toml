@@ -1,4 +1,4 @@
-# AIHub's chat agent (plan Phase 14): our own Claude-Code-style loop. The model comes from the
+# GAIFA's chat agent (plan Phase 14): our own Claude-Code-style loop. The model comes from the
 # relay (every call shows on its Requests page); tools come from the hub's catalog.
 id = "agent"
 name = "Agent"

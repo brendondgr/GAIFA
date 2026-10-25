@@ -265,7 +265,7 @@
   },
   {
    "id": 8,
-   "type": "AIHubTextEncodeQwenImage21",
+   "type": "GAIFATextEncodeQwenImage21",
    "pos": [
     450,
     0
@@ -320,7 +320,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "AIHubTextEncodeQwenImage21"
+    "Node name for S&R": "GAIFATextEncodeQwenImage21"
    },
    "widgets_values": [
     "Remove the background, and output a PNG image",
@@ -812,7 +812,7 @@
     "Node name for S&R": "MarkdownNote"
    },
    "widgets_values": [
-    "## Qwen-Image 2.1 Turbo \u00b7 Remove Background\nLoad a photo into **image_1** and queue. The model outputs a native **RGBA PNG** (transparent background) at the input's own size (`resolution 0`).\n\n- Want the subject extracted differently? Edit the instruction, e.g. `Extract the person in <image1> and remove everything else, output a PNG image`.\n- Keep **Save \u2192 format png** to preserve the alpha channel.\n- Model switch (yellow, left): false = `Turbo Q8_0 GGUF`, true = `Turbo FP8`.\n- **Speed:** the Instruction node (AIHub) reads the prompt and references once; turn `encode_negative` on only if you raise cfg above 1. The VAE runs in bf16. For a quicker, smaller result use resolution **768** (the AIHub *fast* preset).\n\n**Sampling (Turbo):** the checkpoint's own 8-step schedule in *Turbo schedule* (ManualSigmas), euler, cfg **1**. Changing the steps means editing that list; Qwen hasn't evaluated other schedules. The negative prompt is ignored at cfg 1."
+    "## Qwen-Image 2.1 Turbo \u00b7 Remove Background\nLoad a photo into **image_1** and queue. The model outputs a native **RGBA PNG** (transparent background) at the input's own size (`resolution 0`).\n\n- Want the subject extracted differently? Edit the instruction, e.g. `Extract the person in <image1> and remove everything else, output a PNG image`.\n- Keep **Save \u2192 format png** to preserve the alpha channel.\n- Model switch (yellow, left): false = `Turbo Q8_0 GGUF`, true = `Turbo FP8`.\n- **Speed:** the Instruction node (GAIFA) reads the prompt and references once; turn `encode_negative` on only if you raise cfg above 1. The VAE runs in bf16. For a quicker, smaller result use resolution **768** (the GAIFA *fast* preset).\n\n**Sampling (Turbo):** the checkpoint's own 8-step schedule in *Turbo schedule* (ManualSigmas), euler, cfg **1**. Changing the steps means editing that list; Qwen hasn't evaluated other schedules. The negative prompt is ignored at cfg 1."
    ],
    "title": "Notes"
   }

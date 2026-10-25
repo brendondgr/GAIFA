@@ -1,4 +1,4 @@
-"""Tools for the agent (plan 11.10), read by AIHub's tool catalog through `[agent] tools_source`.
+"""Tools for the agent (plan 11.10), read by GAIFA's tool catalog through `[agent] tools_source`.
 
 One tool per task that has a ready pack (`generate_image`, `animate_image`, …): its parameters are
 the task's shared inputs that those packs take, plus an optional `workflow` choosing among them
@@ -43,8 +43,8 @@ def _fn(name: str, description: str, parameters: dict, job: bool = True, risk: s
 
 
 def runs_here(p) -> bool:
-    """A pack's `requires` (plan 39.6) against this mod's variant (AIHUB_ACCEL; unset: anything runs)."""
-    accel = os.environ.get("AIHUB_ACCEL")
+    """A pack's `requires` (plan 39.6) against this mod's variant (GAIFA_ACCEL; unset: anything runs)."""
+    accel = os.environ.get("GAIFA_ACCEL")
     return not (accel and p.manifest and p.manifest.requires and accel not in p.manifest.requires)
 
 
@@ -144,7 +144,7 @@ def catalog(lib: Library, defaults: dict[str, str]) -> list[dict]:
         default = default_for(tid, packs, defaults, "instruction" if len(styles) > 1 else None)
         refs = max((references(p) for p in packs), default=0)
         if refs:
-            props["references"] = {"type": "array", "items": {"type": "string", "format": "aihub-file"}, "maxItems": refs,
+            props["references"] = {"type": "array", "items": {"type": "string", "format": "gaifa-file"}, "maxItems": refs,
                                    "description": lib.tasks.inputs.get("references", {}).get("description", "Extra pictures")}
         if len(styles) > 1:                     # more than one kind of edit is ready: the caller says which
             props["edit"] = {"type": "string", "enum": styles, "description": "What kind of edit (default: instruction)",

@@ -134,7 +134,7 @@ test('deleting an environment warns that its chats go too, archived ones include
 
 test('the dialog: Name, Folders with levels (up to their cap) and Remove, Add folder…, Cancel and Save or Create, Delete when editing', () => {
   const api = { callService: async () => ({ json: {} }) };
-  const env = { id: 'work', name: 'Work', folders: [{ id: 'aihub', path: '/home/u/Agents/AIHub', level: 'read', max_level: 'read', capped: 'the AIHub folder stays at Read' },
+  const env = { id: 'work', name: 'Work', folders: [{ id: 'gaifa', path: '/home/u/Agents/GAIFA', level: 'read', max_level: 'read', capped: 'the GAIFA folder stays at Read' },
     { id: 'a', path: '/home/u/a', level: 'edit', max_level: 'run_net' }] };
   const el = expand(ed.EnvDialog({ api, env, onClose() {} }));
   assert.equal(all(el, n => n.props?.role === 'dialog')[0].props['aria-modal'], 'true');

@@ -16,7 +16,7 @@ openapi = "/openapi.json"
 start_timeout_s = 30
 stop_timeout_s = 180               # in-flight generations finish on stop (uvicorn waits 150 s)
 restart = "on-failure"
-install = "aihub-install.sh"
+install = "gaifa-install.sh"
 
 [run.env]
 LOCALTTS_HOST = "127.0.0.1"

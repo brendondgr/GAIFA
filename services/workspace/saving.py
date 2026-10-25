@@ -1,7 +1,7 @@
-"""Save an output into a folder (plan 48.4): the chat's Save to… on any output. The file comes from AIHub
+"""Save an output into a folder (plan 48.4): the chat's Save to… on any output. The file comes from GAIFA
 (`GET /api/outputs/{id}` and its file) and goes into a folder of the chat's environment at Edit or above, under the
 output's own name (numbered when the name is taken), with a checkpoint so it can be undone. A folder outside the
-environment is refused with how to add it: AIHub writes nowhere else."""
+environment is refused with how to add it: GAIFA writes nowhere else."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def plan(folders: Folders, where: str, name: str, data: bytes) -> Change:
 
 
 async def fetch_output(hub: str, oid: str) -> tuple[bytes, str]:
-    """The output's file and its name, from AIHub."""
+    """The output's file and its name, from GAIFA."""
     async with httpx.AsyncClient(base_url=hub, timeout=120, trust_env=False) as c:
         r = await c.get(f"/api/outputs/{oid}")
         if r.status_code == 404:

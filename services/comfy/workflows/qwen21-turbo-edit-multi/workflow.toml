@@ -7,7 +7,7 @@ description = "Qwen-Image 2.1 Turbo (official 8-step distill): edit image_1 as t
 tags = ["edit", "references", "fast"]
 # memory_gb = 21.9    # estimated from the model files; each run measures it, so set it only to override
 
-[inputs.prompt]          # AIHubTextEncodeQwenImage21 "Instruction (use <image1>, <image2>, …)"
+[inputs.prompt]          # GAIFATextEncodeQwenImage21 "Instruction (use <image1>, <image2>, …)"
 node = "13"
 field = "prompt"
 
@@ -28,7 +28,7 @@ field = "image"
 node = "8"
 field = "image"
 
-[inputs.resolution]          # AIHubTextEncodeQwenImage21 "Instruction"
+[inputs.resolution]          # GAIFATextEncodeQwenImage21 "Instruction"
 node = "13"
 field = "resolution"
 label = "Working size"

@@ -8,11 +8,11 @@ and how an `ask` call waits for the user.
   `elicitation` capability gets an `input_required` result (multi round-trip requests): an
   `elicitation/create` **form** of the tool's `ask` fields (the parameter card; accepting it approves
   with the values shown, declining denies), or, for a client that only opens URLs, a **url**
-  elicitation pointing at AIHub, where the user decides. The retry echoes `requestState`, an HMAC-signed
+  elicitation pointing at GAIFA, where the user decides. The retry echoes `requestState`, an HMAC-signed
   `{approval, tool, arguments digest, mode, expiry}`. Every other client gets a result that explains the
-  approval is waiting in AIHub, with `_meta["aihub/approval"]`; `aihub_wait_approval` waits for the
+  approval is waiting in GAIFA, with `_meta["gaifa/approval"]`; `gaifa_wait_approval` waits for the
   user's decision and then for the call's result. It never approves anything itself.
-- The approval also shows in AIHub's Approvals popover; whichever side decides first wins.
+- The approval also shows in GAIFA's Approvals popover; whichever side decides first wins.
 """
 
 from __future__ import annotations
@@ -43,9 +43,9 @@ FORMATS = {"email", "uri", "date", "date-time"}
 PRIMITIVE = {"string", "number", "integer", "boolean"}
 
 WAIT_TOOL = (
-    "aihub_wait_approval", "AIHub: wait for an approval",
-    "Wait until the user decides an approval in AIHub (the approval_id from a tool call that needed approval), "
-    "then wait for that call's result and return it. It never approves anything: only the user does, in AIHub's "
+    "gaifa_wait_approval", "GAIFA: wait for an approval",
+    "Wait until the user decides an approval in GAIFA (the approval_id from a tool call that needed approval), "
+    "then wait for that call's result and return it. It never approves anything: only the user does, in GAIFA's "
     "Approvals popover. If the user denies, it says so; if the approval is still pending after `wait` seconds, "
     "call it again.",
     {"type": "object", "properties": {
@@ -167,13 +167,13 @@ class Approver:
     def _waiting(self, req: Request, a: dict[str, Any], lead: str = "Approval needed") -> dict[str, Any]:
         meta = self._approval_meta(req, a)
         fields = ", ".join(meta["ask_fields"]) or "none"
-        text = (f"{lead}: {a['tool']} ({a.get('risk')}) has not run. It is waiting for the user in AIHub "
+        text = (f"{lead}: {a['tool']} ({a.get('risk')}) has not run. It is waiting for the user in GAIFA "
                 f"({meta['approve_in']}, header → Approvals) as approval {a['approval_id']}.\n"
                 f"Arguments: {json.dumps(a['arguments'], ensure_ascii=False, default=str)}\n"
                 f"The user can change: {fields}.\n"
                 f"Calling the tool again makes another approval; it doesn't skip this one. To get the result once the "
                 f"user decides, call {WAIT_TOOL[0]} {{\"approval_id\": \"{a['approval_id']}\"}}.")
-        res: dict[str, Any] = {"content": [_text(text)], "isError": False, "_meta": {"aihub/approval": meta}}
+        res: dict[str, Any] = {"content": [_text(text)], "isError": False, "_meta": {"gaifa/approval": meta}}
         if req.modern or req.at_least("2025-06-18"):
             res["structuredContent"] = {"status": "needs_approval", **meta}
         return res
@@ -197,7 +197,7 @@ class Approver:
         return body + "." + _b64(hmac.new(self.key, body.encode(), hashlib.sha256).digest())
 
     def _read_state(self, state: Any, tool: str, args: dict[str, Any]) -> dict[str, Any]:
-        bad = ProtocolError(INVALID_PARAMS, "requestState is invalid, expired or from before AIHub restarted; "
+        bad = ProtocolError(INVALID_PARAMS, "requestState is invalid, expired or from before GAIFA restarted; "
                                             "call the tool again without it")
         if not isinstance(state, str) or "." not in state:
             raise bad
@@ -215,7 +215,7 @@ class Approver:
     def _input_required(self, req: Request, a: dict[str, Any], args: dict[str, Any], mode: str,
                         note: str | None = None) -> dict[str, Any]:
         tool = a["tool"]
-        msg = (f"AIHub wants to run {tool} ({a.get('risk')}) with "
+        msg = (f"GAIFA wants to run {tool} ({a.get('risk')}) with "
                f"{json.dumps(a['arguments'], ensure_ascii=False, default=str)}.")
         if mode == "form":
             params: dict[str, Any] = {"mode": "form", "requestedSchema": form_schema(a.get("schema") or {},
@@ -224,12 +224,12 @@ class Approver:
             msg += " Accept to run it (change the fields first if you like); decline to say no."
         else:
             params = {"mode": "url", "url": req.base + "/"}
-            msg += f" Open AIHub and approve or deny it in the header's Approvals ({a['approval_id']})."
+            msg += f" Open GAIFA and approve or deny it in the header's Approvals ({a['approval_id']})."
         params["message"] = (note + "\n" if note else "") + msg
         return {"resultType": "input_required",
                 "inputRequests": {INPUT_KEY: {"method": "elicitation/create", "params": params}},
                 "requestState": self._state(a["approval_id"], tool, args, mode),
-                "_meta": {"aihub/approval": self._approval_meta(req, a)}}
+                "_meta": {"gaifa/approval": self._approval_meta(req, a)}}
 
     async def needs(self, req: Request, out: dict[str, Any], args: dict[str, Any]) -> dict[str, Any]:
         """A `needs_approval` answer: an elicitation for clients that can show one, else the explanation."""
@@ -269,7 +269,7 @@ class Approver:
                     if e.code != "already_decided":
                         raise ProtocolError(INVALID_PARAMS, e.detail) from None
                     a = await self.hub.approvals.get(aid) or a
-            else:  # url: the user decides in AIHub; wait a while for it
+            else:  # url: the user decides in GAIFA; wait a while for it
                 a = await self._await_decision(aid, URL_WAIT_S)
         return await self._decided(req, a, CALL_WAIT_S)
 
@@ -301,7 +301,7 @@ class Approver:
         return self.result(req, await self.hub.calls.status(a["call_id"], wait))
 
     async def wait_tool(self, req: Request, args: dict[str, Any]) -> dict[str, Any]:
-        """`aihub_wait_approval`: the user's decision, then the call's result. Never approves."""
+        """`gaifa_wait_approval`: the user's decision, then the call's result. Never approves."""
         aid = args.get("approval_id")
         if not isinstance(aid, str) or not aid:
             return self.result(req, {"status": "error", "tool": WAIT_TOOL[0], "error": {

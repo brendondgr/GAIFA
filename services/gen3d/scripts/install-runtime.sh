@@ -7,11 +7,11 @@
 # scripts/) come from the old ~/Models/3D/CubeArt and are kept as they are; the mod only needs
 # cube/, .venv/ and .cache/.
 #   scripts/install-runtime.sh [--accel rocm|cuda]
-# --accel (plan 39.7; default AIHUB_ACCEL, else rocm): rocm builds every venv inside the ROCm image, as above;
+# --accel (plan 39.7; default GAIFA_ACCEL, else rocm): rocm builds every venv inside the ROCm image, as above;
 # cuda builds them on the host (Python 3.13 from uv, PyTorch's CUDA build from scripts/torch_index.py,
 # the same locks and the same shims), and the workers then run there instead of in a container.
 set -euo pipefail
-ACCEL="${AIHUB_ACCEL:-rocm}"
+ACCEL="${GAIFA_ACCEL:-rocm}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --accel) ACCEL="$2"; shift 2 ;;

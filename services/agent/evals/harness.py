@@ -193,12 +193,12 @@ class Harness:
         raise TimeoutError("the turn didn't finish in time")
 
     def hub_url(self) -> str:
-        """The hub this agent runs under: the one given, else the part of `base` before `/api/s/`, else AIHUB_URL."""
+        """The hub this agent runs under: the one given, else the part of `base` before `/api/s/`, else GAIFA_URL."""
         import os
 
         if self._hub:
             return self._hub
-        return self.base.split("/api/s/")[0] if "/api/s/" in self.base else os.environ.get("AIHUB_URL", "http://127.0.0.1:7000")
+        return self.base.split("/api/s/")[0] if "/api/s/" in self.base else os.environ.get("GAIFA_URL", "http://127.0.0.1:7000")
 
     async def _drive(self, task: Task, tid: str, text: str, deadline: float, attachments: list[str] | None = None) -> None:
         """Send one user turn and answer questions and cards until the turn is over."""

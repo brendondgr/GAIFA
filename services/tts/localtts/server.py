@@ -382,7 +382,7 @@ def _output_path(text: str, voice: str, fmt: str, save_dir: str | None = None) -
 
 
 def _save(out: Path, data: bytes, req: SpeechRequest, engine: str, voice: str, fmt: str, stats: dict) -> None:
-    """The clip, then its sidecar (what AIHub's Outputs page shows)."""
+    """The clip, then its sidecar (what GAIFA's Outputs page shows)."""
     outputs.save(out, data, outputs.sidecar(
         text=req.text, voice=voice, engine=engine, model=MODELS.get(engine, engine),
         params={"instructions": req.instruction, "speed": req.speed if engine == "kokoro" else None,
@@ -652,11 +652,11 @@ def get_output(filename: str):
 @app.delete("/v1/outputs/{filename:path}")
 def delete_output(filename: str):
     p = _output_or_404(filename)
-    p.unlink()  # permanent, no trash (AIHub's Outputs page moves to its trash instead)
+    p.unlink()  # permanent, no trash (GAIFA's Outputs page moves to its trash instead)
     p.with_name(p.name + ".json").unlink(missing_ok=True)
     return {"deleted": filename, "permanent": True}
 
 
-from . import hub  # noqa: E402  (the AIHub routes: status and the dashboard widget)
+from . import hub  # noqa: E402  (the GAIFA routes: status and the dashboard widget)
 
 app.include_router(hub.router)

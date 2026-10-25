@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-log = logging.getLogger("aihub.outputs")
+log = logging.getLogger("gaifa.outputs")
 
 QUIET_S = 2.0
 WINDOW_S = 10.0
@@ -42,7 +42,7 @@ class Announcer:
         b = self._open.get(svc)
         if b is None:
             b = self._open[svc] = _Batch(now, now)
-            b.task = asyncio.create_task(self._close_later(svc, b), name=f"aihub-announce-{svc}")
+            b.task = asyncio.create_task(self._close_later(svc, b), name=f"gaifa-announce-{svc}")
         b.items.append(output)
         b.last = now
 

@@ -14,7 +14,7 @@ def ok(data: dict):
 
 
 def test_variants_parse():
-    s = ok({"summary": "x", "smoke": "aihub smoke tts", "variants": [
+    s = ok({"summary": "x", "smoke": "gaifa smoke tts", "variants": [
         {"accel": "rocm", "tested": True, "env": {"HSA": "1"}},
         {"accel": "cuda", "os": ["linux", "wsl"], "steps": [{"run": "./install.sh --accel cuda", "what": "torch cu128"}], "note": "untested"},
         {"accel": "cpu", "os": ["linux", "wsl", "darwin"], "tested": ["linux"], "check": "true", "smoke": "echo hi"},
@@ -23,7 +23,7 @@ def test_variants_parse():
     assert (rocm.os, rocm.tested, rocm.env, rocm.steps) == (["linux"], ["linux"], {"HSA": "1"}, None)
     assert cuda.tested == [] and cuda.steps[0].run == "./install.sh --accel cuda" and cuda.note == "untested"
     assert cpu.tested == ["linux"] and (cpu.check, cpu.smoke) == ("true", "echo hi")
-    assert s.smoke == "aihub smoke tts" and s.gpu is True and s.runs_on() == ["rocm", "cuda", "cpu"]
+    assert s.smoke == "gaifa smoke tts" and s.gpu is True and s.runs_on() == ["rocm", "cuda", "cpu"]
 
 
 def test_version_2_blocks_stand_for_one_variant():

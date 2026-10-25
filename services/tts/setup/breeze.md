@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "tts-breeze"
 title = "Breeze TTS 2 and Whisper (Speech)"
 models = ["tts/breeze-tts-2", "hf-cache/hub/models--openai--whisper-large-v3-turbo", "voices/**"]
@@ -95,7 +95,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 
 ## Prerequisites
 
-- [kokoro.md](kokoro.md): the server venv (`aihub install tts`), and the same host packages. `ffmpeg` converts every voice upload to 24 kHz mono WAV.
+- [kokoro.md](kokoro.md): the server venv (`gaifa install tts`), and the same host packages. `ffmpeg` converts every voice upload to 24 kHz mono WAV.
 - git (the installer clones Breeze's source).
 - **The licence.** Read https://huggingface.co/BreezeBlue/Breeze-TTS-2; installing means passing `--accept-breeze-license`.
 
@@ -127,7 +127,7 @@ Saved voices are folders in `data/models/voices/<name>/` (`reference.wav` and `v
 curl -F name=myvoice -F audio=@me.wav -F "transcript=Exactly what I say in the clip." http://127.0.0.1:7000/api/s/tts/v1/voices
 ```
 
-Leave out the transcript and Whisper writes one (check it: clone quality depends on it). **Design voice** invents one from a description and keeps its sample as the reference. The mod doesn't register a new voice in the models registry; `aihub models scan --add` adds it as kind `voice`. More in the mod's README, "Add a voice".
+Leave out the transcript and Whisper writes one (check it: clone quality depends on it). **Design voice** invents one from a description and keeps its sample as the reference. The mod doesn't register a new voice in the models registry; `gaifa models scan --add` adds it as kind `voice`. More in the mod's README, "Add a voice".
 
 ## Choosing models
 
@@ -158,7 +158,7 @@ Breeze is a fixed engine: it runs one set of weights, `BreezeBlue/Breeze-TTS-2`,
 curl -s http://127.0.0.1:7000/api/s/tts/v1/status
 ```
 
-A GET, so nothing loads. Expect `"breeze": {"state": "unloaded", …}` while idle and `Engines installed` 2. `aihub check tts` is in [kokoro.md](kokoro.md#check-it-works).
+A GET, so nothing loads. Expect `"breeze": {"state": "unloaded", …}` while idle and `Engines installed` 2. `gaifa check tts` is in [kokoro.md](kokoro.md#check-it-works).
 
 ```bash
 uv pip freeze --python services/tts/runtime/venvs/breeze-tts/bin/python | diff - <(sort services/tts/locks/breeze-tts.txt)
@@ -184,15 +184,15 @@ From the project folder. No output and exit 0 means the patch is applied as ship
 - **The fast stages are HIP graphs.** `depth_decoder` and `backbone_decode` capture `torch.cuda.CUDAGraph`s (upstream's `models/cudagraph/`), which run as HIP graphs on ROCm. They're upstream's stock code and the installer's choice for gfx1151 (warm speed about RTF 1.5). `LOCALTTS_BREEZE_FAST=` (empty) runs eager instead: RTF about 2.7, no warmup. Don't add more graph stages (`text_encoder`, `backbone_prefill`, `codec`) or custom kernels.
 - **The first start after an install compiles** (about 50 s; later cold starts about 30 s). Breeze's torch.compile cache is `~/.cache/localtts/inductor`.
 - **Worker settings:** `MIOPEN_FIND_MODE=2`, `MIOPEN_LOG_LEVEL=3`, `ROCPROFILER_REGISTER_ENABLED=0` (see [kokoro.md](kokoro.md#what-to-look-for)). Breeze holds about 3.1 GB of RAM and 9.9 GB of GTT while loaded (`[memory] estimate_gb = 13` with Kokoro).
-- **The patch's `tools/`** (`gemm_bench.py`, `rocm_bench.py`, …) are benchmarks AIHub never runs; leave them alone.
+- **The patch's `tools/`** (`gemm_bench.py`, `rocm_bench.py`, …) are benchmarks GAIFA never runs; leave them alone.
 - **The nightly wheel index drops old builds.** `locks/breeze-tts.txt` pins exact nightly builds (torch, torchaudio, triton, the `rocm*` packages, torchvision and `amd-torch-device-*`, all of build `10.2.0a20260926`) from `https://nightly.repo.amd.com/rocm/whl-next/`, and nightly indexes don't keep every build: on 2026-10-21 `https://nightly.repo.amd.com/rocm/whl-next/` listed only the last two months of torch builds (2026-08-23 to 2026-10-20), and `https://rocm.nightlies.amd.com/v2/gfx1151/` Linux builds from 2026-01-01 to 2026-05-13; both still had the pinned ones. When a pinned wheel is gone, the install stops at uv's resolve ("No solution found", naming the package). Then:
-  1. On a machine that built this venv before, uv's cache (`~/.cache/uv`) still holds the wheels and the installer goes on as is; don't `uv cache clean` or `uv cache prune` it (`aihub backup` doesn't copy it).
+  1. On a machine that built this venv before, uv's cache (`~/.cache/uv`) still holds the wheels and the installer goes on as is; don't `uv cache clean` or `uv cache prune` it (`gaifa backup` doesn't copy it).
   2. Otherwise pick one build the index still has, `curl -sL https://nightly.repo.amd.com/rocm/whl-next/torch/ | grep -o 'torch-[^"<#]*cp312-cp312-linux_x86_64.whl' | tail -3`, change **every** package of the old build in the lock to that same build (their versions all end in the same `rocm…a<date>`; triton's also carries a git hash, so copy the names from the index, `curl -sL https://nightly.repo.amd.com/rocm/whl-next/<package>/`), re-run `scripts/install-runtime.sh --accept-breeze-license`, and let its smoke test or check prove it. Record the new versions in Tested with. A different build is untested here: watch for new errors before trusting its output.
 - **GPU safety.** Keep the IOMMU on ([host.md §1](../../../docs/setup/host.md#1-let-the-gpu-use-the-memory)). On 2026-10-19 and 20, experimental TTS work with custom Triton kernels and HIP graphs, with the IOMMU off, corrupted about 100 files. A GPU ring timeout or a failed GPU reset in `journalctl -k` is a reason to stop and check for Btrfs checksum errors (host.md, What to look for).
 
 ## Known gaps
 
-- `aihub install tts` doesn't download Breeze's weights or Whisper; the block's steps do, ahead of the installer, which can't download them while it forces offline mode.
+- `gaifa install tts` doesn't download Breeze's weights or Whisper; the block's steps do, ahead of the installer, which can't download them while it forces offline mode.
 - This machine's registry entry for Breeze's weights has no revision (it was registered before the pin); a new install records it.
 - Breeze's torch.compile cache (`~/.cache/localtts/inductor`, 56 MB here) and MIOpen's databases (`~/.config/miopen/`, `~/.cache/miopen/`) are outside the project and not on the allowlist.
 - The voices are personal and can't be reproduced; a new machine starts with none.

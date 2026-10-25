@@ -50,7 +50,7 @@ def gpus(src: Source) -> list[Gpu]:
             g.arch = target
             g.accels.append("rocm")
         else:
-            g.problems.append("ROCm on WSL supports only some Radeon cards, and rocminfo doesn't list this one: AIHub uses the CPU here")
+            g.problems.append("ROCm on WSL supports only some Radeon cards, and rocminfo doesn't list this one: GAIFA uses the CPU here")
         out.append(g)
     if not dxg:
         for g in out:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Qwen-Image 2.1 Turbo model pull (into AIHub's data/models/comfyui), for the qwen21-turbo-* packs.
+# Qwen-Image 2.1 Turbo model pull (into GAIFA's data/models/comfyui), for the qwen21-turbo-* packs.
 # The official Turbo weights (Qwen/Qwen-Image-2.1-Turbo), quantized like the base packs' files:
 # Q8_0 GGUF (default) and FP8 (the packs' switch). The text encoder and VAE are the base model's,
 # so run download_qwen_image_2.1.sh first if those are missing.

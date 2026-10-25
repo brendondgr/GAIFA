@@ -6,9 +6,9 @@ from decide import device
 
 
 def test_auto_follows_the_variant(monkeypatch):
-    monkeypatch.setenv("AIHUB_DEVICE", "xpu")
+    monkeypatch.setenv("GAIFA_DEVICE", "xpu")
     assert device.device("auto") == "xpu" and device.device("cpu") == "cpu"
-    monkeypatch.delenv("AIHUB_DEVICE")
+    monkeypatch.delenv("GAIFA_DEVICE")
     monkeypatch.setattr(device, "available", lambda n: n in ("mps", "cpu"))
     assert device.device("auto") == "mps"
 

@@ -23,7 +23,7 @@ def test_each_code_gets_its_fix():
     assert fixes_for(t, {}, {"code": "service_not_running"}, "3D", [])[0] == {"label": "Start 3D", "tool": "hub_start_service", "arguments": {"id": "gen3d"}}
     assert kinds(fixes_for(t, {}, {"code": "needs_room"}, "3D", [])) == ["Free the GPU", "Retry"]
     assert fixes_for(t, {}, {"code": "mod_error"}, "3D", [])[0] == {"label": "Restart 3D", "service": "gen3d", "action": "restart"}
-    assert kinds(fixes_for(t, {}, {"code": "tool_unavailable"}, "3D", [])) == ["Set it up: aihub setup gen3d"]
+    assert kinds(fixes_for(t, {}, {"code": "tool_unavailable"}, "3D", [])) == ["Set it up: gaifa setup gen3d"]
     for code in ("invalid_arguments", "unknown_tool", "denied"):
         assert fixes_for(t, {}, {"code": code}, "3D", []) == []
 

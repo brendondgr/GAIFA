@@ -45,7 +45,7 @@ PRESET_OPTIONS = {
 class TranscribeRequest(BaseModel):
     audio: str = Field(description="The recording: output:<id> of an audio or video output (video is transcribed "
                                    "from its audio track)", validation_alias=AliasChoices("audio", "output_id"),
-                       json_schema_extra={"format": "aihub-file", "x-kind": "audio"})
+                       json_schema_extra={"format": "gaifa-file", "x-kind": "audio"})
     preset: Preset | None = Field(None, description=PRESET_HELP, json_schema_extra={"x-options": PRESET_OPTIONS})
     model: Model | None = Field(None, description="A model by name, instead of a preset")
     language: str | None = Field(None, description="ISO code such as en or de; left out, it is detected")
@@ -72,8 +72,8 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
     engine = engine or Engine(settings, registrar=hub.register_model)
     # Live dictation while another mod holds the GPU (plan 31.3): its own model on the CPU.
     cpu_engine = cpu_engine or Engine(settings, gpu=False, registrar=hub.register_model)
-    # The GPU slot: only with AIHub (AIHUB_URL set); tests pass their own.
-    gpu = gpu or Gpu(os.environ.get("AIHUB_URL") or None)
+    # The GPU slot: only with GAIFA (GAIFA_URL set); tests pass their own.
+    gpu = gpu or Gpu(os.environ.get("GAIFA_URL") or None)
     jobs = Jobs(engine, hub, settings.outputs, gpu=gpu)
 
     @contextlib.asynccontextmanager
@@ -146,7 +146,7 @@ def create_app(settings: Settings | None = None, *, engine: Engine | None = None
             raise http_error(409, str(exc), "busy", exc.fix) from exc
         except Exception as exc:  # noqa: BLE001
             raise http_error(500, f"couldn't load {name}: {exc}", "load_failed",
-                             "try a smaller model, or check `aihub logs stt`") from exc
+                             "try a smaller model, or check `gaifa logs stt`") from exc
         return engine.describe()
 
     @app.post("/v1/unload", summary="Unload the model (its process exits, freeing the memory)")

@@ -85,7 +85,7 @@ async def test_memory_and_ui_changes_apply_at_once(rig, serve):
         assert tomllib.loads(_file(served))["ui"]["dashboard"]["hidden"] == ["heatmap"]
         await c.put("/api/settings", json={"ui": {"theme": "system", "dashboard": {"order": [], "hidden": [], "ranges": {}}}})
         assert "ui" not in tomllib.loads(_file(served))
-        assert any(a["text"] == "AIHub settings saved" for a in hub.activity.recent(5))
+        assert any(a["text"] == "GAIFA settings saved" for a in hub.activity.recent(5))
 
 
 async def test_disable_stops_the_mod_and_default_removes_the_key(rig, serve):

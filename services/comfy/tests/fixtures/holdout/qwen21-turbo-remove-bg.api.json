@@ -81,7 +81,7 @@
   }
  },
  "8": {
-  "class_type": "AIHubTextEncodeQwenImage21",
+  "class_type": "GAIFATextEncodeQwenImage21",
   "inputs": {
    "prompt": "Remove the background, and output a PNG image",
    "negative_prompt": "",

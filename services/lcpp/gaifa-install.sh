@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds .venv/ for the lcpp mod (run by `aihub install lcpp`). llama.cpp itself lives in
+# Builds .venv/ for the lcpp mod (run by `gaifa install lcpp`). llama.cpp itself lives in
 # runtime/ (gitignored; see setup/llama-cpp.md).
 set -euo pipefail
 cd "$(dirname "$0")"

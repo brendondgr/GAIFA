@@ -12,7 +12,7 @@ import running
 from folders import Refused
 from sandbox import DEFAULT_TIMEOUT, MAX_TIMEOUT
 
-OutputRef = Annotated[str, Field(json_schema_extra={"format": "aihub-file"})]
+OutputRef = Annotated[str, Field(json_schema_extra={"format": "gaifa-file"})]
 
 
 class RunIn(BaseModel):
@@ -26,14 +26,14 @@ class RunIn(BaseModel):
 
 class PythonIn(BaseModel):
     code: str = Field(min_length=1, max_length=100000, description="Python 3.12 to run (numpy, pandas, matplotlib, openpyxl, python-pptx, python-docx, pypdfium2 are there)")
-    inputs: list[OutputRef] = Field(default_factory=list, description="Outputs to read (output:<id> or #n): copied into $AIHUB_INPUTS (inputs/ in the working directory)")
+    inputs: list[OutputRef] = Field(default_factory=list, description="Outputs to read (output:<id> or #n): copied into $GAIFA_INPUTS (inputs/ in the working directory)")
     folder: str | None = Field(None, description="A workspace folder at Run to work in (the working directory); without one, files you write become outputs")
     network: bool = Field(False, description="Internet (needs a folder at Run + network)")
     timeout_s: int = Field(DEFAULT_TIMEOUT, ge=1, le=MAX_TIMEOUT, description="Stop it after this many seconds")
 
 
 def _origin(request: Request) -> dict[str, Any]:
-    return reading.origin_of(request.headers.get("x-aihub-origin"))
+    return reading.origin_of(request.headers.get("x-gaifa-origin"))
 
 
 def mount(app: FastAPI, ctx: Any) -> None:

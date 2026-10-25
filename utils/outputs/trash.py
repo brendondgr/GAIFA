@@ -21,7 +21,7 @@ from utils.outputs.describe import output_id
 from utils.outputs.entries import day_of
 from utils.outputs.media import cache_path
 
-log = logging.getLogger("aihub.outputs")
+log = logging.getLogger("gaifa.outputs")
 
 TRASH = ".trash"
 KEEP_DAYS = 30

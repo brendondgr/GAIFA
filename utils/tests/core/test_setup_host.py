@@ -1,4 +1,4 @@
-"""37.3: `aihub setup host` per machine: the GPU checks that apply, fixes for its package manager, and
+"""37.3: `gaifa setup host` per machine: the GPU checks that apply, fixes for its package manager, and
 nothing run (fixes are text)."""
 
 from __future__ import annotations
@@ -77,7 +77,7 @@ def test_wsl(tmp_path, monkeypatch):
     assert found["wsl-systemd"].ok and found["wsl-gpu"].ok and found["wsl-clone"].ok
     assert "WSL uses it" not in found["nvidia-driver"].fix                       # ok: no fix
     monkeypatch.setattr(cli_platform, "systemd_running", lambda: False)
-    found = by_id(cli_setup_host.checks(Probe("wsl2-intel"), Path("/mnt/c/Users/me/AIHub")))
+    found = by_id(cli_setup_host.checks(Probe("wsl2-intel"), Path("/mnt/c/Users/me/GAIFA")))
     assert not found["wsl-systemd"].ok and "wsl --shutdown" in found["wsl-systemd"].fix
     assert not found["wsl-clone"].ok and found["intel-runtime"].ok and "gpu-groups" not in found
     no_driver = Probe("wsl2-nvidia", edit=lambda d: d["which"].update({"nvidia-smi": None}) or d["dirs"].update({"/usr/lib/wsl/lib": []}))

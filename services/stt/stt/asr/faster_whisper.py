@@ -338,7 +338,7 @@ class FasterWhisperBackend(AsrBackend):
             return (
                 f"The GPU runtime rejected loading {self._model_name}: the installed CTranslate2 "
                 "is probably the CPU/CUDA build from PyPI rather than the ROCm one. Rerun the "
-                "mod's installer (aihub install stt), or use the CPU."
+                "mod's installer (gaifa install stt), or use the CPU."
             )
         return (
             f"The CUDA runtime rejected loading {self._model_name}. "

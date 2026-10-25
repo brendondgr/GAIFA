@@ -22,7 +22,7 @@ test('what a fix does', () => {
   assert.deepEqual(fix.fixAction({ label: 'Retry with the fast preset', retry: { preset: 'fast' } }, r), { kind: 'tool', tool: 'gen3d_make_3d', arguments: { prompt: 'x', preset: 'fast' } });
   assert.deepEqual(fix.fixAction({ label: 'Start', tool: 'hub_start_service', arguments: { id: 'gen3d' } }, r), { kind: 'tool', tool: 'hub_start_service', arguments: { id: 'gen3d' } });
   assert.deepEqual(fix.fixAction({ label: 'Restart', service: 'gen3d', action: 'restart' }, r), { kind: 'service', service: 'gen3d', action: 'restart' });
-  assert.deepEqual(fix.fixAction({ label: 'Set it up', command: 'aihub setup gen3d' }, r), { kind: 'copy', text: 'aihub setup gen3d' });
+  assert.deepEqual(fix.fixAction({ label: 'Set it up', command: 'gaifa setup gen3d' }, r), { kind: 'copy', text: 'gaifa setup gen3d' });
 });
 
 test('a fix-it card stands in for the live card of a failed step', () => {

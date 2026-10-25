@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "decide"
 title = "Decisions: d3-lite"
 models = ["decide/**"]
@@ -7,11 +7,11 @@ summary = "Decisions: fast yes/no, choice and score answers with probabilities (
 gpu = true
 disk_gb = 6.6
 needs = ["uv"]
-check = "aihub start decide && aihub check decide"
-smoke = "aihub start decide >/dev/null && curl -fsS -H 'content-type: application/json' -d '{\"input\": \"The sky is blue.\", \"questions\": [{\"id\": \"q\", \"type\": \"yesno\", \"question\": \"Is this about the sky?\"}]}' \"$(aihub url api/s/decide/v1/decide)\" | tee /dev/stderr | grep -q '\"q\"'"   # plan 39: real work, run by aihub setup --smoke and the field test
+check = "gaifa start decide && gaifa check decide"
+smoke = "gaifa start decide >/dev/null && curl -fsS -H 'content-type: application/json' -d '{\"input\": \"The sky is blue.\", \"questions\": [{\"id\": \"q\", \"type\": \"yesno\", \"question\": \"Is this about the sky?\"}]}' \"$(gaifa url api/s/decide/v1/decide)\" | tee /dev/stderr | grep -q '\"q\"'"   # plan 39: real work, run by gaifa setup --smoke and the field test
 
 [[steps]]
-run = "aihub install decide"
+run = "gaifa install decide"
 what = "makes .venv/ with PyTorch for this machine's variant (on gfx1151 locks/decide.txt: ROCm nightly torch, about 4 GB of wheels, 6.6 GB installed; elsewhere requirements.txt from the variant's index) and downloads d3-lite (1.7 GB) at its pinned revision"
 
 [[suggest]]
@@ -102,7 +102,7 @@ The vLLM Semantic Router's own server (`vllm-sr serve -e vllm-sr/d3-lite`, `/v1/
 ## Install
 
 ```bash
-aihub install decide
+gaifa install decide
 ```
 
 Runs `install.sh`:
@@ -150,7 +150,7 @@ Each answer is `{probs, top, p}` (a score adds `value`, the expected level with 
 ## Check it works
 
 ```bash
-aihub start decide && aihub check decide
+gaifa start decide && gaifa check decide
 ```
 
 Expect `decide: all checks passed`.
@@ -174,11 +174,11 @@ Run in `services/decide/` with the env from `service.toml` (`HF_HOME`, `HF_MODUL
 
 ## What to look for
 
-- **The nightly wheel index drops old builds.** `locks/decide.txt` pins torch and ROCm build `10.2.0a20260926` from `https://nightly.repo.amd.com/rocm/whl-next/`, which on 2026-10-21 kept only about the last two months of builds. When a pinned wheel is gone, `aihub install decide` stops at uv's resolve ("No solution found"); what to do is in [Breeze's doc](../../tts/setup/breeze.md#what-to-look-for) (uv's cache first, else move every package of the build to one the index still has, together).
+- **The nightly wheel index drops old builds.** `locks/decide.txt` pins torch and ROCm build `10.2.0a20260926` from `https://nightly.repo.amd.com/rocm/whl-next/`, which on 2026-10-21 kept only about the last two months of builds. When a pinned wheel is gone, `gaifa install decide` stops at uv's resolve ("No solution found"); what to do is in [Breeze's doc](../../tts/setup/breeze.md#what-to-look-for) (uv's cache first, else move every package of the build to one the index still has, together).
 - **Numerics are fixed by the checkpoint** (BF16 backbone, FP32 readout); the runtime refuses dtype casts. On the CPU it still runs BF16 (slow).
 - **The first question after a load is slow** (about 2 s: kernel selection), so loading asks one warm-up question.
-- **A worker crash** answers `503 worker_died` with a fix; the next call starts a new worker. Repeated crashes: `aihub logs decide` and `journalctl -k`. A failure inside the model while the worker stays up answers `503 model_error`.
-- **MIOpen is off in the worker** (`torch.backends.cudnn.enabled = False`). The Gated DeltaNet layers' short convolution used to go to MIOpen, which times its algorithms for every input length it hasn't seen. On 2026-10-21 one worker's timings all read 0, so every new length failed (`Invalid elapsed time detected in EvaluateInvokers`, then `No suitable algorithm`) while lengths timed earlier kept working, which looked like a limit on long inputs. MIOpen also wrote its results to `~/.config/miopen`, outside AIHub. PyTorch's own depthwise kernel runs instead, as d3 already does for its vision patch embedding.
+- **A worker crash** answers `503 worker_died` with a fix; the next call starts a new worker. Repeated crashes: `gaifa logs decide` and `journalctl -k`. A failure inside the model while the worker stays up answers `503 model_error`.
+- **MIOpen is off in the worker** (`torch.backends.cudnn.enabled = False`). The Gated DeltaNet layers' short convolution used to go to MIOpen, which times its algorithms for every input length it hasn't seen. On 2026-10-21 one worker's timings all read 0, so every new length failed (`Invalid elapsed time detected in EvaluateInvokers`, then `No suitable algorithm`) while lengths timed earlier kept working, which looked like a limit on long inputs. MIOpen also wrote its results to `~/.config/miopen`, outside GAIFA. PyTorch's own depthwise kernel runs instead, as d3 already does for its vision patch embedding.
 - **Never `malloc_trim`** in a ROCm process here (setup/embed.md, What to look for); the worker design makes it unneeded.
 - **Files can change on this machine without a write** (2026-10-20, 20:51). The weights passed the check at 19:02 and on loads until 20:22. At 20:51 they failed it: 20 whole 4 KiB pages differed from a fresh download, with no BTRFS error. That fits the memory corruption seen that day. The full check (`DECIDE_VERIFY=full`) is why it was caught. Re-download with `install.sh --force` if it fires.
 - **`409 unpinned_revision`** means the files on disk aren't the revision whose code was read: `install.sh --force` restores them.

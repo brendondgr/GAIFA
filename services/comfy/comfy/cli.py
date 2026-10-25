@@ -28,7 +28,7 @@ def _library(s: Settings) -> Library:
     packs = Packs(s.workflows, s.comfy_view)
     packs.scan()
     lib = Library(packs, NodeCatalog.load(s.data / "object_info.json"), Tasks.load(),
-                  s.hub_url or os.environ.get("AIHUB_URL", "http://127.0.0.1:7000"), s.models)
+                  s.hub_url or os.environ.get("GAIFA_URL", "http://127.0.0.1:7000"), s.models)
     asyncio.run(lib.refresh_models(force=True))
     return lib
 

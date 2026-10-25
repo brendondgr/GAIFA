@@ -1,4 +1,4 @@
-"""Routes for AIHub (architecture §4.6): the status AIHub polls."""
+"""Routes for GAIFA (architecture §4.6): the status GAIFA polls."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ RANGES = {"24h": 1, "7d": 7, "30d": 30, "90d": 90}
 
 
 def _queue_jobs(ctl, ours: set[str] = frozenset()) -> list[dict]:
-    """ComfyUI's own queue, for prompts AIHub didn't queue (from ComfyUI's page)."""
+    """ComfyUI's own queue, for prompts GAIFA didn't queue (from ComfyUI's page)."""
     out = []
     for state, entries in (("running", ctl.running), ("queued", ctl.pending)):
         for e in entries:
@@ -44,7 +44,7 @@ def _run_jobs(db, runner=None) -> tuple[list[dict], set[str]]:
     return jobs, {r["prompt_id"] for r in rows if r.get("prompt_id")}
 
 
-@router.get("/v1/status", summary="Load state, queue and stats for AIHub")
+@router.get("/v1/status", summary="Load state, queue and stats for GAIFA")
 def status(request: Request) -> dict:
     st = request.app.state
     ctl = st.control

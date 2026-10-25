@@ -23,7 +23,7 @@ from utils.registry.model import RegistryError, now_iso
 if TYPE_CHECKING:
     from utils.registry.store import Registry
 
-log = logging.getLogger("aihub.registry")
+log = logging.getLogger("gaifa.registry")
 
 CHUNK = 8 * 1024 * 1024
 HASH = hashlib.sha256
@@ -47,7 +47,7 @@ class Verifier:
         reg.on_delete = self.cancel  # type: ignore[method-assign]
 
     def start(self) -> None:
-        self._task = asyncio.create_task(self._run(), name="aihub-verify")
+        self._task = asyncio.create_task(self._run(), name="gaifa-verify")
 
     async def close(self) -> None:
         self._stop.set()

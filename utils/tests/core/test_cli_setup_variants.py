@@ -1,4 +1,4 @@
-"""38.2: `aihub setup` picks each setup's variant for the machine: per fixture, --accel, a setup this
+"""38.2: `gaifa setup` picks each setup's variant for the machine: per fixture, --accel, a setup this
 machine can't run (and what needs it), untested variants, the steps' environment and the recorded choice."""
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ from utils import cli, cli_setup, hardware
 from utils.tests.core.test_cli_setup import AGENT, RELAY, FakeProbe, FakeRunner, args, block, out, root  # noqa: F401 (root is a fixture)
 
 FIX = Path(__file__).resolve().parents[1] / "hardware" / "fixtures"
-TTS3 = block("tts-kokoro", "Kokoro", summary='"Speech"', disk_gb="14", check='"aihub check tts"', smoke='"scripts/smoke.sh"',
-             _tables='[[steps]]\nrun = "aihub install tts"\nwhat = "the server venv"\n\n'
+TTS3 = block("tts-kokoro", "Kokoro", summary='"Speech"', disk_gb="14", check='"gaifa check tts"', smoke='"scripts/smoke.sh"',
+             _tables='[[steps]]\nrun = "gaifa install tts"\nwhat = "the server venv"\n\n'
                      '[[variants]]\naccel = "rocm"\ntested = true\nenv = { TTS_FAST = "1" }\nsteps = [ { run = "scripts/install-runtime.sh --accel rocm", what = "ROCm wheels" } ]\n\n'
                      '[[variants]]\naccel = "cuda"\nos = ["linux", "wsl"]\nsteps = [ { run = "scripts/install-runtime.sh --accel cuda", what = "CUDA wheels" } ]\n\n'
                      '[[variants]]\naccel = "cpu"\nos = ["linux", "wsl", "darwin"]\ntested = ["linux"]\nnote = "slower"\nsteps = [ { run = "scripts/install-runtime.sh --accel cpu", what = "CPU wheels" } ]')
@@ -85,7 +85,7 @@ def test_steps_run_with_the_variant_env_and_the_choice_is_recorded(root3, capsys
     runner = FakeRunner()
     assert cli_setup.cmd_setup(args("tts", yes=True, smoke=True), runner, Probe()) == 0
     env = next(e for c, _, e in runner.ran if c == "scripts/install-runtime.sh --accel rocm")
-    assert env == {"TTS_FAST": "1", "AIHUB_ACCEL": "rocm", "AIHUB_DEVICE": "cuda", "AIHUB_GPU_ARCH": "gfx1151"}
+    assert env == {"TTS_FAST": "1", "GAIFA_ACCEL": "rocm", "GAIFA_DEVICE": "cuda", "GAIFA_GPU_ARCH": "gfx1151"}
     assert ("PUT", "/api/services/tts/config", {"accel": "rocm", "env": {"TTS_FAST": "1"}}) in runner.calls
     r = out(capsys)
     assert r["smokes"] == [{"setup": "tts-kokoro", "run": "scripts/smoke.sh", "ok": True, "log": "data/state/setup/logs/tts-kokoro_smoke.log"}]

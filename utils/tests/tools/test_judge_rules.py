@@ -47,7 +47,7 @@ COMMANDS = [
     ("find . -name '*.py' -newer setup.cfg", "allow", "read-only"),
     ("awk '{print $1}' data.txt", "allow", "read-only"),
     ("tar tf archive.tar", "allow", "read-only"),
-    ("systemctl --user status aihub", "allow", "systemctl-read"),
+    ("systemctl --user status gaifa", "allow", "systemctl-read"),
     ("python --version", "allow", "read-only"),
     # writes inside the folder
     ("mkdir -p build/out && touch build/out/.keep", "allow", "write-inside"),

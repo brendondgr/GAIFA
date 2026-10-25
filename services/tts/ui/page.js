@@ -1,5 +1,5 @@
-// Speech (tts) page inside AIHub: Speak and Voices tabs (design brief Part B3). Calls LocalTTS's
-// own API through ctx.call (AIHub's proxy, so memory is managed). History is the generic Outputs tab.
+// Speech (tts) page inside GAIFA: Speak and Voices tabs (design brief Part B3). Calls LocalTTS's
+// own API through ctx.call (GAIFA's proxy, so memory is managed). History is the generic Outputs tab.
 import { chartCard, charts, rh, waveform, wavSamples } from '/mod-charts.js';
 import { requireRunning, callRoom, segmented, header, panel, columns, stat, store, fmtSecs, MONO } from '/mod-kit.js';
 
@@ -116,7 +116,7 @@ function speakTab(el, ctx, cleanups) {
     const note = ui.text(ctx.service.load === 'loaded' ? 'Speaking…' : `Loading ${breeze ? 'Breeze (about 30 s cold)' : 'Kokoro'}, then speaking…`, { muted: true });
     const pending = panel(header('Generating'), note);
     result.prepend(pending);
-    // AIHub's GPU queue (plan 31.3): while the request waits for another mod's GPU work, say so.
+    // GAIFA's GPU queue (plan 31.3): while the request waits for another mod's GPU work, say so.
     const said = note.textContent;
     const gpuWait = setInterval(async () => {
       try {

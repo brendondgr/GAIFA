@@ -273,13 +273,13 @@ def history_list(history: dict) -> list[dict]:
         graph = p[2] if len(p) > 2 else {}
         extra = p[3] if len(p) > 3 and isinstance(p[3], dict) else {}
         editor = (extra.get("extra_pnginfo") or {}).get("workflow")
-        aihub = (extra.get("extra_pnginfo") or {}).get("aihub")
+        gaifa = (extra.get("extra_pnginfo") or {}).get("gaifa")
         files = [it.get("filename") for o in (h.get("outputs") or {}).values() for v in o.values() if isinstance(v, list)
                  for it in v if isinstance(it, dict) and it.get("type") == "output"]
         types = sorted({n.get("class_type") for n in graph.values() if isinstance(n, dict)})
         out.append({"prompt_id": pid, "number": p[0] if p else 0, "nodes": len(graph), "has_editor": bool(editor),
                     "status": ((h.get("status") or {}).get("status_str")), "files": files[:4],
-                    "from_aihub": (aihub or {}).get("workflow"), "types": types[:12]})
+                    "from_gaifa": (gaifa or {}).get("workflow"), "types": types[:12]})
     return sorted(out, key=lambda x: -(x["number"] or 0))
 
 

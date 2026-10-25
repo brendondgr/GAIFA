@@ -44,7 +44,7 @@ class Relay:
         self._retry: asyncio.Task | None = None
 
     def body(self, p: Profile) -> dict[str, Any]:
-        hub = os.environ.get("AIHUB_URL", "http://127.0.0.1:7000").rstrip("/")
+        hub = os.environ.get("GAIFA_URL", "http://127.0.0.1:7000").rstrip("/")
         return {"name": f"vllm-{p.id}", "port": self.s.engine_port, "host": "127.0.0.1", "alias": p.alias,
                 "available_models": [p.served], "server_type": "vLLM", "owner": OWNER,
                 "meta": {"manager_url": f"{hub}/#/s/vllm", "profile": p.id, "model": p.model,

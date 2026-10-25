@@ -18,7 +18,7 @@ def proj(client, repo):
 
 
 def post(client, route, origin=None, **body):
-    headers = {"X-AIHub-Origin": json.dumps(origin)} if origin else {}
+    headers = {"X-GAIFA-Origin": json.dumps(origin)} if origin else {}
     return client.post(route, json=body, headers=headers)
 
 
@@ -166,7 +166,7 @@ def test_a_repos_own_drivers_never_run_on_the_host(client, proj, tmp_path):
     for cmd, rev in (("status", None), ("diff", None), ("diff", "HEAD"), ("log", None), ("show", None)):
         assert post(client, "/v1/git", folder="proj", command=cmd, rev=rev).status_code == 200, cmd
     assert not marker.exists(), marker.read_text()
-    r = client.post("/v1/git/commit", json={"folder": "proj", "message": "m"}, headers={"X-AIHub-Origin": '{"thread": "t1"}'})
+    r = client.post("/v1/git/commit", json={"folder": "proj", "message": "m"}, headers={"X-GAIFA-Origin": '{"thread": "t1"}'})
     assert r.status_code == 200, r.text
     assert post(client, "/v1/git", folder="proj", command="show").status_code == 200
     assert not marker.exists(), marker.read_text()

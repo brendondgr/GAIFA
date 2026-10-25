@@ -1,5 +1,5 @@
 """Live runs on the GPU (marked `gpu`; run with STT_GPU_TESTS=1). The GPU is shared: each test loads a
-small model and unloads it when done. Weights come from data/models/stt (AIHUB_MODELS)."""
+small model and unloads it when done. Weights come from data/models/stt (GAIFA_MODELS)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from stt.engine import Engine
 from stt.vad import build_detector
 
 pytestmark = pytest.mark.gpu
-MODELS = Path(os.environ.get("AIHUB_MODELS") or MOD_DIR.parent.parent / "data" / "models")
+MODELS = Path(os.environ.get("GAIFA_MODELS") or MOD_DIR.parent.parent / "data" / "models")
 
 
 def gpu_settings() -> Settings:

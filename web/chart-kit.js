@@ -1,4 +1,4 @@
-// Shared pieces of AIHub's charts (brief §11.6): formatting, scales, the size hook, and the
+// Shared pieces of GAIFA's charts (brief §11.6): formatting, scales, the size hook, and the
 // frame every chart uses (loading / empty / error, legend, tooltip, "View as table").
 // Written by us (revision 2 was built by hand, see web/PATCHES.md). Plain SVG through the page's
 // own React (window.React, served from web/vendor/); no chart library, nothing from a CDN.

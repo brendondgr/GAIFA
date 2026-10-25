@@ -6,7 +6,7 @@ from __future__ import annotations
 from agent import prompts
 
 GRANTS = {"id": "grants", "name": "Grants", "folders": [{"id": "mycelium", "path": "/home/u/Agents/Mycelium", "level": "read"}]}
-DEFAULT = {"id": "default", "name": "Default", "folders": [{"id": "aihub", "path": "/home/u/Agents/AIHub", "level": "read"},
+DEFAULT = {"id": "default", "name": "Default", "folders": [{"id": "gaifa", "path": "/home/u/Agents/GAIFA", "level": "read"},
                                                             {"id": "site", "path": "/srv/site", "level": "run_net"}]}
 
 
@@ -18,7 +18,7 @@ def test_the_note_lists_the_environment_and_the_chats_own_folders():
     assert "Allowed in this chat by the user: ~/notes (Read, id notes)" in note
     assert "pass its full path as `folder`" in note and "If they deny it, tell them; don't retry it." in note
     d = prompts.folders_note({"environment": {"name": "Default"}, "folders": DEFAULT["folders"]}, "/home/u")
-    assert "~/Agents/AIHub (Read, id aihub); /srv/site (Run + network, id site)" in d and "Allowed in" not in d
+    assert "~/Agents/GAIFA (Read, id gaifa); /srv/site (Run + network, id site)" in d and "Allowed in" not in d
     empty = prompts.folders_note({"environment": {"name": "Empty"}, "folders": []})
     assert "This chat's environment (Empty) has no workspace folders." in empty
     assert prompts.folders_note(None) == ""

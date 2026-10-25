@@ -200,8 +200,8 @@ async def test_pause_survives_killing_the_agent_process(env, tmp_path):
         {"question": "Which animal?", "header": "Animal", "options": [{"label": "Fox"}, {"label": "Owl"}]}]}}]},
         {"text": "A fox it is.", "match": "Fox"})
     port = free_port()
-    envv = {**os.environ, "AIHUB_PORT": str(port), "AGENT_DB": str(tmp_path / "proc.db"), "AGENT_DATA": str(tmp_path / "data"),
-            "AGENT_LLM_URL": env.llm_url, "AIHUB_URL": env.hub_url, "AGENT_MODEL": "main", "AGENT_FALLBACK_MODEL": ""}
+    envv = {**os.environ, "GAIFA_PORT": str(port), "AGENT_DB": str(tmp_path / "proc.db"), "AGENT_DATA": str(tmp_path / "data"),
+            "AGENT_LLM_URL": env.llm_url, "GAIFA_URL": env.hub_url, "AGENT_MODEL": "main", "AGENT_FALLBACK_MODEL": ""}
 
     def start() -> subprocess.Popen:
         p = subprocess.Popen([str(ROOT / ".venv/bin/python"), "-m", "agent"], cwd=ROOT, env=envv,

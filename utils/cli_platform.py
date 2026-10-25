@@ -1,4 +1,4 @@
-"""What `aihub` does differently on WSL2 and macOS (plan 37.2). Standard library only.
+"""What `gaifa` does differently on WSL2 and macOS (plan 37.2). Standard library only.
 
 - **Opening the UI:** WSL2 opens the Windows browser (`wslview`, else `explorer.exe`), macOS uses
   `open`, Linux `xdg-open`, anything else Python's `webbrowser`.
@@ -9,7 +9,7 @@
   - **macOS:** a launchd agent. Its plist is written inside the project (`data/state/hub/`), and the
     commands that place and load it are printed for the person: nothing is written outside the
     project.
-  - **Without systemd:** the hub runs detached, with a pidfile (`data/state/hub/aihub.json`), for
+  - **Without systemd:** the hub runs detached, with a pidfile (`data/state/hub/gaifa.json`), for
     `start`, `stop` and `status`.
 """
 
@@ -26,7 +26,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-LABEL = "com.aihub.hub"
+LABEL = "com.gaifa.hub"
 WSL_CONF = Path("/etc/wsl.conf")
 
 
@@ -58,10 +58,10 @@ def wsl_systemd_fix(conf: Path = WSL_CONF) -> str | None:
     has = any(line.replace(" ", "").lower() == "systemd=true" for line in text.splitlines())
     head = ("/etc/wsl.conf turns systemd on, but this WSL session started before that"
             if has else "WSL runs without systemd")
-    return (f"{head}. AIHub runs as a systemd user service, so turn it on:\n"
+    return (f"{head}. GAIFA runs as a systemd user service, so turn it on:\n"
             + ("" if has else "  printf '[boot]\\nsystemd=true\\n' | sudo tee -a /etc/wsl.conf\n")
             + "  then, in Windows (PowerShell): wsl --shutdown   and open Ubuntu again.\n"
-            "Until then, `aihub start` runs the hub without systemd (it stops when WSL shuts down).")
+            "Until then, `gaifa start` runs the hub without systemd (it stops when WSL shuts down).")
 
 
 def open_url(url: str) -> int:
@@ -87,7 +87,7 @@ def tail(path: Path, n: int, follow: bool, out=sys.stdout, poll_s: float = 0.3, 
             f.seek(max(0, f.tell() - 512 * 1024))
             lines = f.read().split(b"\n")
     except OSError as e:
-        print(f"aihub: {path}: {e.strerror}", file=sys.stderr)
+        print(f"gaifa: {path}: {e.strerror}", file=sys.stderr)
         return 1
     for raw in [x for x in lines[:-1]][-n:] if n > 0 else []:
         out.write(raw.decode(errors="replace") + "\n")
@@ -121,7 +121,7 @@ def tail(path: Path, n: int, follow: bool, out=sys.stdout, poll_s: float = 0.3, 
 
 def plist(code: Path, root: Path) -> str:
     py = code / ".venv" / "bin" / "python"
-    log = root / "data" / "logs" / "aihub.launchd.log"
+    log = root / "data" / "logs" / "gaifa.launchd.log"
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -129,7 +129,7 @@ def plist(code: Path, root: Path) -> str:
   <key>Label</key><string>{LABEL}</string>
   <key>ProgramArguments</key><array><string>{py}</string><string>{code / 'app.py'}</string></array>
   <key>WorkingDirectory</key><string>{code}</string>
-  <key>EnvironmentVariables</key><dict><key>AIHUB_ROOT</key><string>{root}</string></dict>
+  <key>EnvironmentVariables</key><dict><key>GAIFA_ROOT</key><string>{root}</string></dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>StandardOutPath</key><string>{log}</string>
@@ -154,7 +154,7 @@ def launchd_install(code: Path, root: Path) -> tuple[Path, list[str]]:
 
 
 def _pidfile(root: Path) -> Path:
-    return root / "data" / "state" / "hub" / "aihub.json"
+    return root / "data" / "state" / "hub" / "gaifa.json"
 
 
 def _alive(pid: int) -> bool:
@@ -190,12 +190,12 @@ def hub_pid(root: Path) -> int | None:
 def hub_start(code: Path, root: Path, args: list[str] | None = None) -> int:
     if hub_pid(root):
         return hub_pid(root) or 0
-    out = root / "data" / "state" / "hub" / "aihub.out"
+    out = root / "data" / "state" / "hub" / "gaifa.out"
     out.parent.mkdir(parents=True, exist_ok=True)
     py = code / ".venv" / "bin" / "python"
     with out.open("ab") as f:
         p = subprocess.Popen([str(py if py.exists() else sys.executable), str(code / "app.py"), *(args or [])], cwd=code,
-                             env={**os.environ, "AIHUB_ROOT": str(root)}, stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT,
+                             env={**os.environ, "GAIFA_ROOT": str(root)}, stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT,
                              start_new_session=True)
     _pidfile(root).write_text(json.dumps({"pid": p.pid, "started_ts": time.time()}))
     return p.pid

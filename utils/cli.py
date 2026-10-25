@@ -1,8 +1,8 @@
-"""`aihub`: the command line for the hub. Standard library only, so it starts fast
+"""`gaifa`: the command line for the hub. Standard library only, so it starts fast
 and works when the venv is broken. It talks to the running hub over HTTP and
 to systemd with `systemctl --user` / `journalctl --user`.
 
-Run through `bin/aihub`, which picks the hub's venv python.
+Run through `bin/gaifa`, which picks the hub's venv python.
 """
 
 from __future__ import annotations
@@ -22,11 +22,11 @@ from typing import Any
 from urllib.parse import quote
 
 CODE = Path(__file__).resolve().parent.parent  # app.py, bin/, .venv/
-ROOT = Path(os.environ.get("AIHUB_ROOT") or CODE)  # config.toml, data/
-UNIT = "aihub.service"
-TEMPLATE = CODE / "bin" / "aihub.service.in"
+ROOT = Path(os.environ.get("GAIFA_ROOT") or CODE)  # config.toml, data/
+UNIT = "gaifa.service"
+TEMPLATE = CODE / "bin" / "gaifa.service.in"
 UNIT_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
-LINK = Path.home() / ".local" / "bin" / "aihub"
+LINK = Path.home() / ".local" / "bin" / "gaifa"
 WAIT_S = 600  # start/stop/restart wait for the mod to settle (start_timeout_s can be minutes)
 
 
@@ -44,7 +44,7 @@ class ApiError(Exception):
 
 
 def hub_url() -> str:
-    env = os.environ.get("AIHUB_URL")
+    env = os.environ.get("GAIFA_URL")
     if env:
         return env.rstrip("/")
     port = 7000
@@ -69,7 +69,7 @@ def call(method: str, path: str, body: Any = None, timeout: float = 10) -> Any:
             err = {}
         raise ApiError(e.code, err.get("detail") or e.reason, err.get("code") or "hub_error") from None
     except (urllib.error.URLError, ConnectionError, TimeoutError) as e:
-        raise HubDown(f"AIHub is not running at {hub_url()} ({getattr(e, 'reason', e)})") from None
+        raise HubDown(f"GAIFA is not running at {hub_url()} ({getattr(e, 'reason', e)})") from None
     return json.loads(raw) if raw else None
 
 
@@ -130,7 +130,7 @@ def table(rows: list[list[str]]) -> str:
 
 
 def down_hint() -> str:
-    return "Start it with `aihub start`" + ("" if unit_installed() else " (after `aihub install`), or run `aihub serve`") + "."
+    return "Start it with `gaifa start`" + ("" if unit_installed() else " (after `gaifa install`), or run `gaifa serve`") + "."
 
 
 # --- commands -----------------------------------------------------------------
@@ -176,7 +176,7 @@ def cmd_docs(args: argparse.Namespace) -> int:
         print(f"removed {rel} (its model is gone and it had no hand-written text)")
     problems = report.problems(strict=args.strict)
     for p in problems:
-        print(f"aihub docs: {p}", file=sys.stderr)
+        print(f"gaifa docs: {p}", file=sys.stderr)
     if not args.strict and report.uncovered_mods:
         print(f"{len(report.uncovered_mods)} mod(s) without a setup doc: {', '.join(report.uncovered_mods)} (--strict fails on them)")
     if not args.check and (report.uncovered or report.unsourced):
@@ -187,14 +187,14 @@ def cmd_docs(args: argparse.Namespace) -> int:
 
 
 def _setup() -> Any:
-    """utils/cli_setup.py (plan 23.9). Its arguments are part of `aihub --help`, so it's loaded the
+    """utils/cli_setup.py (plan 23.9). Its arguments are part of `gaifa --help`, so it's loaded the
     way this file was: as a script (utils/ on sys.path, no `utils` package) or as the package (tests)."""
     if __package__:
         from utils import cli_setup
     else:
         here = str(Path(__file__).resolve().parent)
         if here not in sys.path:
-            sys.path.insert(0, here)   # utils/ itself, as when bin/aihub runs this file: never the utils package
+            sys.path.insert(0, here)   # utils/ itself, as when bin/gaifa runs this file: never the utils package
         import cli_setup  # type: ignore[no-redef]
     cli_setup.cli = sys.modules[__name__]
     return cli_setup
@@ -247,7 +247,7 @@ def cmd_backup(args: argparse.Namespace) -> int:
         from utils import cli_backup
     except ImportError:
         import cli_backup  # type: ignore[no-redef]
-    return cli_backup.cmd_backup(args, Path(os.environ.get("AIHUB_ROOT") or CODE))  # read now, not at import
+    return cli_backup.cmd_backup(args, Path(os.environ.get("GAIFA_ROOT") or CODE))  # read now, not at import
 
 
 def cmd_new(args: argparse.Namespace) -> int:
@@ -264,13 +264,30 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 def _link() -> None:
     LINK.parent.mkdir(parents=True, exist_ok=True)
-    target = CODE / "bin" / "aihub"
+    target = CODE / "bin" / "gaifa"
     if LINK.is_symlink() or LINK.exists():
         if LINK.resolve() != target.resolve():
-            print(f"aihub: {LINK} exists and points elsewhere; leaving it", file=sys.stderr)
+            print(f"gaifa: {LINK} exists and points elsewhere; leaving it", file=sys.stderr)
     else:
         LINK.symlink_to(target)
         print(f"linked {LINK} -> {target}")
+
+
+def _drop_legacy() -> None:
+    """The names from before the rename to GAIFA (plan 50.2): an `aihub.service` and an `~/.local/bin/aihub`
+    link that ran this clone, or a clone that is gone (the folder was renamed with it)."""
+    old_unit, old_link = UNIT_DIR / "aihub.service", LINK.with_name("aihub")
+    ours = lambda p: not p.exists() or p.resolve() == CODE.resolve()  # noqa: E731
+    if old_unit.exists():
+        wd = next((ln.split("=", 1)[1].strip() for ln in old_unit.read_text().splitlines()
+                   if ln.startswith("WorkingDirectory=")), None)
+        if wd and ours(Path(wd)):
+            systemctl("disable", "--now", old_unit.name, quiet=True)
+            old_unit.unlink()
+            print(f"removed {old_unit} (the hub's name before GAIFA)")
+    if old_link.is_symlink() and ours(Path(os.readlink(old_link)).parent.parent):
+        old_link.unlink()
+        print(f"removed {old_link} (the command's name before GAIFA)")
 
 
 def cmd_install(args: argparse.Namespace) -> int:
@@ -280,19 +297,20 @@ def cmd_install(args: argparse.Namespace) -> int:
     if plat.is_macos():          # plan 37.2: a launchd agent, placed by the person (nothing written outside the project)
         _link()
         here, cmds = plat.launchd_install(CODE, ROOT)
-        print(f"wrote {here}\nTo run AIHub at login, run:\n" + "\n".join("  " + c for c in cmds)
-              + "\nUntil then, `aihub start` runs it in the background (it stops when you log out).")
+        print(f"wrote {here}\nTo run GAIFA at login, run:\n" + "\n".join("  " + c for c in cmds)
+              + "\nUntil then, `gaifa start` runs it in the background (it stops when you log out).")
         return 0
     if plat.is_wsl() and plat.wsl_systemd_fix():
         _link()
-        print("aihub: " + plat.wsl_systemd_fix(), file=sys.stderr)
+        print("gaifa: " + plat.wsl_systemd_fix(), file=sys.stderr)
         return 1
     if not plat.systemd_running():
         _link()
-        print("aihub: no systemd here, so AIHub can't be installed as a service. `aihub start` runs it in the background;"
+        print("gaifa: no systemd here, so GAIFA can't be installed as a service. `gaifa start` runs it in the background;"
               " mods run as detached processes that outlive it.", file=sys.stderr)
         return 1
     UNIT_DIR.mkdir(parents=True, exist_ok=True)
+    _drop_legacy()
     (UNIT_DIR / UNIT).write_text(render_unit())
     print(f"wrote {UNIT_DIR / UNIT}")
     _link()
@@ -305,9 +323,9 @@ def cmd_install(args: argparse.Namespace) -> int:
     if not linger():
         print(f"note: lingering is off, so the hub stops when you log out. Turn it on with: loginctl enable-linger {os.environ.get('USER', '')}")
     if not wait_up():
-        print(f"aihub: the hub didn't answer at {hub_url()}; see `aihub logs`", file=sys.stderr)
+        print(f"gaifa: the hub didn't answer at {hub_url()}; see `gaifa logs`", file=sys.stderr)
         return 1
-    print(f"AIHub is up at {hub_url()}/")
+    print(f"GAIFA is up at {hub_url()}/")
     return 0
 
 
@@ -315,9 +333,9 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
     systemctl("disable", "--now", UNIT, quiet=True)
     (UNIT_DIR / UNIT).unlink(missing_ok=True)
     systemctl("daemon-reload")
-    if LINK.is_symlink() and LINK.resolve() == (CODE / "bin" / "aihub").resolve():
+    if LINK.is_symlink() and LINK.resolve() == (CODE / "bin" / "gaifa").resolve():
         LINK.unlink()
-    print(f"removed {UNIT} and the aihub link; running mods were left alone (`aihub stop all` first to stop them)")
+    print(f"removed {UNIT} and the gaifa link; running mods were left alone (`gaifa stop all` first to stop them)")
     return 0
 
 
@@ -355,9 +373,9 @@ def _detached_hub(action: str) -> int:
             return 0
     pid = plat.hub_start(CODE, ROOT)
     if not wait_up(60):
-        print(f"aihub: the hub didn't answer at {hub_url()}; see data/state/hub/aihub.out", file=sys.stderr)
+        print(f"gaifa: the hub didn't answer at {hub_url()}; see data/state/hub/gaifa.out", file=sys.stderr)
         return 1
-    print(f"AIHub is up at {hub_url()}/ (pid {pid}, without a service)")
+    print(f"GAIFA is up at {hub_url()}/ (pid {pid}, without a service)")
     return 0
 
 
@@ -366,11 +384,11 @@ def _lifecycle(action: str, target: str | None) -> int:
         if _no_unit():
             return _detached_hub(action)
         if not unit_installed():
-            print("aihub: the hub isn't installed as a service; run `aihub install` (or `aihub serve`)", file=sys.stderr)
+            print("gaifa: the hub isn't installed as a service; run `gaifa install` (or `gaifa serve`)", file=sys.stderr)
             return 1
         rc = systemctl(action, UNIT)
         if rc == 0 and action != "stop" and not wait_up():
-            print(f"aihub: the hub didn't answer at {hub_url()}; see `aihub logs`", file=sys.stderr)
+            print(f"gaifa: the hub didn't answer at {hub_url()}; see `gaifa logs`", file=sys.stderr)
             return 1
         return rc
     if target == "all":
@@ -436,7 +454,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     unit = "installed" if unit_installed() else "not installed"
     if _no_unit():
         pid = _plat().hub_pid(ROOT)
-        unit = f"running without a service (pid {pid})" if pid else "no service here: `aihub start` runs the hub in the background"
+        unit = f"running without a service (pid {pid})" if pid else "no service here: `gaifa start` runs the hub in the background"
     if unit_installed():
         state = subprocess.run(["systemctl", "--user", "is-active", UNIT], capture_output=True, text=True).stdout.strip()
         unit = f"{UNIT} {state}"
@@ -446,13 +464,13 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(f"{e}\n{unit}\n{down_hint()}")
         return 1
     h = sysinfo["hub"]
-    print(f"AIHub {h['version']} at {hub_url()}  pid {h['pid']}  up {human_secs(h['uptime_s'])}  rss {human_bytes(h['rss_bytes'])}")
+    print(f"GAIFA {h['version']} at {hub_url()}  pid {h['pid']}  up {human_secs(h['uptime_s'])}  rss {human_bytes(h['rss_bytes'])}")
     print(unit)
     d = sysinfo["disk"]
     print(f"disk {human_bytes(d['free_bytes'])} free of {human_bytes(d['total_bytes'])}   root {sysinfo['paths']['root']}")
     services = services_or_none()
     if not services:
-        print("mods: none (add one with `aihub new <id>`)")
+        print("mods: none (add one with `gaifa new <id>`)")
     else:
         rows = [["MOD", "STATE", "LOAD", "PORT", "MEMORY"]]
         for s in services:
@@ -465,12 +483,12 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_logs(args: argparse.Namespace) -> int:
-    """`data/logs/<id>.log` (or `aihub.log`) when it exists (plan 16.1), else the journal."""
-    root = Path(os.environ.get("AIHUB_ROOT") or CODE)
-    f = root / "data" / "logs" / f"{args.id or 'aihub'}.log"
+    """`data/logs/<id>.log` (or `gaifa.log`) when it exists (plan 16.1), else the journal."""
+    root = Path(os.environ.get("GAIFA_ROOT") or CODE)
+    f = root / "data" / "logs" / f"{args.id or 'gaifa'}.log"
     if f.is_file() and not getattr(args, "journal", False):
         return _plat().tail(f, args.n, args.follow)
-    unit = UNIT if args.id is None else f"aihub-{args.id}.service"
+    unit = UNIT if args.id is None else f"gaifa-{args.id}.service"
     cmd = ["journalctl", "--user", "-u", unit, "-n", str(args.n), "--no-pager", "-o", "short-iso"]
     if args.follow:
         cmd.append("-f")
@@ -507,14 +525,14 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             cfg_ok, cfg_note = False, f"not valid TOML: {e}"
     checks.append(("config.toml", cfg_ok, cfg_note))
     if _plat().systemd_running():
-        checks.append(("systemd unit", unit_installed(), str(UNIT_DIR / UNIT) if unit_installed() else "run `aihub install`"))
+        checks.append(("systemd unit", unit_installed(), str(UNIT_DIR / UNIT) if unit_installed() else "run `gaifa install`"))
         checks.append(("linger", linger(), "on" if linger() else f"loginctl enable-linger {os.environ.get('USER', '')}"))
     else:
-        checks.append(("service", True, "no systemd here: `aihub start` runs the hub in the background" + ("; `aihub install` prints the launchd agent" if _plat().is_macos() else "")))
+        checks.append(("service", True, "no systemd here: `gaifa start` runs the hub in the background" + ("; `gaifa install` prints the launchd agent" if _plat().is_macos() else "")))
     try:
         m = _hardware().hardware.detect()
         gpus = "; ".join(f"{g.name}{f' ({g.arch})' if g.arch else ''}" for g in m.gpus) or "no GPU"
-        checks.append(("hardware", True, f"{gpus} · accels {', '.join(m.accels)} (aihub hardware)"))
+        checks.append(("hardware", True, f"{gpus} · accels {', '.join(m.accels)} (gaifa hardware)"))
         checks += [(f"gpu {g.index}", False, p) for g in m.gpus for p in g.problems if not set(m.accels) & {"rocm", "cuda", "xpu", "mps"}]   # a problem matters when no GPU can compute
     except Exception as e:  # noqa: BLE001: detection must never stop the doctor
         checks.append(("hardware", False, f"couldn't read: {e}"))
@@ -546,11 +564,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def cmd_inventory(args: argparse.Namespace) -> int:
-    """`aihub doctor --inventory` (plan 16.3): every path outside the project, with its reason."""
+    """`gaifa doctor --inventory` (plan 16.3): every path outside the project, with its reason."""
     try:
         inv = call("GET", "/api/doctor/inventory", timeout=60)
     except (HubDown, ApiError) as e:
-        print(f"aihub doctor --inventory: {e}")
+        print(f"gaifa doctor --inventory: {e}")
         return 1
     if args.json:
         print(json.dumps(inv, indent=1))
@@ -567,16 +585,16 @@ def cmd_inventory(args: argparse.Namespace) -> int:
 
 
 def parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="aihub", description="Control AIHub and its mods.")
+    ap = argparse.ArgumentParser(prog="gaifa", description="Control GAIFA (Great, Another Interface For Agents) and its mods.")
     sub = ap.add_subparsers(dest="cmd", required=True, metavar="command")
 
     p = sub.add_parser("serve", help="run the hub in the foreground (python app.py)")
     p.add_argument("rest", nargs=argparse.REMAINDER, help="passed to app.py (--port, --dev, ...)")
     p.set_defaults(fn=cmd_serve)
-    p = sub.add_parser("install", help="install and start the aihub systemd user service, or (with an id) run a mod's install.sh")
+    p = sub.add_parser("install", help="install and start the gaifa systemd user service, or (with an id) run a mod's install.sh")
     p.add_argument("id", nargs="?")
     p.set_defaults(fn=cmd_install)
-    sub.add_parser("uninstall", help="stop and remove the aihub service").set_defaults(fn=cmd_uninstall)
+    sub.add_parser("uninstall", help="stop and remove the gaifa service").set_defaults(fn=cmd_uninstall)
     for name, fn, what in (("start", cmd_start, "start"), ("stop", cmd_stop, "stop"), ("restart", cmd_restart, "restart")):
         p = sub.add_parser(name, help=f"{what} the hub (no id), a mod, or everything (all)")
         p.add_argument("id", nargs="?")
@@ -602,7 +620,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--inventory", action="store_true", help="list every path outside the project, with its reason (plan 16.3)")
     p.set_defaults(fn=cmd_doctor)
     p = sub.add_parser("backup", help="databases (online copy), registry, config.toml and the mods' .env files in a dated archive")
-    p.add_argument("folder", help="where to write aihub-backup-<date>.tar.gz (made if missing)")
+    p.add_argument("folder", help="where to write gaifa-backup-<date>.tar.gz (made if missing)")
     p.set_defaults(fn=cmd_backup)
     p = sub.add_parser("new", help="create a mod from services/_template, install it and load it")
     p.add_argument("id", help="lowercase letters, digits and -, e.g. my-mod")
@@ -655,10 +673,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.fn(args)
     except HubDown as e:
-        print(f"aihub: {e}\n{down_hint()}", file=sys.stderr)
+        print(f"gaifa: {e}\n{down_hint()}", file=sys.stderr)
         return 1
     except ApiError as e:
-        print(f"aihub: {e.detail} ({e.code})", file=sys.stderr)
+        print(f"gaifa: {e.detail} ({e.code})", file=sys.stderr)
         return 1
 
 

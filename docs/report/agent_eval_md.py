@@ -36,11 +36,11 @@ for f, m in order:
 live = [f"| {t} | {m} | {'pass' if r['ok'] else 'fail'} | {r['seconds']:.0f} s | {', '.join(r['tools'])[:90]} |" for (t, _), (m, r) in final.items()]
 ltable = "| Live case | Model (latest run) | Result | Time | Tools |\n|---|---|---|---|---|\n" + "\n".join(live)
 other = """**Other live checks:**
-- **Pending card and question survive restarts.** A pending parameter card and a pending question both survived `aihub restart` plus `aihub restart agent`, then finished (`evals/restart_live.py`): pass.
+- **Pending card and question survive restarts.** A pending parameter card and a pending question both survived `gaifa restart` plus `gaifa restart agent`, then finished (`evals/restart_live.py`): pass.
 - **Context meter.** It was within 1.1% of the 31B's own prompt-token count (`evals/meter_check.py`).
 - **Compaction.** In a thread capped at 6k tokens, 5 clears and a model-written summary still answered a question about the first turn (`evals/compact_live.py`): pass.
 - **Sessions.** "LLM work", "3D work" and "Video work" were saved on the real mods, and switching between them peaked at 46 GB of a 118 GB limit; the 26B relaunched with its settings (`evals/sessions_live.py`).
-- **MCP.** Claude Code listed 41 AIHub tools and called two. Its `tts_speak` call became a denied approval, and nothing ran."""
+- **MCP.** Claude Code listed 41 GAIFA tools and called two. Its `tts_speak` call became a denied approval, and nothing ran."""
 p = ROOT / "docs" / "agent-eval.md"
 md = p.read_text()
 block = "<!-- RESULTS -->\n" + table + "\n\n" + ltable + "\n\n(Each live case shows its latest run; the report lists every earlier failure and its cause.)\n\n" + other + "\n<!-- /RESULTS -->"

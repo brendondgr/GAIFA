@@ -1,4 +1,4 @@
-"""40.2: `aihub report`, the field report: notes, every section from a failed run on a recorded machine, the
+"""40.2: `gaifa report`, the field report: notes, every section from a failed run on a recorded machine, the
 likely causes, redaction, and a hub that doesn't answer."""
 
 from __future__ import annotations
@@ -21,13 +21,13 @@ ERROR: No matching distribution found for torch==2.9.1+cu130"""
 def field(tmp_path: Path, monkeypatch):
     """A clone on an NVIDIA box whose last setup run failed a step and a smoke; the hub is down."""
     monkeypatch.setattr(cli, "ROOT", tmp_path)
-    monkeypatch.setenv("AIHUB_HARDWARE_FIXTURE", str(FIX / "linux-nvidia-1gpu.json"))
+    monkeypatch.setenv("GAIFA_HARDWARE_FIXTURE", str(FIX / "linux-nvidia-1gpu.json"))
     hardware.detect(refresh=True)
     monkeypatch.setattr(cli_report, "cli", cli)
-    monkeypatch.setattr(cli, "call", lambda *a, **k: (_ for _ in ()).throw(cli.HubDown("AIHub is not running")))
+    monkeypatch.setattr(cli, "call", lambda *a, **k: (_ for _ in ()).throw(cli.HubDown("GAIFA is not running")))
     doc = tmp_path / "services" / "tts" / "setup"
     doc.mkdir(parents=True)
-    (doc / "kokoro.md").write_text("<!-- aihub-setup\nid = \"tts-kokoro\"\n[[steps]]\nrun = \"scripts/install-runtime.sh\"\n-->\n")
+    (doc / "kokoro.md").write_text("<!-- gaifa-setup\nid = \"tts-kokoro\"\n[[steps]]\nrun = \"scripts/install-runtime.sh\"\n-->\n")
     logs = tmp_path / "data" / "state" / "setup" / "logs"
     logs.mkdir(parents=True)
     (logs / "tts-kokoro_3.log").write_text("$ scripts/install-runtime.sh\n" + CUDA_OOPS + "\nHF_TOKEN=hf_abcdefghijklmnopqrstuvwx\n# exit 1\n")
@@ -40,13 +40,13 @@ def field(tmp_path: Path, monkeypatch):
                 "smokes": [{"setup": "embed", "run": "curl …", "ok": False, "log": "data/state/setup/logs/embed_smoke.log"}],
                 "failed": [
                     {"setup": "tts-kokoro", "step": "tts-kokoro/3", "run": "scripts/install-runtime.sh", "output": "", "doc": "services/tts/setup/kokoro.md",
-                     "source": "services/tts/setup/kokoro.md:4", "cwd": "services/tts", "exit": 1, "env": {"AIHUB_ACCEL": "cuda", "AIHUB_DEVICE": "cuda"},
+                     "source": "services/tts/setup/kokoro.md:4", "cwd": "services/tts", "exit": 1, "env": {"GAIFA_ACCEL": "cuda", "GAIFA_DEVICE": "cuda"},
                      "log": "data/state/setup/logs/tts-kokoro_3.log"},
                     {"setup": "embed", "step": "smoke", "run": "curl …", "output": "", "doc": "services/embed/setup/embed.md", "exit": 7,
                      "log": "data/state/setup/logs/embed_smoke.log", "cwd": "services/embed"}]}}}
     (tmp_path / "data" / "state" / "setup" / "last-run.json").write_text(json.dumps(last))
     yield tmp_path
-    monkeypatch.delenv("AIHUB_HARDWARE_FIXTURE")
+    monkeypatch.delenv("GAIFA_HARDWARE_FIXTURE")
     hardware.detect(refresh=True)
 
 
@@ -58,12 +58,12 @@ def args(action="write", text=None, **kw) -> argparse.Namespace:
 def test_a_full_report(field, capsys):
     out = field / "error.txt"
     out.write_text("Traceback …\nlibcudnn_ops.so.9: cannot open shared object file: No such file or directory\n")
-    assert cli_report.cmd_report(args("note", "stt fell back to the CPU", cmd="aihub check stt", output=str(out),
+    assert cli_report.cmd_report(args("note", "stt fell back to the CPU", cmd="gaifa check stt", output=str(out),
                                       setup="stt", severity="blocker", tried="reinstalled the cuDNN wheel")) == 0
     assert cli_report.cmd_report(args()) == 0
     md_path = next((field / "data" / "state" / "reports").glob("*.md"))
     md = md_path.read_text()
-    for heading in ("# AIHub field report", "## Summary", "## Machine", "## AIHub", "## Host checks", "## The setup run",
+    for heading in ("# GAIFA field report", "## Summary", "## Machine", "## GAIFA", "## Host checks", "## The setup run",
                     "## Issues", "## Mods", "## For the fixer"):
         assert heading in md, heading
     assert "NVIDIA GeForce RTX 4090 (`sm_89`)" in md and "accels `cuda, vulkan, cpu`" in md
@@ -72,7 +72,7 @@ def test_a_full_report(field, capsys):
     issue = md[md.index("ISSUE-1 [blocker]") if "### ISSUE-1 [blocker]: tts-kokoro" in md else md.index("tts-kokoro: tts-kokoro/3"):]
     assert "**Source:** `services/tts/setup/kokoro.md:4`" in md and "**Exit code:** `1`" in md
     assert "No matching distribution found for torch==2.9.1+cu130" in md and "has no build for this platform" in md
-    assert "`AIHUB_ACCEL=cuda`" in md and "**Files to look at:** `services/tts/setup/kokoro.md`, `services/tts/scripts/install-runtime.sh`" in md
+    assert "`GAIFA_ACCEL=cuda`" in md and "**Files to look at:** `services/tts/setup/kokoro.md`, `services/tts/scripts/install-runtime.sh`" in md
     assert "stt fell back to the CPU" in md and "a shared library is missing" in md and "**Tried:** reinstalled the cuDNN wheel" in md
     assert "a download failed" in md                                                    # the smoke's curl
     assert "the hub wasn't answering" in md
@@ -116,14 +116,14 @@ def test_hints(text, hint):
 
 def test_redaction():
     text = ("token hf_ABCDEFGHIJKLMNOPQRSTUVWX and sk-proj-abcdefghijklmnopqrstuv, OPENAI_API_KEY=abc123, "
-            "Authorization: Bearer xyz, /home/someone/AIHub and /home/someone")
+            "Authorization: Bearer xyz, /home/someone/GAIFA and /home/someone")
     out = report_hints.redact(text, "/home/someone")
     assert "hf_ABC" not in out and "sk-proj" not in out and "abc123" not in out and "xyz" not in out
-    assert "OPENAI_API_KEY=<redacted>" in out and "~/AIHub" in out and out.endswith("~")
+    assert "OPENAI_API_KEY=<redacted>" in out and "~/GAIFA" in out and out.endswith("~")
 
 
 def test_render_is_stable():
-    data = {"written": "2026-10-22", "host": "box", "machine": {"error": "no"}, "aihub": {}, "host_checks": [],
+    data = {"written": "2026-10-22", "host": "box", "machine": {"error": "no"}, "gaifa": {}, "host_checks": [],
             "last_run": None, "issues": [], "mods": [], "hub": {"error": "down"}, "setup_logs": []}
     assert report_md.render(data) == report_md.render(json.loads(json.dumps(data)))
     assert "No run recorded" in report_md.render(data) and "None recorded." in report_md.render(data)

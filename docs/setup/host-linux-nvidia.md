@@ -1,19 +1,19 @@
 # The host: Linux with an NVIDIA GPU
 
-What a Linux machine with an NVIDIA card needs before you clone AIHub (plan 38.4). **Not yet run on such a machine:** the field test (plan 40.5) checks it, and this page is corrected from its report. The commands that are the same everywhere (uv, accounts, disk) are in [host.md](host.md) §3–§6.
+What a Linux machine with an NVIDIA card needs before you clone GAIFA (plan 38.4). **Not yet run on such a machine:** the field test (plan 40.5) checks it, and this page is corrected from its report. The commands that are the same everywhere (uv, accounts, disk) are in [host.md](host.md) §3–§6.
 
-## Check what AIHub sees
+## Check what GAIFA sees
 
 ```bash
-bin/aihub hardware
-bin/aihub setup host
+bin/gaifa hardware
+bin/gaifa setup host
 ```
 
-`aihub hardware` should list your card with its `sm_` architecture and CUDA version, and `cuda` among the accels. `aihub setup host` prints a fix for each problem; the ones that need `sudo` are printed, never run.
+`gaifa hardware` should list your card with its `sm_` architecture and CUDA version, and `cuda` among the accels. `gaifa setup host` prints a fix for each problem; the ones that need `sudo` are printed, never run.
 
 ## 1. The NVIDIA driver
 
-AIHub's PyTorch and llama.cpp builds bring their own CUDA runtime; the host needs only the **driver** (`nvidia-smi` must work):
+GAIFA's PyTorch and llama.cpp builds bring their own CUDA runtime; the host needs only the **driver** (`nvidia-smi` must work):
 
 | Distribution | Install |
 |---|---|
@@ -46,10 +46,10 @@ sudo apt install podman git nodejs npm espeak-ng ffmpeg
 
 ## 4. Memory
 
-A card's VRAM is its own budget (plan 36): AIHub's memory panel shows a bar per card, and loading a model that doesn't fit the card unloads idle GPU mods, not RAM-only ones. A mod declares its VRAM as `vram_gb`; llama.cpp can split a model between VRAM and RAM.
+A card's VRAM is its own budget (plan 36): GAIFA's memory panel shows a bar per card, and loading a model that doesn't fit the card unloads idle GPU mods, not RAM-only ones. A mod declares its VRAM as `vram_gb`; llama.cpp can split a model between VRAM and RAM.
 
 ## What to look for
 
-- `nvidia-smi` works but `cuda` is missing from `aihub hardware`: `nvidia-smi` printed no "CUDA Version" (a very old driver).
-- `nouveau` instead of `nvidia` in `aihub hardware`'s driver: the open-source driver is loaded; install NVIDIA's and reboot.
-- Several cards: `[services.<id>] gpu = <index>` in `config.toml` pins a mod to one (`aihub hardware` numbers them); by default a mod starts on the freest.
+- `nvidia-smi` works but `cuda` is missing from `gaifa hardware`: `nvidia-smi` printed no "CUDA Version" (a very old driver).
+- `nouveau` instead of `nvidia` in `gaifa hardware`'s driver: the open-source driver is loaded; install NVIDIA's and reboot.
+- Several cards: `[services.<id>] gpu = <index>` in `config.toml` pins a mod to one (`gaifa hardware` numbers them); by default a mod starts on the freest.

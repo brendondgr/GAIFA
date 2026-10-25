@@ -8,7 +8,7 @@
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
 //   feedback(tid, {value, output_id | seq, note}) decidePref(pid, approve)   (plan 21.7)
 //
-// Errors are ChatError {status, detail, code, data}; status 0 means AIHub didn't answer.
+// Errors are ChatError {status, detail, code, data}; status 0 means GAIFA didn't answer.
 
 import { createMockClient } from './chat-mock.js';
 
@@ -38,7 +38,7 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     let res;
     try {
       res = await f(url(path), { method, headers: json !== undefined ? { 'content-type': 'application/json' } : {}, body: json !== undefined ? JSON.stringify(json) : undefined });
-    } catch { throw new ChatError(0, 'AIHub not responding', 'hub_error'); }
+    } catch { throw new ChatError(0, 'GAIFA not responding', 'hub_error'); }
     if (!res.ok) throw await errorFrom(res);
     if (res.status === 204) return null;
     const t = await res.text();
@@ -104,7 +104,7 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
   };
 }
 
-/** The live client when AIHub proxies to mods, else the scripted mock agent. */
+/** The live client when GAIFA proxies to mods, else the scripted mock agent. */
 export function createChatClient({ api, base = '', mock = null } = {}) {
   const forceMock = mock ?? (typeof location !== 'undefined' && new URLSearchParams(location.search).has('mock'));
   if (!forceMock && api?.isLive?.('proxy')) return createLiveClient({ base });

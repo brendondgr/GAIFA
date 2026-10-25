@@ -20,7 +20,7 @@ import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 
-log = logging.getLogger("aihub.proc")
+log = logging.getLogger("gaifa.proc")
 
 PROC = Path("/proc")
 SYS = Path("/sys")
@@ -217,7 +217,7 @@ def footprint(pids: Iterable[int], proc: Path = PROC, kinds: tuple[str, ...] = (
 
 def engine_ns(pids: Iterable[int], proc: Path = PROC) -> dict[str, int]:
     """Busy nanoseconds per GPU engine (`gfx`, `compute`, `dma`, …) of these processes and their descendants,
-    from their DRM clients' fdinfo, each client counted once (plan 28.2: how busy AIHub keeps the GPU)."""
+    from their DRM clients' fdinfo, each client counted once (plan 28.2: how busy GAIFA keeps the GPU)."""
     every: list[int] = []
     for pid in pids:
         every.extend(p for p in process_tree(pid, proc) if p not in every)

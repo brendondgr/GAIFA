@@ -4,7 +4,7 @@
 # add the programs, the kokoro-tts / breeze-tts launchers in ~/.local/bin and the entries in
 # ~/.config/tts-engines/engines.json (video-maker reads both), and run each engine's smoke test. Re-running is safe.
 #   scripts/install-runtime.sh [--accel <rocm|cuda|xpu|mps|cpu>] [--accept-breeze-license] [--allow-cpu-breeze] [--dry-run]
-# --accel (plan 39.4; default AIHUB_ACCEL, else rocm): ROCm on gfx1151 installs the exact packages in locks/*.txt
+# --accel (plan 39.4; default GAIFA_ACCEL, else rocm): ROCm on gfx1151 installs the exact packages in locks/*.txt
 # (as tested on this machine); any other accelerator installs PyTorch from its own index (scripts/torch_index.py)
 # through the engines' installers. Breeze runs on ROCm, CUDA, and (slowly, with --allow-cpu-breeze) the CPU.
 # --dry-run prints what would run.
@@ -13,8 +13,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HUB="$(cd "$ROOT/../.." && pwd)"
 RT="$ROOT/runtime"
 ACCEPT=0 ALLOW_CPU=0 DRY=0
-ACCEL="${AIHUB_ACCEL:-rocm}"
-ARCH="${AIHUB_GPU_ARCH:-gfx1151}"
+ACCEL="${GAIFA_ACCEL:-rocm}"
+ARCH="${GAIFA_GPU_ARCH:-gfx1151}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --accel) ACCEL="$2"; shift 2 ;;

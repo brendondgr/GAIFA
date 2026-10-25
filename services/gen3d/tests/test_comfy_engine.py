@@ -21,7 +21,7 @@ class Hub:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         p, m = request.url.path, request.method
         self.calls.append((m, p, request.content if m == "POST" and p.endswith("/run") else None,
-                           request.headers.get("x-aihub-make-room")))
+                           request.headers.get("x-gaifa-make-room")))
         if p == "/api/s/comfy/v1/uploads":
             return httpx.Response(200, json={"value": "upload:pic.png"})
         if p == "/api/s/comfy/v1/run":

@@ -42,7 +42,7 @@ from urllib.parse import parse_qs, urlsplit
 
 MODE = sys.argv[1] if len(sys.argv) > 1 else "ok"
 PORT = int(os.environ.get("FAKE_PORT", "5190"))
-OUTPUTS = Path(os.environ.get("FAKE_OUTPUTS") or os.environ.get("AIHUB_OUTPUTS") or "outputs")
+OUTPUTS = Path(os.environ.get("FAKE_OUTPUTS") or os.environ.get("GAIFA_OUTPUTS") or "outputs")
 STARTED = time.time()
 STATE = {"last_used": time.time(), "requests": 0, "outputs": 0, "memory": None}
 JOBS: dict[str, dict] = {}
@@ -132,14 +132,14 @@ COMPONENTS = {"schemas": {"ImageReq": {"type": "object", "title": "ImageReq", "p
     "prompt": {"type": "string", "title": "Prompt", "description": "what to draw"},
     "aspect": {"type": "string", "enum": ["1:1", "16:9", "9:16"], "default": "1:1"},
     "steps": {"type": "integer", "minimum": 1, "maximum": 50, "default": 8},
-    "reference": {"anyOf": [{"type": "string", "format": "aihub-file"}, {"type": "null"}], "description": "an image to follow"},
+    "reference": {"anyOf": [{"type": "string", "format": "gaifa-file"}, {"type": "null"}], "description": "an image to follow"},
 }, "required": ["prompt"]}}}
 RENDERS: dict[str, dict] = {}
 
 
 # A tool whose engine choices declare what they need (plan 20.1).
 SHAPE = {"type": "object", "properties": {
-    "prompt": {"type": "string"}, "image": {"type": "string", "format": "aihub-file"},
+    "prompt": {"type": "string"}, "image": {"type": "string", "format": "gaifa-file"},
     "engine": {"type": "string", "enum": ["words", "picture", "body"], "x-options": {
         "words": {"label": "From words", "needs": ["prompt"], "excludes": ["image"], "default": True, "good_for": "text only"},
         "picture": {"label": "From a picture", "needs": ["image"], "default": True, "good_for": "objects", "allows": {"preset": ["base", "fast"]}},
@@ -268,7 +268,7 @@ class Handler(BaseHTTPRequestHandler):
             if url.path == "/v1/tools":
                 return self.send(200, {"tools": [
                     {"type": "function", "function": {"name": "paint", "description": "Paint a picture (runtime tool).",
-                     "parameters": {"type": "object", "properties": {"prompt": {"type": "string"}, "image": {"type": "string", "format": "aihub-file"},
+                     "parameters": {"type": "object", "properties": {"prompt": {"type": "string"}, "image": {"type": "string", "format": "gaifa-file"},
                                                                     "style": {"type": "string", "enum": ["oil", "ink"]}}, "required": ["prompt"]}},
                      "op": "POST /v1/tools/paint/call", "job": {"status": "GET /v1/render/{job_id}", "cancel": "POST /v1/render/{job_id}/cancel"},
                      "risk": "generate", "ask": ["style"], "examples": [{"prompt": "a fox", "style": "ink"}]},
@@ -325,11 +325,11 @@ class Handler(BaseHTTPRequestHandler):
         if MODE == "ws":
             import _fakews
 
-            out = _fakews.handle(url.path, self.body(), json.loads(self.headers.get("X-AIHub-Origin") or "{}"))
+            out = _fakews.handle(url.path, self.body(), json.loads(self.headers.get("X-GAIFA-Origin") or "{}"))
             if out is not None:
                 return self.send(200, out)
         if MODE == "perms" and url.path in ("/v1/search", "/v1/fetch", "/v1/python", "/v1/run"):
-            origin = json.loads(self.headers.get("X-AIHub-Origin") or "{}")
+            origin = json.loads(self.headers.get("X-GAIFA-Origin") or "{}")
             b = self.body()
             out = {"ran": url.path.rsplit("/", 1)[1], "arguments": b, "dry_run": bool(origin.get("dry_run"))}
             urls = [w for w in str(b.get("query") or "").split() if w.startswith(("http://", "https://"))] if isinstance(b, dict) else []
@@ -348,7 +348,7 @@ class Handler(BaseHTTPRequestHandler):
                 data = tone()
                 self.send_response(200)
                 self.send_header("Content-Type", "audio/wav")
-                self.send_header("X-AIHub-Output", str(f))
+                self.send_header("X-GAIFA-Output", str(f))
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
                 self.wfile.write(data)

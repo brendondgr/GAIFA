@@ -57,8 +57,8 @@ def clean(s: Any) -> Any:
 
 def file_kind(name: str, s: dict[str, Any]) -> str | None:
     """`x-kind` for a file input: from its media type, else its name; None if it isn't a file."""
-    is_file = s.get("format") in ("binary", "aihub-file") or (
-        s.get("type") == "array" and (s.get("items") or {}).get("format") in ("binary", "aihub-file"))
+    is_file = s.get("format") in ("binary", "gaifa-file") or (
+        s.get("type") == "array" and (s.get("items") or {}).get("format") in ("binary", "gaifa-file"))
     if not is_file:
         return None
     media = str(s.get("contentMediaType") or (s.get("items") or {}).get("contentMediaType") or "")

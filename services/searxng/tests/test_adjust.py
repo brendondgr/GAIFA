@@ -169,15 +169,15 @@ def test_startup_survives_a_runtime_that_fails(fake):
 
 def test_old_backups_are_pruned(client, folder, runtime):
     """A change keeps the newest 10 of this mod's backups; files it didn't name stay."""
-    old = [f"settings.yml.aihub-2026-01-{d:02d}T120000" for d in range(1, 13)] + ["settings.yml.aihub-2026-01-12T120000-2"]
+    old = [f"settings.yml.gaifa-2026-01-{d:02d}T120000" for d in range(1, 13)] + ["settings.yml.gaifa-2026-01-12T120000-2"]
     for n in old:
         (folder / n).write_text("old")
-    others = ["settings.yml.aihub-mine", "settings.yml.bak", "settings.yml.aihub-2026-01-01T120000.txt"]
+    others = ["settings.yml.gaifa-mine", "settings.yml.bak", "settings.yml.gaifa-2026-01-01T120000.txt"]
     for n in others:
         (folder / n).write_text("not ours")
     r = client.post("/v1/engines/bing", json={"enabled": False}).json()
     assert r["changed"] is True
     left = runtime.backups(None)
-    assert len(left) == 10 and left[0] == r["backup"] and left[1] == "settings.yml.aihub-2026-01-12T120000-2"
-    assert sorted(r["pruned"]) == [f"settings.yml.aihub-2026-01-{d:02d}T120000" for d in range(1, 5)]
+    assert len(left) == 10 and left[0] == r["backup"] and left[1] == "settings.yml.gaifa-2026-01-12T120000-2"
+    assert sorted(r["pruned"]) == [f"settings.yml.gaifa-2026-01-{d:02d}T120000" for d in range(1, 5)]
     assert all((folder / n).exists() for n in others)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds .venv/ for the comfy adapter (run by `aihub install comfy`). ComfyUI itself runs in the
+# Builds .venv/ for the comfy adapter (run by `gaifa install comfy`). ComfyUI itself runs in the
 # strix-halo-comfyui toolbox (bin/comfyui), with its own Python.
 set -euo pipefail
 cd "$(dirname "$0")"

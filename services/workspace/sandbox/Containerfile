@@ -1,14 +1,14 @@
 # The workspace sandbox (plan 27.5): ONLY Python 3.12, uv, Node LTS, git and ripgrep (decided 2026-10-20),
 # build-essential for wheels that compile, and the data libraries in requirements.lock.
-# Base images are pinned by digest; `aihub`'s workspace page (or `sandbox.py build`) builds it as
-# localhost/aihub-workspace-sandbox:<version>. Commands run as your user (--userns=keep-id), so the image
+# Base images are pinned by digest; `gaifa`'s workspace page (or `sandbox.py build`) builds it as
+# localhost/gaifa-workspace-sandbox:<version>. Commands run as your user (--userns=keep-id), so the image
 # needs no user of its own.
 FROM docker.io/library/node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS node
 FROM ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421e930bfbdc563c00740466603f8723158e90297d07957c2294640262b AS uv
 
 FROM docker.io/library/python:3.12-slim-bookworm@sha256:34386ef0cb081344d7ec1c103ba398e6e9f64e9ab3a1509accc92a4e24a07258
-LABEL org.opencontainers.image.title="aihub-workspace-sandbox" \
-      org.opencontainers.image.description="AIHub workspace sandbox: Python 3.12, uv, Node LTS, git, ripgrep, build-essential, data libraries"
+LABEL org.opencontainers.image.title="gaifa-workspace-sandbox" \
+      org.opencontainers.image.description="GAIFA workspace sandbox: Python 3.12, uv, Node LTS, git, ripgrep, build-essential, data libraries"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ripgrep build-essential ca-certificates \
  && rm -rf /var/lib/apt/lists/*

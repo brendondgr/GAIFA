@@ -40,7 +40,7 @@ class Settings:
     podman: str = os.environ.get("GEN3D_PODMAN", "podman")
     # plan 39.7: the variant. rocm runs the workers in the ROCm image; cuda runs them on the host, in venvs
     # with PyTorch's CUDA build (scripts/install-runtime.sh --accel cuda). Unset: this machine, rocm.
-    accel: str = os.environ.get("AIHUB_ACCEL") or "rocm"
+    accel: str = os.environ.get("GAIFA_ACCEL") or "rocm"
     blender: str = os.path.expanduser(os.environ.get("GEN3D_BLENDER", "blender"))
     # Preview renders: cpu = Workbench under Mesa's llvmpipe, no GPU; gpu = the same on the GPU (OpenGL).
     # The default when the page has no saved choice (prefs.py: the saved choice wins).
@@ -48,12 +48,12 @@ class Settings:
     preview_max_faces: int = int(os.environ.get("GEN3D_PREVIEW_MAX_FACES", "300000"))  # 0 = never simplify
     preview_timeout_s: float = float(os.environ.get("GEN3D_PREVIEW_TIMEOUT_S", "180"))
 
-    # Under AIHub: the database in data/databases, job folders in outputs/gen3d/<date>/, the
+    # Under GAIFA: the database in data/databases, job folders in outputs/gen3d/<date>/, the
     # weights in data/models/3d. Standalone, all three default to the places they always were.
     db: str = os.environ.get("GEN3D_DB", "")
     outputs: str = os.environ.get("GEN3D_OUTPUTS", "")
     weights_dir: str = os.environ.get("GEN3D_WEIGHTS", "")
-    # Settings changed on the page (prefs.py): AIHub's data/state/gen3d, standalone the data folder.
+    # Settings changed on the page (prefs.py): GAIFA's data/state/gen3d, standalone the data folder.
     state_dir: str = os.environ.get("GEN3D_STATE_DIR", "")
 
     @property

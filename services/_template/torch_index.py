@@ -1,11 +1,11 @@
 """The PyTorch wheel index for an accelerator (plan 38.4). The reference helper: mods that install PyTorch keep
 an identical copy (mods never import the hub). Standard library only, and runnable from a shell:
 
-    uv pip install --index-url "$(python torch_index.py "$AIHUB_ACCEL")" torch
+    uv pip install --index-url "$(python torch_index.py "$GAIFA_ACCEL")" torch
 
 - `cuda`: download.pytorch.org's cu130, cu128 or cu126 build, the newest the NVIDIA driver can run
   (nvidia-smi's "CUDA Version"; cu126 when it can't be read).
-- `rocm`: AMD's TheRock nightly index for the GPU family (AIHUB_GPU_ARCH: gfx1151, gfx110X, gfx120X, …).
+- `rocm`: AMD's TheRock nightly index for the GPU family (GAIFA_GPU_ARCH: gfx1151, gfx110X, gfx120X, …).
 - `xpu`: download.pytorch.org's xpu build (Intel GPUs; needs Intel's compute runtime on the host).
 - `mps`: PyPI (Apple Silicon's wheels include MPS); `cpu` and `vulkan` (no PyTorch backend): the CPU build.
 The table follows services/tts/engines/probe.py, which the speech mod uses for the same choice.
@@ -60,9 +60,9 @@ def index(accel: str, gfx: str | None = None, cuda: str | None = None, darwin: b
     if accel == "cuda":
         return f"https://download.pytorch.org/whl/{cuda_flavour(cuda if cuda is not None else driver_cuda())}"
     if accel == "rocm":
-        fam = rocm_family(gfx or os.environ.get("AIHUB_GPU_ARCH", ""))
+        fam = rocm_family(gfx or os.environ.get("GAIFA_GPU_ARCH", ""))
         if not fam:
-            raise SystemExit(f"no PyTorch ROCm index is known for {gfx or os.environ.get('AIHUB_GPU_ARCH') or 'this GPU'}")
+            raise SystemExit(f"no PyTorch ROCm index is known for {gfx or os.environ.get('GAIFA_GPU_ARCH') or 'this GPU'}")
         return f"https://rocm.nightlies.amd.com/v2/{fam}/"
     if accel == "xpu":
         return XPU
@@ -72,4 +72,4 @@ def index(accel: str, gfx: str | None = None, cuda: str | None = None, darwin: b
 
 
 if __name__ == "__main__":
-    print(index(sys.argv[1] if len(sys.argv) > 1 else os.environ.get("AIHUB_ACCEL", "cpu")))
+    print(index(sys.argv[1] if len(sys.argv) > 1 else os.environ.get("GAIFA_ACCEL", "cpu")))

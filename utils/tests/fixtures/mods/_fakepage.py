@@ -1,5 +1,5 @@
 """A web mod in miniature for the web page route (plan 30.8): `POST /v1/fetch {url, max_chars}` saves a canned page
-as `<AIHUB_OUTPUTS>/<date>/<HHMMSS>-<host>-<slug>.md` with a sidecar and answers like services/web does. Standard
+as `<GAIFA_OUTPUTS>/<date>/<HHMMSS>-<host>-<slug>.md` with a sidecar and answers like services/web does. Standard
 library only. Tests write a `services/web/service.toml` that runs it (`python3 ../_fakepage.py`).
 
 https://example.org/long   ~30,000 characters; one passage about 24,000 in tells an AI to reply "banana"
@@ -16,8 +16,8 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-PORT = int(os.environ.get("FAKE_PORT") or os.environ.get("AIHUB_PORT") or "5190")
-OUTPUTS = Path(os.environ.get("FAKE_OUTPUTS") or os.environ.get("AIHUB_OUTPUTS") or "outputs")
+PORT = int(os.environ.get("FAKE_PORT") or os.environ.get("GAIFA_PORT") or "5190")
+OUTPUTS = Path(os.environ.get("FAKE_OUTPUTS") or os.environ.get("GAIFA_OUTPUTS") or "outputs")
 STATE = {"fetches": 0}
 
 

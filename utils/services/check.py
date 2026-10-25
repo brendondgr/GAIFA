@@ -1,4 +1,4 @@
-"""`aihub check <id>` / `GET /api/services/{id}/check`: a mod self-test (plan 2.10).
+"""`gaifa check <id>` / `GET /api/services/{id}/check`: a mod self-test (plan 2.10).
 
 Runs every check it can and says exactly what is wrong, so writing a mod is a
 quick write → check → fix loop. Each check is `{name, status, detail}` with
@@ -60,7 +60,7 @@ async def run(mgr: ServiceManager, svc: Service, start: bool = False, tools: Any
     # 2. command, cwd and env (process mods)
     spec = None
     if svc.external:
-        r.add("command", "skip", 'kind = "external": AIHub doesn\'t launch it')
+        r.add("command", "skip", 'kind = "external": GAIFA doesn\'t launch it')
     else:
         try:
             spec = mf.launch_spec(svc.mod, mgr.config, mgr.paths, mgr.hub_port)
@@ -70,7 +70,7 @@ async def run(mgr: ServiceManager, svc: Service, start: bool = False, tools: Any
             exe = spec.argv[0]
             found = exe if os.path.isabs(exe) else shutil.which(exe)
             if not found or not os.path.exists(found):
-                hint = " (run `aihub install " + svc.id + "`?)" if m.run.install and ".venv" in exe else ""
+                hint = " (run `gaifa install " + svc.id + "`?)" if m.run.install and ".venv" in exe else ""
                 r.add("command", "fail", f"{exe} not found{hint}")
             elif not os.access(found, os.X_OK):
                 r.add("command", "fail", f"{found} is not executable (chmod +x)")
@@ -93,7 +93,7 @@ async def run(mgr: ServiceManager, svc: Service, start: bool = False, tools: Any
     elif svc.state == "failed":
         r.add("state", "fail", (svc.last_error or "failed").split("\n\nLast log lines:")[0])
     elif svc.state in ("stopped", "stopping"):
-        r.add("state", "skip", f"{svc.state}; start it (`aihub start {svc.id}`, or `aihub check {svc.id} --start`) to run the live checks")
+        r.add("state", "skip", f"{svc.state}; start it (`gaifa start {svc.id}`, or `gaifa check {svc.id} --start`) to run the live checks")
     else:
         r.add("state", "warn", svc.state)
 

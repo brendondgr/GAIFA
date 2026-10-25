@@ -11,14 +11,14 @@ const P = {
   megapixels: { type: 'number', minimum: 0.1, maximum: 4, description: 'Image size in megapixels, used with aspect (default 1.0)' },
   seconds: { type: 'number', minimum: 0.5, maximum: 30, description: 'Video length in seconds' },
   steps: { type: 'integer', minimum: 1, maximum: 100, description: 'Sampling steps' },
-  image: { type: 'string', format: 'aihub-file', 'x-kind': 'image', description: 'The input image: an AIHub output id or an uploaded file' },
+  image: { type: 'string', format: 'gaifa-file', 'x-kind': 'image', description: 'The input image: a GAIFA output id or an uploaded file' },
 };
 const wf = (ids, def) => ({ type: 'string', enum: ids, description: `Which workflow to use (default: ${def})` });
 const obj = (properties, required) => ({ type: 'object', properties, required, additionalProperties: false });
 
 // name, mod, risk, summary, parameters, ask, core, grant_key (plan 25.2)
 const TOOLS = [
-  ['hub_list_services', 'hub', 'read', 'List AIHub\'s mods with their state and what they hold in memory', obj({}, []), [], true],
+  ['hub_list_services', 'hub', 'read', 'List GAIFA\'s mods with their state and what they hold in memory', obj({}, []), [], true],
   ['hub_search_outputs', 'hub', 'read', 'Find earlier outputs (images, videos, audio, 3D models) by words', obj({ q: { type: 'string', description: 'Words to search for' }, kind: { type: 'string', enum: ['image', 'video', 'audio', 'model3d'] } }, []), [], true],
   ['comfy_generate_image', 'comfy', 'generate', 'Make an image from a text description.', obj({ prompt: P.prompt, workflow: wf(['zimage-turbo', 'qwen21-t2i', 'zimage-intorealism'], 'zimage-turbo'), aspect: P.aspect, megapixels: P.megapixels, steps: P.steps, seed: P.seed }, ['prompt']), ['workflow', 'aspect', 'megapixels']],
   ['comfy_generate_video', 'comfy', 'generate', 'Make a short video from a text description.', obj({ prompt: P.prompt, workflow: wf(['wan21-t2v'], 'wan21-t2v'), aspect: P.aspect, seconds: P.seconds, seed: P.seed }, ['prompt']), ['workflow', 'aspect', 'seconds']],
@@ -33,10 +33,10 @@ const TOOLS = [
   ['tts_speak', 'tts', 'generate', 'Speak text aloud; the clip is saved to Outputs.', obj({ text: { type: 'string', description: 'Text to speak', 'x-multiline': true }, engine: { type: 'string', enum: ['auto', 'breeze', 'kokoro'], description: 'Engine' },
     voice: { type: 'string', enum: ['Brendon', 'Hope', 'Arabella', 'af_heart', 'am_michael'], description: 'Voice (default Hope)' }, direction: { type: 'string', description: 'Delivery direction (Breeze voices only)' },
     speed: { type: 'number', minimum: 0.5, maximum: 2, description: 'Speed (Kokoro only)' }, format: { type: 'string', enum: ['wav', 'mp3'], description: 'Format' }, timings: { type: 'boolean', description: 'Return word timings' } }, ['text']), ['voice']],
-  ['tts_clone_voice', 'tts', 'write', 'Save a voice cloned from a 3-60 s reference clip.', obj({ name: { type: 'string', description: 'Voice name' }, audio: { type: 'string', format: 'aihub-file', 'x-kind': 'audio', description: 'Reference clip' }, transcript: { type: 'string', description: 'What is said in the clip (empty: transcribe it)' } }, ['name', 'audio']), ['name']],
+  ['tts_clone_voice', 'tts', 'write', 'Save a voice cloned from a 3-60 s reference clip.', obj({ name: { type: 'string', description: 'Voice name' }, audio: { type: 'string', format: 'gaifa-file', 'x-kind': 'audio', description: 'Reference clip' }, transcript: { type: 'string', description: 'What is said in the clip (empty: transcribe it)' } }, ['name', 'audio']), ['name']],
   ['tts_list_voices', 'tts', 'read', 'List saved voices and the built-in ones', obj({}, []), [], true],
   ['tts_delete_voice', 'tts', 'destructive', 'Delete a saved voice (permanent)', obj({ name: { type: 'string', description: 'Voice name' } }, ['name']), ['name']],
-  ['lcpp_start_llm', 'lcpp', 'write', 'Launch a model (asks AIHub for memory first)', obj({ model: { type: 'string', enum: ['gemma-4-26b-it', 'minicpm-5-2b'] }, ctx: { type: 'integer', minimum: 512, maximum: 262144 } }, ['model']), ['ctx']],
+  ['lcpp_start_llm', 'lcpp', 'write', 'Launch a model (asks GAIFA for memory first)', obj({ model: { type: 'string', enum: ['gemma-4-26b-it', 'minicpm-5-2b'] }, ctx: { type: 'integer', minimum: 512, maximum: 262144 } }, ['model']), ['ctx']],
   ['lcpp_stop_llm', 'lcpp', 'destructive', 'Stop an instance', obj({ name: { type: 'string' } }, ['name']), ['name']],
   ['example_hello', 'example', 'read', 'Say hello', obj({ name: { type: 'string', description: 'Who to greet' } }, []), []],
   ['web_fetch', 'web', 'network', 'Fetch a web page as markdown (saved to Outputs).', obj({ url: { type: 'string', description: 'The page (http or https)' }, max_chars: { type: 'integer', minimum: 100, maximum: 100000 } }, ['url']), [], false, 'url:host'],

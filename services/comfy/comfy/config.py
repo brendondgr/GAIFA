@@ -1,4 +1,4 @@
-"""Settings from the environment. AIHub sets these in service.toml; standalone, each one
+"""Settings from the environment. GAIFA sets these in service.toml; standalone, each one
 defaults to a folder inside this mod."""
 
 from __future__ import annotations
@@ -25,9 +25,9 @@ class Settings:
     workflows: Path          # the packs
     comfy_view: Path         # ComfyUI's own workflows folder (symlinks to the packs, drafts)
     models: Path             # ComfyUI's model folders (for memory estimates)
-    input: Path              # ComfyUI's input folder (uploads and file inputs go in input/aihub/)
+    input: Path              # ComfyUI's input folder (uploads and file inputs go in input/gaifa/)
     control: Path            # bin/comfyui
-    hub_url: str             # "" when not under AIHub
+    hub_url: str             # "" when not under GAIFA
     load_timeout_s: float
     idle_unload_s: float     # 0 = never
     quit_on_exit: bool       # stop an idle ComfyUI when the adapter stops
@@ -37,7 +37,7 @@ class Settings:
         env = os.environ if env is None else env
         data = _path(env, "COMFY_DATA", ROOT / "data")
         return cls(
-            port=int(env.get("AIHUB_PORT") or env.get("COMFY_PORT") or 5070),
+            port=int(env.get("GAIFA_PORT") or env.get("COMFY_PORT") or 5070),
             comfy_url=env.get("COMFY_URL", "http://127.0.0.1:8199").rstrip("/"),
             data=data,
             db=_path(env, "COMFY_DB", data / "comfy.db"),
@@ -47,7 +47,7 @@ class Settings:
             models=_path(env, "COMFY_MODELS", ROOT.parents[1] / "data" / "models" / "comfyui"),
             input=_path(env, "COMFY_INPUT", ROOT / "input"),
             control=_path(env, "COMFY_CONTROL", ROOT / "bin" / "comfyui"),
-            hub_url=env.get("AIHUB_URL", "").rstrip("/"),
+            hub_url=env.get("GAIFA_URL", "").rstrip("/"),
             load_timeout_s=float(env.get("COMFY_LOAD_TIMEOUT_S", "600")),
             idle_unload_s=float(env.get("COMFY_IDLE_UNLOAD_S") or 600),
             quit_on_exit=env.get("COMFY_QUIT_ON_EXIT", "1").lower() not in ("0", "false", "no", "off"),

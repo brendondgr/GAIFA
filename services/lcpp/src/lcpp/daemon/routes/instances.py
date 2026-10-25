@@ -31,8 +31,8 @@ async def preflight(request: Request, spec: dict[str, Any] = Body(...)):
 @router.post("", status_code=201)
 async def launch(request: Request, spec: dict[str, Any] = Body(...)):
     sup = state(request).supervisor
-    # AIHub sends X-AIHub-Make-Room: 1 when the user chose "Unload & continue".
-    make_room = request.headers.get("x-aihub-make-room", "").strip().lower() in ("1", "true", "yes")
+    # GAIFA sends X-GAIFA-Make-Room: 1 when the user chose "Unload & continue".
+    make_room = request.headers.get("x-gaifa-make-room", "").strip().lower() in ("1", "true", "yes")
     inst, warnings = await sup.launch(spec, make_room=make_room)
     return {"instance": await sup.view(inst), "warnings": warnings}
 

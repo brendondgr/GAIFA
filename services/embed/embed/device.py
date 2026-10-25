@@ -5,7 +5,7 @@ when asked.
     import torch
     model.to(device())
 
-`AIHUB_DEVICE` is set by the hub from the variant `aihub setup` installed (`[services.<id>] accel`): `cuda`
+`GAIFA_DEVICE` is set by the hub from the variant `gaifa setup` installed (`[services.<id>] accel`): `cuda`
 for CUDA and ROCm (ROCm's PyTorch answers as cuda), `xpu` for Intel, `mps` for Apple, `cpu`. Without it
 (run by hand, or a mod set up before variants), the first that torch can reach: cuda, xpu, mps, cpu.
 `MYMOD_DEVICE`-style overrides belong to the mod: pass one as `want`.
@@ -33,8 +33,8 @@ def available(name: str) -> bool:
 
 
 def device(want: str | None = None) -> str:
-    """`want` (if set and not "auto"), else AIHUB_DEVICE, else the first device torch can reach."""
-    for choice in (want, os.environ.get("AIHUB_DEVICE")):
+    """`want` (if set and not "auto"), else GAIFA_DEVICE, else the first device torch can reach."""
+    for choice in (want, os.environ.get("GAIFA_DEVICE")):
         if choice and choice != "auto":
             return choice
     return next(d for d in ORDER if available(d))

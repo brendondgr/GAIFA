@@ -1,8 +1,8 @@
 """Web: search the web through SearXNG and read pages as outputs (plan Phase 26).
 
-AIHub runs this as `.venv/bin/python server.py` with AIHUB_PORT and AIHUB_OUTPUTS set
+GAIFA runs this as `.venv/bin/python server.py` with GAIFA_PORT and GAIFA_OUTPUTS set
 (architecture §4.4). SEARXNG_URL (default http://127.0.0.1:8080) is a SearXNG with the JSON
-format enabled; it runs outside AIHub (setup/web.md). Fetch rules are in safety.py.
+format enabled; it runs outside GAIFA (setup/web.md). Fetch rules are in safety.py.
 """
 
 from __future__ import annotations
@@ -110,13 +110,13 @@ class FetchOut(BaseModel):
 def create_app(searxng_url: str | None = None, outputs: Path | None = None, guard: safety.Guard | None = None,
                hub_url: str | None = None, icons_dir: Path | None = None,
                icon_origin: Callable[[str], str] | None = None) -> FastAPI:
-    """`hub_url`: where to ask the searxng mod for its URL (default AIHUB_URL; tests pass their own).
+    """`hub_url`: where to ask the searxng mod for its URL (default GAIFA_URL; tests pass their own).
     `icons_dir`: the favicon cache (default `data/state/web/favicons`); `icon_origin(host)`: where a host's
     site is (default `https://<host>`; tests point it at their server)."""
     own = (searxng_url or os.environ.get("SEARXNG_URL") or DEFAULT_SEARXNG).rstrip("/")
-    hub = (hub_url if hub_url is not None else ("" if searxng_url else os.environ.get("AIHUB_URL", ""))).rstrip("/")
+    hub = (hub_url if hub_url is not None else ("" if searxng_url else os.environ.get("GAIFA_URL", ""))).rstrip("/")
     found = {"url": own, "source": "SEARXNG_URL", "at": 0.0}
-    out_dir = outputs or Path(os.environ.get("AIHUB_OUTPUTS", "outputs"))
+    out_dir = outputs or Path(os.environ.get("GAIFA_OUTPUTS", "outputs"))
     state = {"searches": 0, "fetches": 0, "refused": 0, "busy": 0, "last_used": time.time(),
              "probe": (0.0, False, "not checked yet")}
     robots = safety.Robots()
@@ -200,10 +200,10 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
 
     @app.post("/v1/search", summary="Search the web", response_model=SearchOut,
               responses={503: {"description": "SearXNG doesn't answer"}, 502: {"description": "SearXNG refused or failed"}})
-    async def search(body: SearchIn, x_aihub_origin: str | None = Header(None, include_in_schema=False)):
+    async def search(body: SearchIn, x_gaifa_origin: str | None = Header(None, include_in_schema=False)):
         """Results come from SearXNG: title, URL, a snippet, the engine that found it, and the date when known."""
         used()
-        if fakeweb.is_dry_run(x_aihub_origin):   # the agent eval: the fake web, never the internet
+        if fakeweb.is_dry_run(x_gaifa_origin):   # the agent eval: the fake web, never the internet
             return wrapped(SearchOut(query=body.query, results=[SearchResult(**r) for r in fake_web().search(body.query, body.limit)]))
         params = {"q": body.query, "format": "json", "pageno": 1}
         if body.categories:
@@ -259,12 +259,12 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
               responses={403: {"description": "Not allowed: a local or private address, or robots.txt"},
                          413: {"description": "Over 10 MB"}, 415: {"description": "Not a page, text or PDF"},
                          502: {"description": "The site failed"}, 504: {"description": "Over 20 s"}})
-    async def fetch(body: FetchIn, x_aihub_origin: str | None = Header(None, include_in_schema=False)):
+    async def fetch(body: FetchIn, x_gaifa_origin: str | None = Header(None, include_in_schema=False)):
         """The page becomes markdown (main content only), saved under the web mod's outputs with a
         sidecar (URL, title, fetch time). PDFs are saved as documents. Only public http(s) pages;
         robots.txt is honoured; 10 MB and 20 s at most."""
         used()
-        dry = fakeweb.is_dry_run(x_aihub_origin)
+        dry = fakeweb.is_dry_run(x_gaifa_origin)
         state["busy"] += 1
         try:
             if dry:   # the agent eval: the fake web, never the internet
@@ -322,7 +322,7 @@ def create_app(searxng_url: str | None = None, outputs: Path | None = None, guar
 
 
 class _QuietPolls(logging.Filter):
-    """AIHub polls health and status every few seconds; keep them out of the log."""
+    """GAIFA polls health and status every few seconds; keep them out of the log."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
@@ -331,4 +331,4 @@ class _QuietPolls(logging.Filter):
 
 if __name__ == "__main__":
     logging.getLogger("uvicorn.access").addFilter(_QuietPolls())
-    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("AIHUB_PORT", "5102")), log_level="info")
+    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("GAIFA_PORT", "5102")), log_level="info")

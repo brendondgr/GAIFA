@@ -1,4 +1,4 @@
-"""`aihub setup` (plan 23.9, 23.10): one setup process for a person and for an agent working for them.
+"""`gaifa setup` (plan 23.9, 23.10): one setup process for a person and for an agent working for them.
 
 Stages: the hub, the host checks, choosing mods, the plan, the questions, install, models, checks.
 A person answers the questions as they come; an agent gets the same plan with `--plan --json`,
@@ -163,7 +163,7 @@ def plan_text(p: dict[str, Any]) -> str:
     if values:
         out += ["", "After install, it asks (the choices exist only then):"] + [f"  {q['id']:24} {q['text']}{'' if q['required'] else ' (optional)'}" for q in values]
     if p.get("variants"):
-        out += ["", "Variants (aihub hardware; --accel <setup>=<accel> to pick another):"]
+        out += ["", "Variants (gaifa hardware; --accel <setup>=<accel> to pick another):"]
         for v in p["variants"]:
             out.append(f"  {v['setup']:24} {v['label']}" + ("  [untested on this kind of machine]" if v["untested"] else "") + (f"  ({v['note']})" if v["note"] else ""))
     if p.get("unavailable"):
@@ -174,7 +174,7 @@ def plan_text(p: dict[str, Any]) -> str:
         out += ["Then each smoke (real work): " + "; ".join(s["run"] for s in p["smokes"])]
     bad = [c for c in p["host"] if not c["ok"]]
     out += ["", f"Host: {len(p['host']) - len(bad)} checks ok" + (", to fix first: " + ", ".join(c["id"] for c in bad if c["id"] in p["blocking"]) if p["blocking"] else "")
-            + ("" if not bad or p["blocking"] else f" ({', '.join(c['id'] for c in bad)}: advice)") + "  (aihub setup host)"]
+            + ("" if not bad or p["blocking"] else f" ({', '.join(c['id'] for c in bad)}: advice)") + "  (gaifa setup host)"]
     return "\n".join(out)
 
 
@@ -185,7 +185,7 @@ _last: dict[str, Any] = {}     # plan 40.1: what this run saw, saved with its ou
 
 
 def save_last_run(data: dict[str, Any]) -> None:
-    """The run's outcome, its plan, variants and machine, for `aihub report` (plan 40.2). Never fails the run."""
+    """The run's outcome, its plan, variants and machine, for `gaifa report` (plan 40.2). Never fails the run."""
     try:
         p = Path(cli.ROOT) / run_mod.LAST_RUN
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -278,7 +278,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
 
 
 def add_parser(sub: Any) -> None:
-    p = sub.add_parser("setup", help="set up AIHub: the hub, the host checks, the mods you choose, their models, their checks (docs/setup/)",
+    p = sub.add_parser("setup", help="set up GAIFA: the hub, the host checks, the mods you choose, their models, their checks (docs/setup/)",
                        epilog=EXIT, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("targets", nargs="*", metavar="mod", help="mods or setup ids; `hub` or `host` for one stage; none: choose from a list")
     p.add_argument("--plan", action="store_true", help="print the plan (the hub, steps, questions, models, checks, host) and stop")

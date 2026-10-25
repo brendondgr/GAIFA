@@ -1,8 +1,8 @@
 """Persistent state: chats, jobs and stage timings in SQLite; each job's files in its own folder.
 
 A job's folder is `<jobs_dir>/<YYYY-MM-DD>/<job id>-<slug>/` (the `dir` column, relative to the
-jobs folder; under AIHub that is outputs/gen3d). Jobs from before the column have none and live
-in `<jobs_dir>/<job id>/`. Each folder gets an `output.json` (AIHub architecture §4.7): written
+jobs folder; under GAIFA that is outputs/gen3d). Jobs from before the column have none and live
+in `<jobs_dir>/<job id>/`. Each folder gets an `output.json` (GAIFA architecture §4.7): written
 with `complete: false` when the job is queued, and `complete: true` once it is done.
 
 Everything is small and fast, so one connection guarded by a lock is plenty (the GPU is the
@@ -137,7 +137,7 @@ class Store:
         return self.get_job(jid)
 
     def write_output_json(self, jid: str) -> None:
-        """The folder's sidecar for AIHub's Outputs page; `complete` only once the job is done."""
+        """The folder's sidecar for GAIFA's Outputs page; `complete` only once the job is done."""
         job = self.get_job(jid)
         if not job:
             return

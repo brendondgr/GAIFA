@@ -1,7 +1,7 @@
 """Where lcpp keeps things.
 
 Everything hangs off one repo root so tests can point a whole instance of lcpp
-at a temporary directory. Runtime state lives in ``LCPP_STATE_DIR`` (under AIHub:
+at a temporary directory. Runtime state lives in ``LCPP_STATE_DIR`` (under GAIFA:
 ``data/state/lcpp``, which survives reboots: the reconcile forgets records from before
 the last boot), else ``$XDG_RUNTIME_DIR/lcpp`` (tmpfs).
 """

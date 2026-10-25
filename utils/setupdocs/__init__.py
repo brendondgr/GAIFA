@@ -1,6 +1,6 @@
 """Setup docs (plan 23): the mods index in `docs/setup/README.md` and the support matrix in
 `docs/platforms.md` (plan 40.4), both committed, and a local inventory of this machine's models in
-`data/state/setup/models/` (gitignored: which models to set up is each person's choice, plan 23.6). Standard library only, so `aihub docs` runs without the hub. A model
+`data/state/setup/models/` (gitignored: which models to set up is each person's choice, plan 23.6). Standard library only, so `gaifa docs` runs without the hub. A model
 doc's generated part sits between markers; everything outside them is hand-written and kept byte
 for byte. Setup docs (`services/<id>/setup/*.md`) are read, never written.
 """
@@ -37,7 +37,7 @@ class Report:
     uncovered_mods: list[str] = field(default_factory=list)  # mods without a setup doc
 
     def problems(self, strict: bool = False) -> list[str]:
-        """What fails `aihub docs --check`: only what's committed (the mods index, the setup docs).
+        """What fails `gaifa docs --check`: only what's committed (the mods index, the setup docs).
         The inventory is local, so its gaps are notes, never failures."""
         out = [f"stale: {p}" for p in self.stale] + [f"missing: {p}" for p in self.missing]
         out += [f"setup doc {p}: {m}" for p, m in self.env_problems.items()]

@@ -12,7 +12,7 @@ const TXT = {
   height: { type: 'integer', title: 'Height', minimum: 16, maximum: 4096, default: 1024, description: 'Height in pixels' },
   aspect: { type: 'string', title: 'Aspect', enum: ['1:1', '4:3', '3:4', '3:2', '2:3', '16:9', '9:16', '21:9'], description: 'Aspect ratio (sets width and height)' },
   megapixels: { type: 'number', title: 'Megapixels', minimum: 0.1, maximum: 4, default: 1, description: 'Image size, used with aspect' },
-  image: { type: 'string', format: 'aihub-file', title: 'Image', description: 'An AIHub output id, an upload, or a file path' },
+  image: { type: 'string', format: 'gaifa-file', title: 'Image', description: 'A GAIFA output id, an upload, or a file path' },
   frames: { type: 'integer', title: 'Frames', minimum: 1, maximum: 161, default: 81, description: 'Number of video frames' },
   fps: { type: 'integer', title: 'Fps', minimum: 1, maximum: 60, default: 16, description: 'Frames per second' },
   seconds: { type: 'number', title: 'Seconds', minimum: 0.5, maximum: 30, description: 'Video length in seconds (sets frames)' },
@@ -134,7 +134,7 @@ export function comfyMock(m) {
       const id = (form.get('id') || f.name.replace(/\.[^.]+$/, '')).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'workflow';
       const w = { ...packs().find(x => x.id === 'my-portrait'), id, name: id, loose: false }; ws.push(w); svcStats();
       return ok({ id, workflow: clone(w), suggestion: null }, 201); },
-    'GET /v1/import/history': () => ok({ items: [{ prompt_id: 'a1b2c3', number: 41, nodes: 12, has_editor: true, status: 'success', files: ['ComfyUI_00041_.png'], from_aihub: null, types: ['CLIPTextEncode', 'KSampler', 'SaveImage'] }] }),
+    'GET /v1/import/history': () => ok({ items: [{ prompt_id: 'a1b2c3', number: 41, nodes: 12, has_editor: true, status: 'success', files: ['ComfyUI_00041_.png'], from_gaifa: null, types: ['CLIPTextEncode', 'KSampler', 'SaveImage'] }] }),
     'POST /v1/import/history/{pid}': () => { const w = { ...packs().find(x => x.id === 'my-portrait'), id: 'comfy-a1b2c3', name: 'comfy-a1b2c3', loose: false }; ws.push(w); svcStats(); return ok({ id: w.id, workflow: clone(w), suggestion: null }, 201); },
     'POST /v1/downloads': ({ json }) => { const d = { id: 'd-' + Math.random().toString(16).slice(2, 8), url: json.url, folder: json.folder, name: json.name, state: 'running', bytes: 0, total: 9e9, error: null, created: now() };
       downloads.unshift(d); const tick = () => { d.bytes = Math.min(d.total, d.bytes + 1.5e9); if (d.bytes >= d.total) d.state = 'done'; else later(800, tick); }; later(800, tick); return ok(clone(d), 202); },

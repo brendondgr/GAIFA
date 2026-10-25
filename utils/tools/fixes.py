@@ -64,7 +64,7 @@ def fixes_for(tool: ToolDef, args: dict[str, Any], error: dict[str, Any], name: 
     elif code in ("mod_error", "upstream_error", "service_failed") and mod and mod != "hub":
         out.append({"label": f"Restart {name}", "service": mod, "action": "restart"})
     elif code == "tool_unavailable" and mod:
-        out.append({"label": f"Set it up: aihub setup {mod}", "command": f"aihub setup {mod}"})
+        out.append({"label": f"Set it up: gaifa setup {mod}", "command": f"gaifa setup {mod}"})
         return out
     if OOM.search(text):
         if not any(f.get("tool") == "hub_free_gpu" for f in out):

@@ -1,5 +1,5 @@
-"""Routes for AIHub (architecture §4.6 and brief §11.7): the status AIHub polls, and the
-"Job time per stage" dashboard widget. Both work without AIHub too."""
+"""Routes for GAIFA (architecture §4.6 and brief §11.7): the status GAIFA polls, and the
+"Job time per stage" dashboard widget. Both work without GAIFA too."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .live import live_of
 from .options import STAGE_ORDER
 
 router = APIRouter()
-STATE = {"canceled": "cancelled"}       # AIHub's job states spell it the British way
+STATE = {"canceled": "cancelled"}       # GAIFA's job states spell it the British way
 RECENT_S = 120                           # finished jobs stay in the status this long
 WIDGET_RANGES = {"7d": 7, "30d": 30}
 
@@ -35,7 +35,7 @@ def progress(job: dict) -> float | None:
 def _job(job: dict, runner=None, sched: dict | None = None) -> dict:
     out = {"id": job["id"], "label": (job.get("title") or job["id"])[:80], "progress": progress(job),
            "state": STATE.get(job["status"], job["status"]), "route": f"#/s/gen3d/jobs?id={job['id']}"}
-    if runner is not None:                              # plan 45.3: previews wherever AIHub shows jobs
+    if runner is not None:                              # plan 45.3: previews wherever GAIFA shows jobs
         lv = live_of(job, (sched or {}).get(job["id"]), runner.store.job_dir(job["id"]))
         if lv:
             out["live"] = lv

@@ -183,7 +183,7 @@ def test_cli_new_copy_list_check(tmp_path, settings, monkeypatch, capsys):
     monkeypatch.setenv("COMFY_WORKFLOWS", str(settings.workflows))
     monkeypatch.setenv("COMFY_VIEW", str(settings.comfy_view))
     monkeypatch.setenv("COMFY_DATA", str(settings.data))
-    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("GAIFA_URL", "http://127.0.0.1:1")
     settings.data.mkdir(parents=True)
     (settings.data / "object_info.json").write_text((FIX / "object_info.json").read_text())
     assert cli.main(["new", "zimage", "--from", str(FIX / "workflows" / "zit-workflow.json")]) == 0
@@ -208,7 +208,7 @@ def test_suggest_route_and_cli_accept(tmp_path, settings, monkeypatch, capsys):
         assert r["manifest"]["task"] == "image-to-video" and "[inputs.frames]" in r["toml"]
     for k, v in {"COMFY_WORKFLOWS": settings.workflows, "COMFY_VIEW": settings.comfy_view, "COMFY_DATA": settings.data}.items():
         monkeypatch.setenv(k, str(v))
-    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("GAIFA_URL", "http://127.0.0.1:1")
     (settings.data / "object_info.json").write_text((FIX / "object_info.json").read_text())
     assert cli.main(["new", "zimage", "--from", str(FIX / "workflows" / "zit-workflow.json"), "--accept"]) == 0
     out = capsys.readouterr().out
@@ -249,7 +249,7 @@ def test_qwen21_turbo_packs(lib, tmp_path, pid):
     loaders = {n["inputs"].get("unet_name") for n in conv.graph.values()}
     assert {"qwen-image-2.1-turbo-Q8_0.gguf", "qwen-image-2.1-turbo-fp8.safetensors"} <= loaders
     by_type = {n["class_type"]: n["inputs"] for n in conv.graph.values()}   # the speed-ups (report: Speed-ups)
-    assert by_type["AIHubTextEncodeQwenImage21"]["encode_negative"] is False   # encode once
+    assert by_type["GAIFATextEncodeQwenImage21"]["encode_negative"] is False   # encode once
     assert by_type["VAELoaderKJ"]["weight_dtype"] == "bf16"
     if pid == "qwen21-turbo-t2i":
         assert {k: p.manifest.preset_values(k) for k in p.manifest.presets} == {"fast": {"megapixels": 0.6}, "draft": {"megapixels": 0.35}}

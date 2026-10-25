@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "vllm"
 title = "vLLM"
 models = []
@@ -9,10 +9,10 @@ disk_gb = 0.1
 images = { "docker.io/kyuz0/vllm-therock-gfx1151" = 12.4 }
 needs = ["uv", "podman"]
 after = ["relay"]
-check = "aihub check vllm --start"
+check = "gaifa check vllm --start"
 
 [[steps]]
-run = "aihub install vllm"
+run = "gaifa install vllm"
 what = "makes the adapter's .venv/ and pulls the pinned kyuz0/vllm-therock-gfx1151 image (12.4 GB on disk, from Docker Hub)"
 
 [[suggest]]
@@ -39,8 +39,8 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 ## What it is
 
 The `vllm` mod serves Hugging Face models (safetensors, AWQ) with vLLM and publishes the running one to the [relay](../../relay/setup/relay.md). Upstream vLLM doesn't support `gfx1151`, so vLLM runs in kyuz0's patched image, [`kyuz0/vllm-therock-gfx1151`](https://github.com/kyuz0/amd-strix-halo-vllm-toolboxes), pinned by digest. Two environments:
-- **The adapter**, `.venv/` in this folder (port 5101; FastAPI, httpx, tomlkit, huggingface_hub). It downloads models, asks AIHub for memory, and starts and stops one engine container at a time. It never touches the GPU itself.
-- **The engine**, `vllm serve` in a podman container `aihub-vllm-<profile>` from the pinned image, on `127.0.0.1:7801` (host network, nothing published), with `/dev/kfd` and `/dev/dri`.
+- **The adapter**, `.venv/` in this folder (port 5101; FastAPI, httpx, tomlkit, huggingface_hub). It downloads models, asks GAIFA for memory, and starts and stops one engine container at a time. It never touches the GPU itself.
+- **The engine**, `vllm serve` in a podman container `gaifa-vllm-<profile>` from the pinned image, on `127.0.0.1:7801` (host network, nothing published), with `/dev/kfd` and `/dev/dri`.
 
 GGUF models go to [llama.cpp](../../lcpp/setup/llama-cpp.md) instead.
 
@@ -69,7 +69,7 @@ Recorded engine runs: the 0.6B smoke test (2026-10-15: healthy after 130 s cold,
 ## Install
 
 ```bash
-aihub install vllm
+gaifa install vllm
 ```
 
 Runs `install.sh`: makes `.venv/` (Python 3.12) from `requirements-dev.txt`, then `podman pull`s the image named in `service.toml` (`VLLM_IMAGE`) if podman doesn't have it, from Docker Hub.
@@ -82,7 +82,7 @@ A profile is `profiles/<id>.toml` (the keys are in [README.md → Profiles](../R
 echo '["qwen3.6-35b-a3b-awq"]' > services/vllm/profiles/.parked.json
 ```
 
-Remove an id (or the file) to bring a profile back. Then set `autostart = true` under `[services.vllm]` in `config.toml` (or leave it off and start by hand), `aihub start vllm`, and load the profile from the vLLM page. **The first load downloads its model** into `data/models/hf-cache/` (`HF_HOME`) before it asks for memory, registers it as `<repo> (vLLM)`, then starts the engine. The engine itself runs with `HF_HUB_OFFLINE=1`.
+Remove an id (or the file) to bring a profile back. Then set `autostart = true` under `[services.vllm]` in `config.toml` (or leave it off and start by hand), `gaifa start vllm`, and load the profile from the vLLM page. **The first load downloads its model** into `data/models/hf-cache/` (`HF_HOME`) before it asks for memory, registers it as `<repo> (vLLM)`, then starts the engine. The engine itself runs with `HF_HUB_OFFLINE=1`.
 
 **The first start compiles.** The smoke test took 130 s cold (torch.compile 16 s); a hybrid model like Qwen3.6 also autotunes Triton kernels during its first start. The adapter waits up to 1200 s. The compile and tuning caches persist in `data/state/vllm/cache/` (`triton`, `inductor`, `vllm`, `xdg`), so later starts are faster.
 
@@ -110,7 +110,7 @@ The two seed profiles are the suggestions, both optional. Sizes from Hugging Fac
 | `VLLM_PROFILES_DIR`, `VLLM_RELAY_URL`, `VLLM_PODMAN` | optional | `profiles/`, `http://127.0.0.1:4000`, `podman` |
 | `VLLM_START_TIMEOUT_S`, `VLLM_OVERHEAD_GB` | optional | 1200 s; 6 GB asked for beyond the profile's budget (measured 4.2 GB for the 0.6B, 6.4 GB for the 35B-A3B) |
 
-**Memory.** A profile's `memory_gb` is vLLM's whole budget (weights, KV cache, CUDA graphs). The adapter passes `--gpu-memory-utilization` = `memory_gb` × 10⁹ / `mem_info_gtt_total`: 40 GB → 0.3066 here. It refuses more than 0.95. Each load first acquires `memory_gb` + the overhead from AIHub. `[memory] idle_unload_s = 0`: unload by hand.
+**Memory.** A profile's `memory_gb` is vLLM's whole budget (weights, KV cache, CUDA graphs). The adapter passes `--gpu-memory-utilization` = `memory_gb` × 10⁹ / `mem_info_gtt_total`: 40 GB → 0.3066 here. It refuses more than 0.95. Each load first acquires `memory_gb` + the overhead from GAIFA. `[memory] idle_unload_s = 0`: unload by hand.
 
 **`engine_site/`** (mounted read-only, on the engine's `PYTHONPATH`): `sitecustomize.py` works around broken GPU event timing in the pinned image, which made Triton's autotuner run hundreds of thousands of repetitions per config. When events disagree with the wall clock by more than 5×, `triton.testing.do_bench` uses the wall clock and caps repetitions. `VLLM_MOD_TRITON_BENCH=wall|off` (in a profile's `env`) forces it. With `TRITON_CACHE_AUTOTUNING=1`, a model tunes once. Details: [README.md](../README.md#triton-autotuning-on-gfx1151-engine_site).
 
@@ -123,10 +123,10 @@ podman image exists docker.io/kyuz0/vllm-therock-gfx1151@sha256:8002236ea7526491
 Expect `present`.
 
 ```bash
-aihub check vllm
+gaifa check vllm
 ```
 
-Parked, expect `vllm: no failures, but 5 checks skipped` (it's stopped). With a profile back and the mod started, `aihub check vllm` runs the live checks too.
+Parked, expect `vllm: no failures, but 5 checks skipped` (it's stopped). With a profile back and the mod started, `gaifa check vllm` runs the live checks too.
 
 ```bash
 cd services/vllm && .venv/bin/python -m pytest -q
@@ -137,7 +137,7 @@ A fake engine process instead of the container, no GPU: expect `29 passed` (2026
 ## What to look for
 
 - **Use the stock, pinned image.** Don't replace it with `:latest` or a custom build, don't add custom kernels, and keep the IOMMU on ([host.md, the IOMMU warning](../../../docs/setup/host.md#1-let-the-gpu-use-the-memory)). On 2026-10-19/20 experimental GPU compute on this machine wrote into memory the kernel used for file cache and corrupted files. `engine_site/` only changes how Triton times its benchmarks; it adds no kernels.
-- **The first start looks hung.** Compiling and autotuning take minutes; the page shows the stage. A first start that is still autotuning after 20 minutes is what happened before `engine_site/`; check that it's mounted (`aihub logs vllm`, the engine command on the page's Engine tab).
+- **The first start looks hung.** Compiling and autotuning take minutes; the page shows the stage. A first start that is still autotuning after 20 minutes is what happened before `engine_site/`; check that it's mounted (`gaifa logs vllm`, the engine command on the page's Engine tab).
 - **A load fails before asking for memory.** The download failed (disk, network, a gated repo without a token).
 - **`--gpu-memory-utilization` too small.** If `mem_info_gtt_total` is about half your memory, the kernel parameters didn't apply, and every profile's fraction doubles.
 - AWQ needs `enforce_eager = true` on gfx1151 (the AWQ profile's comment, from kyuz0's `models.py`).

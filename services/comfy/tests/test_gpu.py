@@ -1,5 +1,5 @@
-"""Plan 31.3: runs take AIHub's GPU slot (a fake hub) before memory and ComfyUI, wait while another mod
-holds it, give it back when the prompt ends, and run under a caller's lease (X-AIHub-GPU-Lease)."""
+"""Plan 31.3: runs take GAIFA's GPU slot (a fake hub) before memory and ComfyUI, wait while another mod
+holds it, give it back when the prompt ends, and run under a caller's lease (X-GAIFA-GPU-Lease)."""
 
 import time
 
@@ -87,7 +87,7 @@ def test_a_callers_lease_is_the_parent(env):
     c, fake, hub, _ = env
     hub.gpu_busy = True                      # another group holds the slot: our caller (gen3d) is that holder
     r = c.post("/v1/run", json={"workflow": "zimage", "inputs": {"prompt": "nested"}},
-               headers={"X-AIHub-GPU-Lease": "gl_parent0000"})
+               headers={"X-GAIFA-GPU-Lease": "gl_parent0000"})
     assert r.status_code == 202 and "stage" not in r.json()
     assert hub.gpu_acquires[-1]["parent"] == "gl_parent0000"
     assert c.get(f"/v1/jobs/{r.json()['id']}", params={"wait": 10}).json()["state"] == "done"

@@ -8,17 +8,17 @@ import pytest
 from utils import cli
 
 REPO = Path(__file__).resolve().parents[3]
-AIHUB = REPO / "bin" / "aihub"
+GAIFA = REPO / "bin" / "gaifa"
 
 
 def run(*args, env=None, timeout=30):
-    return subprocess.run([str(AIHUB), *args], capture_output=True, text=True, timeout=timeout,
+    return subprocess.run([str(GAIFA), *args], capture_output=True, text=True, timeout=timeout,
                           env={**os.environ, **(env or {})})
 
 
 def test_cli_imports_only_the_standard_library():
     code = (
-        "import sys, runpy; sys.argv=['aihub','--help']\n"
+        "import sys, runpy; sys.argv=['gaifa','--help']\n"
         "try: runpy.run_path(%r, run_name='__main__')\n"
         "except SystemExit: pass\n"
         "bad = sorted({m.split('.')[0] for m in sys.modules} & {'fastapi','pydantic','httpx','uvicorn','starlette','tomlkit','utils'})\n"
@@ -29,31 +29,31 @@ def test_cli_imports_only_the_standard_library():
 
 
 def test_unit_template_renders():
-    unit = cli.render_unit(Path("/x/AIHub"))
+    unit = cli.render_unit(Path("/x/GAIFA"))
     assert "@ROOT@" not in unit
-    assert "ExecStart=/x/AIHub/.venv/bin/python /x/AIHub/app.py" in unit
-    assert "WorkingDirectory=/x/AIHub" in unit and "WantedBy=default.target" in unit
+    assert "ExecStart=/x/GAIFA/.venv/bin/python /x/GAIFA/app.py" in unit
+    assert "WorkingDirectory=/x/GAIFA" in unit and "WantedBy=default.target" in unit
 
 
 def test_hub_down_says_so(tmp_path):
-    r = run("status", env={"AIHUB_URL": "http://127.0.0.1:9", "XDG_CONFIG_HOME": str(tmp_path)})
+    r = run("status", env={"GAIFA_URL": "http://127.0.0.1:9", "XDG_CONFIG_HOME": str(tmp_path)})
     assert r.returncode == 1
-    assert "AIHub is not running at http://127.0.0.1:9" in r.stdout
-    assert "aihub start" in r.stdout
-    r = run("load", "tts", env={"AIHUB_URL": "http://127.0.0.1:9"})
-    assert r.returncode == 1 and "aihub start" in r.stderr
+    assert "GAIFA is not running at http://127.0.0.1:9" in r.stdout
+    assert "gaifa start" in r.stdout
+    r = run("load", "tts", env={"GAIFA_URL": "http://127.0.0.1:9"})
+    assert r.returncode == 1 and "gaifa start" in r.stderr
 
 
 def test_url_uses_config_port(tmp_path, monkeypatch):
-    monkeypatch.delenv("AIHUB_URL")  # without it, the CLI reads the port from config.toml
+    monkeypatch.delenv("GAIFA_URL")  # without it, the CLI reads the port from config.toml
     (tmp_path / "config.toml").write_text("[hub]\nport = 7444\n")
-    r = run("url", "settings", env={"AIHUB_ROOT": str(tmp_path)})
+    r = run("url", "settings", env={"GAIFA_ROOT": str(tmp_path)})
     assert r.stdout.strip() == "http://127.0.0.1:7444/settings"
 
 
 def test_models_needs_a_running_hub():
     r = run("models", "list")
-    assert r.returncode == 1 and "AIHub is not running" in r.stderr
+    assert r.returncode == 1 and "GAIFA is not running" in r.stderr
 
 
 def test_human_formatting():
@@ -64,14 +64,14 @@ def test_human_formatting():
 
 def test_status_against_a_running_hub(hub_process, tmp_path):
     live_hub = hub_process.url
-    r = run("status", env={"AIHUB_URL": live_hub, "XDG_CONFIG_HOME": str(tmp_path)})
+    r = run("status", env={"GAIFA_URL": live_hub, "XDG_CONFIG_HOME": str(tmp_path)})
     assert r.returncode == 0, r.stderr
-    assert r.stdout.startswith("AIHub 0.1.0 at " + live_hub)
-    assert "not installed" in r.stdout and "mods: none (add one with `aihub new <id>`)" in r.stdout
+    assert r.stdout.startswith("GAIFA 0.1.0 at " + live_hub)
+    assert "not installed" in r.stdout and "mods: none (add one with `gaifa new <id>`)" in r.stdout
 
 
 def test_unknown_mod(hub_process):
-    r = run("start", "tts", env={"AIHUB_URL": hub_process.url})
+    r = run("start", "tts", env={"GAIFA_URL": hub_process.url})
     assert r.returncode == 1 and "no mod named 'tts'" in r.stderr and "(service_not_found)" in r.stderr
 
 
@@ -88,7 +88,7 @@ def mod_root(root, services_dir):
 
 
 def test_start_stop_status_with_a_mod(mod_root, hub_process):
-    env = {"AIHUB_URL": hub_process.url}
+    env = {"GAIFA_URL": hub_process.url}
     r = run("start", "fake-ok", env=env)
     assert (r.returncode, r.stdout) == (0, "fake-ok: ready\n"), r.stderr
     r = run("status", env=env)
@@ -102,7 +102,7 @@ def test_start_stop_status_with_a_mod(mod_root, hub_process):
 
 
 def test_start_reports_a_failure(mod_root, hub_process):
-    r = run("start", "fake-crash", env={"AIHUB_URL": hub_process.url})
+    r = run("start", "fake-crash", env={"GAIFA_URL": hub_process.url})
     # It exits 0.2 s after launch, before its first health check succeeds.
     assert (r.returncode, r.stdout) == (1, "fake-crash: failed\n")
     assert "exited with status 1 while starting" in r.stderr and "Last log lines:" in r.stderr

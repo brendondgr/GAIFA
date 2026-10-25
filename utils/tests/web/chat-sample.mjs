@@ -15,7 +15,7 @@ const M3D_ARGS = { image: 'output:' + IMG_ID, engine: 'trellis2', preset: 'balan
 export const M3D_SCHEMA = {
   type: 'object', required: ['engine'],
   properties: {
-    image: { type: 'string', format: 'aihub-file', 'x-kind': 'image', title: 'Picture' },
+    image: { type: 'string', format: 'gaifa-file', 'x-kind': 'image', title: 'Picture' },
     engine: { type: 'string', title: 'Engine', enum: ['trellis2', 'hunyuan21', 'sam3d_objects', 'sam3d_body', 'cube3d'], default: 'trellis2' },
     preset: { type: 'string', title: 'Preset', enum: ['draft', 'balanced', 'detailed'], default: 'balanced' },
     stages: { type: 'array', title: 'Stages', items: { type: 'string', enum: ['shape', 'texture', 'parts', 'rig'] } },

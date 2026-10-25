@@ -154,18 +154,18 @@ export function Sidebar(p) {
 
   const head = rail
     ? h('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '14px 0 10px', flex: 'none' } },
-      h('a', { href: '#/overview', 'aria-label': 'AIHub, go to Overview', ...tipOn('AIHub', 'Go to Overview'), style: { display: 'flex' } }, h(Mark, { size: 26 })),
+      h('a', { href: '#/overview', 'aria-label': 'GAIFA, go to Overview', ...tipOn('GAIFA', 'Go to Overview'), style: { display: 'flex' } }, h(Mark, { size: 26 })),
       h('button', { className: 'hubnav-ib', onClick: () => { tipOff(); set(n => ({ ...n, collapsed: false })); }, 'aria-label': 'Expand the sidebar', ...tipOn('Expand the sidebar', 'Names and the services list'), style: { width: 32, height: 28 } }, h(Icon, { d: ICONS.expand })))
     : h('div', { style: { display: 'flex', alignItems: 'center', gap: 10, padding: '16px 12px 14px 16px', flex: 'none' } },
-      h(Mark, { size: 26 }), h('span', { style: { fontWeight: 600, fontSize: 15, letterSpacing: '-.01em' } }, 'AIHub'), h('span', { style: { flex: 1 } }),
+      h(Mark, { size: 26 }), h('span', { style: { fontWeight: 600, fontSize: 15, letterSpacing: '-.01em' } }, 'GAIFA'), h('span', { style: { flex: 1 } }),
       mob ? h('button', { className: 'hubnav-ib', onClick: p.close, 'aria-label': 'Close navigation', style: { width: 32, height: 32 } }, h(Icon, { d: I.x }))
         : h('button', { className: 'hubnav-ib', onClick: () => { tipOff(); set(n => ({ ...n, collapsed: true })); }, 'aria-label': 'Collapse the sidebar', ...tipOn('Collapse the sidebar', 'A thin rail of icons, with each service’s state'), style: { width: 28, height: 28 } }, h(Icon, { d: ICONS.collapse })));
   const hubDot = h('span', { 'aria-hidden': true, style: { width: 7, height: 7, borderRadius: 99, flex: 'none', background: p.hubDown ? 'var(--rd,#F85149)' : 'var(--gr,#3FB950)' } });
   const mockBtn = p.showMock ? h('button', { onClick: p.openMock, 'aria-label': 'Mock scenarios', ...tipOn('Mock scenarios', 'Shift+D'), style: { height: 20, padding: rail ? '0 4px' : '0 7px', borderRadius: 4, border: '1px solid var(--pu,#BC8CFF)', background: 'var(--tpu,rgba(188,140,255,.13))', color: 'var(--pu,#BC8CFF)', fontSize: 10.5, fontWeight: 600, letterSpacing: '.06em', cursor: 'pointer' } }, rail ? 'M' : 'MOCK') : null;
   const foot = rail
-    ? h('div', { tabIndex: 0, 'aria-label': `${p.hubDown ? 'AIHub down' : 'AIHub'} ${p.version || ''}`, ...tipOn(`AIHub ${p.version || ''}`, p.hubDown ? 'Not responding' : 'Running'), style: { padding: '12px 0', borderTop: '1px solid var(--bd,#1D2430)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 'none' } }, hubDot, mockBtn)
+    ? h('div', { tabIndex: 0, 'aria-label': `${p.hubDown ? 'GAIFA down' : 'GAIFA'} ${p.version || ''}`, ...tipOn(`GAIFA ${p.version || ''}`, p.hubDown ? 'Not responding' : 'Running'), style: { padding: '12px 0', borderTop: '1px solid var(--bd,#1D2430)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: 'none' } }, hubDot, mockBtn)
     : h('div', { style: { padding: '12px 16px', borderTop: '1px solid var(--bd,#1D2430)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--mut,#8A94A6)', flex: 'none' } },
-      hubDot, h('span', null, p.hubDown ? 'AIHub down' : 'AIHub'), h('span', { style: { fontFamily: MONO, fontSize: 11.5 } }, p.version), h('span', { style: { flex: 1 } }), mockBtn);
+      hubDot, h('span', null, p.hubDown ? 'GAIFA down' : 'GAIFA'), h('span', { style: { fontFamily: MONO, fontSize: 11.5 } }, p.version), h('span', { style: { flex: 1 } }), mockBtn);
 
   return h('div', { className: rail ? 'hubnav-rail' : '', style: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 } },
     head,

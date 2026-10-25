@@ -78,7 +78,7 @@ description = "What to avoid"
 
 [inputs.image]
 type = "file"
-description = "The input image: an AIHub output id or an uploaded file"
+description = "The input image: a GAIFA output id or an uploaded file"
 
 [inputs.images]
 type = "files"

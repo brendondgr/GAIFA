@@ -9,7 +9,7 @@ const R = () => globalThis.React;
 const GB = 1e9;
 const ACTION = { stop_llm: ['stop', 'Stop LLM'], unload: ['download', 'Unload'], start: ['play', 'Start'], launch_llm: ['send', 'Launch LLM'], load: ['send', 'Load'], skip: ['x', 'Skip'] };
 const fGB = b => (b == null ? '' : `${b < 0 ? '−' : b > 0 ? '+' : ''}${(Math.abs(b) / GB).toFixed(1)} GB`);
-const DISMISS = 'aihub.sessions.restoreDismissed';
+const DISMISS = 'gaifa.sessions.restoreDismissed';
 const ago = ts => { const a = fmtAgo(ts); return a === 'now' ? 'just now' : `${a} ago`; };
 
 /** The plan of a restore: steps (with live status while it runs) and the memory line. */
@@ -136,6 +136,6 @@ export function RestorePrompt({ api, onRestore }) {
   return h('div', { role: 'alertdialog', 'aria-label': 'Restore last session', style: { position: 'fixed', top: 56, right: 16, zIndex: 94, width: 'min(380px, calc(100vw - 32px))', padding: '12px 14px', borderRadius: 10,
     background: T.card, border: '1px solid ' + T.bds, boxShadow: '0 14px 40px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column', gap: 8 } },
     h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 } }, h('span', { style: { color: T.pu, display: 'flex' } }, h(Icon, { d: 'refresh', size: 15 })), 'Restore last session?'),
-    h('div', { style: { fontSize: 12.5, color: T.mut } }, `AIHub didn’t shut down cleanly. The last setup (saved ${ago(st.last_auto.updated_ts)}): ${st.last_auto.summary}.`),
+    h('div', { style: { fontSize: 12.5, color: T.mut } }, `GAIFA didn’t shut down cleanly. The last setup (saved ${ago(st.last_auto.updated_ts)}): ${st.last_auto.summary}.`),
     h('div', { style: { display: 'flex', gap: 8 } }, h(Btn, { kind: 'pri', sm: true, label: 'Restore…', onClick: () => { close(); onRestore(st.last_auto.id); } }), h(Btn, { kind: 'ghost', sm: true, label: 'Dismiss', onClick: close })));
 }

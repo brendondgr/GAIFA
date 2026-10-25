@@ -46,7 +46,7 @@ def write_atomic(p: Path, data: bytes, mode: int | None = None, root: Path | Non
     it, so the write goes through `parent_fd` (see there)."""
     if root is None:
         p.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=f".{p.name}.", suffix=".aihub")
+        fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=f".{p.name}.", suffix=".gaifa")
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(data)
@@ -58,7 +58,7 @@ def write_atomic(p: Path, data: bytes, mode: int | None = None, root: Path | Non
             raise
         return
     d = parent_fd(root, p, create=True)
-    tmp = f".{p.name}.{secrets.token_hex(4)}.aihub"
+    tmp = f".{p.name}.{secrets.token_hex(4)}.gaifa"
     try:
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=d)
         try:

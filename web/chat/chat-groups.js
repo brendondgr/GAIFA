@@ -1,7 +1,7 @@
 // The chat list by environment (plan 41.2, after Claude Code's sidebar): one section per environment (Phase 34's
 // workspaces) with its name, how many chats, New chat in it and a ⋯ menu (Rename, Manage folders), then its
 // first chats in the chosen order and Show more. The View menu picks the grouping and both orders; they and the
-// collapsed sections are saved in this browser (`aihub.chat.list`). Chats load per section from the agent
+// collapsed sections are saved in this browser (`gaifa.chat.list`). Chats load per section from the agent
 // (`GET /v1/threads?environment=`, `GET /v1/threads/groups`), so a big environment never loads whole.
 // Pure helpers first (tested in utils/tests/web/chat-groups.test.mjs). Written by us (web/PATCHES.md).
 
@@ -9,7 +9,7 @@ import { h, T, Icon, Btn, Popover, chipSt, inputSt, label11, getPref, setPref } 
 
 const R = () => globalThis.React;
 const enc = encodeURIComponent;
-export const LIST_VIEW = 'aihub.chat.list';
+export const LIST_VIEW = 'gaifa.chat.list';
 export const FIRST = 6;          // chats shown in a section before Show more
 export const MORE = 20;          // and each Show more adds
 export const VIEW_DEFAULTS = { group: 'environment', envOrder: 'activity', chatOrder: 'updated', collapsed: [] };

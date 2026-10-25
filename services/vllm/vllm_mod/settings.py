@@ -1,4 +1,4 @@
-"""The adapter's settings, from the environment AIHub sets (service.toml [run.env], architecture §4.4)."""
+"""The adapter's settings, from the environment GAIFA sets (service.toml [run.env], architecture §4.4)."""
 
 from __future__ import annotations
 
@@ -38,13 +38,13 @@ class Settings:
         e = os.environ
         d = cls()
         return cls(
-            port=port or int(e.get("AIHUB_PORT", d.port)),
+            port=port or int(e.get("GAIFA_PORT", d.port)),
             image=e.get("VLLM_IMAGE", d.image),
             engine_port=int(e.get("VLLM_ENGINE_PORT", d.engine_port)),
             state_dir=Path(e.get("VLLM_STATE_DIR", d.state_dir)),
             hf_home=Path(e.get("HF_HOME", d.hf_home)),
             profiles_dir=Path(e.get("VLLM_PROFILES_DIR", d.profiles_dir)),
-            hub_url=(e.get("AIHUB_URL") or "").rstrip("/") or None,
+            hub_url=(e.get("GAIFA_URL") or "").rstrip("/") or None,
             relay_url=e.get("VLLM_RELAY_URL", d.relay_url).rstrip("/"),
             podman=e.get("VLLM_PODMAN", d.podman),
             fake=e.get("VLLM_FAKE", "") not in ("", "0", "false"),

@@ -9,7 +9,7 @@ import {
 	Plane,
 	Ray,
 	MathUtils
-} from '../../three.module.min.js';  // AIHub: relative, so no import map is needed
+} from '../../three.module.min.js';  // GAIFA: relative, so no import map is needed
 
 // OrbitControls performs orbiting, dollying (zooming), and panning.
 // Unlike TrackballControls, it maintains the "up" direction object.up (+Y by default).

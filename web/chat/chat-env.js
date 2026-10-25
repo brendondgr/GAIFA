@@ -12,7 +12,7 @@ import { h, T, MONO, Icon, Popover, label11, getPref, setPref } from './chat-ui.
 const R = () => globalThis.React;
 export const DEFAULT_ENV = 'default';
 export const NONE_ENV = 'none';      // built in: no folders (plan 42.5); a new chat's environment until you pick one
-export const LAST_ENV = 'aihub.chat.environment';
+export const LAST_ENV = 'gaifa.chat.environment';
 export const LEVEL_WORD = { read: 'Read', edit: 'Edit', run: 'Run', run_net: 'Run + network' };
 const enc = encodeURIComponent;
 

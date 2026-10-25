@@ -46,7 +46,7 @@ async def hub(make_app):
 async def test_a_foreign_host_is_refused_dns_rebinding(hub):
     for method in ("GET", "POST"):
         r = await hub.request(method, "/api/sessions", headers={"Host": "attacker.example:7000", "Origin": "http://attacker.example:7000"})
-        assert r.status_code == 421 and r.headers["x-aihub-error"] == "bad_host"
+        assert r.status_code == 421 and r.headers["x-gaifa-error"] == "bad_host"
         assert r.json()["code"] == "bad_host" and "127.0.0.1:7000" in r.json()["data"]["fix"]
     assert (await hub.get("/api/sessions", headers={"Host": "127.0.0.1.nip.io:7000"})).status_code == 421
     assert (await hub.get("/", headers={"Host": "attacker.example"})).status_code == 421       # the UI too
@@ -65,7 +65,7 @@ async def test_cross_site_unsafe_requests_are_refused(hub):
             assert r.status_code == 403 and r.json()["code"] == "cross_origin", (method, headers)
     r = await hub.post("/api/outputs/upload?name=planted.txt", content=b"hi", headers={"Origin": "https://evil.example",
                                                                                         "Content-Type": "text/plain"})
-    assert r.status_code == 403 and r.json()["data"]["fix"] == "open AIHub at http://127.0.0.1:7000"
+    assert r.status_code == 403 and r.json()["data"]["fix"] == "open GAIFA at http://127.0.0.1:7000"
     # the hub's own page (by any loopback name), and clients that aren't pages: through to the route (no mod x: 404)
     for headers in ({}, {"Origin": OWN, "Sec-Fetch-Site": "same-origin"}, {"Origin": "http://localhost:7000"},
                     {"Origin": "http://[::1]:7000"}, {"Sec-Fetch-Site": "none"}):

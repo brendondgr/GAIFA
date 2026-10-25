@@ -1,4 +1,4 @@
-// AIHub mock — chart history (brief §11.7, §11.9): metrics, timeline, output/activity/job stats, widgets.
+// GAIFA mock — chart history (brief §11.7, §11.9): metrics, timeline, output/activity/job stats, widgets.
 // The past is a deterministic function of time (seeded day plans, no big arrays): lcpp loaded ~09–18,
 // tts spikes with a 180 s idle tail, gen3d bursts to ~52 GB while jobs run, comfy sessions of ~20 GB.
 // The last 20 min before the mock started settle on its starting state; from then on the mock's own

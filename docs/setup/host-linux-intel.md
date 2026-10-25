@@ -1,12 +1,12 @@
 # The host: Linux with an Intel GPU
 
-What a Linux machine with an Intel Arc card or an integrated Intel GPU needs before you clone AIHub (plan 38.4). **Not yet run on such a machine:** the field test (plan 40.5, 40.6) checks it. The shared parts are in [host.md](host.md) §3–§6.
+What a Linux machine with an Intel Arc card or an integrated Intel GPU needs before you clone GAIFA (plan 38.4). **Not yet run on such a machine:** the field test (plan 40.5, 40.6) checks it. The shared parts are in [host.md](host.md) §3–§6.
 
-## Check what AIHub sees
+## Check what GAIFA sees
 
 ```bash
-bin/aihub hardware
-bin/aihub setup host
+bin/gaifa hardware
+bin/gaifa setup host
 ```
 
 `xpu` among the accels means PyTorch can use the GPU; `vulkan` alone means only Vulkan software (llama.cpp's Vulkan build) can.
@@ -21,7 +21,7 @@ The kernel driver (`i915` or `xe`) is in every current kernel. PyTorch's `xpu` b
 | Fedora | `sudo dnf install intel-compute-runtime oneapi-level-zero` |
 | Arch | `sudo pacman -S intel-compute-runtime level-zero-loader` |
 
-Check: `aihub hardware` lists `level_zero` under the GPU's runtimes and `xpu` among the accels.
+Check: `gaifa hardware` lists `level_zero` under the GPU's runtimes and `xpu` among the accels.
 
 ## 2. GPU access for your user
 
@@ -31,7 +31,7 @@ sudo usermod -aG render $USER     # then log out and in
 
 ## 3. Memory
 
-An Arc card has its own VRAM (a memory pool of its own, plan 36); an integrated GPU shares the system's memory. `aihub hardware` says which.
+An Arc card has its own VRAM (a memory pool of its own, plan 36); an integrated GPU shares the system's memory. `gaifa hardware` says which.
 
 ## What to look for
 

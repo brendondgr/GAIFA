@@ -31,11 +31,11 @@ page = "ui/page.js"
 chat = "ui/chat.js"                 # the load card in Chat: the engine's stages (plan 46.4)
 
 [memory]
-# Each load acquires its profile's own memory_gb (+ the processes' overhead) from AIHub first.
+# Each load acquires its profile's own memory_gb (+ the processes' overhead) from GAIFA first.
 estimate_gb = 16
 load = "POST /v1/load"
 unload = "POST /v1/unload"
-containers = ["aihub-vllm-*"]
+containers = ["gaifa-vllm-*"]
 idle_unload_s = 0                   # a reload takes minutes; unload by hand
 
 [gpu]                              # plan 31.4: the relay takes an interactive GPU lease per request to this engine

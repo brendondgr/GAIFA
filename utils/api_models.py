@@ -363,7 +363,7 @@ class SystemMemory(_Model):
     reserve_bytes: int
     gpu: Gpu | None
     by_service: list[ServiceMemory]
-    other_bytes: int = Field(description="OS, desktop, browser: anything AIHub doesn't own")
+    other_bytes: int = Field(description="OS, desktop, browser: anything GAIFA doesn't own")
     pools: list[MemoryPool] = Field(description="system first, then each dedicated GPU's VRAM (one pool where every GPU shares the system's memory)")
 
 
@@ -608,7 +608,7 @@ class DoctorCounts(_Model):
 
 
 class Doctor(_Model):
-    """`aihub doctor`'s report (plan 12.4)."""
+    """`gaifa doctor`'s report (plan 12.4)."""
 
     ts: float
     ok: bool
@@ -832,7 +832,7 @@ class Check(_Model):
 
 
 class CheckReport(_Model):
-    """`aihub check <id>`: the mod self-test."""
+    """`gaifa check <id>`: the mod self-test."""
 
     ok: bool
     checks: list[Check]

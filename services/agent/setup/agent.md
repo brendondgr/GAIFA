@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "agent"
 title = "Chat agent"
 models = []
@@ -8,14 +8,14 @@ gpu = false
 disk_gb = 0.05
 needs = ["uv"]
 after = ["relay"]
-check = "aihub check agent --start"
+check = "gaifa check agent --start"
 
 [[steps]]
-run = "aihub install agent"
+run = "gaifa install agent"
 what = "makes .venv/ from requirements-dev.txt (about 45 MB, seconds from uv's cache)"
 
 [[steps]]
-run = "aihub start agent"
+run = "gaifa start agent"
 what = "starts the agent on 127.0.0.1:5100; after install, the wizard asks which of your relay's models it uses"
 
 [[config]]
@@ -40,7 +40,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The `agent` mod (port 5100) is AIHub's chat agent: our own tool loop (call the model, run its tool calls, repeat), behind the Chat page and the Learning page (`#/s/agent/learning`). Its one environment is `.venv/` in this folder: FastAPI, uvicorn, httpx and Pillow. It runs no model. Every model call goes to the [relay](../../relay/setup/relay.md) at `http://127.0.0.1:4000/v1`, and every tool call goes through the hub's catalog. So the agent works only when the relay has at least one chat model, and when the model names below exist on your relay.
+The `agent` mod (port 5100) is GAIFA's chat agent: our own tool loop (call the model, run its tool calls, repeat), behind the Chat page and the Learning page (`#/s/agent/learning`). Its one environment is `.venv/` in this folder: FastAPI, uvicorn, httpx and Pillow. It runs no model. Every model call goes to the [relay](../../relay/setup/relay.md) at `http://127.0.0.1:4000/v1`, and every tool call goes through the hub's catalog. So the agent works only when the relay has at least one chat model, and when the model names below exist on your relay.
 
 ## Tested with
 
@@ -64,7 +64,7 @@ Read from this machine on 2026-10-21:
 ## Install
 
 ```bash
-aihub install agent
+gaifa install agent
 ```
 
 Runs `install.sh`: makes `.venv/` with uv-managed Python and installs `requirements-dev.txt` (about 45 MB, seconds from uv's cache).
@@ -72,12 +72,12 @@ Runs `install.sh`: makes `.venv/` with uv-managed Python and installs `requireme
 Then point it at models that exist on **your** relay (next section) and start it:
 
 ```bash
-aihub start agent
+gaifa start agent
 ```
 
 ## Choosing models
 
-The agent runs no model and downloads none, so it has no suggestions. `aihub setup` asks which model it uses once the relay and your LLM mods are installed (their models exist only then), offers to add a hosted provider when the relay has none, saves the answer through the hub (into `config.toml`, applied at once), restarts the agent, and checks it's on the relay; an agent passes it with `--set "services.agent.env.AGENT_MODEL=<name>"`. The Auto judge's model (`[agent.judge] model`) is asked the same way, and can be skipped. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
+The agent runs no model and downloads none, so it has no suggestions. `gaifa setup` asks which model it uses once the relay and your LLM mods are installed (their models exist only then), offers to add a hosted provider when the relay has none, saves the answer through the hub (into `config.toml`, applied at once), restarts the agent, and checks it's on the relay; an agent passes it with `--set "services.agent.env.AGENT_MODEL=<name>"`. The Auto judge's model (`[agent.judge] model`) is asked the same way, and can be skipped. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
 - **[llama.cpp](../../lcpp/setup/llama-cpp.md) (`lcpp`):** any GGUF you add; a running instance registers under its catalog nickname (`nicknames` in `services/lcpp/data/models.json`), or the alias given at launch. Its doc suggests two models that take tool calls.
 - **[vLLM](../../vllm/setup/vllm.md):** a loaded profile registers under its `alias` (such as `Qwen3-0.6B-vLLM`; the profiles are parked here).
 - **[OpenCode](../../opencode/setup/opencode.md):** a free hosted id such as `opencode/glm-5.3-flash-free`, with no GPU at all. (Its `agent` model is OpenCode's own coding agent, which runs shell commands in its folder; setup doesn't offer it as Chat's model.)
@@ -87,7 +87,7 @@ A model that is always up makes the better default; an lcpp nickname is listed o
 
 ## Configuration
 
-`service.toml` `[run.env]` sets every key. To change one on your machine, don't edit `service.toml`: `config.toml` wins (architecture §4.4). `aihub setup` sets the two it asks for through the hub, which saves `config.toml` and applies the value at once, then restarts the mod. By hand, the hub reads `config.toml` only when it starts, so edit it, run `aihub restart` (the hub), then `aihub restart agent`:
+`service.toml` `[run.env]` sets every key. To change one on your machine, don't edit `service.toml`: `config.toml` wins (architecture §4.4). `gaifa setup` sets the two it asks for through the hub, which saves `config.toml` and applies the value at once, then restarts the mod. By hand, the hub reads `config.toml` only when it starts, so edit it, run `gaifa restart` (the hub), then `gaifa restart agent`:
 
 ```toml
 [services.agent.env]
@@ -95,11 +95,11 @@ AGENT_MODEL = "<your-model>"
 AGENT_FALLBACK_MODEL = "<another-model>"   # optional; "" (the default) for none
 ```
 
-(When the hub isn't running, `aihub setup` edits this table form in the file itself; it leaves an inline `env = { … }` alone and asks you to set it by hand.)
+(When the hub isn't running, `gaifa setup` edits this table form in the file itself; it leaves an inline `env = { … }` alone and asks you to set it by hand.)
 
 | Key | Set to | Required | Meaning |
 |---|---|---|---|
-| `AGENT_MODEL` | `<your-model>`, asked by `aihub setup` (`service.toml` and the code say `skynet`, a name from the machine these docs were written on) | yes | the default chat model: a name the relay's `/v1/models` lists |
+| `AGENT_MODEL` | `<your-model>`, asked by `gaifa setup` (`service.toml` and the code say `skynet`, a name from the machine these docs were written on) | yes | the default chat model: a name the relay's `/v1/models` lists |
 | `AGENT_FALLBACK_MODEL` | `""` (none) | optional | when the thread's model doesn't answer, the turn goes on with this one; empty, the default, means no fallback |
 | `AGENT_LLM_URL` | `http://127.0.0.1:4000/v1` | yes (set) | the relay |
 | `AGENT_DB` | `{databases}/agent.db` | yes (set) | threads and their event logs |
@@ -115,7 +115,7 @@ AGENT_FALLBACK_MODEL = "<another-model>"   # optional; "" (the default) for none
 ## Check it works
 
 ```bash
-aihub check agent --start
+gaifa check agent --start
 ```
 
 Starts the agent if it's stopped (a stopped mod's live checks are skipped), then checks it. Expect `agent: all checks passed` (two widgets, the Learning page).
@@ -136,7 +136,7 @@ Expect `225 passed` (2026-10-21, about a minute).
 
 ## What to look for
 
-- **Every chat fails or falls back.** `AGENT_MODEL` names a model your relay doesn't have (such as `service.toml`'s `skynet`, which exists only on the machine these docs were written on). Check the list above, then `aihub setup agent --set "services.agent.env.AGENT_MODEL=<name>"`, or edit `config.toml` and restart the hub, then the agent (Configuration).
+- **Every chat fails or falls back.** `AGENT_MODEL` names a model your relay doesn't have (such as `service.toml`'s `skynet`, which exists only on the machine these docs were written on). Check the list above, then `gaifa setup agent --set "services.agent.env.AGENT_MODEL=<name>"`, or edit `config.toml` and restart the hub, then the agent (Configuration).
 - **A fallback that's off most of the time.** An lcpp nickname is on the relay only while its instance runs. Start it from the LLM Launcher page, or choose a fallback that is always up.
 - **The judge asks about everything in Auto.** Its model doesn't answer within `timeout_s` (3 s) or isn't on the relay, so each call falls back to asking you. Pick a reachable model in Settings → Agent.
 - **A model without tool calls** answers but never uses a tool. The relay's facts (`tools`) say which ones take them.
@@ -144,5 +144,5 @@ Expect `225 passed` (2026-10-21, about a minute).
 
 ## Known gaps
 
-- `aihub install agent` alone doesn't check that `AGENT_MODEL` exists on the relay (`aihub setup` does, and asks for it); `AGENT_FALLBACK_MODEL` isn't asked or checked.
+- `gaifa install agent` alone doesn't check that `AGENT_MODEL` exists on the relay (`gaifa setup` does, and asks for it); `AGENT_FALLBACK_MODEL` isn't asked or checked.
 - `requirements.txt` is unpinned.

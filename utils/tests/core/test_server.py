@@ -70,7 +70,7 @@ async def test_system(client, root):
 async def test_config_js_lists_live_areas(client):
     r = await client.get("/config.js")
     assert r.headers["content-type"].startswith("text/javascript")
-    assert r.text == 'window.AIHUB_API_BASE = "";\nwindow.AIHUB_LIVE_AREAS = ["system", "services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets", "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions"];\n'
+    assert r.text == 'window.GAIFA_API_BASE = "";\nwindow.GAIFA_LIVE_AREAS = ["system", "services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets", "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions"];\n'
 
 
 async def test_docs_and_openapi(client):
@@ -84,7 +84,7 @@ async def test_error_envelope(client):
     r = await client.get("/api/_test/hub-error")
     assert r.status_code == 409
     assert r.json() == {"detail": "not enough memory", "code": "needs_room", "data": {"plan": {"enough": False}}}
-    assert r.headers["x-aihub-error"] == "needs_room"
+    assert r.headers["x-gaifa-error"] == "needs_room"
 
     r = await client.get("/api/nope")
     assert r.status_code == 404 and r.json() == {"detail": "Not Found", "code": "not_found"}
@@ -131,7 +131,7 @@ def test_app_py_refuses_non_loopback(tmp_path):
     (tmp_path / "config.toml").write_text('[hub]\nhost = "0.0.0.0"\n')
     r = subprocess.run(
         [sys.executable, str(REPO / "app.py")],
-        env={**os.environ, "AIHUB_ROOT": str(tmp_path)}, capture_output=True, text=True, timeout=30,
+        env={**os.environ, "GAIFA_ROOT": str(tmp_path)}, capture_output=True, text=True, timeout=30,
     )
     assert r.returncode == 2
     assert "hub.host" in r.stderr and "not loopback" in r.stderr

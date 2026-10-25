@@ -118,7 +118,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
   const upload = async list => {
     const files = uploadable(list), skipped = [...(list || [])].filter(f => f && !files.includes(f));
     if (!files.length) { if (skipped.length) setUpErr(`Can't upload ${skipped.map(f => f.name || 'that file').join(', ')}: images, video, audio, text, code and documents (PDF, Word, EPUB…) only.`); return; }
-    setUpErr(skipped.length ? `Skipped ${skipped.map(f => f.name).join(', ')}: not a kind AIHub reads.` : null); setUploading(n => n + files.length);
+    setUpErr(skipped.length ? `Skipped ${skipped.map(f => f.name).join(', ')}: not a kind GAIFA reads.` : null); setUploading(n => n + files.length);
     try {
       const { chips, errors } = await uploadAll(api, files);
       setAttachments(a => [...a, ...chips.filter(c => !a.some(x => x.id === c.id))]);

@@ -1,5 +1,5 @@
 """5.5: a proxied call that loads a mod's models makes room first, or returns needs_room;
-the caller retries with X-AIHub-Make-Room: 1."""
+the caller retries with X-GAIFA-Make-Room: 1."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ async def test_trigger_needs_room_then_retry(memhub):
         await c.post("/api/services/fake-mem/load")
         await loaded(app, "fake-mem")
         r = await c.post("/api/s/fake-mem2/v1/load", json={"mb": 8})
-        assert r.status_code == 409 and r.headers["x-aihub-error"] == "needs_room"
+        assert r.status_code == 409 and r.headers["x-gaifa-error"] == "needs_room"
         assert [u["id"] for u in r.json()["data"]["plan"]["unload"]] == ["fake-mem"]
         assert hub.services.get("fake-mem").load == "loaded"
-        r = await c.post("/api/s/fake-mem2/v1/load", json={"mb": 8}, headers={"X-AIHub-Make-Room": "1"})
+        r = await c.post("/api/s/fake-mem2/v1/load", json={"mb": 8}, headers={"X-GAIFA-Make-Room": "1"})
         assert r.status_code == 200 and r.json() == {"loaded": True, "mb": 8}  # the mod's own answer
         assert hub.services.get("fake-mem").load == "unloaded"
         await loaded(app, "fake-mem2")  # its status says so on the next poll
@@ -40,7 +40,7 @@ async def test_a_mod_with_a_request_in_flight_is_never_unloaded(memhub):
         await c.post("/api/services/fake-mem/load")
         await loaded(app, "fake-mem")
         app.state.hub.services.get("fake-mem").in_flight = 1
-        r = await c.post("/api/s/fake-mem2/v1/load", json={"mb": 8}, headers={"X-AIHub-Make-Room": "1"})
+        r = await c.post("/api/s/fake-mem2/v1/load", json={"mb": 8}, headers={"X-GAIFA-Make-Room": "1"})
         assert r.status_code == 409 and r.json()["data"]["plan"]["unload"] == []
         assert app.state.hub.services.get("fake-mem").load == "loaded"
         app.state.hub.services.get("fake-mem").in_flight = 0
@@ -73,7 +73,7 @@ async def test_a_gpu_mod_gets_its_room_at_its_gpu_turn():
     q = GpuQueue(bus, Alerts(bus), cfg=GpuCfg)
     before = hook(Mem(), lambda: q)
     comfy = q.register("comfy", "job", "video")                     # holds the slot
-    await before(svc, "POST", "/v1/jobs", {"x-aihub-make-room": "1"})
+    await before(svc, "POST", "/v1/jobs", {"x-gaifa-make-room": "1"})
     assert calls == [("check", "gen3d", True)]                       # nothing unloaded or reserved while it waits
     lease = q.register("gen3d", "job", "a model")
     assert lease.state == "waiting"

@@ -96,17 +96,17 @@ def test_time_cap(site, make_client, monkeypatch):
 
 def test_robots_disallow_and_allow(site, make_client):
     site.routes["/robots.txt"] = (200, {"Content-Type": "text/plain"},
-                                  b"User-agent: *\nDisallow: /private/\n\nUser-agent: AIHub-web\nDisallow: /no-aihub/\n")
+                                  b"User-agent: *\nDisallow: /private/\n\nUser-agent: GAIFA-web\nDisallow: /no-gaifa/\n")
     site.routes["/private/page"] = html("Private", "<p>x</p>")
     site.routes["/public/page"] = html("Public", "<p>" + "words " * 40 + "</p>")
-    site.routes["/no-aihub/page"] = html("Not for us", "<p>x</p>")
+    site.routes["/no-gaifa/page"] = html("Not for us", "<p>x</p>")
     c = make_client()
     base = f"http://site.test:{site.port}"
     assert c.post("/v1/fetch", json={"url": base + "/public/page"}).status_code == 200
-    for path in ("/no-aihub/page",):
+    for path in ("/no-gaifa/page",):
         r = c.post("/v1/fetch", json={"url": base + path})
         assert r.status_code == 403 and r.json()["code"] == "robots_disallowed", r.text
-    assert not [s for s in site.seen if s["path"] == "/no-aihub/page"]
+    assert not [s for s in site.seen if s["path"] == "/no-gaifa/page"]
     assert len([s for s in site.seen if s["path"] == "/robots.txt"]) == 1  # cached per site
 
 

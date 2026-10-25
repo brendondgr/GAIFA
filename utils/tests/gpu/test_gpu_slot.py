@@ -155,9 +155,9 @@ async def test_no_hub_runs_at_once(gs):
 
 
 async def test_defaults_from_the_environment(gs, monkeypatch):
-    monkeypatch.setenv("AIHUB_SERVICE_ID", "decide")
-    monkeypatch.setenv("AIHUB_GPU_CLASS", "interactive")
-    monkeypatch.setenv("AIHUB_GPU_GROUP", "decide-g")
+    monkeypatch.setenv("GAIFA_SERVICE_ID", "decide")
+    monkeypatch.setenv("GAIFA_GPU_CLASS", "interactive")
+    monkeypatch.setenv("GAIFA_GPU_GROUP", "decide-g")
     s = gs.GpuSlot(hub_url="http://hub")
     assert (s.service, s.cls, s.group) == ("decide", "interactive", "decide-g")
 

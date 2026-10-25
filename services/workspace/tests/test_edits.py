@@ -19,7 +19,7 @@ def proj(client, repo):
 
 def post(client, route, thread="t1", turn=1, **body):
     o = {"service": "agent", "thread": thread, "turn": turn, "tool_call": "call_x"}
-    return client.post(route, json=body, headers={"X-AIHub-Origin": json.dumps(o)})
+    return client.post(route, json=body, headers={"X-GAIFA-Origin": json.dumps(o)})
 
 
 def test_edit_replaces_exactly_once_and_returns_a_diff(client, proj):
@@ -130,10 +130,10 @@ def test_secrets_escapes_and_levels(client, proj, repo):
     assert r.status_code == 403 and r.json()["code"] == "level" and "Edit" in r.json()["detail"]
 
 
-def test_aihub_never_written(client, aihub):
-    f = client.post("/v1/folders", json={"path": str(aihub.parent), "level": "edit", "id": "outer"}).json()
+def test_gaifa_never_written(client, gaifa):
+    f = client.post("/v1/folders", json={"path": str(gaifa.parent), "level": "edit", "id": "outer"}).json()
     assert f["level"] == "edit"
-    r = post(client, "/v1/write", folder="outer", path="AIHub/utils/proxy.py", content="x")
+    r = post(client, "/v1/write", folder="outer", path="GAIFA/utils/proxy.py", content="x")
     assert r.json()["code"] == "protected"
 
 

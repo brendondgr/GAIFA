@@ -75,9 +75,9 @@ def test_image_jobs_need_a_picture(c):
     r = c.post("/v1/jobs/image", files={"image": ("x.png", b"not a picture", "image/png")},
                data={"job": json.dumps({"engine": "hunyuan21"})})
     assert r.status_code == 422 and "picture" in r.json()["detail"]
-    # output:<id> pictures come from AIHub: without it, the job is refused rather than failing later
+    # output:<id> pictures come from GAIFA: without it, the job is refused rather than failing later
     r = c.post("/v1/jobs", json={"engine": "hunyuan21", "image": "output:o_123"})
-    assert r.status_code == 422 and "AIHub" in r.json()["detail"]
+    assert r.status_code == 422 and "GAIFA" in r.json()["detail"]
 
 
 def test_switching_engines_stops_the_other_worker(c):

@@ -1,11 +1,11 @@
-"""The `aihub-setup` block, versions 2 and 3 (plans 23.7, 38.1): what `aihub setup` reads from a setup doc.
+"""The `gaifa-setup` block, versions 2 and 3 (plans 23.7, 38.1): what `gaifa setup` reads from a setup doc.
 
 Every key past `id` and `title` is optional, so a doc without them still parses; the wizard lists
 only docs with a `summary`. Unknown keys are errors, at the top and inside `[[steps]]` and `[[suggest]]`.
 
 Version 3 adds `[[variants]]`, one per accelerator the setup can run on (`accel`, `os`, `tested`, `env`,
 and optionally its own `steps`, `check` and `smoke`), and `smoke`: a command that does real work, run
-by `aihub setup --smoke` and the field test. A block without variants has one: `cpu` when `gpu = false`,
+by `gaifa setup --smoke` and the field test. A block without variants has one: `cpu` when `gpu = false`,
 `rocm` on Linux when `gpu = true` (what the version-2 docs were written on).
 """
 
@@ -63,7 +63,7 @@ class Suggest:
 class Config:
     key: str                        # services.<id>.env.<VAR>, or agent.judge.model, in config.toml
     text: str                       # the question
-    choices: str | list[str] = "relay-models"   # the relay's models once it runs, "folder" (an absolute path outside AIHub), or a list
+    choices: str | list[str] = "relay-models"   # the relay's models once it runs, "folder" (an absolute path outside GAIFA), or a list
     required: bool = False          # no answer stops the run; else it's left for later (the report says so)
     restart: str = ""               # a mod id (or "hub") restarted once it's set
 

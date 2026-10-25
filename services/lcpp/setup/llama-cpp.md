@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "lcpp"
 title = "llama.cpp (LLM Launcher)"
 models = ["llm/**"]
@@ -8,11 +8,11 @@ gpu = true
 disk_gb = 0.15
 needs = ["uv", "curl", "tar", "sha256sum", "systemd-run"]
 after = ["relay"]
-check = "aihub check lcpp --start"
-smoke = "runtime/llama.cpp/bin/current/llama-server --list-devices 2>&1 | tee /dev/stderr | grep -Eq '^ +(Vulkan|CUDA|Metal|SYCL)[0-9]|CPU'"   # plan 39: real work, run by aihub setup --smoke and the field test
+check = "gaifa check lcpp --start"
+smoke = "runtime/llama.cpp/bin/current/llama-server --list-devices 2>&1 | tee /dev/stderr | grep -Eq '^ +(Vulkan|CUDA|Metal|SYCL)[0-9]|CPU'"   # plan 39: real work, run by gaifa setup --smoke and the field test
 
 [[steps]]
-run = "aihub install lcpp"
+run = "gaifa install lcpp"
 what = "makes the daemon's .venv/ from uv.lock (about 29 MB); it doesn't fetch llama.cpp"
 
 [[steps]]
@@ -58,7 +58,7 @@ os = ["linux", "wsl"]
 needs = ["uv", "git", "cmake", "nvcc", "systemd-run"]
 note = "built from source with the CUDA toolkit (10–20 min)"
 steps = [
-  { run = "aihub install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
+  { run = "gaifa install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
   { run = "scripts/build-llama-cpp.sh cuda b11445", what = "clones llama.cpp b11445 and builds llama-server with CUDA (about 1 GB of source and build, 10–20 min), then points runtime/llama.cpp/bin/current at it" },
 ]
 
@@ -68,7 +68,7 @@ os = ["darwin"]
 needs = ["uv", "git", "cmake"]
 note = "built from source with Metal (5–10 min)"
 steps = [
-  { run = "aihub install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
+  { run = "gaifa install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
   { run = "scripts/build-llama-cpp.sh mps b11445", what = "clones llama.cpp b11445 and builds llama-server with Metal (5–10 min)" },
 ]
 
@@ -79,7 +79,7 @@ needs = ["uv", "git", "cmake", "systemd-run"]
 tested = ["linux"]
 note = "built from source for this CPU; slow for big models"
 steps = [
-  { run = "aihub install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
+  { run = "gaifa install lcpp", what = "makes the daemon's .venv/ from uv.lock (about 29 MB)" },
   { run = "scripts/build-llama-cpp.sh cpu b11445", what = "clones llama.cpp b11445 and builds llama-server for this CPU (3–5 min)" },
 ]
 -->
@@ -113,16 +113,16 @@ Read from this machine on 2026-10-21:
 ## Prerequisites
 
 - [host.md](../../../docs/setup/host.md): the kernel parameters (GTT), the `video` and `render` groups, `mesa-vulkan-drivers`, the IOMMU **on**.
-- The [relay](../../relay/setup/relay.md), set up first (`after = ["relay"]`, so `aihub setup lcpp` sets it up too): instances publish themselves to it, and Chat and the agent reach them only through it.
+- The [relay](../../relay/setup/relay.md), set up first (`after = ["relay"]`, so `gaifa setup lcpp` sets it up too): instances publish themselves to it, and Chat and the agent reach them only through it.
 - `systemd-run`, `systemctl` and `journalctl` (instances are user units).
 
 ## Install
 
 ```bash
-aihub install lcpp
+gaifa install lcpp
 ```
 
-Runs `aihub-install.sh`: `uv sync --python 3.14` makes `.venv/` from `uv.lock` (about 29 MB). It doesn't fetch llama.cpp: the block's next two steps do (`aihub setup` runs them), or by hand, from the repo root:
+Runs `gaifa-install.sh`: `uv sync --python 3.14` makes `.venv/` from `uv.lock` (about 29 MB). It doesn't fetch llama.cpp: the block's next two steps do (`gaifa setup` runs them), or by hand, from the repo root:
 
 ```bash
 mkdir -p services/lcpp/runtime/llama.cpp/vendor services/lcpp/runtime/llama.cpp/bin
@@ -147,11 +147,11 @@ The archive holds one folder, `llama-b11445/` (`llama-server`, the other tools a
 ln -sfn llama-b11445 services/lcpp/runtime/llama.cpp/bin/current
 ```
 
-`data/lcpp.json` runs `runtime/llama.cpp/bin/current/llama-server`, so moving `current` is how you upgrade or roll back (`aihub restart lcpp` afterwards; running instances keep their binary).
+`data/lcpp.json` runs `runtime/llama.cpp/bin/current/llama-server`, so moving `current` is how you upgrade or roll back (`gaifa restart lcpp` afterwards; running instances keep their binary).
 
 ### On other machines (plan 39.2)
 
-`aihub setup lcpp` picks the build from `aihub hardware`, in this order:
+`gaifa setup lcpp` picks the build from `gaifa hardware`, in this order:
 
 | Variant | Where | How |
 |---|---|---|
@@ -165,23 +165,23 @@ The script builds a static `llama-server` into `runtime/llama.cpp/bin/llama-b114
 ## Choosing models
 
 llama.cpp runs **any GGUF** chat model; which ones is your choice, and none is needed to install the mod. GGUFs live in `data/models/llm/<Folder>/` (`LCPP_MODELS_DIR`); the catalog is `data/models.json`, with paths relative to that folder. How much fits is set by the GTT ([host.md](../../../docs/setup/host.md)): on 128 GB of unified memory, a model's file plus its context's KV cache should leave room for the other mods. Summary of [README.md → Adding a model](../README.md#adding-a-model):
-- **From Hugging Face:** the page's **Models → Add model → Hugging Face**, with a repo id or a link to one `.gguf` file. It lists the quants and the `mmproj` / `mtp` sidecars, downloads into `data/models/llm/<folder>/`, checks the Hub's sha256, adds it to the catalog and registers it in AIHub's models registry.
-- **By hand:** put the GGUF in `data/models/llm/<Name>/`, then **Models → Discovered → Add to catalog** (or an entry in `data/models.json`), and `aihub models scan --add` to register it.
+- **From Hugging Face:** the page's **Models → Add model → Hugging Face**, with a repo id or a link to one `.gguf` file. It lists the quants and the `mmproj` / `mtp` sidecars, downloads into `data/models/llm/<folder>/`, checks the Hub's sha256, adds it to the catalog and registers it in GAIFA's models registry.
+- **By hand:** put the GGUF in `data/models/llm/<Name>/`, then **Models → Discovered → Add to catalog** (or an entry in `data/models.json`), and `gaifa models scan --add` to register it.
 
 Only GGUF runs here; safetensors, AWQ and GPTQ repos go to [vLLM](../../vllm/setup/vllm.md).
 
-Two optional starting points, which `aihub setup` offers (the page's form does the same with a repo id and a quant); sizes from Hugging Face, 2026-10-21:
+Two optional starting points, which `gaifa setup` offers (the page's form does the same with a repo id and a quant); sizes from Hugging Face, 2026-10-21:
 
 | Model | Size | Good for | Licence |
 |---|---|---|---|
 | [Qwen3 8B](https://huggingface.co/Qwen/Qwen3-8B-GGUF), Q4_K_M | 5.0 GB | an everyday chat model with tool calls and thinking, small enough to run beside other mods | Apache-2.0 |
 | [Gemma 4 26B-A4B](https://huggingface.co/ggml-org/gemma-4-26B-A4B-it-GGUF), Q8_0 with its `mmproj` (images) and `mtp` (draft) files | 28.1 GB | a strong agent and judge model (a mixture of experts, about 4B active per token); a QAT Q4_K_M variant of it is the Auto judge on the machine these docs were written on | Apache-2.0 |
 
-Each joins the catalog under an id made from its file name: `qwen3-8b` and `gemma-4-26b-a4b-it` (`suggest_id` in `src/lcpp/catalog.py`). **`aihub setup` launches the model you choose** once it's downloaded (`POST /api/instances` with that `model_id`, the suggestion's `start_op`), published to the relay (`relay.auto_register`, on by default), so the agent's model question that follows lists it. An instance doesn't survive a reboot: `[sessions] restore_on_boot = true` in `config.toml` (Settings → Sessions) brings back what was running before the restart, lcpp instances included; the setup report says so.
+Each joins the catalog under an id made from its file name: `qwen3-8b` and `gemma-4-26b-a4b-it` (`suggest_id` in `src/lcpp/catalog.py`). **`gaifa setup` launches the model you choose** once it's downloaded (`POST /api/instances` with that `model_id`, the suggestion's `start_op`), published to the relay (`relay.auto_register`, on by default), so the agent's model question that follows lists it. An instance doesn't survive a reboot: `[sessions] restore_on_boot = true` in `config.toml` (Settings → Sessions) brings back what was running before the restart, lcpp instances included; the setup report says so.
 
 ### Running a model, and its name on the relay
 
-A download only adds the model to the catalog; nothing runs until you launch it (`aihub setup` launches the model it downloaded; any other one is yours to launch). With the mod running (`aihub start lcpp`):
+A download only adds the model to the catalog; nothing runs until you launch it (`gaifa setup` launches the model it downloaded; any other one is yours to launch). With the mod running (`gaifa start lcpp`):
 - **On the page:** LLM Launcher → **Launch a model**, pick it, keep **Publish to relay** on, **Launch**. The Instances tab shows it starting, then ready.
 - **From a terminal**, with the mod's own CLI (it talks to the daemon on 7710):
 
@@ -219,7 +219,7 @@ services/lcpp/runtime/llama.cpp/bin/current/llama-server --version
 Expect `version: 0.6.0-dev (build 11445, commit 58cb9138e)`. It loads no model.
 
 ```bash
-aihub check lcpp --start
+gaifa check lcpp --start
 ```
 
 Starts the daemon if it's stopped (a stopped mod's live checks are skipped; the daemon loads no model), then checks it. Expect `lcpp: all checks passed`.
@@ -228,7 +228,7 @@ Starts the daemon if it's stopped (a stopped mod's live checks are skipped; the 
 cd services/lcpp && LCPP_HOME=$PWD LCPP_MODELS_DIR=$PWD/../../data/models/llm .venv/bin/lcpp doctor
 ```
 
-Read-only. Expect `[ok  ]` for settings, llama-server, catalog (`2 models, 0 with missing files` here), daemon and relay. `[warn] service lcpp.service not installed` is expected under AIHub: the daemon runs as AIHub's unit, not as `lcpp.service`.
+Read-only. Expect `[ok  ]` for settings, llama-server, catalog (`2 models, 0 with missing files` here), daemon and relay. `[warn] service lcpp.service not installed` is expected under GAIFA: the daemon runs as GAIFA's unit, not as `lcpp.service`.
 
 ```bash
 cd services/lcpp && .venv/bin/python -m pytest -q
@@ -241,11 +241,11 @@ A fake llama-server, no GPU and no systemd: expect `91 passed` (2026-10-21).
 - **Use the stock, pinned build.** Run the ggml-org release as published; don't build llama.cpp with custom kernels or flags, and keep the IOMMU on ([host.md, the IOMMU warning](../../../docs/setup/host.md#1-let-the-gpu-use-the-memory)). On this chip the GPU writes into the same memory as everything else, and in October 2026 experimental GPU compute corrupted files on this machine.
 - **`lcpp doctor` without the two variables** looks for models in `services/lcpp/models/` and reports every model's file as not found. Pass `LCPP_HOME` and `LCPP_MODELS_DIR` as above.
 - **Two Vulkan devices.** `vulkaninfo --summary` lists the Radeon (`driverName = radv`) and `llvmpipe` (Mesa's CPU renderer). If the Radeon is missing, check the `video`/`render` groups and `mesa-vulkan-drivers`. `llama.environment` (`AMD_VULKAN_ICD=RADV`, `GPU_MAX_HW_QUEUES=8`) is passed to every instance; keep it as it is.
-- **Memory.** A launch asks AIHub for memory first (`POST /api/memory/acquire`); a `needs_room` answer means other mods would have to unload. `services/lcpp/.venv/bin/lcpp start <model> --dry-run` (or the page's launch form) shows the estimate without starting anything. The GPU can only use the GTT the kernel parameters give it (host.md).
+- **Memory.** A launch asks GAIFA for memory first (`POST /api/memory/acquire`); a `needs_room` answer means other mods would have to unload. `services/lcpp/.venv/bin/lcpp start <model> --dry-run` (or the page's launch form) shows the estimate without starting anything. The GPU can only use the GTT the kernel parameters give it (host.md).
 - **Instances aren't on the relay.** The relay was down when they became ready: registrations wait as `pending` and retry. The page's Relay view shows them.
 
 ## Known gaps
 
 - The build is pinned only by the block's steps (build 11445 and its sha256) and the `current` link; upgrading is by hand (Install).
-- `aihub-install.sh` and `.gitignore` point to `runtime/README.md`, which doesn't exist (`runtime/` is gitignored). This doc replaces it.
+- `gaifa-install.sh` and `.gitignore` point to `runtime/README.md`, which doesn't exist (`runtime/` is gitignored). This doc replaces it.
 - The `lcpp` command on this machine's `PATH` is a uv tool (`~/.local/bin/lcpp`, editable install of this folder) installed by the old `scripts/install.sh`, outside the project; a new machine doesn't have it, so this doc uses `services/lcpp/.venv/bin/lcpp`, which does the same.

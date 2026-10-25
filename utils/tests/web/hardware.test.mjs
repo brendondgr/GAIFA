@@ -29,7 +29,7 @@ test('WSL, a dedicated card, a GPU that runs nothing yet, no GPU', () => {
   assert.ok(v.system.startsWith('Ubuntu 24.04 (WSL2) · '));
   assert.equal(v.gpus[0].memory, '12.0 GB VRAM');
   assert.equal(v.gpus[1].memory, 'memory unknown');
-  assert.equal(v.gpus[1].runs, 'nothing AIHub can use yet');
+  assert.equal(v.gpus[1].runs, 'nothing GAIFA can use yet');
   assert.deepEqual(v.gpus[1].problems, ['no Level Zero']);
   assert.equal(hw.hwView({ ...strix, gpus: [], accels: ['cpu'] }).none, true);
   assert.equal(hw.hwView(null), null);

@@ -1,8 +1,8 @@
-# The host: the machine before AIHub
+# The host: the machine before GAIFA
 
-What the machine needs before you clone AIHub. **This page is Linux with an AMD Strix Halo**, the machine AIHub is built on; every value here was read from it (2026-10-20), and where it differs from the upstream guide, both are given. Sections 3–6 (packages, services, disk, accounts) apply to every Linux machine.
+What the machine needs before you clone GAIFA. **This page is Linux with an AMD Strix Halo**, the machine GAIFA is built on; every value here was read from it (2026-10-20), and where it differs from the upstream guide, both are given. Sections 3–6 (packages, services, disk, accounts) apply to every Linux machine.
 
-**Other machines** (plan 38.4): [Linux with NVIDIA](host-linux-nvidia.md) · [Linux with Intel](host-linux-intel.md) · [Windows through WSL2](host-wsl2.md) · [macOS on Apple Silicon](host-macos.md). On any of them, `bin/aihub hardware` shows what AIHub finds and `bin/aihub setup host` checks what that machine needs. What runs where: [platforms.md](../platforms.md).
+**Other machines** (plan 38.4): [Linux with NVIDIA](host-linux-nvidia.md) · [Linux with Intel](host-linux-intel.md) · [Windows through WSL2](host-wsl2.md) · [macOS on Apple Silicon](host-macos.md). On any of them, `bin/gaifa hardware` shows what GAIFA finds and `bin/gaifa setup host` checks what that machine needs. What runs where: [platforms.md](../platforms.md).
 
 ## Tested with
 
@@ -20,7 +20,7 @@ Other Strix Halo machines (the Framework Desktop, the HP Z2 Mini G1a, the GMKtec
 
 ## 1. Let the GPU use the memory
 
-On Strix Halo the GPU and CPU share memory. By default the GPU can address only a small part of it; AIHub's models need most of it. Two places decide this.
+On Strix Halo the GPU and CPU share memory. By default the GPU can address only a small part of it; GAIFA's models need most of it. Two places decide this.
 
 **The BIOS's dedicated GPU memory** (the UMA frame buffer). This machine keeps it small, **4 GB** (`mem_info_vram_total` reads `4294967296`), and gives the GPU the rest through GTT (below). Leave it at its default or set it low; don't give the GPU a large fixed carve-out, which the CPU then can't use.
 
@@ -38,7 +38,7 @@ and **leave the IOMMU on** (don't add `amd_iommu=off`, though the upstream guide
 | `ttm.pages_limit` | `33554432` (128 GiB of 4 KiB pages) | `32505856` (124 GiB) | how many pages the GPU's memory manager may pin; match it to `gttsize` |
 | `amd_iommu` | **leave it out (on)** | `off` | off gives 5–12% faster GPU memory access, but removes the only check on where the GPU may write, disables the NPU, and removes DMA-attack protection |
 
-The upstream guide is kyuz0's Strix Halo toolboxes ([strix-halo-toolboxes.com](https://strix-halo-toolboxes.com), [repo](https://github.com/kyuz0/amd-strix-halo-toolboxes)), whose images AIHub uses. Its 124 GiB leaves a little more for the CPU; 128 GiB is what this machine has run on since the start.
+The upstream guide is kyuz0's Strix Halo toolboxes ([strix-halo-toolboxes.com](https://strix-halo-toolboxes.com), [repo](https://github.com/kyuz0/amd-strix-halo-toolboxes)), whose images GAIFA uses. Its 124 GiB leaves a little more for the CPU; 128 GiB is what this machine has run on since the start.
 
 To set them on Fedora:
 
@@ -58,7 +58,7 @@ sudo reboot
 
 (The upstream guide edits `GRUB_CMDLINE_LINUX` in `/etc/default/grub` and runs `sudo grub2-mkconfig -o /boot/grub2/grub.cfg` instead; either works.)
 
-> **Why the IOMMU stays on: this machine lost files to it.** On 2026-10-19 and 20, with `amd_iommu=off`, experimental GPU compute (custom Triton kernels and HIP graphs in a TTS lab, then a GPU hang whose reset failed while two ROCm processes still held queues) wrote into memory the kernel was using for file cache. About 100 files across `/usr` and `/home` were saved with corrupted contents; Btrfs caught them as checksum errors, and the hub's database was among them. The SSD was fine (no media errors, self-test passed). On this chip the GPU writes into the same RAM as everything else, and with the IOMMU off nothing stops a stray write. With it on, such a write fails as an IO page fault instead. Stock, proven runtimes (the kyuz0 images, AIHub's mods) are the safe default; treat custom GPU kernels as a risk to the whole machine.
+> **Why the IOMMU stays on: this machine lost files to it.** On 2026-10-19 and 20, with `amd_iommu=off`, experimental GPU compute (custom Triton kernels and HIP graphs in a TTS lab, then a GPU hang whose reset failed while two ROCm processes still held queues) wrote into memory the kernel was using for file cache. About 100 files across `/usr` and `/home` were saved with corrupted contents; Btrfs caught them as checksum errors, and the hub's database was among them. The SSD was fine (no media errors, self-test passed). On this chip the GPU writes into the same RAM as everything else, and with the IOMMU off nothing stops a stray write. With it on, such a write fails as an IO page fault instead. Stock, proven runtimes (the kyuz0 images, GAIFA's mods) are the safe default; treat custom GPU kernels as a risk to the whole machine.
 
 **Check it:**
 
@@ -70,7 +70,7 @@ cat /proc/cmdline
 cat /sys/class/drm/card*/device/mem_info_gtt_total
 ```
 
-The first shows the three parameters; the second prints about `130446360576` (121.5 GiB) here. That number matters: AIHub's memory manager and the vLLM mod read it to size what they load. If it prints around 60 GB, the parameters didn't apply.
+The first shows the three parameters; the second prints about `130446360576` (121.5 GiB) here. That number matters: GAIFA's memory manager and the vLLM mod read it to size what they load. If it prints around 60 GB, the parameters didn't apply.
 
 ## 2. GPU access for your user
 
@@ -103,9 +103,9 @@ sudo dnf install rocm-hip rocblas hipblas hiprand rocrand
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
 
-  It installs to `~/.local/bin/uv`. Don't install Python packages with pip or dnf for AIHub; every environment is made by uv or lives in a container.
+  It installs to `~/.local/bin/uv`. Don't install Python packages with pip or dnf for GAIFA; every environment is made by uv or lives in a container.
 - **Blender** (optional): 3D Generate renders previews with it if `~/.local/bin/blender` exists. This machine uses Blender 5.2.2 LTS from blender.org, unpacked and linked there.
-- **Node 22 and npm** (optional) are only for building the LLM Relay's web UI once, during `aihub install relay`; without npm the relay installs and runs, without its page.
+- **Node 22 and npm** (optional) are only for building the LLM Relay's web UI once, during `gaifa install relay`; without npm the relay installs and runs, without its page.
 
 **Check it:**
 
@@ -119,7 +119,7 @@ rpm -q mesa-vulkan-drivers rocm-hip rocblas hipblas hiprand rocrand
 
 ## 4. Keep your services running
 
-AIHub runs as a systemd **user** service, which stops when you log out unless lingering is on:
+GAIFA runs as a systemd **user** service, which stops when you log out unless lingering is on:
 
 ```bash
 loginctl enable-linger $USER
@@ -152,7 +152,7 @@ Each mod's setup doc gives the sizes of the models it suggests. Put the clone on
   ```
 
   The token is stored in `~/.cache/huggingface/token`, where the mods' downloaders find it (or set `HF_TOKEN`).
-- **Licences you accept by installing:** each mod's setup doc names the licences of what it installs and suggests, and `aihub setup` asks before installing the restricted ones: **Breeze TTS 2** (non-commercial; the Speech runtime installer needs `--accept-breeze-license`), **Cube3D** (Roblox's research-only RAIL-MS), **Hunyuan3D 2.1** (Tencent's community licence, which excludes the EU, the UK and South Korea) and **SAM 3D Objects** (gated). The **Qwen-Image 2.1** suggestions (research or evaluation only) name their licence in the model choice.
+- **Licences you accept by installing:** each mod's setup doc names the licences of what it installs and suggests, and `gaifa setup` asks before installing the restricted ones: **Breeze TTS 2** (non-commercial; the Speech runtime installer needs `--accept-breeze-license`), **Cube3D** (Roblox's research-only RAIL-MS), **Hunyuan3D 2.1** (Tencent's community licence, which excludes the EU, the UK and South Korea) and **SAM 3D Objects** (gated). The **Qwen-Image 2.1** suggestions (research or evaluation only) name their licence in the model choice.
 - **OpenCode** (optional) needs an OpenCode Zen key or a provider key; see the OpenCode environment doc.
 
 ## What to look for
@@ -162,6 +162,6 @@ Each mod's setup doc gives the sizes of the models it suggests. Put the clone on
 - **SELinux denials on mounts.** The mods run their containers with `--security-opt label=disable` and the toolbox shares `$HOME`; a clone outside `$HOME` (another disk mounted elsewhere) won't be visible inside the ComfyUI toolbox.
 - **Btrfs `csum failed` lines in `journalctl -k`, or `sudo btrfs device stats /home` showing `corruption_errs` above 0**, with a healthy SSD (`sudo smartctl -a /dev/nvme0n1`: no media errors): something wrote into memory it didn't own. Check for `amdgpu` ring timeouts and GPU resets in the same boot (`journalctl -k -b | grep -iE 'ring .*timeout|GPU reset'`), make sure the IOMMU is on (no `amd_iommu=off` in `/proc/cmdline`), and find the damaged files with `sudo btrfs scrub start -B -d /home`.
 - **The NPU is missing.** That's `amd_iommu=off`; take it out (above).
-- **Upstream tweaks this machine doesn't use:** the upstream guide also suggests `sudo systemctl set-default multi-user.target` (no desktop, more free memory) and `sudo tuned-adm profile accelerator-performance`. This machine keeps the desktop and the `balanced` profile; AIHub keeps a 12 GB reserve for the desktop (`memory.reserve_gb`).
+- **Upstream tweaks this machine doesn't use:** the upstream guide also suggests `sudo systemctl set-default multi-user.target` (no desktop, more free memory) and `sudo tuned-adm profile accelerator-performance`. This machine keeps the desktop and the `balanced` profile; GAIFA keeps a 12 GB reserve for the desktop (`memory.reserve_gb`).
 
 Next: [the hub](hub.md).

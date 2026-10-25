@@ -49,13 +49,13 @@ export { ParamCard } from './chat-forms.js';
 const R = () => globalThis.React;
 const LIST_PAGE = 200;    // chats per page in the list (Show more adds a page)
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
-const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to AIHub” in Hope’s voice', 'What can you do?'];
+const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to GAIFA” in Hope’s voice', 'What can you do?'];
 const PAGE_CSS = `.aichat-box:focus-within{border-color:var(--bdh,#3A4A63)!important}`;
 
 let shared = null;
 /** One client per page load, shared by the Chat page and Settings → Agent. */
 export function getChatClient(api) {
-  if (!shared) shared = createChatClient({ api, base: globalThis.AIHUB_API_BASE || '' });
+  if (!shared) shared = createChatClient({ api, base: globalThis.GAIFA_API_BASE || '' });
   return shared;
 }
 function injectCss() {
@@ -172,8 +172,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   setChatOutputs(view.outputs);    // plan 47.3: ![caption](#n) in a reply draws that output
   useEffect(() => {
     const on = e => openOutput?.(e.detail);
-    document.addEventListener('aihub:open-output', on);
-    return () => document.removeEventListener('aihub:open-output', on);
+    document.addEventListener('gaifa:open-output', on);
+    return () => document.removeEventListener('gaifa:open-output', on);
   }, [openOutput]);
   const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
   const [now, setNow] = useState(() => Date.now() / 1000);   // ticks while a turn runs, so the fold's timers count

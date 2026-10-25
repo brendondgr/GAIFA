@@ -1,4 +1,4 @@
-// AIHub's chart components (brief §11.6), plain SVG through the page's React:
+// GAIFA's chart components (brief §11.6), plain SVG through the page's React:
 //   AreaChart, LineChart, BarChart (time or category axis, stacked, up to 2 y-axes),
 //   HBarChart, Donut, Sparkline, Heatmap, Treemap, Timeline, KpiTile.
 // Every chart sizes itself to its container, shows a crosshair/readout on hover and with the

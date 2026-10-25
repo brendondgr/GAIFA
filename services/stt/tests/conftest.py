@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-os.environ.pop("AIHUB_URL", None)           # never the installed hub's GPU queue (tests pass a fake)
+os.environ.pop("GAIFA_URL", None)           # never the installed hub's GPU queue (tests pass a fake)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 SEMINAR = FIXTURES / "seminar-speech-real.wav"     # 25 s of real speech

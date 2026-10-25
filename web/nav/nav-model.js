@@ -79,7 +79,7 @@ export function groups(route, services) {
 /** What each fixed item is, for its tooltip. */
 export const HINTS = {
   overview: 'The dashboard: memory, services and activity', chat: 'Talk to the agent', outputs: 'Everything the services made',
-  learning: 'What the agent has learned from you', models: 'The models on this machine', settings: "AIHub's settings",
+  learning: 'What the agent has learned from you', models: 'The models on this machine', settings: "GAIFA's settings",
 };
 /** A service's state in words, for its tooltip ("Ready · Active"). */
 export function stateWords(sv) {

@@ -216,17 +216,17 @@ async def test_cli_runtime_write_is_all_or_nothing(docker, folder, monkeypatch):
 async def test_cli_runtime_prunes_its_own_backups_only(docker, folder):
     rt, log, compose = docker
     c = await rt.find()
-    ours = [f"settings.yml.aihub-2026-01-01T1200{s:02d}" for s in range(12)] + [
-        "settings.yml.aihub-2026-01-01T120011-2", "settings.yml.aihub-2026-01-01T120011-10"]
-    for n in ours + ["settings.yml.aihub-keep", "settings.yml.bak"]:
+    ours = [f"settings.yml.gaifa-2026-01-01T1200{s:02d}" for s in range(12)] + [
+        "settings.yml.gaifa-2026-01-01T120011-2", "settings.yml.gaifa-2026-01-01T120011-10"]
+    for n in ours + ["settings.yml.gaifa-keep", "settings.yml.bak"]:
         (folder / n).write_text("x")
-    assert rt.backups(c)[:3] == ["settings.yml.aihub-2026-01-01T120011-10", "settings.yml.aihub-2026-01-01T120011-2",
-                                 "settings.yml.aihub-2026-01-01T120011"]
+    assert rt.backups(c)[:3] == ["settings.yml.gaifa-2026-01-01T120011-10", "settings.yml.gaifa-2026-01-01T120011-2",
+                                 "settings.yml.gaifa-2026-01-01T120011"]
     gone = await rt.prune(c, 10)
-    assert sorted(gone) == [f"settings.yml.aihub-2026-01-01T1200{s:02d}" for s in range(4)]
-    assert len(rt.backups(c)) == 10 and (folder / "settings.yml.aihub-keep").exists() and (folder / "settings.yml.bak").exists()
+    assert sorted(gone) == [f"settings.yml.gaifa-2026-01-01T1200{s:02d}" for s in range(4)]
+    assert len(rt.backups(c)) == 10 and (folder / "settings.yml.gaifa-keep").exists() and (folder / "settings.yml.bak").exists()
     rm = [x["args"] for x in _calls(log) if x["args"][:3] == ["exec", c.id, "rm"]]
-    assert len(rm) == 1 and all(a.startswith("/etc/searxng/settings.yml.aihub-") for a in rm[0][5:])
+    assert len(rm) == 1 and all(a.startswith("/etc/searxng/settings.yml.gaifa-") for a in rm[0][5:])
     assert await rt.prune(c, 10) == []
 
 

@@ -3,7 +3,7 @@
     python scripts/migrate_jobs_to_outputs.py --db DB --old OLD_JOBS --outputs OUTPUTS [--dry-run]
 
 For each job in the database whose folder is still `<OLD>/<id>/` (no `dir` yet): move it to
-`<OUTPUTS>/<created date>/<id>-<slug>/`, set `dir`, and write `output.json` (AIHub architecture
+`<OUTPUTS>/<created date>/<id>-<slug>/`, set `dir`, and write `output.json` (GAIFA architecture
 §4.7). Then every JSON file in the moved folders has old absolute paths rewritten, including paths
 into other jobs' folders (`parts/manifest.json` points at the parent job's mesh). Folders with no job in
 the database are left where they are and listed. Safe to run again: moved jobs are skipped.

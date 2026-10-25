@@ -49,7 +49,7 @@ class Machine:
         g = next((x for x in self.gpus if x.index == index), None)
         if g is None:
             return {}
-        env = {"AIHUB_GPU_INDEX": str(index)}
+        env = {"GAIFA_GPU_INDEX": str(index)}
         n = str(g.vendor_index)
         if g.vendor == "nvidia":
             env["CUDA_VISIBLE_DEVICES"] = n

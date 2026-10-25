@@ -167,7 +167,7 @@ async def fake_preview(jdir: Path, glb: Path, png: Path) -> None:
 
 
 class FakeComfyEngine:
-    """The delegated engines without AIHub: the same events and files, a box for a mesh."""
+    """The delegated engines without GAIFA: the same events and files, a box for a mesh."""
 
     def __init__(self) -> None:
         self.reduce = None

@@ -1,4 +1,4 @@
-"""Plan 31.3: a job takes AIHub's GPU slot (a fake hub) before its first stage, holds it across its stages,
+"""Plan 31.3: a job takes GAIFA's GPU slot (a fake hub) before its first stage, holds it across its stages,
 waits (queued, stage waiting_gpu) while another mod holds it, and passes its lease to comfy."""
 
 import asyncio
@@ -129,7 +129,7 @@ def test_delegate_hands_the_lease_to_comfy():
         runner.comfy = Comfy()
         runner.lease = Lease(id="gl_job", state="granted")
         asyncio.run(runner.delegate(None, None, {}, None, lambda: False))
-        assert seen["headers"] == {"X-AIHub-GPU-Lease": "gl_job"}
+        assert seen["headers"] == {"X-GAIFA-GPU-Lease": "gl_job"}
         runner.lease = None
 
 
@@ -140,14 +140,14 @@ def test_comfy_engine_sends_the_lease_header(tmp_path):
 
     def spy(request):
         if request.url.path.endswith("/v1/run"):
-            seen.append(request.headers.get("x-aihub-gpu-lease"))
+            seen.append(request.headers.get("x-gaifa-gpu-lease"))
         return real(request)
 
     engine = ComfyEngine("http://hub", httpx.MockTransport(spy), poll_s=0)
     orig = engine.run
 
     async def with_lease(*a, **kw):
-        return await orig(*a, gpu_headers={"X-AIHub-GPU-Lease": "gl_job"}, **kw)
+        return await orig(*a, gpu_headers={"X-GAIFA-GPU-Lease": "gl_job"}, **kw)
 
     engine.run = with_lease
     comfy_run(engine, {"engine": "trellis2"}, tmp_path)

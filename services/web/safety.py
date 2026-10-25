@@ -26,8 +26,8 @@ TIMEOUT_S = 20.0
 MAX_REDIRECTS = 5
 ROBOTS_MAX_BYTES = 512 * 1024
 ROBOTS_TTL_S = 3600.0
-USER_AGENT = "AIHub-web/0.1 (a personal assistant fetching a page a person asked for)"
-ROBOTS_AGENT = "AIHub-web"
+USER_AGENT = "GAIFA-web/0.1 (a personal assistant fetching a page a person asked for)"
+ROBOTS_AGENT = "GAIFA-web"
 BLOCKED_SUFFIXES = (".local", ".localhost", ".localdomain", ".internal", ".home.arpa", ".lan")
 
 Resolver = Callable[[str, int], Awaitable[list[str]]]

@@ -145,7 +145,7 @@ class FakeHub:
 
 
 class FakeGpu:
-    """AIHub's GPU queue for one test (plan 31.3). `blocked` holds back leases of these classes (another mod's work
+    """GAIFA's GPU queue for one test (plan 31.3). `blocked` holds back leases of these classes (another mod's work
     runs or waits: acquire answers 202 after a short wait); `cancel_after` grants that many leases, then answers
     the next one as cancelled from the queue. `log` lists (event, class), `held` the leases not yet released."""
 

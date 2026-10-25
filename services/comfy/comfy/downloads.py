@@ -1,5 +1,5 @@
 """Downloading a missing model file into data/models/comfyui/<folder>/ (plan 11.8), then registering
-it in AIHub's models registry. The page asks the user to confirm each one first."""
+it in GAIFA's models registry. The page asks the user to confirm each one first."""
 
 from __future__ import annotations
 
@@ -133,7 +133,7 @@ class Downloads:
                 r = await c.post(f"{self.hub_url}/api/models", json=body)
             if r.status_code < 400:
                 return r.json().get("id")
-            log.warning("AIHub didn't register %s: %s", rel, r.text[:200])
+            log.warning("GAIFA didn't register %s: %s", rel, r.text[:200])
         except httpx.HTTPError as e:
-            log.warning("AIHub didn't register %s: %s", rel, e)
+            log.warning("GAIFA didn't register %s: %s", rel, e)
         return None

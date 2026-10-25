@@ -38,7 +38,7 @@ def test_html_becomes_markdown_output(site, make_client, tmp_path):
     assert side["url"] == url and side["title"] == "Release b6000" and side["kind"] == "text"   # the output keeps it plain
     assert side["fetched_ts"] > 0 and side["fetched"] and side["source"] == {"service": "web", "url": url}
     assert not [p for p in _files(tmp_path) if p.suffix == ".part"]
-    assert all(s["ua"].startswith("AIHub-web/") for s in site.seen)
+    assert all(s["ua"].startswith("GAIFA-web/") for s in site.seen)
 
 
 def test_max_chars_and_names_never_clash(site, make_client):
@@ -98,7 +98,7 @@ def test_redirect_followed_to_allowed_page(site, make_client):
     assert side["url"] == f"http://site.test:{site.port}/old" and side["final_url"] == r["final_url"]
 
 
-DRY = {"X-AIHub-Origin": '{"tool_call": "c1", "dry_run": true}'}
+DRY = {"X-GAIFA-Origin": '{"tool_call": "c1", "dry_run": true}'}
 
 
 def test_dry_run_reads_the_fake_web(site, make_client):

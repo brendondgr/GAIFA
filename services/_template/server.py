@@ -1,9 +1,9 @@
-"""__NAME__: an AIHub mod. Start from here, keep what you need.
+"""__NAME__: a GAIFA mod. Start from here, keep what you need.
 
-AIHub runs this as `.venv/bin/python server.py` with these set (architecture §4.4):
-    AIHUB_PORT       the port to listen on (127.0.0.1 only)
-    AIHUB_OUTPUTS    where to write files the Outputs page should show
-    AIHUB_URL        the hub, if this mod wants to call it
+GAIFA runs this as `.venv/bin/python server.py` with these set (architecture §4.4):
+    GAIFA_PORT       the port to listen on (127.0.0.1 only)
+    GAIFA_OUTPUTS    where to write files the Outputs page should show
+    GAIFA_URL        the hub, if this mod wants to call it
 The hub only needs /health. Everything else is this mod's own API, reachable
 through the hub at /api/s/__ID__/... and listed on its API tab.
 """
@@ -21,8 +21,8 @@ import uvicorn
 from fastapi import FastAPI, Query
 from pydantic import BaseModel, Field
 
-PORT = int(os.environ.get("AIHUB_PORT", "__PORT__"))
-OUTPUTS = Path(os.environ.get("AIHUB_OUTPUTS", "outputs"))
+PORT = int(os.environ.get("GAIFA_PORT", "__PORT__"))
+OUTPUTS = Path(os.environ.get("GAIFA_OUTPUTS", "outputs"))
 PREFIX = os.environ.get("NOTE_PREFIX", "note")
 
 app = FastAPI(title="__NAME__", version="0.1.0")
@@ -39,7 +39,7 @@ def used() -> None:
 
 @app.get("/health")
 def health() -> dict:
-    """AIHub polls this; any 2xx means ready."""
+    """GAIFA polls this; any 2xx means ready."""
     return {"status": "ok"}
 
 

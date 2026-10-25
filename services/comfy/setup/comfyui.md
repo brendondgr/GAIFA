@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "comfyui"
 title = "ComfyUI in the Strix Halo toolbox"
 models = ["comfyui/**"]
@@ -8,11 +8,11 @@ gpu = true
 disk_gb = 4
 images = { "docker.io/kyuz0/amd-strix-halo-comfyui" = 15.1 }
 needs = ["podman", "toolbox", "git"]
-check = "aihub check comfy --start && podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest"
-smoke = "aihub start comfy >/dev/null && curl -fsS -X POST \"$(aihub url api/s/comfy/v1/load)\" >/dev/null && curl -fsS http://127.0.0.1:8199/system_stats | tee /dev/stderr | grep -q '\"devices\"'"   # plan 39: real work, run by aihub setup --smoke and the field test
+check = "gaifa check comfy --start && podman image exists docker.io/kyuz0/amd-strix-halo-comfyui:latest"
+smoke = "gaifa start comfy >/dev/null && curl -fsS -X POST \"$(gaifa url api/s/comfy/v1/load)\" >/dev/null && curl -fsS http://127.0.0.1:8199/system_stats | tee /dev/stderr | grep -q '\"devices\"'"   # plan 39: real work, run by gaifa setup --smoke and the field test
 
 [[steps]]
-run = "aihub install comfy"
+run = "gaifa install comfy"
 what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)"
 
 [[steps]]
@@ -73,9 +73,9 @@ tested = true
 accel = "cuda"
 os = ["linux", "wsl"]
 needs = ["git", "uv", "python3"]
-check = "aihub check comfy --start"
+check = "gaifa check comfy --start"
 steps = [
-  { run = "aihub install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
+  { run = "gaifa install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
   { run = '''
 clone() { [ -d "custom_nodes/$1/.git" ] || git clone "$2" "custom_nodes/$1"; git -C "custom_nodes/$1" checkout --quiet "$3"; }
 clone ComfyUI-GGUF https://github.com/leejet/ComfyUI-GGUF edd981b10e107d3b8f58e16c498f2d08f631bc47
@@ -91,9 +91,9 @@ clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127
 accel = "xpu"
 os = ["linux", "wsl"]
 needs = ["git", "uv", "python3"]
-check = "aihub check comfy --start"
+check = "gaifa check comfy --start"
 steps = [
-  { run = "aihub install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
+  { run = "gaifa install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
   { run = '''
 clone() { [ -d "custom_nodes/$1/.git" ] || git clone "$2" "custom_nodes/$1"; git -C "custom_nodes/$1" checkout --quiet "$3"; }
 clone ComfyUI-GGUF https://github.com/leejet/ComfyUI-GGUF edd981b10e107d3b8f58e16c498f2d08f631bc47
@@ -109,9 +109,9 @@ clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127
 accel = "mps"
 os = ["darwin"]
 needs = ["git", "uv", "python3"]
-check = "aihub check comfy --start"
+check = "gaifa check comfy --start"
 steps = [
-  { run = "aihub install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
+  { run = "gaifa install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
   { run = '''
 clone() { [ -d "custom_nodes/$1/.git" ] || git clone "$2" "custom_nodes/$1"; git -C "custom_nodes/$1" checkout --quiet "$3"; }
 clone ComfyUI-GGUF https://github.com/leejet/ComfyUI-GGUF edd981b10e107d3b8f58e16c498f2d08f631bc47
@@ -127,10 +127,10 @@ clone rgthree-comfy https://github.com/rgthree/rgthree-comfy.git 27b4f4cdcf3b127
 accel = "cpu"
 os = ["linux", "wsl", "darwin"]
 needs = ["git", "uv", "python3"]
-check = "aihub check comfy --start"
+check = "gaifa check comfy --start"
 note = "very slow for images and video"
 steps = [
-  { run = "aihub install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
+  { run = "gaifa install comfy", what = "makes .venv/ in this folder with Python 3.12 from requirements-dev.txt: the adapter only (about 50 MB, a minute)" },
   { run = '''
 clone() { [ -d "custom_nodes/$1/.git" ] || git clone "$2" "custom_nodes/$1"; git -C "custom_nodes/$1" checkout --quiet "$3"; }
 clone ComfyUI-GGUF https://github.com/leejet/ComfyUI-GGUF edd981b10e107d3b8f58e16c498f2d08f631bc47
@@ -174,7 +174,7 @@ The container's versions were read from its overlay layer while it was stopped (
 | `ComfyUI-WanVideoWrapper` | https://github.com/kijai/ComfyUI-WanVideoWrapper.git | `088128b224242e110d3906c6750e9a3a348a659b` (2026-05-24) |
 | `rgthree-comfy` | https://github.com/rgthree/rgthree-comfy.git | `27b4f4cdcf3b127c29d5d8135ac1536ecbd4c383` (2026-06-20) |
 
-AIHub's own nodes are tracked in git: `nodes/aihub_nodes/` (a faster Qwen-VL patch embed, a Qwen-Image 2.1 text encode that can skip the negative, a SAM 3D Body dtype fix). ComfyUI loads them with the custom nodes.
+GAIFA's own nodes are tracked in git: `nodes/gaifa_nodes/` (a faster Qwen-VL patch embed, a Qwen-Image 2.1 text encode that can skip the negative, a SAM 3D Body dtype fix). ComfyUI loads them with the custom nodes.
 
 ## Prerequisites
 
@@ -186,7 +186,7 @@ AIHub's own nodes are tracked in git: `nodes/aihub_nodes/` (a faster Qwen-VL pat
 ## Install
 
 ```bash
-aihub install comfy
+gaifa install comfy
 ```
 
 Runs `install.sh`: makes `.venv/` with Python 3.12 from `requirements-dev.txt` (the adapter only).
@@ -201,13 +201,13 @@ The toolbox is created by the first `bin/comfyui start` (or the first load from 
 
 ```
 python main.py --listen 127.0.0.1 --port 8199 --extra-model-paths-config <mod>/extra_model_paths.yaml
-  --output-directory <AIHub>/outputs/comfy --input-directory <mod>/input --user-directory <mod>/user
+  --output-directory <GAIFA>/outputs/comfy --input-directory <mod>/input --user-directory <mod>/user
   --database-url sqlite:///<mod>/user/comfyui.db --disable-mmap --fp32-vae --enable-manager --preview-method auto
 ```
 
-with `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1`. `--disable-mmap` avoids ROCm's slow mmap path above 64 GB, which hangs model loading (kyuz0's default for gfx1151); `--fp32-vae` keeps the FLUX.2 small-decoder VAE numerically safe; `--enable-manager` loads ComfyUI-Manager 4.x (a pip package, not a `custom_nodes` checkout). `--preview-method auto` sends a picture of each step to AIHub for the live previews in Chat, the Overview and the page (TAESD when its decoders are in `models/vae_approx`, which sharpens them; a cheap colour preview otherwise). `--listen` must stay a loopback address: ComfyUI-Manager refuses node installs otherwise.
+with `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1`. `--disable-mmap` avoids ROCm's slow mmap path above 64 GB, which hangs model loading (kyuz0's default for gfx1151); `--fp32-vae` keeps the FLUX.2 small-decoder VAE numerically safe; `--enable-manager` loads ComfyUI-Manager 4.x (a pip package, not a `custom_nodes` checkout). `--preview-method auto` sends a picture of each step to GAIFA for the live previews in Chat, the Overview and the page (TAESD when its decoders are in `models/vae_approx`, which sharpens them; a cheap colour preview otherwise). `--listen` must stay a loopback address: ComfyUI-Manager refuses node installs otherwise.
 
-**Custom nodes.** They run code, so nothing in AIHub installs them without asking: `aihub setup` asks before the block's third step clones them. By hand, for each row of the custom-node table in Tested with:
+**Custom nodes.** They run code, so nothing in GAIFA installs them without asking: `gaifa setup` asks before the block's third step clones them. By hand, for each row of the custom-node table in Tested with:
 
 ```bash
 git clone <repo> services/comfy/custom_nodes/<folder> && git -C services/comfy/custom_nodes/<folder> checkout <commit>
@@ -215,7 +215,7 @@ git clone <repo> services/comfy/custom_nodes/<folder> && git -C services/comfy/c
 
 Their Python dependencies go into the container's venv (the second command under "Updating ComfyUI in the toolbox" below; here they were installed through ComfyUI-Manager, Manager → Custom Nodes Manager, which runs the same `requirements.txt`). The step is optional: a "no" skips only the nodes. Only some packs need them: the Qwen-Image 2.1 packs load their diffusion model with ComfyUI-GGUF's `UnetLoaderGGUF` (and the Turbo ones their VAE with KJNodes' `VAELoaderKJ`), the `scail2-*` video packs use VideoHelperSuite; the TRELLIS.2 and SAM 3D Body packs use core nodes only.
 
-**Updating ComfyUI in the toolbox.** The image ships ComfyUI 0.22.0; TRELLIS.2 and SAM 3D Body need the commit in Tested with (0.37.0). `aihub setup` doesn't do this (it stays manual, plan 23.14), and the report reminds you when TRELLIS.2 is chosen. The toolbox exists only after the first `bin/comfyui start` (or the first load from the hub); stop ComfyUI first (`services/comfy/bin/comfyui quit`). From `services/comfy/`, ComfyUI itself, with the image's torch family held by a constraints file so pip never replaces it:
+**Updating ComfyUI in the toolbox.** The image ships ComfyUI 0.22.0; TRELLIS.2 and SAM 3D Body need the commit in Tested with (0.37.0). `gaifa setup` doesn't do this (it stays manual, plan 23.14), and the report reminds you when TRELLIS.2 is chosen. The toolbox exists only after the first `bin/comfyui start` (or the first load from the hub); stop ComfyUI first (`services/comfy/bin/comfyui quit`). From `services/comfy/`, ComfyUI itself, with the image's torch family held by a constraints file so pip never replaces it:
 
 ```bash
 toolbox run -c strix-halo-comfyui bash -lc "cd /opt/ComfyUI && git fetch && git checkout 93810483a4739a1588236919a3128d3070244146 && /opt/venv/bin/pip list --format=freeze | grep -iE '^(torch|torchvision|torchaudio|triton|numpy)==' > '$PWD/data/toolbox-constraints.txt' && /opt/venv/bin/pip install -c '$PWD/data/toolbox-constraints.txt' -r requirements.txt"
@@ -231,18 +231,18 @@ toolbox run -c strix-halo-comfyui bash -lc "for r in '$PWD'/custom_nodes/*/requi
 
 ### On other machines (plan 39.6)
 
-Only gfx1151 runs the toolbox above. On any other machine, `aihub setup comfy` picks the native variant: `bin/comfyui-native install` clones ComfyUI at the same commit (0.37.0) into `runtime/ComfyUI` and makes `runtime/venv`, with PyTorch for the machine's accelerator (CUDA, another AMD GPU's ROCm family, Intel's xpu, Apple's mps, or the CPU, from `scripts/torch_index.py`), ComfyUI's requirements, ComfyUI-Manager, `gguf` and the custom nodes' requirements. `bin/comfyui` then hands `start`, `stop`, `quit`, `status` and `logs` to it (`bin/comfyui runtime` says which runtime a machine uses; `COMFY_RUNTIME=native|toolbox` picks one by hand).
+Only gfx1151 runs the toolbox above. On any other machine, `gaifa setup comfy` picks the native variant: `bin/comfyui-native install` clones ComfyUI at the same commit (0.37.0) into `runtime/ComfyUI` and makes `runtime/venv`, with PyTorch for the machine's accelerator (CUDA, another AMD GPU's ROCm family, Intel's xpu, Apple's mps, or the CPU, from `scripts/torch_index.py`), ComfyUI's requirements, ComfyUI-Manager, `gguf` and the custom nodes' requirements. `bin/comfyui` then hands `start`, `stop`, `quit`, `status` and `logs` to it (`bin/comfyui runtime` says which runtime a machine uses; `COMFY_RUNTIME=native|toolbox` picks one by hand).
 
-The models, outputs, custom nodes, user folder and log stay where they are. The gfx1151 launch flags (`--disable-mmap`, `--fp32-vae`) and the toolbox's workarounds stay with the toolbox; AIHub's own nodes (`nodes/aihub_nodes`) are exact on every GPU. A pack whose nodes need one accelerator says so with `requires` in its `workflow.toml` (docs/workflows.md), and the agent isn't offered it elsewhere. The native variants are untested until a field test reports on them.
+The models, outputs, custom nodes, user folder and log stay where they are. The gfx1151 launch flags (`--disable-mmap`, `--fp32-vae`) and the toolbox's workarounds stay with the toolbox; GAIFA's own nodes (`nodes/gaifa_nodes`) are exact on every GPU. A pack whose nodes need one accelerator says so with `requires` in its `workflow.toml` (docs/workflows.md), and the agent isn't offered it elsewhere. The native variants are untested until a field test reports on them.
 
 ## Choosing models
 
 ComfyUI runs any workflow pack, and a pack runs whatever models its workflow names; none are built in. To see what a pack needs, `bin/comfyui workflows check <pack>` (or `--all`): each `missing_model` line names the file and its folder, with a URL when the workflow recorded one. Files go in `data/models/comfyui/<folder>/` (`checkpoints`, `diffusion_models`, `text_encoders`, `vae`, `loras`, `clip_vision`, …). Ways in:
 - the page: a pack's review screen has a **Download** button for each missing file whose workflow recorded a URL (`POST /v1/downloads`: into `<folder>/<name>.part`, renamed when done, then registered with the hub; `HF_TOKEN` is sent only to huggingface.co);
 - `scripts/download_qwen_image_2.1.sh` and `scripts/download_qwen_image_2.1_turbo.sh` (the Qwen-Image 2.1 packs; resumable, sha256-checked; the Turbo one also fixes the FP8 file's metadata);
-- by hand: put the file in its folder and run `aihub models scan --add`; downloads made in ComfyUI's own UI land there too. New packs: [docs/workflows.md](../../../docs/workflows.md).
+- by hand: put the file in its folder and run `gaifa models scan --add`; downloads made in ComfyUI's own UI land there too. New packs: [docs/workflows.md](../../../docs/workflows.md).
 
-`aihub docs` lists the models you have in a local inventory (`data/state/setup/models/`). The suggestions are optional and cover packs that ship in git. **Each choice must be a set that runs:** a suggestion is one Hugging Face repo, so a pack whose models span two repos takes two suggestions:
+`gaifa docs` lists the models you have in a local inventory (`data/state/setup/models/`). The suggestions are optional and cover packs that ship in git. **Each choice must be a set that runs:** a suggestion is one Hugging Face repo, so a pack whose models span two repos takes two suggestions:
 - **Qwen-Image 2.1 Turbo** = *1 of 2* (the Q8_0 diffusion model, 7.59 GB) **and** *2 of 2* (the text encoder and VAE, 18.21 GB): choose both or neither; either alone runs nothing. 25.8 GB together, for the `qwen21-turbo-*` packs (with ComfyUI-GGUF and KJNodes, the block's third step). *2 of 2* is also what the non-Turbo `qwen21-*` packs need besides their own diffusion model (not suggested). Both are under the **Qwen Research Licence**: "for research or evaluation purposes only", no commercial use without a separate licence from Qwen ([LICENSE](https://huggingface.co/Qwen/Qwen-Image-2.1/blob/main/LICENSE)).
 - **TRELLIS.2** is one entry (three files of one repo) and runs alone, but its nodes need ComfyUI newer than the image's (What to look for).
 
@@ -269,10 +269,10 @@ ComfyUI runs any workflow pack, and a pack runs whatever models its workflow nam
 ## Check it works
 
 ```bash
-aihub check comfy --start
+gaifa check comfy --start
 ```
 
-Starts the adapter if it's stopped (not ComfyUI, which starts when the mod loads) and runs every check; a stopped mod's live checks are skipped, hence `--start`. Not run with `--start` here while GPU work is paused: with the mod stopped (2026-10-21), `aihub check comfy` gave `ok` for manifest, command, port and page and `comfy: no failures, but 6 checks skipped`.
+Starts the adapter if it's stopped (not ComfyUI, which starts when the mod loads) and runs every check; a stopped mod's live checks are skipped, hence `--start`. Not run with `--start` here while GPU work is paused: with the mod stopped (2026-10-21), `gaifa check comfy` gave `ok` for manifest, command, port and page and `comfy: no failures, but 6 checks skipped`.
 
 ```bash
 services/comfy/bin/comfyui status
@@ -309,6 +309,6 @@ Reads ComfyUI's version from the container's own layer without starting it. Expe
 
 ## Known gaps
 
-- Nothing in `aihub setup` installs the custom nodes' Python packages or updates ComfyUI in the toolbox: both are the manual commands in Install (the clones are the block's optional step, asked first).
+- Nothing in `gaifa setup` installs the custom nodes' Python packages or updates ComfyUI in the toolbox: both are the manual commands in Install (the clones are the block's optional step, asked first).
 - The image is pinned only by the setup step's digest: `bin/comfyui` and `bin/comfyui update` use `:latest`, and the in-place update to 0.37.0 is the manual commands in Install.
 - The Z-Image and Wan 2.1 packs (`zimage-turbo`, `zimage-intorealism`, `qwen-edit-refine-zimage`, `wan21-t2v`, `wan21-i2v`) have `agent = false`: their models were deleted on 2026-10-20 to free disk space. The workflows are kept; `check` shows them `broken` until the models are downloaded again. The Flux 2 Klein, Krea 2 and Qwen-Image-Edit packs are also `broken` here (their models aren't on disk) but still have the agent on; a broken pack isn't offered to it.

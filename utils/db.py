@@ -251,14 +251,14 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX grants_thread ON grants (thread);
     """,
-    # 010: the grant AIHub ships (plan 26.2; the user's decision, 2026-10-20): web searches run without
+    # 010: the grant GAIFA ships (plan 26.2; the user's decision, 2026-10-20): web searches run without
     # asking. It is an ordinary `always` grant, so Settings → Agent lists it and revoking it deletes
     # it; the migration runs once per database, so a revoked grant stays revoked.
     """
     INSERT OR IGNORE INTO grants (id, tool, key, kind, risk, scope, thread, created_ts, note)
     VALUES ('gr_default_web_search', 'web_search', 'search', 'const:search', 'network', 'always', NULL,
             CAST(strftime('%s', 'now') AS REAL),
-            'Shipped with AIHub: web searches run without asking. Revoke it to be asked each time.');
+            'Shipped with GAIFA: web searches run without asking. Revoke it to be asked each time.');
     """,
     # 011: the Auto mode's judged calls (plan 30.3, 30.5): utils/tools/judge.py. Settings → Agent lists them.
     """
@@ -332,7 +332,7 @@ class Database:
         self._writer.execute("PRAGMA journal_mode = WAL")
         self._writer.execute("PRAGMA synchronous = NORMAL")
         migrate(self._writer, self._migrations)
-        self._thread = threading.Thread(target=self._write_loop, name="aihub-db-writer", daemon=True)
+        self._thread = threading.Thread(target=self._write_loop, name="gaifa-db-writer", daemon=True)
         self._thread.start()
 
     def close(self) -> None:

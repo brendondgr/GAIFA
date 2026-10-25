@@ -1,4 +1,4 @@
-"""`aihub doctor --inventory` (plan 16.3): every path outside the project that anything uses, with
+"""`gaifa doctor --inventory` (plan 16.3): every path outside the project that anything uses, with
 its reason.
 
 The final allowlist: the hub's systemd unit file, podman images and containers, system tools
@@ -57,9 +57,9 @@ def inventory(hub: Any) -> dict[str, Any]:
         for c in (s.m.memory.containers if s.m.memory else []):
             add(_item(f"podman container {c}", "allowlisted", s.id, "the container the mod runs its models in"))
     # 2. the hub's unit and the wrappers in ~/.local/bin
-    unit = home / ".config" / "systemd" / "user" / "aihub.service"
+    unit = home / ".config" / "systemd" / "user" / "gaifa.service"
     if unit.exists():
-        add(_item(str(unit).replace(str(home), "~"), "allowlisted", "hub", "the hub's systemd unit (aihub install)"))
+        add(_item(str(unit).replace(str(home), "~"), "allowlisted", "hub", "the hub's systemd unit (gaifa install)"))
     bindir = home / ".local" / "bin"
     if bindir.is_dir():
         for p in sorted(bindir.iterdir()):
@@ -73,7 +73,7 @@ def inventory(hub: Any) -> dict[str, Any]:
             ours = (target and target.startswith(str(root))) or str(root) in text
             if not ours and not (target and "uv/tools" in target and p.name in {s.id for s in hub.services.list()}):
                 continue
-            add(_item(f"~/.local/bin/{p.name}", "allowlisted", "hub" if p.name == "aihub" else p.name,
+            add(_item(f"~/.local/bin/{p.name}", "allowlisted", "hub" if p.name == "gaifa" else p.name,
                       f"command-line wrapper → {target.replace(str(home), '~') if target else 'a script into the project'}"))
             if target and not Path(target).resolve().is_relative_to(root) and not target.startswith("/usr"):
                 tool = Path(target).parents[1]
@@ -84,6 +84,6 @@ def inventory(hub: Any) -> dict[str, Any]:
         for s in hub.services.list() if hub.services else []:
             if (base / s.id).exists():
                 add(_item(str(base / s.id), "runtime", s.id, "runtime state from before data/state/ (tmpfs: gone at the next reboot)"))
-    add(_item("systemd journal (aihub-*.service)", "allowlisted", "hub", "a second copy of the logs; data/logs/ is the first"))
+    add(_item("systemd journal (gaifa-*.service)", "allowlisted", "hub", "a second copy of the logs; data/logs/ is the first"))
     counts = {k: sum(i["kind"] == k for i in items) for k in ("allowlisted", "runtime", "outside")}
     return {"ok": counts["outside"] == 0, "counts": counts, "items": items}

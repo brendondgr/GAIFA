@@ -34,7 +34,7 @@ async def dry_run(hub: Hub, c: Any) -> bool:
     `outputs/eval/` instead of running (an image drawn from the prompt; a hard link to the newest
     real video, audio or 3D model, or a small stub when there is none), titled from the arguments,
     so chains and cards are tested without the GPU. A tool with `dry_run = true` in `[tools]` goes
-    to its mod as usual: the mod sees `dry_run` in `X-AIHub-Origin` and answers without its side
+    to its mod as usual: the mod sees `dry_run` in `X-GAIFA-Origin` and answers without its side
     effects (the web mod reads its fake web instead of the internet; plan 26.2)."""
     if not c.origin.get("dry_run") or c.tool.risk == "read" or c.tool.mod_dry_run:
         return False

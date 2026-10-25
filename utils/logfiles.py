@@ -4,9 +4,9 @@
   child process's pipes) and appends it to `data/logs/<id>.log`, one line per log line:
   `2026-10-07T01:02:03.456 err text` (`out`/`err` for stdout/stderr). Files rotate at 10 MB
   and 5 old files are kept (`<id>.log.1` … `.5`). journald keeps its own copy.
-- **The hub:** its own log goes to `data/logs/aihub.log`, rotated the same way.
+- **The hub:** its own log goes to `data/logs/gaifa.log`, rotated the same way.
 
-`read(id, n)` gives the last `n` lines back as `LogLine`s (the Logs tab and `aihub logs`).
+`read(id, n)` gives the last `n` lines back as `LogLine`s (the Logs tab and `gaifa logs`).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from typing import Any
 
 from utils.backends.base import LogLine
 
-log = logging.getLogger("aihub.logs")
+log = logging.getLogger("gaifa.logs")
 MAX_BYTES = 10 * 1024 * 1024
 KEEP = 5
 
@@ -137,9 +137,9 @@ def _tail(p: Path, n: int, block: int = 65536) -> list[str]:
 
 
 def hub_handler(dir: Path) -> logging.Handler:
-    """The hub's own log file, `data/logs/aihub.log`."""
+    """The hub's own log file, `data/logs/gaifa.log`."""
     dir.mkdir(parents=True, exist_ok=True)
-    h = logging.handlers.RotatingFileHandler(dir / "aihub.log", maxBytes=MAX_BYTES, backupCount=KEEP, encoding="utf-8")
+    h = logging.handlers.RotatingFileHandler(dir / "gaifa.log", maxBytes=MAX_BYTES, backupCount=KEEP, encoding="utf-8")
     h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     h.setLevel(logging.INFO)
     return h

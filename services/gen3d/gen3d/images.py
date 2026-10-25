@@ -1,4 +1,4 @@
-"""The picture an image engine starts from (plan 17): fetched from AIHub's outputs or uploaded, then
+"""The picture an image engine starts from (plan 17): fetched from GAIFA's outputs or uploaded, then
 written into the job folder as `input.png` (as given, at most MAX_SIDE) and `input_rgba.png` (the
 cut-out every engine reads: alpha from the picture, else everything that isn't near-white)."""
 
@@ -22,7 +22,7 @@ class ImageError(ValueError):
 
 async def output_title(ref: str, hub_url: str | None = None) -> str | None:
     """`output:<id>` → the output's title (for the job's title), or None."""
-    hub = (hub_url or os.environ.get("AIHUB_URL") or "").rstrip("/")
+    hub = (hub_url or os.environ.get("GAIFA_URL") or "").rstrip("/")
     if not hub:
         return None
     try:
@@ -35,9 +35,9 @@ async def output_title(ref: str, hub_url: str | None = None) -> str | None:
 
 async def fetch_output(ref: str, hub_url: str | None = None, timeout: float = 60) -> bytes:
     """`output:<id>` → the output's main file, from the hub (`GET /api/outputs/<id>/file`)."""
-    hub = (hub_url or os.environ.get("AIHUB_URL") or "").rstrip("/")
+    hub = (hub_url or os.environ.get("GAIFA_URL") or "").rstrip("/")
     if not hub:
-        raise ImageError("output:<id> images need AIHub (AIHUB_URL isn't set); upload the picture instead")
+        raise ImageError("output:<id> images need GAIFA (GAIFA_URL isn't set); upload the picture instead")
     oid = ref.split(":", 1)[1]
     async with httpx.AsyncClient(timeout=timeout) as c:
         r = await c.get(f"{hub}/api/outputs/{oid}/file")

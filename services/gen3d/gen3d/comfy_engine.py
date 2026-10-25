@@ -1,6 +1,6 @@
 """The delegated image engines (plan 17.6): TRELLIS.2 and SAM 3D Body run as workflow packs in the comfy
 mod, through the hub. gen3d still owns the job: it uploads the picture, runs the pack with
-`X-AIHub-Make-Room: 1` (the job already asked for room) and the job's GPU lease, turns comfy's 0–1 progress into the stage's
+`X-GAIFA-Make-Room: 1` (the job already asked for room) and the job's GPU lease, turns comfy's 0–1 progress into the stage's
 steps, downloads the mesh into the job folder and moves comfy's copy to the hub's trash, so the
 Outputs page shows the job once.
 """
@@ -18,7 +18,7 @@ from .glb import count_faces
 
 log = logging.getLogger("gen3d.comfy")
 COMFY = "/api/s/comfy"
-MAKE_ROOM = {"X-AIHub-Make-Room": "1"}
+MAKE_ROOM = {"X-GAIFA-Make-Room": "1"}
 
 
 class ComfyError(RuntimeError):
@@ -56,7 +56,7 @@ class ComfyEngine:
         return httpx.AsyncClient(base_url=self.hub, timeout=timeout, transport=self.transport)
 
     async def run(self, req, jdir: Path, inputs: dict, on_event, cancel_check, gpu_headers: dict | None = None) -> dict:
-        """`gpu_headers`: the job's GPU lease (`X-AIHub-GPU-Lease`), so comfy runs under it (plan 31.3)."""
+        """`gpu_headers`: the job's GPU lease (`X-GAIFA-GPU-Lease`), so comfy runs under it (plan 31.3)."""
         pack, key, values, sub = plan(req)
         picture = inputs.get(key) or inputs.get("image")
         async with self._client() as c:
@@ -162,5 +162,5 @@ def _ok(r: httpx.Response, what: str) -> None:
 
 
 def from_env() -> ComfyEngine | None:
-    url = os.environ.get("AIHUB_URL")
+    url = os.environ.get("GAIFA_URL")
     return ComfyEngine(url) if url else None

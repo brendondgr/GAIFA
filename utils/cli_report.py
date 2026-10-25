@@ -1,17 +1,17 @@
-"""`aihub report` (plan 40.2): a field report, one markdown file (and its JSON) that tells whoever fixes AIHub
+"""`gaifa report` (plan 40.2): a field report, one markdown file (and its JSON) that tells whoever fixes GAIFA
 exactly what happened on another machine. Standard library only, so it works when the hub doesn't.
 
-    aihub report note "<what happened>" [--cmd "<command>"] [--output <file>] [--setup <id>]
+    gaifa report note "<what happened>" [--cmd "<command>"] [--output <file>] [--setup <id>]
                                         [--severity blocker|major|minor] [--tried "<what was tried>"]
-    aihub report [--out <file>]          write data/state/reports/<date>-<host>.md (+ .json, + the hardware recording)
-    aihub report clear                   start over: the notes move aside into data/state/reports/
+    gaifa report [--out <file>]          write data/state/reports/<date>-<host>.md (+ .json, + the hardware recording)
+    gaifa report clear                   start over: the notes move aside into data/state/reports/
 
 The report has:
 - a summary;
-- the machine (`aihub hardware`, the tool versions, and a recording that `aihub hardware --from` replays);
-- AIHub's commit and any local changes (`git diff`);
+- the machine (`gaifa hardware`, the tool versions, and a recording that `gaifa hardware --from` replays);
+- GAIFA's commit and any local changes (`git diff`);
 - the failed host checks;
-- the last `aihub setup` run (data/state/setup/last-run.json), with its variants;
+- the last `gaifa setup` run (data/state/setup/last-run.json), with its variants;
 - one section per issue: a failure of that run, or a note, with where it comes from (the setup doc's line),
   the command, folder, environment, exit code, the log's tail, a likely cause (utils/report_hints.py),
   what was tried and the files to look at;
@@ -108,7 +108,7 @@ def notes(root: Path) -> list[dict[str, Any]]:
 
 def machine_section(root: Path, base: Path) -> dict[str, Any]:
     try:
-        fixture = os.environ.get("AIHUB_HARDWARE_FIXTURE")      # dev and tests: the recorded machine
+        fixture = os.environ.get("GAIFA_HARDWARE_FIXTURE")      # dev and tests: the recorded machine
         if fixture:
             snap = json.loads(Path(fixture).read_text())
             m = hardware.from_snapshot(snap)
@@ -210,7 +210,7 @@ def gather(root: Path, base: Path) -> dict[str, Any]:
     noted = notes(root)
     logs = sorted((root / SETUP_LOGS).glob("*.log")) if (root / SETUP_LOGS).is_dir() else []
     data = {"written": time.strftime("%Y-%m-%d %H:%M:%S %z"), "host": socket.gethostname(),
-            "machine": machine_section(root, base), "aihub": git_section(root), "host_checks": host_section(root),
+            "machine": machine_section(root, base), "gaifa": git_section(root), "host_checks": host_section(root),
             "last_run": last, "issues": issues(root, last, noted), "notes": len(noted),
             "setup_logs": [{"file": p.relative_to(root).as_posix(), "bytes": p.stat().st_size,
                             "end": (_tail(p, 1) or [""])[0]} for p in logs],
@@ -252,7 +252,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     root = _root()
     if args.action == "note":
         if not args.text:
-            print("aihub report note: say what happened, in quotes", flush=True)
+            print("gaifa report note: say what happened, in quotes", flush=True)
             return 2
         n = add_note(root, args.text, args.cmd or "", args.output or "", args.setup or "", args.severity, args.tried or "")
         print(f"noted ({n['severity']}): {n['text'][:80]}  → {(root / NOTES).relative_to(root)}")
@@ -273,7 +273,7 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 def add_parser(sub: Any) -> None:
-    p = sub.add_parser("report", help="a field report for whoever fixes AIHub: the machine, the last setup run, every failure with "
+    p = sub.add_parser("report", help="a field report for whoever fixes GAIFA: the machine, the last setup run, every failure with "
                                       "its doc line, command, log and likely cause, the mods and the doctor (plan 40.2)")
     p.add_argument("action", nargs="?", default="write", choices=["write", "note", "clear"], help="write (default), note, or clear the notes")
     p.add_argument("text", nargs="?", help="note: what happened, in your words")

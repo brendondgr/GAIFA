@@ -284,12 +284,12 @@ async def test_dry_run_makes_a_stand_in(th):
 
 
 async def test_calls_ask_the_memory_triggers_to_make_room(th):
-    """A tool call carries X-AIHub-Make-Room (agent.make_room), and the memory trigger hook sees it
+    """A tool call carries X-GAIFA-Make-Room (agent.make_room), and the memory trigger hook sees it
     whatever its case (it was missed once: a 3D job then failed with needs_room)."""
     seen = []
 
     async def hook(svc, method, path, headers):
-        seen.append(headers.get("x-aihub-make-room"))
+        seen.append(headers.get("x-gaifa-make-room"))
 
     th.hub.services.before_proxy.append(hook)
     r = await th.call("fake_tools_make_image", {"prompt": "x"}, mode="auto")

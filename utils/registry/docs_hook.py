@@ -11,7 +11,7 @@ from pathlib import Path
 from utils import setupdocs
 from utils.registry.store import Registry
 
-log = logging.getLogger("aihub.docs")
+log = logging.getLogger("gaifa.docs")
 DEBOUNCE_S = 2.0
 
 
@@ -37,9 +37,9 @@ class DocsHook:
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            return                               # no loop (a script): `aihub docs` covers it
+            return                               # no loop (a script): `gaifa docs` covers it
         if self._task is None or self._task.done():
-            self._task = loop.create_task(self._run(), name="aihub-setup-docs")
+            self._task = loop.create_task(self._run(), name="gaifa-setup-docs")
 
     async def _run(self) -> None:
         await asyncio.sleep(self.debounce_s)
@@ -52,7 +52,7 @@ class DocsHook:
         except Exception:  # noqa: BLE001: docs never break the registry
             log.exception("setup docs")
         if self._ids:                            # changes that came in while writing
-            self._task = asyncio.get_running_loop().create_task(self._run(), name="aihub-setup-docs")
+            self._task = asyncio.get_running_loop().create_task(self._run(), name="gaifa-setup-docs")
 
     async def close(self) -> None:
         if self._task:

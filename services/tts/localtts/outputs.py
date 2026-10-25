@@ -1,4 +1,4 @@
-"""Where generated speech is saved, and the sidecar that describes it (AIHub architecture §4.7).
+"""Where generated speech is saved, and the sidecar that describes it (GAIFA architecture §4.7).
 
     <outputs>/<YYYY-MM-DD>/<HHMMSS>-<slug(text[:40])>-<voice>.<ext>
     <outputs>/<YYYY-MM-DD>/<HHMMSS>-<slug(text[:40])>-<voice>.<ext>.json

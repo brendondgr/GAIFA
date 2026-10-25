@@ -33,7 +33,7 @@ const all = (n, pred, out = []) => {
 };
 const text = n => (n == null || n === false ? '' : typeof n !== 'object' ? String(n) : Array.isArray(n) ? n.map(text).join('') : text(n.props?.children));
 
-const ENVS = [{ id: 'default', name: 'Default', default: true, folders: [{ id: 'aihub', path: '/home/u/Agents/AIHub', level: 'read' }] },
+const ENVS = [{ id: 'default', name: 'Default', default: true, folders: [{ id: 'gaifa', path: '/home/u/Agents/GAIFA', level: 'read' }] },
   { id: 'grants', name: 'Grants', folders: [{ id: 'a', path: '/home/u/a', level: 'edit' }, { id: 'b', path: '/home/u/b', level: 'read' }] }];
 
 test('which environment a chat uses, and the chip\'s words', () => {

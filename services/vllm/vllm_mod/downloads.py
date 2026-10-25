@@ -1,5 +1,5 @@
 """Downloading a profile's model into the Hugging Face cache (HF_HOME = data/models/hf-cache) before
-the engine starts, then registering it in AIHub's models registry (plan 18.3). The engine itself runs
+the engine starts, then registering it in GAIFA's models registry (plan 18.3). The engine itself runs
 offline (HF_HUB_OFFLINE=1), so a start never downloads inside the container, and download time never
 holds a memory grant."""
 

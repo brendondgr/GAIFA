@@ -1,4 +1,4 @@
-"""2.10: the mod self-test (`aihub check`)."""
+"""2.10: the mod self-test (`gaifa check`)."""
 
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ async def test_missing_executable_and_referenced_operations(rig, serve):
     served = await serve()
     r = await check(served, "fake-ok")
     cmd = next(c for c in r["checks"] if c["name"] == "command")
-    assert cmd["status"] == "fail" and cmd["detail"].endswith(".venv/bin/python not found (run `aihub install fake-ok`?)")
+    assert cmd["status"] == "fail" and cmd["detail"].endswith(".venv/bin/python not found (run `gaifa install fake-ok`?)")
 
 
 async def test_operations_must_exist(rig, serve):

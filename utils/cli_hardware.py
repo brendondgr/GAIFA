@@ -1,4 +1,4 @@
-"""`aihub hardware` (plan 35.2): what this machine has, without the hub. Standard library only.
+"""`gaifa hardware` (plan 35.2): what this machine has, without the hub. Standard library only.
 
 `--snapshot <file>` writes the recording detection read (a fixture, or part of a field report);
 `--from <file>` replays one, so another machine's detection can be read here.
@@ -13,7 +13,7 @@ from typing import Any
 
 if __package__:
     from utils import hardware
-else:                    # loaded by bin/aihub's cli.py as a script: utils/ itself is on sys.path
+else:                    # loaded by bin/gaifa's cli.py as a script: utils/ itself is on sys.path
     import hardware  # type: ignore[no-redef]
 
 GIB = 2**30
@@ -29,7 +29,7 @@ def summary(m: hardware.Machine) -> list[str]:
         mem = {"unified": f"unified, up to {g.vram_bytes / GIB:.1f} GiB", "dedicated": f"{g.vram_bytes / GIB:.1f} GiB VRAM" if g.vram_bytes else "its own VRAM (size unknown)"}.get(g.memory, "memory unknown")
         rt = ", ".join(k + ("" if v == "yes" else " " + v) for k, v in g.runtimes.items())
         lines.append(f"GPU {g.index}     {g.name}{f' ({g.arch})' if g.arch else ''} · {mem}" + (f" · {g.driver}" if g.driver else "") + (f" · {rt}" if rt else ""))
-        lines.append(f"          runs: {', '.join(g.accels) or 'nothing AIHub can use yet'}")
+        lines.append(f"          runs: {', '.join(g.accels) or 'nothing GAIFA can use yet'}")
         lines += [f"          problem: {p}" for p in g.problems]
     if not m.gpus:
         lines.append("GPU       none found: everything runs on the CPU")
@@ -59,7 +59,7 @@ def cmd_hardware(args: argparse.Namespace) -> int:
 
 
 def add_parser(sub: Any) -> None:
-    p = sub.add_parser("hardware", help="what this machine has: OS, GPUs, memory, runtimes, and the accelerators AIHub can use")
+    p = sub.add_parser("hardware", help="what this machine has: OS, GPUs, memory, runtimes, and the accelerators GAIFA can use")
     p.add_argument("--json", action="store_true", help="the same as GET /api/system/hardware")
     p.add_argument("--snapshot", metavar="FILE", help="also write everything detection read, to replay elsewhere ('-' prints it instead)")
     p.add_argument("--from", dest="from_file", metavar="FILE", help="replay a snapshot instead of reading this machine")

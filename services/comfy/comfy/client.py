@@ -72,8 +72,8 @@ class ComfyClient:
     async def delete_queued(self, prompt_ids: list[str]) -> None:
         await self._json("POST", "/queue", json={"delete": prompt_ids})
 
-    async def upload_image(self, name: str, data: bytes, subfolder: str = "aihub", overwrite: bool = True) -> str:
-        """Upload to ComfyUI's input folder; returns the name LoadImage takes ("aihub/x.png")."""
+    async def upload_image(self, name: str, data: bytes, subfolder: str = "gaifa", overwrite: bool = True) -> str:
+        """Upload to ComfyUI's input folder; returns the name LoadImage takes ("gaifa/x.png")."""
         files = {"image": (name, data, "application/octet-stream")}
         form = {"subfolder": subfolder, "type": "input", "overwrite": "true" if overwrite else "false"}
         r = await self._json("POST", "/upload/image", files=files, data=form)

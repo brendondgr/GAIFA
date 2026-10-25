@@ -37,7 +37,7 @@ def test_eval_tasks_in_eight_groups():
 
 async def test_attachments_go_with_the_first_turn_only(env, monkeypatch):
     """plan 29.3: `attach` gets the hub's URL and returns output ids for the first message."""
-    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:7000")
+    monkeypatch.setenv("GAIFA_URL", "http://127.0.0.1:7000")
     assert Harness("http://127.0.0.1:7000/api/s/agent", "m").hub_url() == "http://127.0.0.1:7000"
     h = Harness("http://agent", "main", dry_run=True, transport=httpx.ASGITransport(app=env.app))
     env.model.queue({"text": "ok"}, {"text": "ok again"})

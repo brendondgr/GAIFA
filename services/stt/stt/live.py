@@ -20,7 +20,7 @@ model fails). An open stream holds a lease on its model: the idle unloader leave
 any silence, and if it is unloaded anyway (``POST /v1/unload``) the next pass loads it again.
 
 **The GPU slot (plan 31.3; ``gpu.py``).** Dictation never waits for the GPU. When another mod's work holds
-AIHub's GPU slot at the start, the stream runs on the CPU (its own CPU model, ``small`` at most). Otherwise it
+GAIFA's GPU slot at the start, the stream runs on the CPU (its own CPU model, ``small`` at most). Otherwise it
 holds an ``interactive`` lease while it runs on the GPU, and when another mod's work starts waiting, it loads
 the CPU model, moves to it between two frames and gives the slot back: ``{"type": "device", "device": "cpu",
 "model", "precision", "reason"}`` tells the client.

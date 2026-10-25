@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Builds .venv/ for the decide mod (run by `aihub install decide`) and downloads d3-lite (1.7 GB) at its pinned
+# Builds .venv/ for the decide mod (run by `gaifa install decide`) and downloads d3-lite (1.7 GB) at its pinned
 # revision into data/models/decide/d3-lite when it isn't there, then checks every file against the model's
 # manifest. Re-running is safe.
 #   install.sh --accel rocm   (the default) on gfx1151: the exact packages in locks/decide.txt (ROCm nightlies, as tested here);
-#                             another AMD GPU: requirements.txt from AMD's index for its family (AIHUB_GPU_ARCH)
+#                             another AMD GPU: requirements.txt from AMD's index for its family (GAIFA_GPU_ARCH)
 #   install.sh --accel cuda|xpu|mps|cpu   requirements.txt with PyTorch's wheels for it (decide/torch_index.py; plan 39.3)
 #   install.sh --cpu      the same as --accel cpu: PyTorch's CPU wheels (slower)
 #   install.sh --no-weights
-#   install.sh --force    download the weights again (after `aihub check decide` reports changed files)
+#   install.sh --force    download the weights again (after `gaifa check decide` reports changed files)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 HUB="$(cd "$ROOT/../.." && pwd)"
-MODELS="${AIHUB_MODELS:-$HUB/data/models}"
+MODELS="${GAIFA_MODELS:-$HUB/data/models}"
 ROCM_INDEX=https://nightly.repo.amd.com/rocm/whl-next/      # tts's Breeze line, as embed
 REPO=vllm-sr/d3-lite
 REVISION=03560c26f5199c3c04129a2ccb38960c913635e0           # = decide/models/d3_lite.py REVISION (code read 2026-10-20)
 WEIGHTS=1 FORCE=0
-ACCEL="${AIHUB_ACCEL:-rocm}"
+ACCEL="${GAIFA_ACCEL:-rocm}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --accel) ACCEL="$2"; shift 2 ;;
@@ -29,7 +29,7 @@ while [ $# -gt 0 ]; do
 done
 cd "$ROOT"
 uv venv --quiet --allow-existing --python 3.12 --python-preference only-managed .venv
-if [ "$ACCEL" = rocm ] && { [ -z "${AIHUB_GPU_ARCH:-}" ] || [ "${AIHUB_GPU_ARCH:-}" = gfx1151 ]; }; then
+if [ "$ACCEL" = rocm ] && { [ -z "${GAIFA_GPU_ARCH:-}" ] || [ "${GAIFA_GPU_ARCH:-}" = gfx1151 ]; }; then
   uv pip install --quiet --python .venv/bin/python --index-url "$ROCM_INDEX" --extra-index-url https://pypi.org/simple \
     --index-strategy unsafe-best-match -r locks/decide.txt
 else

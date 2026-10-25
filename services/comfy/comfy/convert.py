@@ -377,7 +377,7 @@ def _apply_proxy_widgets(wf: dict) -> dict:
         for (inner_id, wname), v in zip(proxies, vals, strict=False):
             n = inner.get(str(inner_id))           # "-1" (a subgraph input) is handled in _from_subgraph_input
             if n is not None:
-                n.setdefault("properties", {}).setdefault("_aihub_overrides", {})[wname] = v
+                n.setdefault("properties", {}).setdefault("_gaifa_overrides", {})[wname] = v
     return wf
 
 
@@ -448,7 +448,7 @@ def _overrides(scope: _Scope, out: Converted) -> None:
         if node.get("type") in scope.defs:
             _overrides(scope.child(node), out)
             continue
-        ov = (node.get("properties") or {}).get("_aihub_overrides")
+        ov = (node.get("properties") or {}).get("_gaifa_overrides")
         eid = scope.exec_id(nid)
         if ov and eid in out.graph:
             for k, v in ov.items():

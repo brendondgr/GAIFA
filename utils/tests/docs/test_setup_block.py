@@ -1,4 +1,4 @@
-"""The aihub-setup block, version 2 (plan 23.7): summary, gpu, disk, needs, after, check, steps and
+"""The gaifa-setup block, version 2 (plan 23.7): summary, gpu, disk, needs, after, check, steps and
 suggested models; and the mods index that shows them."""
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import pytest
 from utils import setupdocs
 from utils.setupdocs import block, envs, render
 
-FULL = '''<!-- aihub-setup
+FULL = '''<!-- gaifa-setup
 id = "tts-kokoro"
 title = "Kokoro"
 models = ["hf-cache/hub/models--hexgrad--Kokoro-82M"]
@@ -19,10 +19,10 @@ gpu = true
 disk_gb = 14
 needs = ["podman", "espeak-ng"]
 after = ["tts"]
-check = "aihub check tts"
+check = "gaifa check tts"
 
 [[steps]]
-run = "aihub install tts"
+run = "gaifa install tts"
 what = "the server venv"
 
 [[steps]]
@@ -65,8 +65,8 @@ def test_every_key(tmp_path: Path) -> None:
     env, problem = envs.parse(doc(tmp_path, FULL), "tts")
     assert problem is None and env is not None
     s = env.setup
-    assert (s.summary, s.gpu, s.disk_gb, s.needs, s.after, s.check) == ("Speech: fast English voices", True, 14.0, ["podman", "espeak-ng"], ["tts"], "aihub check tts")
-    assert [st.run for st in s.steps] == ["aihub install tts", "scripts/install-runtime.sh --accept-breeze-license"]
+    assert (s.summary, s.gpu, s.disk_gb, s.needs, s.after, s.check) == ("Speech: fast English voices", True, 14.0, ["podman", "espeak-ng"], ["tts"], "gaifa check tts")
+    assert [st.run for st in s.steps] == ["gaifa install tts", "scripts/install-runtime.sh --accept-breeze-license"]
     assert s.steps[0].ask == "" and s.steps[1].ask.startswith("Breeze TTS 2")
     k, w = s.suggest
     assert (k.repo, k.revision, k.dest, k.size_gb, k.required, k.gated, k.op, k.kind) == ("hexgrad/Kokoro-82M", "f3ff357", "hf-cache", 0.34, True, False, "", "other")
@@ -74,7 +74,7 @@ def test_every_key(tmp_path: Path) -> None:
 
 
 def test_the_new_keys_are_optional(tmp_path: Path) -> None:
-    env, problem = envs.parse(doc(tmp_path, '<!-- aihub-setup\nid = "x"\ntitle = "X"\n-->\n'), "tts")
+    env, problem = envs.parse(doc(tmp_path, '<!-- gaifa-setup\nid = "x"\ntitle = "X"\n-->\n'), "tts")
     assert problem is None and env.setup == block.Setup()
 
 
@@ -100,13 +100,13 @@ def test_the_new_keys_are_optional(tmp_path: Path) -> None:
     ('[[suggest]]\nname = "A"\nsize_gb = 1\ngood_for = "b"\nrepo = "o/r"\ndest = "x"\nmirror = "y"', "suggest[0]: unknown key(s) mirror"),
 ])
 def test_bad_values(tmp_path: Path, extra: str, problem: str) -> None:
-    env, got = envs.parse(doc(tmp_path, f'<!-- aihub-setup\nid = "x"\ntitle = "X"\n{extra}\n-->\n'), "tts")
+    env, got = envs.parse(doc(tmp_path, f'<!-- gaifa-setup\nid = "x"\ntitle = "X"\n{extra}\n-->\n'), "tts")
     assert env is None and problem in got
 
 
 def test_the_mods_index_shows_the_block(tmp_path: Path) -> None:
     doc(tmp_path, FULL)
-    doc(tmp_path, '<!-- aihub-setup\nid = "web"\ntitle = "Web"\nsummary = "Search"\ngpu = false\ndisk_gb = 0.05\n-->\n', mod="web")
+    doc(tmp_path, '<!-- gaifa-setup\nid = "web"\ntitle = "Web"\nsummary = "Search"\ngpu = false\ndisk_gb = 0.05\n-->\n', mod="web")
     readme = tmp_path / "docs" / "setup" / "README.md"
     readme.parent.mkdir(parents=True)
     readme.write_text(f"# Setup\n\n{render.START}\n{render.END}\n")
@@ -120,4 +120,4 @@ def test_the_template_parses_once_filled_in(tmp_path: Path) -> None:
     tpl = (Path(__file__).resolve().parents[3] / "services" / "_template" / "setup" / "env.md").read_text()
     env, problem = envs.parse(doc(tmp_path, tpl.replace("__ID__", "my-mod").replace("__NAME__", "My Mod"), mod="my-mod"), "my-mod")
     assert problem is None
-    assert env.setup.summary.startswith("My Mod") and env.setup.check == "aihub check my-mod --start" and env.setup.steps[0].run == "aihub install my-mod"
+    assert env.setup.summary.startswith("My Mod") and env.setup.check == "gaifa check my-mod --start" and env.setup.steps[0].run == "gaifa install my-mod"

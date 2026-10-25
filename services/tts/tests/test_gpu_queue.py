@@ -1,4 +1,4 @@
-"""Plan 31.3: each synthesis takes AIHub's GPU slot. It waits (listed as a `waiting_gpu` job in the status)
+"""Plan 31.3: each synthesis takes GAIFA's GPU slot. It waits (listed as a `waiting_gpu` job in the status)
 while another mod's work holds the GPU, runs after, and gives the slot back when it ends or its client goes
 away. An engine set to the CPU doesn't take it."""
 

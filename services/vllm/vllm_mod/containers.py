@@ -97,7 +97,7 @@ class Podman:
             names = c.get("Names") or []
             name = names[0] if names else ""
             if name.startswith(NAME_PREFIX):
-                found.append(Found(name, (c.get("Labels") or {}).get("aihub.profile"), c.get("State") == "running"))
+                found.append(Found(name, (c.get("Labels") or {}).get("gaifa.profile"), c.get("State") == "running"))
         return found
 
     async def logs(self, name: str, tail: int | None = None) -> AsyncIterator[str]:
@@ -148,7 +148,7 @@ class FakeContainers:
                                                  start_new_session=True,
                                                  cwd=str(Path(__file__).resolve().parent.parent))
         log.close()
-        profile = next((lb.split("=", 1)[1] for lb in labels if lb.startswith("aihub.profile=")), None)
+        profile = next((lb.split("=", 1)[1] for lb in labels if lb.startswith("gaifa.profile=")), None)
         self._rec(name).write_text(json.dumps({"pid": p.pid, "profile": profile, "started": time.time()}))
         self._procs = getattr(self, "_procs", {})
         self._procs[name] = p        # keeps the child reaped while this adapter lives

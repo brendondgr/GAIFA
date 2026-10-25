@@ -1,4 +1,4 @@
-"""AIHub's GPU slot for stt (plan 31.3; the client is ``gpu_slot.py``, a copy of the template's).
+"""GAIFA's GPU slot for stt (plan 31.3; the client is ``gpu_slot.py``, a copy of the template's).
 
 - **File jobs** take a ``job`` lease around loading and transcribing: they wait (stage ``waiting_gpu``)
   while another mod's work holds the GPU.

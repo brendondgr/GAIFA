@@ -1,8 +1,8 @@
 """Workspace: folders on this machine the agent reads, edits in place and runs code in (plan Phase 27).
 
-AIHub runs this as `.venv/bin/python server.py` with AIHUB_PORT, AIHUB_ROOT, AIHUB_MODELS,
-AIHUB_OUTPUTS and AIHUB_URL set (architecture §4.4). WORKSPACE_STATE (default
-`$AIHUB_ROOT/data/state/workspace`) holds environments.json (folders.json before plan 34), checkpoints and run records.
+GAIFA runs this as `.venv/bin/python server.py` with GAIFA_PORT, GAIFA_ROOT, GAIFA_MODELS,
+GAIFA_OUTPUTS and GAIFA_URL set (architecture §4.4). WORKSPACE_STATE (default
+`$GAIFA_ROOT/data/state/workspace`) holds environments.json (folders.json before plan 34), checkpoints and run records.
 
 Folders and levels: folders.py; environments (named sets of folders, plan 34): environments.py.
 """
@@ -81,7 +81,7 @@ class GitIn(BaseModel):
 def view_of(ctx: Any, request: Request, environment: str | None = None) -> Folders:
     """The folders this request may use (plan 34): its chat's environment (`?environment=` or the origin's)
     and the folders the hub passed as allowed in that chat."""
-    o = reading.origin_of(request.headers.get("x-aihub-origin"))
+    o = reading.origin_of(request.headers.get("x-gaifa-origin"))
     if environment:
         o = {**o, "environment": environment}
     return ctx.folders.view(o)
@@ -89,7 +89,7 @@ def view_of(ctx: Any, request: Request, environment: str | None = None) -> Folde
 
 def named_of(request: Request) -> list[str]:
     """The secret-looking files the user named in their message (the agent puts them in the origin)."""
-    m = reading.origin_of(request.headers.get("x-aihub-origin")).get("named")
+    m = reading.origin_of(request.headers.get("x-gaifa-origin")).get("named")
     return [str(x) for x in m][:20] if isinstance(m, list) else []
 
 
@@ -102,10 +102,10 @@ class LimitsIn(BaseModel):
 class Ctx:
     """What the routes share: the folders and the places this mod writes."""
 
-    def __init__(self, state: Path, aihub_root: Path | None, models: Path | None, outputs: Path, hub_url: str) -> None:
+    def __init__(self, state: Path, gaifa_root: Path | None, models: Path | None, outputs: Path, hub_url: str) -> None:
         self.state, self.outputs, self.hub_url = state, outputs, hub_url
-        self.aihub_root = aihub_root
-        self.folders = Folders(state, Caps(aihub_root, models))
+        self.gaifa_root = gaifa_root
+        self.folders = Folders(state, Caps(gaifa_root, models))
         self.checkpoints = Checkpoints(state)
         self.sandbox = Sandbox(state)
         self.started = time.time()
@@ -140,13 +140,13 @@ class Ctx:
             pass
 
 
-def create_app(state: Path | None = None, aihub_root: Path | None = None, models: Path | None = None,
+def create_app(state: Path | None = None, gaifa_root: Path | None = None, models: Path | None = None,
                outputs: Path | None = None, hub_url: str | None = None) -> FastAPI:
-    root = aihub_root or (Path(os.environ["AIHUB_ROOT"]) if os.environ.get("AIHUB_ROOT") else None)
+    root = gaifa_root or (Path(os.environ["GAIFA_ROOT"]) if os.environ.get("GAIFA_ROOT") else None)
     ctx = Ctx(state or Path(os.environ.get("WORKSPACE_STATE") or (root or Path(".")) / "data" / "state" / "workspace"),
-              root, models or (Path(os.environ["AIHUB_MODELS"]) if os.environ.get("AIHUB_MODELS") else (root / "data" / "models" if root else None)),
-              outputs or Path(os.environ.get("AIHUB_OUTPUTS", "outputs")),
-              hub_url or os.environ.get("AIHUB_URL", "http://127.0.0.1:7000"))
+              root, models or (Path(os.environ["GAIFA_MODELS"]) if os.environ.get("GAIFA_MODELS") else (root / "data" / "models" if root else None)),
+              outputs or Path(os.environ.get("GAIFA_OUTPUTS", "outputs")),
+              hub_url or os.environ.get("GAIFA_URL", "http://127.0.0.1:7000"))
     app = FastAPI(title="Workspace", version="0.1.0")
     app.state.ctx = ctx
 
@@ -240,4 +240,4 @@ def create_app(state: Path | None = None, aihub_root: Path | None = None, models
 
 
 if __name__ == "__main__":
-    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("AIHUB_PORT", "5103")), log_level="warning")
+    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("GAIFA_PORT", "5103")), log_level="warning")

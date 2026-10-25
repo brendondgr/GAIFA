@@ -32,8 +32,8 @@ ACCEPTS = {"image": {"image"}, "audio": {"audio", "video"}, "video": {"video"}} 
 
 
 def _file(kind: str) -> Any:
-    return Field(None, description=f"An AIHub output ({kind}): `output:<id>` or the bare id",
-                 json_schema_extra={"format": "aihub-file", "x-kind": kind})
+    return Field(None, description=f"A GAIFA output ({kind}): `output:<id>` or the bare id",
+                 json_schema_extra={"format": "gaifa-file", "x-kind": kind})
 
 
 class Input(BaseModel):

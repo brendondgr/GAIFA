@@ -83,7 +83,7 @@
   }
  },
  "8": {
-  "class_type": "AIHubTextEncodeQwenImage21",
+  "class_type": "GAIFATextEncodeQwenImage21",
   "inputs": {
    "prompt": "A cinematic photo of a red fox curled up asleep on a mossy log in a misty pine forest at dawn, soft golden rim light, shallow depth of field, sharp fur detail",
    "negative_prompt": "",

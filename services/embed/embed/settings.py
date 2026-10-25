@@ -1,4 +1,4 @@
-"""The mod's settings, from the environment AIHub sets (service.toml [run.env], architecture §4.4)."""
+"""The mod's settings, from the environment GAIFA sets (service.toml [run.env], architecture §4.4)."""
 
 from __future__ import annotations
 
@@ -37,17 +37,17 @@ class Settings:
         e = os.environ
         d = cls()
         return cls(
-            port=port or int(e.get("AIHUB_PORT", d.port)),
+            port=port or int(e.get("GAIFA_PORT", d.port)),
             model_dir=Path(e.get("EMBED_MODEL_DIR", d.model_dir)),
             state_dir=Path(e.get("EMBED_STATE_DIR", d.state_dir)),
-            hub_url=(e.get("AIHUB_URL") or "").rstrip("/") or None,
+            hub_url=(e.get("GAIFA_URL") or "").rstrip("/") or None,
             device=e.get("EMBED_DEVICE", d.device),
-            idle_unload_s=float(e.get("EMBED_IDLE_UNLOAD_S") or e.get("AIHUB_IDLE_UNLOAD_S") or d.idle_unload_s),
+            idle_unload_s=float(e.get("EMBED_IDLE_UNLOAD_S") or e.get("GAIFA_IDLE_UNLOAD_S") or d.idle_unload_s),
             max_inputs=int(e.get("EMBED_MAX_INPUTS", d.max_inputs)),
             audio_max_s=float(e.get("EMBED_AUDIO_MAX_S", d.audio_max_s)),
             batch_text=int(e.get("EMBED_BATCH_TEXT", d.batch_text)),
             batch_media=int(e.get("EMBED_BATCH_MEDIA", d.batch_media)),
-            databases=Path(e.get("AIHUB_DATABASES", d.databases)),
+            databases=Path(e.get("GAIFA_DATABASES", d.databases)),
             index=e.get("EMBED_INDEX", "1") not in ("", "0", "false", "no"),
             index_audio_max_s=float(e.get("EMBED_INDEX_AUDIO_MAX_S", d.index_audio_max_s)),
             index_batch_text=int(e.get("EMBED_INDEX_BATCH_TEXT", d.index_batch_text)),

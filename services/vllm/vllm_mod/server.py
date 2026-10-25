@@ -89,7 +89,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None,
 
     @app.get("/health")
     def health() -> dict:
-        """AIHub polls this: the adapter is up (the engine's own state is in /v1/status)."""
+        """GAIFA polls this: the adapter is up (the engine's own state is in /v1/status)."""
         return {"status": "ok"}
 
     @app.get("/v1/profiles", summary="The model profiles")
@@ -116,8 +116,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None,
     @app.post("/v1/load", summary="Start vLLM with a profile (stops the running one first)")
     async def load(request: Request, body: LoadRequest | None = None,
                    wait: bool = Query(True, description="Answer once vLLM is ready (else at once)"),
-                   make_room: bool = Query(False, description="Let AIHub unload idle mods for the memory")) -> dict:
-        room = make_room or request.headers.get("x-aihub-make-room", "").strip().lower() in YES
+                   make_room: bool = Query(False, description="Let GAIFA unload idle mods for the memory")) -> dict:
+        room = make_room or request.headers.get("x-gaifa-make-room", "").strip().lower() in YES
         return await request.app.state.engine.load(body.profile if body else None, make_room=room, wait=wait)
 
     @app.post("/v1/unload", summary="Stop vLLM")

@@ -42,7 +42,7 @@ from utils.widgets import Widgets
 
 DEMO_MODS = DEFAULT_ROOT / "utils" / "tests" / "fixtures" / "mods"
 
-log = logging.getLogger("aihub")
+log = logging.getLogger("gaifa")
 
 STATUS_CODES = {400: "bad_request", 404: "not_found", 405: "method_not_allowed", 409: "conflict", 422: "invalid_request"}
 
@@ -271,14 +271,14 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.sessions = Sessions(hub)
             await hub.sessions.start()
             stack.push_async_callback(hub.sessions.close)
-            log.info("AIHub %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
+            log.info("GAIFA %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 
     app = FastAPI(
-        title="AIHub",
+        title="GAIFA",
         description=("One local hub for every AI service on this machine. Each mod's own API is proxied unchanged at "
                      "`/api/s/{id}/…` (any method); `GET /api/services/{id}/operations` lists it, from the mod's OpenAPI. "
-                     "Hub errors are `{detail, code, data?}` with an `X-AIHub-Error` header."),
+                     "Hub errors are `{detail, code, data?}` with an `X-GAIFA-Error` header."),
         version=hub.version,
         lifespan=lifespan,
         docs_url="/api/docs",
@@ -350,7 +350,7 @@ def _envelope(status: int, code: str, detail: str, data: Any = None) -> JSONResp
     if data is not None:
         body["data"] = data
     # Marks the hub's own errors, so the UI can tell them from a mod's proxied error responses.
-    return JSONResponse(body, status_code=status, headers={"X-AIHub-Error": code})
+    return JSONResponse(body, status_code=status, headers={"X-GAIFA-Error": code})
 
 
 def _error_handlers(app: FastAPI) -> None:

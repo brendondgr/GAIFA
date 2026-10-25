@@ -1,4 +1,4 @@
-"""12.4: `GET /api/doctor` and `aihub doctor`: models, manifests, paths outside the project, ports,
+"""12.4: `GET /api/doctor` and `gaifa doctor`: models, manifests, paths outside the project, ports,
 units, disk and offline mods."""
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def _mod(services: Path, mod: str, extra_env: str = "", models: str = "") -> int
 
 async def test_doctor_reports_each_area(services_dir, root, make_app):
     services = services_dir("fake-ok", "fake-mem")
-    _mod(services, "fake-ok", 'ELSEWHERE = "/etc/aihub-doctor-test", HF_HUB_OFFLINE = "1"', '\n[models]\ndirs = ["tts"]\n')
+    _mod(services, "fake-ok", 'ELSEWHERE = "/etc/gaifa-doctor-test", HF_HUB_OFFLINE = "1"', '\n[models]\ndirs = ["tts"]\n')
     busy = _mod(services, "fake-mem")
     (services / "broken").mkdir()
     (services / "broken" / "service.toml").write_text('id = "broken"\n')
@@ -65,7 +65,7 @@ async def test_doctor_reports_each_area(services_dir, root, make_app):
     assert by[("models", "model gone: missing")]["level"] == "fail"
     assert by[("manifests", "broken: invalid")]["level"] == "fail"
     out = by[("paths", "fake-ok: 1 path(s) outside the project")]
-    assert out["level"] == "warn" and "ELSEWHERE: /etc/aihub-doctor-test" in out["detail"]
+    assert out["level"] == "warn" and "ELSEWHERE: /etc/gaifa-doctor-test" in out["detail"]
     assert by[("paths", "fake-mem: everything inside the project")]["level"] == "ok"
     taken = by[("ports", f"fake-mem: port {busy} is taken while the mod is stopped")]
     assert taken["level"] == "fail" and "pid" in taken["detail"]
@@ -82,13 +82,13 @@ async def test_doctor_is_clean_on_an_empty_install(client):
 
 async def test_inventory_lists_paths_outside_with_reasons(services_dir, root, make_app):
     services = services_dir("fake-ok")
-    _mod(services, "fake-ok", 'ELSEWHERE = "/etc/aihub-inventory-test", TOOL = "/usr/bin/ffmpeg", IMG = "docker.io/kyuz0/image:latest"')
+    _mod(services, "fake-ok", 'ELSEWHERE = "/etc/gaifa-inventory-test", TOOL = "/usr/bin/ffmpeg", IMG = "docker.io/kyuz0/image:latest"')
     app = make_app(port=7000, autostart=False)
     async with app.router.lifespan_context(app):
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://hub") as c:
             inv = (await c.get("/api/doctor/inventory")).json()
     by = {i["path"]: i for i in inv["items"]}
-    assert by["/etc/aihub-inventory-test"]["kind"] == "outside" and by["/etc/aihub-inventory-test"]["used_by"] == "fake-ok"
+    assert by["/etc/gaifa-inventory-test"]["kind"] == "outside" and by["/etc/gaifa-inventory-test"]["used_by"] == "fake-ok"
     assert by["/usr/bin/ffmpeg"]["kind"] == "allowlisted" and by["/usr/bin/ffmpeg"]["reason"] == "system tool"
     assert by["docker.io/kyuz0/image:latest"]["reason"].startswith("podman image")
     assert any(i["path"].startswith("systemd journal") for i in inv["items"])

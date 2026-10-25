@@ -58,7 +58,7 @@ def parts_for(kinds: set[str] | list[str]) -> frozenset[str]:
 
 
 def choose(want: str, torch: Any) -> tuple[str, Any]:
-    """(device, dtype) for EMBED_DEVICE (`auto`: AIHUB_DEVICE, the variant the hub passes, else the first device
+    """(device, dtype) for EMBED_DEVICE (`auto`: GAIFA_DEVICE, the variant the hub passes, else the first device
     torch reaches; plan 39.3): bf16 on CUDA/ROCm cards that have it and on Intel's xpu, fp32 elsewhere (never fp16)."""
     dev = device.device(want)
     if dev != "cpu" and not device.available(dev):

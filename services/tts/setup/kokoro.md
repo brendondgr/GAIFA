@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "tts-kokoro"
 title = "Kokoro-82M (Speech)"
 models = ["hf-cache/hub/models--hexgrad--Kokoro-82M"]
@@ -9,10 +9,10 @@ disk_gb = 6.6
 needs = ["uv", "espeak-ng", "ffmpeg"]
 after = []
 check = "diff -q <(uv pip freeze --python runtime/venvs/kokoro/bin/python | LC_ALL=C sort) <(LC_ALL=C sort locks/kokoro.txt) && test -f ../../data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/snapshots/f3ff3571791e39611d31c381e3a41a3af07b4987/kokoro-v1_0.pth"
-smoke = "aihub start tts >/dev/null && test \"$(curl -fsS -H 'content-type: application/json' -d '{\"model\": \"kokoro\", \"input\": \"Hello from AIHub.\", \"response_format\": \"wav\", \"no_save\": true}' \"$(aihub url api/s/tts/v1/audio/speech)\" | wc -c)\" -gt 10000"   # plan 39: real work, run by aihub setup --smoke and the field test
+smoke = "gaifa start tts >/dev/null && test \"$(curl -fsS -H 'content-type: application/json' -d '{\"model\": \"kokoro\", \"input\": \"Hello from GAIFA.\", \"response_format\": \"wav\", \"no_save\": true}' \"$(gaifa url api/s/tts/v1/audio/speech)\" | wc -c)\" -gt 10000"   # plan 39: real work, run by gaifa setup --smoke and the field test
 
 [[steps]]
-run = "aihub install tts"
+run = "gaifa install tts"
 what = "makes .venv/ in this folder with Python 3.12 from requirements.txt: the server only (about 90 MB, a minute)"
 
 [[steps]]
@@ -100,10 +100,10 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 ## Install
 
 ```bash
-aihub install tts
+gaifa install tts
 ```
 
-Runs `aihub-install.sh`: makes `.venv/` with Python 3.12 from `requirements.txt` (the server only).
+Runs `gaifa-install.sh`: makes `.venv/` with Python 3.12 from `requirements.txt` (the server only).
 
 ```bash
 HF_HOME=data/models/hf-cache uvx --from huggingface_hub hf download hexgrad/Kokoro-82M --revision f3ff3571791e39611d31c381e3a41a3af07b4987 --include config.json --include kokoro-v1_0.pth --include "voices/a*.pt" --include "voices/b*.pt"
@@ -121,11 +121,11 @@ services/tts/scripts/install-runtime.sh
 
 Builds `runtime/venvs/kokoro` with uv (Python 3.12) and installs exactly `locks/kokoro.txt` from the index above (a few GB of wheels). Then it runs `engines/install.sh --gpu rocm --rocm-index … --prefix runtime/venvs/kokoro`, which keeps that torch, copies `kokoro_tts.py` into the venv, writes the `~/.local/bin/kokoro-tts` launcher, records the engine in `~/.config/tts-engines/engines.json`, and ends with a smoke test (`kokoro-tts --check`), **which loads Kokoro on the GPU**. Without `--accept-breeze-license` it stops there with a note about Breeze; with it, it goes on to [breeze.md](breeze.md). Re-running is safe. It wasn't re-run for this doc.
 
-The two files outside the project (`~/.local/bin/kokoro-tts`, `~/.config/tts-engines/engines.json`) are on AIHub's allowlist. video-maker reads them too.
+The two files outside the project (`~/.local/bin/kokoro-tts`, `~/.config/tts-engines/engines.json`) are on GAIFA's allowlist. video-maker reads them too.
 
 ### On other machines (plan 39.4)
 
-`scripts/install-runtime.sh` installs for the variant `aihub setup` picked (`--accel`, else `AIHUB_ACCEL`). ROCm on gfx1151 installs this doc's locks. Anything else goes through the engines' own installers with PyTorch from that accelerator's index: CUDA (the newest build the driver runs), another AMD GPU's TheRock family index, Intel's xpu, Apple's mps or the CPU. Kokoro runs on all of them. Breeze runs on ROCm and CUDA, and on the CPU only with `--allow-cpu-breeze` ([breeze.md](breeze.md)). `--dry-run` prints what it would run. Everything except gfx1151 is untested here.
+`scripts/install-runtime.sh` installs for the variant `gaifa setup` picked (`--accel`, else `GAIFA_ACCEL`). ROCm on gfx1151 installs this doc's locks. Anything else goes through the engines' own installers with PyTorch from that accelerator's index: CUDA (the newest build the driver runs), another AMD GPU's TheRock family index, Intel's xpu, Apple's mps or the CPU. Kokoro runs on all of them. Breeze runs on ROCm and CUDA, and on the CPU only with `--allow-cpu-breeze` ([breeze.md](breeze.md)). `--dry-run` prints what it would run. Everything except gfx1151 is untested here.
 
 ## Choosing models
 
@@ -147,12 +147,12 @@ Kokoro is a fixed engine: it runs one set of weights, `hexgrad/Kokoro-82M`, from
 | `LOCALTTS_DATA`, `LOCALTTS_OUTPUTS_DIR`, `LOCALTTS_VOICES_DIR` | `service.toml` | yes (set) | `services/tts/data`, `outputs/tts`, `data/models/voices` |
 | `LOCALTTS_LLM_URL` | `service.toml` | optional | the relay, for AI-Enhance |
 
-The full list is in `localtts.env.example` (standalone use); under AIHub, `service.toml` and `config.toml` set them.
+The full list is in `localtts.env.example` (standalone use); under GAIFA, `service.toml` and `config.toml` set them.
 
 ## Check it works
 
 ```bash
-aihub check tts --start
+gaifa check tts --start
 ```
 
 Starts the server if it's stopped (a stopped mod's live checks are skipped; starting it loads no engine) and checks it. Expect `ok` on every line but one: `FAIL widget clips series must be a non-empty list of {name, values}`. That's a known tts bug, not your install: the clips widget answers an empty `series` until a clip has been made in the last 7 days, so a fresh install always shows it (seen 2026-10-21). Make one clip on the Speech page and it passes.
@@ -182,13 +182,13 @@ Expect a `kokoro` entry with `"backend": "rocm"`, `"torch": "2.12.0a0+rocm7.13.0
 - **Worker settings** (`workers/kokoro_worker.py`, `localtts/engines.py`): `MIOPEN_FIND_MODE=2` (MIOpen's fast find), `MIOPEN_LOG_LEVEL=3` (errors only), and `ROCPROFILER_REGISTER_ENABLED=0`. Without that last one the ROCm nightly torch loads rocprofiler-sdk, and an idle worker pins a CPU core and keeps the GPU at 100 %.
 - **A loaded engine shows the GPU 100 % busy even when idle** (the compute processor polls its queue; about 45 W instead of 17 W). It stops when the engine unloads, hence the short idle unload.
 - **The nightly wheel index drops old builds.** `locks/kokoro.txt` pins exact nightly builds (torch, torchaudio, triton, the `rocm*` packages, all of build `7.13.0a20260411`) from `https://rocm.nightlies.amd.com/v2/gfx1151/`, and nightly indexes don't keep every build: on 2026-10-21 `https://nightly.repo.amd.com/rocm/whl-next/` listed only the last two months of torch builds (2026-08-23 to 2026-10-20), and `https://rocm.nightlies.amd.com/v2/gfx1151/` Linux builds from 2026-01-01 to 2026-05-13; both still had the pinned ones. When a pinned wheel is gone, the install stops at uv's resolve ("No solution found", naming the package). Then:
-  1. On a machine that built this venv before, uv's cache (`~/.cache/uv`) still holds the wheels and the installer goes on as is; don't `uv cache clean` or `uv cache prune` it (`aihub backup` doesn't copy it).
+  1. On a machine that built this venv before, uv's cache (`~/.cache/uv`) still holds the wheels and the installer goes on as is; don't `uv cache clean` or `uv cache prune` it (`gaifa backup` doesn't copy it).
   2. Otherwise pick one build the index still has, `curl -sL https://rocm.nightlies.amd.com/v2/gfx1151/torch/ | grep -o 'torch-[^"<#]*cp312-cp312-linux_x86_64.whl' | tail -3`, change **every** package of the old build in the lock to that same build (their versions all end in the same `rocm…a<date>`; triton's also carries a git hash, so copy the names from the index, `curl -sL https://rocm.nightlies.amd.com/v2/gfx1151/<package>/`), re-run `scripts/install-runtime.sh`, and let its smoke test or check prove it. Record the new versions in Tested with. A different build is untested here: watch for new errors before trusting its output.
 - **GPU safety.** Use the pinned wheels in the lock. Don't add custom kernels or HIP graphs. Keep the IOMMU on ([host.md §1](../../../docs/setup/host.md#1-let-the-gpu-use-the-memory)). A GPU ring timeout or a failed GPU reset in `journalctl -k` is a reason to stop and check for Btrfs checksum errors (host.md, What to look for).
 
 ## Known gaps
 
-- `aihub install tts` builds only the server venv; the model download and `install-runtime.sh` are separate steps (in the block, for `aihub setup`).
-- `aihub check tts` isn't the block's check: on a fresh install its clips widget fails (`series must be a non-empty list`) until a clip is made.
+- `gaifa install tts` builds only the server venv; the model download and `install-runtime.sh` are separate steps (in the block, for `gaifa setup`).
+- `gaifa check tts` isn't the block's check: on a fresh install its clips widget fails (`series must be a non-empty list`) until a clip is made.
 - MIOpen keeps its databases in `~/.config/miopen/` and `~/.cache/miopen/` (both exist here), outside the project and not on the allowlist.
 - On another GPU, `engines/setup.sh --plan` picks a torch build instead of the locks; that path isn't documented here.

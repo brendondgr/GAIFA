@@ -1,4 +1,4 @@
-% AIHub overnight report: Phases 13–16. Build: python3 build.py && lualatex report.tex (twice).
+% GAIFA overnight report: Phases 13–16. Build: python3 build.py && lualatex report.tex (twice).
 \documentclass[10.5pt,a4paper]{article}
 \usepackage[margin=2.1cm,top=2.2cm,bottom=2.4cm]{geometry}
 \usepackage{fontspec}
@@ -29,7 +29,7 @@
 \definecolor{panel}{HTML}{F4F6FA}
 \definecolor{line}{HTML}{D9DEE7}
 \color{ink}
-\hypersetup{colorlinks=true,linkcolor=purple,urlcolor=purple,pdftitle={AIHub overnight report: Phases 13-16}}
+\hypersetup{colorlinks=true,linkcolor=purple,urlcolor=purple,pdftitle={GAIFA overnight report: Phases 13-16}}
 
 \titleformat{\section}{\Large\bfseries\color{ink}}{\color{accent}\thesection}{0.6em}{}[\vspace{-2pt}{\color{line}\rule{\linewidth}{0.6pt}}]
 \titleformat{\subsection}{\large\bfseries\color{ink}}{\color{accent}\thesubsection}{0.5em}{}
@@ -38,7 +38,7 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{5pt}
 \pagestyle{fancy}\fancyhf{}
-\fancyhead[L]{\small\color{muted}AIHub · overnight report}
+\fancyhead[L]{\small\color{muted}GAIFA · overnight report}
 \fancyhead[R]{\small\color{muted}Phases 13–16 · 7 October 2026}
 \fancyfoot[C]{\small\color{muted}\thepage}
 \renewcommand{\headrulewidth}{0pt}
@@ -59,7 +59,7 @@
 \begin{tikzpicture}[remember picture,overlay]
   \fill[ink] (current page.north west) rectangle ([yshift=-5.3cm]current page.north east);
   \node[anchor=north west,text=white,font=\sffamily] at ([xshift=2.1cm,yshift=-1.4cm]current page.north west)
-    {\begin{minipage}{15cm}{\Huge\bfseries AIHub overnight report}\\[6pt]
+    {\begin{minipage}{15cm}{\Huge\bfseries GAIFA overnight report}\\[6pt]
      {\Large\color{accent}Phases 13–16: tools, the chat agent, sessions, everything in the folder}\\[6pt]
      {\normalsize\color{line} Built and tested overnight, 6–7 October 2026 · prepared by Claude}\end{minipage}};
 \end{tikzpicture}
@@ -91,7 +91,7 @@
   \node[ext] (cc) at (6.3,6.2) {Claude Code\\\scriptsize any MCP client};
   \node[mod,minimum width=3.4cm] (agent) at (0,3.9) {\textbf{agent mod} (:5100)\\\scriptsize loop · event log · context\\\scriptsize skills · memory · todos};
   \node[hub,minimum width=6.2cm,minimum height=2.3cm] (hub) at (6.3,3.4) {};
-  \node[font=\small\bfseries,anchor=north] at (hub.north) {AIHub hub (:7000)};
+  \node[font=\small\bfseries,anchor=north] at (hub.north) {GAIFA hub (:7000)};
   \node[box,fill=white,font=\scriptsize,minimum height=0.6cm] (cat) at ($(hub.center)+(-1.6,0.05)$) {tool catalog\\risk · ask · x-kind};
   \node[box,fill=white,font=\scriptsize,minimum height=0.6cm] (ap) at ($(hub.center)+(1.6,0.05)$) {calls · approvals\\jobs · outputs};
   \node[box,fill=white,font=\scriptsize,minimum height=0.5cm] (mcp) at ($(hub.center)+(0,-0.8)$) {/mcp · sessions · logs · memory manager};

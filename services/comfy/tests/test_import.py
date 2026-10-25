@@ -122,14 +122,14 @@ def test_import_from_history(env):
 
 def test_reimport_of_a_result_png_gives_the_same_graph(tmp_path):
     """A PNG ComfyUI saved (with only the API graph) imports to exactly that graph."""
-    f = importer.read_file("143619-a-fox_00001_.png", png({"prompt": API, "aihub": {"workflow": "zimage"}}))
+    f = importer.read_file("143619-a-fox_00001_.png", png({"prompt": API, "gaifa": {"workflow": "zimage"}}))
     from comfy.packs import Packs
     packs = Packs(tmp_path / "wf")
     pid = importer.create(packs, NodeCatalog(INFO), f, None, "143619-a-fox_00001_.png")
     assert json.loads((tmp_path / "wf" / pid / "workflow.api.json").read_text()) == API
 
 
-def test_downloads_register_in_aihub(tmp_path):
+def test_downloads_register_in_gaifa(tmp_path):
     async def go():
         with FakeHub() as hub:
             d = Downloads(tmp_path / "models", hub.url, allow_http=True)
@@ -168,7 +168,7 @@ def test_cli_imports_media_and_zips_from_relative_paths(tmp_path, settings, monk
     from comfy import cli
     for k, v in {"COMFY_WORKFLOWS": settings.workflows, "COMFY_VIEW": settings.comfy_view, "COMFY_DATA": settings.data}.items():
         monkeypatch.setenv(k, str(v))
-    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("GAIFA_URL", "http://127.0.0.1:1")
     settings.data.mkdir(parents=True)
     (settings.data / "object_info.json").write_text((FIX / "object_info.json").read_text())
     (tmp_path / "shot.png").write_bytes(png({"workflow": EDITOR, "prompt": API}))

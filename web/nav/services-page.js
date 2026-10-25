@@ -67,5 +67,5 @@ export function ServicesPage({ services = [], nav: rawNav, setNav, start, stop, 
       ? h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 12 } },
         ...list.map(sv => h(Card, { key: sv.id, sv, listed: !hidden.has(sv.id), onListed: on => setNav(n => setHidden(n, services, sv.id, !on)), start, stop })))
       : h('div', { style: { padding: '48px 20px', textAlign: 'center', color: 'var(--mut,#8A94A6)', border: '1px dashed var(--bds,#2A3547)', borderRadius: 10 } },
-        services.length ? 'No services match.' : 'No services installed. Make one with aihub new <id>.'));
+        services.length ? 'No services match.' : 'No services installed. Make one with gaifa new <id>.'));
 }

@@ -5,7 +5,7 @@ doc's order, its author's preference: the first whose `accel` this machine has (
 `os` matches wins (lcpp lists its prebuilt Vulkan build before a CUDA build from source). With
 `--accel <setup or mod>=<accel>` a person picks another. A setup with none that fits is "not available on
 this machine" and is left out, with the reason. The chosen variant's steps, check and smoke replace the
-block's where it has its own, and they run with its `env` plus `AIHUB_ACCEL` and `AIHUB_DEVICE`.
+block's where it has its own, and they run with its `env` plus `GAIFA_ACCEL` and `GAIFA_DEVICE`.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ def pick(e: Any, m: hardware.Machine, want: str | None = None) -> tuple[Any | No
 def env_of(v: Any, m: hardware.Machine) -> dict[str, str]:
     """What the variant's steps, check and smoke run with."""
     arch = next((g.arch for g in m.gpus if v.accel in g.accels), "")
-    return {**v.env, "AIHUB_ACCEL": v.accel, "AIHUB_DEVICE": hardware.DEVICE[v.accel], **({"AIHUB_GPU_ARCH": arch} if arch else {})}
+    return {**v.env, "GAIFA_ACCEL": v.accel, "GAIFA_DEVICE": hardware.DEVICE[v.accel], **({"GAIFA_GPU_ARCH": arch} if arch else {})}
 
 
 def apply(e: Any, v: Any, m: hardware.Machine) -> Any:

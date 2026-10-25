@@ -9,7 +9,7 @@ from pathlib import Path
 import pages
 from conftest import html
 
-DRY = {"X-AIHub-Origin": '{"tool_call": "c1", "dry_run": true}'}
+DRY = {"X-GAIFA-Origin": '{"tool_call": "c1", "dry_run": true}'}
 
 
 def _side(r: dict) -> dict:

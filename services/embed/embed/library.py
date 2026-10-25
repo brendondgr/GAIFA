@@ -1,4 +1,4 @@
-"""The library (plan 28.2): every output in AIHub, indexed for search by meaning.
+"""The library (plan 28.2): every output in GAIFA, indexed for search by meaning.
 
 It follows the hub over HTTP: `GET /api/outputs` on every (re)connect to `/api/events` (new, changed and deleted
 outputs since the last look), then `output` and `output_deleted` events. Each output becomes chunks in
@@ -7,7 +7,7 @@ becomes hidden is dropped): a `meta` chunk from its title and prompt for every o
 route (24.3), in ~800-token chunks that keep page and line; an image (a 3D model's preview); a video whole; audio
 whole plus 30 s windows when it's long.
 
-Indexing waits for the GPU (plan 31.3): each batch takes a `background` lease from AIHub's GPU queue, which the
+Indexing waits for the GPU (plan 31.3): each batch takes a `background` lease from GAIFA's GPU queue, which the
 hub grants only when no other mod's GPU work runs or waits, so indexing yields to anything else between batches
 (state `waiting_gpu`, with what runs before it). A lease cancelled from the queue pauses indexing for a minute. It
 unloads the model when the queue is empty (unless a search used it in the last minute). Loading for indexing

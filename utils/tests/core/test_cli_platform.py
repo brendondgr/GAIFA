@@ -1,4 +1,4 @@
-"""37.2: `aihub` on WSL2, macOS and without systemd: opening the UI, following logs, installing, and
+"""37.2: `gaifa` on WSL2, macOS and without systemd: opening the UI, following logs, installing, and
 running the hub in the background with a pidfile."""
 
 from __future__ import annotations
@@ -64,26 +64,26 @@ def test_wsl_without_systemd(tmp_path, monkeypatch):
 
 
 def test_install_on_wsl_without_systemd_prints_the_fix(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(cli, "LINK", tmp_path / "bin" / "aihub")
+    monkeypatch.setattr(cli, "LINK", tmp_path / "bin" / "gaifa")
     monkeypatch.setattr(plat, "is_macos", lambda: False)
     monkeypatch.setattr(plat, "is_wsl", lambda: True)
     monkeypatch.setattr(plat, "systemd_running", lambda: False)
     assert cli.cmd_install(argparse.Namespace(id=None)) == 1
     err = capsys.readouterr().err
     assert "systemd" in err and "wsl --shutdown" in err
-    assert (tmp_path / "bin" / "aihub").is_symlink()
+    assert (tmp_path / "bin" / "gaifa").is_symlink()
 
 
 def test_install_on_macos_writes_the_plist_inside_the_project(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(cli, "LINK", tmp_path / "bin" / "aihub")
+    monkeypatch.setattr(cli, "LINK", tmp_path / "bin" / "gaifa")
     monkeypatch.setattr(cli, "ROOT", tmp_path / "root")
     monkeypatch.setattr(plat, "is_macos", lambda: True)
     assert cli.cmd_install(argparse.Namespace(id=None)) == 0
     out = capsys.readouterr().out
-    p = tmp_path / "root" / "data" / "state" / "hub" / "com.aihub.hub.plist"
+    p = tmp_path / "root" / "data" / "state" / "hub" / "com.gaifa.hub.plist"
     d = plistlib.loads(p.read_bytes())
-    assert d["Label"] == "com.aihub.hub" and d["ProgramArguments"][1].endswith("app.py") and d["KeepAlive"] is True
-    assert "Library/LaunchAgents/com.aihub.hub.plist" in out and "launchctl bootstrap" in out
+    assert d["Label"] == "com.gaifa.hub" and d["ProgramArguments"][1].endswith("app.py") and d["KeepAlive"] is True
+    assert "Library/LaunchAgents/com.gaifa.hub.plist" in out and "launchctl bootstrap" in out
 
 
 def test_the_hub_without_systemd(tmp_path):

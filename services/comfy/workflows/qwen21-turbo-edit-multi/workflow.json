@@ -455,7 +455,7 @@
   },
   {
    "id": 13,
-   "type": "AIHubTextEncodeQwenImage21",
+   "type": "GAIFATextEncodeQwenImage21",
    "pos": [
     450,
     0
@@ -540,7 +540,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "AIHubTextEncodeQwenImage21"
+    "Node name for S&R": "GAIFATextEncodeQwenImage21"
    },
    "widgets_values": [
     "Keep the character and pose in <image1> unchanged, put this light blue denim shirt from <image2> on the character, preserve the original facial features, hair, body shape and pose, the denim shirt fits naturally on body, realistic denim fabric texture, natural clothing folds, keep the original background and original lighting, high fashion editorial photography, sharp details",
@@ -1032,7 +1032,7 @@
     "Node name for S&R": "MarkdownNote"
    },
    "widgets_values": [
-    "## Qwen-Image 2.1 Turbo \u00b7 Image + Text \u2192 Image (multi-reference)\n- **image_1 is the edit target**; image_2\u2026 are references. Refer to them in the prompt as `<image1>`, `<image2>`, \u2026 (up to **10**).\n- image_1\u20132 are active. image_3\u20136 are **bypassed** (purple): select one and press **Ctrl+B** to enable it, then pick a file. For 7\u201310, duplicate a LoadImage and connect it to the next `images.image_N` slot on the Instruction node.\n- **resolution** on the Instruction node = total pixel budget each ref is resized to (1024 official, up to 2048; 0 = keep own size).\n- Output follows **image_1's** size. Flip the *Custom size* switch to use ResolutionSelector instead (keep it close to image_1's aspect or the edit can drift).\n- Model switch (yellow, left): false = `Turbo Q8_0 GGUF`, true = `Turbo FP8`.\n- **Speed:** the Instruction node (AIHub) reads the prompt and references once; turn `encode_negative` on only if you raise cfg above 1. The VAE runs in bf16. For a quicker, smaller result use resolution **768** (the AIHub *fast* preset).\n\n**Sampling (Turbo):** the checkpoint's own 8-step schedule in *Turbo schedule* (ManualSigmas), euler, cfg **1**. Changing the steps means editing that list; Qwen hasn't evaluated other schedules. The negative prompt is ignored at cfg 1."
+    "## Qwen-Image 2.1 Turbo \u00b7 Image + Text \u2192 Image (multi-reference)\n- **image_1 is the edit target**; image_2\u2026 are references. Refer to them in the prompt as `<image1>`, `<image2>`, \u2026 (up to **10**).\n- image_1\u20132 are active. image_3\u20136 are **bypassed** (purple): select one and press **Ctrl+B** to enable it, then pick a file. For 7\u201310, duplicate a LoadImage and connect it to the next `images.image_N` slot on the Instruction node.\n- **resolution** on the Instruction node = total pixel budget each ref is resized to (1024 official, up to 2048; 0 = keep own size).\n- Output follows **image_1's** size. Flip the *Custom size* switch to use ResolutionSelector instead (keep it close to image_1's aspect or the edit can drift).\n- Model switch (yellow, left): false = `Turbo Q8_0 GGUF`, true = `Turbo FP8`.\n- **Speed:** the Instruction node (GAIFA) reads the prompt and references once; turn `encode_negative` on only if you raise cfg above 1. The VAE runs in bf16. For a quicker, smaller result use resolution **768** (the GAIFA *fast* preset).\n\n**Sampling (Turbo):** the checkpoint's own 8-step schedule in *Turbo schedule* (ManualSigmas), euler, cfg **1**. Changing the steps means editing that list; Qwen hasn't evaluated other schedules. The negative prompt is ignored at cfg 1."
    ],
    "title": "Notes"
   }

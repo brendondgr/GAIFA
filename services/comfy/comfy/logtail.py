@@ -1,5 +1,5 @@
 """Copy ComfyUI's log file (data/comfyui.log, written inside the toolbox) to this process's
-stdout, so it shows in AIHub's Logs tab (journald) next to the adapter's own lines."""
+stdout, so it shows in GAIFA's Logs tab (journald) next to the adapter's own lines."""
 
 from __future__ import annotations
 

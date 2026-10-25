@@ -24,7 +24,7 @@ def m(name: str) -> dict:
 
 @pytest.fixture(autouse=True)
 def no_index(monkeypatch):
-    monkeypatch.delenv("AIHUB_GPU_INDEX", raising=False)
+    monkeypatch.delenv("GAIFA_GPU_INDEX", raising=False)
 
 
 def test_amd():
@@ -42,7 +42,7 @@ def test_nvidia():
 
 
 def test_index_from_the_environment(monkeypatch):
-    monkeypatch.setenv("AIHUB_GPU_INDEX", "0")
+    monkeypatch.setenv("GAIFA_GPU_INDEX", "0")
     assert ct.gpu_args(m("linux-nvidia-2gpu"), "podman", selinux=False) == ["--device", "nvidia.com/gpu=0"]
 
 
@@ -54,9 +54,9 @@ def test_intel_wsl_mac_and_none():
 
 
 def test_runtime(monkeypatch):
-    monkeypatch.setenv("AIHUB_CONTAINER_RUNTIME", "docker")
+    monkeypatch.setenv("GAIFA_CONTAINER_RUNTIME", "docker")
     assert ct.runtime() == "docker"
-    monkeypatch.delenv("AIHUB_CONTAINER_RUNTIME")
+    monkeypatch.delenv("GAIFA_CONTAINER_RUNTIME")
     monkeypatch.setattr(ct.shutil, "which", lambda c: "/usr/bin/docker" if c == "docker" else None)
     assert ct.runtime() == "docker"
     monkeypatch.setattr(ct.shutil, "which", lambda c: "/usr/bin/" + c)
@@ -74,4 +74,4 @@ def test_the_hub_passes_the_runtime(rig, tmp_path):
     cfg = config.load(tmp_path / "config.toml")
     mod = next(x for x in mf.discover([rig.services]) if x.id == "fake-ok")
     env = mf.launch_spec(mod, cfg, config.build_paths(cfg, tmp_path), 7000).env
-    assert env["AIHUB_CONTAINER_RUNTIME"] == "docker"
+    assert env["GAIFA_CONTAINER_RUNTIME"] == "docker"

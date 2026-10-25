@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "gen3d-cubeart"
 title = "CubeArt: Cube3D and CubePart (3D Generate)"
 models = ["3d/cube3d-v0.5", "3d/cubepart", "3d/clip-vit-large-patch14", "3d/Qwen3-VL-4B-Instruct", "3d/Qwen-Image"]
@@ -10,7 +10,7 @@ after = ["gen3d"]
 check = "out=$(.venv/bin/python -m gen3d.doctor); for l in 'Cube3D GPT' 'Cube3D shape tokenizer' 'CLIP-L text encoder' 'CubePart DiT' 'CubePart shape VAE' 'Qwen3-VL-4B text encoder' 'Qwen-Image transformer config' 'upstream clone' 'CubePart code' 'worker venv'; do grep -Eq \"ok +$l\" <<<\"$out\" || exit 1; done"
 
 [[steps]]
-run = "test -d runtime/CubeArt/cube/cube3d && test -d runtime/CubeArt/cube/cubepart/cube_part && test -e runtime/CubeArt/.venv/bin/activate && test -e runtime/CubeArt/weights || { echo 'runtime/CubeArt is not built: run aihub setup gen3d (scripts/install-runtime.sh)' >&2; exit 1; }"
+run = "test -d runtime/CubeArt/cube/cube3d && test -d runtime/CubeArt/cube/cubepart/cube_part && test -e runtime/CubeArt/.venv/bin/activate && test -e runtime/CubeArt/weights || { echo 'runtime/CubeArt is not built: run gaifa setup gen3d (scripts/install-runtime.sh)' >&2; exit 1; }"
 what = "checks that the gen3d setup built CubeArt (the Roblox/cube clone, runtime/CubeArt/.venv and its weights link to data/models/3d); nothing is installed here: this setup's own part is the five weight repos below, downloaded only after a yes"
 ask = "Cube3D and CubePart come under Roblox's Cube3D Research-Only RAIL-MS licence (the LICENSE of https://github.com/Roblox/cube, which the gen3d setup cloned; the weights' card, https://huggingface.co/Roblox/cube3d-v0.5, is tagged openrail): its Permitted Purpose is 'for academic or research purposes only'. Download and use Cube3D's and CubePart's weights under that licence?"
 
@@ -87,7 +87,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The text engine of 3D Generate: **CubeArt** (`runtime/CubeArt/`), Roblox's **Cube3D v0.5** (text to mesh, with a CLIP-L text encoder) and **CubePart** (named parts, with a Qwen3-VL-4B text encoder). The `shape` stage with `engine = cube3d` and the `parts` stage need it; `rig` and `preview` run on the CPU. It runs in a `gen3d-worker-*` container of the ROCm image with `runtime/CubeArt/.venv`. The server venv, the image and every engine's code and venv come from [gen3d.md](gen3d.md); this setup is the licence and the weights. The picture engines are [img3d.md](img3d.md) (Hunyuan3D 2.1) and [sam3do.md](sam3do.md) (SAM 3D Objects); TRELLIS.2 and SAM 3D Body run as ComfyUI packs ([ComfyUI](../../comfy/setup/comfyui.md)). **Licence:** Roblox's code repo, [Roblox/cube](https://github.com/Roblox/cube), is under the **Cube3D Research-Only RAIL-MS** licence, whose Permitted Purpose is "for academic or research purposes only" (its listed artifacts are Cube3D and its inference code; CubePart's README says its code is under the same licence). The weights' Hugging Face cards are tagged only `openrail`, with no licence text. `aihub setup` asks before downloading them.
+The text engine of 3D Generate: **CubeArt** (`runtime/CubeArt/`), Roblox's **Cube3D v0.5** (text to mesh, with a CLIP-L text encoder) and **CubePart** (named parts, with a Qwen3-VL-4B text encoder). The `shape` stage with `engine = cube3d` and the `parts` stage need it; `rig` and `preview` run on the CPU. It runs in a `gen3d-worker-*` container of the ROCm image with `runtime/CubeArt/.venv`. The server venv, the image and every engine's code and venv come from [gen3d.md](gen3d.md); this setup is the licence and the weights. The picture engines are [img3d.md](img3d.md) (Hunyuan3D 2.1) and [sam3do.md](sam3do.md) (SAM 3D Objects); TRELLIS.2 and SAM 3D Body run as ComfyUI packs ([ComfyUI](../../comfy/setup/comfyui.md)). **Licence:** Roblox's code repo, [Roblox/cube](https://github.com/Roblox/cube), is under the **Cube3D Research-Only RAIL-MS** licence, whose Permitted Purpose is "for academic or research purposes only" (its listed artifacts are Cube3D and its inference code; CubePart's README says its code is under the same licence). The weights' Hugging Face cards are tagged only `openrail`, with no licence text. `gaifa setup` asks before downloading them.
 
 ## Tested with
 
@@ -114,7 +114,7 @@ cd services/gen3d && test -d runtime/CubeArt/cube/cube3d && test -e runtime/Cube
 
 The setup's one step: checks that [gen3d.md](gen3d.md#install) built CubeArt; it installs nothing. The licence question comes with it.
 
-The weights have **no downloader in git** (CubeArt's old `scripts/download_weights.sh` sits in the gitignored `runtime/`, and nothing recreates it); they're the block's required suggestions (Choosing models), each with its repo, files and folder, and `aihub setup` downloads them. By hand, from the project folder, one command per repo with the files and folder the block gives, for example:
+The weights have **no downloader in git** (CubeArt's old `scripts/download_weights.sh` sits in the gitignored `runtime/`, and nothing recreates it); they're the block's required suggestions (Choosing models), each with its repo, files and folder, and `gaifa setup` downloads them. By hand, from the project folder, one command per repo with the files and folder the block gives, for example:
 
 ```bash
 uvx --from huggingface_hub hf download Roblox/cube3d-v0.5 shape_gpt.safetensors shape_tokenizer.safetensors --local-dir data/models/3d/cube3d-v0.5
@@ -158,5 +158,5 @@ Expect `3c6d06ddbef3160a1e1950cb13ab63dd12a61e50`.
 
 ## Known gaps
 
-- No script in the mod downloads the weights: `aihub setup` downloads them from the block's suggestions, and by hand it's the commands above.
+- No script in the mod downloads the weights: `gaifa setup` downloads them from the block's suggestions, and by hand it's the commands above.
 - `install-runtime.sh` checks out Roblox/cube's commit only on the first clone.

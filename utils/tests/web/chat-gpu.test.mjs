@@ -1,4 +1,4 @@
-// Plan 31.4: a model call waiting for AIHub's GPU slot shows on the turn's live header. The agent sends the
+// Plan 31.4: a model call waiting for GAIFA's GPU slot shows on the turn's live header. The agent sends the
 // transient `gpu_wait` {text, eta_s, ahead} (an empty one clears it); a token, the reply or the turn's end
 // clear it too.
 import { test } from 'node:test';

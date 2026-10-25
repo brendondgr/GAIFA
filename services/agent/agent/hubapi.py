@@ -1,4 +1,4 @@
-"""AIHub over HTTP (the only way a mod talks to the hub): tools, calls, approvals, outputs,
+"""GAIFA over HTTP (the only way a mod talks to the hub): tools, calls, approvals, outputs,
 skills and the event stream."""
 
 from __future__ import annotations
@@ -127,7 +127,7 @@ class HubAPI:
                    if g.get("kind") == "folder" and str(g.get("key") or "").startswith("folder:/")]
         origin = {"service": "agent", "thread": tid, **({"environment": environment} if environment else {}),
                   **({"folders": allowed} if allowed else {})}
-        return await self._json("GET", "/api/s/workspace/v1/folders", headers={"X-AIHub-Origin": json.dumps(origin)})
+        return await self._json("GET", "/api/s/workspace/v1/folders", headers={"X-GAIFA-Origin": json.dumps(origin)})
 
     # ---- preferences and feedback (plan 21.4) -------------------------------------------------
 

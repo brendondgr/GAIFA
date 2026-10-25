@@ -1,6 +1,6 @@
-"""Plan 31.4: while the relay holds a model call in AIHub's GPU queue, the turn says so.
+"""Plan 31.4: while the relay holds a model call in GAIFA's GPU queue, the turn says so.
 
-The model call names its chat (X-AIHub-Thread); the agent reads the hub's queue (`GET /api/gpu`) and sends
+The model call names its chat (X-GAIFA-Thread); the agent reads the hub's queue (`GET /api/gpu`) and sends
 the transient `gpu_wait` `{text, eta_s, ahead}` until the call's turn comes, then an empty one."""
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ async def test_the_model_call_names_its_chat():
     seen: list[str | None] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request.headers.get("x-aihub-thread"))
+        seen.append(request.headers.get("x-gaifa-thread"))
         return httpx.Response(200, json={"choices": [{"index": 0, "message": {"role": "assistant", "content": "hi"},
                                                       "finish_reason": "stop"}], "usage": {}})
 

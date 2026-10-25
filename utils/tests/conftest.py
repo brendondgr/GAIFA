@@ -1,6 +1,6 @@
 """Shared test fixtures.
 
-- `root`: a temporary project root (AIHUB_ROOT), with an empty `services/`.
+- `root`: a temporary project root (GAIFA_ROOT), with an empty `services/`.
 - `make_app` / `app` / `client`: the hub app on that root with its lifespan
   running, and an `httpx.AsyncClient` over ASGI.
 - `fake_mod`: starts a fake mod from `fixtures/mods/` on a free port.
@@ -57,12 +57,12 @@ def wait_for(url: str, timeout: float = 10, ok: Callable[[httpx.Response], bool]
 
 @pytest.fixture(autouse=True)
 def _isolated(tmp_path_factory, monkeypatch):
-    """Every test gets a throwaway AIHUB_ROOT and a closed AIHUB_URL, so nothing (a CLI
+    """Every test gets a throwaway GAIFA_ROOT and a closed GAIFA_URL, so nothing (a CLI
     subprocess included) can touch the real repo's services/ or the installed hub."""
     scratch = tmp_path_factory.mktemp("isolated-root")
     (scratch / "services").mkdir()
-    monkeypatch.setenv("AIHUB_ROOT", str(scratch))
-    monkeypatch.setenv("AIHUB_URL", "http://127.0.0.1:1")
+    monkeypatch.setenv("GAIFA_ROOT", str(scratch))
+    monkeypatch.setenv("GAIFA_URL", "http://127.0.0.1:1")
     from utils.tools import judge as judge_mod      # the judge and screening never reach the real relay
 
     real = judge_mod.config_from
@@ -73,7 +73,7 @@ def _isolated(tmp_path_factory, monkeypatch):
 @pytest.fixture
 def root(tmp_path, monkeypatch) -> Path:
     (tmp_path / "services").mkdir()
-    monkeypatch.setenv("AIHUB_ROOT", str(tmp_path))
+    monkeypatch.setenv("GAIFA_ROOT", str(tmp_path))
     return tmp_path
 
 
@@ -144,7 +144,7 @@ def hub_process(root):
     port = free_port()
     proc = subprocess.Popen(
         [sys.executable, str(REPO / "app.py"), "--port", str(port), "--dev"],  # --dev: never touch real systemd units
-        env={**os.environ, "AIHUB_ROOT": str(root)},
+        env={**os.environ, "GAIFA_ROOT": str(root)},
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
     )
     url = f"http://127.0.0.1:{port}"

@@ -1,5 +1,5 @@
-// 3D Generate (gen3d) page inside AIHub: Create and Jobs tabs (design brief Part B4). Calls
-// 3DGenerate's own API through ctx.call (AIHub's proxy, so memory is managed); live progress
+// 3D Generate (gen3d) page inside GAIFA: Create and Jobs tabs (design brief Part B4). Calls
+// 3DGenerate's own API through ctx.call (GAIFA's proxy, so memory is managed); live progress
 // comes from its /v1/events stream. Finished jobs also appear on the Outputs page.
 import { chartCard, chart, charts, rh } from '/mod-charts.js';
 import { requireRunning, callRoom, segmented, header, panel, columns, stat, store, fmtSecs, fmtAgo, MONO } from '/mod-kit.js';
@@ -10,7 +10,7 @@ const STAGES = ['shape', 'parts', 'rig', 'preview'];
 const STAGE_LABEL = { shape: 'Shape', parts: 'Parts', rig: 'Rig', preview: 'Preview' };
 const STAGE_COLOR = { shape: 'var(--s1,#58C4DD)', parts: 'var(--s2,#FFB224)', rig: 'var(--s3,#BC8CFF)', preview: 'var(--s4,#3FB950)' };
 const TONE = { done: 'green', failed: 'red', canceled: 'dim', running: 'accent', queued: 'dim' };
-// Plan 31.3: a job waiting for AIHub's GPU slot (another mod's work runs first).
+// Plan 31.3: a job waiting for GAIFA's GPU slot (another mod's work runs first).
 const gpuWait = j => {
   if (j.stage !== 'waiting_gpu') return null;
   const a = (j.ahead || [])[0], eta = j.eta_s > 0 ? (j.eta_s >= 90 ? `, about ${Math.round(j.eta_s / 60)} min` : `, about ${Math.round(j.eta_s)} s`) : '';

@@ -1,4 +1,4 @@
-# AIHub settings: the defaults a fresh clone starts from. On the first `aihub` command (or hub start)
+# GAIFA settings: the defaults a fresh clone starts from. On the first `gaifa` command (or hub start)
 # this file is copied to config.toml, which is yours: it isn't in git, and the Settings page edits it
 # and keeps its comments. Each mod ships its own defaults in services/<id>/service.toml; values in
 # config.toml override them. Change defaults for everyone here, your own settings in config.toml.
@@ -35,7 +35,7 @@ idle_unload_s = 180
 
 [services.gen3d]
 idle_unload_s = 600
-# On a machine with more than one GPU, `gpu = <index>` (as `aihub hardware` numbers them) pins a mod to one;
+# On a machine with more than one GPU, `gpu = <index>` (as `gaifa hardware` numbers them) pins a mod to one;
 # the default, "auto", starts it on the freest card (plan 36.3).
 
 [containers]
@@ -47,6 +47,6 @@ regenerate = false          # true keeps this machine's model inventory (data/st
 [agent.screen]
 window_chars = 6000
 
-# The Auto judge's model, a name your relay serves (`aihub setup` asks; Settings → Agent):
+# The Auto judge's model, a name your relay serves (`gaifa setup` asks; Settings → Agent):
 # [agent.judge]
 # model = "<a model your relay serves>"

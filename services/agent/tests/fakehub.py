@@ -1,4 +1,4 @@
-"""A small stand-in for AIHub's tools API (the real one is tested in utils/tests/tools): the index,
+"""A small stand-in for GAIFA's tools API (the real one is tested in utils/tests/tools): the index,
 schemas, calls with permissions and approvals, jobs, outputs, skills and the event stream.
 
 Tools: hub_list_services (core, read), fake_get (read), fake_make_image (generate, asks aspect),
@@ -36,7 +36,7 @@ TOOLS = [
     T("hub_list_services", "hub", "read", {}, core=True, desc="List the mods"),
     T("fake_get", "fake", "read", {"id": {"type": "string"}}, ["id"], desc="Read one item"),
     T("fake_make_image", "fake", "generate", {"prompt": {"type": "string"}, "aspect": {"type": "string", "enum": ["1:1", "16:9"]},
-                                               "image": {"type": "string", "format": "aihub-file", "x-kind": "image"}},
+                                               "image": {"type": "string", "format": "gaifa-file", "x-kind": "image"}},
       ["prompt"], ask=["aspect"], desc="Make an image from text"),
     T("fake_render", "fake", "generate", {"prompt": {"type": "string"}, "seconds": {"type": "number"}}, ["prompt"], job=True,
       desc="Render a video job"),
@@ -45,7 +45,7 @@ TOOLS = [
     T("fake_wipe", "fake", "destructive", {"id": {"type": "string"}}, ["id"], desc="Delete an item"),
     T("fake_fail", "fake", "read", {}, desc="Always fails"),
     T("gen3d_make_3d", "gen3d", "generate", {
-        "prompt": {"type": "string"}, "image": {"type": "string", "format": "aihub-file", "x-kind": "image"},
+        "prompt": {"type": "string"}, "image": {"type": "string", "format": "gaifa-file", "x-kind": "image"},
         "engine": {"type": "string", "enum": ["cube3d", "trellis2", "hunyuan21", "sam3d_body"], "x-options": {   # plan 20.4
             "cube3d": {"label": "Cube3D", "excludes": ["image"], "default": True, "good_for": "a mesh from text"},
             "trellis2": {"label": "TRELLIS.2", "needs": ["image"], "default": True, "good_for": "objects"},
@@ -95,7 +95,7 @@ class FakeHub:
         self.learning = True                           # False: hub_set_preference answers learning_off
         self.workspace: dict[str, Any] | None = None   # plan 34: the workspace mod's folders by environment (None: not running)
         self.grants: list[dict[str, Any]] = []         # GET /api/grants
-        self.folder_origins: list[dict[str, Any]] = []  # the X-AIHub-Origin of each GET /api/s/workspace/v1/folders
+        self.folder_origins: list[dict[str, Any]] = []  # the X-GAIFA-Origin of each GET /api/s/workspace/v1/folders
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -353,7 +353,7 @@ class FakeHub:
 
         @app.get("/api/s/workspace/v1/folders")
         def ws_folders(request: Request) -> dict:
-            o = json.loads(request.headers.get("x-aihub-origin") or "{}")
+            o = json.loads(request.headers.get("x-gaifa-origin") or "{}")
             self.folder_origins.append(o)
             env = (self.workspace or {}).get(o.get("environment") or "default") or (self.workspace or {})["default"]
             granted = [{"id": f["path"].rsplit("/", 1)[-1].lower(), "path": f["path"], "level": "read", "granted": True}

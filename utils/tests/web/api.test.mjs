@@ -83,7 +83,7 @@ test('error mapping: hub down, envelope, non-JSON, 204', async () => {
   const down = createHttpApi('', { fetch: async () => { throw new TypeError('Failed to fetch'); } });
   await assert.rejects(down.getSystem(), e => e instanceof ApiError && e.status === 0 && e.code === 'hub_error' && /not responding/.test(e.detail));
 
-  const env = createHttpApi('', { fetch: async () => json(409, { detail: 'no room', code: 'needs_room', data: { plan: { enough: false } } }, { 'x-aihub-error': 'needs_room' }) });
+  const env = createHttpApi('', { fetch: async () => json(409, { detail: 'no room', code: 'needs_room', data: { plan: { enough: false } } }, { 'x-gaifa-error': 'needs_room' }) });
   await assert.rejects(env.loadService('tts'), e => e.status === 409 && e.code === 'needs_room' && e.detail === 'no room' && e.data.plan.enough === false);
 
   const html = createHttpApi('', { fetch: async () => new Response('Bad Gateway', { status: 502 }) });
@@ -107,19 +107,19 @@ test('callService: JSON, media blobs, mod errors and hub errors', async () => {
   next = () => json(404, { detail: 'no voice "x"' });
   await assert.rejects(http.callService('tts', 'GET', '/v1/voices/x'), e => e.code === 'upstream_error' && e.status === 404 && e.detail === 'no voice "x"' && !!e.data.body.detail);
 
-  next = () => json(503, { detail: 'Speech is not running', code: 'service_not_running' }, { 'x-aihub-error': 'service_not_running' });
+  next = () => json(503, { detail: 'Speech is not running', code: 'service_not_running' }, { 'x-gaifa-error': 'service_not_running' });
   await assert.rejects(http.callService('tts', 'GET', '/health'), e => e.code === 'service_not_running' && e.status === 503);
 });
 
 test('callService: needs_room from a memory trigger, then the makeRoom retry header', async () => {
-  const fetch = fakeFetch((url, init) => init.headers['X-AIHub-Make-Room'] === '1'
+  const fetch = fakeFetch((url, init) => init.headers['X-GAIFA-Make-Room'] === '1'
     ? json(200, { ok: true })
-    : json(409, { detail: 'Loading Speech needs ~9.2 GB', code: 'needs_room', data: { plan: { service: 'tts', unload: [] } } }, { 'x-aihub-error': 'needs_room' }));
+    : json(409, { detail: 'Loading Speech needs ~9.2 GB', code: 'needs_room', data: { plan: { service: 'tts', unload: [] } } }, { 'x-gaifa-error': 'needs_room' }));
   const http = createHttpApi('', { fetch });
   await assert.rejects(http.callService('tts', 'POST', '/v1/speech', { json: {} }), e => e.code === 'needs_room' && e.status === 409 && e.data.plan.service === 'tts');
   const r = await http.callService('tts', 'POST', '/v1/speech', { json: {}, makeRoom: true });
   assert.deepEqual(r.json, { ok: true });
-  assert.equal(fetch.calls[0].headers['X-AIHub-Make-Room'], undefined);
+  assert.equal(fetch.calls[0].headers['X-GAIFA-Make-Room'], undefined);
 });
 
 test('callService streams server-sent events to onEvent', async () => {

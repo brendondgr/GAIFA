@@ -59,7 +59,7 @@ class Settings:
     host: str = os.environ.get("LOCALTTS_HOST", "127.0.0.1")
     port: int = int(os.environ.get("LOCALTTS_PORT", "5040"))
     data: Path = _path("LOCALTTS_DATA", str(ROOT / "data"))
-    # Saved voices; under AIHub they live with the models (data/models/voices).
+    # Saved voices; under GAIFA they live with the models (data/models/voices).
     voices: Path = field(default_factory=lambda: _path(
         "LOCALTTS_VOICES_DIR", str(_path("LOCALTTS_DATA", str(ROOT / "data")) / "voices")))
     outputs: Path = _path("LOCALTTS_OUTPUTS_DIR", "~/Music/TTS")

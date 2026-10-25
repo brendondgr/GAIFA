@@ -13,7 +13,7 @@ import pytest
 from utils import cli, setupdocs
 from utils.setupdocs import envs, render
 
-ENV_DOC = """<!-- aihub-setup
+ENV_DOC = """<!-- gaifa-setup
 id = "img"
 title = "Image engine"
 models = ["comfyui/**"]
@@ -181,11 +181,11 @@ def test_fetch_commands(source, files, path, expect) -> None:
 
 
 @pytest.mark.parametrize("text,problem", [
-    ("# no block\n", "no <!-- aihub-setup"),
-    ('<!-- aihub-setup\nid = "x"\n-->\n', "`title` must be"),
-    ('<!-- aihub-setup\nid = "x"\ntitle = "X"\nmodel = ["a"]\n-->\n', "unknown key(s) model"),
-    ('<!-- aihub-setup\nid = "x"\ntitle = "X"\nmodels = "a"\n-->\n', "`models` must be a list"),
-    ("<!-- aihub-setup\nid = \n-->\n", "isn't TOML"),
+    ("# no block\n", "no <!-- gaifa-setup"),
+    ('<!-- gaifa-setup\nid = "x"\n-->\n', "`title` must be"),
+    ('<!-- gaifa-setup\nid = "x"\ntitle = "X"\nmodel = ["a"]\n-->\n', "unknown key(s) model"),
+    ('<!-- gaifa-setup\nid = "x"\ntitle = "X"\nmodels = "a"\n-->\n', "`models` must be a list"),
+    ("<!-- gaifa-setup\nid = \n-->\n", "isn't TOML"),
 ])
 def test_bad_environment_docs(root: Path, text: str, problem: str) -> None:
     (root / "services" / "img" / "setup" / "bad.md").write_text(text)

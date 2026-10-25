@@ -4,7 +4,7 @@ Stopping the process is the unload. It hands back every byte of GPU memory (weig
 the caching allocator, captured graphs), which an in-process `del model` does not
 reliably do.
 
-Under AIHub, each synthesis (and each Whisper one-shot) takes the GPU slot first (plan 31.3,
+Under GAIFA, each synthesis (and each Whisper one-shot) takes the GPU slot first (plan 31.3,
 `gpu_slot.py`): while another mod's work holds the GPU, the request waits, listed in the status
 as a `waiting_gpu` job. An engine set to run on the CPU doesn't take it.
 """
@@ -44,7 +44,7 @@ WAITING: dict[str, dict] = {}        # request id → the status's waiting_gpu j
 
 
 def gpu() -> GpuSlot:
-    """AIHub's GPU slot (AIHUB_URL; without it, work runs at once)."""
+    """GAIFA's GPU slot (GAIFA_URL; without it, work runs at once)."""
     global _GPU
     if _GPU is None:
         _GPU = GpuSlot(service="tts", group="tts")

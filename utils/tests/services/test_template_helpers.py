@@ -1,4 +1,4 @@
-"""38.4: the template's PyTorch helpers: device.py (AIHUB_DEVICE, then what torch reaches) and torch_index.py
+"""38.4: the template's PyTorch helpers: device.py (GAIFA_DEVICE, then what torch reaches) and torch_index.py
 (the wheel index per accel), and the installer's --accel."""
 
 from __future__ import annotations
@@ -24,9 +24,9 @@ dev, idx = load("device"), load("torch_index")
 
 
 def test_device(monkeypatch):
-    monkeypatch.setenv("AIHUB_DEVICE", "xpu")
+    monkeypatch.setenv("GAIFA_DEVICE", "xpu")
     assert dev.device() == "xpu" and dev.device("cpu") == "cpu" and dev.device("auto") == "xpu"
-    monkeypatch.delenv("AIHUB_DEVICE")
+    monkeypatch.delenv("GAIFA_DEVICE")
     monkeypatch.setattr(dev, "available", lambda name: name in ("mps", "cpu"))
     assert dev.device() == "mps"
     monkeypatch.setattr(dev, "available", lambda name: name == "cpu")

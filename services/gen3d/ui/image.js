@@ -1,5 +1,5 @@
 // The image engines on the Create tab (plan 17.9): the picture, the engine's presets and every setting,
-// built from GET /v1/options' `engines`. A picture is an AIHub output (`output:<id>`): an upload becomes
+// built from GET /v1/options' `engines`. A picture is a GAIFA output (`output:<id>`): an upload becomes
 // one first (POST /api/outputs/upload), so gen3d always fetches it from the hub.
 import { segmented } from '/mod-kit.js';
 import { schemaForm } from '/mod-form.js';
@@ -15,7 +15,7 @@ const FACES = [[0, 'Raw'], [200000, '200k'], [100000, '100k'], [50000, '50k']];
 
 /** A catalogue entry → the JSON Schema schemaForm renders: the picture first, then the engine's settings. */
 export function engineSchema(engine) {
-  const props = { image: { type: 'string', format: 'aihub-file', 'x-kind': 'image', title: 'Picture',
+  const props = { image: { type: 'string', format: 'gaifa-file', 'x-kind': 'image', title: 'Picture',
     description: 'One object or person; a transparent or plain white background works best' } };
   for (const f of engine.fields || []) {
     const p = { title: f.label, description: f.help, default: f.default };

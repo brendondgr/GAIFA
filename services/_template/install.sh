@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Builds .venv/ for this mod. Run by `aihub new`; run it again after changing requirements.txt.
-#   --accel <rocm|cuda|xpu|mps|vulkan|cpu>   the variant (default: $AIHUB_ACCEL, else cpu); plan 38.4
+# Builds .venv/ for this mod. Run by `gaifa new`; run it again after changing requirements.txt.
+#   --accel <rocm|cuda|xpu|mps|vulkan|cpu>   the variant (default: $GAIFA_ACCEL, else cpu); plan 38.4
 # A mod that uses PyTorch lists it in requirements-torch.txt: it's installed from the index for that accel.
 set -euo pipefail
 cd "$(dirname "$0")"
-ACCEL="${AIHUB_ACCEL:-cpu}"
+ACCEL="${GAIFA_ACCEL:-cpu}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --accel) ACCEL="$2"; shift 2 ;;

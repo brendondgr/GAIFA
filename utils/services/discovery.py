@@ -146,7 +146,7 @@ class DiscoveryMixin(_Base):
                 if await self._ours(svc.id):
                     await self._adopt(svc)
                 else:
-                    self._set(svc, "failed", error=f"a unit named {svc.id} is running from another AIHub folder; stop it there first")
+                    self._set(svc, "failed", error=f"a unit named {svc.id} is running from another GAIFA folder; stop it there first")
                 continue
             try:
                 st = await self.backend.state(svc.id)
@@ -154,7 +154,7 @@ class DiscoveryMixin(_Base):
                 continue
             if st.active == "failed":
                 tail = await self._tail(svc)
-                self._set(svc, "failed", error=f"{st.describe_exit()} while AIHub was down" + tail)
+                self._set(svc, "failed", error=f"{st.describe_exit()} while GAIFA was down" + tail)
         if autostart:
             self._boot_task = asyncio.create_task(self._autostart())
 
@@ -202,7 +202,7 @@ class DiscoveryMixin(_Base):
                 log.info("autostart %s: unavailable (%s)", svc.id, svc.eff.accel)
                 continue
             if not self.installed(svc):   # a fresh clone: nothing to start until it's set up (plan 23.12)
-                svc.last_error = f"not installed: run `aihub setup {svc.id}`"
+                svc.last_error = f"not installed: run `gaifa setup {svc.id}`"
                 log.info("autostart %s: not installed", svc.id)
                 continue
             deps = [tasks[d] for d in (svc.m.run.after if svc.m else []) if d in tasks]

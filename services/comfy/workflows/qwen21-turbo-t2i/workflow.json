@@ -266,7 +266,7 @@
   },
   {
    "id": 8,
-   "type": "AIHubTextEncodeQwenImage21",
+   "type": "GAIFATextEncodeQwenImage21",
    "pos": [
     450,
     240
@@ -319,7 +319,7 @@
     }
    ],
    "properties": {
-    "Node name for S&R": "AIHubTextEncodeQwenImage21"
+    "Node name for S&R": "GAIFATextEncodeQwenImage21"
    },
    "widgets_values": [
     "A cinematic photo of a red fox curled up asleep on a mossy log in a misty pine forest at dawn, soft golden rim light, shallow depth of field, sharp fur detail",
@@ -686,7 +686,7 @@
     "Node name for S&R": "MarkdownNote"
    },
    "widgets_values": [
-    "## Qwen-Image 2.1 Turbo \u00b7 Text to Image\n**Model:** `Turbo Q8_0 GGUF` by default (near-lossless). Flip the yellow switch to `true` to use `Turbo FP8` instead; only the selected loader is loaded.\n\n**Size:** ResolutionSelector drives the latent. 1.0 MP \u2248 1024\u00b2, **4.0 MP = native 2048\u00b2** (Qwen's Turbo presets are ~4 MP, e.g. 1680\u00d72512). Keep multiples of 32.\n\n**Transparent (RGBA) output:** wrap the prompt like\n`This is an RGBA format image with transparency. [your subject]. The image has an alpha channel and a transparent background.`\n\n**Speed:** the Prompt node (AIHub) encodes once (turn `encode_negative` on only if you raise cfg above 1), and the VAE runs in bf16.\n\n**Sampling (Turbo):** the checkpoint's own 8-step schedule in *Turbo schedule* (ManualSigmas), euler, cfg **1**. Changing the steps means editing that list; Qwen hasn't evaluated other schedules. The negative prompt is ignored at cfg 1."
+    "## Qwen-Image 2.1 Turbo \u00b7 Text to Image\n**Model:** `Turbo Q8_0 GGUF` by default (near-lossless). Flip the yellow switch to `true` to use `Turbo FP8` instead; only the selected loader is loaded.\n\n**Size:** ResolutionSelector drives the latent. 1.0 MP \u2248 1024\u00b2, **4.0 MP = native 2048\u00b2** (Qwen's Turbo presets are ~4 MP, e.g. 1680\u00d72512). Keep multiples of 32.\n\n**Transparent (RGBA) output:** wrap the prompt like\n`This is an RGBA format image with transparency. [your subject]. The image has an alpha channel and a transparent background.`\n\n**Speed:** the Prompt node (GAIFA) encodes once (turn `encode_negative` on only if you raise cfg above 1), and the VAE runs in bf16.\n\n**Sampling (Turbo):** the checkpoint's own 8-step schedule in *Turbo schedule* (ManualSigmas), euler, cfg **1**. Changing the steps means editing that list; Qwen hasn't evaluated other schedules. The negative prompt is ignored at cfg 1."
    ],
    "title": "Notes"
   }

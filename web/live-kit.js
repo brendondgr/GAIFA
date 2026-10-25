@@ -1,4 +1,4 @@
-// The live kit (plan 44.3): the parts of a live card, for anything being made, wherever AIHub shows it: a step in
+// The live kit (plan 44.3): the parts of a live card, for anything being made, wherever GAIFA shows it: a step in
 // Chat, a running job on the Overview, a run on a mod's page. Plain ES module on the page's React (window.React);
 // written by us (web/PATCHES.md). Every colour is a theme token, so it works in both themes; with
 // prefers-reduced-motion the shimmer, pulses and fades are off.
@@ -36,9 +36,9 @@ export const KIT_CSS = `
 @media (prefers-reduced-motion: reduce){.lk-shim,.lk-dot,.lk-say{animation:none}.lk-fade,.lk-final{transition:none}.lk-say{color:var(--tx,#E6EAF2);background:none}}
 `;
 export function injectLiveCss(doc = globalThis.document) {
-  if (!doc || doc.getElementById('aihub-live-kit')) return;
+  if (!doc || doc.getElementById('gaifa-live-kit')) return;
   const s = doc.createElement('style');
-  s.id = 'aihub-live-kit'; s.textContent = KIT_CSS;
+  s.id = 'gaifa-live-kit'; s.textContent = KIT_CSS;
   doc.head.appendChild(s);
 }
 

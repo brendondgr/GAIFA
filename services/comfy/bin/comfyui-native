@@ -2,10 +2,10 @@
 # ---------------------------------------------------------------------------
 # comfyui-native — ComfyUI in a venv inside this mod (plan 39.6), for every machine but gfx1151, which runs
 # the kyuz0 toolbox (bin/comfyui). bin/comfyui hands its start, stop and status here when the variant
-# (AIHUB_ACCEL) isn't ROCm on gfx1151, or when COMFY_RUNTIME=native.
+# (GAIFA_ACCEL) isn't ROCm on gfx1151, or when COMFY_RUNTIME=native.
 #
 #   comfyui-native install    clone ComfyUI at the pinned commit into runtime/ComfyUI, make runtime/venv with
-#                             PyTorch for AIHUB_ACCEL (scripts/torch_index.py), ComfyUI's requirements,
+#                             PyTorch for GAIFA_ACCEL (scripts/torch_index.py), ComfyUI's requirements,
 #                             ComfyUI-Manager, gguf, and the custom nodes' requirements
 #   comfyui-native start | stop | quit | restart | status | logs [N|-f]
 #   comfyui-native command    print the launch command (for tests and the curious)
@@ -22,7 +22,7 @@ PORT="${COMFY_PORT_UI:-8199}"
 MODELS="${COMFY_MODELS:-$ROOT/data/models/comfyui}"
 OUTPUTS="${COMFY_OUTPUTS:-$ROOT/outputs/comfy}"
 DATA="${COMFY_DATA:-$MOD/data}"
-ACCEL="${AIHUB_ACCEL:-cpu}"
+ACCEL="${GAIFA_ACCEL:-cpu}"
 SRC="$MOD/runtime/ComfyUI"
 VENV="$MOD/runtime/venv"
 PY="$VENV/bin/python"
@@ -88,7 +88,7 @@ case "${1:-}" in
   start)
     mkdir -p "$DATA" "$OUTPUTS" "$MOD/input" "$MOD/user/default" "$MOD/custom_nodes" "$MOD/workflows"
     if web_up; then echo "[comfyui] Already running -> $URL"; exit 0; fi
-    [ -x "$PY" ] && [ -f "$SRC/main.py" ] || { echo "[comfyui] not installed: bin/comfyui-native install (aihub setup comfy does it)"; exit 1; }
+    [ -x "$PY" ] && [ -f "$SRC/main.py" ] || { echo "[comfyui] not installed: bin/comfyui-native install (gaifa setup comfy does it)"; exit 1; }
     if comfy_alive; then wait_for_ui; exit $?; fi
     : > "$LOG"; rm -f "$PIDFILE"
     echo "[comfyui] Launching ComfyUI ($ACCEL, models: $MODELS) ..."

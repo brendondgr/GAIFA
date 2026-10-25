@@ -1,4 +1,4 @@
-"""The field report as markdown (plan 40.2), written for whoever fixes AIHub: each issue says where it comes
+"""The field report as markdown (plan 40.2), written for whoever fixes GAIFA: each issue says where it comes
 from, what ran, what it printed and what it most likely means. Standard library only. `render(data)` takes
 `cli_report.gather`'s dict; redaction happens on the whole text afterwards."""
 
@@ -34,11 +34,11 @@ def _machine(d: dict[str, Any]) -> list[str]:
         out += [f"  - problem: {p}" for p in g.get("problems") or []]
     if not m.get("gpus"):
         out.append("- **GPU:** none found")
-    out.append(f"- **Accels AIHub can use:** `{', '.join(m.get('accels') or [])}`")
+    out.append(f"- **Accels GAIFA can use:** `{', '.join(m.get('accels') or [])}`")
     out.append("- **Tools:** " + ", ".join(f"{k} `{v}`" for k, v in d.get("tools", {}).items()))
     if d.get("nvidia_smi"):
         out += ["", "`nvidia-smi`:", *_code(d["nvidia_smi"])]
-    out.append(f"- **Hardware recording:** `{d.get('snapshot')}` (next to this file): `aihub hardware --from <it>` replays this "
+    out.append(f"- **Hardware recording:** `{d.get('snapshot')}` (next to this file): `gaifa hardware --from <it>` replays this "
                "machine's detection; to make it a test fixture, copy it into `utils/tests/hardware/fixtures/`.")
     return out
 
@@ -78,23 +78,23 @@ def render(data: dict[str, Any]) -> str:
     counts = {s: sum(1 for i in issues if i["severity"] == s) for s in ("blocker", "major", "minor")}
     m = (data.get("machine") or {}).get("machine") or {}
     gpu_names = ", ".join(g.get("name", "?") for g in m.get("gpus", [])) or "no GPU"
-    out = [f"# AIHub field report: {data.get('host')}", "",
-           f"Written {data.get('written')} by `aihub report` (plan 40.2). Feed this file to Claude in the AIHub repo: every issue "
+    out = [f"# GAIFA field report: {data.get('host')}", "",
+           f"Written {data.get('written')} by `gaifa report` (plan 40.2). Feed this file to Claude in the GAIFA repo: every issue "
            "names the setup doc line, the command and the files to change.", "",
            "## Summary", "",
            f"- **Machine:** {(m.get('distro') or {}).get('name') or m.get('os')}{' (WSL2)' if m.get('wsl') else ''}, {gpu_names}; accels `{', '.join(m.get('accels') or [])}`",
-           f"- **AIHub:** `{(data.get('aihub') or {}).get('describe') or 'not a git checkout'}`" + (f", **{data['aihub']['changed_count']} local change(s)**" if (data.get("aihub") or {}).get("changed_count") else ", no local changes"),
+           f"- **GAIFA:** `{(data.get('gaifa') or {}).get('describe') or 'not a git checkout'}`" + (f", **{data['gaifa']['changed_count']} local change(s)**" if (data.get("gaifa") or {}).get("changed_count") else ", no local changes"),
            f"- **Issues:** {len(issues)} ({counts['blocker']} blocker, {counts['major']} major, {counts['minor']} minor)"]
     if result:
         done = result.get("done") or (result.get("report") or {}).get("done") or []
-        out.append(f"- **Last setup run:** `aihub {' '.join(last.get('argv') or [])}` → {result.get('stage')}"
+        out.append(f"- **Last setup run:** `gaifa {' '.join(last.get('argv') or [])}` → {result.get('stage')}"
                    + (f" ({result.get('reason')})" if result.get("reason") else "") + f", {len(done)} step(s) done")
     else:
         out.append("- **Last setup run:** none recorded (data/state/setup/last-run.json is missing)")
     out += [f"  - {i['id']} [{i['severity']}] {i['title']}" for i in issues]
     out += ["", "## Machine", "", *_machine(data.get("machine") or {}), ""]
-    g = data.get("aihub") or {}
-    out += ["## AIHub", "", (f"- **Commit:** `{g.get('commit')}` on `{g.get('branch')}`: {g.get('describe')}" if g.get("commit") else "- **Commit:** none (not a git checkout)")]
+    g = data.get("gaifa") or {}
+    out += ["## GAIFA", "", (f"- **Commit:** `{g.get('commit')}` on `{g.get('branch')}`: {g.get('describe')}" if g.get("commit") else "- **Commit:** none (not a git checkout)")]
     if g.get("changed"):
         out += [f"- **Local changes** ({g['changed_count']}; the agent's workarounds, if any):", *_code(g["changed"])]
         if g.get("diff"):
@@ -106,7 +106,7 @@ def render(data: dict[str, Any]) -> str:
     out.append("")
     out += ["## The setup run", ""]
     if not last:
-        out.append("No run recorded: run `aihub setup` (data/state/setup/last-run.json is written by each run).")
+        out.append("No run recorded: run `gaifa setup` (data/state/setup/last-run.json is written by each run).")
     if plan:
         out.append(f"Setups: {', '.join(plan.get('setups') or [])}.")
         out += [f"- `{v['setup']}`: {v['label']}" + (" (untested on this kind of machine)" if v.get("untested") else "") + (f": {v['note']}" if v.get("note") else "")
@@ -149,8 +149,8 @@ def render(data: dict[str, Any]) -> str:
     targets = " ".join((last.get("targets") or [])) or "<mods>"
     accels = " ".join(f"--accel {v['setup']}={v['accel']}" for v in plan.get("variants") or [])
     out += ["## For the fixer", "",
-            f"- Reproduce the plan here: `AIHUB_HARDWARE_FIXTURE=<the hardware recording> bin/aihub setup --plan --json {targets}`",
-            f"- Rerun on that machine: `{f'bin/aihub setup {targets} {accels}'.rstrip()}` (it resumes after the last step that passed)",
+            f"- Reproduce the plan here: `GAIFA_HARDWARE_FIXTURE=<the hardware recording> bin/gaifa setup --plan --json {targets}`",
+            f"- Rerun on that machine: `{f'bin/gaifa setup {targets} {accels}'.rstrip()}` (it resumes after the last step that passed)",
             "- Each issue's **Source** is the setup doc line the command comes from; **Files to look at** are the scripts it runs.",
             "- The whole data behind this file is in the `.json` next to it."]
     return "\n".join(out) + "\n"

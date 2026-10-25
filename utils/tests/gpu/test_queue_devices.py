@@ -56,11 +56,11 @@ def test_one_device_is_the_old_queue():
 
 def test_visible_env_per_vendor():
     two = machine("linux-nvidia-2gpu")
-    assert two.visible_env(1) == {"AIHUB_GPU_INDEX": "1", "CUDA_VISIBLE_DEVICES": "1"}
-    assert two.visible_env(2) == {"AIHUB_GPU_INDEX": "2", "ONEAPI_DEVICE_SELECTOR": "level_zero:0", "ZE_AFFINITY_MASK": "0"}
+    assert two.visible_env(1) == {"GAIFA_GPU_INDEX": "1", "CUDA_VISIBLE_DEVICES": "1"}
+    assert two.visible_env(2) == {"GAIFA_GPU_INDEX": "2", "ONEAPI_DEVICE_SELECTOR": "level_zero:0", "ZE_AFFINITY_MASK": "0"}
     assert [g.index for g in two.compute_gpus()] == [0, 1]                 # the iGPU has no Level Zero
     strix = machine("strix-halo")
-    assert strix.visible_env(0) == {"AIHUB_GPU_INDEX": "0", "HIP_VISIBLE_DEVICES": "0"} and len(strix.compute_gpus()) == 1
+    assert strix.visible_env(0) == {"GAIFA_GPU_INDEX": "0", "HIP_VISIBLE_DEVICES": "0"} and len(strix.compute_gpus()) == 1
     assert strix.visible_env(5) == {}
 
 
@@ -77,7 +77,7 @@ def test_launch_env_only_with_a_choice(rig):  # noqa: F811
     paths = config.build_paths(cfg, rig.root)
     mod = next(m for m in mf.discover([rig.root / "services"]) if m.id == "fake-ok")
     env = mf.launch_spec(mod, cfg, paths, 7000, machine=machine("linux-nvidia-2gpu")).env
-    assert env["CUDA_VISIBLE_DEVICES"] == "1" and env["AIHUB_GPU_INDEX"] == "1"
+    assert env["CUDA_VISIBLE_DEVICES"] == "1" and env["GAIFA_GPU_INDEX"] == "1"
     env = mf.launch_spec(mod, cfg, paths, 7000, machine=machine("strix-halo")).env
-    assert "HIP_VISIBLE_DEVICES" not in env and "AIHUB_GPU_INDEX" not in env       # one GPU: nothing to choose
+    assert "HIP_VISIBLE_DEVICES" not in env and "GAIFA_GPU_INDEX" not in env       # one GPU: nothing to choose
     assert mf.effective(mod, cfg).as_dict().get("gpu") is None                    # not part of ServiceConfig

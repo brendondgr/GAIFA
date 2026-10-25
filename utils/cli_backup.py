@@ -1,4 +1,4 @@
-"""`aihub backup <folder>` (plan 12.5): the state that can't be rebuilt, in one dated archive.
+"""`gaifa backup <folder>` (plan 12.5): the state that can't be rebuilt, in one dated archive.
 
 - every `*.db` in the databases folder, copied with SQLite's online backup (consistent while the
   hub and mods keep writing; WAL files are folded in)
@@ -49,13 +49,13 @@ def _db_copy(src: Path, dst: Path) -> None:
 
 
 def backup(root: Path, dest: Path, now: float | None = None) -> tuple[Path, list[dict]]:
-    """Write `<dest>/aihub-backup-<YYYY-MM-DD-HHMMSS>.tar.gz`. Returns its path and what's in it."""
+    """Write `<dest>/gaifa-backup-<YYYY-MM-DD-HHMMSS>.tar.gz`. Returns its path and what's in it."""
     now = now or time.time()
     dbs, registry = _paths(root)
     dest.mkdir(parents=True, exist_ok=True)
-    out = dest / f"aihub-backup-{time.strftime('%Y-%m-%d-%H%M%S', time.localtime(now))}.tar.gz"
+    out = dest / f"gaifa-backup-{time.strftime('%Y-%m-%d-%H%M%S', time.localtime(now))}.tar.gz"
     items: list[dict] = []
-    with tempfile.TemporaryDirectory(prefix="aihub-backup-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="gaifa-backup-") as tmp:
         staged: list[tuple[Path, str]] = []
         for db in sorted(dbs.glob("*.db")):
             copy = Path(tmp) / db.name
@@ -89,7 +89,7 @@ def cmd_backup(args: argparse.Namespace, root: Path) -> int:
     try:
         out, items = backup(root, dest)
     except (OSError, sqlite3.Error, RuntimeError) as e:
-        print(f"aihub backup: {e}")
+        print(f"gaifa backup: {e}")
         return 1
     for it in items:
         print(f"  {it['path']:<40} {it['bytes'] / 1e6:8.1f} MB")

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# comfyui — control ComfyUI in the kyuz0 AMD Strix Halo (gfx1151) toolbox, for AIHub's
+# comfyui — control ComfyUI in the kyuz0 AMD Strix Halo (gfx1151) toolbox, for GAIFA's
 # comfy mod (plan Phase 11.2). Moved here from ~/.local/bin/comfyui.
 #
 #   comfyui start      ensure the toolbox is up, launch ComfyUI, wait for the UI
 #   comfyui stop       stop ComfyUI (and the toolbox container)
-#   comfyui quit       stop ComfyUI only; the toolbox keeps running (AIHub's unload)
+#   comfyui quit       stop ComfyUI only; the toolbox keeps running (GAIFA's unload)
 #   comfyui restart    stop + start
 #   comfyui status     container state + whether the web UI answers
 #   comfyui logs       follow ComfyUI's log  (comfyui logs 100  -> last 100 lines)
@@ -14,16 +14,16 @@
 #   comfyui workflows  workflow packs: list, show, check, new, copy, run (comfyui workflows -h)
 #   comfyui runtime    which runtime this machine uses: toolbox or native
 #
-# Other machines (plan 39.6): unless the variant is ROCm on gfx1151 (AIHUB_ACCEL, AIHUB_GPU_ARCH; unset means
+# Other machines (plan 39.6): unless the variant is ROCm on gfx1151 (GAIFA_ACCEL, GAIFA_GPU_ARCH; unset means
 # this machine), start, stop, quit, restart, status, logs and install go to bin/comfyui-native: ComfyUI in a
 # venv inside the mod. COMFY_RUNTIME=toolbox|native picks one by hand.
 #
 # Runtime: kyuz0/amd-strix-halo-comfyui (ROCm nightly + PyTorch, gfx1151-tuned, AOTriton).
 # ComfyUI lives at /opt/ComfyUI inside the container. Everything else is in this mod's
-# folder or AIHub's data folders; the toolbox shares $HOME, so the paths are the same inside.
+# folder or GAIFA's data folders; the toolbox shares $HOME, so the paths are the same inside.
 #   custom_nodes/  user/  input/   this mod (gitignored); user/default/workflows -> ../../../workflows
-#   models         $COMFY_MODELS   (default: <AIHub>/data/models/comfyui)
-#   output         $COMFY_OUTPUTS  (default: <AIHub>/outputs/comfy)
+#   models         $COMFY_MODELS   (default: <GAIFA>/data/models/comfyui)
+#   output         $COMFY_OUTPUTS  (default: <GAIFA>/outputs/comfy)
 #   log, pid       data/
 # The toolbox shares the host network, so the port below is the host port.
 # ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ ROOT="$(cd "$MOD/../.." && pwd)"
 
 runtime() {
   if [ -n "${COMFY_RUNTIME:-}" ]; then echo "$COMFY_RUNTIME"; return; fi
-  if [ -z "${AIHUB_ACCEL:-}" ] || { [ "$AIHUB_ACCEL" = rocm ] && [ "${AIHUB_GPU_ARCH:-gfx1151}" = gfx1151 ]; }; then echo toolbox; else echo native; fi
+  if [ -z "${GAIFA_ACCEL:-}" ] || { [ "$GAIFA_ACCEL" = rocm ] && [ "${GAIFA_GPU_ARCH:-gfx1151}" = gfx1151 ]; }; then echo toolbox; else echo native; fi
 }
 case "${1:-}" in
   runtime) runtime; exit 0 ;;

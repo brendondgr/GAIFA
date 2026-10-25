@@ -274,7 +274,7 @@ def glob_escape(s: str) -> str:
 
 
 def default_folder() -> Path:
-    """`$WEB_STATE/favicons`, else `$AIHUB_ROOT/data/state/web/favicons`, else `./data/state/web/favicons`."""
+    """`$WEB_STATE/favicons`, else `$GAIFA_ROOT/data/state/web/favicons`, else `./data/state/web/favicons`."""
     if os.environ.get("WEB_STATE"):
         return Path(os.environ["WEB_STATE"]) / "favicons"
-    return Path(os.environ.get("AIHUB_ROOT") or ".") / "data" / "state" / "web" / "favicons"
+    return Path(os.environ.get("GAIFA_ROOT") or ".") / "data" / "state" / "web" / "favicons"

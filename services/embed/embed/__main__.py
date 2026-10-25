@@ -10,7 +10,7 @@ from .settings import Settings
 
 
 class _QuietPolls(logging.Filter):
-    """AIHub polls health and status every few seconds; keep them out of the log."""
+    """GAIFA polls health and status every few seconds; keep them out of the log."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()

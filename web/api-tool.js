@@ -42,7 +42,7 @@ export function ToolRun({ api, name, args, onClose, toast = () => {} }) {
   };
   React.useEffect(() => {
     alive.current = true;
-    api.callTool(name, args, { mode: 'ask', origin: { client: 'AIHub API tab' }, wait: 1 })
+    api.callTool(name, args, { mode: 'ask', origin: { client: 'GAIFA API tab' }, wait: 1 })
       .then(r => (r.status === 'needs_approval' ? setSt({ phase: 'approval', res: r }) : follow(r)))
       .catch(e => setSt({ phase: 'error', error: { code: e.code, detail: e.detail || String(e), fix: e.data?.problems?.map(p => p.fix).filter(Boolean).join('; ') } }));
     return () => { alive.current = false; };
@@ -60,7 +60,7 @@ export function ToolRun({ api, name, args, onClose, toast = () => {} }) {
     st.phase !== 'approval' ? h(Badge, { tone: { done: 'green', running: 'accent', calling: 'accent', error: 'red', denied: 'red', cancelled: 'dim' }[st.phase] || 'dim' }, st.phase) : null,
     onClose && st.phase !== 'running' ? h(Btn, { kind: 'ghost', sm: true, icon: 'x', title: 'Close', onClick: onClose }) : null);
   return h('section', { 'aria-label': 'Tool call', 'aria-live': 'polite', style: cardSt({ pad: '12px 14px', gap: 10, style: { borderRadius: 10 } }) }, head,
-    st.phase === 'calling' ? h('div', { style: { fontSize: 12.5, color: T.mut } }, 'Asking AIHub…') : null,
+    st.phase === 'calling' ? h('div', { style: { fontSize: 12.5, color: T.mut } }, 'Asking GAIFA…') : null,
     st.phase === 'approval' ? h(R().Fragment, null,
       h('div', { style: { fontSize: 12.5, color: T.mut } }, `This is the agent tool ${name} (risk: ${r.risk}), so it asks first, like it would for the chat or an MCP client. Check the settings, then allow it.`),
       h(ParamCard, { spec: { tool: name, arguments: r.arguments || args, ask_fields: r.ask_fields || [], schema: r.schema, risk: r.risk, description: r.description, grant_key: r.grant_key }, api, outputs: [], mods: [name.split('_')[0]],

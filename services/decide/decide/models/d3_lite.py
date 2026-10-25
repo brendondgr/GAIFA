@@ -116,7 +116,7 @@ class D3Lite:
         import torch
         from transformers import AutoModel
 
-        dev = devices.device(device)       # plan 39.3: auto → AIHUB_DEVICE (the variant), else the first torch reaches
+        dev = devices.device(device)       # plan 39.3: auto → GAIFA_DEVICE (the variant), else the first torch reaches
         if dev != "cpu" and not devices.available(dev):
             if device not in ("", "auto"):
                 raise RuntimeError(f"DECIDE_DEVICE={device} but torch can't reach {dev}")

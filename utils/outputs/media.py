@@ -20,7 +20,7 @@ import subprocess
 import wave
 from pathlib import Path
 
-log = logging.getLogger("aihub.outputs")
+log = logging.getLogger("gaifa.outputs")
 
 PREVIEW_PX = 640
 PREVIEW_OVER_PX = 4_000_000  # images larger than this (w × h) get a cached preview

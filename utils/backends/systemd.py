@@ -1,4 +1,4 @@
-"""Mods as transient systemd user units, `aihub-<id>.service` (architecture §2, §5).
+"""Mods as transient systemd user units, `gaifa-<id>.service` (architecture §2, §5).
 
 Ported from lcpp's backend. Units belong to the user manager, not the hub,
 so a hub restart leaves mods running and the hub adopts them on start
@@ -21,7 +21,7 @@ from utils import proc
 from utils.backends.base import BackendError, LogLine, UnitState
 from utils.manifest import LaunchSpec
 
-PREFIX = "aihub-"
+PREFIX = "gaifa-"
 SHOW = "LoadState,ActiveState,SubState,MainPID,ExecMainStartTimestamp,Result,ExecMainCode,ExecMainStatus,ControlGroup"
 CALL_TIMEOUT_S = 30
 
@@ -102,7 +102,7 @@ class SystemdBackend:
         unit = self.unit(spec.id)
         await _run("systemctl", "--user", "reset-failed", unit)
         cmd = [
-            "systemd-run", "--user", f"--unit={unit}", f"--description=AIHub mod {spec.id}",
+            "systemd-run", "--user", f"--unit={unit}", f"--description=GAIFA mod {spec.id}",
             f"--working-directory={spec.cwd}",
             "--property=KillMode=mixed",
             f"--property=TimeoutStopSec={max(1, round(spec.stop_timeout_s))}",

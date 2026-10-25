@@ -129,11 +129,11 @@ def test_malformed_answers_ask(reply):
 
 
 def test_the_budget_goes_with_the_call():
-    """timeout_s is the model's once it has the GPU: the relay and the decide mod read X-AIHub-Answer-Within."""
+    """timeout_s is the model's once it has the GPU: the relay and the decide mod read X-GAIFA-Answer-Within."""
     seen = []
 
     async def handler(request: httpx.Request) -> httpx.Response:
-        seen.append(request.headers.get("x-aihub-answer-within"))
+        seen.append(request.headers.get("x-gaifa-answer-within"))
         if request.url.path.endswith("/v1/decide"):
             return httpx.Response(200, json=decide_answers()(None))
         return httpx.Response(200, json=chat('{"verdict":"allow","reason":"asked"}'))

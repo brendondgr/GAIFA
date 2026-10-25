@@ -38,7 +38,7 @@ def _sockets() -> list[socket.socket]:
 
 
 class _QuietPolls(logging.Filter):
-    """Drop access-log lines for the health and status polls (AIHub polls every few seconds)."""
+    """Drop access-log lines for the health and status polls (GAIFA polls every few seconds)."""
     def filter(self, record: logging.LogRecord) -> bool:
         args = record.args if isinstance(record.args, tuple) else ()
         return not (len(args) >= 3 and args[1] == "GET" and str(args[2]).split("?")[0] in ("/health", "/v1/status"))

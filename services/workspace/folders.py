@@ -6,9 +6,9 @@ Phase 27 kept one list in `folders.json`, now Default). The four levels, lowest 
 internet). New folders start at `read`. A call sees the folders of its chat's environment plus those
 the user allowed in that chat (`Folders.view(origin)`).
 
-**Caps.** The AIHub folder and its `data/models/` never go above `read`, whatever is asked: a
+**Caps.** The GAIFA folder and its `data/models/` never go above `read`, whatever is asked: a
 folder inside either is capped, and no write anywhere may land inside them (a folder that
-*contains* AIHub keeps its level for its other files).
+*contains* GAIFA keeps its level for its other files).
 
 **Hard limits** (nothing lifts them; `resolve` raises `Refused`):
 - a path outside the folder, or through a symlink out of it;
@@ -98,12 +98,12 @@ class Folder:
 
 
 class Caps:
-    """The AIHub folder and its models, which stay at Read."""
+    """The GAIFA folder and its models, which stay at Read."""
 
-    def __init__(self, aihub_root: Path | None, models: Path | None) -> None:
+    def __init__(self, gaifa_root: Path | None, models: Path | None) -> None:
         self.roots: list[tuple[Path, str]] = []
         for p, why in ((models, "the models folder (data/models/) stays at Read"),
-                       (aihub_root, "the AIHub folder stays at Read: the agent may read and explain it, never change it")):
+                       (gaifa_root, "the GAIFA folder stays at Read: the agent may read and explain it, never change it")):
             if p is not None:
                 self.roots.append((Path(os.path.realpath(p)), why))
 
@@ -295,7 +295,7 @@ class Folders:
                 git: bool = False, read_file: bool = False) -> tuple[Path, str]:
         """(absolute path, path relative to the folder) for `rel`, or Refused (the hard limits).
 
-        `write`: the call changes it (`.git/`, AIHub and the models are refused); `git`: the git tools
+        `write`: the call changes it (`.git/`, GAIFA and the models are refused); `git`: the git tools
         (which may write `.git/`); `read_file`: its bytes are read (size and binary rules)."""
         root = Path(os.path.realpath(f.path))
         if not root.is_dir():

@@ -12,7 +12,7 @@ import folders as folders_mod
 
 
 def origin(**o):
-    return {"X-AIHub-Origin": json.dumps(o)}
+    return {"X-GAIFA-Origin": json.dumps(o)}
 
 
 @pytest.fixture
@@ -106,14 +106,14 @@ def test_a_folders_level_is_per_environment_and_its_id_is_shared(client, repo, t
         assert client.post("/v1/environments/grants/folders", json={"path": bad}).json()["code"] in ("too_broad", "not_a_folder")
 
 
-def test_the_aihub_folder_stays_at_read_in_every_environment(client, aihub):
+def test_the_gaifa_folder_stays_at_read_in_every_environment(client, gaifa):
     client.post("/v1/environments", json={"name": "Grants"})
     for env in ("default", "grants"):
-        assert client.post(f"/v1/environments/{env}/folders", json={"path": str(aihub), "level": "edit"}).json()["code"] == "capped"
-        f = client.post(f"/v1/environments/{env}/folders", json={"path": str(aihub)}).json()
+        assert client.post(f"/v1/environments/{env}/folders", json={"path": str(gaifa), "level": "edit"}).json()["code"] == "capped"
+        f = client.post(f"/v1/environments/{env}/folders", json={"path": str(gaifa)}).json()
         assert f["max_level"] == "read" and f["capped"]
         assert client.patch(f"/v1/environments/{env}/folders/{f['id']}", json={"level": "run"}).json()["code"] == "capped"
-    models = aihub / "data" / "models"
+    models = gaifa / "data" / "models"
     assert client.post("/v1/environments/grants/folders", json={"path": str(models), "level": "edit"}).json()["code"] == "capped"
 
 

@@ -1,4 +1,4 @@
-"""Output naming and the sidecar AIHub indexes (architecture §4.7)."""
+"""Output naming and the sidecar GAIFA indexes (architecture §4.7)."""
 
 import json
 import time

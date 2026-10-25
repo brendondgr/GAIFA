@@ -1,4 +1,4 @@
-"""A fixture repo in a tmp dir, a fake AIHub root with data/models, and a TestClient for the mod."""
+"""A fixture repo in a tmp dir, a fake GAIFA root with data/models, and a TestClient for the mod."""
 
 from __future__ import annotations
 
@@ -39,8 +39,8 @@ def repo(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def aihub(tmp_path: Path) -> Path:
-    a = tmp_path / "AIHub"
+def gaifa(tmp_path: Path) -> Path:
+    a = tmp_path / "GAIFA"
     (a / "data" / "models" / "llm").mkdir(parents=True)
     (a / "utils").mkdir()
     (a / "utils" / "proxy.py").write_text("def proxy():\n    pass\n")
@@ -48,8 +48,8 @@ def aihub(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def client(tmp_path: Path, aihub: Path):
-    app = server.create_app(tmp_path / "state", aihub, aihub / "data" / "models", tmp_path / "outputs", "http://127.0.0.1:9")
+def client(tmp_path: Path, gaifa: Path):
+    app = server.create_app(tmp_path / "state", gaifa, gaifa / "data" / "models", tmp_path / "outputs", "http://127.0.0.1:9")
     with TestClient(app) as c:
         yield c
 

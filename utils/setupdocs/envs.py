@@ -1,4 +1,4 @@
-"""Setup docs: `services/<id>/setup/<env>.md` and their `<!-- aihub-setup … -->` block (docs/mods.md §9;
+"""Setup docs: `services/<id>/setup/<env>.md` and their `<!-- gaifa-setup … -->` block (docs/mods.md §9;
 the version-2 keys are in block.py)."""
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 from .block import TOP as KEYS
 from .block import Setup, read
 
-HEAD = re.compile(r"\A\s*<!--\s*aihub-setup\s*\n(.*?)\n\s*-->", re.S)
+HEAD = re.compile(r"\A\s*<!--\s*gaifa-setup\s*\n(.*?)\n\s*-->", re.S)
 
 
 @dataclass
@@ -24,7 +24,7 @@ class Env:
     path: Path                      # the doc, absolute
     models: list[str] = field(default_factory=list)
     scan: list[str] = field(default_factory=list)
-    setup: Setup = field(default_factory=Setup)   # the version-2 keys: what `aihub setup` reads
+    setup: Setup = field(default_factory=Setup)   # the version-2 keys: what `gaifa setup` reads
 
 
 def mod_dirs(root: Path) -> list[Path]:
@@ -43,11 +43,11 @@ def parse(path: Path, mod: str) -> tuple[Env | None, str | None]:
         return None, f"can't read it: {e.strerror or e}"
     m = HEAD.match(text)
     if not m:
-        return None, "no <!-- aihub-setup … --> block at the top"
+        return None, "no <!-- gaifa-setup … --> block at the top"
     try:
         data = tomllib.loads(m.group(1))
     except tomllib.TOMLDecodeError as e:
-        return None, f"the aihub-setup block isn't TOML: {e}"
+        return None, f"the gaifa-setup block isn't TOML: {e}"
     unknown = sorted(set(data) - KEYS)
     if unknown:
         return None, f"unknown key(s) {', '.join(unknown)} (allowed: {', '.join(sorted(KEYS))})"

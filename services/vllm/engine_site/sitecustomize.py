@@ -41,7 +41,7 @@ def _wall_do_bench(original):
         wall = (time.perf_counter() - t) * 1000
         events = ev0.elapsed_time(ev1)
         broken = events * 5 < wall
-        print(f"aihub: GPU events time a cache flush at {events:.4f} ms, the wall clock at {wall:.3f} ms; "
+        print(f"gaifa: GPU events time a cache flush at {events:.4f} ms, the wall clock at {wall:.3f} ms; "
               f"Triton benchmarks use {'the wall clock' if broken else 'events'}", file=sys.stderr, flush=True)
         return broken
 
@@ -104,7 +104,7 @@ class _PatchTritonTesting(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         try:
             module.do_bench = _wall_do_bench(module.do_bench)
         except Exception as e:  # noqa: BLE001  (never break the engine over a benchmark patch)
-            print(f"aihub: Triton benchmark patch not applied: {e}", file=sys.stderr, flush=True)
+            print(f"gaifa: Triton benchmark patch not applied: {e}", file=sys.stderr, flush=True)
 
 
 if MODE != "off":

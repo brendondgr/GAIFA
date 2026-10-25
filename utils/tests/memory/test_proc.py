@@ -89,11 +89,11 @@ def test_real_process_tree_and_footprint():
 
 
 def test_cgroup_pids_include_sub_cgroups(tmp_path):
-    cg = tmp_path / "user.slice/app.slice/aihub-x.service"
+    cg = tmp_path / "user.slice/app.slice/gaifa-x.service"
     (cg / "sub").mkdir(parents=True)
     (cg / "cgroup.procs").write_text("100\n101\n")
     (cg / "sub" / "cgroup.procs").write_text("102\n")
-    assert sorted(proc.cgroup_pids("/user.slice/app.slice/aihub-x.service", tmp_path)) == [100, 101, 102]
+    assert sorted(proc.cgroup_pids("/user.slice/app.slice/gaifa-x.service", tmp_path)) == [100, 101, 102]
     assert proc.cgroup_pids("/nope", tmp_path) == []
 
 
@@ -138,5 +138,5 @@ def test_container_members_come_from_its_libpod_cgroup(tmp_path):
 
 
 def test_real_cmd_failures_are_none():
-    assert proc._cmd("definitely-not-a-command-aihub") is None
+    assert proc._cmd("definitely-not-a-command-gaifa") is None
     assert proc._cmd(sys.executable, "-c", "raise SystemExit(3)") is None

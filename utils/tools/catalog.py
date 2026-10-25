@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from utils.server import Hub
     from utils.services import Service
 
-log = logging.getLogger("aihub.tools")
+log = logging.getLogger("gaifa.tools")
 KV_PREFIX = "tools:"
 RISKS = ("read", "write", "generate", "network", "execute", "destructive")   # plan 25.1
 SEARCH_LIMIT = 8

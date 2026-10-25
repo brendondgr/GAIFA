@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "gen3d-img3d"
 title = "Hunyuan3D 2.1 (3D Generate)"
 models = ["3d/Hunyuan3D-2.1"]
@@ -10,7 +10,7 @@ after = ["gen3d"]
 check = ".venv/bin/python -m gen3d.doctor | grep -Eq 'ok +Hunyuan3D 2.1 \\(image engine\\) +ready'"
 
 [[steps]]
-run = "test -d runtime/hunyuan3d-2.1/hy3dshape/hy3dshape && test -e runtime/img3d/.venv/bin/activate || { echo 'runtime/img3d is not built: run aihub setup gen3d (scripts/install-runtime.sh)' >&2; exit 1; }"
+run = "test -d runtime/hunyuan3d-2.1/hy3dshape/hy3dshape && test -e runtime/img3d/.venv/bin/activate || { echo 'runtime/img3d is not built: run gaifa setup gen3d (scripts/install-runtime.sh)' >&2; exit 1; }"
 what = "checks that the gen3d setup built this engine (the Hunyuan3D-2.1 clone at its pinned commit and runtime/img3d/.venv, layered on CubeArt's); nothing is installed here: this setup's own part is the weights, downloaded only after a yes"
 ask = "Hunyuan3D 2.1 comes under the Tencent Hunyuan 3D 2.1 Community License (https://huggingface.co/tencent/Hunyuan3D-2.1/blob/main/LICENSE): its Territory is worldwide 'excluding the territory of the European Union, United Kingdom and South Korea', and a product with more than 1 million monthly active users must ask Tencent for a licence. Download and use Hunyuan3D 2.1's weights under that licence?"
 
@@ -42,7 +42,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-One of 3D Generate's picture engines (`engine = hunyuan21`): Tencent's **Hunyuan3D 2.1**, shape only (no texture), from one picture to a watertight mesh. It's the one to pick for characters. It runs in a `gen3d-worker-*` container of the ROCm image, with the venv `runtime/img3d/.venv` and the upstream code in `runtime/hunyuan3d-2.1/` (only `hy3dshape/` is used). The same worker also reduces meshes from other engines to a face budget (`target_faces`). The server venv, the image, this engine's code and venv, and how the venvs are layered are in [gen3d.md](gen3d.md); this setup is the licence and the weights. **Licence:** the Tencent Hunyuan 3D 2.1 Community License ([LICENSE](https://huggingface.co/tencent/Hunyuan3D-2.1/blob/main/LICENSE), the card's `tencent-hunyuan-community`): its Territory is worldwide "excluding the territory of the European Union, United Kingdom and South Korea", and above 1 million monthly active users you must request a licence from Tencent. `aihub setup` asks before downloading its weights.
+One of 3D Generate's picture engines (`engine = hunyuan21`): Tencent's **Hunyuan3D 2.1**, shape only (no texture), from one picture to a watertight mesh. It's the one to pick for characters. It runs in a `gen3d-worker-*` container of the ROCm image, with the venv `runtime/img3d/.venv` and the upstream code in `runtime/hunyuan3d-2.1/` (only `hy3dshape/` is used). The same worker also reduces meshes from other engines to a face budget (`target_faces`). The server venv, the image, this engine's code and venv, and how the venvs are layered are in [gen3d.md](gen3d.md); this setup is the licence and the weights. **Licence:** the Tencent Hunyuan 3D 2.1 Community License ([LICENSE](https://huggingface.co/tencent/Hunyuan3D-2.1/blob/main/LICENSE), the card's `tencent-hunyuan-community`): its Territory is worldwide "excluding the territory of the European Union, United Kingdom and South Korea", and above 1 million monthly active users you must request a licence from Tencent. `gaifa setup` asks before downloading its weights.
 
 ## Tested with
 
@@ -72,7 +72,7 @@ The setup's one step: checks that [gen3d.md](gen3d.md#install)'s `install-runtim
 uvx --from huggingface_hub hf download tencent/Hunyuan3D-2.1 hunyuan3d-dit-v2-1/model.fp16.ckpt hunyuan3d-vae-v2-1/model.fp16.ckpt LICENSE Notice.txt README.md hunyuan3d-dit-v2-1/config.yaml hunyuan3d-vae-v2-1/config.yaml --local-dir data/models/3d/Hunyuan3D-2.1
 ```
 
-From the project folder, by hand (`aihub setup` downloads the same files from the block's required suggestion): the shape model and its VAE (8.0 GB). The repo also holds the texture (paint) model, which isn't used; this command leaves it out. Nothing in git downloads these weights.
+From the project folder, by hand (`gaifa setup` downloads the same files from the block's required suggestion): the shape model and its VAE (8.0 GB). The repo also holds the texture (paint) model, which isn't used; this command leaves it out. Nothing in git downloads these weights.
 
 ## Choosing models
 

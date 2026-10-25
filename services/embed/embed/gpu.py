@@ -1,6 +1,6 @@
 """The GPU slot for embed's work (plan 31.3; it replaced the GPU-idle gate of plan 28.2).
 
-Every encode takes a lease from AIHub's GPU queue (`gpu_slot.py`, the reference client): searches and `/v1/embed`
+Every encode takes a lease from GAIFA's GPU queue (`gpu_slot.py`, the reference client): searches and `/v1/embed`
 as `interactive` work, library indexing as `background` work, one lease per batch. The hub starts background work
 only when no other mod's GPU work runs or waits, and a batch is short, so indexing yields to anything else between
 batches. An encoder on the CPU takes no slot.

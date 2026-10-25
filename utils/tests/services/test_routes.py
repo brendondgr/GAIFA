@@ -66,7 +66,7 @@ async def test_start_stop_restart(hub):
 async def test_errors_use_the_envelope(hub, rig):
     async with httpx.AsyncClient(base_url=hub.url) as c:
         r = await c.get("/api/services/nope")
-        assert (r.status_code, r.json()["code"], r.headers["x-aihub-error"]) == (404, "service_not_found", "service_not_found")
+        assert (r.status_code, r.json()["code"], r.headers["x-gaifa-error"]) == (404, "service_not_found", "service_not_found")
         r = await c.post("/api/services/fake-ok/load")
         assert (r.status_code, r.json()["code"]) == (409, "not_unloadable")
         r = await c.get("/api/services/fake-ok/logs?lines=0")
@@ -182,7 +182,7 @@ async def test_events_stream_carries_service_events(hub):
 async def test_config_js_lists_the_live_areas(hub):
     async with httpx.AsyncClient(base_url=hub.url) as c:
         text = (await c.get("/config.js")).text
-    areas = json.loads(text.split("AIHUB_LIVE_AREAS = ")[1].rstrip(";\n"))
+    areas = json.loads(text.split("GAIFA_LIVE_AREAS = ")[1].rstrip(";\n"))
     assert set(areas) == {"system", "services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets", "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions"}
 
 

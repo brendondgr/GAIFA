@@ -85,11 +85,11 @@ def test_the_folder_is_writable_only_at_run(sb, folder):
 def test_the_rest_of_home_is_absent_and_caches_are_not_written_back(sb, folder):
     home = Path.home()
     r = run(sb, folder, f"ls -A {home}; ls {home}/.ssh 2>&1; ls {home}/Agents 2>&1; touch {home}/x; "
-                        f"test -d {home}/.cache/uv && touch {home}/.cache/uv/aihub-sandbox-probe && echo cache-writable; true")
+                        f"test -d {home}/.cache/uv && touch {home}/.cache/uv/gaifa-sandbox-probe && echo cache-writable; true")
     assert r.exit_code == 0, r.stderr
     assert ".ssh" not in r.stdout.split("\n")[0] and "No such file" in r.stdout
-    assert not (home / "x").exists() and not (home / ".cache" / "uv" / "aihub-sandbox-probe").exists()
-    assert not (home / "Agents" / "AIHub").exists() or "AIHub" not in r.stdout
+    assert not (home / "x").exists() and not (home / ".cache" / "uv" / "gaifa-sandbox-probe").exists()
+    assert not (home / "Agents" / "GAIFA").exists() or "GAIFA" not in r.stdout
 
 
 def test_a_venv_made_inside_the_folder_keeps_working(sb, folder):

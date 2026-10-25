@@ -167,7 +167,7 @@ def tools() -> list[ToolDef]:
 
     kinds = {"type": "string", "enum": list(KINDS)}
     return [
-        t("list_services", "List AIHub's mods (speech, 3D, images & video, LLMs…) with their state, whether their models "
+        t("list_services", "List GAIFA's mods (speech, 3D, images & video, LLMs…) with their state, whether their models "
           "are loaded, and running jobs.", _obj({}), list_services),
         t("start_service", "Start a mod's process (models load later, on first use).", _obj({"id": SERVICE}, ["id"]),
           start_service, "write"),

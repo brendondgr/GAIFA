@@ -110,13 +110,13 @@ class Settings:
     @classmethod
     def from_env(cls) -> Settings:
         env = os.environ
-        root = Path(env.get("AIHUB_ROOT") or MOD_DIR.parent.parent)
+        root = Path(env.get("GAIFA_ROOT") or MOD_DIR.parent.parent)
         return cls(
-            port=int(env.get("AIHUB_PORT") or 5105),
-            outputs=Path(env.get("AIHUB_OUTPUTS") or root / "outputs" / "stt"),
-            models=Path(env.get("AIHUB_MODELS") or root / "data" / "models"),
-            hub_url=env.get("AIHUB_URL") or "http://127.0.0.1:7000",
+            port=int(env.get("GAIFA_PORT") or 5105),
+            outputs=Path(env.get("GAIFA_OUTPUTS") or root / "outputs" / "stt"),
+            models=Path(env.get("GAIFA_MODELS") or root / "data" / "models"),
+            hub_url=env.get("GAIFA_URL") or "http://127.0.0.1:7000",
             backend=env.get("STT_BACKEND") or "faster-whisper",
             device=env.get("STT_DEVICE") or "auto",
-            idle_unload_s=float(env.get("STT_IDLE_UNLOAD_S") or env.get("AIHUB_IDLE_UNLOAD_S") or 300),
+            idle_unload_s=float(env.get("STT_IDLE_UNLOAD_S") or env.get("GAIFA_IDLE_UNLOAD_S") or 300),
         )

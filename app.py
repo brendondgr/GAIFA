@@ -1,4 +1,4 @@
-"""`python app.py`: start the AIHub hub on 127.0.0.1 and [::1].
+"""`python app.py`: start the GAIFA hub on 127.0.0.1 and [::1].
 
 Ctrl+C stops only the hub; mods keep running (architecture §5).
 """
@@ -16,7 +16,7 @@ from utils import config
 from utils.paths import project_root
 from utils.server import Options, create_app
 
-log = logging.getLogger("aihub")
+log = logging.getLogger("gaifa")
 
 DUAL_STACK = {"127.0.0.1", "localhost", "::1"}
 
@@ -57,7 +57,7 @@ class Server(uvicorn.Server):
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    ap = argparse.ArgumentParser(prog="app.py", description="Run the AIHub hub.")
+    ap = argparse.ArgumentParser(prog="app.py", description="Run the GAIFA hub.")
     ap.add_argument("--port", type=int, help="port (default: config.toml hub.port, 7000)")
     ap.add_argument("--dev", action="store_true", help="run mods as child processes instead of systemd units")
     ap.add_argument("--no-autostart", action="store_true", help="don't autostart mods")
@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
         cfg = config.load(root / "config.toml")
         paths = config.build_paths(cfg, root)
     except config.ConfigError as e:
-        print(f"aihub: {e}", file=sys.stderr)
+        print(f"gaifa: {e}", file=sys.stderr)
         return 2
     opts = Options(port=args.port, dev=args.dev, autostart=not args.no_autostart, demo_mods=args.demo_mods)
     app = create_app(paths, cfg, backend=None, options=opts)
@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         socks = sockets(cfg.hub.host, port)
     except OSError as e:
-        print(f"aihub: can't listen on {cfg.hub.host}:{port}: {e.strerror}", file=sys.stderr)
+        print(f"gaifa: can't listen on {cfg.hub.host}:{port}: {e.strerror}", file=sys.stderr)
         return 1
     server = Server(
         uvicorn.Config(

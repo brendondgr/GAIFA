@@ -98,9 +98,9 @@ def test_device_strings():
 
 
 def test_fixture_env(monkeypatch):
-    monkeypatch.setenv("AIHUB_HARDWARE_FIXTURE", str(FIX / "macos-m3.json"))
+    monkeypatch.setenv("GAIFA_HARDWARE_FIXTURE", str(FIX / "macos-m3.json"))
     assert hardware.detect(refresh=True).os == "darwin"
-    monkeypatch.delenv("AIHUB_HARDWARE_FIXTURE")
+    monkeypatch.delenv("GAIFA_HARDWARE_FIXTURE")
     hardware.detect(refresh=True)
 
 

@@ -114,5 +114,5 @@ async def get_inventory(request: Request) -> dict:
 @router.get("/config.js", include_in_schema=False)
 async def config_js(request: Request) -> Response:
     hub = request.app.state.hub
-    body = f'window.AIHUB_API_BASE = "";\nwindow.AIHUB_LIVE_AREAS = {json.dumps(hub.live_areas)};\n'
+    body = f'window.GAIFA_API_BASE = "";\nwindow.GAIFA_LIVE_AREAS = {json.dumps(hub.live_areas)};\n'
     return Response(body, media_type="text/javascript", headers={"Cache-Control": "no-store"})

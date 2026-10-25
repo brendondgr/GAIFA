@@ -1,4 +1,4 @@
-"""`GET /api/doctor` and `aihub doctor` (plan 12.4): checks over the whole install.
+"""`GET /api/doctor` and `gaifa doctor` (plan 12.4): checks over the whole install.
 
 - **models:** every registry model's files are on disk (missing, partial or mismatched files fail).
 - **manifests:** every mod folder parses and has no config clashes.
@@ -78,18 +78,18 @@ def _models(hub: Any) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     views = {v["id"]: v for v in reg.list()["models"]}
     bad = [v for v in views.values() if v["status"] in ("missing", "partial", "checksum_mismatch")]
     out = [check("models", "fail", f"model {v['id']}: {v['status']}", "; ".join(v["problems"][:3]),
-                 f"aihub models show {v['id']}") for v in bad]
+                 f"gaifa models show {v['id']}") for v in bad]
     if not bad:
         n = len(views)
         unver = sum(v["status"] == "unverified" for v in views.values())
         out.append(check("models", "ok", f"models registry: {n} models, every file present",
-                         f"{unver} not checksummed yet (aihub models verify --all)" if unver else "all verified"))
+                         f"{unver} not checksummed yet (gaifa models verify --all)" if unver else "all verified"))
     return out, views
 
 
 def _manifests(hub: Any) -> list[dict[str, Any]]:
     svcs = hub.services.list() if hub.services else []
-    out = [check("manifests", "fail", f"{s.id}: invalid", "; ".join(s.errors)[:400], f"aihub check {s.id}")
+    out = [check("manifests", "fail", f"{s.id}: invalid", "; ".join(s.errors)[:400], f"gaifa check {s.id}")
            for s in svcs if s.errors]
     if not out:
         out.append(check("manifests", "ok", f"{len(svcs)} mod manifests valid", ", ".join(s.id for s in svcs)))
@@ -147,13 +147,13 @@ async def _ports_units(hub: Any) -> list[dict[str, Any]]:
         else:
             out.append(check("ports", "ok", f"{s.id}: port {port} " + ("external" if s.external else "free")))
         if s.state == "failed":
-            out.append(check("units", "fail", f"{s.id}: failed", s.last_error or "", f"aihub logs {s.id}"))
+            out.append(check("units", "fail", f"{s.id}: failed", s.last_error or "", f"gaifa logs {s.id}"))
         elif s.state == "degraded":
-            out.append(check("units", "warn", f"{s.id}: degraded (health checks failing)", s.last_error or "", f"aihub logs {s.id}"))
+            out.append(check("units", "warn", f"{s.id}: degraded (health checks failing)", s.last_error or "", f"gaifa logs {s.id}"))
         elif s.state == "stopped" and s.eff.enabled and s.eff.autostart and s.startable and not _installed(hub, s):
-            out.append(check("units", "note", f"{s.id}: not installed", "it starts with the hub once it's set up", f"aihub setup {s.id}"))
+            out.append(check("units", "note", f"{s.id}: not installed", "it starts with the hub once it's set up", f"gaifa setup {s.id}"))
         elif s.state == "stopped" and s.eff.enabled and s.eff.autostart and s.startable:
-            out.append(check("units", "warn", f"{s.id}: stopped, but set to start with the hub", "", f"aihub start {s.id}"))
+            out.append(check("units", "warn", f"{s.id}: stopped, but set to start with the hub", "", f"gaifa start {s.id}"))
         else:
             out.append(check("units", "ok", f"{s.id}: {s.state}"))
     return out
@@ -187,10 +187,10 @@ def _offline(hub: Any, views: dict[str, dict[str, Any]]) -> list[dict[str, Any]]
         bad = [v for v in used if v["status"] in ("missing", "partial", "checksum_mismatch")]
         if not used:
             out.append(check("offline", "warn", f"{s.id}: runs offline but uses no registered model",
-                             "its files can't be checked", "aihub models scan --add"))
+                             "its files can't be checked", "gaifa models scan --add"))
         elif bad:
             out.append(check("offline", "fail", f"{s.id}: runs offline without {len(bad)} model(s)",
-                             ", ".join(f"{v['id']} ({v['status']})" for v in bad), "download them, or aihub models show <id>"))
+                             ", ".join(f"{v['id']} ({v['status']})" for v in bad), "download them, or gaifa models show <id>"))
         else:
             out.append(check("offline", "ok", f"{s.id}: runs offline; all {len(used)} model(s) present",
                              ", ".join(v["id"] for v in used)))

@@ -1,4 +1,4 @@
-"""Plan 31.3: AIHub's GPU slot. A file job waits (``waiting_gpu``) while another mod's work holds the GPU and
+"""Plan 31.3: GAIFA's GPU slot. A file job waits (``waiting_gpu``) while another mod's work holds the GPU and
 runs after; a cancel while it waits gives the lease back. Live dictation never waits: it runs on the CPU while
 another mod holds the slot, and moves to the CPU when another mod's work starts waiting."""
 

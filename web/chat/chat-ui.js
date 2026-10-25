@@ -106,7 +106,9 @@ export function Popover({ open, onClose, place = 'down-right', width = 320, chil
 
 // ---------- per-browser preferences (localStorage, wrapped: it can throw) ----------
 const subs = new Set();
-export function getPref(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } }
+// A key saved before the rename to GAIFA (plan 50.2) is read once under its old `aihub.` name.
+const legacy = k => (k.startsWith('gaifa.') ? localStorage.getItem('aihub.' + k.slice(6)) : null);
+export function getPref(k, d) { try { const v = localStorage.getItem(k) ?? legacy(k); return v == null ? d : JSON.parse(v); } catch { return d; } }
 export function setPref(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private window */ } subs.forEach(f => { try { f(k, v); } catch { /* listener */ } }); }
 export function usePref(k, d) {
   const React = R(), [v, set] = React.useState(() => getPref(k, d));

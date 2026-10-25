@@ -9,7 +9,7 @@ import {
 	TriangleStripDrawMode,
 	TrianglesDrawMode,
 	Vector3,
-} from '../../three.module.min.js';  // AIHub: relative, so no import map is needed
+} from '../../three.module.min.js';  // GAIFA: relative, so no import map is needed
 
 function computeMikkTSpaceTangents( geometry, MikkTSpace, negateSign = true ) {
 

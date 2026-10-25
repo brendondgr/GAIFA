@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 from gen3d.live import live_of
-from test_aihub import c, wait  # noqa: F401 - the fixture
+from test_gaifa import c, wait  # noqa: F401 - the fixture
 
 
 def test_live_of_a_running_image_job(tmp_path: Path):

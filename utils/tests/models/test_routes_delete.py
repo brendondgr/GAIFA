@@ -30,7 +30,7 @@ async def test_list_get_put(seeded, client):
     assert r.status_code == 422 and r.json()["code"] == "invalid_request"
     assert (await client.get("/api/models", params={"status": "bogus"})).status_code == 422
     r = await client.get("/api/models/nope")
-    assert (r.status_code, r.json()["code"], r.headers["x-aihub-error"]) == (404, "model_not_found", "model_not_found")
+    assert (r.status_code, r.json()["code"], r.headers["x-gaifa-error"]) == (404, "model_not_found", "model_not_found")
     r = await client.put("/api/models/g", json={"notes": "fast", "tags": ["x"]})
     assert r.status_code == 200 and (r.json()["notes"], r.json()["tags"]) == ("fast", ["x"])
     assert seeded.read()["models"]["g"]["notes"] == "fast"

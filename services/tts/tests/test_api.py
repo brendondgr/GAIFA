@@ -1,4 +1,4 @@
-"""The routes AIHub uses, with the engines stubbed: status, speech saving, outputs, the widget."""
+"""The routes GAIFA uses, with the engines stubbed: status, speech saving, outputs, the widget."""
 
 import json
 import time
@@ -27,7 +27,7 @@ def client(monkeypatch):
     return TestClient(server.app)
 
 
-def test_status_has_the_aihub_shape(client):
+def test_status_has_the_gaifa_shape(client):
     s = client.get("/v1/status").json()
     assert s["loaded"] is False and s["busy"] is False and s["idle_s"] is None
     labels = [x["label"] for x in s["stats"]]

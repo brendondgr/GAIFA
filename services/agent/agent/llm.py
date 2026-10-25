@@ -28,14 +28,14 @@ from typing import Any
 import httpx
 
 Delta = Callable[[str, str], Awaitable[None]]   # (kind: "text" | "thinking", text)
-# The chat a model call belongs to, sent as X-AIHub-Thread: the relay names it on the request's GPU lease (plan 31.4),
+# The chat a model call belongs to, sent as X-GAIFA-Thread: the relay names it on the request's GPU lease (plan 31.4),
 # so the turn can say it is waiting for the GPU. Set for the length of one model call (`Agent._model`).
-THREAD: ContextVar[str | None] = ContextVar("aihub_thread", default=None)
+THREAD: ContextVar[str | None] = ContextVar("gaifa_thread", default=None)
 CHECK_S = 5.0          # how often a model call's stall clock is read
 
 
 class GpuWait:
-    """Whether this model call waits for AIHub's GPU slot (gpuwait.watch sets it, plan 31.4). The client's
+    """Whether this model call waits for GAIFA's GPU slot (gpuwait.watch sets it, plan 31.4). The client's
     timeout is a stall limit, and time spent waiting behind a GPU job doesn't count toward it."""
 
     def __init__(self) -> None:
@@ -46,12 +46,12 @@ class GpuWait:
             self.on, self.since = on, time.monotonic()
 
 
-GPU_WAIT: ContextVar[GpuWait | None] = ContextVar("aihub_gpu_wait", default=None)
+GPU_WAIT: ContextVar[GpuWait | None] = ContextVar("gaifa_gpu_wait", default=None)
 
 
 def _headers() -> dict[str, str]:
     tid = THREAD.get()
-    return {"X-AIHub-Thread": tid} if tid else {}
+    return {"X-GAIFA-Thread": tid} if tid else {}
 
 # Gemma's own `<|tool_call>call:name{…}<tool_call|>`, also written as `<call:name{…}</call>` by the 26B
 GEMMA_CALL = re.compile(r"(?:<\|tool_call\>\s*)?<?(?:call:)?([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*(?:<tool_call\|>|</call>)", re.S)

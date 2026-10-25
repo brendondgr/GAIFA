@@ -1,4 +1,4 @@
-"""44.1: a mod's chat module: `[ui] chat`, `chat_url` in the services view, and `aihub check`."""
+"""44.1: a mod's chat module: `[ui] chat`, `chat_url` in the services view, and `gaifa check`."""
 
 from __future__ import annotations
 

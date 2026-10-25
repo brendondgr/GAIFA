@@ -3,7 +3,7 @@ survive restarts of the hub and the agent (live, on the real stack).
 
 1. thread A asks for an image → a parameter card waits (an approval in hub.db)
 2. thread B asks for "an image" with no subject → a question card waits
-3. `aihub restart` (the hub) and `aihub restart agent`
+3. `gaifa restart` (the hub) and `gaifa restart agent`
 4. both threads are still waiting; the approval is still pending at the hub
 5. approve A and answer B → both finish with an image
 6. both chats and their images are deleted
@@ -59,8 +59,8 @@ async def main() -> None:
             await forget_threads([a, b])
             return
     t0 = time.time()
-    subprocess.run(["aihub", "restart"], capture_output=True, timeout=120)
-    subprocess.run(["aihub", "restart", "agent"], capture_output=True, timeout=120)
+    subprocess.run(["gaifa", "restart"], capture_output=True, timeout=120)
+    subprocess.run(["gaifa", "restart", "agent"], capture_output=True, timeout=120)
     log["restart_seconds"] = round(time.time() - t0, 1)
     async with httpx.AsyncClient(base_url=A, timeout=60) as c:
         for _ in range(60):

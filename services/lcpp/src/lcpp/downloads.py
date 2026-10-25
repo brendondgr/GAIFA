@@ -32,7 +32,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 import httpx
 
-from lcpp import aihub
+from lcpp import gaifa
 
 from lcpp.catalog import QUANT_SUFFIX_RE, SIDECAR_RE, SPLIT_RE, Catalog, suggest_id
 from lcpp.instances import LcppError
@@ -365,7 +365,7 @@ class Downloads:
                         await self._fetch(c, job, f)
                 if job.model:
                     job.warning = await asyncio.to_thread(self._register, job.model)
-                hub = await aihub.register_download(
+                hub = await gaifa.register_download(
                     job.dest_dir, model_id=job.model["id"] if job.model else None,
                     name=job.model["id"] if job.model else job.label, repo=job.repo, revision=job.revision,
                     files=[(f.dest, f.sha256) for f in job.files])

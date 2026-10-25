@@ -1,6 +1,6 @@
-"""A job's live progress (plan 45.3; AIHub's shape, plan 44.2): its stages with their state and time left, the running
+"""A job's live progress (plan 45.3; GAIFA's shape, plan 44.2): its stages with their state and time left, the running
 stage's steps, and a preview: the cut-out the engines read (`input_rgba.png`) while the shape is made, then the
-rendered views (`preview.png`) once they exist. Paths are this mod's (`/v1/jobs/{id}/files/…`); AIHub rewrites them."""
+rendered views (`preview.png`) once they exist. Paths are this mod's (`/v1/jobs/{id}/files/…`); GAIFA rewrites them."""
 
 from __future__ import annotations
 

@@ -18,7 +18,7 @@ SHIPPED = "gr_default_web_search"   # migration 010 (plan 26.2): in every databa
 
 
 def made(grants: list[dict]) -> list[dict]:
-    """The grants a test made: without the one AIHub ships."""
+    """The grants a test made: without the one GAIFA ships."""
     return [g for g in grants if g["id"] != SHIPPED]
 
 
@@ -155,10 +155,10 @@ async def test_a_deleted_chat_ends_its_grants(ph):
 async def test_mcp_calls_use_only_always_grants(ph):
     await ph.hub.grants.add(FETCH, "github.com", "thread", "t1", kind="url:host")
     res = await mcp_call(ph, FETCH, {"url": "https://github.com/x"})
-    assert "aihub/approval" in (res.get("_meta") or {})                    # a thread grant doesn't reach MCP
+    assert "gaifa/approval" in (res.get("_meta") or {})                    # a thread grant doesn't reach MCP
     await ph.hub.grants.add(FETCH, "github.com", "always", kind="url:host")
     res = await mcp_call(ph, FETCH, {"url": "https://github.com/x"})
-    assert "aihub/approval" not in (res.get("_meta") or {}) and not res.get("isError"), res
+    assert "gaifa/approval" not in (res.get("_meta") or {}) and not res.get("isError"), res
     assert "fetch" in res["content"][0]["text"]
 
 
@@ -182,7 +182,7 @@ async def test_every_mode_and_button_in_chat_and_over_mcp(ph, tool, args):
             mcp = await mcp_call(ph, tool, args)
             assert same["status"] == ("needs_approval" if remember == "once" else "done"), (mode, remember)
             assert other["status"] == ("done" if remember == "always" else "needs_approval"), (mode, remember)
-            assert ("aihub/approval" in (mcp.get("_meta") or {})) == (remember != "always"), (mode, remember)
+            assert ("gaifa/approval" in (mcp.get("_meta") or {})) == (remember != "always"), (mode, remember)
             for g in (await ph.client.get("/api/grants")).json():
                 await ph.client.delete(f"/api/grants/{g['id']}")
 
@@ -218,7 +218,7 @@ async def test_shipped_grant_lets_web_search_run_and_a_revoke_stays(ph, tmp_path
 
 async def test_dry_run_reaches_a_mod_that_answers_it(ph):
     """`dry_run = true` in `[tools]` (plan 26.2): in a dry run the call goes to the mod, which sees
-    `dry_run` in X-AIHub-Origin; a network tool without it gets the stand-in, as before."""
+    `dry_run` in X-GAIFA-Origin; a network tool without it gets the stand-in, as before."""
     r = await ph.call(FETCH, {"url": "https://example.org/a"}, thread="t1", dry_run=True, service="agent")
     out = await approve(ph, r)
     assert out["result"] == {"ran": "fetch", "arguments": {"url": "https://example.org/a"}, "dry_run": True}
@@ -229,7 +229,7 @@ async def test_dry_run_reaches_a_mod_that_answers_it(ph):
 
 
 async def test_a_dry_run_ignores_a_persons_always_grants(ph):
-    """In a dry run (the agent eval) only the grants AIHub ships and the chat's own count, so a card the
+    """In a dry run (the agent eval) only the grants GAIFA ships and the chat's own count, so a card the
     eval means to test still shows on a machine where someone chose "always allow"."""
     from utils.tools.catalog import ToolDef
 

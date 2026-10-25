@@ -1,6 +1,6 @@
-"""`aihub new | install <id> | rescan`: making and installing mods. Standard library only, like cli.py.
+"""`gaifa new | install <id> | rescan`: making and installing mods. Standard library only, like cli.py.
 
-`aihub new <id>` copies `services/_template/`, fills in the id, name and a free port,
+`gaifa new <id>` copies `services/_template/`, fills in the id, name and a free port,
 runs its `install.sh`, and asks a running hub to pick it up (`POST /api/services/rescan`).
 """
 
@@ -138,15 +138,15 @@ def cmd_new(args: argparse.Namespace) -> int:
     if not args.no_install:
         rc = run_install(dest)
         if rc != 0:
-            print(f"aihub: install.sh failed; fix it, run services/{sid}/install.sh, then `aihub rescan`", file=sys.stderr)
+            print(f"gaifa: install.sh failed; fix it, run services/{sid}/install.sh, then `gaifa rescan`", file=sys.stderr)
             return 1
 
     state = _pick_up(sid)
     print()
     print("Next:")
     print(f"  edit      services/{sid}/server.py and service.toml   (guide: docs/mods.md)")
-    print(f"  check     aihub check {sid}")
-    print(f"  reload    aihub restart {sid}   (after editing; `aihub rescan` after adding or removing mods)")
+    print(f"  check     gaifa check {sid}")
+    print(f"  reload    gaifa restart {sid}   (after editing; `gaifa rescan` after adding or removing mods)")
     print(f"  open      {cli.hub_url()}/#/s/{sid}")
     print(f"  call      {cli.hub_url()}/api/s/{sid}/v1/hello?name=you")
     return 0 if state in (None, "ready", "stopped") else 1
@@ -157,10 +157,10 @@ def _pick_up(sid: str) -> str | None:
     try:
         cli.call("POST", "/api/services/rescan")
     except cli.HubDown:
-        print("AIHub isn't running; `aihub start` will load the new mod.")
+        print("GAIFA isn't running; `gaifa start` will load the new mod.")
         return None
     except cli.ApiError as e:
-        print(f"aihub: the hub couldn't rescan: {e.detail} ({e.code}); run `aihub restart`", file=sys.stderr)
+        print(f"gaifa: the hub couldn't rescan: {e.detail} ({e.code}); run `gaifa restart`", file=sys.stderr)
         return None
     deadline = time.monotonic() + 90
     s: dict[str, Any] = {}
@@ -174,7 +174,7 @@ def _pick_up(sid: str) -> str | None:
             break
         time.sleep(0.3)
     state = s.get("state")
-    print(f"AIHub picked it up: {sid} is {state}")
+    print(f"GAIFA picked it up: {sid} is {state}")
     if state == "failed":
         print("  " + str(s.get("last_error") or s.get("manifest_errors")).replace("\n", "\n  "), file=sys.stderr)
     return state
@@ -235,5 +235,5 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def _fail(msg: str) -> int:
-    print(f"aihub: {msg}", file=sys.stderr)
+    print(f"gaifa: {msg}", file=sys.stderr)
     return 2

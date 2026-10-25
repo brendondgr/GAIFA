@@ -13,6 +13,6 @@ os.environ.update({
     "LOCALTTS_BREEZE_PYTHON": str(_TMP / "no-breeze" / "python"),
     "LOCALTTS_KOKORO_PYTHON": sys.executable,   # "installed"; generate() is stubbed in the tests
     "XDG_CONFIG_HOME": str(_TMP / "config"),    # no engines.json
-    "AIHUB_URL": "",                            # never the installed hub's GPU queue (tests pass a fake)
+    "GAIFA_URL": "",                            # never the installed hub's GPU queue (tests pass a fake)
 })
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))

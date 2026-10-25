@@ -27,7 +27,7 @@ from utils.outputs.announce import Announcer
 from utils.outputs.entries import scope_for
 from utils.outputs.index import Outputs
 
-log = logging.getLogger("aihub.outputs")
+log = logging.getLogger("gaifa.outputs")
 
 STABLE_S = 1.0
 DEBOUNCE_MS = 1000
@@ -57,9 +57,9 @@ class Watcher:
 
     def start(self) -> None:
         self._tasks = [
-            asyncio.create_task(self._watch(), name="aihub-outputs-watch"),
-            asyncio.create_task(self._process(), name="aihub-outputs-index"),
-            asyncio.create_task(self._housekeeping(), name="aihub-outputs-housekeeping"),
+            asyncio.create_task(self._watch(), name="gaifa-outputs-watch"),
+            asyncio.create_task(self._process(), name="gaifa-outputs-index"),
+            asyncio.create_task(self._housekeeping(), name="gaifa-outputs-housekeeping"),
         ]
 
     async def close(self) -> None:

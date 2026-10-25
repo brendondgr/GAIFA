@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 from utils import manifest as mf
 
-log = logging.getLogger("aihub.services")
+log = logging.getLogger("gaifa.services")
 
 ServiceState = Literal["stopped", "starting", "ready", "degraded", "stopping", "failed"]
 LoadState = Literal["unloaded", "loading", "loaded", "unloading", "n/a"]

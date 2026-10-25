@@ -59,9 +59,9 @@ def refusal(headers: Mapping[str, str], hosts: Iterable[str], port: int) -> str 
     `headers` keys are lowercase."""
     origin = headers.get("origin")
     if origin is not None and not same_origin(origin, hosts, port):
-        return f"a page from {origin[:100]!r} can't change anything in AIHub"
+        return f"a page from {origin[:100]!r} can't change anything in GAIFA"
     if headers.get("sec-fetch-site", "").strip().lower() == "cross-site":
-        return "a page from another site can't change anything in AIHub"
+        return "a page from another site can't change anything in GAIFA"
     return None
 
 
@@ -92,13 +92,13 @@ class RequestGuard:
         hosts, port = self.hub.allowed_hosts, self.hub.port
         if not host_ok(headers.get("host"), hosts):
             await self._refuse(scope, receive, send, 421, "bad_host",
-                               f"AIHub only answers requests addressed to this machine, not {headers.get('host', '')[:100]!r}",
-                               f"open AIHub at http://127.0.0.1:{port}")
+                               f"GAIFA only answers requests addressed to this machine, not {headers.get('host', '')[:100]!r}",
+                               f"open GAIFA at http://127.0.0.1:{port}")
             return
         ws = scope["type"] == "websocket"
         # /mcp answers its own refusals (as JSON-RPC errors), with the same check.
         if (ws or (scope.get("method") in UNSAFE and scope.get("path") != "/mcp")) and (why := refusal(headers, hosts, port)):
-            await self._refuse(scope, receive, send, 403, "cross_origin", why, f"open AIHub at http://127.0.0.1:{port}")
+            await self._refuse(scope, receive, send, 403, "cross_origin", why, f"open GAIFA at http://127.0.0.1:{port}")
             return
         await self.app(scope, receive, send)
 
@@ -110,5 +110,5 @@ class RequestGuard:
             return
         body = json.dumps({"detail": detail, "code": code, "data": {"fix": fix}}).encode()
         await send({"type": "http.response.start", "status": status, "headers": [
-            (b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()), (b"x-aihub-error", code.encode())]})
+            (b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()), (b"x-gaifa-error", code.encode())]})
         await send({"type": "http.response.body", "body": body})

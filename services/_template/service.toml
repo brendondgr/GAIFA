@@ -1,9 +1,9 @@
-# __NAME__: made from services/_template with `aihub new __ID__`.
+# __NAME__: made from services/_template with `gaifa new __ID__`.
 # Every field is explained in docs/mods.md and architecture §4.3. Only id, [run].port
 # and [run].command are required; delete what you don't use.
 id = "__ID__"                      # = the folder name; becomes /api/s/__ID__/ and #/s/__ID__
 name = "__NAME__"
-description = "A new AIHub mod"
+description = "A new GAIFA mod"
 icon = "puzzle"
 version = "0.1.0"
 
@@ -19,11 +19,11 @@ stop_timeout_s = 10
 restart = "on-failure"
 install = "install.sh"
 
-[outputs]                          # present = this mod writes to {outputs} ($AIHUB_OUTPUTS)
+[outputs]                          # present = this mod writes to {outputs} ($GAIFA_OUTPUTS)
 kinds = ["text"]
 
 [ui]
-page = "ui/page.js"                # its own tab(s) inside the AIHub page
+page = "ui/page.js"                # its own tab(s) inside the GAIFA page
 # chat = "ui/chat.js"              # its own cards in Chat: a live card while its job runs (plan 44.1, docs/mods.md)
 
 [[ui.widgets]]                     # charts on the Overview dashboard (Phase 6 draws them)

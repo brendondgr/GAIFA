@@ -1,5 +1,5 @@
 """The fake web (plan 26.2): what search and fetch answer in a dry run (the agent eval), so an eval
-never reaches the internet. The hub sends `dry_run` in `X-AIHub-Origin` because the tools say
+never reaches the internet. The hub sends `dry_run` in `X-GAIFA-Origin` because the tools say
 `dry_run = true` in `[tools]`.
 
 `fakeweb/search.json` lists results, each with `keywords`: a search returns the results that share

@@ -200,7 +200,7 @@ async def test_unit_from_another_root_is_left_alone(rig, tmp_path_factory):
         id="ghost", argv=["sleep", "30"], cwd=other, env={}, port=0, stop_timeout_s=2, outputs=other,
     ))
     await mgr.boot(autostart=True)
-    assert mgr.get("fake-ok").state == "failed" and "another AIHub folder" in mgr.get("fake-ok").last_error
+    assert mgr.get("fake-ok").state == "failed" and "another GAIFA folder" in mgr.get("fake-ok").last_error
     assert await rig.backend.list_ours() == ["fake-ok", "ghost"]
 
 
@@ -230,13 +230,13 @@ async def test_autostart_respects_enabled_autostart_and_after(rig):
 async def test_a_mod_that_isnt_installed_isnt_autostarted(rig):
     rig.add("fake-ok", as_id="fresh", edit={"command": '[".venv/bin/python", "server.py"]'})   # no .venv yet
     rig.add("fake-ok", as_id="ready-one")
-    rig.add("fake-ok", as_id="script", edit={"installed": '"~/.aihub-test-missing/bin/tool"'})   # a tracked command, its tool not installed
-    rig.add("fake-ok", as_id="either", edit={"installed": '["~/.aihub-test-missing/bin/tool", "sh"]'})   # any one of them
+    rig.add("fake-ok", as_id="script", edit={"installed": '"~/.gaifa-test-missing/bin/tool"'})   # a tracked command, its tool not installed
+    rig.add("fake-ok", as_id="either", edit={"installed": '["~/.gaifa-test-missing/bin/tool", "sh"]'})   # any one of them
     mgr = await rig.manager(autostart=True)
     await until(lambda: mgr.get("ready-one").state == "ready")
     await asyncio.sleep(0.2)
     fresh = mgr.get("fresh")
-    assert fresh.state == "stopped" and fresh.last_error == "not installed: run `aihub setup fresh`"
+    assert fresh.state == "stopped" and fresh.last_error == "not installed: run `gaifa setup fresh`"
     assert mgr.installed(fresh) is False and mgr.installed(mgr.get("ready-one")) is True
     assert mgr.get("script").state == "stopped" and mgr.installed(mgr.get("script")) is False
     assert mgr.installed(mgr.get("either")) is True
@@ -307,7 +307,7 @@ async def test_failed_while_hub_was_down(rig):
     await asyncio.sleep(0.6)
     second = await rig.manager()
     svc = second.get("fake-crash")
-    assert svc.state == "failed" and svc.last_error.startswith("exited with status 1 while AIHub was down")
+    assert svc.state == "failed" and svc.last_error.startswith("exited with status 1 while GAIFA was down")
 
 
 async def test_external_mod_is_health_only(rig, fake_mod):

@@ -1,6 +1,6 @@
 // Settings → About → Hardware (plan 35.2, brief §11.7 `Hardware`): what this machine has, from
 // `GET /api/system/hardware`: the system line, one row per GPU (memory, runtimes, what it can run,
-// problems), and the accelerators AIHub can use here. Written by us (web/PATCHES.md).
+// problems), and the accelerators GAIFA can use here. Written by us (web/PATCHES.md).
 
 import { h, MONO, MUT, BD, TONE, fmtBytes, btnSt } from './chart-kit.js';
 
@@ -19,7 +19,7 @@ export function hwView(m) {
     memory: g.memory === 'unified' ? `shares the system's memory${g.vram_bytes ? ` · up to ${fmtBytes(g.vram_bytes)}` : ''}`
       : g.memory === 'dedicated' ? `${g.vram_bytes ? fmtBytes(g.vram_bytes) : 'its own'} VRAM` : 'memory unknown',
     runtimes: Object.entries(g.runtimes || {}).map(([k, v]) => (RUNTIME_LABEL[k] || k) + (v && v !== 'yes' ? ' ' + v : '')).join(', '),
-    runs: (g.accels || []).map(a => ACCEL_LABEL[a] || a).join(', ') || 'nothing AIHub can use yet',
+    runs: (g.accels || []).map(a => ACCEL_LABEL[a] || a).join(', ') || 'nothing GAIFA can use yet',
     problems: g.problems || [],
   }));
   return { system, gpus, accels: (m.accels || []).map(a => ACCEL_LABEL[a] || a).join(' · '), none: !gpus.length };
@@ -39,11 +39,11 @@ export function HardwareCard({ api }) {
     err ? h('div', { role: 'alert', style: { fontSize: 13, color: TONE.red } }, err.detail || String(err))
       : !v ? h('div', { style: { fontSize: 13, color: MUT } }, 'Reading…')
         : [h('div', { key: 's', style: { fontSize: 13 } }, v.system),
-          v.none ? h('div', { key: 'n', style: { fontSize: 13, color: MUT } }, 'No GPU found: AIHub runs everything on the CPU here.') : null,
+          v.none ? h('div', { key: 'n', style: { fontSize: 13, color: MUT } }, 'No GPU found: GAIFA runs everything on the CPU here.') : null,
           ...v.gpus.map(g => h('div', { key: g.key, style: { display: 'flex', flexDirection: 'column', gap: 3, padding: '8px 10px', borderRadius: 7, background: 'var(--inset,#131926)' } },
             h('div', { style: { fontSize: 13, fontWeight: 500 } }, g.name),
             h('div', { style: { fontSize: 12, color: MUT } }, [g.memory, g.runtimes].filter(Boolean).join(' · ')),
             h('div', { style: { fontSize: 12 } }, h('span', { style: { color: MUT } }, 'Runs: '), g.runs),
             ...g.problems.map((p, i) => h('div', { key: i, style: { fontSize: 12, color: TONE.accent } }, p)))),
-          h('div', { key: 'a', style: { fontSize: 12, color: MUT } }, 'AIHub can use: ', h('span', { style: { fontFamily: MONO, color: 'var(--fg,#E6EDF3)' } }, v.accels))]);
+          h('div', { key: 'a', style: { fontSize: 12, color: MUT } }, 'GAIFA can use: ', h('span', { style: { fontFamily: MONO, color: 'var(--fg,#E6EDF3)' } }, v.accels))]);
 }

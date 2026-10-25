@@ -1,6 +1,6 @@
-// AIHub's API for the UI: HTTP for the areas the hub serves, the mock for the rest.
+// GAIFA's API for the UI: HTTP for the areas the hub serves, the mock for the rest.
 // Written by us, not Claude Design (brief §6.1). The page builds it with
-//   createApi({ base: window.AIHUB_API_BASE ?? null, liveAreas: window.AIHUB_LIVE_AREAS, mock: createMockApi() })
+//   createApi({ base: window.GAIFA_API_BASE ?? null, liveAreas: window.GAIFA_LIVE_AREAS, mock: createMockApi() })
 // and `?mock` in the URL forces everything to the mock.
 
 export class ApiError extends Error {
@@ -49,7 +49,7 @@ function qs(params) {
 }
 
 function down(base) {
-  return new ApiError(0, `AIHub not responding at ${base || (globalThis.location ? location.host : '127.0.0.1:7000')}`, 'hub_error');
+  return new ApiError(0, `GAIFA not responding at ${base || (globalThis.location ? location.host : '127.0.0.1:7000')}`, 'hub_error');
 }
 
 async function envelopeError(res) {
@@ -88,7 +88,7 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     try {
       return await fetchFn(url(path), init);
     } catch (e) {
-      // Stopped before any answer: its own code, never status 0 (which means "AIHub is down").
+      // Stopped before any answer: its own code, never status 0 (which means "GAIFA is down").
       if (e?.name === 'AbortError' || signal?.aborted) throw new ApiError(499, 'Request stopped', 'aborted');
       throw down(base);
     }
@@ -215,9 +215,9 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
       const body = opts.json !== undefined ? undefined : opts.form ? toForm(opts.form) : undefined;
       const t0 = Date.now();
       // makeRoom: retry of a call the hub answered with needs_room ("Unload & continue", plan 5.5).
-      const headers = opts.makeRoom ? { 'X-AIHub-Make-Room': '1' } : undefined;
+      const headers = opts.makeRoom ? { 'X-GAIFA-Make-Room': '1' } : undefined;
       const res = await send(method, `/api/s/${enc(id)}${p}${qs(query)}`, { json: opts.json, body, signal: opts.signal, headers });
-      if (!res.ok) throw res.headers.get('x-aihub-error') ? await envelopeError(res) : await upstreamError(res);
+      if (!res.ok) throw res.headers.get('x-gaifa-error') ? await envelopeError(res) : await upstreamError(res);
       const ct = res.headers.get('content-type') || '';
       const out = { status: res.status, ok: true, ms: 0, content_type: ct.split(';')[0] };
       if (opts.stream || ct.startsWith('text/event-stream')) out.text = await readEvents(res, opts.onEvent, opts.signal);

@@ -116,7 +116,7 @@ function environments(el, ctx) {
         try { await ctx.call('POST', envPath(e, '/folders'), { json: { path: path.value.trim(), level: lvl.value } }); ctx.toast(`Added to ${e.name}`, 'success'); draw(); }
         catch (err) { fail(ctx, err); }
       } }, path, lvl, ui.button('Add folder', null, { kind: 'primary', type: 'submit', small: true })),
-      h('div', { style: MUT }, LEVELS.map(([, w, d]) => `${w}: ${d}`).join(' · ') + '. The AIHub folder and its models stay at Read.'),
+      h('div', { style: MUT }, LEVELS.map(([, w, d]) => `${w}: ${d}`).join(' · ') + '. The GAIFA folder and its models stay at Read.'),
       h('div', null, ...(e.folders.length ? e.folders.map(f => row(e, f)) : [ui.text('No folders yet. Add one above.', { muted: true })])));
   }
 

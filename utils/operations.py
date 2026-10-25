@@ -36,7 +36,7 @@ class OpenAPIError(ValueError):
 
 def convert(doc: dict[str, Any], m: Manifest, include_hidden: bool = False) -> list[dict[str, Any]]:
     """The API tab's operations. `[api] hide` leaves routes out of the tab; `include_hidden`
-    keeps them (for `aihub check`, where a widget or tool may point at a hidden route)."""
+    keeps them (for `gaifa check`, where a widget or tool may point at a hidden route)."""
     if not isinstance(doc, dict) or not isinstance(doc.get("paths"), dict):
         raise OpenAPIError("not an OpenAPI document (no `paths`)")
     hidden = [] if include_hidden else [h.strip() for h in m.api.hide]

@@ -20,7 +20,7 @@ import logging
 import re
 from pathlib import Path
 
-log = logging.getLogger("aihub.registry")
+log = logging.getLogger("gaifa.registry")
 
 REPO_RE = re.compile(r"hf-cache/hub/models--[^/]+")
 

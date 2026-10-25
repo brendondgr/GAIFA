@@ -24,11 +24,11 @@ from .worker import WorkerBackend, WorkerDied
 
 log = logging.getLogger("decide")
 MAX_BYTES = {"image": 16_000_000, "video": 256_000_000}
-WITHIN_HEADER = "X-AIHub-Answer-Within"
+WITHIN_HEADER = "X-GAIFA-Answer-Within"
 
 
 def answer_within(headers: Any) -> float | None:
-    """`X-AIHub-Answer-Within: <seconds>`: how long the caller gives the model once the GPU slot is held (the
+    """`X-GAIFA-Answer-Within: <seconds>`: how long the caller gives the model once the GPU slot is held (the
     Auto judge and page screening, whose budget shouldn't run out while a job holds the GPU), or None."""
     try:
         s = float(headers.get(WITHIN_HEADER) or "")
@@ -78,10 +78,10 @@ class DecideRequest(BaseModel):
     input: str | dict[str, Any] | list[Any] = Field(description="What the questions are about: text, or JSON")
     questions: list[Question] = Field(min_length=1, description="Answered together, each on its own")
     images: list[str] = Field(default_factory=list, max_length=8, description="Images every question sees",
-                              json_schema_extra={"items": {"type": "string", "format": "aihub-file", "x-kind": "image"}})
+                              json_schema_extra={"items": {"type": "string", "format": "gaifa-file", "x-kind": "image"}})
     videos: list[str] = Field(default_factory=list, max_length=2, description="Videos every question sees "
                               "(2 frames a second, at most 32)",
-                              json_schema_extra={"items": {"type": "string", "format": "aihub-file", "x-kind": "video"}})
+                              json_schema_extra={"items": {"type": "string", "format": "gaifa-file", "x-kind": "video"}})
     model: str | None = Field(None, description="A model from GET /v1/models (default: the mod's default). "
                               "`<id>@<revision>` names the revision, which must be the pinned one")
 
@@ -214,8 +214,8 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
         log.error("%s", e)
         if isinstance(e, WorkerDied):
             return _err(503, str(e), "worker_died",
-                        fix="call again (it starts a new worker); if it repeats, read `aihub logs decide`")
-        return _err(503, str(e), "model_error", fix="the model failed on this input; read `aihub logs decide`")
+                        fix="call again (it starts a new worker); if it repeats, read `gaifa logs decide`")
+        return _err(503, str(e), "model_error", fix="the model failed on this input; read `gaifa logs decide`")
 
     @app.post("/v1/load", summary="Load a decision model")
     async def load(body: LoadRequest | None = None) -> Any:

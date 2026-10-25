@@ -206,7 +206,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         if svc.external:
             raise ServiceError(
                 409, "external_service",
-                f"{svc.id} is an external service (kind = \"external\"): AIHub only checks its health and proxies it; start or stop it where it runs",
+                f"{svc.id} is an external service (kind = \"external\"): GAIFA only checks its health and proxies it; start or stop it where it runs",
             )
 
     async def _wait_settled(self, svc: Service, timeout: float | None = None) -> None:
@@ -257,7 +257,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         if accel in m.accels:
             return None
         return (f"its variant ({accel}) needs a GPU this machine doesn't have (it has {', '.join(m.accels)}): "
-                f"run `aihub setup {svc.id}` to pick another")
+                f"run `gaifa setup {svc.id}` to pick another")
 
     def installed(self, svc: Service) -> bool:
         """The mod's command exists (its venv, binary or script): it has been set up (plan 23.12).

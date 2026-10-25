@@ -121,8 +121,8 @@ class JobRequest(BaseModel):
     engine: EngineId | None = Field(None, description="what makes the mesh: Cube3D from `prompt`, or an image engine from `image` "
                                                       "(pick by what the picture shows). Left out: cube3d, or trellis2 with a picture",
                                     json_schema_extra=engine_options)
-    image: str | None = Field(None, description="the picture for an image engine: output:<id> of an image (an AIHub output)",
-                              json_schema_extra={"format": "aihub-file", "x-kind": "image"})
+    image: str | None = Field(None, description="the picture for an image engine: output:<id> of an image (a GAIFA output)",
+                              json_schema_extra={"format": "gaifa-file", "x-kind": "image"})
     stages: list[Stage] = Field(default_factory=lambda: ["shape", "preview"])
     preset: PresetId | None = Field(None, description="applied under explicit options; each engine has its own presets "
                                                       "(image engines use fast unless you pass base)",
@@ -159,7 +159,7 @@ class JobRequest(BaseModel):
     @classmethod
     def _image(cls, v: str | None):
         if v is not None and not IMAGE_REF.match(v):
-            raise ValueError("image must be output:<id> (an AIHub output) or a file sent to POST /v1/jobs/image")
+            raise ValueError("image must be output:<id> (a GAIFA output) or a file sent to POST /v1/jobs/image")
         return v
 
     @model_validator(mode="after")

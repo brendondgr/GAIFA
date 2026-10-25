@@ -293,7 +293,7 @@ def write_timeline() -> None:
     rows = [r"\begin{longtable}{@{}l>{\raggedright\arraybackslash}p{14.2cm}@{}}", r"\toprule", r"Time & Commit \\", r"\midrule\endhead"]
     for line in out:
         t, subj = line.split("\t", 1)
-        subj = subj.removeprefix("AIHub ")
+        subj = subj.removeprefix("GAIFA ")
         head, _, rest = subj.partition(": ")
         rows.append(f"{t} & \\textbf{{{tex(head)}}} {tex(rest[:230])}{'…' if len(rest) > 230 else ''} \\\\")
     rows += [r"\bottomrule", r"\end{longtable}"]
@@ -368,7 +368,7 @@ def write_p1516() -> None:
     fresh = load("fresh-inventory.json")
     if inv:
         out.append(r"\subsection*{What's left outside the folder}")
-        out.append(r"\code{aihub doctor --inventory} on this install:")
+        out.append(r"\code{gaifa doctor --inventory} on this install:")
         out.append(r"\begin{longtable}{@{}>{\raggedright\arraybackslash}p{5.2cm}lp{1.8cm}>{\raggedright\arraybackslash}p{5.6cm}@{}}\toprule "
                    r"Path & Kind & Used by & Why \\ \midrule\endhead")
         for it in sorted(inv["items"], key=lambda i: ({"outside": 0, "runtime": 1}.get(i["kind"], 2), i["used_by"])):

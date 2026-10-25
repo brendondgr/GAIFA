@@ -13,8 +13,8 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 router = APIRouter()
-HEADER = "x-aihub-make-room"
-GPU_LEASE = "x-aihub-gpu-lease"     # a caller holding the GPU slot (gen3d) hands its lease down: run under it
+HEADER = "x-gaifa-make-room"
+GPU_LEASE = "x-gaifa-gpu-lease"     # a caller holding the GPU slot (gen3d) hands its lease down: run under it
 
 
 class RunRequest(BaseModel):
@@ -113,7 +113,7 @@ async def upload(request: Request, file: UploadFile) -> dict:
     s = request.app.state.settings
     stem = re.sub(r"[^A-Za-z0-9._-]+", "-", Path(file.filename or "upload").name)[-80:] or "upload"
     name = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}-{stem}"
-    d = s.input / "aihub"
+    d = s.input / "gaifa"
     d.mkdir(parents=True, exist_ok=True)
     (d / name).write_bytes(await file.read())
     return {"value": f"upload:{name}", "name": name}

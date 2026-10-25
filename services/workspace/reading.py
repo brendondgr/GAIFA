@@ -288,7 +288,7 @@ def dirty(root: Path) -> list[str]:
 
 
 def origin_of(header: str | None) -> dict:
-    """X-AIHub-Origin: who called (thread, turn, the files the user named)."""
+    """X-GAIFA-Origin: who called (thread, turn, the files the user named)."""
     if not header:
         return {}
     try:

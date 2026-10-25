@@ -274,7 +274,7 @@ class ToolSpec(_Strict):
     confirm: bool = False         # the same as risk = "destructive"
     risk: Risk | None = None      # default: read for GET, destructive for DELETE or confirm, else write (plan 13.1)
     grant_key: str | None = None  # plan 25.2: what one "allow" covers ("url:host", "arg:<name>", "const:<word>")
-    dry_run: bool = False         # the mod answers dry runs (the agent eval) itself: `dry_run` in X-AIHub-Origin (plan 26.2)
+    dry_run: bool = False         # the mod answers dry runs (the agent eval) itself: `dry_run` in X-GAIFA-Origin (plan 26.2)
     ask: list[str] = []           # inputs the user chooses: editable on the parameter card
     examples: list[dict[str, Any]] = []
     core: bool = False            # always loaded in the chat (plan 14.6)
@@ -427,7 +427,7 @@ class Effective:
     auto_unload: bool
     priority: int
     env: dict[str, str]
-    accel: str | None = None   # plan 38.2: the variant `aihub setup` installed ([services.<id>] accel)
+    accel: str | None = None   # plan 38.2: the variant `gaifa setup` installed ([services.<id>] accel)
 
     def as_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
@@ -631,13 +631,13 @@ def read_env_file(path: Path) -> dict[str, str]:
 def hub_env(mod: Mod, paths: Paths, port: int, hub_port: int) -> dict[str, str]:
     """The variables every mod gets (architecture §4.4)."""
     return {
-        "AIHUB_URL": f"http://127.0.0.1:{hub_port}",
-        "AIHUB_SERVICE_ID": mod.id,
-        "AIHUB_PORT": str(port),
-        "AIHUB_ROOT": str(paths.root),
-        "AIHUB_MODELS": str(paths.models),
-        "AIHUB_OUTPUTS": str(paths.outputs / mod.id),
-        "AIHUB_DATABASES": str(paths.databases),
+        "GAIFA_URL": f"http://127.0.0.1:{hub_port}",
+        "GAIFA_SERVICE_ID": mod.id,
+        "GAIFA_PORT": str(port),
+        "GAIFA_ROOT": str(paths.root),
+        "GAIFA_MODELS": str(paths.models),
+        "GAIFA_OUTPUTS": str(paths.outputs / mod.id),
+        "GAIFA_DATABASES": str(paths.databases),
         "HF_HOME": str(paths.models / "hf-cache"),
         "PYTHONUNBUFFERED": "1",
     }
@@ -680,31 +680,31 @@ def launch_spec(mod: Mod, cfg: Config, paths: Paths, hub_port: int, gpu_index: i
         if env_file.exists():  # optional: secrets that haven't been written yet
             env.update(read_env_file(env_file))
     env.update({k: expand(v, values, f"[run].env.{k}") for k, v in m.run.env.items()})
-    if eff.accel:          # plan 38.3: the variant `aihub setup` installed ([services.<id>] accel)
+    if eff.accel:          # plan 38.3: the variant `gaifa setup` installed ([services.<id>] accel)
         if machine is None:
             from utils import hardware
             machine = hardware.detect()
         from utils.hardware import DEVICE
-        env["AIHUB_ACCEL"], env["AIHUB_DEVICE"] = eff.accel, DEVICE.get(eff.accel, "cpu")
+        env["GAIFA_ACCEL"], env["GAIFA_DEVICE"] = eff.accel, DEVICE.get(eff.accel, "cpu")
         arch = next((g.arch for g in machine.gpus if eff.accel in g.accels and g.arch), "")
         if arch:
-            env["AIHUB_GPU_ARCH"] = arch
+            env["GAIFA_GPU_ARCH"] = arch
         var = m.run.variants.get(eff.accel)
         if var:
             env.update({k: expand(v, values, f"[run.variants.{eff.accel}].env.{k}") for k, v in var.env.items()})
     if m.memory:  # idle unload stays inside the mod (plan 5.6): seconds, 0 = never
         idle = str(eff.idle_unload_s or 0)
-        env["AIHUB_IDLE_UNLOAD_S"] = idle
+        env["GAIFA_IDLE_UNLOAD_S"] = idle
         if m.memory.idle_unload_env:
             env[m.memory.idle_unload_env] = idle
     if m.gpu:  # plan 31.2: the defaults the mod's gpu_slot client reads
-        env["AIHUB_GPU_CLASS"] = m.gpu.cls
-        env["AIHUB_GPU_GROUP"] = m.gpu.group or mod.id
+        env["GAIFA_GPU_CLASS"] = m.gpu.cls
+        env["GAIFA_GPU_GROUP"] = m.gpu.group or mod.id
     rt = cfg.containers.runtime        # plan 37.4: the runtime a mod's containers use (services/_template/containers.py)
     if rt == "auto":
         rt = "podman" if shutil.which("podman") else "docker" if shutil.which("docker") else ""
     if rt:
-        env["AIHUB_CONTAINER_RUNTIME"] = rt
+        env["GAIFA_CONTAINER_RUNTIME"] = rt
     pin = gpu_pin(mod.id, cfg)
     index = pin if isinstance(pin, int) and not isinstance(pin, bool) else gpu_index
     if index is not None:          # plan 36.3: only on machines with more than one GPU to choose from

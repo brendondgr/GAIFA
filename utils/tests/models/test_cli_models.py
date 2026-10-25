@@ -1,4 +1,4 @@
-"""3.3 deliverable: `aihub models list | show | scan | verify` against a running hub."""
+"""3.3 deliverable: `gaifa models list | show | scan | verify` against a running hub."""
 
 from __future__ import annotations
 

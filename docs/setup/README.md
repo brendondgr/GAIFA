@@ -1,44 +1,44 @@
-# Setting up AIHub
+# Setting up GAIFA
 
-How to install AIHub on a new machine: the host, the hub, then **the mods you want**, each with the models **you** choose for it. It's written for the hardware AIHub is built on: an **AMD Strix Halo** (Ryzen AI MAX+ 395, Radeon 8060S, `gfx1151`) with 128 GB of unified memory, on **Fedora Linux**. Everything in the repository (the container images, the PyTorch wheels, the engines' settings) is built and tuned for that chip, so on that hardware these docs should be all you need.
+How to install GAIFA on a new machine: the host, the hub, then **the mods you want**, each with the models **you** choose for it. It's written for the hardware GAIFA is built on: an **AMD Strix Halo** (Ryzen AI MAX+ 395, Radeon 8060S, `gfx1151`) with 128 GB of unified memory, on **Fedora Linux**. Everything in the repository (the container images, the PyTorch wheels, the engines' settings) is built and tuned for that chip, so on that hardware these docs should be all you need.
 
-**Other hardware.** AIHub was built on Linux with an AMD Strix Halo, and runs elsewhere through each mod's variants (plan 38): `bin/aihub hardware` shows what your machine has, and the setup picks the variant that fits, says which ones haven't been tested on that kind of machine, and lists the mods it can't run. Windows works through WSL2; macOS is untested (CI was turned off on 2026-10-22). What runs where: [platforms.md](../platforms.md); the host for your machine: the table below.
+**Other hardware.** GAIFA was built on Linux with an AMD Strix Halo, and runs elsewhere through each mod's variants (plan 38): `bin/gaifa hardware` shows what your machine has, and the setup picks the variant that fits, says which ones haven't been tested on that kind of machine, and lists the mods it can't run. Windows works through WSL2; macOS is untested (CI was turned off on 2026-10-22). What runs where: [platforms.md](../platforms.md); the host for your machine: the table below.
 
 ## The quick way
 
 ```bash
-bin/aihub setup
+bin/gaifa setup
 ```
 
-From a fresh clone, that's the whole process, in this order: choosing mods from a list; the host checks (any fix that needs `sudo` is printed for you to run, never run for you); the plan, with every step, size and question; your answers (licences, which models); the hub; install; the models you chose; the agent's model, from your relay's; each mod's check; a report. Run it again after a stop: it resumes. `--plan` shows the plan without doing anything; `bin/aihub setup relay agent` sets up only those (and what they need).
+From a fresh clone, that's the whole process, in this order: choosing mods from a list; the host checks (any fix that needs `sudo` is printed for you to run, never run for you); the plan, with every step, size and question; your answers (licences, which models); the hub; install; the models you chose; the agent's model, from your relay's; each mod's check; a report. Run it again after a stop: it resumes. `--plan` shows the plan without doing anything; `bin/gaifa setup relay agent` sets up only those (and what they need).
 
-**Your hardware decides each mod's variant** (plan 38.2). `aihub hardware` shows what AIHub finds: the GPUs and the accelerators it can use (ROCm, CUDA, Intel XPU, Apple MPS, Vulkan, CPU). For each mod, the plan names the variant it will install, and marks it when it hasn't been tested on this kind of machine. A mod your machine can't run is listed as not available, with the reason. `--accel <mod>=cpu` (or another accel) picks a different variant, and `--smoke` runs each mod's smoke after the checks: real work that proves the GPU path.
+**Your hardware decides each mod's variant** (plan 38.2). `gaifa hardware` shows what GAIFA finds: the GPUs and the accelerators it can use (ROCm, CUDA, Intel XPU, Apple MPS, Vulkan, CPU). For each mod, the plan names the variant it will install, and marks it when it hasn't been tested on this kind of machine. A mod your machine can't run is listed as not available, with the reason. `--accel <mod>=cpu` (or another accel) picks a different variant, and `--smoke` runs each mod's smoke after the checks: real work that proves the GPU path.
 
-**Having an agent do it.** An AI agent follows the same process for you: it reads the plan (`bin/aihub setup --plan --json <mods>`), asks you the same questions, passes your answers (`--answers <file>`, or `--accept`, `--decline`, `--models`, `--set`), hands you any `sudo` command and any step that prompts (a login), and reads one JSON report. `bin/aihub setup --help` lists the exit codes and the report's shape; agents in this repo have the `aihub-setup` skill. The rest of this guide is what the wizard reads, for when you want to know what it does or do a step by hand.
+**Having an agent do it.** An AI agent follows the same process for you: it reads the plan (`bin/gaifa setup --plan --json <mods>`), asks you the same questions, passes your answers (`--answers <file>`, or `--accept`, `--decline`, `--models`, `--set`), hands you any `sudo` command and any step that prompts (a login), and reads one JSON report. `bin/gaifa setup --help` lists the exit codes and the report's shape; agents in this repo have the `gaifa-setup` skill. The rest of this guide is what the wizard reads, for when you want to know what it does or do a step by hand.
 
-**Testing on another machine** (plan 40.3). To find out what breaks on a new kind of machine, run the setup with `--smoke` and keep notes as you go: `aihub report note "what happened" --setup <id> --cmd "<command>" --output <file> --tried "<what you tried>"`. Then `aihub report` writes `data/state/reports/<date>-<host>.md`: the machine (with a recording that replays its detection), the commit and any local changes, the host checks, the setup run with its variants, each failure with the setup doc line, the command, its log and a likely cause, the mods, the doctor. Hand that file to whoever fixes AIHub. Agents in this repo do all of it with the `aihub-field-test` skill.
+**Testing on another machine** (plan 40.3). To find out what breaks on a new kind of machine, run the setup with `--smoke` and keep notes as you go: `gaifa report note "what happened" --setup <id> --cmd "<command>" --output <file> --tried "<what you tried>"`. Then `gaifa report` writes `data/state/reports/<date>-<host>.md`: the machine (with a recording that replays its detection), the commit and any local changes, the host checks, the setup run with its variants, each failure with the setup doc line, the command, its log and a likely cause, the mods, the doctor. Hand that file to whoever fixes GAIFA. Agents in this repo do all of it with the `gaifa-field-test` skill.
 
 ## The order
 
 | Step | Doc | Time | Disk |
 |---|---|---|---|
 | 1. The machine | [host.md](host.md) (Linux with AMD), or [NVIDIA](host-linux-nvidia.md), [Intel](host-linux-intel.md), [WSL2](host-wsl2.md), [macOS](host-macos.md): drivers, groups, packages, accounts | 30 min and a reboot | — |
-| 2. The hub | [hub.md](hub.md): clone, `uv sync`, `aihub install`, `aihub doctor` | 5 min | 100 MB |
+| 2. The hub | [hub.md](hub.md): clone, `uv sync`, `gaifa install`, `gaifa doctor` | 5 min | 100 MB |
 | 3. The mods you want | their setup docs (below), in the order in [hub.md](hub.md#installing-the-mods) | 10 min to an hour each | up to about 22 GB each (images, runtimes, containers; the ComfyUI image, 15.1 GB, is shared by Images & Video and 3D Generate and counted once) |
 | 4. Their models | each mod's setup doc: what kind of model it runs, a few optional suggestions, how to add your own | the downloads | from nothing to hundreds of GB: your choice |
 
-Pick only the mods you need; each setup doc says what the mod gives you and what it needs. AIHub doesn't come with a model list to copy: the models are yours to choose, per mod.
+Pick only the mods you need; each setup doc says what the mod gives you and what it needs. GAIFA doesn't come with a model list to copy: the models are yours to choose, per mod.
 
 ## How these docs work
 
 - **Environment docs** live in the mod they belong to, `services/<id>/setup/<env>.md`, so a mod's setup goes wherever the mod goes and disappears when it's deleted. Each one has the same sections: what it is, the versions tested, prerequisites, install, configuration, how to check it, what to look for, and known gaps. The format is in [mods.md §9](../mods.md#9-setup-docs).
-- **The mods index** below is generated by `aihub docs` from the setup docs, so a new mod shows up as soon as it has one, and a deleted mod disappears. `aihub docs --check` (run by the test suite) fails when it's out of date or a setup doc doesn't parse; `--strict` also fails when a mod has no setup doc.
-- **What a run saw** (plan 40.1): every step's, check's and smoke's whole output is in `data/state/setup/logs/`, and the last run (the machine, the plan, the report) in `data/state/setup/last-run.json`. A failure names its log and the setup doc's line it comes from; `aihub report` (plan 40.2) turns all of it into one file for whoever fixes it.
-- **Your own models** are listed by `aihub docs` in `data/state/setup/models/` (local, not in git): one doc per model in your registry, with its files, hashes, source, which setup doc runs it and a download command, plus room for your own notes, which are kept when it regenerates. Set `[docs] regenerate = true` in `config.toml` to keep it current as models are added.
+- **The mods index** below is generated by `gaifa docs` from the setup docs, so a new mod shows up as soon as it has one, and a deleted mod disappears. `gaifa docs --check` (run by the test suite) fails when it's out of date or a setup doc doesn't parse; `--strict` also fails when a mod has no setup doc.
+- **What a run saw** (plan 40.1): every step's, check's and smoke's whole output is in `data/state/setup/logs/`, and the last run (the machine, the plan, the report) in `data/state/setup/last-run.json`. A failure names its log and the setup doc's line it comes from; `gaifa report` (plan 40.2) turns all of it into one file for whoever fixes it.
+- **Your own models** are listed by `gaifa docs` in `data/state/setup/models/` (local, not in git): one doc per model in your registry, with its files, hashes, source, which setup doc runs it and a download command, plus room for your own notes, which are kept when it regenerates. Set `[docs] regenerate = true` in `config.toml` to keep it current as models are added.
 
 ## Mods
 
-<!-- generated by aihub docs: do not edit between these markers -->
+<!-- generated by gaifa docs: do not edit between these markers -->
 | Mod | What it gives you | GPU | Runs on | Disk | Setup docs |
 |---|---|---|---|---|---|
 | `agent` | Chat agent: the Chat page's tool loop (files, search, images, speech) on any chat model the relay serves | no | CPU | 50 MB | [Chat agent](../../services/agent/setup/agent.md) |
@@ -49,7 +49,7 @@ Pick only the mods you need; each setup doc says what the mod gives you and what
 | `lcpp` | LLM Launcher: run any GGUF chat model with llama.cpp on the GPU (Vulkan), published to the relay | yes | CUDA · Apple MPS · Vulkan · CPU | 150 MB | [llama.cpp (LLM Launcher)](../../services/lcpp/setup/llama-cpp.md) |
 | `opencode` | OpenCode: a coding agent behind the relay's agent model, plus OpenCode Zen's free hosted models | no | CPU | 200 MB | [OpenCode](../../services/opencode/setup/opencode.md) |
 | `relay` | LLM Relay: one OpenAI-compatible endpoint for every chat model, local or remote, with usage charts | no | CPU | 350 MB | [LLM Relay](../../services/relay/setup/relay.md) |
-| `searxng` | SearXNG watcher: see your SearXNG's health and engines, and change its settings from AIHub or the agent | no | CPU | 30 MB | [SearXNG watcher (the searxng mod)](../../services/searxng/setup/searxng.md) |
+| `searxng` | SearXNG watcher: see your SearXNG's health and engines, and change its settings from GAIFA or the agent | no | CPU | 30 MB | [SearXNG watcher (the searxng mod)](../../services/searxng/setup/searxng.md) |
 | `stt` | Speech to text: transcribe audio and video files, live dictation and the Chat microphone (Whisper; runs on the CPU, much faster with the GPU) | no | ROCm · CUDA · CPU | 750 MB | [Speech to Text (faster-whisper)](../../services/stt/setup/stt.md) |
 | `tts` | Speech: voice cloning, voice design and delivery directions with Breeze TTS 2 (non-commercial), plus Whisper word timings · Speech: text to speech with Kokoro's fast built-in English voices (the server and its first engine) | yes | ROCm · CUDA · Intel XPU · Apple MPS · CPU | 13.6 GB | [Breeze TTS 2 and Whisper (Speech)](../../services/tts/setup/breeze.md), [Kokoro-82M (Speech)](../../services/tts/setup/kokoro.md) |
 | `vllm` | vLLM: serve Hugging Face chat models (safetensors, AWQ) on the GPU, published to the relay | yes | ROCm | 100 MB | [vLLM](../../services/vllm/setup/vllm.md) |

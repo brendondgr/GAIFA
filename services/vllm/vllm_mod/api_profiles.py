@@ -1,5 +1,5 @@
 """Profile routes for the page (plan 18.6): the form's schema, save and delete. Deleting a profile
-never deletes its downloaded files (they stay on AIHub's Models page)."""
+never deletes its downloaded files (they stay on GAIFA's Models page)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "gen3d-sam3do"
 title = "SAM 3D Objects (3D Generate)"
 models = ["3d/sam-3d-objects", "3d/moge-vitl"]
@@ -18,7 +18,7 @@ interactive = true
 ask = "SAM 3D Objects' weights are gated: accept the SAM Licence on https://huggingface.co/facebook/sam-3d-objects and wait until access is granted. Is access granted?"
 
 [[steps]]
-run = "test -d runtime/sam3d-objects/sam3d_objects && test -d runtime/sam3do/dinov2/dinov2 && test -e runtime/sam3do/.venv/bin/activate || { echo 'runtime/sam3do is not built: run aihub setup gen3d (scripts/install-runtime.sh)' >&2; exit 1; }"
+run = "test -d runtime/sam3d-objects/sam3d_objects && test -d runtime/sam3do/dinov2/dinov2 && test -e runtime/sam3do/.venv/bin/activate || { echo 'runtime/sam3do is not built: run gaifa setup gen3d (scripts/install-runtime.sh)' >&2; exit 1; }"
 what = "checks that the gen3d setup built this engine (the sam-3d-objects and DINOv2 clones at their pinned commits and runtime/sam3do/.venv, layered on img3d's and CubeArt's, with pytorch3d); nothing is installed here: this setup's own part is the gated weights"
 
 [[suggest]]
@@ -89,7 +89,7 @@ Read from this machine on 2026-10-21 (Fedora 44, Radeon 8060S / gfx1151):
 uvx --from huggingface_hub hf auth login
 ```
 
-Stores your token in `~/.cache/huggingface/token`; needed once for the gated repo. `aihub setup` skips it when `uvx --from huggingface_hub hf auth whoami` succeeds (the step's `skip_if`).
+Stores your token in `~/.cache/huggingface/token`; needed once for the gated repo. `gaifa setup` skips it when `uvx --from huggingface_hub hf auth whoami` succeeds (the step's `skip_if`).
 
 ```bash
 uvx --from huggingface_hub hf download facebook/sam-3d-objects checkpoints/slat_decoder_gs.ckpt checkpoints/slat_decoder_mesh.ckpt checkpoints/slat_generator.ckpt checkpoints/ss_decoder.ckpt checkpoints/ss_generator.ckpt LICENSE README.md checkpoints/pipeline.yaml checkpoints/slat_decoder_gs.yaml checkpoints/slat_decoder_gs_4.yaml checkpoints/slat_decoder_mesh.yaml checkpoints/slat_encoder.yaml checkpoints/slat_generator.yaml checkpoints/ss_decoder.yaml checkpoints/ss_encoder.yaml checkpoints/ss_generator.yaml --local-dir data/models/3d/sam-3d-objects

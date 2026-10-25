@@ -1,5 +1,5 @@
 # SearXNG: finds the SearXNG on this machine, watches it and its engines, adjusts its settings (plan 26.3).
-# SearXNG itself runs outside AIHub (setup/searxng.md). Fields: docs/mods.md and architecture §4.3.
+# SearXNG itself runs outside GAIFA (setup/searxng.md). Fields: docs/mods.md and architecture §4.3.
 id = "searxng"
 name = "SearXNG"
 description = "Watches the SearXNG this machine runs and adjusts its engines and settings"

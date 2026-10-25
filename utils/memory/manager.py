@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from utils.services import ServiceManager
     from utils.services.model import Service
 
-log = logging.getLogger("aihub.memory")
+log = logging.getLogger("gaifa.memory")
 
 EVERY_S = 2.0
 PUBLISH_EVERY_S = 10.0
@@ -99,7 +99,7 @@ class MemoryManager:
             self.peaks = {r["service"]: r["peak_bytes"] for r in rows}
             self.peak_ts = {r["service"]: r["updated_ts"] or 0.0 for r in rows}
         await self.sample()
-        self._task = asyncio.create_task(self._loop(), name="aihub-memory")
+        self._task = asyncio.create_task(self._loop(), name="gaifa-memory")
 
     async def close(self) -> None:
         if self._task:

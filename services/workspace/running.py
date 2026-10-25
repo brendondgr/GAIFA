@@ -54,7 +54,7 @@ def _timeout(v: Any) -> int:
 
 
 def mounts_for(folders: Folders, root: Path) -> list[tuple[Path, str]]:
-    """The folder read-write, and the AIHub folder and its models read-only on top when the folder
+    """The folder read-write, and the GAIFA folder and its models read-only on top when the folder
     contains them (the caps only stop the edit tools; a command could write anywhere it's mounted)."""
     ro = [(p, "ro") for p, _ in folders.caps.roots if p != root and inside(p, root) and p.exists()]
     return [(root, "rw"), *ro]
@@ -180,7 +180,7 @@ async def run_python(folders: Folders, sb: Sandbox, state: Path, outputs: Path, 
             root, _ = folders.resolve(f, ".")
             mounts += mounts_for(folders, root)
             cwd = root
-        env = {"AIHUB_INPUTS": str(work / "inputs"), "AIHUB_OUT": str(work / "out")}
+        env = {"GAIFA_INPUTS": str(work / "inputs"), "GAIFA_OUT": str(work / "out")}
         r = Run(rid, f"python {work / 'main.py'}", "sandbox", str(cwd), network=net, folder=f.id if f else None,
                 thread=origin.get("thread"), turn=str(origin["turn"]) if origin.get("turn") is not None else None,
                 timeout_s=_timeout(args.get("timeout_s")))
@@ -201,7 +201,7 @@ async def run_python(folders: Folders, sb: Sandbox, state: Path, outputs: Path, 
             out["files"] = files
         elif f is None:
             out["files"] = []
-            out.setdefault("note", "no files were written; files saved in the working directory (or $AIHUB_OUT) become outputs")
+            out.setdefault("note", "no files were written; files saved in the working directory (or $GAIFA_OUT) become outputs")
         return out
     finally:
         shutil.rmtree(work, ignore_errors=True)

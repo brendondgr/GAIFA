@@ -72,8 +72,8 @@ def test_engine_command(tmp_path):
     s = Settings(state_dir=tmp_path / "state", hf_home=tmp_path / "hf", image="img@sha256:abc", engine_port=7801)
     cmd = engine_command(_p(env={"X": "1"}), s, GTT)
     assert cmd[:3] == ["podman", "run", "-d"]
-    assert cmd[cmd.index("--name") + 1] == "aihub-vllm-t"
-    assert LABEL in cmd and "aihub.profile=t" in cmd
+    assert cmd[cmd.index("--name") + 1] == "gaifa-vllm-t"
+    assert LABEL in cmd and "gaifa.profile=t" in cmd
     assert cmd[cmd.index("--network") + 1] == "host"
     assert "-p" not in cmd and "--publish" not in cmd
     assert f"{tmp_path / 'hf'}:{tmp_path / 'hf'}" in cmd

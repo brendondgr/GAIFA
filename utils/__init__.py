@@ -1,1 +1,1 @@
-"""AIHub hub code. See docs/structure.md."""
+"""GAIFA hub code. See docs/structure.md."""

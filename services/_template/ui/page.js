@@ -1,4 +1,4 @@
-// __NAME__'s own tab inside AIHub (design brief §5). AIHub serves this file at
+// __NAME__'s own tab inside GAIFA (design brief §5). GAIFA serves this file at
 // /ui/services/__ID__/page.js and mounts it in the mod's page. Rules: use only `ctx`
 // (no fetch, no raw colors; ctx.ui builds themed elements), and show a Start button
 // when the mod isn't running. Return a cleanup function if you start timers or listeners.
@@ -24,7 +24,7 @@ export default {
       e.preventDefault();
       send.disabled = true;
       try {
-        // ctx.call(method, path, opts) goes through AIHub's proxy: /api/s/<id>/v1/hello
+        // ctx.call(method, path, opts) goes through GAIFA's proxy: /api/s/<id>/v1/hello
         const res = await ctx.call('GET', '/v1/hello', { query: { name: name.value.trim() || 'world' } });
         result.replaceChildren(ui.text(`${res.status} · ${res.ms} ms`, { muted: true, mono: true }), ui.json(res.json));
       } catch (err) {
@@ -42,7 +42,7 @@ export default {
       result,
     ));
 
-    // Live updates: ctx.on(type, fn) subscribes to AIHub events and is removed on unmount.
+    // Live updates: ctx.on(type, fn) subscribes to GAIFA events and is removed on unmount.
     ctx.on('service', ev => { if (ev.service.id === svc.id && ev.service.state === 'stopped') ctx.toast(`${svc.name} stopped`, 'info'); });
   },
 };

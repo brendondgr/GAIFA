@@ -2,7 +2,7 @@
 the mod is unloaded makes room before it is forwarded (the mod then loads by itself).
 
 Without room, the caller gets `409 needs_room` with the plan; it retries with the header
-`X-AIHub-Make-Room: 1` (the UI's "Unload & continue") to have the plan carried out.
+`X-GAIFA-Make-Room: 1` (the UI's "Unload & continue") to have the plan carried out.
 
 A mod that takes the GPU slot (`[gpu]`, plan 31) and would wait for it (another group holds it, or work waits)
 gets the check now (the 409 as above) but the room when its lease is granted: unloading others and reserving
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from utils.memory.manager import MemoryManager
     from utils.services.model import Service
 
-HEADER = "x-aihub-make-room"
+HEADER = "x-gaifa-make-room"
 YES = {"1", "true", "yes"}
 
 

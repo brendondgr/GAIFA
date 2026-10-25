@@ -25,7 +25,7 @@ from stt.server import create_app
 
 
 class LocalHub(Hub):
-    """Outputs from a dict of id → file, instead of AIHub."""
+    """Outputs from a dict of id → file, instead of GAIFA."""
 
     def __init__(self, files: dict[str, Path]) -> None:
         super().__init__("http://hub.invalid")

@@ -1,7 +1,7 @@
 """The turn's "Waiting for the GPU" status (plan 31.4).
 
-A model call to a local engine goes through the relay, which takes AIHub's GPU slot for it and names the
-chat on the lease (`thread`, from the X-AIHub-Thread header `llm.THREAD` sends). From `DELAY_S` into the
+A model call to a local engine goes through the relay, which takes GAIFA's GPU slot for it and names the
+chat on the lease (`thread`, from the X-GAIFA-Thread header `llm.THREAD` sends). From `DELAY_S` into the
 call, `watch` asks the hub's queue (`GET /api/gpu`) every `EVERY_S` for a waiting lease of this chat, and
 while there is one it sends the transient event `gpu_wait` `{text, eta_s, ahead}`; an empty `gpu_wait`
 clears it. The chat draws it on the turn's live header. It stops once the chat's lease holds the slot

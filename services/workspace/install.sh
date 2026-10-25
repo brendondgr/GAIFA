@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds .venv/ for this mod. Run by `aihub new`; run it again after changing requirements.txt.
+# Builds .venv/ for this mod. Run by `gaifa new`; run it again after changing requirements.txt.
 set -euo pipefail
 cd "$(dirname "$0")"
 if command -v uv >/dev/null 2>&1; then

@@ -11,9 +11,9 @@ const CSS = MD_CSS + `
 .aichat-md .web-removed{padding:4px 9px;border-radius:6px;border:1px dashed var(--acct,#FFB224);color:var(--acct,#FFB224);font-size:12px}`;
 
 function style(doc) {
-  if (doc.getElementById('aihub-web-md')) return;
+  if (doc.getElementById('gaifa-web-md')) return;
   const s = doc.createElement('style');
-  s.id = 'aihub-web-md';
+  s.id = 'gaifa-web-md';
   s.textContent = CSS;
   doc.head.append(s);
 }

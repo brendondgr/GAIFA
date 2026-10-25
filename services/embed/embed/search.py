@@ -33,7 +33,7 @@ def untrusted(source: str, text: str) -> str:
 
 
 def origin_thread(header: str | None) -> str | None:
-    """The chat a tool call came from: the hub's `X-AIHub-Origin` header (`{"thread": …}`); None unless it's a chat id."""
+    """The chat a tool call came from: the hub's `X-GAIFA-Origin` header (`{"thread": …}`); None unless it's a chat id."""
     try:
         tid = (json.loads(header) or {}).get("thread") if header else None
     except (ValueError, AttributeError):

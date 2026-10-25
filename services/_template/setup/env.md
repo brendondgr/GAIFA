@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "__ID__"
 title = "__NAME__"
 models = []
@@ -7,10 +7,10 @@ summary = "__NAME__: one line on what it gives you"
 gpu = false
 disk_gb = 0.1
 needs = []
-check = "aihub check __ID__ --start"
+check = "gaifa check __ID__ --start"
 
 [[steps]]
-run = "aihub install __ID__"
+run = "gaifa install __ID__"
 what = "makes .venv/ in this folder from requirements.txt (under 100 MB, a minute)"
 -->
 
@@ -33,7 +33,7 @@ Other environments (link their docs), host packages ([host.md](../../../docs/set
 ## Install
 
 ```bash
-aihub install __ID__
+gaifa install __ID__
 ```
 
 Makes `.venv/` in this folder from `requirements.txt`.
@@ -50,7 +50,7 @@ What kind of model this mod runs, where the files go, and how to add your own. L
 ## Check it works
 
 ```bash
-aihub start __ID__ && aihub check __ID__
+gaifa start __ID__ && gaifa check __ID__
 ```
 
 Expect `all checks passed`.

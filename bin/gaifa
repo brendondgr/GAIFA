@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# aihub: the AIHub command line (utils/cli.py). Works through the ~/.local/bin/aihub symlink.
+# gaifa: the GAIFA command line (utils/cli.py). Works through the ~/.local/bin/gaifa symlink.
 set -euo pipefail
 here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 root="$(dirname "$here")"
 py="$root/.venv/bin/python"
 if [[ ! -x "$py" ]]; then
     # The CLI is standard library only; `serve` still needs the venv. `setup` runs `uv sync` itself.
-    [[ "${1:-}" == "setup" ]] || echo "aihub: $py is missing; run \`uv sync\` in $root (or \`bin/aihub setup\`)" >&2
+    [[ "${1:-}" == "setup" ]] || echo "gaifa: $py is missing; run \`uv sync\` in $root (or \`bin/gaifa setup\`)" >&2
     py="$(command -v python3)"
 fi
 exec "$py" "$root/utils/cli.py" "$@"

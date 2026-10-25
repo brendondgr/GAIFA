@@ -1,4 +1,4 @@
-"""A stand-in for AIHub's GPU queue (plan 31.1), enough for the mod's tests: one holder group, a waiting
+"""A stand-in for GAIFA's GPU queue (plan 31.1), enough for the mod's tests: one holder group, a waiting
 list, long-polled acquire. Tests take and give back the slot from their own thread (``hold``/``release``)."""
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""`aihub setup host` (plan 23.9, 37.3): the checks from docs/setup/host*.md, each with its fix. The GPU
+"""`gaifa setup host` (plan 23.9, 37.3): the checks from docs/setup/host*.md, each with its fix. The GPU
 checks depend on the machine (`utils/hardware/`, cli_setup_gpu.py), package names on its package manager
 (cli_setup_pkgs.py).
 
@@ -122,7 +122,7 @@ def checks(probe: Probe, root: Path, needs: set[str] = frozenset(), disk_gb: flo
                          "" if under else "move the clone under your home folder: the ComfyUI toolbox only sees $HOME (host.md §5)", gpu=True))
     if m.os == "linux":
         lin = probe.linger()
-        out.append(Check("linger", lin, "lingering is on: AIHub keeps running after you log out" if lin else "lingering is off: the hub stops when you log out",
+        out.append(Check("linger", lin, "lingering is on: GAIFA keeps running after you log out" if lin else "lingering is off: the hub stops when you log out",
                          "" if lin else "loginctl enable-linger $USER"))
     free = probe.free_gb(root)
     out.append(Check("disk", free >= disk_gb, f"{free:.0f} GB free, {disk_gb:.1f} GB needed", "" if free >= disk_gb else "free some space, or choose fewer mods or models"))

@@ -20,7 +20,7 @@ install = "install.sh"
 [run.env]
 EMBED_MODEL_DIR = "{models}/embed/embeddinggemma-2"
 EMBED_STATE_DIR = "{root}/data/state/embed"
-EMBED_DEVICE = "auto"               # auto (the variant: AIHUB_DEVICE) | cuda | xpu | mps | cpu (bf16 on CUDA/ROCm and xpu, else fp32, never fp16)
+EMBED_DEVICE = "auto"               # auto (the variant: GAIFA_DEVICE) | cuda | xpu | mps | cpu (bf16 on CUDA/ROCm and xpu, else fp32, never fp16)
 HF_HOME = "{hf_home}"
 HF_HUB_OFFLINE = "1"
 # The library (plan 28.2): index every output. Each batch waits for the GPU slot as background work (plan 31.3),

@@ -53,8 +53,8 @@ def hub():
 
 
 @pytest.fixture
-def wc(tmp_path, aihub, hub):
-    app = server.create_app(tmp_path / "state", aihub, aihub / "data" / "models", tmp_path / "outputs", hub)
+def wc(tmp_path, gaifa, hub):
+    app = server.create_app(tmp_path / "state", gaifa, gaifa / "data" / "models", tmp_path / "outputs", hub)
     with TestClient(app) as c:
         yield c
 
@@ -66,7 +66,7 @@ def proj(wc, repo):
 
 
 def post(c, route, **body):
-    return c.post(route, json=body, headers={"X-AIHub-Origin": json.dumps({"thread": "t1", "turn": 3})})
+    return c.post(route, json=body, headers={"X-GAIFA-Origin": json.dumps({"thread": "t1", "turn": 3})})
 
 
 def test_run_in_the_sandbox(wc, proj):
@@ -99,19 +99,19 @@ def test_levels_and_refusals(wc, proj):
     assert post(wc, "/v1/run", folder="proj", command="ls").json()["code"] == "level"
 
 
-def test_a_command_in_a_folder_holding_aihub_cannot_change_it(wc, aihub, tmp_path):
-    """A Run folder that contains the AIHub folder: the command writes the folder, not AIHub or its models."""
+def test_a_command_in_a_folder_holding_gaifa_cannot_change_it(wc, gaifa, tmp_path):
+    """A Run folder that contains the GAIFA folder: the command writes the folder, not GAIFA or its models."""
     (tmp_path / "work").mkdir()
     assert wc.post("/v1/folders", json={"path": str(tmp_path), "level": "run", "id": "outer"}).status_code == 200
-    cmd = (f"echo x > work/ok.txt; echo hacked > {aihub}/utils/proxy.py; touch {aihub}/data/models/llm/new; "
-           f"python -c \"open('{aihub}/utils/proxy.py','w')\"; echo done")
+    cmd = (f"echo x > work/ok.txt; echo hacked > {gaifa}/utils/proxy.py; touch {gaifa}/data/models/llm/new; "
+           f"python -c \"open('{gaifa}/utils/proxy.py','w')\"; echo done")
     out = post(wc, "/v1/run", folder="outer", command=cmd).json()
     assert "done" in out["stdout"] and "Read-only file system" in out["stderr"], out
     assert (tmp_path / "work" / "ok.txt").read_text() == "x\n"
-    assert (aihub / "utils" / "proxy.py").read_text() == "def proxy():\n    pass\n"
-    assert not (aihub / "data" / "models" / "llm" / "new").exists()
-    py = post(wc, "/v1/python", folder="outer", code=f"open('{aihub}/utils/proxy.py', 'w').write('x')").json()
-    assert py["exit_code"] == 1 and (aihub / "utils" / "proxy.py").read_text() == "def proxy():\n    pass\n"
+    assert (gaifa / "utils" / "proxy.py").read_text() == "def proxy():\n    pass\n"
+    assert not (gaifa / "data" / "models" / "llm" / "new").exists()
+    py = post(wc, "/v1/python", folder="outer", code=f"open('{gaifa}/utils/proxy.py', 'w').write('x')").json()
+    assert py["exit_code"] == 1 and (gaifa / "utils" / "proxy.py").read_text() == "def proxy():\n    pass\n"
 
 def test_run_with_network_installs_a_package(wc, proj):
     wc.patch("/v1/folders/proj", json={"level": "run_net"})
@@ -130,7 +130,7 @@ def test_run_on_the_host(wc, proj):
 
 def test_python_writes_outputs(wc, tmp_path):
     code = ("import pandas as pd, matplotlib.pyplot as plt, os\n"
-            "df = pd.read_csv(os.path.join(os.environ['AIHUB_INPUTS'], 'sales.csv'))\n"
+            "df = pd.read_csv(os.path.join(os.environ['GAIFA_INPUTS'], 'sales.csv'))\n"
             "print(df.loc[df.revenue.idxmax(), 'month'])\n"
             "df.plot.bar(x='month', y='revenue'); plt.savefig('chart.png')\n")
     r = post(wc, "/v1/python", code=code, inputs=["output:0123456789ab"])
@@ -152,7 +152,7 @@ def test_a_symlink_the_code_leaves_never_copies_a_host_file(wc, tmp_path):
     host = tmp_path / "id_ed25519"
     host.write_text("HOST PRIVATE KEY\n")
     code = (f"import os\nos.symlink({str(host)!r}, 'key.txt')\nos.symlink({str(tmp_path)!r}, 'dir')\n"
-            f"os.symlink({str(host)!r}, os.path.join(os.environ['AIHUB_OUT'], 'k.txt'))\nopen('real.txt', 'w').write('ok')\n")
+            f"os.symlink({str(host)!r}, os.path.join(os.environ['GAIFA_OUT'], 'k.txt'))\nopen('real.txt', 'w').write('ok')\n")
     out = post(wc, "/v1/python", code=code).json()
     assert out["exit_code"] == 0, out.get("stderr")
     assert [Path(f).name.split("-", 1)[1] for f in out["files"]] == ["real.txt"]
@@ -172,7 +172,7 @@ def test_python_without_files_and_bad_inputs(wc):
 
 
 def test_python_in_a_folder(wc, proj):
-    r = post(wc, "/v1/python", folder="proj", code="import os\nprint(os.getcwd())\nopen('made.txt','w').write('x')\nopen(os.path.join(os.environ['AIHUB_OUT'],'o.txt'),'w').write('o')").json()
+    r = post(wc, "/v1/python", folder="proj", code="import os\nprint(os.getcwd())\nopen('made.txt','w').write('x')\nopen(os.path.join(os.environ['GAIFA_OUT'],'o.txt'),'w').write('o')").json()
     assert r["exit_code"] == 0 and r["stdout"].split("\n")[1] == str(proj)
     assert (proj / "made.txt").exists() and len(r["files"]) == 1 and r["files"][0].endswith("-out-o.txt")
 
@@ -182,6 +182,6 @@ def test_limits_preflight_for_python(client):
 
 
 def test_missing_image(wc, proj, monkeypatch):
-    monkeypatch.setattr(wc.app.state.ctx.sandbox, "image_name", "localhost/aihub-nope:0")
+    monkeypatch.setattr(wc.app.state.ctx.sandbox, "image_name", "localhost/gaifa-nope:0")
     r = post(wc, "/v1/run", folder="proj", command="ls")
     assert r.status_code == 503 and r.json()["code"] == "sandbox_missing"

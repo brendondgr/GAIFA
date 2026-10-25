@@ -39,7 +39,7 @@ def fixture_folder(level: str = "run"):
     async def attach(hub: str) -> dict[str, Any]:
         import httpx
 
-        d = Path(tempfile.mkdtemp(prefix="aihub-eval-calc-"))
+        d = Path(tempfile.mkdtemp(prefix="gaifa-eval-calc-"))
         (d / "calc.py").write_text(CALC)
         (d / "test_calc.py").write_text(TESTS)
         (d / "README.md").write_text("# calc\n\nRun the tests with `python -m unittest`.\n")

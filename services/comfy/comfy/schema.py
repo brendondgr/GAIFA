@@ -13,8 +13,8 @@ from .tasks import Tasks
 
 JSON_TYPES = {"INT": "integer", "FLOAT": "number", "STRING": "string", "BOOLEAN": "boolean", "COMBO": "string"}
 FILE_LOADERS = {"LoadImage", "LoadImageMask", "LoadVideo", "LoadAudio", "VHS_LoadVideo", "VHS_LoadVideoPath"}
-FILE = {"type": "string", "format": "aihub-file",
-        "description": "An AIHub output id (output:<id>), an uploaded file name, or a URL path under /api/outputs/"}
+FILE = {"type": "string", "format": "gaifa-file",
+        "description": "A GAIFA output id (output:<id>), an uploaded file name, or a URL path under /api/outputs/"}
 
 
 def input_schema(pack: Pack, conv: Converted | None, catalog: NodeCatalog, tasks: Tasks) -> dict:

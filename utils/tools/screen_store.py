@@ -24,7 +24,7 @@ from typing import Any
 from utils.outputs.text import TEXT_DIR
 from utils.tools import screen as sc
 
-log = logging.getLogger("aihub.tools")
+log = logging.getLogger("gaifa.tools")
 
 VERSION = 1
 MAX_WHOLE = 400_000          # characters of a page the route screens at once; the rest is screened as it's read

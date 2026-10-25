@@ -87,7 +87,7 @@ class CubeWorker:
 
     def command(self) -> list[str]:
         # Mount real paths, never symlinks: a link that points outside its mount is broken inside
-        # the container (AIHub architecture §12.3). The jobs folder is the only writable mount
+        # the container (GAIFA architecture §12.3). The jobs folder is the only writable mount
         # besides the family's code/venv/cache folder.
         sp = specs()[self.family]
         ca, jobs, workers = str(settings.cubeart), str(settings.jobs_dir.resolve()), str(ROOT / "workers")

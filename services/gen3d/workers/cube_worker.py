@@ -30,7 +30,7 @@ os.dup2(sys.stderr.fileno(), sys.stdout.fileno())  # C-level prints too
 sys.stdout = sys.stderr
 
 CUBEART = Path(os.environ["GEN3D_CUBEART"])
-W = Path(os.environ.get("GEN3D_WEIGHTS") or CUBEART / "weights")  # AIHub: data/models/3d
+W = Path(os.environ.get("GEN3D_WEIGHTS") or CUBEART / "weights")  # GAIFA: data/models/3d
 
 
 def emit(event: str, **data) -> None:

@@ -1,6 +1,6 @@
-// LLM Launcher (lcpp) page inside AIHub: Instances, Catalog, Playground, Relay publishing and
+// LLM Launcher (lcpp) page inside GAIFA: Instances, Catalog, Playground, Relay publishing and
 // Launcher settings (design brief Part B1, a port of lcpp's own UI). Calls lcppd's API through
-// ctx.call; a launch asks AIHub for memory, so "Make room" comes up when it's needed.
+// ctx.call; a launch asks GAIFA for memory, so "Make room" comes up when it's needed.
 import { chartCard, chart, charts, rh } from '/mod-charts.js';
 import { requireRunning, callRoom, segmented, header, panel, columns, stat, store, fmtBytes, fmtSecs, fmtAgo, MONO } from '/mod-kit.js';
 
@@ -153,7 +153,7 @@ function catalogTab(el, ctx, cleanups) {
       h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, [m.capabilities.vision && 'vision', m.capabilities.speculative && 'speculative', m.capabilities.split && 'split', m.location === 'external' && 'outside the models folder'].filter(Boolean).map(t => ui.badge(t, 'accent'))),
       ...m.problems.map(p => ui.badge(p, 'red')),
       h('div', { style: 'display:flex;gap:6px' }, ui.button('Delete from catalog', async () => {
-        if (!await ctx.confirm({ title: `Delete ${m.id} from the catalog?`, body: 'The entry is removed from lcpp; the files stay on disk (and on AIHub\'s Models page).', danger: true })) return;
+        if (!await ctx.confirm({ title: `Delete ${m.id} from the catalog?`, body: 'The entry is removed from lcpp; the files stay on disk (and on GAIFA\'s Models page).', danger: true })) return;
         try { await ctx.call('DELETE', `/api/models/${enc(m.id)}`); ctx.toast(`Removed ${m.id}`, 'success'); load(); } catch (e) { ctx.toast(errText(e), 'error'); }
       }, { small: true, kind: 'ghost' })));
   }
@@ -322,10 +322,10 @@ function settingsTab(el, ctx) {
         ctx.toast('Launcher settings saved (new instances use them)', 'success');
       } catch (e) { ctx.toast(errText(e), 'error'); }
     }, { kind: 'primary' });
-    out.replaceChildren(panel(header('Launcher settings'), ui.text('lcpp\'s own settings (services/lcpp/data/lcpp.json). AIHub\'s port, autostart and env for this mod are on the generic Settings tab.', { muted: true, small: true }),
+    out.replaceChildren(panel(header('Launcher settings'), ui.text('lcpp\'s own settings (services/lcpp/data/lcpp.json). GAIFA\'s port, autostart and env for this mod are on the generic Settings tab.', { muted: true, small: true }),
       ui.field('llama-server binary', binary, 'Relative to services/lcpp'), h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, ui.field('Instance ports from', pStart), ui.field('to', pEnd)),
       h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end' }, ui.field('Relay URL', relayUrl), h('label', { style: 'display:flex;gap:6px;align-items:center;font-size:12.5px' }, auto, 'Publish new instances by default')),
-      ui.field('Scan folders', scan, 'One per line; "models" is AIHub\'s data/models/llm'), ui.field('Server params (every instance)', params), ui.field('Environment', env), h('div', {}, save)));
+      ui.field('Scan folders', scan, 'One per line; "models" is GAIFA\'s data/models/llm'), ui.field('Server params (every instance)', params), ui.field('Environment', env), h('div', {}, save)));
   }).catch(e => out.replaceChildren(ui.badge(errText(e), 'red')));
   el.append(out);
 }

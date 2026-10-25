@@ -3,10 +3,10 @@
 Stages run in order; each reads its input from this job's earlier output, the parent job's output
 (`parent_id`), or an uploaded mesh. A stage that finished before a server restart is not re-run.
 
-The GPU slot (plan 31.3): a job takes AIHub's slot (`gpu_slot.py`) before its first stage and holds it
+The GPU slot (plan 31.3): a job takes GAIFA's slot (`gpu_slot.py`) before its first stage and holds it
 across all of them, the Blender preview included; memory is asked for after it. While it waits, the
 job stays `queued` with `stage: "waiting_gpu"` (`ahead`, `eta_s`). The lease goes to comfy in
-`X-AIHub-GPU-Lease` when TRELLIS.2 or SAM 3D Body run there, so comfy runs under it.
+`X-GAIFA-GPU-Lease` when TRELLIS.2 or SAM 3D Body run there, so comfy runs under it.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class Runner:
     def __init__(self, store: Store, worker, previewer, events: Broadcaster, eta_scale: float = 1.0, comfy=None,
                  gpu: GpuSlot | None = None):
         self.store = store
-        self.gpu = gpu or GpuSlot(service="gen3d")     # AIHUB_URL from the environment; none: runs at once
+        self.gpu = gpu or GpuSlot(service="gen3d")     # GAIFA_URL from the environment; none: runs at once
         self.lease = None                               # the running job's GPU lease
         self.gpu_wait: dict[str, dict] = {}             # job id → {ahead, eta_s} while it waits for the slot
         self._cancel_waiting: set[str] = set()
@@ -279,7 +279,7 @@ class Runner:
     async def delegate(self, req: JobRequest, jdir: Path, inputs: dict, on_event, cancel_check) -> dict:
         """TRELLIS.2 and SAM 3D Body: a run of their comfy pack through the hub (gen3d/comfy_engine.py)."""
         if self.comfy is None:
-            raise StageError(f"{ENGINES[req.engine].label} runs in the comfy mod, which needs AIHub (AIHUB_URL)")
+            raise StageError(f"{ENGINES[req.engine].label} runs in the comfy mod, which needs GAIFA (GAIFA_URL)")
         # comfy runs under this job's GPU lease instead of queueing behind it
         return await self.comfy.run(req, jdir, inputs, on_event, cancel_check,
                                     gpu_headers=self.lease.headers if self.lease else {})

@@ -23,7 +23,7 @@ import settings as st
 from containers import KEEP_BACKUPS, Container, Runtime, RuntimeError_
 
 PROBES = ("http://127.0.0.1:8080", "http://127.0.0.1:8888")
-CHECK_QUERY = "aihub settings check"
+CHECK_QUERY = "gaifa settings check"
 
 
 class ChangeFailed(Exception):

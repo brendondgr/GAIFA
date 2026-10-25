@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AIHub runs this as the opencode mod (service.toml). It was DashLLM's scripts/opencode-serve.sh.
+# GAIFA runs this as the opencode mod (service.toml). It was DashLLM's scripts/opencode-serve.sh.
 #
 # A wrapper rather than a bare ExecStart because systemd cannot expand
 # variables in WorkingDirectory= or resolve `opencode` on its minimal PATH, and
@@ -37,10 +37,10 @@ fi
 # shellcheck disable=SC1091
 . "$ROOT/auth.sh"
 
-# The folder OpenCode's shell, edit and write tools act in: one the person chose, outside AIHub
-# (plan 23.14). Unset used to mean this folder, which put an agent's shell inside AIHub.
-AIHUB="$(cd "$ROOT/../.." && pwd -P)"
-how="set OPENCODE_PROJECT_DIR to a folder outside AIHub: aihub setup opencode asks for it, or [services.opencode.env] in config.toml (a line in $ROOT/.env wins over it), which the hub reads when it starts: aihub restart, then aihub restart opencode"
+# The folder OpenCode's shell, edit and write tools act in: one the person chose, outside GAIFA
+# (plan 23.14). Unset used to mean this folder, which put an agent's shell inside GAIFA.
+GAIFA="$(cd "$ROOT/../.." && pwd -P)"
+how="set OPENCODE_PROJECT_DIR to a folder outside GAIFA: gaifa setup opencode asks for it, or [services.opencode.env] in config.toml (a line in $ROOT/.env wins over it), which the hub reads when it starts: gaifa restart, then gaifa restart opencode"
 if [ -z "${OPENCODE_PROJECT_DIR:-}" ]; then
   echo "OPENCODE_PROJECT_DIR is not set, so there's no folder for OpenCode to work in; $how" >&2
   exit 1
@@ -49,7 +49,7 @@ PROJECT_DIR="$OPENCODE_PROJECT_DIR"
 [ -d "$PROJECT_DIR" ] || { echo "OPENCODE_PROJECT_DIR does not exist: $PROJECT_DIR" >&2; exit 78; }
 REAL="$(cd "$PROJECT_DIR" && pwd -P)"
 case "$REAL/" in
-  "$AIHUB"/*) echo "OPENCODE_PROJECT_DIR is inside AIHub ($REAL), which stays read-only to agents; $how" >&2; exit 1 ;;
+  "$GAIFA"/*) echo "OPENCODE_PROJECT_DIR is inside GAIFA ($REAL), which stays read-only to agents; $how" >&2; exit 1 ;;
 esac
 
 cd "$PROJECT_DIR"

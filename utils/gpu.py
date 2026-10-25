@@ -10,7 +10,7 @@ work, so only one group's work runs at a time.
 - **Groups share.** While a group holds the slot, more leases of that group join it (an LLM engine
   batches its requests), unless another group's lease of the same or a higher class is waiting: then they
   queue behind it, so a stream of requests can't starve the others.
-- **Nested work.** A lease with `parent` (a held lease, passed down in `X-AIHub-GPU-Lease`) is granted at
+- **Nested work.** A lease with `parent` (a held lease, passed down in `X-GAIFA-GPU-Lease`) is granted at
   once, under its parent: gen3d's job runs comfy's prompt without queueing behind itself.
 - **Expiry.** A held lease not renewed for `[gpu] lease_ttl_s` is dropped with the `gpu_lease_expired`
   alert, so a mod that died frees the slot. A waiting lease nobody asks about any more is dropped quietly.
@@ -39,12 +39,12 @@ if TYPE_CHECKING:
     from utils.config import GpuCfg
     from utils.events import ActivityLog, Alerts, EventBus
 
-log = logging.getLogger("aihub.gpu")
+log = logging.getLogger("gaifa.gpu")
 
 CLASSES = ("interactive", "job", "background")
 RANK = {c: i for i, c in enumerate(CLASSES)}
 ALERT = "gpu_lease_expired"
-HEADER = "X-AIHub-GPU-Lease"
+HEADER = "X-GAIFA-GPU-Lease"
 SWEEP_S = 2.0
 HISTORY = 20
 HOLDS_KEPT = 10          # per service, for the ETA of leases that don't give est_s
@@ -120,8 +120,8 @@ class GpuQueue:
 
     async def start(self) -> None:
         self._sub = self.bus.subscribe()
-        self._tasks = [asyncio.create_task(self._loop(), name="aihub-gpu"),
-                       asyncio.create_task(self._follow(), name="aihub-gpu-services")]
+        self._tasks = [asyncio.create_task(self._loop(), name="gaifa-gpu"),
+                       asyncio.create_task(self._follow(), name="gaifa-gpu-services")]
 
     async def close(self) -> None:
         for t in self._tasks:

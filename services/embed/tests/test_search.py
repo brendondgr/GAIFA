@@ -14,7 +14,7 @@ from tests.conftest import FakeGpu, png
 from tests.test_library import make, run
 
 T1, T2 = "t_00000000000a", "t_00000000000b"                       # the agent's id shape
-ORIGIN = {"X-AIHub-Origin": json.dumps({"tool_call": "c1", "service": "agent", "thread": T1})}
+ORIGIN = {"X-GAIFA-Origin": json.dumps({"tool_call": "c1", "service": "agent", "thread": T1})}
 
 
 @pytest.fixture
@@ -90,7 +90,7 @@ def test_thread_only_uses_the_chats_attachments(client, hub):
     assert r.status_code == 422 and r.json()["code"] == "no_thread"
     hub.threads[T2] = []
     r = client.post("/v1/search", json={"query": "x", "thread_only": True},
-                    headers={"X-AIHub-Origin": json.dumps({"thread": T2})})
+                    headers={"X-GAIFA-Origin": json.dumps({"thread": T2})})
     assert r.json()["results"] == [] and "no attachments" in r.json()["note"]
 
 
@@ -185,7 +185,7 @@ def test_thread_ids_are_checked_and_odd_answers_handled(client, hub):
         r = client.post("/v1/search", json={"query": "x", "collection": f"thread:{bad}"})
         assert r.status_code == 422 and r.json()["code"] == "bad_thread", bad
     r = client.post("/v1/search", json={"query": "x", "thread_only": True},
-                    headers={"X-AIHub-Origin": json.dumps({"thread": "../x"})})
+                    headers={"X-GAIFA-Origin": json.dumps({"thread": "../x"})})
     assert r.status_code == 422 and r.json()["code"] == "no_thread"
     for odd in ({"events": []}, [1, "x", {"type": "user", "payload": "p"}, {"type": "user", "payload": {"attachments": "a"}}]):
         hub.threads[T1] = odd

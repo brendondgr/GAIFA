@@ -1,4 +1,4 @@
-// AIHub mock API — in-memory AIHub + services with simulated time.
+// GAIFA mock API — in-memory GAIFA + services with simulated time.
 // Implements the Section 6 contract; becomes web/js/mock.js in the vanilla port.
 import { createHistory, withSeries } from './mock-history.js';
 import { createModMocks } from './mock-mods.js';
@@ -242,7 +242,7 @@ function seedServices(base) {
     svc({ id: 'tts', name: 'Speech', description: 'Text-to-speech with voice cloning and voice design.', icon: 'wave', port: 5040, version: '0.6.1', load: 'unloaded', estimate: 13 * GB, peak: 16.7 * GB, idle_s: 760, has_outputs: true, has_page: true, native_ui: 'http://127.0.0.1:5040/ui/', models: ['breeze-tts-2', 'kokoro-82m', 'whisper-large-v3-turbo', 'voice-brendon', 'voice-hope', 'voice-arabella'], stats: [{ label: 'Voices', value: 3 }, { label: 'Engines installed', value: 2 }, { label: 'Clips today', value: 12, reset: 'daily' }], priority: 0, idle_unload_s: 180 }),
     svc({ id: 'gen3d', name: '3D Generate', description: 'Text-to-3D meshes with part splitting and auto-rigging.', icon: 'cube', port: 5050, has_page: true, native_ui: 'http://127.0.0.1:5050/ui/', version: '0.3.0', load: 'unloaded', estimate: 52 * GB, peak: 52 * GB, idle_s: 5400, has_outputs: true, models: ['cube3d-v0.5', 'cubepart', 'qwen3-vl-4b-instruct', 'clip-vit-large-patch14'], stats: [{ label: 'Jobs', value: 17 }, { label: 'Queue', value: 0 }], priority: 2 }),
     svc({ id: 'comfy', name: 'Images & Video', description: 'ComfyUI workflows: text to image, image edits and video', icon: 'image', port: 5070, version: '0.1.0', load: 'unloaded', estimate: 24 * GB, peak: 60 * GB, idle_s: null, has_outputs: true, has_page: true, native_ui: 'http://127.0.0.1:8199/', models: ['z-image-turbo-fp8', 'qwen-image-2.1-fp8', 'qwen-image-2.1-q8', 'wan2.1-t2v-14b-fp8', 'wan2.1-i2v-480p-14b-fp8', 'scail-2-q8', 'qwen3vl-8b-bf16', 'umt5-xxl-enc-fp8', 'qwen-3-4b', 'wan-2.1-vae', 'qwen-image-2.1-vae', 'wan21-lightx2v-lora', 'zit-watercolor', 'clip-vision-h', 'remacri-4x'], stats: [{ label: 'Workflows', value: 4 }, { label: 'Drafts', value: 1 }, { label: 'Queue', value: 0 }, { label: 'Made today', value: 3, reset: 'daily' }], priority: 1, idle_unload_s: 600 }),
-    svc({ id: 'example', name: 'Example', description: 'The mod template. Copy it with aihub new <id>.', icon: 'puzzle', port: 5099, used: 0.05 * GB, has_page: true, stats: [{ label: 'Calls', value: 0 }], priority: 3, autostart: false }),
+    svc({ id: 'example', name: 'Example', description: 'The mod template. Copy it with gaifa new <id>.', icon: 'puzzle', port: 5099, used: 0.05 * GB, has_page: true, stats: [{ label: 'Calls', value: 0 }], priority: 3, autostart: false }),
     // the embed mod, so "By meaning" (Outputs, the chat list, the header Search) and its scores show in ?mock
     svc({ id: 'embed', name: 'Embeddings', description: 'EmbeddingGemma 2 and the library: every output indexed for search by meaning', icon: 'search', port: 5104, used: 1.2 * GB, stats: [{ label: 'Indexed', value: 120 }], priority: 6 }),
   ];
@@ -304,13 +304,13 @@ export function createMockApi() {
   { const r = rng(5); for (let i = 0; i < 80; i++) { const svc = services[0]; svc.logs.push({ ts: T0 - (80 - i) * 37, text: `POST /v1/chat/completions ${r() < 0.8 ? 'gemma-4-26b-it' : 'minicpm-5-2b'} 200 ${Math.floor(200 + r() * 900)}ms ${Math.floor(100 + r() * 2000)} tok`, stream: 'stdout' }); } }
 
   const svcById = id => services.find(s => s.id === id);
-  const emit = ev => { if (hubDown) return; for (const fn of listeners) { try { fn(ev); } catch (e) { console.error(`AIHub event handler failed (${ev.type}): ${e?.message}`, e?.stack); } } };
+  const emit = ev => { if (hubDown) return; for (const fn of listeners) { try { fn(ev); } catch (e) { console.error(`GAIFA event handler failed (${ev.type}): ${e?.message}`, e?.stack); } } };
   const later = (ms, fn) => setTimeout(fn, ms / speed);
   const gpuNow = Date.now() / 1000, gpuL = (id, service, name, cls, label, extra) => ({ id, service, name, group: service, class: cls, label, created_ts: gpuNow - 60, renewed_ts: gpuNow, ...extra });
   const gpuQ = { queue: true, lease_ttl_s: 60, holder: { group: 'gen3d', leases: [gpuL('gl_mock00000001', 'gen3d', '3D Generate', 'job', 'Make 3D: chair', { granted_ts: gpuNow - 95, elapsed_s: 95, eta_s: 150 })] },
     waiting: [gpuL('gl_mock00000002', 'comfy', 'Images & Video', 'job', 'Image: portrait', { eta_s: 150, waited_s: 40, ahead: [] }), gpuL('gl_mock00000003', 'tts', 'Speech', 'job', 'Speech: Hope', { eta_s: 240, waited_s: 12, ahead: [] })],
     recent: [] };
-  const net = () => new Promise((res, rej) => setTimeout(() => hubDown ? rej(new ApiError(0, 'AIHub not responding at 127.0.0.1:7000', 'hub_error')) : res(), 40 + Math.random() * 120));
+  const net = () => new Promise((res, rej) => setTimeout(() => hubDown ? rej(new ApiError(0, 'GAIFA not responding at 127.0.0.1:7000', 'hub_error')) : res(), 40 + Math.random() * 120));
   const err = (status, code, detail, data) => new ApiError(status, detail, code, data);
   const usedBytes = () => otherBytes + services.reduce((a, s) => a + s.used, 0);
 
@@ -319,7 +319,7 @@ export function createMockApi() {
       state: s.state, state_since: s.state_since, load: s.load, idle_s: s.load === 'n/a' ? null : s.idle_s, memory: { used_bytes: s.used, estimate_bytes: s.estimate, peak_bytes: s.peak },
       stats: s.stats.map(st => withSeries(s.id, st)), has_page: s.has_page, chat_url: CHAT_MODS.includes(s.id) ? `/ui/services/${s.id}/chat.js` : null, logo_url: ['relay', 'lcpp', 'tts', 'gen3d', 'comfy', 'opencode'].includes(s.id) ? `/ui/services/${s.id}/logo.svg` : null, has_outputs: s.has_outputs, native_ui: s.native_ui, enabled: s.config?.enabled ?? true, autostart: s.config?.autostart ?? s.autostart,
       last_error: s.last_error, manifest_errors: [...s.manifest_errors],
-      accel: MOCK_ACCEL[s.id] ?? null, unavailable: s.id === 'example' ? "its variant (cuda) needs a GPU this machine doesn't have (it has rocm, vulkan, cpu): run `aihub setup example` to pick another" : null };   // plan 38.3
+      accel: MOCK_ACCEL[s.id] ?? null, unavailable: s.id === 'example' ? "its variant (cuda) needs a GPU this machine doesn't have (it has rocm, vulkan, cpu): run `gaifa setup example` to pick another" : null };   // plan 38.3
   }
   function detail(s) {
     const manifest = s.manifest_errors.length ? { id: s.id, name: s.name } : { id: s.id, name: s.name, description: s.description, version: s.version, icon: s.icon,
@@ -341,7 +341,7 @@ export function createMockApi() {
   }
   function system() {
     return { hub: { version: '0.1.0', pid: 31337, uptime_s: Math.round(now() - T0 + 7200), rss_bytes: 92 * MB, port: settings.hub.port },
-      paths: { root: '/home/ops/AIHub', models: '/home/ops/AIHub/data/models', databases: '/home/ops/AIHub/data/databases', outputs: '/home/ops/AIHub/outputs', logs: '/home/ops/AIHub/data/logs', state: '/home/ops/AIHub/data/state' },
+      paths: { root: '/home/ops/GAIFA', models: '/home/ops/GAIFA/data/models', databases: '/home/ops/GAIFA/data/databases', outputs: '/home/ops/GAIFA/outputs', logs: '/home/ops/GAIFA/data/logs', state: '/home/ops/GAIFA/data/state' },
       usage: { logs_bytes: 38 * MB, state_bytes: 24 * 1024, models_bytes: models.reduce((a, m) => a + (m.status === 'missing' ? 0 : m.size_bytes), 0), databases_bytes: 412 * MB, outputs_bytes: outputs.reduce((a, o) => a + o.size_bytes, 0) },
       disk: { free_bytes: 450 * GB, total_bytes: 952 * GB } };
   }
@@ -554,12 +554,12 @@ export function createMockApi() {
     },
     async getDoctor() {  // plan 12.4: the shape of GET /api/doctor, from the mock's own mods
       await net();
-      const checks = [{ area: 'models', level: 'ok', title: 'models registry: 14 models, every file present', detail: '3 not checksummed yet (aihub models verify --all)' },
-        ...services.map(s => s.manifest_errors.length ? { area: 'manifests', level: 'fail', title: `${s.id}: invalid`, detail: s.manifest_errors.join('; '), fix: `aihub check ${s.id}` }
+      const checks = [{ area: 'models', level: 'ok', title: 'models registry: 14 models, every file present', detail: '3 not checksummed yet (gaifa models verify --all)' },
+        ...services.map(s => s.manifest_errors.length ? { area: 'manifests', level: 'fail', title: `${s.id}: invalid`, detail: s.manifest_errors.join('; '), fix: `gaifa check ${s.id}` }
           : { area: 'paths', level: 'ok', title: `${s.id}: everything inside the project`, detail: '' }),
-        { area: 'paths', level: 'note', title: 'logs: in the systemd journal (plan 16.1 moves them to data/logs/)', detail: services.map(s => `aihub-${s.id}.service`).join(', ') },
-        ...services.map(s => s.state === 'failed' ? { area: 'units', level: 'fail', title: `${s.id}: failed`, detail: '', fix: `aihub logs ${s.id}` } : { area: 'units', level: 'ok', title: `${s.id}: ${s.state}`, detail: '' }),
-        { area: 'disk', level: 'ok', title: '395 GB free of 1000 GB', detail: '/home/you/AIHub' }];
+        { area: 'paths', level: 'note', title: 'logs: in the systemd journal (plan 16.1 moves them to data/logs/)', detail: services.map(s => `gaifa-${s.id}.service`).join(', ') },
+        ...services.map(s => s.state === 'failed' ? { area: 'units', level: 'fail', title: `${s.id}: failed`, detail: '', fix: `gaifa logs ${s.id}` } : { area: 'units', level: 'ok', title: `${s.id}: ${s.state}`, detail: '' }),
+        { area: 'disk', level: 'ok', title: '395 GB free of 1000 GB', detail: '/home/you/GAIFA' }];
       const counts = Object.fromEntries(['ok', 'note', 'warn', 'fail'].map(k => [k, checks.filter(c => c.level === k).length]));
       return { ts: Date.now() / 1000, ok: !counts.fail, counts, checks };
     },
@@ -707,7 +707,7 @@ export function createMockApi() {
       settings.memory.priority.forEach((id, i) => { const x = svcById(id); if (x) x.config.priority = i; });
       services.forEach(x => { if (s.services.enabled[x.id] != null) x.config.enabled = s.services.enabled[x.id]; if (s.services.autostart[x.id] != null) x.config.autostart = s.services.autostart[x.id]; });
       services.sort((a, b) => settings.services.order.indexOf(a.id) - settings.services.order.indexOf(b.id));
-      services.forEach(pushSvc); pushMem(); act(`AIHub settings saved${restart ? ' (restart required)' : ''}`);
+      services.forEach(pushSvc); pushMem(); act(`GAIFA settings saved${restart ? ' (restart required)' : ''}`);
       return { settings: clone(settings), restart_required: restart }; },
     subscribe(onEvent, onError) { listeners.add(onEvent); if (onError) errorListeners.add(onError); return { close() { listeners.delete(onEvent); errorListeners.delete(onError); } }; },
   };
@@ -724,7 +724,7 @@ export function createMockApi() {
   api.mock = {
     get speed() { return speed; }, setSpeed(n) { speed = n; },
     get hubDown() { return hubDown; },
-    setHubDown(v) { hubDown = v; if (v) errorListeners.forEach(fn => fn(new ApiError(0, 'AIHub not responding at 127.0.0.1:7000', 'hub_error'))); },
+    setHubDown(v) { hubDown = v; if (v) errorListeners.forEach(fn => fn(new ApiError(0, 'GAIFA not responding at 127.0.0.1:7000', 'hub_error'))); },
     failService(id) { const s = svcById(id); if (!s) return; if (s.state === 'ready' || s.state === 'degraded') { log(id, 'Segmentation fault (core dumped)', 'stderr'); log(id, 'process exited with code 139', 'stderr'); s.used = 0; if (s.load !== 'n/a') s.load = 'unloaded'; s.pid = null; setState(s, 'failed', { last_error: 'Segmentation fault (exit code 139)' }); act(`${s.name} crashed`, id, 'error', `#/s/${id}/logs`); pushMem(); } else { s.failNext = true; startSvc(s); } },
     makeUnreachable(id) { const s = svcById(id); if (!s || s.state !== 'ready') return; s.healthy = false; log(id, `health check failed: GET http://127.0.0.1:${s.config.port}/health → connection refused`, 'stderr'); setState(s, 'degraded'); act(`${s.name} is not responding`, id, 'warn', `#/s/${id}`); },
     memoryPressure(notEnough = false) {

@@ -1,4 +1,4 @@
-"""12.5: `aihub backup <folder>`: an online copy of every database plus the registry, config.toml
+"""12.5: `gaifa backup <folder>`: an online copy of every database plus the registry, config.toml
 and the mods' .env files, in a dated owner-only archive."""
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def test_backup_archives_live_databases_and_settings(root, tmp_path):
 
     assert cli.main(["backup", str(dest)]) == 0
     live.close()
-    [out] = dest.glob("aihub-backup-*.tar.gz")
+    [out] = dest.glob("gaifa-backup-*.tar.gz")
     assert stat.S_IMODE(out.stat().st_mode) == 0o600
     with tarfile.open(out) as tar:
         names = sorted(tar.getnames())

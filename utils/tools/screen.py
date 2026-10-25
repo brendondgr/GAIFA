@@ -336,7 +336,7 @@ async def screen(text: str, cfg: JudgeConfig | None = None, client: httpx.AsyncC
     flagged: dict[int, str] = {}
     if use_model and units:
         own = client is None
-        # `timeout_s` is the models' budget once they have the GPU (sent as X-AIHub-Answer-Within); before that a
+        # `timeout_s` is the models' budget once they have the GPU (sent as X-GAIFA-Answer-Within); before that a
         # local model may wait up to `gpu_wait_s` for the slot behind a job (judge.py, Fail closed).
         gpu_wait = getattr(cfg, "gpu_wait_s", 0.0)
         client = client or httpx.AsyncClient(timeout=httpx.Timeout(timeout_s + gpu_wait + 1))

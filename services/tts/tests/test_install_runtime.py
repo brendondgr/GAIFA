@@ -11,8 +11,8 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "install-runtime.sh"
 
 
 def dry(*args: str, arch: str = "gfx1151") -> list[str]:
-    env = {**os.environ, "AIHUB_GPU_ARCH": arch, "PATH": f"/nonexistent:{os.environ['PATH']}"}   # no nvidia-smi: cu126
-    env.pop("AIHUB_ACCEL", None)
+    env = {**os.environ, "GAIFA_GPU_ARCH": arch, "PATH": f"/nonexistent:{os.environ['PATH']}"}   # no nvidia-smi: cu126
+    env.pop("GAIFA_ACCEL", None)
     r = subprocess.run(["bash", str(SCRIPT), "--dry-run", *args], capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stderr
     return [line for line in r.stdout.splitlines() if not line.startswith("==")]

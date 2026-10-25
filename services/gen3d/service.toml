@@ -16,7 +16,7 @@ openapi = "/openapi.json"
 start_timeout_s = 30
 stop_timeout_s = 60
 restart = "on-failure"
-install = "aihub-install.sh"
+install = "gaifa-install.sh"
 
 [run.env]
 GEN3D_HOST = "127.0.0.1"
@@ -29,7 +29,7 @@ GEN3D_WEIGHTS = "{models}/3d"
 GEN3D_CUBEART = "{service_dir}/runtime/CubeArt" # code, venv and caches (plan 12.2; scripts/install-runtime.sh)
 GEN3D_BLENDER = "~/.local/bin/blender"         # preview renders
 GEN3D_PREVIEW_DEVICE = "cpu"                   # previews on Mesa llvmpipe, no GPU; "gpu" is faster (README: Preview renders)
-GEN3D_STATE_DIR = "{root}/data/state/gen3d"    # settings.json: the page's choices (preview device), in aihub backup
+GEN3D_STATE_DIR = "{root}/data/state/gen3d"    # settings.json: the page's choices (preview device), in gaifa backup
 
 [memory]
 estimate_gb = 52                               # the Quality preset's peak; Low-poly needs ~30

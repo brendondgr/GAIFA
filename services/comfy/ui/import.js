@@ -60,7 +60,7 @@ function addView(el, ctx, cleanups) {
         h('div', { style: 'flex:1;min-width:0' },
           h('div', { style: 'font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, it.files[0] || `${it.nodes} nodes`),
           h('div', { style: `font-size:11px;color:var(--mut,#8A94A6);font-family:${MONO};overflow:hidden;text-overflow:ellipsis;white-space:nowrap`, title: it.types.join(', ') },
-            `#${it.number} · ${it.nodes} nodes${it.from_aihub ? ` · from ${it.from_aihub}` : ''}${it.status && it.status !== 'success' ? ` · ${it.status}` : ''}`)),
+            `#${it.number} · ${it.nodes} nodes${it.from_gaifa ? ` · from ${it.from_gaifa}` : ''}${it.status && it.status !== 'success' ? ` · ${it.status}` : ''}`)),
         ui.button('Import', async () => {
           try {
             const r = (await ctx.call('POST', `/v1/import/history/${it.prompt_id}`, { json: {} })).json;

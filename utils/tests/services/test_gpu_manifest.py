@@ -1,4 +1,4 @@
-"""Plan 31.2: `[gpu]` in service.toml (parsing, the env the client reads) and `aihub check`'s warning."""
+"""Plan 31.2: `[gpu]` in service.toml (parsing, the env the client reads) and `gaifa check`'s warning."""
 
 from __future__ import annotations
 
@@ -49,9 +49,9 @@ def test_the_launch_env_carries_the_defaults(tmp_path):
     m = mod(tmp_path, '[gpu]\nclass = "background"\n')
     cfg = config.Config()
     spec = launch_spec(m, cfg, config.build_paths(cfg, tmp_path), 7000)
-    assert spec.env["AIHUB_GPU_CLASS"] == "background" and spec.env["AIHUB_GPU_GROUP"] == "gpumod"
+    assert spec.env["GAIFA_GPU_CLASS"] == "background" and spec.env["GAIFA_GPU_GROUP"] == "gpumod"
     plain = mod(tmp_path, "", sid="plain")
-    assert "AIHUB_GPU_CLASS" not in launch_spec(plain, cfg, config.build_paths(cfg, tmp_path), 7000).env
+    assert "GAIFA_GPU_CLASS" not in launch_spec(plain, cfg, config.build_paths(cfg, tmp_path), 7000).env
 
 
 def test_check_warns_a_memory_mod_without_gpu(tmp_path):

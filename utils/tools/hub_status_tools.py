@@ -31,7 +31,7 @@ async def gpu_status(hub: Hub, args: dict[str, Any]) -> Any:
 
 
 async def doctor(hub: Hub, args: dict[str, Any]) -> Any:
-    """`aihub doctor`'s checks: the problems first, each with its fix; the passing ones counted."""
+    """`gaifa doctor`'s checks: the problems first, each with its fix; the passing ones counted."""
     from utils import doctor as doc
 
     r = await doc.run(hub)
@@ -74,7 +74,7 @@ def specs(obj: Any, service: dict[str, Any]) -> list[tuple[str, str, dict[str, A
     """(name, description, parameters, handler, risk) for hub_tools.tools()."""
     return [
         ("gpu_status", "The GPU slot now: which job holds it, what waits and how long, and the last few that ran.", obj({}), gpu_status, "read"),
-        ("doctor", "Check the whole install (aihub doctor): models on disk, manifests, ports, units, disk, offline mods; "
+        ("doctor", "Check the whole install (gaifa doctor): models on disk, manifests, ports, units, disk, offline mods; "
          "problems first, each with its fix.", obj({}), doctor, "read"),
         ("free_gpu", "Free memory: unload the named mods' models, or every loaded mod's except the LLM engines (lcpp, vllm: "
          "name them to unload them too). Running jobs of an unloaded mod stop.",

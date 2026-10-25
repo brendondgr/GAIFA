@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from utils.events import ActivityLog, Alerts, EventBus
     from utils.services import Service, ServiceManager
 
-log = logging.getLogger("aihub.registry")
+log = logging.getLogger("gaifa.registry")
 
 RUNNING = ("starting", "ready", "degraded", "stopping")
 HOLDING = ("loading", "loaded", "unloading")

@@ -304,9 +304,9 @@ def test_launch_spec_expands_placeholders_and_layers_env(svc, cfg_paths, tmp_pat
     assert spec.outputs == tmp_path / "outputs" / "tts"
     env = spec.env
     # hub vars
-    assert env["AIHUB_URL"] == "http://127.0.0.1:7001" and env["AIHUB_SERVICE_ID"] == "tts"
-    assert env["AIHUB_PORT"] == "5041" and env["AIHUB_ROOT"] == str(tmp_path)
-    assert env["AIHUB_OUTPUTS"] == str(tmp_path / "outputs" / "tts") and env["PYTHONUNBUFFERED"] == "1"
+    assert env["GAIFA_URL"] == "http://127.0.0.1:7001" and env["GAIFA_SERVICE_ID"] == "tts"
+    assert env["GAIFA_PORT"] == "5041" and env["GAIFA_ROOT"] == str(tmp_path)
+    assert env["GAIFA_OUTPUTS"] == str(tmp_path / "outputs" / "tts") and env["PYTHONUNBUFFERED"] == "1"
     # env_file over hub vars (HF_HOME "unless the mod sets its own"), values not expanded
     assert env["HF_HOME"] == "/elsewhere" and env["SECRET"] == "s3cret" and env["PLAIN"] == "a b"
     assert env["BRACES"] == "{not_expanded}"
@@ -355,7 +355,7 @@ def test_missing_env_file_is_optional_and_bad_one_errors(svc, cfg_paths):
     d = write(svc, "envy", 'id = "envy"\n[run]\ncommand = ["a"]\nport = 5100\nenv_file = ".env"\n')
     cfg, paths = cfg_paths()
     [mod] = discover([svc])
-    assert "AIHUB_PORT" in launch_spec(mod, cfg, paths, 7000).env
+    assert "GAIFA_PORT" in launch_spec(mod, cfg, paths, 7000).env
     (d / ".env").write_text("OK=1\nthis line is wrong\n")
     with pytest.raises(ManifestError, match=r"\.env:2: expected KEY=value"):
         launch_spec(mod, cfg, paths, 7000)

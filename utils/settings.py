@@ -1,7 +1,7 @@
 """The Settings page (brief §6.4 `Settings`, plan 6.3): `config.toml` as the UI sees it, and saving it.
 
 A save may send the whole `Settings` or any part; what is left out stays as it is. Only real
-overrides are written: a value equal to AIHub's default removes its key, so saving the whole
+overrides are written: a value equal to GAIFA's default removes its key, so saving the whole
 form doesn't pin every default into `config.toml` (comments and order survive, via tomlkit).
 An unchanged value is never rewritten. Everything applies at once except the hub's port, which needs a restart (`restart_required`).
 """
@@ -104,7 +104,7 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         raise _invalid(f"Must be less than this machine's {total / GB:.0f} GB", "memory.reserve_gb")
 
     # Only keys whose value changed are touched (an unchanged form leaves the file alone);
-    # a changed value equal to AIHub's default removes its key instead of pinning it.
+    # a changed value equal to GAIFA's default removes its key instead of pinning it.
     d = DEFAULTS
     defaults = {
         "hub": {"port": d.hub.port},
@@ -153,5 +153,5 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         if was_enabled.get(svc.id) and not svc.eff.enabled and svc.state != "stopped" and not svc.external:
             await mgr.stop(svc.id)  # disabling applies now
     if hub.activity:
-        await hub.activity.add("AIHub settings saved" + (" (restart AIHub to use the new port)" if restart_required else ""))
+        await hub.activity.add("GAIFA settings saved" + (" (restart GAIFA to use the new port)" if restart_required else ""))
     return view(hub), restart_required

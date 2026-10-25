@@ -1,4 +1,4 @@
-"""`aihub setup`'s answers and run (plan 23.9, 23.10): questions, the hub stage, steps with resume,
+"""`gaifa setup`'s answers and run (plan 23.9, 23.10): questions, the hub stage, steps with resume,
 models (followed until their jobs end), checks and the report. Standard library only."""
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ class Runner:
         `log` (plan 40.1): the whole output also goes to that file (cut at 2 MB), streamed or not."""
         import os
         full = {**os.environ, **(env or {})}
-        full["PATH"] = f"{Path(cli.CODE) / 'bin'}:{full.get('PATH', '')}"   # `aihub` before ~/.local/bin is on PATH
+        full["PATH"] = f"{Path(cli.CODE) / 'bin'}:{full.get('PATH', '')}"   # `gaifa` before ~/.local/bin is on PATH
         if stream and log is None:
             return subprocess.run(["bash", "-c", cmd], cwd=cwd, env=full).returncode, ""
         if not echo and log is None:
@@ -278,7 +278,7 @@ def hub_needs(code: Path, runner: Runner) -> list[str]:
     if not (code / ".venv" / "bin" / "python").exists():
         out.append("uv sync (the hub's .venv, about 100 MB)")
     if not runner.hub_up():
-        out.append("aihub install (writes ~/.config/systemd/user/aihub.service, links ~/.local/bin/aihub, starts the hub)")
+        out.append("gaifa install (writes ~/.config/systemd/user/gaifa.service, links ~/.local/bin/gaifa, starts the hub)")
     return out
 
 
@@ -290,10 +290,10 @@ def hub_stage(code: Path, runner: Runner, stream: bool) -> list[str]:
             raise Stop("failed", step="hub/uv-sync", output=out, doc="docs/setup/hub.md")
         done.append("uv sync")
     if not runner.hub_up():
-        rc, out = runner.run("bin/aihub install", code, stream=stream)
+        rc, out = runner.run("bin/gaifa install", code, stream=stream)
         if rc:
             raise Stop("failed", step="hub/install", output=out, doc="docs/setup/hub.md")
-        done.append("aihub install")
+        done.append("gaifa install")
     return done or ["already installed and running"]
 
 
@@ -340,7 +340,7 @@ def download(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespac
     if s.op and not fetch:
         return                            # the mod registered it when it downloaded it
     if s.op:
-        rc, out = runner.run(f"aihub start {e.mod}", root, stream=False)
+        rc, out = runner.run(f"gaifa start {e.mod}", root, stream=False)
         if rc:
             raise Stop("failed", output=out)
         before = {str(j.get("id")) for j in _jobs(runner, e.mod)}
@@ -398,7 +398,7 @@ def start(s: Any, e: Any, root: Path, runner: Runner, args: argparse.Namespace) 
     """A suggestion's `start_op` after its download: launching the model (lcpp), so it's usable."""
     if not s.start_op:
         return
-    runner.run(f"aihub start {e.mod}", root, stream=False)
+    runner.run(f"gaifa start {e.mod}", root, stream=False)
     method, path = s.start_op.split()
     say(args, f"    starting {s.name}: {s.start_op}")
     try:
@@ -458,7 +458,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
     for mod, accel in variant_mod.mod_accels(with_variant).items():     # plan 38.2: what the hub passes the mod
         env = {k: v for e in with_variant if e.mod == mod for k, v in e.variant.env.items()}
         if not config_mod.record_accel(runner, root, mod, accel, env):
-            report["next"].append(f"{mod}: its variant ({accel}) is in config.toml; restart the hub (aihub restart) for it to take effect")
+            report["next"].append(f"{mod}: its variant ({accel}) is in config.toml; restart the hub (gaifa restart) for it to take effect")
     for s in p["steps"]:
         e = by_id[s["setup"]]
         if e.id in skip:
@@ -498,7 +498,7 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
         report["done"].append(s["id"])
         report["next"] += [f"{s['id']}: {step.next}"] if step.next else []
     if any(e.mod == "relay" or "relay" in e.setup.after for e in live):
-        runner.run("aihub start relay", root, stream=False)   # LLM mods publish to it as their models start
+        runner.run("gaifa start relay", root, stream=False)   # LLM mods publish to it as their models start
     started = False
     for e in live:
         chosen = picked.get(e.id, [])
@@ -565,6 +565,6 @@ def execute(envs: list[Any], p: dict[str, Any], args: argparse.Namespace, answer
                                      "env": dict(getattr(e, "run_env", None) or {}), "log": rel(root, log)})
     config_mod.verify(live, root, runner, report)
     if report["failed"]:
-        report["next"].append("open each failure's doc (What to look for, Known gaps), fix it, and run aihub setup again: it resumes")
+        report["next"].append("open each failure's doc (What to look for, Known gaps), fix it, and run gaifa setup again: it resumes")
     save_state(root, state)
     return report

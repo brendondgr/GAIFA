@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "web"
 title = "Web (SearXNG search and page fetching)"
 models = []
@@ -7,11 +7,11 @@ summary = "Web: search through your SearXNG and fetch pages and PDFs into Output
 gpu = false
 disk_gb = 0.1
 needs = ["uv"]
-check = "aihub start web && aihub check web"
+check = "gaifa start web && gaifa check web"
 
 [[steps]]
-run = "aihub install web"
-what = "makes .venv/ from requirements-dev.txt (about 70 MB, under a minute); SearXNG, for search, runs outside AIHub (this doc's Install)"
+run = "gaifa install web"
+what = "makes .venv/ from requirements-dev.txt (about 70 MB, under a minute); SearXNG, for search, runs outside GAIFA (this doc's Install)"
 
 [[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
 accel = "cpu"
@@ -25,7 +25,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 
 ## What it is
 
-The `web` mod's own venv (FastAPI, httpx, trafilatura) and the **SearXNG** it searches through. SearXNG is a metasearch engine that runs **outside AIHub**: AIHub doesn't install, start or update it, it only calls `GET <SEARXNG_URL>/search?q=…&format=json` and reports in the mod's status whether it answers. `web_search` needs SearXNG; `web_fetch` (pages and PDFs into Outputs) works without it.
+The `web` mod's own venv (FastAPI, httpx, trafilatura) and the **SearXNG** it searches through. SearXNG is a metasearch engine that runs **outside GAIFA**: GAIFA doesn't install, start or update it, it only calls `GET <SEARXNG_URL>/search?q=…&format=json` and reports in the mod's status whether it answers. `web_search` needs SearXNG; `web_fetch` (pages and PDFs into Outputs) works without it.
 
 ## Tested with
 
@@ -94,7 +94,7 @@ Pulls `searxng/searxng` from Docker Hub (376 MB on disk here, a minute or two) a
 ### The mod
 
 ```bash
-aihub install web
+gaifa install web
 ```
 
 Makes `.venv/` in this folder from `requirements-dev.txt` (the server's packages and pytest; about 70 MB, under a minute).
@@ -119,7 +119,7 @@ curl -s "http://127.0.0.1:8080/search?q=test&format=json" | head -c 200
 Expect JSON starting `{"query": "test", ...`. An HTML `403 Forbidden` means `json` is missing from `search.formats`.
 
 ```bash
-aihub start web && aihub check web
+gaifa start web && gaifa check web
 ```
 
 Expect `all checks passed`. The mod's tile shows **SearXNG: up**; its Overview tab shows the same with the reason when it's down.
@@ -140,5 +140,5 @@ The mod's tests: a fake SearXNG and a local web server, no network.
 
 ## Known gaps
 
-- AIHub doesn't install or start SearXNG; `aihub doctor` doesn't check it yet.
+- GAIFA doesn't install or start SearXNG; `gaifa doctor` doesn't check it yet.
 - `~/Tools/SearchXNG/searxng-docker.service` (a system unit that runs `docker compose up -d`) exists on this machine but isn't installed; the container comes back after a reboot through Docker's restart policy instead.

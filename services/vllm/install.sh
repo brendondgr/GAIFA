@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds .venv/ for the vllm adapter (run by `aihub install vllm`), and pulls the vLLM image named in
+# Builds .venv/ for the vllm adapter (run by `gaifa install vllm`), and pulls the vLLM image named in
 # service.toml (VLLM_IMAGE) when podman doesn't have it yet. vLLM itself runs inside that image.
 set -euo pipefail
 cd "$(dirname "$0")"

@@ -1,4 +1,4 @@
-"""Move ComfyUI's old output folder into AIHub's outputs/comfy/<date>/ (plan 11.9).
+"""Move ComfyUI's old output folder into GAIFA's outputs/comfy/<date>/ (plan 11.9).
 
 Each file becomes <date>/<HHMMSS>-<slug>.<ext> (the date and time from its modification time),
 with a sidecar: the prompt (found in the PNG's embedded graph with the same input detection the

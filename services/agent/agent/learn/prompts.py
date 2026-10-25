@@ -1,7 +1,7 @@
 """The learner's prompts (plan 22.5).
 
 Adapted from the Harness² prompts (Harness Editor, Composer and Experience Reflector; arXiv
-2610.14224, appendix H; github.com/google-research/harness2, Apache-2.0) to AIHub's harness
+2610.14224, appendix H; github.com/google-research/harness2, Apache-2.0) to GAIFA's harness
 (systemprompt.md, guardrails.md, hooks.toml, tools/<tool>.md, skills/<name>/SKILL.md) and to its
 evidence: real chats with the user's card edits, denials, answers and thumbs, instead of benchmark
 rollouts. The rules that matter most are kept: trace every edit to a moment in a chat, prefer the

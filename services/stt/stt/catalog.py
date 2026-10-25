@@ -1,6 +1,6 @@
 """The models this mod offers, the presets, and where their weights live.
 
-Weights are kept in ``data/models/stt/<name>/`` (``$AIHUB_MODELS/stt``), one plain folder per model
+Weights are kept in ``data/models/stt/<name>/`` (``$GAIFA_MODELS/stt``), one plain folder per model
 (``model.bin``, ``config.json``, ``tokenizer.json``, ``vocabulary.*``), never in ``~/.cache``.
 """
 

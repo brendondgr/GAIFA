@@ -1,7 +1,7 @@
 """The engine: at most one vLLM container, from load to unload (plan 18.2).
 
 unloaded → starting → ready → stopping → unloaded, and starting/ready → failed when the container exits
-on its own or doesn't become healthy in time. A load asks AIHub for the profile's memory first, then
+on its own or doesn't become healthy in time. A load asks GAIFA for the profile's memory first, then
 starts the container and waits for vLLM's /health; stages come from its log. On adapter start, a
 container left running (an adapter crash) is adopted; stopping the adapter stops the engine.
 """
@@ -195,7 +195,7 @@ class Engine:
         self._tasks = [asyncio.create_task(self._follow(p, adopted)), asyncio.create_task(self._monitor(p))]
 
     async def _follow(self, p: Profile, adopted: bool) -> None:
-        """The engine's log: into the adapter's stdout (AIHub's Logs tab), the ring, and the stage."""
+        """The engine's log: into the adapter's stdout (GAIFA's Logs tab), the ring, and the stage."""
         try:
             async for line in self.c.logs(p.container, tail=200 if adopted else None):
                 self.lines.append(line)

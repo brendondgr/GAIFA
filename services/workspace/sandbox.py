@@ -2,15 +2,15 @@
 
 - **The image** (`sandbox/Containerfile`): only Python 3.12, uv, Node LTS, git, ripgrep,
   build-essential and the data libraries; base images pinned by digest. Built as
-  `localhost/aihub-workspace-sandbox:<VERSION>` from the Workspace page (`POST /v1/sandbox/build`).
+  `localhost/gaifa-workspace-sandbox:<VERSION>` from the Workspace page (`POST /v1/sandbox/build`).
 - **A run:** your user inside (`--userns=keep-id`), the folder mounted read-write **at the same
-  absolute path** (read-only below Run; the AIHub folder and its models read-only inside it, when
+  absolute path** (read-only below Run; the GAIFA folder and its models read-only inside it, when
   the folder contains them), `~/.cache/uv`, `~/.cache/pip` and `~/.npm` as overlays
   (read from, never written back), the rest of `$HOME` a fresh tmpfs, a read-only root, no network
   unless asked for (Run + network: full internet), memory and process limits, a timeout (120 s by
   default, 600 s at most). SELinux labels are left alone (`label=disable`) rather than relabelling
   your folder.
-- **Other runtimes and systems** (plan 39.1): the runtime is `AIHUB_CONTAINER_RUNTIME` (podman, else
+- **Other runtimes and systems** (plan 39.1): the runtime is `GAIFA_CONTAINER_RUNTIME` (podman, else
   docker; `containers.py`). Docker runs as your uid and gid (`--user`) instead of `keep-id`, gets
   `bridge` for the network, and no cache overlays (docker has none: the caches start empty). Podman off
   Linux (macOS's VM) uses `bridge` instead of `pasta`. `label=disable` only where SELinux is enforcing.
@@ -37,7 +37,7 @@ from folders import Refused
 
 HERE = Path(__file__).resolve().parent
 VERSION = "2"                  # bump with every change to sandbox/Containerfile or requirements.lock
-IMAGE = f"localhost/aihub-workspace-sandbox:{VERSION}"
+IMAGE = f"localhost/gaifa-workspace-sandbox:{VERSION}"
 DEFAULT_TIMEOUT, MAX_TIMEOUT = 120, 600
 MEMORY, PIDS = "8g", 1024
 KEEP_BYTES = 1024 * 1024
@@ -201,7 +201,7 @@ class Sandbox:
 
     def argv(self, run: Run, cwd: Path, mounts: list[tuple[Path, str]], env: dict[str, str]) -> list[str]:
         """The podman command line for a run: `mounts` are (path, "rw" | "ro"), each at its own path."""
-        name = f"aihub-ws-{run.id}"
+        name = f"gaifa-ws-{run.id}"
         home = str(self.home)
         user = [f"--user={os.getuid()}:{os.getgid()}"] if self.docker else ["--userns=keep-id"]
         label = ["--security-opt", "label=disable"] if self.selinux else []
@@ -210,7 +210,7 @@ class Sandbox:
                 "--read-only", f"--memory={MEMORY}", f"--memory-swap={MEMORY}", f"--pids-limit={PIDS}",
                 "--network=" + (online if run.network else "none"),
                 "--tmpfs", "/tmp:rw,size=2g,mode=1777", "--tmpfs", f"{home}:rw,size=2g,mode=0777",
-                "--label", "aihub.workspace=1"]
+                "--label", "gaifa.workspace=1"]
         for rel in CACHES if not self.docker else ():      # docker has no overlay mounts: the caches start empty
             src = self.home / rel
             if src.is_dir():
@@ -234,7 +234,7 @@ class Sandbox:
         if not info["exists"]:
             raise SandboxMissing(info.get("why") or f"the sandbox image {self.image_name} isn't built yet")
         argv = self.argv(run, cwd, mounts, env or {})
-        return await self._exec(run, argv, disconnected, container=f"aihub-ws-{run.id}")
+        return await self._exec(run, argv, disconnected, container=f"gaifa-ws-{run.id}")
 
     async def run_host(self, run: Run, cwd: Path, disconnected: Any = None) -> Run:
         """On this machine, outside the sandbox (plan 27.6): only after the user allowed this one call."""
@@ -314,7 +314,7 @@ class Sandbox:
             return False
         rec = self.records.get(rid) or {}
         self.cancelled.add(rid)
-        await self._stop(p, f"aihub-ws-{rid}" if rec.get("where") == "sandbox" else None)
+        await self._stop(p, f"gaifa-ws-{rid}" if rec.get("where") == "sandbox" else None)
         return True
 
 

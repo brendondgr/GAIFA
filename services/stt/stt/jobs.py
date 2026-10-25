@@ -3,7 +3,7 @@
 An upload waits in ``runtime/tmp`` until its job ends (done, failed or cancelled, queued or not);
 at most ``MAX_QUEUED_UPLOADS`` wait at once, and files left by a crash are swept at startup. A
 running job holds a lease on its model (``Engine.acquire``); when a live stream holds another model,
-the job waits in stage ``waiting`` until it ends. On the GPU, a job first takes AIHub's GPU slot (plan
+the job waits in stage ``waiting`` until it ends. On the GPU, a job first takes GAIFA's GPU slot (plan
 31.3): while another mod's work holds it, the job is ``queued`` in stage ``waiting_gpu``."""
 
 from __future__ import annotations

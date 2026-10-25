@@ -17,7 +17,7 @@ Area (checks) & Status & Evidence and gaps \\
 11 Chat UI (11.1–11.18) & \ok & Node tests (\code{chat.test.mjs}, \code{sessions.test.mjs}); browser checks in \code{?mock} and live (screenshots in Section 7). \\
 12 Sessions (12.1–12.7) & \input{gen/cov_sessions.tex} \\
 13 Inside the folder (13.1–13.6) & \ok & \code{test\_logfiles.py}, the inventory test, lcpp's reboot test; live: lcpp moved to \code{data/state/lcpp} with the 26B still managed; inventory on the live install and on a fresh clone. \\
-14 Regression and safety (14.1–14.6) & \ok & all suites green at every commit; \code{aihub check} passes for every mod (agent included); the injection task passed every run; no out-of-memory during the night (the memory manager refused and explained instead). \\
+14 Regression and safety (14.1–14.6) & \ok & all suites green at every commit; \code{gaifa check} passes for every mod (agent included); the injection task passed every run; no out-of-memory during the night (the memory manager refused and explained instead). \\
 15 Agent eval & \ok & Section 4: the 31B passes the 80\% gate. \\
 \bottomrule
 \end{longtable}

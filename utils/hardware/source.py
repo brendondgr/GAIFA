@@ -1,8 +1,8 @@
 """Where hardware detection reads the machine (plan 35.1): live, recorded, or from a snapshot.
 
 Every reader in `utils/hardware/` goes through a `Source`, so a machine can be recorded once
-(`Recorder`, `aihub hardware --snapshot`) and replayed anywhere (`Snapshot`): the test fixtures
-and the field reports (plan 40.2) are such recordings. Standard library only: `aihub setup` runs
+(`Recorder`, `gaifa hardware --snapshot`) and replayed anywhere (`Snapshot`): the test fixtures
+and the field reports (plan 40.2) are such recordings. Standard library only: `gaifa setup` runs
 this from a bare clone.
 """
 

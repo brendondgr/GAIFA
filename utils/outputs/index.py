@@ -26,7 +26,7 @@ from utils.outputs.describe import describe
 from utils.outputs.entries import KINDS, inside_real, kind_of, subtype_of, walk
 from utils.paths import Paths
 
-log = logging.getLogger("aihub.outputs")
+log = logging.getLogger("gaifa.outputs")
 
 COLUMNS = ("id", "service", "kind", "title", "path", "is_dir", "main", "preview", "size_bytes", "created_ts",
            "duration_s", "width", "height", "meta", "files", "search", "sig", "hidden")
@@ -74,7 +74,7 @@ class Outputs:
     # lifecycle --------------------------------------------------------------
 
     def start(self) -> None:
-        self._warm_task = asyncio.create_task(self._warm_loop(), name="aihub-output-previews")
+        self._warm_task = asyncio.create_task(self._warm_loop(), name="gaifa-output-previews")
 
     async def close(self) -> None:
         if self._warm_task:

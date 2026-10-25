@@ -1,4 +1,4 @@
-"""What AIHub needs from gen3d: dated job folders with output.json, the status route, the stages
+"""What GAIFA needs from gen3d: dated job folders with output.json, the status route, the stages
 widget, the documented POST /v1/jobs body, the worker mounts, and the job migration."""
 
 import json
@@ -68,7 +68,7 @@ def test_an_upload_goes_in_a_dated_folder_too(c):
     wait(c, jid)
 
 
-def test_status_has_the_aihub_shape(c):
+def test_status_has_the_gaifa_shape(c):
     job = c.post("/v1/jobs", json={"prompt": "status probe", "stages": ["shape"]}).json()
     s = c.get("/v1/status").json()
     assert [x["label"] for x in s["stats"]] == ["Jobs", "Queue", "Avg time", "Previews"]

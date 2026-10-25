@@ -1,4 +1,4 @@
-"""38.3: the hub passes a mod its variant: AIHUB_ACCEL, AIHUB_DEVICE, AIHUB_GPU_ARCH, `[run.variants.<accel>]`
+"""38.3: the hub passes a mod its variant: GAIFA_ACCEL, GAIFA_DEVICE, GAIFA_GPU_ARCH, `[run.variants.<accel>]`
 env; and a mod whose variant this machine can't run is unavailable instead of failing to start."""
 
 from __future__ import annotations
@@ -33,22 +33,22 @@ def spec(rig, conf: str, machine_name: str = "strix-halo", variants: str = "") -
 
 def test_the_variant_reaches_the_mod(rig):
     env = spec(rig, '[services.fake-ok]\naccel = "rocm"\n', variants='\n[run.variants.rocm]\nenv = { FAKE_FAST = "1" }\n\n[run.variants.cpu]\nenv = { FAKE_FAST = "0" }\n')
-    assert (env["AIHUB_ACCEL"], env["AIHUB_DEVICE"], env["AIHUB_GPU_ARCH"], env["FAKE_FAST"]) == ("rocm", "cuda", "gfx1151", "1")
+    assert (env["GAIFA_ACCEL"], env["GAIFA_DEVICE"], env["GAIFA_GPU_ARCH"], env["FAKE_FAST"]) == ("rocm", "cuda", "gfx1151", "1")
 
 
 def test_cpu_variant_and_none(rig):
     env = spec(rig, '[services.fake-ok]\naccel = "cpu"\n')
-    assert (env["AIHUB_ACCEL"], env["AIHUB_DEVICE"]) == ("cpu", "cpu") and "AIHUB_GPU_ARCH" not in env
+    assert (env["GAIFA_ACCEL"], env["GAIFA_DEVICE"]) == ("cpu", "cpu") and "GAIFA_GPU_ARCH" not in env
 
 
 def test_nothing_recorded_nothing_passed(rig):
     env = spec(rig, "")
-    assert "AIHUB_ACCEL" not in env and "AIHUB_DEVICE" not in env
+    assert "GAIFA_ACCEL" not in env and "GAIFA_DEVICE" not in env
 
 
 def test_cuda_on_nvidia(rig):
     env = spec(rig, '[services.fake-ok]\naccel = "cuda"\n', machine_name="linux-nvidia-1gpu")
-    assert (env["AIHUB_DEVICE"], env["AIHUB_GPU_ARCH"]) == ("cuda", "sm_89")
+    assert (env["GAIFA_DEVICE"], env["GAIFA_GPU_ARCH"]) == ("cuda", "sm_89")
 
 
 def test_bad_variant_key_is_a_manifest_error(rig):
@@ -72,4 +72,4 @@ async def test_a_variant_this_machine_lacks_is_unavailable(rig, monkeypatch):
     assert e.value.code == "unavailable" and e.value.status == 409
     from utils.services.views import summary
     s = summary(mgr, svc)
-    assert s["accel"] == "cuda" and "aihub setup fake-ok" in s["unavailable"]
+    assert s["accel"] == "cuda" and "gaifa setup fake-ok" in s["unavailable"]

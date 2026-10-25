@@ -42,8 +42,8 @@ async def test_mod_output_is_shipped_and_read_back(services_dir, root, make_app)
             await wait_ready(c, "fake-ok")
             for i in range(3):
                 await c.post("/api/s/fake-ok/v1/echo", json={"i": i})
-            logging.getLogger("aihub.test").setLevel(logging.INFO)
-            logging.getLogger("aihub.test").info("a line for the hub's own log")
+            logging.getLogger("gaifa.test").setLevel(logging.INFO)
+            logging.getLogger("gaifa.test").info("a line for the hub's own log")
             f = root / "data" / "logs" / "fake-ok.log"
             for _ in range(60):
                 if f.exists() and "POST /v1/echo" in f.read_text():
@@ -52,4 +52,4 @@ async def test_mod_output_is_shipped_and_read_back(services_dir, root, make_app)
             assert "POST /v1/echo" in f.read_text()
             lines = (await c.get("/api/services/fake-ok/logs?lines=50")).json()["lines"]
             assert any("POST /v1/echo" in x["text"] for x in lines)
-    assert "a line for the hub's own log" in (root / "data" / "logs" / "aihub.log").read_text()
+    assert "a line for the hub's own log" in (root / "data" / "logs" / "gaifa.log").read_text()

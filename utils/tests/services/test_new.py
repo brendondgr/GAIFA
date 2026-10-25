@@ -1,4 +1,4 @@
-"""2.8: `aihub new`, the _template mod, and rescan."""
+"""2.8: `gaifa new`, the _template mod, and rescan."""
 
 from __future__ import annotations
 
@@ -18,13 +18,13 @@ from utils import manifest
 from utils.tests.conftest import REPO, wait_for
 from utils.tests.services.conftest import until
 
-AIHUB = REPO / "bin" / "aihub"
+GAIFA = REPO / "bin" / "gaifa"
 HAVE_UV = shutil.which("uv") is not None or (Path.home() / ".local/bin/uv").exists()
 
 
 def run(*args, root: Path, url: str = "http://127.0.0.1:1", timeout: float = 180):
-    env = {**os.environ, "AIHUB_ROOT": str(root), "AIHUB_URL": url, "PATH": f"{Path.home() / '.local/bin'}:{os.environ.get('PATH', '')}"}
-    return subprocess.run([str(AIHUB), *args], capture_output=True, text=True, timeout=timeout, env=env)
+    env = {**os.environ, "GAIFA_ROOT": str(root), "GAIFA_URL": url, "PATH": f"{Path.home() / '.local/bin'}:{os.environ.get('PATH', '')}"}
+    return subprocess.run([str(GAIFA), *args], capture_output=True, text=True, timeout=timeout, env=env)
 
 
 @pytest.fixture
@@ -46,7 +46,7 @@ def test_new_fills_the_template(root, ports):
     r = run("new", "hello-world", "--no-install", root=root)
     assert r.returncode == 0, r.stderr
     assert f"created services/hello-world (Hello World, port {ports})" in r.stdout
-    assert "AIHub isn't running" in r.stdout
+    assert "GAIFA isn't running" in r.stdout
     d = root / "services" / "hello-world"
     for path in d.rglob("*"):
         if path.is_file():
@@ -100,12 +100,12 @@ def test_new_refuses_existing_folder_and_taken_ports(root, ports):
 
 @pytest.mark.skipif(not HAVE_UV, reason="uv is needed to install the template's venv")
 def test_template_mod_end_to_end(root, ports, hub_process):
-    """aihub new against a running hub: installed, picked up by rescan, started, and usable through the proxy."""
+    """gaifa new against a running hub: installed, picked up by rescan, started, and usable through the proxy."""
     url = hub_process.url
     r = run("new", "hello", root=root, url=url)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "installed hello into .venv" in r.stdout
-    assert "AIHub picked it up: hello is ready" in r.stdout
+    assert "GAIFA picked it up: hello is ready" in r.stdout
     with httpx.Client(base_url=url, timeout=10) as c:
         assert c.get("/api/s/hello/v1/hello", params={"name": "you"}).json() == {"message": "Hello, you!"}
         ops = {o["id"]: o for o in c.get("/api/services/hello/operations").json()}

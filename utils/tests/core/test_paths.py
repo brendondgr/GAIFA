@@ -6,12 +6,12 @@ from utils.paths import Paths, project_root, write_atomic
 
 
 def test_root_from_env(tmp_path, monkeypatch):
-    monkeypatch.setenv("AIHUB_ROOT", str(tmp_path))
+    monkeypatch.setenv("GAIFA_ROOT", str(tmp_path))
     assert project_root() == tmp_path.resolve()
 
 
 def test_root_defaults_to_app_folder(monkeypatch):
-    monkeypatch.delenv("AIHUB_ROOT", raising=False)
+    monkeypatch.delenv("GAIFA_ROOT", raising=False)
     assert (project_root() / "pyproject.toml").exists()
 
 

@@ -1,4 +1,4 @@
-"""`aihub setup`'s values (plan 23.12): settings a setup doc asks for once its mods are installed, such
+"""`gaifa setup`'s values (plan 23.12): settings a setup doc asks for once its mods are installed, such
 as the agent's model, whose choices only exist then (the relay's models). Hosted providers become
 relay endpoints first. Values go into config.toml with a text edit (standard library only), checked
 by parsing the result. Asked after install and models, before the checks."""
@@ -32,7 +32,7 @@ def relay_models(runner: Runner, root: Path) -> list[str]:
             return sorted({str(m.get("id")) for m in data.get("data", []) if m.get("id")})
         except Exception:  # noqa: BLE001: not running yet
             if attempt == 0:
-                runner.run("aihub start relay", root, stream=False)
+                runner.run("gaifa start relay", root, stream=False)
     return []
 
 
@@ -176,7 +176,7 @@ def _prompt(e: Any, c: Any, choices: list[str], runner: Runner) -> str | None:
         print("  h. add a hosted provider (an OpenAI-compatible API: its URL, key and model names)")
         print("  r. look again (a model that's still loading appears once it's ready)")
     if c.choices == "folder":
-        pick = input("An absolute folder outside AIHub" + ("" if c.required else " (Enter to skip)") + ": ").strip()
+        pick = input("An absolute folder outside GAIFA" + ("" if c.required else " (Enter to skip)") + ": ").strip()
         return pick or None
     while True:
         pick = input("Number" + (", h" if c.choices == "relay-models" else "") + ("" if c.required else ", or Enter to skip") + ": ").strip()
@@ -230,7 +230,7 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
                     hint = ("; to add a hosted provider first: \"providers\" in --answers (services/relay/setup/relay.md)"
                             + ("" if choices else "; the relay serves no chat model yet: set up lcpp with a model (setup launches it), add a hosted provider, or set up opencode"))
                 elif c.choices == "folder":
-                    hint = " (an absolute folder outside AIHub; created if missing)"
+                    hint = " (an absolute folder outside GAIFA; created if missing)"
                 raise Stop("question", id=qid, kind="value", text=c.text, choices=choices if c.choices != "folder" else "folder",
                            answer_with=f'--set "{qid}=<value>"' + hint)
             report["next"].append(f"{qid}: not set ({c.text}); later: --set \"{qid}=<value>\", or Settings")
@@ -238,7 +238,7 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
         if c.choices == "folder":
             folder = Path(value).expanduser()
             if not folder.is_absolute() or folder.resolve().is_relative_to(root.resolve()):
-                raise Stop("unknown-value", id=qid, value=value, choices="an absolute folder outside AIHub", doc=doc_of(e, root))
+                raise Stop("unknown-value", id=qid, value=value, choices="an absolute folder outside GAIFA", doc=doc_of(e, root))
             folder.mkdir(parents=True, exist_ok=True)
             value = str(folder.resolve())
         elif choices and value not in choices:
@@ -257,9 +257,9 @@ def phase(live: list[Any], args: argparse.Namespace, answers: Answers, root: Pat
             elif "hub" not in targets:
                 targets.insert(0, "hub")
         for target in targets:
-            rc, out = runner.run("aihub restart" if target == "hub" else f"aihub restart {target}", root, stream=False)
+            rc, out = runner.run("gaifa restart" if target == "hub" else f"gaifa restart {target}", root, stream=False)
             if rc and target == "hub":
-                # A hub without its systemd unit (`aihub serve`, a test port) can't be restarted from here.
+                # A hub without its systemd unit (`gaifa serve`, a test port) can't be restarted from here.
                 report["next"].append(f"{qid}: written to config.toml; restart the hub yourself"
                                       + (f", then {' and '.join(t for t in targets if t != 'hub')}" if any(t != "hub" for t in targets) else "") + f" ({out.strip()[:200]})")
                 break
@@ -287,7 +287,7 @@ def verify(live: list[Any], root: Path, runner: Runner, report: dict[str, Any]) 
             ok = value in models and running in (None, value)
             report["checks"].append({"setup": e.id, "run": f"{c.key} on the relay", "ok": ok})
             if running not in (None, value):
-                why = f"config.toml says {value!r}, but the hub runs with {running!r}: aihub restart, then restart {c.restart or 'the mod'}"
+                why = f"config.toml says {value!r}, but the hub runs with {running!r}: gaifa restart, then restart {c.restart or 'the mod'}"
             else:
                 why = f"{value!r} isn't a model the relay serves ({', '.join(models) or 'none'})"
             if not ok:

@@ -126,7 +126,7 @@ async def test_system_prompt_order(env):
     await env.send(tid, "image")
     await env.send(tid, "again")
     s = env.model.received[-1]["messages"][0]["content"]
-    order = [s.index(h) for h in ("You are AIHub's assistant", "## Standing instructions", "## Memory", "## Skills",
+    order = [s.index(h) for h in ("You are GAIFA's assistant", "## Standing instructions", "## Memory", "## Skills",
                                   "## More tools", "## Environment", "## Outputs in this chat")]
     assert order == sorted(order)
     assert "Always answer in French." in s and "likes 16:9" in s and "- fake/drawing: How to pick image settings" in s

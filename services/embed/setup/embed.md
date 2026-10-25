@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "embed"
 title = "Embeddings: EmbeddingGemma 2"
 models = ["embed/**"]
@@ -7,11 +7,11 @@ summary = "Embeddings: search outputs, documents and chats by meaning (text, ima
 gpu = true
 disk_gb = 6.6
 needs = ["uv"]
-check = "aihub start embed && aihub check embed"
-smoke = "aihub start embed >/dev/null && curl -fsS -H 'content-type: application/json' -d '{\"inputs\": [{\"text\": \"a red bicycle\"}]}' \"$(aihub url api/s/embed/v1/embed)\" | tee /dev/stderr | grep -q '\"dim\": *768'"   # plan 39: real work, run by aihub setup --smoke and the field test
+check = "gaifa start embed && gaifa check embed"
+smoke = "gaifa start embed >/dev/null && curl -fsS -H 'content-type: application/json' -d '{\"inputs\": [{\"text\": \"a red bicycle\"}]}' \"$(gaifa url api/s/embed/v1/embed)\" | tee /dev/stderr | grep -q '\"dim\": *768'"   # plan 39: real work, run by gaifa setup --smoke and the field test
 
 [[steps]]
-run = "aihub install embed"
+run = "gaifa install embed"
 what = "makes .venv/ with PyTorch for this machine's variant (on gfx1151 locks/embed.txt: ROCm nightly torch, about 4 GB of wheels, 6.6 GB installed; elsewhere requirements.txt from the variant's index) and downloads EmbeddingGemma 2 (1.5 GB)"
 
 [[suggest]]
@@ -75,7 +75,7 @@ Read from this machine on 2026-10-20 (Fedora 44, kernel 7.2.11, Radeon 8060S / g
 ## Install
 
 ```bash
-aihub install embed
+gaifa install embed
 ```
 
 Runs `install.sh`:
@@ -111,12 +111,12 @@ The mod runs **one fixed model**, required: EmbeddingGemma 2 at a pinned revisio
 | `EMBED_IDLE_UNLOAD_S` | the mod's Settings tab (`idle_unload_s`) | no | unload after this many idle seconds; default 300, 0 = never |
 | `EMBED_MAX_INPUTS`, `EMBED_AUDIO_MAX_S`, `EMBED_BATCH_TEXT`, `EMBED_BATCH_MEDIA` | `config.toml` env | no | 256 inputs a call; audio cut at 320 s (25 tokens a second fills the 8k context); batches of 32 texts and 4 images |
 | `EMBED_INDEX` | `service.toml` | no | `1` (default): the library follows the hub's outputs and indexes them into `data/databases/embed.db`; `0` turns it off |
-| `EMBED_INDEX_BATCH_TEXT`, `EMBED_INDEX_AUDIO_MAX_S` | `config.toml` env | no | 8 chunks a batch, each under its own `background` lease from AIHub's GPU queue (plan 31.3: it replaced the `EMBED_IDLE_*` gate); audio indexed up to an hour |
+| `EMBED_INDEX_BATCH_TEXT`, `EMBED_INDEX_AUDIO_MAX_S` | `config.toml` env | no | 8 chunks a batch, each under its own `background` lease from GAIFA's GPU queue (plan 31.3: it replaced the `EMBED_IDLE_*` gate); audio indexed up to an hour |
 
 ## Check it works
 
 ```bash
-aihub start embed && aihub check embed
+gaifa start embed && gaifa check embed
 ```
 
 Expect `embed: all checks passed`.
@@ -158,15 +158,15 @@ Decoding through ffmpeg adds 0.1 s for audio and 0.2 s for video. On the CPU (fp
 
 ## What to look for
 
-- **The nightly wheel index drops old builds.** `locks/embed.txt` pins torch and ROCm build `10.2.0a20260926` from `https://nightly.repo.amd.com/rocm/whl-next/`, which on 2026-10-21 kept only about the last two months of builds. When a pinned wheel is gone, `aihub install embed` stops at uv's resolve ("No solution found"); what to do is in [Breeze's doc](../../tts/setup/breeze.md#what-to-look-for) (uv's cache first, else move every package of the build to one the index still has, together).
+- **The nightly wheel index drops old builds.** `locks/embed.txt` pins torch and ROCm build `10.2.0a20260926` from `https://nightly.repo.amd.com/rocm/whl-next/`, which on 2026-10-21 kept only about the last two months of builds. When a pinned wheel is gone, `gaifa install embed` stops at uv's resolve ("No solution found"); what to do is in [Breeze's doc](../../tts/setup/breeze.md#what-to-look-for) (uv's cache first, else move every package of the build to one the index still has, together).
 - **Never fp16.** The model card says activations overflow fp16 (NaN, or quietly bad vectors). The backend picks bf16 when `torch.cuda.is_bf16_supported()` and fp32 otherwise.
 - **Never `malloc_trim` in a ROCm process here.** On 2026-10-20 a `malloc_trim(0)` after loading, added to give back the heap the weights were read into, came just before the server and another mod's GPU worker crashed in the HSA/HIP runtimes and the kernel reported corrupt page tables (bf16 −inf patterns). The same boot also had disk checksum errors from hours earlier, so the cause isn't certain. The worker process makes it unneeded either way: unloading ends the worker.
-- **A worker crash** (a segfault in `libhsa-runtime64`) answers `503 worker_died` with a fix; the server stays up, and the next call starts a new worker. Repeated crashes: `aihub logs embed` and `journalctl -k`.
+- **A worker crash** (a segfault in `libhsa-runtime64`) answers `503 worker_died` with a fix; the server stays up, and the next call starts a new worker. Repeated crashes: `gaifa logs embed` and `journalctl -k`.
 - **The measured memory** grows after the first encode (kernels, allocator caches), so `memory.json` keeps the most seen per encoder set. `/v1/status` reports it as `memory_estimate_gb`. Delete `data/state/embed/memory.json` to measure again.
 - **Matryoshka:** a slice of a unit vector isn't one, so the mod normalizes again after truncating (sentence-transformers' `truncate_dim` with `normalize_embeddings` normalizes *before* truncating). Queries and documents must use the same `dim`.
 - **Prompts:** text with `task: "query"` gets `task: search result | query: `, documents get `title: {title or none} | text: `. Media take no prompt.
 - **Video** is decoded at 1 fps and scaled to fit 768 px. A video longer than 32 s is sampled evenly down to 32 frames (the processor's own cap). An mp4 often keeps its index at the end, so ffmpeg reads a temporary copy in `data/state/embed/tmp/`, never a pipe.
-- **What "idle" meant (plan 28.2, replaced by the GPU queue in plan 31.3).** `gpu_busy_percent` reads 13–17 % with only the desktop running (Xwayland, plasmashell, browsers) and jumps to 80–90 % about every 15 s, so the `aihub` measure asks what AIHub's mods are doing instead, and keeps the whole GPU only as a 30 s median (spikes don't count) against 30 %. Per-process busy time isn't available for ROCm: a test mod running torch matmuls kept the GPU at 98 % while its DRM fdinfo engine counters stayed at 0 (compute goes through `/dev/kfd`'s user-mode queues), and `/sys/class/kfd/kfd/proc/<pid>/` here has only queues, VRAM and `evicted_ms`. `GET /v1/library` shows the reading, the mods it saw working and the device's median.
+- **What "idle" meant (plan 28.2, replaced by the GPU queue in plan 31.3).** `gpu_busy_percent` reads 13–17 % with only the desktop running (Xwayland, plasmashell, browsers) and jumps to 80–90 % about every 15 s, so the `gaifa` measure asks what GAIFA's mods are doing instead, and keeps the whole GPU only as a 30 s median (spikes don't count) against 30 %. Per-process busy time isn't available for ROCm: a test mod running torch matmuls kept the GPU at 98 % while its DRM fdinfo engine counters stayed at 0 (compute goes through `/dev/kfd`'s user-mode queues), and `/sys/class/kfd/kfd/proc/<pid>/` here has only queues, VRAM and `evicted_ms`. `GET /v1/library` shows the reading, the mods it saw working and the device's median.
 - **Indexing never evicts another mod.** It asks the hub for memory without making room; a `409 needs_room` leaves the library in `no_room` until the next quiet period. A search still loads the model the usual way, and the [memory] triggers make room for it.
 - **Weights through a symlink** are refused by the hub's registry (`doesn't exist in data/models`): keep them as a real folder.
 

@@ -1,5 +1,5 @@
 // ctx.ui for mod page modules (design brief §5, docs/mods.md): small DOM helpers that
-// use AIHub's theme variables, so a page looks native in both themes without raw colors.
+// use GAIFA's theme variables, so a page looks native in both themes without raw colors.
 // Written by us, not Claude Design. Every helper returns a plain DOM element.
 
 const MONO = "'JetBrains Mono',ui-monospace,monospace";

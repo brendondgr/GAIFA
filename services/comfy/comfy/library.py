@@ -38,7 +38,7 @@ class Library:
         self.packs, self.catalog, self.tasks, self.hub_url = packs, catalog, tasks, hub_url
         self.models_dir = models_dir
         self._sizes: tuple[float, dict[str, int]] = (0.0, {})
-        self.models: dict[str, dict] = {}          # file name → {id, source}, from AIHub's registry
+        self.models: dict[str, dict] = {}          # file name → {id, source}, from GAIFA's registry
         self._models_at = 0.0
         self._cache: dict[str, tuple[tuple, Converted | None, list[Issue]]] = {}
 

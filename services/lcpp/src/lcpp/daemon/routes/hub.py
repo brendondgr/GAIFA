@@ -1,5 +1,5 @@
-"""``GET /api/status`` for AIHub (its architecture §4.6): loaded/busy, KPIs for the Overview
-tile, and jobs (instances starting, downloads running) for the header. Works without AIHub too."""
+"""``GET /api/status`` for GAIFA (its architecture §4.6): loaded/busy, KPIs for the Overview
+tile, and jobs (instances starting, downloads running) for the header. Works without GAIFA too."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from fastapi import APIRouter, Request
 
 from lcpp.daemon.app import state
 
-router = APIRouter(prefix="/api", tags=["aihub"])
+router = APIRouter(prefix="/api", tags=["gaifa"])
 RECENT_S = 120  # finished downloads stay in the status this long
 
 

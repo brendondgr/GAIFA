@@ -1,10 +1,10 @@
-"""AIHub's own ComfyUI nodes and fixes (loaded through extra_model_paths.yaml; tracked in git).
+"""GAIFA's own ComfyUI nodes and fixes (loaded through extra_model_paths.yaml; tracked in git).
 
 - Qwen-VL vision patch-embed as a matmul: the Qwen2.5-VL / Qwen3-VL / Qwen3.5 vision towers embed
   patches with a Conv3d whose kernel equals its stride, which is one matrix multiply over the
   patches. ROCm (MIOpen) runs that Conv3d about 100x slower than the matmul on gfx1151 (17.5 s of a
   33 s Qwen3-VL text encode for one 1024x1024 image); the result is the same to rounding (1e-5).
-- AIHubTextEncodeQwenImage21: TextEncodeQwenImage21 that can skip the negative encode. The core
+- GAIFATextEncodeQwenImage21: TextEncodeQwenImage21 that can skip the negative encode. The core
   node runs the whole prompt + reference images through Qwen3-VL twice (positive and negative),
   but at CFG 1 (Qwen-Image 2.1 Turbo, and the base packs) the sampler never uses the negative.
 - SAM 3D Body hand refinement: the keypoint-prompt pass feeds the float32 MHR estimate into the
@@ -47,15 +47,15 @@ def patch_vision_embeds() -> list[str]:
             klass = getattr(__import__(mod, fromlist=[cls]), cls)
         except (ImportError, AttributeError):
             continue                                    # this ComfyUI doesn't have it
-        if getattr(klass.forward, "_aihub", False):
+        if getattr(klass.forward, "_gaifa", False):
             continue
         klass.forward = _patch_embed_forward
-        klass.forward._aihub = True
+        klass.forward._gaifa = True
         patched.append(f"{mod}.{cls}")
     return patched
 
 
-_patch_embed_forward._aihub = True
+_patch_embed_forward._gaifa = True
 
 
 def _zeroed(conditioning):
@@ -69,13 +69,13 @@ def _zeroed(conditioning):
     return out
 
 
-class AIHubTextEncodeQwenImage21(TextEncodeQwenImage21):
+class GAIFATextEncodeQwenImage21(TextEncodeQwenImage21):
     @classmethod
     def define_schema(cls):
         s = super().define_schema()
-        s.node_id = "AIHubTextEncodeQwenImage21"
-        s.display_name = "Text Encode Qwen Image 2.1 (AIHub, encode once)"
-        s.category = "AIHub"
+        s.node_id = "GAIFATextEncodeQwenImage21"
+        s.display_name = "Text Encode Qwen Image 2.1 (GAIFA, encode once)"
+        s.category = "GAIFA"
         s.inputs.append(io.Boolean.Input(
             "encode_negative", default=False,
             tooltip="Off: encode only the prompt (the negative is unused at cfg 1, so the output is identical "
@@ -132,7 +132,7 @@ def patch_sam3d_body() -> bool:
     except ImportError:
         return False                                    # this ComfyUI doesn't have it
     orig = SAM3DBody.forward_decoder
-    if getattr(orig, "_aihub", False):
+    if getattr(orig, "_gaifa", False):
         return True
 
     def forward_decoder(self, branch, image_embeddings, keypoints=None, prev_estimate=None, condition_info=None, batch=None):
@@ -141,19 +141,28 @@ def patch_sam3d_body() -> bool:
         return orig(self, branch, image_embeddings, keypoints=cast(keypoints), prev_estimate=cast(prev_estimate),
                     condition_info=cast(condition_info), batch=batch)
 
-    forward_decoder._aihub = True
+    forward_decoder._gaifa = True
     SAM3DBody.forward_decoder = forward_decoder
     return True
 
 
-class AIHubExtension(ComfyExtension):
+class LegacyTextEncodeQwenImage21(GAIFATextEncodeQwenImage21):
+    """The same node under its name from before the rename to GAIFA (plan 50.2), for workflows saved with it."""
+    @classmethod
+    def define_schema(cls):
+        s = super().define_schema()
+        s.node_id, s.is_deprecated = "AIHubTextEncodeQwenImage21", True
+        return s
+
+
+class GAIFAExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [AIHubTextEncodeQwenImage21]
+        return [GAIFATextEncodeQwenImage21, LegacyTextEncodeQwenImage21]
 
 
-async def comfy_entrypoint() -> AIHubExtension:
+async def comfy_entrypoint() -> GAIFAExtension:
     patched = patch_vision_embeds()
-    logging.info("[aihub_nodes] vision patch-embed as matmul: %s", ", ".join(patched) or "nothing to patch")
-    logging.info("[aihub_nodes] SAM 3D Body decoder dtype fix: %s", "applied" if patch_sam3d_body() else "not needed")
-    return AIHubExtension()
+    logging.info("[gaifa_nodes] vision patch-embed as matmul: %s", ", ".join(patched) or "nothing to patch")
+    logging.info("[gaifa_nodes] SAM 3D Body decoder dtype fix: %s", "applied" if patch_sam3d_body() else "not needed")
+    return GAIFAExtension()

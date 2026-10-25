@@ -1,4 +1,4 @@
-"""5.6: idle unload stays inside the mods; AIHub passes `idle_unload_s` in the mod's env (0 = never)."""
+"""5.6: idle unload stays inside the mods; GAIFA passes `idle_unload_s` in the mod's env (0 = never)."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def spec(tmp_path, cfg_text: str = "", mod: str = MOD):
 def test_the_mods_default_reaches_its_env(tmp_path):
     eff, env = spec(tmp_path)
     assert eff.idle_unload_s == 180
-    assert env["LOCALTTS_IDLE_UNLOAD_S"] == "180" and env["AIHUB_IDLE_UNLOAD_S"] == "180"
+    assert env["LOCALTTS_IDLE_UNLOAD_S"] == "180" and env["GAIFA_IDLE_UNLOAD_S"] == "180"
 
 
 def test_config_overrides_and_zero_means_never(tmp_path):
@@ -50,7 +50,7 @@ def test_config_overrides_and_zero_means_never(tmp_path):
 
 def test_mods_without_memory_get_nothing_and_bad_names_are_errors(tmp_path):
     _, env = spec(tmp_path, mod='id = "tts"\n[run]\ncommand = ["x"]\nport = 5040\n')
-    assert "AIHUB_IDLE_UNLOAD_S" not in env
+    assert "GAIFA_IDLE_UNLOAD_S" not in env
     (tmp_path / "services/tts/service.toml").write_text(MOD.replace('"LOCALTTS_IDLE_UNLOAD_S"', '"BAD NAME"'))
     [m] = discover([tmp_path / "services"])
     assert any("not an environment variable name" in e for e in m.errors)

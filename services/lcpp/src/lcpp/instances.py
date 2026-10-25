@@ -30,7 +30,7 @@ class LcppError(Exception):
         self.detail = detail
         self.status = status
         self.field = field
-        self.data = data  # extra context, e.g. AIHub's make-room plan for needs_room
+        self.data = data  # extra context, e.g. GAIFA's make-room plan for needs_room
 
 
 def relay_off() -> dict[str, Any]:

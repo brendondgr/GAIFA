@@ -1,6 +1,6 @@
-// vLLM page inside AIHub (plan 18.6): Profiles (one card per model setup: load, download, edit) and
+// vLLM page inside GAIFA (plan 18.6): Profiles (one card per model setup: load, download, edit) and
 // Engine (the running command, its log, throughput charts). Calls the vllm adapter through ctx.call;
-// a load asks AIHub for memory, so "Make room" comes up when it's needed.
+// a load asks GAIFA for memory, so "Make room" comes up when it's needed.
 import { chartCard, charts, rh } from '/mod-charts.js';
 import { schemaForm } from '/mod-form.js';
 import { requireRunning, callRoom, header, panel, columns, stat, fmtBytes, fmtSecs, MONO } from '/mod-kit.js';
@@ -123,7 +123,7 @@ function profilesTab(el, ctx, cleanups) {
     }, { kind: 'primary' });
     editor.replaceChildren(panel(header(isNew ? 'New profile' : `Edit ${p.name}`, ui.button('Cancel', () => editor.replaceChildren(), { small: true, kind: 'ghost' })),
       ui.field('Profile id (the file name)', id), form,
-      ui.text('memory_gb is everything vLLM may use: weights, KV cache and graphs. The page asks AIHub for that plus the processes\' overhead.', { small: true, muted: true }),
+      ui.text('memory_gb is everything vLLM may use: weights, KV cache and graphs. The page asks GAIFA for that plus the processes\' overhead.', { small: true, muted: true }),
       h('div', {}, save)));
     editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -152,7 +152,7 @@ function engineTab(el, ctx, cleanups) {
       const st = eng.state;
       info.replaceChildren(panel(header(eng.name || 'No engine', ui.badge(st === 'starting' ? `starting: ${eng.stage || ''}` : st, TONE[st])),
         eng.command?.length ? mono(h, eng.command.slice(eng.command.indexOf('vllm')).join(' ')) : ui.text('Load a profile on the Profiles tab.', { small: true, muted: true }),
-        eng.memory_gb ? ui.text(`Asks AIHub for ${eng.memory_gb} GB · served on ${eng.endpoint || '127.0.0.1 (not ready)'}`, { small: true, muted: true }) : null));
+        eng.memory_gb ? ui.text(`Asks GAIFA for ${eng.memory_gb} GB · served on ${eng.endpoint || '127.0.0.1 (not ready)'}`, { small: true, muted: true }) : null));
       box.textContent = logs.lines.length ? logs.lines.join('\n') : 'No engine log yet.';
       if (follow) box.scrollTop = box.scrollHeight;
     } catch (e) { info.replaceChildren(ui.badge(errText(e), 'red')); }

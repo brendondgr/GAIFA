@@ -88,7 +88,7 @@ async def test_acquire(memhub):
         r = await c.post("/api/memory/acquire", json={"service": "fake-mem2", "needs_bytes": 50 * GB})
         assert r.status_code == 409 and r.json()["code"] == "needs_room"
         r = await c.post("/api/memory/acquire", json={"service": "fake-mem2", "needs_bytes": 50 * GB, "reason": "big model"},
-                         headers={"X-AIHub-Make-Room": "1"})
+                         headers={"X-GAIFA-Make-Room": "1"})
         assert r.status_code == 200 and r.json() == {**r.json(), "granted": True, "freed": ["fake-mem"]}
         assert app.state.hub.services.get("fake-mem").load == "unloaded"
         assert any(a["text"] == "Made room for Fake Memory 2 (big model)" for a in app.state.hub.activity.recent(5))

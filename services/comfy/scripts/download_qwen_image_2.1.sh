@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Qwen-Image 2.1 model pull (into AIHub's data/models/comfyui; moved from ~/Models/ComfyUI/models).
+# Qwen-Image 2.1 model pull (into GAIFA's data/models/comfyui; moved from ~/Models/ComfyUI/models).
 # Resumable: re-run to continue. Downloads to *.part, renames on success.
 set -u
 M="${COMFY_MODELS:-$(cd "$(dirname "$0")/../../.." && pwd)/data/models/comfyui}"

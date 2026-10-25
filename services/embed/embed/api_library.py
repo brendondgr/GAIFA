@@ -48,7 +48,7 @@ def backend_error(e: Exception) -> JSONResponse:
         return JSONResponse({"detail": str(e), "code": "no_weights", "fix": "run services/embed/install.sh"}, 503)
     log.error("%s", e)
     return JSONResponse({"detail": str(e), "code": "worker_died",
-                         "fix": "call again (it starts a new worker); if it repeats, read `aihub logs embed`"}, 503)
+                         "fix": "call again (it starts a new worker); if it repeats, read `gaifa logs embed`"}, 503)
 
 
 def _missing(cid: str) -> JSONResponse:
@@ -61,10 +61,10 @@ def add_library_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
 
     @app.post("/v1/search", summary="Search every output by meaning: text and documents (with page and line), "
               "pictures, audio and video")
-    async def search_route(body: SearchBody, x_aihub_origin: str | None = Header(None)) -> Any:
+    async def search_route(body: SearchBody, x_gaifa_origin: str | None = Header(None)) -> Any:
         """Hits are ranked by cosine score (higher is closer; ~0.5 is unrelated). Snippets are the files' own
         words, so they come as untrusted data. A search within a collection or a chat indexes its outputs first."""
-        thread = origin_thread(x_aihub_origin) if body.thread_only else None
+        thread = origin_thread(x_gaifa_origin) if body.thread_only else None
         if body.thread_only and not thread:
             return JSONResponse({"detail": "thread_only needs a chat: this call didn't come from one", "code": "no_thread",
                                  "fix": "leave thread_only out, or pass collection"}, 422)
@@ -107,10 +107,10 @@ def add_library_routes(app: FastAPI, lib: Library, enc: Encoder) -> None:
         return {"queued": lib.reindex(oid or None)}
 
     @app.get("/v1/collections", summary="Named sets of outputs to search within, and this chat's attachments")
-    async def collections(x_aihub_origin: str | None = Header(None)) -> dict:
+    async def collections(x_gaifa_origin: str | None = Header(None)) -> dict:
         cols = [{"id": c["id"], "name": c["name"], "outputs": c["outputs"], "count": len(c["outputs"])}
                 for c in store.collections()]
-        thread = origin_thread(x_aihub_origin)
+        thread = origin_thread(x_gaifa_origin)
         if thread:
             try:
                 att = await lib.hub.thread_attachments(thread)

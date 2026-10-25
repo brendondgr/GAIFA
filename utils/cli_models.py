@@ -1,4 +1,4 @@
-"""`aihub models list | show | scan | verify` (plan Phase 3). Standard library only;
+"""`gaifa models list | show | scan | verify` (plan Phase 3). Standard library only;
 loaded by `cli.py` when a models command runs, which sets `cli` to that module."""
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def _list(args: argparse.Namespace) -> int:
 
 def _show(args: argparse.Namespace) -> int:
     if not args.ids:
-        print("aihub models show: which model? (aihub models list)", file=sys.stderr)
+        print("gaifa models show: which model? (gaifa models list)", file=sys.stderr)
         return 2
     for mid in args.ids:
         m = cli.call("GET", f"/api/models/{cli.q(mid)}")
@@ -69,7 +69,7 @@ def _scan(args: argparse.Namespace) -> int:
         rows.append([d["path"], d["suggested_kind"], cli.human_bytes(d["size_bytes"]), str(len(d["files"])), d["suggested_id"]])
     print(cli.table(rows))
     if not args.add:
-        print(f"{len(found)} not registered. Add them all with `aihub models scan --add`, or one by one on the Models page.")
+        print(f"{len(found)} not registered. Add them all with `gaifa models scan --add`, or one by one on the Models page.")
         return 0
     failed = 0
     for d in found:
@@ -90,7 +90,7 @@ def _verify(args: argparse.Namespace) -> int:
     if args.all:
         ids = [m["id"] for m in cli.call("GET", "/api/models")["models"] if any(f["exists"] for f in m["files"])]
     if not ids:
-        print("aihub models verify: which model? (an id, or --all)", file=sys.stderr)
+        print("gaifa models verify: which model? (an id, or --all)", file=sys.stderr)
         return 2
     started = []
     for mid in ids:

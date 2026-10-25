@@ -12,7 +12,7 @@ from utils.api_models import SavedSettings, Settings, SettingsPatch
 router = APIRouter(tags=["settings"])
 
 
-@router.get("/api/settings", summary="AIHub's settings (config.toml)", response_model=Settings)
+@router.get("/api/settings", summary="GAIFA's settings (config.toml)", response_model=Settings)
 async def get_settings(request: Request) -> dict[str, Any]:
     return settings_mod.view(request.app.state.hub)
 

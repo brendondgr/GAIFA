@@ -1,6 +1,6 @@
 """Starting and stopping ComfyUI (bin/comfyui), its liveness and queue, and idle unload.
 
-`loaded` (for AIHub) means the ComfyUI process is up. Unload frees its models and stops the
+`loaded` (for GAIFA) means the ComfyUI process is up. Unload frees its models and stops the
 process (`comfyui quit`), so all of its memory comes back; the toolbox container keeps running
 and starts ComfyUI again in ~15 s. Shutdown stops the container too."""
 
@@ -113,7 +113,7 @@ class Controller:
     async def poll_once(self) -> None:
         up = await self.client.up()
         if up and not self.up:
-            self.touch()               # adopted (started outside AIHub, or the adapter restarted)
+            self.touch()               # adopted (started outside GAIFA, or the adapter restarted)
         self.up = up
         if not up:
             self.running, self.pending = [], []

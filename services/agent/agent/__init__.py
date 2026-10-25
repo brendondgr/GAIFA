@@ -1,1 +1,1 @@
-"""AIHub's chat agent (plan Phase 14)."""
+"""GAIFA's chat agent (plan Phase 14)."""

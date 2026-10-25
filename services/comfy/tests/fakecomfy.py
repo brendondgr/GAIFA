@@ -245,7 +245,7 @@ if route:
 
 
 class FakeHub(FakeComfy):
-    """The AIHub routes the adapter calls: memory acquire, its own memory, outputs."""
+    """The GAIFA routes the adapter calls: memory acquire, its own memory, outputs."""
 
     def __init__(self):
         self.acquires: list[dict] = []

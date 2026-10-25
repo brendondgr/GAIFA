@@ -18,7 +18,7 @@ from utils.outputs import trash
 if TYPE_CHECKING:
     from utils.outputs.index import Outputs
 
-log = logging.getLogger("aihub.outputs")
+log = logging.getLogger("gaifa.outputs")
 
 
 async def expire_hidden(outs: Outputs, keep_days: float, now: float | None = None) -> int:

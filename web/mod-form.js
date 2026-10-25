@@ -1,6 +1,6 @@
 // A form built from a JSON Schema, for mod page modules: strings (a text area when x-multiline),
-// numbers with their range, booleans, enums, and files (format "aihub-file": upload one, or pick a
-// recent AIHub output; `x-kind: "video"` on a property offers videos). Written by us, not Claude Design.
+// numbers with their range, booleans, enums, and files (format "gaifa-file": upload one, or pick a
+// recent GAIFA output; `x-kind: "video"` on a property offers videos). Written by us, not Claude Design.
 // Import as '/mod-form.js'.
 //
 //   const form = schemaForm(ctx, schema, { values, upload: file => ctx.call('POST', '/v1/uploads', …) });
@@ -10,7 +10,7 @@ import { h } from './mod-ui.js';
 import { choices, defaultOf, helpOf, labelOf, optionsOf } from './mod-options.js';
 
 const MONO = "'JetBrains Mono',ui-monospace,monospace";
-const isFile = p => p && (p.format === 'aihub-file' || (p.type === 'array' && p.items?.format === 'aihub-file'));
+const isFile = p => p && (p.format === 'gaifa-file' || (p.type === 'array' && p.items?.format === 'gaifa-file'));
 
 /** ctx: the page ctx. schema: {properties, required}. o: { values, upload(file) → Promise<value>,
  *  kinds: output kinds offered for files (default ['image']), order: property names first in this order,

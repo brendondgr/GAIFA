@@ -26,12 +26,12 @@ def reach(monkeypatch):
 def test_auto_follows_the_variant(monkeypatch, reach):
     reach("cuda", "xpu")
     for accel_device, want in (("cuda", ("cuda", "bfloat16")), ("xpu", ("xpu", "bfloat16")), ("cpu", ("cpu", "float32"))):
-        monkeypatch.setenv("AIHUB_DEVICE", accel_device)
+        monkeypatch.setenv("GAIFA_DEVICE", accel_device)
         assert encoder.choose("auto", FakeTorch) == want
 
 
 def test_auto_without_a_variant_takes_what_torch_reaches(monkeypatch, reach):
-    monkeypatch.delenv("AIHUB_DEVICE", raising=False)
+    monkeypatch.delenv("GAIFA_DEVICE", raising=False)
     reach("mps")
     assert encoder.choose("auto", FakeTorch) == ("mps", "float32")
     reach()
@@ -39,7 +39,7 @@ def test_auto_without_a_variant_takes_what_torch_reaches(monkeypatch, reach):
 
 
 def test_asked_for_and_missing(monkeypatch, reach):
-    monkeypatch.setenv("AIHUB_DEVICE", "cuda")
+    monkeypatch.setenv("GAIFA_DEVICE", "cuda")
     reach()
     assert encoder.choose("auto", FakeTorch) == ("cpu", "float32")          # the variant's device is gone: the CPU
     with pytest.raises(RuntimeError, match="EMBED_DEVICE=cuda"):

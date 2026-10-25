@@ -34,7 +34,7 @@ async def backend(request):
     if request.param == "subprocess":
         b = SubprocessBackend()
     else:
-        b = SystemdBackend(prefix=f"aihubtest{os.getpid()}-")
+        b = SystemdBackend(prefix=f"gaifatest{os.getpid()}-")
     yield b
     for sid in await b.list_ours():
         await b.stop(sid, 5)
@@ -110,8 +110,8 @@ async def test_crash_is_failed_with_status(backend, tmp_path):
 
 
 async def test_env_and_cwd_reach_the_process(backend, tmp_path):
-    code = "import os; print('ENV', os.environ['AIHUB_X'], os.getcwd(), flush=True); import time; time.sleep(30)"
-    await backend.start(spec(tmp_path, "envcheck", [PY, "-c", code], {"AIHUB_X": "with space=and equals"}))
+    code = "import os; print('ENV', os.environ['GAIFA_X'], os.getcwd(), flush=True); import time; time.sleep(30)"
+    await backend.start(spec(tmp_path, "envcheck", [PY, "-c", code], {"GAIFA_X": "with space=and equals"}))
 
     async def printed():
         return [ln for ln in await backend.logs("envcheck", 20) if ln["text"].startswith("ENV ")]

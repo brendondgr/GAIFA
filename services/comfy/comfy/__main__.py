@@ -1,4 +1,4 @@
-"""python -m comfy  ->  serve the adapter on 127.0.0.1:$AIHUB_PORT."""
+"""python -m comfy  ->  serve the adapter on 127.0.0.1:$GAIFA_PORT."""
 
 import logging
 
@@ -9,7 +9,7 @@ from .server import create_app
 
 
 class _QuietPolls(logging.Filter):
-    """AIHub polls health and status every few seconds; keep them out of the log."""
+    """GAIFA polls health and status every few seconds; keep them out of the log."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()

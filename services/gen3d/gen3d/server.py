@@ -463,7 +463,7 @@ async def delete_chat(request: Request, cid: str):
     return {"deleted": cid, "jobs": deleted}
 
 
-from . import hub, prefs  # noqa: E402  (the AIHub routes: status and the dashboard widget; the page's settings)
+from . import hub, prefs  # noqa: E402  (the GAIFA routes: status and the dashboard widget; the page's settings)
 
 app.include_router(hub.router)
 app.include_router(prefs.router)

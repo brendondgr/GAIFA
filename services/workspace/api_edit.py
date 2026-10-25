@@ -55,7 +55,7 @@ class CommitIn(BaseModel):
 
 
 def origin(request: Request) -> dict[str, Any]:
-    return reading.origin_of(request.headers.get("x-aihub-origin"))
+    return reading.origin_of(request.headers.get("x-gaifa-origin"))
 
 
 def named(o: dict[str, Any]) -> list[str]:

@@ -4,7 +4,7 @@
   `<date>/…` inside the mod's own folder) becomes `{output_id, ref, url, kind, title, summary}`.
   A file inside a folder output (a 3D job) maps to the folder. The index is synced first, so a
   file written a moment ago is found.
-- **Binary responses** (audio, images): the mod's saved copy (`X-AIHub-Output`, or tts's
+- **Binary responses** (audio, images): the mod's saved copy (`X-GAIFA-Output`, or tts's
   `X-LocalTTS-Path`) is used; without one, the hub saves the bytes to `outputs/<mod>/<date>/`.
 - **Capping:** JSON over 8 KB becomes `{truncated: true, preview, full}`; the full result stays in
   `tool_calls` and `GET /api/tools/calls/{id}/result` pages through it.
@@ -29,7 +29,7 @@ DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 EXT = {"audio/wav": "wav", "audio/x-wav": "wav", "audio/mpeg": "mp3", "audio/flac": "flac", "audio/ogg": "ogg",
        "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm",
        "model/gltf-binary": "glb"}
-PATH_HEADERS = ("x-aihub-output", "x-localtts-path")
+PATH_HEADERS = ("x-gaifa-output", "x-localtts-path")
 
 
 def cap(result: Any, call_id: str, limit: int = CAP_BYTES) -> Any:
@@ -274,7 +274,7 @@ def _stub(kind: str, out: Path, picture: Any) -> bool:
         return True
     if kind == "model3d":
         pos = struct.pack("<9f", 0, 0, 0, 1, 0, 0, 0, 1, 0)
-        gltf = {"asset": {"version": "2.0", "generator": "AIHub dry run"}, "scene": 0, "scenes": [{"nodes": [0]}],
+        gltf = {"asset": {"version": "2.0", "generator": "GAIFA dry run"}, "scene": 0, "scenes": [{"nodes": [0]}],
                 "nodes": [{"mesh": 0}], "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
                 "buffers": [{"byteLength": len(pos)}], "bufferViews": [{"buffer": 0, "byteLength": len(pos), "target": 34962}],
                 "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0, 0, 0], "max": [1, 1, 0]}]}

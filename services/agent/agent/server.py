@@ -2,7 +2,7 @@
 fork, cancel, compaction, the context meter, models, settings, status and the widget.
 
 Environment: AGENT_DB, AGENT_DATA, AGENT_LLM_URL, AGENT_MODEL, AGENT_FALLBACK_MODEL,
-AGENT_MAX_STEPS, AIHUB_URL, AIHUB_PORT.
+AGENT_MAX_STEPS, GAIFA_URL, GAIFA_PORT.
 """
 
 from __future__ import annotations
@@ -184,7 +184,7 @@ def check_quotes(agent: Agent, tid: str, body: Message) -> list[dict[str, Any]]:
 def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str | None = None, llm_url: str | None = None) -> FastAPI:
     cfg = cfg or config_from_env()
     db = db or Path(os.environ.get("AGENT_DB") or "agent.db")
-    hub_url = hub_url or os.environ.get("AIHUB_URL", "http://127.0.0.1:7000")
+    hub_url = hub_url or os.environ.get("GAIFA_URL", "http://127.0.0.1:7000")
     llm_url = llm_url or os.environ.get("AGENT_LLM_URL", "http://127.0.0.1:4000/v1")
 
     @asynccontextmanager
@@ -247,7 +247,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             store.close()
 
     app = FastAPI(title="Agent", version="0.1.0", lifespan=lifespan,
-                  description="AIHub's chat agent: one loop, tools on demand, questions and parameter cards (plan Phase 14).")
+                  description="GAIFA's chat agent: one loop, tools on demand, questions and parameter cards (plan Phase 14).")
     api_summaries.add_routes(app)                                    # plan 28.5
 
     def A(request: Request) -> Agent:
@@ -263,7 +263,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     def health() -> dict:
         return {"status": "ok"}
 
-    @app.get("/v1/status", summary="Status for AIHub: threads, messages and tokens today, running turns")
+    @app.get("/v1/status", summary="Status for GAIFA: threads, messages and tokens today, running turns")
     def status(request: Request) -> dict:
         agent = A(request)
         today = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))

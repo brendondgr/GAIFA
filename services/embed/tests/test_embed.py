@@ -138,4 +138,4 @@ def test_registers_the_model_and_reports_info(client, hub):
                                        "revision": hub.models[0]["source"]["revision"]}
     assert info["dims"] == [768, 512, 256, 128] and info["weights"] is True and info["loaded"] is None
     schema = client.get("/openapi.json").json()["components"]["schemas"]["Input"]["properties"]["image"]
-    assert schema["format"] == "aihub-file" and schema["x-kind"] == "image"
+    assert schema["format"] == "gaifa-file" and schema["x-kind"] == "image"

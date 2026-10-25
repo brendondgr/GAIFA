@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds .venv/ for the agent mod (run by `aihub install agent`).
+# Builds .venv/ for the agent mod (run by `gaifa install agent`).
 set -euo pipefail
 cd "$(dirname "$0")"
 uv venv --quiet --python-preference only-managed .venv

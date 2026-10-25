@@ -18,7 +18,7 @@ def argv(tmp_path: Path, network: bool = False, **kw) -> list[str]:
 
 def test_podman_on_linux_as_before(tmp_path):
     a = argv(tmp_path, podman="podman", linux=True, selinux=True)
-    assert a[:7] == ["podman", "run", "--rm", "--name", "aihub-ws-run_x", "--userns=keep-id", "--security-opt"] and "label=disable" in a
+    assert a[:7] == ["podman", "run", "--rm", "--name", "gaifa-ws-run_x", "--userns=keep-id", "--security-opt"] and "label=disable" in a
     assert "--network=none" in a and any(x.endswith(":O") for x in a)
     assert "--network=pasta" in argv(tmp_path / "n", network=True, podman="podman", linux=True, selinux=True)
 
@@ -35,5 +35,5 @@ def test_podman_on_macos(tmp_path):
 
 
 def test_the_runtime_comes_from_the_hub(tmp_path, monkeypatch):
-    monkeypatch.setenv("AIHUB_CONTAINER_RUNTIME", "docker")
+    monkeypatch.setenv("GAIFA_CONTAINER_RUNTIME", "docker")
     assert Sandbox(tmp_path).podman == "docker"

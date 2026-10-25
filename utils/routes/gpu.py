@@ -86,7 +86,7 @@ class AcquireBody(_Model):
     cls: LeaseClass = Field("job", alias="class")
     label: str = ""
     est_s: float | None = Field(None, ge=0)
-    parent: str | None = Field(None, description="A held lease this work runs under (X-AIHub-GPU-Lease)")
+    parent: str | None = Field(None, description="A held lease this work runs under (X-GAIFA-GPU-Lease)")
     thread: str | None = None
     call_id: str | None = None
     lease: str | None = Field(None, description="Repeat the waiting lease's id to keep its place")

@@ -1,4 +1,4 @@
-"""The two things this mod asks of AIHub, over HTTP: an output's file, and registering weights."""
+"""The two things this mod asks of GAIFA, over HTTP: an output's file, and registering weights."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class Hub:
             try:
                 meta = await c.get(f"{self.url}/api/outputs/{oid}")
             except httpx.HTTPError as exc:
-                raise HubError(f"AIHub didn't answer at {self.url} ({exc}); upload the file instead") from exc
+                raise HubError(f"GAIFA didn't answer at {self.url} ({exc}); upload the file instead") from exc
             if meta.status_code == 404:
                 raise HubError(f"no output {oid!r}")
             meta.raise_for_status()
@@ -64,10 +64,10 @@ class Hub:
             if r.status_code not in (200, 201, 409):
                 logger.warning("Registering %s answered HTTP %s: %s", name, r.status_code, r.text[:200])
         except httpx.HTTPError as exc:
-            logger.warning("Couldn't register %s with AIHub: %s", name, exc)
+            logger.warning("Couldn't register %s with GAIFA: %s", name, exc)
 
     async def register_present(self, weights: Path) -> None:
-        """Register every model whose weights are here (copied in by hand, or before AIHub knew)."""
+        """Register every model whose weights are here (copied in by hand, or before GAIFA knew)."""
         for info in catalog.CATALOG:
             if catalog.is_downloaded(weights, info.name):
                 await self.register_model(info.name, catalog.recorded_source(weights, info.name))

@@ -16,7 +16,7 @@
    - `backend = "relay"`: a chat model (OpenAI-compatible, through the relay) answers `{verdict, reason}` as JSON at
      temperature 0.
 3. Fail closed: unsure, malformed, slower than `timeout_s` (3 s) or not reachable → ask. `timeout_s` counts from
-   when the model has the GPU: the call sends it as `X-AIHub-Answer-Within` and the relay or the decide mod keep it
+   when the model has the GPU: the call sends it as `X-GAIFA-Answer-Within` and the relay or the decide mod keep it
    (504 past it), so a judge on a local model waits for the GPU slot behind a job first, for up to `gpu_wait_s`
    (90 s: the agent gives a tool call 120 s), and asks once that runs out. There is no deny. Arguments
    the model couldn't see whole (a string over 1,500 characters, a list or object over 50 items, deeper than 6, or
@@ -126,7 +126,7 @@ VERDICT_SCHEMA = {"type": "object", "properties": {"verdict": {"type": "string",
 
 
 GPU_WAIT_S = 90.0                        # the longest a judgement waits for the GPU slot behind a job
-WITHIN_HEADER = "X-AIHub-Answer-Within"   # the model's budget once it has the slot (the relay and decide keep it)
+WITHIN_HEADER = "X-GAIFA-Answer-Within"   # the model's budget once it has the slot (the relay and decide keep it)
 
 
 def within(timeout_s: float) -> dict[str, str]:
@@ -141,7 +141,7 @@ class JudgeConfig:
     url: str = "http://127.0.0.1:4000"   # the relay's base URL, or the decide mod's (e.g. the hub's /api/s/decide)
     threshold: float = 0.35          # decide: the lowest "safe" probability must reach it (DECIDE_CUTOFF)
     context: str = "none"                # none | trail | full: what it reads of the turn so far (judge_context.py)
-    timeout_s: float = 3.0               # for the answer, once the model has the GPU (X-AIHub-Answer-Within)
+    timeout_s: float = 3.0               # for the answer, once the model has the GPU (X-GAIFA-Answer-Within)
     gpu_wait_s: float = GPU_WAIT_S       # and before that, for the GPU slot
     api_key: str | None = None
     allow_commands: list[str] = field(default_factory=list)    # your rules (judge_user.py)

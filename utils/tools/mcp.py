@@ -10,13 +10,13 @@ Streamable HTTP, stateless, single `application/json` responses (no SSE, no sess
 - **Legacy (2025-03-26, 2025-06-18, 2025-11-25):** `initialize` (the client's version is echoed when
   supported), `notifications/initialized` (202), `ping`, `tools/list`, `tools/call`.
 
-**Tools** are the catalog's (annotations from `risk`) plus the MCP-only `aihub_wait_approval`. Every
+**Tools** are the catalog's (annotations from `risk`) plus the MCP-only `gaifa_wait_approval`. Every
 call goes through `hub.calls.call(..., origin={"service": "mcp", "client": …}, mode="manual")`, so the
 permissions and approvals apply exactly as for the chat. An `ask` call runs nothing until the user
 decides (`mcp_approval.py`): a modern client that can show forms gets an `input_required` result
 whose `elicitation/create` form is the parameter card; every other client gets a result explaining
-that the approval waits in AIHub (header → Approvals), plus `_meta["aihub/approval"]`, and can wait
-for the outcome with `aihub_wait_approval`.
+that the approval waits in GAIFA (header → Approvals), plus `_meta["gaifa/approval"]`, and can wait
+for the outcome with `gaifa_wait_approval`.
 
 **Security:** the hub listens on loopback only; a present `Origin` must be the hub's own
 (`http://127.0.0.1`, `http://localhost` or `http://[::1]` with the hub's port) and
@@ -38,7 +38,7 @@ from utils.tools.mcp_approval import Approver, ProtocolError
 if TYPE_CHECKING:
     from utils.server import Hub
 
-log = logging.getLogger("aihub.mcp")
+log = logging.getLogger("gaifa.mcp")
 
 MODERN = ("2026-07-28",)
 LEGACY = ("2025-11-25", "2025-06-18", "2025-03-26")
@@ -56,10 +56,10 @@ MODERN_STATUS = {PARSE_ERROR: 400, INVALID_REQUEST: 400, INVALID_PARAMS: 400, HE
                  UNSUPPORTED_VERSION: 400, METHOD_NOT_FOUND: 404}
 LIST_TTL_MS = 30_000
 INSTRUCTIONS = (
-    "AIHub runs this machine's local AI services (speech, images & video, 3D, LLMs). Its tools make files "
+    "GAIFA runs this machine's local AI services (speech, images & video, 3D, LLMs). Its tools make files "
     "(returned as outputs with a ref like output:<id> that other tools take as {\"$file\": \"output:<id>\"}). "
     "Tools that generate or change things ask the user first: the call answers with an approval that the user "
-    "decides in AIHub (or in your client's form); wait for it with aihub_wait_approval. Long jobs answer "
+    "decides in GAIFA (or in your client's form); wait for it with gaifa_wait_approval. Long jobs answer "
     "status 'running' with a call_id: get the result with hub_job_status.")
 
 
@@ -120,15 +120,15 @@ class McpServer:
 
     @property
     def server_info(self) -> dict[str, str]:
-        return {"name": "aihub", "title": "AIHub", "version": self.hub.version}
+        return {"name": "gaifa", "title": "GAIFA", "version": self.hub.version}
 
     # ---- transport ---------------------------------------------------------------------------
 
     async def handle(self, raw: bytes, headers: Mapping[str, str], base: str) -> tuple[int, dict[str, Any] | None]:
         """One POST body → (HTTP status, JSON body or None for 202). `headers` keys are lowercase."""
         if origin.refusal(headers, self.hub.allowed_hosts, self.hub.port):
-            return 403, error(None, INVALID_REQUEST, f"Forbidden origin {headers.get('origin')!r}: AIHub's MCP endpoint "
-                                                     "only answers AIHub's own page and local clients")
+            return 403, error(None, INVALID_REQUEST, f"Forbidden origin {headers.get('origin')!r}: GAIFA's MCP endpoint "
+                                                     "only answers GAIFA's own page and local clients")
         try:
             msg = json.loads(raw)
         except (ValueError, UnicodeDecodeError) as e:
@@ -207,7 +207,7 @@ class McpServer:
     def _initialize(self, req: Request) -> dict[str, Any]:
         asked = req.params.get("protocolVersion")
         version = asked if asked in SUPPORTED else LEGACY[0]
-        info = dict(self.server_info) if version >= "2025-06-18" else {"name": "aihub", "version": self.hub.version}
+        info = dict(self.server_info) if version >= "2025-06-18" else {"name": "gaifa", "version": self.hub.version}
         return {"protocolVersion": version, "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": info, "instructions": INSTRUCTIONS}
 
@@ -221,7 +221,7 @@ class McpServer:
 
     def _title(self, t: Any) -> str:
         if t.mod is None:
-            owner = "AIHub"
+            owner = "GAIFA"
         else:
             svc = self.hub.services.services.get(t.mod) if self.hub.services else None
             owner = svc.mod.name if svc else t.mod
@@ -230,8 +230,8 @@ class McpServer:
     def _tool(self, t: Any, req: Request) -> dict[str, Any]:
         entry = self._tool_entry(req, t.name, self._title(t), t.function()["function"]["description"], t.parameters,
                                  t.risk)
-        entry["_meta"] = {"aihub/risk": t.risk, "aihub/mod": t.mod or "hub", "aihub/ask": t.ask,
-                          "aihub/available": t.available}
+        entry["_meta"] = {"gaifa/risk": t.risk, "gaifa/mod": t.mod or "hub", "gaifa/ask": t.ask,
+                          "gaifa/available": t.available}
         if not t.available and t.why:
             entry["description"] += f"\n(Not running now: {t.why}. Calling it starts it.)"
         return entry
@@ -267,5 +267,5 @@ class McpServer:
 
     def _ready(self) -> Hub:
         if self.hub.calls is None or self.hub.tools is None:
-            raise ProtocolError(INTERNAL_ERROR, "AIHub is still starting; try again in a moment")
+            raise ProtocolError(INTERNAL_ERROR, "GAIFA is still starting; try again in a moment")
         return self.hub

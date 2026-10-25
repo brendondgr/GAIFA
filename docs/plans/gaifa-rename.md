@@ -36,7 +36,7 @@ The name's meaning and pronunciation are said once in the README's first lines, 
 
 - [ ] **50.1 This plan.** `docs/plans/gaifa-rename.md`, listed in `docs/structure.md`.
   *Done when:* the plan is committed.
-- [ ] **50.2 Every identifier, in one commit.**
+- [x] **50.2 Every identifier, in one commit.**
   - **Mechanical pass** over all tracked text files except Markdown prose: `AIHub` → `GAIFA`, `AIHUB` → `GAIFA`, `aihub` → `gaifa`; Markdown gets only the parsed parts (the ` ```aihub-setup ` fences, commands, paths and variables inside code) so the prose can land in 50.3. `services/relay/` is included (its `X-AIHub-*` and `AIHUB_*` uses are ours).
   - **Renamed paths:** `bin/aihub` → `bin/gaifa`, `bin/aihub.service.in` → `bin/gaifa.service.in`, `services/*/aihub-install.sh` → `gaifa-install.sh`, `services/comfy/nodes/aihub_nodes/` → `gaifa_nodes/`, `services/lcpp/src/lcpp/aihub.py` → `gaifa.py`, the `test_aihub.py` files → `test_gaifa.py`, `services/gen3d/desktop/3dgenerate-aihub.desktop` → `3dgenerate-gaifa.desktop`.
   - **By hand:** the unit's description (`GAIFA - Great, Another Interface For Agents (http://127.0.0.1:7000)`); the ComfyUI node's old name kept as a hidden alias (`services/comfy/nodes/gaifa_nodes/__init__.py` `NODE_CLASS_MAPPINGS`); the browser keys' one-time fallback (`web/chat/chat-ui.js` `getPref`); the old unit and link cleanup in `gaifa install` (`utils/cli.py`); Settings → About says what the name means; `pyproject.toml` `name = "gaifa"` and `uv lock`.

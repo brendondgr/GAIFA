@@ -1,7 +1,7 @@
 """Project paths and atomic file writes.
 
 The project root is the folder holding `app.py` (this file's parent's parent),
-or `AIHUB_ROOT` when set. Everything the hub writes lives under it.
+or `GAIFA_ROOT` when set. Everything the hub writes lives under it.
 Nothing here touches the filesystem until `Paths.ensure()` is called.
 """
 
@@ -16,8 +16,8 @@ DEFAULT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def project_root() -> Path:
-    """`AIHUB_ROOT` if set, else the folder holding `app.py`."""
-    env = os.environ.get("AIHUB_ROOT")
+    """`GAIFA_ROOT` if set, else the folder holding `app.py`."""
+    env = os.environ.get("GAIFA_ROOT")
     return Path(env).expanduser().resolve() if env else DEFAULT_ROOT
 
 

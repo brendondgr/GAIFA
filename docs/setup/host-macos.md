@@ -1,6 +1,6 @@
 # The host: macOS on Apple Silicon
 
-What a Mac needs before you clone AIHub (plan 38.4). **Not run on a Mac yet:** the hub and the mods without GPU work are checked in CI; the GPU variants (`mps`) are marked untested until someone runs the field test on a Mac.
+What a Mac needs before you clone GAIFA (plan 38.4). **Not run on a Mac yet:** the hub and the mods without GPU work are checked in CI; the GPU variants (`mps`) are marked untested until someone runs the field test on a Mac.
 
 ## 1. Tools
 
@@ -15,11 +15,11 @@ Podman or Docker Desktop only for mods that run containers; containers on macOS 
 
 ## 2. Running the hub
 
-There's no systemd: `aihub install` writes a launchd agent to `data/state/hub/com.aihub.hub.plist` and prints the commands that copy it to `~/Library/LaunchAgents/` and load it (AIHub writes nothing outside its folder for you). Until then, `aihub start` runs the hub in the background, and mods run as detached processes that outlive it.
+There's no systemd: `gaifa install` writes a launchd agent to `data/state/hub/com.gaifa.hub.plist` and prints the commands that copy it to `~/Library/LaunchAgents/` and load it (GAIFA writes nothing outside its folder for you). Until then, `gaifa start` runs the hub in the background, and mods run as detached processes that outlive it.
 
 ## 3. The GPU
 
-The Apple GPU shares the system's memory (one memory pool). PyTorch reaches it as `mps`, llama.cpp through its Metal build. `aihub hardware` lists `mps` among the accels on Apple Silicon; an Intel Mac has none, and runs the CPU variants.
+The Apple GPU shares the system's memory (one memory pool). PyTorch reaches it as `mps`, llama.cpp through its Metal build. `gaifa hardware` lists `mps` among the accels on Apple Silicon; an Intel Mac has none, and runs the CPU variants.
 
 ## What to look for
 

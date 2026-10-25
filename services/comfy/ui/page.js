@@ -1,6 +1,6 @@
-// Images & Video (comfy) page inside AIHub (design brief Part B5, plan 11.11): Workflows, Run and
+// Images & Video (comfy) page inside GAIFA (design brief Part B5, plan 11.11): Workflows, Run and
 // Import tabs. Workflows are packs (services/comfy/workflows/<id>/); see docs/workflows.md.
-// Everything goes through ctx.call (AIHub's proxy), so it also works under ?mock.
+// Everything goes through ctx.call (GAIFA's proxy), so it also works under ?mock.
 import { chartCard, charts, rh } from '/mod-charts.js';
 import { requireRunning, header, panel, segmented, store } from '/mod-kit.js';
 import { runTab } from './run.js';

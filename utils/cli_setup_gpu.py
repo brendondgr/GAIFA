@@ -1,4 +1,4 @@
-"""The GPU part of `aihub setup host` (plan 37.3), per kind of machine. Standard library only.
+"""The GPU part of `gaifa setup host` (plan 37.3), per kind of machine. Standard library only.
 
 - **AMD that shares the system's memory** (Strix Halo and other APUs): GTT kernel parameters, the IOMMU,
   the GTT size, the `video` and `render` groups (today's checks, docs/setup/host.md).
@@ -60,7 +60,7 @@ def checks(probe: Any, machine: Any, root: Path, needs: set[str], Check: Any) ->
                          "" if from_platform is None else from_platform.split("\n", 1)[-1].strip(), needs_root=True))
         on_windows = str(root.resolve()).startswith("/mnt/")
         out.append(Check("wsl-clone", not on_windows, "the clone is in WSL's own filesystem" if not on_windows else f"the clone ({root}) is on a Windows drive: everything is many times slower there",
-                         "" if not on_windows else "clone AIHub again under your WSL home folder (~/), not /mnt/c/…"))
+                         "" if not on_windows else "clone GAIFA again under your WSL home folder (~/), not /mnt/c/…"))
         dxg = not any("dxg" in p for g in machine.gpus for p in g.problems)
         out.append(Check("wsl-gpu", dxg and bool(machine.gpus), "WSL sees the GPU (/dev/dxg)" if dxg and machine.gpus else "WSL doesn't see a GPU",
                          "" if dxg and machine.gpus else "update WSL (`wsl --update` in PowerShell) and the GPU driver on Windows", gpu=True))
@@ -97,7 +97,7 @@ def checks(probe: Any, machine: Any, root: Path, needs: set[str], Check: Any) ->
         out.append(Check("homebrew", brew, "Homebrew is installed" if brew else "Homebrew is missing (the fixes below use it)",
                          "" if brew else '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'))
     if not machine.gpus and machine.os != "darwin":
-        out.append(Check("gpu", True, "no GPU found: only mods with a CPU variant can run here (aihub hardware)", gpu=True))
+        out.append(Check("gpu", True, "no GPU found: only mods with a CPU variant can run here (gaifa hardware)", gpu=True))
     return out
 
 

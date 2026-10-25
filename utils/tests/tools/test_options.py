@@ -1,5 +1,5 @@
 """20.1: `x-options` on enum parameters: defaults that follow the inputs, refusals with a fix that
-names the choices that fit, dependent values, the model's text, `aihub check`, the MCP form, a mod's
+names the choices that fit, dependent values, the model's text, `gaifa check`, the MCP form, a mod's
 own fix, and the hint to call a sibling tool."""
 
 from __future__ import annotations

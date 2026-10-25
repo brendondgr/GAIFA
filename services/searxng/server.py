@@ -1,7 +1,7 @@
 """SearXNG: find the SearXNG on this machine, watch it, adjust its settings (plan 26.3).
 
-AIHub runs this as `.venv/bin/python server.py` (architecture §4.4). SearXNG itself runs outside
-AIHub (setup/searxng.md); this mod never installs it or changes its network binding. Its only
+GAIFA runs this as `.venv/bin/python server.py` (architecture §4.4). SearXNG itself runs outside
+GAIFA (setup/searxng.md); this mod never installs it or changes its network binding. Its only
 writes outside the project are SearXNG's `settings.yml` and its backups (containers.py).
 """
 
@@ -198,7 +198,7 @@ def create_app(runtime: Runtime | None = None, env_url: str | None = None, watch
 
 
 class _QuietPolls(logging.Filter):
-    """AIHub polls health and status every few seconds; keep them out of the log."""
+    """GAIFA polls health and status every few seconds; keep them out of the log."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
@@ -207,4 +207,4 @@ class _QuietPolls(logging.Filter):
 
 if __name__ == "__main__":
     logging.getLogger("uvicorn.access").addFilter(_QuietPolls())
-    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("AIHUB_PORT", "5106")), log_level="info")
+    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("GAIFA_PORT", "5106")), log_level="info")

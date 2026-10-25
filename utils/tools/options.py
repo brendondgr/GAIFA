@@ -165,7 +165,7 @@ def for_model(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def spec_problems(params: dict[str, Any]) -> list[str]:
-    """Mistakes in a tool's `x-options` (for `aihub check`): unknown values, unknown parameters, and
+    """Mistakes in a tool's `x-options` (for `gaifa check`): unknown values, unknown parameters, and
     more than one default fitting the same inputs."""
     out: list[str] = []
     props = params.get("properties") or {}

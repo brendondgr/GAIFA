@@ -11,7 +11,7 @@ ACCEL="${1:?usage: build-llama-cpp.sh <cuda|mps|cpu> [tag]}"
 TAG="${2:-b11445}"
 cd "$(dirname "$0")/.."
 for cmd in git cmake; do
-  command -v "$cmd" >/dev/null || { echo "build-llama-cpp.sh: needs $cmd (aihub setup host lists the install command)" >&2; exit 1; }
+  command -v "$cmd" >/dev/null || { echo "build-llama-cpp.sh: needs $cmd (gaifa setup host lists the install command)" >&2; exit 1; }
 done
 case "$ACCEL" in
   cuda)

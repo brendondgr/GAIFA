@@ -1,4 +1,4 @@
-"""`GET /api/system/hardware` and `aihub hardware` (plan 35.2)."""
+"""`GET /api/system/hardware` and `gaifa hardware` (plan 35.2)."""
 
 from __future__ import annotations
 
@@ -15,10 +15,10 @@ FIX = Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def nvidia2(monkeypatch):
-    monkeypatch.setenv("AIHUB_HARDWARE_FIXTURE", str(FIX / "linux-nvidia-2gpu.json"))
+    monkeypatch.setenv("GAIFA_HARDWARE_FIXTURE", str(FIX / "linux-nvidia-2gpu.json"))
     hardware.detect(refresh=True)
     yield
-    monkeypatch.delenv("AIHUB_HARDWARE_FIXTURE")
+    monkeypatch.delenv("GAIFA_HARDWARE_FIXTURE")
     hardware.detect(refresh=True)
 
 
@@ -32,7 +32,7 @@ async def test_route_answers_the_machine(client, nvidia2):
 
 
 async def test_route_refresh(client, monkeypatch, nvidia2):
-    monkeypatch.setenv("AIHUB_HARDWARE_FIXTURE", str(FIX / "macos-m3.json"))
+    monkeypatch.setenv("GAIFA_HARDWARE_FIXTURE", str(FIX / "macos-m3.json"))
     assert (await client.get("/api/system/hardware")).json()["os"] == "linux"          # cached
     assert (await client.get("/api/system/hardware?refresh=true")).json()["os"] == "darwin"
 

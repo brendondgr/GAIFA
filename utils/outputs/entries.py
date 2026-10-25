@@ -26,7 +26,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-log = logging.getLogger("aihub.outputs")
+log = logging.getLogger("gaifa.outputs")
 
 FOLDER_SIDECAR = "output.json"
 UNFINISHED = (".part", ".tmp", ".crdownload", ".incomplete")

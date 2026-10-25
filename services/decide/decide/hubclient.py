@@ -1,4 +1,4 @@
-"""AIHub over HTTP: outputs (architecture §6), memory (§7) and the models registry (§8). Never hub imports."""
+"""GAIFA over HTTP: outputs (architecture §6), memory (§7) and the models registry (§8). Never hub imports."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def output_id(ref: str) -> str:
 class Hub:
     def __init__(self, url: str | None, transport: httpx.AsyncBaseTransport | None = None):
         self.url = (url or "").rstrip("/") or None
-        self.service = os.environ.get("AIHUB_SERVICE_ID", "decide")
+        self.service = os.environ.get("GAIFA_SERVICE_ID", "decide")
         self.transport = transport
 
     def _client(self, read: float = 60) -> httpx.AsyncClient:
@@ -49,7 +49,7 @@ class Hub:
     async def output(self, ref: str, max_bytes: int) -> tuple[dict[str, Any], bytes]:
         """An output's record and its main file's bytes."""
         if not self.url:
-            raise HubError(503, "no hub to read outputs from (AIHUB_URL is unset)", "hub_unreachable")
+            raise HubError(503, "no hub to read outputs from (GAIFA_URL is unset)", "hub_unreachable")
         oid = output_id(ref)
         try:
             async with self._client(read=120) as c:
@@ -68,7 +68,7 @@ class Hub:
         except httpx.HTTPStatusError as e:
             raise HubError(502, f"the hub answered {e.response.status_code} for output {oid}", "hub_error") from e
         except httpx.HTTPError as e:
-            raise HubError(503, f"AIHub not reachable ({e})", "hub_unreachable") from e
+            raise HubError(503, f"GAIFA not reachable ({e})", "hub_unreachable") from e
 
     async def acquire(self, gb: float, reason: str) -> None:
         """Ask for memory before loading a model; a 409 needs_room is passed on unchanged."""
@@ -79,7 +79,7 @@ class Hub:
                 r = await c.post("/api/memory/acquire", json={"service": self.service, "needs_bytes": int(gb * 1e9),
                                                               "reason": reason})
         except httpx.HTTPError as e:
-            log.warning("AIHub not reachable for memory (%s); loading anyway", e)
+            log.warning("GAIFA not reachable for memory (%s); loading anyway", e)
             return
         if r.status_code == 409:
             b = r.json()
@@ -96,7 +96,7 @@ class Hub:
             async with self._client() as c:
                 r = await c.post("/api/models", json=entry)
         except httpx.HTTPError as e:
-            return f"AIHub not reachable ({e})"
+            return f"GAIFA not reachable ({e})"
         if r.status_code < 300:
             return "registered"
         if r.status_code == 409:

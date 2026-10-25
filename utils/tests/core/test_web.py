@@ -49,7 +49,7 @@ def test_export_files_are_present_and_support_js_untouched():
         assert (WEB / "vendor" / font).is_file()
 
 
-def test_renamed_to_aihub():
+def test_renamed_to_gaifa():
     for name in ("Hub.dc.html", "mock.js"):
         text = (WEB / name).read_text()
         assert not re.search(r"\bHub\b", text) and "bin/hub" not in text
@@ -59,7 +59,7 @@ async def test_index_serves_the_export(web_client):
     r = await web_client.get("/")
     assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
     assert HEAD_SCRIPTS in r.text and "fonts.googleapis" not in r.text
-    assert "AIHub not responding" in r.text
+    assert "GAIFA not responding" in r.text
 
 
 async def test_a_page_load_gets_an_empty_template(web_client):
@@ -70,7 +70,7 @@ async def test_a_page_load_gets_an_empty_template(web_client):
     assert page.headers["vary"] == "Sec-Fetch-Mode"
     assert "<x-dc></x-dc>" in page.text
     assert "data-dc-script" in page.text and HEAD_SCRIPTS in page.text  # the logic and scripts stay
-    assert "{{ ov.dash }}" in full.text and "AIHub not responding" in full.text
+    assert "{{ ov.dash }}" in full.text and "GAIFA not responding" in full.text
 
 
 async def test_every_web_module_is_served(web_client):

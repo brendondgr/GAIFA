@@ -1,10 +1,10 @@
 """The SearXNG container (plan 26.3): find it with Docker or podman, and the only writes this mod
-makes outside the project: `settings.yml` and its backups `settings.yml.aihub-<date>`, in the folder
+makes outside the project: `settings.yml` and its backups `settings.yml.gaifa-<date>`, in the folder
 bind-mounted at the container's settings path.
 
 The file belongs to the container's `searxng` user (uid 977 in the image) and isn't writable from
 the host, so writes go through the container (`docker exec`, which the `docker` group allows). A
-write never leaves the file half written: the new text goes to `.settings.yml.aihub-new` next to it
+write never leaves the file half written: the new text goes to `.settings.yml.gaifa-new` next to it
 (a `cp -p` of the file, so owner and mode stay), its size is checked, and `mv -f` renames it over
 `settings.yml` in one step. Only when the rename is refused (settings.yml bind-mounted on its own)
 is the checked copy written over the file in place. Restoring a backup goes the same way. Only the
@@ -23,14 +23,14 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
-BACKUP_RE = re.compile(r"^settings\.yml\.aihub-(\d{4}-\d{2}-\d{2}T\d{6})(?:-(\d+))?$")
+BACKUP_RE = re.compile(r"^settings\.yml\.gaifa-(\d{4}-\d{2}-\d{2}T\d{6})(?:-(\d+))?$")
 DEFAULT_SETTINGS_IN = "/etc/searxng/settings.yml"
 KEEP_BACKUPS = 10
 
 # $0 settings.yml, $1 "-" (the new text on stdin, $2 bytes) or a backup to copy back. The new file is
 # a copy of the old one (owner, mode) with the new text, checked for size, then renamed over it.
 _REPLACE = r'''
-f="$0"; t="${f%/*}/.${f##*/}.aihub-new"
+f="$0"; t="${f%/*}/.${f##*/}.gaifa-new"
 rm -f "$t" && cp -p "$f" "$t" || exit 1
 if [ "$1" = - ]; then n="$2"; cat > "$t" || { rm -f "$t"; exit 1; }
 else n=$(($(wc -c < "$1"))) && cat "$1" > "$t" || { rm -f "$t"; exit 1; }; fi
@@ -74,7 +74,7 @@ def backup_order(name: str) -> tuple[str, int]:
 
 
 def backup_name(now: datetime | None = None) -> str:
-    return f"settings.yml.aihub-{(now or datetime.now()).strftime('%Y-%m-%dT%H%M%S')}"
+    return f"settings.yml.gaifa-{(now or datetime.now()).strftime('%Y-%m-%dT%H%M%S')}"
 
 
 class Runtime(Protocol):

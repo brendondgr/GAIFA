@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from utils.registry.store import Registry
 
-log = logging.getLogger("aihub.registry")
+log = logging.getLogger("gaifa.registry")
 
 EVERY_S = 60.0
 PREFIX = "sum-"
@@ -83,7 +83,7 @@ class Watcher:
     def start(self) -> None:
         self.reg.refresh()
         refresh(self.reg)
-        self._task = asyncio.create_task(self._run(), name="aihub-registry-watch")
+        self._task = asyncio.create_task(self._run(), name="gaifa-registry-watch")
 
     async def _run(self) -> None:
         while True:

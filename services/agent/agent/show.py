@@ -26,10 +26,10 @@ POINTS, ROWS, FILE_BYTES, FILE_ROWS, SERIES = 500, 200, 5_000_000, 50_000, 8
 
 TOOL: dict[str, Any] = {
     "name": "show",
-    "description": "Show a chart, a table or pictures in your reply, drawn in AIHub's own style. Use it for numbers worth "
+    "description": "Show a chart, a table or pictures in your reply, drawn in GAIFA's own style. Use it for numbers worth "
     "comparing (a chart), a list with several fields (a table) or outputs worth seeing together (a gallery). Give the data "
     "one way: inline (small sets you worked out), `source` \"#n\" (a CSV or JSON output: name its columns, never copy its "
-    "numbers), `source` \"hub:memory\" | \"hub:outputs_per_day\" | \"hub:job_times\" | \"hub:mod_stat\" with `range` (AIHub's own "
+    "numbers), `source` \"hub:memory\" | \"hub:outputs_per_day\" | \"hub:job_times\" | \"hub:mod_stat\" with `range` (GAIFA's own "
     "data, always current), or `outputs` [\"#1\", …] for image and gallery. Inline: charts take `x` (labels) and `series` "
     "[{name, values, unit?}]; donut and kpi take `items` [{label, value, unit?}]; table takes `columns` and `rows`; heatmap "
     "takes `rows`, `columns` and `values` (one list per row).",
@@ -185,7 +185,7 @@ async def check(args: dict[str, Any], resolve: Callable[[str], str | None],
     src = args.get("source")
     if isinstance(src, str) and src.startswith("hub:"):
         if src not in HUB:
-            raise ShowError("source", f"{src!r} isn't one of AIHub's sources", "one of " + ", ".join(HUB))
+            raise ShowError("source", f"{src!r} isn't one of GAIFA's sources", "one of " + ", ".join(HUB))
         rng = args.get("range") or "24h"
         if rng not in RANGES:
             raise ShowError("range", f"{rng!r} isn't a range", "one of " + ", ".join(RANGES))
@@ -238,7 +238,7 @@ def summary(spec: dict[str, Any]) -> str:
         n = len(spec["outputs"])
         return "Shown: a picture." if v == "image" else f"Shown: a gallery of {n}."
     if "hub" in spec:
-        return f"Shown: a {v} of AIHub's {spec['hub']['name'].replace('_', ' ')} over {spec['hub']['range']}, kept current."
+        return f"Shown: a {v} of GAIFA's {spec['hub']['name'].replace('_', ' ')} over {spec['hub']['range']}, kept current."
     if "file" in spec:
         f = spec["file"]
         return f"Shown: a {v} from a file of {f['rows']} rows" + (f" ({', '.join(f.get('y') or [])} by {f['x']})." if f.get("x") else ".")

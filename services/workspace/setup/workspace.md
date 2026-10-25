@@ -1,4 +1,4 @@
-<!-- aihub-setup
+<!-- gaifa-setup
 id = "workspace"
 title = "Workspace (folders, edits in place, the sandbox)"
 models = []
@@ -7,14 +7,14 @@ summary = "Workspace: let the agent read and edit your folders at a level you se
 gpu = false
 disk_gb = 1.1
 needs = ["uv", "podman", "git"]
-check = "aihub start workspace && aihub check workspace"
+check = "gaifa start workspace && gaifa check workspace"
 
 [[steps]]
-run = "aihub install workspace"
+run = "gaifa install workspace"
 what = "makes .venv/ from requirements-dev.txt (about 26 MB, under a minute)"
 
 [[steps]]
-run = "podman build -t localhost/aihub-workspace-sandbox:2 -f sandbox/Containerfile sandbox"
+run = "podman build -t localhost/gaifa-workspace-sandbox:2 -f sandbox/Containerfile sandbox"
 what = "builds the sandbox image from base images pinned by digest (1.06 GB, a few minutes; needs the internet once)"
 
 [[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
@@ -32,7 +32,7 @@ The format is in [docs/mods.md §9](../../../docs/mods.md#9-setup-docs).
 Two environments:
 
 1. **The mod's venv** (FastAPI, uvicorn, httpx). It keeps the folders you add as workspaces, each at a level (Read · Edit · Run · Run + network), in `data/state/workspace/folders.json`. Git and ripgrep on the host serve the reading tools.
-2. **The sandbox image** `localhost/aihub-workspace-sandbox:2` (rootless podman), where commands and Python run: only Python 3.12, uv, Node LTS, git, ripgrep, build-essential and the data libraries (numpy, pandas, matplotlib, openpyxl, python-pptx, python-docx, pypdfium2), from `sandbox/Containerfile` and `sandbox/requirements.lock`.
+2. **The sandbox image** `localhost/gaifa-workspace-sandbox:2` (rootless podman), where commands and Python run: only Python 3.12, uv, Node LTS, git, ripgrep, build-essential and the data libraries (numpy, pandas, matplotlib, openpyxl, python-pptx, python-docx, pypdfium2), from `sandbox/Containerfile` and `sandbox/requirements.lock`.
 
 ## Tested with
 
@@ -51,13 +51,13 @@ Read from this machine on 2026-10-20:
 ## Install
 
 ```bash
-aihub install workspace
+gaifa install workspace
 ```
 
 Makes `.venv/` in this folder from `requirements-dev.txt`. Then build the sandbox image, from the Workspace page (Sandbox → Build) or by hand:
 
 ```bash
-podman build -t localhost/aihub-workspace-sandbox:2 -f services/workspace/sandbox/Containerfile services/workspace/sandbox
+podman build -t localhost/gaifa-workspace-sandbox:2 -f services/workspace/sandbox/Containerfile services/workspace/sandbox
 ```
 
 To change the data libraries: edit `sandbox/requirements.in`, recompile `requirements.lock` (the command is at its top), bump `VERSION` in `sandbox.py`, rebuild.
@@ -75,7 +75,7 @@ None: the mod runs no model. The model that reads and edits your folders is the 
 ## Check it works
 
 ```bash
-aihub start workspace && aihub check workspace
+gaifa start workspace && gaifa check workspace
 cd services/workspace && .venv/bin/python -m pytest -q
 ```
 
@@ -83,8 +83,8 @@ Expect `all checks passed`, and the tests green; `tests/test_sandbox.py` (marked
 
 ## What to look for
 
-- A folder you add shows **Read** until you raise it on the Workspace page. The AIHub folder and `data/models/` can't go above Read.
-- **How a run is shaped:** `podman run --rm --userns=keep-id --security-opt label=disable --read-only --memory=8g --pids-limit=1024 --network=none|pasta`, a tmpfs at `/tmp` and at `$HOME`, `~/.cache/uv`, `~/.cache/pip` and `~/.npm` as overlays (`:O`, read but never written back), the folder at its own path (`rw` from Run, else `ro`), with the AIHub folder and `data/models/` mounted `ro` on top when the folder contains them; a folder whose path has a `:` or `,` can't be mounted (`bad_mount_path`). `label=disable` because relabelling your folder for SELinux would change its files' labels.
+- A folder you add shows **Read** until you raise it on the Workspace page. The GAIFA folder and `data/models/` can't go above Read.
+- **How a run is shaped:** `podman run --rm --userns=keep-id --security-opt label=disable --read-only --memory=8g --pids-limit=1024 --network=none|pasta`, a tmpfs at `/tmp` and at `$HOME`, `~/.cache/uv`, `~/.cache/pip` and `~/.npm` as overlays (`:O`, read but never written back), the folder at its own path (`rw` from Run, else `ro`), with the GAIFA folder and `data/models/` mounted `ro` on top when the folder contains them; a folder whose path has a `:` or `,` can't be mounted (`bad_mount_path`). `label=disable` because relabelling your folder for SELinux would change its files' labels.
 - **"Read-only file system"** in a run: the folder is below Run. **Exit 127, "not found":** the program isn't in the image; the run's note suggests installing it into the folder (Run + network) or running on your machine (`where = "host"`, which always asks).
 - A project `.venv` made **on the host** points at the host's Python and won't run in the sandbox; make one inside the sandbox (`uv venv` / `uv sync` at Run + network) and it keeps working, because the folder is at the same path.
 

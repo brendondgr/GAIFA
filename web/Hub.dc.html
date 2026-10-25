@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AIHub</title>
+<title>GAIFA</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta name="theme-color" content="#0B0E14">
 <script src="./support.js"></script>
@@ -78,8 +78,8 @@ button:disabled{cursor:not-allowed;opacity:.5}
     <div role="alert" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px clamp(12px,2vw,24px);background:var(--trd,rgba(248,81,73,.13));border-bottom:1px solid var(--rd,#F85149)">
       <span style="color:var(--rd,#F85149);display:flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.alert }}"></path></svg></span>
       <div style="flex:1;min-width:200px">
-        <div style="font-weight:600">AIHub not responding at 127.0.0.1:7000</div>
-        <div style="color:var(--mut,#8A94A6);font-size:12.5px">Retrying in <span style="font-family:'JetBrains Mono',ui-monospace,monospace">{{ retryIn }}s</span>. If it stopped, start it with <code style="font-family:'JetBrains Mono',ui-monospace,monospace;padding:1px 5px;border-radius:4px;background:var(--inset,#131926)">aihub start</code></div>
+        <div style="font-weight:600">GAIFA not responding at 127.0.0.1:7000</div>
+        <div style="color:var(--mut,#8A94A6);font-size:12.5px">Retrying in <span style="font-family:'JetBrains Mono',ui-monospace,monospace">{{ retryIn }}s</span>. If it stopped, start it with <code style="font-family:'JetBrains Mono',ui-monospace,monospace;padding:1px 5px;border-radius:4px;background:var(--inset,#131926)">gaifa start</code></div>
       </div>
       <button onClick="{{ retryNow }}" style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--card,#11151D);font-size:12.5px;cursor:pointer">Retry now</button>
     </div>
@@ -391,7 +391,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
                         </div>
                         <div style="font-weight:500">{{ sv.api.sel.summary }}</div>
                         <div style="color:var(--mut,#8A94A6);font-size:12.5px">{{ sv.api.sel.desc }}</div>
-                        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">via AIHub {{ sv.api.sel.hub }} · response: {{ sv.api.sel.resp }} {{ sv.api.sel.ct }}</div>
+                        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">via GAIFA {{ sv.api.sel.hub }} · response: {{ sv.api.sel.resp }} {{ sv.api.sel.ct }}</div>
                       </div>
                       <sc-if value="{{ sv.api.hasFields }}" hint-placeholder-val="{{ false }}">
                         <div style="display:flex;flex-direction:column;gap:14px;padding-top:14px;border-top:1px solid var(--bd,#1D2430)">
@@ -498,12 +498,12 @@ button:disabled{cursor:not-allowed;opacity:.5}
               <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:0;min-width:0">
                 <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:10px"><h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">config.toml</h2><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:var(--mut,#8A94A6)">[services.{{ sv.id }}]</span></div>
                 <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--bd,#1D2430)"><div style="flex:1"><div style="font-weight:500">Enabled</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Disabled services cannot be started.</div></div><button type="button" role="switch" aria-label="Enabled" aria-checked="{{ sv.cf.enabled.on }}" onClick="{{ sv.cf.enabled.toggle }}" style="{{ sv.cf.enabled.track }}"><span style="{{ sv.cf.enabled.knob }}"></span></button></div>
-                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--bd,#1D2430)"><div style="flex:1"><div style="font-weight:500">Autostart</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Start together with AIHub.</div></div><button type="button" role="switch" aria-label="Autostart" aria-checked="{{ sv.cf.autostart.on }}" onClick="{{ sv.cf.autostart.toggle }}" style="{{ sv.cf.autostart.track }}"><span style="{{ sv.cf.autostart.knob }}"></span></button></div>
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--bd,#1D2430)"><div style="flex:1"><div style="font-weight:500">Autostart</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Start together with GAIFA.</div></div><button type="button" role="switch" aria-label="Autostart" aria-checked="{{ sv.cf.autostart.on }}" onClick="{{ sv.cf.autostart.toggle }}" style="{{ sv.cf.autostart.track }}"><span style="{{ sv.cf.autostart.knob }}"></span></button></div>
                 <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--bd,#1D2430);flex-wrap:wrap"><label for="cf-port" style="flex:1 1 180px"><div style="font-weight:500">Port</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Bound to 127.0.0.1.</div></label><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><input id="cf-port" inputMode="numeric" value="{{ sv.cf.port }}" onChange="{{ sv.cf.onPort }}" style="{{ sv.cf.portSt }}"><span role="alert" style="font-size:12px;color:var(--rd,#F85149);max-width:240px;text-align:right">{{ sv.cf.portErr }}</span></div></div>
                 <sc-if value="{{ sv.cf.hasLoad }}" hint-placeholder-val="{{ true }}">
                   <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--bd,#1D2430);flex-wrap:wrap"><label for="cf-idle" style="flex:1 1 180px"><div style="font-weight:500">Idle unload</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Unload models after this many idle seconds.</div></label>
                     <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><input id="cf-idle" inputMode="numeric" value="{{ sv.cf.idle }}" disabled="{{ sv.cf.idleDis }}" onChange="{{ sv.cf.onIdle }}" style="{{ sv.cf.idleSt }}"><span style="display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--mut,#8A94A6)"><button type="button" role="switch" aria-label="Never unload when idle" aria-checked="{{ sv.cf.never.on }}" onClick="{{ sv.cf.never.toggle }}" style="{{ sv.cf.never.track }}"><span style="{{ sv.cf.never.knob }}"></span></button>Never</span><span role="alert" style="font-size:12px;color:var(--rd,#F85149)">{{ sv.cf.idleErr }}</span></div></div>
-                  <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--bd,#1D2430)"><div style="flex:1"><div style="font-weight:500">AIHub may auto-unload this service</div><div style="font-size:12px;color:var(--mut,#8A94A6)">To make room when another service needs memory.</div></div><button type="button" role="switch" aria-label="AIHub may auto-unload" aria-checked="{{ sv.cf.autoUnload.on }}" onClick="{{ sv.cf.autoUnload.toggle }}" style="{{ sv.cf.autoUnload.track }}"><span style="{{ sv.cf.autoUnload.knob }}"></span></button></div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--bd,#1D2430)"><div style="flex:1"><div style="font-weight:500">GAIFA may auto-unload this service</div><div style="font-size:12px;color:var(--mut,#8A94A6)">To make room when another service needs memory.</div></div><button type="button" role="switch" aria-label="GAIFA may auto-unload" aria-checked="{{ sv.cf.autoUnload.on }}" onClick="{{ sv.cf.autoUnload.toggle }}" style="{{ sv.cf.autoUnload.track }}"><span style="{{ sv.cf.autoUnload.knob }}"></span></button></div>
                   <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--bd,#1D2430)"><label for="cf-prio" style="flex:1"><div style="font-weight:500">Priority</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Lower is unloaded first.</div></label><input id="cf-prio" type="number" min="0" max="99" value="{{ sv.cf.priority }}" onChange="{{ sv.cf.onPriority }}" style="height:32px;width:80px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--sb,#0D1119);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px"></div>
                 </sc-if>
                 <div style="display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid var(--bd,#1D2430)">
@@ -697,7 +697,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
         <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
           <h1 style="{{ h1St }}">Settings</h1>
           <sc-if value="{{ se.restart }}" hint-placeholder-val="{{ false }}">
-            <div role="status" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:10px;background:var(--tacc,rgba(255,178,36,.13));border:1px solid var(--acc,#FFB224)"><span style="flex:1;min-width:200px"><strong>Saved.</strong> Restart AIHub to apply the new port: <code style="font-family:'JetBrains Mono',ui-monospace,monospace">aihub restart</code></span><button onClick="{{ se.dismissRestart }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--card,#11151D);font-size:12px;cursor:pointer">Dismiss</button></div>
+            <div role="status" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:10px;background:var(--tacc,rgba(255,178,36,.13));border:1px solid var(--acc,#FFB224)"><span style="flex:1;min-width:200px"><strong>Saved.</strong> Restart GAIFA to apply the new port: <code style="font-family:'JetBrains Mono',ui-monospace,monospace">gaifa restart</code></span><button onClick="{{ se.dismissRestart }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--card,#11151D);font-size:12px;cursor:pointer">Dismiss</button></div>
           </sc-if>
           <sc-if value="{{ se.hasErr }}" hint-placeholder-val="{{ false }}"><div role="alert" style="padding:10px 12px;border-radius:8px;background:var(--trd,rgba(248,81,73,.13));color:var(--rd,#F85149)">{{ se.errText }}</div></sc-if>
           <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
@@ -708,10 +708,10 @@ button:disabled{cursor:not-allowed;opacity:.5}
               <sc-if value="{{ se.mock }}" hint-placeholder-val="{{ false }}"><div role="note" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut,#8A94A6)"><span style="height:18px;padding:0 6px;border-radius:4px;border:1px solid var(--pu,#BC8CFF);background:var(--tpu,rgba(188,140,255,.13));color:var(--pu,#BC8CFF);font-size:10px;font-weight:600;letter-spacing:.06em;display:inline-flex;align-items:center">MOCK</span><span>{{ se.mockText }}</span></div></sc-if>
               <sc-if value="{{ se.sec.general }}" hint-placeholder-val="{{ true }}">
                 <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:4px 16px">
-                  <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;flex-wrap:wrap"><label for="st-port" style="flex:1 1 220px"><div style="font-weight:500">AIHub port</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Bound to 127.0.0.1 — this machine only. Default 7000.</div></label><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><input id="st-port" inputMode="numeric" value="{{ se.port }}" onChange="{{ se.onPort }}" style="{{ se.portSt }}"><span role="alert" style="font-size:12px;color:var(--rd,#F85149);text-align:right;max-width:260px">{{ se.portErr }}</span></div></div>
+                  <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;flex-wrap:wrap"><label for="st-port" style="flex:1 1 220px"><div style="font-weight:500">GAIFA port</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Bound to 127.0.0.1 — this machine only. Default 7000.</div></label><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><input id="st-port" inputMode="numeric" value="{{ se.port }}" onChange="{{ se.onPort }}" style="{{ se.portSt }}"><span role="alert" style="font-size:12px;color:var(--rd,#F85149);text-align:right;max-width:260px">{{ se.portErr }}</span></div></div>
                 </section>
                 <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px">
-                  <h2 style="margin:0 0 12px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">AIHub process</h2>
+                  <h2 style="margin:0 0 12px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">GAIFA process</h2>
                   <dl style="margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px">
                     <sc-for list="{{ se.info }}" as="x" hint-placeholder-count="4"><div><dt style="font-size:12px;color:var(--mut,#8A94A6)">{{ x.k }}</dt><dd style="margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:15px">{{ x.v }}</dd></div></sc-for>
                   </dl>
@@ -732,8 +732,8 @@ button:disabled{cursor:not-allowed;opacity:.5}
               <sc-if value="{{ se.sec.memory }}" hint-placeholder-val="{{ false }}">
                 <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:4px 16px">
                   <div style="padding:12px 0 4px"><div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6);margin-bottom:6px">Last 24 hours</div>{{ se.memChart }}</div>
-                  <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;flex-wrap:wrap;border-top:1px solid var(--bd,#1D2430)"><label for="st-res" style="flex:1 1 220px"><div style="font-weight:500">Reserve</div><div style="font-size:12px;color:var(--mut,#8A94A6)">GB of unified memory AIHub always keeps free for the OS and desktop.</div></label><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><input id="st-res" type="number" min="0" max="64" value="{{ se.reserve }}" onChange="{{ se.onReserve }}" style="{{ se.resSt }}"><span role="alert" style="font-size:12px;color:var(--rd,#F85149)">{{ se.resErr }}</span></div></div>
-                  <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--bd,#1D2430)"><div style="flex:1"><div style="font-weight:500">Automatically make room when a service needs memory</div><div style="font-size:12px;color:var(--mut,#8A94A6)">When off, AIHub shows you the plan and asks first.</div></div><button type="button" role="switch" aria-label="Automatically make room" aria-checked="{{ se.auto.on }}" onClick="{{ se.auto.toggle }}" style="{{ se.auto.track }}"><span style="{{ se.auto.knob }}"></span></button></div>
+                  <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;flex-wrap:wrap;border-top:1px solid var(--bd,#1D2430)"><label for="st-res" style="flex:1 1 220px"><div style="font-weight:500">Reserve</div><div style="font-size:12px;color:var(--mut,#8A94A6)">GB of unified memory GAIFA always keeps free for the OS and desktop.</div></label><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end"><input id="st-res" type="number" min="0" max="64" value="{{ se.reserve }}" onChange="{{ se.onReserve }}" style="{{ se.resSt }}"><span role="alert" style="font-size:12px;color:var(--rd,#F85149)">{{ se.resErr }}</span></div></div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--bd,#1D2430)"><div style="flex:1"><div style="font-weight:500">Automatically make room when a service needs memory</div><div style="font-size:12px;color:var(--mut,#8A94A6)">When off, GAIFA shows you the plan and asks first.</div></div><button type="button" role="switch" aria-label="Automatically make room" aria-checked="{{ se.auto.on }}" onClick="{{ se.auto.toggle }}" style="{{ se.auto.track }}"><span style="{{ se.auto.knob }}"></span></button></div>
                   <div style="display:flex;flex-direction:column;gap:8px;padding:14px 0;border-top:1px solid var(--bd,#1D2430)"><div><div style="font-weight:500">Never auto-unload</div><div style="font-size:12px;color:var(--mut,#8A94A6)">These services are never part of a make-room plan.</div></div>
                     <div role="group" aria-label="Never auto-unload" style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ se.never }}" as="c" hint-placeholder-count="4"><button onClick="{{ c.on }}" aria-pressed="{{ c.pressed }}" style="{{ c.st }}">{{ c.label }}</button></sc-for></div></div>
                   <div style="display:flex;flex-direction:column;gap:8px;padding:14px 0;border-top:1px solid var(--bd,#1D2430)"><div><div style="font-weight:500">Unload order</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Top of the list is unloaded first.</div></div>
@@ -771,9 +771,9 @@ button:disabled{cursor:not-allowed;opacity:.5}
                 <section style="background:var(--card,#11151D);border:1px dashed var(--pu,#BC8CFF);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
                   <h2 style="margin:0;font-size:14px;font-weight:600;color:var(--pu,#BC8CFF)">Add a mod</h2>
                   <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
-                    <li>Create it from the template: <code style="font-family:'JetBrains Mono',ui-monospace,monospace;padding:1px 5px;border-radius:4px;background:var(--inset,#131926)">aihub new &lt;id&gt;</code></li>
+                    <li>Create it from the template: <code style="font-family:'JetBrains Mono',ui-monospace,monospace;padding:1px 5px;border-radius:4px;background:var(--inset,#131926)">gaifa new &lt;id&gt;</code></li>
                     <li>Edit <code style="font-family:'JetBrains Mono',ui-monospace,monospace;padding:1px 5px;border-radius:4px;background:var(--inset,#131926)">services/&lt;id&gt;/service.toml</code> — name, run command, port, health path.</li>
-                    <li>Restart AIHub. The mod gets a sidebar item, an overview tile, and API, Logs and Settings tabs with no UI code.</li>
+                    <li>Restart GAIFA. The mod gets a sidebar item, an overview tile, and API, Logs and Settings tabs with no UI code.</li>
                   </ol>
                   <a href="#/s/example" style="font-size:12.5px">See the Example mod and its page module →</a>
                 </section>
@@ -788,13 +788,14 @@ button:disabled{cursor:not-allowed;opacity:.5}
               <sc-if value="{{ se.sec.sessions }}" hint-placeholder-val="{{ false }}">{{ se.sessionsEl }}</sc-if>
               <sc-if value="{{ se.sec.about }}" hint-placeholder-val="{{ false }}">
                 <section style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
+                  <p style="margin:0 0 4px;font-size:13px"><strong>GAIFA</strong> <span style="color:var(--mut,#8A94A6)">· Great, Another Interface For Agents · say “guy-fuh”</span></p>
                   <h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Versions</h2>
                   <dl style="margin:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;font-size:13px"><sc-for list="{{ se.versions }}" as="x" hint-placeholder-count="5"><dt>{{ x.k }}</dt><dd style="margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--mut,#8A94A6)">{{ x.v }}</dd></sc-for></dl>
                 </section>
                 {{ se.hwEl }}
                 <section aria-label="Doctor" style="background:var(--card,#11151D);border:1px solid var(--bd,#1D2430);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px">
                   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut,#8A94A6)">Doctor</h2><sc-if value="{{ se.doc.has }}" hint-placeholder-val="{{ false }}"><span style="{{ se.doc.chipSt }}">{{ se.doc.summary }}</span></sc-if><span style="flex:1"></span><span style="font-size:12px;color:var(--mut,#8A94A6)">{{ se.doc.when }}</span><button onClick="{{ se.doc.run }}" disabled="{{ se.doc.runDis }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">{{ se.doc.runLabel }}</button></div>
-                  <div style="font-size:12px;color:var(--mut,#8A94A6)">Models on disk, mod manifests, paths outside the project, ports, units, disk space and offline mods. The same report as <code>aihub doctor</code>.</div>
+                  <div style="font-size:12px;color:var(--mut,#8A94A6)">Models on disk, mod manifests, paths outside the project, ports, units, disk space and offline mods. The same report as <code>gaifa doctor</code>.</div>
                   <sc-if value="{{ se.doc.loading }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px;color:var(--mut,#8A94A6)">Checking…</div></sc-if>
                   <sc-if value="{{ se.doc.hasErr }}" hint-placeholder-val="{{ false }}"><div role="alert" style="font-size:13px;color:var(--rd,#F85149)">{{ se.doc.err }}</div></sc-if>
                   <sc-if value="{{ se.doc.none }}" hint-placeholder-val="{{ false }}"><div style="font-size:13px">Nothing needs attention.</div></sc-if>
@@ -904,7 +905,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;padding:12px 14px;border-top:1px solid var(--bd,#1D2430)">
       <sc-if value="{{ odr.canDl }}" hint-placeholder-val="{{ true }}"><a href="{{ odr.url }}" download="{{ odr.dlName }}" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;background:var(--acc,#FFB224);color:#1A1200;font-size:12.5px;font-weight:600;text-decoration:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.download }}"></path></svg>Download</a></sc-if>
-      <sc-if value="{{ odr.noDl }}" hint-placeholder-val="{{ false }}"><span title="The real AIHub serves this file; the mock has no bytes for it" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--bds,#2A3547);color:var(--mut,#8A94A6);font-size:12.5px">Download (live only)</span></sc-if>
+      <sc-if value="{{ odr.noDl }}" hint-placeholder-val="{{ false }}"><span title="The real GAIFA serves this file; the mock has no bytes for it" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--bds,#2A3547);color:var(--mut,#8A94A6);font-size:12.5px">Download (live only)</span></sc-if>
       <button onClick="{{ odr.copyPath }}" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12.5px;cursor:pointer">Copy path</button>
       <sc-if value="{{ odr.hasSvc }}" hint-placeholder-val="{{ true }}"><a href="{{ odr.svcHref }}" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--bds,#2A3547);color:var(--tx,#E6EAF2);font-size:12.5px;text-decoration:none">Open in {{ odr.svcName }}</a></sc-if>
       <button onClick="{{ odr.del }}" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--rd,#F85149);background:transparent;color:var(--rd,#F85149);font-size:12.5px;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.trash }}"></path></svg>Delete</button>
@@ -957,7 +958,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
           <h2 style="margin:0;font-size:16px">Make room for {{ rm.svc }}</h2>
           <p style="margin:0;color:var(--mut,#8A94A6)">Loading <strong style="color:var(--tx,#E6EAF2)">{{ rm.svc }}</strong> needs <span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--tx,#E6EAF2)">~{{ rm.needs }}</span>; <span style="font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--tx,#E6EAF2)">{{ rm.avail }}</span> is available after the reserve.</p>
           <sc-if value="{{ rm.hasPlan }}" hint-placeholder-val="{{ true }}">
-            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px">AIHub will unload:</span>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px">GAIFA will unload:</span>
               <sc-for list="{{ rm.rows }}" as="u" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--inset,#131926)"><strong style="flex:1;font-weight:600">{{ u.name }}</strong><span style="font-size:12px;color:var(--mut,#8A94A6)">{{ u.idle }}</span><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--gr,#3FB950)">frees {{ u.frees }}</span></div></sc-for>
             </div>
           </sc-if>
@@ -1001,7 +1002,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
       <sc-if value="{{ dlg.mock }}" hint-placeholder-val="{{ false }}">
         <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
           <div style="display:flex;align-items:center;gap:10px"><h2 style="margin:0;font-size:16px">Mock scenarios</h2><span style="height:20px;padding:0 7px;border-radius:4px;border:1px solid var(--pu,#BC8CFF);color:var(--pu,#BC8CFF);font-size:10.5px;font-weight:600;display:inline-flex;align-items:center">MOCK ONLY</span><span style="margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--mut,#8A94A6)">Shift+D</span></div>
-          <div style="display:flex;align-items:center;gap:12px"><div style="flex:1"><div style="font-weight:500">AIHub down</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Every call rejects; the banner retries every 5 s.</div></div><button type="button" role="switch" aria-label="AIHub down" aria-checked="{{ mk.hubDown.on }}" onClick="{{ mk.hubDown.toggle }}" style="{{ mk.hubDown.track }}"><span style="{{ mk.hubDown.knob }}"></span></button></div>
+          <div style="display:flex;align-items:center;gap:12px"><div style="flex:1"><div style="font-weight:500">GAIFA down</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Every call rejects; the banner retries every 5 s.</div></div><button type="button" role="switch" aria-label="GAIFA down" aria-checked="{{ mk.hubDown.on }}" onClick="{{ mk.hubDown.toggle }}" style="{{ mk.hubDown.track }}"><span style="{{ mk.hubDown.knob }}"></span></button></div>
           <div style="display:flex;align-items:center;gap:12px"><div style="flex:1"><div style="font-weight:500">Speed</div><div style="font-size:12px;color:var(--mut,#8A94A6)">Shortens starts, loads, jobs and idle unloads.</div></div><div style="display:inline-flex;padding:2px;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--sb,#0D1119)"><sc-for list="{{ mk.speeds }}" as="x" hint-placeholder-count="2"><button onClick="{{ x.on }}" aria-pressed="{{ x.pressed }}" style="{{ x.st }}">{{ x.label }}</button></sc-for></div></div>
           <div style="display:flex;flex-direction:column;gap:6px"><div style="font-weight:500">Fail a service</div><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ mk.fails }}" as="x" hint-placeholder-count="4"><button onClick="{{ x.on }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--rd,#F85149);background:transparent;color:var(--rd,#F85149);font-size:12px;cursor:pointer">{{ x.label }}</button></sc-for></div></div>
           <div style="display:flex;flex-direction:column;gap:6px"><div style="font-weight:500">Make unreachable (process up, health failing)</div><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ mk.unreach }}" as="x" hint-placeholder-count="4"><button onClick="{{ x.on }}" style="height:28px;padding:0 10px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--inset,#131926);font-size:12px;cursor:pointer">{{ x.label }}</button></sc-for></div></div>
@@ -1078,7 +1079,7 @@ const TONE = {
   cyan: ['var(--cy,#58C4DD)', 'var(--tcy,rgba(88,196,221,.13))'], red: ['var(--rd,#F85149)', 'var(--trd,rgba(248,81,73,.13))'],
   purple: ['var(--pu,#BC8CFF)', 'var(--tpu,rgba(188,140,255,.13))'], dim: ['var(--mut,#8A94A6)', 'var(--hov,#161C28)'],
 };
-// Settings section → the api areas its data comes from (AIHub patch 5, see PATCHES.md).
+// Settings section → the api areas its data comes from (GAIFA patch 5, see PATCHES.md).
 const SETTINGS_AREAS = { general: ['settings', 'system'], paths: ['system'], memory: ['settings', 'memory'], services: ['settings', 'services'], interface: ['settings'], agent: [], sessions: ['sessions'], about: ['services', 'system'] };
 const STATE = { stopped: ['dim', false], starting: ['accent', true], ready: ['green', false], degraded: ['accent', false], stopping: ['dim', true], failed: ['red', false] };
 const LOAD = { unloaded: ['dim', false], loading: ['accent', true], loaded: ['cyan', false], unloading: ['accent', true] };
@@ -1169,7 +1170,7 @@ class Component extends DCLogic {
     this.histTimer = setInterval(() => { if (!document.hidden && this.state.ready && !this.state.hubDown) this.loadHist(); }, 60000);
     this.modUi = modUi.createUi();
     const forceMock = new URLSearchParams(location.search).has('mock');
-    this.api = hub.createApi({ base: window.AIHUB_API_BASE ?? null, liveAreas: forceMock ? [] : (window.AIHUB_LIVE_AREAS || []), mock: mod.createMockApi() });
+    this.api = hub.createApi({ base: window.GAIFA_API_BASE ?? null, liveAreas: forceMock ? [] : (window.GAIFA_LIVE_AREAS || []), mock: mod.createMockApi() });
     if (!location.hash) history.replaceState(null, '', '#/overview');
     this.setState({ route: this.parse() });
     await this.boot();
@@ -1189,9 +1190,9 @@ class Component extends DCLogic {
 
     const t = this.docTitle(); if (document.title !== t) document.title = t;
   }
-  // The browser tab: where you are, then AIHub ("Logs · Speech · AIHub"), with waiting approvals first
+  // The browser tab: where you are, then GAIFA ("Logs · Speech · GAIFA"), with waiting approvals first
   docTitle() {
-    const s = this.state, r = s.route; if (!r) return 'AIHub';
+    const s = this.state, r = s.route; if (!r) return 'GAIFA';
     const cap = x => x ? x[0].toUpperCase() + x.slice(1) : '', parts = [];
     if (r.page === 'service') {
       const d = this.svcMap?.[r.parts[1]];
@@ -1201,7 +1202,7 @@ class Component extends DCLogic {
     else if (r.page === 'outputs' && r.parts[1]) parts.push((s.out?.detail?.id === r.parts[1] && s.out.detail.title) || (s.out?.items || []).find(o => o.id === r.parts[1])?.title || 'Output', 'Outputs');
     else parts.push({ overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', services: 'Services' }[r.page] || cap(r.page));
     const n = s.approvals?.length || 0;
-    return (n ? `(${n}) ` : '') + [...parts, s.hubDown ? 'AIHub (down)' : 'AIHub'].join(' · ');
+    return (n ? `(${n}) ` : '') + [...parts, s.hubDown ? 'GAIFA (down)' : 'GAIFA'].join(' · ');
   }
 
   // ---------- state helpers ----------
@@ -1336,7 +1337,7 @@ class Component extends DCLogic {
       const ov = await this.api.getOverview();
       this.applyOverview(ov); this.setState({ hubDown: false, ready: true });
       this.sub = this.api.subscribe(this.onEvent, this.onStreamErr);
-      this.toast('Reconnected to AIHub', 'success'); this.enterRoute(this.parse(), true); this.loadExtras();
+      this.toast('Reconnected to GAIFA', 'success'); this.enterRoute(this.parse(), true); this.loadExtras();
     } catch { this.goDown(); }
   }
   onEvent = ev => {
@@ -1504,7 +1505,7 @@ class Component extends DCLogic {
   async unload(sv) { try { await this.api.unloadService(sv.id); } catch (e) { this.err(e); } }
   async roomContinue() {
     const d = this.state.dialog; this.setState({ dialog: null });
-    if (d.retry) return d.retry();  // patch 9: a proxied call (API tab) is resent with X-AIHub-Make-Room
+    if (d.retry) return d.retry();  // patch 9: a proxied call (API tab) is resent with X-GAIFA-Make-Room
     try { await this.api.loadService(d.svc.id, { makeRoom: true }); this.toast(`Making room for ${d.svc.name}…`); } catch (e) { this.err(e); }
   }
   // ---------- API tab ----------
@@ -2009,7 +2010,7 @@ class Component extends DCLogic {
   }
   actRow(a) {
     const sv = a.service ? this.svcMap[a.service] : null, t = a.level === 'error' ? 'red' : a.level === 'warn' ? 'accent' : 'dim';
-    return { time: fhm(a.ts), ago: fago(a.ts), text: a.text, href: a.route || '', hasHref: !!a.route, noHref: !a.route, d: sv ? ICON[sv.icon] || ICON.puzzle : ICON.activity, ist: { display: 'flex', flex: 'none', color: t === 'dim' ? 'var(--mut,#8A94A6)' : TONE[t][0] }, svc: sv?.name || 'AIHub', level: a.level };
+    return { time: fhm(a.ts), ago: fago(a.ts), text: a.text, href: a.route || '', hasHref: !!a.route, noHref: !a.route, d: sv ? ICON[sv.icon] || ICON.puzzle : ICON.activity, ist: { display: 'flex', flex: 'none', color: t === 'dim' ? 'var(--mut,#8A94A6)' : TONE[t][0] }, svc: sv?.name || 'GAIFA', level: a.level };
   }
   vmService(s) {
     const sv = s.svc, r = s.route;
@@ -2035,7 +2036,7 @@ class Component extends DCLogic {
     if (mf) v.banner = B('red', 'Manifest invalid — this mod cannot start', d.manifest_errors.join(' · '), [{ label: 'Show manifest', on: () => this.go(`#/s/${d.id}/settings`), st: btn('sec', { sm: true }) }]);
     else if (d.state === 'failed') v.banner = B('red', `${d.name} failed`, d.last_error || 'The process exited unexpectedly.', [startA, logsA]);
     else if (d.state === 'degraded') v.banner = B('accent', `${d.name} is not responding on 127.0.0.1:${d.port}`, 'The process is running but its health check fails. Restarting usually fixes this.', [{ label: 'Restart', on: () => this.restart(d), st: btn('pri', { sm: true }) }, logsA]);
-    else if (d.state === 'stopped') v.banner = B('dim', `${d.name} is stopped`, d.kind === 'external' ? `AIHub controls it through: ${d.command.join(' ')}` : 'Start it to use its API and pages.', [startA]);
+    else if (d.state === 'stopped') v.banner = B('dim', `${d.name} is stopped`, d.kind === 'external' ? `GAIFA controls it through: ${d.command.join(' ')}` : 'Start it to use its API and pages.', [startA]);
     else if (d.state === 'starting') v.banner = B('accent', `${d.name} is starting…`, 'Waiting for the health check to pass.', [logsA]);
     v.hasBanner = !!v.banner;
     const running = d.state === 'ready';
@@ -2274,8 +2275,8 @@ class Component extends DCLogic {
         up: () => this.setDraft(y => { y.services.order = this.moveIn(y.services.order.filter(z => this.svcMap[z]), i, -1); }), down: () => this.setDraft(y => { y.services.order = this.moveIn(y.services.order.filter(z => this.svcMap[z]), i, 1); }), upDis: i === 0, downDis: i === arr.length - 1, upAria: `Move ${x.name} up`, downAria: `Move ${x.name} down`, href: `#/s/${id}/settings` }; });
     v.themes = [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => ({ label: l, st: segSt(s.theme === k), pressed: s.theme === k ? 'true' : 'false', on: () => this.setTheme(k) }));
     v.densities = [['comfortable', 'Comfortable'], ['compact', 'Compact']].map(([k, l]) => ({ label: l, st: segSt(s.density === k), pressed: s.density === k ? 'true' : 'false', on: () => this.setDensity(k) }));
-    v.versions = [['AIHub', 'v' + (sys?.hub?.version || s.system?.hub?.version || '0.1.0')], ...s.services.map(x => [x.name, x.version ? 'v' + x.version : '—'])].map(([k, val]) => ({ k, v: val }));
-    v.cli = ['aihub status', 'aihub start <id>', 'aihub logs <id> -f', 'aihub new <id>', 'aihub doctor'].map(c => ({ c, copy: () => this.copy(c, 'Command copied') }));
+    v.versions = [['GAIFA', 'v' + (sys?.hub?.version || s.system?.hub?.version || '0.1.0')], ...s.services.map(x => [x.name, x.version ? 'v' + x.version : '—'])].map(([k, val]) => ({ k, v: val }));
+    v.cli = ['gaifa status', 'gaifa start <id>', 'gaifa logs <id> -f', 'gaifa new <id>', 'gaifa doctor'].map(c => ({ c, copy: () => this.copy(c, 'Command copied') }));
     const doc = st.doc || {}, rep = doc.report, LV = { fail: ['Problem', 'var(--rd,#F85149)'], warn: ['Warning', 'var(--acc,#FFB224)'], note: ['Note', 'var(--cy,#58C4DD)'], ok: ['OK', 'var(--gr,#3FB950)'] };
     const row = c => ({ title: c.title, detail: c.detail, fix: c.fix ? 'Fix: ' + c.fix : '', area: c.area, lvl: LV[c.level][0], hasDetail: !!c.detail, hasFix: !!c.fix,
       dot: { flex: '0 0 auto', width: 8, height: 8, marginTop: 5, borderRadius: 9, background: LV[c.level][1] } });

@@ -34,7 +34,7 @@ from utils.services import loading
 if TYPE_CHECKING:
     from utils.server import Hub
 
-log = logging.getLogger("aihub.sessions")
+log = logging.getLogger("gaifa.sessions")
 AUTO_NAME = "Last session"
 BOOT_NAME = "Before restart"     # the previous run's last setup, kept at startup
 GB = 1e9
@@ -285,7 +285,7 @@ class Sessions:
                         lc = mgr.get("lcpp")
                         if not lc.up:
                             await mgr.start("lcpp", wait=True)
-                        r = await self.client.post(f"{lc.url}/api/instances", json=st["spec"], headers={"X-AIHub-Make-Room": "1"})
+                        r = await self.client.post(f"{lc.url}/api/instances", json=st["spec"], headers={"X-GAIFA-Make-Room": "1"})
                         res["ok"] = r.status_code < 400
                         if not res["ok"]:
                             res["error"] = r.text[:300]

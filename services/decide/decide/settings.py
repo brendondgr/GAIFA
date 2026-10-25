@@ -1,4 +1,4 @@
-"""The mod's settings, from the environment AIHub sets (service.toml [run.env], architecture §4.4)."""
+"""The mod's settings, from the environment GAIFA sets (service.toml [run.env], architecture §4.4)."""
 
 from __future__ import annotations
 
@@ -28,14 +28,14 @@ class Settings:
         e = os.environ
         d = cls()
         return cls(
-            port=port or int(e.get("AIHUB_PORT", d.port)),
+            port=port or int(e.get("GAIFA_PORT", d.port)),
             models_dir=Path(e.get("DECIDE_MODELS_DIR", d.models_dir)),
             state_dir=Path(e.get("DECIDE_STATE_DIR", d.state_dir)),
-            hub_url=(e.get("AIHUB_URL") or "").rstrip("/") or None,
+            hub_url=(e.get("GAIFA_URL") or "").rstrip("/") or None,
             default_model=e.get("DECIDE_MODEL", d.default_model),
             device=e.get("DECIDE_DEVICE", d.device),
             batch_size=int(e.get("DECIDE_BATCH", d.batch_size)),
             verify=e.get("DECIDE_VERIFY", d.verify),
-            idle_unload_s=float(e.get("DECIDE_IDLE_UNLOAD_S") or e.get("AIHUB_IDLE_UNLOAD_S") or d.idle_unload_s),
+            idle_unload_s=float(e.get("DECIDE_IDLE_UNLOAD_S") or e.get("GAIFA_IDLE_UNLOAD_S") or d.idle_unload_s),
             max_questions=int(e.get("DECIDE_MAX_QUESTIONS", d.max_questions)),
         )

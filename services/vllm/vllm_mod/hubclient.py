@@ -1,5 +1,5 @@
-"""AIHub over HTTP (architecture §7, §8): ask for memory before an engine starts, register downloads.
-Without a hub (no AIHUB_URL) there is nothing to ask."""
+"""GAIFA over HTTP (architecture §7, §8): ask for memory before an engine starts, register downloads.
+Without a hub (no GAIFA_URL) there is nothing to ask."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class NeedsRoom(Exception):
 class Hub:
     def __init__(self, url: str | None, transport: httpx.AsyncBaseTransport | None = None):
         self.url = (url or "").rstrip("/") or None
-        self.service = os.environ.get("AIHUB_SERVICE_ID", "vllm")
+        self.service = os.environ.get("GAIFA_SERVICE_ID", "vllm")
         self.transport = transport
 
     def _client(self, read: float = 30) -> httpx.AsyncClient:
@@ -38,7 +38,7 @@ class Hub:
                 r = await c.post("/api/memory/acquire", params={"make_room": "1"} if make_room else None,
                                  json={"service": self.service, "needs_bytes": int(gb * 1e9), "reason": reason})
         except httpx.HTTPError as e:
-            log.warning("AIHub not reachable for memory (%s); starting anyway", e)
+            log.warning("GAIFA not reachable for memory (%s); starting anyway", e)
             return None
         if r.status_code == 409:
             raise NeedsRoom(r.json())
@@ -56,7 +56,7 @@ class Hub:
             async with self._client() as c:
                 r = await c.post("/api/models", json=entry)
         except httpx.HTTPError as e:
-            return f"AIHub not reachable ({e})"
+            return f"GAIFA not reachable ({e})"
         if r.status_code < 300:
             return "registered"
         if r.status_code == 409:

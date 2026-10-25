@@ -24,7 +24,7 @@ from typing import Any
 
 from utils.outputs import readers
 
-log = logging.getLogger("aihub.outputs")
+log = logging.getLogger("gaifa.outputs")
 
 MAX_CHARS = 4_000_000
 TEXT_DIR = ".text"

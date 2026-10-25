@@ -2,7 +2,7 @@
 // Including thinking and steps. The split button copies with the default; its chevron lists the three and
 // copies with the one picked, which is remembered: the default is the way picked most often in the last
 // 24 hours (a tie goes to the latest; nothing picked → Text only). The picks are kept in this browser
-// (`aihub.chat.copyModes` through chat-ui.js's getPref/setPref; at most 50, none older than a day).
+// (`gaifa.chat.copyModes` through chat-ui.js's getPref/setPref; at most 50, none older than a day).
 // Pure part tested in utils/tests/web/chat-copy.test.mjs.
 
 import { h, T, Icon, Popover, getPref, setPref } from './chat-ui.js';
@@ -17,7 +17,7 @@ export const MODES = [
   { id: 'steps', label: 'Including thinking and steps', hint: 'What it thought and did, then the answer and its sources' },
 ];
 const IDS = new Set(MODES.map(m => m.id));
-export const COPY_KEY = 'aihub.chat.copyModes';
+export const COPY_KEY = 'gaifa.chat.copyModes';
 export const DAY_MS = 86400000;
 const KEEP = 50;
 

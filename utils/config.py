@@ -39,7 +39,7 @@ class HubCfg(_Strict):
     @classmethod
     def _loopback(cls, v: str) -> str:
         if not is_loopback(v):
-            raise ValueError(f"{v!r} is not loopback; AIHub only listens on 127.0.0.1, ::1 or localhost")
+            raise ValueError(f"{v!r} is not loopback; GAIFA only listens on 127.0.0.1, ::1 or localhost")
         return v
 
 
@@ -104,7 +104,7 @@ class ServiceOverride(_Strict):
     auto_unload: bool | None = None
     priority: int | None = None
     gpu: int | Literal["auto"] | None = Field(None, description="Which GPU (hardware index) on a machine with more than one; auto: the freest at start (plan 36.3)")
-    accel: Literal["rocm", "cuda", "xpu", "mps", "vulkan", "cpu"] | None = Field(None, description="The variant `aihub setup` installed (plan 38.2): the mod gets AIHUB_ACCEL and AIHUB_DEVICE")
+    accel: Literal["rocm", "cuda", "xpu", "mps", "vulkan", "cpu"] | None = Field(None, description="The variant `gaifa setup` installed (plan 38.2): the mod gets GAIFA_ACCEL and GAIFA_DEVICE")
 
     @field_validator("gpu")
     @classmethod
@@ -288,7 +288,7 @@ class GpuCfg(_Strict):
 
 class DocsCfg(_Strict):
     """Plan 23.3/23.6: the local model inventory (data/state/setup/models/) follows the registry.
-    Off (the default): only `aihub docs` writes it."""
+    Off (the default): only `gaifa docs` writes it."""
     regenerate: bool = False
 
 

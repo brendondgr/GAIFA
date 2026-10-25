@@ -64,7 +64,7 @@ def test_switching_profiles_stops_the_first(make_engine):
         e = make_engine()
         await e.load("small")
         await e.load("big", make_room=True)
-        assert [(f.name, f.running) for f in await e.c.list()] == [("aihub-vllm-big", True)]
+        assert [(f.name, f.running) for f in await e.c.list()] == [("gaifa-vllm-big", True)]
         assert await _models(e) == ["big"]
         await e.shutdown()
         assert await e.c.list() == []
@@ -177,7 +177,7 @@ def test_routes(settings, make_engine, make_downloads, hub):
         r = c.post("/v1/load", json={"profile": "small"})
         assert r.status_code == 409 and r.json()["code"] == "needs_room"
         hub.room = True
-        r = c.post("/v1/load", json={"profile": "small"}, headers={"X-AIHub-Make-Room": "1"})
+        r = c.post("/v1/load", json={"profile": "small"}, headers={"X-GAIFA-Make-Room": "1"})
         assert r.status_code == 200 and r.json()["state"] == "ready"
         assert hub.calls[-1]["make_room"] == "1"
         st = c.get("/v1/status").json()

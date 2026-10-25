@@ -1,8 +1,8 @@
 """What this machine has (plan 35.1): the OS, WSL, the GPUs, their memory and runtimes, and the
-accelerators AIHub can use here (`rocm`, `cuda`, `xpu`, `mps`, `vulkan`, `cpu`).
+accelerators GAIFA can use here (`rocm`, `cuda`, `xpu`, `mps`, `vulkan`, `cpu`).
 
-Standard library only: `aihub setup` and `aihub hardware` use it from a bare clone. Nothing runs at
-import; `detect()` reads the machine once and caches it. `AIHUB_HARDWARE_FIXTURE=<snapshot.json>`
+Standard library only: `gaifa setup` and `gaifa hardware` use it from a bare clone. Nothing runs at
+import; `detect()` reads the machine once and caches it. `GAIFA_HARDWARE_FIXTURE=<snapshot.json>`
 (dev only) makes it read a recorded machine instead.
 """
 
@@ -69,10 +69,10 @@ def detect_from(src: Source) -> Machine:
 
 
 def detect(refresh: bool = False) -> Machine:
-    """This machine, read once (or a fixture, with AIHUB_HARDWARE_FIXTURE)."""
+    """This machine, read once (or a fixture, with GAIFA_HARDWARE_FIXTURE)."""
     global _cache
     if _cache is None or refresh:
-        fixture = os.environ.get("AIHUB_HARDWARE_FIXTURE")
+        fixture = os.environ.get("GAIFA_HARDWARE_FIXTURE")
         _cache = from_snapshot(json.loads(open(fixture).read())) if fixture else detect_from(Source())
     return _cache
 

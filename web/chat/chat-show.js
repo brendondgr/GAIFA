@@ -1,6 +1,6 @@
 // `show` in Chat (plan 47.2): the agent's chart, table or pictures (agent/show.py's checked spec, `data.show` on the
 // tool_result), drawn under the turn's fold with the dashboard's own charts (web/charts.js): the site's series
-// colours, tooltips, legends, "View as table", loading and error states. A file source is read here; AIHub's own
+// colours, tooltips, legends, "View as table", loading and error states. A file source is read here; GAIFA's own
 // data is fetched here and kept current every 30 s while the chat is open.
 
 import { h, T } from './chat-ui.js';

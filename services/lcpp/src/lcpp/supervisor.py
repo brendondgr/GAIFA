@@ -28,7 +28,7 @@ from lcpp import gguf, proc, settings as settings_mod
 from lcpp.backends import Backend, LogLine
 from lcpp.catalog import Catalog, CatalogError, ModelEntry
 from lcpp.cmdline import render_preset, reserved_keys, router_argv, single_argv, single_params
-from lcpp import aihub
+from lcpp import gaifa
 from lcpp.instances import NAME_RE, Instance, InstanceStore, LcppError, relay_off
 from lcpp.paths import Paths, write_atomic
 
@@ -224,7 +224,7 @@ class Supervisor:
                 continue
             if inst.state == "stopping" or _before_boot(inst.started_ts):
                 # Stopped on purpose, or the machine rebooted since it started: the record is stale
-                # (state lives in AIHub's data/state/ now, which survives reboots; plan 16.2). A
+                # (state lives in GAIFA's data/state/ now, which survives reboots; plan 16.2). A
                 # session restore relaunches what should run.
                 self._forget(inst)
                 await self._emit("instance_gone", inst)
@@ -417,15 +417,15 @@ class Supervisor:
     # ---- launch ---------------------------------------------------------------
     async def launch(self, raw_spec: Any, remember: bool = True,
                      make_room: bool = False) -> tuple[Instance, list[str]]:
-        """``make_room``: under AIHub, let it unload other mods if the memory isn't free."""
+        """``make_room``: under GAIFA, let it unload other mods if the memory isn't free."""
         async with self.lock:
             plan = await asyncio.to_thread(self.plan, raw_spec)
             if plan.preflight["errors"]:
                 first = plan.preflight["errors"][0]
                 status = 404 if first["code"] == "model_not_found" else 409
                 raise LcppError(first["code"], first["detail"], status, first["field"])
-            # Under AIHub: ask for the memory first (raises needs_room with AIHub's plan).
-            await aihub.acquire(plan.preflight["estimated_bytes"], make_room, f"launch {plan.name}")
+            # Under GAIFA: ask for the memory first (raises needs_room with GAIFA's plan).
+            await gaifa.acquire(plan.preflight["estimated_bytes"], make_room, f"launch {plan.name}")
             spec = plan.spec
             if plan.preset is not None:
                 write_atomic(self.paths.generated / f"{plan.name}.ini", plan.preset)

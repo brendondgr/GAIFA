@@ -1,4 +1,4 @@
-"""Downloads into the HF cache and their registration in AIHub (plan 18.3)."""
+"""Downloads into the HF cache and their registration in GAIFA (plan 18.3)."""
 
 from __future__ import annotations
 

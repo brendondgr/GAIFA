@@ -49,7 +49,7 @@ export function urlKey(u) {
 const HOST = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const LOCAL = /(^localhost|\.local|\.localhost|\.localdomain|\.internal|\.home\.arpa|\.lan)$/;
 /** The web mod's icon URL for a hostname (through the hub's proxy), or null when there is none to ask for. */
-export function faviconUrl(site, base = globalThis.AIHUB_API_BASE || '') {
+export function faviconUrl(site, base = globalThis.GAIFA_API_BASE || '') {
   const s = String(site ?? '').toLowerCase().replace(/\.$/, '');
   if (!HOST.test(s) || LOCAL.test(s)) return null;
   return `${base}/api/s/web/v1/favicon?host=${encodeURIComponent(s)}`;

@@ -1,4 +1,4 @@
-"""`aihub setup` (plan 23.9): one process for a person and an agent. Fake mods with setup docs, a
+"""`gaifa setup` (plan 23.9): one process for a person and an agent. Fake mods with setup docs, a
 fake runner that records commands instead of running them, a fake host."""
 
 from __future__ import annotations
@@ -16,15 +16,15 @@ from utils import cli, cli_setup, cli_setup_host, hardware
 def block(eid: str, title: str, **keys: str) -> str:
     extra = "\n".join(f"{k} = {v}" for k, v in keys.items() if not k.startswith("_"))
     tail = keys.get("_tables", "")
-    return f'<!-- aihub-setup\nid = "{eid}"\ntitle = "{title}"\n{extra}\n{tail}\n-->\n\n# {title}\n'
+    return f'<!-- gaifa-setup\nid = "{eid}"\ntitle = "{title}"\n{extra}\n{tail}\n-->\n\n# {title}\n'
 
 
-RELAY = block("relay", "Relay", summary='"LLM routing"', gpu="false", disk_gb="0.2", check='"aihub check relay"',
-              _tables='[[steps]]\nrun = "aihub install relay"\nwhat = "the backend venv"')
-AGENT = block("agent", "Agent", summary='"Chat"', gpu="false", disk_gb="0.1", after='["relay"]', check='"aihub check agent"',
-              _tables='[[steps]]\nrun = "aihub install agent"\nwhat = "the venv"')
-TTS = block("tts-kokoro", "Kokoro", summary='"Speech"', gpu="true", disk_gb="14", needs='["espeak-ng"]', check='"aihub check tts"',
-            _tables='[[steps]]\nrun = "aihub install tts"\nwhat = "the server venv"\n\n'
+RELAY = block("relay", "Relay", summary='"LLM routing"', gpu="false", disk_gb="0.2", check='"gaifa check relay"',
+              _tables='[[steps]]\nrun = "gaifa install relay"\nwhat = "the backend venv"')
+AGENT = block("agent", "Agent", summary='"Chat"', gpu="false", disk_gb="0.1", after='["relay"]', check='"gaifa check agent"',
+              _tables='[[steps]]\nrun = "gaifa install agent"\nwhat = "the venv"')
+TTS = block("tts-kokoro", "Kokoro", summary='"Speech"', gpu="true", disk_gb="14", needs='["espeak-ng"]', check='"gaifa check tts"',
+            _tables='[[steps]]\nrun = "gaifa install tts"\nwhat = "the server venv"\n\n'
                     '[[steps]]\nrun = "scripts/install-runtime.sh --accept-breeze-license"\nwhat = "the engines"\nask = "Accept the licence?"\n\n'
                     '[[suggest]]\nname = "Kokoro 82M"\nrepo = "hexgrad/Kokoro-82M"\nrevision = "f3ff3571791e39611d31c381e3a41a3af07b4987"\ndest = "hf-cache"\nkind = "tts"\nsize_gb = 0.34\ngood_for = "voices"\nrequired = true\n\n'
                     '[[suggest]]\nname = "Whisper"\nop = "POST /v1/load"\nbody = { preset = "small" }\nsize_gb = 0.5\ngood_for = "transcripts"')
@@ -40,7 +40,7 @@ class FakeRunner(cli_setup.Runner):
 
     def run(self, cmd: str, cwd: Path, env: dict | None = None, stream: bool = True, echo: bool = False, log: Path | None = None) -> tuple[int, str]:
         self.ran.append((cmd, cwd.name, env))
-        if cmd == "bin/aihub install":
+        if cmd == "bin/gaifa install":
             self.up = True
         out = f"{cmd}: boom" if cmd in self.fail else ""
         if log is not None:                    # plan 40.1: the whole output goes to the step's log
@@ -131,7 +131,7 @@ def test_the_plan_as_json(root: Path, capsys) -> None:
 def test_plan_text_for_a_person(root: Path, capsys) -> None:
     assert cli_setup.cmd_setup(args("agent", plan=True, json=False), FakeRunner(), FakeProbe()) == 0
     text = capsys.readouterr().out
-    assert "relay/1" in text and "aihub install agent" in text
+    assert "relay/1" in text and "gaifa install agent" in text
 
 
 def test_root_fixes_are_printed_never_run(root: Path, capsys) -> None:
@@ -166,7 +166,7 @@ def test_no_answer_stops_with_the_question(root: Path, capsys) -> None:
 def test_questions_come_before_the_hub_is_installed(root: Path, capsys) -> None:
     runner = FakeRunner(up=False)
     assert cli_setup.cmd_setup(args("tts", yes=True), runner, FakeProbe()) == 2
-    assert runner.ran == []                                           # no `bin/aihub install` before the licence is answered
+    assert runner.ran == []                                           # no `bin/gaifa install` before the licence is answered
 
 
 def test_a_full_run_with_answers(root: Path, capsys) -> None:
@@ -177,16 +177,16 @@ def test_a_full_run_with_answers(root: Path, capsys) -> None:
     assert r["failed"] == [] and r["done"] == ["tts-kokoro/1", "tts-kokoro/2", "tts-kokoro:Kokoro 82M", "tts-kokoro:Whisper"]
     assert r["hub"] == ["already installed and running"]
     cmds = [(c, cwd) for c, cwd, _ in runner.ran]
-    assert ("aihub install tts", "tts") in cmds and ("scripts/install-runtime.sh --accept-breeze-license", "tts") in cmds
+    assert ("gaifa install tts", "tts") in cmds and ("scripts/install-runtime.sh --accept-breeze-license", "tts") in cmds
     dl = next((c, env) for c, _, env in runner.ran if c.startswith("uvx"))
     assert dl[0] == "uvx --from huggingface_hub hf download hexgrad/Kokoro-82M --revision f3ff3571791e39611d31c381e3a41a3af07b4987" and dl[1]["HF_HOME"].endswith("data/models/hf-cache")
     ref = root / "data/models/hf-cache/hub/models--hexgrad--Kokoro-82M/refs/main"
     assert ref.read_text() == "f3ff3571791e39611d31c381e3a41a3af07b4987"        # engines that load by main find it offline
     reg = next(b for m, p, b in runner.calls if p == "/api/models")
     assert reg["path"] == "hf-cache/hub/models--hexgrad--Kokoro-82M" and reg["kind"] == "tts" and reg["source"]["revision"].startswith("f3ff357")
-    assert ("POST", "/api/s/tts/v1/load", {"preset": "small"}) in runner.calls and ("aihub start tts", "", None) in [(c, "" if c.startswith("aihub start") else cwd, e) for c, cwd, e in runner.ran]
-    assert r["checks"] == [{"setup": "tts-kokoro", "run": "aihub check tts", "ok": True, "log": "data/state/setup/logs/tts-kokoro_check.log"}]
-    assert ("aihub check tts", "tts") in cmds or ("aihub check tts", "tts") in [(c, cwd) for c, cwd, _ in runner.ran]   # checks run in the mod's folder
+    assert ("POST", "/api/s/tts/v1/load", {"preset": "small"}) in runner.calls and ("gaifa start tts", "", None) in [(c, "" if c.startswith("gaifa start") else cwd, e) for c, cwd, e in runner.ran]
+    assert r["checks"] == [{"setup": "tts-kokoro", "run": "gaifa check tts", "ok": True, "log": "data/state/setup/logs/tts-kokoro_check.log"}]
+    assert ("gaifa check tts", "tts") in cmds or ("gaifa check tts", "tts") in [(c, cwd) for c, cwd, _ in runner.ran]   # checks run in the mod's folder
 
 
 def test_answers_file_and_none(root: Path, tmp_path: Path, capsys) -> None:
@@ -204,7 +204,7 @@ def test_unknown_model_name(root: Path, capsys) -> None:
 
 
 def test_a_failure_stops_and_a_rerun_resumes(root: Path, capsys) -> None:
-    runner = FakeRunner(fail={"aihub install agent"})
+    runner = FakeRunner(fail={"gaifa install agent"})
     assert cli_setup.cmd_setup(args("agent", yes=True), runner, FakeProbe()) == 1
     r = out(capsys)
     assert r["reason"] == "failed" and r["report"]["failed"][0]["doc"] == "services/agent/setup/env.md"
@@ -219,7 +219,7 @@ def test_a_failure_stops_and_a_rerun_resumes(root: Path, capsys) -> None:
 
 
 def test_a_failed_check_is_reported_with_its_doc(root: Path, capsys) -> None:
-    assert cli_setup.cmd_setup(args("relay", yes=True), FakeRunner(fail={"aihub check relay"}), FakeProbe()) == 1
+    assert cli_setup.cmd_setup(args("relay", yes=True), FakeRunner(fail={"gaifa check relay"}), FakeProbe()) == 1
     r = out(capsys)
     assert r["checks"][0]["ok"] is False and r["failed"][0]["doc"] == "services/relay/setup/env.md" and r["next"]
 
@@ -228,8 +228,8 @@ def test_the_hub_stage_from_a_bare_clone(root: Path, capsys) -> None:
     (root / ".venv" / "bin" / "python").unlink()
     runner = FakeRunner(up=False)
     assert cli_setup.cmd_setup(args("hub"), runner, FakeProbe()) == 0
-    assert [c for c, _, _ in runner.ran] == ["uv sync", "bin/aihub install"]
-    assert out(capsys)["done"] == ["uv sync", "aihub install"]
+    assert [c for c, _, _ in runner.ran] == ["uv sync", "bin/gaifa install"]
+    assert out(capsys)["done"] == ["uv sync", "gaifa install"]
 
 
 def test_the_host_stage(root: Path, capsys) -> None:
@@ -266,7 +266,7 @@ def test_an_interactive_step_is_handed_to_the_person(root: Path, capsys) -> None
     assert cli_setup.cmd_setup(args("relay", yes=True), runner, FakeProbe()) == 2
     r = out(capsys)
     assert r["reason"] == "interactive" and r["id"] == "relay/2" and r["run"] == "opencode auth login" and "--done relay/2" in r["answer_with"]
-    assert [c for c, _, _ in runner.ran] == ["aihub install relay"]    # it ran up to that step
+    assert [c for c, _, _ in runner.ran] == ["gaifa install relay"]    # it ran up to that step
     again = FakeRunner()
     assert cli_setup.cmd_setup(args("relay", yes=True, done=["relay/2"]), again, FakeProbe()) == 0
     r = out(capsys)
@@ -314,7 +314,7 @@ def test_the_plan_shows_the_hub_stage_expansion_and_shared_images(root: Path, ca
     assert cli_setup.cmd_setup(args("tts", plan=True), FakeRunner(up=False), FakeProbe()) == 0
     p = out(capsys)
     assert p["expanded"] == {"tts": ["tts-breeze", "tts-kokoro"]} and p["disk_gb"] == 18.0     # 1 + 2 + the image once
-    assert p["hub"][0].startswith("uv sync") and p["hub"][1].startswith("aihub install")
+    assert p["hub"][0].startswith("uv sync") and p["hub"][1].startswith("gaifa install")
 
 
 # ---- values asked after install (plan 23.12) --------------------------------------------------
@@ -391,7 +391,7 @@ def test_set_writes_config_and_restarts(agent_root: Path, capsys) -> None:
     r = out(capsys)
     assert ("PUT", "/api/services/agent/config", {"env": {"AGENT_MODEL": "qwen3-8b"}}) in runner.calls   # through the hub: applied at once
     assert 'AGENT_MODEL = "qwen3-8b"' in (agent_root / "config.toml").read_text()                     # written by the hub
-    assert any(c == "aihub restart agent" for c, _, _ in runner.ran)
+    assert any(c == "gaifa restart agent" for c, _, _ in runner.ran)
     assert "agent/config:services.agent.env.AGENT_MODEL = qwen3-8b" in r["done"]
     assert any("agent.judge.model" in n for n in r["next"])            # optional, left for later
     assert {"setup": "agent", "run": "services.agent.env.AGENT_MODEL on the relay", "ok": True} in r["checks"]
@@ -503,7 +503,7 @@ def test_skip_if_and_optional_steps(root: Path, capsys) -> None:
 
 def test_a_resumed_run_keeps_the_answers(root: Path, capsys) -> None:
     a = args("tts", yes=True, accept=["tts-kokoro/2"], models=["tts-kokoro=none"])
-    assert cli_setup.cmd_setup(a, FakeRunner(fail={"aihub check tts"}), FakeProbe()) == 1
+    assert cli_setup.cmd_setup(a, FakeRunner(fail={"gaifa check tts"}), FakeProbe()) == 1
     capsys.readouterr()
     assert cli_setup.cmd_setup(args("tts", yes=True), FakeRunner(), FakeProbe()) == 0   # no licence or model question again
     assert out(capsys)["failed"] == []
@@ -563,12 +563,12 @@ def test_a_value_the_hub_wont_take_goes_into_the_file_and_a_rerun_applies_it(age
     capsys.readouterr()
     assert '[services.agent.env]\nAGENT_MODEL = "qwen3-8b"' in (agent_root / "config.toml").read_text()
     ran = [c for c, _, _ in refusing.ran]
-    assert ran.index("aihub restart") < ran.index("aihub restart agent")   # the hub reads the file, then the mod restarts with it
+    assert ran.index("gaifa restart") < ran.index("gaifa restart agent")   # the hub reads the file, then the mod restarts with it
     down = RelayRunner(["qwen3-8b"], refuse={"/api/services/agent/config"})
     down.up = False
     cli_setup_config.phase(cli_setup.resolve(["agent"], cli_setup.choices(agent_root)[0], agent_root), a, cli_setup.run_mod.read_answers(a),
                            agent_root, down, report := {"done": [], "skipped": [], "next": []}, {})
-    assert any("while the hub is down" in n for n in report["next"]) and "aihub restart agent" not in [c for c, _, _ in down.ran]
+    assert any("while the hub is down" in n for n in report["next"]) and "gaifa restart agent" not in [c for c, _, _ in down.ran]
     again = RelayRunner(["qwen3-8b"])
     assert cli_setup.cmd_setup(a, again, FakeProbe()) == 0                # not "already set": the hub runs without it
     assert again.env["agent"] == {"AGENT_MODEL": "qwen3-8b"}
@@ -589,8 +589,8 @@ def test_the_whole_env_table_is_sent_and_every_restart_runs_in_order(agent_root:
     capsys.readouterr()
     assert runner.env["agent"] == {"AGENT_FALLBACK_MODEL": "m2", "AGENT_MODEL": "m1"}   # the route replaces the table
     ran = [c for c, _, _ in runner.ran]
-    assert ran.index("aihub restart agent") < ran.index("aihub restart relay")
-    failing = RelayRunner(["m1"], fail={"aihub restart agent"})
+    assert ran.index("gaifa restart agent") < ran.index("gaifa restart relay")
+    failing = RelayRunner(["m1"], fail={"gaifa restart agent"})
     assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m1"], from_scratch=True), failing, FakeProbe()) == 1
     assert "restarting agent" in out(capsys)["report"]["failed"][0]["output"]
 
@@ -621,7 +621,7 @@ def test_the_relay_starts_before_the_models(agent_root: Path, capsys) -> None:
     runner = RelayRunner(["m"])
     assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m"]), runner, FakeProbe()) == 0
     ran = [c for c, _, _ in runner.ran]
-    assert ran.index("aihub install agent") < ran.index("aihub start relay")
+    assert ran.index("gaifa install agent") < ran.index("gaifa start relay")
 
 
 def test_rejoin_puts_back_names_with_commas() -> None:
@@ -747,10 +747,10 @@ def test_the_plan_shows_a_folder_and_a_mods_setups(root: Path, capsys) -> None:
 
 
 def test_a_hub_that_cant_be_restarted_leaves_a_next_item(agent_root: Path, capsys) -> None:
-    runner = RelayRunner(["m"], refuse={"/api/services/agent/config"}, fail={"aihub restart"})   # `aihub serve`: no unit
+    runner = RelayRunner(["m"], refuse={"/api/services/agent/config"}, fail={"gaifa restart"})   # `gaifa serve`: no unit
     assert cli_setup.cmd_setup(args("agent", yes=True, set=["services.agent.env.AGENT_MODEL=m"]), runner, FakeProbe()) == 0
     assert any("restart the hub yourself, then agent" in n for n in out(capsys)["next"])
-    assert "aihub restart agent" not in [c for c, _, _ in runner.ran]
+    assert "gaifa restart agent" not in [c for c, _, _ in runner.ran]
 
 
 def test_a_decide_judge_isnt_checked_against_the_relay(agent_root: Path, capsys) -> None:

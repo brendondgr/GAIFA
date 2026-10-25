@@ -27,7 +27,7 @@ async def hub(rig, serve):
 async def test_json_query_and_headers(hub):
     async with httpx.AsyncClient(base_url=hub.url) as c:
         r = await c.post("/api/s/fake-ok/v1/echo?a=1&b=two%20words&a=3", json={"x": [1, 2]}, headers={"X-Custom": "yes", "Connection": "keep-alive, X-Drop-Me", "X-Drop-Me": "1"})
-    assert r.status_code == 200 and "x-aihub-error" not in r.headers
+    assert r.status_code == 200 and "x-gaifa-error" not in r.headers
     body = r.json()
     assert body["json"] == {"x": [1, 2]}
     assert body["query"] == {"a": ["1", "3"], "b": ["two words"]}
@@ -103,7 +103,7 @@ async def test_mod_errors_pass_through_unchanged(hub):
     async with httpx.AsyncClient(base_url=hub.url) as c:
         r = await c.get("/api/s/fake-ok/v1/nope")
     assert r.status_code == 404 and r.json() == {"detail": "no route /v1/nope"}
-    assert "x-aihub-error" not in r.headers
+    assert "x-gaifa-error" not in r.headers
 
 
 async def test_redirects_stay_inside_the_proxy(hub):
@@ -125,11 +125,11 @@ async def test_root_path_and_head(hub):
 async def test_unknown_and_stopped_mods(hub):
     async with httpx.AsyncClient(base_url=hub.url) as c:
         r = await c.get("/api/s/nope/x")
-        assert (r.status_code, r.json()["code"], r.headers["x-aihub-error"]) == (404, "service_not_found", "service_not_found")
+        assert (r.status_code, r.json()["code"], r.headers["x-gaifa-error"]) == (404, "service_not_found", "service_not_found")
         await hub.services.stop("fake-ok", wait=True)
         r = await c.get("/api/s/fake-ok/health")
     assert r.status_code == 503 and r.json()["code"] == "service_not_running"
-    assert r.json()["detail"] == "Fake OK is not running (state: stopped)" and r.headers["x-aihub-error"] == "service_not_running"
+    assert r.json()["detail"] == "Fake OK is not running (state: stopped)" and r.headers["x-gaifa-error"] == "service_not_running"
 
 
 async def test_unreachable_mod_is_502(hub):
@@ -157,11 +157,11 @@ async def test_before_proxy_hook_runs(hub):
     seen: list[tuple[str, str, str]] = []
 
     async def hook(svc, method, path, headers):
-        seen.append((svc.id, method, path, headers.get("x-aihub-make-room")))
+        seen.append((svc.id, method, path, headers.get("x-gaifa-make-room")))
 
     hub.services.before_proxy.append(hook)
     async with httpx.AsyncClient(base_url=hub.url) as c:
-        await c.post("/api/s/fake-ok/v1/speech?x=1", json={"text": "a"}, headers={"X-AIHub-Make-Room": "1"})
+        await c.post("/api/s/fake-ok/v1/speech?x=1", json={"text": "a"}, headers={"X-GAIFA-Make-Room": "1"})
     assert seen[-1] == ("fake-ok", "POST", "/v1/speech", "1")
 
 

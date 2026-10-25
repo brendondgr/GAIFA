@@ -7,7 +7,8 @@ import { h, T, MONO, usePref } from '../chat/chat-ui.js';
 import { sections, rowsOf, validateDraft, saveBody, isDirty, summaryOf } from './schema.js';
 import { Row, Group, cardsOf, openGroups, setOpen } from './rows.js';
 import { parseSettingsRoute, settingsPlace } from './route.js';
-import { SectionStrip } from './strip.js';
+import { SectionStrip, SearchBox } from './strip.js';
+import { indexRows, matches, highlight } from './search.js';
 import { HUB_BLOCKS } from './blocks-hub.js';
 import { AGENT_BLOCKS } from './blocks-agent.js';
 
@@ -46,7 +47,8 @@ const btnSt = (pri, dis) => ({ height: 32, padding: '0 12px', borderRadius: 6, f
 /** A block of the schema, drawn by its component. */
 function BlockRow({ row, ctx }) {
   const C = BLOCKS[row.block];
-  return C ? h(C, { ctx, row }) : h('div', { role: 'alert', style: { color: T.rd, fontSize: 12 } }, `No block “${row.block}”`);
+  const el = C ? h(C, { ctx, row }) : h('div', { role: 'alert', style: { color: T.rd, fontSize: 12 } }, `No block “${row.block}”`);
+  return h('div', { id: 'row-' + row.ref.replace(/\//g, '-'), 'data-row': row.ref, style: { opacity: ctx.dim ? 0.45 : 1, minWidth: 0 } }, el);
 }
 
 export function SettingsPage(props) {
@@ -65,6 +67,15 @@ export function SettingsPage(props) {
   }, []);
   useFlashCss();
   const [closed, setClosed] = usePref('gaifa.settings.open', {});
+  const [q, setQ] = React.useState(''), [hit, setHit] = React.useState(-1), boxRef = React.useRef(null);
+  React.useEffect(() => {   // 3.2: '/' focuses the search box when nothing else has focus
+    const f = e => {
+      const tg = e.target, typing = /INPUT|TEXTAREA|SELECT/.test(tg?.tagName || '') || tg?.isContentEditable;
+      if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); boxRef.current?.focus(); }
+    };
+    window.addEventListener('keydown', f);
+    return () => window.removeEventListener('keydown', f);
+  }, []);
   const hash = route?.hash || '';
   React.useEffect(() => {
     if (!st.draft) return undefined;
@@ -105,44 +116,68 @@ export function SettingsPage(props) {
   };
   const revert = () => up(s => ({ draft: { ...clone(s.orig), ui: s.draft.ui }, err: null }));
 
-  const rowEl = (row, first) => {
-    if (row.control === 'block') return h(BlockRow, { key: row.id, row, ctx });
+  // 3.2: with a query, every section with a match shows, only matching groups open, other rows dimmed
+  const index = indexRows(secs, ctx), m = matches(index, q), searching = !!m.query;
+  const curHit = searching && hit >= 0 ? m.rows[hit % m.rows.length]?.id : null;
+  const walk = dir => {
+    if (!m.rows.length) return;
+    const i = hit < 0 ? (dir > 0 ? 0 : m.rows.length - 1) : (hit + dir + m.rows.length) % m.rows.length;
+    setHit(i);
+    const e = m.rows[i], [s, g, r] = e.id.split('/');
+    setTimeout(() => flashPlace(s, g, r), 60);
+  };
+  const rowEl = (row, first, view) => {
+    const rctx = { ...ctx, ...view.rowCtx(row) };
+    if (row.control === 'block') return h(BlockRow, { key: row.id, row, ctx: rctx });
     const value = row.instant ? row.read(ctx) : row.get(st.draft);
     const onChange = row.instant ? v => row.apply(ctx, v) : v => setDraft(d => row.set(d, v));
     const error = problems[row.path] || (errField && errField === row.path ? st.err.detail : null);
-    return h(Row, { key: row.id, row, value, onChange, error, first, ctx });
+    return h(Row, { key: row.id, row, value, onChange, error, first, ctx: rctx });
   };
   // 2.4: open groups: what you left open, plus the hash's group and any group with a problem
-  const refs = cur.groups.map(g => `${cur.id}/${g.id}`);
-  const forced = [place.group ? `${cur.id}/${place.group}` : null,
-    ...cur.groups.filter(g => g.rows.some(r => problems[r.path] || (errField && r.path === errField))).map(g => `${cur.id}/${g.id}`)].filter(Boolean);
-  const openSet = openGroups(closed, forced, refs);
-  const groupEl = g => {
-    const ref = `${cur.id}/${g.id}`, shown = g.rows.filter(r => !r.when || r.when(ctx));
+  const problemGroups = sec => sec.groups.filter(g => g.rows.some(r => problems[r.path] || (errField && r.path === errField))).map(g => `${sec.id}/${g.id}`);
+  const refsOf = sec => sec.groups.map(g => `${sec.id}/${g.id}`);
+  const openSet = openGroups(closed, [place.group ? `${cur.id}/${place.group}` : null, ...problemGroups(cur)].filter(Boolean), refsOf(cur));
+  const groupEl = (sec, g) => {
+    const ref = `${sec.id}/${g.id}`, shown = g.rows.filter(r => !r.when || r.when(ctx));
+    const open = searching ? !!m.perGroup[ref] || problemGroups(sec).includes(ref) : openSet.has(ref);
+    const titleHit = searching && m.ids.has(ref), rowHits = shown.some(r => m.ids.has(`${ref}/${r.id}`));
+    const view = { rowCtx: row => (searching ? { query: m.query, hlParts: highlight, dim: rowHits && !m.ids.has(row.ref), current: curHit === row.ref } : {}) };
     let firstPlain = true;
-    const open = openSet.has(ref);
-    const items = open ? shown.map(r => { const row = { ...r, ref: `${ref}/${r.id}` }, first = !row.card && firstPlain; if (!row.card) firstPlain = false; return { row, el: rowEl(row, first) }; }) : [];
-    return h(Group, { key: g.id, group: { ...g, ref }, open, summary: summaryOf(g, ctx), onToggle: on => setClosed(setOpen(closed, ref, on)) }, cardsOf(items));
+    const items = open ? shown.map(r => { const row = { ...r, ref: `${ref}/${r.id}` }, first = !row.card && firstPlain; if (!row.card) firstPlain = false; return { row, el: rowEl(row, first, view) }; }) : [];
+    return h(Group, { key: ref, group: { ...g, ref, query: searching ? m.query : '', hlParts: highlight, cur: curHit === ref || (titleHit && false) }, open, summary: summaryOf(g, ctx),
+      onToggle: on => (searching ? null : setClosed(setOpen(closed, ref, on))) }, cardsOf(items));
   };
-  const allOpen = refs.every(r => openSet.has(r)), allClosed = refs.every(r => !openSet.has(r));
+  const refs = refsOf(cur), allOpen = refs.every(r => openSet.has(r)), allClosed = refs.every(r => !openSet.has(r));
   const linkBtn = (label, on, dis) => h('button', { type: 'button', disabled: dis, onClick: () => setClosed(setOpen(closed, refs, on)),
     style: { border: 0, background: 'transparent', padding: 0, color: dis ? T.dim : T.cy, fontSize: 12.5, cursor: dis ? 'default' : 'pointer', font: 'inherit' } }, label);
-  const expandBar = refs.length > 1 ? h('div', { style: { display: 'flex', gap: 14, justifyContent: 'flex-end', fontSize: 12.5 } }, linkBtn('Expand all', true, allOpen), linkBtn('Collapse all', false, allClosed)) : null;
+  const expandBar = !searching && refs.length > 1 ? h('div', { style: { display: 'flex', gap: 14, justifyContent: 'flex-end', fontSize: 12.5 } }, linkBtn('Expand all', true, allOpen), linkBtn('Collapse all', false, allClosed)) : null;
+  const shownSecs = searching ? secs.filter(s => m.perSection[s.id]) : [cur];
+  const body = shownSecs.map(sec => (searching
+    ? h('section', { key: sec.id, 'aria-label': sec.label, style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+      h('h2', { style: { margin: '6px 0 0', fontSize: 15, fontWeight: 600 } }, sec.label, h('span', { style: { marginLeft: 8, fontSize: 12, fontWeight: 400, color: T.mut } }, `${m.perSection[sec.id]} match${m.perSection[sec.id] === 1 ? '' : 'es'}`)),
+      sec.groups.map(g => groupEl(sec, g)))
+    : h(R().Fragment, { key: sec.id }, sec.groups.map(g => groupEl(sec, g)))));
+  const nSecs = Object.keys(m.perSection).length;
+  const status = searching ? (m.rows.length ? `${m.rows.length} match${m.rows.length === 1 ? '' : 'es'} in ${nSecs} section${nSecs === 1 ? '' : 's'}` : 'No settings match') : '';
+  const search = h(SearchBox, { inputRef: boxRef, value: q, status, onChange: v => { setQ(v); setHit(-1); }, onClear: () => { setQ(''); setHit(-1); }, onNext: () => walk(1), onPrev: () => walk(-1) });
   const miss = (cur.areas || []).filter(a => !isLive(a));
 
   const pick = id => (props.go ? props.go('#/settings/' + id) : (location.hash = '#/settings/' + id));
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 } },
-    h(SectionStrip, { sections: secs, current: cur.id, onPick: pick, density: props.density, h1St: props.h1St || h1St, counts: props.stripCounts?.(secs) || {}, search: null }),
+    h(SectionStrip, { sections: secs, current: searching ? null : cur.id, onPick: id => { setQ(''); setHit(-1); pick(id); }, density: props.density, h1St: props.h1St || h1St,
+      counts: searching ? m.perSection : {}, dimmed: searching ? Object.fromEntries(secs.map(s => [s.id, !m.perSection[s.id]])) : {}, search }),
     st.restart ? h('div', { role: 'status', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '12px 14px', borderRadius: 10, background: T.tacc, border: '1px solid ' + T.acc } },
       h('span', { style: { flex: 1, minWidth: 200 } }, h('strong', null, 'Saved.'), ' Restart GAIFA to apply the new port: ', h('code', { style: { fontFamily: MONO } }, 'gaifa restart')),
       h('button', { type: 'button', onClick: () => up({ restart: false }), style: { ...btnSt(false), height: 28, fontSize: 12, background: T.card } }, 'Dismiss')) : null,
     st.err && !errField ? h('div', { role: 'alert', style: { padding: '10px 12px', borderRadius: 8, background: T.trd, color: T.rd } }, st.err.detail || String(st.err.message || st.err)) : null,
-    h('div', { role: 'tabpanel', 'aria-labelledby': 'stab-' + cur.id, style: { width: '100%', maxWidth: 900, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 } },
-      miss.length ? h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } },
+    h('div', { role: searching ? 'region' : 'tabpanel', 'aria-labelledby': searching ? undefined : 'stab-' + cur.id, 'aria-label': searching ? 'Search results' : undefined, style: { width: '100%', maxWidth: 900, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 } },
+      !searching && miss.length ? h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } },
         h('span', { style: { height: 18, padding: '0 6px', borderRadius: 4, border: '1px solid ' + T.pu, background: T.tpu, color: T.pu, fontSize: 10, fontWeight: 600, letterSpacing: '.06em', display: 'inline-flex', alignItems: 'center' } }, 'MOCK'),
         h('span', null, `Mock data: the ${miss.join(' and ')} ${miss.length > 1 ? 'areas aren’t' : 'area isn’t'} live yet.`)) : null,
       expandBar,
-      cur.groups.map(groupEl),
+      searching && !m.rows.length ? h('div', { style: { color: T.mut, padding: '24px 0' } }, `Nothing in Settings matches “${q.trim()}”.`) : null,
+      body,
       dirty ? h('div', { role: 'region', 'aria-label': 'Unsaved changes', style: { position: 'sticky', bottom: 12, zIndex: 20, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 14px',
         borderRadius: 10, background: T.card, border: '1px solid ' + T.acc, boxShadow: '0 10px 30px rgba(0,0,0,.35)' } },
         h('span', { style: { flex: 1, minWidth: 160, fontWeight: 500 } }, 'Unsaved changes'),

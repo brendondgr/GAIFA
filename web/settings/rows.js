@@ -85,11 +85,11 @@ export function ListEditor({ value = [], onChange, row }) {
 
 // ---------- highlighting (search) ----------
 /** `text` with `query`'s matches in <mark> (Phase 3 gives the parts; until then the text as it is). */
-export function Hl({ text, query, parts }) {
+export function Hl({ text, query, parts, cur }) {
   if (!text) return null;
   const ps = parts ? parts(String(text), query) : [{ text: String(text), hit: false }];
   if (ps.length === 1 && !ps[0].hit) return String(text);
-  return h(R().Fragment, null, ps.map((p, i) => (p.hit ? h('mark', { key: i, className: 'gaifa-hit', style: { background: 'var(--tacc,rgba(255,178,36,.13))', color: 'inherit', borderRadius: 2, padding: 0 } }, p.text) : p.text)));
+  return h(R().Fragment, null, ps.map((p, i) => (p.hit ? h('mark', { key: i, className: cur ? 'gaifa-hit gaifa-hit-cur' : 'gaifa-hit', style: { background: cur ? T.acc : 'var(--tacc,rgba(255,178,36,.28))', color: cur ? '#1A1200' : 'inherit', borderRadius: 2, padding: 0 } }, p.text) : p.text)));
 }
 
 // ---------- the row ----------
@@ -109,8 +109,8 @@ export function Row({ row, value, onChange, error, ctx = {}, first }) {
   else if (c === 'order') control = h(OrderList, { value, items: row.items(ctx.draft || {}), onChange });
   else if (c === 'list') control = h(ListEditor, { value, onChange, row });
   const head = h(wide ? 'div' : 'label', { htmlFor: wide ? undefined : id, style: { flex: wide ? 'none' : '1 1 220px', minWidth: 0 } },
-    h('div', { style: { fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } }, h(Hl, { text: row.label, query: q, parts }), ...(ctx.labelExtras?.(row) || [])),
-    row.hint ? h('div', { style: { fontSize: 12, color: T.mut } }, h(Hl, { text: row.hint, query: q, parts })) : null,
+    h('div', { style: { fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } }, h(Hl, { text: row.label, query: q, parts, cur: ctx.current }), ...(ctx.labelExtras?.(row) || [])),
+    row.hint ? h('div', { style: { fontSize: 12, color: T.mut } }, h(Hl, { text: row.hint, query: q, parts, cur: ctx.current })) : null,
     ...(ctx.hintExtras?.(row) || []));
   const st = { display: 'flex', alignItems: wide ? 'stretch' : (c === 'number' || c === 'text' ? 'flex-start' : 'center'), flexDirection: wide ? 'column' : 'row', gap: wide ? 8 : 12,
     padding: '14px 0', flexWrap: wide ? 'nowrap' : 'wrap', borderTop: first ? 0 : '1px solid ' + T.bd, opacity: ctx.dim ? 0.45 : 1 };
@@ -142,7 +142,7 @@ export function Group({ group, children, open = true, onToggle, summary }) {
     group.label ? h('button', { type: 'button', 'aria-expanded': open ? 'true' : 'false', 'aria-controls': id + '-body', onClick: () => onToggle?.(!open),
       style: { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px 0', border: 0, background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left', minWidth: 0 } },
       h('span', { style: { display: 'inline-flex', transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .12s', color: T.mut } }, svg(CHEV_D, 13)),
-      h('h2', { style: { ...label11, flex: 'none' } }, h(Hl, { text: group.label, query: group.query, parts: group.hlParts })),
+      h('h2', { style: { ...label11, flex: 'none' } }, h(Hl, { text: group.label, query: group.query, parts: group.hlParts, cur: group.cur })),
       !open && summary ? h('span', { style: { fontSize: 12, color: T.mut, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, summary) : null) : null,
     open ? h('div', { id: id + '-body', style: { display: 'flex', flexDirection: 'column', gap: 14 } }, children) : null);
 }

@@ -19,8 +19,8 @@ OUT = ROOT / "docs/assets/header.svg"
 
 TITLE = "GAIFA"
 TAGLINE = (
-    "One local app that runs every AI service on your machine,",
-    "and a chat agent that chains them together.",
+    "Build your own AI apps as mods, and use them all",
+    "through one agent that learns how you work.",
 )
 MEANING = ("Great, Another Interface For Agents", "say “guy-fuh”")  # under the tagline; the initials in the accent
 # Dot colours are GitHub's own, from github/linguist languages.yml, so the row reads as familiar.
@@ -31,7 +31,7 @@ LANGUAGES = [
     ("TypeScript", "#3178c6"),
     ("Shell", "#89e051"),
 ]
-STACK = [(n, None) for n in ("FastAPI", "React", "SQLite", "uv", "ComfyUI", "llama.cpp", "vLLM", "MCP")]
+STACK = [(n, None) for n in ("FastAPI", "OpenAPI", "MCP", "SQLite", "uv", "React")]
 
 # The UI's own dark theme (web/Hub.dc.html): --bg, --bd, --card, --tx, --mut and the amber accent.
 PANEL_BG, PANEL_EDGE = "#0B0E14", "#1D2430"

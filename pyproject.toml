@@ -1,7 +1,7 @@
 [project]
 name = "gaifa"
 version = "0.1.0"
-description = "GAIFA (Great, Another Interface For Agents): one local app that controls every AI service on this machine"
+description = "GAIFA (Great, Another Interface For Agents): a modular, local server for AI apps you build as mods, used through one agent that learns how you work"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi",

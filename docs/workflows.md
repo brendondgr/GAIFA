@@ -42,13 +42,13 @@ Every import becomes a **draft**. It is checked against your installed nodes and
 ## 3. `workflow.toml`
 
 ```toml
-name = "Z-Image Turbo"
+name = "Qwen-Image 2.1 Turbo"
 task = "text-to-image"               # from tasks.toml (§4); "custom" when none fits
-description = "Fast photoreal text to image"   # the agent reads this
-good_for = "photoreal pictures, quickly"      # one phrase: the agent and the card read it (§3.1)
+description = "Text to image in 8 steps"      # the agent reads this
+good_for = "text inside the picture and complex scenes"   # one phrase: the agent and the card read it (§3.1)
 # speed = "about 40 s"
 # edit = "instruction"               # image-edit packs only: instruction | restyle | inpaint | refine (§3.1)
-tags = ["photo", "fast"]
+tags = ["text", "fast"]
 # agent = false                      # keep it off the agent's tools (it still runs from the page and API)
 # requires = ["cuda"]                 # plan 39.6: the accelerators it runs on (a CUDA-only custom node); empty: any
 # memory_gb = 18                     # set only to override: each run measures its peak
@@ -200,7 +200,7 @@ For anything it can't follow, it names the node.
 - **The page:** Run tab → pick a workflow → fill the form (presets fill it too) → Run. Progress is live, and results land in `outputs/comfy/<date>/` with a sidecar (prompt, seed, settings, workflow), and on the Outputs page.
 - **The API:**
   ```
-  POST /api/s/comfy/v1/run {"workflow": "zimage-turbo", "inputs": {"prompt": "…", "aspect": "3:2"}, "preset": "portrait"}
+  POST /api/s/comfy/v1/run {"workflow": "qwen21-turbo-t2i", "inputs": {"prompt": "…", "aspect": "3:2"}, "preset": "fast"}
   GET  /api/s/comfy/v1/jobs/<job id>?wait=300      # waits up to 300 s, then returns its outputs
   ```
 - **The agent:** `GET /api/s/comfy/v1/tools` lists the task tools; `POST /v1/tools/<name>/call {"arguments": {…}}` runs one as a job.

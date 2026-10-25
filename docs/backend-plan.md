@@ -3213,6 +3213,11 @@ Found on 2026-10-25 by an MCP test after the rename: comfy came up with its pack
   - On this machine (no code): `input/aihub/` moved to `input/gaifa/`, the 19 comfy runs and one output whose inputs named `aihub/…` rewritten to `gaifa/…`, the leftover `nodes/aihub_nodes/__pycache__` (ComfyUI tried to import it) removed.
   *Done when:* `services/comfy/tests/test_import.py` (a history entry with the old key is recognised).
 
+- [x] **51.4 The packs whose models aren't here are removed: `services/comfy/workflows/`.**
+  - The user's call (2026-10-25), instead of downloading the models again: the 15 packs that were `broken` for missing models go (Z-Image `zimage-turbo` and `zimage-intorealism`, Wan 2.1 `wan21-t2v` and `wan21-i2v`, Flux 2 Klein `flux2-klein-edit`, `klein9b-*`, Krea 2 `krea2-txt2img`, `krea2-i2i`, `krea2-inpaint`, and the Qwen-Image-Edit `qwen-edit*` packs), through comfy's own delete (each lands in `workflows/.trash/`). The text-to-image default becomes `qwen21-turbo-t2i`; the video tasks have no default and no tool. The user's own untracked drafts stay.
+  - The agent's skill (`skills/choosing-a-workflow/SKILL.md`) names only what's left and says there's no video tool; the setup doc's known gaps, docs/workflows.md's examples and docs/structure.md follow. The evals' tasks for those workflows were already skipped when a workflow isn't offered (`evals/tasks.py` `NEEDS`), and comfy's tests use their own fixtures.
+  *Done when:* comfy's packs are all `ready` or the user's drafts, its tools and the agent's skill name no removed pack, and comfy's suite passes.
+
 *As checked (2026-10-25):* on the installed hub, a copy of a ready pack added while comfy ran was in `comfy_generate_image`'s workflow choices within 2 s and gone 11 s after it was removed, with no restart; `/mcp` lists 70 tools (comfy's three task tools among them); in Chat, on skynet, the agent searched the web (8 results), summed up MCP in a sentence and made the picture (52 s).
 
 **Checks & deliverables — Phase 51**

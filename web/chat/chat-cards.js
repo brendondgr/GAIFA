@@ -147,7 +147,7 @@ function AssistantCard({ item, ctx }) {
     : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 } }, parts.map((p, i) => p.output
       ? h(Card, { key: p.key, item: { key: p.key, kind: 'figure', output: p.output }, ctx })
       : mdOf(p.html, p.key, item.streaming && i === parts.length - 1)));
-  if (item.streaming || item.ev.seq == null || !text.trim() || ctx?.turn?.running) return md;
+  if (item.streaming || item.ev.seq == null || !text.trim() || ctx?.turn?.running || ctx?.update) return md;   // update: a message between steps (split layout)
   // the reply bar: Sources, Copy (three ways), thumbs (chat-replybar.js)
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2 } }, md,
     h(ReplyBar, { text, ctx, thumbs: h(Thumbs, { ctx, target: { seq: item.ev.seq }, label: 'this reply' }) }));

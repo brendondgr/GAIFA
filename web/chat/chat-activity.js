@@ -4,14 +4,20 @@
 // notes. A tool row opens to its sentence (chat-steps.js), and "Raw call" shows the JSON.
 //
 // One tool's opened detail can be replaced: registerCard('step:<tool name>', ({ row, item, ctx }) => …).
+//
+// Settings → Agent → Steps between messages (per browser, `gaifa.chat.steps`): "One fold" draws the turn as
+// above; "Split at each message" draws each of the agent's updates as a message of its own, with a fold for
+// the steps before it ("Ran 1 tool", then the message, then "Ran 2 tools", …; chat-turn.js `splitTurn`).
 
-import { h, T, MONO, Icon, Badge } from './chat-ui.js';
+import { h, T, MONO, Icon, Badge, usePref } from './chat-ui.js';
 import { Card, ProgressBar, hasCard, cardFor } from './chat-cards.js';
 import { renderMarkdown } from './chat-md.js';
 import { stepText, stepSentence, errorText } from './chat-steps.js';
 import { LiveCards } from './chat-live.js';
 import { OutputStrip } from './chat-results.js';
-import { judgeOf } from './chat-turn.js';
+import { judgeOf, splitTurn } from './chat-turn.js';
+
+export const STEPS_LAYOUT = 'gaifa.chat.steps';   // 'fold' | 'split'
 
 const R = () => globalThis.React;
 
@@ -223,16 +229,29 @@ function UndoTurn({ paths, ctx }) {
         h(Icon, { d: 'undo', size: 12 }), state === 'busy' ? 'Undoing…' : 'Undo this turn'));
 }
 
-/** One turn: your message (or "You ran …"), the fold, errors, cards waiting for you, the outputs, the answer. */
+// The split layout: each part's steps (a fold, or a thought on its own) and then its message.
+function splitKids(turn, ctx) {
+  return splitTurn(turn).flatMap(p => {
+    const thoughts = !p.running && p.steps.length && p.steps[0].rows.every(r => r.type === 'thinking');
+    const steps = thoughts ? h('div', { key: p.key, style: { minWidth: 0 } }, h(StepList, { turn: p, ctx }))
+      : h(ActivityFold, { key: p.key, turn: { ...turn, ...p }, ctx });
+    if (!p.message || p.last) return [steps];   // the answer goes after the outputs, as in one fold
+    return [steps, h('div', { key: 'm:' + p.message.key, 'data-quote-seq': p.message.item.ev?.seq ?? '', style: { minWidth: 0 } },
+      h(Card, { item: p.message.item, ctx: { ...ctx, update: true } }))];   // update: no reply bar under it
+  });
+}
+
+/** One turn: your message (or "You ran …"), the fold (or the split parts), errors, cards waiting for you, the outputs, the answer. */
 export function TurnView({ turn, ctx }) {
+  const [layout] = usePref(STEPS_LAYOUT, 'fold');
   const kids = [
     turn.user ? h(Card, { key: 'u', item: turn.user, ctx }) : h(ActionHead, { key: 'u', turn, ctx }),
-    h(ActivityFold, { key: 'f', turn, ctx }),
+    ...(layout === 'split' ? splitKids(turn, ctx) : [h(ActivityFold, { key: 'f', turn, ctx })]),
     ...turn.errors.map(it => h(Card, { key: it.key, item: it, ctx })),
     ...(ctx.dock ? [] : turn.pending.map(it => h(Card, { key: it.key, item: it, ctx }))),
     turn.outputs.length ? h(OutputStrip, { key: 'o', outputs: turn.outputs, ctx }) : null,
     // data-quote-seq: Select → Reply quotes from here (chat-quote.js), and a quote's click scrolls back to it
-    turn.answer ? h('div', { key: 'a', 'data-quote-seq': turn.answer.item.ev?.seq ?? '', style: { minWidth: 0 } }, h(Card, { item: turn.answer.item, ctx: { ...ctx, turn } })) : null,   // turn: the reply bar's sources and steps (chat-replybar.js)
+    turn.answer ? h('div', { key: 'm:' + turn.answer.key, 'data-quote-seq': turn.answer.item.ev?.seq ?? '', style: { minWidth: 0 } }, h(Card, { item: turn.answer.item, ctx: { ...ctx, turn } })) : null,   // turn: the reply bar's sources and steps (chat-replybar.js)
     turn.undo?.length && !turn.running && ctx.undo ? h(UndoTurn, { key: 'undo', paths: turn.undo, ctx }) : null,
   ];
   return h(R().Fragment, null, ...kids.filter(Boolean));

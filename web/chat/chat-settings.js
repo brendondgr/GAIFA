@@ -1,10 +1,10 @@
 // Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, the memory index and its topics, documents
 // (plan 24.9: whole documents up to a size or the model's window, and the reply reserve), the
-// models, skills, the ask modes and permissions with the grants (plan 25.2: what was allowed in a
+// models, how a turn's steps are drawn (one fold, or split at each message; per browser), skills, the ask modes and permissions with the grants (plan 25.2: what was allowed in a
 // chat or always, with revoke), and Speech input (plan 29.4, chat-speech-input.js). (Show thinking is retired: thinking is a row in each turn's
 // activity fold, plan 19.4.) Mounted by Hub.dc.html's Settings page.
 
-import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens, fmtAgo } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens, fmtAgo, usePref } from './chat-ui.js';
 import { getChatClient } from './chat.js';
 import { MODES } from './chat-header.js';
 import { RISK_TONE, grantText } from './chat-risk.js';
@@ -13,6 +13,7 @@ import { SpeechOutputSection } from './chat-speak.js';
 import { JudgedList } from './chat-judge.js';
 import { PermissionRules } from './chat-rules.js';
 import { WebReadingSection } from './chat-webprefs.js';
+import { STEPS_LAYOUT } from './chat-activity.js';
 
 const R = () => globalThis.React;
 const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
@@ -36,6 +37,7 @@ function Editor({ label, hint, value, onSave, rows = 10, placeholder }) {
 export function AgentSettings({ api, toast = () => {} }) {
   const React = R(), c = getChatClient(api);
   const [s, setS] = React.useState(null), [models, setModels] = React.useState(null), [err, setErr] = React.useState(null);
+  const [layout, setLayout] = usePref(STEPS_LAYOUT, 'fold');
   React.useEffect(() => {
     c.settings().then(setS).catch(setErr);
     c.models().then(setModels).catch(() => {});
@@ -52,7 +54,11 @@ export function AgentSettings({ api, toast = () => {} }) {
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, fontFamily: MONO, fontSize: 12, textAlign: 'right' } },
           h('span', null, h('span', { style: { color: T.mut } }, 'default '), s ? s.model + window_(s.model) : '—'),
           h('span', null, h('span', { style: { color: T.mut } }, 'fallback '), s?.fallback ? s.fallback + window_(s.fallback) : 'none'),
-          h('span', null, h('span', { style: { color: T.mut } }, 'max steps '), s?.max_steps ?? '—')))),
+          h('span', null, h('span', { style: { color: T.mut } }, 'max steps '), s?.max_steps ?? '—'))),
+      row('Steps between messages', 'One fold per turn ("Ran 2 tools"), or each thing the agent says between steps as a message of its own, with a fold for the steps before it. This browser only.',
+        h('select', { 'aria-label': 'Steps between messages', value: layout === 'split' ? 'split' : 'fold', onChange: e => setLayout(e.target.value),
+          style: { height: 28, padding: '0 6px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.sb, color: T.tx, font: 'inherit', fontSize: 12.5 } },
+        h('option', { value: 'fold' }, 'One fold per turn'), h('option', { value: 'split' }, 'Split at each message')))),
     s?.documents ? section('Documents', h(DocSettings, { value: s.documents, onSave: d => save({ documents: d }) })) : null,
     h(WebReadingSection, { api, toast }),   // [agent.screen], [agent.web], [outputs] hidden_keep_days
     section('Instructions',

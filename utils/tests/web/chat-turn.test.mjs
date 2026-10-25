@@ -63,6 +63,26 @@ test('the sample turn while running: answers stream as the answer, waiting rows,
   assert.deepEqual(stopped.steps[1].rows.filter(r => r.type === 'tool').map(r => r.status), ['stopped', 'stopped']);
 });
 
+test('the split layout: the turn cut at each update, a fold per part, the answer last', () => {
+  const [t] = turnsAt(6), parts = ct.splitTurn(t);
+  const shape = p => [p.steps.flatMap(s => s.rows).map(r => r.type === 'tool' ? r.name : r.type), p.message?.type || null, p.summary.text];
+  assert.deepEqual(parts.map(shape), [
+    [['thinking', 'find_tools', 'load_tools', 'thinking'], 'update', 'Looked something up'],
+    [['comfy_generate_image', 'thinking'], 'update', 'Ran 1 tool'],
+    [['gen3d_make_3d', 'thinking'], 'update', 'Ran 1 tool']]);
+  assert.equal(parts.at(-1).message, t.answer, 'the last part\'s message is the answer');
+  assert.deepEqual(parts.map(p => [p.last, p.running, p.status]), [[false, false, null], [false, false, null], [true, false, null]]);
+  assert.equal(parts.reduce((a, p) => a + p.elapsed, 0), t.elapsed, 'the parts\' times add up to the turn\'s');
+  // while running, only the last part is live, and its time counts to now
+  const live = turnsAt(4)[0], lp = ct.splitTurn(live);
+  assert.deepEqual(lp.map(p => p.running), [false, false, true]);
+  assert.equal(lp.at(-1).status.kind, 'tool');
+  assert.equal(lp.reduce((a, p) => a + p.elapsed, 0), live.elapsed);
+  // a plain reply: one part, no steps
+  const plain = ct.groupTurns(th.buildView([{ seq: 1, ts: 1, type: 'user', payload: { text: 'hi' } }, { seq: 2, ts: 2, type: 'assistant', payload: { text: 'Hello!', step: 'a' } }]), { now: 3 })[0];
+  assert.deepEqual(ct.splitTurn(plain).map(shape), [[[], 'update', 'Done']]);
+});
+
 test('tool results cleared mid-turn keep the turn whole; the marker follows it', () => {
   // seen 2026-10-21: after "Older tool results cleared", each later step was drawn as a bare "thinking event" / "tool_call event" card
   const evs = [

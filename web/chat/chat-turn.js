@@ -8,6 +8,7 @@
 // activity fold (chat-activity.js), the outputs and the answer.
 //
 //   groupTurns(view, { running, now, tools }) → [{ kind: 'turn', … } | { kind: 'item', item }]
+//   splitTurn(turn) → the turn's folds cut at each update, for the split layout
 //
 // turn: { key, user, action, steps: [{ id, rows }], answer, outputs, errors, pending, running,
 //         start, end, elapsed, status, summary }
@@ -115,8 +116,32 @@ function finish(turn, live, now, gpu = null) {
   if (turn.pending.length) turn.running = live = true;          // waiting for you is still a live turn
   turn.elapsed = Math.max(0, (live ? now : turn.end) - turn.start);
   turn.status = live ? status(turn, rows, gpu) : null;
-  const work = toolRows.filter(r => !r.lookup).length, looks = toolRows.length - work;
-  turn.summary = { work, lookups: looks, text: work ? `Ran ${work} tool${work === 1 ? '' : 's'}` : looks ? 'Looked something up' : rows.length ? 'Thought it through' : 'Done' };
+  turn.summary = summaryOf(rows);
+}
+
+/** "Ran 2 tools" (lookups aren't counted), "Looked something up", "Thought it through" or "Done". */
+export function summaryOf(rows) {
+  const toolRows = rows.filter(r => r.type === 'tool'), work = toolRows.filter(r => !r.lookup).length, looks = toolRows.length - work;
+  return { work, lookups: looks, text: work ? `Ran ${work} tool${work === 1 ? '' : 's'}` : looks ? 'Looked something up' : rows.length ? 'Thought it through' : 'Done' };
+}
+
+/** A turn cut at each of the agent's updates (Settings → Agent → Steps between messages: Split at each
+ *  message): `[{ key, steps, message, running, status, elapsed, summary, last }]`, each part a turn-shaped fold of
+ *  the rows before its message. The last part holds what came after the last update and the answer (null when the
+ *  last step called tools); only it carries the live status. Times run from the previous message to this one. */
+export function splitTurn(turn) {
+  const parts = [];
+  let rows = [], from = turn.start;
+  const push = (message, end, last) => parts.push({ key: 'p' + parts.length, steps: rows.length ? [{ id: 'p' + parts.length, rows }] : [], message, last,
+    running: last && turn.running, status: last ? turn.status : null, elapsed: Math.max(0, end - from), summary: summaryOf(rows) });
+  for (const r of turn.steps.flatMap(s => s.rows)) {
+    if (r.type !== 'update') { rows.push(r); continue; }
+    const at = Math.max(from, tsOf(r.item));
+    push(r, at, false);
+    rows = []; from = at;
+  }
+  push(turn.answer, Math.max(from, turn.start + turn.elapsed), true);   // elapsed counts to now while the turn runs
+  return parts;
 }
 
 /** A tool row's state: done | error | denied | cancelled | skipped | waiting | running | queued | stopped. */

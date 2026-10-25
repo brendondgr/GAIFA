@@ -41,18 +41,19 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   *Done when:* each block mounts on its own in `utils/tests/web/settings-blocks.test.mjs` (a React render to string of the pure ones with fixed data), and the Node test suite and `uv run pytest` pass. Keep each file under 500 lines: split `blocks-hub.js` into `blocks-machine.js` and `blocks-about.js` if it passes.
   *As built:* `blocks-hub.js` is under 200 lines, so it wasn't split. The agent's cards share one load of the agent's settings (`useAgent` in `chat-settings.js`); Phase 1's Permissions card stays one block (`PermissionsCard`) until 2.1 splits it.
 
-- [ ] **1.4 The page: `web/settings/settings.js`.**
+- [x] **1.4 The page: `web/settings/settings.js`.**
   - **Component:** `SettingsPage({api, services, system, route, go, toast, theme, density, setTheme, setDensity, ref})` owns what `vmSettings` and the shell's `st` state own today: load (`getSettings` and `getSystem`), the draft, `dirty`, Save (`saveSettings` with the whole draft; a `422 invalid_config` marks its `data.field`'s row), Revert, the restart banner, the mock note, and the Save bar (sticky at the bottom, as now). It exposes `dirty()` through the ref for the shell's unsaved-changes guard (`Hub.dc.html` line ~1432) and `beforeunload`.
   - **Shell:** `Hub.dc.html`'s settings template shrinks to `<sc-if value="{{ se.loaded }}">{{ se.pageEl }}</sc-if>` around the `h1`; `vmSettings` returns `pageEl` (a `React.createElement(this.Settings.SettingsPage, …)`), the `st` state keeps only what the guard reads, and `imp('settings/settings.js')` joins the module loads near line 1162. `SETTINGS_AREAS` leaves the shell. The header's "where you are" (plan 33.5) keeps naming the section.
   - **Docs:** `web/PATCHES.md` gets a row; `docs/structure.md` lists `web/settings/`; the brief's §4.5 says Settings is `web/settings/` and names the schema.
+  *As built:* checked on a second hub (7077): the reserve changed and saved (config.toml written), a port of 80 refused with the page’s message, 7010 saved with the restart note, Revert, the guard on leaving with a dirty draft (Cancel keeps you there), every section at its hash, and `?mock`. Theme and density are now saved when picked (`syncUi` → `saveSettings({ui})`), not with the next Save, and Save sends only `saveBody` (no `ui`), so the sidebar’s and the dashboard’s own saves are never overwritten.
   *Done when:* the page behaves as before on the live hub (change the reserve, Save, the restart note on a port change, Revert, the guard on leaving with a dirty draft, every section reachable at its hash) and `Hub.dc.html` lost the settings template; `utils/tests/settings/test_web_settings.py` and `test_settings_nav.py` still pass; `uv run pytest` green.
 
 **Wire — Phase 1:** nothing changes for the user; the same areas are live (`settings`, `system`, `memory`, `services`, `sessions`).
 
 **Checks & deliverables — Phase 1**
-- [ ] Before/after screenshots of all eight sections match (`docs/reference/settings-2026-10/`).
-- [ ] `Hub.dc.html` is shorter by the settings template and view-model; no settings strings remain in it besides the page title and the palette rows.
-- [ ] Delivered: `web/settings/schema.js`, `rows.js`, `blocks-hub.js` (or `blocks-machine.js` + `blocks-about.js`), `blocks-agent.js`, `settings.js`; `chat/chat-settings.js` exporting its cards; tests `settings-schema.test.mjs`, `settings-blocks.test.mjs`.
+- [x] Before/after screenshots of all eight sections match (`docs/reference/settings-2026-10/`).
+- [x] `Hub.dc.html` is shorter by the settings template and view-model; no settings strings remain in it besides the page title and the palette rows.
+- [x] Delivered: `web/settings/schema.js`, `rows.js`, `blocks-hub.js` (or `blocks-machine.js` + `blocks-about.js`), `blocks-agent.js`, `settings.js`; `chat/chat-settings.js` exporting its cards; tests `settings-schema.test.mjs`, `settings-blocks.test.mjs`.
 
 ## Phase 2 — Regrouped sections, the sticky strip and groups (M)
 

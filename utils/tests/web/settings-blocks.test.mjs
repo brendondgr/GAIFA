@@ -53,6 +53,7 @@ test('segmented and the order list’s moves', () => {
 // ---------- the blocks (1.3) ----------
 const B = await load('settings/blocks-hub.js');
 const A = await load('settings/blocks-agent.js');   // imports cleanly: the agent's cards, placed one by one
+await load('settings/settings.js');
 const sys = { hub: { version: '0.1.0', pid: 31337, uptime_s: 7260, rss_bytes: 92e6 },
   paths: { root: '/gaifa', models: '/gaifa/data/models', databases: '/gaifa/data/databases', outputs: '/gaifa/outputs', logs: '/gaifa/data/logs' },
   usage: { models_bytes: 190e9, databases_bytes: 12e6, outputs_bytes: 3.4e9, logs_bytes: 5e6 }, disk: { free_bytes: 500e9, total_bytes: 2000e9 } };

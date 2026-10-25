@@ -261,7 +261,7 @@ The real backend indexes `outputs/<service>/<YYYY-MM-DD>/…`. This page is the 
 
 ### 4.5 Settings
 
-One page with sections (hash `#/settings/<section>`), Save and Revert, an unsaved-changes guard, and restart-required notes:
+One page with sections (hash `#/settings/<section>`), Save and Revert, an unsaved-changes guard, and restart-required notes. As built it is `web/settings/` (plan settings-redesign): `schema.js` declares every section, group and row as data (label, hint, `config.toml` key, control, keywords), `rows.js` draws the rows, `blocks-hub.js` and `blocks-agent.js` the pieces that aren't one value, and `settings.js` is the page (`SettingsPage`, mounted by `Hub.dc.html`):
 
 - **General**:
   - GAIFA port (default 7000), with the note "Bound to 127.0.0.1 — this machine only"

@@ -34,7 +34,7 @@ The name's meaning and pronunciation are said once in the README's first lines, 
 
 ## Phase 50 — The rename to GAIFA (M–L)
 
-- [ ] **50.1 This plan.** `docs/plans/gaifa-rename.md`, listed in `docs/structure.md`.
+- [x] **50.1 This plan.** `docs/plans/gaifa-rename.md`, listed in `docs/structure.md`.
   *Done when:* the plan is committed.
 - [x] **50.2 Every identifier, in one commit.**
   - **Mechanical pass** over all tracked text files except Markdown prose: `AIHub` → `GAIFA`, `AIHUB` → `GAIFA`, `aihub` → `gaifa`; Markdown gets only the parsed parts (the ` ```aihub-setup ` fences, commands, paths and variables inside code) so the prose can land in 50.3. `services/relay/` is included (its `X-AIHub-*` and `AIHUB_*` uses are ours).

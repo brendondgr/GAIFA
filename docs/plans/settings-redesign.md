@@ -143,8 +143,9 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
 
 ## Phase 5 — This machine's settings and the mods in search (S)
 
-- [ ] **5.1 "Set on this machine" block, in `blocks-hub.js`, placed in General → Hub.**
+- [x] **5.1 "Set on this machine" block, in `blocks-hub.js`, placed in General → Hub.**
   - **Block:** `OverridesCard`: the rows whose saved value differs from the default (from `changedRows` over `orig`, not the draft), as "key · value (default x)" lines, each a link to the row's hash; "Nothing changed from the defaults" when empty; a Copy button that copies the lines as TOML. Read-only.
+  *As built:* the card is the first block of General → Hub; it lists the rows with a single value (blocks such as the services table aren't listed) and copies them as TOML grouped by table (`[memory]`, `[agent.judge]`). Checked on the second hub: with `reserve_gb = 20` saved the card shows "memory.reserve_gb · 20 GB (default 12 GB)" and its link lands on the reserve, flashed.
   *Done when:* the card lists this machine's overrides and each link lands on its row with the flash; `settings-schema.test.mjs` covers `overrideLines(rows)` → the TOML text.
 
 - [ ] **5.2 Mods in search, in `search.js` and `schema.js`.**

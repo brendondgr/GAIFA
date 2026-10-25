@@ -272,7 +272,7 @@ One page, `web/settings/` (plan settings-redesign): `schema.js` declares every s
 
 The sections:
 
-- **General:** *Hub* (the port, "Bound to 127.0.0.1 — this machine only", restart to apply; the process card: version, PID, uptime, memory), *Interface* (theme System/Light/Dark, density, services in the sidebar as list/button/counts, fold the list, Reset the dashboard layout), *Outputs* (delete saved web pages after N days).
+- **General:** *Hub* (**Set on this machine**: the saved values that differ from the defaults as "key · value (default x)" links to their rows, with Copy as TOML; the port, "Bound to 127.0.0.1 — this machine only", restart to apply; the process card: version, PID, uptime, memory), *Interface* (theme System/Light/Dark, density, services in the sidebar as list/button/counts, fold the list, Reset the dashboard layout), *Outputs* (delete saved web pages after N days).
 - **Machine:** *Memory* (the 24 h chart with the draft reserve line; reserve; "Automatically make room when a service needs memory"; Never auto-unload; the unload order with up/down), *Storage* (the folders with sizes and Copy path, the disk bar), *Hardware* (plan 35.2: the system line, one row per GPU with memory, runtimes, what it can run and any problem, the accelerators GAIFA can use, Read again).
 - **Services:** every folder in `services/`, broken mods with their errors; per mod enabled, autostart, its tool count and sidebar order (up/down); the **Add a mod** card (`gaifa new <id>`, edit `services/<id>/service.toml`, restart), linking the Example mod.
 - **Agent** (while the agent mod is installed): *Model*, *Documents*, *Reading web pages* (long pages and the relevance model), *Instructions* (AGENT.md), *Memory* (MEMORY.md and topics), *Skills*, *Learning*.

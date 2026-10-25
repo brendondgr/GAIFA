@@ -5,6 +5,8 @@
 import { h, T, MONO } from '../chat/chat-ui.js';
 import { Toggle, cardSt, label11 } from './rows.js';
 import { MemoryChart } from '../views.js';
+import { overrideLines, showValue } from './schema.js';
+import { settingsHash } from './route.js';
 import { HardwareCard as Hardware } from '../hardware.js';
 import { SessionsPanel } from '../sessions.js';
 
@@ -161,5 +163,19 @@ export function DashboardReset({ ctx }) {
       style: { height: 30, padding: '0 12px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.inset, color: T.tx, font: 'inherit', fontSize: 12.5, cursor: custom ? 'pointer' : 'not-allowed', opacity: custom ? 1 : 0.5 } }, 'Reset the dashboard layout'));
 }
 
-export const HUB_BLOCKS = { ProcessCard, PathsList, MemoryHistory, ServicesTable, AddModCard, Versions, CliList, DoctorPanel, HardwareCard, SessionsPanel: SessionsBlock, DashboardReset };
+/** Set on this machine (5.1): the saved values that differ from the defaults, each a link to its row; Copy gives them as TOML. */
+export function OverridesCard({ ctx }) {
+  const list = ctx.overrides || [];
+  return card({ gap: 8 },
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } }, h('h2', { style: label11 }, 'Set on this machine'), h('span', { style: { flex: 1 } }),
+      list.length ? h('button', { type: 'button', onClick: () => ctx.copy?.(overrideLines(list), 'Copied as TOML'),
+        style: { height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.inset, color: T.tx, font: 'inherit', fontSize: 12, cursor: 'pointer' } }, 'Copy as TOML') : null),
+    !ctx.defaults ? h('div', { style: { fontSize: 12.5, color: T.mut } }, 'Reading the defaults…')
+      : !list.length ? h('div', { style: { fontSize: 12.5, color: T.mut } }, 'Nothing changed from the defaults.')
+        : list.map(c => h('a', { key: c.ref, href: settingsHash(c.section, c.group, c.row), style: { display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap', padding: '6px 10px', borderRadius: 7, background: T.inset, color: T.tx, textDecoration: 'none', fontSize: 12.5 } },
+          h('span', { style: { fontFamily: MONO, fontSize: 12 } }, c.key), h('span', { style: { color: T.mut } }, '·'), h('span', null, showValue(c.rowDef, c.value)),
+          h('span', { style: { color: T.mut, fontSize: 12 } }, `(default ${showValue(c.rowDef, c.default)})`))));
+}
+
+export const HUB_BLOCKS = { ProcessCard, PathsList, MemoryHistory, ServicesTable, AddModCard, Versions, CliList, DoctorPanel, HardwareCard, SessionsPanel: SessionsBlock, DashboardReset, OverridesCard };
 export { cardSt };

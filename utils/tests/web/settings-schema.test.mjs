@@ -148,3 +148,14 @@ test('4.2: changedRows compares with the defaults: numbers as numbers, chips as 
   assert.equal(S.showValue(S.rowFor(secs, 'memory.auto_make_room'), false), 'off');
   assert.equal(S.showValue(S.rowFor(secs, 'permissions.deny'), []), 'none');
 });
+
+test('5.1: overrideLines gives what this machine sets as config.toml text', () => {
+  const ctx = { services: ALL, draft: FULL, theme: 'dark', density: 'compact', nav: {} };
+  const secs = S.sections(ctx);
+  const defaults = JSON.parse(JSON.stringify(FULL));
+  defaults.ui.theme = 'dark'; defaults.memory.reserve_gb = 8; defaults.judge.allow_commands = []; defaults.judge.backend = 'relay'; defaults.outputs.hidden_keep_days = 0;
+  const ch = S.changedRows(secs, FULL, defaults, ctx);
+  assert.equal(S.overrideLines(ch), '[outputs]\nhidden_keep_days = 7\n\n[memory]\nreserve_gb = 12\n\n[agent.judge]\nallow_commands = ["pytest *", "ls *"]\n');
+  assert.equal(S.overrideLines([]), '');
+  assert.ok(S.rowsOf(secs).some(r => r.block === 'OverridesCard' && r.ref === 'general/hub/overrides'));
+});

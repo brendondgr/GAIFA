@@ -63,6 +63,7 @@ export function sections(ctx = {}) {
       { id: 'hub', label: 'Hub', summary: () => `Port ${d.hub?.port ?? '—'}${ctx.system ? ` · v${ctx.system.hub.version}` : ''}`, rows: [
         field('port', 'hub.port', { label: 'GAIFA port', hint: 'Bound to 127.0.0.1 — this machine only. Default 7000.', control: 'number', inputMode: 'numeric',
           restart: true, validate: checkPort, keywords: ['address', 'listen', 'localhost', '127.0.0.1'] }),
+        block('overrides', 'OverridesCard', { label: 'Set on this machine', card: true, keywords: ['config.toml', 'overrides', 'changed', 'differs from the defaults', 'TOML'] }),
         block('process', 'ProcessCard', { label: 'GAIFA process', card: true, keywords: ['version', 'pid', 'uptime', 'rss'] }),
       ] },
       { id: 'interface', label: 'Interface', summary: c => `${cap(c.theme || 'system')} theme · ${c.density || 'compact'} · sidebar ${c.nav?.services || 'list'}`, rows: [
@@ -286,4 +287,18 @@ export function showValue(row, v) {
   if (Array.isArray(v)) return v.length ? v.map(x => ch?.find(c => c.value === x)?.label || x).join(', ') : 'none';
   const c = ch?.find(x => x.value === v);
   return c ? c.label : String(v) + (row?.unit && row.control === 'number' ? ' ' + row.unit : '');
+}
+
+// ---------- 5.1: what this machine sets ----------
+const tomlValue = v => (typeof v === 'string' ? JSON.stringify(v) : Array.isArray(v) ? '[' + v.map(tomlValue).join(', ') + ']' : typeof v === 'boolean' || typeof v === 'number' ? String(v) : JSON.stringify(v));
+/** `changedRows` (over what is saved) as config.toml text: one [table] per key's table, in order, `key = value`. */
+export function overrideLines(changed) {
+  const tables = new Map();
+  for (const c of changed) {
+    if (!c.key) continue;
+    const ks = String(c.key).split('.'), name = ks.pop(), table = ks.join('.');
+    if (!tables.has(table)) tables.set(table, []);
+    tables.get(table).push(`${name} = ${tomlValue(c.value)}`);
+  }
+  return [...tables].map(([table, lines]) => `[${table}]\n${lines.join('\n')}`).join('\n\n') + (tables.size ? '\n' : '');
 }

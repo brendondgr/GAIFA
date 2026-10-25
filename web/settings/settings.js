@@ -112,6 +112,8 @@ export function SettingsPage(props) {
   const ctx = { ...props, api, services: props.services || [], system: st.sys, draft: st.draft, orig: st.orig, setDraft,
     judgeStatus: st.judgeStatus, reading: st.reading, voiceChoices: st.voices ? voiceChoices(st.voices) : null, toolCounts: st.toolCounts, hasSessions: !!api.listSessions };
   const secs = sections(ctx);
+  ctx.defaults = st.defaults;
+  ctx.overrides = changedRows(secs, st.orig, st.defaults, ctx).map(c => ({ ...c, rowDef: rowsOf(secs).find(r => r.ref === c.ref) }));   // 5.1: what is saved, not the draft
   const place = parseSettingsRoute((route?.parts || []).slice(1), secs);
   const cur = secs.find(x => x.id === place.section) || secs[0];
   const problems = validateDraft(secs, st.draft), invalid = Object.keys(problems).length > 0;

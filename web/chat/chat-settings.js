@@ -15,8 +15,8 @@ import { PermissionRules } from './chat-rules.js';
 import { WebReadingSection } from './chat-webprefs.js';
 
 const R = () => globalThis.React;
-const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
-const row = (label, hint, control) => h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
+export const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
+export const row = (label, hint, control) => h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
   h('div', { style: { flex: '1 1 220px', minWidth: 0 } }, h('div', { style: { fontWeight: 500 } }, label), hint ? h('div', { style: { fontSize: 12, color: T.mut } }, hint) : null), control);
 
 function Editor({ label, hint, value, onSave, rows = 10, placeholder }) {
@@ -33,51 +33,94 @@ function Editor({ label, hint, value, onSave, rows = 10, placeholder }) {
       dirty ? h(Btn, { kind: 'ghost', sm: true, label: 'Revert', onClick: () => setText(value ?? '') }) : null));
 }
 
-export function AgentSettings({ api, toast = () => {} }) {
-  const React = R(), c = getChatClient(api);
-  const [s, setS] = React.useState(null), [models, setModels] = React.useState(null), [err, setErr] = React.useState(null);
-  React.useEffect(() => {
-    c.settings().then(setS).catch(setErr);
-    c.models().then(setModels).catch(() => {});
-  }, []);
-  const save = async body => {
-    try { setS(await c.saveSettings(body)); toast('Saved', 'success'); } catch (e) { toast(e.detail || String(e), 'error'); throw e; }
-  };
+// One load of the agent's own settings (GET /api/s/agent/v1/settings) and models, shared by the cards below.
+const stores = new WeakMap();
+function storeFor(api) {
+  let st = stores.get(api);
+  if (!st) {
+    const c = getChatClient(api), subs = new Set();
+    st = { c, s: null, models: null, err: null, subs, loaded: false,
+      emit() { subs.forEach(f => f()); },
+      load() { if (st.loaded) return; st.loaded = true; c.settings().then(s => { st.s = s; st.emit(); }, e => { st.err = e; st.emit(); }); c.models().then(m => { st.models = m; st.emit(); }, () => {}); },
+      async save(body, toast) { try { st.s = await c.saveSettings(body); st.emit(); toast?.('Saved by the agent', 'success'); } catch (e) { toast?.(e.detail || String(e), 'error'); throw e; } } };
+    stores.set(api, st);
+  }
+  return st;
+}
+/** The agent's settings for a card: {s, models, err, live, save(body)}; every card shares one load. */
+export function useAgent(api, toast) {
+  const React = R(), st = storeFor(api), [, tick] = React.useState(0);
+  React.useEffect(() => { const f = () => tick(n => n + 1); st.subs.add(f); st.load(); return () => st.subs.delete(f); }, []);
+  return { s: st.s, models: st.models, err: st.err, live: st.c.live, save: body => st.save(body, toast) };
+}
+const byAgent = () => h('span', { title: 'Saved by the agent mod (/api/s/agent/v1/settings), not with the page’s Save', style: { fontSize: 11, color: T.dim, fontWeight: 400, textTransform: 'none', letterSpacing: 0 } }, ' · saved by the agent');
+const agentSection = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title, byAgent()), ...kids);
+
+/** The mock note, and the agent not answering. */
+export function AgentNotes({ api, toast }) {
+  const a = useAgent(api, toast);
+  return h(R().Fragment, null,
+    a.live ? null : h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } }, h(Badge, { tone: 'purple' }, 'MOCK'), 'The scripted mock agent: changes last until the page reloads.'),
+    a.err ? h('div', { role: 'alert', style: { padding: '10px 12px', borderRadius: 8, background: T.trd, color: T.rd } }, `The agent didn’t answer: ${a.err.detail || a.err.message}. Start the Agent mod, then reload.`) : null);
+}
+
+/** The chat's default and fallback models (read-only: the agent's own settings). */
+export function ModelsCard({ api, toast, bare }) {
+  const { s, models } = useAgent(api, toast);
   const window_ = id => { const m = models?.models?.find(x => x.id === id); return m?.meta?.context_length ? ` · ${fmtTokens(m.meta.context_length)}` : ''; };
+  const body = row('Models', 'The model comes from the relay; each chat can pick its own in the header.',
+    h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, fontFamily: MONO, fontSize: 12, textAlign: 'right' } },
+      h('span', null, h('span', { style: { color: T.mut } }, 'default '), s ? s.model + window_(s.model) : '—'),
+      h('span', null, h('span', { style: { color: T.mut } }, 'fallback '), s?.fallback ? s.fallback + window_(s.fallback) : 'none'),
+      h('span', null, h('span', { style: { color: T.mut } }, 'max steps '), s?.max_steps ?? '—')));
+  return bare ? body : section('Chat', body);
+}
+export function DocumentsCard({ api, toast }) {
+  const a = useAgent(api, toast);
+  return a.s?.documents ? agentSection('Documents', h(DocSettings, { value: a.s.documents, onSave: d => a.save({ documents: d }) })) : null;
+}
+export function InstructionsCard({ api, toast }) {
+  const a = useAgent(api, toast);
+  return agentSection('Instructions',
+    a.s ? h(Editor, { label: 'AGENT.md', hint: 'Standing instructions, read every turn (data/agent/AGENT.md).', value: a.s.agent_md, placeholder: '# How I like things\n- Prefer 16:9 images', onSave: v => a.save({ agent_md: v }) })
+      : h('span', { style: { color: T.mut } }, a.err ? 'The agent isn’t running.' : 'Loading…'));
+}
+export function MemoryCard({ api, toast }) {
+  const { s, save } = useAgent(api, toast);
+  return agentSection('Memory',
+    s ? h(Editor, { label: 'MEMORY.md', hint: 'The memory index, in every prompt. The agent adds to it with remember().', value: s.memory, rows: 8, placeholder: '- likes 16:9 images\n- my voice is Brendon', onSave: v => save({ memory: v }) }) : null,
+    s?.topics?.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' } }, h('span', { style: { fontSize: 12, color: T.mut } }, 'Topic files (read on demand):'),
+      s.topics.map(t => h('span', { key: t, style: { fontFamily: MONO, fontSize: 11.5, padding: '2px 7px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd } }, t + '.md'))) : null);
+}
+export function SkillsCard({ api, toast }) {
+  const { s } = useAgent(api, toast);
+  return section('Skills',
+    h('div', { style: { fontSize: 12, color: T.mut } }, 'Loaded only when needed. Each one is also a slash command in the chat.'),
+    s && !s.skills?.length ? h('span', { style: { color: T.mut, fontSize: 12.5 } }, 'No skills yet: mods ship them in services/<id>/skills/, yours go in data/agent/skills/.') : null,
+    ...(s?.skills || []).map(k => h('div', { key: k.id, style: { display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 12.5 } },
+      h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 90 } }, '/' + k.name), h('span', { style: { flex: 1, color: T.mut } }, k.description), h(Badge, null, k.source))));
+}
+/** The five modes, and how a call is decided. */
+export function ModesCard() {
+  return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+    h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, MODES.map(([k, l, d]) => h('div', { key: k, style: { display: 'flex', gap: 10, fontSize: 12.5, alignItems: 'baseline' } },
+      h('span', { style: { minWidth: 130, fontWeight: 500 } }, l), h('span', { style: { color: T.mut } }, d)))),
+    h('div', { style: { fontSize: 12, color: T.mut, display: 'flex', gap: 6, alignItems: 'flex-start' } }, h(Icon, { d: 'shield', size: 13, style: { marginTop: 2 } }),
+      h('span', null, 'Each chat picks its mode in the header (new chats: Manual; a workspace folder’s level caps what any mode allows). Per-tool rules are name globs (Tool permissions; ', h('code', { style: { fontFamily: MONO } }, '[agent.permissions]'),
+        ' in config.toml). A call is decided by the deny list, then the chat’s mode, then a mod’s own limits, then your grants, then the ask and allow lists, then its risk: reading runs; writing and generating ask unless the chat uses defaults; using the internet, running code and deleting ask, except in Auto, where the judge decides. Pending approvals from any client are in the header’s Approvals button.')));
+}
+
+/** Settings → Agent as one column: the cards above in their order (for anything that mounts the whole). */
+export function AgentSettings({ api, toast = () => {} }) {
+  const p = { api, toast };
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } },
-    c.live ? null : h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } }, h(Badge, { tone: 'purple' }, 'MOCK'), 'The scripted mock agent: changes last until the page reloads.'),
-    err ? h('div', { role: 'alert', style: { padding: '10px 12px', borderRadius: 8, background: T.trd, color: T.rd } }, `The agent didn’t answer: ${err.detail || err.message}. Start the Agent mod, then reload.`) : null,
-    section('Chat',
-      row('Models', 'The model comes from the relay; each chat can pick its own in the header.',
-        h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, fontFamily: MONO, fontSize: 12, textAlign: 'right' } },
-          h('span', null, h('span', { style: { color: T.mut } }, 'default '), s ? s.model + window_(s.model) : '—'),
-          h('span', null, h('span', { style: { color: T.mut } }, 'fallback '), s?.fallback ? s.fallback + window_(s.fallback) : 'none'),
-          h('span', null, h('span', { style: { color: T.mut } }, 'max steps '), s?.max_steps ?? '—')))),
-    s?.documents ? section('Documents', h(DocSettings, { value: s.documents, onSave: d => save({ documents: d }) })) : null,
-    h(WebReadingSection, { api, toast }),   // [agent.screen], [agent.web], [outputs] hidden_keep_days
-    section('Instructions',
-      s ? h(Editor, { label: 'AGENT.md', hint: 'Standing instructions, read every turn (data/agent/AGENT.md).', value: s.agent_md, placeholder: '# How I like things\n- Prefer 16:9 images', onSave: v => save({ agent_md: v }) }) : h('span', { style: { color: T.mut } }, 'Loading…')),
-    section('Memory',
-      s ? h(Editor, { label: 'MEMORY.md', hint: 'The memory index, in every prompt. The agent adds to it with remember().', value: s.memory, rows: 8, placeholder: '- likes 16:9 images\n- my voice is Brendon', onSave: v => save({ memory: v }) }) : null,
-      s?.topics?.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' } }, h('span', { style: { fontSize: 12, color: T.mut } }, 'Topic files (read on demand):'),
-        s.topics.map(t => h('span', { key: t, style: { fontFamily: MONO, fontSize: 11.5, padding: '2px 7px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd } }, t + '.md'))) : null),
-    section('Skills',
-      h('div', { style: { fontSize: 12, color: T.mut } }, 'Loaded only when needed. Each one is also a slash command in the chat.'),
-      s && !s.skills?.length ? h('span', { style: { color: T.mut, fontSize: 12.5 } }, 'No skills yet: mods ship them in services/<id>/skills/, yours go in data/agent/skills/.') : null,
-      ...(s?.skills || []).map(k => h('div', { key: k.id, style: { display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 12.5 } },
-        h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 90 } }, '/' + k.name), h('span', { style: { flex: 1, color: T.mut } }, k.description), h(Badge, null, k.source)))),
-    h(LearningSection, { api, toast }),
-    h(SpeechInputSection, { api, toast }),   // plan 29.4: only while the stt mod is up
-    h(SpeechOutputSection, { api, toast }),  // plan 49.1: Voice, only while the tts mod answers
-    section('Permissions',
-      h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, MODES.map(([k, l, d]) => h('div', { key: k, style: { display: 'flex', gap: 10, fontSize: 12.5, alignItems: 'baseline' } },
-        h('span', { style: { minWidth: 130, fontWeight: 500 } }, l), h('span', { style: { color: T.mut } }, d)))),
-      h('div', { style: { fontSize: 12, color: T.mut, display: 'flex', gap: 6, alignItems: 'flex-start' } }, h(Icon, { d: 'shield', size: 13, style: { marginTop: 2 } }),
-        h('span', null, 'Each chat picks its mode in the header (new chats: Manual; a workspace folder’s level caps what any mode allows). Per-tool rules are name globs (Tool permissions, below; ', h('code', { style: { fontFamily: MONO } }, '[agent.permissions]'),
-          ' in config.toml). A call is decided by the deny list, then the chat’s mode, then a mod’s own limits, then your grants (below), then the ask and allow lists, then its risk: reading runs; writing and generating ask unless the chat uses defaults; using the internet, running code and deleting ask, except in Auto, where the judge decides (below). Pending approvals from any client are in the header’s Approvals button.')),
-      h(PermissionRules, { api }),
-      h(GrantsList, { api, toast }),
-      h(JudgedList, { api })));
+    h(AgentNotes, p), h(ModelsCard, p), h(DocumentsCard, p),
+    h(WebReadingSection, p),   // [agent.screen], [agent.web], [outputs] hidden_keep_days
+    h(InstructionsCard, p), h(MemoryCard, p), h(SkillsCard, p),
+    h(LearningSection, p),
+    h(SpeechInputSection, p),   // plan 29.4: only while the stt mod is up
+    h(SpeechOutputSection, p),  // plan 49.1: Voice, only while the tts mod answers
+    section('Permissions', h(ModesCard), h(PermissionRules, { api }), h(GrantsList, p), h(JudgedList, { api })));
 }
 
 // Documents (plan 24.9): how big an attached document may be to go into the message whole, and what the
@@ -103,7 +146,7 @@ function DocSettings({ value, onSave }) {
 }
 
 // Grants (plan 25.2): what a card's "Allow in this chat" or "Always allow" covers, newest first, with revoke.
-function GrantsList({ api, toast }) {
+export function GrantsList({ api, toast }) {
   const React = R(), [gs, setGs] = React.useState(null), [err, setErr] = React.useState(null);
   const load = () => api?.listGrants?.().then(setGs, e => setErr(e));
   React.useEffect(() => { load(); }, []);
@@ -132,7 +175,7 @@ function GrantsList({ api, toast }) {
 
 
 // Learning (plan 21.7): the hub's [learning] settings; the Learning page lists what was learned.
-function LearningSection({ api, toast }) {
+export function LearningSection({ api, toast }) {
   const React = R(), [l, setL] = React.useState(null);
   React.useEffect(() => { api?.getSettings?.().then(x => setL(x?.learning || null)).catch(() => {}); }, []);
   if (!l) return null;

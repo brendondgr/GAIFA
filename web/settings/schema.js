@@ -89,7 +89,17 @@ export function sections(ctx = {}) {
       ] }] },
     { id: 'agent', label: 'Agent', icon: 'chat', areas: SETTINGS_AREAS.agent, groups: [
       { id: 'agent', label: 'Agent', rows: [
-        block('agent', 'AgentSettings', { label: 'Agent', keywords: ['chat', 'model', 'AGENT.md', 'MEMORY.md', 'skills', 'learning', 'permissions', 'judge', 'grants', 'voice', 'dictation'] }),
+        block('notes', 'AgentNotes', { label: 'The agent', card: true }),
+        block('models', 'ModelsCard', { label: 'Models', card: true, keywords: ['chat model', 'fallback', 'max steps', 'relay'] }),
+        block('documents', 'DocumentsCard', { label: 'Documents', card: true, keywords: ['whole documents', 'reply reserve', 'tokens'] }),
+        block('web', 'WebReadingSection', { label: 'Reading web pages', card: true, keywords: ['screening', 'relevance', 'saved web pages', 'web_fetch'] }),
+        block('instructions', 'InstructionsCard', { label: 'Instructions', card: true, keywords: ['AGENT.md', 'standing instructions'] }),
+        block('memory', 'MemoryCard', { label: 'Memory', card: true, keywords: ['MEMORY.md', 'remember', 'topics'] }),
+        block('skills', 'SkillsCard', { label: 'Skills', card: true, keywords: ['slash commands', 'SKILL.md'] }),
+        block('learning', 'LearningSection', { label: 'Learning', card: true, keywords: ['preferences', 'nightly', 'learner'] }),
+        block('dictation', 'SpeechInputSection', { label: 'Speech input', card: true, keywords: ['microphone', 'dictation', 'stt', 'whisper'] }),
+        block('voice', 'SpeechOutputSection', { label: 'Voice', card: true, keywords: ['read aloud', 'tts', 'voice mode'] }),
+        block('permissions', 'PermissionsCard', { label: 'Permissions', card: true, keywords: ['modes', 'tool rules', 'grants', 'judge', 'auto', 'approvals'] }),
       ] }] },
     { id: 'sessions', label: 'Sessions', icon: 'refresh', areas: SETTINGS_AREAS.sessions, groups: [
       { id: 'sessions', label: 'Sessions', rows: [

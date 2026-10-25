@@ -50,3 +50,45 @@ test('segmented and the order list’s moves', () => {
   assert.deepEqual(got, ['b', 'a', 'gone']);
 });
 
+// ---------- the blocks (1.3) ----------
+const B = await load('settings/blocks-hub.js');
+const A = await load('settings/blocks-agent.js');   // imports cleanly: the agent's cards, placed one by one
+const sys = { hub: { version: '0.1.0', pid: 31337, uptime_s: 7260, rss_bytes: 92e6 },
+  paths: { root: '/gaifa', models: '/gaifa/data/models', databases: '/gaifa/data/databases', outputs: '/gaifa/outputs', logs: '/gaifa/data/logs' },
+  usage: { models_bytes: 190e9, databases_bytes: 12e6, outputs_bytes: 3.4e9, logs_bytes: 5e6 }, disk: { free_bytes: 500e9, total_bytes: 2000e9 } };
+
+test('the pure views: process, paths, Doctor', () => {
+  assert.deepEqual(B.processInfo(sys), [{ k: 'Version', v: 'v0.1.0' }, { k: 'PID', v: '31337' }, { k: 'Uptime', v: '2h 1m' }, { k: 'Memory (RSS)', v: '92.0 MB' }]);
+  assert.deepEqual(B.pathRows(sys).map(p => [p.k, p.sz]), [['Project root', ''], ['Models', '190 GB'], ['Databases', '12.0 MB'], ['Outputs', '3.4 GB'], ['Logs', '5.0 MB']]);
+  const rep = { ts: 1, counts: { fail: 1, warn: 0, note: 1, ok: 2 }, checks: [{ level: 'fail', title: 'a' }, { level: 'ok', title: 'b' }, { level: 'note', title: 'c' }, { level: 'ok', title: 'd' }] };
+  const v = B.doctorView(rep, false);
+  assert.equal(v.summary, '1 problem · 2 ok, 0 warnings, 1 note'); assert.equal(v.tone, 'fail');
+  assert.deepEqual(v.rows.map(r => r.title), ['a', 'c']); assert.equal(B.doctorView(rep, true).rows.length, 4);
+  assert.equal(B.doctorView(null), null);
+});
+
+test('the hub blocks render with fixed data', () => {
+  const copied = [], ctx = { system: sys, services, copy: (t, w) => copied.push([t, w]), api: {} };
+  assert.match(text(render(h(B.ProcessCard, { ctx }))), /GAIFA process.*v0\.1\.0.*31337/);
+  const paths = render(h(B.PathsList, { ctx }));
+  assert.match(text(paths), /Disk500 GB free of 2.0 TB/);
+  all(paths, n => n.props['aria-label'] === 'Copy path')[1].props.onClick();
+  assert.deepEqual(copied, [['/gaifa/data/models', 'Path copied']]);
+  assert.match(text(render(h(B.Versions, { ctx }))), /GAIFA.*v0\.1\.0.*LLM Relay—/);
+  assert.equal(all(render(h(B.CliList, { ctx })), n => n.props['aria-label'] === 'Copy command').length, B.CLI.length);
+  assert.match(text(render(h(B.AddModCard, { ctx }))), /gaifa new <id>/);
+  const doc = render(h(B.DoctorPanel, { ctx, initial: { ts: 1, counts: { fail: 0, warn: 0, note: 0, ok: 1 }, checks: [{ level: 'ok', title: 'x', area: 'disk' }] } }));
+  assert.match(text(doc), /All good · 1 ok/); assert.match(text(doc), /Nothing needs attention\./);
+  // the services table edits the draft
+  let d = { services: { order: ['relay', 'lcpp'], enabled: { relay: true, lcpp: true }, autostart: { relay: false, lcpp: true } } };
+  const t = render(h(B.ServicesTable, { ctx: { ...ctx, draft: d, setDraft: fn => { d = JSON.parse(JSON.stringify(d)); fn(d); } } }));
+  const sw = all(t, n => n.props.role === 'switch');
+  assert.deepEqual(sw.map(s => s.props['aria-checked']), ['true', 'false', 'true', 'true']);
+  sw[1].props.onClick(); assert.equal(d.services.autostart.relay, true);
+  all(t, n => n.props['aria-label'] === 'Move LLM Relay down')[0].props.onClick(); assert.deepEqual(d.services.order, ['lcpp', 'relay']);
+});
+
+test('every block the schema names exists', () => {
+  const names = { ...B.HUB_BLOCKS, ...A.AGENT_BLOCKS };
+  for (const r of S.rowsOf(S.sections({ services })).filter(r => r.control === 'block')) assert.ok(names[r.block], r.block);
+});

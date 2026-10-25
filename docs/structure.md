@@ -9,7 +9,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | File / folder | Status | Purpose |
 | :--- | :--- | :--- |
 | `README.md` | ✅ | The front page: what GAIFA is, requirements, quickstart, commands, configuration, adding a mod |
-| `docs/assets/` | ✅ | Images for the README (Overview page; chats: a picture then a 3D model, a parameter card, an edit; the Learning page) |
+| `docs/assets/` | ✅ | The README's banner (`header.svg`, generated from `web/favicon.svg` by `make_header.py`, plan 50.4) and its images (Overview page; chats: a picture then a 3D model, a parameter card, an edit; the Learning page) |
 | `CLAUDE.md` | ✅ | Short rules for agents, true today |
 | `.claude/skills/gaifa/` | ✅ | Project skill: how to work on GAIFA (doc map, invariants, step workflow) |
 | `.claude/skills/plan/` | ✅ | Project skill: how to write and amend plans in this repo's format |

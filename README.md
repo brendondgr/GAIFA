@@ -1,7 +1,14 @@
-# GAIFA
+<p align="center">
+  <img src="docs/assets/header.svg" width="880"
+       alt="GAIFA. The mark is an amber rounded square with a dark hub joined to four smaller nodes. One local app that runs every AI service on your machine, and a chat agent that chains them together. Great, Another Interface For Agents, said guy-fuh. Written in Python, JavaScript, HTML, TypeScript and Shell, on FastAPI, React, SQLite, uv, ComfyUI, llama.cpp, vLLM and MCP." />
+</p>
 
-One local web app that runs and controls every AI service on a single machine: local LLMs,
-image and video generation, 3D models, speech, and a chat agent that chains them together.
+<!-- The banner repeats the sentence below. Change one, change both, then run
+     python3 docs/assets/make_header.py -->
+
+**GAIFA** is one local web app that runs and controls every AI service on a single machine: local LLMs,
+image and video generation, 3D models, speech, search, and a chat agent that chains them together.
+The name stands for *Great, Another Interface For Agents*, and it's said "guy-fuh".
 
 ![The GAIFA Overview page: memory used, services ready, outputs and LLM tokens today, memory over time and memory now by service, outputs per day, LLM traffic, an activity heatmap, jobs and model storage](docs/assets/overview.png)
 
@@ -22,23 +29,29 @@ machine can run: what runs where, and what has been tested, is in [docs/platform
 |-----|------|------------|
 | LLM Relay (`relay`) | 4000 | An OpenAI-compatible endpoint in front of every LLM (local and remote), with routing and usage analytics |
 | LLM Launcher (`lcpp`) | 7710 | Starts and manages llama.cpp model servers and publishes them to the relay |
+| vLLM (`vllm`) | 5101 | Serves Hugging Face models with vLLM, one profile at a time, and publishes them to the relay |
 | Speech (`tts`) | 5040 | Text to speech with Breeze TTS 2 and Kokoro, including voice cloning and voice design |
+| Speech to Text (`stt`) | 5105 | Transcripts of audio and video files with faster-whisper, and live dictation |
 | 3D Generate (`gen3d`) | 5050 | 3D models from a picture (TRELLIS.2, Hunyuan3D 2.1, SAM 3D for people and objects) or from text (Cube3D), plus named parts and game rigs |
 | Images & Video (`comfy`) | 5070 | ComfyUI workflows for text to image, image edits and video, as reusable workflow packs |
-| OpenCode (`opencode`) | 4096 | The OpenCode agent server, behind the relay |
 | Agent (`agent`) | 5100 | The chat agent: asks when a choice is missing, shows settings for approval, chains outputs, and learns how you like things done |
-| vLLM (`vllm`) | 5101 | Serves Hugging Face models with vLLM, one profile at a time, and publishes them to the relay |
+| Workspace (`workspace`) | 5103 | Folders the agent may read, edit in place (with undo) and run code in, inside a podman sandbox, with a level per folder |
+| Web (`web`) | 5102 | Web search through SearXNG, with the pages it reads saved as outputs |
+| SearXNG (`searxng`) | 5106 | Watches the SearXNG this machine runs in Docker and tunes its engines and settings |
+| Embeddings (`embed`) | 5104 | EmbeddingGemma 2: every output indexed for search by meaning, and lookup across past chats |
+| Decisions (`decide`) | 5107 | Small decision models that answer yes/no, choice and score questions with probabilities (used to screen pages) |
+| OpenCode (`opencode`) | 4096 | The OpenCode agent server, behind the relay |
 
 Around the mods, the hub provides:
 
 - **A memory manager** that unloads idle mods to make room before a model loads, so jobs don't run
-  out of memory (it never stops an LLM on its own).
-- **One outputs index** of every image, video, 3D model and audio clip, with search and previews.
+  out of memory (it never stops an LLM on its own), and **a GPU queue** so one GPU job runs at a time.
+- **One outputs index** of every image, video, 3D model, audio clip and document, with search and previews.
 - **A models registry** of the weights on disk (`gaifa models`).
 - **Sessions:** named setups ("LLM work", "Video work") that save what runs and what's loaded, and
   switch between them through the memory manager.
-- **A tool catalog** with risk levels and approvals, also served over MCP at `/mcp`, so Claude
-  Code or another MCP client can use the same tools.
+- **A tool catalog** with risk levels, permission tiers and approvals, also served over MCP at `/mcp`,
+  so Claude Code or another MCP client can use the same tools.
 
 ### The chat agent
 
@@ -49,7 +62,7 @@ something ("make a 3D model of a ceramic teapot, picture first") and it picks th
 them, one output feeding the next. Each turn folds into one tidy line ("Ran 2 tools · 3m 47s") that
 opens into its steps, with the outputs in a strip underneath. Result cards have buttons for the
 obvious next step (animate, edit, make 3D, remove background, describe), and later turns can refer
-back to earlier outputs by number.
+back to earlier outputs by number or with an `@`-mention.
 
 <p>
   <img src="docs/assets/chat-card.png" width="49%" alt="A parameter card docked above the composer: Generate image, with the prompt, the workflow chosen for these inputs (Z-Image Turbo), preset, a 16:9 aspect and megapixels, and Run and Cancel buttons">
@@ -59,7 +72,13 @@ back to earlier outputs by number.
 Before anything runs on the GPU, a parameter card docks above the composer (left). The agent
 fills in what it can, picks a workflow or 3D engine that can actually do the job (picture to 3D,
 text to 3D, an edit with reference pictures), and you change anything before pressing Run. Image
-edits run at full quality unless you ask for a quick draft (right).
+edits run at full quality unless you ask for a quick draft (right). While a job runs, its card shows
+live progress with preview frames.
+
+The agent also reads documents and code, searches the web, and works in the folders you give it:
+each chat has a mode (Plan, Manual, Accept edits, Auto, Bypass), and in Auto a small local judge
+decides which tool calls need you. It can answer with charts, tables and pictures, read its replies
+aloud, and hold a hands-free voice conversation.
 
 ![The Learning page's Harness tab: the agent's instruction versions, each with its date, the files it changed, its eval gate result (passed or failed against the current version), notes on why, and Diff and Activate buttons](docs/assets/learning.png)
 
@@ -70,9 +89,10 @@ tries changes to its own instructions, replays your chats under them, and keeps 
 its evaluation. The Learning page shows all of it, and any version can be rolled back with one
 click. Each chat has a switch to leave it out.
 
-On a 46-task scripted evaluation run three times on MiniCPM-V 4.7, the agent passed 85% of tasks
-every time, and live runs that really generate (a local edit, picture to 3D with each engine, text
-to 3D) all pass. Details and the remaining failures: [docs/agent-eval.md](docs/agent-eval.md).
+On a 51-task scripted evaluation, each task run three times with Swift 1.5 as the model, the agent
+passed 96.1% of runs and 48 of the 51 tasks every time. Live runs that really generate (a local edit,
+picture to 3D with each engine, text to 3D) all pass. Details and the remaining failures:
+[docs/agent-eval.md](docs/agent-eval.md).
 
 ## Requirements
 
@@ -107,6 +127,7 @@ from its OpenAPI), Chat, Models, Outputs and Settings. The command line covers t
 | `gaifa load \| unload <id>` | Load a mod's models into memory, or free them |
 | `gaifa logs [id] [-f]` | A mod's log (`data/logs/<id>.log`), or the hub's |
 | `gaifa doctor [--inventory]` | Check the install; `--inventory` lists every path used outside the project |
+| `gaifa hardware` | The GPUs, memory pools and accelerators GAIFA finds on this machine |
 | `gaifa models list \| show <id> \| scan [--add] \| verify <id>…` | The models registry |
 | `gaifa backup <folder>` | Databases, registry, `config.toml` and the mods' `.env` files in a dated archive |
 | `gaifa open` | Open the UI in a browser |
@@ -120,25 +141,28 @@ at `/api/s/<id>/`.
 flowchart LR
   UI["Web UI<br/>(Overview, Chat, mod pages)"] --> Hub
   MCP["MCP clients<br/>(Claude Code)"] --> Hub
-  Hub["GAIFA hub :7000<br/>memory manager · outputs · models<br/>tool catalog · approvals · sessions"]
+  Hub["GAIFA hub :7000<br/>memory manager · GPU queue · outputs<br/>models · tool catalog · approvals · sessions"]
   Hub -- "HTTP proxy at /api/s/id/" --> Mods
   subgraph Mods["Mods (one systemd unit each)"]
     relay["relay :4000"] --> lcpp["lcpp :7710<br/>llama.cpp servers"]
-    agent["agent :5100"] --> relay
-    tts["tts :5040"]
-    gen3d["gen3d :5050"]
-    comfy["comfy :5070<br/>ComfyUI"]
-    opencode["opencode :4096"]
     vllm["vllm :5101"] --> relay
+    agent["agent :5100"] --> relay
+    comfy["comfy :5070<br/>ComfyUI"]
+    gen3d["gen3d :5050"]
+    tts["tts :5040"]
+    stt["stt :5105"]
+    workspace["workspace :5103"]
+    web["web :5102"] --> searxng["searxng :5106"]
+    embed["embed :5104"]
   end
   agent -- "tool calls" --> Hub
 ```
 
 Mods talk to the hub only over HTTP and never import each other's code. A mod declares itself in
 `services/<id>/service.toml`: its command, port, health route, and optional extras such as a status
-route, Overview widgets, agent tools and its own UI page. Before a mod loads a model, it asks the hub
-for memory; the hub unloads idle mods in a configured order until the model fits under a 12 GB reserve.
-The agent never calls a mod directly. Its tool calls go through the hub's catalog, which checks
+route, Overview widgets, agent tools, chat cards and its own UI page. Before a mod loads a model, it asks
+the hub for memory; the hub unloads idle mods in a configured order until the model fits under a 12 GB
+reserve. The agent never calls a mod directly. Its tool calls go through the hub's catalog, which checks
 permissions and turns anything that generates into an approval card.
 
 The full design is in [docs/architecture.md](docs/architecture.md), and what exists file by
@@ -184,24 +208,24 @@ uv run pytest                                          # the hub, including the 
 cd services/agent && .venv/bin/python -m pytest        # each mod has its own suite
 ```
 
-The hub's suite has 526 tests, and each mod has its own suite on top. Fakes stand in for
+The hub's suite has 1,890 tests, and each mod has its own suite on top. Fakes stand in for
 real mods and models, so none of them need a GPU. The build plan, with every step and its checks,
 is [docs/backend-plan.md](docs/backend-plan.md). The UI is plain ES modules on React with no build
-step (`web/`), and [docs/design-brief-ui.md](docs/design-brief-ui.md) describes it.
+step (`web/`), and [docs/design-brief-ui.md](docs/design-brief-ui.md) describes it. The banner at the
+top of this page is generated from the logo by `docs/assets/make_header.py`.
 
 ## Status
 
 A personal project, in daily use on the machine it was built for. As of October 2026, the plan is built
-through Phase 22: the hub, the eight mods, the tool catalog and MCP endpoint, the chat agent and its
-learner, sessions, and logs and runtime state kept inside the project folder. Known gaps:
+through Phase 50: the hub and its fourteen mods, the tool catalog and MCP endpoint, the chat agent and its
+learner, documents, web search, workspaces and an Auto mode in chat, live progress cards and voice mode,
+sessions, and setup for other machines. Known gaps:
 
 - The GPU mods are tested on a Strix Halo with ROCm; their variants for NVIDIA, Intel, Apple and the CPU
   are written but untested until a field test (`gaifa report`) runs them on that hardware
   ([docs/platforms.md](docs/platforms.md)). vLLM runs on ROCm only.
 - Two paths still live outside the project folder: OpenCode's working directory
   (`OPENCODE_PROJECT_DIR`) and the LLM Launcher's CLI, installed as a uv tool.
-- The memory manager schedules memory, not GPU compute: two mods can still compute at the same time
-  and slow each other down.
 
 ## License
 

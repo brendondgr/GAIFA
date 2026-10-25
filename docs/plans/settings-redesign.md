@@ -1,4 +1,4 @@
-# Plan: the Settings page, regrouped, with a sticky strip, search and row details
+# Plan: the Settings page, regrouped, with a sticky section list, search and row details
 
 **Asked for:** 2026-10-25 · **Status:** In progress
 
@@ -55,7 +55,7 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
 - [x] `Hub.dc.html` is shorter by the settings template and view-model; no settings strings remain in it besides the page title and the palette rows.
 - [x] Delivered: `web/settings/schema.js`, `rows.js`, `blocks-hub.js` (or `blocks-machine.js` + `blocks-about.js`), `blocks-agent.js`, `settings.js`; `chat/chat-settings.js` exporting its cards; tests `settings-schema.test.mjs`, `settings-blocks.test.mjs`.
 
-## Phase 2 — Regrouped sections, the sticky strip and groups (M)
+## Phase 2 — Regrouped sections, the sticky section list and groups (M)
 
 - [x] **2.1 The new sections, in `web/settings/schema.js`.**
   - **General:** groups *Hub* (port, the process card), *Interface* (theme, density, the sidebar's `ui.nav.services` mode and `ui.nav.folded` as rows, a "Reset the dashboard layout" block that clears `ui.dashboard`), *Outputs* (`outputs.hidden_keep_days`, moved out of Reading web pages).
@@ -75,11 +75,11 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   *As built:* `about/hardware` is an alias too (→ `machine/hardware`). The shell asks `settings.js` for the sections (`settingsSections`, `settingsPlace`), so the palette, the tab title ("Auto judge · Permissions · Settings · GAIFA") and the header ("Settings / Permissions / Auto judge") follow the schema. Living docs, web/ comments and the hub's user-facing strings (`approvals.py`'s deny reason, `prefs.py`'s learning-off error) were reworded; closed plans, `backend-plan.md` and PATCHES' history rows keep their words. Checked on the second hub: `#/settings/paths` opens Machine → Storage with the flash, `#/settings/permissions/judge` the judge group.
   *Done when:* `utils/tests/web/settings-route.test.mjs` covers the aliases, the three-part hash and an unknown section; on the live hub `#/settings/paths` opens Machine → Storage and `#/settings/permissions/judge` opens the judge group with the flash.
 
-- [x] **2.3 The strip: `web/settings/strip.js`.**
-  - **Component:** `SectionStrip({sections, current, counts, onPick, search})`: the page title and the sections as tabs in one bar, `position: sticky; top: <header height>` (44 px compact, 52 px comfortable, from the shell's `density`), `z-index` under the header's 40, the page's background behind it, scrolling sideways under 760 px with the current tab kept in view. It replaces the left-hand list in every width. The search box (Phase 3) sits at its right end; until then the slot is empty.
-  - **Badges:** a tab shows a small count when `counts[section]` is set (Phase 3's matches, Phase 4's changed values).
-  *As built:* checked on the second hub with Permissions scrolled 1,200–1,500 px: the strip's top is 44 px (compact) and 52 px (comfortable), right under the header; at 360 px it scrolls sideways with Permissions in view; ArrowRight from Permissions moves to Speech and focuses its tab. The content column is up to 900 px wide now that the left list is gone; segmented controls wrap when narrow. `stepTab` and `headerHeight` are tested in `settings-route.test.mjs`.
-  *Done when:* in the browser the strip stays pinned while a long section (Permissions) scrolls, in both densities and at 360 px; keyboard focus moves along the tabs with the arrow keys (`role="tablist"`).
+- [x] **2.3 The section list: `web/settings/settings-nav.js`.**
+  - **Component:** `SectionNav({sections, current, counts, dimmed, onPick, search, density})`: the sections as plain links in a left column (the look the page had before Phase 1: a text link with a hover background, the current one `aria-current="page"`), about 190 px wide, `position: sticky; top: <header height + 12 px>` (44 px compact, 52 px comfortable) so it stays in view while a long section scrolls and never overlaps the header. Under 760 px the list sits above the content and isn't pinned. The search box (Phase 3) goes at the top of the column, full width.
+  - **Badges:** a link shows a small muted count at its right end when `counts[section]` is set (Phase 3's matches, Phase 4's changed values).
+  *As built:* a bar of tabs across the top (`strip.js`, `SectionStrip`) was built first; the user tried it and asked for the side list back on 2026-10-25 ("that upper bar looks stupid, especially when we scroll"), so `settings-nav.js` replaced it in the same step. Checked on the second hub: with Permissions scrolled 1,400 px the list's top is 56 px (compact) and 64 px (comfortable), under the header; at 360 px the list is above the content; search, `/`, the counts and the walk work as in 3.2 (`docs/reference/settings-2026-10/phase2-*.jpg`).
+  *Done when:* in the browser the list stays in view while a long section (Permissions) scrolls, in both densities, without overlapping the header; at 360 px it sits above the content; no bar across the top at any width.
 
 - [x] **2.4 Collapsible groups, in `rows.js` and `settings.js`.**
   - **Behaviour:** each group is a `<details>`-like card with its title, summary and a chevron; open state per group in `localStorage` (`gaifa.settings.open`, a list of `section/group` ids; everything open by default). "Expand all" and "Collapse all" at the section's top. A group named by the hash or holding a validation error or a search match opens regardless.
@@ -90,8 +90,8 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
 
 **Checks & deliverables — Phase 2**
 - [x] Each section is between one and seven groups; the longest page (Permissions) reads as a list of summaries when collapsed.
-- [x] The brief's §4.5 is rewritten to the new sections and groups; §11.10 lists the strip at 360 px among the states.
-- [x] Delivered: `web/settings/route.js`, `strip.js`; the regrouped `schema.js`; tests `settings-route.test.mjs`, `settings-groups.test.mjs`.
+- [x] The brief's §4.5 is rewritten to the new sections and groups; §11.10 lists the section list while scrolling and at 360 px among the states.
+- [x] Delivered: `web/settings/route.js`, `settings-nav.js` (first `strip.js`, replaced in 2.3); the regrouped `schema.js`; tests `settings-route.test.mjs`, `settings-groups.test.mjs`.
 
 ## Phase 3 — Search with highlighting (M)
 
@@ -100,9 +100,9 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   *As built:* the index holds the groups too (their titles match, so "memory" finds both Memory groups), and rows a `when` hides aren't indexed; `matches` also returns the matching ids as a set for the renderer.
   *Done when:* `utils/tests/web/settings-search.test.mjs` finds `memory.reserve_gb` by "reserve", by "RAM" and by "reserve_gb", counts per section, returns nothing for one character, and `highlight('Memory reserve', 'mem')` splits as expected (one hit, case kept).
 
-- [x] **3.2 The search box and the filtered view, in `strip.js`, `rows.js` and `settings.js`.**
-  - **Box:** in the strip's right end, placeholder "Search settings", `/` focuses it when nothing else has focus on the page, Esc clears, the clear button clears. Live `aria-live` text "12 matches in 4 sections".
-  - **View:** with a query, the page shows every section that has a match (in strip order) instead of only the current one; only groups with a match stay open, the rest collapse; non-matching rows inside a matching group stay, dimmed; the strip badges each section with its count and dims sections with none. `Row` passes `query` down and renders label, hint and key through `highlight()` as `<mark>` (the accent background at low alpha, the theme's text colour). Clearing restores the section and open state from before the search.
+- [x] **3.2 The search box and the filtered view, in `settings-nav.js` (first `strip.js`), `rows.js` and `settings.js`.**
+  - **Box:** at the top of the section list (first the strip's right end), placeholder "Search settings", `/` focuses it when nothing else has focus on the page, Esc clears, the clear button clears. Live `aria-live` text "12 matches in 4 sections".
+  - **View:** with a query, the page shows every section that has a match (in the list's order) instead of only the current one; only groups with a match stay open, the rest collapse; non-matching rows inside a matching group stay, dimmed; the strip badges each section with its count and dims sections with none. `Row` passes `query` down and renders label, hint and key through `highlight()` as `<mark>` (the accent background at low alpha, the theme's text colour). Clearing restores the section and open state from before the search.
   - **Walking:** Enter and ↓ move to the next match, ↑ to the previous, scrolling it into view with the flash; the current match's `<mark>` gets the full accent colour.
   *As built:* checked on the second hub: "memory" gives "7 matches in 2 sections" with Machine → Memory's title and rows and Agent → Memory highlighted and open; "judge" shows Permissions only (10 matches), Enter lands on Auto judge (its title's mark in full accent, the group flashed); Esc clears, back on General with the box still focused. The search state is the page's; typing only filters the schema (no request). A row's own match is what decides dimming: when only a group's title matched, its rows aren't dimmed. Shift+Enter also goes back.
   *Done when:* in the browser, typing "memory" highlights "Memory" in Machine → Memory's title and rows and in Agent → Memory (MEMORY.md), keeps both groups open and collapses the rest; "judge" lands on Permissions → Auto judge; Enter walks the matches; clearing returns to where you were. No new network requests on typing.
@@ -126,7 +126,7 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
 
 - [ ] **4.2 Keys, defaults and Reset, in `rows.js` and `settings.js`.**
   - **Row:** under the hint, the key in 11 px mono; when the draft's value differs from the default, a "Reset to default (<value>)" link at the control's side that sets the draft to the default (still unsaved); `OrderList`, `Chips` and `ListEditor` compare as lists. A row with `restart: true` (`hub.port`) shows a small "restart" badge beside its label before saving, and the Save bar says "Save and restart later" while such a row is dirty.
-  - **Counts:** `changedRows(sections, draft, defaults)` (pure, in `schema.js`) feeds the strip's badges ("General 2") and a "Changed" chip at the section's top that filters the view to changed rows, like a search with no query.
+  - **Counts:** `changedRows(sections, draft, defaults)` (pure, in `schema.js`) feeds the section list's counts ("General 2") and a "Changed" chip at the section's top that filters the view to changed rows, like a search with no query.
   *Done when:* `settings-schema.test.mjs` covers `changedRows` on a fixed draft and defaults (lists compared by value, order rows by order); in the browser the reserve shows its key and, once changed, its Reset link; Reset marks the page dirty and Save writes the default (the `config.toml` line is removed or set, as `settings_mod.save` already does with `_or_default`).
 
 - [ ] **4.3 One Save for the hub-owned agent rows, in `blocks-agent.js`, `chat-judge.js`, `chat-webprefs.js`, `chat-speech-input.js`, `chat-speak.js` and `chat-settings.js`.**
@@ -135,7 +135,7 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
   *Done when:* on the live hub, changing the judge's threshold and the reserve together dirties the page once, Save writes both and `GET /api/settings` shows both; Revert restores both; the chat's mode picker still reads the judge's status (plan 30.5); `utils/tests/web/chat-webprefs.test.mjs` and `chat-speak.test.mjs` are updated for the moved saves; `uv run pytest` green.
 
 **Checks & deliverables — Phase 4**
-- [ ] Every hub-owned row shows its key; every changed row offers Reset; the strip counts match `changedRows`.
+- [ ] Every hub-owned row shows its key; every changed row offers Reset; the section list's counts match `changedRows`.
 - [ ] Delivered: `GET /api/settings/defaults`, `getSettingsDefaults()`, the Reset and restart marks, the Changed filter; tests `test_defaults.py`, the updated web tests.
 
 ## Phase 5 — This machine's settings and the mods in search (S)
@@ -160,7 +160,7 @@ Settings leaves `Hub.dc.html` for `web/settings/`, looking and working exactly a
 | `rows.js` | The row anatomy and the controls; groups that collapse with a summary; keys, Reset, the restart badge, `<mark>` highlighting | `web/settings/rows.js` |
 | `blocks-hub.js`, `blocks-agent.js` | The custom pieces: process, storage, memory chart, services table, versions, CLI, Doctor, overrides; the agent's cards placed one by one | `web/settings/` |
 | `settings.js` | The page: load, draft, Save, Revert, the guard, the filtered view | `web/settings/settings.js` |
-| `strip.js` | The sticky section strip with badges and the search box | `web/settings/strip.js` |
+| `settings-nav.js` | The sticky section list with counts and the search box (replaced `strip.js`, 2.3) | `web/settings/settings-nav.js` |
 | `route.js` | `#/settings/<section>/<group>/<row>` and the aliases | `web/settings/route.js` |
 | `search.js` | `indexRows`, `matches`, `highlight`, `paletteRows` | `web/settings/search.js` |
 | Defaults route | `GET /api/settings/defaults` from `config.example.toml`; `getSettingsDefaults()` | `utils/routes/settings.py`, `utils/settings.py`, `web/api.js`, `web/mock.js` |

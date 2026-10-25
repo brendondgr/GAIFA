@@ -42,10 +42,3 @@ test('where you are, in words', () => {
   assert.deepEqual(R.settingsPlace(['services', 'services'], secs), ['Services']);   // a group named as its section
   assert.deepEqual(R.settingsPlace(['about'], secs), ['About']);
 });
-
-test('2.3: the strip’s arrow keys wrap; it sits under the header', async () => {
-  const St = await load('strip.js');
-  assert.equal(St.stepTab(0, 'ArrowRight', 8), 1); assert.equal(St.stepTab(7, 'ArrowRight', 8), 0); assert.equal(St.stepTab(0, 'ArrowLeft', 8), 7);
-  assert.equal(St.stepTab(3, 'Home', 8), 0); assert.equal(St.stepTab(3, 'End', 8), 7); assert.equal(St.stepTab(3, 'a', 8), 3);
-  assert.equal(St.headerHeight('compact'), 44); assert.equal(St.headerHeight('comfortable'), 52);
-});

@@ -7,7 +7,7 @@ import { h, T, MONO, usePref } from '../chat/chat-ui.js';
 import { sections, rowsOf, validateDraft, saveBody, isDirty, summaryOf } from './schema.js';
 import { Row, Group, cardsOf, openGroups, setOpen } from './rows.js';
 import { parseSettingsRoute, settingsPlace } from './route.js';
-import { SectionStrip, SearchBox } from './strip.js';
+import { SectionNav, SearchBox } from './settings-nav.js';
 import { indexRows, matches, highlight, paletteRows } from './search.js';
 import { HUB_BLOCKS } from './blocks-hub.js';
 import { AGENT_BLOCKS } from './blocks-agent.js';
@@ -15,21 +15,21 @@ import { AGENT_BLOCKS } from './blocks-agent.js';
 const R = () => globalThis.React;
 const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS };
 // The flash on a row or group a hash names (2.2): a short accent ring, 1.2 s.
-const FLASH_CSS = '@keyframes gaifaFlash{0%{box-shadow:0 0 0 2px var(--acc,#FFB224);background:var(--tacc,rgba(255,178,36,.13))}100%{box-shadow:0 0 0 2px transparent;background:transparent}}.gaifa-flash{animation:gaifaFlash 1.2s ease-out;border-radius:8px}';
+const FLASH_CSS = '@keyframes gaifaFlash{0%{box-shadow:0 0 0 2px var(--acc,#FFB224);background:var(--tacc,rgba(255,178,36,.13))}100%{box-shadow:0 0 0 2px transparent;background:transparent}}.gaifa-flash{animation:gaifaFlash 1.2s ease-out;border-radius:8px}.gaifa-settings-link:hover{background:var(--hov,#161C28)}';
 function useFlashCss() {
   R().useEffect(() => {
     if (typeof document === 'undefined' || document.getElementById('gaifa-settings-css')) return;
     const s = document.createElement('style'); s.id = 'gaifa-settings-css'; s.textContent = FLASH_CSS; document.head.appendChild(s);
   }, []);
 }
-/** Scroll the element for a place into view (below the sticky header and strip) and flash it. */
+/** Scroll the element for a place into view (below the sticky header) and flash it. */
 export function flashPlace(section, group, row) {
   if (typeof document === 'undefined') return false;
   const id = row ? `row-${section}-${group}-${row}` : group ? `grp-${section}-${group}` : null;
   const el = id && document.getElementById(id);
   if (!el) return false;
-  const strip = document.querySelector('[data-strip]'), head = document.querySelector('header');
-  const top = el.getBoundingClientRect().top + window.scrollY - (head?.offsetHeight || 0) - (strip?.offsetHeight || 0) - 12;
+  const head = document.querySelector('header');
+  const top = el.getBoundingClientRect().top + window.scrollY - (head?.offsetHeight || 0) - 12;
   window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   el.classList.remove('gaifa-flash'); void el.offsetWidth; el.classList.add('gaifa-flash');
   setTimeout(() => el.classList.remove('gaifa-flash'), 1300);
@@ -167,13 +167,15 @@ export function SettingsPage(props) {
 
   const pick = id => (props.go ? props.go('#/settings/' + id) : (location.hash = '#/settings/' + id));
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 } },
-    h(SectionStrip, { sections: secs, current: searching ? null : cur.id, onPick: id => { setQ(''); setHit(-1); pick(id); }, density: props.density, h1St: props.h1St || h1St,
-      counts: searching ? m.perSection : {}, dimmed: searching ? Object.fromEntries(secs.map(s => [s.id, !m.perSection[s.id]])) : {}, search }),
+    h('h1', { style: props.h1St || h1St }, 'Settings'),
     st.restart ? h('div', { role: 'status', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '12px 14px', borderRadius: 10, background: T.tacc, border: '1px solid ' + T.acc } },
       h('span', { style: { flex: 1, minWidth: 200 } }, h('strong', null, 'Saved.'), ' Restart GAIFA to apply the new port: ', h('code', { style: { fontFamily: MONO } }, 'gaifa restart')),
       h('button', { type: 'button', onClick: () => up({ restart: false }), style: { ...btnSt(false), height: 28, fontSize: 12, background: T.card } }, 'Dismiss')) : null,
     st.err && !errField ? h('div', { role: 'alert', style: { padding: '10px 12px', borderRadius: 8, background: T.trd, color: T.rd } }, st.err.detail || String(st.err.message || st.err)) : null,
-    h('div', { role: searching ? 'region' : 'tabpanel', 'aria-labelledby': searching ? undefined : 'stab-' + cur.id, 'aria-label': searching ? 'Search results' : undefined, style: { width: '100%', maxWidth: 900, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 } },
+    h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' } },
+    h(SectionNav, { sections: secs, current: searching ? null : cur.id, onPick: id => { setQ(''); setHit(-1); pick(id); }, density: props.density,
+      counts: searching ? m.perSection : {}, dimmed: searching ? Object.fromEntries(secs.map(s => [s.id, !m.perSection[s.id]])) : {}, search }),
+    h('div', { role: searching ? 'region' : undefined, 'aria-label': searching ? 'Search results' : undefined, style: { flex: '1 1 480px', maxWidth: 900, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 } },
       !searching && miss.length ? h('div', { role: 'note', style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: T.mut } },
         h('span', { style: { height: 18, padding: '0 6px', borderRadius: 4, border: '1px solid ' + T.pu, background: T.tpu, color: T.pu, fontSize: 10, fontWeight: 600, letterSpacing: '.06em', display: 'inline-flex', alignItems: 'center' } }, 'MOCK'),
         h('span', null, `Mock data: the ${miss.join(' and ')} ${miss.length > 1 ? 'areas aren’t' : 'area isn’t'} live yet.`)) : null,
@@ -184,7 +186,7 @@ export function SettingsPage(props) {
         borderRadius: 10, background: T.card, border: '1px solid ' + T.acc, boxShadow: '0 10px 30px rgba(0,0,0,.35)' } },
         h('span', { style: { flex: 1, minWidth: 160, fontWeight: 500 } }, 'Unsaved changes'),
         h('button', { type: 'button', onClick: revert, style: btnSt(false) }, 'Revert'),
-        h('button', { type: 'button', onClick: save, disabled: invalid || st.saving, style: btnSt(true, invalid || st.saving) }, st.saving ? 'Saving…' : 'Save changes')) : null));
+        h('button', { type: 'button', onClick: save, disabled: invalid || st.saving, style: btnSt(true, invalid || st.saving) }, st.saving ? 'Saving…' : 'Save changes')) : null)));
 }
 
 export { rowsOf };

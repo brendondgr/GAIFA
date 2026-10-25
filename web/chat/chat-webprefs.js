@@ -1,11 +1,10 @@
-// Settings → Permissions → Screening and Agent → Reading web pages: which model screens pages for instructions aimed at an AI
-// (config.toml [agent.screen], utils/tools/screen.py), how web_fetch returns a long page ([agent.web] relevance,
-// utils/tools/webread.py), and when saved web pages are cleaned up ([outputs] hidden_keep_days, plan 30.9).
-// Reads GET /api/web/reading (api.getWebReading: the models each backend offers, what relevance uses now) and saves
-// through PUT /api/settings (api.saveSettings); a 422 invalid_config names the field. Pure parts tested in
-// utils/tests/web/chat-webprefs.test.mjs.
+// Settings → Permissions → Screening and Agent → Reading web pages (plan settings-redesign 2.1, 4.3): the choices for
+// which model screens pages for instructions aimed at an AI (config.toml [agent.screen], utils/tools/screen.py) and how
+// web_fetch returns a long page ([agent.web] relevance, utils/tools/webread.py). The values are rows of the Settings
+// page's draft (web/settings/schema.js); `ScreenModelPick` edits the screening model there, with the choices from
+// GET /api/web/reading (api.getWebReading). Pure parts tested in utils/tests/web/chat-webprefs.test.mjs.
 
-import { h, T, MONO, Btn, Badge, cardSt, label11, inputSt } from './chat-ui.js';
+import { h, T, MONO, inputSt } from './chat-ui.js';
 
 const R = () => globalThis.React;
 
@@ -42,12 +41,6 @@ export function checkDays(v) {
   return n > 3650 ? { error: 'At most 3650 days' } : { value: n };
 }
 
-/** A number field saved when it loses focus: only a whole number that changed. */
-function onNumber(e, was, go) {
-  const v = Number(e.target.value);
-  if (Number.isInteger(v) && v !== was) go(v);
-}
-const errText = e => String(e?.detail || e?.message || e).replace(/Value error, /g, '');
 const sel = { ...inputSt, height: 28, fontSize: 12.5 };
 const row = (label, hint, control) => h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
   h('div', { style: { flex: '1 1 220px', minWidth: 0 } }, h('div', { style: { fontWeight: 500 } }, label), hint ? h('div', { style: { fontSize: 12, color: T.mut } }, hint) : null), control);
@@ -61,68 +54,6 @@ function ModelPick({ label, value, choices, placeholder, onChange }) {
     ? h('select', { 'aria-label': label, value: value || '', style: sel, onChange: e => onChange(e.target.value) },
       value ? null : h('option', { value: '' }, 'pick one'), list.map(c => h('option', { key: c, value: c }, c)))
     : h('input', { 'aria-label': label, value: value || '', placeholder, style: { ...sel, width: 180 }, onChange: e => onChange(e.target.value) });
-}
-
-export function WebReadingSection({ api, toast = () => {} }) {
-  const React = R(), [cfg, setCfg] = React.useState(null), [st, setSt] = React.useState(null), [msg, setMsg] = React.useState(null);
-  const [draft, setDraft] = React.useState(null), [busy, setBusy] = React.useState(false), [days, setDays] = React.useState('');
-  const load = () => {
-    api?.getSettings?.().then(s => { setCfg(s); setDays(String(s?.outputs?.hidden_keep_days ?? 0)); }, () => setCfg(null));
-    api?.getWebReading?.().then(setSt, () => setSt(null));
-  };
-  React.useEffect(load, []);
-  if (!cfg?.screen || !api?.saveSettings) return null;
-  const sc = cfg.screen, web = cfg.web || null;
-  const d = draft || { way: screenWay(sc), model: sc.model || '', threshold: sc.threshold ?? 0.95, confirm: sc.confirm !== false };
-  const set = patch => setDraft({ ...d, ...patch });
-  const save = async (body, what = 'Saved') => {
-    setBusy(true); setMsg(null);
-    try { const r = await api.saveSettings(body); setCfg(r.settings); setDraft(null); setDays(String(r.settings?.outputs?.hidden_keep_days ?? 0)); toast(what, 'success'); api.getWebReading?.().then(setSt, () => {}); }
-    catch (e) { setMsg({ error: `Couldn’t save: ${errText(e)}` }); } finally { setBusy(false); }
-  };
-  const dirty = draft && (d.way !== screenWay(sc) || (d.way !== 'judge' && (d.model !== (sc.model || '') ||
-    (d.way === 'decide' && (Number(d.threshold) !== (sc.threshold ?? 0.95) || d.confirm !== (sc.confirm !== false))))));
-  const judge = st?.judge ? `${st.judge.model} (${st.judge.backend === 'decide' ? 'decision model' : 'chat model'})` : cfg.judge?.model;
-  const now = st?.screen ? `Now: ${st.screen.model}${st.screen.confirm ? `, confirmed by ${st.screen.confirm}` : ''}.` : '';
-  const dd = checkDays(days);
-  return h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) },
-    h('h2', { style: { ...label11, margin: 0 } }, 'Reading web pages'),
-    row('Screen fetched pages', 'Before the chat model reads a page, fixed patterns and a model remove passages that try to instruct an AI. The full page stays an output.',
-      h('div', { style: { display: 'flex', gap: 12, flexWrap: 'wrap' } },
-        check('Pages', sc.pages, v => save({ screen: { pages: v } })),
-        check('Your documents', sc.documents, v => save({ screen: { documents: v } }), 'Uploads and files you attach'),
-        check('Transcripts', sc.transcripts, v => save({ screen: { transcripts: v } })))),
-    row('Screen pages with', [`The judge is ${judge || '—'}.`, now].filter(Boolean).join(' '),
-      h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' } },
-        h('select', { 'aria-label': 'Screen pages with', value: d.way, style: sel, onChange: e => set({ way: e.target.value, model: '' }) },
-          SCREEN_WAYS.map(([k, l]) => h('option', { key: k, value: k }, l))),
-        d.way === 'judge' ? null : h(ModelPick, { label: 'Screening model', value: d.model, choices: st?.choices?.[d.way], placeholder: d.way === 'decide' ? 'd3-lite' : 'a model name', onChange: v => set({ model: v }) }))),
-    d.way === 'decide' ? row('Threshold', 'A passage passes when the decision model is at least this sure it’s for a human reader.',
-      h('input', { type: 'number', min: 0.5, max: 1, step: 0.01, value: d.threshold, 'aria-label': 'Screening threshold', style: { ...sel, width: 80, fontFamily: MONO }, onChange: e => set({ threshold: Number(e.target.value) }) })) : null,
-    d.way === 'decide' ? row('Confirm with the judge’s chat model', 'Decision models flag many ordinary passages; the judge’s chat model reads what it flags again and has the final say.',
-      check('Let the judge’s chat model confirm what it flags', d.confirm, v => set({ confirm: v }))) : null,
-    d.way === 'decide' && st && !st.decide_up ? h('span', { role: 'note', style: { fontSize: 12, color: T.acct } }, 'The decide mod isn’t running: start it on its page, or pages are screened by fixed patterns only.') : null,
-    dirty ? h('div', { style: { display: 'flex', gap: 8 } },
-      h(Btn, { kind: 'pri', sm: true, label: busy ? 'Saving…' : 'Save', disabled: busy || (d.way === 'relay' && !d.model), onClick: () => save({ screen: screenPatch(d.way, d) }) }),
-      h(Btn, { kind: 'ghost', sm: true, label: 'Revert', onClick: () => setDraft(null) })) : null,
-    row('Text per model call', 'Characters of passages in one screening call (800 suits a small model, 6000 a large one), and calls at once.',
-      h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        h('input', { key: 'w' + sc.window_chars, type: 'number', min: 200, max: 20000, step: 200, defaultValue: sc.window_chars, 'aria-label': 'Characters per screening call', style: { ...sel, width: 86, fontFamily: MONO }, onBlur: e => onNumber(e, sc.window_chars, v => save({ screen: { window_chars: v } })) }),
-        h('span', { style: { fontSize: 12, color: T.mut } }, 'chars ×'),
-        h('input', { key: 'p' + sc.parallel, type: 'number', min: 1, max: 32, defaultValue: sc.parallel ?? 4, 'aria-label': 'Screening calls at once', style: { ...sel, width: 56, fontFamily: MONO }, onBlur: e => onNumber(e, sc.parallel ?? 4, v => save({ screen: { parallel: v } })) }))),
-    web ? row('Long pages', `A page longer than the agent asked for comes back as its passages most relevant to the question, most relevant first, with line numbers to cite.${st?.relevance ? ` Now: ${RELEVANCE.find(r => r[0] === st.relevance)?.[1] || st.relevance}.` : ''}`,
-      h('select', { 'aria-label': 'Long pages', value: web.relevance, style: sel, title: RELEVANCE.find(r => r[0] === web.relevance)?.[2], onChange: e => save({ web: { relevance: e.target.value } }) },
-        RELEVANCE.map(([k, l, t]) => h('option', { key: k, value: k, title: t }, l)))) : null,
-    web && (web.relevance === 'decide' || web.relevance === 'auto') ? row('Relevance model', 'The decision model that scores passages.',
-      h(ModelPick, { label: 'Relevance model', value: web.model, choices: st?.choices?.decide, placeholder: 'd3-lite', onChange: v => v && save({ web: { model: v } }) })) : null,
-    cfg.outputs ? row('Saved web pages', 'Pages the agent read are kept as hidden outputs (for citations and rereading). Delete them after this many days; 0 keeps them.',
-      h('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
-        h('input', { value: days, inputMode: 'decimal', 'aria-label': 'Delete saved web pages after (days)', 'aria-invalid': dd.error ? 'true' : 'false', style: { ...sel, width: 64, fontFamily: MONO }, onChange: e => setDays(e.target.value) }),
-        h('span', { style: { fontSize: 12, color: T.mut } }, 'days'),
-        h(Btn, { sm: true, label: 'Save', disabled: busy || !!dd.error || dd.value === cfg.outputs.hidden_keep_days, onClick: () => save({ outputs: { hidden_keep_days: dd.value } }) }),
-        dd.error && days !== '' ? h('span', { role: 'alert', style: { fontSize: 12, color: T.rd } }, dd.error) : null,
-        !dd.error && dd.value === 0 ? h(Badge, { tone: 'dim' }, 'kept') : null)) : null,
-    msg ? h('span', { role: msg.error ? 'alert' : 'status', style: { fontSize: 12, color: msg.error ? T.rd : T.mut } }, msg.error || msg.ok) : null);
 }
 
 /** "Screen pages with" on the Settings page's draft (settings-redesign 2.1): the way (the judge, a decision model,

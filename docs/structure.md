@@ -181,7 +181,7 @@ utils/tests/
 | `chat/chat-view.js` | Ours (plan 46.1): a tool's default view (`view` in its manifest) as a table or chart under the fold; reads a result over 8 KB whole; pure `viewOf`, `getPath`, `fmtCell`, `rowsOf`, `tableFromView`, `chartFromView` |
 | `chat/chat-mentions.js` | Ours (plan 48.2): the `@` picker in the message box (`MentionList`, `useHubMentions`) and the pure `atToken`, `filterChoices`, `insertMention`, `mentionsIn`, `localChoices` |
 | `chat/chat-save.js` | Ours (plan 48.4): Download, Copy and Save to… on every output, as registered actions (`download`, `copy`, `saveTo`, `refusal`) |
-| `chat/chat-speak.js` | Ours (plan 49.1): read replies aloud (`SpeakButton`, `speak`, `PcmPlayer`: the tts mod's streaming PCM through WebAudio), `speakable`, `speechBody`, and Settings → Speech → Voice (`SpeechOutputSection`) |
+| `chat/chat-speak.js` | Ours (plan 49.1): read replies aloud (`SpeakButton`, `speak`, `PcmPlayer`: the tts mod's streaming PCM through WebAudio), `speakable`, `speechBody`, and `voiceChoices` (Settings → Speech → Voice's choices) |
 | `chat/chat-voice.js` | Ours (plan 49.2): voice mode, the button by the microphone (`VoiceButton`): listen → send after a pause → read the reply → listen; barge-in (`bargeTracker`), pauses while a card waits; `voiceStep` (the loop), `lastAnswer` |
 | `chat/mock-live/` | Ours (plan 44.4): the mock's preview frames (`frame-1.jpg` … `frame-6.jpg`, noisy to sharp, and `final.jpg`), for live cards in `?mock` |
 | `palette-meaning.js` | Ours (2026-10-21): the header Search's search by meaning (outputs through the embed mod, chats through the agent), merged under the name matches with their scores |

@@ -78,7 +78,7 @@ export const judgeStatusText = st => (st.available ? `Judge: ${st.model} (${st.b
 
 /** The judged calls. With `onAllow` (the Settings page) "Always allow" adds the rule to the page's draft and the
  *  judge's own controls are rows of the page (`controls: false`); without it, it saves at once as before. */
-export function JudgedList({ api, limit = 30, onAllow, allowed: allowedList, controls = true }) {
+export function JudgedList({ api, limit = 30, onAllow, allowed: allowedList, controls = false }) {
   const React = R(), [rows, setRows] = React.useState(null), [st, setSt] = React.useState(null), [err, setErr] = React.useState(null);
   const [cfg, setCfg] = React.useState(null), [note, setNote] = React.useState(null);
   const load = () => {

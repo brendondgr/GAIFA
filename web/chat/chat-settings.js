@@ -8,11 +8,6 @@ import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens, fmtAgo } from
 import { getChatClient } from './chat.js';
 import { MODES } from './chat-header.js';
 import { RISK_TONE, grantText } from './chat-risk.js';
-import { SpeechInputSection } from './chat-speech-input.js';
-import { SpeechOutputSection } from './chat-speak.js';
-import { JudgedList } from './chat-judge.js';
-import { PermissionRules } from './chat-rules.js';
-import { WebReadingSection } from './chat-webprefs.js';
 
 const R = () => globalThis.React;
 export const section = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title), ...kids);
@@ -110,17 +105,13 @@ export function ModesCard() {
         ' in config.toml). A call is decided by the deny list, then the chat’s mode, then a mod’s own limits, then your grants, then the ask and allow lists, then its risk: reading runs; writing and generating ask unless the chat uses defaults; using the internet, running code and deleting ask, except in Auto, where the judge decides. Pending approvals from any client are in the header’s Approvals button.')));
 }
 
-/** Settings → Agent as one column: the cards above in their order (for anything that mounts the whole). */
+/** The agent's own cards in one column (for anything that mounts the whole); the Settings page places them one by one. */
 export function AgentSettings({ api, toast = () => {} }) {
   const p = { api, toast };
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 14 } },
     h(AgentNotes, p), h(ModelsCard, p), h(DocumentsCard, p),
-    h(WebReadingSection, p),   // [agent.screen], [agent.web], [outputs] hidden_keep_days
     h(InstructionsCard, p), h(MemoryCard, p), h(SkillsCard, p),
-    h(LearningSection, p),
-    h(SpeechInputSection, p),   // plan 29.4: only while the stt mod is up
-    h(SpeechOutputSection, p),  // plan 49.1: Voice, only while the tts mod answers
-    section('Permissions', h(ModesCard), h(PermissionRules, { api }), h(GrantsList, p), h(JudgedList, { api })));
+    section('Permissions', h(ModesCard), h(GrantsList, p)));   // the hub's values (learning, speech, the judge, screening…) are rows of web/settings/
 }
 
 // Documents (plan 24.9): how big an attached document may be to go into the message whole, and what the
@@ -171,25 +162,4 @@ export function GrantsList({ api, toast }) {
       h('span', { style: { fontSize: 11.5, color: T.dim } }, [`used ${g.used || 0}×`, fmtAgo(g.created_ts) === 'now' ? 'just now' : fmtAgo(g.created_ts) + ' ago',
         g.expires_ts ? `ends ${new Date(g.expires_ts * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : null].filter(Boolean).join(' · ')),
       h(Btn, { sm: true, kind: 'ghost', icon: 'x', label: 'Revoke', onClick: () => revoke(g) }))));
-}
-
-
-// Learning (plan 21.7): the hub's [learning] settings; the Learning page lists what was learned.
-export function LearningSection({ api, toast }) {
-  const React = R(), [l, setL] = React.useState(null);
-  React.useEffect(() => { api?.getSettings?.().then(x => setL(x?.learning || null)).catch(() => {}); }, []);
-  if (!l) return null;
-  const save = async patch => {
-    try { const r = await api.saveSettings({ learning: { ...l, ...patch } }); setL(r.settings.learning); toast('Saved', 'success'); }
-    catch (e) { toast(e.detail || String(e), 'error'); }
-  };
-  const num = (k, min) => h('input', { type: 'number', min, value: l[k], style: { width: 70 }, onChange: e => save({ [k]: Number(e.target.value) }) });
-  return section('Learning',
-    row('Learn from chats', 'Card edits, answers and thumbs become preferences that fill your cards; each chat can turn it off in its header. The Learning page lists them.',
-      h('label', { style: { display: 'flex', alignItems: 'center', gap: 6 } }, h('input', { type: 'checkbox', checked: !!l.enabled, onChange: e => save({ enabled: e.target.checked }) }), l.enabled ? 'On' : 'Off')),
-    row('Propose after', 'An inferred preference is proposed once you chose it this many times, in as many chats.', num('infer_after', 1)),
-    row('Fade after (days)', 'Inferred preferences unused this long are retired; ones you stated never fade.', num('fade_days', 1)),
-    row('Nightly run', 'When the learner improves its instructions (plan 22), plus after an hour without a chat.',
-      h('input', { type: 'time', value: l.nightly_at, onChange: e => e.target.value && save({ nightly_at: e.target.value }) })),
-    h('a', { href: '#/s/agent/learning', style: { fontSize: 12.5 } }, 'Open the Learning page →'));
 }

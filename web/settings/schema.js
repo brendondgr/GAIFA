@@ -126,7 +126,11 @@ export function sections(ctx = {}) {
       { id: 'memory', label: 'Memory', summary: () => 'MEMORY.md and its topics', rows: [block('memory', 'MemoryCard', { label: 'Memory', card: true, keywords: ['MEMORY.md', 'remember', 'topics'] })] },
       { id: 'skills', label: 'Skills', summary: () => 'Loaded when needed; each is a slash command', rows: [block('skills', 'SkillsCard', { label: 'Skills', card: true, keywords: ['slash commands', 'SKILL.md'] })] },
       { id: 'learning', label: 'Learning', summary: () => `Learn from chats ${onOff(d.learning?.enabled)} · nightly at ${d.learning?.nightly_at || '—'}`, rows: [
-        block('learning', 'LearningSection', { label: 'Learning', card: true, keys: ['learning.enabled', 'learning.infer_after', 'learning.fade_days', 'learning.nightly_at'], keywords: ['preferences', 'nightly', 'learner'] }),
+        field('learn', 'learning.enabled', { label: 'Learn from chats', hint: 'Card edits, answers and thumbs become preferences that fill your cards; each chat can turn it off in its header.', control: 'toggle', keywords: ['preferences', 'learner'] }),
+        field('inferAfter', 'learning.infer_after', { label: 'Propose after', hint: 'An inferred preference is proposed once you chose it this many times, in as many chats.', control: 'number', min: 1, max: 100, width: 80 }),
+        field('fadeDays', 'learning.fade_days', { label: 'Fade after', hint: 'Inferred preferences unused this long are retired; ones you stated never fade.', control: 'number', min: 1, max: 3650, unit: 'days', width: 90 }),
+        field('nightly', 'learning.nightly_at', { label: 'Nightly run', hint: 'When the learner improves its instructions, plus after an hour without a chat.', control: 'time', keywords: ['schedule', 'harness'] }),
+        block('learningPage', 'LearningLink', { label: 'The Learning page', keywords: ['preferences', 'review'] }),
       ] }] },
     { id: 'permissions', label: 'Permissions', icon: 'shield', areas: SETTINGS_AREAS.permissions, when: () => agentOn, groups: [
       { id: 'modes', label: 'Modes', summary: () => 'Plan · Manual · Accept edits · Auto · Bypass', rows: [block('modes', 'ModesCard', { label: 'Modes', keywords: ['plan', 'manual', 'accept edits', 'auto', 'bypass'] })] },
@@ -156,11 +160,22 @@ export function sections(ctx = {}) {
       { id: 'judged', label: 'Judged calls', summary: () => 'What the judge ran and asked, newest first', rows: [block('judged', 'JudgedList', { label: 'Judged calls', keywords: ['auto', 'verdicts'] })] },
     ] },
     { id: 'speech', label: 'Speech', icon: 'mic', areas: SETTINGS_AREAS.speech, when: () => !ctx.services || hasMod(ctx, 'stt', 'tts'), groups: [
-      { id: 'dictation', label: 'Dictation', summary: () => `${d.speech_input?.preset || 'balanced'} · ${n((d.speech_input?.mics || []).length, 'microphone')} ranked`, rows: [
-        block('dictation', 'SpeechInputSection', { label: 'Speech input', card: true, keys: ['speech_input.mics', 'speech_input.language', 'speech_input.preset', 'speech_input.mode'], keywords: ['microphone', 'dictation', 'stt', 'whisper'] }),
+      { id: 'dictation', label: 'Dictation', when: () => !ctx.services || hasMod(ctx, 'stt'), summary: () => `${d.speech_input?.preset || 'balanced'} · ${n((d.speech_input?.mics || []).length, 'microphone')} ranked`, rows: [
+        block('mics', 'MicsBlock', { label: 'Microphones', keys: ['speech_input.mics'], keywords: ['microphone', 'dictation', 'stt', 'level'] }),
+        field('language', 'speech_input.language', { label: 'Language', hint: 'An ISO code such as en or de; empty detects it.', control: 'text', placeholder: 'detect', maxLength: 3, width: 90,
+          validate: v => (/^([a-z]{2,3})?$/.test(String(v ?? '')) ? null : 'Two or three lowercase letters, or empty'), keywords: ['whisper'] }),
+        field('preset', 'speech_input.preset', { label: 'Model', hint: 'Balanced (small) keeps up live; Accurate is slower to commit.', control: 'select',
+          choices: [{ value: 'fast', label: 'Fast' }, { value: 'balanced', label: 'Balanced (default)' }, { value: 'accurate', label: 'Accurate' }, { value: 'best', label: 'Best' }], keywords: ['stt', 'whisper'] }),
+        field('mode', 'speech_input.mode', { label: 'The microphone button', control: 'segmented',
+          choices: [{ value: 'both', label: 'Click or hold' }, { value: 'toggle', label: 'Click' }, { value: 'hold', label: 'Hold' }], keywords: ['push to talk'] }),
       ] },
-      { id: 'voice', label: 'Voice', summary: () => `${d.speech_output?.voice || 'the default voice'} · read every reply ${onOff(d.speech_output?.auto_read)}`, rows: [
-        block('voice', 'SpeechOutputSection', { label: 'Voice', card: true, keys: ['speech_output.voice', 'speech_output.speed', 'speech_output.auto_read', 'speech_output.pause_ms'], keywords: ['read aloud', 'tts', 'voice mode'] }),
+      { id: 'voice', label: 'Voice', when: () => !ctx.services || hasMod(ctx, 'tts'), summary: () => `${d.speech_output?.voice || 'the default voice'} · read every reply ${onOff(d.speech_output?.auto_read)}`, rows: [
+        field('voice', 'speech_output.voice', { label: 'Read replies in', hint: 'The voice under each reply’s speaker, and voice mode’s answers.', control: 'select',
+          choices: c => c.voiceChoices || [{ value: '', label: 'The speech mod’s default' }], keywords: ['read aloud', 'tts', 'kokoro'] }),
+        field('speed', 'speech_output.speed', { label: 'Speed', hint: 'Built-in (Kokoro) voices only.', control: 'number', min: 0.5, max: 2, step: 0.1, width: 80 }),
+        field('autoRead', 'speech_output.auto_read', { label: 'Read every reply aloud', hint: 'When a reply is finished. With a model on this GPU it waits for the reply to end.', control: 'toggle' }),
+        field('pause', 'speech_output.pause_ms', { label: 'Voice mode: end of what you said', hint: 'The quiet that sends your message.', control: 'segmented',
+          choices: [800, 1200, 1600, 2400].map(ms => ({ value: ms, label: ms / 1000 + ' s' })), keywords: ['voice mode', 'silence'] }),
       ] }] },
     { id: 'sessions', label: 'Sessions', icon: 'refresh', areas: SETTINGS_AREAS.sessions, when: () => ctx.hasSessions !== false, groups: [
       { id: 'sessions', label: 'Sessions', summary: () => 'Save the current setup, switch between them', rows: [
@@ -172,7 +187,7 @@ export function sections(ctx = {}) {
       { id: 'doctor', label: 'Doctor', summary: () => 'The install checked, as gaifa doctor', rows: [block('doctor', 'DoctorPanel', { label: 'Doctor', card: true, keywords: ['checks', 'problems', 'gaifa doctor'] })] },
     ] },
   ];
-  return secs.filter(s => !s.when || s.when(ctx));
+  return secs.filter(s => !s.when || s.when(ctx)).map(s => ({ ...s, groups: s.groups.filter(g => !g.when || g.when(ctx)) }));
 }
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const fb = b => { if (b == null || isNaN(b)) return '—'; const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0, v = b; while (v >= 1000 && i < 4) { v /= 1000; i++; } return (i === 0 ? v : v.toFixed(v >= 100 ? 0 : 1)) + ' ' + u[i]; };

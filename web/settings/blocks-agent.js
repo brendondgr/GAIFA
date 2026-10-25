@@ -3,12 +3,10 @@
 // Each takes `{ctx, row}`. Written by us (web/PATCHES.md).
 
 import { h, T } from '../chat/chat-ui.js';
-import { AgentNotes, ModelsCard, DocumentsCard, InstructionsCard, MemoryCard, SkillsCard, LearningSection, ModesCard, GrantsList, section } from '../chat/chat-settings.js';
-import { WebReadingSection, ScreenModelPick } from '../chat/chat-webprefs.js';
-import { SpeechInputSection } from '../chat/chat-speech-input.js';
-import { SpeechOutputSection } from '../chat/chat-speak.js';
+import { AgentNotes, ModelsCard, DocumentsCard, InstructionsCard, MemoryCard, SkillsCard, ModesCard, GrantsList } from '../chat/chat-settings.js';
+import { ScreenModelPick } from '../chat/chat-webprefs.js';
+import { SpeechInputPanel } from '../chat/chat-speech-input.js';
 import { JudgedList, JudgeModelPick, judgeStatusText } from '../chat/chat-judge.js';
-import { PermissionRules } from '../chat/chat-rules.js';
 
 const p = ctx => ({ api: ctx.api, toast: ctx.toast });
 const wrap = C => ({ ctx }) => h(C, p(ctx));
@@ -36,11 +34,16 @@ function JudgedBlock({ ctx }) {
     onAllow: rule => ctx.setDraft(d => { d.judge.allow_commands = [...new Set([...(d.judge.allow_commands || []), rule])]; }) }));
 }
 
+/** The microphones in order (4.3): the dictation panel on the draft's speech_input, its other fields being rows. */
+function MicsBlock({ ctx }) {
+  return pad(h(SpeechInputPanel, { api: ctx.api, toast: ctx.toast, fields: false, value: ctx.draft?.speech_input,
+    onChange: v => ctx.setDraft(d => { d.speech_input = { ...d.speech_input, ...v }; }) }));
+}
+const LearningLink = () => h('div', { style: { padding: '12px 0' } }, h('a', { href: '#/s/agent/learning', style: { fontSize: 12.5 } }, 'Open the Learning page →'));
+
 export const AGENT_BLOCKS = {
-  AgentNotes: wrap(AgentNotes), ModelsCard: ({ ctx }) => pad(h(ModelsCard, { ...p(ctx), bare: true })), DocumentsCard: wrap(DocumentsCard), WebReadingSection: wrap(WebReadingSection),
-  InstructionsCard: wrap(InstructionsCard), MemoryCard: wrap(MemoryCard), SkillsCard: wrap(SkillsCard), LearningSection: wrap(LearningSection),
-  SpeechInputSection: wrap(SpeechInputSection), SpeechOutputSection: wrap(SpeechOutputSection),
-  ModesCard: () => pad(h(ModesCard)), PermissionRules: ({ ctx }) => h(PermissionRules, { api: ctx.api }), GrantsList: ({ ctx }) => pad(h(GrantsList, p(ctx))),
+  AgentNotes: wrap(AgentNotes), ModelsCard: ({ ctx }) => pad(h(ModelsCard, { ...p(ctx), bare: true })), DocumentsCard: wrap(DocumentsCard),
+  InstructionsCard: wrap(InstructionsCard), MemoryCard: wrap(MemoryCard), SkillsCard: wrap(SkillsCard), LearningLink, MicsBlock,
+  ModesCard: () => pad(h(ModesCard)), GrantsList: ({ ctx }) => pad(h(GrantsList, p(ctx))),
   JudgedList: JudgedBlock, JudgeModelBlock, ScreenModelBlock,
-  PermissionsCard: ({ ctx }) => section('Permissions', h(ModesCard), h(PermissionRules, { api: ctx.api }), h(GrantsList, p(ctx)), h(JudgedList, { api: ctx.api })),
 };

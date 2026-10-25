@@ -51,3 +51,10 @@ test('speak streams the response into the player and ends', async () => {
   await sp.speak('hello', {}, { fetchImpl, Player: P }).done;
   assert.deepEqual(pushed, [4, 2]);
 });
+
+test('settings-redesign 4.3: the voice is a row of the Settings page; the voices are its choices', () => {
+  assert.equal(sp.SpeechOutputSection, undefined);   // no card that saves on its own any more
+  assert.deepEqual(sp.voiceChoices({ custom: [{ name: 'Hope' }], kokoro: ['af_heart'] }),
+    [{ value: '', label: 'The speech mod’s default' }, { value: 'Hope', label: 'Hope' }, { value: 'af_heart', label: 'af_heart' }]);
+  assert.deepEqual(sp.voiceChoices(null), [{ value: '', label: 'The speech mod’s default' }]);
+});

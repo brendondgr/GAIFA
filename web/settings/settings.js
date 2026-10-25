@@ -11,6 +11,7 @@ import { SectionNav, SearchBox } from './settings-nav.js';
 import { indexRows, matches, highlight, paletteRows } from './search.js';
 import { HUB_BLOCKS } from './blocks-hub.js';
 import { AGENT_BLOCKS } from './blocks-agent.js';
+import { voiceChoices } from '../chat/chat-speak.js';
 
 const R = () => globalThis.React;
 const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS };
@@ -70,6 +71,7 @@ export function SettingsPage(props) {
     // what choices and columns read: the judge's status, the screening and relevance models, each mod's tool count
     api.getSettingsDefaults?.().then(x => live && up({ defaults: x }), () => {});   // 4.2: each row's default, for Reset
     api.getJudgeStatus?.().then(x => live && up({ judgeStatus: x }), () => {});
+    if ((props.services || []).some(s => s.id === 'tts')) api.callService?.('tts', 'GET', '/v1/voices').then(r => live && up({ voices: r.json }), () => {});   // Speech → Voice's choices
     api.getWebReading?.().then(x => live && up({ reading: x }), () => {});
     api.getToolIndex?.().then(ix => live && up({ toolCounts: ix.reduce((m, t) => ({ ...m, [t.mod]: (m[t.mod] || 0) + 1 }), {}) }), () => {});
     return () => { live = false; };
@@ -108,7 +110,7 @@ export function SettingsPage(props) {
 
   const setDraft = fn => setSt(s => { const d = clone(s.draft); fn(d); return { ...s, draft: d, err: null }; });
   const ctx = { ...props, api, services: props.services || [], system: st.sys, draft: st.draft, orig: st.orig, setDraft,
-    judgeStatus: st.judgeStatus, reading: st.reading, toolCounts: st.toolCounts, hasSessions: !!api.listSessions };
+    judgeStatus: st.judgeStatus, reading: st.reading, voiceChoices: st.voices ? voiceChoices(st.voices) : null, toolCounts: st.toolCounts, hasSessions: !!api.listSessions };
   const secs = sections(ctx);
   const place = parseSettingsRoute((route?.parts || []).slice(1), secs);
   const cur = secs.find(x => x.id === place.section) || secs[0];

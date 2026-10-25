@@ -89,7 +89,7 @@ test('2.1: eight sections in order, with their groups', () => {
   for (const k of ['hub.port', 'memory.reserve_gb', 'memory.auto_make_room', 'memory.never_unload', 'memory.priority', 'ui.theme', 'ui.density'])
     assert.ok(rows.some(r => r.key === k), k);   // every Phase 1 row still has a home
   for (const b of ['ProcessCard', 'PathsList', 'MemoryHistory', 'ServicesTable', 'AddModCard', 'Versions', 'CliList', 'DoctorPanel', 'SessionsPanel', 'HardwareCard',
-    'ModelsCard', 'DocumentsCard', 'InstructionsCard', 'MemoryCard', 'SkillsCard', 'LearningSection', 'SpeechInputSection', 'SpeechOutputSection', 'GrantsList', 'JudgedList'])
+    'ModelsCard', 'DocumentsCard', 'InstructionsCard', 'MemoryCard', 'SkillsCard', 'MicsBlock', 'GrantsList', 'JudgedList'])
     assert.ok(rows.some(r => r.block === b), b);
   assert.equal(S.rowFor(secs, 'permissions.deny').key, 'agent.permissions.deny');
   assert.equal(S.rowFor(secs, 'judge.allow_commands').control, 'list');

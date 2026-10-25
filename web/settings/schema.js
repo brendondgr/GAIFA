@@ -227,3 +227,48 @@ export function isDirty(orig, draft) {
   const strip = x => { const y = { ...x }; delete y.ui; return JSON.stringify(y); };
   return strip(orig) !== strip(draft);
 }
+
+// ---------- 4.2: defaults, changes ----------
+const norm = (row, v) => {
+  if (v == null) return null;
+  if (row.control === 'number' && String(v).trim() !== '' && !isNaN(Number(v))) return Number(v);
+  if (row.control === 'chips' && Array.isArray(v)) return [...v].sort();   // a set: the order doesn't matter
+  return v;   // order and list rows keep their order
+};
+/** Whether a row's value equals another (numbers as numbers, chips as sets, lists and orders in order). */
+export function sameValue(row, a, b) { return JSON.stringify(norm(row, a)) === JSON.stringify(norm(row, b)); }
+
+/** The rows whose value differs from the default: [{ref, section, group, row, path, key, value, default}]. Instant rows
+ *  read `ctx` (theme, density, the sidebar); blocks have no single value and are left out. */
+export function changedRows(secs, draft, defaults, ctx = {}) {
+  if (!draft || !defaults) return [];
+  const out = [];
+  for (const r of rowsOf(secs)) {
+    if (r.control === 'block' || !r.path || (r.when && !r.when(ctx))) continue;
+    const def = getPath(defaults, r.path);
+    if (def === undefined) continue;
+    const value = r.instant && r.read ? r.read(ctx) : r.get(draft);
+    if (value === undefined || sameValue(r, value, def)) continue;
+    out.push({ ref: r.ref, section: r.section, group: r.group, row: r.id, path: r.path, key: r.key, value, default: def });
+  }
+  return out;
+}
+/** `changedRows` counted per section and group, in the shape `matches` gives (the list's counts, the Changed filter). */
+export function changedMatch(changed) {
+  const m = { rows: [], perSection: {}, perGroup: {}, ids: new Set(), query: '' };
+  for (const c of changed) {
+    m.rows.push({ id: c.ref, section: c.section, group: c.group, kind: 'row' }); m.ids.add(c.ref);
+    m.perSection[c.section] = (m.perSection[c.section] || 0) + 1;
+    const g = `${c.section}/${c.group}`; m.perGroup[g] = (m.perGroup[g] || 0) + 1;
+  }
+  return m;
+}
+/** A value as the Reset link and the overrides say it: a choice's label, on/off, a list joined, "none". */
+export function showValue(row, v) {
+  if (v == null || v === '') return row?.control === 'list' || row?.control === 'chips' ? 'none' : '—';
+  if (typeof v === 'boolean') return v ? 'on' : 'off';
+  const ch = Array.isArray(row?.choices) ? row.choices : null;
+  if (Array.isArray(v)) return v.length ? v.map(x => ch?.find(c => c.value === x)?.label || x).join(', ') : 'none';
+  const c = ch?.find(x => x.value === v);
+  return c ? c.label : String(v) + (row?.unit && row.control === 'number' ? ' ' + row.unit : '');
+}

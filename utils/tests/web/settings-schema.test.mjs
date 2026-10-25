@@ -121,3 +121,30 @@ test('2.1: Save sends only what changed', () => {
   d.judge.threshold = '0.5'; d.memory.reserve_gb = '14';
   assert.deepEqual(S.saveBody(d, FULL, secs), { memory: { reserve_gb: 14 }, judge: { threshold: 0.5 } });
 });
+
+test('4.2: changedRows compares with the defaults: numbers as numbers, chips as sets, orders in order', () => {
+  const ctx = { services: ALL, draft: FULL, theme: 'dark', density: 'compact', nav: { services: 'list', folded: false } };
+  const secs = S.sections(ctx);
+  const defaults = JSON.parse(JSON.stringify(FULL));
+  defaults.ui.theme = 'system';
+  assert.deepEqual(S.changedRows(secs, FULL, defaults, ctx).map(c => c.ref), ['general/interface/theme']);   // instant rows read ctx
+  const d = JSON.parse(JSON.stringify(FULL));
+  d.memory.reserve_gb = '12';                            // the same number as a string
+  d.memory.never_unload = ['lcpp'];
+  defaults.memory.never_unload = ['lcpp'];
+  d.memory.priority = ['relay', 'tts', 'lcpp'];          // reordered
+  d.judge.allow_commands = ['ls *', 'pytest *'];          // a list in another order is a change too
+  d.web.relevance = 'off';
+  const ch = S.changedRows(secs, d, defaults, ctx);
+  assert.deepEqual(ch.map(c => c.ref), ['general/interface/theme', 'machine/memory/priority', 'agent/web/relevance', 'permissions/judge/allowCommands']);
+  assert.deepEqual(ch.find(c => c.path === 'web.relevance'), { ref: 'agent/web/relevance', section: 'agent', group: 'web', row: 'relevance', path: 'web.relevance', key: 'agent.web.relevance', value: 'off', default: 'auto' });
+  const chips = S.rowFor(secs, 'memory.never_unload');
+  assert.equal(S.sameValue(chips, ['a', 'b'], ['b', 'a']), true);
+  const m = S.changedMatch(ch);
+  assert.deepEqual(m.perSection, { general: 1, machine: 1, agent: 1, permissions: 1 });
+  assert.equal(S.changedRows(secs, d, null, ctx).length, 0);   // no defaults yet: nothing to compare
+  assert.equal(S.showValue(S.rowFor(secs, 'web.relevance'), 'auto'), 'Automatic');
+  assert.equal(S.showValue(S.rowFor(secs, 'memory.reserve_gb'), 12), '12 GB');
+  assert.equal(S.showValue(S.rowFor(secs, 'memory.auto_make_room'), false), 'off');
+  assert.equal(S.showValue(S.rowFor(secs, 'permissions.deny'), []), 'none');
+});

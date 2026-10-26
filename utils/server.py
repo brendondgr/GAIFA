@@ -142,7 +142,7 @@ def default_backend(options: Options, config: Config | None = None, paths: Paths
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, gpu, mcp, memory, mentions, metrics, models, outputs, overview, prefs, repos, services, sessions, settings, skills, system, tools, web, webpages, widgets
+    from utils.routes import events, gpu, llm, mcp, memory, mentions, metrics, models, outputs, overview, prefs, repos, services, sessions, settings, skills, system, tools, web, webpages, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options, config, paths), options=options, version=hub_version())
@@ -317,8 +317,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(mcp.router)  # /mcp: the tools over MCP (13.4)
     app.include_router(webpages.router)  # /api/web/read (30.8)
     app.include_router(repos.router)  # /api/repos (mod-repos 3.3)
+    app.include_router(llm.router)  # /api/llm (llm-servers 3.4)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos"):
+                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos", "llm"):
         hub.mark_live(area)
 
     app.include_router(web.router)

@@ -193,9 +193,9 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Release:** merge, push, `gaifa repos pin lcpp`.
   *Done when:* lcpp's tests cover each route; `gaifa check lcpp` passes.
   - **Done 2026-10-26:** LLMs `0324288` (`/api/llm/*`; lcpp's own API lives under `/api`, and `[llm]` names the paths), released on `master` and brought in with `gaifa repos update lcpp` from the CLI (fetch, checkout, check, pin staged; committed here). Live: `gaifa check lcpp --start` passed with `llm: 2 models, engine idle` (gemma-4-26B-it, 17 GB, its relay name `gemma4-26B`); lcpp was stopped again after.
-- [ ] **3.4 The hub's view of engines: `utils/routes/llm.py`.**
+- [x] **3.4 The hub's view of engines: `utils/routes/llm.py`.**
   - **What:** `GET /api/llm/engines` gathers every running mod with `[llm]` (its catalog and engine state, each entry marked with the relay id it will have once loaded). `POST /api/llm/{sid}/load {id}` and `/unload` pass through. Errors use the envelope, and the memory manager's `needs_room` card is passed on.
-  - **Relay catalog:** entries that are `downloaded` but not loaded are added to the relay's catalog response *by the agent* as `loadable: true`, not by the relay, which stays standalone.
+  - **Loadable models:** the Chat picker (5.1) reads `/api/llm/engines` beside the agent's model list and offers what isn't loaded as Load; neither the relay (standalone) nor the agent needs to know about engines.
   *Done when:* `utils/tests/services/test_llm_routes.py` covers two fake engine mods, one stopped, and a load that needs room; the contract test covers the routes; architecture §6 and brief §6 list them.
 
 **Checks & deliverables — Phase 3**

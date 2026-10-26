@@ -6,3 +6,7 @@
 	path = services/lcpp
 	url = git@github.com:brendondgr/LLMs.git
 	branch = master
+[submodule "services/tts"]
+	path = services/tts
+	url = git@github.com:brendondgr/LocalTTS.git
+	branch = main

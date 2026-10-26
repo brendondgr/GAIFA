@@ -167,7 +167,12 @@ class Agent(Compaction):
         if (thread.get("settings") or {}).get("dry_run") or not profile.settings(self.cfg.data)["recall"]:
             return []
         try:
-            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory)[1])
+            try:                                            # what the profile shows this chat isn't recalled again
+                folders = (await ctx.chat_folders(self.hub, tid, thread.get("settings"), await self.hub.services(),
+                                                  (thread.get("settings") or {}).get("disabled") or []) or {}).get("folders")
+            except Exception:  # noqa: BLE001
+                folders = None
+            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory, folders)[1])
         except Exception:  # noqa: BLE001: a message never fails over memory
             log.exception("recall for %s", tid)
             return []

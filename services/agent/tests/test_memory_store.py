@@ -126,3 +126,13 @@ def test_the_tree(m):
     kinds = {k["kind"]: k for k in t["kinds"]}
     assert kinds["project"]["entities"][0]["name"] == "GAIFA" and kinds["project"]["entities"][0]["facts"] == 1
     assert kinds["project"]["entities"][0]["children"][0]["name"] == "memory" and "topic" not in kinds
+
+
+def test_about_with_a_name_and_its_path_is_one_entry(m):
+    f = m.add_fact("The site deploys to Netlify", about=["Ariadne", "projects/Ariadne"])
+    assert [e["path"] for e in f["entities"]] == ["projects/Ariadne"] and len(m.entities()) == 2      # the user and Ariadne
+    t = m.create_entity("topic", "Cooking")
+    g = m.add_fact("Likes Thai food", about=["projects/Cooking"])                 # another kind by that name: used
+    assert [e["id"] for e in g["entities"]] == [t["id"]]
+    h = m.add_fact("Uses the agent loop", about=["projects/Ariadne/agent", "you"])
+    assert sorted(e["path"] for e in h["entities"]) == ["projects/Ariadne/agent", "you"]

@@ -86,26 +86,35 @@ class FactsMixin:
 
     def resolve_about(self, about: list[Any] | None, source: str, by: str) -> list[str]:
         """Entity ids for `about`: ids, paths and names resolve; an unknown name becomes a new entity (`{name, kind}`
-        gives its kind; plain text a topic), proposed when the fact is inferred. Nothing: the user."""
-        ids: list[str] = []
+        gives its kind, a path's first part too; plain text a topic), proposed when the fact is inferred. Paths and
+        kinds go first, a bare name that repeats one is the same entry, and an entry of another kind by that name is
+        used rather than refused. Nothing: the user."""
+        items: list[tuple[str, str | None]] = []
         for a in about or []:
             name, kind = (a.get("name"), a.get("kind")) if isinstance(a, dict) else (str(a), None)
-            name = (name or "").strip()
-            if not name:
-                continue
-            if norm(name) in ("you", "me", "user", "the user"):
+            if (name or "").strip():
+                items.append((name.strip().strip("/"), kind))
+        items.sort(key=lambda x: ("/" not in x[0] and not x[1]))           # paths and kinds first
+        ids: list[str] = []
+        for name, kind in items:
+            if norm(name) in ("you", "me", "user", "the user", "your"):
                 ids.append(USER)
                 continue
-            e = self.resolve(name, kind_of(kind) if kind else None)   # type: ignore[attr-defined]
+            parts = [p for p in name.split("/") if p]
+            leaf = parts[-1]
+            if len(parts) == 1 and any(norm(leaf) == (self.entity_row(i) or {}).get("norm") for i in ids):   # type: ignore[attr-defined]
+                continue                                                  # "Ariadne" after "projects/Ariadne"
+            want = kind_of(kind) if kind else (kind_of(parts[0]) if len(parts) == 2 else None)
+            e = self.resolve(name, want) or self.resolve(name) or (self.resolve(leaf, want) if len(parts) > 1 else None)   # type: ignore[attr-defined]
+            if e is None and len(parts) > 1:
+                e = self.resolve(leaf) if len(parts) == 2 else None   # type: ignore[attr-defined]
             if e is None:
-                parts = [p for p in name.split("/") if p]
                 parent = None
-                if len(parts) > 1:                          # projects/GAIFA/agent: under its parent, kind from the folder
+                if len(parts) > 2:                          # projects/GAIFA/agent: under its parent
                     pe = self.resolve("/".join(parts[:-1]))   # type: ignore[attr-defined]
                     parent = pe["id"] if pe else None
-                    kind = kind or (kind_of(parts[0]) if len(parts) == 2 else (pe or {}).get("kind"))
-                    name = parts[-1]
-                e = self.create_entity(kind or "topic", name, parent=parent, source=source, by=by,   # type: ignore[attr-defined]
+                    want = want or (pe or {}).get("kind")
+                e = self.create_entity(want or "topic", leaf, parent=parent, source=source, by=by,   # type: ignore[attr-defined]
                                        state="proposed" if source == "inferred" else "active")
             ids.append(e["id"])
         return list(dict.fromkeys(ids)) or [USER]

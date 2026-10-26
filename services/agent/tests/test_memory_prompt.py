@@ -47,6 +47,8 @@ async def test_a_chat_in_a_projects_folder_gets_its_facts(env):
     s = system(env)
     assert "This chat works in GAIFA (projects/GAIFA):\n- Mods use ports 5100-5199" in s    # by the folder's name
     assert "This chat works in Site (projects/Site):\n- The site is built with Astro" in s   # by an anchor above it
+    await env.send(tid, "what are the mods' ports?")
+    assert "memory" not in env.payloads(tid, "user")[-1]        # in this chat's profile already: not recalled
     other = await env.thread(settings={"environment": "none"})
     await env.send(other, "hi")
     assert "This chat works in" not in system(env)

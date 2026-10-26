@@ -81,8 +81,8 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
 **Wire — Phase 3:** chats use the new memory; the composer's "Remembered" step shows the entity it was saved under.
 
 **Checks & deliverables — Phase 3**
-- [ ] On the installed hub: in one chat say "remember that GAIFA's mods use ports 5100–5199"; in a new chat in an environment holding `~/Agents/GAIFA`, ask about the ports: the fact is in the profile or recalled, without a tool call; in Claude Code, `/mcp`'s tool list has no memory tool.
-- [ ] Delivered: the manifest field, the agent's tools, the profile and recall, tests; docs: architecture §4.3, §14.1, §14.5, the brief's §11.13.
+- [x] On the installed hub: in one chat say "remember that GAIFA's mods use ports 5100–5199"; in a new chat in an environment holding `~/Agents/GAIFA`, ask about the ports: the fact is in the profile or recalled, without a tool call; in Claude Code, `/mcp`'s tool list has no memory tool. *As checked (2026-10-26, skynet):* no environment holds GAIFA here, so with Ariadne's: "remember this about my Ariadne project: its site deploys from the main branch to Netlify" → `remember` with about `["Ariadne", "projects/Ariadne"]` (which found a bug, fixed: a bare name and its path made two entries), a card, approved, saved under `projects/Ariadne`; a new chat in that environment answered "main, to Netlify" with no tool call (the fact in its profile; recall no longer repeats what the profile shows); `/mcp` lists 70 tools, no `agent_memory_*`. The test fact was forgotten, the entity archived, the chats deleted.
+- [x] Delivered: the manifest field, the agent's tools, the profile and recall, tests; docs: architecture §4.3, §14.1, §14.5, the brief's §11.13.
 
 ## Phase 4 — Learning memories in the background (M)
 

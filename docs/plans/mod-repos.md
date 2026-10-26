@@ -51,13 +51,14 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
     - whether the push is a fast-forward
   - **Nothing is pushed here.**
   *Done when:* `utils/tests/repos/test_preflight.py` covers fast-forward vs diverged, a planted fake key, a planted absolute path and a large file, using a temp repo and a bare "remote"; the real report for the four mods is written and shown to the user.
-- [ ] **1.3 Push, after the user's approval: `utils/repos_migrate.py push <sid>`.**
+- [x] **1.3 Push, after the user's approval: `utils/repos_migrate.py push <sid>`.**
   - **Needs:** the user's yes per mod, after reading 1.2's report. Relay and LocalTTS are public.
   - **What:** `git push <url> split/<sid>:<branch>`, never forced, then `git ls-remote` to confirm the branch head equals the split head. Anything the scan found is fixed by a GAIFA commit and 1.2 is run again, never by editing the split.
   *Done when:* each repository's branch head on GitHub equals `split/<sid>`; the old clones are untouched (their `git status` is unchanged).
+  - **Done 2026-10-26** (the user approved all four): Relay `main` → `4716ca0`, LLMs `master` → `373047d`, LocalTTS `main` → `c7eca45`, 3DGenerate `main` → `823d8cd`.
 
 **Checks & deliverables — Phase 1**
-- [ ] Each repository's GitHub page shows the GAIFA-era commits on top of its September history.
+- [x] Each repository's GitHub page shows the GAIFA-era commits on top of its September history.
 - [ ] Delivered: the four `.gitignore` files, `utils/repos_migrate.py`, the preflight report, tests.
 
 ## Phase 2 — Submodules in place (M)

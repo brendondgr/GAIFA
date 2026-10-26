@@ -386,6 +386,20 @@ Four tasks (capability), skynet, dry run, against the installed hub:
 | `show_csv_chart` | 3/3 (after two fixes) | the 5-row CSV is in the message, so the model copies its numbers inline (right ones) and once sent `x` as JSON text; `show` now reads such lists, and the check accepts the file's numbers inline or by its columns. Its first try with the file named no columns: the error listed them and the next call used them |
 | `show_jobs_table` | 0/3, then 3/3 with 46.1 | the model writes its own markdown table after `gen3d_list_jobs` rather than calling `show`; with 46.1 the tool's default view draws the whole list as a table (its result is over 8 KB, so the card reads it from the hub), and the check is that a table is shown. Asked "as a table", the model still adds its own markdown table under it (cosmetic), though the tool's description now says the user already sees one |
 
+### Structured memory (plan structured-memory 6.1, 2026-10-26)
+
+`python -m evals.memory --runs 3` (in `services/agent`): each scenario seeds a fresh memory, asks one question in a new Auto chat and checks the answer. The agent runs in-process with a throwaway database and the tests' stand-in hub (this machine's memory and chats are untouched); the model is real, through the relay. The stand-in's search by meaning matches words, so this measures names, keywords, the profile and recall.
+
+| Scenario | What it asks | skynet (Swift 1.5) |
+| --- | --- | --- |
+| `rename` | a project renamed AIHub → GAIFA, asked by its old name | 3/3 (recalled by the alias; no tool call) |
+| `changed` | a preference replaced (16:9 → 4:3) | 3/3 (the profile holds only the current one) |
+| `ended` | a fact whose `valid_until` passed (in Lisbon "this week", 2020) | 3/3 (answers from the current facts, says it doesn't know about this week) |
+| `abstain` | something memory doesn't hold (the dog's name) | 3/3 (calls `memory_search`, then says it doesn't know) |
+| `alias` | a project's fact by its other name ("the website"), among 13 projects | 3/3 (recalled by the alias) |
+
+About 4,400–4,500 prompt tokens a turn, 1–2 s each. Not run: this machine's own chat model (the llama.cpp mod was stopped) and LongMemEval's knowledge-update and abstention questions (they need the dataset downloaded first).
+
 ## Gate
 
 Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

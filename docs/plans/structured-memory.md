@@ -1,6 +1,6 @@
 # Plan: structured memory: entities, facts that change, search by meaning
 
-**Asked for:** 2026-10-26 · **Status:** In progress
+**Asked for:** 2026-10-26 · **Status:** Done (2026-10-26)
 
 ## 1. Introduction
 
@@ -119,10 +119,10 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
 
 ## Phase 6 — Measuring it (S)
 
-- [ ] **6.1 A memory eval: `services/agent/evals/memory.py`.**
+- [x] **6.1 A memory eval: `services/agent/evals/memory.py`.**
   - **Scripted conversations:** a project renamed midway, a preference changed, a fact that expires, a question memory can't answer (the agent must say it doesn't know); plus LongMemEval's knowledge-update and abstention questions run through the store and `memory_search` (not the full 115k-token histories).
   - **Measures:** right answers, wrong current fact (stale), proposals that the reviewer would reject (a scripted judge), tokens per turn.
-  *Done when:* the eval runs on skynet (`localhost:9090`) and this machine's chat model, and the numbers are in `docs/agent-eval.md`.
+  *Done when:* the eval runs on skynet (`localhost:9090`) and this machine's chat model, and the numbers are in `docs/agent-eval.md`. *As built (2026-10-26):* five scripted scenarios (rename by the old name, a changed preference, an ended fact, a question memory can't answer, a fact by an alias), the agent in-process with a throwaway memory and the stand-in hub, the real model through the relay: skynet 15/15 over three runs. Not run: this machine's chat model (the llama.cpp mod was stopped) and LongMemEval's questions (the dataset needs downloading: a follow-up).
 
 | Deliverable | Description | Location |
 | --- | --- | --- |

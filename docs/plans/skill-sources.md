@@ -1,6 +1,6 @@
 # Plan: skills from the chat's workspace, uploads and the open skill format
 
-**Asked for:** 2026-10-26 · **Status:** Planned
+**Asked for:** 2026-10-26 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -21,7 +21,7 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
 
 ## Phase 1 — The open skill format everywhere (S)
 
-- [ ] **1.1 Frontmatter and validation: `utils/skillfmt.py`, `services/agent/agent/skillfmt.py`, `services/workspace/skillfmt.py`.**
+- [x] **1.1 Frontmatter and validation: `utils/skillfmt.py`, `services/agent/agent/skillfmt.py`, `services/workspace/skillfmt.py`.**
   - **Parsing:** YAML frontmatter with `yaml.safe_load` (PyYAML: already in the hub's lock through `uvicorn[standard]`; add `pyyaml` to `services/agent/requirements.txt` and `services/workspace/requirements.txt`). Folded and literal scalars, lists and nested `metadata` work; a file without frontmatter or with bad YAML gets `problems`, not an exception.
   - **Shape:** `parse(text) -> {name, description, meta, body, problems}`; `check(name, folder_name, meta)` follows the spec (name 1–64 of `[a-z0-9-]`, no leading, trailing or double hyphen, matching its folder; description 1–1024 characters). A mismatch is a problem shown on the card, not a refusal (other agents' skills are often loose).
   - **Why three copies:** mods never import hub code (architecture §2); each copy is about 60 lines and a test checks they parse the same fixtures alike.

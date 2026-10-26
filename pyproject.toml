@@ -15,6 +15,7 @@ dependencies = [
     "websockets",           # the proxy passes mod WebSockets through (plan 29.2)
     "pypdfium2>=5.14.0",
     "psutil>=6",
+    "pyyaml>=6",
 ]
 
 [dependency-groups]

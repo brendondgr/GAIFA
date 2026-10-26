@@ -23,6 +23,8 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from . import skillfmt
+
 BASE_DIR = Path(__file__).resolve().parents[1] / "harness"
 ALWAYS_ON = ("systemprompt.md", "guardrails.md")
 ALWAYS_ON_MAX = 24_000             # characters: every one competes with the model's own budget (Harness²)
@@ -35,15 +37,9 @@ class HarnessError(Exception):
 
 
 def _frontmatter(text: str) -> dict[str, str]:
-    if not text.startswith("---"):
-        return {}
-    end = text.find("\n---", 3)
-    meta = {}
-    for line in text[3:end if end > 0 else 3].strip().splitlines():
-        if ":" in line:
-            k, v = line.split(":", 1)
-            meta[k.strip()] = v.strip()
-    return meta
+    """A skill's name and description (`skillfmt.parse`): what every prompt lists."""
+    s = skillfmt.parse(text)
+    return {k: s[k] for k in ("name", "description") if s[k]}
 
 
 class Harness:
@@ -229,5 +225,4 @@ def skill_body(tree: dict[str, str], name: str) -> str | None:
     t = tree.get(f"skills/{name}/SKILL.md")
     if t is None:
         return None
-    end = t.find("\n---", 3) if t.startswith("---") else -1
-    return t[end + 4:].lstrip("\n") if end > 0 else t
+    return skillfmt.split(t)[1]

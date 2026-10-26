@@ -3,7 +3,7 @@
     AGENT.md                     standing instructions, re-read every turn (first 200 lines)
     memory/MEMORY.md             the memory index (in every prompt, first 200 lines)
     memory/<topic>.md            topic files, read on demand (read_skill("memory:<topic>"))
-    skills/<name>/SKILL.md       your own skills (frontmatter `name`, `description`)
+    skills/<name>/SKILL.md       your own skills (YAML frontmatter `name`, `description`: skillfmt.py)
 
 Mods' skills come from the hub (`GET /api/skills`, `GET /api/skills/{mod}/{name}`).
 """
@@ -15,24 +15,12 @@ import time
 from pathlib import Path
 from typing import Any
 
+from . import skillfmt
 from .hubapi import HubAPI
 
 MAX_LINES = 200
 NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 
-
-def frontmatter(text: str) -> tuple[dict[str, str], str]:
-    if not text.startswith("---"):
-        return {}, text
-    end = text.find("\n---", 3)
-    if end < 0:
-        return {}, text
-    meta = {}
-    for line in text[3:end].strip().splitlines():
-        if ":" in line:
-            k, v = line.split(":", 1)
-            meta[k.strip()] = v.strip().strip('"').strip("'")
-    return meta, text[end + 4:].lstrip("\n")
 
 
 def slug(s: str) -> str:
@@ -68,8 +56,8 @@ class Knowledge:
         from .harness import skills as harness_skills
         out = harness_skills(self.tree)                 # the harness's skills (plan 22.1), then data/agent/skills/
         for f in sorted((self.data / "skills").glob("*/SKILL.md")):
-            meta, _ = frontmatter(f.read_text())
-            out.append({"name": meta.get("name") or f.parent.name, "description": meta.get("description", ""),
+            s = skillfmt.parse(f.read_text())
+            out.append({"name": s["name"] or f.parent.name, "description": s["description"],
                         "source": "user", "id": f"user/{f.parent.name}"})
         return out
 
@@ -110,7 +98,7 @@ class Knowledge:
             if body is not None:
                 return body
             p = self.data / "skills" / n / "SKILL.md"
-            return frontmatter(p.read_text())[1] if p.is_file() else None
+            return skillfmt.parse(p.read_text())["body"] if p.is_file() else None
         if not self.hub:
             return None
         try:

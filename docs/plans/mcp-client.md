@@ -56,7 +56,7 @@ The approach is one new mod, `mcp` (port 5108), that is an MCP *client*: it star
 
 ## Phase 3 — The page (M)
 
-- [ ] **3.1 `services/mcp/ui/page.js`.**
+- [x] **3.1 `services/mcp/ui/page.js`.**
   - **Servers:** each with its state, tools (name, risk with a picker, allowed or not, description), Approve (and the diff when held), Start/Stop, its log; Add server (stdio command and arguments, or URL; env names to fill in `.env`).
   - **Import:** "Import from…" lists what other apps on this machine configure (read on demand from the files in §2, names, commands and URLs only), and a workspace folder's `.mcp.json`; picked ones are added unapproved.
   *Done when:* `utils/tests/web/mcp-page.test.mjs` covers the server list, the diff and the import list; on the installed hub the page adds, approves and starts the fake server.
@@ -64,8 +64,8 @@ The approach is one new mod, `mcp` (port 5108), that is an MCP *client*: it star
 **Wire — Phase 3:** the `mcp` mod's page.
 
 **Checks & deliverables — Phase 3**
-- [ ] Import shows the `blender` server that `~/.claude.json` and `~/.codex/config.toml` configure, without any env value.
-- [ ] Delivered: `ui/page.js`, `importers.py`, tests; docs: the mod's README.
+- [x] Import shows the `blender` server that `~/.claude.json` and `~/.codex/config.toml` configure, without any env value. *As checked (2026-10-26):* the Import tab lists Claude Code's `blender` (project `~/Projects/Blender`, `uvx blender-mcp`), Codex's `blender` (`uvx --from blender-mcp==2.0.0`, needs BLENDER_HOST, BLENDER_PORT, DISABLE_TELEMETRY), `node_repl` and `unity`; on Servers, the test server showed "tools changed (new: ask)" after a tool was added to it, and Approve the change put it back.
+- [x] Delivered: `ui/page.js`, `importers.py`, tests; docs: the mod's README.
 
 ## Phase 4 — Turning servers on in a chat (S)
 

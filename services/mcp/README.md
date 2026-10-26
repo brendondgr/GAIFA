@@ -26,6 +26,7 @@ Elicitation: a server's request for more input is declined (a mod can't put a fo
 | `PATCH /v1/servers/{id}`, `DELETE /v1/servers/{id}` | change it (a new launch means approving again; risks; turned-off tools), remove it |
 | `POST /v1/servers/{id}/start`, `/stop` | the session |
 | `POST /v1/servers/{id}/approve {hash}` | approve the tools as listed (refused when they changed since) |
+| `GET /v1/import`, `POST /v1/import/{key}[?id=]` | servers other apps here configure (Claude Code, Claude Desktop, Cursor, Codex, Gemini CLI, VS Code, a workspace folder's `.mcp.json`): names, commands and the names of their variables, never values; add one, its variables as `${NAME}` |
 | `GET /v1/tools` | the hub's `tools_source` rows |
 | `POST /v1/call/{id}/{tool} {arguments}` | one call |
 
@@ -37,5 +38,6 @@ Elicitation: a server's request for more input is declined (a mod can't put a fo
 | `servers.py` | `servers.json`, validation, `${NAME}` secrets from `.env` |
 | `client.py` | `Pool`: a session per server (stdio or HTTP) through the `mcp` SDK, idle stop, broken sessions |
 | `tools.py` | rows for the hub, risks, fingerprints and differences, results (outputs) |
-| `ui/page.js` | the page: servers, tools, approval, import |
+| `importers.py` | the other apps' MCP configs, read on demand |
+| `ui/page.js` | the page: Servers (state, tools with a risk and a switch each, Approve with what changed, Start/Stop, Turn off, Remove, Add a server) and Import |
 | `tests/` | a stdio fake server (`fake_server.py`) and the tests: `.venv/bin/python -m pytest` in this folder |

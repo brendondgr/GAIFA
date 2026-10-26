@@ -196,6 +196,38 @@ def create_app(state: Path, outputs: Path, hub_url: str = "", logs: Path | None 
                     out.append({"tool": t["name"], "why": "not checked (the hub didn't answer)", "excerpt": ""})
         return out
 
+    async def workspace_folders() -> list[str]:
+        if not hub_url:
+            return []
+        try:
+            async with httpx.AsyncClient(timeout=10) as c:
+                envs = (await c.get(f"{hub_url.rstrip('/')}/api/s/workspace/v1/environments")).json().get("environments") or []
+        except (httpx.HTTPError, ValueError):
+            return []
+        return sorted({f["path"] for e in envs for f in e.get("folders") or [] if f.get("path")})
+
+    @app.get("/v1/import", summary="MCP servers other apps here configure (Claude Code, Codex, Cursor, …) and workspace project files: names, never values")
+    async def import_list() -> dict:
+        import importers
+        rows = importers.found(await workspace_folders())
+        have = {(s.get("command"), tuple(s.get("args") or []), s.get("url")) for s in servers.list()}
+        return {"found": [{**e, "added": (e["command"], tuple(e["args"]), e["url"]) in have} for e in rows]}
+
+    @app.post("/v1/import/{key}", status_code=201, summary="Add a found server (its env and headers named as ${NAME}, its tools waiting for approval)")
+    async def import_one(key: str, id: str | None = None) -> Any:
+        import importers
+        e = next((x for x in importers.found(await workspace_folders()) if x["key"] == key), None)
+        if e is None:
+            return JSONResponse({"detail": "that server isn't in the configs any more", "code": "not_found"}, 404)
+        body = importers.as_server(e, id)
+        if servers.get(body["id"]):
+            return JSONResponse({"detail": f"there is already a server {body['id']!r}", "code": "exists",
+                                 "fix": "pass ?id=<another id>"}, 409)
+        try:
+            return row(servers.add(ServerIn(**body), origin={"app": e["app"], "file": e["file"], "scope": e["scope"]}))
+        except ValueError as err:
+            return JSONResponse({"detail": str(err), "code": "invalid"}, 422)
+
     @app.get("/v1/tools", summary="The agent's tools: every approved, enabled server's (its tools_source)")
     def agent_tools() -> dict:
         out = []

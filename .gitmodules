@@ -2,3 +2,7 @@
 	path = services/relay
 	url = git@github.com:brendondgr/Relay.git
 	branch = main
+[submodule "services/lcpp"]
+	path = services/lcpp
+	url = git@github.com:brendondgr/LLMs.git
+	branch = master

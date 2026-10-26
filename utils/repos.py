@@ -26,10 +26,12 @@ class GitError(RuntimeError):
     """A git command failed; the message is git's own."""
 
 
-def git(folder: Path, *args: str, timeout: float = GIT_TIMEOUT_S, check: bool = True) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASK_YESNO": "false", "LC_ALL": "C"}
+def git(folder: Path, *args: str, timeout: float = GIT_TIMEOUT_S, check: bool = True, env: dict[str, str] | None = None,
+        input: str | None = None) -> subprocess.CompletedProcess[str]:
+    full = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GIT_ASK_YESNO": "false", "LC_ALL": "C", **(env or {})}
     try:
-        r = subprocess.run(["git", "-C", str(folder), *args], capture_output=True, text=True, env=env, timeout=timeout)
+        r = subprocess.run(["git", "-C", str(folder), *args], capture_output=True, text=True, env=full, timeout=timeout,
+                           input=input)
     except subprocess.TimeoutExpired as e:
         raise GitError(f"git {' '.join(args)}: no answer within {timeout:.0f}s") from e
     if check and r.returncode:

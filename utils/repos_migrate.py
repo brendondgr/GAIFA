@@ -2,6 +2,7 @@
 
     python -m utils.repos_migrate preflight [<sid>…]   split, fetch, check, write the report (1.2)
     python -m utils.repos_migrate push <sid>            push split/<sid> as a fast-forward (1.3)
+    python -m utils.repos_migrate adopt <sid> -F MSG    make services/<sid> a submodule in place (2.1)
 
 Nothing here pushes on its own: `preflight` only reads the remote, and `push` needs a person to have
 read the report (the plan's approval point). Standard library only.
@@ -168,7 +169,20 @@ def main(argv: list[str] | None = None) -> int:
     pre.add_argument("sids", nargs="*")
     pu = sub.add_parser("push")
     pu.add_argument("sid", choices=sorted(MOD_REPOS))
+    ad = sub.add_parser("adopt")
+    ad.add_argument("sid", choices=sorted(MOD_REPOS))
+    ad.add_argument("-F", dest="message_file", required=True, help="GAIFA's commit message")
     a = p.parse_args(argv)
+    if a.cmd == "adopt":
+        from utils.repos_adopt import adopt
+        url, branch = MOD_REPOS[a.sid]
+        try:
+            commit = adopt(ROOT, a.sid, url, branch, Path(a.message_file).read_text())
+        except GitError as e:
+            print(f"{a.sid}: {e}", file=sys.stderr)
+            return 1
+        print(f"{a.sid}: a submodule of {url} {branch}; GAIFA {commit[:10]}")
+        return 0
     if a.cmd == "preflight":
         results = [preflight(ROOT, sid) for sid in (a.sids or list(MOD_REPOS))]
         dest = ROOT / "data" / "state" / "repos" / f"preflight-{time.strftime('%Y-%m-%d')}.md"

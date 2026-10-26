@@ -63,12 +63,12 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
 
 ## Phase 2 — Submodules in place (M)
 
-- [ ] **2.1 Convert one folder without touching its files: `utils/repos_migrate.py adopt <sid>`.**
+- [x] **2.1 Convert one folder without touching its files: `utils/repos_migrate.py adopt <sid>` (`utils/repos_adopt.py`).**
   - **Before:** a snapshot of the folder: path, size and mtime of every file, ignored ones included (`.venv`, `runtime/`, `data/`, `.env`), saved in `data/state/repos/adopt-<sid>-before.json`.
   - **Steps:**
     1. `git rm -r --cached services/<sid>`: the index only, files stay.
     2. In the folder: `git init`, `git remote add origin <url>`, `git fetch origin <branch>`, `git reset --mixed origin/<branch>`. The working tree is unchanged and `git status` is clean, because the split from Phase 1 is exactly this folder's tracked content.
-    3. From GAIFA's root: `git submodule add -b <branch> <url> services/<sid>`, which adopts the existing repository, then `git submodule absorbgitdirs services/<sid>`, which moves its `.git` into GAIFA's `.git/modules/`.
+    3. GAIFA's commit is built in a private index (the folder's files out, the gitlink and the `.gitmodules` entry with `branch` in), the way `git submodule add -b <branch>` would stage it, because another session may share the index; `main` moves only if it hasn't moved meanwhile, and only these two paths of the shared index and working tree follow. Then `git submodule init` and `git submodule absorbgitdirs services/<sid>`, which moves its `.git` into GAIFA's `.git/modules/`.
   - **After:** compare with the snapshot. Any difference stops the step and prints it.
   - **Running mods:** the files don't change, so a running mod keeps running; `gaifa check <sid>` runs at the end.
   - **Refuses:** a folder with uncommitted changes in GAIFA, a remote head that isn't the split head, or a missing snapshot.

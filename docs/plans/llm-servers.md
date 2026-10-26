@@ -82,7 +82,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Aliases:** they may not contain `/` (they can't today; a test pins it).
   *Done when:* `test_catalog.py` (new) covers grouping, hidden models, collisions (an allowlisted `openai/gpt-x` on OpenCode vs a cloud alias `openai`: the alias form wins, and the catalog marks the other unreachable) and the old names still routing.
   - **Done:** Relay `78eac71`; `test_catalog.py` (7), the relay's suite 228.
-- [ ] **1.4 The Anthropic adapter: `app/services/adapters/anthropic.py`.**
+- [x] **1.4 The Anthropic adapter: `app/services/adapters/anthropic.py`.**
   - **Request (OpenAI → Messages API):**
     - `system` messages joined into `system`.
     - `tools`/`tool_choice` → `tools` with `input_schema`.
@@ -104,6 +104,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Errors:** 429 and 529 keep `Retry-After` and are retryable on the same endpoint only. A 400's message is passed through in the error envelope.
   - **Probe:** a model list call.
   *Done when:* `test_adapter_anthropic.py` (a mock Messages server) covers each translation, a two-turn tool conversation whose second request carries the first turn's thinking signature, streaming tool-call deltas, usage with cache tokens, the missing `max_tokens` filled, a 529 and a 400.
+  - **Done:** Relay `3fb2253` with the shared base `adapters/translated.py`; `test_adapter_anthropic.py` (12), the relay's suite 240. Per the claude-api reference: the official SDK, no sampling parameters on API version 2026-10-21, adaptive thinking with `display: "summarized"` (the default shows none), forced `tool_choice` retried as `auto` on the newest models' 400, and the server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`) on by default, dropped on a model's 400.
 - [ ] **1.5 The Gemini adapter: `app/services/adapters/gemini.py`.**
   - **Request:** `generateContent`, and `streamGenerateContent?alt=sse` for streams.
     - System → `systemInstruction`.

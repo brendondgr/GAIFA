@@ -155,7 +155,7 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
 
 ## Phase 4 — The workflow, written down and tested end to end (M)
 
-- [ ] **4.1 Docs: [docs/mods.md](../mods.md) §10 "Mods with their own repository", architecture §12.**
+- [x] **4.1 Docs: [docs/mods.md](../mods.md) §10 "Mods with their own repository", architecture §12.**
   - **Day to day:**
     - Branch and commit in the mod: `cd services/<sid>` or `git -C`. A worktree of the mod goes outside GAIFA.
     - Run the mod's own tests.

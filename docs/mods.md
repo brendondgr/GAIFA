@@ -318,3 +318,31 @@ Then these sections, in this order. Leave a section out only when it has nothing
 7. **Check it works**: commands and the output to expect.
 8. **What to look for**: what's specific to each variant (`gfx1151`, CUDA versions, …), known errors and their fixes, what breaks quietly.
 9. **Known gaps**: steps no script does yet.
+
+## 10. Mods with their own repository
+
+`relay`, `lcpp`, `tts` and `gen3d` are git submodules (plan mod-repos): each folder is its own repository (`brendondgr/Relay` `main`, `brendondgr/LLMs` `master`, `brendondgr/LocalTTS` `main`, `brendondgr/3DGenerate` `main`), and GAIFA records the commit it was tested with, the **pin** (the gitlink in `services/<id>`). The mod still runs from its folder as any mod does; only where its commits go changes.
+
+**Day to day:**
+1. Work in the mod's repository: `cd services/<id>` (or `git -C services/<id> …`), make a branch, commit there. For a separate checkout, make a worktree of the mod's repository outside GAIFA (`git -C services/<id> worktree add ~/wt/<id>-feature`), never a worktree of GAIFA (below).
+2. Run the mod's own tests there, then push its branch and merge it on GitHub (or push its `main`/`master`).
+3. In GAIFA: `gaifa repos pin <id>` (the checkout becomes the pin, staged), `uv run pytest`, then commit GAIFA. The commit names the plan as usual: `GAIFA (<slug> N.k): relay → 9f1c2ab (…)`.
+4. When the mod moved on GitHub without you (another machine, another session): `gaifa repos update <id>`. It refuses if something would be lost, fetches, fast-forwards, reinstalls when dependencies changed, has the hub read the manifest again, restarts the mod if it was running and runs `gaifa check`; any failure puts the old commit back. `--commit` also runs GAIFA's tests and commits only the pin; Settings → Services → Repositories does the same with buttons.
+5. After pulling GAIFA (a new pin), `gaifa repos sync` checks the pins out.
+
+`gaifa repos` shows each mod's pin and checkout and what's wrong, with the fix, and the hub raises the same as alerts (`[repos]` in `config.toml`: `fetch_every_h`, `notify`, `check_on_start`). The doctor has them under `repos`.
+
+**Never:**
+- `git clean -x` or `-X`, in GAIFA or in a mod: the mods' venvs, runtimes and weights are ignored files.
+- `git submodule update` over a mod with changed files: it moves the checkout under them (`gaifa repos sync` refuses).
+- A force push to a mod's branch: GAIFA's pins and other machines point into its history.
+- Committing GAIFA with a pin that isn't pushed: a clone couldn't check it out (`pin_not_on_remote`).
+
+**Edge cases:**
+- **A GAIFA worktree has empty mod folders** until `git submodule update --init`, and even then no venvs, `runtime/` or `.env`, so the mods can't run from it. Run mods from the main checkout; work on a mod in a worktree of the mod's own repository.
+- **Two sessions on one mod:** a branch each in the mod's repository; the pin moves only when one is merged and pinned.
+- **The hub keeps running the old code** until the mod restarts: `gaifa repos update` restarts it; after `pin`, run `gaifa restart <id>` yourself.
+- **Private repositories** (LLMs, 3DGenerate) need an SSH key with access on every machine; without one, `gaifa setup` skips that mod and says why.
+- **A clone without its submodules:** the hub skips the empty folders (no broken-manifest alert) and lists them as `not_checked_out`; tests that read their files skip with the command to run.
+
+**Making another mod a submodule:** push its history to its repository with `python -m utils.repos_migrate preflight <id>` (read the report) and `push <id>`, then `adopt <id> -F <message>`, which turns the folder into a submodule in place without touching its files. The mod needs an entry in `MOD_REPOS` (`utils/repos_migrate.py`) and its own `.gitignore` covering everything GAIFA ignores in it (`utils.repos.ignore_gap`).

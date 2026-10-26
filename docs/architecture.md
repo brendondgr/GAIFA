@@ -671,6 +671,7 @@ regenerate = false       # true: keep this machine's model inventory (data/state
 11. **The UI runtime is Claude Design's generated `support.js` (React 18).** Don't edit it. Any change a new export needs goes in `web/PATCHES.md`, and the brief asks Claude Design to fold those changes in on its next pass.
 12. **Metric storage grows over time.** Rollups and retention (§13) keep `hub.db` small: roughly 30 series × 10 s for 48 h is about 0.5 M rows, pruned hourly.
 13. **Workspace folders are written in place** (plan Phase 27). Only folders at Edit or above, never the GAIFA folder or `data/models/`, and never through a symlink out of the folder (`services/workspace/folders.py`).
+14. **Four mods are submodules** (plan mod-repos): `relay`, `lcpp`, `tts` and `gen3d` commit to their own repositories and GAIFA pins a commit of each. A clone or a GAIFA worktree has them empty until `git submodule update --init` (and never their venvs or runtimes); a change to one is two commits (the mod's, then GAIFA's pin); `git submodule update` over changed files loses them. `gaifa repos` and the `repos.*` alerts say which state each is in and the fix; the workflow is [mods.md §10](mods.md#10-mods-with-their-own-repository).
 
 ## 13. Metrics and charts
 

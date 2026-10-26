@@ -97,3 +97,21 @@ async def test_status(wh, monkeypatch):
     judge_mod._status.clear()
     s = await judge_mod.status(wh.hub.config, httpx.AsyncClient(transport=httpx.MockTransport(handler)))
     assert s["available"] is True and s["model"] == "minicpm-5-2B"
+
+
+async def test_no_cloud_for_the_judge(wh, monkeypatch):
+    """Plan llm-servers 2.4: the judge's and screening's choices leave out cloud models, and a judge set to one
+    isn't available, with why."""
+    data = [{"id": "minicpm-5-2B", "relay": {"group": "local"}}, {"id": "claude", "relay": {"group": "cloud"}},
+            {"id": "claude/claude-opus-5-5", "relay": {"group": "cloud"}}, {"id": "skynet", "relay": {"group": "remote"}},
+            {"id": "auto"}, {"id": "agent", "relay": {"group": "agent"}}]
+    choices, cloud = judge_mod.relay_choices(data)
+    assert choices == ["minicpm-5-2B", "skynet"] and cloud == {"claude", "claude/claude-opus-5-5"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": data})
+    monkeypatch.setattr(wh.hub.config.agent.judge, "model", "claude")
+    judge_mod._status.clear()
+    s = await judge_mod.status(wh.hub.config, httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    assert s["available"] is False and s["detail"] == judge_mod.CLOUD_ONLY_CHATS and s["choices"] == ["minicpm-5-2B", "skynet"]
+    judge_mod._status.clear()

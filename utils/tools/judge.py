@@ -408,6 +408,15 @@ async def judge_call(cfg: Any, tool_name: str, arguments: dict[str, Any], origin
 
 
 _status: dict[str, Any] = {}
+CLOUD_ONLY_CHATS = "cloud models are for chats only; pick a model on this machine or a remote server"
+
+
+def relay_choices(data: list[dict[str, Any]]) -> tuple[list[str], set[str]]:
+    """The relay catalog's models a background caller (the judge, screening) may use, and its cloud ones (plan
+    llm-servers 2.4): local and named models, never `<server>/<model>` ids, `auto`, the agent or a paid provider."""
+    cloud = {str(m.get("id")) for m in data if (m.get("relay") or {}).get("group") == "cloud"}
+    ids = {str(m.get("id")) for m in data if m.get("id")} - {"auto", "agent"} - cloud
+    return sorted(i for i in ids if "/" not in i), cloud
 
 
 async def status(cfg: Any, client: httpx.AsyncClient | None = None, max_age_s: float = 30) -> dict[str, Any]:
@@ -431,10 +440,12 @@ async def status(cfg: Any, client: httpx.AsyncClient | None = None, max_age_s: f
             out["detail"] = "" if out["available"] else ("; ".join((m or {}).get("problems") or []) or
                                                          f"the decide mod has no model {jc.model}")
         else:
-            ids = {m.get("id") for m in d.get("data", [])}
-            out["choices"] = sorted(i for i in ids if i and "/" not in i and i not in ("auto", "agent"))   # local and named models
-            out["available"] = jc.model in ids
-            out["detail"] = "" if out["available"] else f"the relay doesn't list {jc.model} (start it, or pick another judge)"
+            data = d.get("data", [])
+            ids = {m.get("id") for m in data}
+            out["choices"], cloud = relay_choices(data)
+            out["available"] = jc.model in ids and jc.model not in cloud
+            out["detail"] = ("" if out["available"] else CLOUD_ONLY_CHATS if jc.model in cloud
+                             else f"the relay doesn't list {jc.model} (start it, or pick another judge)")
     except (httpx.HTTPError, ValueError) as e:
         out["detail"] = f"{jc.url} doesn't answer ({type(e).__name__})"
     finally:

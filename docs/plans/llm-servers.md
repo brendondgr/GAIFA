@@ -165,11 +165,14 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Fallback:** a fallback turn says which model failed and why.
   *Done when:* `utils/tests/web/chat.test.mjs` covers the marker and the notice; `test_loop.py` covers the fallback note.
   - **Done:** the notice (`Agent._cloud_notice`: a `cloud_notice` event and an info `note`, once per switch) and the fallback note (it already said which model failed and why) are tested in `tests/test_cloud_models.py`. The marker is drawn by Phase 5's model menu (5.1), which shows each model's group; the notice is a `note`, which the Chat page already draws.
-- [ ] **2.4 No cloud for background work: `utils/tools/judge.py`, `utils/tools/screen.py`, `web/settings/blocks-agent.js`.**
+- [x] **2.4 No cloud for background work: `utils/tools/judge.py`, `utils/tools/screen.py`, `web/settings/blocks-agent.js`.**
   - **What:** the judge's and screening's model pickers list only non-cloud models. A config that names a cloud model is refused with "cloud models are for chats only; pick a model on this machine or a remote server", and `GET /api/judge/status` says so.
   *Done when:* `utils/tests/tools/test_judge.py` covers the refusal and the picker filter.
+  - **Done:** `judge.relay_choices()` gives both pickers (the judge's `GET /api/judge/status`, screening's `GET /api/web/reading`) local, remote and named models only; a judge set to a cloud model is unavailable with `CLOUD_ONLY_CHATS` as its detail (the relay refuses it anyway: the hub sends no purpose header). Saving such a setting isn't refused (that would need the relay at save time); the status says why it doesn't run. Test: `test_judge_auto.py::test_no_cloud_for_the_judge`.
 
-**Checks & deliverables — Phase 2**
+**Checks & deliverables — Phase 2** (live, with a key): waits for the user's provider key; everything else is tested against the scripted model.
+
+**Phase 2's live check**
 - [ ] On the installed hub with the user's keys: a chat on Claude runs a turn with two tool calls and a second turn; the same on Gemini; a chat on a local model is unchanged.
 - [ ] Delivered: agent changes, tests; docs: architecture §14.1, the agent's `README.md`.
 

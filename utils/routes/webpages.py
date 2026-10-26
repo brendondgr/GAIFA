@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from utils.api_models import Output
 from utils.server import HubError
 from utils.tools import results, screen, screen_store, webread
+from utils.tools.judge import relay_choices
 
 router = APIRouter(tags=["web"])
 
@@ -161,8 +162,7 @@ async def _models(url: str, backend: str) -> list[str]:
         if backend == "decide":
             out = [str(m.get("id")) for m in d.get("models", []) if m.get("usable") and m.get("id")]
         else:
-            out = sorted({str(m.get("id")) for m in d.get("data", []) if m.get("id")} - {"auto", "agent"})
-            out = [i for i in out if "/" not in i]           # local and named models, as the judge's picker
+            out, _ = relay_choices(d.get("data", []))     # local and named models, never cloud (plan llm-servers 2.4)
     except (httpx.HTTPError, ValueError, AttributeError):
         out = []
     _choices[key] = (time.monotonic(), out)

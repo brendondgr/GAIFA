@@ -136,7 +136,7 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
     - `POST /api/repos/{sid}/pin`.
     - Errors use the envelope.
   *Done when:* `utils/tests/repos/test_repos_routes.py` and `test_repos_alerts.py` (temp repos, a fake clock) cover alerts raised and cleared per code, `notify` levels, `fetch_every_h = 0` never fetching, an update through the route with its progress and its rollback, and 409s; the contract test covers the new routes; architecture §6 and brief §6 list them.
-- [ ] **3.4 The doctor: `utils/doctor.py`.**
+- [x] **3.4 The doctor: `utils/doctor.py`.**
   - **What:** a `repos` area with one `check(...)` per problem, the same title and fix text as the alerts, shown in `gaifa doctor` and Settings → About.
   *Done when:* `utils/tests/core/test_doctor.py` covers a `dirty` and a `not_checked_out` mod.
 - [ ] **3.5 Settings → Services → Repositories: `web/settings/schema.js`, `web/settings/blocks-repos.js`.**

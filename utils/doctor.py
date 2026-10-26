@@ -212,9 +212,22 @@ def _stage_d(hub: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _repos(hub: Any) -> list[dict[str, Any]]:
+    """The mods that are their own repositories (plan mod-repos 3.4): the same problems and fixes as their alerts."""
+    from utils import repos
+    level = {"error": "fail", "warn": "warn", "info": "note"}
+    out = []
+    for st in repos.list_states(hub.paths.root):
+        if not st.problems:
+            out.append(check("repos", "ok", f"{st.id}: at its pin {(st.pinned or '')[:10]}", f"{st.url} {st.branch}"))
+        for p in st.problems:
+            out.append(check("repos", level[p.level], p.title, p.detail, p.fix or None))
+    return out
+
+
 async def run(hub: Any) -> dict[str, Any]:
     models, views = await asyncio.to_thread(_models, hub)
     checks = (models + _manifests(hub) + _paths(hub) + _stage_d(hub) + await _ports_units(hub)
-              + _disk(hub) + _offline(hub, views))
+              + _disk(hub) + _offline(hub, views) + await asyncio.to_thread(_repos, hub))
     counts = {k: sum(c["level"] == k for c in checks) for k in ("ok", "note", "warn", "fail")}
     return {"ts": time.time(), "ok": counts["fail"] == 0, "counts": counts, "checks": checks}

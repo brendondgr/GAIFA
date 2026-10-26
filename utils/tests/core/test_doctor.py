@@ -93,3 +93,21 @@ async def test_inventory_lists_paths_outside_with_reasons(services_dir, root, ma
     assert by["docker.io/kyuz0/image:latest"]["reason"].startswith("podman image")
     assert any(i["path"].startswith("systemd journal") for i in inv["items"])
     assert inv["ok"] is False and inv["counts"]["outside"] == 1
+
+
+async def test_doctor_lists_the_submodule_mods(tmp_path, monkeypatch):
+    """Plan mod-repos 3.4: a `repos` area with the alerts' titles and fixes."""
+    from utils.tests.repos.gitfix import ENV, adopted
+    for k, v in ENV.items():
+        monkeypatch.setenv(k, v)
+    root, mod, _ = adopted(tmp_path)
+    hub = type("H", (), {"paths": type("P", (), {"root": root})()})()
+    [ok] = doctor._repos(hub)
+    assert ok["area"] == "repos" and ok["level"] == "ok" and ok["title"].startswith("m: at its pin")
+    (mod / "service.toml").write_text("changed\n")
+    [dirty] = doctor._repos(hub)
+    assert dirty["level"] == "warn" and dirty["fix"].startswith("commit them in services/m")
+    import subprocess
+    subprocess.run(["git", "-C", str(root), "submodule", "deinit", "-q", "-f", "services/m"], check=True)
+    [gone] = doctor._repos(hub)
+    assert gone["level"] == "fail" and "git submodule update --init services/m" in gone["fix"]

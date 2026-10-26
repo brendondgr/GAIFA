@@ -22,11 +22,13 @@ cli: Any = None   # utils/cli.py sets this before calling in
 
 if __package__:   # imported as utils.cli_setup (tests); as a script's helper it must not load the utils package
     from utils import cli_setup_host as host_mod
+    from utils import cli_setup_repos as repos_mod
     from utils import cli_setup_run as run_mod
     from utils import cli_setup_variant as variant_mod
     from utils import setupdocs
 else:
     import cli_setup_host as host_mod  # type: ignore[no-redef]
+    import cli_setup_repos as repos_mod  # type: ignore[no-redef]
     import cli_setup_run as run_mod  # type: ignore[no-redef]
     import cli_setup_variant as variant_mod  # type: ignore[no-redef]
     import setupdocs  # type: ignore[no-redef]
@@ -166,6 +168,8 @@ def plan_text(p: dict[str, Any]) -> str:
         out += ["", "Variants (gaifa hardware; --accel <setup>=<accel> to pick another):"]
         for v in p["variants"]:
             out.append(f"  {v['setup']:24} {v['label']}" + ("  [untested on this kind of machine]" if v["untested"] else "") + (f"  ({v['note']})" if v["note"] else ""))
+    if (p.get("checkouts") or {}).get("done"):
+        out += ["", "Checked out (their own repositories): " + ", ".join(p["checkouts"]["done"])]
     if p.get("unavailable"):
         out += ["", "Not available on this machine:"] + [f"  {u['setup']:24} {u['why']}" for u in p["unavailable"]]
     if p["checks"]:
@@ -212,6 +216,13 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             done = run_mod.hub_stage(code, runner, stream=not args.json)
             emit(args, {"stage": "hub", "done": done}, "hub: " + ", ".join(done))
             return 0
+        # plan mod-repos 4.3: the submodule mods' setup docs are inside them, so the chosen ones are checked out first
+        subs: dict[str, list[Any]] = {"done": [], "failed": []}
+        if targets[:1] != ["host"]:
+            subs = repos_mod.checkout(root, targets)
+            for sid in subs["done"]:
+                print(f"checked out services/{sid} (its own repository)", file=sys.stderr)
+        _last["checkouts"] = subs
         offered, problems = choices(root)
         if targets[:1] == ["host"]:
             found = host_mod.checks(probe, root)
@@ -219,7 +230,8 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
             return 1 if host_mod.blocking(found, gpu=False) else 0
         if not targets:
             if not run_mod.interactive(args):
-                emit(args, {"stage": "choose", "choices": [{"id": e.id, "mod": e.mod, "summary": e.setup.summary, "gpu": e.setup.gpu, "disk_gb": e.setup.disk_gb, "after": e.setup.after} for e in offered.values()], "problems": problems},
+                emit(args, {"stage": "choose", "choices": [{"id": e.id, "mod": e.mod, "summary": e.setup.summary, "gpu": e.setup.gpu, "disk_gb": e.setup.disk_gb, "after": e.setup.after} for e in offered.values()], "problems": problems,
+                            "unavailable": subs["failed"]},
                      "\n".join(f"  {e.id:24} {e.setup.summary}" for e in offered.values()))
                 return 0
             ids = sorted(offered, key=lambda i: (offered[i].mod, i))
@@ -228,6 +240,11 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
                 print(f"  {n:2}. {i:24} {'GPU ' if e.setup.gpu else '    '}{(e.setup.disk_gb or 0):5.1f} GB  {e.setup.summary}")
             pick = input("Which? numbers or ids, comma-separated: ")
             targets = [ids[int(x) - 1] if x.strip().isdigit() else x.strip() for x in pick.split(",") if x.strip()]
+        lost = [t for t in targets if any(repos_mod.wanted([t], f["mod"]) and t not in offered for f in subs["failed"])]
+        if lost:
+            targets = [t for t in targets if t not in lost]
+            if not targets:
+                raise Stop("unavailable", unavailable=subs["failed"])
         envs = resolve(targets, offered, root)
         machine = probe.machine()
         _last.clear()
@@ -237,6 +254,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
         gone = run_mod.dependents(resolved, {u["setup"] for u in unavailable}) - {u["setup"] for u in unavailable}
         unavailable += [{"setup": i, "mod": next(e.mod for e in resolved if e.id == i), "why": "it needs a setup this machine can't run"} for i in sorted(gone)]
         envs = [e for e in envs if e.id not in gone]
+        unavailable += subs["failed"]
         if not envs:
             raise Stop("unavailable", unavailable=unavailable, hardware=machine.to_dict()["accels"])
         expanded = {t: [e.id for e in envs if e.mod == t] for t in targets if len([e for e in envs if e.mod == t]) > 1}   # a mod id means all its setups
@@ -245,6 +263,7 @@ def cmd_setup(args: argparse.Namespace, runner: Runner | None = None, probe: hos
         p = plan(envs, found, run_mod.hub_needs(code, runner), expanded)
         p["variants"] = [variant_mod.describe(e, machine) for e in envs]
         p["unavailable"] = unavailable
+        p["checkouts"] = subs
         p["smokes"] = [{"setup": e.id, "run": e.setup.smoke} for e in envs if e.setup.smoke] if getattr(args, "smoke", False) else []
         _last["plan"] = p
         if args.plan:

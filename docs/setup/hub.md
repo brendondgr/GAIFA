@@ -11,8 +11,10 @@ Python 3.12+ (uv's managed CPython; the hub's venv is `.venv/`), uv 0.12.23, Fas
 ## Install
 
 ```bash
-git clone https://github.com/brendondgr/GAIFA.git ~/GAIFA
+git clone --recurse-submodules https://github.com/brendondgr/GAIFA.git ~/GAIFA
 ```
+
+`relay`, `lcpp`, `tts` and `gen3d` are git submodules of their own repositories; without `--recurse-submodules` their folders are empty, and `gaifa setup <id>` checks out the ones you pick (the private two, LLMs and 3DGenerate, need an SSH key with access). `gaifa repos` shows them and keeps them up to date ([mods.md §10](../mods.md#10-mods-with-their-own-repository)).
 
 ```bash
 cd ~/GAIFA && uv sync

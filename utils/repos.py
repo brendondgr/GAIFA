@@ -112,7 +112,7 @@ class RepoState:
     dirty: int = 0                  # tracked files changed
     untracked: int = 0
     ahead: int = 0                  # commits on head not on origin/<branch> (after the last fetch)
-    behind: int = 0                 # commits on origin/<branch> the pin doesn't have
+    behind: int = 0                 # commits on origin/<branch> the checkout doesn't have (after the last fetch)
     unpushed: int = 0               # commits on head on no remote branch
     pinned_on_remote: bool | None = None
     checkout_vs_pin: str = "same"   # same | ahead | behind | diverged | unknown
@@ -228,8 +228,7 @@ def repo_state(root: Path, sid: str) -> RepoState:
     has_remote = bool(_out(mod, "rev-parse", "-q", "--verify", remote))
     if has_remote and st.head:
         st.ahead = int(_out(mod, "rev-list", "--count", f"{remote}..{st.head}") or 0)
-        base = st.pinned if st.pinned and _out(mod, "cat-file", "-t", st.pinned) == "commit" else st.head
-        st.behind = int(_out(mod, "rev-list", "--count", f"{base}..{remote}") or 0)
+        st.behind = int(_out(mod, "rev-list", "--count", f"{st.head}..{remote}") or 0)   # new on GitHub for this checkout
     if st.head:
         st.unpushed = int(_out(mod, "rev-list", "--count", st.head, "--not", "--remotes") or 0)
     pin_known = bool(st.pinned) and _out(mod, "cat-file", "-t", st.pinned or "") == "commit"

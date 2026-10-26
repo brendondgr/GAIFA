@@ -45,7 +45,7 @@ class RepoState(_Model):
     dirty: int
     untracked: int
     ahead: int
-    behind: int = Field(description="Commits on the branch on GitHub (as of the last fetch) the pin doesn't have")
+    behind: int = Field(description="Commits on the branch on GitHub (as of the last fetch) the checkout doesn't have")
     unpushed: int
     pinned_on_remote: bool | None
     checkout_vs_pin: Literal["same", "ahead", "behind", "diverged", "unknown"]

@@ -150,3 +150,13 @@ def test_list_states_and_dict(gaifa):
     [st] = list_states(root)
     d = st.to_dict()
     assert d["id"] == "m" and d["level"] is None and d["problems"] == []
+
+
+def test_pushed_but_not_pinned_is_no_update(gaifa):
+    """Committed and pushed in the mod: GAIFA should pin it, not "update" to it (found on the real mods)."""
+    root, mod, _ = gaifa
+    commit(mod, "docs", {"README.md": "r"})
+    g(mod, "push", "-q", "origin", "main")
+    st = repo_state(root, "m")
+    assert st.behind == 0 and st.unpushed == 0 and codes(st) == ["checkout_ahead_of_pin"]
+

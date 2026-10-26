@@ -177,8 +177,8 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
   - **Rules:** commit in the mod first, then the pin, with tests passing in both; check `gaifa repos status` before committing GAIFA; where the four repositories are.
   - **Clone:** a clone needs `--recurse-submodules` (or `gaifa setup` does it, 4.3).
   *Done when:* the rules appear in each file and agree with docs/mods.md §10.
-- [ ] **4.3 Setup on a fresh clone: `utils/cli_setup*.py`, `docs/setup/README.md`, each of the four mods' `setup/*.md`.**
-  - **What:** `gaifa setup [<mod>…]` runs `git submodule update --init services/<sid>` for the chosen mods that are submodules. `--plan` lists it. A clone failure (no SSH key, no access to a private repository) stops that mod with the git message and the fix ("add an SSH key with access to brendondgr/LLMs, or skip lcpp"). `gaifa report` records it.
+- [x] **4.3 Setup on a fresh clone: `utils/cli_setup*.py`, `docs/setup/README.md`, each of the four mods' `setup/*.md`.**
+  - **What:** `gaifa setup [<mod>…]` runs `git submodule update --init services/<sid>` for the chosen mods that are submodules (`utils/cli_setup_repos.py`), before it reads the setup docs, since they're inside the mod; with no mods named, every missing one. `--plan` does it too (it installs nothing). `--plan` lists it. A clone failure (no SSH key, no access to a private repository) stops that mod with the git message and the fix ("add an SSH key with access to brendondgr/LLMs, or skip lcpp"). `gaifa report` records it.
   *Done when:* `utils/tests/core/test_cli_setup.py` covers the init step in the plan, a failing clone (a bad URL) and skipping it; a fresh `git clone` of GAIFA into the scratchpad (no `--recurse-submodules`), `gaifa setup relay --plan` and then `gaifa setup relay` with the hub's port changed reach a passing `gaifa check relay` and stop there, without touching the installed hub.
 
 **Checks & deliverables — Phase 4**

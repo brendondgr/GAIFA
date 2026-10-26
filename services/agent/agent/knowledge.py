@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from . import skillfmt
-from .hubapi import HubAPI
+from .hubapi import HubAPI, HubCallError
 
 MAX_LINES = 200
 NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
@@ -78,31 +78,44 @@ class Knowledge:
         return "\n".join(f"- {s['id']}: {desc(s)}" for s in await self.skills() if s["source"] not in off)
 
     async def read(self, name: str) -> str | None:
+        """A skill's body (followed by its other files' names), one of those files (`<id>/<path>`, skill-sources
+        1.2; skillfmt.SkillFileError when it can't be read), or a memory topic. None: no such skill."""
         name = name.strip().strip("/")
         if name.startswith("memory:"):
             topic = slug(name[7:])
             p = self.data / "memory" / f"{topic}.md"
             return p.read_text() if p.is_file() else None
         if "/" in name:
-            src, n = name.split("/", 1)
+            src, n, path = (name.split("/", 2) + [""])[:3]
         else:
             matches = [s for s in await self.skills() if s["name"] == name or s["id"].endswith("/" + name)]
             if not matches:
                 return None
-            src, n = matches[0]["id"].split("/", 1)
+            (src, n), path = matches[0]["id"].split("/", 1), ""
         if not NAME.match(n) or not NAME.match(src):
             return None
+        sid = f"{src}/{n}"
         if src == "user":
             from .harness import skill_body
             body = skill_body(self.tree, n)
-            if body is not None:
+            if body is not None and not path:
                 return body
-            p = self.data / "skills" / n / "SKILL.md"
-            return skillfmt.parse(p.read_text())["body"] if p.is_file() else None
+            folder = self.data / "skills" / n
+            if not (folder / "SKILL.md").is_file():
+                return None
+            if path:
+                return skillfmt.read_file(folder, path)
+            return skillfmt.parse((folder / "SKILL.md").read_text())["body"] + skillfmt.files_note(sid, skillfmt.files(folder))
         if not self.hub:
             return None
+        if path:
+            try:
+                return (await self.hub.skill_file(src, n, path))["text"]
+            except HubCallError as e:
+                raise skillfmt.SkillFileError(e.code or "not_found", e.detail) from None
         try:
-            return (await self.hub.skill(src, n))["body"]
+            s = await self.hub.skill(src, n)
+            return s["body"] + skillfmt.files_note(sid, s.get("files") or [])
         except Exception:  # noqa: BLE001
             return None
 

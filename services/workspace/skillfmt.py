@@ -3,6 +3,8 @@ frontmatter and the spec's checks.
 
     parse(text)  -> {name, description, meta, body, problems}
     check(name, folder, description) -> problems
+    files(folder) -> [{path, size}]        a skill's other files (skill-sources 1.2)
+    read_file(folder, path) -> text        one of them; SkillFileError when it can't be read
 
 `meta` keeps every other frontmatter field (`license`, `metadata`, `allowed-tools`, other agents' own fields) as
 JSON-safe values. A problem is a sentence to show on the skill's card, never an exception: other agents' skills
@@ -16,13 +18,16 @@ from __future__ import annotations
 
 import datetime as _dt
 import re
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
 
 NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 NAME_MAX, DESC_MAX = 64, 1024
-_OPEN = re.compile(r"\A﻿?---[ \t]*\r?\n")
+FILE_MAX = 256 * 1024          # bytes: a skill's file read whole
+FILES_MAX = 100                # files listed per skill
+_OPEN = re.compile(r"\A\ufeff?---[ \t]*\r?\n")
 _CLOSE = re.compile(r"^(---|\.\.\.)[ \t]*\r?$", re.M)
 
 
@@ -99,3 +104,58 @@ def flag(meta: dict[str, Any], key: str) -> bool:
     """A yes/no field such as `disable-model-invocation`, written as a boolean or a string."""
     v = meta.get(key)
     return v is True or (isinstance(v, str) and v.strip().lower() in ("true", "yes", "1"))
+
+
+class SkillFileError(Exception):
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(detail)
+        self.code, self.detail = code, detail
+
+
+def _inside(folder: Path, p: Path) -> bool:
+    try:
+        return p.resolve().is_relative_to(folder.resolve())
+    except OSError:
+        return False
+
+
+def files(folder: Path) -> list[dict[str, Any]]:
+    """A skill folder's files other than SKILL.md, by path: no hidden ones, none through a symlink that leads out."""
+    out: list[dict[str, Any]] = []
+    for p in sorted(folder.rglob("*")):
+        rel = p.relative_to(folder)
+        if rel.as_posix() == "SKILL.md" or any(part.startswith(".") for part in rel.parts):
+            continue
+        if p.is_file() and _inside(folder, p):
+            out.append({"path": rel.as_posix(), "size": p.stat().st_size})
+            if len(out) >= FILES_MAX:
+                break
+    return out
+
+
+def read_file(folder: Path, path: str) -> str:
+    """One of a skill's files as text: inside the folder (no `..`, no symlink out), not hidden, at most FILE_MAX, UTF-8."""
+    rel = PurePosixPath(path.strip())
+    if not path.strip() or rel.is_absolute() or any(part in ("..", "") or part.startswith(".") for part in rel.parts):
+        raise SkillFileError("not_found", f"no file {path!r} in this skill")
+    p = folder / rel
+    if not _inside(folder, p) or not p.is_file():
+        raise SkillFileError("not_found", f"no file {path!r} in this skill")
+    if p.stat().st_size > FILE_MAX:
+        raise SkillFileError("too_big", f"{path} is {p.stat().st_size // 1024} KB (at most {FILE_MAX // 1024} KB)")
+    data = p.read_bytes()
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        text = None
+    if text is None or "\x00" in text:
+        raise SkillFileError("binary", f"{path} isn't a text file")
+    return text
+
+
+def files_note(sid: str, listed: list[dict[str, Any]]) -> str:
+    """The line after a skill's body that names its other files, for the model."""
+    if not listed:
+        return ""
+    rows = "\n".join(f"- {f['path']} ({max(1, round(f['size'] / 1024))} KB)" for f in listed)
+    return f"\n\n---\nOther files in this skill (read one with read_skill('{sid}/<path>')):\n{rows}"

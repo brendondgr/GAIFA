@@ -9,6 +9,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -203,6 +204,9 @@ class HubAPI:
 
     async def skill(self, mod: str, name: str) -> dict[str, Any]:
         return await self._json("GET", f"/api/skills/{mod}/{name}")
+
+    async def skill_file(self, mod: str, name: str, path: str) -> dict[str, Any]:
+        return await self._json("GET", f"/api/skills/{mod}/{name}/files/{quote(path)}")
 
     # ---- events ------------------------------------------------------------------------------
 

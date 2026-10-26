@@ -12,7 +12,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 | `agent/store.py` | `agent.db`: threads and their append-only event log; fork |
 | `agent/context.py` | Messages rebuilt from the log, the context meter, result capping, compaction helpers |
 | `agent/tools.py` | The local tools' schemas and `ToolSet` (core + loaded + pinned − disabled) |
-| `agent/local.py` | The local tools: ask_user, update_todos, find_tools, load_tools, read_skill, view_output (a PDF's page as an image; the start of a text output), read_result, remember |
+| `agent/local.py` | The local tools: ask_user, update_todos, find_tools, load_tools, read_skill (a skill's body and its other files, `<id>/<path>`), view_output (a PDF's page as an image; the start of a text output), read_result, remember |
 | `agent/knowledge.py` | `data/agent/`: AGENT.md, memory, user skills; mod skills from the hub |
 | `agent/prompts.py` | The system prompt, in plan order (the base text is `harness/systemprompt.md`) |
 | `agent/harness.py`, `harness/` | The harness as versioned files (plan 22.1): the base in git, learned versions in `data/agent/harness/`, rollback |

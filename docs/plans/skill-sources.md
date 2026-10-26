@@ -27,7 +27,7 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
   - **Why three copies:** mods never import hub code (architecture §2); each copy is about 60 lines and a test checks they parse the same fixtures alike.
   - **Callers:** `utils/routes/skills.py`, `knowledge.py` and `harness.py` use it instead of their own `frontmatter`.
   *Done when:* `utils/tests/tools/test_skillfmt.py` covers a folded description, a list, nested metadata, no frontmatter, broken YAML and each name rule, and runs the same fixtures through the agent's and workspace's copies; the existing skill tests pass.
-- [ ] **1.2 A skill's other files: `read_skill('<id>/<path>')`.**
+- [x] **1.2 A skill's other files: `read_skill('<id>/<path>')`.**
   - **Agent:** `Knowledge.read` takes `<id>/<relative path>` for a file inside the skill's folder (`references/forms.md`); a body's result ends with the list of its other files and sizes. Text files only, 256 KB at most, no `..`, no symlink out of the skill folder.
   - **Hub:** `GET /api/skills/{mod}/{name}/files/{path:path}` for mods' skills, with the same rules.
   *Done when:* `services/agent/tests/test_skills_files.py` reads a reference file and refuses `..`, a symlink out and a binary file; `utils/tests/tools/test_skills.py` covers the hub route.

@@ -10,7 +10,7 @@ import re
 from typing import TYPE_CHECKING, Any
 
 from . import context as ctx
-from . import show
+from . import show, skillfmt
 from .knowledge import Knowledge
 
 if TYPE_CHECKING:
@@ -131,7 +131,10 @@ class Local:
         if mod in tools.disabled:                      # a turned-off mod's skill is about tools this chat can't use
             return self.err(tid, cid, "read_skill", "disabled", f"the {mod} tools are turned off in this chat",
                             "tell the user it's turned off; they can turn it back on in the composer")
-        body = await k.read(name)
+        try:
+            body = await k.read(name)
+        except skillfmt.SkillFileError as e:
+            return self.err(tid, cid, "read_skill", e.code, e.detail, "the skill's files are listed after its body")
         if body is None:
             return self.err(tid, cid, "read_skill", "not_found", f"no skill {name!r}", "the skill list is in your instructions")
         return self.ok(tid, cid, "read_skill", body)

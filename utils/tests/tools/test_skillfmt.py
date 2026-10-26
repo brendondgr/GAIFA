@@ -50,7 +50,7 @@ def test_no_frontmatter_broken_yaml_and_not_a_mapping():
 
 
 def test_crlf_bom_and_dots_close():
-    s = skillfmt.parse("﻿---\r\nname: a\r\ndescription: d\r\n...\r\nbody\r\n")
+    s = skillfmt.parse("\ufeff---\r\nname: a\r\ndescription: d\r\n...\r\nbody\r\n")
     assert (s["name"], s["description"], s["body"]) == ("a", "d", "body\r\n")
 
 

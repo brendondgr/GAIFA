@@ -458,7 +458,15 @@ class FakeHub:
             s = self.skills.get((mod, name))
             if s is None:
                 raise HTTPException(404, "no skill")
-            return {"mod": mod, "name": name, **s}
+            return {"mod": mod, "name": name, **{k: v for k, v in s.items() if k != "file_texts"}}
+
+        @app.get("/api/skills/{mod}/{name}/files/{path:path}")      # skill-sources 1.2
+        def skill_file(mod: str, name: str, path: str) -> Any:
+            s = self.skills.get((mod, name))
+            text = (s or {}).get("file_texts", {}).get(path)
+            if text is None:
+                return JSONResponse({"detail": f"no file {path!r} in this skill", "code": "not_found"}, 404)
+            return {"path": path, "text": text}
 
         # the embed mod's chats collection (plan 28.5), proxied as /api/s/embed/…: ranked by shared words
         @app.put("/api/s/embed/v1/chats/{tid}")

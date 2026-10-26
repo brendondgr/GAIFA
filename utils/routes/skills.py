@@ -1,4 +1,5 @@
-"""Mods' agent skills (plan 14.9): `GET /api/skills`, `GET /api/skills/{mod}/{name}`.
+"""Mods' agent skills (plan 14.9): `GET /api/skills`, `GET /api/skills/{mod}/{name}`, and a skill's other files
+(skill-sources 1.2): `GET /api/skills/{mod}/{name}/files/{path}`.
 
 A mod declares `[agent] skills = "skills"`; each `skills/<name>/SKILL.md` starts with YAML frontmatter
 (`name`, `description`; `utils/skillfmt.py`). The agent lists the descriptions in its prompt and reads a body when needed.
@@ -25,8 +26,19 @@ class SkillInfo(BaseModel):
     description: str
 
 
+class SkillFile(BaseModel):
+    path: str
+    size: int
+
+
 class Skill(SkillInfo):
     body: str
+    files: list[SkillFile] = []
+
+
+class SkillFileText(BaseModel):
+    path: str
+    text: str
 
 
 
@@ -57,10 +69,30 @@ async def list_skills(request: Request) -> list[dict[str, Any]]:
 async def get_skill(mod: str, name: str, request: Request) -> dict[str, Any]:
     from utils.server import HubError
 
+    folder = _folder(request, mod, name)
+    if folder is None:
+        raise HubError(404, "not_found", f"no skill {mod}/{name}")
+    s = skillfmt.parse((folder / "SKILL.md").read_text())
+    return {"mod": mod, "name": name, "description": s["description"], "body": s["body"], "files": skillfmt.files(folder)}
+
+
+@router.get("/api/skills/{mod}/{name}/files/{path:path}", summary="One of a skill's other files, as text",
+            response_model=SkillFileText)
+async def get_skill_file(mod: str, name: str, path: str, request: Request) -> dict[str, Any]:
+    from utils.server import HubError
+
+    folder = _folder(request, mod, name)
+    if folder is None:
+        raise HubError(404, "not_found", f"no skill {mod}/{name}")
+    try:
+        return {"path": path, "text": skillfmt.read_file(folder, path)}
+    except skillfmt.SkillFileError as e:
+        raise HubError(404 if e.code == "not_found" else 422, e.code, e.detail) from None
+
+
+def _folder(request: Request, mod: str, name: str) -> Path | None:
     if NAME.match(name):
         for m, d in _dirs(request):
-            f = d / name / "SKILL.md"
-            if m == mod and f.is_file():
-                s = skillfmt.parse(f.read_text())
-                return {"mod": mod, "name": name, "description": s["description"], "body": s["body"]}
-    raise HubError(404, "not_found", f"no skill {mod}/{name}")
+            if m == mod and (d / name / "SKILL.md").is_file():
+                return d / name
+    return None

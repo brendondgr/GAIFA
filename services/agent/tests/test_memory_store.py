@@ -136,3 +136,13 @@ def test_about_with_a_name_and_its_path_is_one_entry(m):
     assert [e["id"] for e in g["entities"]] == [t["id"]]
     h = m.add_fact("Uses the agent loop", about=["projects/Ariadne/agent", "you"])
     assert sorted(e["path"] for e in h["entities"]) == ["projects/Ariadne/agent", "you"]
+
+
+def test_a_proposed_entry_goes_with_its_last_proposal(m):
+    a = m.add_fact("Thesis is about memory", about=[{"name": "Thesis", "kind": "project"}], source="inferred")
+    b = m.add_fact("Thesis is due in May", about=["Thesis"], source="inferred")
+    [t] = m.entities(state="proposed")
+    m.set_fact_state(a["id"], "rejected")
+    assert m.entity_row(t["id"])["state"] == "proposed"                         # b still needs it
+    m.forget(b["id"])
+    assert m.entity_row(t["id"])["state"] == "archived"

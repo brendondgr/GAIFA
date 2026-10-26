@@ -86,19 +86,19 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
 
 ## Phase 4 — Learning memories in the background (M)
 
-- [ ] **4.1 After a chat goes quiet: `memory/learn.py`, called next to `summaries.py`.**
+- [x] **4.1 After a chat goes quiet: `memory/learn.py`, called next to `summaries.py`.**
   - **Input:** the chat's user messages, answers and card edits since the last pass (the learner's rendering, `learn.loop.render`, without tool results or document text), plus the profile.
   - **Steps:** (1) the model lists candidate facts as JSON `[{text, about: [names], kind, valid_from?}]`; (2) each `about` name is resolved without a model (1.1's `resolve`), an unknown one becomes a proposed entity; (3) for each candidate, the 5 nearest current facts of the same entities (2.3); (4) the model picks one operation per candidate: `same:<id>` (`seen` + 1), `replaces:<id>`, `adds`, `skip`; (5) results are saved as `proposed` facts (and `proposed` replacements) with their evidence (thread, seq). An empty or malformed answer is logged and retried once next pass, never read as "nothing to learn".
-  - **Limits:** at most 20 candidates a pass; `no_learn` chats, dry runs and eval threads are skipped; `[learning] enabled = false` stops it.
+  - **Limits:** at most 20 candidates a pass; `no_learn` chats, dry runs and eval threads are skipped; `[learning] enabled = false` stops it. *As built:* its own pass beside the summaries' (`MemoryLearner`, state in `mem_learned`), not inside them. Learning starts from the chats as they were when it first ran (`baseline`): on this machine it first went through 15 past chats and proposed mostly noise (what was generated, which voices exist), so past chats are left for an explicit run (`POST /v1/memory/learn?thread=`). The prompt says what never counts (what was made, what's installed, the assistant's words); `clean_about` turns small models' `about` ("topics/user preference", "Lumen project") into `you` and `projects/Lumen`; proposals reuse a proposed entry by name; rejecting or forgetting a proposed entry's last fact archives it; a rename is a proposed event that renames on approval.
   *Done when:* `services/agent/tests/test_memory_learn.py` (scripted fake model): a new fact is proposed with its evidence, a repeat bumps `seen`, a change ("we renamed AIHub to GAIFA") proposes a rename of the existing entity, a malformed answer is retried, tool results never reach the model's input.
-- [ ] **4.2 Tidying: `memory/tidy.py` in the nightly learner run (`[learning] nightly_at`).**
+- [x] **4.2 Tidying: `memory/tidy.py` in the nightly learner run (`[learning] nightly_at`).**
   - **Work:** facts whose `valid_until` passed are retired; entities whose names or aliases normalize alike, or whose embeddings are very close, become a proposed merge; an entity with new facts gets its summary rewritten (one sentence, from its current facts); facts unused for `[memory] fade_days` (default 180) that were inferred are proposed for retiring.
-  - **Never:** it changes no `stated` fact and merges nothing without approval.
+  - **Never:** it changes no `stated` fact and merges nothing without approval. *As built:* the fade setting is `fade_days` in `data/agent/memory.json` (the hub's `[memory]` is the GPU's); merges and retirements are proposed events whose evidence holds the action, proposed once; `POST /v1/memory/tidy` runs it now.
   *Done when:* `services/agent/tests/test_memory_tidy.py` covers each kind of work and that stated facts are untouched.
 
 **Checks & deliverables — Phase 4**
-- [ ] On the installed hub, a chat that mentions a new project and a changed preference, left quiet, produces proposed memories with their evidence.
-- [ ] Delivered: `memory/learn.py`, `memory/tidy.py`, tests; docs: architecture §14.6.
+- [x] On the installed hub, a chat that mentions a new project and a changed preference, left quiet, produces proposed memories with their evidence. *As checked (2026-10-26, skynet, through `POST /v1/memory/learn?thread=`):* "I started a new side project called Lumen… I switched to light themes this month" → two proposals, "The user switched from dark mode to light themes this month" (`you`, preference) and "Lumen is the user's side project, a small app that tracks reading" (`projects/Lumen`), each with the chat and message; "Which voices can you speak in?" → none. All removed after.
+- [x] Delivered: `memory/learn.py`, `memory/tidy.py`, tests; docs: architecture §14.5.
 
 ## Phase 5 — The Memory page and review (M)
 

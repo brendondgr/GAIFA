@@ -54,6 +54,7 @@ class Schedule:
         hh, mm = (int(x) for x in str(st.get("nightly_at") or "03:00").split(":"))
         if self.last_nightly != day and (lt.tm_hour, lt.tm_min) >= (hh, mm):
             self.last_nightly = day
+            asyncio.create_task(self._tidy())                                           # structured-memory 4.2
             if self.start("nightly"):
                 return "nightly"
         active = self.last_activity()
@@ -62,6 +63,13 @@ class Schedule:
             if self.start("idle"):
                 return "idle"
         return None
+
+    async def _tidy(self) -> None:
+        from ..memory import profile, tidy
+        try:
+            await tidy.run(self.agent, int(profile.settings(self.agent.cfg.data).get("fade_days") or tidy.FADE_DAYS))
+        except Exception:  # noqa: BLE001: tidying never stops the learner
+            logging.getLogger("agent.memory.tidy").exception("tidying memory")
 
     async def run_forever(self, stop: asyncio.Event) -> None:
         # The first nightly is the next one: a hub started at noon doesn't run "last night's" round.

@@ -231,6 +231,9 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         from .memory.index import MemoryIndex
         agent.memory_index = MemoryIndex(agent.memory, hub)                                  # structured-memory 2.2
         indexer = asyncio.create_task(agent.memory_index.run_forever(stop))
+        from .memory.learn import MemoryLearner
+        agent.memory_learner = MemoryLearner(agent, cfg.summary_idle_min)                    # structured-memory 4.1
+        mem_learner = asyncio.create_task(agent.memory_learner.run_forever(stop))
         await agent.resume_all()
         try:
             yield
@@ -245,7 +248,9 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             scheduler.cancel()
             summarizer.cancel()
             indexer.cancel()
-            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, summarizer, indexer, return_exceptions=True)
+            mem_learner.cancel()
+            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, summarizer, indexer, mem_learner,
+                                 return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()

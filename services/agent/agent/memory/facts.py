@@ -106,6 +106,8 @@ class FactsMixin:
                 continue                                                  # "Ariadne" after "projects/Ariadne"
             want = kind_of(kind) if kind else (kind_of(parts[0]) if len(parts) == 2 else None)
             e = self.resolve(name, want) or self.resolve(name) or (self.resolve(leaf, want) if len(parts) > 1 else None)   # type: ignore[attr-defined]
+            if e is None and source == "inferred":           # an entry another proposal brought: the same one
+                e = self._row("SELECT * FROM mem_entities WHERE state = 'proposed' AND norm = ?", (norm(leaf),))   # type: ignore[attr-defined]
             if e is None and len(parts) > 1:
                 e = self.resolve(leaf) if len(parts) == 2 else None   # type: ignore[attr-defined]
             if e is None:
@@ -224,12 +226,27 @@ class FactsMixin:
                     self._index_entity(e)   # type: ignore[attr-defined]
             if state == "active" and f["state"] == "retired":
                 self.c.execute("UPDATE mem_facts SET valid_until = NULL, replaced_by = NULL WHERE id = ?", (fid,))
+            if state == "rejected":
+                self._drop_orphans(proposed_ents)
             self._index_fact(fid)
+        if state == "active" and f["state"] == "proposed":
+            self._act(f, by)
         return self.fact_public(self.need_fact(fid))
+
+    def _drop_orphans(self, ents: list[str]) -> None:
+        """A proposed entry that no fact is about any more goes with its last proposal."""
+        for e in ents:
+            row = self.c.execute("SELECT state FROM mem_entities WHERE id = ?", (e,)).fetchone()
+            if row and row["state"] == "proposed" and not self.c.execute(
+                    "SELECT 1 FROM mem_fact_entities fe JOIN mem_facts f ON f.id = fe.fact WHERE fe.entity = ? "
+                    "AND f.state IN ('proposed', 'active')", (e,)).fetchone():
+                self.c.execute("UPDATE mem_entities SET state = 'archived', updated = ? WHERE id = ?", (self.clock(), e))
+                self._index_entity(e)   # type: ignore[attr-defined]
 
     def forget(self, fid: str, by: str = "user") -> dict[str, Any]:
         """Delete a fact for real: the log keeps only that one was forgotten, not what it said."""
         f = self.need_fact(fid)
+        ents = [r["entity"] for r in self._rows("SELECT entity FROM mem_fact_entities WHERE fact = ?", (fid,))]   # type: ignore[attr-defined]
         with self.tx():   # type: ignore[attr-defined]
             self._scrub(fid, f["text"])
             self.c.execute("DELETE FROM mem_fact_entities WHERE fact = ?", (fid,))
@@ -239,6 +256,7 @@ class FactsMixin:
             self.c.execute("UPDATE mem_facts SET replaces = NULL WHERE replaces = ?", (fid,))
             self.c.execute("UPDATE mem_facts SET replaced_by = NULL WHERE replaced_by = ?", (fid,))
             self._log("forget", fid, "a fact was forgotten", None, None, by)   # type: ignore[attr-defined]
+            self._drop_orphans(ents)
         return {"forgotten": fid}
 
     def _scrub(self, fid: str, text: str) -> None:
@@ -259,6 +277,28 @@ class FactsMixin:
                 out.append(json.dumps(d) if d is not None else None)
             summary = r["summary"].replace(text[:80], "(a forgotten fact)").replace(text[:60], "(a forgotten fact)")
             self.c.execute("UPDATE mem_log SET summary = ?, before = ?, after = ? WHERE id = ?", (summary, *out, r["id"]))
+
+    def saw(self, fid: str, evidence: list[dict[str, Any]], by: str = "learner") -> None:
+        """A fact said again: seen once more, with the new evidence (the learner's `same`)."""
+        f = self.need_fact(fid)
+        with self.change("fact_seen", fid, f"seen again: {f['text'][:80]}", facts=[fid], by=by):   # type: ignore[attr-defined]
+            ev = json.loads(f["evidence"] or "[]") + list(evidence)
+            self.c.execute("UPDATE mem_facts SET seen = seen + 1, evidence = ?, updated = ? WHERE id = ?",
+                           (json.dumps(ev[-20:]), self.clock(), fid))
+
+    def _act(self, f: dict[str, Any], by: str) -> None:
+        """What an approved proposal does besides holding: a learned rename renames its entity (4.1), a tidying merge
+        merges (4.2)."""
+        for ev in json.loads(f["evidence"] or "[]"):
+            try:
+                if ev.get("action") == "rename":
+                    self.update_entity(ev["entity"], name=ev["to"], by=by)   # type: ignore[attr-defined]
+                elif ev.get("action") == "merge":
+                    self.merge(ev["entity"], ev["into"], by=by)   # type: ignore[attr-defined]
+                elif ev.get("action") == "retire":
+                    self.set_fact_state(ev["fact"], "retired", by=by)
+            except MemoryError:
+                continue
 
     def touch(self, ids: list[str]) -> None:
         if ids:

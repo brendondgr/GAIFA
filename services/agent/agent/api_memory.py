@@ -229,6 +229,20 @@ def add_routes(app: FastAPI) -> None:
     def tool_forget(body: ForgetIn, request: Request) -> dict:
         return M(request).forget(body.fact, by="agent")
 
+    @app.post("/v1/memory/learn", summary="Learn from the chats that went quiet now, instead of at the next pass; ?thread= one chat")
+    async def learn_now(request: Request, thread: str | None = None) -> Any:
+        ml = getattr(request.app.state.agent, "memory_learner", None)
+        if ml is None:
+            return JSONResponse({"detail": "the memory learner isn't running", "code": "unavailable"}, 503)
+        if thread:
+            return {"proposed": await ml.learn(thread)}
+        return {"proposed": await ml.check()}
+
+    @app.post("/v1/memory/tidy", summary="Tidy memory now instead of at night: ended facts, duplicate entries, summaries, fading")
+    async def tidy_now(request: Request) -> Any:
+        from .memory import tidy
+        return await tidy.run(request.app.state.agent)
+
     @app.post("/v1/memory/reindex", summary="Send every current fact and entity to the embed mod's memory collection again")
     async def reindex(request: Request) -> Any:
         idx = getattr(request.app.state.agent, "memory_index", None)

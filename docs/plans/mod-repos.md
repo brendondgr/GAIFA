@@ -125,9 +125,10 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
   - **One flow:** `utils/repos_update.py` holds update, pin and sync; how to install, restart, check, test and whether the mod is busy come in as `Hooks` (the CLI's go through the hub's HTTP API, 3.3's are the hub's own). With the hub down, an update still moves and installs and says it couldn't check.
   - **Why `repos` and not `mods`:** `gaifa models` already exists, and `mods`/`models` are one letter apart.
   *Done when:* `utils/tests/repos/test_cli_repos.py` covers status output and exit codes, an update that fast-forwards, an update whose `gaifa check` fails and rolls back (a fixture mod whose new commit breaks its manifest), a dependency change that runs the install, each refusal, the lock, `pin` and `sync`.
-- [ ] **3.3 The hub watches them: `utils/repos_watch.py`, `utils/routes/repos.py`, `utils/config.py`, `config.example.toml`.**
+- [x] **3.3 The hub watches them: `utils/repos_watch.py`, `utils/routes/repos.py`, `utils/config.py`, `config.example.toml`.**
   - **Settings (`[repos]`):** `fetch_every_h = 24` (0 = never contact GitHub), `notify = "warnings"` (`all` also shows `updates_available` and `checkout_ahead_of_pin`; `off`), `check_on_start = true`.
-  - **Watcher:** a lifespan task, started in the §5 order, never at import. It computes states at start and after each fetch, and on `POST /api/repos/fetch`. It raises and clears alerts through `hub.alerts` with ids `repos.<sid>.<code>`, so a fixed problem's alert goes away. The level is the problem's level, and the text carries the fix.
+  - **Watcher:** a lifespan task, started in the §5 order, never at import. It computes states at start and after each fetch, and on `POST /api/repos/fetch`. It raises and clears alerts through `hub.alerts` with ids `repos.<sid>.<code>`, so a fixed problem's alert goes away. Alerts are warn or error only (brief `Alert`): warnings and errors keep their level; info problems are alerts (as warn) only with `notify = "all"`, and new commits on a branch go to the activity log once either way. The text carries the fix.
+  - **Manifests:** after a checkout (and after a rollback) the hub reads the mod's manifest again (`rescan`, a `reload` hook) before the restart and the check, so `gaifa check` sees the new `service.toml`.
   - **Routes:**
     - `GET /api/repos`: states plus `last_fetch_ts` and the settings.
     - `POST /api/repos/fetch`.

@@ -95,6 +95,7 @@ class Hub:
     calls: Any = None       # tools.calls.Calls
     sessions: Any = None    # sessions.Sessions
     prefs: Any = None       # prefs.Prefs (plan 21.2)
+    repos: Any = None       # repos_watch.RepoWatcher (plan mod-repos 3.3)
     services: ServiceManager | None = None
     timing: Any = None  # services.Timing; tests shorten it
     live_areas: list[str] = field(default_factory=list)
@@ -141,7 +142,7 @@ def default_backend(options: Options, config: Config | None = None, paths: Paths
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, gpu, mcp, memory, mentions, metrics, models, outputs, overview, prefs, services, sessions, settings, skills, system, tools, web, webpages, widgets
+    from utils.routes import events, gpu, mcp, memory, mentions, metrics, models, outputs, overview, prefs, repos, services, sessions, settings, skills, system, tools, web, webpages, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options, config, paths), options=options, version=hub_version())
@@ -271,6 +272,12 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
             hub.sessions = Sessions(hub)
             await hub.sessions.start()
             stack.push_async_callback(hub.sessions.close)
+            # 11. the mods that are their own repositories: their state and alerts (local git), the daily fetch.
+            from utils.repos_watch import RepoWatcher
+
+            hub.repos = RepoWatcher(hub)
+            await hub.repos.start()
+            stack.push_async_callback(hub.repos.close)
             log.info("GAIFA %s ready on port %s (root %s)", hub.version, hub.port, paths.root)
             yield
 
@@ -309,8 +316,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(mentions.router)  # /api/mentions (48.1)
     app.include_router(mcp.router)  # /mcp: the tools over MCP (13.4)
     app.include_router(webpages.router)  # /api/web/read (30.8)
+    app.include_router(repos.router)  # /api/repos (mod-repos 3.3)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions"):
+                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos"):
         hub.mark_live(area)
 
     app.include_router(web.router)

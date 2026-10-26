@@ -299,6 +299,14 @@ class ContainersCfg(_Strict):
     runtime: Literal["auto", "podman", "docker"] = "auto"   # auto: podman if installed, else docker
 
 
+class ReposCfg(_Strict):
+    """`[repos]` (plan mod-repos 3.3): the mods that are their own repositories (relay, lcpp, tts, gen3d)."""
+
+    fetch_every_h: float = Field(24, ge=0, le=24 * 30)   # how often the hub asks GitHub what's new; 0 = never
+    notify: Literal["warnings", "all", "off"] = "warnings"   # all: updates and unpinned commits as alerts too
+    check_on_start: bool = True                          # read their state (local git only) when the hub starts
+
+
 class Config(_Strict):
     hub: HubCfg = HubCfg()
     paths: PathsCfg = PathsCfg()
@@ -315,6 +323,7 @@ class Config(_Strict):
     outputs: OutputsCfg = OutputsCfg()
     gpu: GpuCfg = GpuCfg()
     containers: ContainersCfg = ContainersCfg()
+    repos: ReposCfg = ReposCfg()
 
     def service_override(self, service_id: str, defaults: dict[str, Any]) -> dict[str, Any]:
         """Merge `[services.<id>]` over a mod's manifest defaults.

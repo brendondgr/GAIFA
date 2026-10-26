@@ -41,6 +41,11 @@ idle_unload_s = 600
 [containers]
 runtime = "auto"            # the runtime mods run their containers with: auto (podman if installed, else docker), podman, docker
 
+[repos]
+fetch_every_h = 24          # relay, lcpp, tts and gen3d are their own repositories: how often to ask GitHub what's new (0 = never)
+notify = "warnings"         # warnings: changed files, unpushed commits and the like as alerts; all: updates too; off
+check_on_start = true
+
 [docs]
 regenerate = false          # true keeps this machine's model inventory (data/state/setup/models/, local) current as the registry changes
 

@@ -64,19 +64,19 @@ def project(tmp: Path) -> Path:
     return root
 
 
-def adopted(tmp: Path) -> tuple[Path, Path, Path]:
-    """A GAIFA-like project whose services/m is a submodule of a bare remote: (root, mod, bare).
+def adopted(tmp: Path, manifest: str = 'id = "m"\n', sid: str = "m") -> tuple[Path, Path, Path]:
+    """A GAIFA-like project whose services/<sid> is a submodule of a bare remote: (root, mod, bare).
     Needs the ENV identity in os.environ (the adopt commit is made by the code under test)."""
     from utils.repos_adopt import adopt
     from utils.repos_migrate import preflight, push
-    work, bare = mod_repo(tmp)
+    work, bare = mod_repo(tmp, sid)
     root = project(tmp)
-    subtree_add(root, "m", work)
-    commit(root, "GAIFA (1)", {"services/m/service.toml": 'id = "m"\n', "services/m/.gitignore": ".venv/\n"})
-    preflight(root, "m", str(bare), "main")
-    push(root, "m", str(bare), "main")
-    adopt(root, "m", str(bare), "main", "adopt m\n", state_dir=tmp / "state")
-    return root, root / "services" / "m", bare
+    subtree_add(root, sid, work)
+    commit(root, "GAIFA (1)", {f"services/{sid}/service.toml": manifest, f"services/{sid}/.gitignore": ".venv/\n"})
+    preflight(root, sid, str(bare), "main")
+    push(root, sid, str(bare), "main")
+    adopt(root, sid, str(bare), "main", f"adopt {sid}\n", state_dir=tmp / "state")
+    return root, root / "services" / sid, bare
 
 
 def upstream_commit(tmp: Path, bare: Path, msg: str = "upstream", files: dict[str, str] | None = None) -> str:

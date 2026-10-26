@@ -33,6 +33,7 @@ class Calls(list):
             self.append(("install", sid))
             return install_rc
         return Hooks(install=install, running=lambda sid: running, restart=lambda sid: self.append(("restart", sid)),
+                     reload=lambda sid: self.append(("reload", sid)),
                      check=lambda sid: (self.append(("check", sid)), check)[1], busy=lambda sid: busy,
                      tests=lambda: (self.append(("tests",)), tests)[1])
 
@@ -49,7 +50,7 @@ def test_update_fast_forwards_restarts_checks_and_stages(gaifa, tmp_path):
     r = update(root, "m", hooks=calls.hooks())
     assert r.ok and r.old == old and r.new == new and r.staged and not r.rolled_back
     assert [c.split(" ", 1)[1] for c in r.commits] == ["u1"]
-    assert calls == [("restart", "m"), ("check", "m")]                       # no dependency changed: no install
+    assert calls == [("reload", "m"), ("restart", "m"), ("check", "m")]      # no dependency changed: no install
     assert g(mod, "rev-parse", "HEAD") == new and g(mod, "symbolic-ref", "--short", "HEAD") == "main"
     assert pinned(root) == new and g(root, "ls-tree", "HEAD", "services/m").split()[2] == old   # staged, not committed
 
@@ -59,7 +60,7 @@ def test_a_dependency_change_runs_the_install(gaifa, tmp_path):
     upstream_commit(tmp_path, bare, "deps", {"requirements.txt": "httpx\n"})
     calls = Calls()
     r = update(root, "m", hooks=calls.hooks(running=False))
-    assert r.ok and r.installed and calls == [("install", "m"), ("check", "m")]
+    assert r.ok and r.installed and calls == [("install", "m"), ("reload", "m"), ("check", "m")]
 
 
 def test_a_failed_check_rolls_back(gaifa, tmp_path):
@@ -69,7 +70,8 @@ def test_a_failed_check_rolls_back(gaifa, tmp_path):
     calls = Calls()
     r = update(root, "m", hooks=calls.hooks(check=(False, "health: refused")))
     assert not r.ok and r.rolled_back and "gaifa check failed: health: refused" in r.message
-    assert calls == [("install", "m"), ("restart", "m"), ("check", "m"), ("install", "m"), ("restart", "m")]
+    assert calls == [("install", "m"), ("reload", "m"), ("restart", "m"), ("check", "m"),
+                     ("install", "m"), ("reload", "m"), ("restart", "m")]       # the rollback
     assert g(mod, "rev-parse", "HEAD") == old and pinned(root) == old
     assert repo_state(root, "m").problems[0].code == "updates_available"     # still offered
 

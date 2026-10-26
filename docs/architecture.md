@@ -414,6 +414,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/settings/defaults` | the `Settings` shape (brief §6.4) built from `config.example.toml` (read once per process; GAIFA's built-in defaults without it), the installed mods filling `services` and `memory.priority` as `GET /api/settings` does: the defaults the Settings page shows on each row and returns to with Reset (plan settings-redesign 4.1); this machine's `config.toml` never changes it |
 | `GET /api/doctor/inventory` | every path outside the project that anything uses, with its reason (plan 16.3) |
 | `GET /api/system/hardware[?refresh=true]` | what this machine has (plan 35.2, `utils/hardware/`): the OS, WSL, each GPU's vendor, arch, memory (unified or dedicated), runtimes, what it can run and its problems, and the accels usable here (`rocm`, `cuda`, `xpu`, `mps`, `vulkan`, `cpu`); read once and cached. `gaifa hardware` prints the same without the hub |
+| `GET /api/repos[?refresh=1]`, `POST /api/repos/fetch[?id=]`, `POST /api/repos/{id}/update {to?, commit?, force_busy?}`, `POST /api/repos/{id}/pin` | the mods that are their own repositories (plan mod-repos 3.3, `utils/repos_watch.py`): each submodule's pin, checkout, branch, ahead/behind and problems with their fix, the `[repos]` settings and the last update; fetch asks GitHub (the only route that does); update runs in the background (`repos` events with each step; 202, then the result on `GET /api/repos`): refused with `409 repo_refused {refused: [codes]}` (changed files, unpushed commits, a split history, not checked out) or `409 repo_update_running`; it rolls back on a failed install or check and stages the pin (or commits only it after the tests, `commit`); pin stages a pushed checkout |
 | `POST /mcp` | the agent's tools over MCP (plan 13.4; streamable HTTP, stateless, JSON responses; 2026-07-28 per-request `_meta` plus the 2025 `initialize` era). Annotations from `risk`; `ask` calls return `input_required` (an elicitation form of the ask fields) to clients that declare elicitation, else an explanation with `_meta["gaifa/approval"]`; the MCP-only tool `gaifa_wait_approval` waits for a decision (never approves). `GET`/`DELETE` → 405; an `Origin` other than the hub's own page, or `Sec-Fetch-Site: cross-site` → 403 (JSON-RPC error). Claude Code: `claude mcp add --transport http gaifa http://127.0.0.1:7000/mcp` |
 
 **Alerts** (plan 6.4) are the banner items above the Overview grid. Each has a stable id, so it is raised once and cleared when its cause goes away:
@@ -426,6 +427,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `disk-low` | warn (error under 10 GB) | the project's disk has under 50 GB free (checked every 10 s) | 55 GB or more is free |
 | `memory-high` | warn | memory is over 92% used | it drops under 90% |
 | `outputs-watch` | error | the outputs watcher stopped | it recovers |
+| `repos.<id>.<code>` | warn/error | a submodule mod has a problem (plan mod-repos 3.3): `not_checked_out`, `dirty`, `untracked`, `unpushed`, `pin_not_on_remote`, `checkout_behind_pin`, `diverged`, `wrong_remote`; with `[repos] notify = "all"` also `updates_available`, `checkout_ahead_of_pin`, `fetch_failed` (as warn). The text ends with the fix | the problem is gone (read again at each fetch, update, pin and `GET /api/repos?refresh=1`) |
 
 **Error envelope:** every hub error is `{"detail": str, "code": str, "data"?: object}`, sent with an `X-GAIFA-Error: <code>` header. Responses proxied from a mod are passed through unchanged (no header), which is how the UI tells a mod's error from the hub's. The proxy adds `X-Forwarded-Prefix: /api/s/<id>` (plus `X-Forwarded-Host` / `-Proto`) to each request, and rewrites a `Location` that points at the mod so redirects stay inside `/api/s/<id>`. The hub only produces `service_not_running` (503) or `upstream_error` (502) when it can't reach the mod at all. **WebSockets** pass through the same path (plan 29.2): messages both ways until either side closes, the mod's close code included. A page from another origin is refused at the handshake (403); otherwise a missing, stopped or unreachable mod is reported as a close code the browser can read (4404, 4503, 4502). An open socket counts as a request in flight.
 
@@ -615,6 +617,10 @@ mics = ["Samson GoMic Analog Stereo", "ThinkPad USB-C Dock Audio Mono"]   # labe
 language = ""            # an ISO code, or "" to detect
 preset = "balanced"      # fast | balanced | accurate | best
 mode = "both"            # both (click or hold) | toggle | hold
+[repos]                  # plan mod-repos 3.3: relay, lcpp, tts and gen3d are their own repositories (submodules)
+fetch_every_h = 24       # how often the hub asks GitHub what's new; 0 = never
+notify = "warnings"      # warnings | all (updates and unpinned commits too) | off
+check_on_start = true    # read their state (local git only) when the hub starts
 [docs]                   # plan 23.3/23.6; not on the Settings page
 regenerate = false       # true: keep this machine's model inventory (data/state/setup/models/, local) current as the registry changes
 ```

@@ -100,6 +100,12 @@ def hooks() -> repos_update.Hooks:
         s = _service(sid)
         return bool(s) and s.get("state") in ("ready", "starting", "unhealthy")
 
+    def reload(sid: str) -> None:
+        try:
+            cli.call("POST", "/api/services/rescan", timeout=60)
+        except cli.HubDown:
+            pass
+
     def restart(sid: str) -> None:
         cli.call("POST", f"/api/services/{cli.q(sid)}/restart?wait=1", timeout=cli.WAIT_S)
 
@@ -123,7 +129,7 @@ def hooks() -> repos_update.Hooks:
         tail = (r.stdout.strip().splitlines() or [""])[-1]
         return r.returncode == 0, tail
 
-    return repos_update.Hooks(install=install, running=running, restart=restart, check=check, busy=busy,
+    return repos_update.Hooks(install=install, reload=reload, running=running, restart=restart, check=check, busy=busy,
                               progress=lambda m: print(f"  … {m}"), tests=tests)
 
 

@@ -7,7 +7,7 @@ differs between them (how to install, restart and check a mod, whether it's busy
 update: refuse what an update would lose (changed files, unpushed commits, a split history, a folder
 that isn't checked out, a busy mod, another update running) → fetch → move the checkout to the
 branch's head (fast-forward on the branch, or detached) → install when its dependencies changed →
-restart if it was running → `gaifa check` → on any failure, the old commit back (reinstalled and
+the hub reads its manifest again → restart if it was running → `gaifa check` → on any failure, the old commit back (reinstalled and
 restarted) → on success the new pin staged in GAIFA (or committed with `commit=True`, tests first).
 """
 
@@ -35,6 +35,7 @@ LOCK_STALE_S = 3600
 @dataclass
 class Hooks:
     install: Callable[[str], int] = lambda sid: 0                         # the mod's install script; exit code
+    reload: Callable[[str], None] = lambda sid: None                      # the hub reads the mod's manifest again
     running: Callable[[str], bool] = lambda sid: False
     restart: Callable[[str], None] = lambda sid: None
     check: Callable[[str], tuple[bool | None, str]] = lambda sid: (None, "not checked")   # None: couldn't run
@@ -209,6 +210,8 @@ def _update(root: Path, sid: str, to: str | None, dry_run: bool, force_busy: boo
         res.installed = True
         if (rc := h.install(sid)) != 0:
             failure = f"the install exited {rc}"
+    if not failure:
+        h.reload(sid)
     if not failure and was_running:
         h.progress("restarting")
         h.restart(sid)
@@ -223,6 +226,7 @@ def _update(root: Path, sid: str, to: str | None, dry_run: bool, force_busy: boo
         _back(mod, st.head or "", branch)
         if deps:
             h.install(sid)
+        h.reload(sid)
         if was_running:
             h.restart(sid)
         res.rolled_back = True

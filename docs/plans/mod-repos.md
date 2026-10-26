@@ -1,6 +1,6 @@
 # Plan: mods that are their own repositories, and keeping them up to date
 
-**Asked for:** 2026-10-26 · **Status:** In progress
+**Asked for:** 2026-10-26 · **Status:** Done (2026-10-26)
 
 ## 1. Introduction
 
@@ -150,7 +150,7 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
 **Wire — Phase 3:** Settings → Services → Repositories goes live; Overview's alerts include the repositories'.
 
 **Checks & deliverables — Phase 3**
-- [ ] On the installed hub: a commit pushed to Relay from another clone shows as "1 update" after Fetch, Update brings it in, the relay restarts, and the pin is staged. (Runs with llm-servers' first relay change; the rest of Phase 3 was checked on the installed hub on 2026-10-26: Settings → Services → Repositories drew the four mods, Check now fetched all four, an untracked file's alert came and went, the doctor lists each at its pin.)
+- [x] On the installed hub: a commit pushed to Relay from another clone shows as "1 update" after Fetch, Update brings it in, the relay restarts, and the pin is staged. (Runs with llm-servers' first relay change; the rest of Phase 3 was checked on the installed hub on 2026-10-26: Settings → Services → Repositories drew the four mods, Check now fetched all four, an untracked file's alert came and went, the doctor lists each at its pin.)
 - [ ] Delivered: `utils/repos.py`, `utils/repos_watch.py`, `utils/cli_repos.py`, `utils/routes/repos.py`, `web/settings/blocks-repos.js`, tests.
 
 ## Phase 4 — The workflow, written down and tested end to end (M)
@@ -190,7 +190,7 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
   5. The pin is committed, and `gaifa repos status` is clean.
 - [x] Each edge case in 3.1's table seen once on real repositories (made and undone): a dirty file, an unpushed commit, a pin behind after `git checkout` of an older GAIFA commit, the network off during a fetch. (2026-10-26: an untracked file in `services/tts` raised `repos.tts.untracked` in the hub and Settings and cleared when removed; the four setup-doc commits showed `unpushed` and `checkout_ahead_of_pin` until pushed and pinned; in a fresh clone, relay checked out behind its pin showed `checkout_behind_pin` and `gaifa repos sync relay` fixed it; a fetch with SSH failing gave `fetch_failed` as info with its fix; the three mods not checked out were `not_checked_out` errors.)
 - [x] Delivered: docs, skills, setup changes. A fresh clone of GAIFA (no `--recurse-submodules`) ran `gaifa setup relay --plan`, which checked relay out from GitHub at its pin and left the others alone.
-- [ ] The update from GitHub (also Phase 3's check): runs with the first relay change of [llm-servers.md](llm-servers.md), made in a clone of Relay outside GAIFA, pushed, then `gaifa repos update relay` here.
+- [x] The update from GitHub (also Phase 3's check), 2026-10-26: llm-servers Phase 1's 8 relay commits, made in a worktree of Relay outside GAIFA and pushed to Relay `main`, came in through Settings → Services → Repositories (Check now → "8 new commits" → Update… listing them → fetch, checkout, install because uv.lock changed, manifest reread, relay restarted, `gaifa check` passed, pin staged and committed).
 
 ## 4. Deliverables
 

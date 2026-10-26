@@ -135,11 +135,12 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **GAIFA:** `services/relay/service.toml` sets the variable in GAIFA.
   *Done when:* `test_proxy.py` covers the 403, the header letting it through and the rule off by default; `test_stats.py` covers the group filter.
   - **Done:** Relay `4202955` (GAIFA's `service.toml` in the Relay repo sets the variable). The group filter is on the Requests list (`GET /admin/stats/recent?group=`); the hourly rollups behind the dashboard's charts don't split by group. Tests in `test_openai_cloud.py` (9 there in all); the relay's suite 259.
-- [ ] **1.8 Relay docs and release.**
+- [x] **1.8 Relay docs and release.**
   - **Docs:** `README.md` (cloud providers, discovery, `<server>/<model>`, the chats-only rule), `docs/` (the API), `CLAUDE.md`.
   - **Release:** merge to `main` in Relay, push, then in GAIFA `gaifa repos pin relay`, `uv run pytest`, and commit.
   - **GAIFA docs:** architecture §10's relay row.
   *Done when:* the relay's suite passes; on the installed hub after `gaifa restart relay`, `GET /api/s/relay/v1/models` lists the local models grouped, and with a key added through the admin API, one cloud provider's models.
+  - **Done 2026-10-26:** Relay `e1df518` (`docs/cloud.md`, README, routes, deployment, CLAUDE.md). `feat/cloud-providers` went onto Relay `main` as a fast-forward, and Settings → Services → Repositories brought it in: Check now showed 8 new commits, Update… listed them, and the hub fetched, checked out `e1df518`, ran the install (pyproject and uv.lock changed: anthropic 2.3, google-genai), read the manifest again, restarted the relay, `gaifa check relay` passed, and the pin was staged (committed here). The relay serves its models grouped (`remote`, `agent` on this machine, no cloud key yet). A cloud provider's live list waits for the user's key (Phase 1's checks).
 
 **Checks & deliverables — Phase 1**
 - [ ] With the user's keys (step needs them): one plain request and one streamed request to each of Claude, OpenAI and Gemini through `/v1`; each shows in the relay's Requests screen with tokens.

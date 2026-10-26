@@ -65,6 +65,10 @@ export function btnSt(kind = 'sec', o = {}) {
     purple: { background: T.tpu, color: T.pu, borderColor: 'transparent' } }[kind];
   return { ...base, ...(k || {}) };
 }
+// The composer's square buttons (send/stop, microphone, voice mode): one shape, filled so they read as buttons;
+// the quiet ones in a muted tone (`on`: a tint of `tone` while they're active), Send and Stop in the accent.
+export const boxBtn = (on = false, tone = 'acc') => ({ display: 'grid', placeItems: 'center', width: 30, height: 28, padding: 0, borderRadius: 7, flex: 'none',
+  border: '1px solid ' + (on ? 'transparent' : T.bds), background: on ? T['t' + tone] : T.row, color: on ? T[tone] : T.tx });
 export function Btn({ kind = 'sec', sm, icon, label, title, onClick, disabled, children, style, ...rest }) {
   const iconOnly = !!icon && children == null && label == null;
   return h('button', { type: 'button', onClick, disabled, title, 'aria-label': iconOnly ? title : undefined,

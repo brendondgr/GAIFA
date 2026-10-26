@@ -18,7 +18,7 @@ import { TurnView } from './chat-activity.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
 import { decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
 import { ControlsRow, ModeMenu, ModelMenu, EnvMenu } from './chat-controls.js';
-import { Composer } from './chat-composer.js';
+import { Composer, typeInto } from './chat-composer.js';
 import { VoiceButton, lastAnswer } from './chat-voice.js';
 import { scrollToReply } from './chat-quote.js';
 import { QuoteReplyBox, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
@@ -235,7 +235,8 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   const empty = !tid || (ready && !events.length && !running);
   const compacts = events.filter(e => e.type === 'compact').length;
   return h('section', { ref: rootRef, 'aria-label': thread?.title ? `Chat: ${thread.title}` : 'Chat', 'data-chat-pane': tid || 'new', onMouseDownCapture: onFocus || undefined, onFocusCapture: onFocus || undefined,
-    style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', background: T.bg, ...style } },
+    tabIndex: -1, onKeyDown: e => typeInto(e, inputRef.current),   // a click on the chat, then typing: the letters go into the box
+    style: { outline: 'none', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', background: T.bg, ...style } },
     h(ThreadHeader, { thread,
       onRename: title => shared.rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
       learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,

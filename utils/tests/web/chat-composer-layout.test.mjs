@@ -1,5 +1,5 @@
 // Plan 42.2: the message box after Claude Code's: one line of + (upload, attach, tool groups, the quick actions),
-// the text, then the microphone, Stop and Send, no hint line, the text growing to 40% of the window, and the
+// the text, then the microphone and Send (Stop in its place while a turn runs), no hint line, the text growing to 40% of the window, and the
 // controls row under the box.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ globalThis.React = {
   useState: init => [typeof init === 'function' ? init() : init, () => {}],
   useRef: v => ({ current: v }), useEffect: () => {}, useLayoutEffect: () => {}, useMemo: f => f(), useCallback: f => f,
 };
-const { Composer, PLUS_ITEMS, boxMax } = await import(pathToFileURL(path.join(root, 'web/chat/chat-composer.js')).href);
+const { Composer, PLUS_ITEMS, boxMax, typeInto } = await import(pathToFileURL(path.join(root, 'web/chat/chat-composer.js')).href);
 const { registerAction } = await import(pathToFileURL(path.join(root, 'web/chat/chat-actions.js')).href);
 
 const all = (n, pred, out = []) => {
@@ -40,7 +40,7 @@ test('the + menu: upload, attach, tool groups, then the quick actions', () => {
   assert.equal(all(tree, n => n.props?.label === 'Tool groups').length, 1);
 });
 
-test('one line: + · the text · the microphone, Stop while a turn runs, Send; no hint line', () => {
+test('one line: + · the text · the microphone, then Send, which turns into Stop while a turn runs; no hint line', () => {
   const idle = box({ draft: 'hi' });
   assert.doesNotMatch(text(idle), /Enter sends/);
   const row = all(idle, n => n.type === 'div' && n.props.style?.alignItems === 'flex-end')
@@ -54,7 +54,27 @@ test('one line: + · the text · the microphone, Stop while a turn runs, Send; n
   assert.match(kinds[kinds.length - 1], /^Send/);
   const busy = box({ draft: 'hi', running: true });
   assert.ok(all(busy, n => n.props?.title === 'Stop the turn (and its running tool)').length === 1);
-  assert.ok(all(busy, n => n.props?.title === 'Queue this message').length === 1);
+  assert.equal(all(busy, n => /^Send|^Queue/.test(n.props?.title || '')).length, 0);
+  const brow = all(busy, n => n.type === 'div' && n.props.style?.alignItems === 'flex-end').find(n => n.props.children.some(k => k?.type === 'textarea'));
+  const last = brow.props.children.filter(Boolean).at(-1);
+  assert.equal(last.props['aria-label'], 'Stop');                  // in Send's place, a filled square
+  assert.equal(last.props.children[0].props.style.background, 'currentColor');
+});
+
+test('a letter typed on the chat goes into the box; fields, shortcuts and Space on a button stay put', () => {
+  let n = 0;
+  const box = { focus: () => n++, disabled: false };
+  const key = (key, target = { tagName: 'SECTION' }, o = {}) => typeInto({ key, target, ...o }, box);
+  assert.equal(key('h'), true);
+  assert.equal(key('H', { tagName: 'P' }), true);
+  assert.equal(key('Enter'), false);
+  assert.equal(key('c', undefined, { ctrlKey: true }), false);
+  assert.equal(key('x', { tagName: 'INPUT' }), false);
+  assert.equal(key('x', { tagName: 'DIV', isContentEditable: true }), false);
+  assert.equal(key(' ', { tagName: 'BUTTON' }), false);
+  assert.equal(key('a', { tagName: 'BUTTON' }), true);
+  assert.equal(typeInto({ key: 'a', target: { tagName: 'SECTION' } }, { focus() {}, disabled: true }), false);
+  assert.equal(n, 3);
 });
 
 test('the text grows to 40% of the window (at least 120 px), and the controls row goes under the box', () => {

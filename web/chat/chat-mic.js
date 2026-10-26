@@ -6,7 +6,7 @@
 // to talk, or either (`mode`). The pure parts (Resampler, toInt16, the protocol, pickMic, nextMic, onRelease,
 // levelOf) and openMic's fallback and take-over are tested in utils/tests/web/chat-mic.test.mjs.
 
-import { h, T, Btn, Popover } from './chat-ui.js';
+import { h, T, Btn, Popover, boxBtn } from './chat-ui.js';
 import { SpeechInputPanel } from './chat-speech-input.js';
 
 const R = () => globalThis.React;
@@ -282,7 +282,7 @@ export function MicButton({ api, draft, setDraft, disabled }) {
   };
   const stop = () => { want.current = false; setOn(false); const s = sess.current; sess.current = null; s?.stop(); };
   return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative' } },
-    h(Btn, { kind: on ? 'pri' : 'ghost', sm: true, icon: 'mic', disabled: disabled && !on, 'aria-pressed': on ? 'true' : 'false',
+    h(Btn, { sm: true, icon: 'mic', disabled: disabled && !on, 'aria-pressed': on ? 'true' : 'false', style: boxBtn(on, 'rd'),
       title: on ? 'Stop dictating' : { hold: 'Dictate (hold to talk)', toggle: 'Dictate (click to start and stop)' }[mode.current] || 'Dictate (click to start and stop, or hold to talk)',
       // Pointer: what a release does depends on the mode (onRelease). Keyboard (detail 0): Enter or Space toggles.
       onPointerDown: e => { if (e.button) return; press.current = { t: Date.now(), started: !on }; if (!on) start(); },

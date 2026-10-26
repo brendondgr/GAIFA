@@ -4,7 +4,7 @@
 // mic has echo cancellation; a sustained loud level counts). A card waiting for you (an approval, a question)
 // pauses it: the bar says so, and it carries on once you've answered on screen. Escape or the button ends it.
 
-import { h, T, Icon } from './chat-ui.js';
+import { h, T, Icon, boxBtn } from './chat-ui.js';
 import { dictate, dictated, levelOf, speechSettings, useSttUp } from './chat-mic.js';
 import { speak, speakable } from './chat-speak.js';
 
@@ -131,7 +131,7 @@ export function VoiceButton({ api, onSend, running, waiting, answer = { seq: 0, 
       h('span', { style: { color: T.dim, fontSize: 11.5 } }, 'Esc ends')) : null,
     s.error && !on ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, s.error) : null,
     h('button', { type: 'button', disabled, onClick: () => go({ type: on ? 'stop' : 'start' }), title: on ? 'End voice mode' : 'Voice mode: talk, and hear the replies',
-      'aria-label': on ? 'End voice mode' : 'Voice mode', 'aria-pressed': on ? 'true' : 'false', className: 'aichat-quiet',
-      style: { display: 'grid', placeItems: 'center', width: 28, height: 28, border: 0, borderRadius: 7, cursor: disabled ? 'default' : 'pointer', background: on ? T.tacc : 'transparent', color: on ? T.acc : T.mut } },
+      'aria-label': on ? 'End voice mode' : 'Voice mode', 'aria-pressed': on ? 'true' : 'false',
+      style: { ...boxBtn(on), cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1 } },
       h(Icon, { d: 'speaker', size: 14 })));
 }

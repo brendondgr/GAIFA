@@ -8,11 +8,11 @@
 // Quote-replies (Select → Reply, chat-quote-reply.js) are cards in the box, any number of them, each opening its
 // Reply popup to edit; sending takes them with the message (the text may then be empty).
 // Laid out after Claude Code's (plan 42.2): one line inside the box: + on the left (PLUS_ITEMS: upload, attach, tool
-// groups, then the quick actions), the text between, and the microphone, Stop and Send on the right; the text grows
+// groups, then the quick actions), the text between, and the microphone, voice mode and Send on the right (Send turns into Stop, a square, while a turn runs); the text grows
 // upward to 40% of the window (boxMax) while the buttons stay on its bottom line. No hint line under it; the chat's controls sit there (chat-controls.js).
 
 import { atToken, filterChoices, insertMention, mentionsIn, localChoices, useHubMentions, MentionList } from './chat-mentions.js';
-import { h, T, MONO, Icon, Btn, Popover, label11, COL } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Popover, label11, COL, boxBtn, ON_ACC } from './chat-ui.js';
 import { actionsFor } from './chat-actions.js';
 import { MicButton } from './chat-mic.js';
 import { ACCEPT, uploadable, toChip, pasteFile, chipIcon, chipSize } from './chat-files.js';
@@ -24,6 +24,16 @@ export { uploadable, toChip, pasteFile } from './chat-files.js';
 const R = () => globalThis.React;
 /** The box's tallest text: 40% of the window, at least 120 px; then it scrolls (plan 42.2). */
 export const boxMax = (vh = globalThis.innerHeight || 800) => Math.max(120, Math.floor(vh * 0.4));
+// A key typed while the chat (not a field or a button) has focus goes into the box: focusing it during keydown
+// lets the browser put the letter there. Shortcuts, Space and Enter on a button, and a selection being copied stay put.
+export function typeInto(e, box) {
+  const t = e.target, tag = t?.tagName;
+  if (!box || box.disabled || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.key?.length !== 1) return false;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t?.isContentEditable) return false;
+  if ((tag === 'BUTTON' || tag === 'A' || t?.getAttribute?.('role')) && e.key === ' ') return false;
+  box.focus();
+  return true;
+}
 /** The + menu's items, then the quick actions (the registry's `composer` actions). */
 export const PLUS_ITEMS = [
   ['upload', 'upload', 'Upload files', 'Images, video, audio, text, code, PDFs and documents (or drop or paste them on the box)'],
@@ -234,8 +244,11 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
             style: { flex: 1, minWidth: 0, alignSelf: 'center', minHeight: 22, maxHeight: boxMax(), resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
           h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
           voice,                                               // voice mode (plan 49.2)
-          running ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: onStop, title: 'Stop the turn (and its running tool)', className: 'aichat-quiet', style: { background: 'transparent' } }) : null,
-          h(Btn, { kind: 'pri', sm: true, icon: 'send', title: running ? 'Queue this message' : 'Send (Enter)', disabled: !can, onClick: send,
-            style: { width: 30, height: 28, padding: 0, justifyContent: 'center', borderRadius: 7 } }))),
+          running   // Send becomes Stop while a turn runs (Enter still queues what you type)
+            ? h('button', { type: 'button', onClick: onStop, title: 'Stop the turn (and its running tool)', 'aria-label': 'Stop', 'data-stop': '',
+              style: { ...boxBtn(), background: T.acc, color: ON_ACC, borderColor: 'transparent', cursor: 'pointer' } },
+              h('span', { 'aria-hidden': 'true', style: { width: 10, height: 10, borderRadius: 2, background: 'currentColor' } }))
+            : h(Btn, { kind: 'pri', sm: true, icon: 'send', title: 'Send (Enter)', disabled: !can, onClick: send,
+              style: { width: 30, height: 28, padding: 0, justifyContent: 'center', borderRadius: 7 } }))),
       controls || null));
 }

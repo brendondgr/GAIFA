@@ -89,7 +89,7 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
 
 ## Phase 3 — Keeping them up to date (L)
 
-- [ ] **3.1 Each repository's state: `utils/repos.py`.**
+- [x] **3.1 Each repository's state: `utils/repos.py`.**
   - **Library:** standard library only (the CLI imports it); it runs `git` with `subprocess`, `-C <folder>`, `GIT_TERMINAL_PROMPT=0` and a timeout.
   - **`repo_state(root, sid) -> RepoState`:** `{id, path, url, branch, pinned` (the gitlink in GAIFA's `HEAD`)`, staged_pin` (in the index, if different)`, head, on_branch` (branch name or null when detached)`, dirty` (tracked changes)`, untracked` (count)`, ahead, behind` (vs `origin/<branch>` from the last fetch)`, unpushed` (commits on `head` that are on no remote branch)`, pinned_on_remote, checkout_vs_pin` (`same|ahead|behind|diverged`)`, last_fetch_ts, initialized, problems: [Problem]}`.
   - **`Problem` = `{code, level, title, detail, fix}`.** The codes, with their levels:
@@ -106,7 +106,8 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
     | `updates_available` | info |
     | `fetch_failed` | info, with the git message: offline, no access, renamed repository |
     | `wrong_remote` | warn (origin isn't the `.gitmodules` URL) |
-    | `ignore_gap` | warn (1.1's check) |
+    | `untracked` | warn (untracked files in the mod: new files, or a missing ignore rule; 1.1's check no longer applies once it's a submodule) |
+    | `git_error` | error (git itself failed on the folder) |
 
   - **`list_states(root)`** reads `.gitmodules` for the mods, and `fetch(root, sid)` fetches the branch only.
   *Done when:* `utils/tests/repos/test_repo_state.py` builds GAIFA-like temp repos with a bare remote per mod and covers every problem code, a detached head at the pin (no problem), a fetch with no network (an unreachable URL gives `fetch_failed`, never an exception), a remote branch renamed (`fetch_failed` naming the branch) and a missing `.gitmodules` (an empty list).

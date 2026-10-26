@@ -73,10 +73,11 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
   - **Running mods:** the files don't change, so a running mod keeps running; `gaifa check <sid>` runs at the end.
   - **Refuses:** a folder with uncommitted changes in GAIFA, a remote head that isn't the split head, or a missing snapshot.
   *Done when:* `utils/tests/repos/test_adopt.py` adopts a fixture mod folder with ignored files (a fake `.venv/`, `runtime/`, `.env`), checks the snapshot is identical and `git submodule status` shows it, and covers each refusal.
-- [ ] **2.2 Adopt the four mods, one at a time.**
+- [x] **2.2 Adopt the four mods, one at a time.**
   - **Order:** `relay`, `lcpp`, `tts`, `gen3d`. Each is a GAIFA commit that adds `.gitmodules` and the gitlink.
   - **Between mods:** `uv run pytest` and `gaifa check <sid>`; the mod's page loads on the installed hub.
   *Done when:* `git submodule status` lists all four at their branch heads; `gaifa doctor` passes; `uv run pytest` passes; relay still answers a chat through `/v1`.
+  - **Done 2026-10-26:** relay `7859329`, lcpp `b64fdf4`, tts `536f937`, gen3d `c1cebfe`; no file changed but the running relay's log; `gaifa check` passes for each (lcpp's running checks skipped: it was stopped); the doctor's one warning is opencode's `OPENCODE_PROJECT_DIR` (as before); `uv run pytest` 1,935 passed.
 - [ ] **2.3 The hub and tests with a folder that isn't checked out: `utils/services/discovery.py`, `utils/tests/conftest.py`.**
   - **Hub:** an empty `services/<sid>/` with no `service.toml`, the state of a submodule that was never initialized, is skipped by discovery and listed in `GET /api/repos` (3.3) as `not_checked_out`, not reported as a broken manifest.
   - **Tests:** hub tests that read a mod's files are skipped with the reason `services/<sid> isn't checked out: git submodule update --init services/<sid>` when the folder is empty. These are `test_cli_setup*.py`, `test_backup.py`, `test_setupdocs.py`, `test_setup_block.py`, `test_idle_unload.py`, `test_gpu_slot.py`, `gen3d-chat.test.mjs`, `tts-chat.test.mjs`, `mod-status-cards.test.mjs`, `api.test.mjs` and `settings-search.test.mjs`. Use a shared `needs_mod(sid)` marker in `conftest.py`, and the same check in the Node tests' helper.

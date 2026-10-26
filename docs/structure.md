@@ -34,7 +34,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 
 ## `services/` (the mods)
 
-The existing apps come in with `git subtree add` (their history is kept), so most of each folder is the app's own code. These are the parts added for GAIFA; `comfy`, `agent`, `vllm`, `web`, `searxng`, `workspace`, `embed`, `stt` and `decide` are new:
+The existing apps came in with `git subtree add` (their history is kept), so most of each folder is the app's own code; `relay`, `lcpp`, `tts` and `gen3d` are now git submodules of their own repositories (plan mod-repos, `.gitmodules`). These are the parts added for GAIFA; `comfy`, `agent`, `vllm`, `web`, `searxng`, `workspace`, `embed`, `stt` and `decide` are new:
 
 | Mod | From | Added for GAIFA |
 | :--- | :--- | :--- |

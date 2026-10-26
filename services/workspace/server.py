@@ -26,6 +26,7 @@ import api_env
 import api_run
 import limits
 import reading
+import skillscan
 from checkpoints import Checkpoints
 from folders import LEVELS, Caps, Folders, Refused
 from sandbox import Sandbox
@@ -91,6 +92,10 @@ def named_of(request: Request) -> list[str]:
     """The secret-looking files the user named in their message (the agent puts them in the origin)."""
     m = reading.origin_of(request.headers.get("x-gaifa-origin")).get("named")
     return [str(x) for x in m][:20] if isinstance(m, list) else []
+
+
+class SkillRead(BaseModel):
+    id: str = Field(min_length=3, max_length=600, description="<folder>:<skill>, <folder>:<skill>/<path> or <folder>:AGENTS.md")
 
 
 class LimitsIn(BaseModel):
@@ -193,6 +198,15 @@ def create_app(state: Path | None = None, gaifa_root: Path | None = None, models
         return {"removed": fid}
 
     api_env.mount(app, ctx)
+
+    # skill-sources 2.1: every coding agent's skills and instruction files in the chat's folders
+    @app.get("/v1/skills", summary="The skills and instruction files of the folders a chat can use (each agent's skill folders)")
+    def skills_list(request: Request, environment: str | None = None) -> dict[str, Any]:
+        return skillscan.listing(view_of(ctx, request, environment))
+
+    @app.post("/v1/skills/read", summary="A workspace skill's body and files, one of its files (<id>/<path>), or an instruction file")
+    def skills_read(body: SkillRead, request: Request) -> dict[str, Any]:
+        return skillscan.read(view_of(ctx, request), body.id, named_of(request))
 
     @app.get("/v1/recent", summary="Recent edits, runs and undos, newest first; ?thread= for one chat")
     def recent(thread: str | None = None, limit: int = 100) -> dict[str, Any]:

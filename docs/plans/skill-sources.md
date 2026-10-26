@@ -13,7 +13,7 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
 - **Which folders are scanned:** answered by the user (2026-10-26): only the chat's workspace folders, each one's own skill folders; no workspace, no scan; never `~/.claude`, `~/.agents` or other home folders.
 - **Where in a folder:** *Assumption:* the folder's top level only (`<folder>/.claude/skills/*/SKILL.md` and the like), not every subfolder; a folder that is itself a skill folder's parent is not special. Nested repositories are separate workspace folders if the user wants them.
 - **The locations table** (`services/workspace/skills.py`, one place to change): `.agents/skills`, `.claude/skills`, `.codex/skills`, `.gemini/skills`, `.cursor/skills`, `.github/skills`, `.opencode/skills`, `.cline/skills`, `.windsurf/skills`, `.devin/skills`, `.goose/skills`, `.roo/skills`. Instruction files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, and `.cursor/rules/*.mdc` whose frontmatter has `alwaysApply: true`.
-- **The same skill in several folders:** *Assumption:* one entry per name and content hash; the entry lists every place it was found. The same name with different contents in one folder: both listed, each id qualified by its agent folder (`gaifa:plan`, `gaifa:claude/plan`).
+- **The same skill in several folders:** *Assumption:* one entry per name and content hash; the entry lists every place it was found. The same name with different contents in one folder: both listed, each id qualified by its agent folder (`gaifa:plan`, `gaifa:claude.plan`).
 - **Trust:** a workspace skill is the user's own repository's text, so it is followed as instructions, as Claude Code does; every tool call it leads to still goes through the hub's permissions and approvals. An uploaded or copied skill is screened for prompt injection (the hub's page screening, `utils/tools/screen.py`) and a flagged one is saved turned off, with the reason.
 - **Instruction files in the prompt:** *Assumption:* listed, not loaded: "Before working in GAIFA, read its AGENTS.md (read_skill('gaifa:AGENTS.md'))". Small local windows can't carry a large `CLAUDE.md` in every chat. A `CLAUDE.md` that only imports `@AGENTS.md` counts as that file.
 - **Scripts in skills:** *Assumption:* a workspace skill's scripts run with the workspace tools in that folder, at that folder's level (Run for the sandbox); an uploaded skill's scripts are kept but not run in this plan (the listing says so).
@@ -42,10 +42,10 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
 
 ## Phase 2 — Skills from the chat's workspace folders (M)
 
-- [ ] **2.1 The scan: `services/workspace/skills.py`, routes in `services/workspace/server.py`.**
+- [x] **2.1 The scan: `services/workspace/skillscan.py`, routes in `services/workspace/server.py`.**
   - **Routes:** `GET /v1/skills` (the folders of the call's environment and those allowed in its chat, resolved as `GET /v1/folders` does; `?environment=` for the page) → `{skills: [{id, name, description, folder: {id, name, path}, agent, path, hash, found_in: [paths], files, problems, meta}], instructions: [{id, folder, file, lines, imports?}]}`; `POST /v1/skills/read {folder, path}` → `{text, files}` for a `SKILL.md`, one of its files or an instruction file.
   - **Rules:** the folder's level is at least Read (every level is); the hard limits apply (`folders.py`: no symlink out, secret files never read, 2 MB); `.git`, `node_modules` and the like are never entered; at most 200 skills per folder; results cached per folder by the skill folders' mtimes.
-  - **Ids:** `<folder name>:<skill name>` (the folder's name as `GET /v1/folders` gives it, lower-cased to the id rules), qualified by agent only on a clash (2 above).
+  - **Ids:** `<folder id>:<skill name>` (the folder's id, unique among the folders), qualified by agent only on a clash (2 above); a skill is the same when its text and its files are.
   *Done when:* `services/workspace/tests/test_skills.py` covers a folder with `.claude/skills` and `.agents/skills` holding the same skill (one entry, two places), a clash, a symlink out (skipped), a secret file inside a skill (not read), None and an empty environment (nothing), an allowed-in-chat folder, and `AGENTS.md` plus a `CLAUDE.md` that imports it (one entry).
 - [ ] **2.2 The agent lists them per chat: `knowledge.py`, `loop.py`, `hubapi.py`.**
   - **Knowledge:** `skills(tid)` adds the chat's workspace skills (`hub.chat_skills(tid, environment)` → the workspace mod through the hub, with the same origin as `chat_folders`); `skill_list` groups them under their folder ("From GAIFA (workspace): …"), leaving out `disable-model-invocation` ones; `read` takes `<folder>:<name>` and `<folder>:<name>/<path>` and instruction files (`gaifa:AGENTS.md`).
@@ -61,7 +61,7 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
 
 **Checks & deliverables — Phase 2**
 - [ ] On the installed hub, a chat whose environment holds `~/Agents/GAIFA` lists `gaifa:plan`, `gaifa:gaifa-mod` and the others once each (both trees), reads `gaifa:plan/planner.md`, and is told to read `gaifa:AGENTS.md`; the same chat moved to None lists none of them.
-- [ ] Delivered: `services/workspace/skills.py`, the agent's changes, the composer's, tests; docs: the workspace README (routes), architecture §14.1, the brief's §11.13, `docs/structure.md`.
+- [ ] Delivered: `services/workspace/skillscan.py`, the agent's changes, the composer's, tests; docs: the workspace README (routes), architecture §14.1, the brief's §11.13, `docs/structure.md`.
 
 ## Phase 3 — Uploading and copying skills (M)
 
@@ -84,7 +84,7 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
 | Deliverable | Description | Location |
 | --- | --- | --- |
 | Skill format | YAML frontmatter, the spec's checks | `utils/skillfmt.py`, `services/agent/agent/skillfmt.py`, `services/workspace/skillfmt.py` |
-| Workspace scan | skills and instruction files of the chat's folders | `services/workspace/skills.py` |
+| Workspace scan | skills and instruction files of the chat's folders | `services/workspace/skillscan.py` |
 | Agent | per-chat skills, reading files, upload and copy | `services/agent/agent/knowledge.py`, `api_skills.py` |
 | UI | the slash menu per chat, Settings → Agent → Skills | `web/chat/chat-pane.js`, `chat-composer.js`, `chat-settings.js` |
 | Tests | format, scan, per-chat listing, routes, UI | `utils/tests/tools/test_skillfmt.py`, `services/workspace/tests/test_skills.py`, `services/agent/tests/test_workspace_skills.py`, `test_api_skills.py`, `utils/tests/web/*.test.mjs` |

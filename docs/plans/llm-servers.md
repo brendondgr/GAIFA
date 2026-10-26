@@ -204,7 +204,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
 
 ## Phase 4 — Settings → LLMs (M)
 
-- [ ] **4.1 The section: `web/settings/schema.js`, `web/settings/blocks-llm.js` (and `blocks-llm-servers.js` if over ~450 lines).**
+- [x] **4.1 The section: `web/settings/schema.js`, `web/settings/blocks-llm.js` (and `blocks-llm-servers.js` if over ~450 lines).**
   - **Place:** a new section **LLMs** (icon `cpu`) between Services and Agent.
   - **Groups:**
     1. **Servers:** each relay endpoint as a card with group badge, health, model count, key status (Add / Replace / Remove, typed into a password field and sent once to the relay through `/api/s/relay/admin/endpoints`), Refresh models, Enable, and a model list with hide toggles and the hide filter.

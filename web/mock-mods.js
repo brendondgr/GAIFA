@@ -203,7 +203,19 @@ function relayMock(m) {
     'GET /admin/stats/recent': () => { const t = now(); return ok({ rows: Array.from({ length: 30 }, (_, i) => ({ id: `req_${i}`, ts: t - i * 37, endpoint_name: EP[i % 2].name, route: 'chat.completions', model: i % 2 ? 'skynet' : 'gemma-4-26b-it', status: i % 11 === 5 ? 502 : 200, error: i % 11 === 5 ? 'upstream timed out' : null, prompt_tokens: 400 + i * 7, completion_tokens: 300 + i * 5, total_tokens: 700 + i * 12, ttft_ms: 400, latency_ms: 2200 + i * 30, tokens_per_sec: 41 + (i % 5), stream: i % 3 === 0, ok: i % 11 !== 5, state: i % 11 === 5 ? 'error' : 'done' })), counts: { done: 27, error: 3 } }); },
     'GET /admin/endpoints': () => ok(EP.map(e => ({ ...e }))),
     'GET /admin/router': () => ok({ policy: 'priority', pinned_id: null, resolved_id: 'ep-lcpp', resolved_name: EP[0].name }),
-    'POST /admin/endpoints': ({ json }) => { if (!json?.name || !json?.base_url) throw upstream(422, 'name and base_url are required'); const e = { id: 'ep-' + Math.random().toString(16).slice(2, 8), alias: json.name, kind: 'remote', protocol: 'openai', health: 'unknown', share: 0, enabled: true, owner: null, available_models: [], ...json }; EP.push(e); return ok(e, 201); },
+    'POST /admin/endpoints': ({ json }) => {   // plan llm-servers: a preset (anthropic, openai, gemini) fills the rest
+      const PRE = { anthropic: ['anthropic', 'https://api.anthropic.com', 'claude'], openai: ['openai', 'https://api.openai.com/v1', 'openai'], gemini: ['gemini', 'https://generativelanguage.googleapis.com', 'gemini'] }[json?.preset];
+      if (!json?.name || (!json?.base_url && !PRE)) throw upstream(422, 'base_url is required (or a preset: anthropic, openai, gemini)');
+      const { upstream_key: key, preset, ...rest } = json;
+      const e = { id: 'ep-' + Math.random().toString(16).slice(2, 8), alias: PRE ? PRE[2] : json.name, kind: PRE ? 'cloud' : 'remote_direct', protocol: PRE ? PRE[0] : 'openai', server_type: PRE ? preset : 'openai',
+        base_url: PRE ? PRE[1] : '', health: 'healthy', share: 0, enabled: true, owner: null, available_models: [], list_models: !!PRE, hidden_models: [], hide_filter: true, has_key: !!key, key_hint: key ? '…' + key.slice(-4) : null, ...rest };
+      EP.push(e); return ok(e, 201); },
+    'GET /admin/endpoints/{eid}/models': ({ pp }) => { const e = EP.find(x => x.id === pp.eid); if (!e) throw upstream(404, 'endpoint not found');
+      const ids = { anthropic: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'], gemini: ['gemini-3.7-flash', 'gemini-3.5-pro'] }[e.protocol] || (e.kind === 'cloud' ? ['gpt-5.6', 'gpt-5.6-mini', 'text-embedding-3-large', 'whisper-1'] : e.available_models);
+      const hide = id => (e.hidden_models || []).includes(id) || (e.hide_filter !== false && e.kind === 'cloud' && /embed|whisper/.test(id));
+      return ok({ endpoint: e.name, alias: e.alias, ts: now(), error: e.has_key === false && e.kind === 'cloud' ? 'HTTP 401: key rejected' : null, hide_filter: e.hide_filter !== false,
+        models: ids.map(id => ({ id, display_name: id, context_length: e.protocol === 'openai' ? null : 1000000, max_output: null, tools: true, vision: true, reasoning: true, hidden: hide(id) })) }); },
+    'PATCH /admin/endpoints/{eid}/models': ({ pp, json }) => { const e = EP.find(x => x.id === pp.eid); if (json.hidden) e.hidden_models = json.hidden; if (json.hide_filter !== undefined) e.hide_filter = json.hide_filter; return ok({ ok: true }); },
     'PATCH /admin/endpoints/{eid}': ({ pp, json }) => { const e = EP.find(x => x.id === pp.eid); if (!e) throw upstream(404, 'no endpoint'); Object.assign(e, json); return ok(e); },
     'DELETE /admin/endpoints/{eid}': ({ pp }) => { const i = EP.findIndex(x => x.id === pp.eid); if (i < 0) throw upstream(404, 'no endpoint'); EP.splice(i, 1); return ok({ deleted: pp.eid }); },
     'POST /admin/endpoints/{eid}/activate': ({ pp }) => { EP.forEach(e => { e.active = e.id === pp.eid; }); return ok({ ok: true }); },

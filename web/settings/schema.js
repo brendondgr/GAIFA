@@ -6,9 +6,10 @@
 
 import { checkCommandRule, checkToolGlob } from '../chat/chat-rules.js';
 import { repoSummary } from './repos-view.js';
+import { enginesSummary, serversSummary } from './llm-view.js';
 
 // Section → the api areas its data comes from: the "Mock data" note (GAIFA patch 5, PATCHES.md).
-export const SETTINGS_AREAS = { general: ['settings', 'system'], machine: ['settings', 'memory', 'system'], services: ['settings', 'services', 'repos'],
+export const SETTINGS_AREAS = { general: ['settings', 'system'], machine: ['settings', 'memory', 'system'], services: ['settings', 'services', 'repos'], llms: ['services', 'llm'],
   agent: [], permissions: ['settings', 'tools'], speech: ['settings'], sessions: ['sessions'], about: ['services', 'system'] };
 
 // ---------- paths into the Settings object ----------
@@ -120,10 +121,26 @@ export function sections(ctx = {}) {
           choices: [{ value: 'warnings', label: 'Warnings' }, { value: 'all', label: 'All, updates too' }, { value: 'off', label: 'Off' }], keywords: ['notify', 'warnings'] }),
         field('reposStart', 'repos.check_on_start', { label: 'Check when GAIFA starts', hint: 'Reads their state from git on this machine (no network).', control: 'toggle' }),
       ] }] },
+    // plan llm-servers 4.1: every language-model server in one place (the relay's endpoints, the [llm] engines)
+    { id: 'llms', label: 'LLMs', icon: 'cpu', areas: SETTINGS_AREAS.llms, when: () => !ctx.services || hasMod(ctx, 'relay'), groups: [
+      { id: 'servers', label: 'Servers', summary: () => serversSummary(ctx.llm?.endpoints), rows: [
+        block('servers', 'LlmServers', { label: 'The relay’s servers', card: true,
+          keywords: ['relay', 'endpoint', 'Claude', 'Anthropic', 'OpenAI', 'ChatGPT', 'Gemini', 'API key', 'key', 'cloud', 'models', 'hide', 'skynet', 'tunnel'] }),
+      ] },
+      { id: 'add', label: 'Add a server', summary: () => 'Anthropic, OpenAI, Gemini or any OpenAI-compatible URL', rows: [
+        block('add', 'AddLlmServer', { label: 'Add a server', card: true, keywords: ['add', 'provider', 'API key', 'Claude', 'OpenAI', 'Gemini', 'vLLM', 'llama.cpp', 'Ollama', 'URL'] }),
+      ] },
+      { id: 'engines', label: 'On this machine', summary: () => enginesSummary(ctx.llm?.engines), rows: [
+        block('engines', 'LlmEngines', { label: 'Local engines', card: true, keywords: ['llama.cpp', 'lcpp', 'vLLM', 'load', 'unload', 'GGUF', 'engine', 'local models'] }),
+      ] },
+      { id: 'defaults', label: 'Defaults', summary: () => 'The chat model and its fallback', when: () => agentOn, rows: [
+        block('defaults', 'LlmDefaults', { label: 'Chat model and fallback', card: true, keywords: ['default model', 'chat model', 'fallback', 'AGENT_MODEL'] }),
+      ] }] },
     { id: 'agent', label: 'Agent', icon: 'chat', areas: SETTINGS_AREAS.agent, when: () => agentOn, groups: [
       { id: 'model', label: 'Model', summary: () => 'The chat model, fallback and steps (the agent’s own settings)', rows: [
         block('notes', 'AgentNotes', { label: 'The agent' }),
         block('models', 'ModelsCard', { label: 'Models', keywords: ['chat model', 'fallback', 'max steps', 'relay', 'steps between messages', 'split at each message', 'one fold per turn', 'layout'] }),
+        block('llms', 'LlmLink', { label: 'Servers and keys', keywords: ['servers', 'API key', 'cloud'] }),   // llm-servers 4.1
       ] },
       { id: 'documents', label: 'Documents', summary: () => 'Whole documents and the reply reserve', rows: [
         block('documents', 'DocumentsCard', { label: 'Documents', card: true, keywords: ['whole documents', 'reply reserve', 'tokens'] }),

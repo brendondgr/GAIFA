@@ -276,6 +276,7 @@ The sections:
 - **Machine:** *Memory* (the 24 h chart with the draft reserve line; reserve; "Automatically make room when a service needs memory"; Never auto-unload; the unload order with up/down), *Storage* (the folders with sizes and Copy path, the disk bar), *Hardware* (plan 35.2: the system line, one row per GPU with memory, runtimes, what it can run and any problem, the accelerators GAIFA can use, Read again).
 - **Services:** every folder in `services/`, broken mods with their errors; per mod enabled, autostart, its tool count and sidebar order (up/down); the **Add a mod** card (`gaifa new <id>`, edit `services/<id>/service.toml`, restart), linking the Example mod.
 - **Services → Repositories** (plan mod-repos 3.5): relay, lcpp, tts and gen3d are git submodules of their own repositories. One row per mod: its repository (linked) and branch, the pinned and checked-out commits, badges for its problems (red error, amber warning, cyan info, green at its pin, purple when a new pin is staged) with each problem's fix, Pin when it has commits GAIFA doesn't pin yet, and **Update…**, which lists the incoming commits (`repoIncoming`), then follows the hub's update step by step to its result. **Check now** asks GitHub; the line says when it last did. Rows: Check GitHub every (hours, 0 = never), Alerts (warnings, all, off), Check when GAIFA starts.
+- **LLMs** (plan llm-servers 4.1; while the relay is installed), between Services and Agent: *Servers* (the relay's endpoints grouped On this machine / Remote / Cloud / Agents, each with its health, its key as its last four characters (Add key / Key… / Remove key, a password field sent once to the relay), Turn off, Remove (asks again), and **Models**, the server's own list read live (`GET /api/s/relay/admin/endpoints/{id}/models`) with a checkbox per model to show it in the Chat picker, Refresh, and on a cloud OpenAI server the filter that hides embedding, speech and image models); *Add a server* (Anthropic, OpenAI, Gemini with a key, or any OpenAI-compatible URL; a short name, picked as `<short name>/<model>`; the note that cloud models answer chats only); *On this machine* (`getLlmEngines`: each engine with its state, Start while stopped, its models with size, memory, context and format, Load / Unload, and on `needs_room` "GAIFA can unload …" with **Unload & load**); *Defaults* (the agent's chat model and fallback, saved to its `AGENT_MODEL` / `AGENT_FALLBACK_MODEL` and restarting it). Agent → Model links here.
 - **Agent** (while the agent mod is installed): *Model*, *Documents*, *Reading web pages* (long pages and the relevance model), *Instructions* (AGENT.md), *Memory* (MEMORY.md and topics), *Skills*, *Learning*.
 - **Permissions** (while the agent mod is installed): *Modes*, *Tool rules* (never run, always ask, run without asking), *Grants* (with Revoke), *Auto judge* (backend and model, what it reads, threshold, time limit, your command rules), *Screening* (pages, documents, transcripts, the screening model, text per call, calls at once), *Judged calls* (with "Always allow", added to the draft).
 - **Speech** (while the stt or tts mod is installed): *Dictation* (microphones in order, language, model, the button), *Voice* (the voice that reads replies, speed, read every reply, voice mode's pause).
@@ -895,6 +896,9 @@ What every chart must do:
 | `repoIncoming(id)` | `GET /api/repos/{id}/incoming` | `{id, ok, commits: string[], refused: string[], message}`: what an update would bring in |
 | `updateRepo(id, {to?, commit?, force_busy?})` | `POST /api/repos/{id}/update` | `RepoUpdate` (202, in the background; `repos` events per step, the result on `getRepos`); `409 repo_refused {refused}`, `409 repo_update_running` |
 | `pinRepo(id)` | `POST /api/repos/{id}/pin` | `{ok, old, new, commits, refused, staged, committed, message}`: the checkout as GAIFA's pin, staged |
+| `getLlmEngines()` | `GET /api/llm/engines` | `LlmEngine[]` (plan llm-servers 3.4; Settings → LLMs → On this machine, the Chat picker): every mod with `[llm]` |
+| `loadLlm(sid, id, makeRoom?)` | `POST /api/llm/{sid}/load[?make_room=1]` `{id}` | `LlmAction` (202); `409 needs_room {plan}` (the mod's own), `409 engine_stopped`, `404 engine_not_found` |
+| `unloadLlm(sid, id?)` | `POST /api/llm/{sid}/unload` `{id?}` | `LlmAction`: that model, or all of them |
 
 ```ts
 // Series names: "mem.total" "mem.used" "mem.available" "mem.reserve" "mem.other" "gpu.gtt_used"
@@ -923,6 +927,13 @@ interface Hardware { os: "linux" | "darwin" | "windows"; arch: string; wsl: bool
 interface HardwareGpu { vendor: "amd" | "nvidia" | "intel" | "apple"; name: string; memory: "unified" | "dedicated" | "unknown";
                         vram_bytes: number; arch: string; driver: string; pci: string; index: number; vendor_index: number;
                         runtimes: Record<string, string>; accels: string[]; problems: string[] }
+// plan llm-servers 3.4: the local engines ([llm] mods, architecture §4.3)
+interface LlmEngine { id: string; name: string; state: ServiceState; running: boolean;
+                      engine: { state: string; loaded: string[] } | null;   // null while the mod is stopped
+                      models: LlmModel[]; error: string | null }
+interface LlmModel { id: string; name: string; format?: string; size_gb?: number; memory_gb?: number; context?: number;
+                     downloaded?: boolean; loaded: boolean; relay_model?: string }   // relay_model: the name a chat picks once loaded
+interface LlmAction { id?: string; state?: string; loaded?: string[] }             // plus the mod's own fields
 // plan mod-repos 3.5: relay, lcpp, tts and gen3d are git submodules of their own repositories
 interface Repos { repos: RepoState[]; settings: Settings["repos"]; last_fetch_ts: number | null; update: RepoUpdate | null }
 interface RepoState { id: string; path: string; url: string; branch: string; initialized: boolean;

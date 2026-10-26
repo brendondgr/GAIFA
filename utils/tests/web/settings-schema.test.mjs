@@ -73,12 +73,13 @@ const FULL = {
 };
 const ALL = [...services, { id: 'agent', name: 'Agent', manifest_errors: [] }, { id: 'stt', name: 'Speech to Text', manifest_errors: [] }];
 
-test('2.1: eight sections in order, with their groups', () => {
+test('2.1: nine sections in order, with their groups (LLMs since llm-servers 4.1)', () => {
   const secs = S.sections({ services: ALL, draft: FULL, hasSessions: true });
-  assert.deepEqual(secs.map(s => s.id), ['general', 'machine', 'services', 'agent', 'permissions', 'speech', 'sessions', 'about']);
+  assert.deepEqual(secs.map(s => s.id), ['general', 'machine', 'services', 'llms', 'agent', 'permissions', 'speech', 'sessions', 'about']);
   const groups = Object.fromEntries(secs.map(s => [s.id, s.groups.map(g => g.id)]));
   assert.deepEqual(groups, {
     general: ['hub', 'interface', 'outputs'], machine: ['memory', 'storage', 'hardware'], services: ['services', 'repositories'],
+    llms: ['servers', 'add', 'engines', 'defaults'],
     agent: ['model', 'documents', 'web', 'instructions', 'memory', 'skills', 'learning'],
     permissions: ['modes', 'rules', 'grants', 'judge', 'screening', 'judged'], speech: ['dictation', 'voice'], sessions: ['sessions'], about: ['versions', 'cli', 'doctor'] });
   assert.ok(secs.every(s => s.groups.length >= 1 && s.groups.length <= 7));
@@ -98,7 +99,7 @@ test('2.1: eight sections in order, with their groups', () => {
 
 test('2.1: which sections show', () => {
   const ids = c => S.sections(c).map(s => s.id);
-  assert.deepEqual(ids({ services: services.filter(s => s.id !== 'tts'), hasSessions: false }), ['general', 'machine', 'services', 'about']);   // no agent, no speech mods, no sessions
+  assert.deepEqual(ids({ services: services.filter(s => s.id !== 'tts'), hasSessions: false }), ['general', 'machine', 'services', 'llms', 'about']);   // no agent, no speech mods, no sessions (the relay: LLMs)
   assert.ok(ids({ services: [...services, { id: 'tts', name: 'Speech', manifest_errors: [] }] }).includes('speech'));
 });
 

@@ -4,6 +4,7 @@ import { createHistory, withSeries } from './mock-history.js';
 import { createModMocks } from './mock-mods.js';
 import { createToolMocks } from './mock-tools.js';
 import { createSessionMocks } from './mock-sessions.js';
+import { createLlmMocks } from './mock-llm.js';
 import { TEXT_EXT, DOC_EXT } from './chat/chat-files.js';
 const GB = 1e9, MB = 1e6;
 const CHAT_MODS = ['comfy', 'gen3d', 'tts', 'vllm', 'lcpp'];   // mods whose chat module (plan 44.1) the mock lists: they're served from services/<id>/ui/ as in the live hub
@@ -757,6 +758,7 @@ export function createMockApi() {
   Object.assign(api, createToolMocks({ emit, net, err, later, now, outputs: () => outputs }));
   // ----- sessions (plan 15, brief §11.14): web/mock-sessions.js -----
   Object.assign(api, createSessionMocks({ emit, net, err, later, now, api }));
+  Object.assign(api, createLlmMocks({ net, clone, err }));   // plan llm-servers 4.1
 
   // ----- scenario controls (Shift+D panel) -----
   api.mock = {

@@ -11,6 +11,7 @@ export class ApiError extends Error {
 export const METHOD_AREA = {
   getSystem: 'system', getDoctor: 'system', getHardware: 'system',
   getRepos: 'repos', fetchRepos: 'repos', repoIncoming: 'repos', updateRepo: 'repos', pinRepo: 'repos',
+  getLlmEngines: 'llm', loadLlm: 'llm', unloadLlm: 'llm',
   listServices: 'services', getService: 'services', startService: 'services', stopService: 'services',
   restartService: 'services', loadService: 'services', unloadService: 'services', saveServiceConfig: 'services',
   getServiceLogs: 'logs', streamServiceLogs: 'logs',
@@ -147,6 +148,10 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     repoIncoming: id => req('GET', `/api/repos/${enc(id)}/incoming`),
     updateRepo: (id, body = {}) => req('POST', `/api/repos/${enc(id)}/update`, { json: body }),
     pinRepo: id => req('POST', `/api/repos/${enc(id)}/pin`),
+    // plan llm-servers 3.4: the local LLM engines ([llm] mods)
+    getLlmEngines: () => req('GET', '/api/llm/engines'),
+    loadLlm: (sid, id, makeRoom = false) => req('POST', `/api/llm/${enc(sid)}/load${makeRoom ? '?make_room=1' : ''}`, { json: { id } }),
+    unloadLlm: (sid, id) => req('POST', `/api/llm/${enc(sid)}/unload`, { json: id ? { id } : {} }),
     getRecentEvents: (limit = 80) => req('GET', `/api/events/recent${qs({ limit })}`),  // not in the brief: getOverview's fill-in while `overview` is mocked
     listServices: () => req('GET', '/api/services'),
     getService: id => req('GET', `/api/services/${enc(id)}`),

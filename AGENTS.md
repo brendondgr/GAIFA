@@ -23,6 +23,7 @@ One local app (FastAPI hub on `127.0.0.1:7000`) that controls every AI service o
 - `gaifa models list | show <id> | scan [--add] | verify <id>… | --all`: the models registry.
 - `gaifa status | start | stop | restart | logs [id] [-f] | doctor [--inventory] | open`: the hub as a systemd user service (logs read `data/logs/<id>.log`) (`gaifa install` writes `~/.config/systemd/user/gaifa.service` and links `~/.local/bin/gaifa`). After changing hub code, `gaifa restart`. `gaifa doctor` checks the whole install (also Settings → About).
 - `gaifa backup <folder>`: databases, registry, `config.toml`, the mods' `.env` files and their small settings files (`data/state/<id>/*.json`, such as the workspace folders) in a dated archive.
+- `gaifa repos [status | fetch | update <id> [--commit] | pin <id> | sync]`: `relay`, `lcpp`, `tts` and `gen3d` are submodules of their own repositories (plan mod-repos): what each is pinned at, what's new on GitHub, problems with their fix; `update` installs, restarts, checks and rolls back on failure.
 
 ## Mod contract
 Full how-to: [docs/mods.md](docs/mods.md). A mod is done when `gaifa check <id>` passes.

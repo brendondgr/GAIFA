@@ -60,5 +60,31 @@ def subtree_add(project: Path, sid: str, source: Path, rev: str = "HEAD") -> str
 def project(tmp: Path) -> Path:
     root = tmp / "gaifa"
     g(tmp, "init", "-q", "-b", "main", str(root))
-    commit(root, "hub", {"app.py": "hub\n", ".gitignore": "/services/*/.venv/\n"})
+    commit(root, "hub", {"app.py": "hub\n", ".gitignore": "/services/*/.venv/\n/data/\n"})
     return root
+
+
+def adopted(tmp: Path) -> tuple[Path, Path, Path]:
+    """A GAIFA-like project whose services/m is a submodule of a bare remote: (root, mod, bare).
+    Needs the ENV identity in os.environ (the adopt commit is made by the code under test)."""
+    from utils.repos_adopt import adopt
+    from utils.repos_migrate import preflight, push
+    work, bare = mod_repo(tmp)
+    root = project(tmp)
+    subtree_add(root, "m", work)
+    commit(root, "GAIFA (1)", {"services/m/service.toml": 'id = "m"\n', "services/m/.gitignore": ".venv/\n"})
+    preflight(root, "m", str(bare), "main")
+    push(root, "m", str(bare), "main")
+    adopt(root, "m", str(bare), "main", "adopt m\n", state_dir=tmp / "state")
+    return root, root / "services" / "m", bare
+
+
+def upstream_commit(tmp: Path, bare: Path, msg: str = "upstream", files: dict[str, str] | None = None) -> str:
+    """Someone else pushes a commit to the mod's repository."""
+    other = tmp / "other"
+    if not other.exists():
+        g(tmp, "clone", "-q", str(bare), str(other))
+    g(other, "pull", "-q", "--ff-only")
+    sha = commit(other, msg, files or {f"{msg}.py": msg})
+    g(other, "push", "-q", "origin", "main")
+    return sha

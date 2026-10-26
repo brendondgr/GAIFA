@@ -111,7 +111,7 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
 
   - **`list_states(root)`** reads `.gitmodules` for the mods, and `fetch(root, sid)` fetches the branch only.
   *Done when:* `utils/tests/repos/test_repo_state.py` builds GAIFA-like temp repos with a bare remote per mod and covers every problem code, a detached head at the pin (no problem), a fetch with no network (an unreachable URL gives `fetch_failed`, never an exception), a remote branch renamed (`fetch_failed` naming the branch) and a missing `.gitmodules` (an empty list).
-- [ ] **3.2 `gaifa repos`: `utils/cli_repos.py`, `utils/cli.py`.**
+- [x] **3.2 `gaifa repos`: `utils/cli_repos.py`, `utils/repos_update.py`, `utils/cli.py`.**
   - **`gaifa repos [status] [--json]`:** one line per mod (pin, checkout, branch, ahead/behind, problems) and exit code 1 when any warn or error. `gaifa repos fetch [<sid>|all]`.
   - **`gaifa repos update <sid>|all [--to <rev>] [--dry-run] [--commit]`:**
     1. **Refuses:** `dirty`, `unpushed`, `diverged`, `not_checked_out`, a mod busy with jobs (its status shows running jobs; `--force-busy` overrides), and a second update running (a lock in `data/state/repos/update.lock`).
@@ -121,7 +121,8 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
     5. **Any failure** checks out the old pin again, reinstalls if needed, restarts, and reports what failed.
     6. **On success:** stage the gitlink (`git add services/<sid>`) and print the commits it brought in. `--commit` also runs `uv run pytest` and commits `GAIFA (repos): <sid> → <short> (<n> commits)` when it passes.
   - **`gaifa repos pin <sid>`:** records the checkout as the pin (after you committed and pushed in the mod). It refuses `unpushed` and `dirty`.
-  - **`gaifa repos sync [<sid>|all]`:** `git submodule update --init` for mods whose checkout is behind the pin, after a GAIFA pull. It refuses `dirty`.
+  - **`gaifa repos sync [<sid>|all]`:** `git submodule update --init` for mods whose checkout is behind the pin, after a GAIFA pull. It refuses `dirty`, and a checkout ahead of or split from the pin.
+  - **One flow:** `utils/repos_update.py` holds update, pin and sync; how to install, restart, check, test and whether the mod is busy come in as `Hooks` (the CLI's go through the hub's HTTP API, 3.3's are the hub's own). With the hub down, an update still moves and installs and says it couldn't check.
   - **Why `repos` and not `mods`:** `gaifa models` already exists, and `mods`/`models` are one letter apart.
   *Done when:* `utils/tests/repos/test_cli_repos.py` covers status output and exit codes, an update that fast-forwards, an update whose `gaifa check` fails and rolls back (a fixture mod whose new commit breaks its manifest), a dependency change that runs the install, each refusal, the lock, `pin` and `sync`.
 - [ ] **3.3 The hub watches them: `utils/repos_watch.py`, `utils/routes/repos.py`, `utils/config.py`, `config.example.toml`.**

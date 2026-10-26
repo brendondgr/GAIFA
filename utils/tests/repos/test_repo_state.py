@@ -8,9 +8,7 @@ import json
 import pytest
 
 from utils.repos import fetch, list_states, repo_state, submodules
-from utils.repos_adopt import adopt
-from utils.repos_migrate import preflight, push
-from utils.tests.repos.gitfix import ENV, commit, g, mod_repo, project, subtree_add
+from utils.tests.repos.gitfix import ENV, adopted, commit, g, upstream_commit
 
 
 @pytest.fixture(autouse=True)
@@ -21,26 +19,7 @@ def _ident(monkeypatch):
 
 @pytest.fixture
 def gaifa(tmp_path):
-    """A GAIFA-like project whose services/m is a submodule of a bare remote; returns (root, mod, bare)."""
-    work, bare = mod_repo(tmp_path)
-    root = project(tmp_path)
-    subtree_add(root, "m", work)
-    commit(root, "GAIFA (1)", {"services/m/service.toml": 'id = "m"\n', "services/m/.gitignore": ".venv/\n"})
-    preflight(root, "m", str(bare), "main")
-    push(root, "m", str(bare), "main")
-    adopt(root, "m", str(bare), "main", "adopt m\n", state_dir=tmp_path / "state")
-    return root, root / "services" / "m", bare
-
-
-def upstream_commit(tmp_path, bare, msg="upstream", files=None):
-    """Someone else pushes to the mod's repository."""
-    other = tmp_path / "other"
-    if not other.exists():
-        g(tmp_path, "clone", "-q", str(bare), str(other))
-    g(other, "pull", "-q", "--ff-only")
-    sha = commit(other, msg, files or {f"{msg}.py": msg})
-    g(other, "push", "-q", "origin", "main")
-    return sha
+    return adopted(tmp_path)
 
 
 def codes(st):

@@ -241,6 +241,19 @@ def _hardware() -> Any:
     return cli_hardware
 
 
+def _repos() -> Any:
+    """utils/cli_repos.py (plan mod-repos 3.2), loaded like cli_hardware."""
+    if __package__:
+        from utils import cli_repos
+    else:
+        here = str(Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import cli_repos  # type: ignore[no-redef]
+    cli_repos.cli = sys.modules[__name__]
+    return cli_repos
+
+
 def cmd_backup(args: argparse.Namespace) -> int:
     """utils/cli_backup.py (plan 12.5), loaded only when a backup runs."""
     try:
@@ -634,6 +647,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--start", action="store_true", help="start it first if it isn't running")
     p.set_defaults(fn=cmd_check)
     _hardware().add_parser(sub)
+    _repos().add_parser(sub)
     _reporter().add_parser(sub)
     _setup().add_parser(sub)
     sub.choices["setup"].set_defaults(fn=cmd_setup)

@@ -158,8 +158,8 @@ def untrusted(source: str, text: str) -> str:
 
 
 # Tools whose results carry text from outside (pages, files, transcripts, other chats).
-UNTRUSTED_TOOLS = ("web_", "workspace_", "embed_", "stt_", "hub_read_document", "hub_search_document", "view_output",
-                   "read_result", "chat_search")
+UNTRUSTED_TOOLS = ("web_", "workspace_", "embed_", "stt_", "mcp_", "hub_read_document", "hub_search_document", "view_output",
+                   "read_result", "chat_search")              # mcp_: other MCP servers' tools (mcp-client 2.2)
 
 
 def read_untrusted(events: list[dict[str, Any]]) -> bool:

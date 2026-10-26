@@ -1,0 +1,29 @@
+# MCP servers (plan mcp-client): GAIFA's MCP client. Other MCP servers (stdio programs or Streamable HTTP endpoints)
+# give their tools to GAIFA's chats once the user approves them; a server whose tools change is held until approved again.
+id = "mcp"
+name = "MCP servers"
+description = "Other MCP servers' tools in your chats: approved, fingerprinted, and decided like any tool"
+icon = "puzzle"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]
+port = 5108
+health = "/health"
+status = "/v1/status"              # tools_rev: the hub reads the tools again when the approved servers change
+openapi = "/openapi.json"
+env = { MCP_STATE = "{root}/data/state/mcp" }
+start_timeout_s = 30
+stop_timeout_s = 15
+restart = "on-failure"
+install = "install.sh"
+
+[outputs]                          # pictures and sound a server's tool returns
+kinds = ["image", "audio"]
+
+[ui]
+page = "ui/page.js"                # servers, their tools and risks, approval with the difference, import
+
+[agent]
+skills = "skills"                  # skills/<name>/SKILL.md; one names its servers in metadata.mcp-servers
+tools_source = "GET /v1/tools"     # one tool per approved server's tool: mcp_<server>_<tool> (all mcp = false)

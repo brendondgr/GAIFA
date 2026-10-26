@@ -1,6 +1,6 @@
 # Plan: other MCP servers in GAIFA's chats, Blender first
 
-**Asked for:** 2026-10-26 · **Status:** Planned (after [skill-sources.md](skill-sources.md) and [structured-memory.md](structured-memory.md))
+**Asked for:** 2026-10-26 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -21,33 +21,33 @@ The approach is one new mod, `mcp` (port 5108), that is an MCP *client*: it star
 
 ## Phase 1 — The client mod (M)
 
-- [ ] **1.1 The mod: `services/mcp/` from `gaifa new mcp`.**
+- [x] **1.1 The mod: `services/mcp/` from `gaifa new mcp`.**
   - **Files:** `service.toml` (port 5108, `[agent] tools_source = "GET /v1/tools"`, `skills = "skills"`, a status route with `tools_rev`), `server.py` (FastAPI), `servers.py` (the config: `{id, name, transport: stdio|http, command, args, env: [names], url, headers: [names], enabled, approved: {hash, at, tools}, risks: {tool: risk}, allow, deny}`), `install.sh` (a venv with `mcp`, `httpx`, `fastapi`, `uvicorn`), `setup/mcp.md` with its `gaifa-setup` block.
   - **Routes:** `GET /health`, `GET /v1/status` (`{servers: [{id, state, tools, error}], tools_rev}`), `GET/POST /v1/servers`, `GET/PATCH/DELETE /v1/servers/{id}`.
   *Done when:* `gaifa check mcp` passes; `services/mcp/tests/test_servers.py` covers saving, validating (`id` rules, stdio needs `command`, http needs `url`) and the env names.
-- [ ] **1.2 Sessions: `services/mcp/client.py`.**
+- [x] **1.2 Sessions: `services/mcp/client.py`.**
   - **Work:** `Pool.get(server)` opens a client session (stdio: `StdioServerParameters` with the minimal environment and the server's `.env` values; HTTP: `streamable_http_client` with its headers), lists tools (paging, `ttlMs` honoured), calls tools with a timeout (default 120 s), restarts a crashed stdio server once, stops idle ones; logs each server's stderr to `data/logs/mcp-<server>.log`.
   - **Both protocol eras:** the SDK's own negotiation (2026-07-28, falling back to 2025 `initialize`); an `input_required` (elicitation) answer becomes a question card through the hub (Phase 2).
   *Done when:* `services/mcp/tests/test_client.py` runs against a tiny stdio server in the tests (`tests/fake_server.py`, FastMCP: one read tool, one tool that returns an image, one that fails, one that sleeps) and an HTTP one: list, call, error, timeout, crash and restart, idle stop.
-- [ ] **1.3 Tools to the hub: `GET /v1/tools`, `POST /v1/call/{server}/{tool}`.**
+- [x] **1.3 Tools to the hub: `GET /v1/tools`, `POST /v1/call/{server}/{tool}`.**
   - **Rows:** only approved servers' tools whose fingerprint still matches: name `mcp_<server>_<tool>` (cut to 64 characters), `description` prefixed "<Server name>: ", the input schema as given, `risk` (§2's mapping or the user's), `group = "mcp:<server>"`, `mcp = false` (structured-memory 3.1: GAIFA doesn't pass other servers' tools on to its own MCP clients).
   - **Results:** text content joined; images and audio written as outputs (architecture §4.7: `{outputs}/<date>/<HHMMSS>-<slug>.<ext>` with a sidecar naming the server and tool) and returned as `output:<id>` refs once indexed; `structuredContent` kept; `isError` → the error envelope with the server's text as `detail`; results over 64 KB cut with a note.
   - **`tools_rev`:** a hash of the approved, enabled servers' fingerprints; the hub re-reads the tools when it changes.
   *Done when:* `services/mcp/tests/test_tools.py` covers names, risks, the image result as an output (fake hub), errors and the rev changing; with the hub (fake mod setup in `utils/tests/fixtures/mods/`) the tools show in `/api/tools` and a `read` one runs through `POST /api/tools/call`.
 
 **Checks & deliverables — Phase 1**
-- [ ] On the installed hub with the fake server configured and approved, a chat finds its tools with `find_tools`, loads them and calls one.
-- [ ] Delivered: `services/mcp/` (mod, client, tools), tests, the setup doc; docs: architecture §10 (the mods' table), `docs/structure.md`.
+- [x] On the installed hub with the fake server configured and approved, a chat finds its tools with `find_tools`, loads them and calls one. *As checked (2026-10-26, skynet, Auto):* "echo the word hello with it, then get its picture and show it to me" → `mcp_fake_echo` (the hub's argument check corrected `message` → `text`), `mcp_fake_picture` (an output in `outputs/mcp/`), `view_output` on it.
+- [x] Delivered: `services/mcp/` (mod, client, tools), tests, the setup doc; docs: architecture §10 (the mods' table), `docs/structure.md`.
 
 ## Phase 2 — Safety (M)
 
-- [ ] **2.1 Approving a server's tools: `services/mcp/approve.py`.**
+- [x] **2.1 Approving a server's tools: `services/mcp/approve.py`.**
   - **Fingerprint:** a hash over each tool's name, description, input schema and annotations, in name order. A new server's tools wait for approval; a changed list holds the server (its tools leave the catalog) until the user approves the difference, shown as a diff.
   - **Screening:** on approval each tool's description and schema text go through the hub's screening (`POST /api/screen`, skill-sources 3.1); findings are shown next to the tool; a flagged tool starts denied.
   *Done when:* `services/mcp/tests/test_approve.py` covers a first approval, a changed description (held, diff), a removed and an added tool, and a flagged description.
-- [ ] **2.2 Questions and untrusted text.**
-  - **Elicitation:** a mod has no way to put a question card in a chat today, so a server's `input_required` form is declined, and the result tells the model what the server asked so it can ask the user and call again with the answer in its arguments. A real card is later work (a hub route for a mod's question), noted in the mod's README.
-  - **Untrusted:** every text result reaches the model inside `<untrusted>` (the hub's tool-result path already does for `network` tools; MCP tools get the same flag, `untrusted = true` on their rows).
+- [x] **2.2 Questions and untrusted text.**
+  - **Elicitation:** *as built:* the session's elicitation callback declines (both protocol eras: 2026's `input_required` and the older server-to-client request) and records the question; a mod has no way to put a question card in a chat today, so a server's `input_required` form is declined, and the result tells the model what the server asked so it can ask the user and call again with the answer in its arguments. A real card is later work (a hub route for a mod's question), noted in the mod's README.
+  - **Untrusted:** every text result reaches the model inside `<untrusted>`. *As built:* the mod wraps a server's text itself (`<untrusted source="mcp:<server>/<tool>">`), and the agent counts `mcp_` tools among those that bring untrusted text (`context.UNTRUSTED_TOOLS`), so `remember` after one gets a card; no hub change.
   *Done when:* `services/mcp/tests/test_elicit.py` with the fake server's elicitation tool (declined, with what it asked); the hub's test for the `untrusted` row flag.
 
 **Checks & deliverables — Phase 2**

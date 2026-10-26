@@ -17,7 +17,7 @@ What is in the repo **today**, and where each planned piece goes. The full targe
 | `.claude/skills/comfy-workflow/` | ✅ | Project skill: making and fixing ComfyUI workflow packs (points at `docs/workflows.md`) |
 | `.claude/skills/gaifa-setup/` | ✅ | Project skill: setting GAIFA up for someone with `gaifa setup` (their mods, models and answers; root commands handed to them; plan 23.13) |
 | `.claude/skills/gaifa-field-test/` | ✅ | Project skill: testing GAIFA on another machine and writing the field report (`gaifa setup --smoke`, `gaifa report note`, `gaifa report`; plan 40.3) |
-| `AGENTS.md`, `.agents/skills/` | ✅ | The same rules and skills for Codex and other agents that read `AGENTS.md`: copies of `CLAUDE.md` and `.claude/skills/` (refresh them when those change) |
+| `AGENTS.md`, `.agents/skills/` | ✅ | The same rules and skills for Codex and other agents that read `AGENTS.md`: copies of `CLAUDE.md` and `.claude/skills/` (refresh them when those change; `utils/tests/test_skill_copies.py` fails when the skill trees differ, skill-sources 1.3) |
 | `.gitignore` | ✅ | Keeps models, databases, outputs and venvs out of git |
 | `pyproject.toml` | ✅ | Hub dependencies (uv) |
 | `uv.lock` | ✅ | Locked hub dependencies; `uv sync` builds `.venv/` (ignored) from it |

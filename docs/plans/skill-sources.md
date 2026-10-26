@@ -31,14 +31,14 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
   - **Agent:** `Knowledge.read` takes `<id>/<relative path>` for a file inside the skill's folder (`references/forms.md`); a body's result ends with the list of its other files and sizes. Text files only, 256 KB at most, no `..`, no symlink out of the skill folder.
   - **Hub:** `GET /api/skills/{mod}/{name}/files/{path:path}` for mods' skills, with the same rules.
   *Done when:* `services/agent/tests/test_skills_files.py` reads a reference file and refuses `..`, a symlink out and a binary file; `utils/tests/tools/test_skills.py` covers the hub route.
-- [ ] **1.3 The repository's own skill copies agree: `.claude/skills/`, `.agents/skills/`.**
+- [x] **1.3 The repository's own skill copies agree: `.claude/skills/`, `.agents/skills/`.**
   - **Now:** both trees are tracked copies and `comfy-workflow`, `gaifa-mod` and `plan` have drifted. Make `.claude/skills` the source, bring `.agents/skills` level with it (keeping any newer text from either side), and add a test that the trees are identical.
   - **Docs:** `docs/structure.md` names both trees and which one to edit; `AGENTS.md` and `CLAUDE.md` say so in one line.
   *Done when:* `utils/tests/test_skill_copies.py` passes; `diff -r .claude/skills .agents/skills` is empty.
 
 **Checks & deliverables — Phase 1**
-- [ ] A skill with a folded multi-line description lists with its whole description in Settings → Agent.
-- [ ] Delivered: the three `skillfmt.py`, the files route, the copies test.
+- [x] A skill with a folded multi-line description lists with its whole description in Settings → Agent (`GET /v1/settings`, `test_skills_files.py`).
+- [x] Delivered: the three `skillfmt.py`, the files route, the copies test.
 
 ## Phase 2 — Skills from the chat's workspace folders (M)
 

@@ -17,7 +17,7 @@ description: Use when asked to create, refine, extend or review an implementatio
 - **Granularity:** full engineering plans. A plan has one or more phases, numbered from 1 inside the plan and sized **S / M / L**; steps are `<phase>.<n>` (a one-phase plan may just number its steps 1, 2, 3…).
 - **Validation:** pytest (`uv run pytest`) for every step; browser checks against the live backend for UI wiring; `api.js` Node tests and the contract test where the UI/API boundary moves. Fake mods under the subprocess backend stand in for real apps; systemd tests are marked.
 - **Git:** one commit per step, after tests pass, message `GAIFA (<slug> <phase>.<step>): <what was done>`. Push to `origin main` when the user asks or at the end of a plan's phase. Docs changes ride in the same commit as the behavior change.
-- **Audience:** agentic implementation — Claude works the plan step by step, so every step must be executable without re-deriving context.
+- **Audience:** agentic implementation — a coding agent (Claude, Codex) works the plan step by step, so every step must be executable without re-deriving context.
 
 ## Output
 - A new plan: write `docs/plans/<slug>.md` (a short, lower-case, hyphenated name for the work, e.g. `gpu-queue-v2`), add a row to the table in `docs/plans/README.md` (status **Planned**) and a row to `docs/structure.md`'s docs table.

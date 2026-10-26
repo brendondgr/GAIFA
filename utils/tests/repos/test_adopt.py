@@ -107,3 +107,35 @@ def test_second_mod_appends_to_gitmodules(tmp_path):
     mods = g(root, "show", "HEAD:.gitmodules")
     assert '[submodule "services/a"]' in mods and '[submodule "services/b"]' in mods
     assert len(g(root, "submodule", "status").splitlines()) == 2
+
+
+def test_files_a_running_mod_writes_are_listed_not_fatal(setup, tmp_path, monkeypatch):
+    root, bare, mod = setup
+    import utils.repos_adopt as ra
+    real = ra.snapshot
+    calls = []
+
+    def snap(folder):
+        calls.append(1)
+        if len(calls) == 2:                                           # the mod logs during the adoption
+            (folder / "runtime" / "log.txt").write_text("line\n")
+        return real(folder)
+    monkeypatch.setattr(ra, "snapshot", snap)
+    adopt(root, "m", str(bare), "main", MSG, state_dir=tmp_path / "state")
+    assert (tmp_path / "state" / "adopt-m-diff.txt").read_text() == "new: runtime/log.txt\n"
+
+
+def test_a_lost_file_is_an_error(setup, tmp_path, monkeypatch):
+    root, bare, mod = setup
+    import utils.repos_adopt as ra
+    real = ra.snapshot
+    calls = []
+
+    def snap(folder):
+        calls.append(1)
+        if len(calls) == 2:
+            (folder / ".env").unlink()
+        return real(folder)
+    monkeypatch.setattr(ra, "snapshot", snap)
+    with pytest.raises(GitError, match="lost files"):
+        adopt(root, "m", str(bare), "main", MSG, state_dir=tmp_path / "state")

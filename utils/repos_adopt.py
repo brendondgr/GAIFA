@@ -2,7 +2,8 @@
 
 The folder's files never change: its venv, `runtime/`, `.env` and `data/` stay where they are, so a
 running mod keeps running. A snapshot (path, size, mtime of every file, ignored ones too) is taken
-before and compared after; any difference stops with it printed.
+before and compared after: a missing file is an error, and new or changed ones (a running mod's
+logs) are listed in `adopt-<sid>-diff.txt`.
 
 GAIFA's commit is built in a private index (read-tree HEAD, the folder's files out, the gitlink and
 `.gitmodules` in), so the shared index, which another session may be using, only ever sees the
@@ -120,8 +121,12 @@ def adopt(root: Path, sid: str, url: str, branch: str, message: str, state_dir: 
     git(root, "submodule", "absorbgitdirs", "--", f"services/{sid}")
     after = snapshot(mod)
     (state / f"adopt-{sid}-after.json").write_text(json.dumps(after))
+    # The adoption only writes `.git`; a running mod may still write its logs and state meanwhile, so
+    # new and changed files are listed (adopt-<sid>-diff.txt) and only a missing file is an error.
     changed = diff_snapshots(before, after)
-    if changed:
-        raise GitError(f"services/{sid}'s files changed during the adoption ({len(changed)}):\n" + "\n".join(changed[:40]))
+    (state / f"adopt-{sid}-diff.txt").write_text("\n".join(changed) + "\n")
+    gone = [c for c in changed if c.startswith("gone: ")]
+    if gone:
+        raise GitError(f"services/{sid} lost files during the adoption ({len(gone)}):\n" + "\n".join(gone[:40]))
     return commit
 

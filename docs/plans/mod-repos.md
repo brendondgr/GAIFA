@@ -40,8 +40,8 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
   - **What:** GAIFA's root `.gitignore` covers `/services/*/.venv/`, `/services/*/runtime/` and `/services/*/.env`, plus per-mod entries like lcpp's machine-specific `data/models.json` (plan 23.11). Once a folder is a submodule, only its own `.gitignore` applies. Copy every rule that matches inside the folder into the mod's `.gitignore`, written relative to the mod. The check is `utils/repos.py: ignore_gap(sid) -> list[str]`: the paths that `git status --ignored --porcelain` in GAIFA ignores under `services/<sid>/` but the mod's own rules don't (checked with `git check-ignore --no-index` in the folder).
   - **Why first:** these commits must be in the history that 1.2 splits out, so the repository never shows a venv or a key as untracked.
   *Done when:* `ignore_gap` is empty for all four; `utils/tests/repos/test_ignore_gap.py` builds a temp GAIFA-like repo with a mod folder and covers a missing rule, a negated rule and a rule only the root has.
-- [ ] **1.2 Split and preflight: `utils/repos_migrate.py`.**
-  - **Split:** `git subtree split --prefix services/<sid> -b split/<sid>` for each mod.
+- [x] **1.2 Split and preflight: `utils/repos_migrate.py`, `utils/repos_split.py`.**
+  - **Split:** `utils/repos_split.py` does what `git subtree split --prefix services/<sid> -b split/<sid>` does, with plumbing (`git subtree` isn't installed on this machine): every GAIFA commit that changed the folder becomes a commit of that folder with its author, dates and message, on top of the commit the subtree add brought in. It's deterministic, so splitting again gives the same ids.
   - **Fast-forward check:** fetch the remote branch and check that it's an ancestor of `split/<sid>`. It should be, because the subtree was added without squash on top of the remote's history plus the unpushed commits.
   - **Report:** `data/state/repos/preflight-<date>.md`. Per mod it gives:
     - the commits to push: count, first and last, every subject

@@ -6,8 +6,7 @@
 // to talk, or either (`mode`). The pure parts (Resampler, toInt16, the protocol, pickMic, nextMic, onRelease,
 // levelOf) and openMic's fallback and take-over are tested in utils/tests/web/chat-mic.test.mjs.
 
-import { h, T, Btn, Popover, boxBtn } from './chat-ui.js';
-import { SpeechInputPanel } from './chat-speech-input.js';
+import { h, T, Btn, boxBtn } from './chat-ui.js';
 
 const R = () => globalThis.React;
 export const RATE = 16000;
@@ -248,18 +247,18 @@ export const SPEECH_DEFAULTS = { mics: [], language: '', preset: 'balanced', mod
 export const speechSettings = async api => ({ ...SPEECH_DEFAULTS, ...((await api?.getSettings?.().catch(() => null))?.speech_input || {}) });
 
 /** A small level bar (0–1). */
-export const LevelBar = ({ level, width = 46 }) => h('span', { 'aria-hidden': 'true', style: { display: 'inline-block', width, height: 5, borderRadius: 3, background: T.inset, overflow: 'hidden' } },
+export const LevelBar = ({ level, width = 46, height = 5 }) => h('span', { 'aria-hidden': 'true', style: { display: 'inline-block', width, height, borderRadius: 3, background: T.inset, overflow: 'hidden' } },
   h('span', { style: { display: 'block', height: '100%', width: `${Math.round((level || 0) * 100)}%`, background: (level || 0) > 0.9 ? T.rd : T.gr, transition: 'width 80ms linear' } }));
 
-/** The composer's microphone: dictation goes into the draft after what was already typed. The menu (▾)
- * holds the same microphone list and options as Settings → Speech → Dictation. */
+/** The composer's microphone: dictation goes into the draft after what was already typed. Which microphones,
+ * in what order, and the other options are in Settings → Speech → Dictation. */
 export function MicButton({ api, draft, setDraft, disabled }) {
   const React = R(), up = useSttUp(api);
   const [on, setOn] = React.useState(false), [err, setErr] = React.useState(null), [live, setLive] = React.useState({ mic: null, level: 0, note: null });
-  const [menu, setMenu] = React.useState(false), mode = React.useRef('both');
+  const mode = React.useRef('both');
   const sess = React.useRef(null), want = React.useRef(false), base = React.useRef(''), press = React.useRef({ t: 0, started: false });
   React.useEffect(() => () => { want.current = false; sess.current?.stop(); }, []);
-  React.useEffect(() => { if (up) speechSettings(api).then(x => { mode.current = x.mode; }); }, [up, menu]);
+  React.useEffect(() => { if (up) speechSettings(api).then(x => { mode.current = x.mode; }); }, [up]);
   if (!up) return null;
   const start = async () => {
     setErr(null); base.current = draft || ''; want.current = true; setOn(true);
@@ -281,18 +280,17 @@ export function MicButton({ api, draft, setDraft, disabled }) {
     }
   };
   const stop = () => { want.current = false; setOn(false); const s = sess.current; sess.current = null; s?.stop(); };
+  // While listening: only the button (tinted) and a level bar along its top; the mic's name and a CPU note are in its title.
+  const heard = [live.mic && `Listening · ${live.mic}`, live.note?.title || live.note?.text].filter(Boolean).join('\n');
   return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative' } },
     h(Btn, { sm: true, icon: 'mic', disabled: disabled && !on, 'aria-pressed': on ? 'true' : 'false', style: boxBtn(on, 'rd'),
-      title: on ? 'Stop dictating' : { hold: 'Dictate (hold to talk)', toggle: 'Dictate (click to start and stop)' }[mode.current] || 'Dictate (click to start and stop, or hold to talk)',
+      title: on ? 'Stop dictating' + (heard ? '\n' + heard : '') : { hold: 'Dictate (hold to talk)', toggle: 'Dictate (click to start and stop)' }[mode.current] || 'Dictate (click to start and stop, or hold to talk)',
       // Pointer: what a release does depends on the mode (onRelease). Keyboard (detail 0): Enter or Space toggles.
       onPointerDown: e => { if (e.button) return; press.current = { t: Date.now(), started: !on }; if (!on) start(); },
       onPointerUp: () => { if (!press.current.t) return; const { t, started } = press.current; press.current = { t: 0, started: false };
         if (onRelease(mode.current, started, Date.now() - t) === 'stop') stop(); },
       onClick: e => { if (e.detail === 0) (on ? stop() : start()); } }),
-    h(Btn, { kind: 'ghost', sm: true, icon: 'chevD', title: 'Microphone and dictation options', 'aria-expanded': menu ? 'true' : 'false', disabled: on, onClick: () => setMenu(!menu), style: { width: 18, padding: 0 } }),
-    h(Popover, { open: menu, onClose: () => setMenu(false), place: 'up-left', width: 360, label: 'Speech input' }, menu ? h(SpeechInputPanel, { api, compact: true }) : null),
-    on ? h('span', { role: 'status', title: live.mic || '', style: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: T.rd, maxWidth: 220 } },
-      h(LevelBar, { level: live.level }), h('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, live.mic ? `Listening · ${live.mic}` : 'Listening…'),
-      live.note ? h('span', { title: live.note.title, style: { color: T.mut, whiteSpace: 'nowrap' } }, live.note.text) : null) : null,
+    on ? h('span', { role: 'status', 'aria-label': 'Listening', 'data-level': '', style: { position: 'absolute', left: 3, right: 3, top: -6, display: 'flex', pointerEvents: 'none' } },
+      h(LevelBar, { level: live.level, width: '100%', height: 3 })) : null,
     err ? h('span', { role: 'alert', style: { fontSize: 11.5, color: T.rd } }, err) : null);
 }

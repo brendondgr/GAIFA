@@ -224,3 +224,25 @@ test('the settings list: ranked labels first (unplugged ones kept), then the unr
     { label: YETI.label, rank: 0, present: false }, { label: CAM.label, rank: 1, present: true },
     { label: LAP.label, rank: null, present: true }]);
 });
+
+test('while listening the composer shows only the button and a level bar on its top; the mic is named in its title', async () => {
+  const prev = globalThis.React;
+  globalThis.React = {   // every false state (stt up, listening) on; the live state a named mic at half level
+    createElement: (type, props, ...children) => ({ type, props: { ...(props || {}), children: children.flat() } }),
+    useState: v => [v === false ? true : v && typeof v === 'object' && 'level' in v ? { mic: 'GoMic', level: 0.5, note: { text: 'on the CPU', title: 'On the CPU' } } : v, () => {}],
+    useRef: v => ({ current: v }), useEffect: () => {},
+  };
+  try {
+    const { MicButton } = await import('../../../web/chat/chat-mic.js');
+    const tree = MicButton({ api: {}, draft: '', setDraft() {} });
+    const all = (n, out = []) => { if (Array.isArray(n)) n.forEach(x => all(x, out)); else if (n && typeof n === 'object') { out.push(n); all(n.props?.children, out); } return out; };
+    const text = all(tree).flatMap(n => n.props.children.filter(c => typeof c === 'string')).join('');
+    assert.equal(text, '');                                                        // no "Listening · GoMic", no note
+    const bar = all(tree).find(n => n.props['data-level'] != null);
+    assert.equal(bar.props['aria-label'], 'Listening');
+    assert.equal(bar.props.style.position, 'absolute');
+    const btn = tree.props.children.find(c => c?.props?.title?.startsWith('Stop dictating'));
+    assert.match(btn.props.title, /GoMic/);
+    assert.match(btn.props.title, /On the CPU/);
+  } finally { globalThis.React = prev; }
+});

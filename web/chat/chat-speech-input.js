@@ -1,4 +1,4 @@
-// Settings → Speech → Dictation, and the composer microphone's menu (plan 29.4). The microphones in order of
+// Settings → Speech → Dictation (plan 29.4; the composer's microphone has no menu of its own). The microphones in order of
 // preference (matched by label, because browsers change device ids), the one that would be used now, a
 // level meter to test it, and the dictation language, stt preset and button mode. Everything is saved in
 // the hub's settings (`speech_input`, config.toml), so it survives restarts and works in any browser on
@@ -30,10 +30,9 @@ export async function meter(media, mic, onLevel) {
   return () => { clearInterval(t); stream.getTracks().forEach(x => x.stop()); ctx.close().catch(() => {}); };
 }
 
-/** The microphones, a level test and (unless `fields` is false) language, model and button mode. Alone (the composer's
- *  menu) it loads and saves `speech_input` itself; given `value` and `onChange` (the Settings page, settings-redesign 4.3)
+/** The microphones, a level test and (unless `fields` is false) language, model and button mode. Alone (no `value`) it loads and saves `speech_input` itself; given `value` and `onChange` (the Settings page, settings-redesign 4.3)
  *  it edits the page's draft instead and saves nothing. */
-export function SpeechInputPanel({ api, compact = false, toast = () => {}, media = globalThis.navigator?.mediaDevices, value, onChange, fields = true }) {
+export function SpeechInputPanel({ api, toast = () => {}, media = globalThis.navigator?.mediaDevices, value, onChange, fields = true }) {
   const React = R();
   const [prefs, setPrefs] = React.useState(null), [devices, setDevices] = React.useState([]);
   const [level, setLevel] = React.useState(null), [err, setErr] = React.useState(null);
@@ -68,7 +67,7 @@ export function SpeechInputPanel({ api, compact = false, toast = () => {}, media
     catch (e) { setErr(e?.message || 'Could not open the microphone'); }
   };
   const lbl = (t, hint) => h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 } }, h('span', { style: { fontWeight: 500, fontSize: 12.5 } }, t),
-    hint && !compact ? h('span', { style: { fontSize: 12, color: T.mut } }, hint) : null);
+    hint ? h('span', { style: { fontSize: 12, color: T.mut } }, hint) : null);
   const ctl = { height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.sb, color: T.tx, font: 'inherit', fontSize: 12.5 };
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5 } },
     lbl('Microphones, most preferred first', 'The first one plugged in is used; if it is unplugged the next takes over, and a higher one takes over again when it is plugged back in.'),
@@ -90,7 +89,7 @@ export function SpeechInputPanel({ api, compact = false, toast = () => {}, media
       h('span', { style: { color: T.mut, fontSize: 12, flex: 1, minWidth: 160 } }, !named ? 'Which one is used shows once the browser may use a microphone.' : prefs.mics.length && active === BROWSER_DEFAULT ? 'None of these is plugged in: the browser’s default microphone is used.' : `Dictation uses ${active.label}.`),
       level != null ? h(LevelBar, { level, width: 90 }) : null,
       h(Btn, { sm: true, kind: level != null ? 'pri' : 'sec', icon: 'mic', label: level != null ? 'Stop test' : 'Test level', onClick: test })),
-    !fields ? null : h('div', { style: { display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 } },
+    !fields ? null : h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 } },
       h('label', { style: { display: 'flex', flexDirection: 'column', gap: 4 } }, lbl('Language', 'An ISO code such as en or de; empty detects it.'),
         h('input', { 'aria-label': 'Language', defaultValue: prefs.language, placeholder: 'detect', maxLength: 3, style: ctl,
           onBlur: e => { const v = e.target.value.trim().toLowerCase(); if (v !== prefs.language) (/^([a-z]{2,3})?$/.test(v) ? save({ language: v }) : setErr('Language: two or three letters, or empty')); } })),

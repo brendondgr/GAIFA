@@ -316,6 +316,7 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
     msgs: list[dict[str, Any]] = []
     step: list[dict[str, Any]] = []
     step_id: Any = None
+    details: dict[Any, dict[str, Any]] = {}       # step → {details, model} (plan llm-servers 2.1)
 
     def flush() -> None:
         nonlocal step, step_id
@@ -326,6 +327,9 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
             names = ", ".join(e["payload"]["name"] for e in by_user)
             msgs.append({"role": "user", "content": f"(I pressed a button that ran {names} directly; its result follows.)"})
         m = _call_msg(step)
+        if step_id in details:      # sent back only to the model that produced it (llm.for_model)
+            m["reasoning_details"] = details[step_id]["details"]
+            m["details_model"] = details[step_id]["model"]
         msgs.append(m)
         img_msgs = []
         for c in m.get("tool_calls") or []:
@@ -351,6 +355,9 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
         if e["seq"] <= upto:
             continue
         t, p = e["type"], e["payload"]
+        if t == "reasoning_details":
+            details[p.get("step")] = p
+            continue
         if t in ("assistant", "tool_call", "thinking"):
             sid = p.get("step")
             if step and sid != step_id:

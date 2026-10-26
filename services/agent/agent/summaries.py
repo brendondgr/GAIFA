@@ -105,6 +105,8 @@ class Summaries:
             return None
         events = self.store.events(tid)
         model = t.get("model") or self.agent.cfg.model
+        if model != self.agent.cfg.model and await self.agent.llm.is_cloud(model):
+            model = self.agent.cfg.model        # background work never goes to a paid provider (plan llm-servers 2.1)
         reply = await self.agent.llm.chat(model, [{"role": "user", "content": PROMPT.format(chat=chat_text(events))}],
                                           stream=False)
         text = (reply.text or "").strip()

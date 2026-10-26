@@ -6,7 +6,8 @@ A reply is a dict:
     {"text": "…", "thinking": "…", "tool_calls": [{"name": "x", "arguments": {...} | "raw json"}],
      "leaked": "<|tool_call>call:x{a:1}<tool_call|>",   # written into the text instead of tool_calls
      "usage": {"prompt_tokens": 100, "completion_tokens": 20}, "status": 503, "delay": 0.5, "chunk": 8,
-     "field": "reasoning" | "reasoning_content", "match": "substring the request must contain"}
+     "field": "reasoning" | "reasoning_content", "match": "substring the request must contain",
+     "details": [...]}   # reasoning_details, as the relay returns them for Claude and Gemini (plan llm-servers 2.1)
 
 With no reply queued, it answers "ok". `/v1/models` lists `models` with their `meta`.
 """
@@ -25,6 +26,8 @@ class FakeModel:
     def __init__(self) -> None:
         self.script: list[dict[str, Any]] = []
         self.received: list[dict[str, Any]] = []
+        self.headers: list[dict[str, str]] = []         # each chat request's headers (title asks included)
+        self.groups: dict[str, str] = {}                # model → the relay's group (local, cloud, …)
         self.titles = 0
         self.title = "Test title"                       # what the model answers when asked for a title
         self.title_asks: list[dict[str, Any]] = []      # those requests
@@ -56,12 +59,14 @@ class FakeModel:
         @app.get("/v1/models")
         def models() -> dict:
             return {"object": "list", "data": [{"id": k, "object": "model", "meta": v,
-                                                "relay": {"endpoint": k, "health": "healthy", "protocol": "openai"}}
+                                                "relay": {"endpoint": k, "health": "healthy", "protocol": "openai",
+                                                          "group": self.groups.get(k, "local")}}
                                                for k, v in self.models.items()]}
 
         @app.post("/v1/chat/completions")
         async def chat(request: Request):
             body = await request.json()
+            self.headers.append({k.lower(): v for k, v in request.headers.items()})
             if "Give this chat a short title" not in json.dumps(body):
                 self.received.append(body)
             if body.get("model") in self.down:
@@ -78,6 +83,8 @@ class FakeModel:
                     msg["reasoning"] = r["thinking"]
                 if calls:
                     msg["tool_calls"] = calls
+                if r.get("details"):
+                    msg["reasoning_details"] = r["details"]
                 return {"choices": [{"index": 0, "message": msg, "finish_reason": "tool_calls" if calls else "stop"}],
                         "usage": r.get("usage") or {"prompt_tokens": 100, "completion_tokens": 10}}
             return StreamingResponse(self._stream(r, body), media_type="text/event-stream")
@@ -105,6 +112,8 @@ class FakeModel:
                                          "function": {"name": tc["name"], "arguments": ""}}]})
             for i in range(0, len(args), n):
                 yield chunk({"tool_calls": [{"index": idx, "function": {"arguments": args[i:i + n]}}]})
+        if r.get("details"):
+            yield chunk({"reasoning_details": r["details"]})
         yield chunk({}, "tool_calls" if r.get("tool_calls") else "stop")
         usage = r.get("usage") or {"prompt_tokens": len(json.dumps(body["messages"])) // 4, "completion_tokens": max(1, len(text) // 4)}
         yield "data: " + json.dumps({"choices": [], "usage": usage}) + "\n\n"

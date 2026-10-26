@@ -776,6 +776,8 @@ class Agent(Compaction):
                 reply.text = "I couldn't finish this: I kept repeating the same step without getting anywhere."
         if reply.thinking:
             self.emit(tid, "thinking", {"text": reply.thinking, "seconds": reply.thinking_s, "step": step})
+        if reply.details:       # plan llm-servers 2.1: the provider's hidden state, sent back with this step
+            self.emit(tid, "reasoning_details", {"details": reply.details, "model": model, "step": step})
         if reply.text or not reply.tool_calls:
             self.emit(tid, "assistant", {"text": reply.text, "step": step, "model": model})
         for tc in reply.tool_calls:
@@ -807,6 +809,7 @@ class Agent(Compaction):
         return await self.meter(tid, model)
 
     async def _title(self, tid: str, text: str) -> None:
+        token = THREAD.set(tid)          # part of the chat: its lease, and a cloud model may answer it
         try:
             model = (self.store.thread(tid) or {}).get("model") or self.cfg.model
             r = await asyncio.wait_for(self.llm.chat(model, prompts.title_messages(text)), timeout=120)
@@ -816,6 +819,8 @@ class Agent(Compaction):
                 self.transient(tid, "thread", self.store.thread(tid) or {})
         except Exception:  # noqa: BLE001 - the heuristic title stays
             pass
+        finally:
+            THREAD.reset(token)
 
 
 def _title_from(text: str) -> str:

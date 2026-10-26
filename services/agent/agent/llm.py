@@ -50,8 +50,23 @@ GPU_WAIT: ContextVar[GpuWait | None] = ContextVar("gaifa_gpu_wait", default=None
 
 
 def _headers() -> dict[str, str]:
+    """A call that belongs to a chat names it (the GPU lease) and says it's a chat: the relay lets only
+    chats reach a cloud model (plan llm-servers 2.1). Background work (summaries, the learner) sets no thread."""
     tid = THREAD.get()
-    return {"X-GAIFA-Thread": tid} if tid else {}
+    return {"X-GAIFA-Thread": tid, "X-GAIFA-Purpose": "chat"} if tid else {}
+
+
+def for_model(messages: list[dict[str, Any]], model: str) -> list[dict[str, Any]]:
+    """`reasoning_details` (a provider's hidden state: Claude's thinking signatures, Gemini's parts) goes back
+    only to the model that produced it; `details_model` names it and is never sent."""
+    out = []
+    for m in messages:
+        if "details_model" in m or "reasoning_details" in m:
+            m = dict(m)
+            if m.pop("details_model", None) != model:
+                m.pop("reasoning_details", None)
+        out.append(m)
+    return out
 
 # Gemma's own `<|tool_call>call:name{…}<tool_call|>`, also written as `<call:name{…}</call>` by the 26B
 GEMMA_CALL = re.compile(r"(?:<\|tool_call\>\s*)?<?(?:call:)?([A-Za-z0-9_.-]+)\s*(\{.*?\})\s*(?:<tool_call\|>|</call>)", re.S)
@@ -173,6 +188,7 @@ class Reply:
     usage: dict[str, int] = field(default_factory=dict)
     finish: str | None = None
     model: str | None = None
+    details: list[dict[str, Any]] = field(default_factory=list)   # reasoning_details to send back next turn
     leaked: bool = False
     split: bool = False          # planning moved out of the reply (split_planning)
     runaway: bool = False        # cut off: the model kept repeating itself (looping)
@@ -337,6 +353,13 @@ class LLM:
         self._models = (time.time(), data)
         return data
 
+    async def is_cloud(self, model: str) -> bool:
+        """A paid provider's model (the relay's `cloud` group): for chats only."""
+        for m in await self.models():
+            if m.get("id") == model:
+                return (m.get("relay") or {}).get("group") == "cloud"
+        return False
+
     async def meta(self, model: str) -> dict[str, Any]:
         for m in await self.models():
             if m.get("id") == model:
@@ -376,6 +399,7 @@ class LLM:
         m = (d.get("choices") or [{}])[0].get("message") or {}
         reply.text = m.get("content") or ""
         reply.thinking = m.get("reasoning") or m.get("reasoning_content") or ""
+        reply.details = list(m.get("reasoning_details") or [])
         for i, tc in enumerate(m.get("tool_calls") or []):
             fn = tc.get("function") or {}
             args = fn.get("arguments")
@@ -385,7 +409,7 @@ class LLM:
     async def chat(self, model: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None = None,
                    on_delta: Delta | None = None, known: set[str] | None = None, stream: bool = True,
                    tool_choice: str = "auto") -> Reply:
-        body: dict[str, Any] = {"model": model, "messages": defuse(messages), "stream": True,
+        body: dict[str, Any] = {"model": model, "messages": defuse(for_model(messages, model)), "stream": True,
                                 "stream_options": {"include_usage": True}}
         if tools:
             body["tools"] = tools
@@ -425,6 +449,8 @@ class LLM:
                         reply.usage = {k: int(v) for k, v in chunk["usage"].items() if isinstance(v, (int, float))}
                     for ch in chunk.get("choices") or []:
                         d = ch.get("delta") or {}
+                        if d.get("reasoning_details"):
+                            reply.details.extend(d["reasoning_details"])
                         think = d.get("reasoning") or d.get("reasoning_content")
                         if think:
                             t_think = t_think or time.monotonic()

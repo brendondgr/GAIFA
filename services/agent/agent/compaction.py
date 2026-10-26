@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from . import context as ctx
 from . import prompts
+from .llm import THREAD
 from .tools import ToolSet
 
 
@@ -41,7 +42,11 @@ class Compaction:
         msgs, _ = ctx.rebuild(events)
         prompt = [{"role": "system", "content": "You summarize chats." + (f"\nEarlier summary:\n{old_summary}" if old_summary else "")},
                   *msgs, {"role": "user", "content": prompts.SUMMARY_PROMPT}]
-        reply = await self.llm.chat(model, prompt)
+        token = THREAD.set(tid)          # part of the chat (plan llm-servers 2.1)
+        try:
+            reply = await self.llm.chat(model, prompt)
+        finally:
+            THREAD.reset(token)
         outs = prompts.outputs_table(ctx.model_outputs(events))
         summary = reply.text.strip() + (f"\n\nOutputs so far:\n{outs}" if outs else "")
         self.emit(tid, "compact", {"stage": "summary", "summary": summary, "upto_seq": cut, "before": before})

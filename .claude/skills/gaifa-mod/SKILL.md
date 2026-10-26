@@ -23,6 +23,7 @@ A mod is a folder `services/<id>/` with a `service.toml` and an HTTP server on `
 - **Outputs** follow architecture §4.7: `<date>/<HHMMSS>-<slug>.<ext>`, `.part` then rename, optional sidecar JSON.
 - **Page modules** use only `ctx` (`ctx.call`, `ctx.api`, `ctx.ui`, `ctx.on`): no `fetch`, no raw colors, and a Start button when the mod is stopped.
 - **Don't stop or move the existing apps' services, models or data** without the user's approval (see the `gaifa` skill's invariants).
+- **`relay`, `lcpp`, `tts`, `gen3d` are their own repositories** (submodules): work on a branch in the mod's repository (or a worktree of it, outside GAIFA), run its tests, push, then `gaifa repos pin <id>` and commit GAIFA. To make a new mod a repository of its own, docs/mods.md §10 (preflight, push, adopt).
 - **Ship a setup doc:** `services/<id>/setup/<env>.md` from the template (`gaifa new` copies one), with its `gaifa-setup` block filled in (summary, steps, check, a few optional model suggestions) so `gaifa setup <id>` can install it; describe the mod, not this machine's models (docs/mods.md §9). `gaifa docs --check --strict` must pass.
 
 ## Choosing how much UI

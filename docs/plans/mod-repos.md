@@ -173,7 +173,7 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
     - Two sessions editing one mod: use a mod branch each.
     - The relay running while its code changes: it reloads only on restart.
   *Done when:* `gaifa docs --check --strict` passes and the doc's commands are the ones 3.2 built.
-- [ ] **4.2 Project instructions and skills: `CLAUDE.md`, `AGENTS.md`, `.claude/skills/gaifa/SKILL.md`, `.claude/skills/gaifa-mod/SKILL.md`, the root `README.md`.**
+- [x] **4.2 Project instructions and skills: `CLAUDE.md`, `AGENTS.md`, `.claude/skills/gaifa/SKILL.md`, `.claude/skills/gaifa-mod/SKILL.md`, the root `README.md`.**
   - **Rules:** commit in the mod first, then the pin, with tests passing in both; check `gaifa repos status` before committing GAIFA; where the four repositories are.
   - **Clone:** a clone needs `--recurse-submodules` (or `gaifa setup` does it, 4.3).
   *Done when:* the rules appear in each file and agree with docs/mods.md §10.

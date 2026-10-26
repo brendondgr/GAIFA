@@ -208,10 +208,12 @@ CPU), and setup picks the one your machine can run.
 ## Quickstart
 
 ```bash
-git clone https://github.com/brendondgr/GAIFA.git
+git clone --recurse-submodules https://github.com/brendondgr/GAIFA.git
 cd GAIFA
 bin/gaifa setup
 ```
+
+Four mods (the relay, the llama.cpp launcher, speech and 3D) are git submodules of their own repositories; `gaifa setup` checks out the ones you pick if the clone didn't, and `gaifa repos` keeps them up to date.
 
 `gaifa setup` does the whole install: the hub (`uv sync`, then `gaifa install`, which writes and starts the `gaifa` systemd user service and links `gaifa` into `~/.local/bin`), the host checks (it prints any `sudo` fixes for you to run; it never runs them), then the mods you pick from a list. It asks every question first (licences, which models), installs each mod, downloads the models you chose, asks for the agent's model once your relay has some, and checks each mod. If it stops, run it again: it resumes. Open <http://127.0.0.1:7000> when it's done.
 

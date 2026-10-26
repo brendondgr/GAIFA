@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY, name TEXT NOT NULL 
 CREATE TABLE IF NOT EXISTS chats (                                           -- plan 28.5: the `chats` collection
     thread_id TEXT PRIMARY KEY, title TEXT, summary TEXT NOT NULL, created_ts REAL, updated_ts REAL,
     state TEXT NOT NULL, vector BLOB);                                       -- pending | done
+CREATE TABLE IF NOT EXISTS texts (                                           -- structured-memory 2.1: named text collections
+    ns TEXT NOT NULL, id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, meta TEXT NOT NULL DEFAULT '{}',
+    state TEXT NOT NULL, vector BLOB, updated_ts REAL, PRIMARY KEY (ns, id));
+CREATE INDEX IF NOT EXISTS texts_state ON texts(state, updated_ts);
 CREATE TABLE IF NOT EXISTS collection_outputs (
     collection_id TEXT NOT NULL REFERENCES collections(id) ON DELETE CASCADE, output_id TEXT NOT NULL,
     PRIMARY KEY (collection_id, output_id));
@@ -226,6 +230,42 @@ class Store:
         out = {"pending": 0, "done": 0}
         out.update({r["state"]: r["n"] for r in self._rows("SELECT state, COUNT(*) AS n FROM chats GROUP BY state")})
         return out
+
+    # texts (structured-memory 2.1): named collections of short texts, one vector each, like the chats ----------
+
+    def put_text(self, ns: str, tid: str, title: str, text: str, meta: str) -> None:
+        with self.lock:
+            self.db.execute("INSERT INTO texts (ns, id, title, text, meta, state, updated_ts) VALUES (?, ?, ?, ?, ?, 'pending', ?) "
+                            "ON CONFLICT(ns, id) DO UPDATE SET title = excluded.title, meta = excluded.meta, updated_ts = excluded.updated_ts, "
+                            "state = CASE WHEN texts.text = excluded.text AND texts.title = excluded.title AND texts.vector IS NOT NULL "
+                            "THEN texts.state ELSE 'pending' END, text = excluded.text", (ns, tid, title, text, meta, time.time()))
+
+    def texts_pending(self, limit: int = 8) -> list[dict[str, Any]]:
+        return self._rows("SELECT ns, id, title, text FROM texts WHERE state = 'pending' ORDER BY updated_ts DESC LIMIT ?", (limit,))
+
+    def finish_text(self, ns: str, tid: str, text: str, vector: np.ndarray) -> None:
+        with self.lock:
+            self.db.execute("UPDATE texts SET state = 'done', vector = ? WHERE ns = ? AND id = ? AND text = ?",
+                            (np.asarray(vector, dtype=np.float16)[:DIM].tobytes(), ns, tid, text))
+
+    def delete_texts(self, ns: str, ids: list[str] | None = None) -> int:
+        with self.lock:
+            if ids is None:
+                return self.db.execute("DELETE FROM texts WHERE ns = ?", (ns,)).rowcount
+            return sum(self.db.execute("DELETE FROM texts WHERE ns = ? AND id = ?", (ns, i)).rowcount for i in ids)
+
+    def texts(self, ns: str, ids: list[str] | None = None) -> list[dict[str, Any]]:
+        rows = self._rows("SELECT id, title, meta, state, vector FROM texts WHERE ns = ?", (ns,))
+        return [r for r in rows if ids is None or r["id"] in set(ids)]
+
+    def text_counts(self, ns: str) -> dict[str, int]:
+        out = {"pending": 0, "done": 0}
+        out.update({r["state"]: r["n"] for r in self._rows("SELECT state, COUNT(*) AS n FROM texts WHERE ns = ? GROUP BY state", (ns,))})
+        return out
+
+    def queued(self) -> bool:
+        """Chat summaries or texts waiting to be embedded (they go between outputs)."""
+        return bool(self.chats_pending(1) or self.texts_pending(1))
 
     # collections ---------------------------------------------------------------------------
 

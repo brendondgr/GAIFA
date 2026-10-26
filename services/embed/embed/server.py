@@ -23,6 +23,7 @@ from .hubclient import Hub, HubError
 from .settings import MODEL_ID, REPO, REVISION, Settings
 from .worker import WorkerBackend, WorkerDied
 from .api_chats import add_chat_routes
+from .api_texts import add_text_routes
 from .api_library import add_library_routes, backend_error
 from .library import Library, open_library
 
@@ -120,6 +121,7 @@ def create_app(settings: Settings, encoder: Encoder | None = None, hub: Hub | No
     if lib is not None:
         add_library_routes(app, lib, enc)
         add_chat_routes(app, lib, enc)
+        add_text_routes(app, lib, enc)                # structured-memory 2.1
 
     async def make_room(kinds: set[str]) -> None:
         """Loading another encoder while loaded needs more memory: ask the hub for the difference. (A load from

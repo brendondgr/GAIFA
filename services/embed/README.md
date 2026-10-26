@@ -23,6 +23,7 @@ Vectors are unit length (cosine = dot product), in input order. Media are GAIFA 
 | `embed/chunks.py` | ~800-token chunks with 100 of overlap, keeping offset, page and line |
 | `embed/gpu.py` | the GPU slot around each encode (plan 31.3): `interactive` for `/v1/embed` and searches, `background` for indexing; none on the CPU |
 | `embed/gpu_slot.py` | GAIFA's reference GPU client, an identical copy of `services/_template/gpu_slot.py` |
+| `embed/api_texts.py` | named text collections (structured-memory 2.1): `PUT/DELETE /v1/texts/{ns}/{id}` `{text, title, meta}`, `DELETE /v1/texts/{ns}?ids=`, `GET /v1/texts/{ns}` (counts), `POST /v1/texts/{ns}/search {query, limit, ids?}`; one vector a text, embedded with the chats under the idle rule; unchanged text keeps its vector; the agent's memory is `memory` |
 | `embed/api_library.py` | `/v1/search`, `/v1/library`, `/v1/library/reindex`, `/v1/collections` |
 | `embed/search.py` | search: the query against every chunk, filters, a chat's or collection's scope indexed first |
 | `embed/hubclient.py` | outputs, memory acquire and the models registry over HTTP |

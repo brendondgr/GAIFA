@@ -45,9 +45,9 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
 
 ## Phase 2 — Search by meaning (M)
 
-- [ ] **2.1 Text collections in the embed mod: `services/embed/embed/api_texts.py`, `store.py`.**
+- [x] **2.1 Text collections in the embed mod: `services/embed/embed/api_texts.py`, `store.py`.**
   - **Generalize `chats`:** a `texts` table `{ns, id, title, text, meta, state, vector}`; `PUT /v1/texts/{ns}/{id}`, `DELETE /v1/texts/{ns}/{id}`, `DELETE /v1/texts/{ns}?ids=`, `GET /v1/texts/{ns}` (counts), `POST /v1/texts/{ns}/search {query, limit, ids?}` → `[{id, score, title, meta}]`. Embedded under the same idle rule and GPU lease as the chats; `ns` is `[a-z][a-z0-9-]{1,31}`.
-  - **The chats:** `/v1/chats…` stay as they are (now `ns = "chats"` underneath; the table's rows move once).
+  - **The chats:** `/v1/chats…` stay as they are. *As built:* the chats keep their own table; the texts get theirs (`texts`), and the indexer embeds both between outputs (`store.queued`). A text put again with the same words keeps its vector.
   *Done when:* `services/embed/tests/test_texts.py` (fake backend) covers put, re-put with new text, delete, search ranking, `ids` filtering and the chats routes unchanged.
 - [ ] **2.2 Keeping the index: `memory/index.py`.**
   - **What is embedded:** each current fact (`text` plus its entities' paths and names) as `fact:<id>`; each entity (path, name, aliases, summary) as `entity:<id>`, in `ns = "memory"`.

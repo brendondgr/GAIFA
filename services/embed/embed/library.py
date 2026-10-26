@@ -175,7 +175,7 @@ class Library:
         follower = asyncio.create_task(self.hub.follow(self.on_event, self.on_connect, stop))
         try:
             while not stop.is_set():
-                if not self.store.pending(1) and not self.store.chats_pending(1):
+                if not self.store.pending(1) and not self.store.queued():
                     self.state, self.error = "idle", None
                     await self._unload_if_unused()
                     self.wake.clear()
@@ -246,7 +246,7 @@ class Library:
             return n
         n += done
         while (rows := self.store.pending(1)):
-            if self.store.chats_pending(1):      # summaries that came in meanwhile go before the next output
+            if self.store.queued():              # summaries and texts that came in meanwhile go before the next output
                 if (done := await self._chats()) is None:
                     break
                 n += done
@@ -267,7 +267,7 @@ class Library:
                     break
             finally:
                 self.current = None
-        if not self.store.pending(1) and not self.store.chats_pending(1):
+        if not self.store.pending(1) and not self.store.queued():
             await self._unload_if_unused()
         return n
 
@@ -288,6 +288,11 @@ class Library:
                 vecs = await self._embed("text", [prompt(r["summary"], "document", r["title"]) for r in rows])
                 for r, v in zip(rows, vecs):
                     self.store.finish_chat(r["thread_id"], r["summary"], v)
+                n += len(rows)
+            while (rows := self.store.texts_pending(limit)):          # structured-memory 2.1: the text collections
+                vecs = await self._embed("text", [prompt(r["text"], "document", r["title"] or None) for r in rows])
+                for r, v in zip(rows, vecs):
+                    self.store.finish_text(r["ns"], r["id"], r["text"], v)
                 n += len(rows)
         finally:
             self._in_chats = False
@@ -337,7 +342,7 @@ class Library:
         finally:
             if gated:
                 self.gpu_wait = None
-        if not self._in_chats and self.store.chats_pending(1):     # summaries go between an output's batches too
+        if not self._in_chats and self.store.queued():     # summaries and texts go between an output's batches too
             await self.index_chats(gate=GATED.get())
         return vecs
 

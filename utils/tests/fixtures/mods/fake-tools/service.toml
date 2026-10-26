@@ -37,3 +37,4 @@ wipe = { op = "DELETE /v1/jobs/{jid}", description = "Delete a job", confirm = t
 fail = { op = "POST /v1/fail", description = "Always fails", risk = "read" }
 get_item_quiet = { op = "GET /v1/items/{item_id}", description = "Read one item, never verbose", fixed = { verbose = true }, hide = [] }
 make_image_simple = { op = "POST /v1/images", description = "Make an image with defaults", risk = "generate", hide = ["steps", "reference"] }
+chat_only = { op = "GET /v1/items/{item_id}", description = "Read one item, for the chat only", risk = "read", mcp = false }

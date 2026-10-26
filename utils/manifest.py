@@ -285,6 +285,7 @@ class ToolSpec(_Strict):
     job_status: Op | None = None  # "GET /v1/jobs/{id}": `{id}` (or any one placeholder) is the job id
     job_cancel: Op | None = None
     cap_kb: int | None = Field(None, ge=1, le=256)  # results kept whole up to this many KB (default 8; plan 27.2)
+    mcp: bool = True              # structured-memory 3.1: false keeps it out of /mcp (the agent's own tools, such as memory)
 
     @field_validator("grant_key")
     @classmethod

@@ -66,6 +66,7 @@ class ToolDef:
     mod_dry_run: bool = False        # plan 26.2: in a dry run the call still goes to the mod, which answers it itself
     limits: str | None = None        # plan 27.4: the mod's preflight op ("POST /v1/limits"), asked before deciding
     view: dict[str, Any] | None = None  # plan 46.1: how its result draws in Chat (utils/tools/views.py)
+    mcp: bool = True                 # structured-memory 3.1: false keeps it out of /mcp (the chat and the hub's API still see it)
 
     def public(self, full: bool = True, view: str = "full") -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "mod": self.mod or "hub", "risk": self.risk, "core": self.core,
@@ -226,7 +227,7 @@ class Catalog:
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=list(spec.examples), core=spec.core, route=route, response=op["response"],
                                job=job, problems=problems, grant_key=spec.grant_key, mod_dry_run=spec.dry_run,
-                               cap_bytes=spec.cap_kb * 1024 if spec.cap_kb else None, view=view))
+                               cap_bytes=spec.cap_kb * 1024 if spec.cap_kb else None, view=view, mcp=spec.mcp))
         if svc.m.agent.tools_source:
             out += await self._source(svc)
         for t in out:
@@ -264,7 +265,7 @@ class Catalog:
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=[e for e in it.get("examples") or [] if isinstance(e, dict)],
                                core=bool(it.get("core")), source="tools_source", route=route, job=job,
-                               problems=grant_problems(gk, params) + vp, grant_key=gk, view=view))
+                               problems=grant_problems(gk, params) + vp, grant_key=gk, view=view, mcp=it.get("mcp") is not False))
         return out
 
     # ---- persistence (a stopped mod keeps its tools listed) ----------------------------------
@@ -274,7 +275,8 @@ class Catalog:
         if db is None:
             return
         rows = [{**t.public(), "route": t.route.__dict__ if t.route else None, "response": t.response,
-                 "job_ops": t.job, "tool": t.tool, "mod_dry_run": t.mod_dry_run, "cap_bytes": t.cap_bytes, "limits": t.limits} for t in tools]
+                 "job_ops": t.job, "tool": t.tool, "mod_dry_run": t.mod_dry_run, "cap_bytes": t.cap_bytes, "limits": t.limits,
+                 "mcp": t.mcp} for t in tools]
         await db.execute("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                          (KV_PREFIX + sid, json.dumps({"ts": time.time(), "tools": rows})))
 
@@ -297,7 +299,8 @@ class Catalog:
                                    core=bool(r.get("core")), source=r.get("source", "manifest"), route=route,
                                    response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key"),
                                    mod_dry_run=bool(r.get("mod_dry_run")),
-                                   cap_bytes=r.get("cap_bytes"), limits=svc.m.agent.limits if svc.m else r.get("limits"), view=r.get("view")))
+                                   cap_bytes=r.get("cap_bytes"), limits=svc.m.agent.limits if svc.m else r.get("limits"), view=r.get("view"),
+                                   mcp=r.get("mcp") is not False))
             return out
         assert svc.m
         return [ToolDef(tool_name(svc.id, n), svc.id, n, s.description or s.op, {"type": "object"},
@@ -305,7 +308,7 @@ class Catalog:
                         examples=list(s.examples), core=s.core,
                         job=_job_ops(s.job_status, s.job_cancel) if s.job else None, grant_key=s.grant_key,
                         mod_dry_run=s.dry_run, cap_bytes=s.cap_kb * 1024 if s.cap_kb else None, limits=svc.m.agent.limits,
-                        view=views.check(s.view)[0])
+                        view=views.check(s.view)[0], mcp=s.mcp)
                 for n, s in svc.m.tools.items()]
 
     # ---- lookups -----------------------------------------------------------------------------

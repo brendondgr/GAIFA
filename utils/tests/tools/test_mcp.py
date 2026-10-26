@@ -107,6 +107,19 @@ async def test_read_tool_runs_and_returns_json(th):
     assert status == 200 and body["error"]["code"] == -32602
 
 
+async def test_a_tool_marked_mcp_false_is_the_chats_only(th):
+    """structured-memory 3.1: left out of both eras' lists, called as if unknown; the hub's API still has it."""
+    for version in ("2025-06-18", MODERN):
+        _, body = await rpc(th, "tools/list", version=version)
+        assert "fake_tools_chat_only" not in {t["name"] for t in body["result"]["tools"]}
+        assert "fake_tools_get_item" in {t["name"] for t in body["result"]["tools"]}
+    res = await call(th, "fake_tools_chat_only", {"item_id": "a"})
+    assert res["isError"] is True and "unknown_tool" in text(res)
+    assert any(t["name"] == "fake_tools_chat_only" for t in (await th.client.get("/api/tools")).json())
+    r = await th.call("fake_tools_chat_only", {"item_id": "a"})
+    assert r["status"] == "done"
+
+
 async def test_ask_tool_waits_for_the_user_then_wait_approval_returns_the_result(th):
     res = await call(th, "fake_tools_make_image", {"prompt": "x"}, version="2025-06-18",
                      headers={"User-Agent": "claude-code/9.9"})

@@ -64,7 +64,7 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
 
 ## Phase 3 — Memory in chats (M)
 
-- [ ] **3.1 Tools only the agent sees: `mcp = false`: `utils/manifest.py`, `utils/tools/catalog.py`, `utils/tools/mcp.py`.**
+- [x] **3.1 Tools only the agent sees: `mcp = false`: `utils/manifest.py`, `utils/tools/catalog.py`, `utils/tools/mcp.py`.**
   - **Field:** `ToolSpec.mcp: bool = True` (and the same key in `tools_source` rows); `ToolDef.mcp`; the MCP endpoint leaves such tools out of `tools/list` and answers `tools/call` for one as an unknown tool. The chat and the hub's own API still see them.
   *Done when:* `utils/tests/tools/test_mcp.py` gains a fake-mod tool with `mcp = false`: absent from both protocol eras' lists, refused on call, present in `/api/tools`; the docs: architecture §4.3 (the field) and §14.7.
 - [ ] **3.2 Writing from a chat: the agent's `[tools]` and `remember`.**

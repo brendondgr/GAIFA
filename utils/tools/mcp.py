@@ -10,7 +10,8 @@ Streamable HTTP, stateless, single `application/json` responses (no SSE, no sess
 - **Legacy (2025-03-26, 2025-06-18, 2025-11-25):** `initialize` (the client's version is echoed when
   supported), `notifications/initialized` (202), `ping`, `tools/list`, `tools/call`.
 
-**Tools** are the catalog's (annotations from `risk`) plus the MCP-only `gaifa_wait_approval`. Every
+**Tools** are the catalog's (annotations from `risk`) plus the MCP-only `gaifa_wait_approval`; a tool marked
+`mcp = false` (the agent's own, such as memory: structured-memory 3.1) is left out and called as if unknown. Every
 call goes through `hub.calls.call(..., origin={"service": "mcp", "client": …}, mode="manual")`, so the
 permissions and approvals apply exactly as for the chat. An `ask` call runs nothing until the user
 decides (`mcp_approval.py`): a modern client that can show forms gets an `input_required` result
@@ -213,7 +214,7 @@ class McpServer:
 
     async def _tools_list(self, req: Request) -> dict[str, Any]:
         catalog = await self._ready().tools.tools()
-        tools = [self._tool(t, req) for t in catalog] + [self._tool_entry(req, *mcp_approval.WAIT_TOOL)]
+        tools = [self._tool(t, req) for t in catalog if t.mcp] + [self._tool_entry(req, *mcp_approval.WAIT_TOOL)]
         out: dict[str, Any] = {"tools": tools}
         if req.modern:
             out.update({"ttlMs": LIST_TTL_MS, "cacheScope": "private"})
@@ -257,6 +258,9 @@ class McpServer:
         args = args or {}
         if name == mcp_approval.WAIT_TOOL[0]:
             return await self.approver.wait_tool(req, args)
+        tool = await hub.tools.get(name)
+        if tool is not None and not tool.mcp:           # structured-memory 3.1: the agent's own, as if it weren't there
+            return self.approver.result(req, {"status": "error", "error": {"code": "unknown_tool", "detail": f"there is no tool {name!r}"}})
         if req.modern and req.params.get("requestState") is not None:
             return await self.approver.resume(req, name, args)
         out = await hub.calls.call(name, args, origin={"service": "mcp", "client": req.client}, mode="manual",

@@ -213,6 +213,7 @@ delete_voice = { op = "DELETE /v1/voices/{name}", confirm = true }
 # risk: read | write | generate | network | execute | destructive (default: read for GET, destructive for DELETE/confirm, else write; §14.7)
 # ask = [...] inputs the user chooses (parameter card) · examples = [{...}] · core = true (always loaded)
 # hide = [...] / fixed = {...}: parameters kept from the model / always sent
+# mcp = false: the chat's only, left out of /mcp (the agent's own tools, such as memory; structured-memory 3.1)
 # job = true + job_status = "GET /v1/jobs/{id}" (+ job_cancel): the hub follows the job to its outputs
 
 [agent]                             # optional: tools the mod lists at runtime (comfy: one per task)

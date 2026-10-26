@@ -1,6 +1,6 @@
 # Plan: mods that are their own repositories, and keeping them up to date
 
-**Asked for:** 2026-10-26 · **Status:** Planned
+**Asked for:** 2026-10-26 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -36,7 +36,7 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
 
 ## Phase 1 — Give each repository GAIFA's history (M)
 
-- [ ] **1.1 Each mod ignores its own files: `services/{relay,lcpp,tts,gen3d}/.gitignore`.**
+- [x] **1.1 Each mod ignores its own files: `services/{relay,lcpp,tts,gen3d}/.gitignore`.**
   - **What:** GAIFA's root `.gitignore` covers `/services/*/.venv/`, `/services/*/runtime/` and `/services/*/.env`, plus per-mod entries like lcpp's machine-specific `data/models.json` (plan 23.11). Once a folder is a submodule, only its own `.gitignore` applies. Copy every rule that matches inside the folder into the mod's `.gitignore`, written relative to the mod. The check is `utils/repos.py: ignore_gap(sid) -> list[str]`: the paths that `git status --ignored --porcelain` in GAIFA ignores under `services/<sid>/` but the mod's own rules don't (checked with `git check-ignore --no-index` in the folder).
   - **Why first:** these commits must be in the history that 1.2 splits out, so the repository never shows a venv or a key as untracked.
   *Done when:* `ignore_gap` is empty for all four; `utils/tests/repos/test_ignore_gap.py` builds a temp GAIFA-like repo with a mod folder and covers a missing rule, a negated rule and a rule only the root has.

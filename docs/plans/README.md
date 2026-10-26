@@ -19,5 +19,5 @@ Each piece of work GAIFA builds has its own plan here: one file per plan, `docs/
 | [gaifa-rename.md](gaifa-rename.md) | Stage Q (Phase 50): AIHub becomes GAIFA | Done |
 | [settings-redesign.md](settings-redesign.md) | The Settings page in `web/settings/`: eight regrouped sections, a sticky section list, search with highlighting, keys, defaults and Reset on every row | Done (2026-10-25) |
 | [chat-split.md](chat-split.md) | Several chats side by side on the Chat page: split panes by dragging, resizable dividers, one stream for all of them | Done (2026-10-25) |
-| [mod-repos.md](mod-repos.md) | relay, lcpp, tts and gen3d as submodules of their own repositories (Relay, LLMs, LocalTTS, 3DGenerate), pinned per commit; `gaifa repos` status, update with rollback, warnings, settings and the doctor | Planned |
+| [mod-repos.md](mod-repos.md) | relay, lcpp, tts and gen3d as submodules of their own repositories (Relay, LLMs, LocalTTS, 3DGenerate), pinned per commit; `gaifa repos` status, update with rollback, warnings, settings and the doctor | In progress |
 | [llm-servers.md](llm-servers.md) | Claude, OpenAI and Gemini in the relay (live model lists, `<server>/<model>`, chats only), one engine contract for lcpp and vLLM, Settings → LLMs and the Chat server → model picker; after mod-repos Phase 2 | Planned |

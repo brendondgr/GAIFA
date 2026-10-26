@@ -22,3 +22,6 @@ data/*.local.json
 
 # This machine's model catalog (plan 23.11): a fresh clone starts with an empty one
 /data/models.json
+
+# Secrets (GAIFA root ignores /services/*/.env; as a submodule only this file applies)
+.env

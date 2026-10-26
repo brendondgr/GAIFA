@@ -1,6 +1,6 @@
 # Plan: skills from the chat's workspace, uploads and the open skill format
 
-**Asked for:** 2026-10-26 · **Status:** In progress
+**Asked for:** 2026-10-26 · **Status:** Done (2026-10-26)
 
 ## 1. Introduction
 
@@ -71,16 +71,16 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
   - **Screening:** *as built:* the hub's fixed patterns only, `POST /api/screen {text}` → `{findings, checked: "patterns"}` (`utils/routes/webpages.py`; nothing kept): hidden characters, chat-template tokens, encoded blobs and phrases aimed at an AI. Not the page screening model: a skill is instructions to an AI by design, and that model flags exactly that. Findings, or a hub that didn't answer, save the skill with `enabled = false` and the reason in `data/agent/skills/<name>/.gaifa.json`; a turned-off skill isn't listed and `read_skill` refuses it as `disabled`.
   *Done when:* `services/agent/tests/test_api_skills.py` covers each input form, a zip with `../` (refused), a flagged skill (off), copy from a fake workspace, delete into `.trash`; `utils/tests/tools/test_screen_route.py` covers the route. ✓
 
-- [ ] **3.2 Settings → Agent → Skills: `web/chat/chat-settings.js` (`SkillsCard`).**
-  - **List:** every skill GAIFA has, grouped by source (mine, learned, each mod), each with its description, problems and an on/off switch; "Upload…" (file picker for a `.md`, `.zip` or folder) and a drop zone; Delete asks first.
-  - **From workspace:** the skills of the folders of the environment picked at the top of the card, each with "Copy to my skills".
-  *Done when:* `utils/tests/web/chat-settings.test.mjs` covers the grouping; on the second hub (`?mock`) an upload, a copy and a delete show in the list.
+- [x] **3.2 Settings → Agent → Skills: `web/chat/chat-settings.js` (`SkillsCard`), `web/chat/chat-skills.js`.**
+  - **List:** every skill GAIFA has, grouped by source (yours, learned, each mod; `groupSkills`), each with its description (two lines, the rest on hover), problems, and for yours Turn off / Turn on and Delete (two clicks; kept in `.trash`), with the screening's note when one was saved off; "Upload a folder…" (`webkitdirectory`) and "Upload a SKILL.md or zip…" (`uploadBody`). *As built:* no drop zone: a dropped folder needs the File System Entries API, and the two buttons cover it.
+  - **From workspace:** the skills of the folders of the environment picked in the card, each with Copy, or "yours too" when you have one by that name.
+  *Done when:* `utils/tests/web/chat-skills.test.mjs` covers the grouping and the upload body; on the installed hub a copy, turning off and on, and a delete show in the list. ✓ 2026-10-26.
 
 **Wire — Phase 3:** Settings → Agent → Skills is live (upload, copy, switch off, delete).
 
 **Checks & deliverables — Phase 3**
-- [ ] On the installed hub: upload `~/.claude/skills/portfolio-readme` as a folder; it lists under "mine", appears in a new chat's `/` menu and is read when asked.
-- [ ] Delivered: `api_skills.py`, the card, tests; docs: the agent's README, architecture §14.1, `docs/structure.md`.
+- [x] On the installed hub: upload `~/.claude/skills/portfolio-readme` as a folder; it lists under "mine", appears in a new chat's `/` menu and is read when asked. *As checked (2026-10-26):* uploaded through `POST /v1/skills` (the folder picker is the desktop's own dialog), screened clean and on, listed under Yours with its problem (its description has an unquoted `: `); `ariadne:planner` copied from the Ariadne environment and deleted again in the card.
+- [x] Delivered: `api_skills.py`, the card, tests; docs: the agent's README, architecture §14.1, `docs/structure.md`.
 
 | Deliverable | Description | Location |
 | --- | --- | --- |

@@ -110,6 +110,10 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     context: tid => req('GET', `${T(tid)}/context`),
     settings: () => req('GET', '/v1/settings'),
     saveSettings: body => req('PUT', '/v1/settings', body),
+    uploadSkill: body => req('POST', '/v1/skills', body),                                  // skill-sources 3.1
+    copySkill: body => req('POST', '/v1/skills/copy', body),
+    setSkill: (name, enabled) => req('PATCH', `/v1/skills/${enc(name)}`, { enabled }),
+    deleteSkill: name => req('DELETE', `/v1/skills/${enc(name)}`),
     feedback: (tid, body) => req('POST', `${T(tid)}/feedback`, body),
     decidePref: (pid, approve) => req('POST', `/v1/prefs/${enc(pid)}/${approve ? 'approve' : 'reject'}`),
   };

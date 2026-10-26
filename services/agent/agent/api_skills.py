@@ -129,7 +129,10 @@ def save(data: Path, files: dict[str, bytes], origin: dict[str, Any], findings: 
         raise SkillError(422, "bad_skill", "SKILL.md isn't UTF-8 text") from None
     s = skillfmt.parse(text)
     name = s["name"]
-    if not name or not skillfmt.NAME.match(name) or len(name) > skillfmt.NAME_MAX:
+    if not name:
+        raise SkillError(422, "bad_name", "SKILL.md has no name in its frontmatter",
+                         "start it with ---, name: <skill-name> and description: <what it does>, then ---")
+    if not skillfmt.NAME.match(name) or len(name) > skillfmt.NAME_MAX:
         raise SkillError(422, "bad_name", f"the skill's name {name!r} isn't valid",
                          "the frontmatter needs name: lower-case letters, digits and single hyphens (pdf-forms)")
     if not s["description"]:

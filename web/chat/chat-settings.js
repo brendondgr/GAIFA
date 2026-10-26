@@ -4,7 +4,8 @@
 // chat or always, with revoke), and Speech input (plan 29.4, chat-speech-input.js). (Show thinking is retired: thinking is a row in each turn's
 // activity fold, plan 19.4.) Mounted by Hub.dc.html's Settings page.
 
-import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, fmtTokens, fmtAgo, usePref } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, inputSt, fmtTokens, fmtAgo, usePref } from './chat-ui.js';
+import { groupSkills, uploadBody } from './chat-skills.js';
 import { STEPS_LAYOUT } from './chat-activity.js';
 import { getChatClient } from './chat.js';
 import { MODES } from './chat-header.js';
@@ -38,6 +39,7 @@ function storeFor(api) {
     st = { c, s: null, models: null, err: null, subs, loaded: false,
       emit() { subs.forEach(f => f()); },
       load() { if (st.loaded) return; st.loaded = true; c.settings().then(s => { st.s = s; st.emit(); }, e => { st.err = e; st.emit(); }); c.models().then(m => { st.models = m; st.emit(); }, () => {}); },
+      reload() { return c.settings().then(s => { st.s = s; st.emit(); }, () => {}); },
       async save(body, toast) { try { st.s = await c.saveSettings(body); st.emit(); toast?.('Saved by the agent', 'success'); } catch (e) { toast?.(e.detail || String(e), 'error'); throw e; } } };
     stores.set(api, st);
   }
@@ -47,7 +49,7 @@ function storeFor(api) {
 export function useAgent(api, toast) {
   const React = R(), st = storeFor(api), [, tick] = React.useState(0);
   React.useEffect(() => { const f = () => tick(n => n + 1); st.subs.add(f); st.load(); return () => st.subs.delete(f); }, []);
-  return { s: st.s, models: st.models, err: st.err, live: st.c.live, save: body => st.save(body, toast) };
+  return { s: st.s, models: st.models, err: st.err, live: st.c.live, c: st.c, reload: () => st.reload(), save: body => st.save(body, toast) };
 }
 const byAgent = () => h('span', { title: 'Saved by the agent mod (/api/s/agent/v1/settings), not with the page’s Save', style: { fontSize: 11, color: T.dim, fontWeight: 400, textTransform: 'none', letterSpacing: 0 } }, ' · saved by the agent');
 const agentSection = (title, ...kids) => h('section', { style: cardSt({ pad: '14px 16px', gap: 10, style: { borderRadius: 10 } }) }, h('h2', { style: { ...label11, margin: 0 } }, title, byAgent()), ...kids);
@@ -94,12 +96,62 @@ export function MemoryCard({ api, toast }) {
       s.topics.map(t => h('span', { key: t, style: { fontFamily: MONO, fontSize: 11.5, padding: '2px 7px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd } }, t + '.md'))) : null);
 }
 export function SkillsCard({ api, toast }) {
-  const { s } = useAgent(api, toast);
+  const React = R(), { s, c, reload } = useAgent(api, toast);
+  const [busy, setBusy] = React.useState(''), [envs, setEnvs] = React.useState(null), [env, setEnv] = React.useState(''), [ws, setWs] = React.useState(null);
+  const [askDelete, setAskDelete] = React.useState(null);
+  const folderRef = React.useRef(null), fileRef = React.useRef(null);
+  React.useEffect(() => { api.callService?.('workspace', 'GET', '/v1/environments').then(r => {   // skill-sources 3.2
+    const list = (r.json?.environments || []).filter(e => e.id !== 'none'); setEnvs(list); setEnv(e => e || list[0]?.id || ''); }).catch(() => setEnvs([])); }, []);
+  React.useEffect(() => { if (!env) { setWs(null); return; }
+    api.callService?.('workspace', 'GET', '/v1/skills', { query: { environment: env } }).then(r => setWs(r.json?.skills || [])).catch(() => setWs([])); }, [env]);
+  const act = async (key, fn, done) => {
+    setBusy(key);
+    try { await fn(); await reload(); if (done) toast(done, 'success'); }
+    catch (e) { toast(e.detail || e.message || String(e), 'error'); }
+    finally { setBusy(''); }
+  };
+  const upload = files => files?.length && act('upload', async () => {
+    const row = await c.uploadSkill(await uploadBody(files));
+    if (row && row.enabled === false) toast(`${row.name} is saved turned off: ${row.screening?.note || 'look it over, then turn it on'}`, 'warning');
+  }, 'Skill added');
+  const own = s?.skills?.filter(k => k.source === 'user') || [];
+  const rowOf = k => {
+    const mine = k.source === 'user', name = k.id.split('/')[1], off = k.enabled === false;
+    return h('div', { key: k.id, style: { display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 12.5, flexWrap: 'wrap', opacity: off ? 0.65 : 1 } },
+      h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 90 } }, '/' + k.name),
+      h('span', { style: { flex: '1 1 240px', color: T.mut, minWidth: 0 } },
+        h('span', { title: k.description, style: { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, k.description),
+        off && k.screening?.note ? h('div', { style: { color: T.acct, fontSize: 12 } }, k.screening.note) : null,
+        k.problems?.length ? h('div', { style: { color: T.dim, fontSize: 12 } }, k.problems.join(' · ')) : null),
+      h('span', { style: { display: 'flex', gap: 6, alignItems: 'baseline', flex: 'none' } },
+      mine && off ? h(Badge, { tone: 'accent' }, 'off') : null,
+      mine ? h(Btn, { sm: true, kind: 'ghost', label: off ? 'Turn on' : 'Turn off', disabled: !!busy, onClick: () => act(k.id, () => c.setSkill(name, off)) }) : null,
+      mine ? h(Btn, { sm: true, kind: 'ghost', label: askDelete === k.id ? 'Delete it' : 'Delete', disabled: !!busy, style: askDelete === k.id ? { color: T.rd } : undefined,
+        onClick: () => askDelete === k.id ? (setAskDelete(null), act(k.id, () => c.deleteSkill(name), `Deleted ${k.name} (kept in data/agent/skills/.trash/)`)) : setAskDelete(k.id) }) : null));
+  };
+  const picker = (ref, attrs) => h('input', { ref, type: 'file', multiple: true, style: { display: 'none' }, ...attrs, onChange: e => { upload(e.target.files); e.target.value = ''; } });
   return section('Skills',
-    h('div', { style: { fontSize: 12, color: T.mut } }, 'Loaded only when needed. Each one is also a slash command in the chat.'),
+    h('div', { style: { fontSize: 12, color: T.mut } }, 'Loaded only when needed. Each one is also a slash command in the chat. A chat working in workspace folders also gets the skills other agents keep there.'),
+    h('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' } },
+      h(Btn, { sm: true, icon: 'upload', label: busy === 'upload' ? 'Adding…' : 'Upload a folder…', disabled: !!busy || !c?.uploadSkill, onClick: () => folderRef.current?.click() }),
+      h(Btn, { sm: true, kind: 'ghost', label: 'Upload a SKILL.md or zip…', disabled: !!busy || !c?.uploadSkill, onClick: () => fileRef.current?.click() }),
+      picker(folderRef, { webkitdirectory: '', directory: '' }), picker(fileRef, { accept: '.md,.zip', multiple: false }),
+      h('span', { style: { fontSize: 12, color: T.dim } }, 'Checked for hidden instructions; one that looks off is saved turned off.')),
     s && !s.skills?.length ? h('span', { style: { color: T.mut, fontSize: 12.5 } }, 'No skills yet: mods ship them in services/<id>/skills/, yours go in data/agent/skills/.') : null,
-    ...(s?.skills || []).map(k => h('div', { key: k.id, style: { display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 12.5 } },
-      h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 90 } }, '/' + k.name), h('span', { style: { flex: 1, color: T.mut } }, k.description), h(Badge, null, k.source))));
+    ...groupSkills(s?.skills || []).map(g => h('div', { key: g.key, style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+      h('div', { style: { ...label11, fontSize: 10.5 } }, g.title), ...g.items.map(rowOf))),
+    envs?.length ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid ' + T.bd, paddingTop: 10 } },
+      h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } },
+        h('span', { style: { fontWeight: 500 } }, 'From a workspace'),
+        h('select', { value: env, 'aria-label': 'Environment', onChange: e => setEnv(e.target.value), style: { ...inputSt, height: 28 } }, envs.map(e => h('option', { key: e.id, value: e.id }, e.name)))),
+      ws && !ws.length ? h('span', { style: { color: T.mut, fontSize: 12.5 } }, 'No skills in this environment’s folders.') : null,
+      ...(ws || []).map(k => h('div', { key: k.id, style: { display: 'flex', flexDirection: 'column', gap: 2, fontSize: 12.5 } },
+        h('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+          h('span', { style: { fontFamily: MONO, fontSize: 12, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, '/' + k.id),
+          h(Badge, null, k.folder?.name || ''),
+          own.some(o => o.name === k.name) ? h(Badge, { tone: 'dim' }, 'yours too') :
+            h(Btn, { sm: true, kind: 'ghost', label: 'Copy', title: 'Copy to my skills', disabled: !!busy, onClick: () => act(k.id, () => c.copySkill({ id: k.id, environment: env }), `Copied ${k.name} to your skills`) })),
+        h('span', { title: k.description, style: { color: T.mut, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } }, k.description)))) : null);
 }
 /** The five modes, and how a call is decided. */
 export function ModesCard() {

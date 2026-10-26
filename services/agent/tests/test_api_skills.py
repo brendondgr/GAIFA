@@ -53,6 +53,8 @@ async def test_what_is_refused(env):
     assert (await post([("a/notes.md", "x"), ("a/more.md", "y")])).json()["code"] == "no_skill"
     assert (await post([("SKILL.md", "---\nname: Bad_Name\ndescription: d\n---\n")])).json()["code"] == "bad_name"
     assert (await post([("SKILL.md", "---\nname: ok\n---\n")])).json()["code"] == "bad_skill"
+    nameless = (await post([("SKILL.md", "Just steps.\n")])).json()
+    assert nameless["code"] == "bad_name" and "no name" in nameless["detail"]
     assert (await post([("SKILL.md", SKILL), (".env", "K=1")])).json()["code"] == "bad_path"
     assert (await post([("SKILL.md", SKILL), ("big.bin", "x" * (3 * 1024 * 1024))])).json()["code"] == "too_big"
 

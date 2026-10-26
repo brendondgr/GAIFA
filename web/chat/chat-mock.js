@@ -486,5 +486,20 @@ export function createMockClient(api, { speed = 1 } = {}) {
     async decidePref(pid, approve) { await net(); return { id: pid, state: approve ? 'active' : 'rejected' }; },
     async saveSettings(body) { await net(); if (body.agent_md != null) settings.agent_md = body.agent_md; if (body.memory != null) settings.memory = body.memory;
       if (body.documents) settings.documents = { ...settings.documents, ...body.documents }; return structuredClone(settings); },
+    // skill-sources 3.1: your own skills, kept until the page reloads
+    async uploadSkill(body) { await net();
+      if (body.zip) throw { status: 422, code: 'bad_zip', detail: 'The mock can’t open zips: upload the folder or its SKILL.md' };
+      const md = (body.files || []).find(f => /(^|\/)SKILL\.md$/.test(f.path)) || (body.files?.length === 1 ? body.files[0] : null);
+      const text = md ? decodeURIComponent(escape(atob(md.data))) : '';
+      const name = /^name:\s*(\S+)/m.exec(text)?.[1], description = /^description:\s*(.+)$/m.exec(text)?.[1] || '';
+      if (!name) throw { status: 422, code: 'no_skill', detail: 'there’s no SKILL.md with a name at the top of the skill' };
+      if (settings.skills.some(k => k.id === 'user/' + name) && !body.replace) throw { status: 409, code: 'exists', detail: `you already have a skill named ${name}` };
+      const row = { name, description, source: 'user', id: 'user/' + name, enabled: true, problems: [], from: { kind: 'upload' } };
+      settings.skills = [...settings.skills.filter(k => k.id !== row.id), row]; return structuredClone(row); },
+    async copySkill(body) { await net(); const name = body.id.split(':')[1];
+      const row = { name, description: `Copied from ${body.id}`, source: 'user', id: 'user/' + name, enabled: true, problems: [], from: { kind: 'workspace', id: body.id } };
+      settings.skills = [...settings.skills.filter(k => k.id !== row.id), row]; return structuredClone(row); },
+    async setSkill(name, enabled) { await net(); const k = settings.skills.find(x => x.id === 'user/' + name); if (k) k.enabled = enabled; return structuredClone(k); },
+    async deleteSkill(name) { await net(); settings.skills = settings.skills.filter(x => x.id !== 'user/' + name); return { deleted: name }; },
   };
 }

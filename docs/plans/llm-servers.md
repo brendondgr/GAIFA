@@ -1,6 +1,6 @@
 # Plan: every LLM server in one place: cloud providers in the relay, local engines, Settings → LLMs and the Chat picker
 
-**Asked for:** 2026-10-26 · **Status:** Planned
+**Asked for:** 2026-10-26 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -28,8 +28,8 @@ The approach:
 - **Phase 7:** the pins are updated and the whole thing is checked live.
 
 **Where the work lands.** This plan needs [mod-repos.md](mod-repos.md) Phase 2 done first. After that, `relay` and `lcpp` are submodules of `brendondgr/Relay` and `brendondgr/LLMs`:
-- Relay and lcpp steps are commits on a branch in that repository, with its own tests, pushed there.
-- Each such step ends with a GAIFA commit that pins it (`gaifa repos pin`) and names this plan.
+- Relay and lcpp steps are commits on a feature branch in that repository (made in a worktree of it outside GAIFA), with its own tests, pushed there; each step's GAIFA commit ticks it here and names the mod's commit.
+- The pin moves at the release step (1.8 for the relay, 3.3 for lcpp): the branch is merged on the mod's `main`, pushed, and `gaifa repos update <id>` brings it into GAIFA (the real update from GitHub that [mod-repos.md](mod-repos.md) Phase 3 still has to check).
 - Steps in `vllm`, `agent`, the hub and `web/` are ordinary GAIFA commits.
 
 The relay must keep working on its own, without GAIFA: everything GAIFA-specific is off unless GAIFA's environment turns it on, as with the GPU slot today.
@@ -53,7 +53,7 @@ Touches architecture §4.3 (a new `[llm]` manifest section), §6 (hub routes), �
 
 Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-providers`. Tests: `services/relay/tests/backend/`, run with the relay's own venv.
 
-- [ ] **1.1 Cloud endpoints: `app/schemas/__init__.py`, `app/db.py`, `app/services/router.py`, `app/routes/admin_endpoints.py`.**
+- [x] **1.1 Cloud endpoints: `app/schemas/__init__.py`, `app/db.py`, `app/services/router.py`, `app/routes/admin_endpoints.py`.**
   - **Schema:**
     - `Protocol` adds `anthropic` and `gemini`.
     - `EndpointKind` adds `cloud`. It's inferred for `api.anthropic.com`, `api.openai.com` and `generativelanguage.googleapis.com`, or set explicitly.
@@ -63,6 +63,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Migration:** existing rows keep their kind.
   - **Never for cloud:** the GPU lease (`gpu_lease.py` takes it only for `local` loopback endpoints; a test pins it), failover to another endpoint, or the `auto` route.
   *Done when:* `test_endpoints_api.py` covers creating each preset, the hidden key, kind inference; `test_gpu_slot.py` covers a cloud endpoint taking no lease; `test_proxy.py` covers no failover from a cloud endpoint.
+  - **Done:** Relay `d6c1507` on `feat/cloud-providers` (`tests/backend/test_cloud_endpoints.py`, 9: each preset, what a preset keeps, no URL and no preset, kind inference and a patch keeping `cloud`, never `auto` or a failover target even when pinned, no GPU lease, the key hint; the relay's suite 212).
 - [ ] **1.2 Live model lists: `app/services/discovery.py`, `app/services/model_facts.py`.**
   - **Per protocol** (the skill's `discovery.md` §1), returning `[{id, display_name, context_length, max_output, tools, vision, reasoning, source}]`:
     - **openai:** `GET /v1/models`, ids only, so facts stay null unless the model facts override says otherwise. For llama.cpp, vLLM and Ollama it adds the second requests the skill names (`/props`, `/api/show`).

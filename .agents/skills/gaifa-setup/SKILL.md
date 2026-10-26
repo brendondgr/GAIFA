@@ -1,6 +1,7 @@
 ---
 name: gaifa-setup
-description: Use when asked to set up, install or bootstrap GAIFA, or some of its mods, on a machine ("set up GAIFA for me", "install the speech and chat mods", "get this running", "add llama.cpp to my install"), or when `gaifa setup` stopped and needs finishing. Drives `gaifa setup` for the person: the same steps and questions they'd see, with their answers, never root.
+description: >-
+  Use when asked to set up, install or bootstrap GAIFA, or some of its mods, on a machine ("set up GAIFA for me", "install the speech and chat mods", "get this running", "add llama.cpp to my install"), or when `gaifa setup` stopped and needs finishing. Drives `gaifa setup` for the person: the same steps and questions they'd see, with their answers, never root.
 ---
 
 # Setting up GAIFA for someone

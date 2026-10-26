@@ -43,8 +43,9 @@ def test_literal_block_and_a_list():
 def test_no_frontmatter_broken_yaml_and_not_a_mapping():
     s = skillfmt.load("# Just text\n", "x")
     assert s["body"] == "# Just text\n" and "no frontmatter" in s["problems"][0]
-    s = skillfmt.parse("---\nname: [unclosed\ndescription: x\n---\nbody")
-    assert s["problems"] and "valid YAML" in s["problems"][0] and s["name"] == ""
+    s = skillfmt.load("---\nname: a\ndescription: Use when asked: \"make X\", or when it fails\n---\nbody", "a")
+    assert s["description"] == 'Use when asked: "make X", or when it fails' and s["name"] == "a"   # read line by line
+    assert len(s["problems"]) == 1 and "valid YAML" in s["problems"][0] and "line by line" in s["problems"][0]
     assert "key: value" in skillfmt.parse("---\n- a\n- b\n---\n")["problems"][0]
     assert skillfmt.parse("---\nname: a\n")["problems"]           # never closed: no frontmatter
 
@@ -73,6 +74,17 @@ def test_numbers_and_null_become_text():
 def test_flag():
     assert skillfmt.flag({"disable-model-invocation": True}, "disable-model-invocation")
     assert skillfmt.flag({"x": "true"}, "x") and not skillfmt.flag({"x": "no"}, "x") and not skillfmt.flag({}, "x")
+
+
+def test_every_skill_in_the_repository_is_valid():
+    """Our own skills follow the format strictly, so every agent reads them alike. A mod kept in its own repository
+    (a submodule, plan mod-repos) is that repository's to fix."""
+    subs = {p.parent for p in ROOT.glob("services/*/.git")}
+    paths = [*ROOT.glob(".claude/skills/*/SKILL.md"), *ROOT.glob("services/agent/harness/skills/*/SKILL.md"),
+             *(p for p in ROOT.glob("services/*/skills/*/SKILL.md") if p.parents[2] not in subs)]
+    assert paths
+    for p in paths:
+        assert skillfmt.load(p.read_text(), p.parent.name)["problems"] == [], p
 
 
 def test_the_mods_copies_are_identical():

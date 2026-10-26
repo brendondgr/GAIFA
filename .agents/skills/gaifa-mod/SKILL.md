@@ -1,6 +1,7 @@
 ---
 name: gaifa-mod
-description: Use when asked to build, port, fix or extend a GAIFA mod: "make a mod for X", "add <app> to GAIFA", "give my mod a page / chart / status", or when `gaifa check <id>` fails. Covers the mod contract, the new → edit → check → restart loop, status/widgets/page modules, outputs, memory and tools.
+description: >-
+  Use when asked to build, port, fix or extend a GAIFA mod: "make a mod for X", "add <app> to GAIFA", "give my mod a page / chart / status", or when `gaifa check <id>` fails. Covers the mod contract, the new → edit → check → restart loop, status/widgets/page modules, outputs, memory and tools.
 ---
 
 # Building a GAIFA mod

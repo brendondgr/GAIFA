@@ -53,6 +53,16 @@ def split(text: str) -> tuple[str | None, str]:
     return text[m.end():c.start()], text[c.end():].lstrip("\r\n")
 
 
+def _lines(head: str) -> dict[str, str]:
+    """Top-level `key: value` lines, the way a lenient reader takes frontmatter YAML can't parse."""
+    out = {}
+    for line in head.splitlines():
+        if line[:1] not in (" ", "\t", "#", "-") and ":" in line:
+            k, v = line.split(":", 1)
+            out[k.strip()] = v.strip().strip('"').strip("'")
+    return out
+
+
 def parse(text: str) -> dict[str, Any]:
     head, body = split(text)
     out: dict[str, Any] = {"name": "", "description": "", "meta": {}, "body": body, "problems": []}
@@ -62,9 +72,11 @@ def parse(text: str) -> dict[str, Any]:
     try:
         data = yaml.safe_load(head) if head.strip() else {}
     except yaml.YAMLError as e:
+        # Many skills put an unquoted ": " in their description; other agents read those line by line, and so do we.
         mark = getattr(e, "problem_mark", None)
-        out["problems"].append(f"the frontmatter isn't valid YAML{f' (line {mark.line + 2})' if mark else ''}")
-        return out
+        out["problems"].append(f"the frontmatter isn't valid YAML{f' (line {mark.line + 2})' if mark else ''}: "
+                               "read line by line (quote the value, or write it as a > block)")
+        data = _lines(head)
     if not isinstance(data, dict):
         out["problems"].append("the frontmatter isn't a set of key: value lines")
         return out
@@ -95,8 +107,8 @@ def check(name: str, folder: str | None, description: str) -> list[str]:
 def load(text: str, folder: str | None = None) -> dict[str, Any]:
     """`parse`, then `check` against the folder's name; the problems of both."""
     s = parse(text)
-    if not s["problems"]:
-        s["problems"] = check(s["name"], folder, s["description"])
+    if s["name"] or s["description"]:
+        s["problems"] += check(s["name"], folder, s["description"])
     return s
 
 

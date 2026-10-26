@@ -1,6 +1,7 @@
 ---
 name: workspace
-description: Working in the user's project folders (workspaces): find the folder, read and search its code, cite path:line, edit in place, run tests and code in the sandbox, and respect each folder's level and the chat's mode.
+description: >-
+  Working in the user's project folders (workspaces): find the folder, read and search its code, cite path:line, edit in place, run tests and code in the sandbox, and respect each folder's level and the chat's mode.
 ---
 
 # Working in a workspace folder

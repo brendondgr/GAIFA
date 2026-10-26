@@ -1,6 +1,7 @@
 ---
 name: researching
-description: Answering from the web: searching, opening the best sources, citing each claim, and saying when sources disagree
+description: >-
+  Answering from the web: searching, opening the best sources, citing each claim, and saying when sources disagree
 ---
 # Researching on the web (`web_search`, `web_fetch`)
 

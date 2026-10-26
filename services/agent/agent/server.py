@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import json
 import os
 import time
 from contextlib import asynccontextmanager
@@ -17,7 +16,6 @@ from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
@@ -26,6 +24,7 @@ from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
 from .store import MODES, Store
+from .streams import add_stream_routes
 
 PING_S = 15.0
 QUOTE_MAX = 8000         # characters of a quoted reply (Select → Reply)
@@ -383,37 +382,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         thread_or_404(agent, tid)
         return agent.store.events(tid, after)
 
-    @app.get("/v1/threads/{tid}/stream", summary="Server-sent events: the events after `after`, then live events and deltas")
-    async def stream(tid: str, request: Request, after: int = 0) -> StreamingResponse:
-        agent = A(request)
-        thread_or_404(agent, tid)
-        q = agent.live.subscribe(tid)
-
-        async def gen():
-            last = after
-            try:
-                yield "retry: 2000\n\n"
-                for ev in agent.store.events(tid, after):
-                    last = ev["seq"]
-                    yield f"data: {json.dumps(ev, ensure_ascii=False, default=str)}\n\n"
-                yield f"data: {json.dumps({'type': 'ready', 'thread_id': tid, 'seq': last, 'running': agent.running(tid)})}\n\n"
-                while True:
-                    if await request.is_disconnected():
-                        break
-                    try:
-                        ev = await asyncio.wait_for(q.get(), timeout=PING_S)
-                    except asyncio.TimeoutError:
-                        yield ": ping\n\n"
-                        continue
-                    if ev.get("seq") is not None:
-                        if ev["seq"] <= last:
-                            continue
-                        last = ev["seq"]
-                    yield f"data: {json.dumps(ev, ensure_ascii=False, default=str)}\n\n"
-            finally:
-                agent.live.unsubscribe(tid, q)
-
-        return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+    add_stream_routes(app, A, thread_or_404, PING_S)                 # one thread's stream, and several on one (plan chat-split 3.1)
 
     @app.post("/v1/threads/{tid}/messages", status_code=202, summary="Send a message; during a turn it's queued for the next model call")
     async def send(tid: str, body: Message, request: Request) -> dict:

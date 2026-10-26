@@ -59,9 +59,10 @@ The approach: first make one chat a component of its own (`ChatPane`) that can r
 
 ## Phase 3 — One stream for every pane (S)
 
-- [ ] **3.1 The agent's shared stream: `services/agent/agent/streams.py`.**
+- [x] **3.1 The agent's shared stream: `services/agent/agent/streams.py`.**
   - **Route:** `GET /v1/streams?threads=<tid>:<after>,<tid>:<after>…` sends the stored events after each `after`, a `ready` per thread (`{type: 'ready', thread_id, seq, running}`), then every live event and delta of those threads; each already carries `thread_id`. An unknown thread sends `{type: 'gone', thread_id}` and is skipped. The per-thread `/v1/threads/{tid}/stream` moves into the same file unchanged.
-  *Done when:* `services/agent/tests/test_streams.py` covers two threads' replay, live events of both, `after` and an unknown id; architecture §14.1 lists the route.
+    - **Live bus:** `Live.subscribe(tid, q=None)` (`agent/loop.py`) takes a queue to share across threads.
+  *Done when:* `services/agent/tests/test_streams.py` covers two threads' replay, live events of both, `after`, an unknown id and the unsubscribe; the agent's `README.md` lists the route (architecture §14.1 doesn't list the agent's routes).
 - [ ] **3.2 The client's stream pool: `web/chat/chat-streams.js`, `web/chat/chat-api.js`.**
   - **Pool:** `c.stream(tid, after, handlers)` keeps its interface; the live client shares one `EventSource` for every open stream, reopened (debounced) with each thread's last seq when the set changes, and hands each event to its thread's handlers. A 404 from `/v1/streams` falls back to one stream per thread and keeps the cap.
   - **Cap:** gone while the pool is shared.

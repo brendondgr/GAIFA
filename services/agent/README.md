@@ -32,6 +32,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 - `GET /v1/threads?environment=a,b&sort=updated|created|title&offset=` (a chat without `settings.environment` is in `default`), `GET /v1/threads/groups?archived=` (per environment: count, newest `updated`, running): the chat list's sections (plan 41.1)
 - `POST /v1/threads/{id}/messages {text, attachments}`: starts a turn, or queues the message during one
 - `GET /v1/threads/{id}/events?after=`, `GET /v1/threads/{id}/stream?after=` (SSE: events, then live deltas, progress and the context meter)
+- `GET /v1/streams?threads=<id>:<after>,…` (SSE for up to 64 chats on one connection: each chat's events after its seq and a `ready` for it, then live events of all of them, each with `thread_id`; an unknown chat gets `gone`. The Chat page's split view uses it, plan chat-split 3.1)
 - `POST /v1/threads/{id}/answer {question_id, answers}`, `/approval {approval_id, approve, arguments?, remember?, confirm?}` (remember: once | thread | always, the hub's grants, plan 25.2; deleting a thread ends its grants), `/action {tool, arguments}`, `/fork {seq}`, `/cancel`, `/compact`; `GET /v1/threads/{id}/context`
 - `GET /v1/models`, `GET/PUT /v1/settings` (AGENT.md, memory)
 - Learning (Phases 21–22):

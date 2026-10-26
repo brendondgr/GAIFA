@@ -68,8 +68,9 @@ class Live:
             except asyncio.QueueFull:
                 pass
 
-    def subscribe(self, tid: str) -> asyncio.Queue[dict[str, Any]]:
-        q: asyncio.Queue[dict[str, Any]] = asyncio.Queue(2000)
+    def subscribe(self, tid: str, q: asyncio.Queue[dict[str, Any]] | None = None) -> asyncio.Queue[dict[str, Any]]:
+        """A queue for this thread's events; pass one to share it across threads (`/v1/streams`, plan chat-split 3.1)."""
+        q = q if q is not None else asyncio.Queue(2000)
         self.subs.setdefault(tid, set()).add(q)
         return q
 

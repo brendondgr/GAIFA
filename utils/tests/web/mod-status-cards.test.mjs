@@ -1,14 +1,11 @@
 // The mods' status cards (plan 46.4): vLLM's load card, lcpp's start card, tts's voices.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import path from 'node:path';
+import { loadMod, modSkip } from './mods.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const load = f => import(pathToFileURL(path.join(root, f)).href);
-const vllm = await load('services/vllm/ui/chat.js');
-const lcpp = await load('services/lcpp/ui/chat.js');
-const tts = await load('services/tts/ui/chat.js');
+const vllm = await loadMod('services/vllm/ui/chat.js');
+const lcpp = await loadMod('services/lcpp/ui/chat.js');
+const tts = await loadMod('services/tts/ui/chat.js');
 
 test("vLLM's stages follow the engine", () => {
   const c = vllm.stageChips({ state: 'starting', stage: 'loading weights' });
@@ -20,13 +17,13 @@ test("vLLM's stages follow the engine", () => {
   assert.equal(vllm.elapsed({}), null);
 });
 
-test("lcpp's started instance from its result", () => {
+test("lcpp's started instance from its result", { skip: modSkip('services/lcpp/ui/chat.js') }, () => {
   assert.equal(lcpp.startedName({ name: 'gemma-1' }), 'gemma-1');
   assert.equal(lcpp.startedName({ instance: { name: 'qwen-2' }, warnings: [] }), 'qwen-2');
   assert.equal(lcpp.startedName(null), null);
 });
 
-test('each registers its cards', () => {
+test('each registers its cards', { skip: modSkip('services/lcpp/ui/chat.js', 'services/tts/ui/chat.js') }, () => {
   const kinds = [];
   const chat = { ui: { h: () => null }, live: {}, parts: {}, registerCard: k => kinds.push(k) };
   vllm.default(chat); lcpp.default(chat); tts.default(chat);

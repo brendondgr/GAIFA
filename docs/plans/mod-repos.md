@@ -78,14 +78,14 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
   - **Between mods:** `uv run pytest` and `gaifa check <sid>`; the mod's page loads on the installed hub.
   *Done when:* `git submodule status` lists all four at their branch heads; `gaifa doctor` passes; `uv run pytest` passes; relay still answers a chat through `/v1`.
   - **Done 2026-10-26:** relay `7859329`, lcpp `b64fdf4`, tts `536f937`, gen3d `c1cebfe`; no file changed but the running relay's log; `gaifa check` passes for each (lcpp's running checks skipped: it was stopped); the doctor's one warning is opencode's `OPENCODE_PROJECT_DIR` (as before); `uv run pytest` 1,935 passed.
-- [ ] **2.3 The hub and tests with a folder that isn't checked out: `utils/services/discovery.py`, `utils/tests/conftest.py`.**
-  - **Hub:** an empty `services/<sid>/` with no `service.toml`, the state of a submodule that was never initialized, is skipped by discovery and listed in `GET /api/repos` (3.3) as `not_checked_out`, not reported as a broken manifest.
+- [x] **2.3 The hub and tests with a folder that isn't checked out: `utils/services/discovery.py`, `utils/tests/conftest.py`.**
+  - **Hub:** an empty `services/<sid>/` with no `service.toml`, the state of a submodule that was never initialized, is skipped by discovery (it already was: `manifest.discover` skips a folder without `service.toml`; now a test pins it) and listed in `GET /api/repos` (3.3) as `not_checked_out`, not reported as a broken manifest.
   - **Tests:** hub tests that read a mod's files are skipped with the reason `services/<sid> isn't checked out: git submodule update --init services/<sid>` when the folder is empty. These are `test_cli_setup*.py`, `test_backup.py`, `test_setupdocs.py`, `test_setup_block.py`, `test_idle_unload.py`, `test_gpu_slot.py`, `gen3d-chat.test.mjs`, `tts-chat.test.mjs`, `mod-status-cards.test.mjs`, `api.test.mjs` and `settings-search.test.mjs`. Use a shared `needs_mod(sid)` marker in `conftest.py`, and the same check in the Node tests' helper.
   *Done when:* `utils/tests/core/test_uninitialized_mod.py` covers discovery and the marker, and with `services/gen3d` moved aside in a temp copy the suite passes with those tests skipped.
 
 **Checks & deliverables — Phase 2**
-- [ ] Every mod runs as before; `gaifa backup` still includes the four mods' `.env` and state files.
-- [ ] Delivered: `.gitmodules`, the four gitlinks, the adopt tool, the discovery change, the test marker; docs: architecture §3 and §10 (each of the four is a submodule of its repository), `docs/structure.md`.
+- [x] Every mod runs as before; `gaifa backup` still includes the four mods' `.env` and state files (2026-10-26: relay's `.env` and the mods' `data/state/*` files are in the archive; adoption snapshots are removed after a successful adoption).
+- [x] Delivered: `.gitmodules`, the four gitlinks, the adopt tool, the discovery test, the test marker; docs: architecture §3 and §10 (each of the four is a submodule of its repository), `docs/structure.md`.
 
 ## Phase 3 — Keeping them up to date (L)
 

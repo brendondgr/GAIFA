@@ -50,6 +50,7 @@ def test_adopt_in_place(setup, tmp_path):
     assert g(mod, "rev-parse", "--abbrev-ref", "@{u}") == "origin/main"
     assert g(root, "submodule", "status").split()[1] == "services/m"
     assert (mod / ".env").read_text() == "KEY=secret\n"
+    assert sorted(p.name for p in (tmp_path / "state").iterdir()) == ["adopt-m-diff.txt"]   # snapshots go on success
 
 
 def test_adopt_keeps_others_staged_and_unstaged_work(setup, tmp_path):

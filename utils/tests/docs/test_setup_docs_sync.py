@@ -10,9 +10,11 @@ from utils import setupdocs
 from utils.setupdocs import render
 from utils.setupdocs.block import OSES
 from utils.setupdocs.envs import load_envs
+from utils.tests.conftest import needs_mods
 
 REPO = Path(__file__).resolve().parents[3]
 STRICT = True
+pytestmark = needs_mods("relay", "lcpp", "tts", "gen3d")   # the index lists every mod's setup docs
 
 
 def test_setup_docs_are_current() -> None:

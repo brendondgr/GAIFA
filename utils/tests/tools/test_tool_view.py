@@ -6,7 +6,7 @@ import tomllib
 
 import pytest
 
-from utils.tests.conftest import REPO
+from utils.tests.conftest import REPO, needs_mods
 from utils.tools import views
 
 
@@ -33,7 +33,8 @@ def test_a_chart_view():
     assert p == [] and v["y"] == ["size_bytes"] and v["unit"] == "bytes"
 
 
-@pytest.mark.parametrize("mod, tool", [("gen3d", "list_jobs"), ("stt", "list_models"), ("lcpp", "list_llms"), ("searxng", "engines"), ("vllm", "list_profiles")])
+@pytest.mark.parametrize("mod, tool", [pytest.param("gen3d", "list_jobs", marks=needs_mods("gen3d")), ("stt", "list_models"),
+                                       pytest.param("lcpp", "list_llms", marks=needs_mods("lcpp")), ("searxng", "engines"), ("vllm", "list_profiles")])
 def test_the_installed_mods_views_are_valid(mod, tool):
     spec = tomllib.loads((REPO / "services" / mod / "service.toml").read_text())["tools"][tool]
     v, p = views.check(spec["view"])

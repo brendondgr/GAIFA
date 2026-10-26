@@ -9,12 +9,14 @@ from pathlib import Path
 import pytest
 
 from utils import cli_setup_variant as cv, hardware, setupdocs
-from utils.tests.conftest import REPO
+from utils.tests.conftest import REPO, needs_mods
 
 FIX = REPO / "utils" / "tests" / "hardware" / "fixtures"
 MACHINES = ["strix-halo", "linux-nvidia-1gpu", "linux-nvidia-2gpu", "linux-intel-arc", "wsl2-nvidia", "wsl2-intel", "macos-m3", "linux-cpu"]
 
 # setup id → {machine: accel} (absent: unavailable there)
+pytestmark = needs_mods("relay", "lcpp", "tts", "gen3d")   # every mod's setup docs
+
 EXPECTED: dict[str, dict[str, str]] = {
     "lcpp": {"strix-halo": "vulkan", "linux-nvidia-1gpu": "vulkan", "linux-nvidia-2gpu": "vulkan", "linux-intel-arc": "vulkan",
              "wsl2-nvidia": "cuda", "wsl2-intel": "cpu", "macos-m3": "mps", "linux-cpu": "cpu"},

@@ -35,6 +35,15 @@ FAKE_MODS = FIXTURES / "mods"
 OPENAPI = FIXTURES / "openapi"
 
 
+def needs_mods(*sids: str) -> pytest.MarkDecorator:
+    """Skip a test that reads these mods' files when their folders aren't checked out: relay, lcpp,
+    tts and gen3d are submodules (plan mod-repos 2.3), empty in a clone made without them."""
+    missing = [s for s in sids if not (REPO / "services" / s / "service.toml").is_file()]
+    verb = "isn't" if len(missing) == 1 else "aren't"
+    return pytest.mark.skipif(bool(missing), reason=", ".join(f"services/{s}" for s in missing)
+                              + f" {verb} checked out: git submodule update --init " + " ".join(f"services/{s}" for s in missing))
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))

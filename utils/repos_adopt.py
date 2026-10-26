@@ -128,5 +128,7 @@ def adopt(root: Path, sid: str, url: str, branch: str, message: str, state_dir: 
     gone = [c for c in changed if c.startswith("gone: ")]
     if gone:
         raise GitError(f"services/{sid} lost files during the adoption ({len(gone)}):\n" + "\n".join(gone[:40]))
+    for name in (f"adopt-{sid}-before.json", f"adopt-{sid}-after.json"):     # kept only when something went wrong
+        (state / name).unlink(missing_ok=True)
     return commit
 

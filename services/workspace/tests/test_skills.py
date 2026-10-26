@@ -64,6 +64,8 @@ def test_reading_a_skill_its_files_and_instructions(client, proj):
     assert read("proj:plan/references/format.md").json() == {"id": "proj:plan/references/format.md", "kind": "file", "text": "The format."}
     assert read("proj:plan/secrets.md").json()["code"] == "secret_file"
     assert read("proj:codex.deploy").json()["text"].strip() == "Codex's way."
+    raw = client.post("/v1/skills/read", json={"id": "proj:plan", "raw": True}).json()
+    assert raw["text"].startswith("---\nname: plan\n") and raw["text"].rstrip().endswith("Plan body.")
     assert read("proj:deploy").json()["text"].strip() == "Claude's way."
     assert read("proj:AGENTS.md").json()["text"].startswith("# Rules")
     assert read("proj:CLAUDE.md").json()["kind"] == "instructions"

@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
-from . import api_summaries, docs
+from . import api_skills, api_summaries, docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -248,6 +248,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     app = FastAPI(title="Agent", version="0.1.0", lifespan=lifespan,
                   description="GAIFA's chat agent: one loop, tools on demand, questions and parameter cards (plan Phase 14).")
     api_summaries.add_routes(app)                                    # plan 28.5
+    api_skills.add_routes(app)                                       # skill-sources 3.1
 
     def A(request: Request) -> Agent:
         return request.app.state.agent

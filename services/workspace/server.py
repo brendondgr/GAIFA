@@ -96,6 +96,7 @@ def named_of(request: Request) -> list[str]:
 
 class SkillRead(BaseModel):
     id: str = Field(min_length=3, max_length=600, description="<folder>:<skill>, <folder>:<skill>/<path> or <folder>:AGENTS.md")
+    raw: bool = Field(False, description="A skill's SKILL.md whole, frontmatter and all (to copy it)")
 
 
 class LimitsIn(BaseModel):
@@ -206,7 +207,7 @@ def create_app(state: Path | None = None, gaifa_root: Path | None = None, models
 
     @app.post("/v1/skills/read", summary="A workspace skill's body and files, one of its files (<id>/<path>), or an instruction file")
     def skills_read(body: SkillRead, request: Request) -> dict[str, Any]:
-        return skillscan.read(view_of(ctx, request), body.id, named_of(request))
+        return skillscan.read(view_of(ctx, request), body.id, named_of(request), body.raw)
 
     @app.get("/v1/recent", summary="Recent edits, runs and undos, newest first; ?thread= for one chat")
     def recent(thread: str | None = None, limit: int = 100) -> dict[str, Any]:

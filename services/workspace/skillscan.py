@@ -154,8 +154,9 @@ def listing(folders: Folders) -> dict[str, Any]:
     return {"skills": skills, "instructions": instructions}
 
 
-def read(folders: Folders, ref: str, named: list[str] | None = None) -> dict[str, Any]:
-    """`POST /v1/skills/read`: a skill's body and its files, one of its files (`<id>/<path>`), or an instruction file."""
+def read(folders: Folders, ref: str, named: list[str] | None = None, raw: bool = False) -> dict[str, Any]:
+    """`POST /v1/skills/read`: a skill's body and its files (`raw`: SKILL.md whole), one of its files (`<id>/<path>`),
+    or an instruction file."""
     fid, sep, rest = (ref or "").strip().partition(":")
     if not sep or not rest:
         raise Refused("not_found", f"{ref!r} isn't a workspace skill id (<folder>:<skill>)", "", 404)
@@ -176,7 +177,8 @@ def read(folders: Folders, ref: str, named: list[str] | None = None) -> dict[str
         p, _ = folders.resolve(f, r["path"], read_file=True)
         sdir, _ = folders.resolve(f, r["dir"])
         listed = [x for x in skillfmt.files(sdir) if _readable(folders, f, f"{r['dir']}/{x['path']}")]
-        return {"id": ref, "kind": "skill", "text": skillfmt.parse(p.read_text(errors="replace"))["body"], "files": listed,
+        text = p.read_text(errors="replace")
+        return {"id": ref, "kind": "skill", "text": text if raw else skillfmt.parse(text)["body"], "files": listed,
                 "name": r["name"], "description": r["description"]}
     p, _ = folders.resolve(f, f"{r['dir']}/{path}", read_file=True, named=named)
     sdir, _ = folders.resolve(f, r["dir"])

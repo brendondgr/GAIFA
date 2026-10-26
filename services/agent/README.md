@@ -23,6 +23,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 | `ui/page.js` | The Learning page: Preferences, Review, Tool usage, Harness, Runs, Library |
 | `agent/hubapi.py` | GAIFA over HTTP: tools, calls, approvals, outputs, skills, the event stream |
 | `agent/server.py` | The HTTP API (`create_app`) |
+| `agent/api_skills.py` | Your own skills (skill-sources 3.1): `POST /v1/skills` (a folder's files, a zip or one SKILL.md, base64), `POST /v1/skills/copy` (a workspace folder's skill), `PATCH /v1/skills/{name}` (on or off), `DELETE /v1/skills/{name}` (to `data/agent/skills/.trash/`); `.gaifa.json` beside a skill: where it came from, on or off, the hub's pattern screening |
 | `evals/` | The eval (plan 13.5): `python -m evals.run --model skynet --runs 3` (`--live` for real outputs; each run's chats and outputs are deleted afterwards unless `--keep`, `evals/cleanup.py`), `python -m evals.vision` |
 | `tests/` | `.venv/bin/python -m pytest`: a scripted model (`fakemodel.py`) and a stand-in hub (`fakehub.py`); no model or GPU needed |
 

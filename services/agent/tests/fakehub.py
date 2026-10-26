@@ -99,6 +99,7 @@ class FakeHub:
         # skill-sources 2.2: the workspace's skills by environment ({skills, instructions}) and what reads return by id
         self.ws_skills: dict[str, dict[str, Any]] = {}
         self.ws_texts: dict[str, dict[str, Any]] = {}
+        self.screen_down = False
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -368,9 +369,21 @@ class FakeHub:
             o = json.loads(request.headers.get("x-gaifa-origin") or "{}")
             return self.ws_skills.get(o.get("environment") or "default") or {"skills": [], "instructions": []}
 
+        @app.post("/api/screen")                                       # skill-sources 3.1: fixed patterns only
+        async def screen_text(request: Request) -> Any:
+            if self.screen_down:
+                return JSONResponse({"detail": "the hub is restarting", "code": "unavailable"}, 503)
+            text = (await request.json())["text"]
+            return {"findings": [{"passage": 1, "line": i + 1, "why": "phrases aimed at an AI", "excerpt": ln[:80]}
+                                 for i, ln in enumerate(text.split("\n")) if "ignore previous instructions" in ln.lower()],
+                    "checked": "patterns"}
+
         @app.post("/api/s/workspace/v1/skills/read")
         async def ws_skill_read(request: Request) -> Any:
-            sid = (await request.json())["id"]
+            body = await request.json()
+            sid = body["id"]
+            if body.get("raw") and f"{sid}#raw" in self.ws_texts:
+                return self.ws_texts[f"{sid}#raw"]
             o = json.loads(request.headers.get("x-gaifa-origin") or "{}")
             listed = self.ws_skills.get(o.get("environment") or "default") or {}
             folder = sid.split(":", 1)[0]

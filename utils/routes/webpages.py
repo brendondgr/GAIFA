@@ -191,3 +191,30 @@ async def reading(request: Request) -> dict[str, Any]:
             "judge": {"backend": jc.backend, "model": jc.model},
             "choices": {"relay": relay, "decide": decide},
             "relevance": webread.backend(hub), "decide_up": decide_up}
+
+
+class PatternScreenIn(BaseModel):
+    text: str = Field(max_length=4_000_000, description="The text to check")
+
+
+class PatternFinding(BaseModel):
+    passage: int
+    line: int
+    why: str
+    excerpt: str
+
+
+class PatternScreen(BaseModel):
+    findings: list[PatternFinding]
+    checked: Literal["patterns"]
+
+
+@router.post("/api/screen", summary="Check a text for hidden instructions by fixed patterns only (skills; nothing is kept)",
+             response_model=PatternScreen)
+async def screen_patterns(body: PatternScreenIn) -> dict[str, Any]:
+    """skill-sources 3.1: hidden characters, chat-template tokens, long encoded blobs and phrases aimed at an AI
+    ("ignore previous instructions"). No model reads it: a skill is instructions to an AI by design, so the page
+    screening model would flag every one."""
+    s = await screen.screen(body.text, use_model=False)
+    return {"findings": [{"passage": f.passage, "line": f.lines[0] + 1, "why": f.why, "excerpt": f.excerpt} for f in s.findings],
+            "checked": "patterns"}

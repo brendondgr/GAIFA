@@ -55,10 +55,13 @@ class Knowledge:
     def user_skills(self) -> list[dict[str, str]]:
         from .harness import skills as harness_skills
         out = harness_skills(self.tree)                 # the harness's skills (plan 22.1), then data/agent/skills/
+        from .api_skills import enabled
         for f in sorted((self.data / "skills").glob("*/SKILL.md")):
-            s = skillfmt.parse(f.read_text())
-            out.append({"name": s["name"] or f.parent.name, "description": s["description"],
-                        "source": "user", "id": f"user/{f.parent.name}"})
+            if not NAME.match(f.parent.name):                           # .trash, .incoming-…
+                continue
+            s = skillfmt.load(f.read_text(), f.parent.name)
+            out.append({"name": s["name"] or f.parent.name, "description": s["description"], "source": "user",
+                        "id": f"user/{f.parent.name}", "enabled": enabled(f.parent), "problems": s["problems"]})
         return out
 
     async def skills(self) -> list[dict[str, str]]:
@@ -76,7 +79,7 @@ class Knowledge:
             d = re.sub(r"\s+", " ", s.get("description") or "").strip()
             return d if len(d) <= cap else d[: cap - 1] + "…"
         out = "\n".join(f"- {s['id']}: {desc(s, SKILL_DESC_MAX if s['source'] in ('harness', 'user') else 2 * SKILL_DESC_MAX)}"
-                        for s in await self.skills() if s["source"] not in off)
+                        for s in await self.skills() if s["source"] not in off and s.get("enabled", True))
         return out + workspace_list(ws, lambda s: desc(s, 2 * SKILL_DESC_MAX))
 
     async def read(self, name: str, tid: str | None = None, environment: str | None = None) -> str | None:
@@ -107,6 +110,9 @@ class Knowledge:
             folder = self.data / "skills" / n
             if not (folder / "SKILL.md").is_file():
                 return None
+            from .api_skills import enabled
+            if not enabled(folder):
+                raise skillfmt.SkillFileError("disabled", f"the skill {n} is turned off (Settings → Agent → Skills)")
             if path:
                 return skillfmt.read_file(folder, path)
             return skillfmt.parse((folder / "SKILL.md").read_text())["body"] + skillfmt.files_note(sid, skillfmt.files(folder))

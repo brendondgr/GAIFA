@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
-from . import api_skills, api_summaries, docs
+from . import api_memory, api_skills, api_summaries, docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -131,13 +131,15 @@ def config_from_env() -> Config:
 
 log = logging.getLogger("agent")
 
-async def _import_memory(k: Any) -> None:
-    """Once, a little after start (the hub may still be starting): the old memory files → preferences."""
+async def _import_memory(agent: Any) -> None:
+    """Once, a little after start (the hub may still be starting): the agent preferences and the old memory files
+    become facts (plan structured-memory 1.3)."""
+    from .memory import importer
     for _ in range(10):
         try:
-            n = await k.import_memory()
+            n = await importer.run(agent.memory, agent.hub, agent.cfg.data)
             if n:
-                log.info("imported %d memory lines as preferences", n)
+                log.info("imported %d memories as facts", n)
             return
         except Exception:  # noqa: BLE001
             await asyncio.sleep(30)
@@ -196,7 +198,6 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         watcher = asyncio.create_task(hub.follow_events(agent.hub_event, stop))
         upkeep = asyncio.create_task(_upkeep(store, stop))
         from . import records
-        from .knowledge import Knowledge
 
         async def turn_record(tid: str) -> None:
             await asyncio.to_thread(records.record, store, tid)
@@ -218,7 +219,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                 agent.emit(tid, "proposal", {"prefs": [{k: p.get(k) for k in ("id", "scope", "tool", "field", "value", "when", "cue")}
                                                        for p in done["proposed"]]})
         agent.on_turn_end.append(mine_after)
-        importer = asyncio.create_task(_import_memory(Knowledge(cfg.data, hub)))
+        importer = asyncio.create_task(_import_memory(agent))
         from .learn.loop import Learner
         from .learn.schedule import Schedule
         app.state.learner = Learner(agent, base=f"{hub_url.rstrip('/')}/api/s/agent")       # plan 22.5–22.6
@@ -249,6 +250,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                   description="GAIFA's chat agent: one loop, tools on demand, questions and parameter cards (plan Phase 14).")
     api_summaries.add_routes(app)                                    # plan 28.5
     api_skills.add_routes(app)                                       # skill-sources 3.1
+    api_memory.add_routes(app)                                       # structured-memory 1.2
 
     def A(request: Request) -> Agent:
         return request.app.state.agent

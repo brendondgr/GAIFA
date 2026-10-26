@@ -460,6 +460,12 @@ class FakeHub:
             self.prefs.append(p)
             return p
 
+        @app.patch("/api/prefs/{pid}")
+        async def patch_pref(pid: str, request: Request) -> dict:
+            p = next(x for x in self.prefs if x["id"] == pid)
+            p.update({k: v for k, v in (await request.json()).items() if v is not None})
+            return p
+
         @app.delete("/api/prefs/{pid}")
         def del_pref(pid: str) -> dict:
             self.prefs[:] = [p for p in self.prefs if p["id"] != pid]

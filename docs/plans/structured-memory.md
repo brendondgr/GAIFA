@@ -1,6 +1,6 @@
 # Plan: structured memory: entities, facts that change, search by meaning
 
-**Asked for:** 2026-10-26 · **Status:** Planned
+**Asked for:** 2026-10-26 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -24,24 +24,24 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
 
 ## Phase 1 — The store (M)
 
-- [ ] **1.1 Entities and facts: `services/agent/agent/memory/store.py`, `memory/model.py`.**
+- [x] **1.1 Entities and facts: `services/agent/agent/memory/store.py`, `memory/model.py`.**
   - **Tables (in `agent.db`):** `mem_entities {id, kind, name, parent, summary, scope, state (active|merged|archived), merged_into, created, updated}`; `mem_aliases {entity, alias, normalized, added}` (unique per normalized alias among active entities); `mem_anchors {entity, kind (folder|git|workspace), value}`; `mem_facts {id, text, kind (preference|fact|event|procedure), valid_from, valid_until, recorded, source (stated|inferred|imported), state (proposed|active|retired|rejected), confidence, replaces, replaced_by, evidence (json: thread, seq), seen, last_used, updated}`; `mem_fact_entities {fact, entity}`; `mem_log {id, ts, op, target, before, after, by}` (every change, for undo and the history view); `mem_fts` (FTS5 over facts and entity names and aliases).
   - **Kinds:** `user` (one, the person), `project`, `person`, `place`, `tool`, `topic`, `organization`. A path is the names up the `parent` chain (`projects/GAIFA` for a project whose parent is the kind's root).
   - **Operations (`MemoryStore`):** `entity_create`, `rename(id, name)` (the old name becomes an alias; every title is drawn from the id, so nothing else changes), `alias_add/remove`, `move(id, parent)`, `merge(a, into)` (facts and aliases move, `a` becomes `merged` with `merged_into`; undoable from the log), `fact_add`, `fact_replace(old, new)` (old gets `valid_until` and `replaced_by`), `fact_retire`, `approve/reject`, `undo(log_id)`, `resolve(name)` (exact name, then alias, normalized: case, spaces, punctuation; never a model).
   - **Why in the agent mod:** memory is the agent's only (§1), and the agent already owns its database and data folder.
   *Done when:* `services/agent/tests/test_memory_store.py` covers create, rename (old name resolves to the same id), merge and its undo, replace (history kept, only the current fact listed as current), retire, a clash of aliases, FTS search and the log.
-- [ ] **1.2 The routes: `services/agent/agent/api_memory.py`.**
+- [x] **1.2 The routes: `services/agent/agent/api_memory.py`.**
   - **Routes:** `GET /v1/memory/tree` (kinds → entities with counts), `GET /v1/memory/entities/{id}` (with current facts, replaced facts, aliases, anchors, history), `POST /v1/memory/entities`, `PATCH /v1/memory/entities/{id}` (`name`, `parent`, `summary`, `aliases`), `POST /v1/memory/entities/{id}/merge {into}`, `GET /v1/memory/facts?state=&entity=&q=`, `POST /v1/memory/facts`, `PATCH /v1/memory/facts/{id}` (text, entities, valid dates, state), `DELETE /v1/memory/facts/{id}` (forget), `POST /v1/memory/undo/{log_id}`, `GET /v1/memory/log`.
   - **Errors:** the envelope `{detail, code, fix?}`.
   *Done when:* `services/agent/tests/test_api_memory.py` covers each route over the app (TestClient), including 404s, a merge into itself (422) and an undo.
-- [ ] **1.3 Importing what exists: `memory/importer.py`.**
+- [x] **1.3 Importing what exists: `memory/importer.py`.**
   - **Once, at start:** each active `agent`-scope preference (`GET /api/prefs?scope=agent&state=active`) and each line of `data/agent/memory/*.md` becomes a `stated` (or `imported`, for the files) fact about the `user` entity (a topic file's name becomes a `topic` entity it is also about); the preferences are retired with the note "moved to memory: <fact id>"; a marker in `data/agent/memory/.structured` stops a second run.
-  - **Then:** `Knowledge.preferences` stops listing `agent`-scope preferences (tool and thread preferences stay); `Knowledge.memory_index` and `import_memory` go.
+  - **Then:** `Knowledge.memory_index` lists the current facts from the store (and, until 5.2 removes Settings' MEMORY.md editor, its lines that aren't facts); `import_memory` goes. *As built:* preferences are looked for at every start (each one moved is retired), so a `remember` made before 3.2 still moves; the files once. `Knowledge.preferences` keeps listing `agent`-scope preferences until 3.2 moves `remember`.
   *Done when:* `services/agent/tests/test_memory_import.py` (fake hub): preferences and files become facts once, the preferences are retired, a second start imports nothing.
 
 **Checks & deliverables — Phase 1**
-- [ ] On the installed agent, the import runs, `GET /v1/memory/tree` lists the user and topic entities, and nothing in a chat's prompt is lost (the profile of Phase 3 isn't built yet: the facts list under "Memory" as before, from the store).
-- [ ] Delivered: `memory/store.py`, `model.py`, `api_memory.py`, `importer.py`, tests; docs: the agent's README, architecture §14.5.
+- [x] On the installed agent, the import runs, `GET /v1/memory/tree` lists the user and topic entities, and nothing in a chat's prompt is lost (the profile of Phase 3 isn't built yet: the facts list under "Memory" as before, from the store). *As checked (2026-10-26):* this machine had no memory files and no agent preferences: the import wrote its marker, the tree holds the user alone.
+- [x] Delivered: `memory/store.py`, `facts.py`, `model.py`, `api_memory.py`, `importer.py`, tests; docs: the agent's README, architecture §14.5.
 
 ## Phase 2 — Search by meaning (M)
 

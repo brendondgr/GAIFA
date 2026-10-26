@@ -28,9 +28,10 @@ def slug(s: str) -> str:
 
 
 class Knowledge:
-    def __init__(self, data: Path | None, hub: HubAPI | None, tree: dict[str, str] | None = None) -> None:
+    def __init__(self, data: Path | None, hub: HubAPI | None, tree: dict[str, str] | None = None, memory: Any = None) -> None:
         self.data = Path(data) if data else Path("data/agent")
         self.hub = hub
+        self.memory = memory            # the structured memory (plan structured-memory), when the caller has it
         self._tree = tree               # the chat's harness files (plan 22.1); None: the active version
 
     @property
@@ -50,7 +51,21 @@ class Knowledge:
         return self._head(self.data / "AGENT.md")
 
     def memory_index(self) -> str:
-        return self._head(self.data / "memory" / "MEMORY.md")
+        """What the prompt's Memory section lists: the current facts, newest first (structured-memory 1.3; Phase 3
+        makes this a profile and recall), else the old MEMORY.md."""
+        if self.memory is None:
+            return self._head(self.data / "memory" / "MEMORY.md")
+        from .memory.model import norm
+        lines, known = [], set()
+        for f in self.memory.facts(current=True, limit=MAX_LINES):
+            where = ", ".join(e["path"] for e in f["entities"] if e["id"] != "user")
+            lines.append(f"- {f['text']}" + (f" ({where})" if where else ""))
+            known.add(norm(f["text"]))
+        for line in self._head(self.data / "memory" / "MEMORY.md").splitlines():   # Settings' editor, until Phase 5
+            text = re.sub(r"\s*\(\d{4}-\d{2}-\d{2}\)\s*$", "", line.lstrip("-* ").strip())
+            if text and not text.startswith("#") and norm(text) not in known:
+                lines.append(f"- {text}")
+        return "\n".join(lines[:MAX_LINES])
 
     def user_skills(self) -> list[dict[str, str]]:
         from .harness import skills as harness_skills

@@ -92,6 +92,8 @@ class Agent(Compaction):
         from .local import Local
 
         self.cfg, self.store, self.hub, self.llm = cfg, store, hub, llm
+        from .memory.store import MemoryStore
+        self.memory = MemoryStore(store)          # plan structured-memory 1.1
         self.live = Live()
         self.tasks: dict[str, asyncio.Task[Any]] = {}
         self.local = Local(self)
@@ -620,7 +622,7 @@ class Agent(Compaction):
 
         hv, tree = self.harness_of(tid)
         tools.notes = {rel[6:-3]: text for rel, text in tree.items() if rel.startswith("tools/")}
-        k = Knowledge(self.cfg.data, self.hub, tree)
+        k = Knowledge(self.cfg.data, self.hub, tree, self.memory)
         events = self.store.events(tid)
         meta = await self.llm.meta(model)
         try:

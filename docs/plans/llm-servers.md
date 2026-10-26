@@ -120,7 +120,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Usage:** `usageMetadata` (including `cachedContentTokenCount` and `thoughtsTokenCount`) → OpenAI usage.
   *Done when:* `test_adapter_gemini.py` covers each translation, the schema subset, a two-turn function call carrying its thought signature, a blocked prompt and streamed usage.
   - **Done:** Relay `f8dd9f7` through `google-genai`; the schema isn't cut down (`parameters_json_schema` carries it whole), and the model's own parts, signatures included, go back as `reasoning_details`; `test_adapter_gemini.py` (10), the relay's suite 250.
-- [ ] **1.6 OpenAI's API: `app/services/adapters/passthrough.py` (cloud rules) or `openai_cloud.py` if it grows past ~150 lines.**
+- [x] **1.6 OpenAI's API: `app/services/adapters/passthrough.py` (cloud rules) or `openai_cloud.py` if it grows past ~150 lines.**
   - **On a `cloud` openai endpoint:**
     - `max_tokens` becomes `max_completion_tokens`.
     - Sampling parameters that reasoning models reject are dropped, with an `X-Relay-Dropped` header naming them, not a 400.
@@ -128,11 +128,13 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
     - `reasoning_effort` passes through.
   - **Local servers:** unchanged.
   *Done when:* `test_proxy.py` covers each rule against a mock, and that a local endpoint's body is forwarded byte for byte as before.
-- [ ] **1.7 Chats only, and telemetry: `app/services/proxy.py`, `app/services/telemetry.py`, `app/config.py`.**
+  - **Done:** Relay `11465f2`; the rejected parameter comes from OpenAI's 400 (`code` `unsupported_parameter`/`unsupported_value`, `param`), so there's no list of reasoning models; `test_openai_cloud.py`.
+- [x] **1.7 Chats only, and telemetry: `app/services/proxy.py`, `app/services/telemetry.py`, `app/config.py`.**
   - **Rule:** with `RELAY_CLOUD_REQUIRES_PURPOSE=1`, a request routed to a `cloud` endpoint without `X-GAIFA-Purpose: chat` gets 403 `{detail: "cloud models are for chats only", code: "cloud_not_allowed"}`.
   - **Telemetry:** requests record `group` and the cache token columns. The relay's dashboard filters by group.
   - **GAIFA:** `services/relay/service.toml` sets the variable in GAIFA.
   *Done when:* `test_proxy.py` covers the 403, the header letting it through and the rule off by default; `test_stats.py` covers the group filter.
+  - **Done:** Relay `4202955` (GAIFA's `service.toml` in the Relay repo sets the variable). The group filter is on the Requests list (`GET /admin/stats/recent?group=`); the hourly rollups behind the dashboard's charts don't split by group. Tests in `test_openai_cloud.py` (9 there in all); the relay's suite 259.
 - [ ] **1.8 Relay docs and release.**
   - **Docs:** `README.md` (cloud providers, discovery, `<server>/<model>`, the chats-only rule), `docs/` (the API), `CLAUDE.md`.
   - **Release:** merge to `main` in Relay, push, then in GAIFA `gaifa repos pin relay`, `uv run pytest`, and commit.

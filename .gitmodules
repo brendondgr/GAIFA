@@ -10,3 +10,7 @@
 	path = services/tts
 	url = git@github.com:brendondgr/LocalTTS.git
 	branch = main
+[submodule "services/gen3d"]
+	path = services/gen3d
+	url = git@github.com:brendondgr/3DGenerate.git
+	branch = main

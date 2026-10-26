@@ -1,4 +1,0 @@
-# Hunyuan3D 2.1 shape worker: runtime/img3d/.venv, layered on CubeArt's venv and the image's /opt/venv
-# (torch, diffusers, transformers, trimesh, pymeshlab come from there). scripts/install-runtime.sh.
-timm==1.0.30
-fast-simplification==0.2.0

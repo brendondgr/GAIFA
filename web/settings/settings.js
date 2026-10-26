@@ -74,7 +74,7 @@ export function SettingsPage(props) {
     api.getJudgeStatus?.().then(x => live && up({ judgeStatus: x }), () => {});
     if ((props.services || []).some(s => s.id === 'tts')) api.callService?.('tts', 'GET', '/v1/voices').then(r => live && up({ voices: r.json }), () => {});   // Speech → Voice's choices
     api.getWebReading?.().then(x => live && up({ reading: x }), () => {});
-    api.getRepos?.().then(x => live && up({ repos: x }), () => {});   // Services → Repositories' summary (mod-repos 3.5)
+    api.getRepos?.(true).then(x => live && up({ repos: x }), () => {});   // Services → Repositories' summary (mod-repos 3.5)
     api.getToolIndex?.().then(ix => live && up({ toolCounts: ix.reduce((m, t) => ({ ...m, [t.mod]: (m[t.mod] || 0) + 1 }), {}) }), () => {});
     return () => { live = false; };
   }, []);

@@ -54,7 +54,7 @@ export function RepositoriesTable({ ctx }) {
       return b;
     } catch (e) { setErr(e); return null; }
   }, [api]);
-  React.useEffect(() => { if (api.getRepos) load(); }, [load]);
+  React.useEffect(() => { if (api.getRepos) load('refresh'); }, [load]);   // fresh from git (local, cheap): a CLI fetch or commit since the hub last looked
   const running = !!body?.update?.running;
   React.useEffect(() => {                                   // follow an update until it ends
     if (!running) return undefined;

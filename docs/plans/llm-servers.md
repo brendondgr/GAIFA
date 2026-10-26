@@ -154,10 +154,11 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **`max_tokens`:** still not sent.
   *Done when:* `services/agent/tests/test_llm.py` and `test_loop.py`: a scripted model returns `reasoning_details` with a tool call; the next request carries them verbatim; a chat's compaction and title requests carry the purpose header; the judge's requests (hub, `utils/tools/judge.py`) don't.
   - **Done:** the details are their own event (`reasoning_details` {details, model, step}, which the Chat page doesn't draw), put back on that step's assistant message by `context.rebuild` and sent only to the model that made them (`llm.for_model`), so a local server never sees another provider's fields. The purpose header rides on every call made with a chat's `THREAD` (turns, titles, compaction); background summaries of a cloud chat use the agent's default model (`LLM.is_cloud`). The judge calls the relay from the hub without the header. Tests: `services/agent/tests/test_cloud_models.py` (7); the agent's suite 315.
-- [ ] **2.2 Models by server: `services/agent/agent/server.py` (`GET /v1/models`).**
+- [x] **2.2 Models by server: `services/agent/agent/server.py` (`GET /v1/models`).**
   - **What:** each model carries `{id, name, server, group, provider, health, meta, cloud}` from the relay's catalog, grouped in server order (this machine, remote, cloud), and still without OpenCode's protocol.
   - **Validation:** the chat's model and `/model` accept `server/model`; an unknown id is a 400 that lists the near matches.
   *Done when:* `test_models_route.py` (new) covers the grouping, `cloud`, and `/model claude/claude-opus-5-5`.
+  - **Done:** `services/agent/agent/server.py` `model_list()` and `check_model()` (creating a chat and changing its model; with the relay unreachable any id is taken); `tests/test_models_route.py` (3).
 - [ ] **2.3 The cloud marker, the notice and the fallback note: `services/agent/agent/loop.py`, `web/chat/chat-header.js`, `web/chat/chat-controls.js`.**
   - **Marker:** a chat whose model is `cloud` shows the provider beside the model name.
   - **Notice:** the first turn after switching to cloud gets a one-line notice event: "This chat now goes to Anthropic: its messages, attachments and tool results".

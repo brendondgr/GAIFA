@@ -8,6 +8,7 @@ AGENT_MAX_STEPS, GAIFA_URL, GAIFA_PORT.
 from __future__ import annotations
 
 import asyncio
+import difflib
 import logging
 import os
 import time
@@ -160,6 +161,25 @@ async def _upkeep(store: Store, stop: asyncio.Event, every: float = 3600) -> Non
             pass
 
 
+GROUP_ORDER = {"local": 0, "remote": 1, "cloud": 2}
+
+
+def model_list(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The relay's catalog as the Chat page and Settings pick from it (plan llm-servers 2.2): each model with its
+    server, where that server runs, its provider and facts; this machine first, then remote, then cloud.
+    OpenCode's agent models are left out (the chat agent can't run its tools through another agent)."""
+    out = []
+    for m in data:
+        r = m.get("relay") or {}
+        if r.get("protocol") == "opencode" or m.get("id") == "auto" and not r:
+            continue
+        group = r.get("group") or "local"
+        out.append({"id": m["id"], "name": r.get("display_name") or m["id"], "meta": m.get("meta") or {},
+                    "endpoint": r.get("endpoint"), "server": r.get("alias") or r.get("endpoint"), "group": group,
+                    "provider": r.get("protocol") or "openai", "health": r.get("health"), "cloud": group == "cloud"})
+    return sorted(out, key=lambda m: GROUP_ORDER.get(m["group"], 3))
+
+
 def check_quotes(agent: Agent, tid: str, body: Message) -> list[dict[str, Any]]:
     """The message's quote-replies as stored, `[{text, reply, seq?}]` (any number of them); the older single `quote`
     becomes one with an empty reply. 422 `invalid_quote`: both given, a blank quoted part, a seq that isn't a reply
@@ -289,8 +309,10 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         if run:                                  # the learner's run, with its stage (plan 22.6)
             jobs.append({"id": run["id"], "label": f"Learning: {run['stage']}", "progress": None, "state": "running",
                          "route": "#/s/agent/runs"})
+        review = agent.memory.count_facts("proposed")
         return {"loaded": None, "busy": bool(jobs), "stats": [
             {"label": "Threads", "value": s["threads"]},
+            {"label": "Memories to review", "value": review},          # structured-memory 5.1
             {"label": "Messages today", "value": s["messages"], "reset": "daily"},
             {"label": "Tokens today", "value": s["tokens"], "reset": "daily"}], "jobs": jobs}
 
@@ -332,14 +354,12 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def patch_pref(pid: str, body: dict, request: Request) -> dict:
         return await A(request).hub.update_pref(pid, body)
 
-    @app.get("/v1/models", summary="Models from the relay with their facts (window, tools, vision), and the defaults")
+    @app.get("/v1/models", summary="Models from the relay with their facts (window, tools, vision), grouped by server "
+             "(this machine, remote, cloud), and the defaults")
     async def models(request: Request) -> dict:
         agent = A(request)
         data = await agent.llm.models(max_age=10)
-        return {"default": agent.cfg.model, "fallback": agent.cfg.fallback,
-                "models": [{"id": m["id"], "meta": m.get("meta") or {}, "endpoint": (m.get("relay") or {}).get("endpoint"),
-                            "health": (m.get("relay") or {}).get("health")} for m in data
-                           if (m.get("relay") or {}).get("protocol") != "opencode"]}
+        return {"default": agent.cfg.model, "fallback": agent.cfg.fallback, "models": model_list(data)}
 
     # ---- threads -----------------------------------------------------------------------------
 
@@ -356,8 +376,18 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     def thread_groups(request: Request, archived: bool = False) -> list[dict]:
         return A(request).store.groups(archived)
 
+    async def check_model(agent: Agent, model: str | None) -> None:
+        """A chat's model must be one the relay serves (plan llm-servers 2.2); with the relay unreachable, anything goes."""
+        if not model:
+            return
+        ids = [m["id"] for m in model_list(await agent.llm.models(max_age=10))]
+        if ids and model not in ids:
+            near = difflib.get_close_matches(model, ids, n=3, cutoff=0.4)
+            raise HTTPException(400, f"the relay doesn't serve {model!r}" + (f"; did you mean {', '.join(near)}?" if near else ""))
+
     @app.post("/v1/threads", status_code=201, summary="Start a thread")
-    def new_thread(body: NewThread, request: Request) -> dict:
+    async def new_thread(body: NewThread, request: Request) -> dict:
+        await check_model(A(request), body.model)
         return A(request).store.create_thread(body.title, body.model, body.mode, body.settings)
 
     @app.get("/v1/threads/{tid}", summary="One thread")
@@ -368,9 +398,10 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         return t
 
     @app.patch("/v1/threads/{tid}", summary="Rename, change model or mode, archive, or change tool groups")
-    def patch_thread(tid: str, body: ThreadPatch, request: Request) -> dict:
+    async def patch_thread(tid: str, body: ThreadPatch, request: Request) -> dict:
         agent = A(request)
         t = thread_or_404(agent, tid)
+        await check_model(agent, body.model)
         settings = None
         if body.settings is not None:
             settings = {**t["settings"], **body.settings}

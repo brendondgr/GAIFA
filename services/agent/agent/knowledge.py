@@ -66,18 +66,20 @@ class Knowledge:
         return [*({"name": s["name"], "description": s.get("description", ""), "source": s["mod"], "id": f"{s['mod']}/{s['name']}"}
                   for s in mods), *self.user_skills()]
 
-    async def skill_list(self, off: set[str] | frozenset[str] = frozenset()) -> str:
+    async def skill_list(self, off: set[str] | frozenset[str] = frozenset(), ws: dict[str, Any] | None = None) -> str:
         """The skills, without those of mods turned off in this chat (their tools can't be used). Each description
-        is one line; the harness's (which the learner writes) and your own at most SKILL_DESC_MAX characters."""
+        is one line; the harness's (which the learner writes) and your own at most SKILL_DESC_MAX characters.
+        `ws`: the chat's workspace skills and instruction files (skill-sources 2.2), grouped by folder."""
         from .harness import SKILL_DESC_MAX
 
-        def desc(s: dict[str, str]) -> str:
+        def desc(s: dict[str, Any], cap: int) -> str:
             d = re.sub(r"\s+", " ", s.get("description") or "").strip()
-            cap = SKILL_DESC_MAX if s["source"] in ("harness", "user") else 2 * SKILL_DESC_MAX
             return d if len(d) <= cap else d[: cap - 1] + "…"
-        return "\n".join(f"- {s['id']}: {desc(s)}" for s in await self.skills() if s["source"] not in off)
+        out = "\n".join(f"- {s['id']}: {desc(s, SKILL_DESC_MAX if s['source'] in ('harness', 'user') else 2 * SKILL_DESC_MAX)}"
+                        for s in await self.skills() if s["source"] not in off)
+        return out + workspace_list(ws, lambda s: desc(s, 2 * SKILL_DESC_MAX))
 
-    async def read(self, name: str) -> str | None:
+    async def read(self, name: str, tid: str | None = None, environment: str | None = None) -> str | None:
         """A skill's body (followed by its other files' names), one of those files (`<id>/<path>`, skill-sources
         1.2; skillfmt.SkillFileError when it can't be read), or a memory topic. None: no such skill."""
         name = name.strip().strip("/")
@@ -85,6 +87,8 @@ class Knowledge:
             topic = slug(name[7:])
             p = self.data / "memory" / f"{topic}.md"
             return p.read_text() if p.is_file() else None
+        if ":" in name.split("/", 1)[0]:                 # a workspace folder's skill (skill-sources 2.2)
+            return await self.read_workspace(name, tid, environment)
         if "/" in name:
             src, n, path = (name.split("/", 2) + [""])[:3]
         else:
@@ -118,6 +122,16 @@ class Knowledge:
             return s["body"] + skillfmt.files_note(sid, s.get("files") or [])
         except Exception:  # noqa: BLE001
             return None
+
+    async def read_workspace(self, sid: str, tid: str | None, environment: str | None) -> str | None:
+        """`<folder>:<skill>` (with its files named after the body), `…/<path>`, or `<folder>:AGENTS.md`."""
+        if not self.hub or not tid:
+            return None
+        try:
+            r = await self.hub.chat_skill_read(tid, environment, sid)
+        except HubCallError as e:
+            raise skillfmt.SkillFileError(e.code or "not_found", e.detail) from None
+        return r["text"] + (skillfmt.files_note(sid, r.get("files") or []) if r.get("kind") == "skill" else "")
 
     async def preferences(self, loaded: set[str], thread: str | None = None) -> str:
         """The user's preferences for the prompt (plan 21.4): the agent-scoped ones (what `remember`
@@ -196,3 +210,23 @@ def _write(p: Path, text: str) -> None:
     tmp = p.with_name(p.name + ".part")
     tmp.write_text(text)
     tmp.replace(p)
+
+
+def workspace_list(ws: dict[str, Any] | None, desc: Any) -> str:
+    """The chat's workspace skills under their folder, and the instruction files to read before working there."""
+    if not ws:
+        return ""
+    folders: dict[str, dict[str, Any]] = {}
+    for s in ws.get("skills") or []:
+        if s.get("model_invocable", True):
+            folders.setdefault(s["folder"]["id"], {"f": s["folder"], "skills": [], "docs": []})["skills"].append(s)
+    for d in ws.get("instructions") or []:
+        folders.setdefault(d["folder"]["id"], {"f": d["folder"], "skills": [], "docs": []})["docs"].append(d)
+    out = ""
+    for g in folders.values():
+        out += f"\nFrom the workspace folder {g['f']['name']} ({g['f']['path']}):"
+        out += "".join(f"\n- {s['id']}: {desc(s)}" for s in g["skills"])
+        if g["docs"]:
+            out += (f"\nBefore working in {g['f']['name']}, read its instructions with read_skill: "
+                    + ", ".join(d["id"] for d in g["docs"]))
+    return out

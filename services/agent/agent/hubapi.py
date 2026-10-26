@@ -123,12 +123,26 @@ class HubAPI:
     async def chat_folders(self, tid: str, environment: str | None) -> dict[str, Any]:
         """The workspace folders this chat can use (plan 34): its environment's and those the user allowed in it
         (folder grants), as the workspace mod resolves them for the chat's calls: `{folders, environment}`."""
+        return await self._json("GET", "/api/s/workspace/v1/folders", headers=await self._chat_origin(tid, environment))
+
+    async def chat_skills(self, tid: str, environment: str | None) -> dict[str, Any]:
+        """Other agents' skills and instruction files in this chat's workspace folders (skill-sources 2.2):
+        `{skills, instructions}` from the workspace mod."""
+        return await self._json("GET", "/api/s/workspace/v1/skills", headers=await self._chat_origin(tid, environment))
+
+    async def chat_skill_read(self, tid: str, environment: str | None, sid: str) -> dict[str, Any]:
+        """A workspace skill (`<folder>:<skill>`), one of its files (`…/<path>`) or an instruction file."""
+        return await self._json("POST", "/api/s/workspace/v1/skills/read", json={"id": sid},
+                                headers=await self._chat_origin(tid, environment))
+
+    async def _chat_origin(self, tid: str, environment: str | None) -> dict[str, str]:
+        """The origin a chat's workspace calls carry: its environment and the folders allowed in it (folder grants)."""
         grants = await self._json("GET", "/api/grants", params={"thread": tid})
         allowed = [{"path": g["key"][len("folder:"):], "level": "read"} for g in grants or []
                    if g.get("kind") == "folder" and str(g.get("key") or "").startswith("folder:/")]
         origin = {"service": "agent", "thread": tid, **({"environment": environment} if environment else {}),
                   **({"folders": allowed} if allowed else {})}
-        return await self._json("GET", "/api/s/workspace/v1/folders", headers={"X-GAIFA-Origin": json.dumps(origin)})
+        return {"X-GAIFA-Origin": json.dumps(origin)}
 
     # ---- preferences and feedback (plan 21.4) -------------------------------------------------
 

@@ -464,3 +464,20 @@ async def folders_note(hub: Any, tid: str, settings: dict[str, Any] | None, serv
         logging.getLogger("agent.context").warning("the folders of chat %s: %s", tid, e)
         return ""
     return prompts.folders_note(data, os.path.expanduser("~"))
+
+
+async def chat_skills(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
+                      disabled: set[str] | list[str]) -> dict[str, Any] | None:
+    """skill-sources 2.2: other agents' skills and instruction files in this chat's workspace folders, as the workspace
+    mod finds them; None when the mod is off, turned off here, or doesn't answer (the prompt goes on without them)."""
+    import logging
+
+    if "workspace" in disabled or not any(s.get("id") == "workspace" and s.get("state") in ("ready", "degraded")
+                                          for s in services or []):
+        return None
+    env = (settings or {}).get("environment")
+    try:
+        return await hub.chat_skills(tid, env if isinstance(env, str) and env else None)
+    except Exception as e:  # noqa: BLE001: the prompt goes on without them
+        logging.getLogger("agent.context").warning("the workspace skills of chat %s: %s", tid, e)
+        return None

@@ -128,11 +128,14 @@ class Local:
         k = Knowledge(self.a.cfg.data, self.a.hub)
         name = str(args.get("name") or "")
         mod = name.split("/", 1)[0] if "/" in name else next((s["source"] for s in await k.skills() if s["name"] == name), None)
+        if ":" in name.split("/", 1)[0] and not name.startswith("memory:"):
+            mod = "workspace"                          # a workspace folder's skill (skill-sources 2.2)
         if mod in tools.disabled:                      # a turned-off mod's skill is about tools this chat can't use
             return self.err(tid, cid, "read_skill", "disabled", f"the {mod} tools are turned off in this chat",
                             "tell the user it's turned off; they can turn it back on in the composer")
         try:
-            body = await k.read(name)
+            env = (thread.get("settings") or {}).get("environment")
+            body = await k.read(name, tid, env if isinstance(env, str) and env else None)
         except skillfmt.SkillFileError as e:
             return self.err(tid, cid, "read_skill", e.code, e.detail, "the skill's files are listed after its body")
         if body is None:

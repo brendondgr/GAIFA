@@ -96,6 +96,9 @@ class FakeHub:
         self.workspace: dict[str, Any] | None = None   # plan 34: the workspace mod's folders by environment (None: not running)
         self.grants: list[dict[str, Any]] = []         # GET /api/grants
         self.folder_origins: list[dict[str, Any]] = []  # the X-GAIFA-Origin of each GET /api/s/workspace/v1/folders
+        # skill-sources 2.2: the workspace's skills by environment ({skills, instructions}) and what reads return by id
+        self.ws_skills: dict[str, dict[str, Any]] = {}
+        self.ws_texts: dict[str, dict[str, Any]] = {}
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -359,6 +362,22 @@ class FakeHub:
             granted = [{"id": f["path"].rsplit("/", 1)[-1].lower(), "path": f["path"], "level": "read", "granted": True}
                        for f in o.get("folders") or []]
             return {"folders": [*env["folders"], *granted], "environment": {"id": env["id"], "name": env["name"]}}
+
+        @app.get("/api/s/workspace/v1/skills")
+        def ws_skills(request: Request) -> dict:
+            o = json.loads(request.headers.get("x-gaifa-origin") or "{}")
+            return self.ws_skills.get(o.get("environment") or "default") or {"skills": [], "instructions": []}
+
+        @app.post("/api/s/workspace/v1/skills/read")
+        async def ws_skill_read(request: Request) -> Any:
+            sid = (await request.json())["id"]
+            o = json.loads(request.headers.get("x-gaifa-origin") or "{}")
+            listed = self.ws_skills.get(o.get("environment") or "default") or {}
+            folder = sid.split(":", 1)[0]
+            if not any(x["folder"]["id"] == folder for x in [*listed.get("skills", []), *listed.get("instructions", [])]):
+                return JSONResponse({"detail": f"{folder!r} isn't one of this chat's folders", "code": "unknown_folder"}, 404)
+            r = self.ws_texts.get(sid)
+            return r if r else JSONResponse({"detail": f"no skill {sid!r}", "code": "not_found"}, 404)
 
         @app.delete("/api/grants")
         def end_grants(thread: str) -> dict:

@@ -631,7 +631,8 @@ class Agent(Compaction):
         prefs = await k.preferences(set(tools.full), tid) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
         parts = {"base": tree.get("systemprompt.md", ""), "guardrails": tree.get("guardrails.md", ""),
                  "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.memory_index(), prefs) if x),
-                 "skills": await k.skill_list(set(tools.disabled)),
+                 "skills": await k.skill_list(set(tools.disabled), await ctx.chat_skills(
+                     self.hub, tid, thread_settings(self.store, tid), services, tools.disabled)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
                  "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "

@@ -75,12 +75,13 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Routes:** `GET /admin/endpoints/{id}/models` (with `?refresh=1`) and `PATCH /admin/endpoints/{id}/models {hidden: [...] , hide_filter: bool}` (a new `hidden_models` column).
   *Done when:* `test_discovery.py` runs against mock servers reproducing each provider's list shapes, ported from the skill's `selftest.py`. It covers pagination, the generateContent filter, the prefix, the hide filter, a 401 (`{error: "key rejected"}` and an empty list), a timeout (the last good list) and an unreachable local server (connect timeout ≤ 2 s).
   - **Done:** Relay `2d34546`. The fakes are real HTTP servers (`tests/backend/fake_providers.py`) so the official SDKs talk to them as to the providers; `test_discovery.py` (9). Found: the anthropic SDK is 2.x (API version 2026-10-21: no sampling parameters at all, and it sends the key as `Authorization: Bearer`). A rejected key keeps the last good list with `HTTP 401: key rejected — …`.
-- [ ] **1.3 `<server>/<model>` routing and the grouped catalog: `app/services/catalog.py`, `app/services/router.py`.**
+- [x] **1.3 `<server>/<model>` routing and the grouped catalog: `app/services/catalog.py`, `app/services/router.py`.**
   - **Catalog:** every visible discovered model is listed as `<alias>/<model id>` (for example `claude/claude-opus-5-5`, `openai/gpt-5.6`, `gemini/gemini-3.7-flash`, `local/gemma4-26B`).
   - **Each entry's `relay`:** `{endpoint, alias, group: "local"|"cloud"|"remote"|"agent", provider, upstream_model, health, discovered: true}`.
   - **Routing:** `resolve_request_model` matches `alias/model` first (split at the first `/` whose prefix is an alias), then the existing alias and allowlist rules, unchanged, so `skynet`, `gemma4-26B` and OpenCode's `anthropic/…` ids keep working.
   - **Aliases:** they may not contain `/` (they can't today; a test pins it).
   *Done when:* `test_catalog.py` (new) covers grouping, hidden models, collisions (an allowlisted `openai/gpt-x` on OpenCode vs a cloud alias `openai`: the alias form wins, and the catalog marks the other unreachable) and the old names still routing.
+  - **Done:** Relay `78eac71`; `test_catalog.py` (7), the relay's suite 228.
 - [ ] **1.4 The Anthropic adapter: `app/services/adapters/anthropic.py`.**
   - **Request (OpenAI → Messages API):**
     - `system` messages joined into `system`.

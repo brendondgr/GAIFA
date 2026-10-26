@@ -78,7 +78,7 @@ test('2.1: eight sections in order, with their groups', () => {
   assert.deepEqual(secs.map(s => s.id), ['general', 'machine', 'services', 'agent', 'permissions', 'speech', 'sessions', 'about']);
   const groups = Object.fromEntries(secs.map(s => [s.id, s.groups.map(g => g.id)]));
   assert.deepEqual(groups, {
-    general: ['hub', 'interface', 'outputs'], machine: ['memory', 'storage', 'hardware'], services: ['services'],
+    general: ['hub', 'interface', 'outputs'], machine: ['memory', 'storage', 'hardware'], services: ['services', 'repositories'],
     agent: ['model', 'documents', 'web', 'instructions', 'memory', 'skills', 'learning'],
     permissions: ['modes', 'rules', 'grants', 'judge', 'screening', 'judged'], speech: ['dictation', 'voice'], sessions: ['sessions'], about: ['versions', 'cli', 'doctor'] });
   assert.ok(secs.every(s => s.groups.length >= 1 && s.groups.length <= 7));

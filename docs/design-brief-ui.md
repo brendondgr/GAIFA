@@ -275,6 +275,7 @@ The sections:
 - **General:** *Hub* (**Set on this machine**: the saved values that differ from the defaults as "key · value (default x)" links to their rows, with Copy as TOML; the port, "Bound to 127.0.0.1 — this machine only", restart to apply; the process card: version, PID, uptime, memory), *Interface* (theme System/Light/Dark, density, services in the sidebar as list/button/counts, fold the list, Reset the dashboard layout), *Outputs* (delete saved web pages after N days).
 - **Machine:** *Memory* (the 24 h chart with the draft reserve line; reserve; "Automatically make room when a service needs memory"; Never auto-unload; the unload order with up/down), *Storage* (the folders with sizes and Copy path, the disk bar), *Hardware* (plan 35.2: the system line, one row per GPU with memory, runtimes, what it can run and any problem, the accelerators GAIFA can use, Read again).
 - **Services:** every folder in `services/`, broken mods with their errors; per mod enabled, autostart, its tool count and sidebar order (up/down); the **Add a mod** card (`gaifa new <id>`, edit `services/<id>/service.toml`, restart), linking the Example mod.
+- **Services → Repositories** (plan mod-repos 3.5): relay, lcpp, tts and gen3d are git submodules of their own repositories. One row per mod: its repository (linked) and branch, the pinned and checked-out commits, badges for its problems (red error, amber warning, cyan info, green at its pin, purple when a new pin is staged) with each problem's fix, Pin when it has commits GAIFA doesn't pin yet, and **Update…**, which lists the incoming commits (`repoIncoming`), then follows the hub's update step by step to its result. **Check now** asks GitHub; the line says when it last did. Rows: Check GitHub every (hours, 0 = never), Alerts (warnings, all, off), Check when GAIFA starts.
 - **Agent** (while the agent mod is installed): *Model*, *Documents*, *Reading web pages* (long pages and the relevance model), *Instructions* (AGENT.md), *Memory* (MEMORY.md and topics), *Skills*, *Learning*.
 - **Permissions** (while the agent mod is installed): *Modes*, *Tool rules* (never run, always ask, run without asking), *Grants* (with Revoke), *Auto judge* (backend and model, what it reads, threshold, time limit, your command rules), *Screening* (pages, documents, transcripts, the screening model, text per call, calls at once), *Judged calls* (with "Always allow", added to the draft).
 - **Speech** (while the stt or tts mod is installed): *Dictation* (microphones in order, language, model, the button), *Voice* (the voice that reads replies, speed, read every reply, voice mode's pause).
@@ -628,6 +629,7 @@ interface Settings {
             threshold: number | null; confirm: boolean; parallel: number };   // parallel: model calls at once for one text
   web: { relevance: "auto" | "decide" | "lexical" | "off"; model: string; url: string; candidates: number; timeout_s: number };   // [agent.web]: a long page's relevant passages first (webread.py, 2026-10-21)
   outputs: { hidden_keep_days: number };   // [outputs] (plan 30.9): saved web pages go to the trash after this many days; 0 keeps them
+  repos: { fetch_every_h: number; notify: "warnings" | "all" | "off"; check_on_start: boolean };   // [repos] (plan mod-repos 3.5): how often to ask GitHub (0 = never), which problems are alerts
 }
 
 type HubEvent =
@@ -888,6 +890,11 @@ What every chart must do:
 | `getWidget(service, id, {range})` | `GET /api/widgets/{service}/{id}?range=` | `WidgetData` |
 | `getDoctor()` | `GET /api/doctor` | `Doctor` (plan 12.4; Settings → About) |
 | `getHardware(refresh?)` | `GET /api/system/hardware[?refresh=true]` | `Hardware` (plan 35.2; Settings → About): read once and cached; `refresh` reads the machine again |
+| `getRepos(refresh?)` | `GET /api/repos[?refresh=1]` | `Repos` (plan mod-repos 3.5; Settings → Services → Repositories): the mods that are their own repositories |
+| `fetchRepos(id?)` | `POST /api/repos/fetch[?id=]` | `Repos`: asks GitHub what's new (the one call that does) |
+| `repoIncoming(id)` | `GET /api/repos/{id}/incoming` | `{id, ok, commits: string[], refused: string[], message}`: what an update would bring in |
+| `updateRepo(id, {to?, commit?, force_busy?})` | `POST /api/repos/{id}/update` | `RepoUpdate` (202, in the background; `repos` events per step, the result on `getRepos`); `409 repo_refused {refused}`, `409 repo_update_running` |
+| `pinRepo(id)` | `POST /api/repos/{id}/pin` | `{ok, old, new, commits, refused, staged, committed, message}`: the checkout as GAIFA's pin, staged |
 
 ```ts
 // Series names: "mem.total" "mem.used" "mem.available" "mem.reserve" "mem.other" "gpu.gtt_used"
@@ -907,7 +914,7 @@ interface Timeline { from: number; to: number; lanes: {
 interface OutputBucket { key: string; count: number; size_bytes: number; by_kind: Partial<Record<OutputKind, number>> }
 interface WidgetInfo { service: string; id: string; title: string; kind: "line" | "area" | "bar" | "donut" | "number" | "table";
                        ranges: string[]; span: 3 | 4 | 6 | 12 }
-interface DoctorCheck { area: "models" | "manifests" | "paths" | "ports" | "units" | "disk" | "offline";
+interface DoctorCheck { area: "models" | "manifests" | "paths" | "ports" | "units" | "disk" | "offline" | "repos";
                        level: "ok" | "note" | "warn" | "fail"; title: string; detail: string; fix?: string }
 interface Hardware { os: "linux" | "darwin" | "windows"; arch: string; wsl: boolean; container: string;   // plan 35.2
                      distro: Record<string, string>; kernel: string; cpu: string; cpus: number; ram_bytes: number; pkg: string;
@@ -916,6 +923,18 @@ interface Hardware { os: "linux" | "darwin" | "windows"; arch: string; wsl: bool
 interface HardwareGpu { vendor: "amd" | "nvidia" | "intel" | "apple"; name: string; memory: "unified" | "dedicated" | "unknown";
                         vram_bytes: number; arch: string; driver: string; pci: string; index: number; vendor_index: number;
                         runtimes: Record<string, string>; accels: string[]; problems: string[] }
+// plan mod-repos 3.5: relay, lcpp, tts and gen3d are git submodules of their own repositories
+interface Repos { repos: RepoState[]; settings: Settings["repos"]; last_fetch_ts: number | null; update: RepoUpdate | null }
+interface RepoState { id: string; path: string; url: string; branch: string; initialized: boolean;
+                      pinned: string | null; staged_pin: string | null; head: string | null; on_branch: string | null;   // null: detached
+                      dirty: number; untracked: number; ahead: number; behind: number; unpushed: number;
+                      pinned_on_remote: boolean | null; checkout_vs_pin: "same" | "ahead" | "behind" | "diverged" | "unknown";
+                      remote_url: string | null; last_fetch_ts: number | null; fetch_error: string | null;
+                      problems: RepoProblem[]; level: "info" | "warn" | "error" | null }
+interface RepoProblem { code: string; level: "info" | "warn" | "error"; title: string; detail: string; fix: string }
+interface RepoUpdate { id: string; running: boolean; started: number; steps: { ts: number; text: string }[];
+                       result: { ok: boolean; message: string; old?: string; new?: string; commits?: string[]; refused?: string[];
+                                 rolled_back?: boolean; staged?: boolean; committed?: string | null } | null }
 interface Doctor { ts: number; ok: boolean;                                  // ok = no "fail" checks
                    counts: { ok: number; note: number; warn: number; fail: number }; checks: DoctorCheck[] }
 interface WidgetData { unit?: string; t?: number[]; categories?: string[];

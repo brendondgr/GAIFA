@@ -10,6 +10,7 @@ export class ApiError extends Error {
 // Method → area (brief §6.1). getOverview and subscribe span areas and are handled separately.
 export const METHOD_AREA = {
   getSystem: 'system', getDoctor: 'system', getHardware: 'system',
+  getRepos: 'repos', fetchRepos: 'repos', repoIncoming: 'repos', updateRepo: 'repos', pinRepo: 'repos',
   listServices: 'services', getService: 'services', startService: 'services', stopService: 'services',
   restartService: 'services', loadService: 'services', unloadService: 'services', saveServiceConfig: 'services',
   getServiceLogs: 'logs', streamServiceLogs: 'logs',
@@ -38,7 +39,7 @@ export const EVENT_AREA = {
   service: 'services', memory: 'memory', gpu: 'gpu', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
   approval: 'tools', tool_call: 'tools', grant: 'tools', grant_deleted: 'tools',
-  session: 'sessions', session_step: 'sessions',
+  session: 'sessions', session_step: 'sessions', repos: 'repos',
 };
 
 const enc = encodeURIComponent;
@@ -140,6 +141,12 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     getSystem: () => req('GET', '/api/system'),
     getDoctor: () => req('GET', '/api/doctor'),
     getHardware: (refresh = false) => req('GET', `/api/system/hardware${refresh ? '?refresh=true' : ''}`),
+    // plan mod-repos 3.3–3.5: the mods that are their own repositories
+    getRepos: (refresh = false) => req('GET', `/api/repos${refresh ? '?refresh=1' : ''}`),
+    fetchRepos: id => req('POST', `/api/repos/fetch${qs({ id })}`),
+    repoIncoming: id => req('GET', `/api/repos/${enc(id)}/incoming`),
+    updateRepo: (id, body = {}) => req('POST', `/api/repos/${enc(id)}/update`, { json: body }),
+    pinRepo: id => req('POST', `/api/repos/${enc(id)}/pin`),
     getRecentEvents: (limit = 80) => req('GET', `/api/events/recent${qs({ limit })}`),  // not in the brief: getOverview's fill-in while `overview` is mocked
     listServices: () => req('GET', '/api/services'),
     getService: id => req('GET', `/api/services/${enc(id)}`),

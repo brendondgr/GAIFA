@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from utils import api_models as am
+from utils.routes import repos as rr
 from utils.routes import sessions as rs
 from utils.tools import api as ta
 from utils.tests.conftest import REPO
@@ -85,6 +86,7 @@ MODELS: dict[str, type[BaseModel]] = {
     "Settings": am.Settings, "LogLine": am.LogLine, "Metrics": am.Metrics, "SeriesInfo": am.SeriesInfo,
     "Timeline": am.Timeline, "OutputBucket": am.OutputBucket, "WidgetInfo": am.WidgetInfo, "WidgetData": am.WidgetData,
     "Doctor": am.Doctor, "DoctorCheck": am.DoctorCheck, "Hardware": am.Hardware, "HardwareGpu": am.HardwareGpu,
+    "Repos": rr.Repos, "RepoState": rr.RepoState, "RepoProblem": rr.RepoProblem, "RepoUpdate": rr.RepoUpdate,   # plan mod-repos 3.5
     "ToolIndexItem": ta.ToolIndexItem, "Tool": ta.Tool, "ToolOutput": ta.ToolOutput, "ToolCallResult": ta.ToolCallResult,
     "Approval": ta.Approval, "Grant": ta.Grant,
     "Session": rs.Session, "SessionStep": rs.SessionStep, "SessionMemory": rs.SessionMemory, "SessionRestore": rs.Restore,

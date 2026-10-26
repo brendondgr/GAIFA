@@ -45,6 +45,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "web": {"relevance": "auto", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide", "candidates": 24,
                     "timeout_s": 8.0},
             "outputs": {"hidden_keep_days": 0.0},
+            "repos": {"fetch_every_h": 24.0, "notify": "warnings", "check_on_start": True},
         }
         before = _file(served)
         s["hub"]["port"] = served.hub.config.hub.port
@@ -230,3 +231,20 @@ async def test_speech_output_is_saved_in_config_toml(rig, serve):
         assert tomllib.loads(_file(served))["speech_output"] == {"voice": "af_heart", "auto_read": True}
         r = await c.put("/api/settings", json={"speech_output": {"speed": 9}})
         assert r.status_code == 422
+
+
+async def test_repos_settings_round_trip(make_app, root):
+    """Plan mod-repos 3.5: [repos] on the Settings page; a default value removes its key."""
+    app = make_app(port=7000, autostart=False)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://hub") as c:
+            r = await c.put("/api/settings", json={"repos": {"fetch_every_h": 6, "notify": "all"}})
+            assert r.status_code == 200 and r.json()["settings"]["repos"] == {"fetch_every_h": 6, "notify": "all", "check_on_start": True}
+            text = (root / "config.toml").read_text()
+            assert "[repos]" in text and "fetch_every_h = 6\n" in text and 'notify = "all"' in text
+            assert app.state.hub.config.repos.notify == "all"            # the watcher reads it from here
+            r = await c.put("/api/settings", json={"repos": {"fetch_every_h": 24, "notify": "warnings"}})
+            assert "fetch_every_h" not in (root / "config.toml").read_text()
+            bad = await c.put("/api/settings", json={"repos": {"notify": "loud"}})
+            assert bad.status_code == 422 or bad.json()["code"] == "invalid_setting"
+

@@ -1,7 +1,7 @@
 """The `repos` area (plan mod-repos 3.3): the mods that are their own repositories.
 
 `GET /api/repos` (each submodule's state and problems, the settings, the last update),
-`POST /api/repos/fetch`, `POST /api/repos/{id}/update` (in the background: progress as
+`POST /api/repos/fetch`, `GET /api/repos/{id}/incoming` (what an update would bring in), `POST /api/repos/{id}/update` (in the background: progress as
 `{type: "repos"}` events, the result on `GET /api/repos`), `POST /api/repos/{id}/pin`.
 """
 
@@ -130,6 +130,24 @@ async def fetch_repos(request: Request, id: str | None = None) -> dict[str, Any]
         _known(w, id)
     await w.fetch(id)
     return _body(w)
+
+
+class Incoming(_Model):
+    id: str
+    ok: bool
+    commits: list[str] = Field(description="`<short sha> <subject>`, newest first")
+    refused: list[str]
+    message: str
+
+
+@router.get("/api/repos/{sid}/incoming", summary="What an update would bring in: fetches, then lists the new commits (changes nothing)",
+            response_model=Incoming)
+async def repo_incoming(sid: str, request: Request) -> dict[str, Any]:
+    w = _watch(request)
+    _known(w, sid)
+    r = await asyncio.to_thread(repos_update.update, w.root, sid, None, True)
+    await w.refresh()
+    return {"id": sid, "ok": r.ok, "commits": r.commits, "refused": r.refused, "message": r.message}
 
 
 @router.post("/api/repos/{sid}/update", status_code=202, response_model=RepoUpdate,

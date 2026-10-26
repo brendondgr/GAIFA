@@ -186,3 +186,15 @@ async def test_a_project_without_submodules(tmp_path, monkeypatch):
     async with Hub(root) as h:
         body = (await h.client.get("/api/repos")).json()
     assert body["repos"] == [] and body["last_fetch_ts"] is None
+
+
+async def test_incoming_lists_and_changes_nothing(project, tmp_path):
+    root, mod, bare = project
+    old = g(mod, "rev-parse", "HEAD")
+    upstream_commit(tmp_path, bare, "u1")
+    upstream_commit(tmp_path, bare, "u2")
+    async with Hub(root) as h:
+        r = (await h.client.get("/api/repos/mo/incoming")).json()
+        assert r["ok"] and [c.split(" ", 1)[1] for c in r["commits"]] == ["u2", "u1"]
+        assert (await h.client.get("/api/repos")).json()["repos"][0]["behind"] == 2     # it fetched
+    assert g(mod, "rev-parse", "HEAD") == old and g(root, "ls-files", "-s", "services/mo").split()[1] == old

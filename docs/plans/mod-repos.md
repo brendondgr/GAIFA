@@ -139,9 +139,10 @@ Touches architecture §3 (layout), §4.8 (adding a mod), §10 (the existing apps
 - [x] **3.4 The doctor: `utils/doctor.py`.**
   - **What:** a `repos` area with one `check(...)` per problem, the same title and fix text as the alerts, shown in `gaifa doctor` and Settings → About.
   *Done when:* `utils/tests/core/test_doctor.py` covers a `dirty` and a `not_checked_out` mod.
-- [ ] **3.5 Settings → Services → Repositories: `web/settings/schema.js`, `web/settings/blocks-repos.js`.**
+- [x] **3.5 Settings → Services → Repositories: `web/settings/schema.js`, `web/settings/blocks-repos.js`, `web/settings/repos-view.js`.**
   - **Group:** "Repositories", with summary "4 repositories · 1 update · 1 warning".
-  - **Per mod:** the repository (linked), branch, pinned and checked-out commits, ahead/behind, the problem badges with their fix, and Update / Pin / Fetch buttons. Update shows the incoming commits first and the operation's progress after.
+  - **Per mod:** the repository (linked), branch, pinned and checked-out commits, ahead/behind, the problem badges with their fix, and Update / Pin / Fetch buttons. Update shows the incoming commits first (`GET /api/repos/{id}/incoming`, a dry run) and the operation's progress after.
+  - **The API:** `GET/PUT /api/settings` carry `repos` (`Settings.repos`), and `api.js` gains the repos methods (area and event `repos`).
   - **Settings rows:** the `[repos]` keys, each with its `config.toml` key, default and Reset like every row.
   - **Overview:** shows the alerts as it shows others.
   *Done when:* `utils/tests/web/settings-repos.test.mjs` covers the summary, badges per state and the update confirmation; on a second hub (`--dev --demo-mods`, temp repos) each state draws, and the settings search finds "repositories", "submodule" and "update".

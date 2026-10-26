@@ -11,10 +11,11 @@ import { SectionNav, SearchBox } from './settings-nav.js';
 import { indexRows, matches, highlight, paletteRows } from './search.js';
 import { HUB_BLOCKS } from './blocks-hub.js';
 import { AGENT_BLOCKS } from './blocks-agent.js';
+import { REPO_BLOCKS } from './blocks-repos.js';
 import { voiceChoices } from '../chat/chat-speak.js';
 
 const R = () => globalThis.React;
-const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS };
+const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS, ...REPO_BLOCKS };
 // The flash on a row or group a hash names (2.2): a short accent ring, 1.2 s.
 const FLASH_CSS = '@keyframes gaifaFlash{0%{box-shadow:0 0 0 2px var(--acc,#FFB224);background:var(--tacc,rgba(255,178,36,.13))}100%{box-shadow:0 0 0 2px transparent;background:transparent}}.gaifa-flash{animation:gaifaFlash 1.2s ease-out;border-radius:8px}.gaifa-settings-link:hover{background:var(--hov,#161C28)}';
 function useFlashCss() {
@@ -73,6 +74,7 @@ export function SettingsPage(props) {
     api.getJudgeStatus?.().then(x => live && up({ judgeStatus: x }), () => {});
     if ((props.services || []).some(s => s.id === 'tts')) api.callService?.('tts', 'GET', '/v1/voices').then(r => live && up({ voices: r.json }), () => {});   // Speech → Voice's choices
     api.getWebReading?.().then(x => live && up({ reading: x }), () => {});
+    api.getRepos?.().then(x => live && up({ repos: x }), () => {});   // Services → Repositories' summary (mod-repos 3.5)
     api.getToolIndex?.().then(ix => live && up({ toolCounts: ix.reduce((m, t) => ({ ...m, [t.mod]: (m[t.mod] || 0) + 1 }), {}) }), () => {});
     return () => { live = false; };
   }, []);
@@ -110,7 +112,8 @@ export function SettingsPage(props) {
 
   const setDraft = fn => setSt(s => { const d = clone(s.draft); fn(d); return { ...s, draft: d, err: null }; });
   const ctx = { ...props, api, services: props.services || [], system: st.sys, draft: st.draft, orig: st.orig, setDraft,
-    judgeStatus: st.judgeStatus, reading: st.reading, voiceChoices: st.voices ? voiceChoices(st.voices) : null, toolCounts: st.toolCounts, hasSessions: !!api.listSessions };
+    judgeStatus: st.judgeStatus, reading: st.reading, voiceChoices: st.voices ? voiceChoices(st.voices) : null, toolCounts: st.toolCounts, hasSessions: !!api.listSessions,
+    repos: st.repos, onRepos: x => up({ repos: x }) };
   const secs = sections(ctx);
   ctx.defaults = st.defaults;
   ctx.overrides = changedRows(secs, st.orig, st.defaults, ctx).map(c => ({ ...c, rowDef: rowsOf(secs).find(r => r.ref === c.ref) }));   // 5.1: what is saved, not the draft

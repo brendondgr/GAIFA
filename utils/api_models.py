@@ -763,6 +763,13 @@ class WebReadSettings(_Model):
     timeout_s: float = Field(gt=0, le=60, description="Slower than this: lexical's order")
 
 
+class ReposSettings(_Model):
+    """`[repos]` (plan mod-repos 3.5): the mods that are their own repositories."""
+    fetch_every_h: float = Field(ge=0, le=720, description="How often the hub asks GitHub what's new; 0 = never")
+    notify: Literal["warnings", "all", "off"] = Field(description="Alerts: warnings, all (updates too) or off")
+    check_on_start: bool = Field(description="Read their state (local git) when the hub starts")
+
+
 class OutputsSettings(_Model):
     """`[outputs]` (plan 30.9)."""
     hidden_keep_days: float = Field(ge=0, le=3650, description="Hidden outputs (the web mod's saved pages) older than this "
@@ -791,6 +798,7 @@ class Settings(_Model):
     permissions: PermissionsSettings
     web: WebReadSettings
     outputs: OutputsSettings
+    repos: ReposSettings
 
 
 class SettingsPatch(_Model):
@@ -808,6 +816,7 @@ class SettingsPatch(_Model):
     permissions: dict[str, Any] | None = None
     web: dict[str, Any] | None = None
     outputs: dict[str, Any] | None = None
+    repos: dict[str, Any] | None = None
 
 
 class SavedSettings(_Model):

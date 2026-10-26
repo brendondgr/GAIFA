@@ -5,9 +5,10 @@
 // are named here and drawn by blocks-hub.js / blocks-agent.js. Written by us (web/PATCHES.md).
 
 import { checkCommandRule, checkToolGlob } from '../chat/chat-rules.js';
+import { repoSummary } from './repos-view.js';
 
 // Section → the api areas its data comes from: the "Mock data" note (GAIFA patch 5, PATCHES.md).
-export const SETTINGS_AREAS = { general: ['settings', 'system'], machine: ['settings', 'memory', 'system'], services: ['settings', 'services'],
+export const SETTINGS_AREAS = { general: ['settings', 'system'], machine: ['settings', 'memory', 'system'], services: ['settings', 'services', 'repos'],
   agent: [], permissions: ['settings', 'tools'], speech: ['settings'], sessions: ['sessions'], about: ['services', 'system'] };
 
 // ---------- paths into the Settings object ----------
@@ -108,6 +109,16 @@ export function sections(ctx = {}) {
         block('table', 'ServicesTable', { label: 'Folders in services/', keys: ['services.order', 'services.enabled', 'services.autostart'], card: true,
           keywords: ['mods', 'enabled', 'autostart', 'order', 'sidebar', 'tools'] }),
         block('add', 'AddModCard', { label: 'Add a mod', card: true, keywords: ['new mod', 'template', 'gaifa new'] }),
+      ] },
+      // plan mod-repos 3.5: relay, lcpp, tts and gen3d are their own repositories (git submodules)
+      { id: 'repositories', label: 'Repositories', summary: () => repoSummary(ctx.repos), rows: [
+        block('repos', 'RepositoriesTable', { label: 'Mods with their own repository', card: true,
+          keywords: ['git', 'submodule', 'GitHub', 'update', 'pin', 'relay', 'lcpp', 'tts', 'gen3d', 'gaifa repos'] }),
+        field('reposFetch', 'repos.fetch_every_h', { label: 'Check GitHub every', hint: 'How often GAIFA asks GitHub what’s new in them. 0: never (Check now still does).',
+          control: 'number', min: 0, max: 720, unit: 'hours', width: 90, keywords: ['fetch', 'network', 'updates'] }),
+        field('reposNotify', 'repos.notify', { label: 'Alerts', hint: 'Warnings: changed files, unpushed commits and the like. All: new commits too.', control: 'select',
+          choices: [{ value: 'warnings', label: 'Warnings' }, { value: 'all', label: 'All, updates too' }, { value: 'off', label: 'Off' }], keywords: ['notify', 'warnings'] }),
+        field('reposStart', 'repos.check_on_start', { label: 'Check when GAIFA starts', hint: 'Reads their state from git on this machine (no network).', control: 'toggle' }),
       ] }] },
     { id: 'agent', label: 'Agent', icon: 'chat', areas: SETTINGS_AREAS.agent, when: () => agentOn, groups: [
       { id: 'model', label: 'Model', summary: () => 'The chat model, fallback and steps (the agent’s own settings)', rows: [

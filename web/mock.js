@@ -544,10 +544,43 @@ export function createMockApi() {
     return null;
   }
 
+  const repoRow = (id, url, branch, sha, extra = {}) => ({ id, path: `services/${id}`, url, branch, initialized: true, pinned: sha, staged_pin: null, head: sha,
+    on_branch: branch, dirty: 0, untracked: 0, ahead: 0, behind: 0, unpushed: 0, pinned_on_remote: true, checkout_vs_pin: 'same', remote_url: url,
+    last_fetch_ts: Date.now() / 1000 - 3 * 3600, fetch_error: null, problems: [], level: null, ...extra });
+  const repoState = { settings: { fetch_every_h: 24, notify: 'warnings', check_on_start: true }, last_fetch_ts: Date.now() / 1000 - 3 * 3600, update: null, repos: [
+    repoRow('gen3d', 'git@github.com:brendondgr/3DGenerate.git', 'main', '823d8cd048a024b683f14df17e808405130aa48e'),
+    repoRow('lcpp', 'git@github.com:brendondgr/LLMs.git', 'master', '373047daad4de4d03debe6ecfd8b96f545e6a05e', { dirty: 1, level: 'warn',
+      problems: [{ code: 'dirty', level: 'warn', title: 'lcpp has 1 changed file not committed', detail: 'Changes in services/lcpp belong to its own repository (git@github.com:brendondgr/LLMs.git).', fix: 'commit them in services/lcpp (git -C services/lcpp commit) and push, or discard them' }] }),
+    repoRow('relay', 'git@github.com:brendondgr/Relay.git', 'main', '4716ca04014a6b206cf7f5dd6962d732a30becb0', { behind: 2, level: 'info',
+      problems: [{ code: 'updates_available', level: 'info', title: 'relay: 2 new commits on main', detail: 'git@github.com:brendondgr/Relay.git main is ahead of the pin.', fix: 'gaifa repos update relay' }] }),
+    repoRow('tts', 'git@github.com:brendondgr/LocalTTS.git', 'main', 'c7eca453ee158da01f5ea969bf31e432cf589cdb'),
+  ] };
+
   const getSvc = id => { const s = svcById(id); if (!s) throw err(404, 'service_not_found', `No service "${id}"`); return s; };
   const api = {
     async getOverview() { await net(); return { services: services.map(summary), memory: memory(), recent_outputs: outputs.filter(o => !o.hidden).slice(0, 8).map(clone), activity: activity.slice(0, 30).map(clone), alerts: [...alerts.values()].map(clone), jobs: [...jobs.values()].map(clone), system: system() }; },
     async getSystem() { await net(); return system(); },
+    // plan mod-repos 3.5: GET /api/repos and the rest: relay has two new commits, lcpp a changed file
+    async getRepos() { await net(); return clone(repoState); },
+    async fetchRepos() { await net(); repoState.last_fetch_ts = Date.now() / 1000; repoState.repos.forEach(r => { r.last_fetch_ts = repoState.last_fetch_ts; }); return clone(repoState); },
+    async repoIncoming(id) {
+      await net();
+      const r = repoState.repos.find(x => x.id === id);
+      if (!r) throw err(404, 'repo_not_found', `${id} isn't a mod with its own repository (.gitmodules)`);
+      return { id, ok: true, refused: [], message: '', commits: r.behind ? ['9f1c2ab Anthropic adapter', '77d0e3c Live model lists'] : [] };
+    },
+    async updateRepo(id) {
+      await net();
+      const r = repoState.repos.find(x => x.id === id);
+      if (r.problems.some(p => ['dirty', 'unpushed', 'diverged', 'not_checked_out'].includes(p.code))) throw err(409, 'repo_refused', r.problems[0].title, { refused: r.problems.map(p => p.code) });
+      const now = Date.now() / 1000, old = r.head, nu = '9f1c2ab0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6';
+      Object.assign(r, { head: nu, staged_pin: nu, behind: 0, problems: [], level: null });
+      repoState.update = { id, running: false, started: now, steps: [{ ts: now, text: 'fetching' }, { ts: now, text: `checking out ${nu.slice(0, 10)}` }, { ts: now, text: 'restarting' }, { ts: now, text: 'checking' }],
+        result: { id, ok: true, old, new: nu, commits: ['9f1c2ab Anthropic adapter', '77d0e3c Live model lists'], refused: [], installed: false, restarted: true, checked: true,
+          check_detail: 'all checks passed', rolled_back: false, staged: true, committed: null, message: `${id} → ${nu.slice(0, 10)} (2 commits)` } };
+      return clone(repoState.update);
+    },
+    async pinRepo(id) { await net(); return { id, ok: true, old: null, new: null, commits: [], refused: [], staged: true, committed: null, message: `${id} pinned (staged)` }; },
     async getHardware() {  // plan 35.2: GET /api/system/hardware, this machine's shape (the strix-halo fixture)
       await net();
       return { os: 'linux', arch: 'x86_64', wsl: false, container: '', distro: { id: 'fedora', version: '44', name: 'Fedora Linux 44 (KDE Plasma Desktop Edition)' },

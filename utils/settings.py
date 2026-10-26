@@ -54,6 +54,7 @@ def _shape(cfg: config_mod.Config, svcs: list[Any], eff: Any) -> dict[str, Any]:
         "permissions": cfg.agent.permissions.model_dump(),   # [agent.permissions]: tool-name globs (plan 13.2)
         "web": cfg.agent.web.model_dump(),          # [agent.web]: a long page's relevant passages first (webread.py)
         "outputs": cfg.outputs.model_dump(),        # [outputs]: saved web pages' clean-up (plan 30.9)
+        "repos": cfg.repos.model_dump(),            # [repos]: the mods that are their own repositories (plan mod-repos 3.5)
     }
 
 
@@ -119,6 +120,8 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         new["memory"]["reserve_gb"] = int(gb)  # written as 13, not 13.0
     if float(new["outputs"]["hidden_keep_days"]).is_integer():
         new["outputs"]["hidden_keep_days"] = int(new["outputs"]["hidden_keep_days"])
+    if float(new["repos"]["fetch_every_h"]).is_integer():
+        new["repos"]["fetch_every_h"] = int(new["repos"]["fetch_every_h"])
     port = new["hub"]["port"]
     clash = next((s for s in mgr.list() if s.port == port), None)
     if clash:
@@ -143,6 +146,7 @@ async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
         "permissions": d.agent.permissions.model_dump(),
         "web": d.agent.web.model_dump(),
         "outputs": d.outputs.model_dump(),
+        "repos": d.repos.model_dump(),
     }
     changes: dict[str, Any] = {}
     for section, keys in defaults.items():

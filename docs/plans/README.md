@@ -18,3 +18,4 @@ Each piece of work GAIFA builds has its own plan here: one file per plan, `docs/
 | [chat-cards.md](chat-cards.md) | Stage P (Phases 44–49): mods' chat cards, live progress, `show`, @-mentions, Save to…, voice | Done |
 | [gaifa-rename.md](gaifa-rename.md) | Stage Q (Phase 50): AIHub becomes GAIFA | Done |
 | [settings-redesign.md](settings-redesign.md) | The Settings page in `web/settings/`: eight regrouped sections, a sticky section list, search with highlighting, keys, defaults and Reset on every row | Done (2026-10-25) |
+| [chat-split.md](chat-split.md) | Several chats side by side on the Chat page: split panes by dragging, resizable dividers, one stream for all of them | In progress |

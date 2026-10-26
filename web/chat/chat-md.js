@@ -54,7 +54,8 @@ export function citeGroup(inner) {
 
 // The titles of the chat's sources while a message renders (renderMarkdown's `cites`): '#3' → title.
 let titles = null;
-// Plan 47.3: the open chat's outputs, so `![caption](#3)` draws output #3 in the reply (chat.js keeps it current).
+// Plan 47.3: the open chat's outputs, so `![caption](#3)` draws output #3 in the reply (renderMarkdown's `outputs`, or
+// setChatOutputs for a caller without a chat).
 let chatOutputs = [];
 export function setChatOutputs(list) { chatOutputs = Array.isArray(list) ? list : []; }
 // Outputs the reply's own turn already shows (renderMarkdown's `hide`): a `![caption](#n)` of one is left out, not drawn twice.
@@ -166,10 +167,12 @@ function table(head, delim, rows) {
 }
 
 /** Markdown → an HTML string that is safe to set as innerHTML. `cites(ref)` names a citation's source ('#3' → its title);
- *  `hide` is a Set of output ids whose `![caption](#n)` is left out (the turn shows them already). */
-export function renderMarkdown(text, { cites, hide } = {}) {
-  titles = cites || null; hidden = hide || null;
-  try { return blocks(text); } finally { titles = null; hidden = null; }
+ *  `hide` is a Set of output ids whose `![caption](#n)` is left out (the turn shows them already); `outputs` are the
+ *  chat's own (chat-split plan 1.1: with several chats open, each reply draws its own chat's #n). */
+export function renderMarkdown(text, { cites, hide, outputs } = {}) {
+  const was = chatOutputs;
+  titles = cites || null; hidden = hide || null; if (Array.isArray(outputs)) chatOutputs = outputs;
+  try { return blocks(text); } finally { titles = null; hidden = null; chatOutputs = was; }
 }
 
 const FIGURE = /^\s*!\[([^\]\n]*)\]\((#\d{1,4}|output:[0-9a-f]{12})\)\s*$/;

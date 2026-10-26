@@ -339,3 +339,14 @@ test('a reply\'s pictures are drawn once: a figure line is its result card, the 
   assert.ok(mdm.renderMarkdown('see ![Fox](#2) here').includes('<img'), 'hide lasts one render');
   mdm.setChatOutputs([]);
 });
+
+test('each chat\'s reply draws its own #n: renderMarkdown takes the chat\'s outputs (chat-split plan 1.1)', async () => {
+  const mdm = await import(pathToFileURL(path.join(root, 'web/chat/chat-md.js')).href);
+  const a = [{ n: 1, output_id: 'aaaaaaaaaaaa', kind: 'image', title: 'Robot', url: '/api/outputs/aaaaaaaaaaaa/file' }];
+  const b = [{ n: 1, output_id: 'cccccccccccc', kind: 'image', title: 'Cat', url: '/api/outputs/cccccccccccc/file' }];
+  mdm.setChatOutputs(b);                                                     // the last pane that rendered
+  assert.ok(mdm.renderMarkdown('![x](#1)', { outputs: a }).includes('aaaaaaaaaaaa'), 'its own chat\'s #1');
+  assert.ok(mdm.renderMarkdown('![x](#1)').includes('cccccccccccc'), 'the fallback is back after the render');
+  assert.ok(!mdm.renderMarkdown('![x](#1)', { outputs: [] }).includes('<img'), 'a chat without outputs draws none');
+  mdm.setChatOutputs([]);
+});

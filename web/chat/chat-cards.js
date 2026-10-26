@@ -130,9 +130,9 @@ function AssistantCard({ item, ctx }) {
   const parts = React.useMemo(() => {
     const cites = ref => outputByRef(ref, outs)?.title;
     return splitFigures(text).flatMap((p, i) => {
-      if (p.text != null) return [{ key: 't' + i, html: renderMarkdown(p.text, { cites, hide: made }) }];
+      if (p.text != null) return [{ key: 't' + i, html: renderMarkdown(p.text, { cites, hide: made, outputs: outs }) }];
       const o = outputByRef(p.ref, outs);
-      if (!o) return [{ key: 't' + i, html: renderMarkdown(p.src, { cites, hide: made }) }];   // not this chat's: stays as text
+      if (!o) return [{ key: 't' + i, html: renderMarkdown(p.src, { cites, hide: made, outputs: outs }) }];   // not this chat's: stays as text
       return made.has(o.output_id) ? [] : [{ key: 'f' + i, output: o }];
     });
   }, [text, outs.length, madeKey]);

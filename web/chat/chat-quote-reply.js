@@ -125,7 +125,9 @@ export function QuoteReplyBox({ scrollRef, onAdd, resetKey }) {
       clearTimeout(t);
       t = setTimeout(() => {
         if (down.current || inBox(doc.activeElement)) return;         // a drag still going, or typing in the box
-        const sel = doc.getSelection?.(), q = selectionQuote(sel, doc);
+        const sel = doc.getSelection?.(), sc = scrollRef?.current;
+        if (sc && sel?.anchorNode && !sc.contains(sel.anchorNode)) return;   // another chat's pane (chat-split plan 1.1)
+        const q = selectionQuote(sel, doc);
         if (!q) return;                                                // nothing quotable: a box already open stays
         const range = sel.getRangeAt(0).cloneRange();
         setReply('');

@@ -1,0 +1,4 @@
+[submodule "services/relay"]
+	path = services/relay
+	url = git@github.com:brendondgr/Relay.git
+	branch = main

@@ -41,13 +41,13 @@ The approach: first make one chat a component of its own (`ChatPane`) that can r
   - **Shape:** a pane `{id, tid}` (tid null: a new chat) or a split `{id, dir: 'row'|'col', sizes: [fractions], kids: [nodes]}`; one active pane id.
   - **Functions (pure):** `single(tid)`, `panes(tree)`, `findPane`, `splitPane(tree, paneId, edge, tid)` (edge `left|right|top|bottom`; same-direction splits add a sibling instead of nesting), `closePane` (its sibling takes the space; a split of one collapses), `movePane(tree, paneId, targetId, edge)`, `setTid`, `resize(tree, splitId, i, fraction, minFraction)`, `equalize`, `normalize`, `dropTids` (a deleted chat's panes close), `paneSize`/`splitPaneSize` (pixels, for refusing a split that's too small), `parseLayout`/`loadLayout`/`saveLayout` (`gaifa.chat.layout`; a read that throws or doesn't parse gives null, and the page starts from `single`).
   *Done when:* `utils/tests/web/chat-layout.test.mjs` covers each function, including nesting four deep, closing down to one pane and a corrupt saved value.
-- [ ] **2.2 Drawing and resizing: `web/chat/chat-split.js`.**
-  - **SplitView:** draws the tree as nested flex boxes; each split's kids are separated by a 5 px divider dragged with pointer events (`setPointerCapture`), limited by the smallest pane; a double click equalizes. Each pane gets a slim bar: a drag handle and the chat's title, a running dot, and ×. The active pane has an accent outline; clicking a pane makes it active.
+- [x] **2.2 Drawing and resizing: `web/chat/chat-split.js`.**
+  - **SplitView:** draws the tree as nested flex boxes; each split's kids are separated by a 5 px divider dragged with pointer events (`setPointerCapture`), limited by the smallest pane; a double click equalizes. Each pane's own header gets the controls (no second bar): a grip at its left (dragged to move the pane), Split (a new chat beside, or below when the pane is taller than wide) and × at its right. The active pane has an accent outline; clicking a pane makes it active.
   - **Page:** `ChatPage` keeps the tree and the active id, draws `SplitView` with a `ChatPane` per pane, sets the hash when the active pane changes, and on a hash change opens that chat in the active pane. Under 760 px: the active pane only, with tabs for the rest.
   *Done when:* on the second hub two and three panes draw, the dividers resize and stop at the smallest size, the layout survives a reload; `chat-layout` tests pass.
-- [ ] **2.3 Drag and drop: `web/chat/chat-list.js`, `web/chat/chat-split.js`.**
+- [x] **2.3 Drag and drop: `web/chat/chat-list.js`, `web/chat/chat-split.js`.**
   - **Sources:** a chat in the list (`draggable`, `dataTransfer` type `application/x-gaifa-chat` with `{tid}`) and a pane's bar (`{pane}`).
-  - **Targets:** over a pane, five zones: a third at each edge splits that way, the middle opens the chat in that pane; the zone is shown as a shaded half. A dropped pane moves (`movePane`).
+  - **Targets:** over a pane, five zones (`dropZone`: the nearest edge within 28% of it, else the middle): an edge splits that way, the middle opens the chat in that pane; the zone is shown as a shaded half. A dropped pane moves (`movePane`, keeping its id), or swaps chats when dropped on a middle.
   - **Cap:** at most four panes while each opens its own stream; a fifth is refused with a toast that says why.
   *Done when:* on the second hub dragging a chat to each edge and the middle does what the zone showed, moving a pane by its bar works, and a fifth pane is refused.
 

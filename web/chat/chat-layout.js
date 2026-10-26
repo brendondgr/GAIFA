@@ -50,11 +50,12 @@ export function normalize(node) {
   return { ...node, kids, sizes: sizes.map(x => x / total) };
 }
 
-/** Split pane `paneId` at `edge` (left | right | top | bottom) with a new pane showing `tid`; the new pane is active. */
-export function splitPane(L, paneId, edge, tid = null) {
+/** Split pane `paneId` at `edge` (left | right | top | bottom) with a new pane showing `tid`; the new pane is active.
+ *  `keep`: the new pane's id (a moved pane keeps its own, so its chat isn't drawn again from scratch). */
+export function splitPane(L, paneId, edge, tid = null, keep = null) {
   const [dir, before] = EDGES[edge] || EDGES.right;
   if (!findPane(L, paneId)) return L;
-  const id = 'p' + L.next, fresh = { id, tid }, sid = 's' + (L.next + 1);
+  const id = keep || 'p' + L.next, fresh = { id, tid }, sid = 's' + (L.next + 1);
   const at = parentOf(L.root, paneId);
   let root;
   if (at && at.parent.dir === dir) {           // a sibling in the same row or column: the target gives it half its space
@@ -81,11 +82,11 @@ export function closePane(L, paneId) {
   return { ...L, root, active };
 }
 
-/** Move pane `paneId` next to `targetId` at `edge`; it keeps its chat and becomes active. */
+/** Move pane `paneId` next to `targetId` at `edge`; it keeps its id and chat, and becomes active. */
 export function movePane(L, paneId, targetId, edge) {
   const p = findPane(L, paneId);
   if (!p || paneId === targetId || !findPane(L, targetId) || panes(L.root).length < 2) return L;
-  return splitPane(closePane(L, paneId), targetId, edge, p.tid);
+  return splitPane(closePane(L, paneId), targetId, edge, p.tid, p.id);
 }
 
 export function setTid(L, paneId, tid) {
@@ -131,6 +132,30 @@ export function paneSize(node, paneId, w, h) {
     if (r) return r;
   }
   return null;
+}
+
+/** Where each pane and divider sits, as fractions of the page's split area: panes [{id, tid, x, y, w, h}] and
+ *  dividers [{split, i, dir, box, at}] (`at`: the divider's x for a row, y for a column; `box`: its split's box).
+ *  The view draws every pane at its box, keyed by id, so a split or a move never remounts a chat. */
+export function geometry(root) {
+  const out = { panes: [], dividers: [] };
+  (function walk(n, b) {
+    if (isPane(n)) { out.panes.push({ id: n.id, tid: n.tid, ...b }); return; }
+    let at = 0;
+    n.kids.forEach((k, i) => {
+      const s = n.sizes[i];
+      walk(k, n.dir === 'row' ? { x: b.x + b.w * at, y: b.y, w: b.w * s, h: b.h } : { x: b.x, y: b.y + b.h * at, w: b.w, h: b.h * s });
+      at += s;
+      if (i < n.kids.length - 1) out.dividers.push({ split: n.id, i, dir: n.dir, box: b, at: n.dir === 'row' ? b.x + b.w * at : b.y + b.h * at });
+    });
+  })(root, { x: 0, y: 0, w: 1, h: 1 });
+  return out;
+}
+
+/** The drop zone under the pointer at (x, y) in a pane of w × h: the nearest edge within `edge` of it, else 'center'. */
+export function dropZone(x, y, w, h, edge = 0.28) {
+  const d = [['left', x / w], ['right', 1 - x / w], ['top', y / h], ['bottom', 1 - y / h]].sort((a, b) => a[1] - b[1])[0];
+  return d[1] < edge ? d[0] : 'center';
 }
 
 function valid(node, seen) {

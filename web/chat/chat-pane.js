@@ -6,7 +6,8 @@
 // shared: {api, c, toast, confirm, openOutput, fail, models, settings, tools, mods, judge, speechOut, envs, folders?,
 //          loadEnvList, relist, reloadList, addThread(th), listPatch(id, partial), patched(t), rename(t, title),
 //          envDeleted(ids), bus (EventTarget: 'patched' {detail: thread}), banner (an element or null), onMenu}
-// cmd: {n, type: 'new', env?} from the page, acted on when `n` changes (New chat, New chat in an environment).
+// cmd: {n, type: 'new', env?, pane} from the page, acted on when `n` changes by the pane it names (New chat, New chat in
+// an environment). grip, paneTools: the split view's handle and buttons, drawn in the header.
 
 import { h, T, Icon, COL, useWidth, chipSt, label11 } from './chat-ui.js';
 import { Card, TodoList } from './chat-cards.js';
@@ -27,7 +28,7 @@ const R = () => globalThis.React;
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
 const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to GAIFA” in Hope’s voice', 'What can you do?'];
 
-export function ChatPane({ shared, tid = null, cmd = null, onOpen = () => {}, onFocus = null, style = null }) {
+export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen = () => {}, onFocus = null, grip = null, paneTools = null, style = null }) {
   const React = R(), { useState, useEffect, useRef, useMemo, useLayoutEffect } = React;
   const { api, c, toast, confirm, openOutput, fail, models, settings, tools, mods, judge, speechOut, envs } = shared;
   const [rootRef, width] = useWidth(800);
@@ -84,6 +85,7 @@ export function ChatPane({ shared, tid = null, cmd = null, onOpen = () => {}, on
   useEffect(() => {      // the page's New chat (in an environment): this pane is the active one
     if (!cmd || cmd.n === seenCmd.current) return;
     seenCmd.current = cmd.n;
+    if (cmd.pane && cmd.pane !== paneId) return;
     if (cmd.type === 'new') {
       if (cmd.env) { rememberEnv(cmd.env); setFresh(f => ({ ...f, settings: { ...f.settings, environment: cmd.env } })); }
       onOpen(null);
@@ -237,7 +239,7 @@ export function ChatPane({ shared, tid = null, cmd = null, onOpen = () => {}, on
     h(ThreadHeader, { thread,
       onRename: title => shared.rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
       learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,
-      running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: shared.onMenu, narrow: width < 700 }),
+      running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: shared.onMenu, narrow: width < 700, grip, tools: paneTools }),
     shared.banner || null,
     conn === 'reconnecting' ? h('div', { role: 'status', style: { padding: '4px 14px', fontSize: 12, color: T.acct, background: T.tacc } }, 'Reconnecting to the chat…') : null,
     h('div', { ref: scrollRef, onScroll, style: { flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', position: 'relative' } },

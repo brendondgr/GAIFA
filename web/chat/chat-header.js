@@ -98,9 +98,10 @@ function Title({ title, onRename }) {
   title || 'New chat');
 }
 
-export function ThreadHeader({ thread, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn }) {
+export function ThreadHeader({ thread, onRename, meter, meterOpen, setMeterOpen, onCompact, compacts, running, state, onBranch, onMenu, narrow, learn, onLearn, grip = null, tools = null }) {   // grip, tools: the split view's (chat-split plan 2.2)
   const st = running ? ['running', T.acc] : state === 'waiting' ? ['waiting for you', T.pu] : null;
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, height: 44, padding: '0 12px', borderBottom: '1px solid ' + T.bd, background: T.bg, flex: 'none', minWidth: 0 } },
+    grip,
     onMenu ? h(Btn, { kind: 'ghost', sm: true, icon: 'menu', title: 'Chats', onClick: onMenu }) : null,
     h(Title, { title: thread?.title, onRename: thread ? onRename : null }),
     st ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: st[1], whiteSpace: 'nowrap', flex: 'none' } },
@@ -110,5 +111,6 @@ export function ThreadHeader({ thread, onRename, meter, meterOpen, setMeterOpen,
     onLearn ? h(Btn, { kind: 'ghost', sm: true, icon: 'bulb', 'aria-pressed': learn ? 'true' : 'false',   // plan 21.7: this chat teaches the agent, or not
       title: learn ? 'Learning from this chat: your choices here become preferences. Click to stop.' : 'Not learning from this chat. Click to learn from it again.',
       label: narrow ? undefined : learn ? 'Learning' : 'Not learning', onClick: () => onLearn(!learn), style: learn ? undefined : { opacity: 0.6 } }) : null,
-    thread && onBranch ? h(Btn, { kind: 'ghost', sm: true, icon: 'branch', title: 'Branch: copy this chat into a new one', label: narrow ? undefined : 'Branch', onClick: onBranch }) : null);
+    thread && onBranch ? h(Btn, { kind: 'ghost', sm: true, icon: 'branch', title: 'Branch: copy this chat into a new one', label: narrow ? undefined : 'Branch', onClick: onBranch }) : null,
+    tools);
 }

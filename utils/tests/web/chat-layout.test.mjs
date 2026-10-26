@@ -82,6 +82,7 @@ test('moving a pane keeps its chat, places it at the edge and makes it active', 
   x = L.movePane(x, c, 'p1', 'top');
   assert.deepEqual(tids(x), ['c', 'a', 'b']);
   assert.equal(L.activePane(x).tid, 'c');
+  assert.equal(x.active, c, 'it keeps its id, so the view keeps the chat mounted');
   assert.equal(L.movePane(x, x.active, x.active, 'left'), x, 'onto itself: nothing');
 });
 
@@ -144,4 +145,30 @@ test('a saved layout round-trips; a corrupt or hostile one gives null', () => {
   const throwing = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } };
   assert.equal(L.loadLayout(throwing), null);
   assert.doesNotThrow(() => L.saveLayout(x, throwing));
+});
+
+test('geometry places every pane and divider; the boxes tile the whole area', () => {
+  let x = L.splitPane(L.single('a'), 'p1', 'right', 'b');      // row [a, b]
+  x = L.splitPane(x, x.active, 'bottom', 'c');                 // row [a, col [b, c]]
+  x = L.resize(x, x.root.id, 0, 0.1);                          // a: 0.6
+  const g = L.geometry(x.root);
+  const at = id => g.panes.find(p => p.id === id);
+  const [a, b, c] = L.panes(x.root).map(p => at(p.id));
+  assert.deepEqual([a.x, a.y, a.h], [0, 0, 1]); assert.ok(close(a.w, 0.6));
+  assert.ok(close(b.x, 0.6) && close(b.w, 0.4) && close(b.h, 0.5) && b.y === 0);
+  assert.ok(close(c.y, 0.5) && close(c.h, 0.5));
+  assert.ok(close(sum(g.panes.map(p => p.w * p.h)), 1), 'no gaps or overlaps');
+  assert.equal(g.dividers.length, 2);
+  const row = g.dividers.find(d => d.dir === 'row'), col = g.dividers.find(d => d.dir === 'col');
+  assert.ok(close(row.at, 0.6)); assert.ok(close(col.at, 0.5)); assert.ok(close(col.box.x, 0.6) && close(col.box.w, 0.4));
+  assert.deepEqual(L.geometry(L.single('z').root), { panes: [{ id: 'p1', tid: 'z', x: 0, y: 0, w: 1, h: 1 }], dividers: [] });
+});
+
+test('dropZone: the nearest edge within a band, else the middle', () => {
+  assert.equal(L.dropZone(10, 300, 800, 600), 'left');
+  assert.equal(L.dropZone(790, 300, 800, 600), 'right');
+  assert.equal(L.dropZone(400, 20, 800, 600), 'top');
+  assert.equal(L.dropZone(400, 590, 800, 600), 'bottom');
+  assert.equal(L.dropZone(400, 300, 800, 600), 'center');
+  assert.equal(L.dropZone(30, 20, 800, 600), 'top', 'a corner: the nearer edge by fraction (20/600 < 30/800)');
 });

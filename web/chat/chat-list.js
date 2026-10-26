@@ -29,7 +29,8 @@ export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo 
       onKeyDown: e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { e.stopPropagation(); setEdit(null); } }, style: { ...inputSt, width: '100%', height: 28 } }));
   }
   return h('div', { className: 'aichat-item' + (menu ? ' open' : ''), style: { position: 'relative', display: 'flex', alignItems: 'center', borderRadius: 6, background: active ? T.hov : 'transparent' } },
-    h('a', { href: '#/chat/' + encodeURIComponent(t.id), onClick: onOpen, onDoubleClick: e => { e.preventDefault(); setEdit(t.title || ''); }, 'aria-current': active ? 'page' : undefined,
+    h('a', { href: '#/chat/' + encodeURIComponent(t.id), onClick: onOpen, draggable: true,   // chat-split plan 2.3: drag it beside an open chat
+      onDragStart: e => { e.dataTransfer.setData('application/x-gaifa-chat', t.id); e.dataTransfer.effectAllowed = 'copyMove'; }, onDoubleClick: e => { e.preventDefault(); setEdit(t.title || ''); }, 'aria-current': active ? 'page' : undefined,
       style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 4px 0 10px', color: active ? T.tx : T.mut, fontWeight: active ? 500 : 400, textDecoration: 'none' } },
       dot ? h('span', { 'aria-label': t.state, style: { width: 6, height: 6, borderRadius: 99, background: dot, flex: 'none', animation: dot === T.acc ? 'aichatpulse 1.2s ease-in-out infinite' : 'none' } }) : null,
       h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, t.title || 'New chat'),

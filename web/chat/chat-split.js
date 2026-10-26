@@ -91,7 +91,9 @@ export function SplitView({ layout, setLayout, renderPane, titleOf = () => null,
   };
 
   const toolsFor = p => {
-    const s = size(), ps = s && paneSize(layout.root, p.id, s.w, s.h), edge = ps && ps.w < ps.h ? 'bottom' : 'right';
+    const s = size(), ps = s && paneSize(layout.root, p.id, s.w, s.h);   // beside when it's wider than tall, else below; whichever fits
+    const fits = e => !ps || (e === 'right' ? ps.w / 2 >= MIN_W : ps.h / 2 >= MIN_H), pref = ps && ps.w < ps.h ? 'bottom' : 'right';
+    const edge = fits(pref) ? pref : fits(pref === 'right' ? 'bottom' : 'right') ? (pref === 'right' ? 'bottom' : 'right') : pref;
     return h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 2, flex: 'none' } },
       h(Btn, { kind: 'ghost', sm: true, icon: SPLIT, title: edge === 'right' ? 'Open a new chat beside this one' : 'Open a new chat below this one', 'aria-label': 'Split', onClick: () => split(p.id, edge, null) }),
       many ? h(Btn, { kind: 'ghost', sm: true, icon: 'x', title: 'Close this pane (the chat stays in the list)', 'aria-label': 'Close pane', onClick: () => setLayout(closePane(lref.current, p.id)) }) : null);

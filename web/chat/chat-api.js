@@ -3,7 +3,8 @@
 // and the scripted mock agent (chat-mock.js) in `?mock`. Both have the same methods:
 //
 //   models() threads({q, archived, limit, environment, sort, offset}) threadGroups({archived}) searchChats(q, limit) create(body) get(tid) patch(tid, p) remove(tid) events(tid, after)
-//   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq)
+//   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq; the live client shares one
+//   connection for every open chat, chat-streams.js; `sharedStream` says whether it does)
 //   send(tid, text, attachments, doc_modes, quotes) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
 //   feedback(tid, {value, output_id | seq, note}) decidePref(pid, approve)   (plan 21.7)
@@ -11,6 +12,7 @@
 // Errors are ChatError {status, detail, code, data}; status 0 means GAIFA didn't answer.
 
 import { createMockClient } from './chat-mock.js';
+import { createStreamPool } from './chat-streams.js';
 
 export class ChatError extends Error {
   constructor(status, detail, code, data) { super(detail); Object.assign(this, { status, detail, code, data }); }
@@ -71,6 +73,14 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     open();
     return { close() { closed = true; clearTimeout(timer); es?.close(); }, get lastSeq() { return last; } };
   }
+  // chat-split plan 3.2: every open chat on /v1/streams; an agent that answers 404 itself (not the hub's envelope,
+  // which says the agent is down) hasn't got the route, and each chat gets its own stream as before
+  const pool = createStreamPool({ EventSource: ES, single: stream, streamsUrl: spec => url(`/v1/streams?threads=${spec}`),
+    probe: async () => {
+      const ac = globalThis.AbortController ? new AbortController() : null;
+      try { const r = await f(url('/v1/streams?threads='), ac ? { signal: ac.signal } : {}); return !(r.status === 404 && !r.headers?.get?.('x-gaifa-error')); }
+      catch { return true; } finally { ac?.abort(); }
+    } });
 
   return {
     live: true,
@@ -84,7 +94,8 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     patch: (tid, p) => req('PATCH', T(tid), p),
     remove: tid => req('DELETE', T(tid)),
     events: (tid, after = 0) => req('GET', `${T(tid)}/events?after=${after}`),
-    stream,
+    stream: pool.stream,
+    get sharedStream() { return pool.shared; },
     // quotes: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each (Select → Reply);
     // `text` may be empty when a reply says something
     send: (tid, text, attachments = [], doc_modes = {}, quotes = [], mentions = []) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),

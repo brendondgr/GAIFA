@@ -1,6 +1,6 @@
 # Plan: several chats side by side on the Chat page
 
-**Asked for:** 2026-10-25 · **Status:** In progress
+**Asked for:** 2026-10-25 · **Status:** Done (2026-10-25)
 
 ## 1. Introduction
 
@@ -32,7 +32,7 @@ The approach: first make one chat a component of its own (`ChatPane`) that can r
 **Wire — Phase 1:** nothing new on screen; the Chat page is drawn by `ChatPane`.
 
 **Checks & deliverables — Phase 1**
-- [ ] A turn with a picture and a citation draws them in the reply; Select → Reply adds a card.
+- [x] A turn with a picture and a citation draws them in the reply; Select → Reply adds a card.
 - [ ] Delivered: `web/chat/chat-pane.js`, the changed `chat.js`, `chat-md.js`, `chat-quote*.js`, `chat-cards.js`.
 
 ## Phase 2 — The split layout (M)
@@ -54,7 +54,7 @@ The approach: first make one chat a component of its own (`ChatPane`) that can r
 **Wire — Phase 2:** the Chat page draws several chats; the list's chats can be dragged into it.
 
 **Checks & deliverables — Phase 2**
-- [ ] Two chats run turns at the same time in two panes, each with its own composer and approvals.
+- [x] Two chats run turns at the same time in two panes, each with its own composer and approvals.
 - [ ] Delivered: `web/chat/chat-layout.js`, `web/chat/chat-split.js`, tests, docs: the brief's §11.13, `web/PATCHES.md`, `docs/structure.md`.
 
 ## Phase 3 — One stream for every pane (S)
@@ -63,9 +63,10 @@ The approach: first make one chat a component of its own (`ChatPane`) that can r
   - **Route:** `GET /v1/streams?threads=<tid>:<after>,<tid>:<after>…` sends the stored events after each `after`, a `ready` per thread (`{type: 'ready', thread_id, seq, running}`), then every live event and delta of those threads; each already carries `thread_id`. An unknown thread sends `{type: 'gone', thread_id}` and is skipped. The per-thread `/v1/threads/{tid}/stream` moves into the same file unchanged.
     - **Live bus:** `Live.subscribe(tid, q=None)` (`agent/loop.py`) takes a queue to share across threads.
   *Done when:* `services/agent/tests/test_streams.py` covers two threads' replay, live events of both, `after`, an unknown id and the unsubscribe; the agent's `README.md` lists the route (architecture §14.1 doesn't list the agent's routes).
-- [ ] **3.2 The client's stream pool: `web/chat/chat-streams.js`, `web/chat/chat-api.js`.**
+- [x] **3.2 The client's stream pool: `web/chat/chat-streams.js`, `web/chat/chat-api.js`.**
   - **Pool:** `c.stream(tid, after, handlers)` keeps its interface; the live client shares one `EventSource` for every open stream, reopened (debounced) with each thread's last seq when the set changes, and hands each event to its thread's handlers. A 404 from `/v1/streams` falls back to one stream per thread and keeps the cap.
-  - **Cap:** gone while the pool is shared.
+  - **Cap:** gone while the pool is shared (`c.sharedStream`). The probe is a `GET /v1/streams?threads=` aborted at once; only a 404 without the hub's `x-gaifa-error` header (the agent's own) means an older agent.
+  - **Split:** the header's Split goes beside or below, whichever leaves both panes at least the smallest size.
   *Done when:* `utils/tests/web/chat-streams.test.mjs` (a fake `EventSource`) covers sharing, reopening with the last seqs, `ready` per thread and the fallback; six panes stream at once on the installed hub after `gaifa restart`.
 
 **Wire — Phase 3:** any number of panes, all on one connection.

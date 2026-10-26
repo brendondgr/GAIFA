@@ -37,9 +37,9 @@ The approach: first make one chat a component of its own (`ChatPane`) that can r
 
 ## Phase 2 — The split layout (M)
 
-- [ ] **2.1 The layout tree: `web/chat/chat-layout.js`.**
+- [x] **2.1 The layout tree: `web/chat/chat-layout.js`.**
   - **Shape:** a pane `{id, tid}` (tid null: a new chat) or a split `{id, dir: 'row'|'col', sizes: [fractions], kids: [nodes]}`; one active pane id.
-  - **Functions (pure):** `single(tid)`, `panes(tree)`, `findPane`, `splitPane(tree, paneId, edge, tid)` (edge `left|right|top|bottom`; same-direction splits add a sibling instead of nesting), `closePane` (its sibling takes the space; a split of one collapses), `movePane(tree, paneId, targetId, edge)`, `setTid`, `resize(tree, splitId, i, fraction, minFraction)`, `equalize`, `normalize`, `parseLayout`/`saveLayout` (`gaifa.chat.layout`, reads that throw or don't parse give `single`).
+  - **Functions (pure):** `single(tid)`, `panes(tree)`, `findPane`, `splitPane(tree, paneId, edge, tid)` (edge `left|right|top|bottom`; same-direction splits add a sibling instead of nesting), `closePane` (its sibling takes the space; a split of one collapses), `movePane(tree, paneId, targetId, edge)`, `setTid`, `resize(tree, splitId, i, fraction, minFraction)`, `equalize`, `normalize`, `dropTids` (a deleted chat's panes close), `paneSize`/`splitPaneSize` (pixels, for refusing a split that's too small), `parseLayout`/`loadLayout`/`saveLayout` (`gaifa.chat.layout`; a read that throws or doesn't parse gives null, and the page starts from `single`).
   *Done when:* `utils/tests/web/chat-layout.test.mjs` covers each function, including nesting four deep, closing down to one pane and a corrupt saved value.
 - [ ] **2.2 Drawing and resizing: `web/chat/chat-split.js`.**
   - **SplitView:** draws the tree as nested flex boxes; each split's kids are separated by a 5 px divider dragged with pointer events (`setPointerCapture`), limited by the smallest pane; a double click equalizes. Each pane gets a slim bar: a drag handle and the chat's title, a running dot, and ×. The active pane has an accent outline; clicking a pane makes it active.

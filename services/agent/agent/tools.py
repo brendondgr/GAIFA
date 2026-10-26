@@ -97,8 +97,20 @@ def function(t: dict[str, Any], note: str | None = None) -> dict[str, Any]:
     return {"type": "function", "function": {"name": t["name"], "description": desc, "parameters": t.get("parameters") or {"type": "object"}}}
 
 
+def group_of(t: dict[str, Any]) -> str:
+    """A tool's group in the chat: its mod's own group (mcp-client 4.1: `mcp:<server>`), else its mod."""
+    return t.get("group") or t["mod"]
+
+
+def hidden_group(g: str) -> bool:
+    """An MCP server's group: hidden in a chat until a skill, an @-mention or the composer turns it on."""
+    return g.startswith("mcp:")
+
+
 class ToolSet:
-    """The tools one thread sees right now."""
+    """The tools one thread sees right now. A group is a mod, or a mod's own group (an MCP server, `mcp:<id>`);
+    `pinned` and `disabled` hold either. An MCP server's group is hidden (not listed, not loaded, not found) until it
+    is on in the chat (`mcp_on`), pinned, or one of its tools was loaded."""
 
     def __init__(self, hub: HubAPI, settings: dict[str, Any], all_tools: bool = False) -> None:
         self.hub = hub
@@ -108,17 +120,25 @@ class ToolSet:
         self.loaded: list[str] = list(settings.get("loaded") or [])
         self.pinned: set[str] = set(settings.get("pinned") or [])
         self.disabled: set[str] = set(settings.get("disabled") or [])
+        self.on: set[str] = set(settings.get("mcp_on") or [])
         self.index: list[dict[str, Any]] = []
         self.full: dict[str, dict[str, Any]] = {}
         self.notes: dict[str, str] = {}              # tool → the harness's note (plan 22.2)
+
+    def off(self, t: dict[str, Any]) -> bool:
+        return t["mod"] in self.disabled or group_of(t) in self.disabled
+
+    def hidden(self, t: dict[str, Any]) -> bool:
+        g = group_of(t)
+        return hidden_group(g) and g not in self.on and g not in self.pinned and t["name"] not in self.loaded
 
     async def refresh(self) -> None:
         try:
             self.index = await self.hub.index()
         except Exception:  # noqa: BLE001 - the hub may be restarting: keep what we had
             self.index = self.index or []
-        names = [t["name"] for t in self.index if t["mod"] not in self.disabled and
-                 (self.all_tools or t["core"] or t["mod"] in self.pinned or t["name"] in self.loaded)]
+        names = [t["name"] for t in self.index if not self.off(t) and not self.hidden(t) and
+                 (self.all_tools or t["core"] or t["mod"] in self.pinned or group_of(t) in self.pinned or t["name"] in self.loaded)]
         self.full = {t["name"]: t for t in await self.hub.tools(names)} if names else {}
 
     def by_name(self, name: str) -> dict[str, Any] | None:
@@ -131,7 +151,7 @@ class ToolSet:
         return [function(t, self.notes.get(t["name"])) for t in LOCAL] + [function(t, self.notes.get(t["name"])) for t in self.full.values()]
 
     def deferred(self) -> list[dict[str, Any]]:
-        return [t for t in self.index if t["name"] not in self.full and t["mod"] not in self.disabled]
+        return [t for t in self.index if t["name"] not in self.full and not self.off(t) and not self.hidden(t)]
 
     def risk(self, name: str) -> str:
         if name in LOCAL_NAMES:
@@ -140,12 +160,14 @@ class ToolSet:
         return t.get("risk", "write")
 
     def load(self, names: list[str] | None = None, group: str | None = None) -> tuple[list[str], list[str]]:
-        """(loaded now, unknown)."""
+        """(loaded now, unknown). Loading an MCP server's group turns it on in the chat."""
         want = list(names or [])
         if group:
-            want += [t["name"] for t in self.index if t["mod"] == group]
+            want += [t["name"] for t in self.index if t["mod"] == group or group_of(t) == group]
+            if hidden_group(group):
+                self.on.add(group)
         known = {t["name"] for t in self.index}
-        ok = [n for n in want if n in known and self.by_name(n)["mod"] not in self.disabled]  # type: ignore[index]
+        ok = [n for n in want if n in known and not self.off(self.by_name(n))]  # type: ignore[arg-type]
         bad = [n for n in want if n not in ok]
         for n in ok:
             if n not in self.loaded:

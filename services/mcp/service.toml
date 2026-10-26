@@ -27,3 +27,11 @@ page = "ui/page.js"                # servers, their tools and risks, approval wi
 [agent]
 skills = "skills"                  # skills/<name>/SKILL.md; one names its servers in metadata.mcp-servers
 tools_source = "GET /v1/tools"     # one tool per approved server's tool: mcp_<server>_<tool> (all mcp = false)
+
+# @-mentions (plan 48.1; mcp-client 4.1): @mcp:<server> turns that server's tools on in the chat (it fills no field)
+[[agent.mentions]]
+kind = "mcp"
+list = "GET /v1/servers"
+value = "id"
+label = "name"
+fills = []

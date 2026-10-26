@@ -194,6 +194,10 @@ test('slash commands: built-ins and skills', () => {
   const pl = composer.slashMatches('/pl', ws);
   assert.deepEqual(pl.map(c => [c.cmd, c.hint]), [['gaifa:plan', 'GAIFA: Write plans']]);
   assert.deepEqual(composer.slashMatches('/gaifa:', ws).map(c => c.cmd), ['gaifa:plan']);
+  // mcp-client 4.1: an MCP server is its own tool group in the composer
+  assert.equal(composer.groupOf({ mod: 'mcp', group: 'mcp:blender' }), 'mcp:blender');
+  assert.equal(composer.groupOf({ mod: 'comfy' }), 'comfy');
+  assert.equal(composer.groupLabel('mcp:blender'), 'blender (MCP server)');
 });
 
 test('the live client parses the agent\'s and the hub\'s error shapes', async () => {

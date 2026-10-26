@@ -260,7 +260,7 @@ class FakeHub:
 
         @app.get("/api/tools/index")
         def index() -> list:
-            return [{k: t[k] for k in ("name", "mod", "risk", "core", "summary", "available")} for t in self.tools.values()]
+            return [{k: t[k] for k in ("name", "mod", "risk", "core", "summary", "available", "group") if k in t} for t in self.tools.values()]
 
         @app.get("/api/tools")
         def tools(names: str | None = None, q: str | None = None, view: str = "full") -> list:

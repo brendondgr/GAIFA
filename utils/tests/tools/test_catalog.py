@@ -35,6 +35,7 @@ async def test_catalog_lists_manifest_source_and_hub_tools(th):
     assert paint["source"] == "tools_source" and paint["risk"] == "generate" and paint["ask"] == ["style"]
     assert paint["parameters"]["properties"]["image"]["x-kind"] == "image" and paint["job"] is True
     assert tools["fake_tools_styles"]["core"] is True and tools["fake_tools_styles"]["risk"] == "read"
+    assert tools["fake_tools_styles"]["group"] == "fake-tools:looks" and "group" not in paint      # mcp-client 4.1
     assert tools["hub_stop_service"]["risk"] == "destructive" and tools["hub_list_services"]["core"]
 
 

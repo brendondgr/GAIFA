@@ -112,6 +112,18 @@ def load(text: str, folder: str | None = None) -> dict[str, Any]:
     return s
 
 
+def mcp_servers(meta: dict[str, Any]) -> list[str]:
+    """The MCP servers a skill brings (mcp-client 4.1): `metadata.mcp-servers` ("blender" or "a, b"), else a top-level
+    `mcp-servers` or Amp's `mcpServers` (a list, or a map by name)."""
+    md = meta.get("metadata") if isinstance(meta.get("metadata"), dict) else {}
+    v = md.get("mcp-servers") or meta.get("mcp-servers") or meta.get("mcpServers")
+    if isinstance(v, dict):
+        v = list(v)
+    if isinstance(v, str):
+        v = re.split(r"[,\s]+", v)
+    return [str(x).strip() for x in v or [] if str(x).strip()]
+
+
 def flag(meta: dict[str, Any], key: str) -> bool:
     """A yes/no field such as `disable-model-invocation`, written as a boolean or a string."""
     v = meta.get(key)

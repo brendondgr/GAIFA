@@ -90,19 +90,24 @@ function AttachPicker({ api, outputs, chosen, onToggle, onReadPage }) {
     h('span', { style: label11 }, 'Recent outputs'), recent == null ? h('span', { style: { color: T.mut, fontSize: 12 } }, 'Loading…') : rest.length ? grid(rest) : h('span', { style: { color: T.mut, fontSize: 12 } }, 'Nothing yet.'));
 }
 
+/** A tool's group in the chat: its mod's own group (an MCP server: "mcp:blender"; mcp-client 4.1), else its mod. */
+export const groupOf = t => t.group || t.mod;
+/** How a group reads in the menu: "blender (MCP server)" for mcp:blender. */
+export const groupLabel = g => g.startsWith('mcp:') ? `${g.slice(4)} (MCP server)` : g;
+
 function ToolGroups({ index, settings, onChange }) {
-  const mods = [...new Set((index || []).filter(t => t.mod !== 'hub').map(t => t.mod))];
+  const mods = [...new Set((index || []).filter(t => t.mod !== 'hub').map(groupOf))];
   const pinned = settings?.pinned || [], disabled = settings?.disabled || [];
   const set = (mod, v) => onChange({ pinned: v === 'pin' ? [...new Set([...pinned, mod])] : pinned.filter(x => x !== mod), disabled: v === 'off' ? [...new Set([...disabled, mod])] : disabled.filter(x => x !== mod) });
   const seg = (mod, v, label, cur) => h('button', { key: v, type: 'button', 'aria-pressed': cur === v ? 'true' : 'false', onClick: () => set(mod, v),
     style: { height: 22, padding: '0 8px', border: 0, borderRadius: 4, font: 'inherit', fontSize: 11.5, cursor: 'pointer', background: cur === v ? T.hov : 'transparent', color: cur === v ? T.tx : T.mut, boxShadow: cur === v ? '0 0 0 1px ' + T.bds : 'none' } }, label);
   return h(R().Fragment, null,
     h('span', { style: label11 }, 'Tool groups in this chat'),
-    h('span', { style: { fontSize: 11.5, color: T.mut } }, 'Auto: the agent loads a group when it needs it. Pinned: always loaded. Off: never used.'),
+    h('span', { style: { fontSize: 11.5, color: T.mut } }, 'Auto: the agent loads a group when it needs it (an MCP server when a skill or @mcp:<server> asks for it). Pinned: always loaded. Off: never used.'),
     mods.length ? mods.map(mod => {
-      const cur = disabled.includes(mod) ? 'off' : pinned.includes(mod) ? 'pin' : 'auto', n = index.filter(t => t.mod === mod).length;
+      const cur = disabled.includes(mod) ? 'off' : pinned.includes(mod) ? 'pin' : 'auto', n = index.filter(t => groupOf(t) === mod).length;
       return h('div', { key: mod, style: { display: 'flex', alignItems: 'center', gap: 8 } },
-        h('span', { style: { flex: 1, fontSize: 12.5, color: cur === 'off' ? T.mut : T.tx } }, mod, h('span', { style: { color: T.dim, fontFamily: MONO, fontSize: 11, marginLeft: 6 } }, n)),
+        h('span', { style: { flex: 1, fontSize: 12.5, color: cur === 'off' ? T.mut : T.tx } }, groupLabel(mod), h('span', { style: { color: T.dim, fontFamily: MONO, fontSize: 11, marginLeft: 6 } }, n)),
         h('span', { role: 'group', 'aria-label': mod, style: { display: 'inline-flex', padding: 2, borderRadius: 6, border: '1px solid ' + T.bd, background: T.sb } },
           seg(mod, 'auto', 'Auto', cur), seg(mod, 'pin', 'Pinned', cur), seg(mod, 'off', 'Off', cur)));
     }) : h('span', { style: { color: T.mut, fontSize: 12 } }, 'Loading the tool catalog…'));

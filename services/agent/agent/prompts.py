@@ -20,9 +20,10 @@ def section(title: str, body: str) -> str:
 def tool_index(index: list[dict[str, Any]], loaded: set[str], disabled: set[str]) -> str:
     groups: dict[str, list[dict[str, Any]]] = {}
     for t in index:
-        if t["name"] in loaded or t["mod"] in disabled:
+        g = t.get("group") or t["mod"]                  # mcp-client 4.1: an MCP server's tools under mcp:<server>
+        if t["name"] in loaded or t["mod"] in disabled or g in disabled:
             continue
-        groups.setdefault(t["mod"], []).append(t)
+        groups.setdefault(g, []).append(t)
     lines = []
     for mod, tools in groups.items():
         names = ", ".join(f"{t['name']}" + ("" if t.get("available", True) else " (starts on use)") for t in tools)

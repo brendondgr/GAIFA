@@ -34,6 +34,7 @@ class SkillFile(BaseModel):
 class Skill(SkillInfo):
     body: str
     files: list[SkillFile] = []
+    meta: dict[str, Any] = {}      # its other frontmatter fields (metadata.mcp-servers, allowed-tools, …)
 
 
 class SkillFileText(BaseModel):
@@ -73,7 +74,8 @@ async def get_skill(mod: str, name: str, request: Request) -> dict[str, Any]:
     if folder is None:
         raise HubError(404, "not_found", f"no skill {mod}/{name}")
     s = skillfmt.parse((folder / "SKILL.md").read_text())
-    return {"mod": mod, "name": name, "description": s["description"], "body": s["body"], "files": skillfmt.files(folder)}
+    return {"mod": mod, "name": name, "description": s["description"], "body": s["body"], "files": skillfmt.files(folder),
+            "meta": s["meta"]}
 
 
 @router.get("/api/skills/{mod}/{name}/files/{path:path}", summary="One of a skill's other files, as text",

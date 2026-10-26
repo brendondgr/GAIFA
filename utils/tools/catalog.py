@@ -42,6 +42,9 @@ SYNONYMS = {"picture": "image", "photo": "image", "pic": "image", "img": "image"
             "movie": "video", "clip": "video", "llm": "llm", "gpu": "memory", "ram": "memory"}
 
 
+GROUP = re.compile(r"^[a-z][a-z0-9_-]{0,31}(:[a-z0-9][a-z0-9_-]{0,31})?$")   # mcp-client 4.1: <mod> or <mod>:<name>
+
+
 @dataclass
 class ToolDef:
     name: str
@@ -67,12 +70,15 @@ class ToolDef:
     limits: str | None = None        # plan 27.4: the mod's preflight op ("POST /v1/limits"), asked before deciding
     view: dict[str, Any] | None = None  # plan 46.1: how its result draws in Chat (utils/tools/views.py)
     mcp: bool = True                 # structured-memory 3.1: false keeps it out of /mcp (the chat and the hub's API still see it)
+    group: str | None = None         # mcp-client 4.1: a tools_source row's group within its mod ("mcp:blender"); the chat's tool groups
 
     def public(self, full: bool = True, view: str = "full") -> dict[str, Any]:
         out: dict[str, Any] = {"name": self.name, "mod": self.mod or "hub", "risk": self.risk, "core": self.core,
                                "summary": summary_line(self.description), "available": self.available}
         if self.why:
             out["why"] = self.why
+        if self.group:
+            out["group"] = self.group
         if full:
             params = options.for_model(self.parameters) if view == "model" else self.parameters
             desc = self.description
@@ -265,7 +271,8 @@ class Catalog:
             out.append(ToolDef(tool_name(svc.id, name), svc.id, name, desc, params, risk=risk, ask=ask,
                                examples=[e for e in it.get("examples") or [] if isinstance(e, dict)],
                                core=bool(it.get("core")), source="tools_source", route=route, job=job,
-                               problems=grant_problems(gk, params) + vp, grant_key=gk, view=view, mcp=it.get("mcp") is not False))
+                               problems=grant_problems(gk, params) + vp, grant_key=gk, view=view, mcp=it.get("mcp") is not False,
+                               group=it["group"] if isinstance(it.get("group"), str) and GROUP.match(it["group"]) else None))
         return out
 
     # ---- persistence (a stopped mod keeps its tools listed) ----------------------------------
@@ -276,7 +283,7 @@ class Catalog:
             return
         rows = [{**t.public(), "route": t.route.__dict__ if t.route else None, "response": t.response,
                  "job_ops": t.job, "tool": t.tool, "mod_dry_run": t.mod_dry_run, "cap_bytes": t.cap_bytes, "limits": t.limits,
-                 "mcp": t.mcp} for t in tools]
+                 "mcp": t.mcp, "group": t.group} for t in tools]
         await db.execute("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
                          (KV_PREFIX + sid, json.dumps({"ts": time.time(), "tools": rows})))
 
@@ -300,7 +307,7 @@ class Catalog:
                                    response=r.get("response", "json"), job=r.get("job_ops"), grant_key=r.get("grant_key"),
                                    mod_dry_run=bool(r.get("mod_dry_run")),
                                    cap_bytes=r.get("cap_bytes"), limits=svc.m.agent.limits if svc.m else r.get("limits"), view=r.get("view"),
-                                   mcp=r.get("mcp") is not False))
+                                   mcp=r.get("mcp") is not False, group=r.get("group")))
             return out
         assert svc.m
         return [ToolDef(tool_name(svc.id, n), svc.id, n, s.description or s.op, {"type": "object"},

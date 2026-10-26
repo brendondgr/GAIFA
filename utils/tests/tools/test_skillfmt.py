@@ -71,6 +71,12 @@ def test_numbers_and_null_become_text():
     assert s["name"] == "123" and s["description"] == ""
 
 
+def test_mcp_servers():
+    assert skillfmt.mcp_servers({"metadata": {"mcp-servers": "blender, unity"}}) == ["blender", "unity"]
+    assert skillfmt.mcp_servers({"mcp-servers": ["a"]}) == ["a"] and skillfmt.mcp_servers({"mcpServers": {"x": {}}}) == ["x"]
+    assert skillfmt.mcp_servers({}) == []
+
+
 def test_flag():
     assert skillfmt.flag({"disable-model-invocation": True}, "disable-model-invocation")
     assert skillfmt.flag({"x": "true"}, "x") and not skillfmt.flag({"x": "no"}, "x") and not skillfmt.flag({}, "x")

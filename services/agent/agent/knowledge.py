@@ -152,6 +152,30 @@ class Knowledge:
         except Exception:  # noqa: BLE001
             return None
 
+    async def meta(self, name: str) -> dict[str, Any]:
+        """A whole skill's other frontmatter fields (`metadata.mcp-servers`, …); {} for a file, a workspace skill, a
+        memory topic or one that isn't there."""
+        name = name.strip().strip("/")
+        if name.startswith("memory:") or ":" in name.split("/", 1)[0] or name.count("/") > 1:
+            return {}
+        if "/" in name:
+            src, n = name.split("/", 1)
+        else:
+            m = next((s for s in await self.skills() if s["name"] == name or s["id"].endswith("/" + name)), None)
+            if m is None:
+                return {}
+            src, n = m["id"].split("/", 1)
+        if src == "user":
+            text = self.tree.get(f"skills/{n}/SKILL.md")
+            p = self.data / "skills" / n / "SKILL.md"
+            if text is None and p.is_file():
+                text = p.read_text()
+            return skillfmt.parse(text)["meta"] if text else {}
+        try:
+            return (await self.hub.skill(src, n)).get("meta") or {} if self.hub else {}
+        except Exception:  # noqa: BLE001
+            return {}
+
     async def read_workspace(self, sid: str, tid: str | None, environment: str | None) -> str | None:
         """`<folder>:<skill>` (with its files named after the body), `…/<path>`, or `<folder>:AGENTS.md`."""
         if not self.hub or not tid:

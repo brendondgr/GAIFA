@@ -90,11 +90,14 @@ class Local:
 
     async def t_find_tools(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         query = str(args.get("query") or "")
+        from .tools import group_of, hidden_group
         hits = await self.a.hub.search(query)
         off = sorted({h["mod"] for h in hits if h["mod"] in tools.disabled} | {g for g in tools.disabled if g in query.lower()})
-        hits = [h for h in hits if h["mod"] not in tools.disabled]
+        named = query.lower()                       # mcp-client 4.1: a hidden server's tools only when the query names it
+        hits = [h for h in hits if not tools.off(h) and not (tools.hidden(h) and group_of(h)[4:].lower() not in named)]
         if not hits:
-            groups = sorted({t["mod"] for t in tools.index} - tools.disabled)
+            groups = sorted({group_of(t) for t in tools.index if not tools.off(t)
+                             and (not hidden_group(group_of(t)) or not tools.hidden(t))})
             return self.ok(tid, cid, "find_tools", (_off_note(off) + " " if off else "") +
                            "No tools match. The groups are: " + ", ".join(groups))
         return self.ok(tid, cid, "find_tools", {"tools": [{"name": h["name"], "summary": h["summary"], "risk": h["risk"],
@@ -140,7 +143,29 @@ class Local:
             return self.err(tid, cid, "read_skill", e.code, e.detail, "the skill's files are listed after its body")
         if body is None:
             return self.err(tid, cid, "read_skill", "not_found", f"no skill {name!r}", "the skill list is in your instructions")
-        return self.ok(tid, cid, "read_skill", body)
+        return self.ok(tid, cid, "read_skill", body + await self._skill_servers(tid, k, name, tools))
+
+    async def _skill_servers(self, tid: str, k: Knowledge, name: str, tools: ToolSet) -> str:
+        """mcp-client 4.1: a skill that names MCP servers (`metadata.mcp-servers`) turns their tools on in this chat."""
+        servers = skillfmt.mcp_servers(await k.meta(name))
+        if not servers:
+            return ""
+        from .tools import group_of
+        notes = []
+        for sid in servers:
+            g = f"mcp:{sid}"
+            if any(group_of(t) == g for t in tools.index):
+                if g in tools.disabled:
+                    notes.append(f"The MCP server {sid} is turned off in this chat: tell the user, who can turn it on in the composer.")
+                    continue
+                ok, _ = tools.load(group=g)
+                notes.append(f"The MCP server {sid}'s tools are loaded: {', '.join(ok)}.")
+            else:
+                notes.append(f"This skill uses the MCP server {sid}, which isn't set up and approved in GAIFA: tell the user to "
+                             "add it and approve its tools on the MCP servers page.")
+        await tools.refresh()
+        self.a._save_loaded(tid, tools)
+        return "\n\n---\n" + "\n".join(notes)
 
     async def t_remember(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         """Only an empty text or an eval's thread ends here: the loop runs `remember` as the agent mod's

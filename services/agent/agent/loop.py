@@ -145,6 +145,11 @@ class Agent(Compaction):
         n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
         for i, d in enumerate(docs):
             d["ref"] = f"#{n0 + i + 1}"
+        servers = [f"mcp:{m['id']}" for m in mentions or [] if isinstance(m, dict) and m.get("kind") == "mcp" and m.get("id")]
+        if servers:                                     # mcp-client 4.1: @mcp:<server> pins its tools in this chat
+            st = dict(thread.get("settings") or {})
+            st["pinned"] = sorted(set(st.get("pinned") or []) | set(servers))
+            self.store.update_thread(tid, settings=st)
         ev = self.emit(tid, "user", {"text": text, **({"quotes": quotes} if quotes else {}),
                                      **({"mentions": mentions} if mentions else {}),     # plan 48.3
                                      **({"attachments": attachments} if attachments else {}),
@@ -636,6 +641,8 @@ class Agent(Compaction):
         t = self.store.thread(tid) or {}
         s = dict(t.get("settings") or {})
         s["loaded"] = tools.loaded
+        if tools.on or s.get("mcp_on"):
+            s["mcp_on"] = sorted(tools.on)              # mcp-client 4.1: MCP servers on in this chat
         self.store.update_thread(tid, settings=s)
 
     # ---- the model ---------------------------------------------------------------------------

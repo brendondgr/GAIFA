@@ -10,6 +10,8 @@ GAIFA's MCP client (plan [mcp-client](../../docs/plans/mcp-client.md)): other MC
 4. **A call** goes through the hub's permissions, approvals, grants and the Auto judge like any tool, then `POST /v1/call/{server}/{tool}`. Text comes back as text, pictures and sound as outputs (`outputs/mcp/<date>/`), structured content as is.
 5. **A server whose tools change** (a new session lists them again) is held: its tools leave the catalog and calls answer `409 changed` until the user looks at the difference and approves again.
 
+In a chat, each server is its own tool group, `mcp:<server>`, hidden until it's on: a skill whose frontmatter names it (`metadata: {mcp-servers: blender}`) loads its tools when read, `@mcp:<server>` in the composer pins it, and the composer's Tool groups has Auto / Pinned / Off for it.
+
 Risk of a tool: what the user chose on the page, else `readOnlyHint` → read, `destructiveHint` → destructive, a name or description about running code → execute, `openWorldHint` → network, else write.
 
 Sessions: one per server for the machine, started on first use, stopped after 15 idle minutes; a stdio server gets a minimal environment (HOME, LOGNAME, PATH, SHELL, TERM, USER, LANG) plus its own variables, and its stderr goes to `data/logs/mcp-<id>.log`. A session that breaks under a call is stopped; the next call starts a new one (a call is never sent twice).

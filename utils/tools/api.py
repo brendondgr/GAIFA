@@ -22,6 +22,7 @@ class ToolIndexItem(_Model):
     summary: str
     available: bool
     why: str | None = None
+    group: str | None = Field(None, description="mcp-client 4.1: a group within its mod (mcp:<server>); the chat's tool groups use it, else the mod")
 
 
 class Tool(ToolIndexItem):

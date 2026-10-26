@@ -69,15 +69,15 @@ The approach is one new mod, `mcp` (port 5108), that is an MCP *client*: it star
 
 ## Phase 4 — Turning servers on in a chat (S)
 
-- [ ] **4.1 Skills that bring servers, and per-chat switches: `services/agent/agent/knowledge.py`, `loop.py`, `chat-composer.js`.**
+- [x] **4.1 Skills that bring servers, and per-chat switches: `services/agent/agent/knowledge.py`, `loop.py`, `chat-composer.js`.**
   - **Skills:** a skill's frontmatter `metadata: {mcp-servers: "blender"}` (or Amp's `mcpServers` names) lists servers; when `read_skill` reads it, the agent loads those servers' tool groups in that chat (`load_tools group mcp:<server>`) and says so in the result.
   - **Asking for one:** `@mcp:blender` in the composer (plan 48's mentions, a new `mcp` kind listed from `GET /v1/servers`) loads the group for that turn's chat.
-  - **Off by default:** `find_tools` lists an MCP tool only when its server is on in that chat or the query names the server; the composer's tools menu shows each server with a switch (the chat's `settings.mcp`).
+  - **Off by default:** `find_tools` lists an MCP tool only when its server is on in that chat or the query names the server; the composer's tools menu shows each server with a switch (the chat's `settings.mcp`). *As built:* a tools_source row may name a `group` (a small hub change: `ToolDef.group`, in `/api/tools` and the index), the `mcp` mod gives each server `mcp:<server>`, and the agent's tool sets, tool index and the composer work per group. A server's group is hidden until on (`settings.mcp_on`, set by reading a skill whose `metadata.mcp-servers` names it, or by `load_tools group mcp:<server>`); `@mcp:<server>` (an `[[agent.mentions]]` kind with no fields to fill) pins it; the composer shows it as "<server> (MCP server)" with Auto / Pinned / Off. The hub's `GET /api/skills/{mod}/{name}` gains `meta` (`skillfmt.mcp_servers` reads it).
   *Done when:* `services/agent/tests/test_mcp_servers.py` (fake hub): reading a skill with `mcp-servers` loads the group; `find_tools` hides an off server's tools; `@mcp:<id>` turns one on.
 
 **Checks & deliverables — Phase 4**
-- [ ] A chat that never mentions Blender carries no Blender tool; asking it to "make a scene in Blender" reads the Blender skill and loads the server's tools.
-- [ ] Delivered: the agent's changes, the composer's, tests; docs: the brief's §11.13, architecture §14.1.
+- [x] A chat that never mentions Blender carries no Blender tool; asking it to "make a scene in Blender" reads the Blender skill and loads the server's tools. *As checked:* with a stand-in Blender server and skill in the agent's tests; on the installed hub the composer lists "fake (MCP server)" with Auto / Pinned / Off and `@mcp:fake` resolves; the real Blender check is Phase 5's.
+- [x] Delivered: the agent's changes, the composer's, tests; docs: the brief's §11.13, architecture §14.1, PATCHES #65.
 
 ## Phase 5 — Blender (M)
 

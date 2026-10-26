@@ -185,7 +185,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **`engine`:** `{state, stage, loaded: [ids]}`.
   - **Contract:** a mod declares only routes it serves, and `gaifa check` calls `catalog` and `engine`.
   *Done when:* `utils/tests/services/test_manifest.py` covers the section and its validation; `utils/tests/services/test_check.py` covers `gaifa check` on a fake engine mod (`utils/tests/fixtures/mods/fake-engine/`).
-- [ ] **3.2 vLLM implements it: `services/vllm/vllm_mod/api_llm.py`, `service.toml`.**
+- [x] **3.2 vLLM implements it: `services/vllm/vllm_mod/api_llm.py`, `service.toml`.**
   - **What:** profiles become catalog entries, and load/unload/engine wrap the existing ones. Memory acquisition and the chat card are unchanged.
   *Done when:* `services/vllm/tests/test_api_llm.py` (with the fake engine) covers each route; `gaifa check vllm` passes.
 - [ ] **3.3 lcpp implements it: `src/lcpp/daemon/routes/llm.py`, `service.toml` (repository `brendondgr/LLMs`, branch `feat/llm-contract`).**

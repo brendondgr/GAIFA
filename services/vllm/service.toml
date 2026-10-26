@@ -26,6 +26,12 @@ VLLM_STATE_DIR = "{root}/data/state/vllm"
 HF_HOME = "{hf_home}"
 
 
+[llm]                              # GAIFA's engine contract (plan llm-servers 3.2): profiles as models
+catalog = "GET /v1/llm/catalog"
+load = "POST /v1/llm/load"
+unload = "POST /v1/llm/unload"
+engine = "GET /v1/llm/engine"
+
 [ui]
 page = "ui/page.js"
 chat = "ui/chat.js"                 # the load card in Chat: the engine's stages (plan 46.4)

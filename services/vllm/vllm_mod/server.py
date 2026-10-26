@@ -10,7 +10,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from . import api_profiles
+from . import api_llm, api_profiles
 from .downloads import Downloads
 from .engine import STAGE_ORDER, Engine, EngineError
 from .hubclient import Hub, NeedsRoom
@@ -78,6 +78,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None,
                   description="Runs vLLM in kyuz0's gfx1151 image, one model profile at a time.")
 
     app.include_router(api_profiles.router)
+    app.include_router(api_llm.router)           # GAIFA's [llm] contract (plan llm-servers 3.2)
 
     @app.exception_handler(EngineError)
     async def _engine_error(_: Request, e: EngineError) -> JSONResponse:

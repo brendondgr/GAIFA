@@ -7,6 +7,10 @@ A GAIFA mod (plan Phase 18) that serves Hugging Face models with [vLLM](https://
 - **The adapter** (`vllm_mod/`, port 5101) is what GAIFA runs. It starts one vLLM container at a time and stops it again.
 - **The engine** is `vllm serve` in a container named `gaifa-vllm-<profile>`, listening on `127.0.0.1:7801` (`VLLM_ENGINE_PORT`, host network, nothing published).
 
+## GAIFA's engine contract
+
+`[llm]` in `service.toml` (GAIFA plan llm-servers 3.2, `vllm_mod/api_llm.py`): the routes every local LLM engine serves, so Settings → LLMs and the Chat picker treat vLLM and llama.cpp alike. `GET /v1/llm/catalog` lists each profile as `{id, name, format: "hf", model, size_gb, memory_gb, context, downloaded, loaded, relay_model}`; `POST /v1/llm/load {id}` starts it and answers at once (202; one profile at a time, so a running one stops first; a profile not downloaded yet downloads first); `POST /v1/llm/unload {id?}` stops it; `GET /v1/llm/engine` is `{state, stage, loaded: [id]}`.
+
 ## Profiles
 
 A profile is one model setup: `profiles/<id>.toml`. Unknown keys are errors.

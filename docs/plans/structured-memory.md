@@ -49,18 +49,18 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
   - **Generalize `chats`:** a `texts` table `{ns, id, title, text, meta, state, vector}`; `PUT /v1/texts/{ns}/{id}`, `DELETE /v1/texts/{ns}/{id}`, `DELETE /v1/texts/{ns}?ids=`, `GET /v1/texts/{ns}` (counts), `POST /v1/texts/{ns}/search {query, limit, ids?}` → `[{id, score, title, meta}]`. Embedded under the same idle rule and GPU lease as the chats; `ns` is `[a-z][a-z0-9-]{1,31}`.
   - **The chats:** `/v1/chats…` stay as they are. *As built:* the chats keep their own table; the texts get theirs (`texts`), and the indexer embeds both between outputs (`store.queued`). A text put again with the same words keeps its vector.
   *Done when:* `services/embed/tests/test_texts.py` (fake backend) covers put, re-put with new text, delete, search ranking, `ids` filtering and the chats routes unchanged.
-- [ ] **2.2 Keeping the index: `memory/index.py`.**
+- [x] **2.2 Keeping the index: `memory/index.py`.**
   - **What is embedded:** each current fact (`text` plus its entities' paths and names) as `fact:<id>`; each entity (path, name, aliases, summary) as `entity:<id>`, in `ns = "memory"`.
   - **When:** after each change (a queue in the agent, sent in batches); a retired or forgotten fact is deleted from the index; a rename re-sends the entity and its facts. A full re-send on `POST /v1/memory/reindex` and when the embed mod reports an empty namespace.
   *Done when:* `services/agent/tests/test_memory_index.py` (fake hub): a new fact, a rename and a retire send the right puts and deletes; nothing is sent for proposed facts.
-- [ ] **2.3 `memory_search`: `memory/search.py`, a local tool in `tools.py` and `local.py`.**
+- [x] **2.3 `memory_search`: `memory/search.py`, a local tool in `tools.py` and `local.py`.**
   - **Search:** three lists fused by reciprocal rank (k = 60): names and aliases found in the query (exact, normalized), FTS5 keywords, and the embed mod's `memory` search; then the facts of matched entities, one step down the tree for a matched parent. Current facts only unless `history: true`.
   - **Tool:** `memory_search {query, entity?, kind?, history?, limit?}` → facts with `{id, text, entities: [paths], valid_from, source, replaced?}` and the matched entities with their summaries; a read-only local tool (never in the hub's catalog, so never at `/mcp`).
   *Done when:* `services/agent/tests/test_memory_search.py`: a query naming an old alias ("AIHub") finds GAIFA's facts; a meaning-only query finds a fact through the fake embed scores; without the embed mod the keyword and name lists still answer.
 
 **Checks & deliverables — Phase 2**
-- [ ] On the installed hub with the embed mod running: after the import, `memory_search` in a chat finds a fact by a paraphrase.
-- [ ] Delivered: `api_texts.py`, `memory/index.py`, `memory/search.py`, tests; docs: the embed mod's README, the agent's README.
+- [x] On the installed hub with the embed mod running: after the import, `memory_search` in a chat finds a fact by a paraphrase. *As checked (2026-10-26):* a fact sent through the agent reached the `memory` collection, and "what aspect ratio does the user like for desktop backgrounds?" found "Prefers widescreen 16:9 pictures for wallpapers" at 0.82 (the user entity 0.59); then forgotten.
+- [x] Delivered: `api_texts.py`, `memory/index.py`, `memory/search.py`, tests; docs: the embed mod's README, the agent's README.
 
 ## Phase 3 — Memory in chats (M)
 

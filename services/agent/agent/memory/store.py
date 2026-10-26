@@ -52,6 +52,8 @@ def new_id(prefix: str) -> str:
 class MemoryStore(FactsMixin):
     def __init__(self, store: Any, clock: Any = time.time) -> None:
         self.c, self.lock, self.clock = store._c, store._lock, clock
+        self.dirty: set[str] = set()          # fact:<id> and entity:<id> changed since the search index last had them (2.2)
+        self.on_dirty: Any = None
         with self.lock:
             self.c.executescript(SCHEMA)
             if not self.c.execute("SELECT 1 FROM mem_entities WHERE id = ?", (USER,)).fetchone():
@@ -151,7 +153,13 @@ class MemoryStore(FactsMixin):
 
     # ---- search index ------------------------------------------------------------------------------
 
+    def _mark(self, ref: str) -> None:
+        self.dirty.add(ref)
+        if self.on_dirty is not None:
+            self.on_dirty()
+
     def _index_entity(self, eid: str) -> None:
+        self._mark(f"entity:{eid}")
         self.c.execute("DELETE FROM mem_fts WHERE ref = ?", (f"entity:{eid}",))
         e = self.c.execute("SELECT * FROM mem_entities WHERE id = ?", (eid,)).fetchone()
         if e is not None and e["state"] == "active":

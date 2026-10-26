@@ -1,5 +1,5 @@
 """The agent's local tools: ask_user, update_todos, find_tools, load_tools, read_skill,
-view_output, read_result, remember."""
+view_output, read_result, chat_search, memory_search, remember."""
 
 from __future__ import annotations
 
@@ -276,6 +276,22 @@ class Local:
         hits = [{**h, "title": ctx.label(h.get("title")),
                  "summary": ctx.untrusted(f"chat {h['thread_id']} summary", str(h.get("summary") or ""))} for h in hits]
         return self.ok(tid, cid, "chat_search", {"chats": hits} if hits else {"chats": [], "note": "no earlier chat matches"})
+
+    async def t_memory_search(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        """structured-memory 2.3: names, keywords and meaning, fused."""
+        from .memory.model import MemoryError
+        from .memory.search import search
+        try:
+            r = await search(self.a.memory, self.a.hub, str(args.get("query") or ""), args.get("entity") or None,
+                             args.get("kind") or None, bool(args.get("history")), int(args.get("limit") or 10))
+        except MemoryError as e:
+            return self.err(tid, cid, "memory_search", e.code, e.detail, e.fix)
+        self.a.memory.touch([f["id"] for f in r["facts"]])
+        if not r["facts"] and not r["entities"]:
+            r["note"] = "nothing in memory matches: ask the user if it matters"
+        if not r.pop("meaning"):
+            r["note"] = (r.get("note", "") + " (searched by names and words only: the Embeddings mod isn't running)").strip()
+        return self.ok(tid, cid, "memory_search", r)
 
     async def t_read_result(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         seq = int(args["seq"])

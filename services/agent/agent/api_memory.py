@@ -154,6 +154,17 @@ def add_routes(app: FastAPI) -> None:
     def undo(log_id: int, request: Request) -> dict:
         return M(request).undo(log_id)
 
+    @app.post("/v1/memory/reindex", summary="Send every current fact and entity to the embed mod's memory collection again")
+    async def reindex(request: Request) -> Any:
+        idx = getattr(request.app.state.agent, "memory_index", None)
+        if idx is None:
+            return JSONResponse({"detail": "the memory index isn't running", "code": "unavailable"}, 503)
+        try:
+            return {"sent": await idx.reindex()}
+        except Exception as e:  # noqa: BLE001: the embed mod is away
+            return JSONResponse({"detail": f"the embed mod didn't answer: {e}", "code": "unavailable",
+                                 "fix": "start the Embeddings mod, then try again"}, 503)
+
     @app.get("/v1/memory/log", summary="Changes to memory, newest first; ?target= one entity's or fact's")
     def log(request: Request, target: str | None = None, limit: int = 100) -> list:
         return M(request).log(target, min(limit, 500))

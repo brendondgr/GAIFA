@@ -228,6 +228,9 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         from .summaries import Summaries
         agent.summaries = Summaries(agent, cfg.summary_idle_min)                             # plan 28.5
         summarizer = asyncio.create_task(agent.summaries.run_forever(stop))
+        from .memory.index import MemoryIndex
+        agent.memory_index = MemoryIndex(agent.memory, hub)                                  # structured-memory 2.2
+        indexer = asyncio.create_task(agent.memory_index.run_forever(stop))
         await agent.resume_all()
         try:
             yield
@@ -241,7 +244,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             importer.cancel()
             scheduler.cancel()
             summarizer.cancel()
-            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, summarizer, return_exceptions=True)
+            indexer.cancel()
+            await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, summarizer, indexer, return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()

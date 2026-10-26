@@ -30,6 +30,7 @@ class FactsMixin:
         return f"{alias}.state = 'active' AND ({alias}.valid_until IS NULL OR {alias}.valid_until > '{self.today()}')"
 
     def _index_fact(self, fid: str) -> None:
+        self._mark(f"fact:{fid}")   # type: ignore[attr-defined]
         self.c.execute("DELETE FROM mem_fts WHERE ref = ?", (f"fact:{fid}",))
         f = self.c.execute(f"SELECT * FROM mem_facts f WHERE id = ? AND {self._current_sql()}", (fid,)).fetchone()
         if f is not None:
@@ -215,6 +216,7 @@ class FactsMixin:
             self.c.execute("DELETE FROM mem_fact_entities WHERE fact = ?", (fid,))
             self.c.execute("DELETE FROM mem_facts WHERE id = ?", (fid,))
             self.c.execute("DELETE FROM mem_fts WHERE ref = ?", (f"fact:{fid}",))
+            self._mark(f"fact:{fid}")   # type: ignore[attr-defined]
             self.c.execute("UPDATE mem_facts SET replaces = NULL WHERE replaces = ?", (fid,))
             self.c.execute("UPDATE mem_facts SET replaced_by = NULL WHERE replaced_by = ?", (fid,))
             self._log("forget", fid, "a fact was forgotten", None, None, by)   # type: ignore[attr-defined]

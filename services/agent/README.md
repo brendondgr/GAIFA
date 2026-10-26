@@ -12,7 +12,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 | `agent/store.py` | `agent.db`: threads and their append-only event log; fork |
 | `agent/context.py` | Messages rebuilt from the log, the context meter, result capping, compaction helpers |
 | `agent/tools.py` | The local tools' schemas and `ToolSet` (core + loaded + pinned − disabled) |
-| `agent/local.py` | The local tools: ask_user, update_todos, find_tools, load_tools, read_skill (a skill's body and its other files, `<id>/<path>`; a workspace folder's skills and instruction files, `<folder>:<skill>`, through the workspace mod), view_output (a PDF's page as an image; the start of a text output), read_result, remember |
+| `agent/local.py` | The local tools: ask_user, update_todos, find_tools, load_tools, read_skill (a skill's body and its other files, `<id>/<path>`; a workspace folder's skills and instruction files, `<folder>:<skill>`, through the workspace mod), view_output (a PDF's page as an image; the start of a text output), read_result, chat_search, memory_search, remember |
 | `agent/knowledge.py` | `data/agent/`: AGENT.md, memory, user skills; mod skills from the hub |
 | `agent/prompts.py` | The system prompt, in plan order (the base text is `harness/systemprompt.md`) |
 | `agent/harness.py`, `harness/` | The harness as versioned files (plan 22.1): the base in git, learned versions in `data/agent/harness/`, rollback |
@@ -23,7 +23,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 | `ui/page.js` | The Learning page: Preferences, Review, Tool usage, Harness, Runs, Library |
 | `agent/hubapi.py` | GAIFA over HTTP: tools, calls, approvals, outputs, skills, the event stream |
 | `agent/server.py` | The HTTP API (`create_app`) |
-| `agent/memory/` | Structured memory (plan structured-memory): `model.py` kinds, paths, normalized names; `store.py` `MemoryStore` (entities, aliases, anchors, the log and undo, `mem_*` tables in `agent.db`); `facts.py` facts added, replaced, retired, approved, forgotten, searched by keyword (FTS5); `importer.py` agent preferences and the old memory files become facts |
+| `agent/memory/` | Structured memory (plan structured-memory): `model.py` kinds, paths, normalized names; `store.py` `MemoryStore` (entities, aliases, anchors, the log and undo, `mem_*` tables in `agent.db`); `facts.py` facts added, replaced, retired, approved, forgotten, searched by keyword (FTS5); `importer.py` agent preferences and the old memory files become facts; `index.py` keeps the embed mod's `memory` collection in step; `search.py` `memory_search`: names, keywords and meaning fused |
 | `agent/api_memory.py` | The memory routes: `/v1/memory/tree`, `/entities`, `/facts`, `/undo`, `/log` |
 | `agent/api_skills.py` | Your own skills (skill-sources 3.1): `POST /v1/skills` (a folder's files, a zip or one SKILL.md, base64), `POST /v1/skills/copy` (a workspace folder's skill), `PATCH /v1/skills/{name}` (on or off), `DELETE /v1/skills/{name}` (to `data/agent/skills/.trash/`); `.gaifa.json` beside a skill: where it came from, on or off, the hub's pattern screening |
 | `evals/` | The eval (plan 13.5): `python -m evals.run --model skynet --runs 3` (`--live` for real outputs; each run's chats and outputs are deleted afterwards unless `--keep`, `evals/cleanup.py`), `python -m evals.vision` |

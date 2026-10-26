@@ -15,6 +15,7 @@ import asyncio
 import base64
 import hashlib
 import json
+import re
 import time
 from typing import Any
 
@@ -100,6 +101,9 @@ class FakeHub:
         self.ws_skills: dict[str, dict[str, Any]] = {}
         self.ws_texts: dict[str, dict[str, Any]] = {}
         self.screen_down = False
+        self.texts: dict[str, dict[str, Any]] = {}       # structured-memory 2.1: the embed mod's text collections
+        self.embed_down = False
+        self.synonyms: list[tuple[str, str]] = []        # (query word, text word) pairs the fake treats as close in meaning
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -505,6 +509,49 @@ class FakeHub:
             if text is None:
                 return JSONResponse({"detail": f"no file {path!r} in this skill", "code": "not_found"}, 404)
             return {"path": path, "text": text}
+
+        # the embed mod's text collections (structured-memory 2.1), proxied: ranked by shared words
+        @app.put("/api/s/embed/v1/texts/{ns}/{tid}")
+        async def put_text(ns: str, tid: str, request: Request) -> Any:
+            if self.embed_down:
+                return JSONResponse({"detail": "embed is not running", "code": "service_not_running"}, 503)
+            self.texts.setdefault(ns, {})[tid] = await request.json()
+            return {"ns": ns, "id": tid}
+
+        @app.delete("/api/s/embed/v1/texts/{ns}/{tid}")
+        def delete_text(ns: str, tid: str) -> Any:
+            if self.embed_down:
+                return JSONResponse({"detail": "embed is not running", "code": "service_not_running"}, 503)
+            if self.texts.get(ns, {}).pop(tid, None) is None:
+                return JSONResponse({"detail": "no text", "code": "not_found"}, 404)
+            return {"deleted": tid}
+
+        @app.delete("/api/s/embed/v1/texts/{ns}")
+        def delete_ns(ns: str) -> Any:
+            return {"deleted": len(self.texts.pop(ns, {}))}
+
+        @app.get("/api/s/embed/v1/texts/{ns}")
+        def text_counts(ns: str) -> Any:
+            if self.embed_down:
+                return JSONResponse({"detail": "embed is not running", "code": "service_not_running"}, 503)
+            return {"pending": 0, "done": len(self.texts.get(ns, {}))}
+
+        @app.post("/api/s/embed/v1/texts/{ns}/search")
+        async def search_texts(ns: str, request: Request) -> Any:
+            if self.embed_down:
+                return JSONResponse({"detail": "embed is not running", "code": "service_not_running"}, 503)
+            b = await request.json()
+            q = set(re.findall(r"\w+", b["query"].lower()))
+            hits = []
+            for tid, t in self.texts.get(ns, {}).items():
+                if b.get("ids") is not None and tid not in b["ids"]:
+                    continue
+                words = set(re.findall(r"\w+", (t["text"] + " " + t.get("title", "")).lower()))
+                syn = sum(1 for a, z in self.synonyms if a in q and z in words)
+                score = 0.5 + 0.1 * (len(q & words) + syn)
+                hits.append({"id": tid, "title": t.get("title", ""), "meta": t.get("meta", {}), "score": round(score, 3)})
+            hits.sort(key=lambda h: -h["score"])
+            return {"results": hits[: b.get("limit", 10)], "pending": 0}
 
         # the embed mod's chats collection (plan 28.5), proxied as /api/s/embed/…: ranked by shared words
         @app.put("/api/s/embed/v1/chats/{tid}")

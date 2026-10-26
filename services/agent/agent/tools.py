@@ -66,6 +66,16 @@ LOCAL: list[dict[str, Any]] = [
      "parameters": {"type": "object", "properties": {"query": {"type": "string"},
                                                     "limit": {"type": "integer", "minimum": 1, "maximum": 20, "default": 5}},
                     "required": ["query"]}},
+    {"name": "memory_search", "description": "Search what you know about the user, their projects, people, tools and "
+     "topics (structured-memory 2.3): by names (old names too), words and meaning. Returns current facts with what they're "
+     "about (paths like projects/GAIFA) and the entities found. Use it before asking the user something they may have "
+     "told you, and before saving a fact that may replace an older one (pass that one's id as replaces).",
+     "parameters": {"type": "object", "properties": {"query": {"type": "string"},
+                                                    "entity": {"type": "string", "description": "Only facts about this entity (a name or path) and its children"},
+                                                    "kind": {"type": "string", "enum": ["preference", "fact", "event", "procedure"]},
+                                                    "history": {"type": "boolean", "default": False, "description": "Also facts that were replaced or ended"},
+                                                    "limit": {"type": "integer", "minimum": 1, "maximum": 30, "default": 10}},
+                    "required": ["query"]}},
     SHOW_TOOL,
     {"name": "remember", "description": "Save a lasting fact or preference about the user (e.g. 'prefers 16:9 images'). "
      "Optional `topic` files it under a topic.",

@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
@@ -75,6 +76,41 @@ class FactPatch(BaseModel):
     valid_from: str | None = Field("", description="A date like 2026-10-26; null clears it; leave out to keep it")
     valid_until: str | None = Field("", description="A date like 2026-10-26; null clears it; leave out to keep it")
     state: Literal["proposed", "active", "retired", "rejected"] | None = None
+
+
+class SaveIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000, description="The fact, as one sentence that stands on its own "
+                      "(\"Prefers 16:9 images\", \"GAIFA's mods use ports 5100-5199\")")
+    about: list[str] = Field(default_factory=list, max_length=6, description="What it's about: names or paths of projects, "
+                             "people, places, tools, topics (\"GAIFA\", \"projects/GAIFA\", \"people/Ana\"). Leave out for the user. "
+                             "An unknown name makes a new entry; a path's first part (projects, people, places, tools, topics) gives its kind")
+    kind: Literal["preference", "fact", "event", "procedure"] = Field("fact", description="preference: how the user likes things")
+    replaces: str | None = Field(None, description="The id of a fact this one makes out of date (from memory_search); it's kept as history")
+    valid_from: str | None = Field(None, description="When it starts to hold, YYYY-MM-DD (default: always)")
+    valid_until: str | None = Field(None, description="When it stops holding, YYYY-MM-DD (a trip, a deadline)")
+
+
+class EntityToolIn(BaseModel):
+    entity: str = Field(min_length=1, max_length=200, description="The entry's name, an old name, its path or id")
+    kind: Literal["project", "person", "place", "tool", "topic", "organization"] | None = Field(
+        None, description="Makes the entry when there's none by that name")
+    rename: str | None = Field(None, max_length=120, description="Its new name (the old one stays an alias, so it's still found)")
+    aliases: list[str] = Field(default_factory=list, max_length=10, description="Other names it goes by")
+    parent: str | None = Field(None, description="Put it under this entry (a name or path)")
+    summary: str | None = Field(None, max_length=600, description="One sentence on what it is")
+
+
+class ForgetIn(BaseModel):
+    fact: str = Field(min_length=1, max_length=40, description="The fact's id (from memory_search)")
+
+
+def origin_thread(request: Request) -> str | None:
+    try:
+        o = json.loads(request.headers.get("x-gaifa-origin") or "{}")
+    except ValueError:
+        return None
+    t = o.get("thread") if isinstance(o, dict) else None
+    return t if isinstance(t, str) else None
 
 
 def entity_view(m: Any, ref: str) -> dict[str, Any]:
@@ -153,6 +189,45 @@ def add_routes(app: FastAPI) -> None:
     @app.post("/v1/memory/undo/{log_id}", summary="Undo one change to memory")
     def undo(log_id: int, request: Request) -> dict:
         return M(request).undo(log_id)
+
+    # ---- the agent's own memory tools (structured-memory 3.2; `[tools]` in service.toml, mcp = false) -----------
+
+    @app.post("/v1/memory/save", summary="Remember a fact the user told you, about them or a project, person, place, tool or topic")
+    def tool_save(body: SaveIn, request: Request) -> dict:
+        m = M(request)
+        tid = origin_thread(request)
+        f = m.add_fact(body.text, body.about, body.kind, body.valid_from, body.valid_until, "stated",
+                       evidence=[{"thread": tid}] if tid else [], replaces=body.replaces, by="agent")
+        ents = [e["id"] for e in f["entities"]]
+        related = [x for x in m.facts(current=True, limit=200) if x["id"] != f["id"] and {e["id"] for e in x["entities"]} & set(ents)][:3]
+        out = {"saved": {"id": f["id"], "text": f["text"], "about": [e["path"] for e in f["entities"]], "seen": f["seen"]}}
+        if body.replaces:
+            out["replaced"] = body.replaces
+        if related and not body.replaces:
+            out["related"] = [{"id": x["id"], "text": x["text"]} for x in related]
+            out["note"] = ("if the new fact makes one of these out of date, save it again with replaces=<that id> "
+                           "(the old one is kept as history)")
+        return out
+
+    @app.post("/v1/memory/entity", summary="Make, rename, re-parent or describe an entry in memory (a project, person, place, tool, topic)")
+    def tool_entity(body: EntityToolIn, request: Request) -> dict:
+        m = M(request)
+        e = m.resolve(body.entity)
+        if e is None:
+            if body.kind is None:
+                raise MemoryError(404, "not_found", f"nothing in memory is called {body.entity!r}",
+                                  "pass kind to make it, or memory_search to find what it's called")
+            parts = [p for p in body.entity.split("/") if p]
+            pe = m.resolve(body.parent) if body.parent else (m.resolve("/".join(parts[:-1])) if len(parts) > 1 else None)
+            made = m.create_entity(body.kind, parts[-1], pe["id"] if pe else None, body.summary or "", body.aliases, by="agent")
+            return {"made": made}
+        p = m.update_entity(e["id"], body.rename, (m.need(body.parent)["id"] if body.parent else ""), body.summary,
+                            aliases_add=body.aliases, by="agent")
+        return {"changed": p}
+
+    @app.post("/v1/memory/forget", summary="Forget a fact for good, when the user asks you to (memory_search finds its id)")
+    def tool_forget(body: ForgetIn, request: Request) -> dict:
+        return M(request).forget(body.fact, by="agent")
 
     @app.post("/v1/memory/reindex", summary="Send every current fact and entity to the embed mod's memory collection again")
     async def reindex(request: Request) -> Any:

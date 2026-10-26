@@ -77,9 +77,13 @@ LOCAL: list[dict[str, Any]] = [
                                                     "limit": {"type": "integer", "minimum": 1, "maximum": 30, "default": 10}},
                     "required": ["query"]}},
     SHOW_TOOL,
-    {"name": "remember", "description": "Save a lasting fact or preference about the user (e.g. 'prefers 16:9 images'). "
-     "Optional `topic` files it under a topic.",
-     "parameters": {"type": "object", "properties": {"text": {"type": "string"}, "topic": {"type": "string"}},
+    {"name": "remember", "description": "Save a lasting fact the user told you, about them or about a project, person, "
+     "place, tool or topic (e.g. 'prefers 16:9 images'; 'GAIFA's mods use ports 5100-5199' about GAIFA). `about` names what "
+     "it's about (names or paths like projects/GAIFA); leave it out for the user.",
+     "parameters": {"type": "object", "properties": {"text": {"type": "string"},
+                                                    "about": {"type": "array", "items": {"type": "string"}},
+                                                    "kind": {"type": "string", "enum": ["preference", "fact", "event", "procedure"]},
+                                                    "topic": {"type": "string", "description": "Older name for one `about` entry"}},
                     "required": ["text"]}},
 ]
 LOCAL_NAMES = {t["name"] for t in LOCAL}

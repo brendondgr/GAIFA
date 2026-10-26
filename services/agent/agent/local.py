@@ -143,8 +143,8 @@ class Local:
         return self.ok(tid, cid, "read_skill", body)
 
     async def t_remember(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
-        """Only an empty text or an eval's thread ends here: the loop runs `remember` as the hub's
-        hub_set_preference, so the chat's mode and permissions decide it like any write (plan 21.4)."""
+        """Only an empty text or an eval's thread ends here: the loop runs `remember` as the agent mod's
+        agent_memory_save through the hub, so the chat's mode and permissions decide it like any write (structured-memory 3.2)."""
         text = str(args.get("text") or "").strip()
         if not text:
             return self.err(tid, cid, "remember", "invalid_arguments", "text is empty")
@@ -154,18 +154,19 @@ class Local:
         return self.ok(tid, cid, "remember", "Saved to memory.")
 
     def remembered(self, tid: str, res: dict[str, Any], args: dict[str, Any]) -> dict[str, Any]:
-        """`remember`'s result once the hub ran it as hub_set_preference (`args`: its value and cue): the chat's
-        `memory` event and a plain answer; when learning is off (the call was allowed), the memory file as before."""
-        saved = (res.get("result") or {}).get("saved") if isinstance(res.get("result"), dict) else None
-        if res.get("status") == "done":
-            self.a.emit(tid, "memory", {"text": (saved or {}).get("value", args.get("value")), "topic": args.get("cue") or None,
-                                        "pref_id": (saved or {}).get("id")})
-            return {**res, "content": "Saved: it's one of the user's preferences now."}
-        if (res.get("error") or {}).get("code") == "learning_off":
-            Knowledge(self.a.cfg.data, self.a.hub).remember(str(args.get("value")), args.get("cue") or None)
-            self.a.emit(tid, "memory", {"text": args.get("value"), "topic": args.get("cue") or None, "file": True})
-            return {"status": "done", "call_id": res.get("call_id"), "content": "Saved to memory (learning is off: kept in the memory file)."}
-        return res
+        """`remember`'s result once the hub ran it as agent_memory_save: the chat's `memory` event (with what the fact
+        is about) and a plain answer, with the related facts it may replace."""
+        out = res.get("result") if isinstance(res.get("result"), dict) else {}
+        saved = out.get("saved") or {}
+        if res.get("status") != "done" or not saved:
+            return res
+        about = [p for p in saved.get("about") or [] if p != "you"]
+        self.a.emit(tid, "memory", {"text": saved.get("text", args.get("text")), "fact_id": saved.get("id"), "about": about,
+                                    "topic": about[0] if about else None})
+        content = "Saved to memory" + (f" under {', '.join(about)}" if about else "") + "."
+        if out.get("related"):
+            content += " Related facts: " + "; ".join(f"{r['id']}: {r['text']}" for r in out["related"]) + f". {out.get('note', '')}"
+        return {**res, "content": content}
 
     # ---- outputs -----------------------------------------------------------------------------
 

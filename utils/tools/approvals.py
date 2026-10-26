@@ -57,7 +57,7 @@ MODE_WORD = {"plan": "Plan", "manual": "Manual", "accept_edits": "Accept edits",
 EDITS_RUN = ("accept_edits", "auto", "bypass")    # modes where `write` and `generate` tools run without a card
 AUTO_RUNS = ("write", "generate")
 ACTIONS = ("read", "edit", "delete", "commit", "command", "network", "host", "remote")
-ASK_AFTER_UNTRUSTED = ("hub_set_preference",)     # never saved unseen by a chat that read a page, file or transcript
+ASK_AFTER_UNTRUSTED = ("hub_set_preference", "agent_memory_save", "agent_memory_entity")   # never saved unseen by a chat that read a page, file or transcript
 
 # The mode × action table (plan Phase 27). "judge": Auto's judge decides (Phase 30); until then it asks.
 CELLS: dict[str, dict[str, str]] = {

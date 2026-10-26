@@ -41,7 +41,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
                       "allow_commands": [], "ask_commands": []},
             "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800,
                        "backend": None, "model": None, "url": None, "threshold": None, "confirm": True, "parallel": 4},
-            "permissions": {"deny": [], "ask": ["hub_set_preference"], "allow": ["hub_start_service"]},
+            "permissions": {"deny": [], "ask": ["hub_set_preference", "agent_memory_save", "agent_memory_entity"], "allow": ["hub_start_service"]},
             "web": {"relevance": "auto", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide", "candidates": 24,
                     "timeout_s": 8.0},
             "outputs": {"hidden_keep_days": 0.0},
@@ -217,7 +217,7 @@ async def test_command_rules_and_tool_permissions_are_edited_in_settings(rig, se
         assert served.hub.config.agent.judge.allow_commands == ["pytest *", "make -C * test"]     # a refusal changes nothing
         # back to the defaults: the keys go
         r = await c.put("/api/settings", json={"judge": {"allow_commands": [], "ask_commands": []},
-                                               "permissions": {"deny": [], "ask": ["hub_set_preference"]}})
+                                               "permissions": {"deny": [], "ask": ["hub_set_preference", "agent_memory_save", "agent_memory_entity"]}})
         assert r.status_code == 200 and "agent" not in tomllib.loads(_file(served))
 
 

@@ -155,8 +155,9 @@ class Knowledge:
         return r["text"] + (skillfmt.files_note(sid, r.get("files") or []) if r.get("kind") == "skill" else "")
 
     async def preferences(self, loaded: set[str], thread: str | None = None) -> str:
-        """The user's preferences for the prompt (plan 21.4): the agent-scoped ones (what `remember`
-        saves), and tool preferences only for the tools loaded in this chat, so they cost nothing elsewhere."""
+        """The user's preferences for the prompt (plan 21.4): tool preferences only for the tools loaded in this chat,
+        so they cost nothing elsewhere, and this chat's own. The agent-scoped ones moved to memory (structured-memory
+        1.3); one made since by another client moves at the agent's next start."""
         if not self.hub:
             return ""
         try:
@@ -165,7 +166,7 @@ class Knowledge:
             return ""
         lines = []
         for r in rows:
-            if r["scope"] == "agent" or (r["scope"] == "thread" and not r.get("tool") and thread and r.get("thread") == thread):
+            if r["scope"] == "thread" and not r.get("tool") and thread and r.get("thread") == thread:
                 lines.append(f"- {r['value']}")
             elif r["scope"] == "tool" and r.get("tool") in loaded:
                 cond = ", ".join(f"{k} {v}" if v in ("present", "absent") else f"{k}={v}" for k, v in (r.get("when") or {}).items())

@@ -445,9 +445,11 @@ class Agent(Compaction):
             text = str((args or {}).get("text") or "").strip()
             if not text or (thread.get("settings") or {}).get("dry_run"):
                 return await self.local.run(tid, cid, name, args or {}, tools, thread)   # refused there, or an eval's stand-in
-            # A lasting preference goes into every later chat's prompt: the hub decides it as hub_set_preference,
-            # a `write` (Plan refuses it; a chat that read untrusted text gets a card; plan 21.4)
-            hub_name, args = "hub_set_preference", {"value": text, "cue": str((args or {}).get("topic") or "")}
+            # A lasting fact goes into later chats: the hub decides it as agent_memory_save, a `write` in the ask list
+            # (Plan refuses it; a chat that read untrusted text gets a card; structured-memory 3.2)
+            about = (args or {}).get("about") or ([args["topic"]] if (args or {}).get("topic") else [])
+            hub_name, args = "agent_memory_save", {"text": text, **({"about": [str(a) for a in about][:6]} if about else {}),
+                                                   **({"kind": args["kind"]} if (args or {}).get("kind") else {})}
         elif name in LOCAL_NAMES:
             return await self.local.run(tid, cid, name, args or {}, tools, thread)
         # a hub tool: decided approval, a call already started, or a new call
@@ -524,7 +526,7 @@ class Agent(Compaction):
         return "ok"
 
     def _hub_result(self, tid: str, cid: str, name: str, res: dict[str, Any], args: dict[str, Any] | None) -> None:
-        """A hub call's result; `remember` (run as hub_set_preference) says what it saved (local.py)."""
+        """A hub call's result; `remember` (run as agent_memory_save) says what it saved (local.py)."""
         self._result(tid, cid, name, self.local.remembered(tid, res, args or {}) if name == "remember" else res)
 
     async def _wait_call(self, tid: str, cid: str, call_id: str) -> dict[str, Any]:

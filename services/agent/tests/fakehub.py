@@ -61,8 +61,18 @@ TOOLS = [
       desc="Search a document's text"),
     T("hub_set_preference", "hub", "write", {"tool": {"type": "string"}, "field": {"type": "string"}, "value": {},
                                              "cue": {"type": "string"}}, ["value"], core=True, desc="Save a lasting preference"),
+    # structured-memory 3.2: the agent mod's own tools, run by the agent app itself (FakeHub.agent_app)
+    T("agent_memory_save", "agent", "write", {"text": {"type": "string"}, "about": {"type": "array", "items": {"type": "string"}},
+                                              "kind": {"type": "string"}, "replaces": {"type": "string"}}, ["text"],
+      desc="Remember a lasting fact"),
+    T("agent_memory_entity", "agent", "write", {"entity": {"type": "string"}, "kind": {"type": "string"}, "rename": {"type": "string"},
+                                                "parent": {"type": "string"}, "summary": {"type": "string"}}, ["entity"],
+      desc="Make or rename an entry in memory"),
+    T("agent_memory_forget", "agent", "destructive", {"fact": {"type": "string"}}, ["fact"], desc="Forget a fact"),
 ]
-ASK = {"hub_set_preference"}         # the hub's default permissions.ask
+ASK = {"hub_set_preference", "agent_memory_save", "agent_memory_entity"}   # the hub's default permissions.ask
+AGENT_ROUTES = {"agent_memory_save": "/v1/memory/save", "agent_memory_entity": "/v1/memory/entity",
+                "agent_memory_forget": "/v1/memory/forget"}
 
 
 def _model_view(t: dict[str, Any]) -> dict[str, Any]:
@@ -94,6 +104,7 @@ class FakeHub:
         self.chat_deletes: list[str] = []
         self.embed_up = True
         self.learning = True                           # False: hub_set_preference answers learning_off
+        self.agent_app: Any = None                     # the agent's app: agent_memory_* calls go to it (structured-memory 3.2)
         self.workspace: dict[str, Any] | None = None   # plan 34: the workspace mod's folders by environment (None: not running)
         self.grants: list[dict[str, Any]] = []         # GET /api/grants
         self.folder_origins: list[dict[str, Any]] = []  # the X-GAIFA-Origin of each GET /api/s/workspace/v1/folders
@@ -199,6 +210,14 @@ class FakeHub:
             self.prefs.append(p)
             return {"status": "done", "call_id": cid, "tool": name,
                     "result": {"saved": {k: p[k] for k in ("id", "scope", "tool", "field", "value", "when")}}}
+        if name in AGENT_ROUTES and self.agent_app is not None:     # the hub proxies these to the agent mod
+            import httpx
+            origin = json.dumps({"service": "agent", "thread": self.attempts[-1]["origin"].get("thread")} if self.attempts else {})
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=self.agent_app), base_url="http://agent") as c:
+                r = await c.post(AGENT_ROUTES[name], json=args, headers={"X-GAIFA-Origin": origin})
+            if r.status_code >= 400:
+                return {"status": "error", "call_id": cid, "tool": name, "error": r.json()}
+            return {"status": "done", "call_id": cid, "tool": name, "result": r.json()}
         if name == "hub_list_services":
             return {"status": "done", "call_id": cid, "tool": name, "result": {"services": [{"id": "fake", "state": "ready"}]}}
         return {"status": "done", "call_id": cid, "tool": name, "result": {"ok": True, **args}}

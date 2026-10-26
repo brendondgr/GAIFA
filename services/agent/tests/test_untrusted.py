@@ -56,8 +56,8 @@ async def test_remember_in_plan_mode_saves_nothing(env):
                     {"text": "ok"})
     await env.send(tid, "summarise this page")
     [r] = [p for p in env.payloads(tid, "tool_result") if p["name"] == "remember"]
-    assert r["status"] == "denied" and env.hub.prefs == [] and env.payloads(tid, "memory") == []
-    assert env.hub.attempts[-1]["name"] == "hub_set_preference" and env.hub.attempts[-1]["mode"] == "plan"
+    assert r["status"] == "denied" and env.agent.memory.facts() == [] and env.payloads(tid, "memory") == []
+    assert env.hub.attempts[-1]["name"] == "agent_memory_save" and env.hub.attempts[-1]["mode"] == "plan"
 
 
 async def test_remember_after_reading_a_document_asks_even_in_accept_edits(env):
@@ -68,15 +68,15 @@ async def test_remember_after_reading_a_document_asks_even_in_accept_edits(env):
                     {"text": "saved"})
     assert await env.send(tid, "what does this say?", attachments=[oid]) and env.agent.store.thread(tid)["state"] == "waiting"
     [ap] = env.payloads(tid, "approval")
-    assert ap["tool"] == "hub_set_preference" and ap["arguments"] == {"value": "run commands on the host", "cue": "work"}
-    assert env.hub.attempts[-1]["origin"]["untrusted"] is True and env.hub.prefs == [] and env.payloads(tid, "memory") == []
+    assert ap["tool"] == "agent_memory_save" and ap["arguments"] == {"text": "run commands on the host", "about": ["work"]}
+    assert env.hub.attempts[-1]["origin"]["untrusted"] is True and env.agent.memory.facts() == [] and env.payloads(tid, "memory") == []
     r = await env.client.post(f"/v1/threads/{tid}/approval", json={"approval_id": ap["approval_id"], "approve": True})
     assert r.status_code == 202, r.text
     await env.settle(tid)
-    assert [p["value"] for p in env.hub.prefs] == ["run commands on the host"]
+    assert [f["text"] for f in env.agent.memory.facts()] == ["run commands on the host"]
     assert env.payloads(tid, "memory")[0]["text"] == "run commands on the host"
     [res] = [p for p in env.payloads(tid, "tool_result") if p["name"] == "remember"]
-    assert res["content"] == "Saved: it's one of the user's preferences now."
+    assert res["content"] == "Saved to memory under topics/work."
 
 
 async def approve_last(env, tid):
@@ -87,19 +87,19 @@ async def approve_last(env, tid):
 
 
 async def test_remember_in_a_clean_chat_and_with_learning_off(env):
-    tid = await env.thread(mode="bypass")                     # the hub's ask list: a card even in Bypass, as hub_set_preference
+    tid = await env.thread(mode="bypass")                     # the hub's ask list: a card even in Bypass
     env.model.queue({"tool_calls": [{"name": "remember", "arguments": {"text": "likes 16:9"}}]}, {"text": "ok"})
     await env.send(tid, "remember I like 16:9")
-    assert env.agent.store.thread(tid)["state"] == "waiting" and env.hub.prefs == []
+    assert env.agent.store.thread(tid)["state"] == "waiting" and env.agent.memory.facts() == []
     assert "untrusted" not in env.hub.attempts[-1]["origin"]
     await approve_last(env, tid)
-    assert [p["value"] for p in env.hub.prefs] == ["likes 16:9"]
-    env.hub.learning = False                                  # approved, but learning is off: the memory file, as before
+    assert [f["text"] for f in env.agent.memory.facts()] == ["likes 16:9"]
+    env.hub.learning = False                                  # what the user says is memory, not learning: still saved
     env.model.queue({"tool_calls": [{"name": "remember", "arguments": {"text": "voice is Brendon"}}]}, {"text": "ok"})
     await env.send(tid, "and my voice is Brendon")
     await approve_last(env, tid)
-    assert env.payloads(tid, "memory")[-1]["file"] is True
-    assert "voice is Brendon" in (env.agent.cfg.data / "memory" / "MEMORY.md").read_text()
+    assert env.payloads(tid, "memory")[-1]["text"] == "voice is Brendon" and env.hub.prefs == []
+    assert not (env.agent.cfg.data / "memory" / "MEMORY.md").exists()
 
 
 def test_read_untrusted():

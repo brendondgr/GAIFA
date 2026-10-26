@@ -44,15 +44,18 @@ async def test_remember_writes_memory_and_shows_it(env):
     await env.send(tid, "remember I like 16:9 and my voice is Brendon")
     for _ in range(2):                         # each one is a card (the hub's default ask list), approved in turn
         ap = env.payloads(tid, "approval")[-1]
-        assert ap["tool"] == "hub_set_preference"
+        assert ap["tool"] == "agent_memory_save"
         assert (await env.client.post(f"/v1/threads/{tid}/approval", json={"approval_id": ap["approval_id"], "approve": True})).status_code == 202
         await env.settle(tid)
-    assert [p["text"] for p in env.payloads(tid, "memory")] == ["likes 16:9 images", "voice is Brendon"]
-    # plan 21.4: remember saves a preference in the hub (every chat, and MCP clients, see it)
-    assert [(p["value"], p["cue"], p["scope"]) for p in env.hub.prefs] == [("likes 16:9 images", "", "agent"), ("voice is Brendon", "Voices", "agent")]
+    mem = env.payloads(tid, "memory")
+    assert [p["text"] for p in mem] == ["likes 16:9 images", "voice is Brendon"] and mem[1]["about"] == ["topics/Voices"]
+    # structured-memory 3.2: remember saves a fact in the agent's memory (no hub preference)
+    assert env.hub.prefs == []
+    facts = {f["text"]: f for f in env.agent.memory.facts(current=True)}
+    assert facts["likes 16:9 images"]["source"] == "stated" and facts["likes 16:9 images"]["evidence"] == [{"thread": tid}]
     await env.send(tid, "next")
     assert "- likes 16:9 images" in env.model.received[-1]["messages"][0]["content"]
-    await env.client.put("/v1/settings", json={"memory": "- prefers square images\n"})      # Settings → Agent still edits the file
+    await env.client.put("/v1/settings", json={"memory": "- prefers square images\n"})      # Settings' editor, until 5.2
     await env.send(tid, "and now")
     s = env.model.received[-1]["messages"][0]["content"]
     assert "prefers square images" in s and "likes 16:9" in s

@@ -94,6 +94,7 @@ async def env(tmp_path):
     cfg = Config(model="main", fallback="backup", max_steps=6, data=tmp_path / "data" / "agent", default_window=8000)
     hub_url, llm_url = f"http://127.0.0.1:{hport}", f"http://127.0.0.1:{mport}/v1"
     app = create_app(cfg, db=tmp_path / "agent.db", hub_url=hub_url, llm_url=llm_url)
+    hub.agent_app = app
     async with app.router.lifespan_context(app):
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://agent", timeout=30) as c:

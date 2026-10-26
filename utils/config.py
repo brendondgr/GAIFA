@@ -173,7 +173,7 @@ def command_patterns(v: list[str]) -> list[str]:
 class PermissionsCfg(_Strict):
     """Tool permissions (plan 13.2, 25.1): name globs; the order with modes and grants is in `utils/tools/approvals.py`."""
     deny: list[str] = []
-    ask: list[str] = ["hub_set_preference"]     # a lasting preference reaches every later chat: a card in every mode
+    ask: list[str] = ["hub_set_preference", "agent_memory_save", "agent_memory_entity"]   # lasting: reaches every later chat, a card in every mode
     allow: list[str] = ["hub_start_service"]
 
     _globs = field_validator("deny", "ask", "allow")(lambda cls, v: tool_globs(v))

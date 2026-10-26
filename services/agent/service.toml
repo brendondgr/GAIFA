@@ -38,6 +38,13 @@ source = "GET /v1/widgets/messages"
 ranges = ["7d", "30d"]
 span = 4
 
+# The agent's own memory tools (plan structured-memory 3.2): agent_memory_*, never offered at /mcp (mcp = false).
+# `remember` (a local name the model knows) runs as agent_memory_save.
+[tools]
+memory_save = { op = "POST /v1/memory/save", risk = "write", mcp = false, description = "Remember a lasting fact the user told you, about them or about a project, person, place, tool or topic (what it's about goes in about, by name or path). It goes into later chats. Use memory_search first when it may replace an older fact, and pass that one as replaces." }
+memory_entity = { op = "POST /v1/memory/entity", risk = "write", mcp = false, description = "Make an entry in memory (a project, person, place, tool, topic), or rename one (the old name stays an alias), move it under another, add other names or a one-line summary." }
+memory_forget = { op = "POST /v1/memory/forget", risk = "destructive", mcp = false, description = "Forget a fact for good, only when the user asks you to forget it." }
+
 [api]
 hide = ["GET /v1/threads/{tid}/stream"]
 [api.responses]

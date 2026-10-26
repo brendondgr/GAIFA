@@ -125,6 +125,13 @@ class FactsMixin:
             raise MemoryError(409, "not_current", f"{replaces} is {old['state']}: only a current fact can be replaced")
         ents = self.resolve_about(about, source, by)
         same = self._same(text, ents)
+        if same is not None and old is not None and same["id"] != old["id"]:   # saved already; now it replaces `old`
+            with self.change("fact_replace", same["id"], f"replaced: {old['text'][:60]} → {text[:60]}",   # type: ignore[attr-defined]
+                             facts=[same["id"], old["id"]], by=by):
+                self.c.execute("UPDATE mem_facts SET replaces = ? WHERE id = ?", (old["id"], same["id"]))
+                if same["state"] == "active":
+                    self._retire_for(old["id"], same["id"], same["valid_from"])
+            return self.fact_public(self.need_fact(same["id"]))
         if same is not None and not replaces:                 # said again: seen once more, with the new evidence
             with self.change("fact_seen", same["id"], f"seen again: {text[:80]}", facts=[same["id"]], by=by):   # type: ignore[attr-defined]
                 ev = json.loads(same["evidence"] or "[]") + list(evidence or [])

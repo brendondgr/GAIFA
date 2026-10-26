@@ -51,20 +51,12 @@ class Knowledge:
         return self._head(self.data / "AGENT.md")
 
     def profile(self, folders: list[dict[str, Any]] | None = None) -> str:
-        """The prompt's Memory section (structured-memory 3.3): the profile (the user's facts, the projects, the chat's
-        projects by its folders), and Settings' MEMORY.md lines that aren't facts, until 5.2 retires that editor."""
+        """The prompt's Memory section (structured-memory 3.3): the user's facts, the projects, and the chat's projects
+        by its folders. (MEMORY.md was imported once, 1.3; its editor is gone, 5.2.)"""
         if self.memory is None:
             return self.memory_index()
         from .memory import profile
-        from .memory.model import norm
-        text, _ = profile.build(self.memory, folders)
-        known = {norm(f["text"]) for f in self.memory.facts(current=True, limit=1000)}
-        extra = []
-        for line in self._head(self.data / "memory" / "MEMORY.md").splitlines():
-            t = re.sub(r"\s*\(\d{4}-\d{2}-\d{2}\)\s*$", "", line.lstrip("-* ").strip())
-            if t and not t.startswith("#") and norm(t) not in known:
-                extra.append(f"- {t}")
-        return "\n".join(x for x in (text, "\n".join(extra)) if x)
+        return profile.build(self.memory, folders)[0]
 
     def memory_index(self) -> str:
         """What the prompt's Memory section lists: the current facts, newest first (structured-memory 1.3; Phase 3

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+import json
 import logging
 import os
 import time
@@ -113,10 +114,16 @@ class DocSettings(BaseModel):
     reply_reserve: int | None = Field(None, ge=0, description="Tokens kept free for the reply and tools")
 
 
+class MemorySettings(BaseModel):
+    recall: bool | None = Field(None, description="Recall memories in each message (structured-memory 3.3)")
+    fade_days: int | None = Field(None, ge=7, le=3650, description="Learned facts unused this long are proposed for retiring (4.2)")
+
+
 class AgentFiles(BaseModel):
     agent_md: str | None = None
     memory: str | None = None
     documents: DocSettings | None = None
+    memory_settings: MemorySettings | None = None
 
 
 def config_from_env() -> Config:
@@ -625,10 +632,15 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def get_settings(request: Request) -> dict:
         agent = A(request)
         k = Knowledge(agent.cfg.data, agent.hub)
-        return {**k.files(), "skills": await k.skills(), "model": agent.cfg.model, "fallback": agent.cfg.fallback,
+        from .memory import profile, tidy
+        m = agent.memory
+        mem = {"settings": {"fade_days": tidy.FADE_DAYS, **profile.settings(agent.cfg.data)},
+               "facts": len(m.facts(current=True, limit=100000)), "entities": len(m.entities()) - 1, "proposed": m.count_facts("proposed")}
+        return {**k.files(), "memory_settings": mem["settings"], "memory_stats": {k_: v for k_, v in mem.items() if k_ != "settings"},
+                "skills": await k.skills(), "model": agent.cfg.model, "fallback": agent.cfg.fallback,
                 "max_steps": agent.cfg.max_steps, "modes": list(MODES), "documents": docs.load(agent.cfg.data, agent.cfg)}
 
-    @app.put("/v1/settings", summary="Save AGENT.md, the memory index and/or the document settings")
+    @app.put("/v1/settings", summary="Save AGENT.md, the document settings and/or memory's settings (recall, fade_days)")
     async def put_settings(body: AgentFiles, request: Request) -> dict:
         agent = A(request)
         Knowledge(agent.cfg.data, agent.hub).save(body.agent_md, body.memory)
@@ -637,6 +649,13 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                 docs.save(agent.cfg.data, agent.cfg, body.documents.model_dump(exclude_none=True))
             except docs.SettingsError as e:
                 raise HTTPException(422, str(e)) from None
+        if body.memory_settings is not None:                  # structured-memory 5.2: data/agent/memory.json
+            from .memory import profile
+            cur = {**profile.settings(agent.cfg.data), **body.memory_settings.model_dump(exclude_none=True)}
+            agent.cfg.data.mkdir(parents=True, exist_ok=True)
+            tmp = agent.cfg.data / "memory.json.part"
+            tmp.write_text(json.dumps(cur, indent=1))
+            tmp.replace(agent.cfg.data / "memory.json")
         return await get_settings(request)
 
     return app

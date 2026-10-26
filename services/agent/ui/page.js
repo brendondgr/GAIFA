@@ -1,12 +1,15 @@
 // The agent's Learning page (plan 21.7; brief §5): what the agent has learned about you and how
-// your tools are used. Preferences: what applies to your cards, with where it came from; forget any.
+// your tools are used. Memory (structured-memory 5.1, memory.js): what it knows, entry by entry, with renames,
+// edits and undo. Preferences: what applies to your cards, with where it came from; forget any.
 // Review: what the miner proposes, to approve or reject. Tool usage: calls, errors and how often you
 // change each tool's card. The data is the hub's (/api/prefs, /api/tools/usage), through this mod.
 
 const SOURCE = { stated: 'you said', inferred: 'learned', carried: 'this chat' };
 
+import { memoryReview, memoryTab } from './memory.js';
+
 export default {
-  tabs: [{ id: 'learning', label: 'Preferences', icon: 'star' }, { id: 'review', label: 'Review', icon: 'check' },
+  tabs: [{ id: 'memory', label: 'Memory', icon: 'folder' }, { id: 'learning', label: 'Preferences', icon: 'star' }, { id: 'review', label: 'Review', icon: 'check' },
          { id: 'usage', label: 'Tool usage', icon: 'chart' }, { id: 'harness', label: 'Harness', icon: 'layers' },
          { id: 'runs', label: 'Runs', icon: 'play' }, { id: 'library', label: 'Library', icon: 'file' }],
 
@@ -57,7 +60,10 @@ export default {
       const rows = (await ctx.call('GET', '/v1/prefs', { query: { state: 'proposed' } })).json;
       const proposed = (await ctx.call('GET', '/v1/harness/versions')).json.filter(v => v.adopted_by === 'proposed');
       const decide = (p, verb, label, kind) => ui.button(label, async () => { await ctx.call('POST', `/v1/prefs/${p.id}/${verb}`).catch(fail); render(); }, { kind });
+      const mem = await memoryReview(ctx, fail, render);                       // structured-memory 5.1
       put(
+        h('h2', { style: 'margin:0;font-size:14px' }, 'Memories'), ...mem,
+        h('h2', { style: 'margin:8px 0 0;font-size:14px' }, 'Card preferences'),
         h('div', { style: 'display:flex;gap:8px;align-items:center' },
           ui.text('What the agent noticed you choose again and again. Approve one and it fills your cards from then on.', { muted: true }),
           h('span', { style: 'flex:1' }),
@@ -129,8 +135,8 @@ export default {
           : [ui.empty('No lessons yet', 'Each improvement run may keep one per area.')]));
     }
 
-    const views = { learning: preferences, review, usage, harness, runs, library };
-    function render() { (views[ctx.tab] || preferences)().catch(fail); }
+    const views = { memory: memoryTab(ctx, put, fail, () => render()), learning: preferences, review, usage, harness, runs, library };
+    function render() { (views[ctx.tab] || views.memory)().catch(fail); }
     render();
     ctx.on('pref', () => { if (ctx.tab !== 'usage') render(); });
   },

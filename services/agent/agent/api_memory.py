@@ -161,6 +161,12 @@ def add_routes(app: FastAPI) -> None:
     def merge(ref: str, body: MergeIn, request: Request) -> dict:
         return M(request).merge(ref, body.into)
 
+    @app.get("/v1/memory/search", summary="Search memory by names, words and meaning (what memory_search does), for the Memory page")
+    async def search_route(request: Request, q: str, history: bool = False, limit: int = 20) -> dict:
+        from .memory.search import search
+        agent = request.app.state.agent
+        return await search(agent.memory, agent.hub, q, history=history, limit=min(limit, 50), meaning_wait=8)
+
     @app.get("/v1/memory/facts", summary="Facts: ?state=proposed|active|retired|rejected, ?entity=, ?q= (words), ?current=true")
     def facts(request: Request, state: str | None = None, entity: str | None = None, q: str | None = None,
               current: bool | None = None, limit: int = 200) -> list:

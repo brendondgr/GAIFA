@@ -55,10 +55,12 @@ async def test_remember_writes_memory_and_shows_it(env):
     assert facts["likes 16:9 images"]["source"] == "stated" and facts["likes 16:9 images"]["evidence"] == [{"thread": tid}]
     await env.send(tid, "next")
     assert "- likes 16:9 images" in env.model.received[-1]["messages"][0]["content"]
-    await env.client.put("/v1/settings", json={"memory": "- prefers square images\n"})      # Settings' editor, until 5.2
-    await env.send(tid, "and now")
-    s = env.model.received[-1]["messages"][0]["content"]
-    assert "prefers square images" in s and "likes 16:9" in s
+    # structured-memory 5.2: Settings → Agent → Memory holds memory's settings and counts, not a MEMORY.md editor
+    st = (await env.client.get("/v1/settings")).json()
+    assert st["memory_settings"] == {"fade_days": 180, "recall": True} and st["memory_stats"]["facts"] == 2
+    st = (await env.client.put("/v1/settings", json={"memory_settings": {"recall": False, "fade_days": 90}})).json()
+    assert st["memory_settings"] == {"fade_days": 90, "recall": False}
+    assert (await env.client.put("/v1/settings", json={"memory_settings": {"fade_days": 1}})).status_code == 422
 
 
 async def test_tool_preferences_show_only_for_loaded_tools_and_not_when_opted_out(env):

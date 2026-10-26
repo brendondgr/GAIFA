@@ -56,7 +56,8 @@ export function createMockClient(api, { speed = 1 } = {}) {
       { name: 'comfy', description: 'Choosing a ComfyUI workflow and its settings per task', source: 'comfy', id: 'comfy/comfy' },
       { name: 'tts', description: 'Voices and delivery direction', source: 'tts', id: 'tts/tts' },
       { name: 'gen3d', description: 'Presets, parts and rigs for 3D models', source: 'gen3d', id: 'gen3d/gen3d' }],
-    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['plan', 'manual', 'accept_edits', 'auto', 'bypass'], documents: { inline_tokens: 6000, reply_reserve: 4096 } };
+    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['plan', 'manual', 'accept_edits', 'auto', 'bypass'], documents: { inline_tokens: 6000, reply_reserve: 4096 },
+    memory_settings: { recall: true, fade_days: 180 }, memory_stats: { facts: 2, entities: 1, proposed: 0 } };
 
   function newThread(o = {}) {
     const ts = now(), th = { id: rid('t_'), title: o.title || '', model: o.model || null, mode: o.mode || 'manual', state: 'idle', settings: o.settings || {}, created: ts, updated: ts, archived: false, parent_id: o.parent_id || null, fork_seq: o.fork_seq ?? null };
@@ -485,7 +486,8 @@ export function createMockClient(api, { speed = 1 } = {}) {
     async feedback(tid, body) { await net(); return { seq: 0, ...body }; },          // plan 21.7: the mock keeps no learning
     async decidePref(pid, approve) { await net(); return { id: pid, state: approve ? 'active' : 'rejected' }; },
     async saveSettings(body) { await net(); if (body.agent_md != null) settings.agent_md = body.agent_md; if (body.memory != null) settings.memory = body.memory;
-      if (body.documents) settings.documents = { ...settings.documents, ...body.documents }; return structuredClone(settings); },
+      if (body.documents) settings.documents = { ...settings.documents, ...body.documents };
+      if (body.memory_settings) settings.memory_settings = { ...settings.memory_settings, ...body.memory_settings }; return structuredClone(settings); },
     // skill-sources 3.1: your own skills, kept until the page reloads
     async uploadSkill(body) { await net();
       if (body.zip) throw { status: 422, code: 'bad_zip', detail: 'The mock can’t open zips: upload the folder or its SKILL.md' };

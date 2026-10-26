@@ -102,20 +102,20 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
 
 ## Phase 5 — The Memory page and review (M)
 
-- [ ] **5.1 Memory and Review tabs: `services/agent/ui/page.js`, `services/agent/ui/memory.js`.**
+- [x] **5.1 Memory and Review tabs: `services/agent/ui/page.js`, `services/agent/ui/memory.js`.**
   - **Memory tab:** the tree (kinds → entities), an entity's page (name with Rename, aliases, anchors, summary, current facts with Edit and Forget, replaced facts folded with when and why, the history from `mem_log` with Undo), search across memory (2.3), and "New memory".
   - **Review tab:** proposed facts, replacements, renames and merges next to the proposed preferences, each with its evidence (a link to the chat at that message), Approve / Edit / Reject, and "Approve all from this chat".
-  - **Header badge:** the agent's status reports `memory_review` (a count); the nav's Agent entry shows it.
+  - **Header badge:** the agent's status reports `memory_review` (a count); the nav's Agent entry shows it. *As built:* the nav has no badge for a mod, so the agent's status shows it as a stat, "Memories to review", and the Memory tab and Settings card show the count with a link to Review.
   *Done when:* `utils/tests/web/agent-memory.test.mjs` covers the tree, an entity page and the review rows; on the installed hub the user renames an entity, approves a proposed fact and undoes a merge.
-- [ ] **5.2 Settings → Agent → Memory: `web/chat/chat-settings.js` (`MemoryCard`), `web/settings/schema.js`.**
+- [x] **5.2 Settings → Agent → Memory: `web/chat/chat-settings.js` (`MemoryCard`), `web/settings/schema.js`.**
   - **Rows:** recall per turn (3.3), fade days (4.2), a link to the Memory tab, the count of facts and entities; the old AGENT.md editor stays; the MEMORY.md editor goes.
   *Done when:* `utils/tests/web/settings-schema.test.mjs` covers the rows; Settings → Agent shows them on the installed hub.
 
 **Wire — Phase 5:** the agent's page gains Memory and Review; Settings → Agent → Memory is the new card.
 
 **Checks & deliverables — Phase 5**
-- [ ] Rename "GAIFA" to "GAIFA hub" on the page: every fact shows the new name, "AIHub" and "GAIFA" still find it, the history shows the rename and Undo restores it.
-- [ ] Delivered: `ui/memory.js`, the page's tabs, the settings card, tests; docs: the agent's README, the brief's §11.13.
+- [x] Rename "GAIFA" to "GAIFA hub" on the page: every fact shows the new name, "AIHub" and "GAIFA" still find it, the history shows the rename and Undo restores it. *As checked (2026-10-26, on the installed hub with a test entry, removed after):* "Demo Project" renamed to "Demo Hub" on the Memory tab, the old name listed under Also called, the History row "renamed Demo Project → Demo Hub" and its Undo put it back; a proposal approved on Review; Settings → Agent → Memory's recall checkbox wrote `data/agent/memory.json` and back.
+- [x] Delivered: `ui/memory.js`, the page's tabs, the settings card, tests; docs: the agent's README, the brief's Settings → Agent, PATCHES #64.
 
 ## Phase 6 — Measuring it (S)
 

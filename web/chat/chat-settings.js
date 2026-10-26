@@ -1,4 +1,4 @@
-// Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, the memory index and its topics, documents
+// Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, memory (structured-memory 5.2: its settings and counts), documents
 // (plan 24.9: whole documents up to a size or the model's window, and the reply reserve), the
 // models, how a turn's steps are drawn (one fold, or split at each message; per browser), skills, the ask modes and permissions with the grants (plan 25.2: what was allowed in a
 // chat or always, with revoke), and Speech input (plan 29.4, chat-speech-input.js). (Show thinking is retired: thinking is a row in each turn's
@@ -89,11 +89,25 @@ export function InstructionsCard({ api, toast }) {
       : h('span', { style: { color: T.mut } }, a.err ? 'The agent isn’t running.' : 'Loading…'));
 }
 export function MemoryCard({ api, toast }) {
-  const { s, save } = useAgent(api, toast);
+  const React = R(), { s, save } = useAgent(api, toast);
+  const ms = s?.memory_settings, st = s?.memory_stats;      // structured-memory 5.2
+  const [days, setDays] = React.useState(null);
+  React.useEffect(() => { if (ms) setDays(ms.fade_days); }, [ms?.fade_days]);
+  if (!s) return agentSection('Memory', h('span', { style: { color: T.mut } }, 'Loading…'));
+  const link = (href, label) => h('a', { href, style: { color: T.acct, fontSize: 12.5 } }, label);
   return agentSection('Memory',
-    s ? h(Editor, { label: 'MEMORY.md', hint: 'The memory index, in every prompt. The agent adds to it with remember().', value: s.memory, rows: 8, placeholder: '- likes 16:9 images\n- my voice is Brendon', onSave: v => save({ memory: v }) }) : null,
-    s?.topics?.length ? h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' } }, h('span', { style: { fontSize: 12, color: T.mut } }, 'Topic files (read on demand):'),
-      s.topics.map(t => h('span', { key: t, style: { fontFamily: MONO, fontSize: 11.5, padding: '2px 7px', borderRadius: 5, background: T.inset, border: '1px solid ' + T.bd } }, t + '.md'))) : null);
+    h('div', { style: { fontSize: 12.5, color: T.mut, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'baseline' } },
+      st ? h('span', null, `${st.facts} fact${st.facts === 1 ? '' : 's'} · ${st.entities} entr${st.entities === 1 ? 'y' : 'ies'} besides you`) : null,
+      st?.proposed ? link('#/s/agent/review', `${st.proposed} to review`) : null,
+      link('#/s/agent/memory', 'Open the Memory page')),
+    ms ? row('Recall memories in each message', 'Before the agent answers, the facts your message calls to mind come with it (not what its profile already holds).',
+      h('input', { type: 'checkbox', checked: !!ms.recall, 'aria-label': 'Recall memories in each message', onChange: e => save({ memory_settings: { recall: e.target.checked } }) })) : null,
+    ms ? row('Let learned facts fade after', 'A fact the agent learned that nothing used this long is proposed for retiring. What you said yourself never fades.',
+      h('span', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+        h('input', { type: 'number', min: 7, max: 3650, value: days ?? '', 'aria-label': 'Fade after days', onChange: e => setDays(e.target.value),
+          style: { width: 80, height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.sb, color: T.tx } }),
+        h('span', { style: { fontSize: 12, color: T.mut } }, 'days'),
+        Number(days) !== ms.fade_days ? h(Btn, { sm: true, kind: 'pri', label: 'Save', onClick: () => save({ memory_settings: { fade_days: Number(days) } }) }) : null)) : null);
 }
 export function SkillsCard({ api, toast }) {
   const React = R(), { s, c, reload } = useAgent(api, toast);

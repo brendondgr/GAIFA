@@ -13,7 +13,7 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
 - **Which folders are scanned:** answered by the user (2026-10-26): only the chat's workspace folders, each one's own skill folders; no workspace, no scan; never `~/.claude`, `~/.agents` or other home folders.
 - **Where in a folder:** *Assumption:* the folder's top level only (`<folder>/.claude/skills/*/SKILL.md` and the like), not every subfolder; a folder that is itself a skill folder's parent is not special. Nested repositories are separate workspace folders if the user wants them.
 - **The locations table** (`services/workspace/skillscan.py`, one place to change): `.agents/skills`, `.claude/skills`, `.codex/skills`, `.gemini/skills`, `.cursor/skills`, `.github/skills`, `.opencode/skills`, `.cline/skills`, `.windsurf/skills`, `.devin/skills`, `.goose/skills`, `.roo/skills`. Instruction files: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, and `.cursor/rules/*.mdc` whose frontmatter has `alwaysApply: true`.
-- **The same skill in several folders:** *Assumption:* one entry per name and content hash; the entry lists every place it was found. The same name with different contents in one folder: both listed, each id qualified by its agent folder (`gaifa:plan`, `gaifa:claude.plan`).
+- **The same skill in several folders:** one entry per name; the entry lists every place it was found. *As built (2026-10-26):* a copy with other text or files is a `variant` of the first copy in the locations' order (the shared `.agents` first), read by an id qualified by its agent (`jobstuff:claude.apply`) but not listed for the model: this machine's JobStuff keeps each skill in `.agents` and `.claude` with one agent's paths in each, and listing both doubled the prompt.
 - **Trust:** a workspace skill is the user's own repository's text, so it is followed as instructions, as Claude Code does; every tool call it leads to still goes through the hub's permissions and approvals. An uploaded or copied skill is screened for prompt injection (the hub's page screening, `utils/tools/screen.py`) and a flagged one is saved turned off, with the reason.
 - **Instruction files in the prompt:** *Assumption:* listed, not loaded: "Before working in GAIFA, read its AGENTS.md (read_skill('gaifa:AGENTS.md'))". Small local windows can't carry a large `CLAUDE.md` in every chat. A `CLAUDE.md` that only imports `@AGENTS.md` counts as that file.
 - **Scripts in skills:** *Assumption:* a workspace skill's scripts run with the workspace tools in that folder, at that folder's level (Run for the sandbox); an uploaded skill's scripts are kept but not run in this plan (the listing says so).
@@ -52,16 +52,16 @@ Nearly every coding agent now reads the same open format ([agentskills.io](https
   - **Prompt:** the instruction files are listed with the folder's skills (`knowledge.workspace_list`): "Before working in GAIFA, read its instructions with read_skill: gaifa:AGENTS.md".
   - **Off:** nothing when the workspace mod is off, turned off in the chat, or doesn't answer (the prompt goes on, as `folders_note` does).
   *Done when:* `services/agent/tests/test_workspace_skills.py` (fake hub): a chat in an environment with a skill lists and reads it; a chat in None lists none; a chat with workspace turned off lists none; the instruction note appears.
-- [ ] **2.3 The composer's slash commands per chat: `GET /v1/threads/{tid}/skills` (agent), `web/chat/chat-pane.js`, `chat-composer.js`.**
-  - **Route:** the chat's skills (GAIFA's own and the workspace's) with `{id, name, description, source, folder?}`; `GET /v1/settings` keeps only GAIFA's own.
-  - **UI:** `ChatPane` fetches it when the chat or its environment changes; the slash list shows each skill's source (a folder name or "mod"/"mine") and a `disable-model-invocation` skill only here; `/skill-name` sends `Use the <id> skill: …` as today.
-  *Done when:* `utils/tests/web/chat-composer.test.mjs` covers grouped matches with sources; on the second hub (`?mock`) a chat in an environment shows the folder's skills under `/`, and one in None doesn't.
+- [x] **2.3 The composer's slash commands per chat: `web/chat/chat-pane.js`, `chat-composer.js`.**
+  - **Source:** *as built:* `ChatPane` asks the workspace mod directly (`GET /v1/skills` with the chat's environment, as it already asks for `/v1/folders`), not an agent route; nothing when the workspace is turned off in the chat. `GET /v1/settings` keeps only GAIFA's own skills.
+  - **UI:** `chatSkills(own, workspace)` puts them after GAIFA's own; the slash list offers one as `/<folder>:<name>`, found by either part, its hint led by the folder's name; it sends `Use the <id> skill: …` as today.
+  *Done when:* `utils/tests/web/chat.test.mjs` covers the matches and hints; on the installed hub a new chat in the Job Applications environment offers `/jobstuff:apply` for `/ap`, and in None doesn't. ✓ 2026-10-26.
 
 **Wire — Phase 2:** the chat's slash menu and the agent's skill list follow its environment.
 
 **Checks & deliverables — Phase 2**
-- [ ] On the installed hub, a chat whose environment holds `~/Agents/GAIFA` lists `gaifa:plan`, `gaifa:gaifa-mod` and the others once each (both trees), reads `gaifa:plan/planner.md`, and is told to read `gaifa:AGENTS.md`; the same chat moved to None lists none of them.
-- [ ] Delivered: `services/workspace/skillscan.py`, the agent's changes, the composer's, tests; docs: the workspace README (routes), architecture §14.1, the brief's §11.13, `docs/structure.md`.
+- [x] On the installed hub, a chat whose environment holds `~/Agents/GAIFA` lists `gaifa:plan`, `gaifa:gaifa-mod` and the others once each (both trees), reads `gaifa:plan/planner.md`, and is told to read `gaifa:AGENTS.md`; the same chat moved to None lists none of them. *As checked (2026-10-26):* the scan of the GAIFA folder gives the six skills once each, `AGENTS.md` and `CLAUDE.md`, and `planner.md`; no environment here holds GAIFA, so the chat check ran on Job Applications (`~/Tools/JobStuff`): its 8 skills in the prompt (skills 139 → 395 tokens), none in None.
+- [x] Delivered: `services/workspace/skillscan.py`, the agent's changes, the composer's, tests; docs: the workspace README (routes), architecture §14.1, the brief's §11.13, `docs/structure.md`.
 
 ## Phase 3 — Uploading and copying skills (M)
 

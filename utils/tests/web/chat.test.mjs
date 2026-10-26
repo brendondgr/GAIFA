@@ -187,6 +187,13 @@ test('slash commands: built-ins and skills', () => {
   assert.deepEqual(composer.slashMatches('/co', [{ name: 'comfy', description: 'workflows' }]).map(c => c.cmd), ['compact', 'context', 'comfy']);
   assert.deepEqual(composer.slashMatches('/model gemma', []), []);
   assert.deepEqual(composer.slashMatches('hello /c', []), []);
+  // skill-sources 2.3: a workspace folder's skill is /<folder>:<name>, found by either part, its folder in the hint
+  const ws = composer.chatSkills([{ name: 'comfy', description: 'workflows' }],
+    [{ id: 'gaifa:plan', name: 'plan', description: 'Write plans', folder: { id: 'gaifa', name: 'GAIFA' } }]);
+  assert.equal(ws[1].source, 'workspace');
+  const pl = composer.slashMatches('/pl', ws);
+  assert.deepEqual(pl.map(c => [c.cmd, c.hint]), [['gaifa:plan', 'GAIFA: Write plans']]);
+  assert.deepEqual(composer.slashMatches('/gaifa:', ws).map(c => c.cmd), ['gaifa:plan']);
 });
 
 test('the live client parses the agent\'s and the hub\'s error shapes', async () => {

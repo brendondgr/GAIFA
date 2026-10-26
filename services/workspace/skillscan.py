@@ -4,9 +4,9 @@ For each folder a call may use (its environment's, and those allowed in its chat
 folder (`LOCATIONS`) is looked at one level deep: `<folder>/<location>/<name>/SKILL.md`, in the open skill format
 (`skillfmt.py`). Nothing above or outside the folder is read, and a chat with no folders gets nothing.
 
-- **One entry per skill:** the same name with the same text and files in several locations is one skill, with every place
-  it was found (`found_in`); the same name with different text in one folder keeps both, each id qualified by its
-  agent (`gaifa:claude.plan`).
+- **One entry per skill name:** the first copy in `LOCATIONS` order (the shared `.agents` first) is the skill, with
+  every place it was found (`found_in`); a copy with other text or files (one agent's own wording) is a `variant`,
+  readable by an id qualified by its agent (`gaifa:claude.plan`) but not listed for the model.
 - **Ids:** `<folder id>:<skill name>`; a skill's file is `<id>/<path>`; an instruction file is `<folder id>:<file>`
   (`gaifa:AGENTS.md`).
 - **Instruction files** (`INSTRUCTIONS`, and `.cursor/rules/*.mdc` with `alwaysApply: true`) are listed for the
@@ -79,25 +79,26 @@ def _found(folders: Folders, f: Folder) -> list[dict[str, Any]]:
 
 
 def folder_skills(folders: Folders, f: Folder) -> list[dict[str, Any]]:
-    """The folder's skills, one entry per name and text."""
-    by: dict[tuple[str, str], dict[str, Any]] = {}
+    """The folder's skills, one entry per name: the first copy in LOCATIONS order (the shared `.agents` first);
+    copies with other text or files are its `variants`, each readable by its qualified id."""
+    by: dict[str, dict[str, Any]] = {}
     for x in _found(folders, f):
         s = x["s"]
         name = s["name"] if s["name"] and skillfmt.NAME.match(s["name"]) else x["dir"].rsplit("/", 1)[1].lower()
-        k = (name, x["key"])
-        if k in by:
-            by[k]["found_in"].append(x["path"])
+        row = by.get(name)
+        if row is None:
+            if len(by) >= PER_FOLDER:
+                break
+            by[name] = {"id": f"{f.id}:{name}", "name": name, "description": s["description"], "agent": x["agent"],
+                        "path": x["path"], "dir": x["dir"], "hash": x["key"], "found_in": [x["path"]], "variants": [],
+                        "problems": s["problems"], "meta": s["meta"],
+                        "model_invocable": not skillfmt.flag(s["meta"], "disable-model-invocation")}
             continue
-        by[k] = {"name": name, "description": s["description"], "agent": x["agent"], "path": x["path"], "dir": x["dir"],
-                 "hash": x["key"], "found_in": [x["path"]], "problems": s["problems"], "meta": s["meta"],
-                 "model_invocable": not skillfmt.flag(s["meta"], "disable-model-invocation")}
-        if len(by) >= PER_FOLDER:
-            break
-    rows = list(by.values())
-    clash = {r["name"] for r in rows if sum(1 for o in rows if o["name"] == r["name"]) > 1}
-    for r in rows:
-        r["id"] = f"{f.id}:{r['agent']}.{r['name']}" if r["name"] in clash else f"{f.id}:{r['name']}"
-    return rows
+        row["found_in"].append(x["path"])
+        if x["key"] != row["hash"] and all(v["hash"] != x["key"] for v in row["variants"]):
+            row["variants"].append({"id": f"{f.id}:{x['agent']}.{name}", "agent": x["agent"], "path": x["path"],
+                                    "dir": x["dir"], "hash": x["key"], "description": s["description"]})
+    return list(by.values())
 
 
 def folder_instructions(folders: Folders, f: Folder) -> list[dict[str, Any]]:
@@ -164,7 +165,10 @@ def read(folders: Folders, ref: str, named: list[str] | None = None) -> dict[str
         p, _ = folders.resolve(f, rest, read_file=True, named=named)
         return {"id": ref, "kind": "instructions", "text": p.read_text(errors="replace")}
     sid, _, path = rest.partition("/")
-    rows = {r["id"].split(":", 1)[1]: r for r in folder_skills(folders, f)}
+    rows: dict[str, dict[str, Any]] = {}
+    for r in folder_skills(folders, f):
+        rows[r["name"]] = r
+        rows.update({v["id"].split(":", 1)[1]: {**r, **v, "name": r["name"]} for v in r["variants"]})
     r = rows.get(sid)
     if r is None:
         raise Refused("not_found", f"no skill {sid!r} in the folder {f.id}", "the chat's skills are listed in its instructions", 404)

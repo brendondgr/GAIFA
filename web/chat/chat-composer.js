@@ -47,14 +47,19 @@ export const COMMANDS = [
   { cmd: 'context', hint: 'Show the context meter' },
   { cmd: 'clear-gpu', hint: 'Free the GPU: unload what is loaded (LLM engines only when named)', arg: '[mod…]' },   // plan 46.2
 ];
-/** The slash commands for a draft like "/mo": built-ins, then skills. */
+/** The slash commands for a draft like "/mo": built-ins, then skills. A workspace folder's skill (skill-sources 2.3) is
+ *  `/<folder>:<name>`, found by either part, its hint led by the folder's name. */
 export function slashMatches(draft, skills = []) {
   const m = /^\/(\S*)$/.exec(draft || '');
   if (!m) return [];
   const q = m[1].toLowerCase();
-  const all = [...COMMANDS, ...skills.map(s => ({ cmd: s.name, hint: s.description || `Use the ${s.name} skill`, arg: '<request>', skill: s }))];
-  return all.filter(c => c.cmd.toLowerCase().startsWith(q)).slice(0, 8);
+  const all = [...COMMANDS, ...skills.map(s => ({ cmd: s.folder ? s.id : s.name, arg: '<request>', skill: s,
+    hint: (s.folder ? s.folder.name + ': ' : '') + (s.description || `Use the ${s.name} skill`) }))];
+  return all.filter(c => c.cmd.toLowerCase().startsWith(q) || (c.skill && c.skill.name.toLowerCase().startsWith(q))).slice(0, 8);
 }
+
+/** The skills a chat's `/` menu offers: GAIFA's own, then its workspace folders' (skill-sources 2.3). */
+export const chatSkills = (own = [], workspace = []) => [...own, ...workspace.map(s => ({ ...s, source: 'workspace' }))];
 
 /** Uploads each file: { chips } for the ones that worked, { errors } ("name: why") for the rest. */
 export async function uploadAll(api, files) {

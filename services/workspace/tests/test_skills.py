@@ -46,7 +46,8 @@ def test_a_folders_skills_are_listed_once_each(client, proj):
     client.post("/v1/environments/default/folders", json={"path": str(proj)})
     out = client.get("/v1/skills", headers=origin(environment="default")).json()
     by = {s["id"]: s for s in out["skills"]}
-    assert set(by) == {"proj:plan", "proj:claude.deploy", "proj:codex.deploy", "proj:hidden-one"}
+    assert set(by) == {"proj:plan", "proj:deploy", "proj:hidden-one"}
+    assert by["proj:deploy"]["agent"] == "claude" and [v["id"] for v in by["proj:deploy"]["variants"]] == ["proj:codex.deploy"]
     assert by["proj:plan"]["found_in"] == [".agents/skills/plan/SKILL.md", ".claude/skills/plan/SKILL.md"]
     assert by["proj:plan"]["description"] == "Write plans" and by["proj:plan"]["folder"]["id"] == "proj"
     assert by["proj:hidden-one"]["model_invocable"] is False and by["proj:plan"]["model_invocable"] is True
@@ -63,17 +64,19 @@ def test_reading_a_skill_its_files_and_instructions(client, proj):
     assert read("proj:plan/references/format.md").json() == {"id": "proj:plan/references/format.md", "kind": "file", "text": "The format."}
     assert read("proj:plan/secrets.md").json()["code"] == "secret_file"
     assert read("proj:codex.deploy").json()["text"].strip() == "Codex's way."
+    assert read("proj:deploy").json()["text"].strip() == "Claude's way."
     assert read("proj:AGENTS.md").json()["text"].startswith("# Rules")
     assert read("proj:CLAUDE.md").json()["kind"] == "instructions"
     assert read("proj:nope").status_code == 404 and read("proj:plan/../../.env").status_code in (403, 404)
     assert read("other:plan").json()["code"] == "unknown_folder" and read("plan").status_code == 404
 
 
-def test_the_same_text_with_other_files_is_another_skill(client, proj):
+def test_the_same_name_with_other_files_is_a_variant(client, proj):
     (proj / ".agents" / "skills" / "plan" / "references" / "extra.md").write_text("More.")
     client.post("/v1/environments/default/folders", json={"path": str(proj)})
-    ids = {s["id"] for s in client.get("/v1/skills").json()["skills"]}
-    assert {"proj:agents.plan", "proj:claude.plan"} <= ids and "proj:plan" not in ids
+    plan = next(s for s in client.get("/v1/skills").json()["skills"] if s["name"] == "plan")
+    assert plan["agent"] == "agents" and [v["id"] for v in plan["variants"]] == ["proj:claude.plan"]
+    assert client.post("/v1/skills/read", json={"id": "proj:claude.plan/references/format.md"}).json()["text"] == "The format."
 
 
 def test_no_folders_no_skills(client, proj):
@@ -92,7 +95,7 @@ def test_a_folder_allowed_in_the_chat_counts(client, proj, tmp_path, monkeypatch
 def test_a_changed_skill_is_read_again(client, proj):
     client.post("/v1/environments/default/folders", json={"path": str(proj)})
     first = {s["id"]: s for s in client.get("/v1/skills").json()["skills"]}
-    skill(proj / ".claude" / "skills" / "plan", "plan", "Write better plans", "Plan body v2.")
+    skill(proj / ".agents" / "skills" / "plan", "plan", "Write better plans", "Plan body v2.")
     second = {s["id"]: s for s in client.get("/v1/skills").json()["skills"]}
-    assert first["proj:plan"]["description"] == "Write plans"
-    assert {second[k]["description"] for k in second if k.endswith("plan")} >= {"Write better plans"}
+    assert first["proj:plan"]["description"] == "Write plans" and second["proj:plan"]["description"] == "Write better plans"
+    assert [v["description"] for v in second["proj:plan"]["variants"]] == ["Write plans"]

@@ -18,7 +18,7 @@ import { TurnView } from './chat-activity.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
 import { decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
 import { ControlsRow, ModeMenu, ModelMenu, EnvMenu } from './chat-controls.js';
-import { Composer, typeInto } from './chat-composer.js';
+import { Composer, chatSkills, typeInto } from './chat-composer.js';
 import { VoiceButton, lastAnswer } from './chat-voice.js';
 import { scrollToReply } from './chat-quote.js';
 import { QuoteReplyBox, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
@@ -97,6 +97,13 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   useEffect(() => {      // its folders (and those allowed in this chat), for Bypass (plan 27.4)
     api.callService?.('workspace', 'GET', '/v1/folders', envId ? { query: { environment: envId } } : {}).then(r => setFolders(r.json?.folders || [])).catch(() => setFolders([]));
   }, [envId]);
+  const wsOff = (thread?.settings?.disabled || []).includes('workspace');
+  const [wsSkills, setWsSkills] = useState([]);
+  useEffect(() => {      // skill-sources 2.3: the skills other agents keep in this chat's folders, for its `/` menu
+    if (wsOff) { setWsSkills([]); return; }
+    api.callService?.('workspace', 'GET', '/v1/skills', envId ? { query: { environment: envId } } : {}).then(r => setWsSkills(r.json?.skills || [])).catch(() => setWsSkills([]));
+  }, [envId, wsOff]);
+  const skills = useMemo(() => chatSkills(settings?.skills || [], wsSkills), [settings?.skills, wsSkills]);
   const wasRunning = useRef(false), reading = useRef(null), voiceOn = useRef(false);
   useEffect(() => {      // read every reply aloud (auto_read): when a turn ends, its last message
     if (wasRunning.current && !running && speechOut?.auto_read && c.live && !voiceOn.current) {   // voice mode reads its own
@@ -157,7 +164,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
       if (models && !models.models.some(m => m.id === arg)) { toast(`No model “${arg}”`, 'error'); return null; }
       setModel(arg); toast(`Model: ${arg}`, 'success'); return null;
     }
-    const skill = settings?.skills?.find(s => s.name === cmdName);
+    const skill = skills.find(s => (s.folder ? s.id : s.name) === cmdName);
     if (skill) return `Use the ${skill.id || skill.name} skill: ${arg}`.trim();
     return text;
   };
@@ -253,7 +260,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
       dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
       voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
-      settings: thread?.settings || fresh.settings, onSettings: setGroups, skills: settings?.skills || [], outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
+      settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
       onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
       controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
         env: h(EnvMenu, { api, c, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: shared.loadEnvList, confirm,

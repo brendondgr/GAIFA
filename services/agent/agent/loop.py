@@ -275,10 +275,32 @@ class Agent(Compaction):
 
     # ---- the turn ----------------------------------------------------------------------------
 
+    async def _cloud_notice(self, tid: str, model: str) -> None:
+        """The first turn on a cloud model since the chat was on another says where the chat now goes (plan
+        llm-servers 2.3): the provider sees its messages, attachments and tool results from here on."""
+        last = next((e["payload"].get("model") for e in reversed(self.store.events(tid))
+                     if e["type"] in ("usage", "cloud_notice")), None)
+        if last == model:
+            return
+        try:
+            data = await self.llm.models(max_age=60)
+        except Exception:  # noqa: BLE001 — a notice never stops a turn
+            return
+        r = next(((m.get("relay") or {}) for m in data if m.get("id") == model), {})
+        if r.get("group") != "cloud":
+            return
+        provider = {"anthropic": "Anthropic", "gemini": "Google (Gemini)"}.get(r.get("protocol") or "", r.get("endpoint") or "a cloud provider")
+        if (r.get("protocol") or "") == "openai":
+            provider = r.get("endpoint") or "OpenAI"
+        self.emit(tid, "cloud_notice", {"model": model, "provider": provider})
+        self.emit(tid, "note", {"text": f"This chat now goes to {provider} ({model}): its messages, attachments and tool "
+                                        "results are sent there from this turn on.", "level": "info"})
+
     async def _turn(self, tid: str) -> None:
         self.set_state(tid, "running")
         thread = self.store.thread(tid) or {}
         model = thread.get("model") or self.cfg.model
+        await self._cloud_notice(tid, model)
         tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
         steps = 0
         final = "idle"

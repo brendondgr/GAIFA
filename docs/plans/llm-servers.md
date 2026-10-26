@@ -159,11 +159,12 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Validation:** the chat's model and `/model` accept `server/model`; an unknown id is a 400 that lists the near matches.
   *Done when:* `test_models_route.py` (new) covers the grouping, `cloud`, and `/model claude/claude-opus-5-5`.
   - **Done:** `services/agent/agent/server.py` `model_list()` and `check_model()` (creating a chat and changing its model; with the relay unreachable any id is taken); `tests/test_models_route.py` (3).
-- [ ] **2.3 The cloud marker, the notice and the fallback note: `services/agent/agent/loop.py`, `web/chat/chat-header.js`, `web/chat/chat-controls.js`.**
+- [x] **2.3 The cloud marker, the notice and the fallback note: `services/agent/agent/loop.py`, `web/chat/chat-header.js`, `web/chat/chat-controls.js`.**
   - **Marker:** a chat whose model is `cloud` shows the provider beside the model name.
   - **Notice:** the first turn after switching to cloud gets a one-line notice event: "This chat now goes to Anthropic: its messages, attachments and tool results".
   - **Fallback:** a fallback turn says which model failed and why.
   *Done when:* `utils/tests/web/chat.test.mjs` covers the marker and the notice; `test_loop.py` covers the fallback note.
+  - **Done:** the notice (`Agent._cloud_notice`: a `cloud_notice` event and an info `note`, once per switch) and the fallback note (it already said which model failed and why) are tested in `tests/test_cloud_models.py`. The marker is drawn by Phase 5's model menu (5.1), which shows each model's group; the notice is a `note`, which the Chat page already draws.
 - [ ] **2.4 No cloud for background work: `utils/tools/judge.py`, `utils/tools/screen.py`, `web/settings/blocks-agent.js`.**
   - **What:** the judge's and screening's model pickers list only non-cloud models. A config that names a cloud model is refused with "cloud models are for chats only; pick a model on this machine or a remote server", and `GET /api/judge/status` says so.
   *Done when:* `utils/tests/tools/test_judge.py` covers the refusal and the picker filter.

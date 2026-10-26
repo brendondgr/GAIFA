@@ -72,3 +72,24 @@ async def test_a_cloud_chats_summary_uses_the_local_model(env):
 async def test_is_cloud(env):
     env.model.groups["main"] = "cloud"
     assert await env.agent.llm.is_cloud("main") and not await env.agent.llm.is_cloud("backup")
+
+
+async def test_switching_to_a_cloud_model_says_so_once(env):
+    env.model.groups["backup"] = "cloud"
+    tid = await env.thread()
+    await env.send(tid, "hi")
+    assert not [n for n in env.payloads(tid, "note") if "This chat now goes to" in n["text"]]   # a local model: nothing
+    env.agent.store.update_thread(tid, model="backup")
+    await env.send(tid, "again")
+    await env.send(tid, "and again")
+    notes = [n["text"] for n in env.payloads(tid, "note") if "This chat now goes to" in n["text"]]
+    assert notes == ["This chat now goes to backup (backup): its messages, attachments and tool results are sent there from this turn on."]
+
+
+async def test_a_failed_cloud_model_falls_back_with_a_note(env):
+    env.agent.cfg.fallback = "backup"
+    env.model.down.add("main")
+    tid = await env.thread()
+    await env.send(tid, "hi")
+    note = next(n["text"] for n in env.payloads(tid, "note") if "didn't answer" in n["text"])
+    assert note.startswith("main didn't answer (") and note.endswith("continuing on backup")

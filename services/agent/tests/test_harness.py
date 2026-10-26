@@ -10,7 +10,7 @@ import pytest
 from agent import prompts
 from agent.harness import Harness, HarnessError, validate
 
-OLD = (Path(__file__).parent / "fixtures" / "base-prompt-2026-10-20.txt").read_text()
+OLD = (Path(__file__).parent / "fixtures" / "base-prompt-2026-10-26.txt").read_text()
 
 
 def test_the_base_prompt_is_unchanged():

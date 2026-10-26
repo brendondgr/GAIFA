@@ -11,6 +11,7 @@ directly. Only current facts unless `history`. Without the embed mod the first t
 
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any
 
@@ -53,11 +54,18 @@ async def meaning(hub: Any, query: str, limit: int = 20) -> list[str] | None:
 
 
 async def search(m: MemoryStore, hub: Any, query: str, entity: str | None = None, kind: str | None = None,
-                 history: bool = False, limit: int = 10) -> dict[str, Any]:
+                 history: bool = False, limit: int = 10, meaning_wait: float | None = None) -> dict[str, Any]:
+    """`meaning_wait`: give up on the meaning list after this many seconds (recall: names and words answer)."""
     query = re.sub(r"\s+", " ", query or "").strip()
     by_name = [f"entity:{e}" for e in names_in(m, query)]
     by_word = [ref for ref, _ in m.keyword(query, 40)]
-    by_meaning = await meaning(hub, query)
+    if meaning_wait is None:
+        by_meaning = await meaning(hub, query)
+    else:
+        try:
+            by_meaning = await asyncio.wait_for(meaning(hub, query), timeout=meaning_wait)
+        except asyncio.TimeoutError:
+            by_meaning = None
     fused = rrf([by_name, by_word, by_meaning or []])
     scores: dict[str, float] = {}
     for ref, s in fused.items():

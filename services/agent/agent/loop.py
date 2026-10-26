@@ -17,6 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 from collections.abc import Awaitable, Callable
@@ -138,6 +139,7 @@ class Agent(Compaction):
         if not queued and thread["state"] == "waiting":
             await self._dismiss_pending(tid, "The user wrote a message instead of answering.")
         docs = await describe_docs(self, tid, thread, attachments, doc_modes) if attachments else []
+        recalled = await self._recall(tid, thread, text)
         # Numbered now, with no await before the event is written: a tool result that landed while the
         # documents were described has taken its #n already (two outputs never share one).
         n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
@@ -146,7 +148,8 @@ class Agent(Compaction):
         ev = self.emit(tid, "user", {"text": text, **({"quotes": quotes} if quotes else {}),
                                      **({"mentions": mentions} if mentions else {}),     # plan 48.3
                                      **({"attachments": attachments} if attachments else {}),
-                                     **({"docs": docs} if docs else {}), **({"queued": True} if queued else {})})
+                                     **({"docs": docs} if docs else {}), **({"queued": True} if queued else {}),
+                                     **({"memory": recalled} if recalled else {})})
         for d in docs:
             if d.get("fallback"):        # asked for whole, didn't fit (plan 24.9): say so in the chat
                 self.emit(tid, "note", {"text": d["fallback"], "level": "warn"})
@@ -157,6 +160,19 @@ class Agent(Compaction):
         if not queued:
             self.start(tid)
         return ev
+
+    async def _recall(self, tid: str, thread: dict[str, Any], text: str) -> list[dict[str, Any]]:
+        """structured-memory 3.3: the facts this message calls to mind (not an eval's, not when turned off)."""
+        from .memory import profile
+        if (thread.get("settings") or {}).get("dry_run") or not profile.settings(self.cfg.data)["recall"]:
+            return []
+        try:
+            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory)[1])
+        except Exception:  # noqa: BLE001: a message never fails over memory
+            log.exception("recall for %s", tid)
+            return []
+        self.memory.touch([r["id"] for r in got])
+        return got
 
     async def answer(self, tid: str, question_id: str, answers: dict[str, Any]) -> dict[str, Any]:
         q = self._find(tid, "question", question_id)
@@ -633,8 +649,9 @@ class Agent(Compaction):
             services, memory = None, None
         summary, _, _ = ctx.summary_state(events)
         prefs = await k.preferences(set(tools.full), tid) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
+        fdata = await ctx.chat_folders(self.hub, tid, thread_settings(self.store, tid), services, tools.disabled)
         parts = {"base": tree.get("systemprompt.md", ""), "guardrails": tree.get("guardrails.md", ""),
-                 "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.memory_index(), prefs) if x),
+                 "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.profile((fdata or {}).get("folders")), prefs) if x),
                  "skills": await k.skill_list(set(tools.disabled), await ctx.chat_skills(
                      self.hub, tid, thread_settings(self.store, tid), services, tools.disabled)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
@@ -642,7 +659,7 @@ class Agent(Compaction):
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "
                     "the user can turn them back on in the composer)" if tools.disabled else "")
                  + prompts.mode_note(mode_of((self.store.thread(tid) or {}).get("mode")))
-                 + await ctx.folders_note(self.hub, tid, thread_settings(self.store, tid), services, tools.disabled),
+                 + (prompts.folders_note(fdata, os.path.expanduser("~")) if fdata is not None else ""),
                  "outputs": prompts.outputs_table(ctx.model_outputs(events)), "summary": summary}
         sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),

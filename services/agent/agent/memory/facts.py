@@ -16,6 +16,9 @@ from typing import Any
 from .model import FACT_KINDS, FACT_STATES, SOURCES, USER, MemoryError, check_date, kind_of, norm, today
 
 MAX_TEXT = 1000
+STOP = frozenset("""a an and are as at be but by can could did do does for from had has have he her his how i if in into is it
+its me my no not of on or our she so than that the their them then there these they this to too us was we were what when
+where which who why will with would you your yours i'm im it's don't dont about just please also any some""".split())
 
 
 class FactsMixin:
@@ -255,7 +258,7 @@ class FactsMixin:
 
     def keyword(self, q: str, limit: int = 30) -> list[tuple[str, float]]:
         """FTS5 over current facts and active entities: [(ref, score)], best first. `ref` is fact:<id> or entity:<id>."""
-        words = [w for w in re.findall(r"[^\W_]+", (q or "").lower()) if len(w) > 1][:24]
+        words = [w for w in re.findall(r"[^\W_]+", (q or "").lower()) if len(w) > 1 and w not in STOP][:24]
         if not words:
             return []
         match = " OR ".join(f'"{w}"' for w in words)

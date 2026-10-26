@@ -31,4 +31,4 @@ async def test_the_prompt_lists_current_facts(env):
     tid = await env.thread()
     await env.send(tid, "hi")
     system = env.model.received[-1]["messages"][0]["content"]
-    assert "- Prefers 16:9 images" in system and "- Mods use ports 5100-5199 (projects/GAIFA)" in system
+    assert "About the user:\n- Prefers 16:9 images" in system and "Projects: GAIFA" in system

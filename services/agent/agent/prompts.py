@@ -55,7 +55,7 @@ def build(parts: dict[str, str]) -> str:
     out = (parts.get("base") or base_text()).rstrip("\n")
     out += section("Guardrails", parts.get("guardrails", ""))
     out += section("Standing instructions (AGENT.md)", parts.get("agent_md", ""))
-    out += section("Memory (what you know about the user; topic files via read_skill('memory:<topic>'))", parts.get("memory", ""))
+    out += section("Memory (what you know: memory_search finds more; remember saves what the user tells you to keep)", parts.get("memory", ""))
     out += section("Skills (read one with read_skill before doing that kind of task)", parts.get("skills", ""))
     out += section("More tools (not loaded; load_tools or find_tools first)", parts.get("tools", ""))
     out += section("Environment", parts.get("env", ""))

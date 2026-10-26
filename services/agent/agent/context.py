@@ -364,6 +364,9 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
             text = with_quotes(p.get("text") or "", quotes_of(p))
             if line := mentions_line(p):
                 text += "\n\n" + line                 # plan 48.3: the @-mentions, plainly
+            if p.get("memory"):                       # structured-memory 3.3: what was recalled when it came
+                from .memory.profile import block
+                text += "\n\n" + block(p["memory"])
             docs = p.get("docs") or []
             rest = [a for a in p.get("attachments") or [] if a not in {d["id"] for d in docs}]
             if rest:
@@ -445,25 +448,31 @@ def summary_cut(events: list[dict[str, Any]]) -> int | None:
     return cut if cut > upto else None
 
 
-async def folders_note(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
-                       disabled: set[str] | list[str]) -> str:
-    """Plan 34: for the system prompt, the workspace folders this chat can use (its environment's, and those the user
-    allowed in it), as the workspace mod resolves them; "" when the mod is off, turned off here, or doesn't answer."""
+async def chat_folders(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
+                       disabled: set[str] | list[str]) -> dict[str, Any] | None:
+    """Plan 34: the workspace folders this chat can use (its environment's, and those the user allowed in it), as the
+    workspace mod resolves them: `{folders, environment}`; None when the mod is off, turned off here, or doesn't answer."""
     import logging
-    import os
-
-    from . import prompts
 
     if "workspace" in disabled or not any(s.get("id") == "workspace" and s.get("state") in ("ready", "degraded")
                                           for s in services or []):
-        return ""
+        return None
     env = (settings or {}).get("environment")
     try:
-        data = await hub.chat_folders(tid, env if isinstance(env, str) and env else None)
+        return await hub.chat_folders(tid, env if isinstance(env, str) and env else None)
     except Exception as e:  # noqa: BLE001: the prompt goes on without it
         logging.getLogger("agent.context").warning("the folders of chat %s: %s", tid, e)
-        return ""
-    return prompts.folders_note(data, os.path.expanduser("~"))
+        return None
+
+
+async def folders_note(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
+                       disabled: set[str] | list[str]) -> str:
+    """For the system prompt: the chat's folders (`chat_folders`) as prompts.folders_note writes them; "" without."""
+    import os
+
+    from . import prompts
+    data = await chat_folders(hub, tid, settings, services, disabled)
+    return prompts.folders_note(data, os.path.expanduser("~")) if data is not None else ""
 
 
 async def chat_skills(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,

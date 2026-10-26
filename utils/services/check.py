@@ -181,6 +181,27 @@ async def run(mgr: ServiceManager, svc: Service, start: bool = False, tools: Any
         problems = widget_problems(data, w.kind)
         r.add(name, "fail" if problems else "ok", "; ".join(problems) if problems else f"{w.kind} with {len(data.get('series', []))} series")
 
+    # 9b. the [llm] engine contract (plan llm-servers 3.1)
+    if m.llm:
+        if not live:
+            r.add("llm", "skip", "not running")
+        else:
+            got: dict[str, Any] = {}
+            for key in ("catalog", "engine"):
+                op = getattr(m.llm, key)
+                if not op:
+                    continue
+                method, path = op.split(" ", 1)
+                try:
+                    resp = await mgr.client.request(method, svc.url + path, timeout=15)
+                    got[key] = resp.json() if 200 <= resp.status_code < 300 else {"_status": resp.status_code}
+                except (httpx.HTTPError, ValueError) as e:
+                    got[key] = {"_error": type(e).__name__}
+            bad = [f"{k}: {v.get('_error') or 'HTTP ' + str(v.get('_status'))}" for k, v in got.items() if "_status" in v or "_error" in v]
+            bad = bad or llm_problems(got.get("catalog"), got.get("engine"))
+            n = len((got.get("catalog") or {}).get("models") or [])
+            r.add("llm", "fail" if bad else "ok", "; ".join(bad) if bad else f"{n} models, engine {(got.get('engine') or {}).get('state', '?')}")
+
     # 10. agent tools: their schemas and `x-options` (plan 20.1)
     if tools is not None and (m.tools or m.agent.tools_source) and live:
         from utils.tools.options import spec_problems
@@ -245,7 +266,29 @@ def _manifest_ops(m: mf.Manifest) -> list[tuple[str, str]]:
     if m.agent.tools_source:
         refs.append(("[agent].tools_source", m.agent.tools_source))
     refs += [(f"[ui.widgets].{w.id}", w.source) for w in m.ui.widgets]
+    if m.llm:
+        refs += [(f"[llm].{key}", getattr(m.llm, key)) for key in ("catalog", "load", "unload", "engine") if getattr(m.llm, key)]
     return refs
+
+
+def llm_problems(catalog: Any, engine: Any) -> list[str]:
+    """[llm] (plan llm-servers 3.1): `catalog` is {models: [{id, name, loaded, …}]}; `engine` is {state, loaded: [ids]}."""
+    out = []
+    models = catalog.get("models") if isinstance(catalog, dict) else None
+    if not isinstance(models, list):
+        out.append("catalog: no `models` list")
+    else:
+        for i, e in enumerate(models[:200]):
+            if not isinstance(e, dict) or not isinstance(e.get("id"), str) or not isinstance(e.get("name"), str):
+                out.append(f"catalog: models[{i}] needs a string id and name")
+                break
+            if not isinstance(e.get("loaded", False), bool):
+                out.append(f"catalog: models[{i}].loaded must be true or false")
+                break
+    if engine is not None:
+        if not isinstance(engine, dict) or not isinstance(engine.get("state"), str) or not isinstance(engine.get("loaded", []), list):
+            out.append("engine: needs a string state and a loaded list")
+    return out
 
 
 def widget_problems(data: Any, kind: str) -> list[str]:

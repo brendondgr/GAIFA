@@ -13,6 +13,8 @@ tools  like ok, plus routes for agent tools (plan 13): items, an image output, s
 perms  like ok, plus network and execute tools (plan 25): POST /v1/search, /v1/fetch, /v1/python
        and /v1/run echo what they were sent as {"ran": <route>, "arguments": {...}}
 ws     like ok, plus a workspace mod in miniature with its preflight /v1/limits (plan 27.4; _fakews.py)
+engine like ok, plus the [llm] engine contract (plan llm-servers 3.1): GET /v1/llm/catalog (two models),
+       GET /v1/llm/engine, POST /v1/llm/load {id} (202; unknown: 404), POST /v1/llm/unload {id?}
 
 POST /v1/upload reads the body in chunks and returns its size and sha256 (for big uploads).
 GET /v1/events?n=3&gap=0.05 streams n server-sent events, gap seconds apart.
@@ -47,6 +49,11 @@ OUTPUTS = Path(os.environ.get("FAKE_OUTPUTS") or os.environ.get("GAIFA_OUTPUTS")
 STARTED = time.time()
 STATE = {"last_used": time.time(), "requests": 0, "outputs": 0, "memory": None, "doodle": False}
 JOBS: dict[str, dict] = {}
+ENGINE_MODELS = [{"id": "tiny-gguf", "name": "Tiny (GGUF)", "format": "gguf", "size_gb": 0.5, "memory_gb": 1.0, "context": 8192,
+                  "downloaded": True, "relay_model": "tiny"},
+                 {"id": "small-hf", "name": "Small (HF)", "format": "hf", "size_gb": 2.0, "memory_gb": 6.0, "context": 32768,
+                  "downloaded": False, "relay_model": "small-vllm"}]
+LOADED: set[str] = set()
 MB = 1024 * 1024
 
 
@@ -82,6 +89,11 @@ def openapi() -> dict:
         import _fakews
 
         paths.update(_fakews.paths())
+    if MODE == "engine":
+        paths["/v1/llm/catalog"] = {"get": op("What this engine can run")}
+        paths["/v1/llm/engine"] = {"get": op("What runs now")}
+        paths["/v1/llm/load"] = {"post": op("Start a model", {"type": "object", "properties": {"id": {"type": "string"}}})}
+        paths["/v1/llm/unload"] = {"post": op("Stop a model, or all", {"type": "object", "properties": {"id": {"type": "string"}}})}
     if MODE == "mem":
         paths["/v1/load"] = {"post": op("Allocate memory")}
         paths["/v1/unload"] = {"post": op("Free memory")}
@@ -256,6 +268,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.sse(int(q.get("n", ["3"])[0]), float(q.get("gap", ["0.05"])[0]))
         if url.path == "/v1/widgets/requests":
             return self.send(200, widget(parse_qs(url.query).get("range", ["24h"])[0]))
+        if MODE == "engine" and url.path == "/v1/llm/catalog":
+            return self.send(200, {"models": [{**m, "loaded": m["id"] in LOADED} for m in ENGINE_MODELS]})
+        if MODE == "engine" and url.path == "/v1/llm/engine":
+            return self.send(200, {"state": "ready" if LOADED else "idle", "loaded": sorted(LOADED)})
         if MODE == "tools":
             m = re.fullmatch(r"/v1/items/([^/]+)", url.path)
             if m:
@@ -274,7 +290,7 @@ class Handler(BaseHTTPRequestHandler):
                      "op": "POST /v1/tools/paint/call", "job": {"status": "GET /v1/render/{job_id}", "cancel": "POST /v1/render/{job_id}/cancel"},
                      "risk": "generate", "ask": ["style"], "examples": [{"prompt": "a fox", "style": "ink"}]},
                     {"type": "function", "function": {"name": "styles", "description": "List styles.", "parameters": {"type": "object", "properties": {}}},
-                     "op": "POST /v1/tools/styles/call", "job": None, "risk": "read", "core": True},
+                     "op": "POST /v1/tools/styles/call", "job": None, "risk": "read", "core": True, "group": "fake-tools:looks"},
                     {"type": "function", "function": {"name": "shape", "description": "Make a shape (x-options, plan 20.1).", "parameters": SHAPE},
                      "op": "POST /v1/tools/shape/call", "job": None, "risk": "generate", "ask": ["engine", "preset"]},
                     {"type": "function", "function": {"name": "sketch", "description": "Sketch (another style enum).", "parameters": {
@@ -321,6 +337,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {"size": size, "sha256": h.hexdigest(), "content_type": self.headers.get("Content-Type", "")})
         if url.path == "/v1/fail":
             return self.send(500, {"detail": "fake failure: this route always fails"})
+        if MODE == "engine" and url.path in ("/v1/llm/load", "/v1/llm/unload"):
+            mid = self.body().get("id")
+            if url.path.endswith("load") and not url.path.endswith("unload"):
+                if mid not in {m["id"] for m in ENGINE_MODELS}:
+                    return self.send(404, {"detail": f"no model {mid}"})
+                LOADED.add(mid)
+                return self.send(202, {"id": mid, "state": "loading"})
+            LOADED.difference_update({mid} if mid else set(LOADED))
+            return self.send(200, {"loaded": sorted(LOADED)})
         if url.path == "/v1/jobs":
             b = self.body()
             jid = f"j_{len(JOBS) + 1}"
@@ -475,7 +500,7 @@ def status() -> dict:
 
 
 def main() -> None:
-    if MODE not in {"ok", "slow", "crash", "mem", "tools", "perms", "ws"}:
+    if MODE not in {"ok", "slow", "crash", "mem", "tools", "perms", "ws", "engine"}:
         sys.exit(f"unknown mode {MODE!r}")
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     server.daemon_threads = True

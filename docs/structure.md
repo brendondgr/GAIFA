@@ -155,7 +155,7 @@ Tests stay inside the hub package, as the plan specifies. Group them by area as 
 utils/tests/
 ├── conftest.py                 ✅     root, make_app/app/client (ASGI), fake_mod, hub_process, services_dir; `needs_mods(*ids)` skips a test that reads a submodule mod's files when it isn't checked out (plan mod-repos 2.3)
 ├── fixtures/
-│   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok (with a `requests` widget), fake-slow, fake-crash, fake-mem, fake-tools (agent tools of every kind: a job, file inputs, binary results, a tools_source), fake-perms (network and execute tools, plan 25), fake-ws + `_fakews.py` (a workspace mod in miniature with its preflight, plan 27.4)
+│   ├── mods/                   ✅     _fakemod.py (stdlib server) + fake-ok (with a `requests` widget), fake-slow, fake-crash, fake-mem, fake-tools (agent tools of every kind: a job, file inputs, binary results, a tools_source), fake-perms (network and execute tools, plan 25), fake-ws + `_fakews.py` (a workspace mod in miniature with its preflight, plan 27.4); fake-engine (`_fakemod.py engine`: the `[llm]` engine contract, plan llm-servers 3.1)
 │   ├── docs/                   ✅     documents, text and code for plan 24 (a PDF with bookmarks, a scanned-page PDF, docx, odt, epub, ipynb, HTML, CSV, .py, .md), written by `make.py` (stdlib + Pillow; its `pdf()` makes longer PDFs for tests)
 │   └── openapi/                ✅     real OpenAPI captures from Phase 0.5: tts, gen3d, lcpp, relay; snapshots/ = their converted Operation[]
 ├── core/test_<behavior>.py     ✅     paths, config, db, events, server, cli, doctor, backup, `gaifa setup` (test_cli_setup.py: fake setup docs, runner and host)

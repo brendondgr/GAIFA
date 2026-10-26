@@ -178,7 +178,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
 
 ## Phase 3 — One contract for local engines (M)
 
-- [ ] **3.1 The `[llm]` manifest section: architecture §4.3, `utils/manifest.py`.**
+- [x] **3.1 The `[llm]` manifest section: architecture §4.3, `utils/manifest.py`.**
   - **Fields:** `[llm] catalog = "GET /v1/llm/catalog"`, `load = "POST /v1/llm/load"`, `unload = "POST /v1/llm/unload"`, `engine = "GET /v1/llm/engine"`.
   - **Catalog entries:** `{id, name, format: "gguf"|"hf", size_gb, memory_gb, context, downloaded, loaded, endpoint?, relay_model?}`.
   - **Load:** `{id, wait: false}` → 202.

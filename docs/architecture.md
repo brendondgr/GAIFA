@@ -179,6 +179,12 @@ containers = []                     # podman containers counted as this mod's me
 idle_unload_s = 180                 # the mod's default; config.toml may override (0 = never)
 idle_unload_env = "LOCALTTS_IDLE_UNLOAD_S"   # the variable the mod reads it from (GAIFA_IDLE_UNLOAD_S is always set too)
 
+[llm]                               # optional (plan llm-servers 3.1): local language-model engines (lcpp, vllm), one contract
+catalog = "GET /v1/llm/catalog"     # {models: [{id, name, format, size_gb, memory_gb, context, downloaded, loaded, relay_model?}]}
+load = "POST /v1/llm/load"          # {id} → 202 (the mod asks GAIFA for memory itself)
+unload = "POST /v1/llm/unload"      # {id} or {} for all
+engine = "GET /v1/llm/engine"       # {state, loaded: [ids]}; `gaifa check` reads catalog and engine
+
 [models]
 dirs = ["tts", "voices"]            # data/models subfolders this mod uses
 

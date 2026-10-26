@@ -37,7 +37,7 @@ def test_manifests_follow_the_contract(folder):
 
 
 def test_all_four_exist():
-    assert {p.name for p in FAKE_MODS.iterdir() if p.is_dir() and not p.name.startswith("_")} == {"fake-ok", "fake-slow", "fake-crash", "fake-mem", "fake-tools", "fake-perms", "fake-ws"}
+    assert {p.name for p in FAKE_MODS.iterdir() if p.is_dir() and not p.name.startswith("_")} == {"fake-ok", "fake-slow", "fake-crash", "fake-mem", "fake-tools", "fake-perms", "fake-ws", "fake-engine"}
 
 
 @pytest.mark.parametrize("name", ["tts", "gen3d", "lcpp", "relay"])

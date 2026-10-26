@@ -160,6 +160,18 @@ class GpuSpec(_Strict):
     group: str | None = Field(None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")   # default: the mod id
 
 
+class LlmSpec(_Strict):
+    """[llm] (plan llm-servers 3.1): the mod runs local language-model engines; one contract for all of them
+    (llama.cpp, vLLM, …) so the hub, Settings → LLMs and the Chat picker treat them alike. `catalog` lists what it
+    can run (`{models: [{id, name, format, size_gb, memory_gb, context, downloaded, loaded, relay_model?}]}`),
+    `load` starts one (`{id}` → 202), `unload` stops one (`{id}` or all), `engine` says what runs now
+    (`{state, loaded: [ids]}`)."""
+    catalog: Op
+    load: Op | None = None
+    unload: Op | None = None
+    engine: Op | None = None
+
+
 class ModelsSpec(_Strict):
     dirs: list[str] = []
 
@@ -353,6 +365,7 @@ class Manifest(_Strict):
     run: RunSpec
     memory: MemorySpec | None = None
     gpu: GpuSpec | None = None
+    llm: LlmSpec | None = None
     models: ModelsSpec = ModelsSpec()
     outputs: OutputsSpec | None = None
     ui: UiSpec = UiSpec()

@@ -147,3 +147,34 @@ async def test_hidden_routes_still_count_for_widgets(rig, serve):
     st = {c["name"]: c for c in r["checks"]}
     assert st["operations"]["status"] == "ok", st["operations"]
     assert "hidden from the API tab" in st["openapi"]["detail"]
+
+
+async def test_the_llm_engine_contract(rig, serve):
+    """Plan llm-servers 3.1: [llm]'s operations exist, and its catalog and engine have the contract's shape."""
+    rig.add("fake-engine")
+    served = await serve()
+    await ready(served, "fake-engine")
+    r = await check(served, "fake-engine")
+    llm = next(c for c in r["checks"] if c["name"] == "llm")
+    assert r["ok"] is True and llm["status"] == "ok" and llm["detail"] == "2 models, engine idle"
+    assert statuses(r)["operations"] == "ok"
+
+
+def test_llm_problems():
+    from utils.services.check import llm_problems
+    assert llm_problems({"models": [{"id": "a", "name": "A", "loaded": False}]}, {"state": "idle", "loaded": []}) == []
+    assert llm_problems({}, None) == ["catalog: no `models` list"]
+    assert llm_problems({"models": [{"id": "a"}]}, None) == ["catalog: models[0] needs a string id and name"]
+    assert llm_problems({"models": [{"id": "a", "name": "A", "loaded": "yes"}]}, {"loaded": []}) == [
+        "catalog: models[0].loaded must be true or false", "engine: needs a string state and a loaded list"]
+
+
+def test_llm_section_in_the_manifest(tmp_path):
+    from utils import manifest as mf
+    d = tmp_path / "eng"
+    d.mkdir()
+    (d / "service.toml").write_text('id = "eng"\n[run]\ncommand = ["x"]\nport = 5150\nhealth = "/h"\n[llm]\ncatalog = "GET /v1/llm/catalog"\nload = "bad"\n')
+    m = mf.parse(d)
+    assert m.errors and "is not an operation" in m.errors[0]
+    (d / "service.toml").write_text('id = "eng"\n[run]\ncommand = ["x"]\nport = 5150\nhealth = "/h"\n[llm]\nload = "POST /v1/llm/load"\n')
+    assert any("catalog" in e for e in mf.parse(d).errors)                  # catalog is required

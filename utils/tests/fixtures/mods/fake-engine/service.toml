@@ -1,0 +1,23 @@
+# Test fixture: a local LLM engine with the [llm] contract (plan llm-servers 3.1)
+id = "fake-engine"
+name = "Fake Engine"
+description = "lists two models and loads them, as lcpp and vllm do"
+icon = "cpu"
+version = "1.0.0"
+
+[run]
+command = ["python3", "../_fakemod.py", "engine"]   # relative paths resolve against this folder
+port = 5188
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { FAKE_PORT = "{port}", FAKE_OUTPUTS = "{outputs}" }
+start_timeout_s = 15
+stop_timeout_s = 5
+restart = "no"
+
+[llm]
+catalog = "GET /v1/llm/catalog"
+load = "POST /v1/llm/load"
+unload = "POST /v1/llm/unload"
+engine = "GET /v1/llm/engine"

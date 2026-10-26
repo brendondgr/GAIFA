@@ -907,7 +907,7 @@ interface Timeline { from: number; to: number; lanes: {
 interface OutputBucket { key: string; count: number; size_bytes: number; by_kind: Partial<Record<OutputKind, number>> }
 interface WidgetInfo { service: string; id: string; title: string; kind: "line" | "area" | "bar" | "donut" | "number" | "table";
                        ranges: string[]; span: 3 | 4 | 6 | 12 }
-interface DoctorCheck { area: "models" | "manifests" | "paths" | "ports" | "units" | "disk" | "offline" | "repos";
+interface DoctorCheck { area: "models" | "manifests" | "paths" | "ports" | "units" | "disk" | "offline";
                        level: "ok" | "note" | "warn" | "fail"; title: string; detail: string; fix?: string }
 interface Hardware { os: "linux" | "darwin" | "windows"; arch: string; wsl: boolean; container: string;   // plan 35.2
                      distro: Record<string, string>; kernel: string; cpu: string; cpus: number; ram_bytes: number; pkg: string;

@@ -105,7 +105,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Probe:** a model list call.
   *Done when:* `test_adapter_anthropic.py` (a mock Messages server) covers each translation, a two-turn tool conversation whose second request carries the first turn's thinking signature, streaming tool-call deltas, usage with cache tokens, the missing `max_tokens` filled, a 529 and a 400.
   - **Done:** Relay `3fb2253` with the shared base `adapters/translated.py`; `test_adapter_anthropic.py` (12), the relay's suite 240. Per the claude-api reference: the official SDK, no sampling parameters on API version 2026-10-21, adaptive thinking with `display: "summarized"` (the default shows none), forced `tool_choice` retried as `auto` on the newest models' 400, and the server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`) on by default, dropped on a model's 400.
-- [ ] **1.5 The Gemini adapter: `app/services/adapters/gemini.py`.**
+- [x] **1.5 The Gemini adapter: `app/services/adapters/gemini.py`.**
   - **Request:** `generateContent`, and `streamGenerateContent?alt=sse` for streams.
     - System → `systemInstruction`.
     - Messages → `contents` with roles `user`/`model`.
@@ -119,6 +119,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Blocked prompts:** a 200 with no candidates becomes an error with `promptFeedback.blockReason`, never an empty reply.
   - **Usage:** `usageMetadata` (including `cachedContentTokenCount` and `thoughtsTokenCount`) → OpenAI usage.
   *Done when:* `test_adapter_gemini.py` covers each translation, the schema subset, a two-turn function call carrying its thought signature, a blocked prompt and streamed usage.
+  - **Done:** Relay `f8dd9f7` through `google-genai`; the schema isn't cut down (`parameters_json_schema` carries it whole), and the model's own parts, signatures included, go back as `reasoning_details`; `test_adapter_gemini.py` (10), the relay's suite 250.
 - [ ] **1.6 OpenAI's API: `app/services/adapters/passthrough.py` (cloud rules) or `openai_cloud.py` if it grows past ~150 lines.**
   - **On a `cloud` openai endpoint:**
     - `max_tokens` becomes `max_completion_tokens`.

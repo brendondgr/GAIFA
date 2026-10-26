@@ -64,7 +64,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Never for cloud:** the GPU lease (`gpu_lease.py` takes it only for `local` loopback endpoints; a test pins it), failover to another endpoint, or the `auto` route.
   *Done when:* `test_endpoints_api.py` covers creating each preset, the hidden key, kind inference; `test_gpu_slot.py` covers a cloud endpoint taking no lease; `test_proxy.py` covers no failover from a cloud endpoint.
   - **Done:** Relay `d6c1507` on `feat/cloud-providers` (`tests/backend/test_cloud_endpoints.py`, 9: each preset, what a preset keeps, no URL and no preset, kind inference and a patch keeping `cloud`, never `auto` or a failover target even when pinned, no GPU lease, the key hint; the relay's suite 212).
-- [ ] **1.2 Live model lists: `app/services/discovery.py`, `app/services/model_facts.py`.**
+- [x] **1.2 Live model lists: `app/services/discovery.py`, `app/services/model_facts.py`.**
   - **Per protocol** (the skill's `discovery.md` §1), returning `[{id, display_name, context_length, max_output, tools, vision, reasoning, source}]`:
     - **openai:** `GET /v1/models`, ids only, so facts stay null unless the model facts override says otherwise. For llama.cpp, vLLM and Ollama it adds the second requests the skill names (`/props`, `/api/show`).
     - **anthropic:** `GET /v1/models` with `x-api-key` and `anthropic-version`, paginated (`after_id`), reading `max_input_tokens`, `max_tokens` and `capabilities`.
@@ -74,6 +74,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **Facts:** they feed `model_facts`, so `meta` comes from the provider when it says something.
   - **Routes:** `GET /admin/endpoints/{id}/models` (with `?refresh=1`) and `PATCH /admin/endpoints/{id}/models {hidden: [...] , hide_filter: bool}` (a new `hidden_models` column).
   *Done when:* `test_discovery.py` runs against mock servers reproducing each provider's list shapes, ported from the skill's `selftest.py`. It covers pagination, the generateContent filter, the prefix, the hide filter, a 401 (`{error: "key rejected"}` and an empty list), a timeout (the last good list) and an unreachable local server (connect timeout ≤ 2 s).
+  - **Done:** Relay `2d34546`. The fakes are real HTTP servers (`tests/backend/fake_providers.py`) so the official SDKs talk to them as to the providers; `test_discovery.py` (9). Found: the anthropic SDK is 2.x (API version 2026-10-21: no sampling parameters at all, and it sends the key as `Authorization: Bearer`). A rejected key keeps the last good list with `HTTP 401: key rejected — …`.
 - [ ] **1.3 `<server>/<model>` routing and the grouped catalog: `app/services/catalog.py`, `app/services/router.py`.**
   - **Catalog:** every visible discovered model is listed as `<alias>/<model id>` (for example `claude/claude-opus-5-5`, `openai/gpt-5.6`, `gemini/gemini-3.7-flash`, `local/gemma4-26B`).
   - **Each entry's `relay`:** `{endpoint, alias, group: "local"|"cloud"|"remote"|"agent", provider, upstream_model, health, discovered: true}`.

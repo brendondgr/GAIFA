@@ -18,6 +18,7 @@ import { MicButton } from './chat-mic.js';
 import { ACCEPT, uploadable, toChip, pasteFile, chipIcon, chipSize } from './chat-files.js';
 import { loneUrl, readPage, WebPageOffer, AddWebPage, WebBadge } from './chat-webpage.js';
 import { QuoteCards, QuoteReplyDialog, editQuote, removeQuote, canSendQuotes, quotesProblem } from './chat-quote-reply.js';
+import { modelCompletions } from './chat-model-menu.js';
 
 export { uploadable, toChip, pasteFile } from './chat-files.js';
 
@@ -43,7 +44,7 @@ export const PLUS_ITEMS = [
 export const COMMANDS = [
   { cmd: 'compact', hint: 'Summarize earlier messages now' },
   { cmd: 'clear', hint: 'Start a new chat' },
-  { cmd: 'model', hint: 'Switch this chat’s model', arg: '<id>' },
+  { cmd: 'model', hint: 'Switch this chat’s model', arg: '<server/model>' },
   { cmd: 'context', hint: 'Show the context meter' },
   { cmd: 'clear-gpu', hint: 'Free the GPU: unload what is loaded (LLM engines only when named)', arg: '[mod…]' },   // plan 46.2
 ];
@@ -128,7 +129,7 @@ function DocMode({ a, mode, onPick }) {
 const menuSt = { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' };
 
 // controls: the row under the box (chat-controls.js: environment, mode, model; plan 42.3)
-export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [], voice = null }) {
+export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, models = null, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [], voice = null }) {
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
@@ -164,7 +165,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
     setOffer(loneUrl(e.clipboardData?.getData?.('text/plain')));   // a lone URL: pasted as text, and offered as a page
   };
   const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
-  const matches = slashMatches(draft, skills);
+  const matches = [...modelCompletions(draft, models), ...slashMatches(draft, skills)];   // /model <part>: llm-servers 5.1
   // @-mentions (plan 48.2): the token at the caret, its choices, and what was picked for this message
   const [picked, setPicked] = React.useState([]), [mSel, setMSel] = React.useState(0), [caret, setCaret] = React.useState(null);
   const tok = matches.length ? null : atToken(draft, caret ?? draft.length);

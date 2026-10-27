@@ -65,7 +65,7 @@ test('the mode menu keeps the rules: Bypass where folders allow it, Auto disable
 
 test('the model and environment menus list their choices and call back', () => {
   const got = [];
-  const models = menuOf(ctl.ModelMenu({ models: MODELS, value: 'skynet', onChange: m => got.push(m) }), 'Model').filter(r => r.type === 'button');
+  const models = all(menuOf(ctl.ModelMenu({ models: MODELS, value: 'skynet', onChange: m => got.push(m) }), 'Model'), n => n.props?.role === 'menuitemradio');   // grouped by server since llm-servers 5.1
   assert.deepEqual(models.map(r => r.props.key), ['skynet', 'gemma4-26B']);
   assert.match(text(models[0]), /skynet \(default\).*128K|skynet \(default\)/);
   models[1].props.onClick();

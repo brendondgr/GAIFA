@@ -260,14 +260,14 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
       dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
       voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
-      settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
+      settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, models, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
       onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
       controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
         env: h(EnvMenu, { api, c, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: shared.loadEnvList, confirm,
           onDeleted: (id, ids) => { shared.envDeleted(ids); if (tid && ids.includes(tid)) onOpen(null);
             toast(`Deleted the environment${ids.length ? ` and ${ids.length} chat${ids.length === 1 ? '' : 's'}` : ''}`, 'success'); } }),
         mode: h(ModeMenu, { value: thread?.mode || fresh.mode, onChange: setMode, bypass: bypassAllowed(folders, events), judge }),
-        model: h(ModelMenu, { models, value: thread?.model || fresh.model || models?.default, onChange: setModel }) }) }),
+        model: h(ModelMenu, { models, value: thread?.model || fresh.model || models?.default, onChange: setModel, api, toast, onModels: shared.reloadModels }) }) }),
     h(QuoteReplyBox, { scrollRef, resetKey: dkey, onAdd: q => setQuotes(l => addQuote(l, q)) }));
 }
 

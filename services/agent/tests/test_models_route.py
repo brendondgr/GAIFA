@@ -29,3 +29,9 @@ async def test_relay_unreachable_accepts_any(env, monkeypatch):
     monkeypatch.setattr(env.agent.llm, "models", none)
     tid = await env.thread()
     assert (await env.client.patch(f"/v1/threads/{tid}", json={"model": "claude/claude-opus-5-5"})).status_code == 200
+
+
+def test_an_id_listed_twice_is_one_model():
+    from agent.server import model_list
+    rel = {"endpoint": "smollm2-7071", "alias": "smollm2", "group": "local", "protocol": "openai"}
+    assert [m["id"] for m in model_list([{"id": "smollm2", "relay": rel}, {"id": "smollm2", "relay": rel}, {"id": "skynet"}])] == ["smollm2", "skynet"]

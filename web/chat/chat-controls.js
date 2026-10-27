@@ -5,7 +5,7 @@
 
 import { h, T, MONO, Icon, Popover, label11 } from './chat-ui.js';
 import { EnvDialog } from './chat-envedit.js';
-import { modeChoices, modeTitle, modeOf, modelLabel, MODES } from './chat-header.js';
+import { modeChoices, modeTitle, modeOf, MODES } from './chat-header.js';
 import { envOf, allowedFolders, shortPath, LEVEL_WORD } from './chat-env.js';
 
 const R = () => globalThis.React;
@@ -36,18 +36,8 @@ export function ModeMenu({ value, onChange, bypass = false, judge = null }) {
         h('span', { style: { fontSize: 11.5, color: T.mut, lineHeight: 1.35 } }, m.desc)))));
 }
 
-/** The model, from the relay, each with its context window. */
-export function ModelMenu({ models, value, onChange }) {
-  const React = R(), [open, setOpen] = React.useState(false);
-  const list = models?.models || [], cur = value || models?.default || '';
-  return h('span', { style: { position: 'relative', flex: 'none' } },
-    h(Control, { icon: 'chat', label: cur || 'No model', title: 'Model (from the relay) and its context window', ariaLabel: `Model: ${cur || 'none'}`, open, onClick: () => setOpen(!open) }),
-    h(Popover, { open, onClose: () => setOpen(false), place: 'up-right', width: 300, label: 'Model', style: { gap: 2, padding: 6 } },
-      !list.length ? h('span', { style: { fontSize: 12, color: T.mut, padding: 6 } }, 'No models from the relay yet.') : null,
-      list.map(m => h('button', { key: m.id, type: 'button', role: 'menuitemradio', 'aria-checked': m.id === cur ? 'true' : 'false', onClick: () => { setOpen(false); if (m.id !== cur) onChange(m.id); }, style: rowSt(m.id === cur) },
-        h('span', { style: { fontSize: 12.5, fontWeight: 500, fontFamily: MONO } }, m.id + (m.id === models.default ? ' (default)' : '')),
-        h('span', { style: { fontSize: 11.5, color: T.mut } }, modelLabel(m).slice(m.id.length).replace(/^ · /, '') || ' ')))));
-}
+/** The model: server → model (plan llm-servers 5.1), in chat-model-menu.js. */
+export { ModelMenu } from './chat-model-menu.js';
 
 // ---------- environments from the chat (plan 42.4; the editor is chat-envedit.js) ----------
 const envRowSt = on => ({ display: 'flex', alignItems: 'center', gap: 6, minHeight: 28, padding: '0 4px 0 8px', borderRadius: 6, background: on ? T.tcy : 'transparent',

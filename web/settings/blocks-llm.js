@@ -7,6 +7,7 @@
 
 import { h, T, MONO, Btn, Badge, inputSt } from '../chat/chat-ui.js';
 import { useAgent } from '../chat/chat-settings.js';
+import { ModelMenu } from '../chat/chat-model-menu.js';
 import { PRESETS, addBody, grouped, groupOf, healthState, keyState, modelFacts } from './llm-view.js';
 
 const R = () => globalThis.React;
@@ -145,10 +146,8 @@ export function LlmDefaults({ ctx }) {
   const [pick, setPick] = React.useState(null), [busy, setBusy] = React.useState(false);
   if (!a.s) return h('div', { style: { padding: '12px 0', ...small } }, a.err ? 'The agent isn’t running.' : 'Loading…');
   const v = pick || { model: a.s.model || '', fallback: a.s.fallback || '' };
-  const models = (a.models?.models || []).map(m => m.id);
   const dirty = v.model !== (a.s.model || '') || v.fallback !== (a.s.fallback || '');
-  const sel = (k, opts) => h('select', { value: v[k], 'aria-label': k === 'model' ? 'Chat model' : 'Fallback model', onChange: e => setPick({ ...v, [k]: e.target.value }),
-    style: { ...inputSt, width: 280 } }, opts.map(o => h('option', { key: o.value, value: o.value }, o.label)));
+  const menu = (k, o) => h(ModelMenu, { models: { ...(a.models || {}), default: null }, value: v[k], onChange: id => setPick({ ...v, [k]: id }), place: 'down-left', ...o });   // the Chat picker's menu (5.1)
   const save = async () => {
     setBusy(true);
     try {
@@ -159,10 +158,9 @@ export function LlmDefaults({ ctx }) {
       setPick(null); setTimeout(() => a.reload?.(), 2500);
     } catch (e) { ctx.toast?.(msg(e), 'error'); } finally { setBusy(false); }
   };
-  const opt = id => ({ value: id, label: id });
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 0 14px' } },
-    row(h('span', { style: { width: 110, fontSize: 12.5 } }, 'Chat model'), sel('model', [...new Set([v.model, ...models])].filter(Boolean).map(opt))),
-    row(h('span', { style: { width: 110, fontSize: 12.5 } }, 'Fallback'), sel('fallback', [{ value: '', label: 'none' }, ...[...new Set([v.fallback, ...models])].filter(Boolean).map(opt)])),
+    row(h('span', { style: { width: 110, fontSize: 12.5 } }, 'Chat model'), menu('model', { label: 'Chat model' })),
+    row(h('span', { style: { width: 110, fontSize: 12.5 } }, 'Fallback'), menu('fallback', { label: 'Fallback model', none: 'none' })),
     row(h(Btn, { sm: true, kind: 'pri', label: busy ? 'Saving…' : 'Save and restart the agent', disabled: !dirty || busy, onClick: save }),
       h('span', { style: small }, 'New chats start on the chat model; each chat can switch in its model menu. The fallback answers when a chat’s model fails.')));
 }

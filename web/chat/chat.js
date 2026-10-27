@@ -155,7 +155,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     try { await c.remove(t.id); setThreads(l => l.filter(x => x.id !== t.id)); relist(); setLayout(L => dropTids(L, [t.id])); toast('Chat deleted', 'success'); } catch (e) { fail(e); }
   };
   const sh = {
-    api, c, toast, confirm, openOutput, fail, models, settings, tools, mods, judge, speechOut, envs, loadEnvList, relist, bus: bus.current, rename, patched, listPatch,
+    api, c, toast, confirm, openOutput, fail, models, reloadModels: () => c.models().then(m => { setModels(m); return m; }, fail), settings, tools, mods, judge, speechOut, envs, loadEnvList, relist, bus: bus.current, rename, patched, listPatch,
     reloadList: () => loadRef.current?.(),
     addThread: th => { setThreads(l => [th, ...l]); relist(); },
     envDeleted: ids => { setThreads(l => l.filter(x => !ids.includes(x.id))); relist(); setLayout(L => dropTids(L, ids)); },

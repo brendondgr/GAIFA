@@ -175,11 +175,12 @@ def model_list(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The relay's catalog as the Chat page and Settings pick from it (plan llm-servers 2.2): each model with its
     server, where that server runs, its provider and facts; this machine first, then remote, then cloud.
     OpenCode's agent models are left out (the chat agent can't run its tools through another agent)."""
-    out = []
+    out, seen = [], set()
     for m in data:
         r = m.get("relay") or {}
-        if r.get("protocol") == "opencode" or m.get("id") == "auto" and not r:
+        if r.get("protocol") == "opencode" or m.get("id") == "auto" and not r or m.get("id") in seen:   # the relay may list an id twice
             continue
+        seen.add(m.get("id"))
         group = r.get("group") or "local"
         out.append({"id": m["id"], "name": r.get("display_name") or m["id"], "meta": m.get("meta") or {},
                     "endpoint": r.get("endpoint"), "server": r.get("alias") or r.get("endpoint"), "group": group,

@@ -90,5 +90,6 @@ def test_a_title_filed_under_reasoning_is_used():
     # skynet (vLLM, MiniCPM-V 4.7) 2026-10-21: content null, reasoning "Boots and Gaiters for Torres del Paine Hike"
     assert prompts.reply_title("", "Boots and Gaiters for Torres del Paine Hike") == "Boots and Gaiters for Torres del Paine Hike"
     assert prompts.reply_title("Rust lifetimes", "Boots") == "Rust lifetimes"                      # the text wins
+    assert prompts.reply_title("<title>Test of the model picker</title>") == "Test of the model picker"   # smollm2's tags (llm-servers 5.1)
     assert prompts.reply_title("", "The user wants a title.\nMaybe 'Boots'.") is None              # real thinking isn't a title
     assert prompts.reply_title("", "") is None

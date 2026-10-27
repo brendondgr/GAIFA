@@ -199,8 +199,8 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   *Done when:* `utils/tests/services/test_llm_routes.py` covers two fake engine mods, one stopped, and a load that needs room; the contract test covers the routes; architecture §6 and brief §6 list them.
 
 **Checks & deliverables — Phase 3**
-- [ ] `GET /api/llm/engines` on the installed hub lists lcpp's and vLLM's models with what's loaded.
-- [ ] Delivered: the manifest section, two implementations, the hub route, tests.
+- [x] `GET /api/llm/engines` on the installed hub lists lcpp's and vLLM's models with what's loaded (2026-10-27: lcpp's two, gemma-4-26B-it and smollm2 loaded in turn; vLLM's profiles are parked on this machine, so it lists none).
+- [x] Delivered: the manifest section, two implementations, the hub route, tests.
 
 ## Phase 4 — Settings → LLMs (M)
 
@@ -215,12 +215,13 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   *Done when:* `utils/tests/web/settings-llm.test.mjs` covers the cards per state (no key, key rejected, healthy, unreachable), hide toggles and the presets' bodies; the settings search finds "Claude", "API key", "OpenAI", "Gemini", "llama.cpp" and "vLLM"; `settings-search.test.mjs` passes.
 - [ ] **4.2 Live check.**
   *Done when:* on the installed hub, a key added in Settings lists that provider's models within one refresh; a hidden model leaves the Chat picker; Load on an lcpp model starts it and its card turns healthy.
+  *So far (2026-10-27):* Start and Load on lcpp's models work (from the Chat menu, through the same `loadLlm`), and the relay's card for the loaded model turns healthy. The key and hide checks wait for a provider key (skynet doesn't list its models, so there's nothing to hide on this machine yet).
 
 **Wire — Phase 4:** Settings → LLMs goes live on the relay's admin API and `/api/llm/engines`.
 
 ## Phase 5 — The Chat picker (M)
 
-- [ ] **5.1 Server → model: `web/chat/chat-controls.js` (`ModelMenu`), `web/chat/chat-model-menu.js` (new, if `chat-controls.js` would pass ~450 lines).**
+- [x] **5.1 Server → model: `web/chat/chat-controls.js` (`ModelMenu`), `web/chat/chat-model-menu.js` (new, if `chat-controls.js` would pass ~450 lines).**
   - **Layout:** the menu groups by server (This machine, Remote, Cloud), each with its health and models (context window, tools, vision), plus a search field.
   - **Local models not loaded:** listed with Load. Choosing one loads it through `/api/llm/{sid}/load` and shows the engine's existing chat card in that chat, and the chat switches to it when it's ready.
   - **Badges:** cloud models carry the provider badge.
@@ -228,6 +229,7 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
   - **`/model`:** completes `server/model`.
   - **Reuse:** the Settings default picker (4.1) uses the same component.
   *Done when:* `utils/tests/web/chat-model-menu.test.mjs` covers grouping, search, a loadable model and the cloud badge; on the installed hub two panes talk to a local model and a cloud model side by side.
+  *As built (2026-10-27):* `chat-model-menu.js`. While a model loads, the model button says "Loading <id>…" (and "Starting <engine>…") instead of drawing the engine's chat card in the chat (that card belongs to a tool call); the chat switches when the relay serves it. A stopped engine has no catalog, so it shows a Start row. The relay can list one id twice (a local endpoint whose alias is its model id), so the agent's `/v1/models` and the menu keep one row per id (the relay's own fix is in Phase 6). A small model's `<title>…</title>` is taken as the title. Checked on the installed hub: LLM Launcher started and smollm2 and gemma4-26B loaded from the menu, the chat switching to each; two panes side by side on gemma4-26B and skynet both answered; `/model gem` completed. smollm2's 8,192-token window is too small for the agent's prompt (it says `context_full`). The cloud pane waits for a provider key.
 
 ## Phase 6 — OpenCode's models, read live (S)
 

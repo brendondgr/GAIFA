@@ -96,6 +96,7 @@ def good_title(reply: str) -> str | None:
     t = (reply or "").strip()
     if not t or "\n" in t:
         return None
+    t = re.sub(r"^<(title)>(.*)</\1>$", r"\2", t, flags=re.I).strip()          # a small model's <title>…</title>
     t = re.sub(r"^(chat )?title\s*:\s*", "", t, flags=re.I).strip().strip("*_#`").strip().strip("\"'“”‘’").strip()
     if t.endswith(("…", "..", ":", ",", ";")):          # cut off, or about to go on
         return None

@@ -46,6 +46,11 @@ async def test_a_denied_tool_and_a_users_risk(c):
     rows = {r["function"]["name"]: r for r in (await c.get("/v1/tools")).json()["tools"]}
     assert "fake_die" not in rows and rows["fake_picture"]["risk"] == "generate"
     assert (await c.post("/v1/call/fake/die", json={"arguments": {}})).json()["code"] == "denied"
+    rev = (await c.get("/v1/status")).json()["tools_rev"]
+    await c.patch("/v1/servers/fake", json={"note": "Save files under /x."})          # a new note: the hub reads them again
+    assert (await c.get("/v1/status")).json()["tools_rev"] != rev
+    rows = {r["function"]["name"]: r for r in (await c.get("/v1/tools")).json()["tools"]}
+    assert rows["fake_echo"]["function"]["description"].endswith("Save files under /x.")
 
 
 async def test_a_server_whose_tools_change_is_held(c, app, tmp_path):
@@ -98,3 +103,64 @@ async def test_an_elicitation_is_declined_and_reported(c):
     await approved(c)
     r = (await c.post("/v1/call/fake/ask", json={"arguments": {}})).json()
     assert "decline" in r["text"] and r["asked"] == "Which size should the box be?" and "ask the user" in r["note"]
+
+
+async def test_a_companion_starts_first_and_stops_with_the_session(c, app, tmp_path):
+    import socket
+    import sys
+    s = socket.socket()
+    s.bind(("localhost", 0))
+    port = s.getsockname()[1]
+    s.close()
+    listen = f"import socket,time;s=socket.socket();s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(('localhost',{port}));s.listen();time.sleep(60)"
+    spec = {**FAKE, "id": "withcomp", "companion": {"command": sys.executable, "args": ["-c", listen], "port": port, "wait_s": 20}}
+    await approved(c, spec)
+    assert (await c.get("/v1/servers/withcomp")).json()["session"]["companion"] == "running"
+    proc = app.state.pool.companions["withcomp"]
+    await c.post("/v1/servers/withcomp/stop")
+    assert proc.returncode is not None and "withcomp" not in app.state.pool.companions
+
+
+async def test_the_blender_preset(c, monkeypatch, tmp_path):
+    import presets
+    monkeypatch.setattr(presets, "_which", lambda n: f"/opt/bin/{n}")
+    [p] = (await c.get("/v1/presets")).json()
+    assert p["id"] == "blender" and p["available"] and not p["added"]
+    s = (await c.post("/v1/presets/blender")).json()
+    assert s["command"] == "/opt/bin/uvx" and s["args"] == ["--from", "mcp-for-blender==2.2.0", "mcp-for-blender"]
+    assert s["env"]["DISABLE_TELEMETRY"] == "true" and s["companion"]["port"] == 9876 and s["companion"]["command"] == "/opt/bin/blender"
+    assert s["risks"]["execute_blender_code"] == "execute" and s["deny"] == ["record_trajectory_feedback"]
+    assert s["approval"]["state"] == "needs_approval" and (await c.post("/v1/presets/blender")).json()["code"] == "exists"
+    monkeypatch.setattr(presets, "_which", lambda n: None)
+    assert (await c.get("/v1/presets")).json()[0]["available"] is False
+
+
+def test_saved_files_become_outputs(tmp_path):
+    import tools
+    out = tmp_path / "outputs"
+    (out / "2026-10-26").mkdir(parents=True)
+    f = out / "2026-10-26" / "render.png"
+    f.write_bytes(b"png")
+    text = f"Saved to {f}. Also {out}/2026-10-26/missing.png and /etc/passwd"
+    assert tools.written(text, out) == [str(f)]
+
+
+def test_files_a_call_wrote_become_outputs(tmp_path):
+    import time
+    import tools
+    out = tmp_path / "outputs"
+    day = out / time.strftime("%Y-%m-%d")
+    day.mkdir(parents=True)
+    old = day / "earlier.png"
+    old.write_bytes(b"png")
+    os_t = time.time() - 60
+    __import__("os").utime(old, (os_t, os_t))
+    t0 = time.time()
+    new = day / "render.png"
+    new.write_bytes(b"png")                                  # a render whose path the code didn't print
+    (day / "render.json").write_text("{}")
+    (out / "World").mkdir()
+    (out / "World" / "stray.png").write_bytes(b"png")       # a folder the code made up
+    assert tools.fresh(out, t0) == sorted([str(new), str(out / "World" / "stray.png")])
+    r = type("R", (), {"content": [type("C", (), {"type": "text", "text": "done"})()], "is_error": False, "structured_content": None})()
+    assert tools.result("blender", "execute_blender_code", r, out, since=t0)["outputs"] == tools.fresh(out, t0)

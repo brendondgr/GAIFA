@@ -1,4 +1,4 @@
-// The MCP servers page (plan mcp-client 3.1). Servers: each one's state, its tools with a risk each and a switch,
+// The MCP servers page (plan mcp-client 3.1). Servers: presets ready to add (Blender, 5.1), each server's state, its tools with a risk each and a switch,
 // Approve (and what changed since the last approval), Start / Stop, Remove; Add a server. Import: what other apps on
 // this machine already configure (names and commands, never secret values), each added unapproved.
 
@@ -111,9 +111,19 @@ export default {
           }, { kind: 'primary' })));
     }
 
+    function presetRow(presets) {
+      const todo = presets.filter(p => !p.added);
+      return todo.length ? ui.card(h('strong', null, 'Ready to add'), ...todo.map(p => h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' },
+        h('div', { style: 'flex:1;min-width:0' }, h('strong', { style: 'font-size:13px' }, p.name), ui.text(p.available ? p.description : `Can't run here: ${p.why}`, { small: true, muted: true })),
+        ui.button(`Add ${p.name}`, async () => {
+          try { await call('POST', `/v1/presets/${p.id}`); ctx.toast(`Added ${p.name}: press Tools, look, then approve`, 'success'); render(); } catch (e) { fail(e); }
+        }, { small: true, kind: 'primary', disabled: !p.available })))) : null;
+    }
+
     async function servers() {
-      const rows = await call('GET', '/v1/servers');
+      const [rows, presets] = await Promise.all([call('GET', '/v1/servers'), call('GET', '/v1/presets').catch(() => [])]);
       put(ui.text('Other MCP servers whose tools your chats can use. A server\'s tools reach your chats only after you approve them, and if they change, they wait until you look again.', { muted: true }),
+        presetRow(presets),
         rows.length ? rows.map(serverCard) : ui.empty('No servers yet', 'Add one below, or import what other apps here already use.'),
         addForm());
     }

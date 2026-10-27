@@ -1,6 +1,6 @@
 # Plan: other MCP servers in GAIFA's chats, Blender first
 
-**Asked for:** 2026-10-26 · **Status:** In progress
+**Asked for:** 2026-10-26 · **Status:** Done (2026-10-27)
 
 ## 1. Introduction
 
@@ -81,21 +81,23 @@ The approach is one new mod, `mcp` (port 5108), that is an MCP *client*: it star
 
 ## Phase 5 — Blender (M)
 
-- [ ] **5.1 Choosing and setting up the server: `services/mcp/setup/blender.md`.**
+- [x] **5.1 Choosing and setting up the server: `services/mcp/setup/blender.md`.**
   - **Check:** whether the Blender Lab server supports Blender 5.2.2 here; else the community server pinned to the version matching the installed add-on, `DISABLE_TELEMETRY=true`, and its socket on `127.0.0.1:9876`.
   - **Config:** a `blender` entry (stdio) in the mod's `setup` defaults, unapproved until the user approves it; its code-running tool `execute`, screenshot and scene tools `read`, asset downloads `network`.
   *Done when:* the setup doc's check (`gaifa setup mcp --plan` lists it; `gaifa docs --check --strict` passes); with Blender open and the add-on's server started (the user), `GET /v1/servers/blender` lists its tools.
-- [ ] **5.2 The Blender skill: `services/mcp/skills/blender/SKILL.md`.**
+  - **Built (differs):** the community server, MCP for Blender 2.2.0 (`uvx`, telemetry off), whose add-on 1.8 was already installed; the Blender Lab server wasn't tried (it needs a download). The entry is a **preset** (`presets.py`, `GET/POST /v1/presets`; "Ready to add" on the page; `gaifa setup mcp-blender` adds it) rather than a default, and Blender needn't be open: a server's **companion** (`client.py`) starts `blender -b` with `scripts/blender_headless.py` when nothing answers on 9876 and stops with the session. A server's `note` (where to save files) ends its tools' descriptions, can be patched and changes `tools_rev`; files a call writes under `outputs/mcp/` become outputs.
+- [x] **5.2 The Blender skill: `services/mcp/skills/blender/SKILL.md`.**
   - **Body:** look at the scene first (scene info, a screenshot), change it in small steps of code and look again, name objects, keep units, save with a path the user named or as an output; how to bring in a gen3d model (its GLB output's path) and render to an output; `metadata: {mcp-servers: "blender"}`.
   *Done when:* `services/mcp/tests/test_skill.py` checks the frontmatter (skill-sources 1.1); reading it in a chat loads the Blender tools (4.1).
-- [ ] **5.3 A Blender eval: `services/agent/evals/blender.py`.**
+- [x] **5.3 A Blender eval: `services/agent/evals/blender.py`.**
   - **Tasks:** clear the scene and add three named primitives in a row; give one a red material; import the newest gen3d model and frame the camera on it; render a 512 px image to an output; answer how many objects the scene has.
   - **Runs:** the chat model of this machine and skynet; each task's success checked by the scene's state (the server's scene info), its steps and tokens; results in `docs/agent-eval.md`.
   *Done when:* the eval runs with Blender open (the user starts it), and the table is in the docs.
+  - **Built:** six tasks (the Phase 5 check's tree too), checked through the mod's call route; skynet 18/18 over three runs (`docs/agent-eval.md`). Not run on the local chat model (the LLM engines were in use by other work).
 
 **Checks & deliverables — Phase 5**
-- [ ] In a chat: "make a low-poly tree in Blender and show me a render" reads the skill, asks (Manual) or is judged (Auto) for each code step, and shows the render as an output.
-- [ ] Delivered: the Blender setup doc, the skill, the eval; docs: `docs/agent-eval.md`, the mod's README.
+- [x] In a chat: "make a low-poly tree in Blender and show me a render" reads the skill, asks (Manual) or is judged (Auto) for each code step, and shows the render as an output. (The eval's `tree` task, 3/3; the Manual cards in a chat on 2026-10-26.)
+- [x] Delivered: the Blender setup doc, the skill, the eval; docs: `docs/agent-eval.md`, the mod's README.
 
 | Deliverable | Description | Location |
 | --- | --- | --- |

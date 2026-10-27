@@ -42,7 +42,7 @@ class Approve(BaseModel):
 
 def rev(servers: list[dict[str, Any]], held: set[str]) -> str:
     key = [(s["id"], (s.get("approved") or {}).get("hash"), s.get("enabled"), sorted(s.get("deny") or []),
-            sorted((s.get("risks") or {}).items()), s["id"] in held) for s in servers]
+            sorted((s.get("risks") or {}).items()), s.get("note"), s["id"] in held) for s in servers]
     return hashlib.sha256(json.dumps(key, default=str).encode()).hexdigest()[:12]
 
 
@@ -206,6 +206,26 @@ def create_app(state: Path, outputs: Path, hub_url: str = "", logs: Path | None 
             return []
         return sorted({f["path"] for e in envs for f in e.get("folders") or [] if f.get("path")})
 
+    @app.get("/v1/presets", summary="Servers GAIFA knows how to set up (Blender), and whether this machine can run them")
+    def preset_list() -> list:
+        import presets
+        return [{"id": k, "name": v["server"]["name"], "description": v["server"]["description"], "available": v["available"],
+                 "why": v["why"], "added": servers.get(v["server"]["id"]) is not None} for k, v in presets.presets(outputs).items()]
+
+    @app.post("/v1/presets/{pid}", status_code=201, summary="Add a preset server (its tools wait for approval)")
+    def preset_add(pid: str) -> Any:
+        import presets
+        p = presets.presets(outputs).get(pid)
+        if p is None:
+            return JSONResponse({"detail": f"there is no preset {pid!r}", "code": "not_found"}, 404)
+        if not p["available"]:
+            return JSONResponse({"detail": f"{p['server']['name']} can't run here: {p['why']}", "code": "unavailable"}, 409)
+        try:
+            servers.add(ServerIn(**p["server"]), origin={"app": "gaifa", "preset": pid})
+        except KeyError:
+            return JSONResponse({"detail": f"there is already a server {p['server']['id']!r}", "code": "exists"}, 409)
+        return row(servers.update(p["server"]["id"], {"risks": p["risks"], "deny": p["deny"]}))
+
     @app.get("/v1/import", summary="MCP servers other apps here configure (Claude Code, Codex, Cursor, …) and workspace project files: names, never values")
     async def import_list() -> dict:
         import importers
@@ -255,8 +275,9 @@ def create_app(state: Path, outputs: Path, hub_url: str = "", logs: Path | None 
         if conn is not None:
             conn.asked = None
         try:
+            t0 = time.time()
             r = await pool.call(sid, tool, args)
-            out = T.result(sid, tool, r, outputs)
+            out = T.result(sid, tool, r, outputs, since=t0)
         except ValueError as e:
             counts["errors"] += 1
             return JSONResponse({"detail": str(e), "code": "tool_error"}, 422)

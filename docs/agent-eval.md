@@ -400,6 +400,21 @@ Four tasks (capability), skynet, dry run, against the installed hub:
 
 About 4,400–4,500 prompt tokens a turn, 1–2 s each. Not run: this machine's own chat model (the llama.cpp mod was stopped) and LongMemEval's knowledge-update and abstention questions (they need the dataset downloaded first).
 
+### Blender through MCP (plan mcp-client 5.3, 2026-10-27)
+
+`python -m evals.blender --runs 3` (in `services/agent`), against the installed hub with the `mcp` mod's Blender server approved: each task resets the scene through the mod (a camera and a light), seeds it, asks one thing in a new Manual chat (cards approved by the harness) and checks Blender's state afterwards, not the agent's words: objects, places and materials from the scene, whether the camera sees a mesh, a new render under `outputs/mcp/` that isn't blank. Blender 5.2.2 ran without a window (the preset's companion). Every code step ran under a standing "always allow" grant for `mcp_blender_execute_blender_code` that the user made in a chat on 2026-10-26, so no card was shown; the Manual cards were checked in that chat.
+
+| Task | What it asks | skynet (Swift 1.5) | Time | Code steps | Tool calls | Prompt |
+| --- | --- | --- | --- | --- | --- | --- |
+| `row` | a cube A, a sphere B and a cone C in a row, 1 m apart | 3/3 | 12 s | 1.3 | 4.3 | 17.4k |
+| `material` | a red material on A | 3/3 | 9 s | 1.0 | 4.3 | 16.6k |
+| `render` | a 512 px render of the scene, shown | 3/3 | 11 s | 1.3 | 4.0 | 17.0k |
+| `gen3d` | import the newest gen3d model and point the camera at it | 3/3 | 15 s | 2.0 | 7.0 | 17.7k |
+| `tree` | "make a low-poly tree in Blender and show me a render" (the plan's Phase 5 check) | 3/3 | 20 s | 3.7 | 6.7 | 18.7k |
+| `count` | how many objects the scene has | 3/3 | 5 s | 0 | 2.7 | 15.9k |
+
+The first runs failed on the model's Blender: an operator that doesn't exist (`primitive_sphere_add`) or a wrong keyword (`rings`, `size`), a colour on the viewport's `diffuse_color` instead of the shader, a render set in one step and written in another to Blender's `/tmp`, a new camera never made the scene's, a camera aimed at one part of a tree from too close, a viewport screenshot offered as a render, and a stray `)` copying a dense line. The skill now lists the primitives with their arguments, the material recipe, how files are named (`time.strftime('%Y-%m-%d/%H%M%S')` under the outputs folder), a framing snippet that fits every mesh, and that `look` is never a render; the mod turns any file a call writes under `outputs/mcp/` into an output, printed or not. Not run: this machine's own chat model (the LLM engines were in use by other work) and the Blender Lab's official server (it needs a download; the community server's add-on was already installed).
+
 ## Gate
 
 Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

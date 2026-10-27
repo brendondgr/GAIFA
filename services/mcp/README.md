@@ -12,6 +12,8 @@ GAIFA's MCP client (plan [mcp-client](../../docs/plans/mcp-client.md)): other MC
 
 In a chat, each server is its own tool group, `mcp:<server>`, hidden until it's on: a skill whose frontmatter names it (`metadata: {mcp-servers: blender}`) loads its tools when read, `@mcp:<server>` in the composer pins it, and the composer's Tool groups has Auto / Pinned / Off for it.
 
+**Presets** (`presets.py`, plan 5.1): servers GAIFA knows how to set up, one click on the page ("Ready to add"), then the user approves the tools as for any server. **Blender** (MCP for Blender 2.2.0 through `uvx`, telemetry off; its add-on goes in Blender's add-ons, [setup/blender.md](setup/blender.md)): running Python in Blender is `execute`, the asset and generation tools are `network`, the feedback tool is off. A server may have a **companion**, a program it talks to: if nothing answers on its port, the mod starts it (Blender without a window, `scripts/blender_headless.py`) and stops it with the session; your own Blender with the add-on's server on is used as it is. A server's **note** (where to save files) ends each of its tools' descriptions, and a file a tool reports under `outputs/mcp/` becomes an output. The skill `skills/blender/SKILL.md` names the server, so reading it in a chat turns the tools on.
+
 Risk of a tool: what the user chose on the page, else `readOnlyHint` → read, `destructiveHint` → destructive, a name or description about running code → execute, `openWorldHint` → network, else write.
 
 Sessions: one per server for the machine, started on first use, stopped after 15 idle minutes; a stdio server gets a minimal environment (HOME, LOGNAME, PATH, SHELL, TERM, USER, LANG) plus its own variables, and its stderr goes to `data/logs/mcp-<id>.log`. A session that breaks under a call is stopped; the next call starts a new one (a call is never sent twice).
@@ -29,6 +31,7 @@ Elicitation: a server's request for more input is declined (a mod can't put a fo
 | `POST /v1/servers/{id}/start`, `/stop` | the session |
 | `POST /v1/servers/{id}/approve {hash}` | approve the tools as listed (refused when they changed since) |
 | `GET /v1/import`, `POST /v1/import/{key}[?id=]` | servers other apps here configure (Claude Code, Claude Desktop, Cursor, Codex, Gemini CLI, VS Code, a workspace folder's `.mcp.json`): names, commands and the names of their variables, never values; add one, its variables as `${NAME}` |
+| `GET /v1/presets`, `POST /v1/presets/{id}` | servers GAIFA knows how to set up (whether they can run here); add one, unapproved |
 | `GET /v1/tools` | the hub's `tools_source` rows |
 | `POST /v1/call/{id}/{tool} {arguments}` | one call |
 
@@ -38,8 +41,12 @@ Elicitation: a server's request for more input is declined (a mod can't put a fo
 |---|---|
 | `server.py` | the API, approval and screening, `tools_rev` |
 | `servers.py` | `servers.json`, validation, `${NAME}` secrets from `.env` |
-| `client.py` | `Pool`: a session per server (stdio or HTTP) through the `mcp` SDK, idle stop, broken sessions |
+| `client.py` | `Pool`: a session per server (stdio or HTTP) through the `mcp` SDK, idle stop, broken sessions, companions |
 | `tools.py` | rows for the hub, risks, fingerprints and differences, results (outputs) |
 | `importers.py` | the other apps' MCP configs, read on demand |
+| `presets.py` | servers ready to add: Blender (its launch, risks, companion, note) |
+| `scripts/blender_headless.py` | the add-on's socket server in a Blender without a window |
+| `skills/blender/SKILL.md` | how the agent works in Blender; turns the server on in a chat |
+| `setup/blender.md` | the add-on and the preset (`gaifa setup mcp-blender`) |
 | `ui/page.js` | the page: Servers (state, tools with a risk and a switch each, Approve with what changed, Start/Stop, Turn off, Remove, Add a server) and Import |
-| `tests/` | a stdio fake server (`fake_server.py`) and the tests: `.venv/bin/python -m pytest` in this folder |
+| `tests/` | a stdio fake server (`fake_server.py`) and the tests (`test_skill.py`: the Blender skill and preset): `.venv/bin/python -m pytest` in this folder |

@@ -74,14 +74,17 @@ def rows(spec: dict[str, Any], tools: list[dict[str, Any]]) -> list[dict[str, An
         seen.add(name)
         schema = t.get("inputSchema") or {"type": "object", "properties": {}}
         desc = f"{spec.get('name') or spec['id']} (MCP server): " + (t.get("description") or t.get("title") or t["name"]).strip()
+        if spec.get("note"):
+            desc += "\n" + spec["note"]
         out.append({"type": "function", "function": {"name": name, "description": desc[:2000], "parameters": schema},
                     "op": f"POST /v1/call/{spec['id']}/{t['name']}", "risk": risk_of(t, spec.get("risks")), "mcp": False,
                     "group": f"mcp:{spec['id']}"})
     return out
 
 
-def result(sid: str, tool: str, r: Any, outputs: Path) -> dict[str, Any]:
-    """A CallToolResult as this mod's answer: {text, outputs, structured}, or raises ValueError for an error result."""
+def result(sid: str, tool: str, r: Any, outputs: Path, since: float | None = None) -> dict[str, Any]:
+    """A CallToolResult as this mod's answer: {text, outputs, structured}, or raises ValueError for an error result.
+    `since`: when the call started; files written under the outputs folder from then on become outputs too."""
     texts, files = [], []
     for c in getattr(r, "content", None) or []:
         kind = getattr(c, "type", "")
@@ -98,12 +101,43 @@ def result(sid: str, tool: str, r: Any, outputs: Path) -> dict[str, Any]:
     if getattr(r, "is_error", False):
         raise ValueError(text[:2000] or "the tool reported an error")
     text = text[:TEXT_CAP] + ("\n[…cut]" if len(text) > TEXT_CAP else "")
+    for f in written(text, outputs) + (fresh(outputs, since, files) if since is not None else []):
+        if f not in files:                          # files the server saved under this mod's outputs (a render)
+            files.append(f)
     out: dict[str, Any] = {"text": untrusted(f"mcp:{sid}/{tool}", text) if text else ""}
     if files:
         out["outputs"] = files
     if getattr(r, "structured_content", None):
         out["structured"] = r.structured_content
     return out
+
+
+def written(text: str, outputs: Path) -> list[str]:
+    """Paths in a server's text to files that exist under this mod's outputs folder: they become outputs."""
+    root = str(outputs.resolve())
+    out = []
+    for m in re.finditer(re.escape(root) + r"/[^\s'\"<>)\]]+", text):
+        p = Path(m.group(0).rstrip(".,;:"))
+        if p.is_file() and p.resolve().is_relative_to(outputs.resolve()) and str(p) not in out:
+            out.append(str(p))
+    return out[:20]
+
+
+def fresh(outputs: Path, since: float, skip: list[str] = ()) -> list[str]:  # type: ignore[assignment]
+    """Files written under the outputs folder since `since` (a call's start), the ones it saved itself aside: a render
+    whose path the code didn't print. Only today's and yesterday's folders and folders changed since are looked at."""
+    if not outputs.is_dir():
+        return []
+    days = {time.strftime("%Y-%m-%d", time.localtime(since - d)) for d in (0, 86400)} | {time.strftime("%Y-%m-%d")}
+    out = []
+    for d in outputs.iterdir():
+        if not d.is_dir() or (d.name not in days and d.stat().st_mtime < since - 1):
+            continue
+        for p in d.rglob("*"):
+            if (p.is_file() and not p.name.startswith(".") and p.suffix not in (".json", ".part")
+                    and p.stat().st_mtime >= since - 1 and str(p) not in skip and str(p) not in out):
+                out.append(str(p))
+    return sorted(out)[:20]
 
 
 def untrusted(source: str, text: str) -> str:

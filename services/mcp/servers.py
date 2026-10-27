@@ -25,6 +25,16 @@ VAR = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 RISKS = ("read", "write", "generate", "network", "execute", "destructive")
 
 
+class Companion(BaseModel):
+    """A program the server needs running first (mcp-client 5.1: a Blender without a window). Started only when
+    nothing answers on `port` yet (your own Blender with its add-on's server on is used as it is), stopped with it."""
+    command: str = Field(min_length=1, max_length=500)
+    args: list[str] = Field(default_factory=list, max_length=64)
+    host: str = "localhost"
+    port: int = Field(ge=1, le=65535)
+    wait_s: float = Field(60, ge=1, le=600)
+
+
 class ServerIn(BaseModel):
     id: str = Field(min_length=2, max_length=32, description="Lower-case letters, digits and -; tools become mcp_<id>_<tool>")
     name: str = Field("", max_length=80)
@@ -38,6 +48,8 @@ class ServerIn(BaseModel):
     headers: dict[str, str] = Field(default_factory=dict, description="http: headers; ${NAME} reads NAME from the mod's .env")
     enabled: bool = True
     skill: str | None = Field(None, max_length=64, description="A skill to read before using it (its mcp-servers names this server)")
+    companion: Companion | None = None
+    note: str = Field("", max_length=600, description="Added to each of its tools' descriptions (where to save files, …)")
 
     @field_validator("id")
     @classmethod
@@ -68,6 +80,7 @@ class ServerPatch(BaseModel):
     risks: dict[str, Literal["read", "write", "generate", "network", "execute", "destructive"]] | None = None
     deny: list[str] | None = None
     skill: str | None = None
+    note: str | None = Field(None, max_length=600)
 
 
 def read_env_file(path: Path) -> dict[str, str]:

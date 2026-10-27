@@ -68,11 +68,53 @@ def target(spec: dict[str, Any], secrets_: dict[str, str], logs: Path | None) ->
     return (stdio_client(params, errlog=errlog) if errlog else stdio_client(params)), missing
 
 
+def listening(host: str, port: int) -> bool:
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
 class Pool:
     def __init__(self, servers: Any, logs: Path | None = None, idle_s: float = IDLE_S) -> None:
         self.servers, self.logs, self.idle_s = servers, logs, idle_s
         self.conns: dict[str, Conn] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self.companions: dict[str, asyncio.subprocess.Process] = {}     # the ones this mod started
+
+    async def companion(self, spec: dict[str, Any]) -> None:
+        """Start the server's companion (mcp-client 5.1) unless something already answers on its port."""
+        c = spec.get("companion")
+        if not c or listening(c.get("host", "localhost"), c["port"]):
+            return
+        proc = self.companions.get(spec["id"])
+        if proc is None or proc.returncode is not None:
+            if self.logs:
+                self.logs.mkdir(parents=True, exist_ok=True)
+            out = open(self.logs / f"mcp-{spec['id']}-companion.log", "a", buffering=1) if self.logs else asyncio.subprocess.DEVNULL   # noqa: SIM115
+            proc = await asyncio.create_subprocess_exec(c["command"], *c.get("args", []), stdin=asyncio.subprocess.DEVNULL,
+                                                        stdout=out, stderr=asyncio.subprocess.STDOUT, start_new_session=True)
+            self.companions[spec["id"]] = proc
+        deadline = time.time() + float(c.get("wait_s") or 60)
+        while time.time() < deadline:
+            if listening(c.get("host", "localhost"), c["port"]):
+                return
+            if proc.returncode is not None:
+                raise ServerError("companion_failed", f"{spec['id']}'s companion ({c['command']}) exited with {proc.returncode}: "
+                                  f"see data/logs/mcp-{spec['id']}-companion.log")
+            await asyncio.sleep(0.25)
+        raise ServerError("companion_timeout", f"{spec['id']}'s companion didn't listen on port {c['port']} in time", 504)
+
+    async def stop_companion(self, sid: str) -> None:
+        proc = self.companions.pop(sid, None)
+        if proc is not None and proc.returncode is None:
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=10)
+            except asyncio.TimeoutError:
+                proc.kill()
 
     async def _run(self, conn: Conn, tgt: Any) -> None:
         async def decline(_ctx: Any, params: Any) -> Any:      # plan mcp-client 2.2: no form to show; say what it asked
@@ -107,6 +149,7 @@ class Pool:
             tgt, missing = target(spec, self.servers.secrets(), self.logs)
             if missing:
                 raise ServerError("missing_secret", f"{sid} needs {', '.join(missing)} in services/mcp/.env", 409)
+            await self.companion(spec)
             restarts = (conn.restarts + 1) if conn is not None else 0
             conn = Conn(sid, started=time.time(), last_used=time.time(), restarts=restarts)
             self.conns[sid] = conn
@@ -154,6 +197,7 @@ class Pool:
 
     async def stop(self, sid: str) -> bool:
         conn = self.conns.pop(sid, None)
+        await self.stop_companion(sid)
         if conn is None:
             return False
         conn.stop.set()
@@ -183,8 +227,14 @@ class Pool:
 
     def state(self, sid: str) -> dict[str, Any]:
         conn = self.conns.get(sid)
+        proc = self.companions.get(sid)
         if conn is None:
             return {"state": "stopped"}
+        if proc is not None and proc.returncode is None:
+            return {**self._state(conn), "companion": "running"}
+        return self._state(conn)
+
+    def _state(self, conn: Conn) -> dict[str, Any]:
         if conn.client is not None:
             return {"state": "running", "since": conn.started, "last_used": conn.last_used}
         return {"state": "failed" if conn.error else "starting", **({"error": conn.error} if conn.error else {})}

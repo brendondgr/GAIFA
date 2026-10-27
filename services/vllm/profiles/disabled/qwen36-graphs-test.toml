@@ -1,0 +1,14 @@
+name = "Qwen3.6 35B-A3B AWQ (graphs test)"
+model = "cyankiwi/Qwen3.6-35B-A3B-AWQ-4bit"
+revision = "main"
+served_name = "qwen3.6-graphs-test"
+alias = "Qwen3.6-graphs-test"
+memory_gb = 32.0
+max_model_len = 65536
+max_num_seqs = 4
+attention_backend = "TRITON_ATTN"
+enforce_eager = false
+trust_remote_code = true
+tool_parser = "qwen3_coder"
+reasoning_parser = "qwen3"
+notes = "temporary: CUDA graphs test"

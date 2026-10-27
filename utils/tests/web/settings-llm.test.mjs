@@ -29,6 +29,7 @@ test('key and health states', () => {
   assert.deepEqual(V.keyState(EPS[0]), { tone: 'green', text: 'key …abcd' });
   assert.deepEqual(V.keyState(EPS[1]), { tone: 'red', text: 'no key' });
   assert.deepEqual(V.keyState(EPS[2]), { tone: 'dim', text: 'no key needed' });
+  assert.deepEqual(V.keyState(EPS[4]), { tone: 'dim', text: 'keys in its .env' });   // OpenCode (llm-servers 6.1)
   assert.equal(V.healthState(EPS[1]).text, 'failing');
   assert.equal(V.healthState({ health: 'unknown', enabled: false }).text, 'off');
 });
@@ -82,4 +83,12 @@ test('the settings search finds the section by provider and engine', async () =>
   const ix = Q.indexRows(secs, { services });
   for (const q of ['Claude', 'API key', 'OpenAI', 'Gemini', 'llama.cpp', 'vLLM'])
     assert.ok(Q.matches(ix, q).rows.some(r => r.section === 'llms' || r.id.startsWith('llms/')), q);
+});
+
+test('OpenCode\'s card says where its keys live and has no key buttons', () => {
+  const card = ep => render(B.ServerCard({ api: {}, ep, onChange() {} }));
+  const oc = card(EPS[4]);
+  assert.match(text(oc), /provider keys live in services\/opencode\/\.env/);
+  assert.ok(!all(oc, n => n.type === 'button').some(b => /key/i.test(text(b))));
+  assert.ok(all(card(EPS[0]), n => n.type === 'button').some(b => text(b) === 'Key…'));        // a cloud server keeps its key buttons
 });

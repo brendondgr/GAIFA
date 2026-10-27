@@ -233,26 +233,28 @@ Work in `services/relay` (repository `brendondgr/Relay`), on branch `feat/cloud-
 
 ## Phase 6 — OpenCode's models, read live (S)
 
-- [ ] **6.1 `app/services/discovery.py` (relay), `app/services/opencode_boot.py`.**
+- [x] **6.1 `app/services/discovery.py` (relay), `app/services/opencode_boot.py`.**
   - **What:** an `opencode` endpoint's models come from OpenCode's provider list (`GET /config/providers` with its Basic auth), instead of the allowlist written at boot. They're listed in the `agent` group as `<alias>/<provider>/<model>`, and the old `<provider>/<model>` ids keep routing.
   - **Settings:** OpenCode's card in Settings → LLMs says its keys live in `services/opencode/.env`.
   - **Chat:** the Chat picker still leaves OpenCode out (the agent's `/v1/models` filters it).
   *Done when:* `test_opencode_boot.py` and `test_discovery.py` cover the live list and the old ids; Relay is released and pinned as in 1.8.
+  *As built (2026-10-27):* Relay 1f6189e and a98d8e3 (a running `opencode serve` reports `capabilities.{toolcall, reasoning, input.image}` beside `limit`, models.dev's entries `tool_call` and `modalities`: both are read): `Discovery._list_opencode` reads `/config/providers` with the endpoint's Basic auth through the adapter's `catalog_entries` (free models only, with the window, output cap, tools, images and thinking OpenCode reports); `listed_models` is on for `opencode`; the catalog lists them as `agent/<provider>/<model>` and no longer lists the allowlisted `<provider>/<model>` ids (they still route), and lists any id once (lcpp's alias that is also its model id). `opencode_boot.py` is unchanged: its allowlist keeps the old ids routing and the adapter's free-model rule. The tests are in `test_opencode_boot.py` (the fake OpenCode now reports facts), `test_catalog.py` and `test_adapter_opencode.py`. Settings → LLMs: OpenCode's card says where its keys live. Live (relay updated with `gaifa repos update relay` once the other session's evals were idle): OpenCode's 10 free models listed as `agent/<provider>/<model>` with their windows, tools, images and thinking; with OpenCode stopped, its card shows the connection error; no id is listed twice.
 
 ## Phase 7 — Release, pins and the live run (S)
 
-- [ ] **7.1 Pins and docs.**
+- [x] **7.1 Pins and docs.**
   - **Pins:** Relay and LLMs `main` include every step; `gaifa repos status` is clean.
   - **GAIFA docs:** architecture §4.3/§6/§10/§14.1, the brief §11.13, `docs/structure.md`, `web/PATCHES.md`, and the `CLAUDE.md`/`AGENTS.md` status lines.
   - **Setup docs:** relay's setup doc (`services/relay/setup/relay.md`) says how to add a provider key; `gaifa docs --check --strict` passes.
   *Done when:* the docs checks and `uv run pytest` pass.
+  *As built (2026-10-27):* Relay main a98d8e3 and LLMs master 0324288 pinned; architecture §10 and §14.1, the brief, structure, PATCHES #66–68, the status lines; the relay's setup doc has "Adding Claude, OpenAI or Gemini"; `gaifa docs --check --strict` passes.
 
 **Checks & deliverables — the whole plan** (with the user's keys)
 - [ ] One chat each on Claude, OpenAI and Gemini, each with a tool call, a second turn and an attached picture; the relay's Requests screen shows each with tokens and cache tokens.
 - [ ] The judge refuses a cloud model; a request without the purpose header gets 403.
 - [ ] A wrong key shows on its Settings card; turning the network off leaves the local models working and the cloud cards showing their last list with the error.
-- [ ] A local model loaded from the Chat picker answers in that chat.
-- [ ] `uv run pytest`, the relay's, lcpp's, vLLM's and the agent's suites pass.
+- [x] A local model loaded from the Chat picker answers in that chat (gemma4-26B, 2026-10-27).
+- [x] `uv run pytest`, the relay's, lcpp's, vLLM's and the agent's suites pass (2026-10-27: 2012, 262, 94, 32, 326).
 
 ## 4. Deliverables
 

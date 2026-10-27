@@ -31,6 +31,7 @@ export function grouped(endpoints) {
 
 /** A key's state for the card: `{tone, text}`. */
 export function keyState(ep) {
+  if (groupOf(ep) === 'agent') return { tone: 'dim', text: 'keys in its .env' };   // its key here is OpenCode's server password
   if (ep.has_key) return { tone: 'green', text: `key ${ep.key_hint || 'set'}` };
   if (groupOf(ep) === 'cloud') return { tone: 'red', text: 'no key' };
   return { tone: 'dim', text: 'no key needed' };

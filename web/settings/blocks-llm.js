@@ -38,11 +38,11 @@ function ModelList({ api, ep, toast }) {
       h('span', { style: { color: T.dim, fontSize: 11.5 } }, [m.context_length ? `${Math.round(m.context_length / 1000)}k` : '', m.vision ? 'vision' : '', m.reasoning ? 'thinks' : ''].filter(Boolean).join(' · ')))));
 }
 
-function ServerCard({ api, ep, toast, onChange }) {
+export function ServerCard({ api, ep, toast, onChange }) {
   const React = R(), [open, setOpen] = React.useState(false), [keyOpen, setKeyOpen] = React.useState(false);
   const [key, setKey] = React.useState(''), [busy, setBusy] = React.useState(false), [sure, setSure] = React.useState(false);
   const act = async fn => { setBusy(true); try { await fn(); await onChange(); } catch (e) { toast?.(msg(e), 'error'); } finally { setBusy(false); } };
-  const hs = healthState(ep), ks = keyState(ep);
+  const hs = healthState(ep), ks = keyState(ep), agent = groupOf(ep) === 'agent';
   return h('div', { style: { padding: '10px 0', borderBottom: '1px solid ' + T.bd } },
     row(h('span', { style: { fontWeight: 600 } }, ep.name),
       ep.alias ? h('span', { style: { fontFamily: MONO, fontSize: 12, color: T.mut } }, ep.alias) : null,
@@ -50,12 +50,14 @@ function ServerCard({ api, ep, toast, onChange }) {
       ep.owner ? h(Badge, { tone: 'dim', title: `${ep.owner} manages it` }, ep.owner) : null,
       h('span', { style: { flex: 1 } }),
       h(Btn, { sm: true, kind: 'ghost', label: open ? 'Hide models' : 'Models', onClick: () => setOpen(!open) }),
-      ep.owner ? null : h(Btn, { sm: true, kind: 'ghost', label: ep.has_key ? 'Key…' : 'Add key', onClick: () => setKeyOpen(!keyOpen) }),
+      ep.owner || agent ? null : h(Btn, { sm: true, kind: 'ghost', label: ep.has_key ? 'Key…' : 'Add key', onClick: () => setKeyOpen(!keyOpen) }),
       h(Btn, { sm: true, kind: 'ghost', label: ep.enabled === false ? 'Turn on' : 'Turn off', disabled: busy,
         onClick: () => act(() => relay(api, 'PATCH', `/admin/endpoints/${ep.id}`, { enabled: ep.enabled === false })) }),
       ep.owner ? null : h(Btn, { sm: true, kind: sure ? 'pri' : 'ghost', label: sure ? 'Remove it' : 'Remove', disabled: busy,
         onClick: () => (sure ? act(() => relay(api, 'DELETE', `/admin/endpoints/${ep.id}`)) : setSure(true)) })),
     h('div', { style: { ...small, fontFamily: MONO, fontSize: 11.5, marginTop: 2 } }, ep.base_url),
+    agent ? h('div', { style: { ...small, fontSize: 11.5, marginTop: 2 } }, 'OpenCode’s provider keys live in ', h('code', { style: { fontFamily: MONO } }, 'services/opencode/.env'),   // llm-servers 6.1
+      '; the relay holds only its server password. Its free models are read from OpenCode and stay out of the Chat picker.') : null,
     keyOpen ? row(h('input', { type: 'password', autoComplete: 'off', value: key, placeholder: 'the provider’s API key', 'aria-label': `API key for ${ep.name}`,
         onChange: e => setKey(e.target.value), style: { ...inputSt, width: 300 } }),
       h(Btn, { sm: true, kind: 'pri', label: 'Save key', disabled: busy || !key.trim(),

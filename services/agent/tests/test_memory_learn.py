@@ -118,3 +118,18 @@ def test_clean_about():
     assert [clean_about(x) for x in ("topics/user preference", "User", "the user's habits", "topics/Lumen project", "Lumen project",
                                      "projects/Lumen", "GAIFA", "Ana person", "topics/cooking")] == \
         ["you", "you", "you", "projects/Lumen", "projects/Lumen", "projects/Lumen", "GAIFA", "people/Ana", "topics/cooking"]
+
+
+
+async def test_learning_uses_a_served_model_and_waits_after_a_failure(env):
+    ml, now = env.agent.memory_learner, [0.0]
+    tid = await chat(env, "I live in Lisbon.")
+    env.agent.store.update_thread(tid, model="unloaded-local")                # e.g. a llama.cpp model since unloaded
+    now[0] = env.agent.store.events(tid)[-1]["ts"] + 31 * 60
+    ml.clock = ml.backoff.clock = lambda: now[0]
+    env.model.queue({"status": 503, "text": "no healthy upstream", "match": "lasting facts"})
+    assert await ml.check() == 0
+    assert env.model.received[-1]["model"] == "main"                          # the agent's, not the unserved one
+    assert ml.backoff.waiting(tid) and tid not in [t["id"] for t in ml.due()]
+    now[0] += 5 * 60
+    assert tid in [t["id"] for t in ml.due()]

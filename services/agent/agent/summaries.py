@@ -8,6 +8,8 @@ embed mod's `chats` collection, which embeds it under its idle rule. The Chat li
   get into it (plan 24.8's rule).
 - **Rewritten** when the chat continues and goes quiet again; dry runs and `no_learn` chats are skipped; deleting
   a chat deletes its summary here and in the embed mod.
+- **A model that's there:** the chat's own model when the relay serves it, else the agent's; while neither is
+  served, nothing is asked. A chat whose summary failed waits before the next try (5 min, doubling to 6 h).
 - **Not memory:** nothing here feeds preferences or the prompt unless a chat is looked up.
 """
 
@@ -22,6 +24,7 @@ from .learn.loop import render
 
 log = logging.getLogger("agent.summaries")
 CHECK_S = 60
+RETRY_S, RETRY_MAX_S = 5 * 60, 6 * 3600          # after a failed summary: 5 min, doubling to 6 h
 EMBED = "/api/s/embed/v1"
 SCHEMA = """CREATE TABLE IF NOT EXISTS thread_summaries (
     thread_id TEXT PRIMARY KEY, summary TEXT NOT NULL, upto_seq INTEGER NOT NULL, made REAL NOT NULL,
@@ -49,6 +52,27 @@ def chat_text(events: list[dict[str, Any]], cap: int = 8000) -> str:
     return text + ("\nOUTPUTS MADE: " + "; ".join(dict.fromkeys(made)) if made else "")
 
 
+class Backoff:
+    """Per chat, after a failed background pass: wait 5 min, doubling to 6 h, before trying it again (in memory: a
+    restart tries once more). Also used by memory learning."""
+
+    def __init__(self, what: str, clock: Callable[[], float] = time.time) -> None:
+        self.what, self.clock = what, clock
+        self.tries: dict[str, tuple[int, float]] = {}   # thread → (failures in a row, not before)
+
+    def waiting(self, tid: str) -> bool:
+        return self.clock() < self.tries.get(tid, (0, 0.0))[1]
+
+    def failed(self, tid: str, why: object) -> None:
+        n = self.tries.get(tid, (0, 0.0))[0] + 1
+        wait = min(RETRY_S * 2 ** (n - 1), RETRY_MAX_S)
+        self.tries[tid] = (n, self.clock() + wait)
+        log.warning("%s %s: %s (try %d; next in %d min)", self.what, tid, why, n, wait // 60)
+
+    def ok(self, tid: str) -> None:
+        self.tries.pop(tid, None)
+
+
 class Summaries:
     def __init__(self, agent: Any, idle_min: float = 30, clock: Callable[[], float] = time.time) -> None:
         self.agent, self.idle_s, self.clock = agent, idle_min * 60, clock
@@ -56,6 +80,7 @@ class Summaries:
         with self.store._lock:
             self.store._c.execute(SCHEMA)
         self.busy = False
+        self.backoff = Backoff("summarising", clock)
 
     # ---- the table ---------------------------------------------------------------------------
 
@@ -85,6 +110,8 @@ class Summaries:
             st = t.get("settings") or {}
             if st.get("dry_run") or st.get("no_learn") or self.agent.running(t["id"]):
                 continue
+            if self.backoff.waiting(t["id"]):
+                continue
             last = self.store.last_seq(t["id"])
             evs = self.store.events(t["id"], max(0, last - 1))
             if not evs or now - evs[-1]["ts"] < self.idle_s:
@@ -104,9 +131,9 @@ class Summaries:
         if t is None:
             return None
         events = self.store.events(tid)
-        model = t.get("model") or self.agent.cfg.model
-        if model != self.agent.cfg.model and await self.agent.llm.is_cloud(model):
-            model = self.agent.cfg.model        # background work never goes to a paid provider (plan llm-servers 2.1)
+        model = await self.agent.llm.background_model(t.get("model"), self.agent.cfg.model)
+        if model is None:
+            raise RuntimeError("no model to summarise with: neither the chat's nor the agent's is served")
         reply = await self.agent.llm.chat(model, [{"role": "user", "content": PROMPT.format(chat=chat_text(events))}],
                                           stream=False)
         text = (reply.text or "").strip()
@@ -151,8 +178,11 @@ class Summaries:
                 try:
                     if await self.summarize(t["id"]):
                         n += 1
-                except Exception:  # noqa: BLE001: the model may be away; the next pass tries again
-                    log.exception("summarising %s", t["id"])
+                        self.backoff.ok(t["id"])
+                    else:
+                        self.backoff.failed(t["id"], "the model wrote nothing")
+                except Exception as e:  # noqa: BLE001: the model may be away; a later pass tries again
+                    self.backoff.failed(t["id"], e)
             for r in self.store._all("SELECT thread_id FROM thread_summaries WHERE sent = 0", []):
                 await self.send(r["thread_id"])
         finally:

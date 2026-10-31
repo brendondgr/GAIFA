@@ -3,7 +3,8 @@
 For each chat quiet for the summaries' idle time (and not an eval's, and not `no_learn`), what came since the last pass:
 1. **Extract.** The chat as the learner renders it (`learn.loop.render`: the user's words plain; the agent's replies,
    arguments and anything from documents or pages inside `<untrusted>`, documents as their cards) goes to the
-   chat's model, which lists lasting facts the USER stated, and renames, as JSON. Learning starts from the chats
+   chat's model (the agent's when the relay doesn't serve it; a failed chat waits, `summaries.Backoff`), which lists
+   lasting facts the USER stated, and renames, as JSON. Learning starts from the chats
    as they were when it was first turned on (`baseline`): past chats aren't mined all at once.
 2. **Resolve.** Each fact's `about` resolves without a model (`MemoryStore.resolve`).
 3. **Compare.** Its five nearest current facts (`memory_search`); when it has any, the model chooses one operation per
@@ -24,6 +25,7 @@ import time
 from typing import Any, Callable
 
 from ..learn.loop import _json, render
+from ..summaries import Backoff
 from .model import FACT_KINDS, MemoryError, check_date, norm
 from .search import search
 from .store import MemoryStore
@@ -93,6 +95,7 @@ def clean_about(a: str) -> str:
 class MemoryLearner:
     def __init__(self, agent: Any, idle_min: float = 30, clock: Callable[[], float] = time.time) -> None:
         self.agent, self.idle_s, self.clock = agent, idle_min * 60, clock
+        self.backoff = Backoff("memory learning in", clock)
         self.m: MemoryStore = agent.memory
         with self.m.lock:
             self.m.c.execute(SCHEMA)
@@ -126,7 +129,7 @@ class MemoryLearner:
         store, now, out = self.agent.store, self.clock(), []
         for t in store.threads(limit=1000):
             st = t.get("settings") or {}
-            if st.get("dry_run") or st.get("no_learn") or self.agent.running(t["id"]):
+            if st.get("dry_run") or st.get("no_learn") or self.agent.running(t["id"]) or self.backoff.waiting(t["id"]):
                 continue
             last = store.last_seq(t["id"])
             evs = store.events(t["id"], max(0, last - 1))
@@ -161,7 +164,9 @@ class MemoryLearner:
         if not users:
             self._mark(tid, last, 0)
             return 0
-        model = t.get("model") or self.agent.cfg.model
+        model = await self.agent.llm.background_model(t.get("model"), self.agent.cfg.model)
+        if model is None:
+            raise RuntimeError("no model to learn with: neither the chat's nor the agent's is served")
         known, ents = self._known()
         got = await self.ask(model, EXTRACT.format(known=known, entities=ents, chat=render(events, cap=8000, reply_cap=600)))
         if got is None or not isinstance(got.get("facts", []), list):
@@ -251,8 +256,9 @@ class MemoryLearner:
             for t in self.due():
                 try:
                     n += await self.learn(t["id"]) or 0
-                except Exception:  # noqa: BLE001: the model may be away; the next pass tries again
-                    log.exception("memory learning in %s", t["id"])
+                    self.backoff.ok(t["id"])
+                except Exception as e:  # noqa: BLE001: the model may be away; a later pass tries again
+                    self.backoff.failed(t["id"], e)
         finally:
             self.busy = False
         return n

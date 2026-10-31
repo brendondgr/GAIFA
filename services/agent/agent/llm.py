@@ -360,6 +360,15 @@ class LLM:
                 return (m.get("relay") or {}).get("group") == "cloud"
         return False
 
+    async def background_model(self, model: str | None, default: str) -> str | None:
+        """The model background work (summaries, memory learning) uses for a chat: the chat's own when the relay
+        serves it and it isn't a paid provider's (plan llm-servers 2.1), else `default`; None while neither is served."""
+        served = {m.get("id") for m in await self.models()}
+        model = model or default
+        if model != default and (model not in served or await self.is_cloud(model)):
+            model = default
+        return model if model in served else None
+
     async def meta(self, model: str) -> dict[str, Any]:
         for m in await self.models():
             if m.get("id") == model:

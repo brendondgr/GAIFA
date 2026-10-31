@@ -134,3 +134,43 @@ async def test_search_route_and_the_chat_search_tool(env):
     assert "quarterly tax estimate" in body["chats"][0]["summary"]
     env.hub.embed_up = False
     assert (await env.client.get("/v1/chats/search", params={"q": "x"})).status_code == 503
+
+
+async def test_a_chat_whose_model_isnt_served_uses_the_agents(env):
+    s, clock = summaries(env)
+    tid = await chat(env, "Plan a garden", "Here's a plan.")
+    env.agent.store.update_thread(tid, model="unloaded-local")      # e.g. a llama.cpp model since unloaded
+    clock.t += 31 * 60
+    env.model.queue({"text": "Planned a garden.", "match": "Summarise"})
+    assert await s.check() == 1
+    assert env.model.received[-1]["model"] == "main" and s.get(tid)["model"] == "main"
+
+
+async def test_nothing_is_asked_while_no_model_is_served(env):
+    s, clock = summaries(env)
+    tid = await chat(env, "Plan a garden", "Here's a plan.")
+    env.model.models.clear()
+    env.agent.llm._models = (0.0, [])
+    asked = len(env.model.received)
+    clock.t += 31 * 60
+    assert await s.check() == 0
+    assert len(env.model.received) == asked and s.get(tid) is None
+    assert s.due() == []                                            # waiting before the next try
+
+
+async def test_a_failed_summary_waits_longer_each_time(env):
+    s, clock = summaries(env)
+    tid = await chat(env, "Write a poem", "Here it is.")
+    clock.t += 31 * 60
+    env.model.queue({"status": 503, "text": "no healthy upstream", "match": "Summarise"})
+    assert await s.check() == 0
+    assert s.due() == []                                            # not on the next pass
+    clock.t += 5 * 60
+    assert [t["id"] for t in s.due()] == [tid]
+    env.model.queue({"status": 503, "text": "no healthy upstream", "match": "Summarise"})
+    await s.check()
+    clock.t += 5 * 60
+    assert s.due() == []                                            # 10 min after the second failure
+    clock.t += 5 * 60
+    env.model.queue({"text": "Wrote a poem.", "match": "Summarise"})
+    assert await s.check() == 1 and tid not in s.backoff.tries

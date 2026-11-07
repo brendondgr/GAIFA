@@ -1,6 +1,6 @@
 # Plan: a responsive Chat: messages that show at once, and a queue for messages sent during a turn
 
-**Asked for:** 2026-11-07 · **Status:** In progress
+**Asked for:** 2026-11-07 · **Status:** Done (2026-11-07)
 
 ## 1. Introduction
 
@@ -81,22 +81,22 @@ The approach has three phases. Phase 1 makes the message appear the moment the u
 
 ## Phase 3 — Fewer waits around the first token (S)
 
-- [ ] **3.1 Add a chat to the shared stream without reconnecting: `services/agent/agent/streams.py`, `web/chat/chat-streams.js`.**
+- [x] **3.1 Add a chat to the shared stream without reconnecting: `services/agent/agent/streams.py`, `web/chat/chat-streams.js`.**
   - **Route:** `/v1/streams` sends a `stream` id in its first event. `POST /v1/streams/{sid}/threads` `{add: [[tid, after]], remove: [tid]}` changes what an open stream carries, and replays an added chat's events after `after`. The pool uses it for new and closed panes, and reopens the connection only when that call fails (404: an older agent, or a stream that ended).
   *Done when:* `services/agent/tests/test_streams_add.py` covers add with replay, remove, and an unknown `sid` (404). `utils/tests/web/chat-streams.test.mjs` shows that a new pane adds itself without a new `EventSource`, and falls back to reconnecting on 404.
-- [ ] **3.2 The title and the meter out of the turn's way: `loop.py` (`_title`), `server.py` (`/context`).**
-  - **Title:** a new chat's title is asked for after the first turn's first model call ends, not before it. On a cloud model it is asked at once, as now.
+- [x] **3.2 The title and the meter out of the turn's way: `loop.py` (`_title`), `server.py` (`/context`).**
+  - **Title:** a new chat's title is asked for after the first turn's first model call ends, not before it. *As built:* on every model, cloud included (a few seconds later at most); a turn that ends before its model call asks for it then.
   - **Meter:** `/context` reuses the system prompt the running turn last built, kept per thread for 10 s, instead of building it again with its hub calls.
   *Done when:* `test_loop.py` shows that the title call comes after the first model call (a fake model records the order). `test_send_order.py` shows that `/context` during a turn makes no hub calls.
-- [ ] **3.3 Measured: `services/agent/evals/latency.py` (new).**
+- [x] **3.3 Measured: `services/agent/evals/latency.py` (new).**
   - **What:** a script against the installed hub. It makes a new chat with a message, sends into an idle chat, and queues during a turn. It reports the time to the `user` event on the stream and the time to the first token, each as the median of 5 runs, written to `docs/agent-eval.md`. It uses a `dry_run` chat (no memory) and the skynet model. It is never part of `pytest`.
-  *Done when:* the run shows the `user` event in under 300 ms (median) with the embed mod unloaded, and the results are in `docs/agent-eval.md`.
+  *Done when:* the run shows the `user` event in under 300 ms (median) with the embed mod unloaded, and the results are in `docs/agent-eval.md`. *As built:* chats with learning off (`no_learn`) rather than dry runs, so recall runs as in any chat; the user event in 8–9 ms (median), the first token in about 0.5 s; deleted at the end.
 
 **Wire — Phase 3:** nothing new on screen. Opening a new chat no longer reconnects the others' stream.
 
 **Checks & deliverables — Phase 3**
-- [ ] With three panes open, a new chat in a fourth shows its message at once. The other three don't flicker or replay.
-- [ ] Delivered: the changed `streams.py`, `chat-streams.js`, `loop.py`, `server.py`, `services/agent/evals/latency.py`, the results in `docs/agent-eval.md`.
+- [x] With three panes open, a new chat in a fourth shows its message at once. The other three don't flicker or replay. *Checked 2026-11-07 on the installed hub:* opening another chat in a pane made one `POST /v1/streams/{id}/threads` and no new stream; the chat drew from that replay.
+- [x] Delivered: the changed `streams.py`, `chat-streams.js`, `loop.py`, `server.py`, `services/agent/evals/latency.py`, the results in `docs/agent-eval.md`.
 
 ## 4. Deliverables
 

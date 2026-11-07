@@ -38,7 +38,8 @@ from .tools import LOCAL_NAMES, ToolSet
 
 log = logging.getLogger("agent.loop")
 POLL_S = 15
-RECALL_WAIT_S = 10       # chat-responsive 1.1: how long a model call waits for its messages' recall
+RECALL_WAIT_S = 10
+PROMPT_REUSE_S = 10      # chat-responsive 3.2: the meter reuses a turn's prompt this long       # chat-responsive 1.1: how long a model call waits for its messages' recall
 SERVICE_TOOLS = {"hub_start_service", "hub_stop_service", "hub_unload_service"}   # their `id` is a mod
 # Sent (not stored) when a turn only repeats itself; that model call gets tool_choice "none".
 WRAP_UP = ("(A note from the app, not from the user: you have repeated the same tool call and its result won't change. "
@@ -107,6 +108,8 @@ class Agent(Compaction, Queueing):
         self._ending: dict[str, asyncio.Task[Any]] = {}          # a turn in its turn-end hooks: no longer busy
         self.queue = Queue(store)                # chat-responsive 2.1: messages held during a turn
         self._drains: set[asyncio.Task[Any]] = set()
+        self._prompts: dict[str, tuple[str, float, dict[str, int]]] = {}   # the turn's last prompt sizes, for the meter
+        self._titles: dict[str, str] = {}        # a new chat's words, to name it once its first reply is under way
         self.shutting_down = False   # set before the app stops: turns then stay `running` and resume at the next start
 
     # ---- events ------------------------------------------------------------------------------
@@ -185,7 +188,7 @@ class Agent(Compaction, Queueing):
         if not thread["title"]:
             words = ctx.said({"text": text, "quotes": quotes})      # an empty text with replies: name it by the replies
             self.store.update_thread(tid, title=_title_from(words))
-            asyncio.create_task(self._title(tid, words))
+            self._titles[tid] = words       # asked for after the turn's first model call (chat-responsive 3.2)
         if self._recalling(thread):      # after the event (chat-responsive 1.1); the next model call waits for it
             task = asyncio.create_task(self._recall_into(tid, thread, text, ev["seq"]))
             self._recalls.setdefault(tid, set()).add(task)
@@ -374,6 +377,7 @@ class Agent(Compaction, Queueing):
                     return
                 stuck = self._stuck(tid)
                 reply, model = await self._model(tid, tools, model, wrap_up=stuck)
+                self._title_soon(tid)
                 steps += 1
                 if stuck or (not reply.tool_calls and not self._unanswered(tid)):
                     return
@@ -388,6 +392,7 @@ class Agent(Compaction, Queueing):
             self.emit(tid, "error", {"code": "agent_error", "detail": f"{type(e).__name__}: {e}"[:500]})
             final = "error"
         finally:
+            self._title_soon(tid)               # a turn that ended before its model call
             me = asyncio.current_task()
             if me is not None and self.tasks.get(tid) is me:
                 self._ending[tid] = me      # from here a message starts a turn of its own (chat-responsive 1.1)
@@ -776,26 +781,37 @@ class Agent(Compaction, Queueing):
 
     async def messages(self, tid: str, tools: ToolSet, model: str,
                        turn: bool = False) -> tuple[list[dict[str, Any]], dict[str, int]]:
-        """`turn`: for the turn's model call, which marks what it read (`_unanswered`)."""
+        """`turn`: for the turn's model call, which marks what it read (`_unanswered`) and keeps its prompt's sizes for
+        the meter (chat-responsive 3.2)."""
         system, sizes = await self.system_prompt(tid, tools, model)
+        sizes["tools"] = ctx.est(tools.functions())
+        if turn:
+            self._prompts[tid] = (model, time.monotonic(), dict(sizes))
+        msgs, sizes = self._history(tid, sizes, mark=turn)
+        return [{"role": "system", "content": system}, *msgs], sizes
+
+    def _history(self, tid: str, sizes: dict[str, int], mark: bool = False) -> tuple[list[dict[str, Any]], dict[str, int]]:
         events = self.store.events(tid)
-        if turn and events:
+        if mark and events:
             self._read_upto[tid] = events[-1]["seq"]
         images = self.local.images(events)
         msgs, _ = ctx.rebuild(events, images)
         results = sum(ctx.est(m["content"]) for m in msgs if m["role"] == "tool")
-        sizes["tools"] = ctx.est(tools.functions())
         sizes["documents"] = ctx.doc_tokens(msgs)
         sizes["messages"] = ctx.est(msgs) - results - sizes["documents"]
         sizes["tool_results"] = results
-        return [{"role": "system", "content": system}, *msgs], sizes
+        return msgs, sizes
 
     async def meter(self, tid: str, model: str | None = None) -> dict[str, Any]:
         thread = self.store.thread(tid) or {}
         model = model or thread.get("model") or self.cfg.model
-        tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
-        await tools.refresh()
-        _, sizes = await self.messages(tid, tools, model)
+        hit = self._prompts.get(tid)
+        if hit and hit[0] == model and time.monotonic() - hit[1] < PROMPT_REUSE_S:   # the turn just built it: no hub calls
+            _, sizes = self._history(tid, dict(hit[2]))
+        else:
+            tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
+            await tools.refresh()
+            _, sizes = await self.messages(tid, tools, model)
         m = ctx.meter(self.store.events(tid), await self.window(model, tid), sizes)
         m["model"] = model
         return m
@@ -900,6 +916,12 @@ class Agent(Compaction, Queueing):
         model = thread.get("model") or self.cfg.model
         await self._compact_if_needed(tid, tools, model, force=True)
         return await self.meter(tid, model)
+
+    def _title_soon(self, tid: str) -> None:
+        """Names a new chat after its first model call, so the title's call doesn't compete with it for a local GPU."""
+        words = self._titles.pop(tid, None)
+        if words is not None:
+            asyncio.create_task(self._title(tid, words))
 
     async def _title(self, tid: str, text: str) -> None:
         token = THREAD.set(tid)          # part of the chat: its lease, and a cloud model may answer it

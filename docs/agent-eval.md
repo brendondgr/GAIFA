@@ -415,6 +415,21 @@ About 4,400–4,500 prompt tokens a turn, 1–2 s each. Not run: this machine's 
 
 The first runs failed on the model's Blender: an operator that doesn't exist (`primitive_sphere_add`) or a wrong keyword (`rings`, `size`), a colour on the viewport's `diffuse_color` instead of the shader, a render set in one step and written in another to Blender's `/tmp`, a new camera never made the scene's, a camera aimed at one part of a tree from too close, a viewport screenshot offered as a render, and a stray `)` copying a dense line. The skill now lists the primitives with their arguments, the material recipe, how files are named (`time.strftime('%Y-%m-%d/%H%M%S')` under the outputs folder), a framing snippet that fits every mesh, and that `look` is never a render; the mod turns any file a call writes under `outputs/mcp/` into an output, printed or not. Not run: this machine's own chat model (the LLM engines were in use by other work) and the Blender Lab's official server (it needs a download; the community server's add-on was already installed).
 
+### Responsiveness (plan chat-responsive 3.3, 2026-11-07)
+
+`python -m evals.latency - 5` against the installed hub (through its proxy, as the page talks to the agent), on the default model (skynet), chats with learning off that recall memory as any chat does. Times from the request:
+
+| Measure (skynet, 5 runs) | Median (ms) | Min | Max |
+| --- | --- | --- | --- |
+| new chat: user event | 8 | 7 | 23 |
+| new chat: first token | 471 | 452 | 3236 |
+| idle chat: user event on the stream | 9 | 7 | 15 |
+| idle chat: first token | 546 | 461 | 2902 |
+| queued: held | 8 | 6 | 9 |
+| queued: queue event on the stream | 8 | 6 | 8 |
+
+Before the plan, a message waited for its recall before it was stored: 2.5 s whenever the search by meaning hit its cap (the first run's first tokens above are that wait, now after the message instead of before it), and a new chat made two requests in a row. The page draws a message before any of this (Phase 1); these are the agent's own times.
+
 ## Gate
 
 Plan 13.5: Stage D starts when the primary model passes 80% of tasks at pass^3. **The 31B passes.** Plan 20.5 keeps the gate for every change to the agent's tools or prompt: MiniCPM-V 4.7 passes at 85%.

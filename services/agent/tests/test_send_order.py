@@ -69,3 +69,36 @@ async def test_stop_stays_stopped_with_an_unread_message(env):
     await asyncio.sleep(0.2)
     await env.client.post(f"/v1/threads/{tid}/cancel")
     assert await env.settle(tid) == "idle" and len(env.model.received) <= 1
+
+
+async def test_the_title_is_asked_after_the_first_model_call(env):
+    env.model.queue({"text": "hello", "delay": 0.3})
+    tid = await env.thread()
+    await env.send(tid, "a new chat about foxes")
+    for _ in range(100):
+        if env.model.titles:
+            break
+        await asyncio.sleep(0.02)
+    assert env.model.order[:2] == ["chat", "title"]
+
+
+async def test_the_meter_during_a_turn_reuses_its_prompt(env):
+    env.model.queue({"tool_calls": [{"name": "fake_render", "arguments": {"prompt": "x", "seconds": 0.8}}]}, {"text": "done"})
+    tid = await env.thread(mode="auto")
+    await env.send(tid, "render", wait=False)
+    for _ in range(200):
+        if env.events(tid, "tool_call"):
+            break
+        await asyncio.sleep(0.02)
+    built, real = [], env.agent.system_prompt
+
+    async def counted(*a, **k):
+        built.append(1)
+        return await real(*a, **k)
+
+    env.agent.system_prompt = counted
+    r = await env.client.get(f"/v1/threads/{tid}/context")
+    assert r.status_code == 200 and r.json()["breakdown"] and not built    # no prompt built, no hub calls for it
+    await env.settle(tid)
+    env.agent._prompts.clear()
+    assert (await env.client.get(f"/v1/threads/{tid}/context")).status_code == 200 and built   # nothing to reuse: built

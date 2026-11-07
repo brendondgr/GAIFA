@@ -22,7 +22,7 @@ function fakeES() {
 const tick = () => new Promise(r => setTimeout(r, 0));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const pool = (es, o = {}) => createStreamPool({ streamsUrl: spec => `/s?threads=${spec}`, single: o.single || (() => { throw new Error('no single'); }),
-  probe: o.probe || (() => Promise.resolve(true)), EventSource: es.ES, delay: 1 });
+  probe: o.probe || (() => Promise.resolve(true)), EventSource: es.ES, delay: 1, control: o.control || null });
 
 test('two chats share one connection; each gets only its own events, once', async () => {
   const es = fakeES(), p = pool(es), got = { a: [], b: [] }, ready = [];
@@ -123,4 +123,38 @@ test('the live client falls back to per-chat streams when the agent answers 404 
   await wait(80);
   assert.equal(es.live()[0].url, '/api/s/agent/v1/threads/t_a/stream?after=0');
   assert.equal(c.sharedStream, false);
+});
+
+
+test('chat-responsive 3.1: a chat opened or closed later joins or leaves the open connection; a failed call reopens it', async () => {
+  const es = fakeES(), calls = [];
+  let answer = true;
+  const p = pool(es, { control: async (id, body) => { calls.push([id, body]); return answer; } }), got = { a: [], b: [] };
+  p.stream('t_a', 3, { onEvent: e => got.a.push(e.seq) });
+  await wait(10);
+  const c = es.live()[0];
+  c.send({ type: 'stream', id: 's_1' });
+  const b = p.stream('t_b', 0, { onEvent: e => got.b.push(e.seq) });
+  await wait(10);
+  assert.equal(es.made.length, 1, 'no new EventSource');
+  assert.deepEqual(calls, [['s_1', { add: [['t_b', 0]], remove: [] }]]);
+  c.send({ thread_id: 't_b', seq: 1, type: 'user' });
+  assert.deepEqual(got.b, [1]);
+  b.close();
+  await wait(10);
+  assert.deepEqual(calls[1], ['s_1', { add: [], remove: ['t_b'] }]);
+  answer = false;                                                   // the stream ended on the agent: open a new one
+  p.stream('t_c', 0, {});
+  await wait(10);
+  assert.equal(es.live().length, 1); assert.equal(es.made.length, 2);
+  assert.equal(es.live()[0].url, '/s?threads=t_a:3,t_c:0');
+});
+
+test('chat-responsive 3.1: before the stream has its id, or with no control, a change reopens it as before', async () => {
+  const es = fakeES(), p = pool(es, { control: async () => true });
+  p.stream('t_a', 0, {});
+  await wait(10);
+  p.stream('t_b', 0, {});                                           // no {type: 'stream'} yet
+  await wait(10);
+  assert.equal(es.made.length, 2); assert.equal(es.live()[0].url, '/s?threads=t_a:0,t_b:0');
 });

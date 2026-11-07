@@ -86,6 +86,9 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
   // chat-split plan 3.2: every open chat on /v1/streams; an agent that answers 404 itself (not the hub's envelope,
   // which says the agent is down) hasn't got the route, and each chat gets its own stream as before
   const pool = createStreamPool({ EventSource: ES, single: stream, streamsUrl: spec => url(`/v1/streams?threads=${spec}`),
+    // chat-responsive 3.1: a chat opened or closed later joins or leaves the open connection
+    control: (id, body) => f(url(`/v1/streams/${enc(id)}/threads`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(r => !!r.ok, () => false),
     probe: async () => {
       const ac = globalThis.AbortController ? new AbortController() : null;
       try { const r = await f(url('/v1/streams?threads='), ac ? { signal: ac.signal } : {}); return !(r.status === 404 && !r.headers?.get?.('x-gaifa-error')); }

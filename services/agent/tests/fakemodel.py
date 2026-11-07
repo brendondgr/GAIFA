@@ -31,6 +31,7 @@ class FakeModel:
         self.titles = 0
         self.title = "Test title"                       # what the model answers when asked for a title
         self.title_asks: list[dict[str, Any]] = []      # those requests
+        self.order: list[str] = []                      # each request, "title" or "chat", in the order they came
         self.models: dict[str, dict[str, Any]] = {
             "main": {"context_length": 8000, "tools": True, "vision": True, "reasoning": True},
             "backup": {"context_length": 16000, "tools": True, "vision": False, "reasoning": False},
@@ -67,6 +68,7 @@ class FakeModel:
         async def chat(request: Request):
             body = await request.json()
             self.headers.append({k.lower(): v for k, v in request.headers.items()})
+            self.order.append("title" if "Give this chat a short title" in json.dumps(body) else "chat")
             if "Give this chat a short title" not in json.dumps(body):
                 self.received.append(body)
             if body.get("model") in self.down:

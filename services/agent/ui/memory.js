@@ -6,7 +6,7 @@
 // Importing another assistant's memory is memimport.js (memory-import 2.1): its card opens above the entries.
 // The data is this mod's /v1/memory/… routes.
 
-import { FROM, importCard, importOf } from './memimport.js';
+import { exportCard, FROM, importCard, importOf } from './memimport.js';
 
 const KIND_LABEL = { user: 'You', project: 'Projects', person: 'People', place: 'Places', tool: 'Tools', topic: 'Topics', organization: 'Organizations' };
 const SOURCE = { stated: 'you said', inferred: 'learned', imported: 'imported' };
@@ -181,8 +181,10 @@ export function memoryTab(ctx, put, fail, render) {
         ui.text('What the agent knows about you and your work. Each entry keeps its old names, so a rename never loses anything; every change can be undone.', { muted: true }),
         h('span', { style: 'flex:1' }), tree.proposed ? h('a', { href: '#/s/agent/review', style: 'text-decoration:none' }, ui.badge(`${tree.proposed} to review →`, 'accent')) : null),
       h('div', { style: 'display:flex;gap:6px' }, search, ui.button('Search', () => { state.q = search.value.trim(); render(); }),
-        ui.button('Import…', () => { importCard.state.open = true; render(); }, { kind: importCard.state.open ? 'ghost' : 'secondary' })),
+        ui.button('Import…', () => { importCard.state.open = true; render(); }, { kind: importCard.state.open ? 'ghost' : 'secondary' }),
+        ui.button('Export', () => { state.exporting = !state.exporting; render(); }, { kind: state.exporting ? 'ghost' : 'secondary' })),
       imp.card || null,
+      state.exporting ? await exportCard(ctx, fail, () => { state.exporting = false; render(); }) : null,
       state.q ? await searchResults(state.q) : null,
       h('div', { style: 'display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap' }, side,
         h('div', { style: 'flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:12px' }, entityView(e), newMemory(), imp.history || null)));

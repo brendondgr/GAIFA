@@ -11,6 +11,7 @@ one `[YYYY-MM-DD] - entry` per line in one code block. `read_lines` reads such a
 - a plain line is an entry only when nothing in the text is marked as one (a list pasted as it is), else it is the
   answer's own words ("Here is everything I know:") and left out.
 
+Claude's export file (`read_file`: the zip, or its memories.json) is read the same way (plan memory-import 3.1).
 The model only interprets each entry (imports.py).
 """
 
@@ -118,3 +119,107 @@ def read_lines(text: str) -> list[dict[str, Any]]:
         seen.add(key)
         out.append({"n": len(out) + 1, "section": section, "date": date, "text": re.sub(r"\s+", " ", body)})
     return out
+
+
+# ---- files (plan memory-import 3.1) --------------------------------------------------------------------------------
+
+MAX_FILE = 50_000_000          # a Claude export's first zip, or its memories.json
+MAX_MEMBER = 20_000_000        # memories.json or projects.json inside it
+
+
+class NotAnExport(ValueError):
+    """The file isn't a memory export; `fix` says what to do instead."""
+
+    def __init__(self, detail: str, fix: str) -> None:
+        super().__init__(detail)
+        self.detail, self.fix = detail, fix
+
+
+def _markdown_lines(text: str, section: str | None, prefix: str = "") -> list[tuple[str | None, str]]:
+    """Each paragraph or bullet of a markdown memory, under its heading (the heading's words as the section)."""
+    out, sec = [], section
+    for raw in (text or "").replace("\r\n", "\n").split("\n"):
+        line = raw.strip()
+        if not line or _FENCE.match(line):
+            continue
+        h = _HEADER.match(line)
+        if h:
+            sec = section or section_of(h.group("h") or h.group("b"))
+            continue
+        b = _BULLET.match(line)
+        body = (b.group("t") if b else line).strip()
+        if body.strip("-–—*:. "):
+            out.append((sec, prefix + body))
+    return out
+
+
+def read_claude(memories: Any, projects: Any = None) -> list[dict[str, Any]]:
+    """Claude's export: `memories.json` (`conversations_memory`, one markdown text; `project_memories`, one text per
+    project id) and `projects.json` (the projects' names), as entries like `read_lines`'. A project's lines start with
+    its name, so they are filed under it."""
+    mems = memories if isinstance(memories, list) else [memories]
+    names = {p.get("uuid"): p.get("name") for p in (projects if isinstance(projects, list) else []) if isinstance(p, dict)}
+    found: list[tuple[str | None, str]] = []
+    for m in mems:
+        if not isinstance(m, dict) or not ({"conversations_memory", "project_memories"} & set(m)):
+            raise NotAnExport("memories.json doesn't hold Claude's memory (no conversations_memory or project_memories)",
+                              "choose the memories.json from Claude's export, or paste the answer to the prompt instead")
+        if isinstance(m.get("conversations_memory"), str):
+            found += _markdown_lines(m["conversations_memory"], None)
+        for pid, text in (m.get("project_memories") or {}).items():
+            if isinstance(text, str):
+                name = names.get(pid) or "A project"
+                found += _markdown_lines(text, "projects", f"{name}: ")
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for sec, body in found:
+        key = re.sub(r"\s+", " ", body.lower())
+        if key not in seen:
+            seen.add(key)
+            out.append({"n": len(out) + 1, "section": sec, "date": None, "text": re.sub(r"\s+", " ", body)})
+    return out
+
+
+def read_file(name: str, data: bytes) -> list[dict[str, Any]]:
+    """The entries of a memory export file: Claude's export `.zip` (the batch with memories.json) or its
+    `memories.json`. A ChatGPT export (its chats, no memory) or anything else raises NotAnExport with what to do."""
+    import io
+    import json
+    import zipfile
+    if len(data) > MAX_FILE:
+        raise NotAnExport(f"the file is over {MAX_FILE // 1_000_000} MB", "choose memories.json from inside the export instead")
+    if data[:2] == b"PK":
+        try:
+            z = zipfile.ZipFile(io.BytesIO(data))
+        except zipfile.BadZipFile as e:
+            raise NotAnExport(f"the zip can't be opened: {e}", "download the export again") from None
+        members = {i.filename.rsplit("/", 1)[-1]: i for i in z.infolist() if not i.is_dir()}
+        if "memories.json" not in members:
+            if "conversations.json" in members and "chat.html" in members:
+                raise NotAnExport("this is ChatGPT's export: it holds your chats, not ChatGPT's memories",
+                                  "ask ChatGPT with the prompt in step 1 and paste its answer")
+            raise NotAnExport(f"no memories.json in the zip (it has {', '.join(sorted(members)[:8]) or 'nothing'})",
+                              "with many chats Claude splits its export; memories.json is in the first zip")
+
+        def load(n: str) -> Any:
+            i = members.get(n)
+            if i is None:
+                return None
+            if i.file_size > MAX_MEMBER:
+                raise NotAnExport(f"{n} is over {MAX_MEMBER // 1_000_000} MB", "paste the answer to the prompt instead")
+            return json.loads(z.read(i).decode("utf-8", "replace"))
+        try:
+            return read_claude(load("memories.json"), load("projects.json"))
+        except ValueError as e:
+            if isinstance(e, NotAnExport):
+                raise
+            raise NotAnExport(f"memories.json isn't valid JSON: {e}", "download the export again") from None
+    try:
+        doc = json.loads(data.decode("utf-8", "replace"))
+    except ValueError:
+        raise NotAnExport(f"{name or 'the file'} is neither a zip nor JSON",
+                          "choose Claude's export zip or its memories.json, or paste the text instead") from None
+    if isinstance(doc, list) and doc and isinstance(doc[0], dict) and "mapping" in doc[0]:
+        raise NotAnExport("this is ChatGPT's conversations.json: your chats, not its memories",
+                          "ask ChatGPT with the prompt in step 1 and paste its answer")
+    return read_claude(doc)

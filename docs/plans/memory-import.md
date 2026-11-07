@@ -155,20 +155,22 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
 
 ## Phase 3 — Files from Claude, and exporting GAIFA's memory (S)
 
-- [ ] **3.1 Claude's export file: `sources.py`, the sheet.**
+- [x] **3.1 Claude's export file: `sources.py`, the sheet.**
   - **Work:** the sheet also takes a file, either Claude's export `.zip` (the first batch, which holds `memories.json`) or `memories.json` itself. It is read in the agent (`POST /v1/memory/imports` with a multipart file, 50 MB at most), and only `memories.json` and `projects.json` are opened.
     - `conversations_memory` (markdown with its own headings) → `read_lines` (each paragraph or bullet a line, its heading the section).
     - `project_memories[uuid]` → lines filed under `projects/<the project's name from projects.json>`.
 
     Missing or unexpected fields give "this file isn't a Claude export" with the files it found, never a 500.
   *Done when:* `test_memory_imports.py` reads a made-up Claude zip (with `memories.json`, `projects.json` and a large `conversations.json` that isn't read) and a bare `memories.json`. A ChatGPT zip gives the message that it holds no memories, with the prompt route to use instead.
-- [ ] **3.2 Export: `GET /v1/memory/export`, the Memory tab.**
+  *As built:* the file comes as base64 in JSON (`POST /v1/memory/imports/file {name, data, source}`, like the skills upload), read by `sources.read_file`: a zip's `memories.json` and `projects.json` wherever they sit in it (20 MB each at most), else the file as `memories.json` (a dict or a list of one); `conversations_memory`'s headings become sections and each paragraph or bullet an entry; a project's entries start with its name ("Lantern: …") under `projects`. A ChatGPT zip or `conversations.json`, a zip without `memories.json`, or something else are a 422 `not_an_export` with what to do. The card's step 2 has a file chooser.
+- [x] **3.2 Export: `GET /v1/memory/export`, the Memory tab.**
   - **Work:** the user's current facts and the projects' facts in the same five-section `[YYYY-MM-DD] - entry` format, as text to copy or a `.md` to download. That way the memory can be pasted into Claude's import or into another GAIFA. Reading GAIFA's own export back is `same` for every line.
   *Done when:* a round-trip test: export → import preview → every line `same`.
+  *As built:* `Importer.export()` → `{text, count}`; sections: an imported preference goes back to the section it came from, otherwise a preference about someone ("The user prefers…", "Sam likes…") is Preferences and a rule ("Never push…") Instructions, the user's other facts Identity, projects' facts Projects, the rest Other. The preview treats an entry that is a current fact's own text as `same` without the model, so the round trip needs no model call. **Export** beside Import… shows the text with Copy and Download .md (`exportCard`).
 
 **Checks & deliverables — Phase 3**
-- [ ] On the installed hub: a made-up Claude export zip is previewed, and Export's text, pasted back, previews as all known.
-- [ ] Delivered: the file reader, export, and docs: architecture §14, the brief, `docs/structure.md`.
+- [x] On the installed hub: a made-up Claude export zip is previewed, and Export's text, pasted back, previews as all known. *As checked (2026-11-07, skynet):* a zip shaped like Claude's (`memories.json` with work and personal context and one project memory, `projects.json` naming it Lantern, `conversations.json`, `users.json`; `[memory-test]` lines) gave 5 entries and 5 facts to save; saved, Export gave them in four lines under Identity and Projects (and "Sam prefers short answers." under Instructions, now fixed: the prompt says "The user" even where an entry uses a name, and Export reads a preference about someone as a Preference); pasted back, the preview was 5 already known at once, without the model; the import undone, memory as before.
+- [x] Delivered: the file reader, export, and docs: architecture §14, the brief, `docs/structure.md`.
 
 ## Phase 4 — Learning from the chats in an export (L, optional)
 

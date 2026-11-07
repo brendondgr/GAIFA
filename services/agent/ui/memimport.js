@@ -1,7 +1,8 @@
 // Importing another assistant's memory on the Memory tab (plan memory-import 2.1). Three steps in one card:
 // 1. the prompt to paste into the other assistant (Copy), 2. its answer pasted back, 3. the preview, entry by entry,
 // with what each fact would do and a choice per fact (Save, Review, Skip; the agent's default and its reason), then
-// Save. A saved import can be undone as a whole, here or from the Imports list.
+// Save. A saved import can be undone as a whole, here or from the Imports list. Claude's export file can be chosen
+// instead of pasting (3.1), and Export shows the memory in the same format (3.2).
 // The data is this mod's /v1/memory/imports routes (api_imports.py).
 
 export const FROM = { chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini', other: 'another assistant' };
@@ -86,8 +87,26 @@ export function importCard(ctx, fail, render) {
           ui.button('Read it', async () => {
             try { const r = await call('POST', '/v1/memory/imports', { json: { text: st.text, source: st.source } }); st.id = r.id; st.imp = r; render(); } catch (e) { fail(e); }
           }, { kind: 'primary' }))),
+      h('div', { style: 'display:flex;flex-direction:column;gap:6px' },
+        h('strong', { style: 'font-size:13px' }, 'Or choose Claude’s export file'),
+        ui.text('Claude → Settings → Privacy → Export data emails a zip; choose it (the first one, if there are several) or the memories.json inside. ChatGPT’s export holds only your chats, so use the prompt for ChatGPT.', { small: true, muted: true }),
+        h('input', { type: 'file', accept: '.zip,.json,application/zip,application/json', style: 'font-size:12.5px', onchange: e => readFile(e.target.files?.[0]) })),
       ui.text('Nothing is saved until you look at what it found and press Save.', { small: true, muted: true }),
     ];
+  }
+
+  function readFile(file) {
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        const data = String(r.result).split(',', 2)[1] || '';
+        const imp = await call('POST', '/v1/memory/imports/file', { json: { name: file.name, data, source: 'claude' } });
+        st.id = imp.id; st.imp = imp; render();
+      } catch (e) { fail(e); }
+    };
+    r.onerror = () => fail({ detail: 'The file couldn’t be read' });
+    r.readAsDataURL(file);
   }
 
   function chooser(f, redraw) {
@@ -202,4 +221,27 @@ export function importCard(ctx, fail, render) {
     redraw();
     return { card, history };
   };
+}
+
+/** Your memory as text in the prompt's format (plan memory-import 3.2), to copy or download and paste into another
+ * assistant (Claude: Settings → Your Claude → Start import) or another GAIFA. */
+export async function exportCard(ctx, fail, close) {
+  const { ui } = ctx, h = ui.h;
+  const r = await ctx.call('GET', '/v1/memory/export');
+  if (r.status >= 400) { fail(r.json || { detail: `HTTP ${r.status}` }); return null; }
+  const { text, count } = r.json;
+  const download = () => {
+    const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: 'text/markdown' })), download: `memory-${new Date().toISOString().slice(0, 10)}.md` });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  return ui.card(
+    h('div', { style: 'display:flex;gap:8px;align-items:center' }, h('h2', { style: 'margin:0;font-size:15px' }, `Export your memory (${count})`),
+      h('span', { style: 'flex:1' }), ui.button('×', close, { small: true, kind: 'ghost' })),
+    ui.text('What the agent holds now, in the same format the import prompt asks for: paste it into another assistant (Claude: Settings → Your Claude → Start import) or another GAIFA.', { small: true, muted: true }),
+    count ? h('pre', { style: 'margin:0;max-height:260px;overflow:auto;white-space:pre-wrap;font-size:12px;line-height:1.5;padding:10px 12px;border-radius:8px;background:var(--inset,#131926);border:1px solid var(--bd,#1D2430)' }, text)
+      : ui.text('Nothing saved yet.', { muted: true }),
+    count ? h('div', { style: 'display:flex;gap:8px' },
+      ui.button('Copy', async () => { try { await navigator.clipboard.writeText(text); ctx.toast('Copied', 'success'); } catch { ctx.toast('Select the text and copy it', 'error'); } }, { small: true, kind: 'primary' }),
+      ui.button('Download .md', download, { small: true })) : null);
 }

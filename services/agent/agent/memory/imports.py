@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import time
 from typing import Any
 
@@ -30,7 +31,7 @@ from . import auto, profile
 from .compare import compare
 from .learn import clean_about
 from .model import FACT_KINDS, FOLDERS, MemoryError, kind_of, norm
-from .sources import MAX_BYTES, MAX_LINES, read_lines
+from .sources import MAX_BYTES, MAX_LINES, NotAnExport, read_file, read_lines
 from .store import MemoryStore, new_id
 from .wording import first_person, reword
 
@@ -44,12 +45,15 @@ MAX_FACTS = 4                 # per entry: a long project line may say a few thi
 CHOICES = ("save", "review", "skip")
 YOURS = ("identity", "career", "preferences")
 FOLDER_WORDS = {*FOLDERS.values(), *FOLDERS}
+# A preference said about someone ("The user prefers…", "Sam likes…") rather than a rule to the assistant ("Never push…").
+_ABOUT = re.compile(r"^(?:The user|Their|They|[A-Z][\w'’-]*(?: [A-Z][\w'’-]*)?)(?:'s)? (?:\w+ )?(?:prefers|likes|loves|dislikes|hates|wants|values|enjoys|"
+                    r"uses|tends|is|has|avoids|finds|cares|considers|trusts|notices|keeps|reads|shares|runs)\b")
 
 READ = """You are moving a user's memory from another AI assistant into a new one. Below are entries the other assistant wrote, numbered, each under the section it was in (instructions, identity, career, projects, preferences, or none).
 
 For each entry, write the facts it says, so the new assistant can keep them:
 - Instructions are rules the user gave the assistant. Keep each one as a rule addressed to the assistant, in the imperative, in its own words: only "me", "my" and "I" become "the user", "their" and "the user" ("Never run sudo for me" → "Never run sudo for the user"); add no other words. Kind "preference". "about": ["you"] when it applies to any work; when it is only for one kind of work or one project, the topic or project instead ("topics/Cover letters", "projects/Ariadne"), not "you".
-- Identity, career and preferences are about the user: one sentence in the third person each ("The user is a PhD student at Florida State University."). Kinds: "preference" for tastes and working style, "interest" for what they are into or learning these days, "fact" for lasting facts, "event" for something that happened on a date.
+- Identity, career and preferences are about the user: one sentence in the third person each, starting "The user" even where the entry uses their name ("Sam is a PhD student at FSU" → "The user is a PhD student at FSU."; the name itself is a fact: "The user's name is Sam."). Kinds: "preference" for tastes and working style, "interest" for what they are into or learning these days, "fact" for lasting facts, "event" for something that happened on a date.
 - Projects: the entry's first words name the project. Give "entity": {{"name": "the project's name", "kind": "project", "aliases": [former or other names it is called, from "(formerly X)" or "(X)"], "summary": "what it is, under 120 characters"}}. Each fact starts with the project's name ("Mycelium is an open-source research assistant…") and is about "projects/<name>".
 - One fact per entry is usual. Split a long entry into at most 4 facts, each a sentence that stands on its own, so that a sensitive part (money, health, family) is its own fact.
 - Keep every detail, date and name. Copy the user's quoted words exactly, inside their double quotation marks ("…"). Add nothing. Never write "I", "me", "my", "we" or "our" outside quotation marks.
@@ -162,11 +166,21 @@ class Importer:
 
     def start(self, text: str, source: str) -> dict[str, Any]:
         """Read `text` (an assistant's memory export) into a preview in the background; the import's row."""
-        if source not in FROM:
-            raise MemoryError(422, "bad_source", f"source is one of {', '.join(FROM)}")
         if len((text or "").encode()) > MAX_BYTES:
             raise MemoryError(413, "too_big", f"an import is at most {MAX_BYTES // 1000} KB", "import it in parts")
-        lines = read_lines(text)
+        return self.start_lines(read_lines(text), source)
+
+    def start_file(self, name: str, data: bytes, source: str = "claude") -> dict[str, Any]:
+        """The same for a memory export file (Claude's zip or memories.json; sources.read_file)."""
+        try:
+            lines = read_file(name, data)
+        except NotAnExport as e:
+            raise MemoryError(422, "not_an_export", e.detail, e.fix) from None
+        return self.start_lines(lines, source)
+
+    def start_lines(self, lines: list[dict[str, Any]], source: str) -> dict[str, Any]:
+        if source not in FROM:
+            raise MemoryError(422, "bad_source", f"source is one of {', '.join(FROM)}")
         if not lines:
             raise MemoryError(422, "nothing_to_import", "no memories found in the text",
                               "paste the other assistant's answer: one memory per line")
@@ -238,9 +252,13 @@ class Importer:
             self._set(iid, state="failed", error=str(e)[:500])
 
     def _known_lines(self) -> dict[str, list[str]]:
-        """Entries imported before (normalized) → the current facts they became."""
+        """Entries imported before (normalized) → the current facts they became; and a current fact's own text (GAIFA's
+        export pasted back, 3.2) → that fact."""
         out: dict[str, list[str]] = {}
-        for f in self.m._rows("SELECT id, evidence FROM mem_facts WHERE source = 'imported' AND state IN ('active', 'proposed')"):
+        for f in self.m._rows("SELECT id, text, source, evidence FROM mem_facts WHERE state IN ('active', 'proposed')"):
+            out.setdefault(norm(f["text"]), []).append(f["id"])
+            if f["source"] != "imported":
+                continue
             for ev in json.loads(f["evidence"] or "[]"):
                 if isinstance(ev, dict) and ev.get("import") and isinstance(ev.get("line"), str):
                     out.setdefault(norm(ev["line"]), []).append(f["id"])
@@ -260,7 +278,7 @@ class Importer:
         cfg = auto.settings(profile.settings(self.agent.cfg.data))
         out = []
         for li in lines:
-            held_line = [f for f in (self.m.fact_row(x) for x in known.get(norm(li["text"]), [])) if f]
+            held_line = [f for f in (self.m.fact_row(x) for x in dict.fromkeys(known.get(norm(li["text"]), []))) if f]
             if held_line:
                 out.append({**li, "entity": None, "error": None, "facts": [
                     {"key": f"{li['n']}.{k}", "text": f["text"], "kind": f["kind"], "about": [], "op": "same",
@@ -380,3 +398,29 @@ class Importer:
                 kept += row["op"] == "fact_add"
         self._set(iid, state="undone", undone={"undone": undone, "kept": kept, "at": self.clock()})
         return self.get(iid)
+
+    # ---- export (3.2) -------------------------------------------------------------------------------
+
+    def export(self) -> dict[str, Any]:
+        """GAIFA's current memory in the export prompt's format: five sections, "[YYYY-MM-DD] - fact", oldest first.
+        An imported preference goes back to the section it came from; otherwise the user's rules (a preference not
+        written about someone: "Never push…") are Instructions and their tastes ("The user prefers…") Preferences; the rest about them Identity; facts about projects Projects (a fact about the user and a
+        project counts as the user's). Topics' and others' facts go under Other."""
+        groups: dict[str, list[tuple[str, str]]] = {k: [] for k in ("Instructions", "Identity", "Projects", "Preferences", "Other")}
+        for f in self.m.facts(state="active", current=True, limit=100000):
+            kinds = {e["kind"] for e in f["entities"]}
+            was = next((e.get("section") for e in f["evidence"] if isinstance(e, dict) and e.get("import")), None)
+            if was in ("instructions", "preferences") and f["kind"] == "preference":
+                sec = was.capitalize()                           # where the import found it
+            elif "user" in kinds:
+                sec = ("Preferences" if _ABOUT.match(f["text"]) else "Instructions") if f["kind"] == "preference" else "Identity"
+            elif "project" in kinds:
+                sec = "Projects"
+            elif f["kind"] == "preference":
+                sec = "Instructions"
+            else:
+                sec = "Other"
+            date = f["valid_from"] or time.strftime("%Y-%m-%d", time.localtime(f["recorded"] or 0))
+            groups[sec].append((date, f["text"]))
+        parts = [f"## {sec}\n\n" + "\n".join(f"[{d}] - {t}" for d, t in sorted(rows)) for sec, rows in groups.items() if rows]
+        return {"text": "\n\n".join(parts) + ("\n" if parts else ""), "count": sum(len(r) for r in groups.values())}

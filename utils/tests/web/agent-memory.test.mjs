@@ -143,3 +143,18 @@ test('the Import card: choose per fact, Save with the choices, then Undo import'
   assert.equal(I.importCard.state.id, null);
   assert.ok(renders >= 2);
 });
+
+test('step 2 also takes Claude\'s export file, and Export shows the memory to copy', async () => {
+  const { createUi } = await import(pathToFileURL(path.join(root, 'web/mod-ui.js')).href);
+  const ui = createUi();
+  const text = '## Preferences\n\n[2026-03-02] - The user prefers short answers.\n';
+  const ctx = { ui, toast: () => {}, call: async (m, p) => ({ status: 200, json: p === '/v1/memory/export' ? { text, count: 1 } : p.endsWith('/prompt') ? { prompt: 'Export all…' } : [] }) };
+  I.importCard.state = { open: true, id: null, source: 'chatgpt', text: '', picks: {}, imp: null, timer: null, prompt: null };
+  const { card } = await I.importCard(ctx, e => { throw e; }, () => {})();
+  assert.match(card.textContent, /Or choose Claude’s export file/);
+  assert.equal(card.findAll(e => e.tagName === 'INPUT' && e.attrs.type === 'file').length, 1);
+  const ex = await I.exportCard(ctx, e => { throw e; }, () => {});
+  assert.match(ex.textContent, /Export your memory \(1\)/);
+  assert.match(ex.textContent, /\[2026-03-02\] - The user prefers short answers\./);
+  assert.deepEqual(ex.findAll(e => e.tagName === 'BUTTON').map(b => b.textContent), ['×', 'Copy', 'Download .md']);
+});

@@ -183,3 +183,78 @@ async def test_limits_and_one_at_a_time(env):
     bad = await c.post(f"/v1/memory/imports/{first.json()['id']}/save", json={"choices": {"1.1": "maybe"}})
     assert bad.status_code == 422
     assert (await c.get("/v1/memory/imports/prompt")).json()["prompt"].startswith("Export all of my stored memories")
+
+
+# ---- 3.1 Claude's export file, 3.2 export -----------------------------------------------------------------------
+
+CLAUDE_MEMORY = {"conversations_memory": "**Work context**\n\nSam is a data engineer at Northwind Labs.\n\n"
+                                         "**Personal context**\n\n- Into bouldering.\n- Prefers short answers.\n",
+                 "project_memories": {"p-1": "**Purpose**\nA reading-tracker app with offline sync.\n\n**Current state**\nBeta on iOS."}}
+CLAUDE_PROJECTS = [{"uuid": "p-1", "name": "Lantern", "description": ""}]
+
+
+def zipped(files):
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for name, body in files.items():
+            z.writestr(name, body if isinstance(body, str) else json.dumps(body))
+    return buf.getvalue()
+
+
+def test_reading_claudes_export_file():
+    import pytest
+    from agent.memory.sources import NotAnExport, read_file
+    want = [("work context", "Sam is a data engineer at Northwind Labs."), ("personal context", "Into bouldering."),
+            ("personal context", "Prefers short answers."), ("projects", "Lantern: A reading-tracker app with offline sync."),
+            ("projects", "Lantern: Beta on iOS.")]
+    data = zipped({"export/memories.json": [CLAUDE_MEMORY], "export/projects.json": CLAUDE_PROJECTS,
+                   "export/conversations.json": "[" + "{}," * 1000 + "{}]", "export/users.json": []})
+    assert [(li["section"], li["text"]) for li in read_file("data.zip", data)] == want
+    bare = read_file("memories.json", json.dumps(CLAUDE_MEMORY).encode())               # no projects.json: no names
+    assert bare[3]["text"] == "A project: A reading-tracker app with offline sync."
+    with pytest.raises(NotAnExport, match="ChatGPT's export"):
+        read_file("chatgpt.zip", zipped({"conversations.json": [], "chat.html": "<html>", "user.json": {}}))
+    with pytest.raises(NotAnExport, match="ChatGPT's conversations.json"):
+        read_file("conversations.json", json.dumps([{"title": "x", "mapping": {}}]).encode())
+    with pytest.raises(NotAnExport, match="no memories.json"):
+        read_file("other.zip", zipped({"notes.txt": "hi"}))
+    with pytest.raises(NotAnExport, match="neither a zip nor JSON"):
+        read_file("notes.txt", b"hello")
+
+
+async def test_importing_claudes_export_file_over_http(env):
+    import base64
+    c = env.client
+    env.model.queue(read_reply({"lines": [{"n": 1, "facts": [fact("The user is a data engineer at Northwind Labs.")]}]}))
+    data = base64.b64encode(zipped({"memories.json": CLAUDE_MEMORY, "projects.json": CLAUDE_PROJECTS})).decode()
+    r = await c.post("/v1/memory/imports/file", json={"name": "data-1.zip", "data": data})
+    assert r.status_code == 202, r.text
+    p = await ready(c, r.json()["id"])
+    assert p["source"] == "claude" and p["total"] == 5 and p["lines"][0]["facts"][0]["choice"] == "save"
+    bad = await c.post("/v1/memory/imports/file", json={"name": "c.zip", "data": base64.b64encode(zipped({"conversations.json": [], "chat.html": ""})).decode()})
+    assert bad.status_code == 422 and bad.json()["code"] == "not_an_export" and "prompt" in bad.json()["fix"]
+    assert (await c.post("/v1/memory/imports/file", json={"name": "x", "data": "not base64!"})).status_code == 422
+
+
+async def test_exporting_and_pasting_it_back_is_all_known(env):
+    m, c = env.agent.memory, env.client
+    m.add_fact("The user prefers short answers.", kind="preference", valid_from="2026-03-02")
+    m.add_fact("Never push to GitHub unless asked.", kind="preference", valid_from="2026-01-05")
+    m.add_fact("The user is a data engineer.", valid_from="2026-02-01")
+    m.add_fact("Lantern is a reading-tracker app.", about=["projects/Lantern"], valid_from="2026-02-14")
+    m.add_fact("The user is into Godot.", kind="interest", source="inferred")                    # proposed: not exported
+    out = (await c.get("/v1/memory/export")).json()
+    assert out["count"] == 4
+    from agent.memory.imports import _ABOUT
+    assert [bool(_ABOUT.match(t)) for t in ("Sam prefers short answers.", "The user's advisor is kind.", "Keep READMEs lean.",
+                                            "Use plain language.", "Never push unless asked.")] == [True, True, False, False, False]
+    assert out["text"] == ("## Instructions\n\n[2026-01-05] - Never push to GitHub unless asked.\n\n"
+                           "## Identity\n\n[2026-02-01] - The user is a data engineer.\n\n"
+                           "## Projects\n\n[2026-02-14] - Lantern is a reading-tracker app.\n\n"
+                           "## Preferences\n\n[2026-03-02] - The user prefers short answers.\n")
+    env.model.received.clear()
+    p = await preview(env, out["text"], "other")
+    assert p["counts"]["same"] == 4 and p["counts"]["save"] == 0
+    assert not [r for r in env.model.received if READ_MATCH in json.dumps(r)]                   # no model call at all

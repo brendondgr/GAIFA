@@ -166,7 +166,7 @@ export function memoryTab(ctx, put, fail, render) {
     put(
       h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
         ui.text('What the agent knows about you and your work. Each entry keeps its old names, so a rename never loses anything; every change can be undone.', { muted: true }),
-        h('span', { style: 'flex:1' }), tree.proposed ? ui.badge(`${tree.proposed} to review`, 'accent') : null),
+        h('span', { style: 'flex:1' }), tree.proposed ? h('a', { href: '#/s/agent/review', style: 'text-decoration:none' }, ui.badge(`${tree.proposed} to review →`, 'accent')) : null),
       h('div', { style: 'display:flex;gap:6px' }, search, ui.button('Search', () => { state.q = search.value.trim(); render(); })),
       state.q ? await searchResults(state.q) : null,
       h('div', { style: 'display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap' }, side,

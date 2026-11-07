@@ -89,6 +89,7 @@ The existing apps came in with `git subtree add` (their history is kept), so mos
 | `structure.md` | This file |
 | `reference/ui-export-2026-10-04/` | Claude Design's Part A v1 export, the UI baseline (read-only reference) |
 | `reference/chat-activity-2026-10/` | Screenshots of the Chat page's activity fold as built in Phase 19 (live and mock: running, waiting with the dock, done, a step opened; dark and light; phone width), replacing the design study |
+| `reference/memory-auto-2026-11/` | Screenshots of finding memory (plan memory-auto-learning Phase 4): the header's Approvals popover with its Memories section, and Review reached from it |
 | `reference/live-cards-2026-10/` | `prototype.html`: the live cards for image, video, 3D and speech the user approved on 2026-10-22 (plan Phase 45); its `assets/` (this machine's outputs and a cloned voice) are local only |
 | `reference/settings-2026-10/` | Screenshots of the Settings page before and after plan settings-redesign (each section at 1280 px, dark; `?mock`), with a README naming each state |
 

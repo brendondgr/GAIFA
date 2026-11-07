@@ -1,6 +1,6 @@
 # Plan: Memory that learns on its own, worded right, dated, and easy to find
 
-**Asked for:** 2026-11-07 · **Status:** In progress
+**Asked for:** 2026-11-07 · **Status:** Done (2026-11-07)
 
 ## 1. Introduction
 
@@ -102,17 +102,18 @@ It touches architecture §14 (the agent: memory and learning lines), the brief's
 
 ## Phase 4 — Finding it (S)
 
-- [ ] **4.1 The header's Approvals popover: `web/Hub.dc.html` (`loadApprovals`, the popover), `web/api.js`.**
+- [x] **4.1 The header's Approvals popover: `web/Hub.dc.html` (`loadApprovals`, the popover), `web/api.js`.**
   - **Work:** the popover gains a **Memories** section under the tool approvals: "N memories wait for you — Review", linking to `#/s/agent/review`. The count is read from the agent's status stat `memory_review` (already reported by `services/agent/agent/server.py`) through `GET /api/services/agent`, refreshed when the popover opens and on the agent's status events. The badge number stays tool approvals only, because those block a running chat. When only memories wait, the badge shows a small dot instead of a number.
   - **Docs:** the brief's header section, PATCHES.
   *Done when:* `utils/tests/web/` has a header test with tool approvals, memories, both or neither. In the browser, with proposals waiting, the popover shows the Memories line and its link opens Review.
-- [ ] **4.2 The sidebar entry: `web/Hub.dc.html` (the nav list, line ~1648), `services/agent/service.toml` `[ui] page` comment.**
+  *As built:* the count comes from the agent's `GET /v1/memory/tree` (`proposed`), read in `loadMemReview` whenever the approvals are (boot, the overview, `approval` events, opening the popover), only while the agent is ready; `memoriesText` in `chat-approvals.js`; the Memory tab's badge is a link to Review.
+- [x] **4.2 The sidebar entry: `web/Hub.dc.html` (the nav list, line ~1648), `services/agent/service.toml` `[ui] page` comment.**
   - **Work:** rename **Learning** to **Memory** and point it to `#/s/agent/memory`. The Memory tab opens with "You" and the count waiting in Review as its first lines, plus a link. Put the Review tab right after Memory (`page.js` `tabs`). The command palette entry says "Memory & learning".
   *Done when:* the nav test and a browser check show that the sidebar's Memory entry lands on the Memory tab with the review count.
 
 **Checks & deliverables — Phase 4**
-- [ ] A browser walk-through on the installed hub, starting from the Overview: the person can reach the waiting memories from the header and from the sidebar in one click each. Screenshots go in `docs/reference/memory-auto-2026-11/`.
-- [ ] Delivered: the popover section, the renamed nav entry, the tab order, and docs: the brief, PATCHES, and `docs/structure.md` (new files: `wording.py`, `auto.py`, tests, this plan).
+- [x] A browser walk-through on the installed hub, starting from the Overview: the person can reach the waiting memories from the header and from the sidebar in one click each. Screenshots go in `docs/reference/memory-auto-2026-11/`. *As checked (2026-11-07):* with no tool waiting and 12 memories, the shield had the amber dot and read "Approvals, 12 memories to review"; the popover said "No tool is waiting…" then "Memories · 12 memories wait for your review · Review →", which opened Review and closed the popover (`approvals-popover.jpg`, `review-from-popover.jpg`); the sidebar's Memory opened `#/s/agent/memory`, whose "12 to review →" links to Review, and stayed lit on Review.
+- [x] Delivered: the popover section, the renamed nav entry, the tab order, and docs: the brief, PATCHES, and `docs/structure.md` (new files: `wording.py`, `auto.py`, tests, this plan).
 
 ## 4. Deliverables
 

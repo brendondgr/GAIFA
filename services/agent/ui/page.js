@@ -9,7 +9,7 @@ const SOURCE = { stated: 'you said', inferred: 'learned', carried: 'this chat' }
 import { memoryReview, memoryTab } from './memory.js';
 
 export default {
-  tabs: [{ id: 'memory', label: 'Memory', icon: 'folder' }, { id: 'learning', label: 'Preferences', icon: 'star' }, { id: 'review', label: 'Review', icon: 'check' },
+  tabs: [{ id: 'memory', label: 'Memory', icon: 'folder' }, { id: 'review', label: 'Review', icon: 'check' }, { id: 'learning', label: 'Preferences', icon: 'star' },
          { id: 'usage', label: 'Tool usage', icon: 'chart' }, { id: 'harness', label: 'Harness', icon: 'layers' },
          { id: 'runs', label: 'Runs', icon: 'play' }, { id: 'library', label: 'Library', icon: 'file' }],
 

@@ -109,3 +109,10 @@ test('choosing a button hands the card its remember; always on execute asks a se
   assert.equal(risk.rememberText('thread'), 'Allowed in this chat');
   assert.equal(risk.rememberText('once'), null);
 });
+
+test('the popover says how many memories wait for review (memory-auto-learning 4.1)', async () => {
+  const { memoriesText } = await load('chat/chat-approvals.js');
+  assert.equal(memoriesText(0), null);
+  assert.equal(memoriesText(1), '1 memory waits for your review');
+  assert.equal(memoriesText(12), '12 memories wait for your review');
+});

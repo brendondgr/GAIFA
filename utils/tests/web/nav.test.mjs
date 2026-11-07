@@ -52,16 +52,20 @@ test('the listed services: all but the hidden ones, new mods shown, removed ids 
   assert.deepEqual(n.setAllHidden(nav, SVCS, false).hidden, []);
 });
 
-test('the groups: Overview, Chat, Outputs on top; Learning only with the agent; Models and Settings at the bottom', () => {
+test('the groups: Overview, Chat, Outputs on top; Memory only with the agent; Models and Settings at the bottom', () => {
   const r = (page, ...parts) => ({ page, parts: [page === 'service' ? 's' : page, ...parts] });
   const g = n.groups(r('outputs'), SVCS);
   assert.deepEqual(g.top.map(x => x.label), ['Overview', 'Chat', 'Outputs']);
-  assert.deepEqual(g.bottom.map(x => x.label), ['Learning', 'Models', 'Settings']);
+  assert.deepEqual(g.bottom.map(x => x.label), ['Memory', 'Models', 'Settings']);
+  assert.equal(g.bottom[0].href, '#/s/agent/memory');
   assert.deepEqual(g.top.map(x => x.on), [false, false, true]);
   assert.deepEqual(n.groups(r('overview'), SVCS.filter(s => s.id !== 'agent')).bottom.map(x => x.key), ['models', 'settings']);
-  const learn = n.groups(r('service', 'agent', 'learning'), SVCS);
-  assert.ok(learn.bottom[0].on);
-  assert.ok(!n.serviceOn(r('service', 'agent', 'learning'), 'agent') && n.serviceOn(r('service', 'agent'), 'agent'));
+  for (const tab of ['memory', 'review', 'learning']) {                   // memory-auto-learning 4.2
+    assert.ok(n.groups(r('service', 'agent', tab), SVCS).bottom[0].on, tab);
+    assert.ok(!n.serviceOn(r('service', 'agent', tab), 'agent'), tab);
+  }
+  assert.ok(!n.groups(r('service', 'agent', 'harness'), SVCS).bottom[0].on && n.serviceOn(r('service', 'agent', 'harness'), 'agent'));
+  assert.ok(n.serviceOn(r('service', 'agent'), 'agent'));
   assert.ok(n.serviceOn(r('service', 'tts', 'logs'), 'tts') && !n.serviceOn(r('services'), 'tts'));
   assert.ok(n.groups(null, []).top[0].on);  // before the route is known
 });

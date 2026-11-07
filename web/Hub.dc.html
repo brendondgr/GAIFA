@@ -63,6 +63,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
     <button onClick="{{ hd.onApprovals }}" aria-label="{{ hd.apAria }}" title="Approvals" style="position:relative;width:34px;height:32px;display:grid;place-items:center;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--card,#11151D);color:var(--mut,#8A94A6);cursor:pointer;flex:none" style-hover="color:var(--tx,#E6EAF2)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.shield }}"></path></svg>
       <sc-if value="{{ hd.hasAp }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:var(--pu,#BC8CFF);color:#160A2B;font-size:10px;font-weight:600;display:grid;place-items:center;font-family:'JetBrains Mono',ui-monospace,monospace">{{ hd.apCount }}</span></sc-if>
+      <sc-if value="{{ hd.memDot }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true" style="position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:99px;background:var(--acc,#FFB224);box-shadow:0 0 0 2px var(--bg,#0B0E14)"></span></sc-if>
     </button>
     <button onClick="{{ hd.onBell }}" aria-label="{{ hd.bellAria }}" style="position:relative;width:34px;height:32px;display:grid;place-items:center;border-radius:7px;border:1px solid var(--bd,#1D2430);background:var(--card,#11151D);color:var(--mut,#8A94A6);cursor:pointer;flex:none" style-hover="color:var(--tx,#E6EAF2)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ ic.bell }}"></path></svg>
@@ -1013,7 +1014,7 @@ class Component extends DCLogic {
     ovView: lsGet('hub.ovView', 'dashboard'), dash: { order: [], hidden: [], ranges: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
     nav: (() => { try { return JSON.parse(lsGet('hub.nav', 'null')); } catch { return null; } })(),  // plan 33: Settings.ui.nav, this browser's copy first
     tlRange: lsGet('hub.tlRange', '24h'), tlTable: false, svcRange: lsGet('hub.svcRange', '24h'), tileMenu: null, outTick: 0,
-    approvals: [], apLoaded: false, toolIx: null, sessions: [],  // sessions: the palette's "Switch to …" (Wire 15)  // Phase 13 Wire: the header's Approvals popover; the API tab's tool risk levels
+    approvals: [], apLoaded: false, memReview: 0, toolIx: null, sessions: [],  // sessions: the palette's "Switch to …" (Wire 15)  // Phase 13 Wire: the header's Approvals popover; the API tab's tool risk levels
   };
 
   async componentDidMount() {
@@ -1143,6 +1144,13 @@ class Component extends DCLogic {
   loadApprovals() {
     clearTimeout(this.apT);
     this.apT = setTimeout(() => this.api.listApprovals().then(a => this.setState({ approvals: a, apLoaded: true })).catch(() => this.setState({ apLoaded: true })), 120);
+    this.loadMemReview();
+  }
+  // memory-auto-learning 4.1: the memories that wait for review, under the tools in the Approvals popover
+  loadMemReview() {
+    const agent = (this.state.services || []).find(x => x.id === 'agent');
+    if (!agent || !['ready', 'degraded'].includes(agent.state) || !this.api.callService) { if (this.state.memReview) this.setState({ memReview: 0 }); return; }
+    this.api.callService('agent', 'GET', '/v1/memory/tree').then(r => this.setState({ memReview: Number(r.json?.proposed) || 0 })).catch(() => {});
   }
   loadGpu() { if (this.api.isLive?.('gpu') || !this.api.isLive?.('services')) this.api.getGpu?.().then(g => this.setState({ gpu: g })).catch(() => {}); }  // plan 31.5; then `gpu` events
   cancelGpu = id => this.api.cancelGpuLease(id).then(() => this.loadGpu()).catch(e => this.toast(e.message || 'Could not cancel it', 'error'));
@@ -1645,7 +1653,7 @@ class Component extends DCLogic {
   }
   palItems() {
     const out = [], nav = h => () => { this.setState({ palette: null }); this.go(h); }, run = fn => () => { this.setState({ palette: null }); fn(); };
-    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['Outputs', '#/outputs', ICON.folder], ['Services', '#/services', ICON.puzzle], ['Learning', '#/s/agent/learning', ICON.bulb], ['Models', '#/models', ICON.layers], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
+    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['Outputs', '#/outputs', ICON.folder], ['Services', '#/services', ICON.puzzle], ['Memory & learning', '#/s/agent/memory', ICON.bulb], ['Models', '#/models', ICON.layers], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
     if (this.state.vw >= 1024) { const n = this.state.nav || {}; out.push({ label: n.collapsed ? 'Expand the sidebar' : 'Collapse the sidebar', sub: 'Action', d: ICON.menu, run: run(() => this.setNav({ collapsed: false, services: 'list', hidden: [], folded: false, ...n, collapsed: !n.collapsed })) }); }  // plan 33
     this.state.services.forEach(sv => {
       const d = ICON[sv.icon] || ICON.puzzle;
@@ -1828,7 +1836,8 @@ class Component extends DCLogic {
       memWarn: pct > 0.8, onMem: () => this.togglePop('memory'),
       hasJobs: running.length > 0, jobsText: `${running.length} running`, onJobs: () => this.togglePop('jobs'),
       unread: s.unread > 99 ? '99+' : String(s.unread), hasUnread: s.unread > 0, bellAria: `Activity${s.unread ? `, ${s.unread} unread` : ''}`, onBell: () => this.togglePop('activity'),
-      apCount: s.approvals.length > 99 ? '99+' : String(s.approvals.length), hasAp: s.approvals.length > 0, apAria: `Approvals${s.approvals.length ? `, ${s.approvals.length} waiting` : ''}`, onApprovals: () => { this.togglePop('approvals'); this.loadApprovals(); },
+      apCount: s.approvals.length > 99 ? '99+' : String(s.approvals.length), hasAp: s.approvals.length > 0, memDot: !s.approvals.length && s.memReview > 0,
+      apAria: `Approvals${s.approvals.length ? `, ${s.approvals.length} waiting` : ''}${s.memReview ? `, ${s.memReview} memories to review` : ''}`, onApprovals: () => { this.togglePop('approvals'); this.loadApprovals(); },
       onSearch: () => this.togglePalette(), onMenu: () => this.setState({ navOpen: true }), kbd: /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl K',
     };
     return { sb, hd };
@@ -2115,7 +2124,8 @@ class Component extends DCLogic {
     if (s.pop === 'memory') v.pmem = { ...this.memVM(s.memory, true), title: this.Pools ? this.Pools.poolTitle(s.memory) : 'Unified memory', poolsEl: this.Pools && s.memory ? React.createElement(this.Pools.PoolBars, { memory: s.memory, services: s.services }) : null, gpuEl: this.Gpu && s.gpu ? React.createElement(this.Gpu.GpuSection, { gpu: s.gpu, nameOf: id => this.svcMap[id]?.name || id, onCancel: this.cancelGpu }) : null, chart: this.V ? React.createElement(this.V.MemoryChart, { api: this.api, services: s.services, range: '1h', height: 110, label: 'Memory, last hour' }) : null };
     if (s.pop === 'jobs') v.pjobs = s.jobs.map(j => ({ label: j.label, href: j.route || '#/overview', pct: j.progress != null ? Math.round(j.progress * 100) + '%' : '', bar: { display: 'block', height: '100%', width: (j.progress || 0) * 100 + '%', background: 'var(--acc,#FFB224)', borderRadius: 9, transition: 'width .5s' }, state: this.Gpu?.jobGpuText(j, id => this.svcMap[id]?.name || id) || j.state, svc: this.svcMap[j.service]?.name || j.service }));
     if (s.pop === 'approvals') v.pap = this.ChatAp ? React.createElement(this.ChatAp.ApprovalsPanel, { api: this.api, approvals: s.approvals, loading: !s.apLoaded, toast: (t, l) => this.toast(t, l),
-      onDecided: id => this.setState(st => ({ approvals: st.approvals.filter(a => a.id !== id) })) }) : null;
+      onDecided: id => this.setState(st => ({ approvals: st.approvals.filter(a => a.id !== id) })),
+      memories: s.memReview, onGo: () => this.setState({ pop: null }) }) : null;
     if (s.pop === 'activity') { v.pact = s.activity.slice(0, 30).map(a => this.actRow(a)); v.pactEmpty = !s.activity.length; }
     // drawers share a frame
     v.drawerSt = mob ? { position: 'fixed', left: 0, right: 0, bottom: 0, height: '90vh', zIndex: 80, background: 'var(--card,#11151D)', borderTop: '1px solid var(--bds,#2A3547)', borderRadius: '14px 14px 0 0', display: 'flex', flexDirection: 'column', boxShadow: '0 -16px 50px rgba(0,0,0,.45)' }

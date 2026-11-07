@@ -1,5 +1,5 @@
 // The sidebar (plan 33.3): Overview, Chat and Outputs on top; the services as a list (folding under
-// its header), one button, or a button with counts; Learning, Models and Settings at the bottom; the
+// its header), one button, or a button with counts; Memory, Models and Settings at the bottom; the
 // footer. Collapsed, it is a 56 px rail of icons where each service's logo carries its state colour.
 // Hovering the services shows a gear: a menu to pick how they show and which are listed. Hub.dc.html
 // mounts it in its <aside> (`{{ sb.navEl }}`); the choices are Settings.ui.nav (nav-model.js).

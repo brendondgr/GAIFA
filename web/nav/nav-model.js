@@ -64,22 +64,25 @@ export function setAllHidden(nav, services, hide) {
   return { ...normNav(nav), hidden: hide ? (services || []).map(s => s.id) : [] };
 }
 
-/** The fixed items: Overview, Chat and Outputs on top; Learning (with the agent mod), Models and Settings at the bottom. */
+/** The agent page's tabs that the sidebar's Memory entry stands for (memory-auto-learning 4.2). */
+export const MEMORY_TABS = ['memory', 'review', 'learning'];
+
+/** The fixed items: Overview, Chat and Outputs on top; Memory (with the agent mod), Models and Settings at the bottom. */
 export function groups(route, services) {
   const r = route || { page: 'overview', parts: [] }, has = id => (services || []).some(s => s.id === id);
-  const learning = r.page === 'service' && r.parts[1] === 'agent' && r.parts[2] === 'learning';
+  const memory = r.page === 'service' && r.parts[1] === 'agent' && MEMORY_TABS.includes(r.parts[2]);
   const item = (key, label, href, icon, on) => ({ key, label, href, icon, on: !!on, hint: HINTS[key] });
   return {
     top: [item('overview', 'Overview', '#/overview', 'grid', r.page === 'overview'), item('chat', 'Chat', '#/chat', 'chat', r.page === 'chat'),
       item('outputs', 'Outputs', '#/outputs', 'folder', r.page === 'outputs')],
-    bottom: [...(has('agent') ? [item('learning', 'Learning', '#/s/agent/learning', 'bulb', learning)] : []),
+    bottom: [...(has('agent') ? [item('memory', 'Memory', '#/s/agent/memory', 'bulb', memory)] : []),
       item('models', 'Models', '#/models', 'layers', r.page === 'models'), item('settings', 'Settings', '#/settings', 'gear', r.page === 'settings')],
   };
 }
 /** What each fixed item is, for its tooltip. */
 export const HINTS = {
   overview: 'The dashboard: memory, services and activity', chat: 'Talk to the agent', outputs: 'Everything the services made',
-  learning: 'What the agent has learned from you', models: 'The models on this machine', settings: "GAIFA's settings",
+  memory: 'What the agent knows and has learned about you, and what waits for your review', models: 'The models on this machine', settings: "GAIFA's settings",
 };
 /** A service's state in words, for its tooltip ("Ready · Active"). */
 export function stateWords(sv) {
@@ -89,7 +92,7 @@ export function stateWords(sv) {
 
 /** Whether a service's item is the current page (the agent's Learning tab belongs to Learning). */
 export function serviceOn(route, id) {
-  return route?.page === 'service' && route.parts[1] === id && !(id === 'agent' && route.parts[2] === 'learning');
+  return route?.page === 'service' && route.parts[1] === id && !(id === 'agent' && MEMORY_TABS.includes(route.parts[2]));
 }
 
 /** The Services page's list: a bucket ('all' or one) and words matched against name, id and description. */

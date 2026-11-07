@@ -361,3 +361,16 @@ test('each chat\'s reply draws its own #n: renderMarkdown takes the chat\'s outp
   assert.ok(!mdm.renderMarkdown('![x](#1)', { outputs: [] }).includes('<img'), 'a chat without outputs draws none');
   mdm.setChatOutputs([]);
 });
+
+test('a new chat and its first message in one call, and the message body (chat-responsive 1.2)', async () => {
+  assert.deepEqual(capi.messageBody('hi', [], {}, [{ text: 'q', seq: 3 }], [], 'c-1'),
+    { text: 'hi', attachments: [], quotes: [{ text: 'q', reply: '', seq: 3 }], client_id: 'c-1' });
+  assert.deepEqual(capi.messageBody('hi'), { text: 'hi', attachments: [] });
+  const c = cmock.createMockClient({}, { speed: 400 });
+  const plain = await c.create({});
+  assert.equal(plain.event, undefined);
+  const t = await c.create({ mode: 'auto', message: capi.messageBody('hello', [], {}, [], [], 'c-2') });
+  assert.equal(t.mode, 'auto'); assert.equal(t.event.type, 'user'); assert.equal(t.event.payload.client_id, 'c-2');
+  assert.equal((await c.events(t.id)).find(e => e.type === 'user').payload.text, 'hello');
+  await c.cancel(t.id);
+});

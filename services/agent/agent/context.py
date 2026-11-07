@@ -317,6 +317,7 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
     step: list[dict[str, Any]] = []
     step_id: Any = None
     details: dict[Any, dict[str, Any]] = {}       # step → {details, model} (plan llm-servers 2.1)
+    recalled = {e["payload"]["for"]: e["payload"]["memory"] for e in events if e["type"] == "recall"}
 
     def flush() -> None:
         nonlocal step, step_id
@@ -371,9 +372,9 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
             text = with_quotes(p.get("text") or "", quotes_of(p))
             if line := mentions_line(p):
                 text += "\n\n" + line                 # plan 48.3: the @-mentions, plainly
-            if p.get("memory"):                       # structured-memory 3.3: what was recalled when it came
-                from .memory.profile import block
-                text += "\n\n" + block(p["memory"])
+            if mem := p.get("memory") or recalled.get(e["seq"]):   # structured-memory 3.3: what was recalled when it came
+                from .memory.profile import block                     # (a `recall` event since chat-responsive 1.1)
+                text += "\n\n" + block(mem)
             docs = p.get("docs") or []
             rest = [a for a in p.get("attachments") or [] if a not in {d["id"] for d in docs}]
             if rest:

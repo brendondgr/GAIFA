@@ -114,6 +114,7 @@ class FakeHub:
         self.screen_down = False
         self.texts: dict[str, dict[str, Any]] = {}       # structured-memory 2.1: the embed mod's text collections
         self.embed_down = False
+        self.search_delay = 0.0                          # chat-responsive 1.1: a slow search by meaning
         self.synonyms: list[tuple[str, str]] = []        # (query word, text word) pairs the fake treats as close in meaning
 
     def publish(self, ev: dict[str, Any]) -> None:
@@ -557,6 +558,8 @@ class FakeHub:
 
         @app.post("/api/s/embed/v1/texts/{ns}/search")
         async def search_texts(ns: str, request: Request) -> Any:
+            if self.search_delay:
+                await asyncio.sleep(self.search_delay)
             if self.embed_down:
                 return JSONResponse({"detail": "embed is not running", "code": "service_not_running"}, 503)
             b = await request.json()

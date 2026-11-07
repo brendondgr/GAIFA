@@ -2,10 +2,10 @@
 // /api/s/agent. `createChatClient({api})` returns the live client when the `proxy` area is live,
 // and the scripted mock agent (chat-mock.js) in `?mock`. Both have the same methods:
 //
-//   models() threads({q, archived, limit, environment, sort, offset}) threadGroups({archived}) searchChats(q, limit) create(body) get(tid) patch(tid, p) remove(tid) events(tid, after)
+//   models() threads({q, archived, limit, environment, sort, offset}) threadGroups({archived}) searchChats(q, limit) create(body: {model, mode, settings, message?: messageBody(…)} → the thread, with `event` when it had a message) get(tid) patch(tid, p) remove(tid) events(tid, after)
 //   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq; the live client shares one
 //   connection for every open chat, chat-streams.js; `sharedStream` says whether it does)
-//   send(tid, text, attachments, doc_modes, quotes) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
+//   send(tid, text, attachments, doc_modes, quotes, mentions, client_id) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
 //   feedback(tid, {value, output_id | seq, note}) decidePref(pid, approve)   (plan 21.7)
 //
@@ -24,6 +24,13 @@ const qs = o => { const p = Object.entries(o).filter(([, v]) => v !== undefined 
 // FastAPI answers {detail: "…"}, or {detail: {code, detail, data}} for the agent's own errors
 // (an approval whose edited arguments are invalid), or {detail: [validation errors]}; the hub's
 // proxy answers its envelope {detail, code, data}.
+// A message's body for `send(tid, …)` and `create({…, message})` (chat-responsive 1.2): mentions [{kind, id, label, fills}]
+// (plan 48.2); client_id the page's id for the message, kept on its user event (chat-responsive 1.1).
+export const messageBody = (text, attachments = [], doc_modes = {}, quotes = [], mentions = [], client_id) => ({ text, attachments,
+  ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),
+  ...(quotes?.length ? { quotes: quotes.map(q => ({ text: q.text, reply: q.reply || '', ...(q.seq != null ? { seq: q.seq } : {}) })) } : {}),
+  ...(mentions?.length ? { mentions } : {}), ...(client_id ? { client_id } : {}) });
+
 export async function errorFrom(res) {
   const text = await res.text().catch(() => '');
   let j = null;
@@ -98,9 +105,7 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     get sharedStream() { return pool.shared; },
     // quotes: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each (Select → Reply);
     // `text` may be empty when a reply says something
-    send: (tid, text, attachments = [], doc_modes = {}, quotes = [], mentions = []) => req('POST', `${T(tid)}/messages`, { text, attachments, ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),
-      ...(quotes?.length ? { quotes: quotes.map(q => ({ text: q.text, reply: q.reply || '', ...(q.seq != null ? { seq: q.seq } : {}) })) } : {}),
-      ...(mentions?.length ? { mentions } : {}) }),   // plan 48.2: [{kind, id, label, fills}]
+    send: (tid, ...msg) => req('POST', `${T(tid)}/messages`, messageBody(...msg)),
     answer: (tid, question_id, answers) => req('POST', `${T(tid)}/answer`, { question_id, answers }),
     approval: (tid, body) => req('POST', `${T(tid)}/approval`, body),
     action: (tid, tool, args = {}) => req('POST', `${T(tid)}/action`, { tool, arguments: args }),

@@ -14,7 +14,7 @@
 // Tool calls the page never shows as tool cards: their effect has its own card.
 export const HIDDEN_TOOLS = new Set(['ask_user', 'update_todos', 'remember']);
 // Events folded into other cards or into the page state.
-const FOLDED = new Set(['call', 'answer', 'decision', 'usage', 'state']);
+const FOLDED = new Set(['call', 'answer', 'decision', 'usage', 'state', 'recall']);   // recall: what memory brought to a message (chat-responsive 1.1)
 
 export function buildView(events, live = {}) {
   const items = [], calls = new Map(), questions = new Map(), outputs = [];
@@ -25,7 +25,8 @@ export function buildView(events, live = {}) {
     if (ev.seq > lastSeq) lastSeq = ev.seq;
     switch (ev.type) {
       case 'user': {
-        const it = { key: 'e' + ev.seq, kind: 'user', ev, queued: !!p.queued };
+        // keyed by the page's id when it sent one, so the message it drew before (live.pending) keeps its place
+        const it = { key: p.client_id ? 'u' + p.client_id : 'e' + ev.seq, kind: 'user', ev, queued: !!p.queued };
         items.push(it);
         (p.docs || []).forEach(d => outputs.push({ n: +String(d.ref).replace('#', ''), output_id: d.id, kind: d.kind, title: d.name, tool: 'attached' }));  // plan 24.5
         if (p.queued) queued.push(it);
@@ -87,12 +88,27 @@ export function buildView(events, live = {}) {
     if (d.thinking && !stored.has('thinking:' + step)) items.push({ key: 'dt' + step, kind: 'thinking', streaming: true, ev: { type: 'thinking', payload: { text: d.thinking, step, since: d.t0 } } });
     if (d.text && !stored.has('assistant:' + step)) items.push({ key: 'da' + step, kind: 'assistant', streaming: true, ev: { type: 'assistant', payload: { text: d.text, step } } });
   }
+  // chat-responsive 1.3: messages the page drew before the agent stored them, until their user event is here
+  for (const m of pendingOf(events, live.pending)) {
+    items.push({ key: 'u' + m.cid, kind: 'user', pending: m.state, error: m.error || null, cid: m.cid,
+      ev: { seq: null, type: 'user', ts: m.ts, payload: { text: m.text, client_id: m.cid, ...(m.attachments?.length ? { attachments: m.attachments } : {}),
+        ...(m.quotes?.length ? { quotes: m.quotes } : {}), ...(m.mentions?.length ? { mentions: m.mentions } : {}) } } });
+  }
   for (const it of calls.values()) {
     const pr = live.progress?.[it.call.id];
     if (pr && !it.result) it.progress = pr;
   }
   const pending = items.filter(i => (i.kind === 'question' && !i.answer && !i.result) || (i.kind === 'approval' && !i.decision && !i.result));
   return { items, todos, state, usage, outputs, pending, lastSeq, gpu: live.gpu || null };
+}
+
+/** The pending messages ({cid, seq?, …}) whose user event isn't in `events` yet: matched by `client_id`, or by the seq
+ * the send answered with. */
+export function pendingOf(events, pending) {
+  if (!pending?.length) return [];
+  const cids = new Set(), seqs = new Set();
+  for (const e of events || []) if (e.type === 'user') { seqs.add(e.seq); if (e.payload?.client_id) cids.add(e.payload.client_id); }
+  return pending.filter(m => !cids.has(m.cid) && !(m.seq != null && seqs.has(m.seq)));
 }
 
 /** Folds one transient stream event (seq null) into the live state `{deltas, progress, meter}`. */

@@ -37,6 +37,7 @@ from .tools import LOCAL_NAMES, ToolSet
 
 log = logging.getLogger("agent.loop")
 POLL_S = 15
+RECALL_WAIT_S = 10       # chat-responsive 1.1: how long a model call waits for its messages' recall
 SERVICE_TOOLS = {"hub_start_service", "hub_stop_service", "hub_unload_service"}   # their `id` is a mod
 # Sent (not stored) when a turn only repeats itself; that model call gets tool_choice "none".
 WRAP_UP = ("(A note from the app, not from the user: you have repeated the same tool call and its result won't change. "
@@ -100,6 +101,9 @@ class Agent(Compaction):
         self.local = Local(self)
         self.on_turn_end: list[Callable[[str], Awaitable[None]]] = []
         self._deciding: set[str] = set()
+        self._recalls: dict[str, set[asyncio.Task[Any]]] = {}   # chat-responsive 1.1: recall runs after the user event
+        self._read_upto: dict[str, int] = {}     # the last seq the turn's latest model call read
+        self._ending: dict[str, asyncio.Task[Any]] = {}          # a turn in its turn-end hooks: no longer busy
         self.shutting_down = False   # set before the app stops: turns then stay `running` and resume at the next start
 
     # ---- events ------------------------------------------------------------------------------
@@ -120,28 +124,38 @@ class Agent(Compaction):
         t = self.tasks.get(tid)
         return t is not None and not t.done()
 
+    def busy(self, tid: str) -> bool:
+        """A turn that will still read new messages: running, and not past its end (its turn-end hooks)."""
+        t = self.tasks.get(tid)
+        return t is not None and not t.done() and self._ending.get(tid) is not t
+
+    def _unanswered(self, tid: str) -> bool:
+        """A user message written after the turn's latest model call read the chat (sent while the reply streamed)."""
+        mark = self._read_upto.get(tid)
+        return mark is not None and bool(self.store.events(tid, after=mark, types=("user",)))
+
     # ---- entry points ------------------------------------------------------------------------
 
     def start(self, tid: str) -> None:
-        if self.running(tid):
+        if self.busy(tid):
             return
         self.tasks[tid] = asyncio.create_task(self._turn(tid))
 
     async def send(self, tid: str, text: str, attachments: list[str] | None = None,
                    doc_modes: dict[str, str] | None = None, quotes: list[dict[str, Any]] | None = None,
-                   mentions: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                   mentions: list[dict[str, Any]] | None = None, client_id: str | None = None) -> dict[str, Any]:
         """`quotes`: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each, in order
         (Select → Reply). `text` may be empty when a reply says something."""
         thread = self.store.thread(tid)
         if thread is None:
             raise KeyError(tid)
-        queued = self.running(tid)
-        if not queued and thread["state"] == "waiting":
+        if not self.busy(tid) and thread["state"] == "waiting":
             await self._dismiss_pending(tid, "The user wrote a message instead of answering.")
         docs = await describe_docs(self, tid, thread, attachments, doc_modes) if attachments else []
-        recalled = await self._recall(tid, thread, text)
         # Numbered now, with no await before the event is written: a tool result that landed while the
-        # documents were described has taken its #n already (two outputs never share one).
+        # documents were described has taken its #n already (two outputs never share one). Whether a turn
+        # will read it is decided here too, so a turn that ended during the awaits above starts again.
+        queued = self.busy(tid)
         n0 = len(ctx.outputs(self.store.events(tid, types=("tool_result", "user"))))
         for i, d in enumerate(docs):
             d["ref"] = f"#{n0 + i + 1}"
@@ -154,7 +168,7 @@ class Agent(Compaction):
                                      **({"mentions": mentions} if mentions else {}),     # plan 48.3
                                      **({"attachments": attachments} if attachments else {}),
                                      **({"docs": docs} if docs else {}), **({"queued": True} if queued else {}),
-                                     **({"memory": recalled} if recalled else {})})
+                                     **({"client_id": client_id} if client_id else {})})
         for d in docs:
             if d.get("fallback"):        # asked for whole, didn't fit (plan 24.9): say so in the chat
                 self.emit(tid, "note", {"text": d["fallback"], "level": "warn"})
@@ -162,9 +176,28 @@ class Agent(Compaction):
             words = ctx.said({"text": text, "quotes": quotes})      # an empty text with replies: name it by the replies
             self.store.update_thread(tid, title=_title_from(words))
             asyncio.create_task(self._title(tid, words))
+        if self._recalling(thread):      # after the event (chat-responsive 1.1); the next model call waits for it
+            task = asyncio.create_task(self._recall_into(tid, thread, text, ev["seq"]))
+            self._recalls.setdefault(tid, set()).add(task)
+            task.add_done_callback(lambda t: self._recalls.get(tid, set()).discard(t))
         if not queued:
             self.start(tid)
         return ev
+
+    def _recalling(self, thread: dict[str, Any]) -> bool:
+        from .memory import profile
+        return not (thread.get("settings") or {}).get("dry_run") and bool(profile.settings(self.cfg.data)["recall"])
+
+    async def _recall_into(self, tid: str, thread: dict[str, Any], text: str, seq: int) -> None:
+        """A `recall` event for the user event `seq`: read with it as its `memory` (context.rebuild)."""
+        got = await self._recall(tid, thread, text)
+        if got:
+            self.emit(tid, "recall", {"for": seq, "memory": got})
+
+    async def _await_recall(self, tid: str) -> None:
+        pending = list(self._recalls.get(tid, ()))
+        if pending:
+            await asyncio.wait(pending, timeout=RECALL_WAIT_S)
 
     async def _recall(self, tid: str, thread: dict[str, Any], text: str) -> list[dict[str, Any]]:
         """structured-memory 3.3: the facts this message calls to mind (not an eval's, not when turned off)."""
@@ -309,7 +342,7 @@ class Agent(Compaction):
         await self._cloud_notice(tid, model)
         tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
         steps = 0
-        final = "idle"
+        final, cancelled = "idle", False
         try:
             await tools.refresh()
             while True:
@@ -331,25 +364,35 @@ class Agent(Compaction):
                 stuck = self._stuck(tid)
                 reply, model = await self._model(tid, tools, model, wrap_up=stuck)
                 steps += 1
-                if not reply.tool_calls or stuck:
+                if stuck or (not reply.tool_calls and not self._unanswered(tid)):
                     return
         except asyncio.CancelledError:
             if self.shutting_down:      # not the user's Stop: leave the turn to resume after the restart
                 raise
             final = "idle"
+            cancelled = True
             await asyncio.shield(self._cancelled(tid))
         except Exception as e:  # noqa: BLE001
             log.exception("turn of %s failed", tid)
             self.emit(tid, "error", {"code": "agent_error", "detail": f"{type(e).__name__}: {e}"[:500]})
             final = "error"
         finally:
+            me = asyncio.current_task()
+            if me is not None and self.tasks.get(tid) is me:
+                self._ending[tid] = me      # from here a message starts a turn of its own (chat-responsive 1.1)
             if not self.shutting_down:
                 self.set_state(tid, final)
-            for cb in self.on_turn_end:
-                try:
-                    await cb(tid)
-                except Exception:  # noqa: BLE001
-                    log.exception("turn-end hook")
+                if final == "idle" and not cancelled and self._unanswered(tid):
+                    self.start(tid)
+            try:
+                for cb in self.on_turn_end:
+                    try:
+                        await cb(tid)
+                    except Exception:  # noqa: BLE001
+                        log.exception("turn-end hook")
+            finally:
+                if self._ending.get(tid) is me:
+                    del self._ending[tid]
 
     async def _cancelled(self, tid: str) -> None:
         for e in self._unresolved(tid):
@@ -718,9 +761,13 @@ class Agent(Compaction):
         cap = ((self.store.thread(tid) or {}).get("settings") or {}).get("window") if tid else None
         return min(w, int(cap)) if isinstance(cap, (int, float)) and cap > 0 else w
 
-    async def messages(self, tid: str, tools: ToolSet, model: str) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    async def messages(self, tid: str, tools: ToolSet, model: str,
+                       turn: bool = False) -> tuple[list[dict[str, Any]], dict[str, int]]:
+        """`turn`: for the turn's model call, which marks what it read (`_unanswered`)."""
         system, sizes = await self.system_prompt(tid, tools, model)
         events = self.store.events(tid)
+        if turn and events:
+            self._read_upto[tid] = events[-1]["seq"]
         images = self.local.images(events)
         msgs, _ = ctx.rebuild(events, images)
         results = sum(ctx.est(m["content"]) for m in msgs if m["role"] == "tool")
@@ -758,7 +805,8 @@ class Agent(Compaction):
 
     async def _call_model(self, tid: str, tools: ToolSet, model: str, wrap_up: bool = False) -> tuple[Reply, str]:
         step = new_id("s_")
-        msgs, sizes = await self.messages(tid, tools, model)
+        await self._await_recall(tid)
+        msgs, sizes = await self.messages(tid, tools, model, turn=True)
         choice = "auto"
         if wrap_up:     # the thrash guard: no more tools this turn, say what happened
             choice = "none"
@@ -782,7 +830,7 @@ class Agent(Compaction):
             self.emit(tid, "note", {"text": f"{model} didn't answer ({e.detail[:160]}); continuing on {fb}", "level": "warn"})
             self.transient(tid, "delta_reset", {"step": step})
             model = fb
-            msgs, sizes = await self.messages(tid, tools, model)
+            msgs, sizes = await self.messages(tid, tools, model, turn=True)
             if wrap_up:
                 msgs.append({"role": "user", "content": WRAP_UP})
             reply = await self.llm.chat(model, msgs, tools.functions(), delta, known, tool_choice=choice)

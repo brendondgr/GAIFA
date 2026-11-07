@@ -78,9 +78,10 @@ export const STATUS = { running: ['accent', 'running'], waiting: ['purple', 'wai
 
 // ---------- user ----------
 function UserCard({ item, ctx }) {
-  const p = item.ev.payload, atts = p.attachments || [];
-  return h('div', { className: 'aichat-user', style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 6, minWidth: 0 } },
-    h('div', { className: 'aichat-hov', style: { display: 'flex', gap: 2, paddingTop: 3 } },
+  const p = item.ev.payload, atts = p.attachments || [], failed = item.pending === 'failed';
+  return h('div', { className: 'aichat-user', 'data-pending': item.pending || undefined, style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 6, minWidth: 0,
+    opacity: item.pending === 'sending' ? 0.7 : 1, transition: 'opacity .2s' } },
+    item.pending ? null : h('div', { className: 'aichat-hov', style: { display: 'flex', gap: 2, paddingTop: 3 } },
       ctx.branch ? h(Btn, { kind: 'ghost', sm: true, icon: 'branch', title: 'Branch from here: a new chat up to this message, with it in the box to edit', onClick: () => ctx.branch(item) }) : null,
       h(Btn, { kind: 'ghost', sm: true, icon: 'copy', title: 'Copy', onClick: () => ctx.copy?.(userCopy(p)) })),
     h('div', { style: { maxWidth: 'min(85%, 620px)', minWidth: 0, padding: '7px 11px', borderRadius: 10, background: T.hov, border: '1px solid ' + T.bd, display: 'flex', flexDirection: 'column', gap: 6 } },
@@ -90,7 +91,11 @@ function UserCard({ item, ctx }) {
       // plan 24.9: a document asked for whole that didn't fit says so here, where the user looks
       ...(p.docs || []).filter(d => d.fallback).map(d => h('div', { key: 'fb' + d.id, role: 'note', 'data-fallback': d.id,
         style: { display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: T.acct } }, h(Icon, { d: 'alert', size: 12, style: { marginTop: 2, flex: 'none' } }), h('span', null, d.fallback))),
-      item.queued ? h('div', null, h(Badge, { tone: 'purple', title: 'Sent during a turn: the agent reads it after the current step' }, 'queued')) : null));
+      item.queued ? h('div', null, h(Badge, { tone: 'purple', title: 'Sent during a turn: the agent reads it after the current step' }, 'queued')) : null,
+      failed ? h('div', { role: 'alert', style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11.5, color: T.rd } },   // chat-responsive 1.3
+        h(Icon, { d: 'alert', size: 12, style: { flex: 'none' } }), h('span', { style: { minWidth: 0 } }, 'Not sent' + (item.error ? `: ${item.error}` : '')),
+        h(Btn, { kind: 'ghost', sm: true, onClick: () => ctx.retrySend?.(item.cid) }, 'Retry'),
+        h(Btn, { kind: 'ghost', sm: true, onClick: () => ctx.editPending?.(item.cid) }, 'Edit')) : null));
 }
 /** A user message as copied: each quote-reply (the part as a blockquote, then the reply), then the text. */
 export function userCopy(p) {

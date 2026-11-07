@@ -34,13 +34,6 @@ REPLY_MAX = 4000         # characters of the user's reply to one quoted part
 QUOTES_TOTAL = 200_000   # characters of quoted parts and replies in one message, in all (no limit on how many)
 
 
-class NewThread(BaseModel):
-    title: str = ""
-    model: str | None = None
-    mode: Literal["plan", "manual", "accept_edits", "auto", "bypass", "ask", "read_only"] = "manual"   # old names map over
-    settings: dict[str, Any] = Field(default_factory=dict, description="pinned / disabled groups (mod ids)")
-
-
 class ThreadPatch(BaseModel):
     title: str | None = None
     model: str | None = None
@@ -77,6 +70,16 @@ class Message(BaseModel):
                                                                    description="per attached document: whole, card, or auto (plan 24.9)")
     mentions: list[Mention] = Field(default_factory=list, max_length=20,
                                     description="plan 48.3: what the message @-mentions; fills that turn's calls")
+    client_id: str | None = Field(None, max_length=64, description="chat-responsive 1.1: the page's id for the message, "
+                                                                  "kept on its user event so the page can match what it drew")
+
+
+class NewThread(BaseModel):
+    title: str = ""
+    model: str | None = None
+    mode: Literal["plan", "manual", "accept_edits", "auto", "bypass", "ask", "read_only"] = "manual"   # old names map over
+    settings: dict[str, Any] = Field(default_factory=dict, description="pinned / disabled groups (mod ids)")
+    message: Message | None = Field(None, description="chat-responsive 1.2: the first message, sent in the same call")
 
 
 class Answer(BaseModel):
@@ -397,6 +400,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         """A chat's model must be one the relay serves (plan llm-servers 2.2); with the relay unreachable, anything goes."""
         if not model:
             return
+        if model in [m["id"] for m in model_list(await agent.llm.models(max_age=float("inf")))]:
+            return                  # known already: no wait for the relay (chat-responsive 1.2)
         ids = [m["id"] for m in model_list(await agent.llm.models(max_age=10))]
         if ids and model not in ids:
             near = difflib.get_close_matches(model, ids, n=3, cutoff=0.4)
@@ -404,8 +409,15 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
 
     @app.post("/v1/threads", status_code=201, summary="Start a thread")
     async def new_thread(body: NewThread, request: Request) -> dict:
-        await check_model(A(request), body.model)
-        return A(request).store.create_thread(body.title, body.model, body.mode, body.settings)
+        """With a `message`, the thread and its first message in one call: the thread, with that message's `event`."""
+        agent = A(request)
+        await check_model(agent, body.model)
+        if body.message is not None:
+            check_message(agent, None, body.message)
+        th = agent.store.create_thread(body.title, body.model, body.mode, body.settings)
+        if body.message is not None:
+            th["event"] = await send_message(agent, th["id"], body.message)
+        return th
 
     @app.get("/v1/threads/{tid}", summary="One thread")
     def get_thread(tid: str, request: Request) -> dict:
@@ -448,12 +460,20 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def send(tid: str, body: Message, request: Request) -> dict:
         agent = A(request)
         thread_or_404(agent, tid)
-        quotes = check_quotes(agent, tid, body)
+        return await send_message(agent, tid, body)
+
+    def check_message(agent: Agent, tid: str | None, body: Message) -> list[dict[str, Any]]:
+        """The message's quote-replies, checked (`tid` None: a new thread, where no reply can be named), or a 422."""
+        quotes = check_quotes(agent, tid or "", body)
         if not body.text.strip() and not any(q["reply"].strip() for q in quotes):
             raise HTTPException(422, {"code": "empty_message" if not quotes else "invalid_quote",
                                       "detail": "the message is empty" if not quotes else "say something: a reply to a quoted part or a message"})
+        return quotes
+
+    async def send_message(agent: Agent, tid: str, body: Message) -> dict:
+        quotes = check_message(agent, tid, body)
         return await agent.send(tid, body.text, body.attachments, body.doc_modes, quotes=quotes,
-                                mentions=[m.model_dump() for m in body.mentions])
+                                mentions=[m.model_dump() for m in body.mentions], client_id=body.client_id)
 
     @app.post("/v1/threads/{tid}/answer", status_code=202, summary="Answer an ask_user question card")
     async def answer(tid: str, body: Answer, request: Request) -> dict:

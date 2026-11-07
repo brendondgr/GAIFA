@@ -389,7 +389,12 @@ export function createMockClient(api, { speed = 1 } = {}) {
           link: '#/chat/' + t.thread.id, score: Math.round(1000 * (0.3 + 0.45 * shared / Math.max(1, words.size) + 0.05 * (t.thread.id.length % 7) / 7)) / 1000 };
       }).sort((a, b) => b.score - a.score).slice(0, limit);
     },
-    async create(body = {}) { await net(); return pub(newThread(body)); },
+    async create(body = {}) {        // with a message, the thread and its first message at once (chat-responsive 1.2)
+      await net(); const t = newThread(body), m = body.message;
+      if (!m) return pub(t);
+      const event = await this.send(t.thread.id, m.text, m.attachments || [], m.doc_modes || {}, m.quotes || [], m.mentions || [], m.client_id);
+      return { ...pub(t), event };
+    },
     async get(tid) { await seed(); await net(); return pub(T(tid)); },
     async patch(tid, p) { await net(); const t = T(tid); for (const k of ['title', 'model', 'mode', 'archived']) if (p[k] != null) t.thread[k] = p[k];
       if (p.settings) t.thread.settings = { ...t.thread.settings, ...p.settings }; t.thread.updated = now(); return pub(t); },
@@ -406,7 +411,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       }, 40));
       return { close() { closed = true; threads.get(tid)?.subs.delete(f); }, get lastSeq() { return last; } };
     },
-    async send(tid, text, attachments = [], docModes = {}, quotes = []) {
+    async send(tid, text, attachments = [], docModes = {}, quotes = [], mentions = [], clientId = null) {
       await net(); const t = T(tid), queued = !!t.run;
       // as the agent: quotes [{text 1–8,000, reply 0–4,000, seq?}], any number, 200,000 characters in all; an older single quote too
       const qs = Array.isArray(quotes) ? quotes : quotes?.text != null ? [{ text: quotes.text, reply: '', seq: quotes.seq }] : [];
@@ -423,7 +428,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       if (!queued && t.pending) { emit(t, 'tool_result', { id: t.pending.id, name: t.pending.kind === 'question' ? 'ask_user' : 'comfy_generate_image', status: 'skipped', content: '{}', error: { code: 'skipped', detail: 'The user wrote a message instead of answering.' } }); t.pending = null; }
       const docs = attachments.length ? await describe(t, attachments, docModes) : [];
       const stored = qs.map(q => ({ text: q.text, reply: String(q.reply || ''), ...(q.seq != null ? { seq: q.seq } : {}) }));
-      const ev = emit(t, 'user', { text, ...(stored.length ? { quotes: stored } : {}), ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}) });
+      const ev = emit(t, 'user', { text, ...(stored.length ? { quotes: stored } : {}), ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}), ...(clientId ? { client_id: clientId } : {}) });
       if (!t.thread.title) { t.thread.title = said.slice(0, 48); transient(t, 'thread', pub(t)); }
       if (queued) t.queue.push(said); else start(t, run => messageTurn(t, run, said, docs));
       return ev;

@@ -15,6 +15,12 @@ def system(env) -> str:
     return env.model.received[-1]["messages"][0]["content"]
 
 
+def recalled(env, tid) -> list:
+    """What was recalled for the last user message (a `recall` event since chat-responsive 1.1)."""
+    seq = env.events(tid, "user")[-1]["seq"]
+    return next((p["memory"] for p in env.payloads(tid, "recall") if p["for"] == seq), [])
+
+
 def last_user(env) -> str:
     return [m for m in env.model.received[-1]["messages"] if m["role"] == "user"][-1]["content"]
 
@@ -49,7 +55,7 @@ async def test_a_chat_in_a_projects_folder_gets_its_facts(env):
     assert "This chat works in GAIFA (projects/GAIFA):\n- Mods use ports 5100-5199" in s    # by the folder's name
     assert "This chat works in Site (projects/Site):\n- The site is built with Astro" in s   # by an anchor above it
     await env.send(tid, "what are the mods' ports?")
-    assert "memory" not in env.payloads(tid, "user")[-1]        # in this chat's profile already: not recalled
+    assert not recalled(env, tid)                               # in this chat's profile already: not recalled
     other = await env.thread(settings={"environment": "none"})
     await env.send(other, "hi")
     assert "This chat works in" not in system(env)
@@ -64,15 +70,15 @@ async def test_recall_is_stored_with_the_message_and_sent_the_same(env):
     await env.agent.memory_index.flush()
     tid = await env.thread()
     await env.send(tid, "which port does AIHub use again?")
-    u = env.payloads(tid, "user")[-1]
-    assert [r["id"] for r in u["memory"]] == [f["id"]] and u["memory"][0]["about"] == ["projects/GAIFA"]
+    mem = recalled(env, tid)
+    assert [r["id"] for r in mem] == [f["id"]] and mem[0]["about"] == ["projects/GAIFA"]
     first = last_user(env)
     assert "<memory note=" in first and "- The hub listens on port 7000 (projects/GAIFA)" in first and "16:9" not in first
     m.update_fact(f["id"], text="The hub listens on 127.0.0.1:7000")
     await env.send(tid, "thanks")
     again = [x["content"] for x in env.model.received[-1]["messages"] if x["role"] == "user"][0]
     assert again == first                                      # byte-identical: the stored recall, not today's text
-    assert "memory" not in env.payloads(tid, "user")[-1]       # "thanks" calls nothing to mind
+    assert not recalled(env, tid)                              # "thanks" calls nothing to mind
     assert m.need_fact(f["id"])["last_used"] is not None
 
 
@@ -82,8 +88,8 @@ async def test_recall_off_and_eval_threads(env):
     (env.agent.cfg.data / "memory.json").write_text(json.dumps({"recall": False}))
     tid = await env.thread()
     await env.send(tid, "which port does GAIFA use?")
-    assert "memory" not in env.payloads(tid, "user")[-1]
+    assert not recalled(env, tid)
     (env.agent.cfg.data / "memory.json").unlink()
     ev = await env.thread(settings={"dry_run": True})
     await env.send(ev, "which port does GAIFA use?")
-    assert "memory" not in env.payloads(ev, "user")[-1]
+    assert not recalled(env, ev)

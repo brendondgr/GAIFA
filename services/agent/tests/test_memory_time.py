@@ -118,3 +118,21 @@ async def test_a_change_replaces_the_held_fact_without_asking_and_isnt_a_rename(
     o = m.fact_public(m.need_fact(old["id"]))
     assert o["state"] == "retired" and o["valid_until"] == new["valid_from"]
     assert m.facts(state="proposed") == [] and m.resolve("Blender")["name"] == "Blender"     # no rename proposed
+
+
+async def test_after_an_import_the_profile_holds_the_newest_preferences_and_recall_the_rest(env):
+    """memory-import 2.2: a larger profile, the user's preferences newest first by when they began; a rule filed under
+    a topic comes in through recall when a message is about it."""
+    m = env.agent.memory
+    for i in range(30):
+        m.add_fact(f"Rule {i:02d}: keep every answer under {100 + i} words when the user asks for a summary.", kind="preference",
+                   source="imported", valid_from=f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}")
+    m.add_fact("Cover letters must show fit, not tell it.", about=["topics/Cover letters"], kind="preference", source="imported")
+    await env.agent.memory_index.flush()
+    text, shown = profile.build(m)
+    lines = [ln for ln in text.split("\n") if ln.startswith("- Rule")]
+    assert len(text) <= profile.PROFILE_MAX + 200 and len(lines) > 20
+    assert lines[0].startswith("- Rule 29") and lines[1].startswith("- Rule 28")                   # newest first
+    assert "Cover letters" not in text
+    got = await profile.recall(m, env.agent.hub, "Can you draft a cover letter for the PNNL internship?", shown)
+    assert "Cover letters must show fit, not tell it." in [r["text"] for r in got]

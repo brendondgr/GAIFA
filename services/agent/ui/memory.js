@@ -3,21 +3,31 @@
 // overwritten, and every change can be undone. What the agent learned on its own is saved when it's sure and the
 // user said it (listed in Review under "Learned on its own"); the rest waits in Review with the reason
 // (memory-auto-learning 2.3).
+// Importing another assistant's memory is memimport.js (memory-import 2.1): its card opens above the entries.
 // The data is this mod's /v1/memory/… routes.
+
+import { FROM, importCard, importOf } from './memimport.js';
 
 const KIND_LABEL = { user: 'You', project: 'Projects', person: 'People', place: 'Places', tool: 'Tools', topic: 'Topics', organization: 'Organizations' };
 const SOURCE = { stated: 'you said', inferred: 'learned', imported: 'imported' };
 const enc = encodeURIComponent;
 
-/** Group proposals by the chat they came from (the first evidence with a thread). */
+/** Group proposals by the chat they came from (the first evidence with a thread), or the import that brought them. */
 export function byChat(facts) {
   const out = new Map();
   for (const f of facts) {
-    const t = (f.evidence || []).find(e => e.thread)?.thread || '';
-    if (!out.has(t)) out.set(t, []);
-    out.get(t).push(f);
+    const t = (f.evidence || []).find(e => e.thread)?.thread || '', imp = t ? null : importOf(f);
+    const key = t || (imp ? `import:${imp.import}` : '');
+    if (!out.has(key)) out.set(key, { thread: t, import: imp, items: [] });
+    out.get(key).items.push(f);
   }
-  return [...out.entries()].map(([thread, items]) => ({ thread, items }));
+  return [...out.values()];
+}
+
+/** Where an imported fact came from, in words: "imported from Claude · “the entry”". */
+export function importText(f) {
+  const imp = importOf(f);
+  return imp ? [`imported from ${FROM[imp.from] || imp.from || 'another assistant'}`, imp.line && `“${imp.line}”`].filter(Boolean).join(' · ') : '';
 }
 
 /** What a proposal does when approved, in words. */
@@ -78,7 +88,7 @@ export function memoryTab(ctx, put, fail, render) {
         h('div', { style: `font-size:13px;overflow-wrap:anywhere${history ? ';text-decoration:line-through;opacity:.7' : ''}` }, f.text),
         h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' },
           ui.badge(f.kind, f.kind === 'preference' ? 'accent' : 'dim'),
-          ui.badge(`${SOURCE[f.source] || f.source} ${when(f.recorded)}`, f.source === 'stated' ? 'green' : 'dim'),
+          ui.badge(`${f.source === 'imported' && importOf(f) ? `imported from ${FROM[importOf(f).from] || 'another assistant'}` : SOURCE[f.source] || f.source} ${when(f.recorded)}`, f.source === 'stated' ? 'green' : 'dim'),
           ui.text([f.valid_from && `from ${f.valid_from}`, f.valid_until && `until ${f.valid_until}`,
             f.seen > 1 && `said ${f.seen}×`, f.entities.filter(e => e.id !== state.sel).map(e => e.path).join(', ')].filter(Boolean).join(' · '), { small: true, muted: true }))),
       history ? null : ui.button('Edit', () => { shown.style.display = 'none'; edit.style.display = 'flex'; }, { small: true, kind: 'ghost' }),
@@ -149,8 +159,11 @@ export function memoryTab(ctx, put, fail, render) {
       r.meaning ? null : ui.text('Searched by names and words only: the Embeddings mod isn’t running.', { small: true, muted: true }));
   }
 
+  const imports = importCard(ctx, fail, render);
+
   return async function memory() {
-    const [tree, e] = await Promise.all([call('GET', '/v1/memory/tree'), call('GET', `/v1/memory/entities/${enc(state.sel)}`).catch(() => null)]);
+    const [tree, e, imp] = await Promise.all([call('GET', '/v1/memory/tree'), call('GET', `/v1/memory/entities/${enc(state.sel)}`).catch(() => null),
+      imports().catch(err => { fail(err); return {}; })]);
     if (!e) { state.sel = 'user'; return render(); }
     const search = ui.input({ value: state.q, placeholder: 'Search memory (names, words, meaning)' });
     search.style.flex = '1';
@@ -167,10 +180,12 @@ export function memoryTab(ctx, put, fail, render) {
       h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' },
         ui.text('What the agent knows about you and your work. Each entry keeps its old names, so a rename never loses anything; every change can be undone.', { muted: true }),
         h('span', { style: 'flex:1' }), tree.proposed ? h('a', { href: '#/s/agent/review', style: 'text-decoration:none' }, ui.badge(`${tree.proposed} to review →`, 'accent')) : null),
-      h('div', { style: 'display:flex;gap:6px' }, search, ui.button('Search', () => { state.q = search.value.trim(); render(); })),
+      h('div', { style: 'display:flex;gap:6px' }, search, ui.button('Search', () => { state.q = search.value.trim(); render(); }),
+        ui.button('Import…', () => { importCard.state.open = true; render(); }, { kind: importCard.state.open ? 'ghost' : 'secondary' })),
+      imp.card || null,
       state.q ? await searchResults(state.q) : null,
       h('div', { style: 'display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap' }, side,
-        h('div', { style: 'flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:12px' }, entityView(e), newMemory())));
+        h('div', { style: 'flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:12px' }, entityView(e), newMemory(), imp.history || null)));
   };
 }
 
@@ -193,7 +208,7 @@ export async function memoryReview(ctx, fail, render) {
     return h('div', { style: 'padding:8px 0;border-top:1px solid var(--bd,#1D2430);display:flex;flex-direction:column;gap:4px' },
       h('div', { style: 'display:flex;gap:8px;align-items:flex-start' },
         h('div', { style: 'flex:1;min-width:0' }, h('div', { style: 'font-size:13px;overflow-wrap:anywhere' }, f.text),
-          ui.text([f.entities.map(e => e.path).join(', '), f.kind, actionText(f)].filter(Boolean).join(' · '), { small: true, muted: true }),
+          ui.text([f.entities.map(e => e.path).join(', '), f.kind, actionText(f), importText(f)].filter(Boolean).join(' · '), { small: true, muted: true }),
           whyText(f) ? ui.badge(`waiting: ${whyText(f)}`, 'accent') : null),
         decide(f, 'active', 'Approve', 'primary'),
         ui.button('Edit', () => { edit.style.display = edit.style.display === 'none' ? 'flex' : 'none'; }, { small: true }),
@@ -221,10 +236,11 @@ export async function memoryReview(ctx, fail, render) {
   return [
     ...(learnedCard ? [learnedCard] : []),
     h('strong', { style: 'font-size:13px' }, groups.length ? `Needs your look (${facts.length})` : 'Needs your look'),
-    ui.text('What the agent learned but wasn’t sure enough about, or that is personal. Nothing here is used until you approve it.', { muted: true }),
+    ui.text('What the agent learned or imported but wasn’t sure enough about, or that is personal. Nothing here is used until you approve it.', { muted: true }),
     ...(groups.length ? groups.map(g => ui.card(
       h('div', { style: 'display:flex;gap:8px;align-items:center' },
-        g.thread ? h('a', { href: `#/chat/${g.thread}`, style: 'font-size:13px;font-weight:500' }, 'From this chat') : h('strong', null, 'Not from a chat (tidying, or added here)'),
+        g.thread ? h('a', { href: `#/chat/${g.thread}`, style: 'font-size:13px;font-weight:500' }, 'From this chat')
+          : g.import ? h('strong', null, `From your ${FROM[g.import.from] || 'other assistant'} import`) : h('strong', null, 'Not from a chat (tidying, or added here)'),
         h('span', { style: 'flex:1' }),
         g.items.length > 1 ? ui.button('Approve all', async () => {
           try { for (const f of g.items) await call('PATCH', `/v1/memory/facts/${f.id}`, { json: { state: 'active' } }); render(); } catch (e) { fail(e); }

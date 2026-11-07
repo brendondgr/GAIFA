@@ -1,7 +1,8 @@
 """What every chat knows without searching (plan structured-memory 3.3).
 
-- **The profile** (in the system prompt): the user's current facts with their dates, preferences first, then
-  interests by when they were last said and a line of earlier interests, up to PROFILE_MAX characters;
+- **The profile** (in the system prompt): the user's current facts with their dates, preferences first (newest
+  first, by when they began), then interests by when they were last said and a line of earlier interests, up to
+  PROFILE_MAX characters (what doesn't fit comes in through recall);
   the active projects by name and one-line summary; and, for a chat working in workspace folders, the projects those
   folders are (by an anchor, or by the folder's name) with their current facts. It changes only when memory does,
   so a local server's prefix cache holds between turns.
@@ -21,7 +22,7 @@ from .model import norm
 from .search import search
 from .store import MemoryStore
 
-PROFILE_MAX = 1500          # characters of the user's own facts
+PROFILE_MAX = 3000          # characters of the user's own facts (an import's instructions are many; memory-import 2.2)
 PROJECTS_MAX = 12
 CHAT_MAX = 900              # characters of the chat's projects' facts
 RECALL_MAX = 800            # characters recalled on a message
@@ -61,6 +62,14 @@ def said_at(f: dict[str, Any]) -> float:
     return max(ts) if ts else float(f.get("recorded") or 0)
 
 
+def begun(f: dict[str, Any]) -> float:
+    """When a fact began: its `valid_from` (an imported entry's date), else when it was saved (memory-import 2.2)."""
+    try:
+        return time.mktime(time.strptime(f["valid_from"], "%Y-%m-%d")) if f.get("valid_from") else float(f.get("recorded") or 0)
+    except ValueError:
+        return float(f.get("recorded") or 0)
+
+
 def _month(f: dict[str, Any]) -> str:
     return (f.get("valid_from") or time.strftime("%Y-%m-%d", time.localtime(f.get("recorded") or 0)))[:7]
 
@@ -75,8 +84,8 @@ def dated(f: dict[str, Any]) -> str:
 
 def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None, interest_days: int = INTEREST_DAYS) -> tuple[str, set[str]]:
     """(the profile's text, the ids of the facts it shows). The user's facts carry their dates; preferences come
-    first, then interests by when they were last said; an interest not said for `interest_days`, or one that was
-    replaced or ended this past year, goes on the "Earlier interests" line."""
+    first, newest first, then interests by when they were last said, then the rest, newest first; an interest not
+    said for `interest_days`, or one that was replaced or ended this past year, goes on the "Earlier interests" line."""
     shown: set[str] = set()
     parts = []
     stale = time.time() - interest_days * 86400
@@ -84,7 +93,7 @@ def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None, interest_
     for f in m.facts_of("user"):
         (earlier if f["kind"] == "interest" and said_at(f) < stale else now_).append(f)
     rank = {"preference": 0, "interest": 1}
-    you = sorted(now_, key=lambda f: (rank.get(f["kind"], 2), -(said_at(f) if f["kind"] == "interest" else f["updated"] or 0)))
+    you = sorted(now_, key=lambda f: (rank.get(f["kind"], 2), -(said_at(f) if f["kind"] == "interest" else begun(f))))
     lines, size = [], 0
     for f in you:
         line = f"- {dated(f)}"

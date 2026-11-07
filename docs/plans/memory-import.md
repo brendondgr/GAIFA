@@ -129,7 +129,7 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
 
 ## Phase 2 — The Import sheet (M)
 
-- [ ] **2.1 Import on the Memory tab: `services/agent/ui/memimport.js` (new), `memory.js`.**
+- [x] **2.1 Import on the Memory tab: `services/agent/ui/memimport.js` (new), `memory.js`.**
   - **The sheet** (an **Import** button beside the Memory tab's search) has three steps:
     1. **"Ask your other assistant":** the prompt (`GET /v1/memory/imports/prompt` → `EXPORT_PROMPT`) with **Copy**, and a line saying where each assistant keeps its memory (ChatGPT: Settings → Personalization → Manage memories; Claude: Settings → Your Claude).
     2. **"Paste its answer":** a box, and From (ChatGPT / Claude / Gemini / Other).
@@ -138,7 +138,8 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
   - **Elsewhere:** the Memory tab's **Imports** list (date, source, counts, Undo). Review and the Timeline show "imported from Claude, 2026-11-07" and the original line.
   - **Docs:** the brief's agent page (Memory tab, Review).
   *Done when:* `utils/tests/web/agent-memory.test.mjs` renders the preview from a recorded `GET` result with the fake DOM: the sections, the choices and their defaults, the counts, and Undo import.
-- [ ] **2.2 The profile after an import: `profile.py`.**
+  *As built:* the card and the Imports list are `importCard` in `memimport.js`; the Memory tab draws them (Import… beside Search, the card above the entries, Imports (N) under them). A reading import redraws every 2.5 s and can be left and opened again from Imports. Changing a choice redraws only the card. Review's `byChat` also groups by import, and `importText` gives "imported from Claude · “the entry”".
+- [x] **2.2 The profile after an import: `profile.py`.**
   - **Work:**
     - `PROFILE_MAX` becomes 3000;
     - the user's preferences come newest first (by `valid_from`, else `recorded`);
@@ -148,9 +149,9 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
   *Done when:* `test_memory_time.py` checks that the profile stays within 3000 characters with the fixture's 30 preferences, newest first. A recall test checks that a message about a cover letter brings back the cover-letter instruction filed under its topic.
 
 **Checks & deliverables — Phase 2**
-- [ ] A browser walk-through on the installed hub with a made-up export titled `[memory-test]`: Import → Copy prompt → paste → preview (sections, defaults, reasons) → Save → the facts on the Memory tab with "imported", a waiting one on Review → Undo import → gone. Screenshots in `docs/reference/memory-import-2026-11/`.
+- [x] A browser walk-through on the installed hub with a made-up export titled `[memory-test]`: Import → Copy prompt → paste → preview (sections, defaults, reasons) → Save → the facts on the Memory tab with "imported", a waiting one on Review → Undo import → gone. Screenshots in `docs/reference/memory-import-2026-11/`. *As checked (2026-11-07):* in the browser on the installed hub, Import… → the prompt and Copy → the made-up export pasted (with a `[memory-test]` line, which the model left out as not a memory: "1 entry it couldn't read") → Read it → the preview (9 to save, 2 to Review: $40k and the sister) → Save → the facts on the Memory tab "imported from ChatGPT" with their dates, Lantern and Hearth under Projects, Cover letters under Topics → Review's "From your ChatGPT import" with the entries and reasons → Undo import (confirmed) → "Undone: 11 facts", memory as before (10 facts, 12 to review). The person's own 113-entry preview opened from Imports and showed its four waiting facts with their reasons (not saved). Fixed on the way: "1 entries"; the prompt's instructions now change only "me/my/I" (the model had written "unless told to the user").
 - [ ] With the person's go-ahead, they import their sample from the sheet (or it is imported for them). Then a new chat answers from memory alone: "what are my projects?", "should you push to GitHub?" and "what am I into these days?".
-- [ ] Delivered: `memimport.js`, the Memory tab and Review changes, the profile change, and docs: the brief, PATCHES (if `web/` changes), `docs/structure.md`.
+- [x] Delivered: `memimport.js`, the Memory tab and Review changes, the profile change, and docs: the brief, `docs/structure.md` (no `web/` change, so no PATCHES entry), architecture §14 (the profile).
 
 ## Phase 3 — Files from Claude, and exporting GAIFA's memory (S)
 

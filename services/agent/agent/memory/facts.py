@@ -64,11 +64,13 @@ class FactsMixin:
                 "entities": [{"id": e["id"], "name": e["name"], "kind": e["kind"], "path": self.path(e)} for e in ents]}   # type: ignore[attr-defined]
 
     def facts(self, state: str | None = None, entity: str | None = None, q: str | None = None, current: bool | None = None,
-              limit: int = 200, thread: str | None = None, source: str | None = None) -> list[dict[str, Any]]:
+              limit: int = 200, thread: str | None = None, source: str | None = None,
+              imported: str | None = None) -> list[dict[str, Any]]:
         where, args = [], []
-        if thread:                                    # learned from this chat (its evidence names it)
-            where.append("f.evidence LIKE ? ESCAPE '\\'")
-            args.append("%" + f'"thread": {json.dumps(thread)}'.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+        for key, val in (("thread", thread), ("import", imported)):   # learned from this chat, or from this import
+            if val:
+                where.append("f.evidence LIKE ? ESCAPE '\\'")
+                args.append("%" + f'"{key}": {json.dumps(val)}'.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
         if source:
             where.append("f.source = ?")
             args.append(source)
@@ -90,11 +92,11 @@ class FactsMixin:
     def facts_of(self, eid: str, current: bool = True) -> list[dict[str, Any]]:
         return self.facts(entity=eid, current=current or None, limit=1000)
 
-    def resolve_about(self, about: list[Any] | None, source: str, by: str) -> list[str]:
+    def resolve_about(self, about: list[Any] | None, source: str, by: str, propose: bool = False) -> list[str]:
         """Entity ids for `about`: ids, paths and names resolve; an unknown name becomes a new entity (`{name, kind}`
-        gives its kind, a path's first part too; plain text a topic), proposed when the fact is inferred. Paths and
-        kinds go first, a bare name that repeats one is the same entry, and an entry of another kind by that name is
-        used rather than refused. Nothing: the user."""
+        gives its kind, a path's first part too; plain text a topic), proposed when the fact is inferred or waits
+        (`propose`). Paths and kinds go first, a bare name that repeats one is the same entry, and an entry of another
+        kind by that name is used rather than refused. Nothing: the user."""
         items: list[tuple[str, str | None]] = []
         for a in about or []:
             name, kind = (a.get("name"), a.get("kind")) if isinstance(a, dict) else (str(a), None)
@@ -112,7 +114,7 @@ class FactsMixin:
                 continue                                                  # "Ariadne" after "projects/Ariadne"
             want = kind_of(kind) if kind else (kind_of(parts[0]) if len(parts) == 2 else None)
             e = self.resolve(name, want) or self.resolve(name) or (self.resolve(leaf, want) if len(parts) > 1 else None)   # type: ignore[attr-defined]
-            if e is None and source == "inferred":           # an entry another proposal brought: the same one
+            if e is None and (source == "inferred" or propose):   # an entry another proposal brought: the same one
                 e = self._row("SELECT * FROM mem_entities WHERE state = 'proposed' AND norm = ?", (norm(leaf),))   # type: ignore[attr-defined]
             if e is None and len(parts) > 1:
                 e = self.resolve(leaf) if len(parts) == 2 else None   # type: ignore[attr-defined]
@@ -123,7 +125,7 @@ class FactsMixin:
                     parent = pe["id"] if pe else None
                     want = want or (pe or {}).get("kind")
                 e = self.create_entity(want or "topic", leaf, parent=parent, source=source, by=by,   # type: ignore[attr-defined]
-                                       state="proposed" if source == "inferred" else "active")
+                                       state="proposed" if source == "inferred" or propose else "active")
             ids.append(e["id"])
         return list(dict.fromkeys(ids)) or [USER]
 
@@ -143,7 +145,7 @@ class FactsMixin:
         old = self.need_fact(replaces) if replaces else None
         if old is not None and old["state"] not in ("active", "proposed"):
             raise MemoryError(409, "not_current", f"{replaces} is {old['state']}: only a current fact can be replaced")
-        ents = self.resolve_about(about, source, by)
+        ents = self.resolve_about(about, source, by, propose=state == "proposed")
         same = self._same(text, ents)
         if same is not None and old is not None and same["id"] != old["id"]:   # saved already; now it replaces `old`
             with self.change("fact_replace", same["id"], f"replaced: {old['text'][:60]} → {text[:60]}",   # type: ignore[attr-defined]

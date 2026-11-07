@@ -5,7 +5,7 @@
     POST   /v1/memory/entities                  {kind, name, parent?, summary?, aliases?, anchors?}
     PATCH  /v1/memory/entities/{id}             {name?, parent?, summary?, kind?, aliases_add?, aliases_remove?, anchors_add?, anchors_remove?, state?}
     POST   /v1/memory/entities/{id}/merge       {into}
-    GET    /v1/memory/facts                     ?state=&entity=&q=&current=
+    GET    /v1/memory/facts                     ?state=&entity=&q=&current=&thread=&source=&import=
     POST   /v1/memory/facts                     {text, about?, kind?, valid_from?, valid_until?, replaces?, source?}
     PATCH  /v1/memory/facts/{id}                {text?, about?, kind?, valid_from?, valid_until?, state?}
     DELETE /v1/memory/facts/{id}                forget it for real
@@ -14,6 +14,8 @@
     POST   /v1/memory/undo/{log_id}
     POST   /v1/memory/reword                    learned facts in the first person, rewritten (memory-auto-learning 1.3)
     GET    /v1/memory/log                       ?target=&limit=
+
+Importing another assistant's memory: api_imports.py (memory-import 1.4).
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -171,10 +173,11 @@ def add_routes(app: FastAPI) -> None:
         return await search(agent.memory, agent.hub, q, history=history, limit=min(limit, 50), meaning_wait=8)
 
     @app.get("/v1/memory/facts", summary="Facts: ?state=proposed|active|retired|rejected, ?entity=, ?q= (words), ?current=true, "
-             "?thread= (learned from that chat), ?source=stated|inferred")
+             "?thread= (learned from that chat), ?source=stated|inferred|imported, ?import= (saved by that import)")
     def facts(request: Request, state: str | None = None, entity: str | None = None, q: str | None = None,
-              current: bool | None = None, limit: int = 200, thread: str | None = None, source: str | None = None) -> list:
-        return M(request).facts(state, entity, q, current, min(limit, 1000), thread, source)
+              current: bool | None = None, limit: int = 200, thread: str | None = None, source: str | None = None,
+              imported: str | None = Query(None, alias="import")) -> list:
+        return M(request).facts(state, entity, q, current, min(limit, 1000), thread, source, imported)
 
     @app.post("/v1/memory/facts", status_code=201, summary="Remember a fact about entities (the user when none); replaces retires an older one")
     def add(body: FactIn, request: Request) -> dict:

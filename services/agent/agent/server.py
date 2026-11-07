@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
-from . import api_memory, api_skills, api_summaries, docs
+from . import api_imports, api_memory, api_skills, api_summaries, docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -268,6 +268,8 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         from .memory.learn import MemoryLearner
         agent.memory_learner = MemoryLearner(agent, cfg.summary_idle_min)                    # structured-memory 4.1
         mem_learner = asyncio.create_task(agent.memory_learner.run_forever(stop))
+        from .memory.imports import Importer
+        agent.memory_importer = Importer(agent)                                              # memory-import 1.4
         await agent.resume_all()
         try:
             yield
@@ -294,6 +296,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     api_summaries.add_routes(app)                                    # plan 28.5
     api_skills.add_routes(app)                                       # skill-sources 3.1
     api_memory.add_routes(app)                                       # structured-memory 1.2
+    api_imports.add_routes(app)                                      # memory-import 1.4
 
     def A(request: Request) -> Agent:
         return request.app.state.agent

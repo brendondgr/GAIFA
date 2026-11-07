@@ -127,12 +127,12 @@ def fading(m: MemoryStore, days: int = FADE_DAYS) -> int:
 
 
 def old_interests(m: MemoryStore, days: int = profile.INTEREST_DAYS) -> int:
-    """An interest the learner saved that the user hasn't said, and nothing used, for `days` is retired (logged, with
-    Undo; memory-auto-learning 3.2): it stays on the timeline and the profile's "Earlier interests". A stated one
-    stays as the user put it."""
+    """An interest the learner saved (or an import brought, dated by its line; memory-import) that the user hasn't
+    said, and nothing used, for `days` is retired (logged, with Undo; memory-auto-learning 3.2): it stays on the
+    timeline and the profile's "Earlier interests". A stated one stays as the user put it."""
     cut, n = time.time() - days * 86400, 0
     for f in m.facts(state="active", limit=100000):
-        if f["kind"] != "interest" or f["source"] != "inferred" or not f["current"]:
+        if f["kind"] != "interest" or f["source"] not in ("inferred", "imported") or not f["current"]:
             continue
         if max(profile.said_at(f), float(f["last_used"] or 0)) < cut:
             m.set_fact_state(f["id"], "retired", by="tidy")

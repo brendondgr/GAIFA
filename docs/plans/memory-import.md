@@ -1,6 +1,6 @@
 # Plan: Importing memories from ChatGPT, Claude and other assistants
 
-**Asked for:** 2026-11-07 · **Status:** Planned
+**Asked for:** 2026-11-07 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -58,7 +58,7 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
 
 ## Phase 1 — Reading an export (M)
 
-- [ ] **1.1 The formats: `services/agent/agent/memory/sources.py` (new).**
+- [x] **1.1 The formats: `services/agent/agent/memory/sources.py` (new).**
   - **`EXPORT_PROMPT`:** the person's prompt, word for word, which the Import sheet shows with Copy (2.1).
   - **`read_lines(text) -> list[Line]`:** deterministic, with no model; `Line = {n, section, date, text}`.
     - It strips a surrounding code fence and anything after it ("This is the complete set…").
@@ -68,7 +68,8 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
     - An empty or header-only text is dropped.
   - **Why:** the structure is fixed, so reading it needs no model; the model only interprets each entry (1.2).
   *Done when:* `services/agent/tests/test_memory_imports.py` reads a made-up export in the person's format (`services/agent/tests/fixtures/memory-export.md`: five sections, a fence, the trailer, `[unknown]`, a bullet list without dates) and gets every line with its section and date. The real sample, read the same way in a check outside the tests, gives 113 lines: 53, 9, 7, 31 and 13 per section.
-- [ ] **1.2 Interpreting the lines: `services/agent/agent/memory/imports.py` (new), `READ` prompt.**
+  *As built:* `**Instructions**:` written as the prompt's own list ("1. **Instructions**: Rules…") is read as a header; `[n/a]`, `[?]`, `[date saved, if available]` give no date; the same entry twice is read once.
+- [x] **1.2 Interpreting the lines: `services/agent/agent/memory/imports.py` (new), `READ` prompt.**
   - **Work:** `interpret(llm, model, lines, entities) -> list[Cand]`. It makes one model call per 20 lines with the held entries' paths and aliases, and asks for each line's facts:
     - `text`: the third person ("The user…") for identity, career and preferences, and the imperative for instructions; never "I"/"me"/"my";
     - `kind`: `preference` for instructions and preferences, `interest` for what the user is into for now, else `fact` or `event`;
@@ -83,7 +84,9 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
   - a project line makes an entry with its alias and summary;
   - "for me" comes back as "for the user";
   - a batch that isn't JSON is tried again and then reported.
-- [ ] **1.3 Comparing and deciding: `imports.py`, `auto.py`.**
+
+  *As built:* an entry the model leaves out of its answer is "couldn't read this line" too; an identity, career or preference fact is filed under the user as well as what it names; `confidence` defaults to 0.9 when the model gives none (the entry is the user's, not a guess); an entry imported before isn't sent to the model again (1.3).
+- [x] **1.3 Comparing and deciding: `imports.py`, `auto.py`.**
   - **Compare:** for each `Cand`:
     - a line already in an imported fact's evidence (`evidence[].line`, normalised) is `same`;
     - otherwise `search` finds held current facts, and the learner's `DECIDE` prompt answers same/replaces/adds/skip in batches (factored out of learn.py `_facts` into a shared `compare(m, hub, llm, model, cands)`, which the learner then calls too);
@@ -97,7 +100,9 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
   - replacing a stated fact defaults to Review.
 
   `test_memory_learn.py` and `test_memory_auto.py` pass as they are.
-- [ ] **1.4 The preview, saving and undo: `imports.py`, `store.py`, `api_memory.py`.**
+
+  *As built:* `services/agent/agent/memory/compare.py` holds `DECIDE`, `ends_of`, `ended_fact` and `compare(m, hub, ask, cands, meaning_wait, batch)` (the learner asks in one batch, imports 20 at a time, waiting 3 s for meaning); an entry imported before becomes its held facts, each `same`, without a model call; the compare's `skip` defaults to Skip ("not worth keeping").
+- [x] **1.4 The preview, saving and undo: `imports.py`, `store.py`, `api_memory.py`.**
   - **Store:** a table `mem_imports (id, made, source, lines, state, result, saved, undone)`:
     - `source` is `chatgpt|claude|gemini|other`;
     - `state` is `reading|ready|saved|undone|failed`;
@@ -116,9 +121,11 @@ Nothing is saved until the person has seen a preview, and a whole import can be 
   - **Docs:** architecture §14 (memory: imports).
   *Done when:* `test_memory_imports.py` runs the whole route path with the scripted model: preview → save with mixed choices → the facts, entries, aliases and log are as chosen → `DELETE` brings back what was replaced and removes the rest, leaving a fact edited since then as it was. 413 and 409 are checked.
 
+  *As built:* the routes are their own file, `services/agent/agent/api_imports.py`, with `GET /v1/memory/imports/prompt`; `mem_imports` is made by `Importer` (`imports.py`, like `mem_learned` in learn.py) with `done` (progress), `error` and `logs` (the log ids it made) as well; an import still reading when the agent restarts is marked failed. Save adds facts directly as active or proposed (not `fact_auto`: the preview was the review, so they don't fill Review's "Learned on its own"); a waiting fact's new entry is proposed with it (`resolve_about(propose=)`). Undo counts `undone` and `kept` facts; `422` for an unknown choice, `409` saving before ready.
+
 **Checks & deliverables — Phase 1**
-- [ ] On the installed hub with the agent's model: the person's sample is read as a preview only (nothing saved). Its 113 lines come back with their sections, Mycelium, Mytheca (alias Velora), GAIFA (alias AIHub, the entry that already exists) and KDence (alias TimeKeeper-v2) as entries, the general instructions under the user, the cover-letter ones under a topic, and the Anni, legal-name and grant lines defaulting to Review. Then a made-up export titled `[memory-test]` is imported and undone, and memory is exactly as before (counted by state and kind).
-- [ ] Delivered: `sources.py`, `imports.py`, the shared compare step, `decide_import`, `mem_imports`, the routes, the fixture and tests, and docs: architecture §14, `docs/structure.md`, this plan, the plans index.
+- [x] On the installed hub with the agent's model: the person's sample is read as a preview only (nothing saved). Its 113 lines come back with their sections, Mycelium, Mytheca (alias Velora), GAIFA (alias AIHub, the entry that already exists) and KDence (alias TimeKeeper-v2) as entries, the general instructions under the user, the cover-letter ones under a topic, and the Anni, legal-name and grant lines defaulting to Review. Then a made-up export titled `[memory-test]` is imported and undone, and memory is exactly as before (counted by state and kind). *As checked (2026-11-07, skynet):* the sample's preview (nothing saved) read all 113 entries in about 20 minutes (6 batches): 137 facts; 32 project entries, among them Mytheca (Velora), KDence (TimeKeeper-v2), GAIFA (AIHub; memory held no project yet, so it would be new), DashLLM (relay), CSC Textiles storefront (CSC-Project); 37 instructions under the user and the rest under their topic or project (Cover letters, Exam solutions, Ariadne, Mycelium…); 133 defaulting to Save and 4 to Review: Anni (sensitive), the legal-name line (sensitive: legal), Mycelium's grant (sensitive: money, split from its other three facts), and "About Me page", wrongly caught as the first person. Fixed: a capitalised "Me", "My", "We" counts only where a sentence starts (`wording.py`); a project name with "/" ("ProQuest/Pivot-RP scraper") is kept as a name with the "/" form as an alias, not read as a path; the prompt asks for quoted words in their double quotes (the model had dropped some). Then the made-up export with a `[memory-test]` line was imported (9 saved, 3 waiting: the sister, the $40k pitch, the test line at "not sure: 0.50"; Lantern with its alias Firefly and summary) and undone: 12 facts undone, 0 kept, and memory as before (10 facts, 12 waiting, no project entries).
+- [x] Delivered: `sources.py`, `imports.py`, the shared compare step, `decide_import`, `mem_imports`, the routes, the fixture and tests, and docs: architecture §14, `docs/structure.md`, this plan, the plans index.
 
 ## Phase 2 — The Import sheet (M)
 

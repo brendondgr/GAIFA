@@ -16,9 +16,11 @@ from ..learn.loop import _json
 
 log = logging.getLogger("agent.memory.wording")
 
-# "I" only as a capital; the rest in any case. Quoted words ("…", “…”) don't count: a fact may quote the user.
+# "I" only as a capital; the rest in lower case, or capitalised at a sentence's start. Quoted words ("…", “…”) don't count: a fact may quote the user.
 _I = re.compile(r"(?<![\w'’])I(?:['’](?:m|ve|d|ll))?(?![\w'’])")
-_OTHER = re.compile(r"(?<![\w'’])(?:me|my|mine|myself|we|our|ours|ourselves)(?![\w'’])", re.I)
+_OTHER = re.compile(r"(?<![\w'’])(?:me|my|mine|myself|we|our|ours|ourselves)(?![\w'’])")
+# Capitalised only where a sentence starts: "My advisor…", but not a name like "About Me page".
+_OTHER_CAP = re.compile(r"(?:^|[.!?;:]\s+|\(\s*)(?:Me|My|Mine|Myself|We|Our|Ours|Ourselves|ME|MY|WE|OUR)(?![\w'’])")
 _QUOTED = re.compile(r"\"[^\"]*\"|“[^”]*”")
 
 REWORD = """Rewrite each sentence below as a fact about the user, in the third person: "The user…", "Their…", never "I", "my", "me", "we" or "our". Keep the meaning exactly; change nothing else.
@@ -31,7 +33,7 @@ Answer with JSON only, one sentence per number, in the same order: {{"facts": ["
 def first_person(text: str) -> bool:
     """Whether a fact speaks as the user ("I", "my", "we"…) outside quotation marks."""
     t = _QUOTED.sub(" ", text or "")
-    return bool(_I.search(t) or _OTHER.search(t))
+    return bool(_I.search(t) or _OTHER.search(t) or _OTHER_CAP.search(t))
 
 
 async def reword(llm: Any, model: str, texts: list[str]) -> list[str]:

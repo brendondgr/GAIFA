@@ -12,6 +12,7 @@ in Review with the first reason that stopped it, which the page shows ("sensitiv
 - it doesn't replace a fact the user stated (their own words are only changed by them);
 - it isn't still in the first person (`wording.first_person`).
 
+An imported line (plan memory-import) stands for the user's words; the other rules hold for it too (`decide_import`).
 A proposal the learner sees again becomes active once it was seen `auto_after_seen` times, unless it is sensitive.
 Nothing here changes memory; the learner acts on the verdict, and every auto-approval is logged with Undo.
 """
@@ -97,6 +98,13 @@ def decide(cand: dict[str, Any], said: list[str], replaced: dict[str, Any] | Non
     if conf < float(cfg["auto_threshold"]):
         return False, f"not sure: {conf:.2f}"
     return True, ""
+
+
+def decide_import(cand: dict[str, Any], replaced: dict[str, Any] | None, cfg: dict[str, Any]) -> tuple[bool, str]:
+    """`decide` for a fact read from an imported line (plan memory-import 1.3): the person pasted the line, so it
+    stands for the user's words (`cand["line"]` is the quote); every other rule is the same."""
+    line = str(cand.get("line") or cand.get("text") or "")
+    return decide({**cand, "quote": line}, [line], replaced, cfg)
 
 
 def seen_enough(fact: dict[str, Any], cfg: dict[str, Any]) -> bool:

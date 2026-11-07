@@ -22,6 +22,8 @@ def test_first_person_is_caught():
         "The user said \"I can't\" about the exam", "The user said “my way or nothing”", "The user prefers 4:3 images",
         "The user's advisor is supportive", "Mycelium targets ECIR 2027", "Uses iOS and MIT licenses", "The user likes Imagen",
         "Prefers dark themes for IDEs"))
+    assert not first_person("In the About Me page, the user keeps their own wording.")       # a name, not "me"
+    assert first_person("My advisor is supportive.") and first_person("Lisbon. My sister lives there.")
 
 
 def facts_reply(facts):

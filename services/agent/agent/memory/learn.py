@@ -8,7 +8,7 @@ For each chat quiet for the summaries' idle time (and not an eval's, and not `no
    sensitive, and renames, as JSON. A fact still in the first person is reworded once (`wording.py`). Learning starts from the chats
    as they were when it was first turned on (`baseline`): past chats aren't mined all at once.
 2. **Resolve.** Each fact's `about` resolves without a model (`MemoryStore.resolve`).
-3. **Compare.** Its five nearest current facts (`memory_search`); when it has any, the model chooses one operation per
+3. **Compare** (`compare.py`, shared with imports). Its five nearest current facts (`memory_search`); when it has any, the model chooses one operation per
    fact: `same` (seen once more), `replaces` (a change), `adds`, or `skip`.
 4. **Save.** New facts and replacements are saved with their evidence (the chat, the message their quote is in, the
    quote), new entities with them. One that `auto.decide` passes (grounded in the user's words, confident, not
@@ -24,15 +24,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 import time
 from typing import Any, Callable
 
 from ..learn.loop import _json, render
 from ..summaries import Backoff
 from . import auto, profile
+from .compare import compare, ends_of
 from .model import FACT_KINDS, MemoryError, check_date, norm
-from .search import search
 from .store import MemoryStore
 from .wording import first_person, reword
 
@@ -77,14 +76,7 @@ Answer with JSON only, no prose:
 THE CHAT:
 {chat}"""
 
-DECIDE = """You keep an assistant's memory. For each new fact below, compare it with the facts memory already holds about the same things, and choose one:
-- "same": it says what held fact <id> says (nothing changes)
-- "replaces": it makes held fact <id> out of date (a change, a correction, a newer value; a new fact that says the user no longer does, likes or uses what <id> says replaces it)
-- "adds": it is new
-- "skip": it isn't worth keeping
-Answer with JSON only: {{"decisions": [{{"n": 1, "op": "same|replaces|adds|skip", "id": "the held fact's id, or null"}}]}}
 
-{items}"""
 
 
 USERISH = {"you", "me", "user", "the user", "users", "user preference", "user preferences", "preferences", "the user s preferences",
@@ -108,36 +100,6 @@ def clean_about(a: str) -> str:
         if len(words) > 1 and words[-1].lower() in KIND_WORDS:
             return f"{KIND_WORDS[words[-1].lower()]}/{' '.join(words[:-1])}"
     return a
-
-
-_ENDS = [re.compile(p, re.I) for p in (
-    r"\bno longer (?:using |into |use |uses |with |likes? |a fan of |working (?:on|with) )?([A-Z][\w.+#-]*)",
-    r"\bnot (?:using |into |with )?([A-Z][\w.+#-]*) any ?more", r"\binstead of ([A-Z][\w.+#-]*)",
-    r"\bswitched (?:away )?from ([A-Z][\w.+#-]*)", r"\bmoved (?:away )?from ([A-Z][\w.+#-]*)", r"\bstopped (?:using )?([A-Z][\w.+#-]*)")]
-
-
-def ends_of(c: dict[str, Any]) -> list[str]:
-    """What a learned fact says the user stopped (memory-auto-learning 3.2): the model's `ends`, and names after "no
-    longer", "not … anymore", "instead of", "switched from" in the fact or its quote."""
-    out = [str(t).strip() for t in c.get("ends") or [] if isinstance(t, str) and str(t).strip()]
-    for text in (c.get("text"), c.get("quote")):
-        for rx in _ENDS:
-            out += [m.group(1).rstrip(".,;") for m in rx.finditer(text or "") if m.group(1)[:1].isupper()]
-    return list(dict.fromkeys(t for t in out if norm(t) and norm(t) not in ("the", "it", "that", "this")))
-
-
-def ended_fact(m: MemoryStore, terms: list[str]) -> str | None:
-    """The newest current fact that names one of `terms` as something the user has (not one that already says it
-    ended): the fact a "no longer X" replaces."""
-    if not terms:
-        return None
-    pats = [re.compile(rf"(?<![\w]){re.escape(t)}(?![\w])", re.I) for t in terms]
-    for f in m.facts(state="active", current=True, limit=500):
-        if f["kind"] == "event" or any(rx.search(f["text"]) for rx in _ENDS):
-            continue
-        if any(p.search(f["text"]) for p in pats):
-            return f["id"]
-    return None
 
 
 class MemoryLearner:
@@ -274,29 +236,7 @@ class MemoryLearner:
 
     async def _facts(self, model: str, cands: list[dict[str, Any]], evidence: list[dict[str, Any]],
                      users: list[dict[str, Any]] | None = None) -> int:
-        held: list[list[dict[str, Any]]] = []
-        for c in cands:
-            r = await search(self.m, self.agent.hub, c["text"], limit=5, meaning_wait=10)
-            held.append([f for f in r["facts"] if f.get("current", True)][:5])
-        ops: dict[int, tuple[str, str | None]] = {i: ("adds", None) for i in range(len(cands))}
-        for i, c in enumerate(cands):                       # "…, no longer Blender": the held Blender fact, without asking
-            old = ended_fact(self.m, ends_of(c))
-            if old is not None:
-                ops[i] = ("replaces", old)
-        ask = [i for i, h in enumerate(held) if h and ops[i][0] == "adds"]
-        if ask:
-            items = "\n\n".join(f"{k}. NEW: {cands[i]['text']}\n   HELD: " + "; ".join(f"{h['id']}: {h['text']}" for h in held[i])
-                                for k, i in enumerate(ask, 1))
-            got = await self.ask(model, DECIDE.format(items=items)) or {}
-            for d in got.get("decisions") or []:
-                try:
-                    i = ask[int(d.get("n")) - 1]
-                except (TypeError, ValueError, IndexError):
-                    continue
-                op, fid = str(d.get("op") or "adds"), d.get("id")
-                if op in ("same", "replaces") and fid not in {h["id"] for h in held[i]}:
-                    op, fid = "adds", None                     # an id it made up: treat it as new
-                ops[i] = (op if op in ("same", "replaces", "adds", "skip") else "adds", fid)
+        ops = await compare(self.m, self.agent.hub, lambda p: self.ask(model, p), cands)
         users = users or []
         said = [u["payload"].get("text") or "" for u in users]
         cfg = auto.settings(profile.settings(self.agent.cfg.data))

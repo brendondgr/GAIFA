@@ -27,6 +27,7 @@ from .llm import LLM
 from .loop import Agent, Busy, Config
 from .store import MODES, Store
 from .streams import add_stream_routes
+from .api_queue import add_queue_routes
 
 PING_S = 15.0
 QUOTE_MAX = 8000         # characters of a quoted reply (Select → Reply)
@@ -72,6 +73,9 @@ class Message(BaseModel):
                                     description="plan 48.3: what the message @-mentions; fills that turn's calls")
     client_id: str | None = Field(None, max_length=64, description="chat-responsive 1.1: the page's id for the message, "
                                                                   "kept on its user event so the page can match what it drew")
+    when: Literal["auto", "queue", "now"] = Field("auto", description="chat-responsive 2.1: during a turn (or while a card waits), "
+                                                    "auto and queue hold it until the turn ends (answering {queued}); now "
+                                                    "writes it at once, for the turn's next model call")
 
 
 class NewThread(BaseModel):
@@ -455,8 +459,10 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         return agent.store.events(tid, after)
 
     add_stream_routes(app, A, thread_or_404, PING_S)                 # one thread's stream, and several on one (plan chat-split 3.1)
+    add_queue_routes(app, A, thread_or_404)                          # messages held during a turn (chat-responsive 2.1)
 
-    @app.post("/v1/threads/{tid}/messages", status_code=202, summary="Send a message; during a turn it's queued for the next model call")
+    @app.post("/v1/threads/{tid}/messages", status_code=202, summary="Send a message; during a turn it's held until the turn ends "
+              "(`when: now`: read at the turn's next model call)")
     async def send(tid: str, body: Message, request: Request) -> dict:
         agent = A(request)
         thread_or_404(agent, tid)
@@ -473,7 +479,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def send_message(agent: Agent, tid: str, body: Message) -> dict:
         quotes = check_message(agent, tid, body)
         return await agent.send(tid, body.text, body.attachments, body.doc_modes, quotes=quotes,
-                                mentions=[m.model_dump() for m in body.mentions], client_id=body.client_id)
+                                mentions=[m.model_dump() for m in body.mentions], client_id=body.client_id, when=body.when)
 
     @app.post("/v1/threads/{tid}/answer", status_code=202, summary="Answer an ask_user question card")
     async def answer(tid: str, body: Answer, request: Request) -> dict:

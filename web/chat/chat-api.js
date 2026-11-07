@@ -5,7 +5,9 @@
 //   models() threads({q, archived, limit, environment, sort, offset}) threadGroups({archived}) searchChats(q, limit) create(body: {model, mode, settings, message?: messageBody(…)} → the thread, with `event` when it had a message) get(tid) patch(tid, p) remove(tid) events(tid, after)
 //   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq; the live client shares one
 //   connection for every open chat, chat-streams.js; `sharedStream` says whether it does)
-//   send(tid, text, attachments, doc_modes, quotes, mentions, client_id) answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
+//   send(tid, text, attachments, doc_modes, quotes, mentions, client_id, when) → the user event, or {queued: item} (held during a turn)
+//   queue(tid) queueEdit(tid, qid, {text, index}) queueRemove(tid, qid) queueSend(tid, qid) queueResume(tid) queueClear(tid)
+//   answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
 //   feedback(tid, {value, output_id | seq, note}) decidePref(pid, approve)   (plan 21.7)
 //
@@ -26,10 +28,11 @@ const qs = o => { const p = Object.entries(o).filter(([, v]) => v !== undefined 
 // proxy answers its envelope {detail, code, data}.
 // A message's body for `send(tid, …)` and `create({…, message})` (chat-responsive 1.2): mentions [{kind, id, label, fills}]
 // (plan 48.2); client_id the page's id for the message, kept on its user event (chat-responsive 1.1).
-export const messageBody = (text, attachments = [], doc_modes = {}, quotes = [], mentions = [], client_id) => ({ text, attachments,
+// when (chat-responsive 2.1): 'now' writes it into a running turn; otherwise a message sent during a turn is held.
+export const messageBody = (text, attachments = [], doc_modes = {}, quotes = [], mentions = [], client_id, when) => ({ text, attachments,
   ...(Object.keys(doc_modes || {}).length ? { doc_modes } : {}),
   ...(quotes?.length ? { quotes: quotes.map(q => ({ text: q.text, reply: q.reply || '', ...(q.seq != null ? { seq: q.seq } : {}) })) } : {}),
-  ...(mentions?.length ? { mentions } : {}), ...(client_id ? { client_id } : {}) });
+  ...(mentions?.length ? { mentions } : {}), ...(client_id ? { client_id } : {}), ...(when && when !== 'auto' ? { when } : {}) });
 
 export async function errorFrom(res) {
   const text = await res.text().catch(() => '');
@@ -106,6 +109,13 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     // quotes: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each (Select → Reply);
     // `text` may be empty when a reply says something
     send: (tid, ...msg) => req('POST', `${T(tid)}/messages`, messageBody(...msg)),
+    // the queue (chat-responsive 2.1): {items, paused}
+    queue: tid => req('GET', `${T(tid)}/queue`),
+    queueEdit: (tid, qid, p) => req('PATCH', `${T(tid)}/queue/${enc(qid)}`, p),
+    queueRemove: (tid, qid) => req('DELETE', `${T(tid)}/queue/${enc(qid)}`),
+    queueSend: (tid, qid) => req('POST', `${T(tid)}/queue/${enc(qid)}/send`),
+    queueResume: tid => req('POST', `${T(tid)}/queue/resume`),
+    queueClear: tid => req('DELETE', `${T(tid)}/queue`),
     answer: (tid, question_id, answers) => req('POST', `${T(tid)}/answer`, { question_id, answers }),
     approval: (tid, body) => req('POST', `${T(tid)}/approval`, body),
     action: (tid, tool, args = {}) => req('POST', `${T(tid)}/action`, { tool, arguments: args }),

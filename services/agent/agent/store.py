@@ -91,6 +91,8 @@ class Store:
         self._c.executescript(SCHEMA)
         from .records import SCHEMA as TURNS            # plan 21.4: one row per turn
         self._c.executescript(TURNS)
+        from .queue import SCHEMA as QUEUE              # chat-responsive 2.1: messages held during a turn
+        self._c.executescript(QUEUE)
         self._migrate()
 
     def _migrate(self) -> None:
@@ -206,6 +208,8 @@ class Store:
             self._c.execute("BEGIN")
             self._c.execute("DELETE FROM events WHERE thread_id = ?", (tid,))
             self._c.execute("DELETE FROM turns WHERE thread_id = ?", (tid,))
+            self._c.execute("DELETE FROM queue WHERE thread_id = ?", (tid,))
+            self._c.execute("DELETE FROM queue_paused WHERE thread_id = ?", (tid,))
             n = self._c.execute("DELETE FROM threads WHERE id = ?", (tid,)).rowcount
             self._c.execute("COMMIT")
         return bool(n)

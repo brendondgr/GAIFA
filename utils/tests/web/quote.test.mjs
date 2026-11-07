@@ -197,12 +197,12 @@ test('composer: one card per quote-reply, in order; × removes it; sending takes
   const sent = [], t2 = composer({ draft: '', quotes: qs, onSend: (...a) => sent.push(a) });
   assert.equal(sendBtn(t2).props.disabled, false);
   sendBtn(t2).props.onClick();
-  assert.deepEqual(sent, [['', [], qs, []]]);   // the last: the message's @-mentions (plan 48.2)
+  assert.deepEqual(sent, [['', [], qs, [], { now: false }]]);   // then the message's @-mentions (plan 48.2), and `now` (chat-responsive 2.2)
   const t3 = composer({ draft: '', quotes: QR.addQuote([], { text: 'x', reply: '' }) });   // nothing said: can't send
   assert.equal(sendBtn(t3).props.disabled, true);
   const t4 = composer({ onSend: (...a) => sent.push(a) });                           // without cards: an empty list
   sendBtn(t4).props.onClick();
-  assert.deepEqual(sent[1], ['why?', [], [], []]);
+  assert.deepEqual(sent[1], ['why?', [], [], [], { now: false }]);
 });
 
 test('composer: 25 cards wrap in a row that scrolls; too much in all says why and blocks Send', () => {
@@ -278,9 +278,9 @@ test('send carries quotes: the live client in the body, the mock validates and s
   const ev = await m.send(th.id, '', [], {}, [{ text: 'quoted', reply: 'my reply' }]);
   assert.deepEqual(ev.payload.quotes, [{ text: 'quoted', reply: 'my reply' }]);
   const many = Array.from({ length: 25 }, (_, i) => ({ text: `Q${i + 1}`, reply: `A${i + 1}` }));
-  const ev2 = await m.send(th.id, '', [], {}, many);
+  const ev2 = await m.send(th.id, '', [], {}, many, [], null, 'now');     // written at once, though a turn runs (chat-responsive 2.1)
   assert.equal(ev2.payload.quotes.length, 25);
-  const ev3 = await m.send(th.id, 'why?', [], {}, { text: 'old style' });              // an older single quote
+  const ev3 = await m.send(th.id, 'why?', [], {}, { text: 'old style' }, [], null, 'now');              // an older single quote
   assert.deepEqual(ev3.payload.quotes, [{ text: 'old style', reply: '' }]);
 });
 

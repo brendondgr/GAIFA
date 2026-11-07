@@ -80,7 +80,7 @@ async def test_queued_message_is_read_after_the_current_tool_calls(env):
     tid = await env.thread(mode="auto")
     await env.send(tid, "render x", wait=False)
     await asyncio.sleep(0.3)
-    r = await env.send(tid, "also make it blue", wait=False)
+    r = await env.send(tid, "also make it blue", wait=False, when="now")      # steered (chat-responsive 2.1)
     assert r["payload"].get("queued") is True
     await env.settle(tid)
     msgs = env.model.received[-1]["messages"]

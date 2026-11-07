@@ -129,7 +129,7 @@ function DocMode({ a, mode, onPick }) {
 const menuSt = { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' };
 
 // controls: the row under the box (chat-controls.js: environment, mode, model; plan 42.3)
-export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, models = null, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [], voice = null }) {
+export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, models = null, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [], voice = null, queue = null, queued = 0 }) {   // queue: the strip; queued: how many it holds
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
@@ -183,7 +183,8 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
   React.useEffect(() => { setSel(0); }, [matches.length]);
   const qProblem = quotesProblem(quotes);
   const can = !disabled && !uploading && !reading && canSendQuotes(draft, attachments, quotes);
-  const send = () => { if (can) { setOffer(null); onSend(draft, attachments, quotes, mentionsIn(draft, picked)); setPicked([]); } };   // the page clears the cards (and puts them back if it fails)
+  // now: Ctrl/⌘+Enter during a turn writes it into the turn (read at its next step) rather than queueing it (chat-responsive 2.2)
+  const send = (now = false) => { if (can) { setOffer(null); onSend(draft, attachments, quotes, mentionsIn(draft, picked), { now }); setPicked([]); } };   // the page clears the cards (and puts them back if it fails)
   const complete = c => { setDraft('/' + c.cmd + (c.arg ? ' ' : '')); ref.current?.focus(); };
   const onKey = e => {
     if (e.nativeEvent?.isComposing) return;
@@ -197,7 +198,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); setSel(i => (i + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length); return; }
       if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey && draft !== '/' + matches[sel].cmd)) { e.preventDefault(); const c = matches[sel]; if (c.arg || e.key === 'Tab') complete(c); else onSend('/' + c.cmd, []); return; }
     }
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(running && (e.ctrlKey || e.metaKey)); }
   };
   const quick = actionsFor('composer', { tools: index });
   const toggleAtt = o => setAttachments(a => a.some(x => x.id === o.id) ? a.filter(x => x.id !== o.id) : [...a, o]);
@@ -205,6 +206,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
     h('div', { style: { maxWidth: COL, margin: '0 auto', position: 'relative' } },
       dock && dock.length ? h('div', { role: 'region', 'aria-label': 'Waiting for you', style: { display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8, maxHeight: '50vh', overflowY: 'auto', minWidth: 0 } },
         dock.length > 1 ? h('div', { style: { ...label11, color: T.pu } }, `Waiting for you · ${dock.length}`) : null, dock) : null,
+      queue || null,     // the queue strip (chat-queue.js)
       mItems.length ? h(MentionList, { items: mItems, sel: Math.min(mSel, mItems.length - 1), onPick: pickM }) : null,
       matches.length ? h('div', { role: 'listbox', 'aria-label': 'Commands', style: { position: 'absolute', left: 0, right: 0, bottom: 'calc(100% + 6px)', zIndex: 30, background: T.card, border: '1px solid ' + T.bds, borderRadius: 9, boxShadow: '0 12px 30px rgba(0,0,0,.3)', padding: 4 } },
         matches.map((c, i) => h('button', { key: c.cmd, type: 'button', role: 'option', 'aria-selected': i === sel ? 'true' : 'false', onMouseDown: e => { e.preventDefault(); complete(c); },
@@ -251,15 +253,16 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
           h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => { setDraft(e.target.value); setCaret(e.target.selectionStart); }, onKeyDown: onKey, 'aria-label': 'Message',
             onSelect: e => setCaret(e.target.selectionStart),
             onPaste,
-            placeholder: running ? 'Add a message (it’s read after the current step)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
+            placeholder: running ? 'Queue a message (sent when this reply ends; Ctrl+Enter sends it now)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
             style: { flex: 1, minWidth: 0, alignSelf: 'center', minHeight: 22, maxHeight: boxMax(), resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
           h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
           voice,                                               // voice mode (plan 49.2)
-          running   // Send becomes Stop while a turn runs (Enter still queues what you type)
-            ? h('button', { type: 'button', onClick: onStop, title: 'Stop the turn (and its running tool)', 'aria-label': 'Stop', 'data-stop': '',
-              style: { ...boxBtn(), background: T.acc, color: ON_ACC, borderColor: 'transparent', cursor: 'pointer' } },
+          running   // Stop beside Send while a turn runs: Send queues (chat-responsive 2.2), Stop sends the queue
+            ? h('button', { type: 'button', onClick: onStop, title: queued ? 'Stop the turn and send the queued messages now' : 'Stop the turn (and its running tool)', 'aria-label': 'Stop', 'data-stop': '',
+              style: { ...boxBtn(), background: can ? 'transparent' : T.acc, color: can ? T.tx : ON_ACC, borderColor: can ? T.bds : 'transparent', cursor: 'pointer' } },
               h('span', { 'aria-hidden': 'true', style: { width: 10, height: 10, borderRadius: 2, background: 'currentColor' } }))
-            : h(Btn, { kind: 'pri', sm: true, icon: 'send', title: 'Send (Enter)', disabled: !can, onClick: send,
-              style: { width: 30, height: 28, padding: 0, justifyContent: 'center', borderRadius: 7 } }))),
+            : null,
+          !running || can ? h(Btn, { kind: 'pri', sm: true, icon: 'send', title: running ? 'Queue: sent when this reply ends (Enter; Ctrl+Enter sends it now)' : 'Send (Enter)', disabled: !can, onClick: () => send(),
+            style: { width: 30, height: 28, padding: 0, justifyContent: 'center', borderRadius: 7 } }) : null)),
       controls || null));
 }

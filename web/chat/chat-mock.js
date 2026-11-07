@@ -61,7 +61,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
 
   function newThread(o = {}) {
     const ts = now(), th = { id: rid('t_'), title: o.title || '', model: o.model || null, mode: o.mode || 'manual', state: 'idle', settings: o.settings || {}, created: ts, updated: ts, archived: false, parent_id: o.parent_id || null, fork_seq: o.fork_seq ?? null };
-    const t = { thread: th, events: [], subs: new Set(), run: null, queue: [], pending: null };
+    const t = { thread: th, events: [], subs: new Set(), run: null, queue: [], pending: null, held: [], paused: null };   // held, paused: the queue (chat-responsive 2.1)
     threads.set(th.id, t);
     return t;
   }
@@ -316,9 +316,27 @@ export function createMockClient(api, { speed = 1 } = {}) {
           setState(t, final);
           const q = t.queue.shift();
           if (q) start(t, r => say(t, r, `About “${q.slice(0, 60)}”: noted, I’ll use that from here on.`, null));
+          else if (t.held.length && final === 'error') { t.paused = 'error'; pubQ(t); }
+          else if (t.held.length && final === 'idle' && !t.paused) drain(t);   // Stop included: what was held goes now
         }
       }
     })();
+  }
+
+  // chat-responsive 2.1: messages held during a turn, sent together (one turn answers them) when it ends
+  const qstate = t => ({ items: t.held.map((x, i) => ({ ...x, position: i })), paused: t.paused });
+  const pubQ = t => transient(t, 'queue', qstate(t));
+  function drain(t, qid = null) {
+    if (qid == null) t.paused = null;
+    const items = t.held.filter(x => qid == null || x.id === qid);
+    t.held = t.held.filter(x => !items.includes(x)); pubQ(t);
+    if (!items.length) return null;
+    if (t.pending) { emit(t, 'tool_result', { id: t.pending.id, name: 'ask_user', status: 'skipped', content: '{}', error: { code: 'skipped', detail: 'The user wrote a message instead of answering.' } }); t.pending = null; }
+    const evs = items.map(x => emit(t, 'user', { text: x.text, ...(x.quotes?.length ? { quotes: x.quotes } : {}), ...(x.client_id ? { client_id: x.client_id } : {}),
+      ...(t.run ? { queued: true, steer: true } : {}) }));
+    const said = items.map(x => x.text).join('\n\n');
+    if (t.run) t.queue.push(said); else start(t, run => messageTurn(t, run, said, []));
+    return evs[0];
   }
 
   async function seed() {
@@ -407,11 +425,11 @@ export function createMockClient(api, { speed = 1 } = {}) {
         if (closed) return;
         const t = threads.get(tid);
         if (!t) { onState?.('failed'); return; }
-        t.events.forEach(f); onState?.('open'); onReady?.({ type: 'ready', thread_id: tid, seq: last, running: !!t.run }); t.subs.add(f);
+        t.events.forEach(f); onState?.('open'); onReady?.({ type: 'ready', thread_id: tid, seq: last, running: !!t.run, queue: qstate(t) }); t.subs.add(f);
       }, 40));
       return { close() { closed = true; threads.get(tid)?.subs.delete(f); }, get lastSeq() { return last; } };
     },
-    async send(tid, text, attachments = [], docModes = {}, quotes = [], mentions = [], clientId = null) {
+    async send(tid, text, attachments = [], docModes = {}, quotes = [], mentions = [], clientId = null, when = 'auto') {
       await net(); const t = T(tid), queued = !!t.run;
       // as the agent: quotes [{text 1–8,000, reply 0–4,000, seq?}], any number, 200,000 characters in all; an older single quote too
       const qs = Array.isArray(quotes) ? quotes : quotes?.text != null ? [{ text: quotes.text, reply: '', seq: quotes.seq }] : [];
@@ -425,10 +443,17 @@ export function createMockClient(api, { speed = 1 } = {}) {
       if (total > 200000) throw err(422, `the quoted parts and replies are ${total} characters in all; at most 200,000`, 'invalid_quote');
       const replies = qs.map(q => String(q.reply || '').trim()).filter(Boolean), said = [...replies, String(text || '').trim()].filter(Boolean).join('\n\n');
       if (!said) throw err(422, qs.length ? 'say something: a reply to a quoted part or a message' : 'the message is empty', qs.length ? 'invalid_quote' : 'empty_message');
+      if (when !== 'now' && (t.run || t.held.length)) {    // held until the turn ends (chat-responsive 2.1)
+        const item = { id: rid('q_'), text, ...(attachments.length ? { attachments } : {}), ...(qs.length ? { quotes: qs.map(q => ({ text: q.text, reply: String(q.reply || '') })) } : {}),
+          ...(clientId ? { client_id: clientId } : {}), created: now(), edited: null };
+        t.held.push(item); pubQ(t);
+        if (!t.run) drain(t);
+        return { queued: { ...item, position: t.held.indexOf(item) } };
+      }
       if (!queued && t.pending) { emit(t, 'tool_result', { id: t.pending.id, name: t.pending.kind === 'question' ? 'ask_user' : 'comfy_generate_image', status: 'skipped', content: '{}', error: { code: 'skipped', detail: 'The user wrote a message instead of answering.' } }); t.pending = null; }
       const docs = attachments.length ? await describe(t, attachments, docModes) : [];
       const stored = qs.map(q => ({ text: q.text, reply: String(q.reply || ''), ...(q.seq != null ? { seq: q.seq } : {}) }));
-      const ev = emit(t, 'user', { text, ...(stored.length ? { quotes: stored } : {}), ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true } : {}), ...(clientId ? { client_id: clientId } : {}) });
+      const ev = emit(t, 'user', { text, ...(stored.length ? { quotes: stored } : {}), ...(attachments.length ? { attachments } : {}), ...(docs.length ? { docs } : {}), ...(queued ? { queued: true, steer: true } : {}), ...(clientId ? { client_id: clientId } : {}) });
       if (!t.thread.title) { t.thread.title = said.slice(0, 48); transient(t, 'thread', pub(t)); }
       if (queued) t.queue.push(said); else start(t, run => messageTurn(t, run, said, docs));
       return ev;
@@ -472,6 +497,18 @@ export function createMockClient(api, { speed = 1 } = {}) {
       evs.forEach((e, i) => t.events.push({ ...structuredClone(e), thread_id: t.thread.id, seq: i + 1 }));
       return pub(t);
     },
+    async queue(tid) { await net(); return qstate(T(tid)); },
+    async queueEdit(tid, qid, { text, index } = {}) {
+      await net(); const t = T(tid), x = t.held.find(i => i.id === qid);
+      if (!x) throw err(404, `no held message '${qid}'`, 'not_found');
+      if (text != null) { if (!String(text).trim()) throw err(422, 'the message is empty: remove it instead', 'empty_message'); x.text = text; x.edited = now(); }
+      if (index != null) { t.held = t.held.filter(i => i !== x); t.held.splice(Math.max(0, Math.min(index, t.held.length)), 0, x); }
+      pubQ(t); return { ...x, position: t.held.indexOf(x) };
+    },
+    async queueRemove(tid, qid) { await net(); const t = T(tid); if (!t.held.some(i => i.id === qid)) throw err(404, `no held message '${qid}'`, 'not_found'); t.held = t.held.filter(i => i.id !== qid); pubQ(t); return qstate(t); },
+    async queueSend(tid, qid) { await net(); const t = T(tid); if (!t.held.some(i => i.id === qid)) throw err(404, `no held message '${qid}'`, 'not_found'); return drain(t, qid) || {}; },
+    async queueResume(tid) { await net(); const t = T(tid); t.paused = null; if (t.run || t.pending) pubQ(t); else drain(t); return qstate(t); },
+    async queueClear(tid) { await net(); const t = T(tid); t.held = []; t.paused = null; pubQ(t); return qstate(t); },
     async cancel(tid) {
       await net(); const t = T(tid);
       if (t.run) t.run.cancel();

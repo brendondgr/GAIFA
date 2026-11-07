@@ -46,7 +46,7 @@ The approach has three phases. Phase 1 makes the message appear the moment the u
 
 ## Phase 2 — The queue (M)
 
-- [ ] **2.1 The queue in the agent: `services/agent/agent/queue.py` (new), `loop.py`, `server.py`.**
+- [x] **2.1 The queue in the agent: `services/agent/agent/queue.py` (new), `loop.py`, `server.py`.**
   - **Store:** an `agent.db` table `queue` (id `q_…`, thread_id, position, body (the `/messages` body), created, edited). Plus `threads.queue_paused` (0/1).
   - **Sending:** `POST /v1/threads/{id}/messages` takes `when: "auto" | "queue" | "now"` (default `auto`). With `auto` or `queue`, a message sent while the thread is running or waiting is added to the queue. Nothing goes in the event log. The call answers 202 `{queued: {id, position}}` and the stream gets a `queue` event with the whole list. With `now`, it behaves as today (written at once, read by the next model call), stored with `steer: true`. An idle thread with an empty queue sends at once, whatever `when` says.
   - **Routes:** `GET /v1/threads/{id}/queue` (`{items, paused}`). `PATCH /v1/threads/{id}/queue/{qid}` (`text`, `position`). `DELETE /v1/threads/{id}/queue/{qid}`. `POST /v1/threads/{id}/queue/{qid}/send` (steer now: as `when: "now"`; on a waiting thread it dismisses the card). `POST /v1/threads/{id}/queue/resume`. `DELETE /v1/threads/{id}/queue` (clear). Each change publishes a `queue` event. Queue events are live only, and a stream's `ready` carries the current queue so a page that reconnects has it.
@@ -62,11 +62,15 @@ The approach has three phases. Phase 1 makes the message appear the moment the u
     - `ready` carries the queue.
 
   Update architecture §14.1 (the agent's routes) and §14.2 (the queue next to the event log).
-- [ ] **2.2 The queue strip: `web/chat/chat-queue.js` (new), `chat-composer.js`, `chat-pane.js`, `chat-api.js`, `chat-mock.js`.**
+
+  *As built:* each held message gets its own recall when it's written (not one over their joined text). A message sent with no turn running goes at once even while a card waits (it dismisses the card, as before): only messages held during a turn wait for a card that turn ends on; one sent behind held messages sends them all, itself last. `ready` is built by `streams.ready()`, tested directly.
+- [x] **2.2 The queue strip: `web/chat/chat-queue.js` (new), `chat-composer.js`, `chat-pane.js`, `chat-api.js`, `chat-mock.js`.**
   - **Composer:** during a turn the Send button stays, next to Stop. Enter and Send queue the message, and the placeholder says "Queue a message (sent when this reply ends)…". **Ctrl/⌘+Enter** sends now (steer).
   - **Strip:** right above the composer, shown while the queue has items. A header reads "Queued · N · sent when this reply ends (Stop sends them now)", or "Paused after an error · Resume · Clear", or "Waits for your answer" when a card is waiting. One row per message shows the text on one line, its attachments and quotes as small chips, and its actions: **Edit** (inline), **Send now**, **×**, and drag to reorder. A message the user just queued shows in the strip at once (optimistic, by `client_id`). When the agent sends the queue, its messages leave the strip and appear in the thread as user messages, answered by one reply.
   - **Client:** `queue(tid)`, `queueEdit`, `queueRemove`, `queueSend`, `queueResume`, `queueClear` in both the live client and the mock. The pane reads `queue` events and `ready`'s queue.
   *Done when:* `utils/tests/web/chat-queue.test.mjs` covers the strip's states (items, paused, waiting), edit, remove, Send now and reorder, against the mock. The mock answers the whole queue in one turn. In the browser on the installed hub: three messages typed during a long reply show in the strip at once; when the reply ends they appear as three messages with one reply; with another queue, Stop sends it and the reply starts at once. `chat-composer.js` and `chat-pane.js` stay under 500 lines (the strip and its handlers live in `chat-queue.js`). Update the brief §11.13.
+
+  *As built:* with a message typed, Send stays beside Stop (Stop alone, filled, while the box is empty). Sends go one at a time, in order (`chain`); messages sent while a new chat is being made go to that chat once it exists (held while its first turn runs), and what's typed meanwhile moves to it. Checked in the browser on a second hub (`?mock#/chat`): a first message, then three typed while it was created and answered: one chat, the three in the strip in order, then three messages and one reply.
 
 **Wire — Phase 2:** the Chat page's composer queues messages during a turn and shows them above it. The old in-thread "queued" badge is used only for steered messages.
 

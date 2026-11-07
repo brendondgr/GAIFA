@@ -63,7 +63,7 @@ async def test_quotes_are_validated(env):
     tid = await env.thread()
     rseq = await reply_seq(env, tid, "hi")
     user_seq = env.events(tid, "user")[-1]["seq"]
-    post = lambda body: env.client.post(f"/v1/threads/{tid}/messages", json={"text": "x", **body})   # noqa: E731
+    post = lambda body: env.client.post(f"/v1/threads/{tid}/messages", json={"text": "x", "when": "now", **body})   # noqa: E731: written at once, turn or not
 
     async def bad(body, code="invalid_quote"):
         r = await post(body)

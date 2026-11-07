@@ -35,6 +35,11 @@ def parse_threads(spec: str) -> list[tuple[str, int]]:
     return list(out.items())
 
 
+def ready(agent: Any, tid: str, seq: int) -> dict[str, Any]:
+    """A stream's `ready` for one thread: replayed up to `seq`, whether a turn runs, and its queue (chat-responsive 2.1)."""
+    return {"type": "ready", "thread_id": tid, "seq": seq, "running": agent.running(tid), "queue": agent.queue.state(tid)}
+
+
 def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: Callable[[Any, str], Any], ping_s: float) -> None:
     @app.get("/v1/threads/{tid}/stream", summary="Server-sent events: the events after `after`, then live events and deltas")
     async def stream(tid: str, request: Request, after: int = 0) -> StreamingResponse:
@@ -49,7 +54,7 @@ def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: 
                 for ev in agent.store.events(tid, after):
                     last = ev["seq"]
                     yield sse(ev)
-                yield sse({"type": "ready", "thread_id": tid, "seq": last, "running": agent.running(tid)})
+                yield sse(ready(agent, tid, last))
                 while True:
                     if await request.is_disconnected():
                         break
@@ -90,7 +95,7 @@ def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: 
                     for ev in agent.store.events(tid, after):
                         last[tid] = ev["seq"]
                         yield sse(ev)
-                    yield sse({"type": "ready", "thread_id": tid, "seq": last[tid], "running": agent.running(tid)})
+                    yield sse(ready(agent, tid, last[tid]))
                 while True:
                     if await request.is_disconnected():
                         break

@@ -26,6 +26,7 @@ from typing import Any
 
 from . import context as ctx
 from .compaction import Compaction
+from .queue import Queue, Queueing
 from . import links
 from .docs import describe as describe_docs
 from . import prompts
@@ -89,7 +90,7 @@ def thread_settings(store: Any, tid: str) -> dict[str, Any]:
     t = store.thread(tid)
     return (t or {}).get("settings") or {}
 
-class Agent(Compaction):
+class Agent(Compaction, Queueing):
     def __init__(self, cfg: Config, store: Store, hub: HubAPI, llm: LLM) -> None:
         from .local import Local
 
@@ -104,6 +105,8 @@ class Agent(Compaction):
         self._recalls: dict[str, set[asyncio.Task[Any]]] = {}   # chat-responsive 1.1: recall runs after the user event
         self._read_upto: dict[str, int] = {}     # the last seq the turn's latest model call read
         self._ending: dict[str, asyncio.Task[Any]] = {}          # a turn in its turn-end hooks: no longer busy
+        self.queue = Queue(store)                # chat-responsive 2.1: messages held during a turn
+        self._drains: set[asyncio.Task[Any]] = set()
         self.shutting_down = False   # set before the app stops: turns then stay `running` and resume at the next start
 
     # ---- events ------------------------------------------------------------------------------
@@ -143,12 +146,18 @@ class Agent(Compaction):
 
     async def send(self, tid: str, text: str, attachments: list[str] | None = None,
                    doc_modes: dict[str, str] | None = None, quotes: list[dict[str, Any]] | None = None,
-                   mentions: list[dict[str, Any]] | None = None, client_id: str | None = None) -> dict[str, Any]:
+                   mentions: list[dict[str, Any]] | None = None, client_id: str | None = None, when: str = "auto",
+                   start: bool = True) -> dict[str, Any]:
         """`quotes`: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each, in order
-        (Select → Reply). `text` may be empty when a reply says something."""
+        (Select → Reply). `text` may be empty when a reply says something. `when` (chat-responsive 2.1): `auto` holds a
+        message sent during a turn, or while a card waits, in the queue (answers `{queued: item}`); `now` writes it at
+        once, for the running turn's next model call to read."""
         thread = self.store.thread(tid)
         if thread is None:
             raise KeyError(tid)
+        if when != "now" and (held := self._hold(tid, thread, {"text": text, "attachments": attachments, "doc_modes": doc_modes,
+                                                               "quotes": quotes, "mentions": mentions, "client_id": client_id})):
+            return held
         if not self.busy(tid) and thread["state"] == "waiting":
             await self._dismiss_pending(tid, "The user wrote a message instead of answering.")
         docs = await describe_docs(self, tid, thread, attachments, doc_modes) if attachments else []
@@ -168,6 +177,7 @@ class Agent(Compaction):
                                      **({"mentions": mentions} if mentions else {}),     # plan 48.3
                                      **({"attachments": attachments} if attachments else {}),
                                      **({"docs": docs} if docs else {}), **({"queued": True} if queued else {}),
+                                     **({"steer": True} if queued and when == "now" else {}),
                                      **({"client_id": client_id} if client_id else {})})
         for d in docs:
             if d.get("fallback"):        # asked for whole, didn't fit (plan 24.9): say so in the chat
@@ -180,7 +190,7 @@ class Agent(Compaction):
             task = asyncio.create_task(self._recall_into(tid, thread, text, ev["seq"]))
             self._recalls.setdefault(tid, set()).add(task)
             task.add_done_callback(lambda t: self._recalls.get(tid, set()).discard(t))
-        if not queued:
+        if not queued and start:
             self.start(tid)
         return ev
 
@@ -302,6 +312,7 @@ class Agent(Compaction):
         elif (self.store.thread(tid) or {}).get("state") == "waiting":
             await self._dismiss_pending(tid, "Cancelled by the user.")
             self.set_state(tid, "idle", "cancelled")
+            self._queue_after(tid, "idle")      # Stop sends what was held (chat-responsive 2.1)
 
     async def resume_all(self) -> int:
         """At startup: threads a crash left `running` continue."""
@@ -382,7 +393,9 @@ class Agent(Compaction):
                 self._ending[tid] = me      # from here a message starts a turn of its own (chat-responsive 1.1)
             if not self.shutting_down:
                 self.set_state(tid, final)
-                if final == "idle" and not cancelled and self._unanswered(tid):
+                if self.queue.has(tid):           # held messages go now, Stop included; an error pauses them
+                    self._queue_after(tid, final)
+                elif final == "idle" and not cancelled and self._unanswered(tid):
                     self.start(tid)
             try:
                 for cb in self.on_turn_end:

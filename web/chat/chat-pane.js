@@ -25,6 +25,7 @@ import { scrollToReply } from './chat-quote.js';
 import { QuoteReplyBox, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
 import { speak, speakable } from './chat-speak.js';
 import { MemoryNote } from './chat-memory-note.js';
+import { QueueStrip, queueRows } from './chat-queue.js';
 
 const R = () => globalThis.React;
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
@@ -41,9 +42,12 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   const [fresh, setFresh] = useState(() => ({ model: null, mode: 'manual', settings: newChatSettings({}, lastEnv()) }));   // a chat not created yet; its environment: the last one picked (plan 34)
   const [folders, setFolders] = useState(null);   // the workspace mod's folders, for Bypass (plan 27.4)
   // chat-responsive 1.3: messages drawn at once, before the agent stored them: {cid, key (tid | 'new'), text, atts, cards,
-  // mentions, ts, state: sending | sent | failed, seq?, error?}; dropped when their user event arrives
+  // mentions, ts, state: sending | sent | failed, seq?, error?, queued?}; dropped when their user event arrives. `queued`:
+  // sent during a turn, drawn in the queue strip until the agent lists it (2.2)
   const [pending, setPending] = useState([]);
-  const adopt = useRef(null);      // {id, thread}: the chat this pane just made with its first message: not wiped on open
+  const [held, setHeld] = useState({ items: [], paused: null });   // the agent's queue for this chat (2.1)
+  const adopt = useRef(null), creating = useRef(null);   // creating: the new chat's id, while its create is on its way
+  const chain = useRef(Promise.resolve());               // the sends, one after another      // {id, thread}: the chat this pane just made with its first message: not wiped on open
   const scrollRef = useRef(null), contentRef = useRef(null), stick = useRef(true), first = useRef(true), inputRef = useRef(null), queue = useRef([]), flushT = useRef(0);
   const dkey = tid || 'new', draft = drafts[dkey] || '';
   const setDraft = v => setDrafts(d => ({ ...d, [dkey]: typeof v === 'function' ? v(d[dkey] || '') : v }));
@@ -58,6 +62,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     if (stored.length) setEvents(list => mergeEvents(list, stored));
     setLive(l => evs.reduce((acc, e) => (e.seq == null ? applyTransient(acc, e) : settleLive(acc, e)), l));
     for (const e of evs) {
+      if (e.type === 'queue' && e.seq == null && e.payload) setHeld(e.payload);
       if (e.type === 'thread' && threadOf(e.payload)) { const t = threadOf(e.payload); setThread(x => (x && x.id === t.id ? { ...x, ...t } : x)); shared.listPatch(t.id, t); }
       if (e.type === 'state' && e.seq != null) {
         const st = e.payload.state;
@@ -70,7 +75,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   useEffect(() => {
     const own = tid && adopt.current?.id === tid ? adopt.current : null;   // its first message is on its way: keep the pane drawn
     adopt.current = null;
-    setEvents([]); setLive(EMPTY_LIVE); setThread(own ? own.thread : null); setReady(false); setRunning(!!own); setToolForms([]); setMeterOpen(false);
+    setEvents([]); setLive(EMPTY_LIVE); setThread(own ? own.thread : null); setReady(false); setRunning(!!own); setToolForms([]); setMeterOpen(false); setHeld({ items: [], paused: null });
     if (!own) setAttachments([]);
     first.current = true; stick.current = true; queue.current = [];
     if (!tid) return undefined;
@@ -80,7 +85,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     if (!own) c.context(tid).then(m => alive && setLive(l => ({ ...l, meter: m }))).catch(() => {});   // a new chat's comes when its turn ends
     const s = c.stream(tid, 0, {
       onEvent: ev => { if (!alive) return; queue.current.push(ev); if (!flushT.current) flushT.current = setTimeout(flush, 30); },
-      onReady: ev => { if (alive) { setRunning(!!ev.running); setReady(true); } },
+      onReady: ev => { if (alive) { setRunning(!!ev.running); setReady(true); if (ev.queue) setHeld(ev.queue); } },
       onState: st => alive && setConn(st),
     });
     return () => { alive = false; s.close(); clearTimeout(flushT.current); flushT.current = 0; };
@@ -122,7 +127,9 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     wasRunning.current = running;
   }, [running]);
   useEffect(() => () => reading.current?.stop(), [tid]);
-  const mine = useMemo(() => pending.filter(x => x.key === dkey), [pending, dkey]);
+  const mine = useMemo(() => pending.filter(x => x.key === dkey && !x.queued), [pending, dkey]);
+  const qRows = useMemo(() => queueRows(held, pending.filter(x => x.key === dkey && x.queued)), [held, pending, dkey]);
+  const qAct = f => (...a) => { if (tid) f(tid, ...a).catch(fail); };
   const view = useMemo(() => buildView(events, { ...live, pending: mine }), [events, live, mine]);
   const starting = mine.some(x => x.state !== 'failed');      // sent, not stored yet: the turn's header shows at once
   const [now, setNow] = useState(() => Date.now() / 1000);   // ticks while a turn runs, so the fold's timers count
@@ -179,7 +186,8 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     if (skill) return `Use the ${skill.id || skill.name} skill: ${arg}`.trim();
     return text;
   };
-  const send = async (text, atts = [], qs = null, mentions = []) => {   // qs: the composer's quote-reply cards (null: a suggestion or a button); mentions: plan 48.2
+  // qs: the composer's quote-reply cards (null: a suggestion or a button); mentions: plan 48.2; now: write it into the running turn
+  const send = async (text, atts = [], qs = null, mentions = [], { now = false } = {}) => {
     let t = text.trim();
     const k = dkey, cards = qs || [];
     if (t.startsWith('/')) { t = await slash(t); setDrafts(d => ({ ...d, [k]: '' })); if (t == null) return; }   // the cards stay for the next message
@@ -187,26 +195,48 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     if (!t && !cards.some(q => q.reply.trim())) return;
     setDrafts(d => ({ ...d, [k]: '' })); setAttachments([]); if (cards.length) setQuotes([], k); stick.current = true;
     const m = { cid: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), key: k, text: t, atts, cards, mentions, ts: Date.now() / 1000,
-      attachments: atts.map(a => a.id), quotes: quotesPayload(cards) };
+      attachments: atts.map(a => a.id), quotes: quotesPayload(cards), when: now ? 'now' : 'auto',
+      queued: !now && !!tid && (running || held.items.length > 0) };    // the agent holds it: drawn in the queue strip
     setPending(l => [...l, { ...m, state: 'sending' }]);
     post(m);
   };
-  // chat-responsive 1.3: sends a drawn message; a new chat's first one makes the chat in the same request (1.2)
-  const post = async m => {
+  // chat-responsive 1.3: sends a drawn message; a new chat's first one makes the chat in the same request (1.2). Sends
+  // go one at a time, in the order they were made; one made while the new chat is being made goes to that chat.
+  const post = m => {
+    const job = { ...m };
+    if (job.key === 'new') {
+      if (creating.current) job.into = creating.current;
+      else { const p = new Promise((ok, no) => { job.made = { ok, no }; }); p.catch(() => {}); creating.current = job.promise = p; }
+    }
+    chain.current = chain.current.then(() => postNow(job));
+  };
+  const postNow = async job => {
+    let m = job;
     const mark = patch => setPending(l => l.map(x => (x.cid === m.cid ? { ...x, ...patch } : x)));
     const body = messageBody(m.text, m.attachments, Object.fromEntries(m.atts.filter(a => a.mode).map(a => [a.id, a.mode])), m.quotes, m.mentions, m.cid);
     try {
-      if (m.key === 'new') {
-        const { event, ...th } = await c.create({ model: fresh.model || undefined, mode: fresh.mode, settings: fresh.settings, message: body });
-        mark({ key: th.id, state: 'sent', seq: event?.seq ?? null });
-        shared.addThread(th);
-        adopt.current = { id: th.id, thread: th };
-        onOpen(th.id);
-      } else {
-        const ev = await c.send(m.key, m.text, m.attachments, body.doc_modes || {}, m.quotes, m.mentions, m.cid);
-        mark({ state: 'sent', seq: ev?.seq ?? null });
+      if (m.into) {                       // sent while the new chat was being made: it goes to that chat (held while it runs)
+        const id = await m.into;
+        m = { ...m, key: id }; mark({ key: id, queued: m.when !== 'now' });
       }
-    } catch (e) { mark({ state: 'failed', error: e?.detail || e?.message || null }); }
+      if (m.key === 'new') {
+        const made = m.made;
+        try {
+          const { event, ...th } = await c.create({ model: fresh.model || undefined, mode: fresh.mode, settings: fresh.settings, message: body });
+          mark({ key: th.id, state: 'sent', seq: event?.seq ?? null });
+          shared.addThread(th);
+          adopt.current = { id: th.id, thread: th };
+          // what was typed while it was being made (the first message cleared the box) goes with it
+          setDrafts(d => (d.new ? (({ new: n, ...rest }) => ({ ...rest, [th.id]: n }))(d) : d));
+          setQuoteDrafts(q => (q.new?.length ? (({ new: n, ...rest }) => ({ ...rest, [th.id]: n }))(q) : q));
+          onOpen(th.id);
+          made.ok(th.id);
+        } catch (e) { made.no(e); throw e; } finally { if (creating.current === m.promise) creating.current = null; }
+      } else {
+        const ev = await c.send(m.key, m.text, m.attachments, body.doc_modes || {}, m.quotes, m.mentions, m.cid, m.when);
+        if (!ev?.queued) mark({ state: 'sent', seq: ev?.seq ?? null, queued: false });   // a held one leaves when the queue lists it
+      }
+    } catch (e) { mark({ state: 'failed', error: e?.detail || e?.message || null, queued: false }); }
   };
   const retrySend = cid => { const m = pending.find(x => x.cid === cid); if (m) { setPending(l => l.map(x => (x.cid === cid ? { ...x, state: 'sending', error: null } : x))); post(m); } };
   const editPending = cid => {      // the failed message back in the composer, to change and send again
@@ -216,10 +246,11 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     if (m.key === dkey && m.atts.length) setAttachments(l => [...m.atts, ...l.filter(a => !m.atts.some(x => x.id === a.id))]);
     inputRef.current?.focus();
   };
-  useEffect(() => {      // a message whose user event came is drawn from the event now
+  useEffect(() => {      // a message whose user event came is drawn from the event now; a queued one, by the queue strip
+    const listed = new Set(held.items.map(i => i.client_id).filter(Boolean));
     setPending(l => { if (!l.length) return l; const keep = new Set(pendingOf(events, l.filter(x => x.key === tid)).map(x => x.cid));
-      const next = l.filter(x => x.key !== tid || keep.has(x.cid)); return next.length === l.length ? l : next; });
-  }, [events]);
+      const next = l.filter(x => x.key !== tid || (keep.has(x.cid) && !(x.queued && listed.has(x.cid)))); return next.length === l.length ? l : next; });
+  }, [events, held]);
   const setModel = m => { if (thread) c.patch(thread.id, { model: m }).then(t => { shared.patched(t); c.context(thread.id).then(mm => setLive(l => ({ ...l, meter: mm }))).catch(() => {}); }, fail); else setFresh(f => ({ ...f, model: m })); };
   const setMode = m => { if (thread) c.patch(thread.id, { mode: m }).then(shared.patched, fail); else setFresh(f => ({ ...f, mode: m })); };
   const setGroups = s => { if (thread) c.patch(thread.id, { settings: s }).then(shared.patched, fail); else setFresh(f => ({ ...f, settings: { ...f.settings, ...s } })); };
@@ -304,6 +335,10 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
       dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
       voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
+      queued: qRows.length,
+      queue: h(QueueStrip, { rows: qRows, paused: held.paused, waiting: !running && (thread?.state === 'waiting' || view.pending.length > 0),
+        onEdit: qAct((t, id, text) => c.queueEdit(t, id, { text })), onMove: qAct((t, id, index) => c.queueEdit(t, id, { index })),
+        onRemove: qAct(c.queueRemove), onSendNow: qAct(c.queueSend), onResume: qAct(c.queueResume), onClear: qAct(c.queueClear) }),
       settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, models, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
       onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
       controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box

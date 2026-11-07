@@ -40,7 +40,7 @@ test('the + menu: upload, attach, tool groups, then the quick actions', () => {
   assert.equal(all(tree, n => n.props?.label === 'Tool groups').length, 1);
 });
 
-test('one line: + · the text · the microphone, then Send, which turns into Stop while a turn runs; no hint line', () => {
+test('one line: + · the text · the microphone, then Send; while a turn runs Stop, with Send beside it once there is a message to queue; no hint line', () => {
   const idle = box({ draft: 'hi' });
   assert.doesNotMatch(text(idle), /Enter sends/);
   const row = all(idle, n => n.type === 'div' && n.props.style?.alignItems === 'flex-end')
@@ -52,13 +52,19 @@ test('one line: + · the text · the microphone, then Send, which turns into Sto
   assert.equal(kinds[1], 'textarea');
   assert.equal(kinds[2], 'MicButton');
   assert.match(kinds[kinds.length - 1], /^Send/);
-  const busy = box({ draft: 'hi', running: true });
+  const busy = box({ draft: '', running: true });
   assert.ok(all(busy, n => n.props?.title === 'Stop the turn (and its running tool)').length === 1);
   assert.equal(all(busy, n => /^Send|^Queue/.test(n.props?.title || '')).length, 0);
   const brow = all(busy, n => n.type === 'div' && n.props.style?.alignItems === 'flex-end').find(n => n.props.children.some(k => k?.type === 'textarea'));
   const last = brow.props.children.filter(Boolean).at(-1);
   assert.equal(last.props['aria-label'], 'Stop');                  // in Send's place, a filled square
   assert.equal(last.props.children[0].props.style.background, 'currentColor');
+  // chat-responsive 2.2: with a message typed, Send (it queues) sits after Stop; with a queue, Stop says it sends it
+  const typed = box({ draft: 'hi', running: true, queued: 2 });
+  const trow = all(typed, n => n.type === 'div' && n.props.style?.alignItems === 'flex-end').find(n => n.props.children.some(k => k?.type === 'textarea'));
+  const tail = trow.props.children.filter(Boolean).slice(-2);
+  assert.equal(tail[0].props['aria-label'], 'Stop'); assert.match(tail[0].props.title, /send the queued messages/);
+  assert.match(tail[1].props.title, /^Queue: sent when this reply ends/);
 });
 
 test('a letter typed on the chat goes into the box; fields, shortcuts and Space on a button stay put', () => {

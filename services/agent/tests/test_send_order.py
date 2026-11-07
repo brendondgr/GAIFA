@@ -34,8 +34,8 @@ async def test_a_message_sent_while_the_last_reply_streams_is_answered(env):
             break
         await asyncio.sleep(0.01)
     await asyncio.sleep(0.1)
-    r = await env.send(tid, "second", wait=False)
-    assert r["payload"].get("queued") is True
+    r = await env.send(tid, "second", wait=False, when="now")      # steered: read by the running turn (2.1)
+    assert r["payload"].get("queued") is True and r["payload"]["steer"] is True
     assert await env.settle(tid) == "idle"
     assert len(env.model.received) == 2 and env.payloads(tid, "assistant")[-1]["text"] == "about the second"
 

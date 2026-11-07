@@ -1,6 +1,8 @@
 // The agent's Memory tab and the memory part of Review (plan structured-memory 5.1). Memory is entries in a tree
 // (you, projects, people, places, tools, topics, organizations) and the facts about them; a fact is replaced, never
-// overwritten, and every change can be undone. Proposals (what the agent learned on its own) wait in Review.
+// overwritten, and every change can be undone. What the agent learned on its own is saved when it's sure and the
+// user said it (listed in Review under "Learned on its own"); the rest waits in Review with the reason
+// (memory-auto-learning 2.3).
 // The data is this mod's /v1/memory/… routes.
 
 const KIND_LABEL = { user: 'You', project: 'Projects', person: 'People', place: 'Places', tool: 'Tools', topic: 'Topics', organization: 'Organizations' };
@@ -23,6 +25,17 @@ export function actionText(f) {
   const a = (f.evidence || []).find(e => e.action);
   if (!a) return f.replaces ? 'replaces an older fact' : '';
   return { rename: `renames it to ${a.to}`, merge: 'merges the two entries', retire: 'stops remembering that fact' }[a.action] || '';
+}
+
+/** Why a proposal waits for you (memory-auto-learning 2.1), from its newest evidence: "sensitive: health", "not sure: 0.55". */
+export function whyText(f) {
+  const ev = [...(f.evidence || [])].reverse().find(e => e.why);
+  return ev ? ev.why : '';
+}
+
+/** The words a fact came from, if the learner kept them. */
+export function quoteOf(f) {
+  return [...(f.evidence || [])].reverse().find(e => e.quote)?.quote || '';
 }
 
 /** Flatten the tree into rows with their depth, for drawing. */
@@ -53,8 +66,9 @@ export function memoryTab(ctx, put, fail, render) {
       h('div', { style: 'flex:1;min-width:0;display:flex;flex-direction:column;gap:3px' },
         h('div', { style: `font-size:13px;overflow-wrap:anywhere${history ? ';text-decoration:line-through;opacity:.7' : ''}` }, f.text),
         h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' },
-          ui.badge(f.kind, f.kind === 'preference' ? 'accent' : 'dim'), ui.badge(SOURCE[f.source] || f.source, f.source === 'stated' ? 'green' : 'dim'),
-          ui.text([f.valid_from && `from ${f.valid_from}`, f.valid_until && `until ${f.valid_until}`, `noted ${when(f.recorded)}`,
+          ui.badge(f.kind, f.kind === 'preference' ? 'accent' : 'dim'),
+          ui.badge(`${SOURCE[f.source] || f.source} ${when(f.recorded)}`, f.source === 'stated' ? 'green' : 'dim'),
+          ui.text([f.valid_from && `from ${f.valid_from}`, f.valid_until && `until ${f.valid_until}`,
             f.seen > 1 && `said ${f.seen}×`, f.entities.filter(e => e.id !== state.sel).map(e => e.path).join(', ')].filter(Boolean).join(' · '), { small: true, muted: true }))),
       history ? null : ui.button('Edit', () => { shown.style.display = 'none'; edit.style.display = 'flex'; }, { small: true, kind: 'ghost' }),
       ui.button('Forget', async () => {
@@ -96,7 +110,7 @@ export function memoryTab(ctx, put, fail, render) {
       e.log.length ? h('details', null, h('summary', { style: 'cursor:pointer;font-size:12.5px' }, 'History'),
         ...e.log.slice(0, 30).map(l => h('div', { style: 'display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12px' },
           h('span', { style: 'flex:1;min-width:0' }, l.summary || l.op), ui.text(`${l.by} · ${new Date(l.ts * 1000).toLocaleString()}`, { small: true, muted: true }),
-          ['undo', 'forget'].includes(l.op) ? null : ui.button('Undo', act(() => call('POST', `/v1/memory/undo/${l.id}`), 'Undone'), { small: true, kind: 'ghost' })))) : null);
+          ['undo', 'forget', 'fact_kept'].includes(l.op) ? null : ui.button('Undo', act(() => call('POST', `/v1/memory/undo/${l.id}`), 'Undone'), { small: true, kind: 'ghost' })))) : null);
   }
 
   function newMemory() {
@@ -148,7 +162,8 @@ export function memoryTab(ctx, put, fail, render) {
 export async function memoryReview(ctx, fail, render) {
   const { ui } = ctx, h = ui.h;
   const call = (m, p, o) => ctx.call(m, p, o).then(r => { if (r.status >= 400) throw r.json || { detail: `HTTP ${r.status}` }; return r.json; });
-  const facts = await call('GET', '/v1/memory/facts', { query: { state: 'proposed' } });
+  const [facts, learned] = await Promise.all([call('GET', '/v1/memory/facts', { query: { state: 'proposed' } }),
+    call('GET', '/v1/memory/auto', { query: { days: 14 } }).catch(() => [])]);
   const decide = (f, state, label, kind) => ui.button(label, async () => {
     try { await call('PATCH', `/v1/memory/facts/${f.id}`, { json: { state } }); render(); } catch (e) { fail(e); }
   }, { kind, small: true });
@@ -162,15 +177,35 @@ export async function memoryReview(ctx, fail, render) {
     return h('div', { style: 'padding:8px 0;border-top:1px solid var(--bd,#1D2430);display:flex;flex-direction:column;gap:4px' },
       h('div', { style: 'display:flex;gap:8px;align-items:flex-start' },
         h('div', { style: 'flex:1;min-width:0' }, h('div', { style: 'font-size:13px;overflow-wrap:anywhere' }, f.text),
-          ui.text([f.entities.map(e => e.path).join(', '), f.kind, actionText(f)].filter(Boolean).join(' · '), { small: true, muted: true })),
+          ui.text([f.entities.map(e => e.path).join(', '), f.kind, actionText(f)].filter(Boolean).join(' · '), { small: true, muted: true }),
+          whyText(f) ? ui.badge(`waiting: ${whyText(f)}`, 'accent') : null),
         decide(f, 'active', 'Approve', 'primary'),
         ui.button('Edit', () => { edit.style.display = edit.style.display === 'none' ? 'flex' : 'none'; }, { small: true }),
         decide(f, 'rejected', 'Not this', 'ghost')),
       edit);
   };
+  const keep = f => ui.button('Keep', async () => {
+    try { await call('POST', `/v1/memory/facts/${f.id}/keep`); render(); } catch (e) { fail(e); }
+  }, { small: true });
+  const learnedRow = f => h('div', { style: 'padding:8px 0;border-top:1px solid var(--bd,#1D2430);display:flex;gap:8px;align-items:flex-start' },
+    h('div', { style: 'flex:1;min-width:0' }, h('div', { style: 'font-size:13px;overflow-wrap:anywhere' }, f.text),
+      ui.text([f.entities.map(e => e.path).join(', '), f.kind, `saved ${new Date(f.auto_at * 1000).toLocaleDateString()}`,
+        quoteOf(f) && `you said “${quoteOf(f)}”`].filter(Boolean).join(' · '), { small: true, muted: true })),
+    keep(f), decide(f, 'rejected', 'Not this', 'ghost'));
+  const learnedCard = learned.length ? ui.card(
+    h('div', { style: 'display:flex;gap:8px;align-items:center' },
+      h('strong', { style: 'font-size:13px' }, `Learned on its own (${learned.length})`),
+      ui.text('in the last 14 days; already in use. Not this takes one back.', { small: true, muted: true }),
+      h('span', { style: 'flex:1' }),
+      learned.length > 1 ? ui.button('Keep all', async () => {
+        try { for (const f of learned) await call('POST', `/v1/memory/facts/${f.id}/keep`); render(); } catch (e) { fail(e); }
+      }, { small: true }) : null),
+    ...learned.map(learnedRow)) : null;
   const groups = byChat(facts);
   return [
-    ui.text('What the agent learned on its own from your chats. Nothing here is used until you approve it.', { muted: true }),
+    ...(learnedCard ? [learnedCard] : []),
+    h('strong', { style: 'font-size:13px' }, groups.length ? `Needs your look (${facts.length})` : 'Needs your look'),
+    ui.text('What the agent learned but wasn’t sure enough about, or that is personal. Nothing here is used until you approve it.', { muted: true }),
     ...(groups.length ? groups.map(g => ui.card(
       h('div', { style: 'display:flex;gap:8px;align-items:center' },
         g.thread ? h('a', { href: `#/chat/${g.thread}`, style: 'font-size:13px;font-weight:500' }, 'From this chat') : h('strong', null, 'Not from a chat (tidying, or added here)'),

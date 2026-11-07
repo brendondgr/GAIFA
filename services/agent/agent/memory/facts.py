@@ -207,15 +207,18 @@ class FactsMixin:
             self._index_fact(fid)
         return self.fact_public(self.need_fact(fid))
 
-    def set_fact_state(self, fid: str, state: str, by: str = "user") -> dict[str, Any]:
-        """approve (proposed → active, retiring what it replaces), reject, retire, or bring back (active)."""
+    def set_fact_state(self, fid: str, state: str, by: str = "user", op: str | None = None) -> dict[str, Any]:
+        """approve (proposed → active, retiring what it replaces), reject, retire, or bring back (active). `op` names
+        the change in the log (`fact_auto`: the learner approved it on its own, memory-auto-learning 2.2; undoing it
+        makes it a proposal again)."""
         f = self.need_fact(fid)
         if state not in FACT_STATES:
             raise MemoryError(422, "bad_state", f"state is one of {', '.join(FACT_STATES)}")
         facts = [fid, *([f["replaces"]] if f["replaces"] else [])]
         ents = [r["entity"] for r in self._rows("SELECT entity FROM mem_fact_entities WHERE fact = ?", (fid,))]   # type: ignore[attr-defined]
         proposed_ents = [e for e in ents if (self.entity_row(e) or {}).get("state") == "proposed"]   # type: ignore[attr-defined]
-        with self.change("fact_" + state, fid, f"{state}: {f['text'][:80]}", entities=proposed_ents, facts=facts, by=by):   # type: ignore[attr-defined]
+        summary = f"learned on its own: {f['text'][:80]}" if op == "fact_auto" else f"{state}: {f['text'][:80]}"
+        with self.change(op or "fact_" + state, fid, summary, entities=proposed_ents, facts=facts, by=by):   # type: ignore[attr-defined]
             self.c.execute("UPDATE mem_facts SET state = ?, updated = ?" + (", valid_until = COALESCE(valid_until, ?)" if state == "retired" else "")
                            + " WHERE id = ?", (state, self.clock(), *([self.today()] if state == "retired" else []), fid))
             if state == "active" and f["state"] == "proposed":
@@ -232,6 +235,22 @@ class FactsMixin:
         if state == "active" and f["state"] == "proposed":
             self._act(f, by)
         return self.fact_public(self.need_fact(fid))
+
+    def auto_learned(self, days: float = 14) -> list[dict[str, Any]]:
+        """Facts the learner saved on its own (`fact_auto`) in the last `days` that are still active and the user
+        hasn't kept (`fact_kept`) since, newest first (memory-auto-learning 2.3)."""
+        cut = self.clock() - days * 86400
+        rows = self._rows("SELECT l.target, MAX(l.ts) AS ts FROM mem_log l JOIN mem_facts f ON f.id = l.target "   # type: ignore[attr-defined]
+                          "WHERE l.op = 'fact_auto' AND l.ts >= ? AND f.state = 'active' AND NOT EXISTS (SELECT 1 FROM mem_log k "
+                          "WHERE k.target = l.target AND k.op = 'fact_kept' AND k.ts >= l.ts) GROUP BY l.target ORDER BY ts DESC", (cut,))
+        return [{**self.fact_public(self.need_fact(r["target"])), "auto_at": r["ts"]} for r in rows]
+
+    def keep(self, fid: str, by: str = "user") -> dict[str, Any]:
+        """The user looked at a fact the learner saved on its own and keeps it: off the "Learned on its own" list."""
+        f = self.need_fact(fid)
+        with self.tx():   # type: ignore[attr-defined]
+            self._log("fact_kept", fid, f"kept: {f['text'][:80]}", None, None, by)   # type: ignore[attr-defined]
+        return self.fact_public(f)
 
     def _drop_orphans(self, ents: list[str]) -> None:
         """A proposed entry that no fact is about any more goes with its last proposal."""

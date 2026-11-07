@@ -9,6 +9,8 @@
     POST   /v1/memory/facts                     {text, about?, kind?, valid_from?, valid_until?, replaces?, source?}
     PATCH  /v1/memory/facts/{id}                {text?, about?, kind?, valid_from?, valid_until?, state?}
     DELETE /v1/memory/facts/{id}                forget it for real
+    GET    /v1/memory/auto                      ?days=14: saved on its own lately, not kept yet (memory-auto-learning 2.3)
+    POST   /v1/memory/facts/{id}/keep           off that list
     POST   /v1/memory/undo/{log_id}
     POST   /v1/memory/reword                    learned facts in the first person, rewritten (memory-auto-learning 1.3)
     GET    /v1/memory/log                       ?target=&limit=
@@ -189,6 +191,14 @@ def add_routes(app: FastAPI) -> None:
             return m.set_fact_state(fid, body.state)
         return m.fact_public(m.need_fact(fid))
 
+    @app.get("/v1/memory/auto", summary="Facts the learner saved on its own lately that you haven't kept yet (?days=14)")
+    def auto_learned(request: Request, days: float = 14) -> list:
+        return M(request).auto_learned(min(max(days, 1), 365))
+
+    @app.post("/v1/memory/facts/{fid}/keep", summary="Keep a fact the learner saved on its own (it leaves the Learned on its own list)")
+    def keep(fid: str, request: Request) -> dict:
+        return M(request).keep(fid)
+
     @app.delete("/v1/memory/facts/{fid}", summary="Forget a fact for real (the log keeps only that one was forgotten)")
     def forget(fid: str, request: Request) -> dict:
         return M(request).forget(fid)
@@ -241,8 +251,10 @@ def add_routes(app: FastAPI) -> None:
         ml = getattr(request.app.state.agent, "memory_learner", None)
         if ml is None:
             return JSONResponse({"detail": "the memory learner isn't running", "code": "unavailable"}, 503)
+        ml.last = {"proposed": 0, "auto": 0}
         try:
-            return {"proposed": await (ml.learn(thread) if thread else ml.check())}
+            n = await (ml.learn(thread) if thread else ml.check())
+            return {"proposed": n, "auto": ml.last["auto"], "review": ml.last["proposed"]}   # proposed: all saved
         except Exception as e:  # noqa: BLE001: the model didn't answer; the next pass tries again
             return JSONResponse({"detail": f"the model didn't answer: {e}", "code": "unavailable",
                                  "fix": "try again in a moment, or check Settings → LLMs"}, 503)

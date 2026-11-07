@@ -28,7 +28,8 @@ async def test_a_new_fact_and_entity_are_proposed_with_evidence(env):
     props = {f["text"]: f for f in m.facts(state="proposed")}
     assert set(props) == {"Prefers 4:3 images", "The thesis is about memory systems"}
     user_seq = env.payloads(tid, "user") and env.events(tid, "user")[-1]["seq"]
-    assert props["Prefers 4:3 images"]["evidence"] == [{"thread": tid, "seq": user_seq}] and props["Prefers 4:3 images"]["source"] == "inferred"
+    assert props["Prefers 4:3 images"]["evidence"] == [{"thread": tid, "seq": user_seq, "why": "not in your words"}]   # no quote
+    assert props["Prefers 4:3 images"]["source"] == "inferred"
     assert m.resolve("Thesis") is None and m.entities(state="proposed")[0]["name"] == "Thesis"
     assert m.facts(current=True) == []                                         # nothing a chat knows yet
     m.set_fact_state(props["The thesis is about memory systems"]["id"], "active")

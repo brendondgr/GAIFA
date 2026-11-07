@@ -13,7 +13,7 @@ Memory belongs to the chat agent: it lives in the agent mod (`services/agent/age
 ## 2. Gaps & unanswered questions
 
 - **A graph?** No (the user, 2026-10-26): entities form a tree by `parent`; a fact may be `about` several entities; there are no typed relations between entities and no graph store.
-- **Inferred memories:** answered: they need the user's approval, in the same review as inferred preferences (the agent mod's Learning page). What the user states (`remember`, "remember that…") is active at once.
+- **Inferred memories:** answered: they need the user's approval, in the same review as inferred preferences (the agent mod's Learning page). What the user states (`remember`, "remember that…") is active at once. *Changed 2026-11-07* ([memory-auto-learning](memory-auto-learning.md) Phase 2): learned facts grounded in the user's words, confident and not sensitive are saved at once, with Undo; the rest wait.
 - **MCP clients:** answered: memory is the agent's only. The memory tools carry `mcp = false` (3.1) and `/mcp` never lists them.
 - **Which model writes memories in the background:** *Assumption:* the model the chat summaries use (plan 28.5, `summaries.py`), with JSON constrained by a schema where the server supports it (llama.cpp grammars through the relay).
 - **What background learning may read:** *Assumption:* only the user's own messages, their answers to questions, their card edits and what the agent did (tool names and statuses), never tool results, documents or pages (plan 24.8's rule: text from outside never becomes a memory on its own).

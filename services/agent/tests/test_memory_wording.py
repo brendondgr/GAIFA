@@ -43,7 +43,7 @@ async def test_the_prompt_asks_for_the_third_person_a_quote_a_confidence_and_sen
     assert await ml.learn(tid) == 1
     prompt = env.model.received[-1]["messages"][0]["content"]
     assert "third person" in prompt and '"quote"' in prompt and '"confidence"' in prompt and '"sensitive"' in prompt
-    assert [f["text"] for f in env.agent.memory.facts(state="proposed")] == ["The user prefers short answers"]
+    assert [f["text"] for f in env.agent.memory.facts(state="active")] == ["The user prefers short answers"]   # auto (Phase 2)
 
 
 async def test_the_learner_rewords_first_person_facts_once(env):

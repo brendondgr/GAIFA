@@ -57,9 +57,9 @@ async def test_remember_writes_memory_and_shows_it(env):
     assert "- likes 16:9 images" in env.model.received[-1]["messages"][0]["content"]
     # structured-memory 5.2: Settings → Agent → Memory holds memory's settings and counts, not a MEMORY.md editor
     st = (await env.client.get("/v1/settings")).json()
-    assert st["memory_settings"] == {"fade_days": 180, "recall": True} and st["memory_stats"]["facts"] == 2
+    assert {k: st["memory_settings"][k] for k in ("fade_days", "recall")} == {"fade_days": 180, "recall": True} and st["memory_stats"]["facts"] == 2
     st = (await env.client.put("/v1/settings", json={"memory_settings": {"recall": False, "fade_days": 90}})).json()
-    assert st["memory_settings"] == {"fade_days": 90, "recall": False}
+    assert {k: st["memory_settings"][k] for k in ("fade_days", "recall")} == {"fade_days": 90, "recall": False}
     assert (await env.client.put("/v1/settings", json={"memory_settings": {"fade_days": 1}})).status_code == 422
 
 

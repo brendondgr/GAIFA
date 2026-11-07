@@ -46,7 +46,7 @@ It touches architecture §14 (the agent: memory and learning lines), the brief's
 
 ## Phase 2 — Auto-approval of confident facts (M)
 
-- [ ] **2.1 The decision: `services/agent/agent/memory/auto.py` (new).**
+- [x] **2.1 The decision: `services/agent/agent/memory/auto.py` (new).**
   - **`decide(cand, chat_users, held, settings) -> "auto" | "review" | "skip"`:** the result is `auto` only when all of these hold:
     - `settings["auto_approve"]` is on;
     - `confidence ≥ settings["auto_threshold"]` (default 0.8);
@@ -56,26 +56,27 @@ It touches architecture §14 (the agent: memory and learning lines), the brief's
     - the third-person check from 1.2 passes;
     - the chat is not `no_learn`, a dry run or an eval chat (already skipped by `due()`).
   - A fact the learner sees again (`same`) that is still proposed also becomes active once `seen ≥ settings["auto_after_seen"]` (default 2), if it is not sensitive.
+  - *As built:* reasons are "worded as the user", "sensitive: <topic>", "sensitive", "would change something you said", "not in your words", "not sure[: n]" and "auto-approval is off"; they ride in the fact's evidence as `why`, next to the `quote`. The learner's last pass counts are `MemoryLearner.last`, and `POST /v1/memory/learn` answers `{proposed (all saved), auto, review}`.
   - **Settings:** `data/agent/memory.json` gains `auto_approve` (true), `auto_threshold` (0.8), `auto_after_seen` (2) and `always_review` (the category list). `profile.settings()` returns their defaults.
   *Done when:* `services/agent/tests/test_memory_auto.py` covers each rule on its own: a high score with no matching quote goes to review, a sensitive fact goes to review, replacing a stated fact goes to review, a repeat becomes active at `seen = 2`, and switching auto-approval off sends everything to review.
-- [ ] **2.2 The learner uses it: `learn.py` `_facts`.**
+- [x] **2.2 The learner uses it: `learn.py` `_facts`.**
   - **Work:** after the `same`/`replaces`/`adds` choice, `decide` sets the state: `add_fact(..., state="active")` for `auto`, otherwise proposed. Each auto-approved fact is logged with op `fact_auto` by `learner`, with its confidence and quote in the log entry, and `MemoryStore.undo` turns it back into a proposal. A new entity that comes with an auto-approved fact is made active with it (the path `set_state` already takes for approvals).
   - **Indexing:** auto-approved facts are sent to the embed mod's `memory` collection like approved ones (`index.py`).
   *Done when:* `test_memory_learn.py` (scripted model) checks that a grounded, confident, non-sensitive fact is active with a `fact_auto` log entry, that undoing it leaves it proposed, and that the other facts in the same pass stay proposed.
-- [ ] **2.3 Review shows both lists: `services/agent/ui/memory.js` `memoryReview`.**
+- [x] **2.3 Review shows both lists: `services/agent/ui/memory.js` `memoryReview`.**
   - **Needs your look:** the proposals, as now, each with a short reason it is waiting ("sensitive: health", "not sure: 0.55", "would change something you said").
-  - **Learned on its own (last 14 days):** the auto-approved facts, newest first, each with the date, the chat link, the quote, **Keep** (which clears it from this list) and **Not this** (which undoes it, so the fact is rejected). "Keep all" works per chat.
+  - **Learned on its own (last 14 days):** *as built,* `GET /v1/memory/auto?days=14` and `POST /v1/memory/facts/{id}/keep` (a `fact_kept` log entry); the auto-approved facts, newest first, each with the date, the chat link, the quote, **Keep** (which clears it from this list) and **Not this** (which undoes it, so the fact is rejected). "Keep all" works per chat.
   - **Memory tab:** an inferred fact shows "learned 2026-11-05" next to it, and a stated fact shows "you said 2026-11-05".
   *Done when:* `utils/tests/web/agent-memory.test.mjs` covers both lists, the reasons, Keep and Not this.
-- [ ] **2.4 Settings → Agent → Memory: `web/chat/chat-settings.js`.**
+- [x] **2.4 Settings → Agent → Memory: `web/chat/chat-settings.js`.**
   - **Rows:** "Save what I learn without asking when I'm sure" (`auto_approve`), "How sure" (the threshold as Cautious 0.9 / Normal 0.8 / Eager 0.65), and "Always ask about" (the categories as chips).
   - **Docs:** the brief's Settings → Agent row.
   *Done when:* the settings test writes and reads `memory.json`. On the installed hub, switching the setting off makes the next learned fact wait in Review.
 
 **Checks & deliverables — Phase 2**
-- [ ] On the installed hub, a quiet chat with "I'm writing my thesis on sparse solvers, and I prefer Python over Julia" makes both facts active with a `fact_auto` entry each. The next chat's profile holds them. "Learned on its own" lists them, and Not this removes one from the profile.
-- [ ] A chat with "my doctor says I should cut caffeine" leaves that fact in Review with the reason "sensitive: health".
-- [ ] Delivered: `auto.py`, the learner change, both Review lists, the settings rows, and docs: architecture §14 (inferred memories become active on their own when grounded and confident; the rest wait), the structured-memory plan's §2 answer with a pointer here, and the brief.
+- [x] On the installed hub, a quiet chat with "I'm writing my thesis on sparse solvers, and I prefer Python over Julia" makes both facts active with a `fact_auto` entry each. The next chat's profile holds them. "Learned on its own" lists them, and Not this removes one from the profile. *As checked (2026-11-07, skynet, Plan-mode chats so the agent couldn't `remember` them itself):* both saved at confidence 1.0 with their quotes; a new chat answered "You prefer Python over Julia, and your thesis is about sparse solvers."; Not this on the thesis in the browser, and the same chat then said it didn't know the thesis. A first try that said "no need to save anything" learned nothing, as it should.
+- [x] A chat with "my doctor says I should cut caffeine" leaves that fact in Review with the reason "sensitive: health". *As checked:* shown on Review as "waiting: sensitive: health". With the Settings checkbox off, "I prefer tabs over spaces" waited with "auto-approval is off"; switched back on after. Every test chat and fact deleted after.
+- [x] Delivered: `auto.py`, the learner change, both Review lists, the settings rows, and docs: architecture §14 (inferred memories become active on their own when grounded and confident; the rest wait), the structured-memory plan's §2 answer with a pointer here, and the brief.
 
 ## Phase 3 — Dates and changing interests (M)
 

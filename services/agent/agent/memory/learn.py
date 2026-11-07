@@ -1,4 +1,4 @@
-"""Learning memories after a chat goes quiet (plan structured-memory 4.1). Everything learned waits for the user.
+"""Learning memories after a chat goes quiet (plan structured-memory 4.1; memory-auto-learning Phases 1–2).
 
 For each chat quiet for the summaries' idle time (and not an eval's, and not `no_learn`), what came since the last pass:
 1. **Extract.** The chat as the learner renders it (`learn.loop.render`: the user's words plain; the agent's replies,
@@ -10,9 +10,11 @@ For each chat quiet for the summaries' idle time (and not an eval's, and not `no
 2. **Resolve.** Each fact's `about` resolves without a model (`MemoryStore.resolve`).
 3. **Compare.** Its five nearest current facts (`memory_search`); when it has any, the model chooses one operation per
    fact: `same` (seen once more), `replaces` (a change), `adds`, or `skip`.
-4. **Propose.** New facts and replacements are saved `proposed` with their evidence (the chat and message), new
-   entities with them; a rename becomes a proposed event that renames the entity when approved. Nothing here
-   changes what a chat knows until the user approves it on the Learning page.
+4. **Save.** New facts and replacements are saved with their evidence (the chat, the message their quote is in, the
+   quote), new entities with them. One that `auto.decide` passes (grounded in the user's words, confident, not
+   sensitive, not replacing what the user stated) becomes active at once (`fact_auto` in the log, undoable); the
+   rest wait in Review with the reason (`why` in their evidence). A proposal seen again often enough is approved
+   the same way. A rename is a proposed event that renames the entity when approved.
 
 An empty answer is fine; a reply that isn't JSON is retried once at the next pass, never read as "nothing to learn".
 `[learning] enabled = false` stops it.
@@ -27,6 +29,7 @@ from typing import Any, Callable
 
 from ..learn.loop import _json, render
 from ..summaries import Backoff
+from . import auto, profile
 from .model import FACT_KINDS, MemoryError, check_date, norm
 from .search import search
 from .store import MemoryStore
@@ -109,6 +112,7 @@ class MemoryLearner:
         with self.m.lock:
             self.m.c.execute(SCHEMA)
         self.busy = False
+        self.last: dict[str, int] = {"proposed": 0, "auto": 0}     # the last pass's counts (memory-auto-learning 2.2)
 
     # ---- which chats -------------------------------------------------------------------------------
 
@@ -187,7 +191,7 @@ class MemoryLearner:
         n = self._renames(got.get("renames") or [], evidence)
         cands = [f for f in got.get("facts") or [] if isinstance(f, dict) and isinstance(f.get("text"), str) and f["text"].strip()][:MAX_FACTS]
         await self._third_person(model, cands)
-        n += await self._facts(model, cands, evidence)
+        n += await self._facts(model, cands, evidence, users)
         self._mark(tid, last, 0)
         return n
 
@@ -217,7 +221,15 @@ class MemoryLearner:
                 continue
         return n
 
-    async def _facts(self, model: str, cands: list[dict[str, Any]], evidence: list[dict[str, Any]]) -> int:
+    def _evidence(self, c: dict[str, Any], evidence: list[dict[str, Any]], users: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The chat and the user's message the fact's quote is in (else the last one), with the quote."""
+        q = c.get("quote") if isinstance(c.get("quote"), str) else ""
+        hit = next((u for u in reversed(users) if auto.grounded(q, [u["payload"].get("text") or ""])), None)
+        ev = {**evidence[-1], **({"seq": hit["seq"]} if hit else {}), **({"quote": q.strip()[:300]} if q.strip() else {})}
+        return [*evidence[:-1], ev]
+
+    async def _facts(self, model: str, cands: list[dict[str, Any]], evidence: list[dict[str, Any]],
+                     users: list[dict[str, Any]] | None = None) -> int:
         held: list[list[dict[str, Any]]] = []
         for c in cands:
             r = await search(self.m, self.agent.hub, c["text"], limit=5, meaning_wait=10)
@@ -237,13 +249,21 @@ class MemoryLearner:
                 if op in ("same", "replaces") and fid not in {h["id"] for h in held[i]}:
                     op, fid = "adds", None                     # an id it made up: treat it as new
                 ops[i] = (op if op in ("same", "replaces", "adds", "skip") else "adds", fid)
+        users = users or []
+        said = [u["payload"].get("text") or "" for u in users]
+        cfg = auto.settings(profile.settings(self.agent.cfg.data))
         n = 0
         for i, c in enumerate(cands):
             op, fid = ops[i]
             if op == "skip":
                 continue
+            ev = self._evidence(c, evidence, users)
             if op == "same":
-                self.m.saw(fid, evidence)
+                self.m.saw(fid, ev)
+                f = self.m.need_fact(fid)
+                if auto.seen_enough(f, cfg):
+                    self.m.set_fact_state(fid, "active", by="learner", op="fact_auto")
+                    self.last["auto"] += 1
                 continue
             kind = c.get("kind") if c.get("kind") in FACT_KINDS else "fact"
             try:
@@ -251,12 +271,26 @@ class MemoryLearner:
             except MemoryError:
                 valid = None
             about = [clean_about(a) for a in c.get("about") or [] if isinstance(a, str)][:6]
+            replaced = self.m.fact_row(fid) if op == "replaces" and fid else None
+            ok, why = auto.decide(c, said, replaced, cfg)
             try:
-                self.m.add_fact(c["text"], about, kind, valid, source="inferred", evidence=evidence,
-                                replaces=fid if op == "replaces" else None, by="learner")
-                n += 1
+                conf = min(1.0, max(0.0, float(c.get("confidence"))))
+            except (TypeError, ValueError):
+                conf = 0.5
+            if not ok:
+                ev[-1] = {**ev[-1], "why": why}
+            try:
+                f = self.m.add_fact(c["text"], about, kind, valid, source="inferred", evidence=ev, confidence=conf,
+                                    replaces=fid if op == "replaces" else None, by="learner")
             except MemoryError as e:
                 log.info("memory learning: %s: %s", c["text"][:80], e.detail)
+                continue
+            n += 1
+            if (ok or auto.seen_enough(f, cfg)) and f["state"] == "proposed":     # a proposal said again counts too
+                self.m.set_fact_state(f["id"], "active", by="learner", op="fact_auto")
+                self.last["auto"] += 1
+            elif f["state"] == "proposed":
+                self.last["proposed"] += 1
         return n
 
     # ---- the loop ------------------------------------------------------------------------------------
@@ -271,6 +305,7 @@ class MemoryLearner:
         if self.busy or not await self.enabled():
             return 0
         self.busy = True
+        self.last = {"proposed": 0, "auto": 0}
         n = 0
         try:
             for t in self.due():

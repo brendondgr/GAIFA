@@ -117,6 +117,11 @@ class DocSettings(BaseModel):
 class MemorySettings(BaseModel):
     recall: bool | None = Field(None, description="Recall memories in each message (structured-memory 3.3)")
     fade_days: int | None = Field(None, ge=7, le=3650, description="Learned facts unused this long are proposed for retiring (4.2)")
+    auto_approve: bool | None = Field(None, description="Save learned facts without asking when grounded, confident and not sensitive (memory-auto-learning 2.1)")
+    auto_threshold: float | None = Field(None, ge=0.5, le=1, description="How sure the learner must be to save without asking")
+    auto_after_seen: int | None = Field(None, ge=2, le=20, description="A proposal said this many times is saved without asking")
+    always_review: list[Literal["health", "money", "legal", "relationships", "religion", "politics", "sexuality"]] | None = Field(
+        None, description="Topics whose facts always wait for review")
 
 
 class AgentFiles(BaseModel):
@@ -633,15 +638,15 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def get_settings(request: Request) -> dict:
         agent = A(request)
         k = Knowledge(agent.cfg.data, agent.hub)
-        from .memory import profile, tidy
+        from .memory import auto, profile, tidy
         m = agent.memory
-        mem = {"settings": {"fade_days": tidy.FADE_DAYS, **profile.settings(agent.cfg.data)},
+        mem = {"settings": {"fade_days": tidy.FADE_DAYS, **auto.DEFAULTS, **profile.settings(agent.cfg.data)},
                "facts": len(m.facts(current=True, limit=100000)), "entities": len(m.entities()) - 1, "proposed": m.count_facts("proposed")}
         return {**k.files(), "memory_settings": mem["settings"], "memory_stats": {k_: v for k_, v in mem.items() if k_ != "settings"},
                 "skills": await k.skills(), "model": agent.cfg.model, "fallback": agent.cfg.fallback,
                 "max_steps": agent.cfg.max_steps, "modes": list(MODES), "documents": docs.load(agent.cfg.data, agent.cfg)}
 
-    @app.put("/v1/settings", summary="Save AGENT.md, the document settings and/or memory's settings (recall, fade_days)")
+    @app.put("/v1/settings", summary="Save AGENT.md, the document settings and/or memory's settings (recall, fade_days, auto-approval)")
     async def put_settings(body: AgentFiles, request: Request) -> dict:
         agent = A(request)
         Knowledge(agent.cfg.data, agent.hub).save(body.agent_md, body.memory)

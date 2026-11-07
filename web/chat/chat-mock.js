@@ -57,7 +57,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       { name: 'tts', description: 'Voices and delivery direction', source: 'tts', id: 'tts/tts' },
       { name: 'gen3d', description: 'Presets, parts and rigs for 3D models', source: 'gen3d', id: 'gen3d/gen3d' }],
     model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['plan', 'manual', 'accept_edits', 'auto', 'bypass'], documents: { inline_tokens: 6000, reply_reserve: 4096 },
-    memory_settings: { recall: true, fade_days: 180 }, memory_stats: { facts: 2, entities: 1, proposed: 0 } };
+    memory_settings: { recall: true, fade_days: 180, auto_approve: true, auto_threshold: 0.8, auto_after_seen: 2, always_review: ['health', 'money', 'legal', 'relationships', 'religion', 'politics', 'sexuality'] }, memory_stats: { facts: 2, entities: 1, proposed: 0 } };
 
   function newThread(o = {}) {
     const ts = now(), th = { id: rid('t_'), title: o.title || '', model: o.model || null, mode: o.mode || 'manual', state: 'idle', settings: o.settings || {}, created: ts, updated: ts, archived: false, parent_id: o.parent_id || null, fork_seq: o.fork_seq ?? null };

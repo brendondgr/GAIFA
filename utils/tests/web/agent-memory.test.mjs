@@ -21,3 +21,50 @@ test('proposals group by their chat, and say what approving does', () => {
   assert.equal(M.actionText(f('e', [], { replaces: 'f_1' })), 'replaces an older fact');
   assert.equal(M.actionText(f('g', [])), '');
 });
+
+// memory-auto-learning 2.3: why a proposal waits, the quote, and Review's two lists, against a tiny fake DOM.
+class FNode {}
+class FText extends FNode { constructor(t) { super(); this.textContent = String(t); } }
+class FEl extends FNode {
+  constructor(tag) { super(); this.tagName = tag.toUpperCase(); this.children = []; this.attrs = {}; this.style = {}; this.listeners = {}; this.value = ''; }
+  setAttribute(k, v) { this.attrs[k] = String(v); if (k === 'value') this.value = String(v); }
+  addEventListener(t, fn) { (this.listeners[t] ||= []).push(fn); }
+  dispatch(t) { for (const fn of this.listeners[t] || []) fn({ preventDefault() {}, target: this }); }
+  append(...kids) { this.children.push(...kids); }
+  get textContent() { return this.children.map(c => c.textContent).join(''); }
+  findAll(pred, out = []) { if (pred(this)) out.push(this); for (const c of this.children) if (c instanceof FEl) c.findAll(pred, out); return out; }
+}
+for (const prop of ['value', 'disabled', 'type', 'rows', 'name', 'placeholder', 'autocomplete', 'href']) FEl.prototype[prop] ??= undefined;
+globalThis.Node ??= FNode;
+globalThis.document ??= { createElement: t => new FEl(t), createTextNode: t => new FText(t) };
+
+test('why a proposal waits, and the words it came from', () => {
+  assert.equal(M.whyText({ evidence: [{ thread: 't', why: 'not sure: 0.55' }, { thread: 't2', why: 'sensitive: health' }] }), 'sensitive: health');
+  assert.equal(M.whyText({ evidence: [{ thread: 't' }] }), '');
+  assert.equal(M.quoteOf({ evidence: [{ thread: 't', quote: 'I prefer tea' }] }), 'I prefer tea');
+});
+
+test('Review: what was learned on its own (Keep, Not this) and what needs a look, with the reason', async () => {
+  const { createUi } = await import(pathToFileURL(path.join(root, 'web/mod-ui.js')).href);
+  const ui = createUi();
+  const fact = (id, text, ev, extra = {}) => ({ id, text, kind: 'fact', entities: [{ id: 'user', path: 'you' }], evidence: ev, ...extra });
+  const learned = [fact('f_a', 'The user prefers Python.', [{ thread: 't1', quote: 'I prefer Python' }], { auto_at: 1794000000 })];
+  const proposed = [fact('f_b', 'The user should cut caffeine.', [{ thread: 't1', why: 'sensitive: health' }])];
+  const calls = [];
+  const ctx = { ui, call: async (m, p, o) => { calls.push([m, p, o?.json]); return { status: 200, json: p === '/v1/memory/auto' ? learned : m === 'GET' ? proposed : {} }; } };
+  let renders = 0;
+  const parts = (await M.memoryReview(ctx, e => { throw e; }, () => { renders++; })).filter(Boolean);
+  const text = parts.map(p => p.textContent).join('|');
+  assert.match(text, /Learned on its own \(1\)/);
+  assert.match(text, /you said “I prefer Python”/);
+  assert.match(text, /Needs your look \(1\)/);
+  assert.match(text, /waiting: sensitive: health/);
+  const buttons = parts.flatMap(p => p.findAll(e => e.tagName === 'BUTTON'));
+  const [keep] = buttons.filter(b => b.textContent === 'Keep');
+  const [notThisLearned] = buttons.filter(b => b.textContent === 'Not this');
+  keep.dispatch('click');
+  notThisLearned.dispatch('click');
+  await new Promise(r => setTimeout(r, 0));
+  assert.deepEqual(calls.slice(2), [['POST', '/v1/memory/facts/f_a/keep', undefined], ['PATCH', '/v1/memory/facts/f_a', { state: 'rejected' }]]);
+  assert.equal(renders, 2);
+});

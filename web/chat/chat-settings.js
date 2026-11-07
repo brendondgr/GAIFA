@@ -107,8 +107,21 @@ export function MemoryCard({ api, toast }) {
         h('input', { type: 'number', min: 7, max: 3650, value: days ?? '', 'aria-label': 'Fade after days', onChange: e => setDays(e.target.value),
           style: { width: 80, height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.sb, color: T.tx } }),
         h('span', { style: { fontSize: 12, color: T.mut } }, 'days'),
-        Number(days) !== ms.fade_days ? h(Btn, { sm: true, kind: 'pri', label: 'Save', onClick: () => save({ memory_settings: { fade_days: Number(days) } }) }) : null)) : null);
+        Number(days) !== ms.fade_days ? h(Btn, { sm: true, kind: 'pri', label: 'Save', onClick: () => save({ memory_settings: { fade_days: Number(days) } }) }) : null)) : null,
+    ms ? row('Save what it learns without asking when it’s sure', 'From a chat that went quiet, a fact you said in your own words, that it’s sure of and that isn’t personal, is saved at once; Review lists it under “Learned on its own”, where Not this takes it back. The rest waits for you.',
+      h('input', { type: 'checkbox', checked: ms.auto_approve !== false, 'aria-label': 'Save learned facts without asking', onChange: e => save({ memory_settings: { auto_approve: e.target.checked } }) })) : null,
+    ms && ms.auto_approve !== false ? row('How sure', 'Cautious saves fewer facts on its own; Eager saves more.',
+      h('span', { style: { display: 'flex', gap: 4 } }, ...SURE.map(([v, l]) => h(Btn, { key: l, sm: true, kind: Math.abs((ms.auto_threshold ?? 0.8) - v) < 0.001 ? 'pri' : undefined, label: l,
+        onClick: () => save({ memory_settings: { auto_threshold: v } }) })))) : null,
+    ms && ms.auto_approve !== false ? row('Always ask about', 'Facts on these topics always wait for you in Review.',
+      h('span', { style: { display: 'flex', gap: 4, flexWrap: 'wrap' } }, ...SENSITIVE.map(c => {
+        const on = (ms.always_review || SENSITIVE).includes(c);
+        return h(Btn, { key: c, sm: true, kind: on ? 'pri' : undefined, label: c, 'aria-pressed': on,
+          onClick: () => save({ memory_settings: { always_review: on ? (ms.always_review || SENSITIVE).filter(x => x !== c) : [...(ms.always_review || SENSITIVE), c] } }) });
+      }))) : null);
 }
+const SURE = [[0.9, 'Cautious'], [0.8, 'Normal'], [0.65, 'Eager']];          // memory-auto-learning 2.4
+const SENSITIVE = ['health', 'money', 'legal', 'relationships', 'religion', 'politics', 'sexuality'];
 export function SkillsCard({ api, toast }) {
   const React = R(), { s, c, reload } = useAgent(api, toast);
   const [busy, setBusy] = React.useState(''), [envs, setEnvs] = React.useState(null), [env, setEnv] = React.useState(''), [ws, setWs] = React.useState(null);

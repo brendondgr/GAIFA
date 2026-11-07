@@ -41,8 +41,8 @@ The approach has three phases. Phase 1 makes the message appear the moment the u
 **Wire — Phase 1:** the Chat page draws a sent message at once, in new and existing chats, with **Not sent** / Retry on failure.
 
 **Checks & deliverables — Phase 1**
-- [ ] On the installed hub with the embed mod unloaded, the first message of a new chat shows in the frame of Send. The URL is the chat's at once. The reply streams as before. The model still gets the recalled facts with the message.
-- [ ] Delivered: the changed `loop.py`, `context.py`, `server.py`, `chat-api.js`, `chat-mock.js`, `chat-pane.js`, `chat-thread.js`, `chat-cards.js`, and tests.
+- [x] On the installed hub with the embed mod unloaded, the first message of a new chat shows in the frame of Send. The URL is the chat's at once. The reply streams as before. The model still gets the recalled facts with the message. *Checked 2026-11-07:* drawn 7.5 ms after Enter, the chat's URL at 67 ms, its stored user event at 157 ms; the recall came 2.5 s later (the search by meaning at its cap: before, the message waited for it) and the model call after it; the reply on skynet.
+- [x] Delivered: the changed `loop.py`, `context.py`, `server.py`, `chat-api.js`, `chat-mock.js`, `chat-pane.js`, `chat-thread.js`, `chat-cards.js`, and tests.
 
 ## Phase 2 — The queue (M)
 

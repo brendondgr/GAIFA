@@ -1,6 +1,7 @@
 """What every chat knows without searching (plan structured-memory 3.3).
 
-- **The profile** (in the system prompt): the user's current facts, preferences first, up to PROFILE_MAX characters;
+- **The profile** (in the system prompt): the user's current facts with their dates, preferences first, then
+  interests by when they were last said and a line of earlier interests, up to PROFILE_MAX characters;
   the active projects by name and one-line summary; and, for a chat working in workspace folders, the projects those
   folders are (by an anchor, or by the folder's name) with their current facts. It changes only when memory does,
   so a local server's prefix cache holds between turns.
@@ -12,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,8 @@ PROJECTS_MAX = 12
 CHAT_MAX = 900              # characters of the chat's projects' facts
 RECALL_MAX = 800            # characters recalled on a message
 RECALL_FACTS = 8
+INTEREST_DAYS = 90          # an interest not said this long is an earlier one (memory-auto-learning 3.2)
+EARLIER_MAX = 5
 MEANING_WAIT_S = 2.5        # recall doesn't hold a message up for a model load: names and words answer meanwhile
 
 
@@ -51,19 +55,51 @@ def chat_projects(m: MemoryStore, folders: list[dict[str, Any]] | None) -> list[
     return out
 
 
-def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None) -> tuple[str, set[str]]:
-    """(the profile's text, the ids of the facts it shows)."""
+def said_at(f: dict[str, Any]) -> float:
+    """When the user last said a fact: its newest evidence's message time, else when it was saved."""
+    ts = [float(e["ts"]) for e in f.get("evidence") or [] if isinstance(e, dict) and isinstance(e.get("ts"), (int, float))]
+    return max(ts) if ts else float(f.get("recorded") or 0)
+
+
+def _month(f: dict[str, Any]) -> str:
+    return (f.get("valid_from") or time.strftime("%Y-%m-%d", time.localtime(f.get("recorded") or 0)))[:7]
+
+
+def dated(f: dict[str, Any]) -> str:
+    """A fact as the profile writes it, with its time (memory-auto-learning 3.2): "… (since 2026-11)", and for one
+    that ended "… (2026-09 – 2026-11)"."""
+    if f.get("valid_until") and not f.get("current", True):
+        return f"{f['text']} ({_month(f)} – {f['valid_until'][:7]})"
+    return f"{f['text']} (since {_month(f)})"
+
+
+def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None, interest_days: int = INTEREST_DAYS) -> tuple[str, set[str]]:
+    """(the profile's text, the ids of the facts it shows). The user's facts carry their dates; preferences come
+    first, then interests by when they were last said; an interest not said for `interest_days`, or one that was
+    replaced or ended this past year, goes on the "Earlier interests" line."""
     shown: set[str] = set()
     parts = []
-    you = sorted(m.facts_of("user"), key=lambda f: (f["kind"] != "preference", -(f["updated"] or 0)))
+    stale = time.time() - interest_days * 86400
+    now_, earlier = [], []
+    for f in m.facts_of("user"):
+        (earlier if f["kind"] == "interest" and said_at(f) < stale else now_).append(f)
+    rank = {"preference": 0, "interest": 1}
+    you = sorted(now_, key=lambda f: (rank.get(f["kind"], 2), -(said_at(f) if f["kind"] == "interest" else f["updated"] or 0)))
     lines, size = [], 0
     for f in you:
-        line = f"- {f['text']}"
+        line = f"- {dated(f)}"
         if size + len(line) > PROFILE_MAX:
             break
         lines.append(line)
         size += len(line) + 1
         shown.add(f["id"])
+    year = time.strftime("%Y-%m-%d", time.localtime(time.time() - 365 * 86400))
+    ended = [f for f in m.facts_of("user", current=False) if f["kind"] == "interest" and not f["current"]
+             and f["state"] == "retired" and (f["valid_until"] or "") >= year]
+    earlier = sorted(earlier, key=lambda f: -said_at(f)) + sorted(ended, key=lambda f: f["valid_until"] or "", reverse=True)
+    if earlier:
+        lines.append("- Earlier interests: " + "; ".join(dated(f).removeprefix("The user ") for f in earlier[:EARLIER_MAX]))
+        shown.update(f["id"] for f in earlier[:EARLIER_MAX])
     if lines:
         parts.append("About the user:\n" + "\n".join(lines))
     projects = [e for e in m.entities("project") if not e["parent"]][:PROJECTS_MAX]
@@ -83,10 +119,11 @@ def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None) -> tuple[
 
 
 def settings(data: Path) -> dict[str, Any]:
+    base = {"recall": True, "interest_days": INTEREST_DAYS}
     try:
-        return {"recall": True, **json.loads((data / "memory.json").read_text())}
+        return {**base, **json.loads((data / "memory.json").read_text())}
     except (OSError, ValueError):
-        return {"recall": True}
+        return base
 
 
 async def recall(m: MemoryStore, hub: Any, text: str, shown: set[str]) -> list[dict[str, Any]]:

@@ -56,7 +56,7 @@ class Knowledge:
         if self.memory is None:
             return self.memory_index()
         from .memory import profile
-        return profile.build(self.memory, folders)[0]
+        return profile.build(self.memory, folders, int(profile.settings(self.data).get("interest_days") or profile.INTEREST_DAYS))[0]
 
     def memory_index(self) -> str:
         """What the prompt's Memory section lists: the current facts, newest first (structured-memory 1.3; Phase 3

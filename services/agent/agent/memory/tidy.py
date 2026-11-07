@@ -5,10 +5,12 @@
 - **Duplicate entries:** two active entities of the same kind whose names share most of their words (one name inside
   the other, or Jaccard ≥ 0.6), or whose embeddings are very close (≥ 0.92), become a proposed merge, once.
 - **Summaries:** an entity with facts newer than its summary gets one sentence from its current facts (10 a night).
+- **Old interests:** an `interest` the learner saved that wasn't said or used for `interest_days` (90) is retired at
+  once, logged by `tidy` with Undo (memory-auto-learning 3.2); it shows as an earlier interest.
 - **Wording:** a learned fact still in the first person is rewritten about the user (`wording.reword_saved`).
 - **Fading:** an inferred fact nobody used for `fade_days` (`data/agent/memory.json`, default 180) is proposed for retiring.
 
-Merges and retirements are proposals (`proposed` events whose evidence carries the action); nothing is merged or
+Merges and retirements (old interests aside) are proposals (`proposed` events whose evidence carries the action); nothing is merged or
 retired without the user's approval, and no stated fact is touched.
 """
 
@@ -19,7 +21,7 @@ import time
 from itertools import combinations
 from typing import Any
 
-from . import wording
+from . import profile, wording
 from .model import norm
 from .store import MemoryStore
 
@@ -114,7 +116,7 @@ def fading(m: MemoryStore, days: int = FADE_DAYS) -> int:
     done, n = proposed_actions(m), 0
     cut = time.time() - days * 86400
     for f in m._rows("SELECT * FROM mem_facts WHERE state = 'active' AND source = 'inferred' AND kind != 'event' "
-                     "AND COALESCE(last_used, recorded) < ?", (cut,)):
+                     "AND kind != 'interest' AND COALESCE(last_used, recorded) < ?", (cut,)):
         if ("retire", f["id"]) in done:
             continue
         ents = [r["entity"] for r in m._rows("SELECT entity FROM mem_fact_entities WHERE fact = ?", (f["id"],))]
@@ -124,9 +126,25 @@ def fading(m: MemoryStore, days: int = FADE_DAYS) -> int:
     return n
 
 
+def old_interests(m: MemoryStore, days: int = profile.INTEREST_DAYS) -> int:
+    """An interest the learner saved that the user hasn't said, and nothing used, for `days` is retired (logged, with
+    Undo; memory-auto-learning 3.2): it stays on the timeline and the profile's "Earlier interests". A stated one
+    stays as the user put it."""
+    cut, n = time.time() - days * 86400, 0
+    for f in m.facts(state="active", limit=100000):
+        if f["kind"] != "interest" or f["source"] != "inferred" or not f["current"]:
+            continue
+        if max(profile.said_at(f), float(f["last_used"] or 0)) < cut:
+            m.set_fact_state(f["id"], "retired", by="tidy")
+            n += 1
+    return n
+
+
 async def run(agent: Any, fade_days: int = FADE_DAYS) -> dict[str, int]:
     m: MemoryStore = agent.memory
-    out = {"ended": ended(m), "merges": await duplicates(m, agent.hub), "fading": fading(m, fade_days)}
+    days = int(profile.settings(agent.cfg.data).get("interest_days") or profile.INTEREST_DAYS)
+    out = {"ended": ended(m), "merges": await duplicates(m, agent.hub), "fading": fading(m, fade_days),
+           "interests": old_interests(m, days)}
     try:
         out["reworded"] = (await wording.reword_saved(agent))["reworded"]
     except Exception:  # noqa: BLE001: the model may be away tonight

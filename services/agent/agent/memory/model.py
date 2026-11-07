@@ -21,7 +21,7 @@ KINDS = ("user", "project", "person", "place", "tool", "topic", "organization")
 FOLDERS = {"user": "you", "project": "projects", "person": "people", "place": "places", "tool": "tools",
            "topic": "topics", "organization": "organizations"}
 BY_FOLDER = {v: k for k, v in FOLDERS.items()}
-FACT_KINDS = ("preference", "fact", "event", "procedure")
+FACT_KINDS = ("preference", "fact", "interest", "event", "procedure")   # interest: for now (memory-auto-learning 3.1)
 FACT_STATES = ("proposed", "active", "retired", "rejected")
 ENTITY_STATES = ("proposed", "active", "merged", "archived")
 SOURCES = ("stated", "inferred", "imported")

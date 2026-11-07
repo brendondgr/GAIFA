@@ -177,7 +177,8 @@ class Agent(Compaction):
                                                   (thread.get("settings") or {}).get("disabled") or []) or {}).get("folders")
             except Exception:  # noqa: BLE001
                 folders = None
-            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory, folders)[1])
+            days = int(profile.settings(self.cfg.data).get("interest_days") or profile.INTEREST_DAYS)
+            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory, folders, days)[1])
         except Exception:  # noqa: BLE001: a message never fails over memory
             log.exception("recall for %s", tid)
             return []

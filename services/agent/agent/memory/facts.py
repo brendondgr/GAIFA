@@ -64,8 +64,14 @@ class FactsMixin:
                 "entities": [{"id": e["id"], "name": e["name"], "kind": e["kind"], "path": self.path(e)} for e in ents]}   # type: ignore[attr-defined]
 
     def facts(self, state: str | None = None, entity: str | None = None, q: str | None = None, current: bool | None = None,
-              limit: int = 200) -> list[dict[str, Any]]:
+              limit: int = 200, thread: str | None = None, source: str | None = None) -> list[dict[str, Any]]:
         where, args = [], []
+        if thread:                                    # learned from this chat (its evidence names it)
+            where.append("f.evidence LIKE ? ESCAPE '\\'")
+            args.append("%" + f'"thread": {json.dumps(thread)}'.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+        if source:
+            where.append("f.source = ?")
+            args.append(source)
         if state:
             where.append("f.state = ?")
             args.append(state)

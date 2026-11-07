@@ -117,6 +117,7 @@ class DocSettings(BaseModel):
 class MemorySettings(BaseModel):
     recall: bool | None = Field(None, description="Recall memories in each message (structured-memory 3.3)")
     fade_days: int | None = Field(None, ge=7, le=3650, description="Learned facts unused this long are proposed for retiring (4.2)")
+    interest_days: int | None = Field(None, ge=14, le=730, description="An interest not said this long becomes an earlier one (memory-auto-learning 3.2)")
     auto_approve: bool | None = Field(None, description="Save learned facts without asking when grounded, confident and not sensitive (memory-auto-learning 2.1)")
     auto_threshold: float | None = Field(None, ge=0.5, le=1, description="How sure the learner must be to save without asking")
     auto_after_seen: int | None = Field(None, ge=2, le=20, description="A proposal said this many times is saved without asking")

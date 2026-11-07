@@ -15,6 +15,7 @@ import asyncio
 import re
 from typing import Any
 
+from .facts import STOP
 from .model import norm
 from .store import MemoryStore
 
@@ -53,6 +54,30 @@ async def meaning(hub: Any, query: str, limit: int = 20) -> list[str] | None:
     return [h["id"] for h in r.get("results") or [] if h.get("score", 1) >= MEANING_FLOOR]
 
 
+PAST_WORDS = frozenset("before earlier previously used past former anymore ago last year years months".split())
+
+
+def past(m: MemoryStore, query: str) -> dict[str, float]:
+    """Facts that held once (replaced or ended), for `history` (memory-auto-learning 3.3): the index holds only current
+    facts, so these are matched here by the query's words in their text or entries' paths ("tools" finds
+    tools/Blender), and a question about the past ("what did I use before?") brings the newest of them."""
+    words = {w for w in re.findall(r"[^\W_]+", (query or "").lower()) if len(w) > 2 and w not in STOP}
+    asks_past = bool(words & PAST_WORDS)
+    words -= PAST_WORDS
+    out: dict[str, float] = {}
+    rows = m._rows("SELECT * FROM mem_facts WHERE state = 'retired' OR (state = 'active' AND valid_until IS NOT NULL "
+                   "AND valid_until <= ?) ORDER BY COALESCE(valid_until, '') DESC, updated DESC LIMIT 400", (m.today(),))
+    for rank, f in enumerate(rows):
+        pub = m.fact_public(f)
+        hay = set(re.findall(r"[^\W_]+", " ".join([pub["text"], *(e["path"] for e in pub["entities"])]).lower()))
+        hits = sum(1 for w in words if w in hay or any(h.startswith(w[:5]) for h in hay if len(w) > 5))
+        if hits:
+            out[f["id"]] = 0.4 * hits / (K + rank + 2)
+        elif asks_past and rank < 20:
+            out[f["id"]] = 0.2 / (K + rank + 2)
+    return out
+
+
 async def search(m: MemoryStore, hub: Any, query: str, entity: str | None = None, kind: str | None = None,
                  history: bool = False, limit: int = 10, meaning_wait: float | None = None) -> dict[str, Any]:
     """`meaning_wait`: give up on the meaning list after this many seconds (recall: names and words answer)."""
@@ -81,6 +106,9 @@ async def search(m: MemoryStore, hub: Any, query: str, entity: str | None = None
         for x in [eid, *kids]:
             for f in m.facts_of(x, current=not history):
                 scores.setdefault(f["id"], 0.5 / (K + rank + 2) * (1.0 if x == eid else 0.8))
+    if history:
+        for fid, sc in past(m, query).items():
+            scores.setdefault(fid, sc)
     if entity:
         e = m.need(entity)
         allowed = {e["id"], *(r["id"] for r in m._rows("SELECT id FROM mem_entities WHERE parent = ?", (e["id"],)))}

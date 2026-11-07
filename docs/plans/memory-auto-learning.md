@@ -80,22 +80,25 @@ It touches architecture §14 (the agent: memory and learning lines), the brief's
 
 ## Phase 3 — Dates and changing interests (M)
 
-- [ ] **3.1 When a fact was said: `learn.py`, `facts.py`.**
+- [x] **3.1 When a fact was said: `learn.py`, `facts.py`.**
   - **Work:** a learned fact's `valid_from` defaults to the date of the USER message its quote was found in, read from the event's `ts`, when the model gives none. `recorded` stays the time it was saved. Each new piece of evidence (`saw`) keeps its message date, so a fact has a first date and a last date it was said (`evidence[].ts`).
   - **Interests:** add `interest` to `FACT_KINDS` (`model.py`) for what the user is into for now ("is learning HPC", "is into Blender"), apart from lasting facts. The extract prompt says when to use it.
   *Done when:* `test_memory_learn.py` checks that a fact without `valid_from` gets the message's date and that a repeat adds a later date to its evidence. `test_memory_store.py` checks that `interest` is a kind.
-- [ ] **3.2 Old interests fade; new ones replace them: `tidy.py`, `profile.py`.**
+  *As built:* the evidence's message time is `ts`; with no quote it is the last user message's.
+- [x] **3.2 Old interests fade; new ones replace them: `tidy.py`, `profile.py`.**
   - **Profile:** `profile.build` writes each fact with its time: "(since 2026-11)", or for an interest "(2026-09 – 2026-11)" once it has been replaced. Interests are listed by the last date they were said, and an interest not said for `interest_days` (default 90) moves to a short "Earlier interests" line instead of the main list.
   - **Tidy:** an auto-learned **interest** not said or used for `interest_days` is retired on its own (logged, with Undo). Other inferred facts keep the 180-day `fade_days` proposal. A replacement keeps the old fact as retired, with `valid_until` set to the new fact's `valid_from`, so the timeline has no gaps.
   *Done when:* `services/agent/tests/test_memory_profile.py` checks that the profile shows dates, that an old interest moves to "Earlier interests", and that replacing an interest sets `valid_until`. `test_memory_tidy.py` checks that an unused interest is retired and that a stated fact is never retired.
-- [ ] **3.3 The timeline: `services/agent/ui/memory.js`, the chat.**
+  *As built:* the earlier interest is written without "The user " ("Earlier interests: is into Blender. (2026-09 – 2026-11)"); a learned preference or interest is also filed under the user (`you`), so the profile has it even when the model filed it under `tools/Blender` only; the extract prompt keeps a change in the fact's text ("…now, no longer Blender") and the compare prompt says a fact that says the user moved on replaces the old one; `fading` skips interests (they have their own rule).
+- [x] **3.3 The timeline: `services/agent/ui/memory.js`, the chat.**
   - **Entity page:** a **Timeline** section lists current and past facts with their spans, oldest at the bottom, each with its chat link. `memory_search` (`search.py`) gains `when="past"|"all"` so the agent can answer "what was I into last year?" from retired facts.
   - **Chat notice:** when a chat is reopened after the learner saved facts from it, a muted line under the last turn reads "Remembered: The user is learning Rust · +2 · Review". It is drawn from `GET /v1/memory/log?thread=` (a new filter on the log route) in `web/chat/` (the pane's footer area).
   *Done when:* `agent-memory.test.mjs` covers the timeline, a chat test covers the notice, and `test_memory_search.py` checks that `when="past"` finds a retired fact.
+  *As built:* instead of `when=`, the existing `history` flag ("Also replaced and ended facts, with when they held") finds past facts by words and paths through `search.past`, which the meaning and keyword indexes (current facts only) can't; the chat's list is `GET /v1/memory/facts?thread=&source=inferred` rather than the log, and the note is `web/chat/chat-memory-note.js`.
 
 **Checks & deliverables — Phase 3**
-- [ ] On the installed hub, a chat saying "I'm into Unity now, not Blender" replaces the Blender interest. The profile shows Unity with its date, and Blender's timeline shows its span. Asking "what tools was I using before?" in a new chat finds Blender.
-- [ ] Delivered: the dates, `interest`, fading, the timeline, `when=`, the chat notice, and docs: architecture §14 (memory and time) and the brief (the entity page, the chat notice).
+- [x] On the installed hub, a chat saying "I'm into Unity now, not Blender" replaces the Blender interest. The profile shows Unity with its date, and Blender's timeline shows its span. Asking "what tools was I using before?" in a new chat finds Blender. *As checked (2026-11-07, skynet, chats titled "[memory-test]", each deleted with its facts after):* the first run replaced Blender, but reruns showed the compare step was unreliable (1 of 3 replaced; once it proposed renaming Blender to Unity) and that the interests were filed under `topics/…` only. Fixed: the extract prompt asks for `ends` (what the user stopped), `ends_of` also reads "no longer X", "not X anymore", "instead of X", "switched from X" in the fact or quote, a current fact naming it is replaced without asking the model (`ended_fact`), a rename of something the user stopped is dropped, and preferences and interests are filed under the user too. Then 3 of 3 rounds replaced Blender (its span 2026-09-01 – 2026-11-07, Unity `replaces` it), and a new chat answered from the profile alone: "You're currently into Unity … (since November 2026). Before that, you were into Blender (from September 2026 to November 2026)." `memory_search` with history found Blender as past; the Timeline and the chat's "Remembered: … · Review" line showed in the browser. A reply left empty with the answer in the model's thinking is now read from there, and a reply that isn't JSON is logged with its start.
+- [x] Delivered: the dates, `interest`, fading, the timeline, `history` for the past, the chat notice, and docs: architecture §14 (memory and time) and the brief (the entity page, the chat notice).
 
 ## Phase 4 — Finding it (S)
 

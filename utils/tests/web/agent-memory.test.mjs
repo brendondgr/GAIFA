@@ -68,3 +68,11 @@ test('Review: what was learned on its own (Keep, Not this) and what needs a look
   assert.deepEqual(calls.slice(2), [['POST', '/v1/memory/facts/f_a/keep', undefined], ['PATCH', '/v1/memory/facts/f_a', { state: 'rejected' }]]);
   assert.equal(renders, 2);
 });
+
+test('an entry\'s timeline: newest first, with spans and the chat', () => {
+  const rows = M.timeline([
+    { id: 'a', text: 'Into Blender', kind: 'interest', current: false, valid_from: '2026-09-02', valid_until: '2026-11-05', evidence: [{ thread: 't1' }] },
+    { id: 'b', text: 'Into Unity', kind: 'interest', current: true, valid_from: '2026-11-05', valid_until: null, evidence: [] },
+    { id: 'c', text: 'Works late', kind: 'fact', current: true, valid_from: null, recorded: Date.UTC(2026, 7, 3) / 1000, evidence: [] }]);
+  assert.deepEqual(rows.map(r => [r.id, r.span, r.thread]), [['b', 'since 2026-11', ''], ['a', '2026-09 – 2026-11', 't1'], ['c', 'since 2026-08', '']]);
+});

@@ -28,7 +28,10 @@ async def test_a_new_fact_and_entity_are_proposed_with_evidence(env):
     props = {f["text"]: f for f in m.facts(state="proposed")}
     assert set(props) == {"Prefers 4:3 images", "The thesis is about memory systems"}
     user_seq = env.payloads(tid, "user") and env.events(tid, "user")[-1]["seq"]
-    assert props["Prefers 4:3 images"]["evidence"] == [{"thread": tid, "seq": user_seq, "why": "not in your words"}]   # no quote
+    [ev] = props["Prefers 4:3 images"]["evidence"]
+    assert ev.pop("ts") == round(env.events(tid, "user")[-1]["ts"], 1)                 # when it was said (memory-auto-learning 3.1)
+    assert ev == {"thread": tid, "seq": user_seq, "why": "not in your words"}          # no quote
+    assert props["Prefers 4:3 images"]["valid_from"] == __import__("time").strftime("%Y-%m-%d")
     assert props["Prefers 4:3 images"]["source"] == "inferred"
     assert m.resolve("Thesis") is None and m.entities(state="proposed")[0]["name"] == "Thesis"
     assert m.facts(current=True) == []                                         # nothing a chat knows yet
@@ -134,3 +137,10 @@ async def test_learning_uses_a_served_model_and_waits_after_a_failure(env):
     assert ml.backoff.waiting(tid) and tid not in [t["id"] for t in ml.due()]
     now[0] += 5 * 60
     assert tid in [t["id"] for t in ml.due()]
+
+
+async def test_an_answer_left_in_the_thinking_is_read(env):
+    ml, m = env.agent.memory_learner, env.agent.memory
+    tid = await chat(env, "I prefer tea")
+    env.model.queue({"text": "", "thinking": 'Let me list them. {"facts": [{"text": "The user prefers tea.", "about": ["you"], "kind": "preference"}], "renames": []}'})
+    assert await ml.learn(tid) == 1 and [f["text"] for f in m.facts(state="proposed")] == ["The user prefers tea."]

@@ -23,6 +23,7 @@ import { VoiceButton, lastAnswer } from './chat-voice.js';
 import { scrollToReply } from './chat-quote.js';
 import { QuoteReplyBox, addQuote, draftQuotes, quotesPayload, messageText } from './chat-quote-reply.js';
 import { speak, speakable } from './chat-speak.js';
+import { MemoryNote } from './chat-memory-note.js';
 
 const R = () => globalThis.React;
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
@@ -256,7 +257,8 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
           h('span', { style: label11 }, 'Plan'), h('div', { style: { minWidth: 0, flex: 1 } }, h(TodoList, { items: view.todos, compact: true })))) : null,
       h('div', { ref: contentRef, style: { maxWidth: COL, margin: '0 auto', padding: '18px 16px 28px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } },
         empty && !toolForms.length ? h(EmptyState, { onPick: t => send(t), tools }) : null,
-        blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))))),
+        blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))),
+        running ? null : h(MemoryNote, { api, tid }))),
     h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
       dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
       voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),

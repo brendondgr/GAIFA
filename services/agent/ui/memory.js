@@ -38,6 +38,17 @@ export function quoteOf(f) {
   return [...(f.evidence || [])].reverse().find(e => e.quote)?.quote || '';
 }
 
+const month = f => (f.valid_from || new Date((f.recorded || 0) * 1000).toISOString().slice(0, 10)).slice(0, 7);
+
+/** An entry's facts as a timeline (memory-auto-learning 3.3): current and past, newest first, each with its span
+ * ("since 2026-11", "2026-09 – 2026-11") and the chat it came from. */
+export function timeline(facts) {
+  return [...facts].sort((a, b) => (b.valid_from || '').localeCompare(a.valid_from || '') || (b.recorded || 0) - (a.recorded || 0))
+    .map(f => ({ id: f.id, text: f.text, kind: f.kind, current: !!f.current,
+      span: f.current || !f.valid_until ? `since ${month(f)}` : `${month(f)} – ${f.valid_until.slice(0, 7)}`,
+      thread: (f.evidence || []).find(e => e.thread)?.thread || '' }));
+}
+
 /** Flatten the tree into rows with their depth, for drawing. */
 export function treeRows(tree) {
   const out = [];
@@ -105,6 +116,11 @@ export function memoryTab(ctx, put, fail, render) {
       e.proposed.length ? ui.text(`${e.proposed.length} more wait in Review.`, { small: true, muted: true }) : null,
       e.children.length ? h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, ui.text('Inside it:', { small: true, muted: true }),
         ...e.children.map(c => ui.button(c.name, () => { state.sel = c.id; render(); }, { small: true }))) : null,
+      e.history.length ? h('details', null, h('summary', { style: 'cursor:pointer;font-size:12.5px' }, `Timeline (${e.facts.length + e.history.length})`),
+        ...timeline([...e.facts, ...e.history]).map(r => h('div', { style: 'display:flex;gap:8px;align-items:baseline;padding:4px 0;font-size:12.5px' },
+          h('span', { style: `flex:0 0 130px;color:var(--mut,#8A94A6);font-variant-numeric:tabular-nums` }, r.span),
+          h('span', { style: `flex:1;min-width:0;overflow-wrap:anywhere${r.current ? '' : ';opacity:.7'}` }, r.text),
+          r.thread ? h('a', { href: `#/chat/${r.thread}`, style: 'font-size:12px' }, 'chat') : null))) : null,
       e.history.length ? h('details', null, h('summary', { style: 'cursor:pointer;font-size:12.5px' }, `Earlier (${e.history.length}): replaced or ended`),
         ...e.history.map(f => factRow(f, { history: true }))) : null,
       e.log.length ? h('details', null, h('summary', { style: 'cursor:pointer;font-size:12.5px' }, 'History'),
@@ -116,7 +132,7 @@ export function memoryTab(ctx, put, fail, render) {
   function newMemory() {
     const text = ui.input({ placeholder: 'A fact, as one sentence ("Prefers 16:9 images")' });
     const about = ui.input({ placeholder: 'About (names or paths, comma-separated; empty: you)' });
-    const kind = ui.select(['fact', 'preference', 'event', 'procedure'], { value: 'fact' });
+    const kind = ui.select(['fact', 'preference', 'interest', 'event', 'procedure'], { value: 'fact' });
     text.style.flex = '2';
     about.style.flex = '1';
     return ui.card(h('strong', null, 'Remember something'), h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, text, about, kind,

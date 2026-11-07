@@ -70,14 +70,14 @@ LOCAL: list[dict[str, Any]] = [
      "topics, by name (old names too), words and meaning. Use it before asking what they may have told you.",
      "parameters": {"type": "object", "properties": {"query": {"type": "string"},
                                                     "entity": {"type": "string", "description": "Only about this (a name or path)"},
-                                                    "history": {"type": "boolean", "description": "Also replaced facts"}},
+                                                    "history": {"type": "boolean", "description": "Also replaced and ended facts, with when they held (what the user used or liked before)"}},
                     "required": ["query"]}},
     SHOW_TOOL,
     {"name": "remember", "description": "Save a lasting fact the user told you (e.g. 'prefers 16:9 images'). `about`: what "
      "it's about, by name or path (projects/GAIFA); leave it out for the user.",
      "parameters": {"type": "object", "properties": {"text": {"type": "string"},
                                                     "about": {"type": "array", "items": {"type": "string"}},
-                                                    "kind": {"type": "string", "enum": ["preference", "fact", "event"]}},
+                                                    "kind": {"type": "string", "enum": ["preference", "fact", "interest", "event"]}},
                     "required": ["text"]}},
 ]
 LOCAL_NAMES = {t["name"] for t in LOCAL}

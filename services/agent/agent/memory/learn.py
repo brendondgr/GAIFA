@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from typing import Any, Callable
 
@@ -49,7 +50,9 @@ List only what the USER said in their own words that will still be true and usef
 
 Never list: what the user asked for or made in this chat (an image, a model, a voice clip, a job), what tools, models or voices are installed or available, anything the assistant said or found, document or web content, questions, or what memory already holds.
 
-When the user renames something memory knows ("we renamed AIHub to GAIFA"), put it in renames.
+When the user says something changed ("I'm into Unity now, not Blender anymore", "I switched to light themes"), keep the change in the fact's text so it can replace the old one: "The user is into Unity now, no longer Blender."
+
+When the user renames something memory knows ("we renamed AIHub to GAIFA"), put it in renames. Moving from one thing to another ("Unity now, not Blender") is not a rename: it's a fact with "ends".
 
 Memory already holds:
 {known}
@@ -57,15 +60,18 @@ Memory already holds:
 Entries memory knows (use their names or paths when a fact is about one; "you" is the user):
 {entities}
 
+Kinds: "preference" for how the user likes things; "interest" for what they are into, learning or working with for now ("The user is learning Rust", "The user is into Blender"), which can change; "fact" for lasting facts; "event" for something that happened on a date; "procedure" for how they do something.
+
 Write every fact in the third person, as a sentence about the user that stands on its own: "The user…", "Their…", never "I", "my", "me", "we" or "our". "I hate qualifying exams" → "The user dislikes qualifying exams."; "my advisor is supportive" → "The user's advisor is supportive."
 
 For each fact also give:
 - "quote": the USER's own words it comes from, copied exactly from one USER line (a few words to one sentence);
+- "ends": what the user says they no longer do, like or use, by name (["Blender"] for "not Blender anymore"), else [];
 - "confidence": 0 to 1, how sure you are that the user meant it as a lasting fact about themselves or their work (1: said plainly and seriously; 0.5: a guess, a joke, a hypothetical, role-play or a test);
 - "sensitive": true when it is about health, money or finances, legal matters, relationships or family, religion, politics, sexuality, or another named person.
 
 Answer with JSON only, no prose:
-{{"facts": [{{"text": "one sentence in the third person", "about": ["you"], "kind": "preference|fact|event|procedure", "valid_from": "YYYY-MM-DD or null", "quote": "the user's words", "confidence": 0.9, "sensitive": false}}], "renames": [{{"from": "old name", "to": "new name"}}]}}
+{{"facts": [{{"text": "one sentence in the third person", "about": ["you"], "kind": "preference|fact|interest|event|procedure", "valid_from": "YYYY-MM-DD or null", "quote": "the user's words", "ends": [], "confidence": 0.9, "sensitive": false}}], "renames": [{{"from": "old name", "to": "new name"}}]}}
 "about" says what a fact is about: "you" for the user themselves (their tastes and habits), or a path made of a folder and a name: "projects/Lumen", "people/Ana", "places/Lisbon", "tools/Blender", "topics/cooking". A fact about a project, a person or a thing goes about that, even when the user did it: "I started a reading app called Lumen" → {{"text": "Lumen is the user's reading-tracker app", "about": ["projects/Lumen"]}}. Empty lists are a fine answer.
 
 THE CHAT:
@@ -73,7 +79,7 @@ THE CHAT:
 
 DECIDE = """You keep an assistant's memory. For each new fact below, compare it with the facts memory already holds about the same things, and choose one:
 - "same": it says what held fact <id> says (nothing changes)
-- "replaces": it makes held fact <id> out of date (a change, a correction, a newer value)
+- "replaces": it makes held fact <id> out of date (a change, a correction, a newer value; a new fact that says the user no longer does, likes or uses what <id> says replaces it)
 - "adds": it is new
 - "skip": it isn't worth keeping
 Answer with JSON only: {{"decisions": [{{"n": 1, "op": "same|replaces|adds|skip", "id": "the held fact's id, or null"}}]}}
@@ -102,6 +108,36 @@ def clean_about(a: str) -> str:
         if len(words) > 1 and words[-1].lower() in KIND_WORDS:
             return f"{KIND_WORDS[words[-1].lower()]}/{' '.join(words[:-1])}"
     return a
+
+
+_ENDS = [re.compile(p, re.I) for p in (
+    r"\bno longer (?:using |into |use |uses |with |likes? |a fan of |working (?:on|with) )?([A-Z][\w.+#-]*)",
+    r"\bnot (?:using |into |with )?([A-Z][\w.+#-]*) any ?more", r"\binstead of ([A-Z][\w.+#-]*)",
+    r"\bswitched (?:away )?from ([A-Z][\w.+#-]*)", r"\bmoved (?:away )?from ([A-Z][\w.+#-]*)", r"\bstopped (?:using )?([A-Z][\w.+#-]*)")]
+
+
+def ends_of(c: dict[str, Any]) -> list[str]:
+    """What a learned fact says the user stopped (memory-auto-learning 3.2): the model's `ends`, and names after "no
+    longer", "not … anymore", "instead of", "switched from" in the fact or its quote."""
+    out = [str(t).strip() for t in c.get("ends") or [] if isinstance(t, str) and str(t).strip()]
+    for text in (c.get("text"), c.get("quote")):
+        for rx in _ENDS:
+            out += [m.group(1).rstrip(".,;") for m in rx.finditer(text or "") if m.group(1)[:1].isupper()]
+    return list(dict.fromkeys(t for t in out if norm(t) and norm(t) not in ("the", "it", "that", "this")))
+
+
+def ended_fact(m: MemoryStore, terms: list[str]) -> str | None:
+    """The newest current fact that names one of `terms` as something the user has (not one that already says it
+    ended): the fact a "no longer X" replaces."""
+    if not terms:
+        return None
+    pats = [re.compile(rf"(?<![\w]){re.escape(t)}(?![\w])", re.I) for t in terms]
+    for f in m.facts(state="active", current=True, limit=500):
+        if f["kind"] == "event" or any(rx.search(f["text"]) for rx in _ENDS):
+            continue
+        if any(p.search(f["text"]) for p in pats):
+            return f["id"]
+    return None
 
 
 class MemoryLearner:
@@ -162,7 +198,11 @@ class MemoryLearner:
 
     async def ask(self, model: str, prompt: str) -> dict[str, Any] | None:
         reply = await self.agent.llm.chat(model, [{"role": "user", "content": prompt}], stream=False)
-        return _json(reply.text or "")
+        self.last_reply = reply.text or ""
+        got = _json(self.last_reply)
+        if got is None and not self.last_reply.strip() and reply.thinking:   # all of it went into the thinking
+            got = _json(reply.thinking[reply.thinking.rfind('{"facts"'):] if '{"facts"' in reply.thinking else "")
+        return got
 
     async def learn(self, tid: str) -> int | None:
         """Propose what chat `tid` taught since the last pass; the number of proposals, or None when the model's answer
@@ -184,12 +224,14 @@ class MemoryLearner:
         got = await self.ask(model, EXTRACT.format(known=known, entities=ents, chat=render(events, cap=8000, reply_cap=600)))
         if got is None or not isinstance(got.get("facts", []), list):
             tries = st["tries"] + 1
-            log.warning("memory learning: %s answered no JSON (try %d)", tid, tries)
+            log.warning("memory learning: %s answered no JSON (try %d): %r", tid, tries, getattr(self, "last_reply", "")[:300])
             self._mark(tid, last if tries >= 2 else st["upto_seq"], 0 if tries >= 2 else tries)
             return None
         evidence = [{"thread": tid, "seq": users[-1]["seq"]}]
-        n = self._renames(got.get("renames") or [], evidence)
         cands = [f for f in got.get("facts") or [] if isinstance(f, dict) and isinstance(f.get("text"), str) and f["text"].strip()][:MAX_FACTS]
+        stopped = {norm(t) for c in cands for t in ends_of(c)}
+        n = self._renames([r for r in got.get("renames") or [] if not (isinstance(r, dict) and norm(str(r.get("from") or "")) in stopped)],
+                          evidence)                          # "Unity now, not Blender" isn't a rename
         await self._third_person(model, cands)
         n += await self._facts(model, cands, evidence, users)
         self._mark(tid, last, 0)
@@ -225,7 +267,9 @@ class MemoryLearner:
         """The chat and the user's message the fact's quote is in (else the last one), with the quote."""
         q = c.get("quote") if isinstance(c.get("quote"), str) else ""
         hit = next((u for u in reversed(users) if auto.grounded(q, [u["payload"].get("text") or ""])), None)
-        ev = {**evidence[-1], **({"seq": hit["seq"]} if hit else {}), **({"quote": q.strip()[:300]} if q.strip() else {})}
+        at = hit or (users[-1] if users else None)
+        ev = {**evidence[-1], **({"seq": hit["seq"]} if hit else {}), **({"ts": round(at["ts"], 1)} if at and at.get("ts") else {}),
+              **({"quote": q.strip()[:300]} if q.strip() else {})}
         return [*evidence[:-1], ev]
 
     async def _facts(self, model: str, cands: list[dict[str, Any]], evidence: list[dict[str, Any]],
@@ -235,7 +279,11 @@ class MemoryLearner:
             r = await search(self.m, self.agent.hub, c["text"], limit=5, meaning_wait=10)
             held.append([f for f in r["facts"] if f.get("current", True)][:5])
         ops: dict[int, tuple[str, str | None]] = {i: ("adds", None) for i in range(len(cands))}
-        ask = [i for i, h in enumerate(held) if h]
+        for i, c in enumerate(cands):                       # "…, no longer Blender": the held Blender fact, without asking
+            old = ended_fact(self.m, ends_of(c))
+            if old is not None:
+                ops[i] = ("replaces", old)
+        ask = [i for i, h in enumerate(held) if h and ops[i][0] == "adds"]
         if ask:
             items = "\n\n".join(f"{k}. NEW: {cands[i]['text']}\n   HELD: " + "; ".join(f"{h['id']}: {h['text']}" for h in held[i])
                                 for k, i in enumerate(ask, 1))
@@ -270,7 +318,11 @@ class MemoryLearner:
                 valid = check_date(c.get("valid_from") if isinstance(c.get("valid_from"), str) else None, "valid_from")
             except MemoryError:
                 valid = None
+            if valid is None and ev[-1].get("ts"):                  # when the user said it (memory-auto-learning 3.1)
+                valid = time.strftime("%Y-%m-%d", time.localtime(ev[-1]["ts"]))
             about = [clean_about(a) for a in c.get("about") or [] if isinstance(a, str)][:6]
+            if kind in ("preference", "interest") and about and "you" not in about:
+                about.append("you")                  # the user's taste, filed under them too (memory-auto-learning 3.2)
             replaced = self.m.fact_row(fid) if op == "replaces" and fid else None
             ok, why = auto.decide(c, said, replaced, cfg)
             try:

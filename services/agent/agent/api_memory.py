@@ -64,7 +64,7 @@ class MergeIn(BaseModel):
 class FactIn(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
     about: list[Any] = Field(default_factory=list, max_length=10, description="Entities: ids, paths, names, or {name, kind}")
-    kind: Literal["preference", "fact", "event", "procedure"] = "fact"
+    kind: Literal["preference", "fact", "interest", "event", "procedure"] = "fact"
     valid_from: str | None = None
     valid_until: str | None = None
     replaces: str | None = None
@@ -75,7 +75,7 @@ class FactIn(BaseModel):
 class FactPatch(BaseModel):
     text: str | None = Field(None, max_length=1000)
     about: list[Any] | None = Field(None, max_length=10)
-    kind: Literal["preference", "fact", "event", "procedure"] | None = None
+    kind: Literal["preference", "fact", "interest", "event", "procedure"] | None = None
     valid_from: str | None = Field("", description="A date like 2026-10-26; null clears it; leave out to keep it")
     valid_until: str | None = Field("", description="A date like 2026-10-26; null clears it; leave out to keep it")
     state: Literal["proposed", "active", "retired", "rejected"] | None = None
@@ -87,7 +87,7 @@ class SaveIn(BaseModel):
     about: list[str] = Field(default_factory=list, max_length=6, description="What it's about: names or paths of projects, "
                              "people, places, tools, topics (\"GAIFA\", \"projects/GAIFA\", \"people/Ana\"). Leave out for the user. "
                              "An unknown name makes a new entry; a path's first part (projects, people, places, tools, topics) gives its kind")
-    kind: Literal["preference", "fact", "event", "procedure"] = Field("fact", description="preference: how the user likes things")
+    kind: Literal["preference", "fact", "interest", "event", "procedure"] = Field("fact", description="preference: how the user likes things; interest: what they're into or learning for now")
     replaces: str | None = Field(None, description="The id of a fact this one makes out of date (from memory_search); it's kept as history")
     valid_from: str | None = Field(None, description="When it starts to hold, YYYY-MM-DD (default: always)")
     valid_until: str | None = Field(None, description="When it stops holding, YYYY-MM-DD (a trip, a deadline)")
@@ -170,10 +170,11 @@ def add_routes(app: FastAPI) -> None:
         agent = request.app.state.agent
         return await search(agent.memory, agent.hub, q, history=history, limit=min(limit, 50), meaning_wait=8)
 
-    @app.get("/v1/memory/facts", summary="Facts: ?state=proposed|active|retired|rejected, ?entity=, ?q= (words), ?current=true")
+    @app.get("/v1/memory/facts", summary="Facts: ?state=proposed|active|retired|rejected, ?entity=, ?q= (words), ?current=true, "
+             "?thread= (learned from that chat), ?source=stated|inferred")
     def facts(request: Request, state: str | None = None, entity: str | None = None, q: str | None = None,
-              current: bool | None = None, limit: int = 200) -> list:
-        return M(request).facts(state, entity, q, current, min(limit, 1000))
+              current: bool | None = None, limit: int = 200, thread: str | None = None, source: str | None = None) -> list:
+        return M(request).facts(state, entity, q, current, min(limit, 1000), thread, source)
 
     @app.post("/v1/memory/facts", status_code=201, summary="Remember a fact about entities (the user when none); replaces retires an older one")
     def add(body: FactIn, request: Request) -> dict:

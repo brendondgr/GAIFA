@@ -27,7 +27,8 @@ async def test_the_profile_and_its_cap(env):
     m.create_entity("project", "Ariadne")
     m.add_fact("Mods use ports 5100-5199", about=[g["id"]])
     text, shown = profile.build(m)
-    assert text.startswith("About the user:\n- Prefers 16:9 images\n- Works late\nProjects: Ariadne; GAIFA (the local AI hub)")
+    mo = __import__("time").strftime("%Y-%m")
+    assert text.startswith(f"About the user:\n- Prefers 16:9 images (since {mo})\n- Works late (since {mo})\nProjects: Ariadne; GAIFA (the local AI hub)")
     assert "5100" not in text and len(shown) == 2
     for i in range(200):
         m.add_fact(f"Fact number {i} about the user, written to be long enough to fill the profile")

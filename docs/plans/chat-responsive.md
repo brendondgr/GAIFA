@@ -75,9 +75,9 @@ The approach has three phases. Phase 1 makes the message appear the moment the u
 **Wire — Phase 2:** the Chat page's composer queues messages during a turn and shows them above it. The old in-thread "queued" badge is used only for steered messages.
 
 **Checks & deliverables — Phase 2**
-- [ ] The same chat open in two panes shows the same queue, and an edit in one shows in the other.
-- [ ] A queued message with an attached document and a quote-reply runs with both.
-- [ ] Delivered: `services/agent/agent/queue.py`, `web/chat/chat-queue.js`, the changed agent and chat files, and tests.
+- [x] The same chat open in two panes shows the same queue, and an edit in one shows in the other. *Checked 2026-11-07 on the installed hub,* in two browser tabs on one chat.
+- [x] A queued message with an attached document and a quote-reply runs with both. *Checked:* held during a turn, then sent with its document (`#1`, read whole) and its quote-reply; the answer used the file. Also on the installed hub: three messages queued during a long reply, the third edited in the strip, then Stop: the three were written at once and one reply answered them all (with the count it had been asked for).
+- [x] Delivered: `services/agent/agent/queue.py`, `web/chat/chat-queue.js`, the changed agent and chat files, and tests.
 
 ## Phase 3 — Fewer waits around the first token (S)
 

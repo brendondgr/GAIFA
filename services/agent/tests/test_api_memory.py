@@ -46,3 +46,12 @@ async def test_merge_over_http(env):
     m = (await c.post(f"/v1/memory/entities/{b['id']}/merge", json={"into": a["id"]})).json()
     assert m["aliases"] == ["Ana B."]
     assert (await c.post(f"/v1/memory/entities/{a['id']}/merge", json={"into": a["id"]})).json()["code"] == "bad_merge"
+
+
+async def test_learn_now_says_when_the_model_failed(env):
+    env.model.queue({"text": "noted"})
+    tid = await env.thread()
+    await env.send(tid, "I prefer tea")
+    env.model.queue({"status": 502, "text": "bad gateway", "match": "lasting facts"})
+    r = await env.client.post(f"/v1/memory/learn?thread={tid}")
+    assert r.status_code == 503 and r.json()["code"] == "unavailable"

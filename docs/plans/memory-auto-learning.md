@@ -1,6 +1,6 @@
 # Plan: Memory that learns on its own, worded right, dated, and easy to find
 
-**Asked for:** 2026-11-07 · **Status:** Planned
+**Asked for:** 2026-11-07 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -26,23 +26,23 @@ It touches architecture §14 (the agent: memory and learning lines), the brief's
 
 ## Phase 1 — Facts in the third person (S)
 
-- [ ] **1.1 The extract prompt: `services/agent/agent/memory/learn.py` `EXTRACT`.**
+- [x] **1.1 The extract prompt: `services/agent/agent/memory/learn.py` `EXTRACT`.**
   - **Prompt:** each fact is "one sentence in the third person about the user ('The user…', 'Their…'), never 'I', 'my' or 'me'". Add two examples next to the Lumen one: "I hate qualifying exams" → "The user dislikes qualifying exams." and "my advisor is supportive" → "The user's advisor is supportive."
   - **Also asked for (used by Phase 2):** `quote`, the user's own words the fact comes from, copied exactly; `confidence`, 0 to 1; and `sensitive`, true or false with the categories from §2.
   *Done when:* `services/agent/tests/test_memory_learn.py` checks that the prompt asks for the third person and for `quote`, `confidence` and `sensitive`, and that a scripted answer with these fields is read.
-- [ ] **1.2 A wording check: `services/agent/agent/memory/wording.py` (new).**
+- [x] **1.2 A wording check: `services/agent/agent/memory/wording.py` (new).**
   - **`first_person(text) -> bool`:** whole-word "I", "I'm", "I've", "me", "my", "mine", "myself", "we", "our", outside quotation marks.
   - **`reword(llm, model, facts) -> list[str]`:** one call that rewrites the given facts in the third person and keeps their meaning. The learner uses it on any fact that `first_person` catches. A fact that still fails after one rewrite is saved as proposed (never auto-approved) and logged.
   - **Never:** it is used only on `source = "inferred"` facts. Stated facts (`remember`) keep the user's words.
   *Done when:* `services/agent/tests/test_memory_wording.py` checks that the five first-person Nov 5 sentences are caught, that "The user said 'I can't'" is not caught, and that a scripted reword is applied while a failed one leaves the fact proposed.
-- [ ] **1.3 The proposals already saved: `POST /v1/memory/reword` (`services/agent/agent/api_memory.py`).**
-  - **Work:** this rewords every proposed or active **inferred** fact that `first_person` catches, through `MemoryStore.set_text` (or the existing correct-a-fact path in `facts.py`). Each change is logged as `fact_edit` by `learner`, so it can be undone.
+- [x] **1.3 The proposals already saved: `POST /v1/memory/reword` (`services/agent/agent/api_memory.py`).**
+  - **Work:** this rewords every proposed or active **inferred** fact that `first_person` catches, through the existing correct-a-fact path (`update_fact`). *As built:* each change is logged as `fact_update` by `learner`, so it can be undone.
   - The tidy pass (`tidy.py`) also calls it every night.
   *Done when:* the route test rewords an inferred first-person fact and leaves a stated one untouched. On the installed hub, the six first-person proposals from 2026-11-05 read "The user…" on Review, and each one's History shows the old text with Undo.
 
 **Checks & deliverables — Phase 1**
-- [ ] A chat on the installed hub that says "I prefer short answers and I'm learning Rust", left quiet (or `POST /v1/memory/learn?thread=`), produces "The user prefers short answers" and "The user is learning Rust".
-- [ ] Delivered: `wording.py`, the prompt change, the route, and the docs: architecture §14 (the learner) and the structured-memory plan's 4.1 note linking here.
+- [x] A chat on the installed hub that says "I prefer short answers and I'm learning Rust", left quiet (or `POST /v1/memory/learn?thread=`), produces "The user prefers short answers" and "The user is learning Rust". *As checked (2026-11-07, skynet):* "The user prefers short, concise answers." and "The user is learning Rust.", each with the chat and message; the chat and both facts deleted after. `POST /v1/memory/reword` rewrote the six first-person proposals from 2026-11-05 ("The user works independently and hates qualifying exams.", …). On the way, `POST /v1/memory/learn` answered a bare 500 when the relay gave a 502; it now answers 503 with a fix.
+- [x] Delivered: `wording.py`, the prompt change, the route, and the docs: architecture §14 (the learner) and the structured-memory plan's 4.1 note linking here.
 
 ## Phase 2 — Auto-approval of confident facts (M)
 

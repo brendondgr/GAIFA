@@ -5,6 +5,7 @@
 - **Duplicate entries:** two active entities of the same kind whose names share most of their words (one name inside
   the other, or Jaccard ≥ 0.6), or whose embeddings are very close (≥ 0.92), become a proposed merge, once.
 - **Summaries:** an entity with facts newer than its summary gets one sentence from its current facts (10 a night).
+- **Wording:** a learned fact still in the first person is rewritten about the user (`wording.reword_saved`).
 - **Fading:** an inferred fact nobody used for `fade_days` (`data/agent/memory.json`, default 180) is proposed for retiring.
 
 Merges and retirements are proposals (`proposed` events whose evidence carries the action); nothing is merged or
@@ -18,6 +19,7 @@ import time
 from itertools import combinations
 from typing import Any
 
+from . import wording
 from .model import norm
 from .store import MemoryStore
 
@@ -125,6 +127,11 @@ def fading(m: MemoryStore, days: int = FADE_DAYS) -> int:
 async def run(agent: Any, fade_days: int = FADE_DAYS) -> dict[str, int]:
     m: MemoryStore = agent.memory
     out = {"ended": ended(m), "merges": await duplicates(m, agent.hub), "fading": fading(m, fade_days)}
+    try:
+        out["reworded"] = (await wording.reword_saved(agent))["reworded"]
+    except Exception:  # noqa: BLE001: the model may be away tonight
+        log.exception("memory rewording")
+        out["reworded"] = 0
     try:
         out["summaries"] = await summaries(m, agent.llm, agent.cfg.model)
     except Exception:  # noqa: BLE001: the model may be away tonight

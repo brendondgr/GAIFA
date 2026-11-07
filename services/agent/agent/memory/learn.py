@@ -4,7 +4,8 @@ For each chat quiet for the summaries' idle time (and not an eval's, and not `no
 1. **Extract.** The chat as the learner renders it (`learn.loop.render`: the user's words plain; the agent's replies,
    arguments and anything from documents or pages inside `<untrusted>`, documents as their cards) goes to the
    chat's model (the agent's when the relay doesn't serve it; a failed chat waits, `summaries.Backoff`), which lists
-   lasting facts the USER stated, and renames, as JSON. Learning starts from the chats
+   lasting facts the USER stated, in the third person, each with the user's quote, a confidence and whether it is
+   sensitive, and renames, as JSON. A fact still in the first person is reworded once (`wording.py`). Learning starts from the chats
    as they were when it was first turned on (`baseline`): past chats aren't mined all at once.
 2. **Resolve.** Each fact's `about` resolves without a model (`MemoryStore.resolve`).
 3. **Compare.** Its five nearest current facts (`memory_search`); when it has any, the model chooses one operation per
@@ -29,6 +30,7 @@ from ..summaries import Backoff
 from .model import FACT_KINDS, MemoryError, check_date, norm
 from .search import search
 from .store import MemoryStore
+from .wording import first_person, reword
 
 log = logging.getLogger("agent.memory.learn")
 SCHEMA = ("CREATE TABLE IF NOT EXISTS mem_learned (thread_id TEXT PRIMARY KEY, upto_seq INTEGER NOT NULL, made REAL NOT NULL, "
@@ -52,8 +54,15 @@ Memory already holds:
 Entries memory knows (use their names or paths when a fact is about one; "you" is the user):
 {entities}
 
+Write every fact in the third person, as a sentence about the user that stands on its own: "The user…", "Their…", never "I", "my", "me", "we" or "our". "I hate qualifying exams" → "The user dislikes qualifying exams."; "my advisor is supportive" → "The user's advisor is supportive."
+
+For each fact also give:
+- "quote": the USER's own words it comes from, copied exactly from one USER line (a few words to one sentence);
+- "confidence": 0 to 1, how sure you are that the user meant it as a lasting fact about themselves or their work (1: said plainly and seriously; 0.5: a guess, a joke, a hypothetical, role-play or a test);
+- "sensitive": true when it is about health, money or finances, legal matters, relationships or family, religion, politics, sexuality, or another named person.
+
 Answer with JSON only, no prose:
-{{"facts": [{{"text": "one sentence that stands on its own", "about": ["you"], "kind": "preference|fact|event|procedure", "valid_from": "YYYY-MM-DD or null"}}], "renames": [{{"from": "old name", "to": "new name"}}]}}
+{{"facts": [{{"text": "one sentence in the third person", "about": ["you"], "kind": "preference|fact|event|procedure", "valid_from": "YYYY-MM-DD or null", "quote": "the user's words", "confidence": 0.9, "sensitive": false}}], "renames": [{{"from": "old name", "to": "new name"}}]}}
 "about" says what a fact is about: "you" for the user themselves (their tastes and habits), or a path made of a folder and a name: "projects/Lumen", "people/Ana", "places/Lisbon", "tools/Blender", "topics/cooking". A fact about a project, a person or a thing goes about that, even when the user did it: "I started a reading app called Lumen" → {{"text": "Lumen is the user's reading-tracker app", "about": ["projects/Lumen"]}}. Empty lists are a fine answer.
 
 THE CHAT:
@@ -177,9 +186,20 @@ class MemoryLearner:
         evidence = [{"thread": tid, "seq": users[-1]["seq"]}]
         n = self._renames(got.get("renames") or [], evidence)
         cands = [f for f in got.get("facts") or [] if isinstance(f, dict) and isinstance(f.get("text"), str) and f["text"].strip()][:MAX_FACTS]
+        await self._third_person(model, cands)
         n += await self._facts(model, cands, evidence)
         self._mark(tid, last, 0)
         return n
+
+    async def _third_person(self, model: str, cands: list[dict[str, Any]]) -> None:
+        """Facts the model still wrote as the user ("I prefer…") rewritten once (memory-auto-learning 1.2); one that
+        stays in the first person is marked `first_person` (never saved without review)."""
+        bad = [c for c in cands if first_person(c["text"])]
+        for c, t in zip(bad, await reword(self.agent.llm, model, [c["text"] for c in bad])):
+            c["text"] = t
+            if first_person(t):
+                c["first_person"] = True
+                log.info("memory learning: still in the first person: %s", t[:80])
 
     def _renames(self, renames: list[Any], evidence: list[dict[str, Any]]) -> int:
         n = 0

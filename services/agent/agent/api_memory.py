@@ -10,6 +10,7 @@
     PATCH  /v1/memory/facts/{id}                {text?, about?, kind?, valid_from?, valid_until?, state?}
     DELETE /v1/memory/facts/{id}                forget it for real
     POST   /v1/memory/undo/{log_id}
+    POST   /v1/memory/reword                    learned facts in the first person, rewritten (memory-auto-learning 1.3)
     GET    /v1/memory/log                       ?target=&limit=
 """
 
@@ -240,14 +241,21 @@ def add_routes(app: FastAPI) -> None:
         ml = getattr(request.app.state.agent, "memory_learner", None)
         if ml is None:
             return JSONResponse({"detail": "the memory learner isn't running", "code": "unavailable"}, 503)
-        if thread:
-            return {"proposed": await ml.learn(thread)}
-        return {"proposed": await ml.check()}
+        try:
+            return {"proposed": await (ml.learn(thread) if thread else ml.check())}
+        except Exception as e:  # noqa: BLE001: the model didn't answer; the next pass tries again
+            return JSONResponse({"detail": f"the model didn't answer: {e}", "code": "unavailable",
+                                 "fix": "try again in a moment, or check Settings → LLMs"}, 503)
 
     @app.post("/v1/memory/tidy", summary="Tidy memory now instead of at night: ended facts, duplicate entries, summaries, fading")
     async def tidy_now(request: Request) -> Any:
         from .memory import tidy
         return await tidy.run(request.app.state.agent)
+
+    @app.post("/v1/memory/reword", summary="Rewrite learned facts still in the first person (\"I prefer…\") as facts about the user")
+    async def reword_now(request: Request) -> Any:
+        from .memory.wording import reword_saved
+        return await reword_saved(request.app.state.agent)
 
     @app.post("/v1/memory/reindex", summary="Send every current fact and entity to the embed mod's memory collection again")
     async def reindex(request: Request) -> Any:

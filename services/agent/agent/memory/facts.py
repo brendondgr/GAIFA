@@ -98,6 +98,8 @@ class FactsMixin:
         (`propose`). Paths and kinds go first, a bare name that repeats one is the same entry, and an entry of another
         kind by that name is used rather than refused. Nothing: the user."""
         items: list[tuple[str, str | None]] = []
+        if isinstance(about, (str, dict)):                  # one name given bare: never its letters
+            about = [about]
         for a in about or []:
             name, kind = (a.get("name"), a.get("kind")) if isinstance(a, dict) else (str(a), None)
             if (name or "").strip():

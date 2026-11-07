@@ -29,6 +29,20 @@ async def test_remember_about_a_project_then_rename_keeps_its_facts(env):
     assert env.payloads(tid, "memory")[0]["about"] == ["projects/AIHub"]
 
 
+async def test_about_given_as_one_string_is_one_name_not_its_letters(env):
+    """Seen live 2026-11-07: remember(about="user") made topics u, s, e and r."""
+    env.model.queue({"tool_calls": [{"name": "remember", "arguments": {"text": "The user's name is Brendon.", "about": "user"}}]},
+                    {"tool_calls": [{"name": "remember", "arguments": {"text": "Lumen is a reading app.", "about": "projects/Lumen"}}]},
+                    {"text": "ok"})
+    tid = await env.thread()
+    await env.send(tid, "my name is Brendon, and remember Lumen is a reading app")
+    await approve_all(env, tid)
+    m = env.agent.memory
+    assert [e["path"] for e in m.facts(q="Brendon")[0]["entities"]] == ["you"]
+    assert [e["path"] for e in m.facts(q="Lumen")[0]["entities"]] == ["projects/Lumen"]
+    assert not any(len(e["name"]) == 1 for e in m.entities()) and m.resolve_about("you", "stated", "user") == ["user"]
+
+
 async def test_replaces_retires_the_old_fact_and_related_facts_are_offered(env):
     m = env.agent.memory
     old = m.add_fact("Prefers 16:9 images", kind="preference")

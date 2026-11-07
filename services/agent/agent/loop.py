@@ -497,6 +497,8 @@ class Agent(Compaction):
             # A lasting fact goes into later chats: the hub decides it as agent_memory_save, a `write` in the ask list
             # (Plan refuses it; a chat that read untrusted text gets a card; structured-memory 3.2)
             about = (args or {}).get("about") or ([args["topic"]] if (args or {}).get("topic") else [])
+            if isinstance(about, str):                     # "user", not ["user"]: one name, never its letters
+                about = [about]
             hub_name, args = "agent_memory_save", {"text": text, **({"about": [str(a) for a in about][:6]} if about else {}),
                                                    **({"kind": args["kind"]} if (args or {}).get("kind") else {})}
         elif name in LOCAL_NAMES:

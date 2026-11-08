@@ -67,3 +67,50 @@ export function useUiPref(path, d, prefs = uiPrefs) {
   React.useEffect(() => prefs.subscribe(() => setN(n => n + 1)), [prefs]);
   return [prefs.get(path, d), v => prefs.set(path, v)];
 }
+
+// ---------- 3.3: this browser's old choices, saved to config.toml once ----------
+export const IMPORTED_KEY = 'gaifa.prefs.imported';
+const OVERVIEW = { view: ['dashboard', 'services', 'table', 'timeline'], range: ['1h', '6h', '24h', '7d'] };
+const LIST = { group: ['environment', 'none'], envOrder: ['activity', 'name', 'created'], chatOrder: ['updated', 'title', 'created'] };
+
+/** What to save from this browser: each choice it made (not the default) that config.toml doesn't set yet.
+ *  `ui` is GET /api/settings's `ui`. Old `aihub.*` copies count too. Returns a `ui` patch (maybe empty). */
+export function browserChoices(ui, storage) {
+  const raw = k => { try { return storage?.getItem(k) ?? (k.startsWith('gaifa.') ? storage?.getItem('aihub.' + k.slice(6)) : null); } catch { return null; } };
+  const json = k => { try { const v = raw(k); return v == null ? null : JSON.parse(v); } catch { return null; } };
+  const out = {}, chat = ui?.chat || {}, ov = ui?.overview || {}, put = (t, k, v) => { (out[t] ||= {})[k] = v; };
+  const steps = json('gaifa.chat.steps');
+  if (steps === 'split' && (chat.steps ?? 'fold') === 'fold') put('chat', 'steps', 'split');
+  const env = json('gaifa.chat.environment');
+  if (typeof env === 'string' && env && chat.environment == null) put('chat', 'environment', env);
+  const lv = json('gaifa.chat.list'), cl = chat.list || {};
+  const listDefault = (cl.group ?? 'environment') === 'environment' && (cl.env_order ?? 'activity') === 'activity' && (cl.chat_order ?? 'updated') === 'updated' && !(cl.collapsed || []).length;
+  if (lv && typeof lv === 'object' && listDefault) {
+    const l = {};
+    if (LIST.group.includes(lv.group) && lv.group !== 'environment') l.group = lv.group;
+    if (LIST.envOrder.includes(lv.envOrder) && lv.envOrder !== 'activity') l.env_order = lv.envOrder;
+    if (LIST.chatOrder.includes(lv.chatOrder) && lv.chatOrder !== 'updated') l.chat_order = lv.chatOrder;
+    if (Array.isArray(lv.collapsed) && lv.collapsed.length) l.collapsed = lv.collapsed.map(String);
+    if (Object.keys(l).length) put('chat', 'list', l);
+  }
+  const view = raw('hub.ovView'), tl = raw('hub.tlRange'), sv = raw('hub.svcRange');
+  if (OVERVIEW.view.includes(view) && view !== 'dashboard' && (ov.view ?? 'dashboard') === 'dashboard') put('overview', 'view', view);
+  if (OVERVIEW.range.includes(tl) && tl !== '24h' && (ov.timeline_range ?? '24h') === '24h') put('overview', 'timeline_range', tl);
+  if (OVERVIEW.range.includes(sv) && sv !== '24h' && (ov.services_range ?? '24h') === '24h') put('overview', 'services_range', sv);
+  const theme = raw('hub.theme'), density = raw('hub.density');
+  if (['light', 'dark'].includes(theme) && (ui?.theme ?? 'system') === 'system') out.theme = theme;
+  if (density === 'comfortable' && (ui?.density ?? 'compact') === 'compact') out.density = density;
+  return out;
+}
+
+/** Once per browser: save `browserChoices` (one PUT), then mark it done. */
+export async function importBrowser(api, st, storage = globalThis.localStorage) {
+  try { if (storage?.getItem(IMPORTED_KEY)) return null; } catch { return null; }
+  const patch = browserChoices(st?.ui, storage);
+  if (Object.keys(patch).length) {
+    const r = await api.saveSettings({ ui: patch });
+    if (r?.settings) uiPrefs.apply(r.settings);
+  }
+  try { storage?.setItem(IMPORTED_KEY, '1'); } catch { /* private window: asked again next time, harmless */ }
+  return patch;
+}

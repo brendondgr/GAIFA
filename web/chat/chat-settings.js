@@ -1,10 +1,11 @@
 // Settings → Agent (plan 14.9, Wire — Phase 14): AGENT.md, memory (structured-memory 5.2: its settings and counts), documents
 // (plan 24.9: whole documents up to a size or the model's window, and the reply reserve), the
-// models, how a turn's steps are drawn (one fold, or split at each message; per browser), skills, the ask modes and permissions with the grants (plan 25.2: what was allowed in a
+// models, how a turn's steps are drawn (one fold, or split at each message; config.toml [ui.chat]), skills, the ask modes and permissions with the grants (plan 25.2: what was allowed in a
 // chat or always, with revoke), and Speech input (plan 29.4, chat-speech-input.js). (Show thinking is retired: thinking is a row in each turn's
 // activity fold, plan 19.4.) Mounted by Hub.dc.html's Settings page.
 
-import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, inputSt, fmtTokens, fmtAgo, usePref } from './chat-ui.js';
+import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, inputSt, fmtTokens, fmtAgo } from './chat-ui.js';
+import { useUiPref } from '../ui-prefs.js';
 import { groupSkills, uploadBody } from './chat-skills.js';
 import { STEPS_LAYOUT } from './chat-activity.js';
 import { getChatClient } from './chat.js';
@@ -62,6 +63,8 @@ export function AgentNotes({ api, toast }) {
     a.err ? h('div', { role: 'alert', style: { padding: '10px 12px', borderRadius: 8, background: T.trd, color: T.rd } }, `The agent didn’t answer: ${a.err.detail || a.err.message}. Start the Agent mod, then reload.`) : null);
 }
 
+export const STEPS_HINT = 'One fold per turn ("Ran 2 tools"), or each thing the agent says between steps as a message of its own, with a fold for the steps before it.';
+
 /** The chat's default and fallback models (read-only: the agent's own settings). */
 export function ModelsCard({ api, toast, bare }) {
   const { s, models } = useAgent(api, toast);
@@ -71,12 +74,12 @@ export function ModelsCard({ api, toast, bare }) {
       h('span', null, h('span', { style: { color: T.mut } }, 'default '), s ? s.model + window_(s.model) : '—'),
       h('span', null, h('span', { style: { color: T.mut } }, 'fallback '), s?.fallback ? s.fallback + window_(s.fallback) : 'none'),
       h('span', null, h('span', { style: { color: T.mut } }, 'max steps '), s?.max_steps ?? '—')));
-  const [layout, setLayout] = usePref(STEPS_LAYOUT, 'fold');   // this browser only (gaifa.chat.steps)
-  const steps = row('Steps between messages', 'One fold per turn ("Ran 2 tools"), or each thing the agent says between steps as a message of its own, with a fold for the steps before it. This browser only.',
+  const [layout, setLayout] = useUiPref(STEPS_LAYOUT, 'fold');   // config.toml [ui.chat] steps (settings-that-stick 3.3)
+  const steps = row('Steps between messages', STEPS_HINT,
     h('select', { 'aria-label': 'Steps between messages', value: layout === 'split' ? 'split' : 'fold', onChange: e => setLayout(e.target.value),
       style: { height: 28, padding: '0 6px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.sb, color: T.tx, font: 'inherit', fontSize: 12.5 } },
     h('option', { value: 'fold' }, 'One fold per turn'), h('option', { value: 'split' }, 'Split at each message')));
-  return bare ? h(R().Fragment, null, body, steps) : section('Chat', body, steps);
+  return bare ? body : section('Chat', body, steps);   // in Settings, steps is a row of its own (ui.chat.steps)
 }
 export function DocumentsCard({ api, toast }) {
   const a = useAgent(api, toast);

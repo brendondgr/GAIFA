@@ -987,6 +987,8 @@ const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 const clone = o => o == null ? o : JSON.parse(JSON.stringify(o));
 const lsGet = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+// settings-that-stick 3.3: a choice from the last copy of config.toml's [ui] (ui-prefs.js keeps it), for the first paint
+const uiCached = (path, d) => { try { const v = String(path).split('.').reduce((x, k) => (x == null ? undefined : x[k]), JSON.parse(localStorage.getItem('gaifa.ui.cache') || 'null')); return v ?? d; } catch { return d; } };
 const hashBars = (id, n) => { let h = 7; for (const c of id) h = (h * 31 + c.charCodeAt(0)) | 0; return Array.from({ length: n }, (_, i) => { h = (h * 1103515245 + 12345) | 0; const v = ((h >>> 16) & 255) / 255; return Math.round(18 + v * 82 * Math.pow(Math.sin(Math.PI * (i + 0.5) / n), 0.5)); }); };
 const fuzzy = (q, t) => { q = q.toLowerCase(); t = t.toLowerCase(); if (!q) return 1; const i = t.indexOf(q); if (i >= 0) return 200 - i; let ti = 0, sc = 0; for (const ch of q) { const j = t.indexOf(ch, ti); if (j < 0) return 0; sc += j === ti ? 3 : 1; ti = j + 1; } return sc; };
 const btn = (v = 'sec', o = {}) => ({ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: o.sm ? 28 : 32, padding: o.icon ? 0 : (o.sm ? '0 10px' : '0 12px'), width: o.icon ? (o.sm ? 28 : 32) : undefined, borderRadius: 6, fontSize: o.sm ? 12 : 12.5, fontWeight: 500, cursor: o.dis ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', opacity: o.dis ? 0.5 : 1, flex: 'none',
@@ -1011,9 +1013,9 @@ class Component extends DCLogic {
     audio: { key: null, playing: false, t: 0, dur: 0 },
     jopen: {}, speed: 1,
     // revision 2: Overview views, dashboard layout (Settings.ui.dashboard), metric history for sparklines
-    ovView: lsGet('hub.ovView', 'dashboard'), dash: { order: [], hidden: [], ranges: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
+    ovView: uiCached('overview.view', lsGet('hub.ovView', 'dashboard')), dash: { order: [], hidden: [], ranges: {} }, customizing: false, widgets: [], hist1: null, hist24: null,
     nav: (() => { try { return JSON.parse(lsGet('hub.nav', 'null')); } catch { return null; } })(),  // plan 33: Settings.ui.nav, this browser's copy first
-    tlRange: lsGet('hub.tlRange', '24h'), tlTable: false, svcRange: lsGet('hub.svcRange', '24h'), tileMenu: null, outTick: 0,
+    tlRange: uiCached('overview.timeline_range', lsGet('hub.tlRange', '24h')), tlTable: false, svcRange: uiCached('overview.services_range', lsGet('hub.svcRange', '24h')), tileMenu: null, outTick: 0,
     approvals: [], apLoaded: false, memReview: 0, toolIx: null, sessions: [],  // sessions: the palette's "Switch to …" (Wire 15)  // Phase 13 Wire: the header's Approvals popover; the API tab's tool risk levels
   };
 
@@ -1119,7 +1121,7 @@ class Component extends DCLogic {
   }
   setTheme(t) { lsSet('hub.theme', t); this.setState({ theme: t }); this.applyTheme(t); this.syncUi('theme', t); }
   setDensity(d) { lsSet('hub.density', d); this.setState({ density: d }); this.syncUi('density', d); }
-  syncUi(k, v) { this.api?.saveSettings({ ui: { [k]: v } }).catch(() => {}); }  // the Settings page's theme and density rows apply at once (plan settings-redesign 1.4)
+  syncUi(k, v) { this.uiSaving = (this.uiSaving || 0) + 1; this.api?.saveSettings({ ui: { [k]: v } }).catch(() => {}).finally(() => { this.uiSaving--; }); }  // the Settings page's theme and density rows apply at once (plan settings-redesign 1.4)
 
   // ---------- boot / connection ----------
   async boot() {
@@ -1145,8 +1147,12 @@ class Component extends DCLogic {
     this.savedUi = u;   // settings-that-stick 2.2: the base of the next dashboard and sidebar saves
     if (!this.dashT) this.setState({ dash: { order: [], hidden: [], ranges: {}, ...(u.dashboard || {}) } });   // not over a change still waiting to save
     if (u.nav && !this.navT) { this.setState({ nav: u.nav }); lsSet('hub.nav', JSON.stringify(u.nav)); }
-    if (lsGet('hub.density', null) == null && u.density) this.setState({ density: u.density });  // this browser hasn't chosen: use the saved one
-    if (lsGet('hub.theme', null) == null && u.theme && u.theme !== this.state.theme) { this.setState({ theme: u.theme }); this.applyTheme(u.theme); }
+    // 3.3: config.toml wins; hub.theme / hub.density are only this browser's copy for the first paint
+    if (!this.uiSaving && u.density && u.density !== this.state.density) { lsSet('hub.density', u.density); this.setState({ density: u.density }); }
+    if (!this.uiSaving && u.theme && u.theme !== this.state.theme) { lsSet('hub.theme', u.theme); this.setState({ theme: u.theme }); this.applyTheme(u.theme); }
+    const o = u.overview || {};
+    this.setState(s0 => ({ ovView: o.view || s0.ovView, tlRange: o.timeline_range || s0.tlRange, svcRange: o.services_range || s0.svcRange }));
+    if (!this.prefsImported) { this.prefsImported = true; this.UiPrefs?.importBrowser(this.api, st, globalThis.localStorage).catch(() => {}); }   // once: this browser's old choices
   }
   // Phase 13 Wire: pending approvals (the header button's count and popover), refreshed on `approval` events.
   loadApprovals() {
@@ -1199,7 +1205,7 @@ class Component extends DCLogic {
   };
   bumpOutputs() { clearTimeout(this.outT); this.outT = setTimeout(() => this.setState(s => ({ outTick: s.outTick + 1 })), 2000); }
   ovView() { const v = this.state.route.params.view; return ['dashboard', 'services', 'table', 'timeline'].includes(v) ? v : this.state.ovView; }
-  setView(v) { lsSet('hub.ovView', v); this.setState({ ovView: v, tileMenu: null }); this.go('#/overview?view=' + v); }
+  setView(v) { this.UiPrefs?.uiPrefs.set('overview.view', v); this.setState({ ovView: v, tileMenu: null }); this.go('#/overview?view=' + v); }
   applyOverview(ov) { this.setState({ services: ov.services, memory: ov.memory, jobs: ov.jobs.filter(j => ['queued', 'running'].includes(j.state)), activity: ov.activity, alerts: ov.alerts, recent: ov.recent_outputs, system: ov.system }); }
   // A dropped stream isn't a down hub: Firefox closes quiet connections whenever a network
   // interface changes (a container starting, say). Ask the hub first; if it answers, reopen the
@@ -1867,7 +1873,7 @@ class Component extends DCLogic {
       dash: view === 'dashboard' && D ? h(D.Dashboard, { api: this.api, services: svcs, memory: s.memory, gpu: s.gpu, cancelGpu: this.cancelGpu, jobs: s.jobs, activity: s.activity, recent: s.recent, hist1: s.hist1, hist24: s.hist24, widgets: s.widgets,
         layout: s.dash, onLayout: this.onLayout, customizing: s.customizing, onCustomize: v => this.setState({ customizing: v }), go: hh => this.go(hh), badge, compact, outTick: s.outTick }) : null,
       table: view === 'table' && V ? h(V.ServiceTable, { services: svcs, hist1: s.hist1, jobs: s.jobs, icons: ICON, badge, compact, actionsFor: sv => this.svcActions(sv, true).map(a => ({ label: a.label, d: a.d, on: a.on, dis: a.dis, primary: a.label === 'Start' })) }) : null,
-      timeline: view === 'timeline' && V ? h(V.TimelineView, { api: this.api, services: svcs, go: hh => this.go(hh), range: s.tlRange, onRange: r => { lsSet('hub.tlRange', r); this.setState({ tlRange: r }); }, table: s.tlTable, onTable: v => this.setState({ tlTable: v }), mock: !this.api.isLive?.('metrics') }) : null,
+      timeline: view === 'timeline' && V ? h(V.TimelineView, { api: this.api, services: svcs, go: hh => this.go(hh), range: s.tlRange, onRange: r => { this.UiPrefs?.uiPrefs.set('overview.timeline_range', r); this.setState({ tlRange: r }); }, table: s.tlTable, onTable: v => this.setState({ tlTable: v }), mock: !this.api.isLive?.('metrics') }) : null,
     };
     return {
       ...ov,
@@ -1931,7 +1937,7 @@ class Component extends DCLogic {
         memRows: [['Used', fgb(d.memory.used_bytes)], ['Estimate when loaded', d.memory.estimate_bytes ? fgb(d.memory.estimate_bytes) : '—'], ['Peak', d.memory.peak_bytes ? fgb(d.memory.peak_bytes) : '—'], ['PID', d.pid ?? '—'], ['Started', d.started_ts ? fago(d.started_ts) : '—'], ['Folder', d.folder]].map(([k, val]) => ({ k, v: String(val) })),
         models: d.models.map(id => ({ label: id, href: '#/models/' + id })), hasModels: d.models.length > 0, noModels: !d.models.length,
         hasOuts: !!sv.outs?.length, outs: (sv.outs || []).map(o => this.cardVM(o)), showOuts: d.has_outputs, outsHref: `#/s/${d.id}/outputs`,
-        charts: this.V ? React.createElement(this.V.Card, { title: 'History', ranges: ['1h', '6h', '24h', '7d'], range: s.svcRange, onRange: r => { lsSet('hub.svcRange', r); this.setState({ svcRange: r }); }, mock: !this.api.isLive?.('metrics'), pad: 12 },
+        charts: this.V ? React.createElement(this.V.Card, { title: 'History', ranges: ['1h', '6h', '24h', '7d'], range: s.svcRange, onRange: r => { this.UiPrefs?.uiPrefs.set('overview.services_range', r); this.setState({ svcRange: r }); }, mock: !this.api.isLive?.('metrics'), pad: 12 },
           React.createElement(this.V.ServiceCharts, { api: this.api, service: d, range: s.svcRange })) : null };
     }
     if (v.t.api) v.api = this.vmApi(s, d);

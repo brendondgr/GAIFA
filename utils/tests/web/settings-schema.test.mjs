@@ -173,7 +173,7 @@ test('settings-that-stick 2.3: a save elsewhere reaches an open page', () => {
   // a touched list changed elsewhere: both sides' changes in the draft, the saved list its new base
   assert.deepEqual(r.draft.judge.allow_commands, ['a', 'theirs', 'mine']); assert.deepEqual(r.orig.judge.allow_commands, ['a', 'theirs']);
   assert.deepEqual(r.elsewhere, {});
-  assert.equal(r.orig.ui.theme, 'dark');   // ui applies at once, never through the draft
+  assert.equal(r.orig.ui.theme, 'light'); assert.equal(r.draft.ui.theme, 'light');   // ui applies at once: the saved values
   // a touched plain value saved differently: kept, listed with the saved value
   const r2 = S.mergeReload({ judge: { threshold: 0.35 } }, { judge: { threshold: 0.4 } }, { judge: { threshold: 0.5 } });
   assert.equal(r2.draft.judge.threshold, 0.4); assert.equal(r2.orig.judge.threshold, 0.35); assert.deepEqual(r2.elsewhere, { 'judge.threshold': 0.5 });

@@ -16,6 +16,7 @@ import { LLM_BLOCKS } from './blocks-llm.js';
 import { voiceChoices } from '../chat/chat-speak.js';
 import { baseOf } from '../settings-merge.js';
 import { allowRule } from '../chat/chat-judge.js';
+import { useUiPref } from '../ui-prefs.js';
 
 const R = () => globalThis.React;
 const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS, ...REPO_BLOCKS, ...LLM_BLOCKS };
@@ -88,6 +89,7 @@ export function SettingsPage(props) {
     globalThis.addEventListener?.('gaifa:settings', f);
     return () => globalThis.removeEventListener?.('gaifa:settings', f);
   }, []);
+  useUiPref('chat', null);   // 3.3: rows read from ui-prefs (Steps between messages) redraw when it changes
   useFlashCss();
   const [closed, setClosed] = usePref('gaifa.settings.open', {});
   const [q, setQ] = React.useState(''), [hit, setHit] = React.useState(-1), boxRef = React.useRef(null), [changedOnly, setChangedOnly] = React.useState(false);

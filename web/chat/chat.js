@@ -21,7 +21,8 @@ import './chat-save.js';
 import { ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, Item, LIST_CSS } from './chat-list.js';
-import { GroupedChats, readView, saveView, loadEnvs } from './chat-groups.js';
+import { GroupedChats, readView, saveView, viewOfUi, loadEnvs } from './chat-groups.js';
+import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
 import { SplitView, SPLIT_CSS } from './chat-split.js';
 import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout } from './chat-layout.js';
@@ -80,7 +81,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
   const [judge, setJudge] = useState(null);       // GET /api/judge/status: Auto is offered while its model answers (plan 30.5)
-  const [envs, setEnvs] = useState(null), [listView, setListViewState] = useState(readView), [listKey, setListKey] = useState(0);   // plan 41.2
+  const [envs, setEnvs] = useState(null), [listKey, setListKey] = useState(0);   // plan 41.2
+  const [listUi] = useUiPref('chat.list', null), listView = readView(listUi ? viewOfUi(listUi) : undefined);   // settings-that-stick 3.3: config.toml [ui.chat.list]
   const [cmd, setCmd] = useState(null);           // the page's New chat, for the active pane
   // chat-split plan 2.2: the open chats' layout, saved in this browser; the URL follows the active pane
   const [layout, setLayout] = useState(() => withRoute(loadLayout() || single(tid), tid));
@@ -94,7 +96,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const act = activePane(layout);
   useEffect(() => { if ((act.tid || null) !== tid) go(act.tid ? '#/chat/' + act.tid : '#/chat'); }, [act.id, act.tid]);
   const bus = useRef(null); if (!bus.current) bus.current = new EventTarget();
-  const setListView = v => { setListViewState(v); saveView(v); };
+  const setListView = v => saveView(v);
   const relist = () => setListKey(n => n + 1);
   const loadRef = useRef(null);
   const fail = e => { if (c.live && (DOWN.has(e?.code) || e?.status === 502 || e?.status === 503)) setDown(e); else toast(e?.detail || String(e?.message || e), 'error'); };

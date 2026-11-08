@@ -5,11 +5,12 @@
 //
 // One tool's opened detail can be replaced: registerCard('step:<tool name>', ({ row, item, ctx }) => …).
 //
-// Settings → Agent → Steps between messages (per browser, `gaifa.chat.steps`): "One fold" draws the turn as
+// Settings → Agent → Steps between messages (config.toml `[ui.chat] steps`, settings-that-stick 3.3): "One fold" draws the turn as
 // above; "Split at each message" draws each of the agent's updates as a message of its own, with a fold for
 // the steps before it ("Ran 1 tool", then the message, then "Ran 2 tools", …; chat-turn.js `splitTurn`).
 
-import { h, T, MONO, Icon, Badge, usePref } from './chat-ui.js';
+import { h, T, MONO, Icon, Badge } from './chat-ui.js';
+import { useUiPref } from '../ui-prefs.js';
 import { Card, ProgressBar, hasCard, cardFor } from './chat-cards.js';
 import { renderMarkdown } from './chat-md.js';
 import { stepText, stepSentence, errorText } from './chat-steps.js';
@@ -17,7 +18,7 @@ import { LiveCards } from './chat-live.js';
 import { OutputStrip } from './chat-results.js';
 import { judgeOf, splitTurn } from './chat-turn.js';
 
-export const STEPS_LAYOUT = 'gaifa.chat.steps';   // 'fold' | 'split'
+export const STEPS_LAYOUT = 'chat.steps';   // under `ui` (ui-prefs.js): 'fold' | 'split'
 
 const R = () => globalThis.React;
 
@@ -243,7 +244,7 @@ function splitKids(turn, ctx) {
 
 /** One turn: your message (or "You ran …"), the fold (or the split parts), errors, cards waiting for you, the outputs, the answer. */
 export function TurnView({ turn, ctx }) {
-  const [layout] = usePref(STEPS_LAYOUT, 'fold');
+  const [layout] = useUiPref(STEPS_LAYOUT, 'fold');
   const kids = [
     turn.user ? h(Card, { key: 'u', item: turn.user, ctx }) : h(ActionHead, { key: 'u', turn, ctx }),
     ...(layout === 'split' ? splitKids(turn, ctx) : [h(ActivityFold, { key: 'f', turn, ctx })]),

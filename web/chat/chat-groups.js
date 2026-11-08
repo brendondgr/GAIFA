@@ -1,11 +1,12 @@
 // The chat list by environment (plan 41.2, after Claude Code's sidebar): one section per environment (Phase 34's
 // workspaces) with its name, how many chats, New chat in it and a ⋯ menu (Rename, Manage folders), then its
 // first chats in the chosen order and Show more. The View menu picks the grouping and both orders; they and the
-// collapsed sections are saved in this browser (`gaifa.chat.list`). Chats load per section from the agent
+// collapsed sections are saved in config.toml (`[ui.chat.list]`, settings-that-stick 3.3; `gaifa.chat.list` before). Chats load per section from the agent
 // (`GET /v1/threads?environment=`, `GET /v1/threads/groups`), so a big environment never loads whole.
 // Pure helpers first (tested in utils/tests/web/chat-groups.test.mjs). Written by us (web/PATCHES.md).
 
-import { h, T, Icon, Btn, Popover, chipSt, inputSt, label11, getPref, setPref } from './chat-ui.js';
+import { h, T, Icon, Btn, Popover, chipSt, inputSt, label11, getPref } from './chat-ui.js';
+import { uiPrefs } from '../ui-prefs.js';
 
 const R = () => globalThis.React;
 const enc = encodeURIComponent;
@@ -18,14 +19,19 @@ export const SHOW = [['chats', 'Chats'], ['archived', 'Archived']];
 export const ENV_ORDERS = [['activity', 'Recent activity'], ['name', 'Name'], ['created', 'Created']];
 export const CHAT_ORDERS = [['updated', 'Recent activity'], ['title', 'Name'], ['created', 'Created']];
 
+/** `[ui.chat.list]` (snake case) ↔ the page's view. */
+export const viewOfUi = u => (u && typeof u === 'object' ? { group: u.group, envOrder: u.env_order, chatOrder: u.chat_order, collapsed: u.collapsed } : {});
+export const uiOfView = v => ({ group: v.group, env_order: v.envOrder, chat_order: v.chatOrder, collapsed: [...(v.collapsed || [])] });
+const saved0 = () => { const u = uiPrefs.get('chat.list', null); return u ? viewOfUi(u) : getPref(LIST_VIEW, {}); };
+
 /** The saved view, with defaults for anything missing or unknown. */
-export function readView(saved = getPref(LIST_VIEW, {})) {
-  const v = { ...VIEW_DEFAULTS, ...(saved && typeof saved === 'object' ? saved : {}) };
+export function readView(saved = saved0()) {
+  const v = { ...VIEW_DEFAULTS, ...Object.fromEntries(Object.entries(saved && typeof saved === 'object' ? saved : {}).filter(([, x]) => x !== undefined)) };
   const ok = (list, x, d) => (list.some(([k]) => k === x) ? x : d);
   return { group: ok(GROUP_BY, v.group, 'environment'), envOrder: ok(ENV_ORDERS, v.envOrder, 'activity'),
     chatOrder: ok(CHAT_ORDERS, v.chatOrder, 'updated'), collapsed: Array.isArray(v.collapsed) ? v.collapsed.map(String) : [] };
 }
-export const saveView = v => setPref(LIST_VIEW, v);
+export const saveView = v => uiPrefs.set('chat.list', uiOfView(v));
 export const toggled = (list, id) => (list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
 /** One section per environment: `{env, ids, count, updated, running}`. `groups` is the agent's

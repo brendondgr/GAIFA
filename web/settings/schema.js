@@ -6,6 +6,7 @@
 
 import { checkCommandRule, checkToolGlob } from '../chat/chat-rules.js';
 import { mergeValue, Conflict } from '../settings-merge.js';
+import { uiPrefs } from '../ui-prefs.js';
 import { repoSummary } from './repos-view.js';
 import { enginesSummary, serversSummary } from './llm-view.js';
 
@@ -140,7 +141,10 @@ export function sections(ctx = {}) {
     { id: 'agent', label: 'Agent', icon: 'chat', areas: SETTINGS_AREAS.agent, when: () => agentOn, groups: [
       { id: 'model', label: 'Model', summary: () => 'The chat model, fallback and steps (the agent’s own settings)', rows: [
         block('notes', 'AgentNotes', { label: 'The agent' }),
-        block('models', 'ModelsCard', { label: 'Models', keywords: ['chat model', 'fallback', 'max steps', 'relay', 'steps between messages', 'split at each message', 'one fold per turn', 'layout'] }),
+        block('models', 'ModelsCard', { label: 'Models', keywords: ['chat model', 'fallback', 'max steps', 'relay'] }),
+        instant('steps', 'ui.chat.steps', { label: 'Steps between messages', hint: 'One fold per turn ("Ran 2 tools"), or each thing the agent says between steps as a message of its own, with a fold for the steps before it. Applied immediately, in every browser.',
+          control: 'segmented', choices: [{ value: 'fold', label: 'One fold per turn' }, { value: 'split', label: 'Split at each message' }],
+          read: () => uiPrefs.get('chat.steps', 'fold'), apply: (c, v) => uiPrefs.set('chat.steps', v), keywords: ['split at each message', 'one fold per turn', 'layout', 'activity fold'] }),   // settings-that-stick 3.3
         block('llms', 'LlmLink', { label: 'Servers and keys', keywords: ['servers', 'API key', 'cloud'] }),   // llm-servers 4.1
       ] },
       { id: 'documents', label: 'Documents', summary: () => 'Whole documents and the reply reserve', rows: [
@@ -278,11 +282,12 @@ const sameJ = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /** Fresh settings into an open page: a key the user hasn't touched takes the saved value (in `orig` and the draft). A
  *  touched list or table merges both sides' changes into the draft (as the hub would on Save). A touched plain value
  *  saved differently elsewhere keeps the draft and its old `orig`, and is listed in `elsewhere` (dotted key → the saved
- *  value) for Use theirs / Keep mine. `ui` applies at once, so it is left out. */
+ *  value) for Use theirs / Keep mine. `ui` applies at once, so it simply takes the saved values. */
 export function mergeReload(orig, draft, fresh, elsewhere = {}) {
   const o = JSON.parse(JSON.stringify(orig)), d = JSON.parse(JSON.stringify(draft)), el = { ...elsewhere };
   for (const [sec, vals] of Object.entries(fresh || {})) {
-    if (sec === 'ui' || !vals || typeof vals !== 'object') continue;
+    if (sec === 'ui') { o.ui = JSON.parse(JSON.stringify(vals)); d.ui = JSON.parse(JSON.stringify(vals)); continue; }   // applied at once: just the saved values
+    if (!vals || typeof vals !== 'object') continue;
     o[sec] ||= {}; d[sec] ||= {};
     for (const [k, f] of Object.entries(vals)) {
       const was = o[sec][k], mine = d[sec][k], key = `${sec}.${k}`;

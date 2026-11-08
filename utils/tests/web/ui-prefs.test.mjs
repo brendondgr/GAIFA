@@ -46,3 +46,22 @@ test('a reload during a save keeps the change; a failed save keeps it and report
   release[1](new Error('down')); await p;
   assert.equal(prefs.get('chat.steps'), 'split'); assert.deepEqual(errs, [['down', 'chat.steps']]);
 });
+
+test('this browser’s old choices are saved once, unless config.toml already sets them', async () => {
+  const { browserChoices, importBrowser, IMPORTED_KEY } = await import('../../../web/ui-prefs.js');
+  const s = store({ 'gaifa.chat.steps': '"split"', 'gaifa.chat.environment': '"work"', 'gaifa.chat.list': JSON.stringify({ group: 'none', envOrder: 'activity', chatOrder: 'title', collapsed: [] }),
+    'hub.ovView': 'timeline', 'hub.tlRange': '7d', 'hub.svcRange': '24h', 'hub.theme': 'dark', 'hub.density': 'compact' });
+  const fresh = { theme: 'system', density: 'compact', chat: { steps: 'fold', list: { group: 'environment', env_order: 'activity', chat_order: 'updated', collapsed: [] }, environment: null },
+    overview: { view: 'dashboard', timeline_range: '24h', services_range: '24h' } };
+  assert.deepEqual(browserChoices(fresh, s), { chat: { steps: 'split', environment: 'work', list: { group: 'none', chat_order: 'title' } },
+    overview: { view: 'timeline', timeline_range: '7d' }, theme: 'dark' });
+  // what config.toml sets wins: nothing from the browser for it
+  assert.deepEqual(browserChoices({ ...fresh, theme: 'light', chat: { ...fresh.chat, steps: 'fold', environment: 'home' } }, store({ 'hub.theme': 'dark', 'gaifa.chat.environment': '"work"' })), {});
+  // the name before GAIFA counts
+  assert.deepEqual(browserChoices(fresh, store({ 'aihub.chat.steps': '"split"' })), { chat: { steps: 'split' } });
+  const calls = [];
+  const api = { saveSettings: async b => { calls.push(b); return { settings: { ui: fresh } }; } };
+  assert.deepEqual(await importBrowser(api, { ui: fresh }, s), browserChoices(fresh, s));
+  assert.equal(s.m.get(IMPORTED_KEY), '1'); assert.equal(calls.length, 1);
+  assert.equal(await importBrowser(api, { ui: fresh }, s), null); assert.equal(calls.length, 1);   // once
+});

@@ -7,7 +7,8 @@
 // last one picked in this browser. Pure helpers first (tested in utils/tests/web/environments.test.mjs).
 // Written by us (web/PATCHES.md).
 
-import { h, T, MONO, Icon, Popover, label11, getPref, setPref } from './chat-ui.js';
+import { h, T, MONO, Icon, Popover, label11, getPref } from './chat-ui.js';
+import { uiPrefs } from '../ui-prefs.js';
 
 const R = () => globalThis.React;
 export const DEFAULT_ENV = 'default';
@@ -44,8 +45,9 @@ export const shortPath = p => String(p || '').replace(/^\/home\/[^/]+(?=\/|$)/, 
 export function newChatSettings(settings = {}, last = null) {
   return settings.environment ? settings : { ...settings, environment: last || NONE_ENV };
 }
-export const lastEnv = () => getPref(LAST_ENV, null);
-export const rememberEnv = id => setPref(LAST_ENV, id);
+// config.toml [ui.chat] environment (settings-that-stick 3.3); this browser's `gaifa.chat.environment` until it has one
+export const lastEnv = () => uiPrefs.get('chat.environment', null) ?? getPref(LAST_ENV, null);
+export const rememberEnv = id => { if (uiPrefs.get('chat.environment', null) !== id) uiPrefs.set('chat.environment', id); };
 
 /** The folder card's buttons (plan 34): allow for this chat; add to the environment the card names. */
 export function folderChoices(ask) {

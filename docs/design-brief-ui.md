@@ -401,6 +401,8 @@ Areas: `system`, `services`, `logs`, `operations`, `proxy` (`callService`), `mem
 | `outputPageUrl(id, n, {width})` | `GET /api/outputs/{id}/page/{n}.png?width=` (a URL, not a request) | A PDF page as a PNG (`width` 1200 px by default, 64–2400), cached under `outputs/.previews/<id>/`; `no_page` 404 |
 | `getSettings()` | `GET /api/settings` | `Settings` (`services.order` and `memory.priority` list every installed mod: the configured ids first, then the rest in sidebar order) |
 | `saveSettings(s)` | `PUT /api/settings` | `{ settings: Settings, restart_required: boolean }` (send the whole form or any part; what is left out stays as it is, and only changed values are written. A bad value is `422 invalid_config` with `data.field`, e.g. `"hub.port"` for a port a mod uses; nothing is written). With `base` (`{section: {key: value}}`, what each changed key held when the page loaded), lists and tables merge with what is saved now (architecture §9, Saving); a value changed elsewhere too is `409 settings_conflict` with `data: {field, current, yours}`) |
+| `getUiStore(scope)` | `GET /api/ui/store/{scope}` | `{ values: Record<string, unknown> }`: what the pages remember for a mod (its id) or for the hub (`"hub"`) (settings-that-stick 4.1) |
+| `saveUiStore(scope, {set, del})` | `PATCH /api/ui/store/{scope}` | `{ values }` after setting and deleting those keys only (each value ≤ 16 KB: `413 payload_too_large`) |
 | `getSettingsDefaults()` | `GET /api/settings/defaults` | `Settings`: the values of `config.example.toml`, what each row of the Settings page returns to with Reset (plan settings-redesign 4.1) |
 | `subscribe(onEvent)` | `EventSource /api/events` | `{ close() }`; each `data:` is a `HubEvent` |
 
@@ -647,6 +649,7 @@ type HubEvent =
   | { type: "job"; job: Job }
   | { type: "alert"; alert: Alert }
   | { type: "alert_cleared"; id: string }
+  | { type: "ui_store"; scope: string; keys: string[] }   // a page's remembered values changed (settings-that-stick 4.1)
   | { type: "settings"; changed: string[] }   // config.toml was saved (settings-that-stick 2.3): `changed` are dotted Settings keys; open pages reload getSettings()
   | { type: "resync" };            // events were dropped (slow client): refetch everything
 

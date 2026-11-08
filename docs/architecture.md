@@ -95,7 +95,8 @@ GAIFA/
 │   │   └── hf-cache/        HF_HOME for every mod
 │   ├── databases/           hub.db, relay.db, gen3d.db (+ agent.db in Stage D)
 │   ├── logs/                Stage D: per-mod logs (until then: journald)
-│   └── state/               Stage D: runtime state, e.g. lcpp's instance records (until then: $XDG_RUNTIME_DIR)
+│   └── state/               Stage D: runtime state, e.g. lcpp's instance records (until then: $XDG_RUNTIME_DIR);
+│                            ui/<scope>.json: what each page remembers (settings-that-stick 4.1)
 ├── outputs/                 <mod>/<YYYY-MM-DD>/<HHMMSS>-<slug>.<ext> (+ .json sidecar) or a folder per job
 └── web/                     the UI in Claude Design's .dc.html format (v1 export; revision 2 built here)
     ├── Hub.dc.html          shell + core pages (served at /, with vendor scripts and /config.js injected)
@@ -418,6 +419,7 @@ The UI-facing contract is **Section 6 of [design-brief-ui.md](design-brief-ui.md
 | `GET /api/skills`, `GET /api/skills/{mod}/{name}`, `GET /api/skills/{mod}/{name}/files/{path}` | the mods' agent skills (plan 14.9); a skill lists its other files and each is read as text (skill-sources 1.2) |
 | `GET/POST /api/prefs`, `PATCH/DELETE /api/prefs/{id}`, `POST /api/prefs/{id}/approve\|reject` | preferences (plan 21.2, §14.5): saved only when they fit the tool's schema and choices; applied to every caller's card |
 | `GET /api/mentions?q=&kind=` | what the user can @-mention (plan 48.1): the kinds the mods declare in `[[agent.mentions]]` (a voice, a workflow, an engine), listed from each running mod (cached 30 s), each with the tool fields it fills |
+| `GET /api/ui/store/{scope}`, `PATCH /api/ui/store/{scope}` | what a page remembers (settings-that-stick 4.1): a mod page's choices (scope = its id) and the hub's own view state (scope `hub`: the chat panes, folded Settings groups, sorts), in `data/state/ui/<scope>.json`; a PATCH `{set, delete}` changes only those keys (each value ≤ 16 KB, a file ≤ 256 KB: `413 payload_too_large`; an unknown mod `404`) and publishes `{type: "ui_store", scope, keys}` |
 | `GET /api/settings/defaults` | the `Settings` shape (brief §6.4) built from `config.example.toml` (read once per process; GAIFA's built-in defaults without it), the installed mods filling `services` and `memory.priority` as `GET /api/settings` does: the defaults the Settings page shows on each row and returns to with Reset (plan settings-redesign 4.1); this machine's `config.toml` never changes it |
 | `GET /api/doctor/inventory` | every path outside the project that anything uses, with its reason (plan 16.3) |
 | `GET /api/system/hardware[?refresh=true]` | what this machine has (plan 35.2, `utils/hardware/`): the OS, WSL, each GPU's vendor, arch, memory (unified or dedicated), runtimes, what it can run and its problems, and the accels usable here (`rocm`, `cuda`, `xpu`, `mps`, `vulkan`, `cpu`); read once and cached. `gaifa hardware` prints the same without the hub |

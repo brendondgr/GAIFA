@@ -96,10 +96,10 @@ The approach: Phase 1 reproduces both causes with failing tests. Phase 2 makes s
 
 ## Phase 4 — Everything else off the browser (M)
 
-- [ ] **4.1 A small store per mod: `utils/routes/ui_store.py` (new), `utils/ui_store.py` (new).**
+- [x] **4.1 A small store per mod: `utils/routes/ui_store.py` (new), `utils/ui_store.py` (new).**
   - `GET /api/ui/store/{mod}` → `{values: {key: value}}`; `PATCH /api/ui/store/{mod}` `{set: {key: value}, delete: [key]}` merges per key, so two pages never overwrite each other's keys. Values are JSON, each ≤ 16 KB, the file ≤ 256 KB (`413` past it); `mod` must be a known mod id or `hub`.
   - Kept in `data/state/ui/<mod>.json` (atomic writes, `paths.write_atomic`), which `gaifa backup` already copies. A save publishes `{type: "ui_store", mod, keys}`.
-  *Done when:* `utils/tests/ui/test_ui_store.py` covers get, set, delete, the limits, an unknown mod, and two patches to different keys both kept. Update architecture §6 and §3 (the folder), and the brief §11.7.
+  *Done when:* `utils/tests/ui/test_ui_store.py` covers get, set, delete, the limits, an unknown mod, and two patches to different keys both kept. Update architecture §6 and §3 (the folder), and the brief §11.7. *As built:* the store is made on first use (`hub.ui_store`); `api.getUiStore(scope)` and `api.saveUiStore(scope, {set, del})` (area `ui_store`) and the mock's in-memory copy come with this step, so the contract test covers the routes.
 - [ ] **4.2 `store` in `web/mod-kit.js` uses it.**
   - The page's `store` loads its mod's values when the page mounts. `get` reads that copy, with `localStorage` as the fallback until it arrives (and when the hub is down). `set` writes both. `store.local.get/set` stay browser-only, for drafts. `tts.draft` moves to `store.local`; that is the only change in a mod that is its own repository (tts: a commit in LocalTTS, then `gaifa repos pin tts`, per docs/mods.md §10). Every other mod page works unchanged. On the first load, the browser's values for the mod are imported once, as in 3.3.
   *Done when:* `utils/tests/web/mod-kit.test.mjs` covers the load, the fallback, `set` writing both, `store.local` staying local, and the import. Browser check on the installed hub: pick a voice on the Speech page and a preset on the Dictation page, clear the site's data, and both are still there. Update docs/mods.md (the page `store`, `store.local`).

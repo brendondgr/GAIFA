@@ -293,6 +293,7 @@ export function createMockApi() {
     outputs: { hidden_keep_days: 0 },
   };
   const defaults = clone(settings);
+  const uiStore = {};
   const deep = (o, n) => { const out = { ...(o || {}) }; for (const [k, v] of Object.entries(n)) out[k] = v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' ? deep(out[k], v) : clone(v); return out; };   // [ui.chat], [ui.overview] saved in part   // the seed is the mock's config.example.toml (getSettingsDefaults)
   // LocalTTS's own voice shape (GET /v1/voices → { custom, kokoro }), so the Speech page works on the mock.
   const voice = (name, source, duration_s, transcript, extra = {}) => ({ engine: 'breeze', name, transcript, duration_s, created: '2026-09-26T10:30:00-0400', source, instruction: null, language: null, transcript_auto: false, ...extra });
@@ -734,6 +735,12 @@ export function createMockApi() {
     },
     async deleteOutput(id) { await net(); const i = outputs.findIndex(x => x.id === id); if (i < 0) throw err(404, 'output_not_found', `No output "${id}"`); outputs.splice(i, 1); emit({ type: 'output_deleted', id }); return null; },
     async getSettings() { await net(); return clone(settings); },
+    // settings-that-stick 4.1: the UI store, in memory (scope → key → value)
+    async getUiStore(scope) { await net(); if (scope !== 'hub' && !svcById(scope)) throw err(404, 'not_found', `No mod '${scope}'`); return { values: clone(uiStore[scope] || {}) }; },
+    async saveUiStore(scope, { set = {}, del = [] } = {}) { await net(); if (scope !== 'hub' && !svcById(scope)) throw err(404, 'not_found', `No mod '${scope}'`);
+      const cur = uiStore[scope] || {}, next = { ...Object.fromEntries(Object.entries(cur).filter(([k]) => !del.includes(k))), ...clone(set) };
+      const keys = [...new Set([...Object.keys(cur), ...Object.keys(next)])].filter(k => JSON.stringify(cur[k]) !== JSON.stringify(next[k])).sort();
+      uiStore[scope] = next; if (keys.length) emit({ type: 'ui_store', scope, keys }); return { values: clone(next) }; },
     async getSettingsDefaults() { await net(); return { ...clone(defaults), services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) } }; },
     async saveSettings(patch, { base } = {}) { await net();
       // Like utils/settings.py: sections merge key by key; services.enabled/autostart merge per mod; `base` merges with what is saved (2.2).

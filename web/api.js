@@ -33,6 +33,7 @@ export const METHOD_AREA = {
   restoreSession: 'sessions', getSessionState: 'sessions',
   readWebPage: 'webpages', getWebReading: 'webpages',
   listMentions: 'mentions',
+  getUiStore: 'ui_store', saveUiStore: 'ui_store',
 };
 
 // HubEvent type → area, for merging live and mock event streams.
@@ -40,7 +41,7 @@ export const EVENT_AREA = {
   service: 'services', memory: 'memory', gpu: 'gpu', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
   approval: 'tools', tool_call: 'tools', grant: 'tools', grant_deleted: 'tools',
-  session: 'sessions', session_step: 'sessions', repos: 'repos', settings: 'settings',
+  session: 'sessions', session_step: 'sessions', repos: 'repos', settings: 'settings', ui_store: 'ui_store',
 };
 
 const enc = encodeURIComponent;
@@ -194,7 +195,10 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     getSettings: () => req('GET', '/api/settings'),
     // settings-that-stick 2.2: `base` (what each changed key held when loaded; settings-merge.js baseOf) merges with what is saved now
     saveSettings: (s, { base } = {}) => req('PUT', '/api/settings', { json: base && Object.keys(base).length ? { ...s, base } : s }),
-    getSettingsDefaults: () => req('GET', '/api/settings/defaults'),   // plan settings-redesign 4.1: config.example.toml's values
+    getSettingsDefaults: () => req('GET', '/api/settings/defaults'),
+    // settings-that-stick 4.1: what a page remembers (a mod id, or 'hub'): {values}; save sets and deletes keys
+    getUiStore: scope => req('GET', `/api/ui/store/${enc(scope)}`),
+    saveUiStore: (scope, { set = {}, del = [] } = {}) => req('PATCH', `/api/ui/store/${enc(scope)}`, { json: { set, delete: del } }),   // plan settings-redesign 4.1: config.example.toml's values
     getMetrics: ({ series, range, step } = {}) => req('GET', `/api/metrics${qs({ series, range, step })}`),
     listMetricSeries: () => req('GET', '/api/metrics/series'),
     getTimeline: ({ range, services } = {}) => req('GET', `/api/timeline${qs({ range, services })}`),

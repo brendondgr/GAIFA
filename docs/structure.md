@@ -219,6 +219,7 @@ utils/tests/
 | `mock.js` | `createMockApi()`: the brief §6 contract on simulated data |
 | `mock-history.js` | Ours: 7 days of seeded mock history for the chart methods (brief §11.9), with the Empty and Gaps scenarios |
 | `api.js` | Ours, not the export: `createApi({base, liveAreas, mock})` routes each method to HTTP or the mock by area; `createHttpApi()` |
+| `settings-merge.js` | A settings save merged with what is saved now (settings-that-stick 2.2), as `utils/settings_merge.py`: `mergeValue`, `rebase` (the mock's `saveSettings`), `baseOf` (each writer's `base`) |
 | `ModPage.dc.html` | Ours: the host that loads a mod's `ui/page.js` and calls `mount(el, ctx)` (brief §5) |
 | `mod-ui.js` | Ours: `ctx.ui`, themed DOM helpers for page modules |
 | `mod-kit.js` | Ours: shared pieces for the built-in mods' pages (Part B): `requireRunning`, `callRoom` (answers `needs_room` with a confirm, then retries with make-room), `segmented`, `panel`, `header`, `columns`, `stat`, `store`, formatting |

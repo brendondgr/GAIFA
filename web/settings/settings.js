@@ -14,6 +14,8 @@ import { AGENT_BLOCKS } from './blocks-agent.js';
 import { REPO_BLOCKS } from './blocks-repos.js';
 import { LLM_BLOCKS } from './blocks-llm.js';
 import { voiceChoices } from '../chat/chat-speak.js';
+import { baseOf } from '../settings-merge.js';
+import { allowRule } from '../chat/chat-judge.js';
 
 const R = () => globalThis.React;
 const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS, ...REPO_BLOCKS, ...LLM_BLOCKS };
@@ -125,13 +127,21 @@ export function SettingsPage(props) {
   const save = async () => {
     up({ saving: true });
     try {
-      const r = await api.saveSettings(saveBody(st.draft, st.orig, secs));
+      const body = saveBody(st.draft, st.orig, secs);
+      const r = await api.saveSettings(body, { base: baseOf(body, st.orig) });   // 2.2: merged with what others saved since the page loaded
       up(s => ({ orig: r.settings, draft: { ...clone(r.settings), ui: s.draft.ui }, saving: false, restart: r.restart_required, err: null }));
       props.toast?.('Settings saved', 'success');
       props.onSaved?.(r);
     } catch (e) { up({ saving: false, err: e }); if (e.status === 0) props.goDown?.(); }
   };
   const revert = () => up(s => ({ draft: { ...clone(s.orig), ui: s.draft.ui }, err: null }));
+  // 2.2: "Always allow" under Judged calls saves at once; the saved list goes into `orig`, and into the draft with its own edits kept
+  ctx.allowCommand = async rule => {
+    const r = await api.saveSettings(...allowRule(st.orig.judge.allow_commands, rule));
+    const saved = r.settings.judge.allow_commands;
+    up(s => ({ orig: { ...s.orig, judge: { ...s.orig.judge, allow_commands: saved } },
+      draft: { ...s.draft, judge: { ...s.draft.judge, allow_commands: [...new Set([...(s.draft.judge.allow_commands || []), rule])] } } }));
+  };
 
   // 3.2: with a query, every section with a match shows, only matching groups open, other rows dimmed
   const changed = changedRows(secs, st.draft, st.defaults, ctx), changedM = changedMatch(changed);

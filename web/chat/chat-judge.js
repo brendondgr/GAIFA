@@ -76,8 +76,15 @@ export function JudgeModelPick({ st, value, onChange }) {
 export const judgeStatusText = st => (st.available ? `Judge: ${st.model} (${st.backend}), answering.`
   : `Judge: ${st.model} (${st.backend}) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`);
 
-/** The judged calls. With `onAllow` (the Settings page) "Always allow" adds the rule to the page's draft and the
- *  judge's own controls are rows of the page (`controls: false`); without it, it saves at once as before. */
+/** "Always allow"'s save: the list with the rule, and as `base` the list it was added to, so a rule added elsewhere
+ *  since that list loaded stays (settings-that-stick 2.2). Returns `saveSettings`' arguments. */
+export function allowRule(list, rule) {
+  const was = [...(list || [])];
+  return [{ judge: { allow_commands: withRule(was, rule) } }, { base: { judge: { allow_commands: was } } }];
+}
+
+/** The judged calls. "Always allow" saves the rule at once; with `onAllow` (the Settings page) the page saves it and
+ *  keeps its draft in step, and the judge's own controls are rows of the page (`controls: false`). */
 export function JudgedList({ api, limit = 30, onAllow, allowed: allowedList, controls = false }) {
   const React = R(), [rows, setRows] = React.useState(null), [st, setSt] = React.useState(null), [err, setErr] = React.useState(null);
   const [cfg, setCfg] = React.useState(null), [note, setNote] = React.useState(null);
@@ -87,9 +94,13 @@ export function JudgedList({ api, limit = 30, onAllow, allowed: allowedList, con
     api.getSettings?.().then(setCfg, () => setCfg(null));
   };
   const always = async p => {     // the "Always allow" shortcut: one more allow rule, after a confirm
-    if (onAllow) { if (globalThis.confirm?.(allowConfirm(p))) { onAllow(p); setNote({ ok: `Added “${p}” to your command rules: save the page to keep it.` }); } return; }
+    if (onAllow) {   // the Settings page saves it at once too (settings-that-stick 2.2), and keeps its draft in step
+      if (!globalThis.confirm?.(allowConfirm(p))) return;
+      try { await onAllow(p); setNote({ ok: `Added “${p}” to your command rules.` }); } catch (e) { setNote({ error: `Couldn’t add “${p}”: ${errText(e)}` }); }
+      return;
+    }
     if (!cfg?.judge || !globalThis.confirm?.(allowConfirm(p))) return;
-    try { const r = await api.saveSettings({ judge: { allow_commands: withRule(cfg.judge.allow_commands, p) } }); setCfg(r.settings); setNote({ ok: `Added “${p}” to your command rules.` }); }
+    try { const r = await api.saveSettings(...allowRule(cfg.judge.allow_commands, p)); setCfg(r.settings); setNote({ ok: `Added “${p}” to your command rules.` }); }
     catch (e) { setNote({ error: `Couldn’t add “${p}”: ${errText(e)}` }); }
   };
   const allowed = new Set(allowedList || cfg?.judge?.allow_commands || []);

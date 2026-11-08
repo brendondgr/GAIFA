@@ -6,6 +6,7 @@ import { createToolMocks } from './mock-tools.js';
 import { createSessionMocks } from './mock-sessions.js';
 import { createLlmMocks } from './mock-llm.js';
 import { TEXT_EXT, DOC_EXT } from './chat/chat-files.js';
+import { rebase, Conflict } from './settings-merge.js';
 const GB = 1e9, MB = 1e6;
 const CHAT_MODS = ['comfy', 'gen3d', 'tts', 'vllm', 'lcpp'];   // mods whose chat module (plan 44.1) the mock lists: they're served from services/<id>/ui/ as in the live hub
 export class ApiError extends Error {
@@ -731,8 +732,11 @@ export function createMockApi() {
     async deleteOutput(id) { await net(); const i = outputs.findIndex(x => x.id === id); if (i < 0) throw err(404, 'output_not_found', `No output "${id}"`); outputs.splice(i, 1); emit({ type: 'output_deleted', id }); return null; },
     async getSettings() { await net(); return clone(settings); },
     async getSettingsDefaults() { await net(); return { ...clone(defaults), services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) } }; },
-    async saveSettings(patch) { await net();
-      // Like utils/settings.py: sections merge key by key; services.enabled/autostart merge per mod.
+    async saveSettings(patch, { base } = {}) { await net();
+      // Like utils/settings.py: sections merge key by key; services.enabled/autostart merge per mod; `base` merges with what is saved (2.2).
+      if (patch?.base) { base = patch.base; patch = { ...patch }; delete patch.base; }
+      try { patch = rebase(settings, patch, base); }
+      catch (e) { if (e instanceof Conflict) throw err(409, 'settings_conflict', `${e.field} was changed elsewhere since you loaded it`, { field: e.field, current: e.current, yours: e.yours }); throw e; }
       const s = clone(settings);
       for (const [sec, v] of Object.entries(patch || {})) { if (v == null) continue;
         if (typeof v !== 'object' || Array.isArray(v)) throw err(422, 'invalid_config', `${sec}: must be an object`, { field: sec });

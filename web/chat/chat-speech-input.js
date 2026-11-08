@@ -49,7 +49,7 @@ export function SpeechInputPanel({ api, toast = () => {}, media = globalThis.nav
   return panelBody({ prefs, save: async patch => {
     const next = { ...prefs, ...patch };
     setPrefs(next); setErr(null);
-    try { const r = await api.saveSettings({ speech_input: next }); setPrefs(r.settings.speech_input); }
+    try { const r = await api.saveSettings({ speech_input: next }, { base: { speech_input: prefs } }); setPrefs(r.settings.speech_input); }
     catch (e) { setErr(e.detail || String(e)); toast(e.detail || String(e), 'error'); }
   } });
   function panelBody({ prefs, save }) {

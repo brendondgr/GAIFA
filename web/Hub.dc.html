@@ -1134,6 +1134,7 @@ class Component extends DCLogic {
     this.api.listWidgets().then(w => this.setState({ widgets: w })).catch(() => this.setState({ widgets: [] }));
     this.api.getSettings().then(st => {
       const u = st.ui || {};
+      this.savedUi = u;   // settings-that-stick 2.2: the base of the next dashboard and sidebar saves
       this.setState({ dash: { order: [], hidden: [], ranges: {}, ...(u.dashboard || {}) } });
       if (u.nav && !this.navT) { this.setState({ nav: u.nav }); lsSet('hub.nav', JSON.stringify(u.nav)); }
       if (lsGet('hub.density', null) == null && u.density) this.setState({ density: u.density });  // this browser hasn't chosen: use the saved one
@@ -1171,7 +1172,8 @@ class Component extends DCLogic {
     clearTimeout(this.dashT);
     this.dashT = setTimeout(async () => {
       try {
-        await this.api.saveSettings({ ui: { dashboard: next } });
+        const was = this.savedUi?.dashboard, r = await this.api.saveSettings({ ui: { dashboard: next } }, { base: was ? { ui: { dashboard: was } } : null });
+        this.savedUi = r.settings.ui;
       } catch (e) { this.err(e); }
     }, 500);
   };
@@ -1183,7 +1185,8 @@ class Component extends DCLogic {
     clearTimeout(this.navT);
     this.navT = setTimeout(async () => {
       try {
-        await this.api.saveSettings({ ui: { nav: next } });
+        const was = this.savedUi?.nav, r = await this.api.saveSettings({ ui: { nav: next } }, { base: was ? { ui: { nav: was } } : null });
+        this.savedUi = r.settings.ui;
       } catch (e) { this.err(e); } finally { this.navT = null; this.navNow = null; }
     }, 500);
   };

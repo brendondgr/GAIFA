@@ -192,7 +192,8 @@ export function createHttpApi(base = '', { fetch: fetchFn = globalThis.fetch?.bi
     // How pages are read and screened, for Settings → Permissions → Screening and Agent → Reading web pages: the models each backend offers, what relevance uses now
     getWebReading: () => req('GET', '/api/web/reading'),
     getSettings: () => req('GET', '/api/settings'),
-    saveSettings: s => req('PUT', '/api/settings', { json: s }),
+    // settings-that-stick 2.2: `base` (what each changed key held when loaded; settings-merge.js baseOf) merges with what is saved now
+    saveSettings: (s, { base } = {}) => req('PUT', '/api/settings', { json: base && Object.keys(base).length ? { ...s, base } : s }),
     getSettingsDefaults: () => req('GET', '/api/settings/defaults'),   // plan settings-redesign 4.1: config.example.toml's values
     getMetrics: ({ series, range, step } = {}) => req('GET', `/api/metrics${qs({ series, range, step })}`),
     listMetricSeries: () => req('GET', '/api/metrics/series'),

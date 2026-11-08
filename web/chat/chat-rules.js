@@ -60,7 +60,7 @@ function RulesEditor({ api, section, value, lists, check, onSaved }) {
   const dirty = JSON.stringify(draft) !== JSON.stringify(value);
   const save = async () => {
     setBusy(true); setMsg(null);
-    try { const r = await api.saveSettings({ [section]: draft }); setMsg({ ok: 'Saved. It applies to the next call.' }); onSaved?.(r.settings); }
+    try { const r = await api.saveSettings({ [section]: draft }, { base: { [section]: value } }); setMsg({ ok: 'Saved. It applies to the next call.' }); onSaved?.(r.settings); }
     catch (e) {
       const list = lists.find(l => (e?.data?.field || '').startsWith(`${section}.${l.key}`));
       setMsg({ error: `Couldn’t save${list ? ` “${list.label}”` : ''}: ${errText(e)}` });

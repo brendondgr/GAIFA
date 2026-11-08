@@ -27,11 +27,10 @@ function ScreenModelBlock({ ctx }) {
   return h(ScreenModelPick, { screen: ctx.draft?.screen, reading: ctx.reading, onChange: patch => ctx.setDraft(d => { d.screen = { ...d.screen, ...patch }; }) });
 }
 
-/** The judged calls; "Always allow" adds the rule to the draft. */
+/** The judged calls; "Always allow" saves the rule at once (ctx.allowCommand, settings-that-stick 2.2). */
 function JudgedBlock({ ctx }) {
   const allow = ctx.draft?.judge?.allow_commands || [];
-  return pad(h(JudgedList, { api: ctx.api, controls: false, allowed: allow,
-    onAllow: rule => ctx.setDraft(d => { d.judge.allow_commands = [...new Set([...(d.judge.allow_commands || []), rule])]; }) }));
+  return pad(h(JudgedList, { api: ctx.api, controls: false, allowed: allow, onAllow: ctx.allowCommand }));
 }
 
 /** The microphones in order (4.3): the dictation panel on the draft's speech_input, its other fields being rows. */

@@ -3,7 +3,7 @@
 // draws the current section's groups from schema.js with rows.js and the blocks. Hub.dc.html mounts it and
 // asks `ref.current.dirty()` before leaving with unsaved changes. Written by us (web/PATCHES.md).
 
-import { h, T, MONO, usePref, chipSt, Badge } from '../chat/chat-ui.js';
+import { h, T, MONO, chipSt, Badge } from '../chat/chat-ui.js';
 import { sections, rowsOf, validateDraft, saveBody, isDirty, summaryOf, changedRows, changedMatch, sameValue, showValue, mergeReload, resolveElsewhere } from './schema.js';
 import { Row, Group, cardsOf, openGroups, setOpen } from './rows.js';
 import { parseSettingsRoute, settingsPlace } from './route.js';
@@ -17,6 +17,7 @@ import { voiceChoices } from '../chat/chat-speak.js';
 import { baseOf } from '../settings-merge.js';
 import { allowRule } from '../chat/chat-judge.js';
 import { useUiPref } from '../ui-prefs.js';
+import { store } from '../ui-store.js';
 
 const R = () => globalThis.React;
 const BLOCKS = { ...HUB_BLOCKS, ...AGENT_BLOCKS, ...REPO_BLOCKS, ...LLM_BLOCKS };
@@ -91,7 +92,8 @@ export function SettingsPage(props) {
   }, []);
   useUiPref('chat', null);   // 3.3: rows read from ui-prefs (Steps between messages) redraw when it changes
   useFlashCss();
-  const [closed, setClosed] = usePref('gaifa.settings.open', {});
+  const [closed, setClosedState] = React.useState(() => store.get('hub.settings.open', {}));   // folded groups: the UI store (settings-that-stick 4.3)
+  const setClosed = v => { setClosedState(v); store.set('hub.settings.open', v); };
   const [q, setQ] = React.useState(''), [hit, setHit] = React.useState(-1), boxRef = React.useRef(null), [changedOnly, setChangedOnly] = React.useState(false);
   React.useEffect(() => {   // 3.2: '/' focuses the search box when nothing else has focus
     const f = e => {

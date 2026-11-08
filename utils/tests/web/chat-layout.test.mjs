@@ -172,3 +172,16 @@ test('dropZone: the nearest edge within a band, else the middle', () => {
   assert.equal(L.dropZone(400, 300, 800, 600), 'center');
   assert.equal(L.dropZone(30, 20, 800, 600), 'top', 'a corner: the nearer edge by fraction (20/600 < 30/800)');
 });
+
+test('settings-that-stick 4.3: the layout is kept in the UI store, saved to the hub once dragging stops', async t => {
+  const { store } = await import(pathToFileURL(path.join(root, 'web/ui-store.js')).href);
+  const saved = [];
+  store.attach({ saveUiStore: async (scope, { set }) => { saved.push([scope, set]); return { values: set }; } });
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const a = L.single('t1'), b = L.single('t2');
+  L.saveLayout(a); L.saveLayout(b);
+  assert.deepEqual(L.loadLayout(), L.parseLayout(JSON.stringify(b)));
+  assert.equal(saved.length, 0);
+  t.mock.timers.tick(2000);
+  assert.equal(saved.length, 1); assert.equal(saved[0][0], 'hub'); assert.ok(saved[0][1]['hub.chat.layout']);
+});

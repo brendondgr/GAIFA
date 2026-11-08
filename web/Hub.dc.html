@@ -1056,6 +1056,8 @@ class Component extends DCLogic {
     uiPrefsMod.uiPrefs.onError = e => { if (!this.prefErrShown) { this.prefErrShown = true; this.toast(`Couldn’t save: kept in this browser only (${e?.detail || e?.message || e})`, 'error'); } };
     if (!location.hash) history.replaceState(null, '', '#/overview');
     this.setState({ route: this.parse() });
+    // 4.3: the hub's own remembered state (chat panes, folded groups, sorts) before the first page draws; at most 1.5 s
+    await Promise.race([modKitMod.store.load(this.api, 'hub'), new Promise(r => setTimeout(r, 1500))]);
     await this.boot();
   }
   componentWillUnmount() {

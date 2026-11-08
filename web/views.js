@@ -5,6 +5,7 @@
 
 import { h, SERIES, OTHER, TONE, MONO, MUT, BD, fmtBytes, fmtDur, srOnly, Frame } from './chart-kit.js';
 import { AreaChart, LineChart, BarChart, Sparkline, Timeline, Treemap } from './charts.js';
+import { store } from './ui-store.js';
 
 const R = () => globalThis.React;
 export const svcColor = (services, id) => { const i = services.findIndex(s => s.id === id); return i < 0 ? OTHER : SERIES[i % SERIES.length]; };
@@ -126,8 +127,8 @@ export function ServiceCharts({ api, service, range = '24h' }) {
 // ---------- Overview → Table ----------
 const COLS = [['name', 'Service'], ['state', 'State'], ['load', 'Load'], ['mem', 'Memory'], ['spark', '1 h'], ['idle', 'Idle'], ['jobs', 'Jobs'], ['err', 'Last error'], ['act', '']];
 export function ServiceTable({ services, hist1, jobs, icons, actionsFor, badge, compact }) {
-  const React = R(), [sort, setSort] = React.useState(() => { try { return JSON.parse(localStorage.getItem('hub.tableSort')) || { k: null, dir: 1 }; } catch { return { k: null, dir: 1 }; } });
-  const setS = k => { const s = { k, dir: sort.k === k ? -sort.dir : 1 }; setSort(s); try { localStorage.setItem('hub.tableSort', JSON.stringify(s)); } catch { /* private window */ } };
+  const React = R(), [sort, setSort] = React.useState(() => store.get('hub.table.sort', null) || { k: null, dir: 1 });   // the UI store (settings-that-stick 4.3)
+  const setS = k => { const s = { k, dir: sort.k === k ? -sort.dir : 1 }; setSort(s); store.set('hub.table.sort', s); };
   const maxMem = Math.max(1, ...services.map(s => s.memory.used_bytes));
   const rows = services.map((s, i) => ({ s, i, jobs: jobs.filter(j => j.service === s.id).length, idle: s.load === 'loaded' && s.idle_s != null ? s.idle_s : null }));
   const key = { name: r => r.s.name.toLowerCase(), state: r => r.s.state, load: r => r.s.load, mem: r => r.s.memory.used_bytes, idle: r => r.idle ?? -1, jobs: r => r.jobs, err: r => r.s.last_error || '' }[sort.k];

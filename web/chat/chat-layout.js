@@ -1,5 +1,6 @@
 // The Chat page's split layout (chat-split plan 2.1): a tree of panes and splits, as pure functions over a layout
-// value, saved per browser. Tested in utils/tests/web/chat-layout.test.mjs.
+// value, saved on the hub (`hub.chat.layout` in the UI store, settings-that-stick 4.3; this browser's copy paints first).
+// Tested in utils/tests/web/chat-layout.test.mjs.
 //
 //   layout: {root, active, next}         active: the pane id the URL follows; next: the counter for new ids
 //   pane:   {id: 'p3', tid}              tid null: a new chat, not created yet
@@ -7,7 +8,15 @@
 //
 // A split in the same direction as its parent is never nested in it: its kids join the parent's (`normalize`).
 
-export const LAYOUT_KEY = 'gaifa.chat.layout';
+import { store } from '../ui-store.js';
+
+export const LAYOUT_KEY = 'gaifa.chat.layout';   // the key this browser used before; the store's is HUB_LAYOUT
+export const HUB_LAYOUT = 'hub.chat.layout';
+/** The UI store as the storage loadLayout/saveLayout take: saved to the hub once dragging stops for 2 s. */
+export const hubStorage = {
+  getItem: () => { const v = store.get(HUB_LAYOUT, null); return v == null ? null : JSON.stringify(v); },
+  setItem: (k, v) => store.set(HUB_LAYOUT, JSON.parse(v), { wait: 2000 }),
+};
 const EDGES = { left: ['row', true], right: ['row', false], top: ['col', true], bottom: ['col', false] };
 
 export function single(tid = null) { return { root: { id: 'p1', tid }, active: 'p1', next: 2 }; }
@@ -177,9 +186,9 @@ export function parseLayout(text) {
   const next = Math.max(Number.isInteger(v.next) ? v.next : 0, Math.max(...ids) + 1);
   return { root, active: findPane({ root }, v.active) ? v.active : panes(root)[0].id, next };
 }
-export function loadLayout(storage = globalThis.localStorage) {
+export function loadLayout(storage = hubStorage) {
   try { return parseLayout(storage?.getItem(LAYOUT_KEY)) || null; } catch { return null; }
 }
-export function saveLayout(L, storage = globalThis.localStorage) {
+export function saveLayout(L, storage = hubStorage) {
   try { storage?.setItem(LAYOUT_KEY, JSON.stringify(L)); } catch { /* private window, storage full: the layout lasts this page */ }
 }

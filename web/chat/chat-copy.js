@@ -5,7 +5,8 @@
 // (`gaifa.chat.copyModes` through chat-ui.js's getPref/setPref; at most 50, none older than a day).
 // Pure part tested in utils/tests/web/chat-copy.test.mjs.
 
-import { h, T, Icon, Popover, getPref, setPref } from './chat-ui.js';
+import { h, T, Icon, Popover } from './chat-ui.js';
+import { store } from '../ui-store.js';
 import { parseCitations, citeGroup } from './chat-md.js';
 import { stepText, errorText } from './chat-steps.js';
 import { SEARCH_TOOLS, FETCH_TOOLS, turnSources, placeFor } from './chat-sources.js';
@@ -17,7 +18,8 @@ export const MODES = [
   { id: 'steps', label: 'Including thinking and steps', hint: 'What it thought and did, then the answer and its sources' },
 ];
 const IDS = new Set(MODES.map(m => m.id));
-export const COPY_KEY = 'gaifa.chat.copyModes';
+export const COPY_KEY = 'gaifa.chat.copyModes';   // this browser's key before; now the UI store's HUB_COPY (settings-that-stick 4.3)
+export const HUB_COPY = 'hub.chat.copyModes';
 export const DAY_MS = 86400000;
 const KEEP = 50;
 
@@ -133,7 +135,7 @@ export async function toClipboard(text, doc = globalThis.document) {
 const iconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, height: 24, border: 0, background: 'none', color: T.dim, font: 'inherit', fontSize: 12, cursor: 'pointer', padding: 0 };
 
 export function CopyButton({ text, turn, src, ctx }) {
-  const React = R(), [open, setOpen] = React.useState(false), [place, setPlace] = React.useState({ place: 'up-left', max: 320 }), [said, setSaid] = React.useState(null), [log, setLog] = React.useState(() => getPref(COPY_KEY, []));
+  const React = R(), [open, setOpen] = React.useState(false), [place, setPlace] = React.useState({ place: 'up-left', max: 320 }), [said, setSaid] = React.useState(null), [log, setLog] = React.useState(() => store.get(HUB_COPY, []));
   const timer = React.useRef(0), chev = React.useRef(null), menu = React.useRef(null);
   React.useEffect(() => () => clearTimeout(timer.current), []);
   React.useEffect(() => { if (open) (menu.current?.querySelector('[aria-checked="true"]') || menu.current?.querySelector('button'))?.focus(); }, [open]);
@@ -144,8 +146,8 @@ export function CopyButton({ text, turn, src, ctx }) {
     clearTimeout(timer.current); timer.current = setTimeout(() => setSaid(null), 1600);
   };
   const pick = mode => {
-    const next = recordMode(getPref(COPY_KEY, []), mode);
-    setPref(COPY_KEY, next); setLog(next); setOpen(false); chev.current?.focus();
+    const next = recordMode(store.get(HUB_COPY, []), mode);
+    store.set(HUB_COPY, next); setLog(next); setOpen(false); chev.current?.focus();
     run(mode);
   };
   const onKey = e => {   // arrow keys move between the three

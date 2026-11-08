@@ -644,6 +644,7 @@ type HubEvent =
   | { type: "job"; job: Job }
   | { type: "alert"; alert: Alert }
   | { type: "alert_cleared"; id: string }
+  | { type: "settings"; changed: string[] }   // config.toml was saved (settings-that-stick 2.3): `changed` are dotted Settings keys; open pages reload getSettings()
   | { type: "resync" };            // events were dropped (slow client): refetch everything
 
 interface LogLine { ts: number; text: string; stream: "stdout" | "stderr" }

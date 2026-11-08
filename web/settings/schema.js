@@ -5,6 +5,7 @@
 // are named here and drawn by blocks-hub.js / blocks-agent.js. Written by us (web/PATCHES.md).
 
 import { checkCommandRule, checkToolGlob } from '../chat/chat-rules.js';
+import { mergeValue, Conflict } from '../settings-merge.js';
 import { repoSummary } from './repos-view.js';
 import { enginesSummary, serversSummary } from './llm-view.js';
 
@@ -270,6 +271,37 @@ export function isDirty(orig, draft) {
   if (!orig || !draft) return false;
   const strip = x => { const y = { ...x }; delete y.ui; return JSON.stringify(y); };
   return strip(orig) !== strip(draft);
+}
+
+// ---------- settings-that-stick 2.3: another page or tab saved ----------
+const sameJ = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/** Fresh settings into an open page: a key the user hasn't touched takes the saved value (in `orig` and the draft). A
+ *  touched list or table merges both sides' changes into the draft (as the hub would on Save). A touched plain value
+ *  saved differently elsewhere keeps the draft and its old `orig`, and is listed in `elsewhere` (dotted key → the saved
+ *  value) for Use theirs / Keep mine. `ui` applies at once, so it is left out. */
+export function mergeReload(orig, draft, fresh, elsewhere = {}) {
+  const o = JSON.parse(JSON.stringify(orig)), d = JSON.parse(JSON.stringify(draft)), el = { ...elsewhere };
+  for (const [sec, vals] of Object.entries(fresh || {})) {
+    if (sec === 'ui' || !vals || typeof vals !== 'object') continue;
+    o[sec] ||= {}; d[sec] ||= {};
+    for (const [k, f] of Object.entries(vals)) {
+      const was = o[sec][k], mine = d[sec][k], key = `${sec}.${k}`;
+      if (sameJ(mine, was)) { o[sec][k] = f; d[sec][k] = JSON.parse(JSON.stringify(f)); delete el[key]; }
+      else if (sameJ(f, mine)) { o[sec][k] = f; delete el[key]; }
+      else if (!sameJ(f, was)) {
+        try { d[sec][k] = mergeValue(key, f, was, mine); o[sec][k] = f; delete el[key]; } catch (e) { if (!(e instanceof Conflict)) throw e; el[key] = f; }
+      }
+    }
+  }
+  return { orig: o, draft: d, elsewhere: el };
+}
+/** Resolve one key changed elsewhere: `theirs` takes the saved value; `mine` keeps the draft and saves over it. */
+export function resolveElsewhere(st, key, pick) {
+  const [sec, k] = key.split('.'), f = st.elsewhere[key], el = { ...st.elsewhere };
+  delete el[key];
+  const orig = { ...st.orig, [sec]: { ...st.orig[sec], [k]: f } };
+  const draft = pick === 'theirs' ? { ...st.draft, [sec]: { ...st.draft[sec], [k]: JSON.parse(JSON.stringify(f)) } } : st.draft;
+  return { orig, draft, elsewhere: el };
 }
 
 // ---------- 4.2: defaults, changes ----------

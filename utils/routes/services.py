@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 
 from utils import config as config_mod
 from utils import operations
+from utils import settings as settings_mod
 from utils.services import check, loading
 from utils.api_models import CheckReport, Logs, Operation, Rescan, SavedConfig, ServiceConfigPatch, ServiceDetail, ServiceSummary
 from utils.events import SSE_RETRY_MS
@@ -182,6 +183,7 @@ async def save_service_config(service_id: str, patch: ServiceConfigPatch, reques
     clash = check_effective_ports([s.mod for s in mgr.list()], trial, hub.port).get(service_id)
     if clash:
         raise ServiceError(422, "invalid_config", f"{service_id}: {clash}")
+    before = settings_mod.view(hub)
     async with hub.config_lock:   # not between a Settings save's read and write (settings-that-stick 2.1)
         try:
             cfg = config_mod.save(hub.paths.config_file, {"services": {service_id: changes}})
@@ -189,6 +191,7 @@ async def save_service_config(service_id: str, patch: ServiceConfigPatch, reques
             raise ServiceError(422, "invalid_config", str(e)) from None
         hub.config = cfg
         mgr.reconfigure(cfg)
+    settings_mod.publish_saved(hub, before, settings_mod.view(hub))   # Settings → Services follows (2.3)
     new = effective(svc.mod, cfg).as_dict()
     keys = RESTART_KEYS | ({"idle_unload_s"} if svc.has_memory else set())  # passed in the env (plan 5.6)
     restart_required = svc.state not in ("stopped", "failed") and any(old[k] != new[k] for k in keys)

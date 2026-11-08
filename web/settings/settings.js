@@ -4,7 +4,7 @@
 // asks `ref.current.dirty()` before leaving with unsaved changes. Written by us (web/PATCHES.md).
 
 import { h, T, MONO, usePref, chipSt, Badge } from '../chat/chat-ui.js';
-import { sections, rowsOf, validateDraft, saveBody, isDirty, summaryOf, changedRows, changedMatch, sameValue, showValue } from './schema.js';
+import { sections, rowsOf, validateDraft, saveBody, isDirty, summaryOf, changedRows, changedMatch, sameValue, showValue, mergeReload, resolveElsewhere } from './schema.js';
 import { Row, Group, cardsOf, openGroups, setOpen } from './rows.js';
 import { parseSettingsRoute, settingsPlace } from './route.js';
 import { SectionNav, SearchBox } from './settings-nav.js';
@@ -81,6 +81,13 @@ export function SettingsPage(props) {
     api.getToolIndex?.().then(ix => live && up({ toolCounts: ix.reduce((m, t) => ({ ...m, [t.mod]: (m[t.mod] || 0) + 1 }), {}) }), () => {});
     return () => { live = false; };
   }, []);
+  // 2.3: another page, tab or chat saved: untouched keys follow it, touched ones are listed as changed elsewhere
+  const reload = fresh => up(s => (s.orig && s.draft ? mergeReload(s.orig, s.draft, fresh, s.elsewhere) : {}));
+  React.useEffect(() => {
+    const f = e => e.detail && reload(e.detail);
+    globalThis.addEventListener?.('gaifa:settings', f);
+    return () => globalThis.removeEventListener?.('gaifa:settings', f);
+  }, []);
   useFlashCss();
   const [closed, setClosed] = usePref('gaifa.settings.open', {});
   const [q, setQ] = React.useState(''), [hit, setHit] = React.useState(-1), boxRef = React.useRef(null), [changedOnly, setChangedOnly] = React.useState(false);
@@ -132,7 +139,10 @@ export function SettingsPage(props) {
       up(s => ({ orig: r.settings, draft: { ...clone(r.settings), ui: s.draft.ui }, saving: false, restart: r.restart_required, err: null }));
       props.toast?.('Settings saved', 'success');
       props.onSaved?.(r);
-    } catch (e) { up({ saving: false, err: e }); if (e.status === 0) props.goDown?.(); }
+    } catch (e) {
+      up({ saving: false, err: e.code === 'settings_conflict' ? null : e }); if (e.status === 0) props.goDown?.();
+      if (e.code === 'settings_conflict') api.getSettings().then(reload, () => {});   // 2.3: shown as changed elsewhere
+    }
   };
   const revert = () => up(s => ({ draft: { ...clone(s.orig), ui: s.draft.ui }, err: null }));
   // 2.2: "Always allow" under Judged calls saves at once; the saved list goes into `orig`, and into the draft with its own edits kept
@@ -215,6 +225,13 @@ export function SettingsPage(props) {
     st.restart ? h('div', { role: 'status', style: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '12px 14px', borderRadius: 10, background: T.tacc, border: '1px solid ' + T.acc } },
       h('span', { style: { flex: 1, minWidth: 200 } }, h('strong', null, 'Saved.'), ' Restart GAIFA to apply the new port: ', h('code', { style: { fontFamily: MONO } }, 'gaifa restart')),
       h('button', { type: 'button', onClick: () => up({ restart: false }), style: { ...btnSt(false), height: 28, fontSize: 12, background: T.card } }, 'Dismiss')) : null,
+    Object.keys(st.elsewhere || {}).length ? h('div', { role: 'alert', 'aria-label': 'Changed elsewhere', style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderRadius: 8, background: T.tacc, border: '1px solid ' + T.acc } },
+      h('strong', null, 'Changed elsewhere since you opened this page'),
+      Object.entries(st.elsewhere).map(([key, v]) => { const row = rowsOf(secs).find(r => r.path === key);
+        return h('div', { key, style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12.5 } },
+          h('span', { style: { flex: '1 1 240px', minWidth: 0 } }, row?.label || key, ': saved as ', h('code', { style: { fontFamily: MONO } }, row ? showValue(row, v) : JSON.stringify(v))),
+          h('button', { type: 'button', onClick: () => up(s => resolveElsewhere(s, key, 'theirs')), style: { ...btnSt(false), height: 26, fontSize: 12 } }, 'Use theirs'),
+          h('button', { type: 'button', onClick: () => up(s => resolveElsewhere(s, key, 'mine')), style: { ...btnSt(false), height: 26, fontSize: 12 } }, 'Keep mine')); })) : null,
     st.err && !errField ? h('div', { role: 'alert', style: { padding: '10px 12px', borderRadius: 8, background: T.trd, color: T.rd } }, st.err.detail || String(st.err.message || st.err)) : null,
     h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'flex-start' } },
     h(SectionNav, { sections: secs, current: searching ? null : cur.id, onPick: id => { setQ(''); setHit(-1); setChangedOnly(false); pick(id); }, density: props.density,

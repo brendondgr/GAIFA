@@ -743,6 +743,7 @@ export function createMockApi() {
         s[sec] = { ...s[sec] }; for (const [k, x] of Object.entries(v)) s[sec][k] = sec === 'services' && (k === 'enabled' || k === 'autostart') && x && typeof x === 'object' ? { ...s[sec][k], ...clone(x) } : clone(x); }
       for (const k of ['enabled', 'autostart']) { const bad = Object.keys(s.services[k] || {}).find(id => !svcById(id)); if (bad) throw err(422, 'invalid_config', `No mod '${bad}'`, { field: `services.${k}` }); }
       if (JSON.stringify(s) === JSON.stringify(settings)) return { settings: clone(settings), restart_required: false };
+      const before = clone(settings);
       const port = Number(s.hub.port); if (!Number.isInteger(port) || port < 1024 || port > 65535) throw err(422, 'invalid_config', 'hub.port must be between 1024 and 65535', { field: 'hub.port' });
       if (services.some(x => x.config.port === port)) throw err(409, 'port_in_use', `Port ${port} is used by ${services.find(x => x.config.port === port).name}`, { field: 'hub.port' });
       if (!(s.memory.reserve_gb >= 0 && s.memory.reserve_gb <= 64)) throw err(422, 'invalid_config', 'memory.reserve_gb must be between 0 and 64', { field: 'memory.reserve_gb' });
@@ -751,6 +752,7 @@ export function createMockApi() {
       services.forEach(x => { if (s.services.enabled[x.id] != null) x.config.enabled = s.services.enabled[x.id]; if (s.services.autostart[x.id] != null) x.config.autostart = s.services.autostart[x.id]; });
       services.sort((a, b) => settings.services.order.indexOf(a.id) - settings.services.order.indexOf(b.id));
       services.forEach(pushSvc); pushMem(); act(`GAIFA settings saved${restart ? ' (restart required)' : ''}`);
+      emit({ type: 'settings', changed: Object.keys(s).flatMap(sec => Object.keys(s[sec] || {}).filter(k => JSON.stringify(s[sec][k]) !== JSON.stringify(before[sec]?.[k])).map(k => `${sec}.${k}`)) });
       return { settings: clone(settings), restart_required: restart }; },
     subscribe(onEvent, onError) { listeners.add(onEvent); if (onError) errorListeners.add(onError); return { close() { listeners.delete(onEvent); errorListeners.delete(onError); } }; },
   };

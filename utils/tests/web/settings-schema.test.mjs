@@ -160,3 +160,25 @@ test('5.1: overrideLines gives what this machine sets as config.toml text', () =
   assert.equal(S.overrideLines([]), '');
   assert.ok(S.rowsOf(secs).some(r => r.block === 'OverridesCard' && r.ref === 'general/hub/overrides'));
 });
+
+test('settings-that-stick 2.3: a save elsewhere reaches an open page', () => {
+  const orig = { judge: { allow_commands: ['a'], threshold: 0.35, model: 'm' }, ui: { theme: 'dark' } };
+  const draft = { judge: { allow_commands: ['a', 'mine'], threshold: 0.35, model: 'm2' }, ui: { theme: 'dark' } };
+  const fresh = { judge: { allow_commands: ['a', 'theirs'], threshold: 0.5, model: 'm2' }, ui: { theme: 'light' } };
+  const r = S.mergeReload(orig, draft, fresh);
+  // untouched: follows the save, in orig and the draft
+  assert.equal(r.orig.judge.threshold, 0.5); assert.equal(r.draft.judge.threshold, 0.5);
+  // touched, saved the same way elsewhere: nothing to ask
+  assert.equal(r.orig.judge.model, 'm2'); assert.equal(r.elsewhere['judge.model'], undefined);
+  // a touched list changed elsewhere: both sides' changes in the draft, the saved list its new base
+  assert.deepEqual(r.draft.judge.allow_commands, ['a', 'theirs', 'mine']); assert.deepEqual(r.orig.judge.allow_commands, ['a', 'theirs']);
+  assert.deepEqual(r.elsewhere, {});
+  assert.equal(r.orig.ui.theme, 'dark');   // ui applies at once, never through the draft
+  // a touched plain value saved differently: kept, listed with the saved value
+  const r2 = S.mergeReload({ judge: { threshold: 0.35 } }, { judge: { threshold: 0.4 } }, { judge: { threshold: 0.5 } });
+  assert.equal(r2.draft.judge.threshold, 0.4); assert.equal(r2.orig.judge.threshold, 0.35); assert.deepEqual(r2.elsewhere, { 'judge.threshold': 0.5 });
+  const theirs = S.resolveElsewhere(r2, 'judge.threshold', 'theirs');
+  assert.equal(theirs.draft.judge.threshold, 0.5); assert.deepEqual(theirs.elsewhere, {});
+  const mine = S.resolveElsewhere(r2, 'judge.threshold', 'mine');
+  assert.equal(mine.draft.judge.threshold, 0.4); assert.equal(mine.orig.judge.threshold, 0.5);
+});

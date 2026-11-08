@@ -76,6 +76,19 @@ def defaults(hub: Hub) -> dict[str, Any]:
     return _shape(ex, svcs, lambda s: mf.effective(s.mod, ex))
 
 
+def changed_keys(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+    """The dotted `Settings` keys whose value differs (`judge.allow_commands`, `ui.nav`)."""
+    return [f"{sec}.{k}" for sec, vals in after.items() if isinstance(vals, dict)
+            for k, v in vals.items() if (before.get(sec) or {}).get(k) != v]
+
+
+def publish_saved(hub: Hub, before: dict[str, Any], after: dict[str, Any]) -> None:
+    """`{type: "settings", changed}` on the event stream after a save (settings-that-stick 2.3): every open page reloads."""
+    changed = changed_keys(before, after)
+    if changed:
+        hub.bus.publish({"type": "settings", "changed": changed})
+
+
 def _invalid(detail: str, field: str | None = None) -> ServiceError:
     return ServiceError(422, "invalid_config", detail, {"field": field} if field else None)
 
@@ -192,6 +205,8 @@ async def _save(hub: Hub, patch: dict[str, Any], base: dict[str, Any] | None) ->
     for svc in mgr.list():
         if was_enabled.get(svc.id) and not svc.eff.enabled and svc.state != "stopped" and not svc.external:
             await mgr.stop(svc.id)  # disabling applies now
+    after = view(hub)
+    publish_saved(hub, before, after)
     if hub.activity:
         await hub.activity.add("GAIFA settings saved" + (" (restart GAIFA to use the new port)" if restart_required else ""))
-    return view(hub), restart_required
+    return after, restart_required

@@ -1132,14 +1132,17 @@ class Component extends DCLogic {
   loadExtras() {
     this.loadHist(); this.loadApprovals(); this.loadSessions(); this.loadGpu();
     this.api.listWidgets().then(w => this.setState({ widgets: w })).catch(() => this.setState({ widgets: [] }));
-    this.api.getSettings().then(st => {
-      const u = st.ui || {};
-      this.savedUi = u;   // settings-that-stick 2.2: the base of the next dashboard and sidebar saves
-      this.setState({ dash: { order: [], hidden: [], ranges: {}, ...(u.dashboard || {}) } });
-      if (u.nav && !this.navT) { this.setState({ nav: u.nav }); lsSet('hub.nav', JSON.stringify(u.nav)); }
-      if (lsGet('hub.density', null) == null && u.density) this.setState({ density: u.density });  // this browser hasn't chosen: use the saved one
-      if (lsGet('hub.theme', null) == null && u.theme && u.theme !== this.state.theme) { this.setState({ theme: u.theme }); this.applyTheme(u.theme); }
-    }).catch(() => {});
+    this.api.getSettings().then(st => this.applySettings(st)).catch(() => {});
+  }
+  // settings-that-stick 2.3: the hub's saved settings, at start and after each `settings` event; pages hear them as `gaifa:settings`
+  applySettings(st) {
+    try { globalThis.dispatchEvent?.(new CustomEvent('gaifa:settings', { detail: st })); } catch { /* no window */ }
+    const u = st.ui || {};
+    this.savedUi = u;   // settings-that-stick 2.2: the base of the next dashboard and sidebar saves
+    if (!this.dashT) this.setState({ dash: { order: [], hidden: [], ranges: {}, ...(u.dashboard || {}) } });   // not over a change still waiting to save
+    if (u.nav && !this.navT) { this.setState({ nav: u.nav }); lsSet('hub.nav', JSON.stringify(u.nav)); }
+    if (lsGet('hub.density', null) == null && u.density) this.setState({ density: u.density });  // this browser hasn't chosen: use the saved one
+    if (lsGet('hub.theme', null) == null && u.theme && u.theme !== this.state.theme) { this.setState({ theme: u.theme }); this.applyTheme(u.theme); }
   }
   // Phase 13 Wire: pending approvals (the header button's count and popover), refreshed on `approval` events.
   loadApprovals() {
@@ -1174,7 +1177,7 @@ class Component extends DCLogic {
       try {
         const was = this.savedUi?.dashboard, r = await this.api.saveSettings({ ui: { dashboard: next } }, { base: was ? { ui: { dashboard: was } } : null });
         this.savedUi = r.settings.ui;
-      } catch (e) { this.err(e); }
+      } catch (e) { this.err(e); } finally { this.dashT = null; }
     }, 500);
   };
   // Plan 33: the sidebar's choices: shown at once, kept in this browser, saved to config.toml ([ui.nav]) shortly after.
@@ -1243,6 +1246,7 @@ class Component extends DCLogic {
       case 'memory': this.setState({ memory: ev.memory }); break;
       case 'gpu': if (ev.gpu) this.setState({ gpu: ev.gpu }); break;
       case 'approval': this.loadApprovals(); break;
+      case 'settings': clearTimeout(this.setT); this.setT = setTimeout(() => this.api.getSettings().then(st => this.applySettings(st)).catch(() => {}), 150); break;   // 2.3: another page or tab saved
       case 'session': this.loadSessions(); break;
       case 'activity': this.setState(st => ({ activity: [ev.item, ...st.activity].slice(0, 80), unread: st.pop === 'activity' ? 0 : st.unread + 1 })); break;
       case 'job': this.setState(st => { let j = st.jobs.filter(x => x.id !== ev.job.id); if (['queued', 'running'].includes(ev.job.state)) j = [...j, ev.job]; return { jobs: j }; }); break;

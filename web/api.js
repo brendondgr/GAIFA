@@ -40,7 +40,7 @@ export const EVENT_AREA = {
   service: 'services', memory: 'memory', gpu: 'gpu', output: 'outputs', output_deleted: 'outputs', model: 'models', model_deleted: 'models',
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
   approval: 'tools', tool_call: 'tools', grant: 'tools', grant_deleted: 'tools',
-  session: 'sessions', session_step: 'sessions', repos: 'repos',
+  session: 'sessions', session_step: 'sessions', repos: 'repos', settings: 'settings',
 };
 
 const enc = encodeURIComponent;

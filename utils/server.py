@@ -77,6 +77,7 @@ class Hub:
     version: str
     started_ts: float = field(default_factory=time.time)
     bus: EventBus = field(default_factory=EventBus)
+    config_lock: asyncio.Lock = field(default_factory=asyncio.Lock)   # config.toml saves, one at a time (settings-that-stick 2.1)
     db: Database | None = None
     activity: ActivityLog | None = None
     alerts: Alerts | None = None

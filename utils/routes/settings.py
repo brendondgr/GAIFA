@@ -22,7 +22,10 @@ async def get_settings_defaults(request: Request) -> dict[str, Any]:
     return settings_mod.defaults(request.app.state.hub)
 
 
-@router.put("/api/settings", summary="Save settings: the whole form or any part; only real overrides are written", response_model=SavedSettings)
+@router.put("/api/settings", summary="Save settings: the whole form or any part; only real overrides are written; `base` merges with what is saved now",
+            response_model=SavedSettings, responses={409: {"description": "settings_conflict: a value changed elsewhere since `base`"}})
 async def save_settings(body: SettingsPatch, request: Request) -> dict[str, Any]:
-    settings, restart = await settings_mod.save(request.app.state.hub, body.model_dump(exclude_none=True))
+    patch = body.model_dump(exclude_none=True)
+    base = patch.pop("base", None)
+    settings, restart = await settings_mod.save(request.app.state.hub, patch, base)
     return {"settings": settings, "restart_required": restart}

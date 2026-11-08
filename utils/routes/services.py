@@ -182,12 +182,13 @@ async def save_service_config(service_id: str, patch: ServiceConfigPatch, reques
     clash = check_effective_ports([s.mod for s in mgr.list()], trial, hub.port).get(service_id)
     if clash:
         raise ServiceError(422, "invalid_config", f"{service_id}: {clash}")
-    try:
-        cfg = config_mod.save(hub.paths.config_file, {"services": {service_id: changes}})
-    except config_mod.ConfigError as e:
-        raise ServiceError(422, "invalid_config", str(e)) from None
-    hub.config = cfg
-    mgr.reconfigure(cfg)
+    async with hub.config_lock:   # not between a Settings save's read and write (settings-that-stick 2.1)
+        try:
+            cfg = config_mod.save(hub.paths.config_file, {"services": {service_id: changes}})
+        except config_mod.ConfigError as e:
+            raise ServiceError(422, "invalid_config", str(e)) from None
+        hub.config = cfg
+        mgr.reconfigure(cfg)
     new = effective(svc.mod, cfg).as_dict()
     keys = RESTART_KEYS | ({"idle_unload_s"} if svc.has_memory else set())  # passed in the env (plan 5.6)
     restart_required = svc.state not in ("stopped", "failed") and any(old[k] != new[k] for k in keys)

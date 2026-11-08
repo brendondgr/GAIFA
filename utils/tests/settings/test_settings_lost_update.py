@@ -9,12 +9,10 @@ import asyncio
 import tomllib
 
 import httpx
-import pytest
 
 from utils.tests.settings.test_settings import _file, _hub
 
 
-@pytest.mark.xfail(strict=True, reason="settings-that-stick 2.1: `base` and the merge")
 async def test_a_list_keeps_what_another_save_added(rig, serve):
     served = await _hub(rig, serve, '[agent.judge]\nallow_commands = ["git status"]\n')
     async with httpx.AsyncClient(base_url=served.url) as c:

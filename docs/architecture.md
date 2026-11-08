@@ -633,6 +633,8 @@ check_on_start = true    # read their state (local git only) when the hub starts
 regenerate = false       # true: keep this machine's model inventory (data/state/setup/models/, local) current as the registry changes
 ```
 
+**Saving** (settings-that-stick 2.1). Every write to `config.toml` goes through `config.save()` under `hub.config_lock`, one at a time (`PUT /api/settings`, `PUT /api/services/{id}/config`). A writer that loaded the settings earlier sends `base`, what each changed key held when it loaded them; `utils/settings_merge.py` merges the save with what is saved now. A list keeps what others added and drops only what this writer removed. A table (`services.enabled`, `ui.nav`) merges entry by entry. A value both sides changed differently is `409 settings_conflict` (`data: {field, current, yours}`), and nothing is written. So a command rule added from a chat survives the Settings page saving its own edit to the same list.
+
 ## 10. The existing apps as mods
 
 | Mod | From | Port | Models | Databases | Changes inside the app |

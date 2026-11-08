@@ -17,6 +17,7 @@ from pydantic import ValidationError
 
 from utils import config as config_mod
 from utils import manifest as mf
+from utils import settings_merge
 from utils.api_models import Settings
 from utils.services.model import ServiceError
 
@@ -100,8 +101,19 @@ def _or_default(value: Any, default: Any) -> Any:
     return None if value == default else value
 
 
-async def save(hub: Hub, patch: dict[str, Any]) -> tuple[dict[str, Any], bool]:
+async def save(hub: Hub, patch: dict[str, Any], base: dict[str, Any] | None = None) -> tuple[dict[str, Any], bool]:
+    """One save at a time (`hub.config_lock`); keys sent with a `base` are merged with what is saved now (settings_merge)."""
+    async with hub.config_lock:
+        return await _save(hub, patch, base)
+
+
+async def _save(hub: Hub, patch: dict[str, Any], base: dict[str, Any] | None) -> tuple[dict[str, Any], bool]:
     before = view(hub)
+    try:
+        patch = settings_merge.rebase(before, patch, base)
+    except settings_merge.Conflict as e:
+        raise ServiceError(409, "settings_conflict", f"{e.field} was changed elsewhere since you loaded it",
+                           {"field": e.field, "current": e.current, "yours": e.yours}) from None
     running = hub.port
     try:
         new = Settings.model_validate(_merge(before, patch)).model_dump()

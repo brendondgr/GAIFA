@@ -817,6 +817,8 @@ class SettingsPatch(_Model):
     web: dict[str, Any] | None = None
     outputs: dict[str, Any] | None = None
     repos: dict[str, Any] | None = None
+    base: dict[str, dict[str, Any]] | None = Field(None, description="What each changed key held when the writer loaded it (section → key → value): "
+                                                     "lists and tables merge with what is saved now; a value changed on both sides is a 409 settings_conflict")
 
 
 class SavedSettings(_Model):

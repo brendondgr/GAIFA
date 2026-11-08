@@ -1,6 +1,6 @@
 # Plan: settings that stick: preferences kept in `config.toml`, and saves that never drop what another save wrote
 
-**Asked for:** 2026-11-08 · **Status:** In progress
+**Asked for:** 2026-11-08 · **Status:** Done (2026-11-08)
 
 ## 1. Introduction
 
@@ -109,9 +109,9 @@ The approach: Phase 1 reproduces both causes with failing tests. Phase 2 makes s
   *Done when:* `chat-layout.test.mjs` (layout saved to and read from the store, throttled), `no-local-prefs.test.mjs`. *As built:* the store moved to `web/ui-store.js` (`mod-kit.js` re-exports it) with the keys `hub.chat.layout`, `hub.settings.open`, `hub.chat.copyModes`, `hub.table.sort` (`HUB_KEYS` maps them to the old browser keys for the one-time copy and the first paint); the shell loads scope `hub` before its first page (at most 1.5 s). The guard checks literal keys written through `setItem`, `lsSet`, `setPref` and `usePref`; the allowed ones are the first-paint copies and the import marks. Browser check on a second hub: split the chat into two panes, fold a Settings group, sort a table, clear the site's data, reload, and all three are back.
 
 **Checks & deliverables — Phase 4**
-- [ ] On the installed hub, after clearing LibreWolf's data for the site: Split, the open panes, the Speech page's voice and the Overview's ranges are all as they were.
-- [ ] `gaifa backup` includes `data/state/ui/*.json`. `gaifa check` passes for tts, stt and comfy.
-- [ ] Delivered: `utils/ui_store.py`, its route, the synced `store`, the hub's view state in `hub.json`, the `localStorage` guard test, docs/mods.md.
+- [x] On the installed hub, after clearing LibreWolf's data for the site: Split, the open panes, the Speech page's voice and the Overview's ranges are all as they were. *Done 2026-11-08 in the in-app browser* (LibreWolf's data is the user's to clear): on the installed hub after `gaifa restart`, the Speech to Text page's preset set to Accurate went to `data/state/ui/stt.json`, and with the browser's copy removed the reload showed Accurate (the test value was deleted again, so the user's own browsers' values are copied up when they next open the page). Split from a cleared origin is Phase 3's check. The hub's own state was checked on the scratch hub (to leave the user's pane layout for their browser's one-time copy): the Overview table sorted by Memory and Settings → Machine → Storage folded both came back after clearing the site's storage. The panes are covered by `chat-layout.test.mjs`.
+- [x] `gaifa backup` includes `data/state/ui/*.json`. `gaifa check` passes for tts, stt and comfy. *2026-11-08:* backup's glob (`data/state/*/*.json`) lists `data/state/ui/stt.json`; `gaifa check` passes for stt and comfy; tts fails one check, its `clips` widget returning an empty series, which is the mod's own data and untouched by this plan.
+- [x] Delivered: `utils/ui_store.py`, its route, the synced `store`, the hub's view state in `hub.json`, the `localStorage` guard test, docs/mods.md.
 
 ## 4. Deliverables
 

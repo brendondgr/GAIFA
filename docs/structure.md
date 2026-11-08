@@ -219,6 +219,7 @@ utils/tests/
 | `mock.js` | `createMockApi()`: the brief §6 contract on simulated data |
 | `mock-history.js` | Ours: 7 days of seeded mock history for the chart methods (brief §11.9), with the Empty and Gaps scenarios |
 | `api.js` | Ours, not the export: `createApi({base, liveAreas, mock})` routes each method to HTTP or the mock by area; `createHttpApi()` |
+| `ui-prefs.js` | The UI's choices kept in `config.toml` (settings-that-stick 3.2): `uiPrefs` (the page's copy of `GET /api/settings`'s `ui`; `get`, `set` saving the table with its `base`, `apply` on each reload, a `gaifa.ui.cache` copy for the first paint), `useUiPref(path, default)` |
 | `settings-merge.js` | A settings save merged with what is saved now (settings-that-stick 2.2), as `utils/settings_merge.py`: `mergeValue`, `rebase` (the mock's `saveSettings`), `baseOf` (each writer's `base`) |
 | `ModPage.dc.html` | Ours: the host that loads a mod's `ui/page.js` and calls `mount(el, ctx)` (brief §5) |
 | `mod-ui.js` | Ours: `ctx.ui`, themed DOM helpers for page modules |

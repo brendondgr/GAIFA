@@ -1036,6 +1036,7 @@ class Component extends DCLogic {
     imp('settings/settings.js').then(m => { this.Settings = m; this.forceUpdate(); });  // plan settings-redesign: the Settings page (web/settings/)
     imp('mem-pools.js').then(m => { this.Pools = m; this.forceUpdate(); });  // plan 36.4: one bar per GPU's VRAM
     Promise.all([imp('nav/sidebar.js'), imp('nav/services-page.js')]).then(([a, b]) => { this.Nav = a; this.SvcsPage = b; this.forceUpdate(); });  // plan 33: the sidebar and the Services page
+    const uiPrefsMod = await imp('ui-prefs.js');
     const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning, hidden, palMeaning] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
       imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js'), imp('outputs/meaning.js'), imp('outputs/hidden.js'), imp('palette-meaning.js')]);
     this.Viewer = viewer;  // plan 24.7: the text and PDF viewer in the Outputs drawer
@@ -1048,6 +1049,8 @@ class Component extends DCLogic {
     this.modUi = modUi.createUi();
     const forceMock = new URLSearchParams(location.search).has('mock');
     this.api = hub.createApi({ base: window.GAIFA_API_BASE ?? null, liveAreas: forceMock ? [] : (window.GAIFA_LIVE_AREAS || []), mock: mod.createMockApi() });
+    this.UiPrefs = uiPrefsMod; uiPrefsMod.uiPrefs.attach(this.api);   // settings-that-stick 3.2: the UI's choices, saved in config.toml
+    uiPrefsMod.uiPrefs.onError = e => { if (!this.prefErrShown) { this.prefErrShown = true; this.toast(`Couldn’t save: kept in this browser only (${e?.detail || e?.message || e})`, 'error'); } };
     if (!location.hash) history.replaceState(null, '', '#/overview');
     this.setState({ route: this.parse() });
     await this.boot();
@@ -1136,6 +1139,7 @@ class Component extends DCLogic {
   }
   // settings-that-stick 2.3: the hub's saved settings, at start and after each `settings` event; pages hear them as `gaifa:settings`
   applySettings(st) {
+    this.UiPrefs?.uiPrefs.apply(st);   // 3.2: ui.chat, ui.overview, … for every page
     try { globalThis.dispatchEvent?.(new CustomEvent('gaifa:settings', { detail: st })); } catch { /* no window */ }
     const u = st.ui || {};
     this.savedUi = u;   // settings-that-stick 2.2: the base of the next dashboard and sidebar saves

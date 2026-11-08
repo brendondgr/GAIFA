@@ -63,3 +63,41 @@ test('callRoom also answers a needs_room that a mod passes back from the hub', a
   assert.equal((await kit.callRoom(ctx, 'POST', '/api/instances')).status, 201);
   assert.deepEqual(calls, [false, true]);
 });
+
+// settings-that-stick 4.2: the pages' store keeps a mod's values on the hub; drafts stay in the browser.
+function fakeStorage(init = {}) {
+  const m = new Map(Object.entries(init));
+  return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), key: i => [...m.keys()][i] ?? null, get length() { return m.size; }, m };
+}
+function fakeApi(values = {}) {
+  const saved = [];
+  return { saved, getUiStore: async mod => ({ values: { ...(values[mod] || {}) } }), saveUiStore: async (mod, { set }) => { saved.push([mod, set]); values[mod] = { ...(values[mod] || {}), ...set }; return { values: values[mod] }; } };
+}
+
+test('store: the hub’s values win once loaded; set saves there and here; drafts stay here', async () => {
+  const st = fakeStorage({ 'gaifa.prefs.imported.tts': '1', 'tts.speak': JSON.stringify({ voice: 'old' }) });
+  const api = fakeApi({ tts: { 'tts.speak': { voice: 'af_heart' } } });
+  const s = kit.createStore({ storage: st });
+  assert.deepEqual(s.get('tts.speak'), { voice: 'old' });            // before load: this browser's copy
+  await s.load(api, 'tts');
+  assert.deepEqual(s.get('tts.speak'), { voice: 'af_heart' });
+  s.set('tts.speak', { voice: 'bf_emma' });
+  assert.deepEqual(s.get('tts.speak'), { voice: 'bf_emma' }); assert.deepEqual(api.saved, [['tts', { 'tts.speak': { voice: 'bf_emma' } }]]);
+  assert.equal(st.m.get('tts.speak'), JSON.stringify({ voice: 'bf_emma' }));
+  s.set('tts.draft', 'Hello'); s.local.set('tts.other', 1);
+  assert.equal(api.saved.length, 1); assert.equal(s.get('tts.draft'), 'Hello');
+});
+
+test('store: a mod’s values saved in this browser before are copied up once; a down hub falls back', async () => {
+  const st = fakeStorage({ 'stt.preset': '"accurate"', 'stt.language': '"en"', 'tts.speak': '{}', 'stt.draft': '"x"' });
+  const api = fakeApi({ stt: { 'stt.language': 'de' } });
+  const s = kit.createStore({ storage: st });
+  await s.load(api, 'stt');
+  assert.deepEqual(api.saved, [['stt', { 'stt.preset': 'accurate' }]]);     // not the one the hub has, not a draft, not another mod's
+  assert.equal(s.get('stt.preset'), 'accurate'); assert.equal(s.get('stt.language'), 'de');
+  assert.equal(st.m.get('gaifa.prefs.imported.stt'), '1');
+  await s.load(api, 'stt'); assert.equal(api.saved.length, 1);
+  const down = kit.createStore({ storage: fakeStorage({ 'relay.window': '"7d"' }) });
+  await down.load({ getUiStore: async () => { throw new Error('down'); } }, 'relay');
+  assert.equal(down.get('relay.window', '24h'), '7d');
+});

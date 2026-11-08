@@ -105,7 +105,65 @@ export const stat = (label, value) => h('div', { style: 'display:flex;flex-direc
   h('span', { style: `font-family:${MONO};font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis` }, value));
 
 /** localStorage that never throws (private windows, blocked storage). */
-export const store = {
-  get(k, d = null) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* not kept */ } },
-};
+function local(storage) {
+  return {
+    get(k, d = null) { try { const v = storage?.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { storage?.setItem(k, JSON.stringify(v)); } catch { /* not kept */ } },
+  };
+}
+
+/** What a page remembers (settings-that-stick 4.2). Keys start with the mod's id (`tts.speak`, `comfy.values.<wf>`);
+ *  each mod's values are kept on the hub (`/api/ui/store/<mod>`), loaded before its page mounts, so a choice is the
+ *  same in every browser. This browser keeps a copy for when the hub is down. `store.local` (and any key ending in
+ *  `.draft`, text being typed) stays in this browser only. A mod's values saved here before are copied up once. */
+export function createStore({ storage = globalThis.localStorage } = {}) {
+  const loc = local(storage), hub = new Map();   // mod → its values from the hub
+  let api = null;
+  const scopeOf = k => String(k).split('.')[0];
+  const isLocal = k => /\.draft$/.test(String(k));
+  const s = {
+    local: loc,
+    attach(a) { api = a; },
+    /** The mod's values from the hub (the shell calls it before mounting the page); quietly local-only without it. */
+    async load(a, mod) {
+      if (a) api = a;
+      if (!api?.getUiStore || !mod) return;
+      try {
+        const values = (await api.getUiStore(mod)).values || {};
+        hub.set(mod, values);
+        await importLocal(mod, values);
+      } catch { /* the hub's down or the store isn't live: this browser's copy */ }
+    },
+    get(k, d = null) {
+      const m = hub.get(scopeOf(k));
+      if (!isLocal(k) && m && Object.prototype.hasOwnProperty.call(m, k)) return JSON.parse(JSON.stringify(m[k]));
+      return loc.get(k, d);
+    },
+    set(k, v) {
+      loc.set(k, v);
+      if (isLocal(k) || !api?.saveUiStore) return;
+      const mod = scopeOf(k), m = hub.get(mod);
+      if (m) m[k] = JSON.parse(JSON.stringify(v));
+      api.saveUiStore(mod, { set: { [k]: v } }).catch(() => { /* kept in this browser */ });
+    },
+  };
+  async function importLocal(mod, values) {
+    const mark = `gaifa.prefs.imported.${mod}`;
+    try { if (storage?.getItem(mark)) return; } catch { return; }
+    const set = {};
+    try {
+      for (let i = 0; i < (storage?.length || 0); i++) {
+        const k = storage.key(i);
+        if (k && k.startsWith(mod + '.') && !isLocal(k) && !(k in values)) { try { set[k] = JSON.parse(storage.getItem(k)); } catch { /* not JSON: skip */ } }
+      }
+    } catch { return; }
+    if (Object.keys(set).length) {
+      try { const r = await api.saveUiStore(mod, { set }); hub.set(mod, r.values || { ...values, ...set }); } catch { return; }
+    }
+    try { storage?.setItem(mark, '1'); } catch { /* asked again next time */ }
+  }
+  return s;
+}
+
+/** The pages' one store. */
+export const store = createStore();

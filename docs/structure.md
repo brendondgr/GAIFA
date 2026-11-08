@@ -224,7 +224,7 @@ utils/tests/
 | `settings-merge.js` | A settings save merged with what is saved now (settings-that-stick 2.2), as `utils/settings_merge.py`: `mergeValue`, `rebase` (the mock's `saveSettings`), `baseOf` (each writer's `base`) |
 | `ModPage.dc.html` | Ours: the host that loads a mod's `ui/page.js` and calls `mount(el, ctx)` (brief §5) |
 | `mod-ui.js` | Ours: `ctx.ui`, themed DOM helpers for page modules |
-| `mod-kit.js` | Ours: shared pieces for the built-in mods' pages (Part B): `requireRunning`, `callRoom` (answers `needs_room` with a confirm, then retries with make-room), `segmented`, `panel`, `header`, `columns`, `stat`, `store`, formatting |
+| `mod-kit.js` | Ours: shared pieces for the built-in mods' pages (Part B): `requireRunning`, `callRoom` (answers `needs_room` with a confirm, then retries with make-room), `segmented`, `panel`, `header`, `columns`, `stat`, `store` (`createStore`: a page's choices kept on the hub per mod, `/api/ui/store/<mod>`; `store.local` and `*.draft` keys in the browser; settings-that-stick 4.2), formatting |
 | `mod-form.js` | Ours: `schemaForm(ctx, schema, o)`: a form built from a JSON Schema (text, numbers with ranges, enums, booleans, files that upload or pick a recent output), for any mod page (plan 11.11) |
 | `mod-options.js` | Ours: choices that follow the inputs (plan 20.7): `choices`, `defaultOf`, `labelOf`, `helpOf` over a schema's `x-options` (brief §11.12); `schemaForm` uses them, so the parameter card and mod pages list only what fits |
 | `mock-comfy.js` | Ours: the comfy mod's API on the mock (packs, runs, imports, review, downloads, charts) |

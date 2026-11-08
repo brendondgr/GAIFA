@@ -1038,7 +1038,7 @@ class Component extends DCLogic {
     imp('settings/settings.js').then(m => { this.Settings = m; this.forceUpdate(); });  // plan settings-redesign: the Settings page (web/settings/)
     imp('mem-pools.js').then(m => { this.Pools = m; this.forceUpdate(); });  // plan 36.4: one bar per GPU's VRAM
     Promise.all([imp('nav/sidebar.js'), imp('nav/services-page.js')]).then(([a, b]) => { this.Nav = a; this.SvcsPage = b; this.forceUpdate(); });  // plan 33: the sidebar and the Services page
-    const uiPrefsMod = await imp('ui-prefs.js');
+    const [uiPrefsMod, modKitMod] = await Promise.all([imp('ui-prefs.js'), imp('mod-kit.js')]);
     const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning, hidden, palMeaning] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
       imp('chat/chat.js'), imp('chat/chat-settings.js'), imp('chat/chat-approvals.js'), imp('sessions.js'), imp('api-tool.js'), imp('outputs/viewer.js'), imp('outputs/meaning.js'), imp('outputs/hidden.js'), imp('palette-meaning.js')]);
     this.Viewer = viewer;  // plan 24.7: the text and PDF viewer in the Outputs drawer
@@ -1051,6 +1051,7 @@ class Component extends DCLogic {
     this.modUi = modUi.createUi();
     const forceMock = new URLSearchParams(location.search).has('mock');
     this.api = hub.createApi({ base: window.GAIFA_API_BASE ?? null, liveAreas: forceMock ? [] : (window.GAIFA_LIVE_AREAS || []), mock: mod.createMockApi() });
+    this.ModKit = modKitMod; modKitMod.store.attach(this.api);   // 4.2: mod pages' remembered choices, on the hub
     this.UiPrefs = uiPrefsMod; uiPrefsMod.uiPrefs.attach(this.api);   // settings-that-stick 3.2: the UI's choices, saved in config.toml
     uiPrefsMod.uiPrefs.onError = e => { if (!this.prefErrShown) { this.prefErrShown = true; this.toast(`Couldn’t save: kept in this browser only (${e?.detail || e?.message || e})`, 'error'); } };
     if (!location.hash) history.replaceState(null, '', '#/overview');
@@ -1545,7 +1546,7 @@ class Component extends DCLogic {
     this.pages[d.id] = { loading: true, ver, tabs: cur?.tabs };
     try {
       const url = new URL(this.pageUrl(d), location.href); url.searchParams.set('v', String(ver));
-      const page = (await import(url.href)).default;
+      const [page] = await Promise.all([import(url.href).then(m => m.default), this.ModKit?.store.load(this.api, d.id)]);   // 4.2: its store before it mounts
       if (!page || typeof page.mount !== 'function') throw new Error('page.js must `export default { tabs, mount(el, ctx) }`');
       const tabs = (Array.isArray(page.tabs) && page.tabs.length ? page.tabs : [{ id: 'page', label: 'Page' }])
         .filter(t => t && t.id && !BUILTIN_TABS.has(String(t.id))).map(t => ({ id: String(t.id), label: String(t.label || t.id) }));

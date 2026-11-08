@@ -1,6 +1,6 @@
 # Plan: settings that stick: preferences kept in `config.toml`, and saves that never drop what another save wrote
 
-**Asked for:** 2026-11-08 · **Status:** Planned
+**Asked for:** 2026-11-08 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -41,14 +41,14 @@ The approach: Phase 1 reproduces both causes with failing tests. Phase 2 makes s
 
 ## Phase 1 — Find what's lost (S)
 
-- [ ] **1.1 Reproduce on the installed hub, and record it in this plan.**
+- [x] **1.1 Reproduce on the installed hub, and record it in this plan.**
   - **Browser:** with Steps set to Split on `127.0.0.1:7000`, open `localhost:7000`, restart the browser, then a private window. Note which ones show Fold. In LibreWolf, read Settings → Privacy → "Delete cookies and site data when LibreWolf is closed", and its exceptions.
   - **Lost update:** open Settings → Permissions, add a command rule there without saving, add another from a chat's Judged calls "Always allow" (or a second tab), then Save the page. The second rule is gone.
-  *Done when:* the plan's §2 records what happened in each case (which of these lost Split on this machine).
-- [ ] **1.2 Failing tests for each cause.**
+  *Done when:* the plan's §2 records what happened in each case (which of these lost Split on this machine). *Found (2026-11-08):* `gaifa open`/`gaifa url` give `127.0.0.1:7000`; a Split saved there is absent on `localhost:7000` (checked in the in-app browser: `gaifa.chat.steps` set on one origin, `null` on the other). LibreWolf's profile isn't readable from the toolbox, so whether it clears site data on close is left to the Phase 3 check. The lost update is reproduced by `test_settings_lost_update.py` (1.2) rather than on the installed hub, so this machine's `config.toml` isn't edited to show it.
+- [x] **1.2 Failing tests for each cause.**
   - `utils/tests/settings/test_settings_lost_update.py`: a `PUT /api/settings` adds `judge.allow_commands: ["a", "b"]` from base `["a"]` after another PUT saved `["a", "c"]`; the file must hold `a`, `b`, `c` (fails today). Two concurrent PUTs to different keys both land.
   - `utils/tests/web/ui-prefs.test.mjs`: a `getSettings` with `ui.chat.steps = "split"` and an empty `localStorage` must give `split` (fails today: there is no such key).
-  *Done when:* the tests exist and fail for the reasons above; `uv run pytest` is otherwise green (the new ones are marked expected to fail, then unmarked by the step that fixes each).
+  *Done when:* the tests exist and fail for the reasons above; `uv run pytest` is otherwise green (the new ones are marked expected to fail, then unmarked by the step that fixes each). *As built:* the list test is `xfail(strict=True)` until 2.1; two saves at once already both land (kept as a guard for 2.1's lock); the `ui-prefs.test.mjs` case is a Node `todo` until 3.2.
 ## Phase 2 — Saves that keep what others saved (M)
 
 - [ ] **2.1 Three-way merge, one save at a time: `utils/settings.py`, `utils/routes/settings.py`.**

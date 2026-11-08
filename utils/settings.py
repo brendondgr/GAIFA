@@ -46,7 +46,7 @@ def _shape(cfg: config_mod.Config, svcs: list[Any], eff: Any) -> dict[str, Any]:
                      "enabled": {s.id: eff(s).enabled for s in svcs},
                      "autostart": {s.id: eff(s).autostart for s in svcs}},
         "ui": {"theme": cfg.ui.theme, "density": cfg.ui.density, "dashboard": cfg.ui.dashboard.model_dump(),
-               "nav": cfg.ui.nav.model_dump()},
+               "nav": cfg.ui.nav.model_dump(), "chat": cfg.ui.chat.model_dump(), "overview": cfg.ui.overview.model_dump()},
         "learning": cfg.learning.model_dump(),
         "speech_input": cfg.speech_input.model_dump(),
         "speech_output": cfg.speech_output.model_dump(),   # plan 49.1
@@ -104,9 +104,35 @@ def _merge(current: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
         for key, value in values.items():
             if section == "services" and key in ("enabled", "autostart") and isinstance(value, dict):
                 merged[key] = {**merged.get(key, {}), **value}  # per mod: the ones sent change
+            elif section == "ui" and key in UI_TABLES and isinstance(value, dict) and isinstance(merged.get(key), dict):
+                merged[key] = _deep(merged[key], value)   # settings-that-stick 3.1: `{chat: {steps}}` changes only steps
             else:
                 merged[key] = value
         out[section] = merged
+    return out
+
+
+UI_TABLES = ("chat", "overview")   # [ui.chat], [ui.overview]: saved in part, written as only what differs from the defaults
+
+
+def _deep(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
+    out = dict(old)
+    for k, v in new.items():
+        out[k] = _deep(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+    return out
+
+
+def _non_default(value: dict[str, Any], default: dict[str, Any]) -> dict[str, Any]:
+    """Only what differs from the defaults, tables within it the same way (empty ones dropped)."""
+    out = {}
+    for k, v in value.items():
+        d = default.get(k)
+        if isinstance(v, dict) and isinstance(d, dict):
+            v = _non_default(v, d)
+            if v:
+                out[k] = v
+        elif v != d and v is not None:
+            out[k] = v
     return out
 
 
@@ -184,6 +210,10 @@ async def _save(hub: Hub, patch: dict[str, Any], base: dict[str, Any] | None) ->
     if new["ui"]["dashboard"] != before["ui"]["dashboard"]:
         layout = {k: v for k, v in new["ui"]["dashboard"].items() if v}
         changes.setdefault("ui", {})["dashboard"] = config_mod.Replace(layout or None)
+    for key in UI_TABLES:
+        if new["ui"][key] != before["ui"][key]:
+            table = _non_default(new["ui"][key], getattr(d.ui, key).model_dump())
+            changes.setdefault("ui", {})[key] = config_mod.Replace(table or None)
     if new["ui"]["nav"] != before["ui"]["nav"]:   # plan 33.2: only what differs from the defaults is written
         nav = {k: v for k, v in new["ui"]["nav"].items() if v != getattr(d.ui.nav, k)}
         changes.setdefault("ui", {})["nav"] = config_mod.Replace(nav or None)

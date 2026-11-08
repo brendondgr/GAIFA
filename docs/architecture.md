@@ -575,6 +575,17 @@ services = "counts"         # "list" (default), "button" or "counts"
 hidden = ["fake-ok"]        # mods left out of the sidebar's list
 folded = false              # the list folded under its header
 
+[ui.chat]                   # the Chat page's choices (settings-that-stick 3.1, written by the UI; only what differs from the defaults)
+steps = "split"             # Steps between messages: "fold" (default, one fold per turn) or "split" (at each of the agent's messages)
+environment = "work"        # the environment a new chat starts in (the last one picked)
+
+[ui.chat.list]              # the chat list's View menu
+group = "none"              # "environment" (default) or "none"; env_order, chat_order, collapsed
+
+[ui.overview]               # the Overview (settings-that-stick 3.1)
+view = "timeline"           # "dashboard" (default), "services", "table" or "timeline"
+timeline_range = "7d"       # 1h, 6h, 24h (default) or 7d; services_range: a service's History charts
+
 [services]
 order = ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode"]
 

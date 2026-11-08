@@ -86,11 +86,41 @@ class NavCfg(_Strict):
     folded: bool = False            # the list folded under its SERVICES header
 
 
+class ChatListCfg(_Strict):
+    """`[ui.chat.list]`: the chat list's View menu (plan 41.2): grouping, both orders, the folded sections."""
+
+    group: Literal["environment", "none"] = "environment"
+    env_order: Literal["activity", "name", "created"] = "activity"
+    chat_order: Literal["updated", "title", "created"] = "updated"
+    collapsed: list[str] = []
+
+
+class ChatUiCfg(_Strict):
+    """`[ui.chat]` (settings-that-stick 3.1): the Chat page's choices, the same in every browser."""
+
+    steps: Literal["fold", "split"] = "fold"     # Steps between messages: one fold per turn, or split at each message
+    list: ChatListCfg = ChatListCfg()
+    environment: str | None = None               # the environment a new chat starts in (the last one picked)
+
+
+RANGES = Literal["1h", "6h", "24h", "7d"]
+
+
+class OverviewCfg(_Strict):
+    """`[ui.overview]` (settings-that-stick 3.1): the Overview's view and its charts' ranges."""
+
+    view: Literal["dashboard", "services", "table", "timeline"] = "dashboard"
+    timeline_range: RANGES = "24h"
+    services_range: RANGES = "24h"               # a service's History charts
+
+
 class UiCfg(_Strict):
     theme: Literal["system", "light", "dark"] = "system"
     density: Literal["comfortable", "compact"] = "compact"
     dashboard: DashboardCfg = DashboardCfg()
     nav: NavCfg = NavCfg()
+    chat: ChatUiCfg = ChatUiCfg()
+    overview: OverviewCfg = OverviewCfg()
 
 
 class ServiceOverride(_Strict):

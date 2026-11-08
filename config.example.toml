@@ -26,6 +26,9 @@ new_mods = [5100, 5199]
 theme = "system"
 density = "compact"         # or "comfortable"
 # [ui.dashboard] holds the Overview dashboard's layout (order, hidden, ranges); the UI writes it.
+# The UI also keeps your choices here, the same in every browser (settings-that-stick):
+# [ui.chat]      steps = "fold" | "split" (Steps between messages), environment (a new chat's), [ui.chat.list] (the chat list's view)
+# [ui.overview]  view = "dashboard" | "services" | "table" | "timeline", timeline_range, services_range (1h, 6h, 24h, 7d)
 
 [services]
 order = ["relay", "lcpp", "tts", "gen3d", "comfy", "opencode"]

@@ -280,7 +280,9 @@ export function createMockApi() {
     hub: { port: 7000 },
     memory: { reserve_gb: 12, auto_make_room: false, never_unload: ['lcpp'], priority: ['tts', 'comfy', 'gen3d', 'example', 'relay', 'lcpp'] },
     services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) },
-    ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} }, nav: { collapsed: false, services: 'list', hidden: [], folded: false } },
+    ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} }, nav: { collapsed: false, services: 'list', hidden: [], folded: false },
+      chat: { steps: 'fold', list: { group: 'environment', env_order: 'activity', chat_order: 'updated', collapsed: [] }, environment: null },   // settings-that-stick 3.1
+      overview: { view: 'dashboard', timeline_range: '24h', services_range: '24h' } },
     learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
     speech_input: { mics: [], language: '', preset: 'balanced', mode: 'both' },
     judge: { backend: 'relay', model: 'minicpm-5-2B', url: 'http://127.0.0.1:4000', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: [], ask_commands: [] },
@@ -290,7 +292,8 @@ export function createMockApi() {
     web: { relevance: 'auto', model: 'd3-lite', url: 'http://127.0.0.1:7000/api/s/decide', candidates: 24, timeout_s: 8 },
     outputs: { hidden_keep_days: 0 },
   };
-  const defaults = clone(settings);   // the seed is the mock's config.example.toml (getSettingsDefaults)
+  const defaults = clone(settings);
+  const deep = (o, n) => { const out = { ...(o || {}) }; for (const [k, v] of Object.entries(n)) out[k] = v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object' ? deep(out[k], v) : clone(v); return out; };   // [ui.chat], [ui.overview] saved in part   // the seed is the mock's config.example.toml (getSettingsDefaults)
   // LocalTTS's own voice shape (GET /v1/voices → { custom, kokoro }), so the Speech page works on the mock.
   const voice = (name, source, duration_s, transcript, extra = {}) => ({ engine: 'breeze', name, transcript, duration_s, created: '2026-09-26T10:30:00-0400', source, instruction: null, language: null, transcript_auto: false, ...extra });
   const voices = [voice('Brendon', 'upload', 22.2, 'This morning, my refrigerator asked me to stop calling it a refrigerator.'),
@@ -740,7 +743,8 @@ export function createMockApi() {
       const s = clone(settings);
       for (const [sec, v] of Object.entries(patch || {})) { if (v == null) continue;
         if (typeof v !== 'object' || Array.isArray(v)) throw err(422, 'invalid_config', `${sec}: must be an object`, { field: sec });
-        s[sec] = { ...s[sec] }; for (const [k, x] of Object.entries(v)) s[sec][k] = sec === 'services' && (k === 'enabled' || k === 'autostart') && x && typeof x === 'object' ? { ...s[sec][k], ...clone(x) } : clone(x); }
+        s[sec] = { ...s[sec] }; for (const [k, x] of Object.entries(v)) s[sec][k] = sec === 'services' && (k === 'enabled' || k === 'autostart') && x && typeof x === 'object' ? { ...s[sec][k], ...clone(x) }
+          : sec === 'ui' && (k === 'chat' || k === 'overview') && x && typeof x === 'object' ? deep(s[sec][k], x) : clone(x); }
       for (const k of ['enabled', 'autostart']) { const bad = Object.keys(s.services[k] || {}).find(id => !svcById(id)); if (bad) throw err(422, 'invalid_config', `No mod '${bad}'`, { field: `services.${k}` }); }
       if (JSON.stringify(s) === JSON.stringify(settings)) return { settings: clone(settings), restart_required: false };
       const before = clone(settings);

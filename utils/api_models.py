@@ -685,11 +685,35 @@ class NavSettings(_Model):
     folded: bool = Field(False, description="The list is folded under its header")
 
 
+class ChatListSettings(_Model):
+    """`[ui.chat.list]`: the chat list's View menu."""
+    group: Literal["environment", "none"] = "environment"
+    env_order: Literal["activity", "name", "created"] = "activity"
+    chat_order: Literal["updated", "title", "created"] = "updated"
+    collapsed: list[str] = Field([], description="Environment ids whose section is folded")
+
+
+class ChatUiSettings(_Model):
+    """`[ui.chat]` (settings-that-stick 3.1)."""
+    steps: Literal["fold", "split"] = Field("fold", description="Steps between messages: one fold per turn, or split at each message")
+    list: ChatListSettings = ChatListSettings()
+    environment: str | None = Field(None, description="The environment a new chat starts in (the last one picked)")
+
+
+class OverviewSettings(_Model):
+    """`[ui.overview]` (settings-that-stick 3.1)."""
+    view: Literal["dashboard", "services", "table", "timeline"] = "dashboard"
+    timeline_range: Literal["1h", "6h", "24h", "7d"] = "24h"
+    services_range: Literal["1h", "6h", "24h", "7d"] = "24h"
+
+
 class UiSettings(_Model):
     theme: Literal["system", "light", "dark"]
     density: Literal["comfortable", "compact"]
     dashboard: DashboardLayout
     nav: NavSettings = NavSettings()
+    chat: ChatUiSettings = ChatUiSettings()
+    overview: OverviewSettings = OverviewSettings()
 
 
 class LearningSettings(_Model):

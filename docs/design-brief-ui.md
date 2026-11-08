@@ -612,7 +612,10 @@ interface Settings {
   services: { order: string[]; enabled: Record<string, boolean>; autostart: Record<string, boolean> };
   ui: { theme: "system" | "light" | "dark"; density: "comfortable" | "compact";   // compact is the default
         dashboard: { order: string[]; hidden: string[]; ranges: Record<string, string> };   // Customize (§11.5), saved in config.toml
-        nav: { collapsed: boolean; services: "list" | "button" | "counts"; hidden: string[]; folded: boolean } };   // the sidebar (plan 33.2), [ui.nav]; send it whole
+        nav: { collapsed: boolean; services: "list" | "button" | "counts"; hidden: string[]; folded: boolean };   // the sidebar (plan 33.2), [ui.nav]; send it whole
+        chat: { steps: "fold" | "split"; environment: string | null;   // [ui.chat] (settings-that-stick 3.1); chat and overview may be sent in part
+                list: { group: "environment" | "none"; env_order: "activity" | "name" | "created"; chat_order: "updated" | "title" | "created"; collapsed: string[] } };
+        overview: { view: "dashboard" | "services" | "table" | "timeline"; timeline_range: "1h" | "6h" | "24h" | "7d"; services_range: "1h" | "6h" | "24h" | "7d" } };   // [ui.overview]
   learning: { enabled: boolean;   // plan 21: preferences on the cards and the learner; off = nothing filled or learned
               nightly_at: string; idle_min: number; infer_after: number; fade_days: number };
   speech_input: { mics: string[];   // plan 29.4: microphone labels, most preferred first; the first one present is used

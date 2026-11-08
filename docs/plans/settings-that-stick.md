@@ -74,11 +74,11 @@ The approach: Phase 1 reproduces both causes with failing tests. Phase 2 makes s
 
 ## Phase 3 — Preferences in `config.toml` (M)
 
-- [ ] **3.1 The new keys: `utils/config.py`, `utils/settings.py`, `config.example.toml`.**
+- [x] **3.1 The new keys: `utils/config.py`, `utils/settings.py`, `config.example.toml`.**
   - `UiCfg` gains `chat: ChatUiCfg` (`steps: Literal["fold", "split"] = "fold"`, `list: ChatListCfg` with the fields `chat-groups.js` `readView` keeps today, `environment: str | None = None`) and `overview: OverviewCfg` (`view: Literal[…] = "dashboard"`, `timeline_range: str = "24h"`, `services_range: str = "24h"`; the allowed ranges are the ones `Hub.dc.html` offers).
   - `settings.view` / `defaults` / `save` carry them, as `[ui.nav]` is (only values that differ from the default are written; `Replace` for the tables).
   - `config.example.toml` lists them, commented, under `[ui]`.
-  *Done when:* `utils/tests/settings/test_settings_ui_prefs.py`: a save of `ui.chat.steps = "split"` writes `[ui.chat] steps = "split"`, back to `"fold"` removes the key, a bad value is a 422 naming the field; `GET /api/settings/defaults` has them. Update architecture §9.
+  *Done when:* `utils/tests/settings/test_settings_ui_prefs.py`: a save of `ui.chat.steps = "split"` writes `[ui.chat] steps = "split"`, back to `"fold"` removes the key, a bad value is a 422 naming the field; `GET /api/settings/defaults` has them. Update architecture §9. *As built:* the list's keys are `group`, `env_order`, `chat_order`, `collapsed` (snake case in TOML; the page maps them); `ui.chat` and `ui.overview` may be saved in part (`{ui: {chat: {steps}}}` changes only steps, `settings._deep`), the hub and the mock alike; only what differs from the defaults is written (`_non_default`), and an empty table is removed.
 - [ ] **3.2 One way to read a preference: `web/ui-prefs.js` (new), `web/chat/chat-ui.js`.**
   - `ui-prefs.js` keeps the hub's `ui` settings for the page. `load(api)` reads `GET /api/settings` once at start. It is refreshed by the `settings` event (2.3), and a cache in `localStorage` (`gaifa.ui.cache`) gives the first paint before the hub answers. `useUiPref(path, default)` returns `[value, set]`. `set` updates at once and saves `{ui: {...}}` with `base` (2.1), then puts the hub's answer in the cache. If the save fails, it keeps the value for this page and shows the error once ("Couldn't save: kept in this browser only").
   - `chat-ui.js` `usePref` stays for the per-browser keys in the inventory. The moved keys are read only through `useUiPref`.

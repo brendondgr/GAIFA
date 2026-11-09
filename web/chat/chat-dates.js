@@ -58,7 +58,7 @@ export function shortDate(ts, now = Date.now() / 1000, locale = undefined) {
 }
 
 // ---------- drawing ----------
-export const dateHeadSt = { padding: '10px 10px 3px', fontSize: 11.5, color: T.dim, fontWeight: 500 };
+export const dateHeadSt = { padding: '10px 10px 3px', fontSize: 11.5, color: T.tx, fontWeight: 600 };
 
 /** The loaded chats under their date headings: a plain heading (no arrow, no count), then its rows. No paging of its
  * own: the page loads the 20 newest, and Show all has the rest. */

@@ -87,7 +87,7 @@ Assumed:
 
 ## Phase 2 — Folders across environments (M)
 
-- [ ] **2.1 Several environments in an origin: `services/workspace/folders.py`, `environments.py`, `api_env.py`.**
+- [x] **2.1 Several environments in an origin: `services/workspace/folders.py`, `environments.py`, `api_env.py`.**
   - **Origin:** `X-GAIFA-Origin` may carry `environments: [ids]` (primary first). `Folders.view(origin)` resolves the union of their folders. A folder that is in more than one gets the highest level any of them gives it. `environment` alone works as before. With both, `environments` wins. The folder grants (`origin.folders`) still add folders at Read. Every route that uses `view` (read, search, edit, run, preflight, undo, skills) gets this for free. Check each one in the tests.
   - **Project environments:** an environment may carry `project: "<pid>"`. `GET /v1/environments` leaves them out unless `?all=1`, and the Workspace page and the chat's environment chip never list them. `POST /v1/environments` takes `project`. `DELETE` works on them as on any environment, except the Default one.
   *Done when:* `services/workspace/tests/test_environments.py` (extended) and `test_origin_envs.py` (new) cover:
@@ -99,6 +99,7 @@ Assumed:
     - project environments hidden from the list.
 
   Update architecture §4.2/§10 where the workspace mod's origin is described, and `docs/mods.md` if it documents `X-GAIFA-Origin`.
+  *As built:* the tests are all in `test_origin_envs.py`. An id in `environments` that names no environment is skipped (all unknown: Default, as for one). `GET /v1/folders` answers the primary as `environment` and, with more than one, `environments`; an explicit `?environment=` (the Workspace page) drops the origin's `environments`. The origin is described in architecture §14.7 (limits); `docs/mods.md` doesn't document the workspace origin, so it is unchanged.
 - [ ] **2.2 The agent sends a project's environments: `services/agent/agent/projects/origin.py` (new), `hubapi.py`, `loop.py`, `context.py`, `local.py`, `prompts.py`.**
   - **One helper:** `chat_envs(settings, projects) -> {environment, environments}` replaces the four places that read `settings.environment` today (`loop.py` ≈ 602, `local.py` ≈ 140, `context.py` ≈ 468/495, `hubapi._chat_origin`). For a project chat it returns the project's environments followed by its own hidden one. Otherwise it returns the chat's environment, as now.
   - **The prompt's Environment note** (`prompts.py` ≈ 140) names the project and each of its environments.

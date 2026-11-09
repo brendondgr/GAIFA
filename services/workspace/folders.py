@@ -4,7 +4,9 @@ A folder is `{id, path, level, allow_bypass}`, kept in an environment (`environm
 Phase 27 kept one list in `folders.json`, now Default). The four levels, lowest first: `read` ·
 `edit` (files change in place) · `run` (commands in the sandbox) · `run_net` (the sandbox with full
 internet). New folders start at `read`. A call sees the folders of its chat's environment plus those
-the user allowed in that chat (`Folders.view(origin)`).
+the user allowed in that chat (`Folders.view(origin)`). A project chat's call names several environments
+(`origin.environments`, primary first; plan projects 2.1) and sees all their folders, each at the highest
+level any of them gives it.
 
 **Caps.** The GAIFA folder and its `data/models/` never go above `read`, whatever is asked: a
 folder inside either is capped, and no write anywhere may land inside them (a folder that
@@ -27,6 +29,7 @@ import secrets as _secrets
 import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 LEVELS = ("read", "edit", "run", "run_net")
@@ -182,22 +185,62 @@ class Folders:
     instance the server keeps is Default's view, which the Phase 27 `/v1/folders` routes use."""
 
     def __init__(self, state: Path | None, caps: Caps, envs: Any = None, env: str | None = None,
-                 granted: list[Any] | tuple[Any, ...] = ()) -> None:
+                 granted: list[Any] | tuple[Any, ...] = (), env_ids: list[str] | None = None) -> None:
         from environments import Environments
         self.caps = caps
         self.envs = envs if envs is not None else Environments(state or Path("."), caps)
         self.env_id = env
+        self.env_ids = list(env_ids or [])      # several environments, primary first (plan projects 2.1)
         self.granted_raw = list(granted) if isinstance(granted, (list, tuple)) else []
         self._lock = threading.Lock()
 
     def view(self, origin: dict[str, Any] | None) -> Folders:
+        """The call's folders: `origin.environments` (ids, primary first: a project chat's, plan projects 2.1) wins over
+        `origin.environment`; then the folders allowed in the chat."""
         o = origin if isinstance(origin, dict) else {}
+        many = o.get("environments")
+        ids = list(dict.fromkeys(str(e) for e in many if isinstance(e, str) and e))[:16] if isinstance(many, list) else []
+        if ids:
+            return Folders(None, self.caps, self.envs, ids[0], o.get("folders") or [], env_ids=ids)
         env = o.get("environment")
         return Folders(None, self.caps, self.envs, str(env) if isinstance(env, str) and env else None, o.get("folders") or [])
 
     @property
     def environment(self) -> Any:
+        """The primary environment (the only one, unless the origin named several)."""
         return self.envs.of(self.env_id)
+
+    @property
+    def environments(self) -> list[Any]:
+        """Every environment the call uses, primary first; ids that name none are skipped (all unknown: the primary's
+        fallback, Default, as for one)."""
+        if len(self.env_ids) < 2:
+            return [self.environment]
+        known = {e.id: e for e in self.envs.all()}
+        found = [known[i] for i in self.env_ids if i in known]
+        return found or [self.environment]
+
+    def _env_folders(self) -> list[Folder]:
+        """The union of the environments' folders; a folder in more than one gets the highest level any of them gives it
+        (one path has one id everywhere, environments.py)."""
+        envs = self.environments
+        if len(envs) == 1:
+            return list(envs[0].folders)
+        best: dict[str, Folder] = {}
+        for e in envs:
+            for f in e.folders:
+                cur = best.get(f.id)
+                if cur is None or LEVELS.index(f.level) > LEVELS.index(cur.level):
+                    best[f.id] = f
+        return list(best.values())
+
+    @property
+    def named(self) -> Any:
+        """What messages call the call's environment: the primary one, or all of them by name."""
+        envs = self.environments
+        if len(envs) == 1:
+            return envs[0]
+        return SimpleNamespace(id=envs[0].id, name=" + ".join(e.name for e in envs))
 
     def _granted(self, env_folders: list[Folder]) -> list[Folder]:
         """The chat's folders from the origin, checked again (grantable, not already in the environment), at Read."""
@@ -222,7 +265,7 @@ class Folders:
         return out
 
     def _load(self) -> list[Folder]:
-        env = self.environment.folders
+        env = self._env_folders()
         return [*env, *self._granted(env)]
 
     def list(self) -> list[Folder]:
@@ -252,7 +295,7 @@ class Folders:
                     raise Refused("inside_folder", f"{ref} is inside the folder {f.id} ({f.path})",
                                   f"pass folder={f.id!r} and path={rel!r}", 404)
         known = ", ".join(f.id for f in folders) or "none yet"
-        env = self.environment
+        env = self.named
         fix = ("pass its full path as `folder` to workspace_tree or workspace_read: the user is asked to let this chat "
                "read it (editing or running there needs it in the environment at a higher level, on the Workspace page)"
                if real else "call workspace_folders to see them; the user adds folders on the Workspace page")

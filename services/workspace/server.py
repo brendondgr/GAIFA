@@ -83,8 +83,8 @@ def view_of(ctx: Any, request: Request, environment: str | None = None) -> Folde
     """The folders this request may use (plan 34): its chat's environment (`?environment=` or the origin's)
     and the folders the hub passed as allowed in that chat."""
     o = reading.origin_of(request.headers.get("x-gaifa-origin"))
-    if environment:
-        o = {**o, "environment": environment}
+    if environment:                       # one environment asked for by name: the project's others don't apply
+        o = {**{k: v for k, v in o.items() if k != "environments"}, "environment": environment}
     return ctx.folders.view(o)
 
 
@@ -180,7 +180,9 @@ def create_app(state: Path | None = None, gaifa_root: Path | None = None, models
     def folders(request: Request, environment: str | None = None) -> dict[str, Any]:
         v = view_of(ctx, request, environment)
         env = v.environment
-        return {"folders": v.public(), "levels": list(LEVELS), "environment": {"id": env.id, "name": env.name}}
+        many = v.environments
+        return {"folders": v.public(), "levels": list(LEVELS), "environment": {"id": env.id, "name": env.name},
+                **({"environments": [{"id": e.id, "name": e.name} for e in many]} if len(many) > 1 else {})}
 
     @app.post("/v1/folders", summary="Add a folder to an environment (Default unless ?environment=; starts at Read)")
     def add(body: FolderIn, environment: str | None = None) -> dict[str, Any]:

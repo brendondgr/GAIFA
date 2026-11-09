@@ -20,6 +20,8 @@ Level = Literal["read", "edit", "run", "run_net"]
 class EnvIn(BaseModel):
     name: str = Field(min_length=1, max_length=64, description="The environment's name, e.g. Grants")
     id: str | None = Field(None, description="A short id (default: from the name)")
+    project: str | None = Field(None, max_length=64, description="The agent's project whose own folders this holds "
+                                                                 "(plan projects 2.1): left out of the lists")
 
 
 class EnvPatch(BaseModel):
@@ -56,13 +58,14 @@ def mount(app: FastAPI, ctx: Any) -> None:
         b = body or PickIn()
         return await pick_folder(b.start, b.title)
 
-    @app.get("/v1/environments", summary="The environments, each with its folders and their levels")
-    def list_envs() -> dict[str, Any]:
-        return {"environments": [e.public(caps) for e in envs.all()], "default": "default", "levels": list(LEVELS)}
+    @app.get("/v1/environments", summary="The environments, each with its folders and their levels (?all=1: projects' own too)")
+    def list_envs(all: bool = False) -> dict[str, Any]:
+        return {"environments": [e.public(caps) for e in (envs.all() if all else envs.listed())], "default": "default",
+                "levels": list(LEVELS)}
 
-    @app.post("/v1/environments", summary="Create an environment (no folders yet)")
+    @app.post("/v1/environments", summary="Create an environment (no folders yet); with `project`, a project's own")
     def create(body: EnvIn) -> dict[str, Any]:
-        return envs.create(body.name, body.id).public(caps)
+        return envs.create(body.name, body.id, body.project).public(caps)
 
     @app.get("/v1/environments/{eid}", summary="One environment and its folders")
     def one(eid: str) -> dict[str, Any]:

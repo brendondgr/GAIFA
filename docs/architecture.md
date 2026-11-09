@@ -626,6 +626,17 @@ window_chars = 800       # a chat model's passages per call: 800 for a small mod
 # threshold = 0.95
 # confirm = true         # ignored since plan web-approvals (it re-read with the judge's chat model; the judge is a decision model only)
 
+[agent.workflows]        # plan agent-workflows 3.6: sub-agents (the agent mod reads them from GET /api/settings → workflows); Settings → Agent → Model
+enabled = true
+parallel_local = 1       # sub-agents at once on this machine's models (the relay's local group); they only queue on one GPU
+parallel_remote = 3      # …on remote and cloud models
+max_children = 8         # per turn of the chat that starts them
+max_depth = 1            # 1: a sub-agent can't start its own
+child_max_steps = 25
+workflow_tokens = 400000 # per turn, every sub-agent's prompt and reply tokens; past it they are stopped
+queue_wait_s = 1800      # a queued sub-agent that waited longer is dropped
+min_window = 16384       # the agent tool only on models with at least this context window
+
 [learning]               # plan 21–22: preferences on the cards, and the learner; Settings → Agent → Learning
 enabled = true
 nightly_at = "03:00"     # the learner's nightly run; it also runs after idle_min minutes without a chat

@@ -56,6 +56,16 @@ regenerate = false          # true keeps this machine's model inventory (data/st
 [agent.screen]
 window_chars = 6000
 
+# Sub-agents (plan agent-workflows): a chat may start others to do parts of its task (the `agent` tool).
+[agent.workflows]
+enabled = true
+parallel_local = 1          # at once on this machine's models: they only queue on one GPU
+parallel_remote = 3         # at once on remote and cloud models
+max_children = 8            # per turn of the chat that starts them
+max_depth = 1               # 1: a sub-agent can't start its own
+workflow_tokens = 400000    # per turn, every sub-agent's prompt and reply tokens together
+min_window = 16384          # the tool only on models with at least this context window
+
 # The Auto judge is always a decision model in the decide mod (d3-lite), never a chat model (plan web-approvals):
 # [agent.judge]
 # model = "d3-lite"

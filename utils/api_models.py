@@ -789,6 +789,19 @@ class WebReadSettings(_Model):
     timeout_s: float = Field(gt=0, le=60, description="Slower than this: lexical's order")
 
 
+class WorkflowsSettings(_Model):
+    """`[agent.workflows]`: sub-agents (plan agent-workflows 3.6)."""
+    enabled: bool = Field(description="The agent tool: a chat may start sub-agents")
+    parallel_local: int = Field(ge=1, le=16, description="Sub-agents at once on this machine's models")
+    parallel_remote: int = Field(ge=1, le=32, description="…on remote and cloud models")
+    max_children: int = Field(ge=0, le=64, description="Per turn of the chat that starts them")
+    max_depth: int = Field(ge=1, le=3, description="1: a sub-agent can't start its own")
+    child_max_steps: int = Field(ge=1, le=200, description="A sub-agent's step limit")
+    workflow_tokens: int = Field(ge=1000, description="Tokens per turn among its sub-agents")
+    queue_wait_s: int = Field(ge=10, description="A queued sub-agent that waited longer is dropped")
+    min_window: int = Field(ge=0, description="Offered only on models with at least this window")
+
+
 class ReposSettings(_Model):
     """`[repos]` (plan mod-repos 3.5): the mods that are their own repositories."""
     fetch_every_h: float = Field(ge=0, le=720, description="How often the hub asks GitHub what's new; 0 = never")
@@ -823,6 +836,7 @@ class Settings(_Model):
     screen: ScreenSettings
     permissions: PermissionsSettings
     web: WebReadSettings
+    workflows: WorkflowsSettings
     outputs: OutputsSettings
     repos: ReposSettings
 
@@ -841,6 +855,7 @@ class SettingsPatch(_Model):
     screen: dict[str, Any] | None = None
     permissions: dict[str, Any] | None = None
     web: dict[str, Any] | None = None
+    workflows: dict[str, Any] | None = None
     outputs: dict[str, Any] | None = None
     repos: dict[str, Any] | None = None
     base: dict[str, dict[str, Any]] | None = Field(None, description="What each changed key held when the writer loaded it (section → key → value): "

@@ -46,6 +46,8 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "permissions": {"deny": [], "ask": ["hub_set_preference", "agent_memory_save", "agent_memory_entity"], "allow": ["hub_start_service"]},
             "web": {"relevance": "auto", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide", "candidates": 24,
                     "timeout_s": 8.0},
+            "workflows": {"enabled": True, "parallel_local": 1, "parallel_remote": 3, "max_children": 8, "max_depth": 1,   # agent-workflows 3.6
+                          "child_max_steps": 25, "workflow_tokens": 400000, "queue_wait_s": 1800, "min_window": 16384},
             "outputs": {"hidden_keep_days": 0.0},
             "repos": {"fetch_every_h": 24.0, "notify": "warnings", "check_on_start": True},
         }
@@ -189,6 +191,20 @@ async def test_the_judge_is_picked_in_settings_and_saved_under_agent(rig, serve)
         assert r.status_code == 422 and r.json()["data"]["field"].startswith("judge")
         r = await c.put("/api/settings", json={"judge": {"model": "d3-lite"}})   # back to the default: the key goes
         assert "judge" not in (tomllib.loads(_file(served)).get("agent") or {})
+
+
+async def test_sub_agent_limits_are_saved_under_agent(rig, serve):
+    """Plan agent-workflows 3.6: [agent.workflows], which the agent mod reads from GET /api/settings."""
+    served = await _hub(rig, serve, "")
+    async with httpx.AsyncClient(base_url=served.url) as c:
+        r = await c.put("/api/settings", json={"workflows": {"parallel_local": 2, "enabled": False}})
+        assert r.status_code == 200, r.text
+        assert r.json()["settings"]["workflows"]["parallel_local"] == 2
+        assert tomllib.loads(_file(served))["agent"]["workflows"] == {"parallel_local": 2, "enabled": False}
+        assert (await c.get("/api/settings")).json()["workflows"]["enabled"] is False
+        r = await c.put("/api/settings", json={"workflows": {"max_depth": 9}})
+        assert r.status_code == 422 and r.json()["data"]["field"].startswith("workflows")
+        assert (await c.get("/api/settings/defaults")).json()["workflows"]["parallel_local"] == 1
 
 
 async def test_command_rules_and_tool_permissions_are_edited_in_settings(rig, serve):

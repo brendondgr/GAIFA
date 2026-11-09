@@ -114,7 +114,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 - [x] **3.5 The child's chat and the dialogs: `chat-header.js`, `chat-actions.js`.**
   - A link back ("↖ <parent title>"), a sub-agent chip and a read-only chip; the composer works (your message is a normal `user` event). Delete and Archive on a parent say how many sub-agents go with it.
 
-- [ ] **3.6 Settings: `config.example.toml`, `web/settings/`.**
+- [x] **3.6 Settings: `config.example.toml`, `web/settings/`.** *(As built: the rows sit at the end of Settings → Agent → Model, since a section keeps at most 7 groups; the hub's `WorkflowsCfg` in `utils/config.py` and `workflows` in `/api/settings`.)*
   - `[agent.workflows]` with the 1.2 defaults; Settings → Agent → Sub-agents rows (on/off, parallel local and remote, children, depth, steps, tokens), with keys, defaults and Reset.
   - Docs: brief §11 (a new section on workflows), `web/PATCHES.md`, `docs/structure.md`.
   *Done when:* the settings tests and the docs tests pass.

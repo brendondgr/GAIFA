@@ -98,6 +98,8 @@ class Agent(Compaction, Queueing):
         self.cfg, self.store, self.hub, self.llm = cfg, store, hub, llm
         from .memory.store import MemoryStore
         self.memory = MemoryStore(store)          # plan structured-memory 1.1
+        from .projects.store import ProjectStore
+        self.projects = ProjectStore(store)       # plan projects 1.1
         self.live = Live()
         self.tasks: dict[str, asyncio.Task[Any]] = {}
         self.local = Local(self)

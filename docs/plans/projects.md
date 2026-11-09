@@ -1,6 +1,6 @@
 # Plan: projects: chats with standing instructions, files, live web pages, folders and their own memory
 
-**Asked for:** 2026-11-08 · **Status:** Planned
+**Asked for:** 2026-11-08 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -52,7 +52,7 @@ Assumed:
 
 ## Phase 1 — Projects in the agent (M)
 
-- [ ] **1.1 The store: `services/agent/agent/projects/__init__.py`, `projects/store.py` (new).**
+- [x] **1.1 The store: `services/agent/agent/projects/__init__.py`, `projects/store.py` (new).**
   - **Tables in `agent.db`:**
     - `projects(id, name, description, instructions, environments JSON, own_env, defaults JSON, memory_entity, pinned, created, updated)`;
     - `project_sources(id, project_id, kind 'file'|'page', output_id, url, title, max_age_s, fetched, chars, status 'ok'|'fetching'|'error', error, added, position)`.

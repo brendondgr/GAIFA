@@ -37,6 +37,8 @@ from typing import Any
 
 # A chat's environment (plan 34: `settings.environment`); none is Default. The orders `threads` takes (plan 41.1).
 ENV_OF = "COALESCE(json_extract(settings, '$.environment'), 'default')"
+PROJ_OF = "COALESCE(json_extract(settings, '$.project'), 'none')"     # a chat's project (plan projects 1.1); `none`: no project
+GROUP_OF = {"environment": ENV_OF, "project": PROJ_OF}
 SORTS = {"updated": "updated DESC", "created": "created DESC", "title": "lower(title) ASC, updated DESC"}
 
 SCHEMA = """
@@ -141,9 +143,10 @@ class Store:
         return self._thread(self._one("SELECT * FROM threads WHERE id = ?", (tid,)))
 
     def threads(self, q: str | None = None, archived: bool = False, limit: int = 200, environment: list[str] | None = None,
-                sort: str = "updated", offset: int = 0) -> list[dict[str, Any]]:
+                sort: str = "updated", offset: int = 0, project: list[str] | None = None) -> list[dict[str, Any]]:
         """Newest first (`sort`: updated | created; `title` A to Z), optionally only the chats of some environments
-        (plan 41.1: `default` also matches chats without one)."""
+        (plan 41.1: `default` also matches chats without one) or projects (plan projects 1.1: `none` matches chats
+        in none)."""
         sql, args = "SELECT * FROM threads WHERE archived = ?", [int(archived)]
         if q:
             sql += (" AND (title LIKE ? OR id IN (SELECT thread_id FROM events WHERE type IN ('user', 'assistant') "
@@ -152,16 +155,20 @@ class Store:
         if environment:
             sql += f" AND {ENV_OF} IN ({', '.join('?' * len(environment))})"
             args += list(environment)
+        if project:
+            sql += f" AND {PROJ_OF} IN ({', '.join('?' * len(project))})"
+            args += list(project)
         sql += " ORDER BY " + SORTS.get(sort, SORTS["updated"]) + " LIMIT ? OFFSET ?"
         args += [limit, max(0, offset)]
         return [self._thread(r) for r in self._all(sql, args)]  # type: ignore[misc]
 
-    def groups(self, archived: bool = False) -> list[dict[str, Any]]:
+    def groups(self, archived: bool = False, by: str = "environment") -> list[dict[str, Any]]:
         """Per environment id the chats use (`default` for none): how many, the newest `updated`, and how many are
-        running or waiting (plan 41.1)."""
-        rows = self._all(f"SELECT {ENV_OF} AS env, COUNT(*), MAX(updated), SUM(state IN ('running', 'waiting')) "
-                         "FROM threads WHERE archived = ? GROUP BY env ORDER BY MAX(updated) DESC", (int(archived),))
-        return [{"environment": r[0], "count": r[1], "updated": r[2], "running": int(r[3] or 0)} for r in rows]
+        running or waiting (plan 41.1). `by="project"`: per project instead (`none` for chats in none; plan projects 1.1)."""
+        key = by if by in GROUP_OF else "environment"
+        rows = self._all(f"SELECT {GROUP_OF[key]} AS g, COUNT(*), MAX(updated), SUM(state IN ('running', 'waiting')) "
+                         "FROM threads WHERE archived = ? GROUP BY g ORDER BY MAX(updated) DESC", (int(archived),))
+        return [{key: r[0], "count": r[1], "updated": r[2], "running": int(r[3] or 0)} for r in rows]
 
     def update_thread(self, tid: str, **fields: Any) -> dict[str, Any] | None:
         allowed = {"title", "model", "mode", "state", "settings", "archived"}

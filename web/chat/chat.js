@@ -1,6 +1,8 @@
 // The Chat page (plan 14.1, Wire — Phase 14): thread list, thread view and composer for the agent
 // mod. A plain ES module on the page's React; Hub.dc.html mounts `ChatPage` for #/chat and
-// #/chat/<thread id>. Written by us (web/PATCHES.md). The page keeps the list and what every chat shares;
+// #/chat/<thread id>, and for #/chat/projects (the projects grid, chat-projects.js; plan projects 5.1) and
+// #/chat/projects/<id> (a project's page, chat-project.js), drawn in the main area instead of the panes. Written by us
+// (web/PATCHES.md). The page keeps the list and what every chat shares;
 // each open chat is a `ChatPane` (chat-pane.js, chat-split plan 1.2).
 //
 // Extending the chat (the modularity contract, brief §11.13): import from this file
@@ -25,6 +27,7 @@ import { GroupedChats, readView, saveView, viewOfUi, loadEnvs } from './chat-gro
 import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
 import { SplitView, SPLIT_CSS } from './chat-split.js';
+import { ProjectsPage, PROJECTS_CSS } from './chat-projects.js';
 import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout } from './chat-layout.js';
 import { CONTROLS_CSS } from './chat-controls.js';
 import { QUOTE_CSS } from './chat-quote.js';
@@ -57,7 +60,7 @@ function injectCss() {
   if (typeof document === 'undefined' || document.getElementById('aichat-css')) return;
   installCopy();
   const s = document.createElement('style');
-  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + CONTROLS_CSS + QUOTE_CSS + QREPLY_CSS + SPLIT_CSS + PAGE_CSS;
+  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + CONTROLS_CSS + QUOTE_CSS + QREPLY_CSS + SPLIT_CSS + PROJECTS_CSS + PAGE_CSS;
   document.head.appendChild(s);
 }
 /** What a mod's chat module gets (plan 44.1). */
@@ -70,12 +73,19 @@ function withRoute(L, tid) {
   const open = panes(L.root).find(p => p.tid === tid);
   return open ? setActive(L, open.id) : setTid(L, activePane(L).id, tid);
 }
+/** What the route draws in the main area: a page of its own (`{page: 'projects'}`, `{page: 'project', pid}`; plan projects
+ * 5.1–5.2), or null for the chats' panes. Thread ids start with t_, so they never clash. */
+export function subPage(route) {
+  const p = route?.parts || [];
+  if (p[1] !== 'projects') return null;
+  return p[2] ? { page: 'project', pid: decodeURIComponent(p[2]) } : { page: 'projects' };
+}
 const MAX_PANES = 4;   // while each pane opens its own stream: a browser keeps about six connections to the hub (plan chat-split 2.3)
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
 
 export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, openSessions, go = x => { location.hash = x; } }) {
   const React = R(), { useState, useEffect, useRef, useMemo } = React;
-  const c = getChatClient(api), tid = route?.parts?.[1] || null;
+  const c = getChatClient(api), sub = subPage(route), tid = sub ? null : route?.parts?.[1] || null;
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
   const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [archived, setArchived] = useState(false), [limit, setLimit] = useState(LIST_PAGE);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
@@ -91,10 +101,11 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const mounted = useRef(false);
   useEffect(() => {      // a link, the list or Back: that chat in view (#/chat: the active pane becomes a new chat)
     if (!mounted.current) { mounted.current = true; return; }
+    if (sub) return;                               // a page in the main area: the panes keep their chats for coming back
     setLayout(L => (tid ? withRoute(L, tid) : setTid(L, activePane(L).id, null)));
-  }, [tid]);
+  }, [tid, sub?.page]);
   const act = activePane(layout);
-  useEffect(() => { if ((act.tid || null) !== tid) go(act.tid ? '#/chat/' + act.tid : '#/chat'); }, [act.id, act.tid]);
+  useEffect(() => { if (!sub && (act.tid || null) !== tid) go(act.tid ? '#/chat/' + act.tid : '#/chat'); }, [act.id, act.tid]);
   const bus = useRef(null); if (!bus.current) bus.current = new EventTarget();
   const setListView = v => saveView(v);
   const relist = () => setListKey(n => n + 1);
@@ -181,6 +192,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     narrow && drawer ? h(React.Fragment, null,
       h('div', { onClick: () => setDrawer(false), 'aria-hidden': true, style: { position: 'absolute', inset: 0, zIndex: 40, background: T.ov } }),
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
+    sub?.page === 'projects' ? h(ProjectsPage, { c, toast, go, onMenu: narrow ? () => setDrawer(true) : null }) :
     h(SplitView, { layout, setLayout, narrow, maxPanes: c.live && !c.sharedStream ? MAX_PANES : Infinity, onRefuse: m => toast(m, 'error'),
       titleOf: id => threads.find(t => t.id === id)?.title || null,
       renderPane: (p, { active, tools, grip }) => h(ChatPane, { shared: sh, tid: p.tid, paneId: p.id, cmd, grip, paneTools: tools,

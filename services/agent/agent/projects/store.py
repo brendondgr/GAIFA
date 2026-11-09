@@ -151,8 +151,10 @@ class ProjectStore:
             sets.append(f"{k} = ?")
             args.append(v)
         if sets:
-            sets.append("updated = ?")
-            args += [self.clock(), pid]
+            if sets != ["pinned = ?"]:                     # a pin isn't activity: the list's order stays
+                sets.append("updated = ?")
+                args.append(self.clock())
+            args.append(pid)
             with self.lock:
                 self.c.execute(f"UPDATE projects SET {', '.join(sets)} WHERE id = ?", args)
         return self.get(pid)

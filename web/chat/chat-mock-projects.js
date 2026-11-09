@@ -105,7 +105,7 @@ export function createProjectMocks({ threads, newThread, emit, net, err, now, ri
       for (const k of ['name', 'description', 'instructions', 'pinned']) if (patch[k] != null) p[k] = k === 'name' ? String(patch[k]).trim() : patch[k];
       if (patch.environments) p.environments = [...new Set(patch.environments)];
       if (patch.defaults) p.defaults = Object.fromEntries(Object.entries(patch.defaults).filter(([, v]) => v != null));
-      p.updated = now();
+      if (Object.keys(patch).some(k => k !== 'pinned')) p.updated = now();   // a pin isn't activity
       if (p.environments[0] && p.environments[0] !== old) inProject(pid).forEach(t => { t.thread.settings = { ...t.thread.settings, environment: p.environments[0] }; });
       changed(pid);
       return full(p);

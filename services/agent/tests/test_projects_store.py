@@ -47,7 +47,9 @@ def test_list_search_sort_pins(tmp_path):
     s._c.execute("UPDATE threads SET updated = 5000 WHERE id = ?", (t["id"],))
     assert [p["name"] for p in ps.list()][0] == "alpha"
     assert ps.get(a["id"])["chats"] == 1
+    before = ps.get(b["id"])["updated"]
     ps.update(b["id"], pinned=True)
+    assert ps.get(b["id"])["updated"] == before                                     # a pin isn't activity (5.1)
     assert [p["name"] for p in ps.list(sort="name")] == ["Beta", "alpha", "gamma"]   # pins on top
     assert {p["name"] for p in ps.list(q="birds")} == {"alpha", "gamma"}
     assert [p["name"] for p in ps.list(q="BET")] == ["Beta"]

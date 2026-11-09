@@ -118,7 +118,8 @@ Assumed:
   *As built:* the calls are in `projects/folders.py`; `GET /v1/projects/{pid}/folders` lists them. The hidden environment's id is `proj-<the project id's hex>`; when "<project> (project)" is taken (two projects with one name) it is "<project> (project <hex>)". Deleting the project deletes it (`project_cleanup`).
 
 **Checks & deliverables — Phase 2**
-- [ ] On a second hub with the real workspace mod, a project with two environments and one folder of its own: a project chat lists all three folders, edits a file in an Edit folder, and is refused an edit in a Read one.
+- [x] On a second hub with the real workspace mod, a project with two environments and one folder of its own: a project chat lists all three folders, edits a file in an Edit folder, and is refused an edit in a Read one.
+  *As built (2026-11-08, port 7078, the worktree's agent and workspace mods):* environments Alpha (a folder at Edit) and Beta (one at Read) and a folder of the project's own at Edit; the project chat's `workspace_folders` (run as a button, `/action`, so no model was needed) listed all three with the environments Alpha, Beta and "Live check (project)"; `workspace_edit` in Alpha edited the file; in Beta it was refused (`level`: Beta is at Read). The hidden environment wasn't in `GET /v1/environments`. The model reading the folders note is covered by `test_project_folders.py`.
 - [x] Delivered: the changed `folders.py`, `environments.py`, `api_env.py`, `projects/origin.py`, the agent's origin call sites, and tests.
 
 ## Phase 3 — Knowledge: files and pages (L)
@@ -203,13 +204,14 @@ Assumed:
 
 ## Phase 5 — The UI (L)
 
-- [ ] **5.1 The projects page: `web/chat/chat-projects.js` (new), `chat.js`.**
+- [x] **5.1 The projects page: `web/chat/chat-projects.js` (new), `chat.js`.**
   - **Route:** `#/chat/projects` draws `ProjectsPage` in the main area (as chat-history's Show all does).
   - **Header:** a title "Projects", a search, a sort menu (Recent activity, Name, Created) and **New project**.
   - **Cards:** a two-column grid (one column when narrow). Each card shows an icon, the name and the date of its last activity, and a pin toggle on hover. Pinned cards come first. A card opens `#/chat/projects/<pid>`.
   - **New project:** a dialog asks for the name (required), a description and instructions (optional). It creates the project and opens it.
   - **Empty state:** one line and the New project button.
   *Done when:* `utils/tests/web/chat-projects.test.mjs` (new; sorting, pins first, search) passes. In the browser on the mock, the grid, search, sort, pin and New project work.
+  *As built:* `chat.js`'s `subPage(route)` picks the page (the panes keep their chats while it shows). The sort is kept on the hub (`hub.chat.projects.sort`, ui-store). A card also shows how many chats the project has; a pin isn't activity, so pinning doesn't reorder by recent activity (the store and the mock leave `updated` alone). The grid follows `project` events through `c.watchProjects`. Checked on a second hub (`?mock#/chat/projects`): search, Sort by Name, pin, New project (an empty name refused, then made and opened).
 - [ ] **5.2 The project page: `web/chat/chat-project.js`, `chat-project-panels.js` (new).**
   - **Route:** `#/chat/projects/<pid>`.
   - **Left column:**

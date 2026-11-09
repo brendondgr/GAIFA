@@ -442,6 +442,7 @@ interface ServiceSummary {
   page_url: string | null;       // where the shell loads the page: /ui/services/<id>/page.js or /Mod_<id>.dc.html
   logo_url: string | null;       // plan 33.1: the mod's logo ([ui] logo, else ui/logo.svg), or null: the UI draws a monogram
   chat_url?: string | null;      // plan 44.1: the mod's chat module ([ui] chat), which the Chat page loads; null without one
+  badge?: number | null;         // calendar 2.1: the mod's unread count (its last POST /api/notify `unread`), a badge on its sidebar item
   has_outputs: boolean;
   native_ui: string | null;      // URL of the service's own UI, if any
   enabled: boolean;
@@ -650,6 +651,8 @@ type HubEvent =
   | { type: "alert"; alert: Alert }
   | { type: "alert_cleared"; id: string }
   | { type: "ui_store"; scope: string; keys: string[] }   // a page's remembered values changed (settings-that-stick 4.1)
+  | { type: "notification"; id: string; ts: number; service: string; title: string; body: string; level: "info" | "warn"; route: string | null; key: string | null; actions: { label: string; op: string }[] }   // calendar 2.1: a mod's toast (POST /api/notify), area `notify`
+  | { type: "badge"; service: string; unread: number }   // calendar 2.1: a mod's unread count, its sidebar badge
   | { type: "settings"; changed: string[] }   // config.toml was saved (settings-that-stick 2.3): `changed` are dotted Settings keys; open pages reload getSettings()
   | { type: "resync" };            // events were dropped (slow client): refetch everything
 

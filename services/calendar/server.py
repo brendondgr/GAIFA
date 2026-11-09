@@ -45,9 +45,12 @@ def create_app(db: str | None = None, state: str | None = None, hub_url: str | N
     async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         app.state.cal = Calendar(db, state, hub_url)
         app.state.cal.store.purge()
+        from alerts import Alerts
+        app.state.cal.alerts = Alerts(app.state.cal)
+        if background:
+            app.state.cal.alerts.start()
         yield
-        if app.state.cal.alerts is not None:
-            await app.state.cal.alerts.stop()
+        await app.state.cal.alerts.stop()
 
     app = FastAPI(title="Calendar", version="0.1.0", lifespan=lifespan)
 
@@ -74,10 +77,12 @@ def create_app(db: str | None = None, state: str | None = None, hub_url: str | N
                 "stats": [{"label": "Items", "value": items}, {"label": "Calendars", "value": len(s.calendars())},
                           {"label": "Unread reminders", "value": unread}], "jobs": []}
 
+    import api_alerts
     import api_items
     import api_more
     app.include_router(api_more.router)          # first: /v1/items/{id}.ics before /v1/items/{id}
     app.include_router(api_items.router)
+    app.include_router(api_alerts.router)
     return app
 
 

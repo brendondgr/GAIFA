@@ -65,6 +65,7 @@ class ServiceSummary(_Model):
     page_url: str | None
     logo_url: str | None = Field(description="The mod's logo (`[ui] logo`, else `ui/logo.svg`), or null: the UI draws a monogram")
     chat_url: str | None = Field(None, description="The mod's chat module (`[ui] chat`, plan 44.1), loaded by the Chat page; null without one")
+    badge: int | None = Field(None, description="The mod's unread count, as it last posted to /api/notify (calendar plan 2.1); null: none")
     has_outputs: bool
     native_ui: str | None
     enabled: bool

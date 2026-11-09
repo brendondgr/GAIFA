@@ -104,3 +104,7 @@ test('tooltips: every fixed item has its words, and a service its state (33.5)',
   assert.equal(n.stateWords(SVCS[4]), 'Stopping · Inactive');
   assert.equal(n.stateWords(SVCS[6]), 'Manifest error · Failed');
 });
+
+test('calendar 2.2: a badge reads the count up to 9, then 9+', () => {
+  assert.deepEqual([0, -1, null, 1, 9, 10, 250].map(n.badgeText), ['', '', '', '1', '9', '9+', '9+']);
+});

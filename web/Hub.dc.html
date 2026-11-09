@@ -926,7 +926,13 @@ button:disabled{cursor:not-allowed;opacity:.5}
   <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
     <div role="{{ t.role }}" style="pointer-events:auto;display:flex;align-items:flex-start;gap:10px;padding:11px 12px;border-radius:10px;background:var(--card,#11151D);border:1px solid var(--bds,#2A3547);box-shadow:0 12px 34px rgba(0,0,0,.4);font-size:13px">
       <span style="{{ t.ist }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ t.d }}"></path></svg></span>
-      <span style="flex:1;min-width:0;word-break:break-word">{{ t.text }}</span>
+      <span style="flex:1;min-width:0;word-break:break-word;display:flex;flex-direction:column;gap:3px">
+        <span style="{{ t.textSt }}">{{ t.text }}</span>
+        <span style="{{ t.bodySt }}">{{ t.body }}</span>
+        <span style="{{ t.actsSt }}">
+          <sc-for list="{{ t.acts }}" as="a" hint-placeholder-count="0"><button onClick="{{ a.run }}" style="height:24px;padding:0 9px;border-radius:6px;border:1px solid var(--bds,#2A3547);background:var(--hov,#161C28);color:var(--tx,#E6EAF2);font-size:12px;cursor:pointer">{{ a.label }}</button></sc-for>
+        </span>
+      </span>
       <button onClick="{{ t.close }}" aria-label="Dismiss" style="width:22px;height:22px;display:grid;place-items:center;border:0;background:transparent;color:var(--mut,#8A94A6);cursor:pointer;flex:none;padding:0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="{{ ic.x }}"></path></svg></button>
     </div>
   </sc-for>
@@ -1037,6 +1043,7 @@ class Component extends DCLogic {
     imp('gpu-queue.js').then(m => { this.Gpu = m; this.forceUpdate(); });  // plan 31.5: the GPU queue (memory popover, Overview widget, job rows)
     imp('settings/settings.js').then(m => { this.Settings = m; this.forceUpdate(); });  // plan settings-redesign: the Settings page (web/settings/)
     imp('mem-pools.js').then(m => { this.Pools = m; this.forceUpdate(); });  // plan 36.4: one bar per GPU's VRAM
+    imp('notify.js').then(m => { this.Notify = m; });  // calendar 2.2: mods' notifications as toasts
     Promise.all([imp('nav/sidebar.js'), imp('nav/services-page.js')]).then(([a, b]) => { this.Nav = a; this.SvcsPage = b; this.forceUpdate(); });  // plan 33: the sidebar and the Services page
     const [uiPrefsMod, modKitMod] = await Promise.all([imp('ui-prefs.js'), imp('mod-kit.js')]);
     const [mod, hub, modUi, charts, views, dash, chat, chatSettings, chatAp, sess, apiTool, viewer, meaning, hidden, palMeaning] = await Promise.all([imp('mock.js'), imp('api.js'), imp('mod-ui.js'), imp('charts.js'), imp('views.js'), imp('dashboard.js'),
@@ -1099,6 +1106,15 @@ class Component extends DCLogic {
     if (level !== 'error') setTimeout(() => this.dismiss(id), 4000);
   }
   dismiss(id) { this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })); }
+  // calendar 2.2: a mod's notification: a toast that stays until closed, with Open and its actions (web/notify.js)
+  modNotify(ev) {
+    if (!this.Notify) return;
+    const t = this.Notify.toastOf(ev);
+    this.setState(s => ({ toasts: this.Notify.addToast(s.toasts, t) }));
+  }
+  async toastAction(t, a) {
+    try { await this.api.callService(t.service, a.method, a.path, { json: {} }); this.dismiss(t.id); } catch (e) { this.err(e); }
+  }
   err(e) { if (e?.status === 0) return this.goDown(); this.toast(e?.detail || String(e?.message || e), 'error'); }
   copy(text, what = 'Copied') {
     const done = () => this.toast(what, 'success');
@@ -1258,6 +1274,8 @@ class Component extends DCLogic {
       }
       case 'memory': this.setState({ memory: ev.memory }); break;
       case 'gpu': if (ev.gpu) this.setState({ gpu: ev.gpu }); break;
+      case 'notification': this.modNotify(ev); break;   // calendar 2.2
+      case 'badge': if (this.Notify) this.setState(st => ({ services: this.Notify.withBadge(st.services, ev) })); break;
       case 'approval': this.loadApprovals(); break;
       case 'settings': clearTimeout(this.setT); this.setT = setTimeout(() => this.api.getSettings().then(st => this.applySettings(st)).catch(() => {}), 150); break;   // 2.3: another page or tab saved
       case 'session': this.loadSessions(); break;
@@ -2203,7 +2221,17 @@ class Component extends DCLogic {
         empty: list.length === 0, emptyText: pm?.busy ? 'Searching by meaning…' : `Nothing matches "${q}"`,
         hint: q ? `${list.length} result${list.length === 1 ? '' : 's'}${pm?.busy ? ' · searching by meaning…' : byMeaning.length ? ` · ${byMeaning.length} by meaning` : ''}` : 'Pages, services and quick actions — type to search models and outputs too' };
     } else v.pal = { show: false };
-    v.toasts = s.toasts.map(t => { const tone = t.level === 'error' ? 'red' : t.level === 'success' ? 'green' : t.level === 'warn' ? 'accent' : 'cyan'; return { text: t.text, close: () => this.dismiss(t.id), role: t.level === 'error' ? 'alert' : 'status', ist: { color: TONE[tone][0], display: 'flex', flex: 'none', paddingTop: 1 }, d: t.level === 'error' ? ICON.alert : t.level === 'success' ? ICON.check : ICON.info }; });
+    v.toasts = s.toasts.map(t => {
+      const tone = t.level === 'error' ? 'red' : t.level === 'success' ? 'green' : t.level === 'warn' ? 'accent' : 'cyan';
+      // calendar 2.2: a notification has a title, a body, Open (its route) and the mod's actions
+      const acts = t.sticky ? [...(t.route ? [{ label: 'Open', run: () => { this.dismiss(t.id); this.go(t.route); } }] : []),
+        ...t.actions.map(a => ({ label: a.label, run: () => this.toastAction(t, a) }))] : [];
+      return { text: t.sticky ? t.title : t.text, body: t.sticky ? t.body : '', textSt: t.sticky ? { fontWeight: 600 } : {}, acts,
+        bodySt: { display: t.sticky && t.body ? 'block' : 'none', color: 'var(--mut,#8A94A6)', fontSize: 12 },
+        actsSt: { display: acts.length ? 'flex' : 'none', gap: 6, flexWrap: 'wrap', marginTop: 5 },
+        close: () => this.dismiss(t.id), role: t.level === 'error' ? 'alert' : 'status', ist: { color: TONE[tone][0], display: 'flex', flex: 'none', paddingTop: 1 },
+        d: t.level === 'error' ? ICON.alert : t.level === 'success' ? ICON.check : t.sticky ? ICON.bell || ICON.info : ICON.info };
+    });
     v.toastWrap = mob ? { position: 'fixed', left: 12, right: 12, bottom: 12, zIndex: 95, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' } : { position: 'fixed', right: 16, bottom: 16, zIndex: 95, display: 'flex', flexDirection: 'column', gap: 8, width: 380, pointerEvents: 'none' };
     return v;
   }

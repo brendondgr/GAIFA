@@ -200,7 +200,7 @@ Assumed:
 
 ## Phase 2 — In-app notifications and alerts (M)
 
-- [ ] **2.1 The hub: `utils/routes/notify.py` (new), `utils/events.py`, `utils/services/views.py`.**
+- [x] **2.1 The hub: `utils/routes/notify.py` (new), `utils/events.py`, `utils/services/views.py`.**
   - **`POST /api/notify`:**
     - **Body:** `{service, title?, body?, level: info|warn, route?, key?, actions?: [{label, op: "POST /v1/…"}], unread?: int}`.
     - **Checks:** `service` must be a known mod (`422 unknown_service`), `actions` at most 3, and each op a `POST` or `PATCH` path of that mod.
@@ -210,13 +210,13 @@ Assumed:
   *Done when:* `utils/tests/routes/test_notify.py` covers a notification (event and activity), an unknown service, bad actions, the badge in the event and in `/api/services`, and a badge alone without a toast.
 
   Update architecture §6 and the brief §6 / §11.7.
-- [ ] **2.2 The UI: `web/Hub.dc.html`, `web/nav/nav-model.js`, `web/nav/sidebar.js`.**
+- [x] **2.2 The UI: `web/Hub.dc.html`, `web/nav/nav-model.js`, `web/nav/sidebar.js`.**
   - **Toasts:** `onEvent('notification')` shows a toast with its title, body, an **Open** link (the route) and its actions. Each action calls `/api/s/<service><path>` and the toast closes on success. Notification toasts stay until closed (others still close after 4 s), at most 5 at once.
   - **Badges:** sidebar items (fixed and mods') draw `badge` as a small count (9+ past 9), updated on `badge` events.
   *Done when:* `utils/tests/web/notify.test.mjs` covers the toast model (actions, the route, staying open) and `nav.test.mjs` the badge on an item. Checked in the browser on the second hub with a notification posted by curl.
 
   Update the brief §11.7 and `web/PATCHES.md` (#84).
-- [ ] **2.3 Alerts: `services/calendar/alerts.py` (new), `api_alerts.py` (new).**
+- [x] **2.3 Alerts: `services/calendar/alerts.py` (new), `api_alerts.py` (new).**
   - **The loop:** every 20 s, the alerts due since the last tick (from `occurrences`, the next 24 h kept in memory and rebuilt when `rev` moves) go into `fired` and are posted to `/api/notify`.
     - title: the item's title;
     - body: its time, e.g. "in 10 min · 14:00–15:00", or "due 17:00";
@@ -231,8 +231,9 @@ Assumed:
 **Wire — Phase 2:** notifications and badges are live for every mod; the calendar's alerts post them.
 
 **Checks & deliverables — Phase 2**
-- [ ] On the second hub: an item set two minutes ahead with a 1-minute alert shows a toast with Snooze. Snoozed, it fires again. With the page closed, the badge counts it when the page opens.
-- [ ] Delivered: `utils/routes/notify.py`, the changed `events.py`, `views.py`, `Hub.dc.html`, `nav-model.js`, `sidebar.js`, the calendar's `alerts.py` and `api_alerts.py`, and tests.
+- [x] On the second hub: an item set two minutes ahead with a 1-minute alert shows a toast with Snooze. Snoozed, it fires again. With the page closed, the badge counts it when the page opens.
+  *As built (2026-11-09, a second hub on port 7079 from the worktree, `--dev`):* the item's alert fired 16 s after its time (`in 1 min · 18:03–19:03`), the Calendar item showed the badge 1 on load, a toast with Open and Snooze 10 min drew, and Snooze went through the proxy (the alert `snoozed`, the badge gone at once by its `badge` event). Found: `api.js` drops event types without an area, so `EVENT_AREA` maps `notification` and `badge` to `notify`; and an `sc-if` inside the toasts' `sc-for` stopped every toast from drawing, so the body and actions are spans shown by style.
+- [x] Delivered: `utils/routes/notify.py`, the changed `events.py`, `views.py`, `Hub.dc.html`, `nav-model.js`, `sidebar.js`, the calendar's `alerts.py` and `api_alerts.py`, and tests.
 
 ## Phase 3 — The Calendar in the main view (L)
 

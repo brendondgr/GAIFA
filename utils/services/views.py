@@ -42,6 +42,7 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "page_url": page_url(svc),
         "logo_url": logo_url(svc),
         "chat_url": chat_url(svc),
+        "badge": mgr.badges.get(svc.id) or None,
         "has_outputs": bool(m and m.outputs),
         "native_ui": native,
         "enabled": svc.eff.enabled,

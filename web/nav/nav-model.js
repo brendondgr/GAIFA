@@ -79,6 +79,12 @@ export function groups(route, services) {
       item('models', 'Models', '#/models', 'layers', r.page === 'models'), item('settings', 'Settings', '#/settings', 'gear', r.page === 'settings')],
   };
 }
+/** A badge's text (calendar 2.2): '' for none, the count up to 9, then '9+'. */
+export function badgeText(n) {
+  const v = Number(n) || 0;
+  return v <= 0 ? '' : v > 9 ? '9+' : String(v);
+}
+
 /** What each fixed item is, for its tooltip. */
 export const HINTS = {
   overview: 'The dashboard: memory, services and activity', chat: 'Talk to the agent', outputs: 'Everything the services made',

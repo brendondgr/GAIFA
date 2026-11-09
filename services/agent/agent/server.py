@@ -119,6 +119,8 @@ class Fork(BaseModel):
 class DocSettings(BaseModel):
     inline_tokens: int | Literal["window"] | None = Field(None, description='Whole documents up to this many tokens, or "window"')
     reply_reserve: int | None = Field(None, ge=0, description="Tokens kept free for the reply and tools")
+    project_share: float | None = Field(None, ge=0, le=0.9, description="The share of the window a project's files and pages "
+                                                                        "fill whole before they are listed (plan projects 3.3)")
 
 
 class MemorySettings(BaseModel):

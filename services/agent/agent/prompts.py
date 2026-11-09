@@ -1,5 +1,5 @@
-"""The system prompt (plan 14.7 order): base rules, AGENT.md, the memory index, skills, the
-deferred tool index, the environment, and the thread's outputs table."""
+"""The system prompt (plan 14.7 order): base rules, AGENT.md, a project chat's project (plan projects 3.3), the memory
+index, skills, a project's files and pages, the deferred tool index, the environment, and the thread's outputs table."""
 
 from __future__ import annotations
 
@@ -56,8 +56,10 @@ def build(parts: dict[str, str]) -> str:
     out = (parts.get("base") or base_text()).rstrip("\n")
     out += section("Guardrails", parts.get("guardrails", ""))
     out += section("Standing instructions (AGENT.md)", parts.get("agent_md", ""))
+    out += section("Project", parts.get("project", ""))                          # plan projects 3.3
     out += section("Memory (what you know: memory_search finds more; remember saves what the user tells you to keep)", parts.get("memory", ""))
     out += section("Skills (read one with read_skill before doing that kind of task)", parts.get("skills", ""))
+    out += section("Project files and pages", parts.get("project_knowledge", ""))
     out += section("More tools (not loaded; load_tools or find_tools first)", parts.get("tools", ""))
     out += section("Environment", parts.get("env", ""))
     out += section("Outputs in this chat (reference them as output:<id>)", parts.get("outputs", ""))

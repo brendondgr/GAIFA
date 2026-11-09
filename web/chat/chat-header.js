@@ -14,8 +14,8 @@ export const MODES = [
   ['bypass', 'Bypass', 'Edits and commands in the sandbox run without asking, only in folders that allow Bypass; your machine still asks']];
 const OLD_MODES = { ask: 'manual', read_only: 'plan' };
 export const modeOf = m => { const k = OLD_MODES[m] || m; return MODES.some(x => x[0] === k) ? k : 'manual'; };
-const PARTS = [['instructions', 'Instructions'], ['skills_memory', 'Skills & memory'], ['tool_index', 'Tool index'], ['tools', 'Loaded tools'], ['outputs', 'Outputs table'], ['messages', 'Messages'], ['documents', 'Documents'], ['tool_results', 'Tool results']];
-const PART_COLOR = ['var(--s6,#79C0FF)', 'var(--s3,#BC8CFF)', 'var(--s7,#D2A8FF)', 'var(--s1,#58C4DD)', 'var(--s8,#E3B341)', 'var(--s4,#3FB950)', 'var(--s2,#FFB224)', 'var(--s5,#F78166)'];
+const PARTS = [['instructions', 'Instructions'], ['skills_memory', 'Skills & memory'], ['tool_index', 'Tool index'], ['tools', 'Loaded tools'], ['outputs', 'Outputs table'], ['messages', 'Messages'], ['documents', 'Documents'], ['tool_results', 'Tool results'], ['project', 'Project']];   // project: a project chat's own part (plan projects 3.3)
+const PART_COLOR = ['var(--s6,#79C0FF)', 'var(--s3,#BC8CFF)', 'var(--s7,#D2A8FF)', 'var(--s1,#58C4DD)', 'var(--s8,#E3B341)', 'var(--s4,#3FB950)', 'var(--s2,#FFB224)', 'var(--s5,#F78166)', 'var(--s9,#56D4BC)'];
 const selSt = { ...inputSt, height: 28, paddingRight: 6, fontSize: 12, cursor: 'pointer', maxWidth: 210 };
 
 export const modelLabel = m => `${m.id}${m.meta?.context_length ? ' · ' + fmtTokens(m.meta.context_length) : ''}${m.health && m.health !== 'healthy' ? ` (${m.health})` : ''}`;
@@ -79,7 +79,7 @@ export function ContextMeter({ meter, open, onOpen, onClose, onCompact, compacts
         PARTS.map(([k], i) => bd[k] ? h('span', { key: k, title: k, style: { width: `${100 * (bd[k] / (win || total))}%`, background: PART_COLOR[i] } }) : null),
         h('span', { title: 'Compaction starts at 70%', style: { position: 'absolute', left: '70%', top: 0, bottom: 0, width: 1, background: T.acc } }),
         h('span', { title: 'Summary at 85%', style: { position: 'absolute', left: '85%', top: 0, bottom: 0, width: 1, background: T.rd } })) : null,
-      meter ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 3 } }, PARTS.map(([k, l], i) => h('div', { key: k, style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 } },
+      meter ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 3 } }, PARTS.map(([k, l], i) => k === 'project' && !bd[k] ? null : h('div', { key: k, style: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 } },
         h('span', { style: { width: 8, height: 8, borderRadius: 2, background: PART_COLOR[i], flex: 'none' } }), h('span', { style: { flex: 1, color: T.mut } }, l),
         h('span', { style: { fontFamily: MONO, fontSize: 11.5 } }, fmtTokens(bd[k] || 0))))) : null,
       h('div', { style: { fontSize: 11.5, color: T.mut } }, `Older tool results are cleared at 70%; earlier turns are summarized at 85%.${compacts ? ` Compacted ${compacts}× in this chat (the divider marks where).` : ''}`),

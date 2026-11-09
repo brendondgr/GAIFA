@@ -140,13 +140,14 @@ Assumed:
   - **Background work:** indexing runs in a task after a source is added or refreshed, and never holds up a route.
   *Done when:* `services/agent/tests/test_project_index.py` covers the chunk edges, re-indexing replacing old chunks, a search through the faked embed mod, and the BM25 fallback.
   *As built:* `ProjectIndex` (the agent's `project_index_store`); the embed ids `<sid>#<n>` go URL-encoded. A chunk ends at the last line break in its final quarter when there is one. A search by meaning that returns none of the kept chunks (not embedded yet) also falls back to words.
-- [ ] **3.3 Knowledge in the prompt: `services/agent/agent/projects/knowledge.py` (new), `loop.py` (`system_prompt`), `prompts.py` (`build`).**
+- [x] **3.3 Knowledge in the prompt: `services/agent/agent/projects/knowledge.py` (new), `loop.py` (`system_prompt`), `prompts.py` (`build`).**
   - **Inline or listed:** `project_knowledge(pid, window) -> {mode: 'inline'|'listed', text, tokens}`.
     - *Inline:* while all sources' text fits `project_share` × the model's window, the sources go in full, each inside `<untrusted>` with its title, kind, URL and, for pages, "fetched <age> ago".
     - *Listed:* past that, each source is one line (`src_…`, title, kind, size, age), followed by a line on `project_search` and `project_read`.
   - **Order in `prompts.build`:** new parts `project` (the name, description and instructions, after AGENT.md) and `project_knowledge` (after Skills).
   - **The meter:** the context meter (`context.meter`) counts both parts.
   *Done when:* `services/agent/tests/test_project_prompt.py` covers inline under the budget, listed over it, untrusted wrapping, page ages, the part order, and a plain chat's prompt unchanged.
+  *As built:* `loop.py` was at 963 lines, so its model side (the harness of a chat, `system_prompt`, the window, `messages`, the meter and the model call) moved to `agent/prompting.py` (the `Prompting` mixin); the project parts are added there. Inline sources have numbered lines (cited `src_…:N`). `project_share` is also a row in Settings → Agent → Documents (`chat-settings.js`), and the meter's popover shows *Project* when a chat has it (`chat-header.js`).
 - [ ] **3.4 The project tools: `services/agent/agent/projects/tools.py` (new), `local.py`, `tools.py`.**
   - **Tools:** `project_search {query, k?}` (passages with `src_…` and line), `project_read {source, offset?, limit?}` (a window of a source's text, cited as `src_…:line`), and `project_refresh_page {source}`. They are local tools, loaded only in project chats, and never offered at `/mcp`.
   - **Citations:** results start with how to cite them, as workspace reads do (backend-plan 34.6).

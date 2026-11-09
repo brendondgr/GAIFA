@@ -57,7 +57,7 @@ export function createMockClient(api, { speed = 1 } = {}) {
       { name: 'comfy', description: 'Choosing a ComfyUI workflow and its settings per task', source: 'comfy', id: 'comfy/comfy' },
       { name: 'tts', description: 'Voices and delivery direction', source: 'tts', id: 'tts/tts' },
       { name: 'gen3d', description: 'Presets, parts and rigs for 3D models', source: 'gen3d', id: 'gen3d/gen3d' }],
-    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['plan', 'manual', 'accept_edits', 'auto', 'bypass'], documents: { inline_tokens: 6000, reply_reserve: 4096 },
+    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['plan', 'manual', 'accept_edits', 'auto', 'bypass'], documents: { inline_tokens: 6000, reply_reserve: 4096, project_share: 0.25 },
     memory_settings: { recall: true, fade_days: 180, auto_approve: true, auto_threshold: 0.8, auto_after_seen: 2, always_review: ['health', 'money', 'legal', 'relationships', 'religion', 'politics', 'sexuality'] }, memory_stats: { facts: 2, entities: 1, proposed: 0 } };
 
   function newThread(o = {}) {

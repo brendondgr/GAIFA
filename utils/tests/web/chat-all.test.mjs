@@ -98,3 +98,10 @@ test('the page: its title, the search from the URL, Show and Group by as chips',
   assert.deepEqual(chips.map(c => [c.props.label, c.props.value]), [['Show', 'both'], ['Group by', 'date']]);
   assert.deepEqual(chips[1].props.options.map(([k]) => k), ['environment', 'date', 'none']);
 });
+
+// chat-history 3.2: the palette's pages list it, next to Chat.
+test('the command palette offers All chats', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const hub = await readFile(path.join(root, 'web/Hub.dc.html'), 'utf8');
+  assert.match(hub, /\['Chat', '#\/chat', ICON\.chat\], \['All chats', '#\/chat\/all', ICON\.chat\]/);
+});

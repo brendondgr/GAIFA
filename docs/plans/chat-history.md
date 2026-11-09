@@ -1,6 +1,6 @@
 # Plan: a cleaner chat history: names only, grouped by date or environment, a short sidebar and a Show all page
 
-**Asked for:** 2026-11-08 · **Status:** In progress
+**Asked for:** 2026-11-08 · **Status:** In progress: every step built (2026-11-08); Phase 3's check on the installed hub waits for the merge
 
 ## 1. Introduction
 
@@ -77,15 +77,16 @@ Touches the agent's thread routes (architecture §14.1), Stage O's chat list (ba
   - **Narrow screens:** the page fills the screen, as the panes do.
   *Done when:* `utils/tests/web/chat-all.test.mjs` (new; the pure parts: page arithmetic, merging pages without duplicates when a chat moves between loads, grouping what is loaded) passes. In the browser on the mock: Show all opens the page with the count, it scrolls to the last chat in pages, search narrows it, and a row opens its chat. Update the brief §11.13 (the Chat page: the sidebar and Show all).
   *As built:* a row is the sidebar's `Item` with a new `aside` (environment and date), so the menu, rename and drag are the same code. The page also has × (back to the active pane's chat) and, under 760 px, the menu button for the chat list; returning from it leaves the panes as they were (the route effects skip `#/chat/all` and the step back from it). After a chat is made, moved, archived or deleted elsewhere it reloads the rows it had (`reloadKey`), and a rename shows at once (the page's `patched` events). The environment's name shrinks first on a narrow row. Checked on a second hub (`?mock`): the count (27, then 72 after making 45 chats from the console), pages of 50 then 72 with none repeated and the oldest ("Oct 24, 2025") last, the search ("paging test 1": 10), Show all from a sidebar search carrying `?q=`, ↓ from the search to the rows, a row opening its chat in the panes, and the page at phone width.
-- [ ] **3.2 Command palette and docs: `web/Hub.dc.html` (the palette's pages), `docs/structure.md`, `web/PATCHES.md`.**
+- [x] **3.2 Command palette and docs: `web/Hub.dc.html` (the palette's pages), `docs/structure.md`, `web/PATCHES.md`.**
   - The palette gains "All chats" (`#/chat/all`). `web/PATCHES.md` gets an entry for the changed list, the View menu, the date groups and the Show all page. `docs/structure.md` lists `chat-dates.js` and `chat-all.js`.
   *Done when:* the docs tests (`utils/tests/docs/`) and `utils/tests/web/` are green. The palette finds "All chats".
+  *As built:* `docs/structure.md` gained `chat-dates.js` and `chat-all.js` in their own steps (2.3, 3.1), as the docs tests ask of every new file; this step adds the palette entry (after Chat, tested in chat-all.test.mjs) and `web/PATCHES.md` 78. Checked on a second hub: Search, "all chats", Enter opens `#/chat/all`.
 
 **Wire — Phase 3:** Show all opens a full, searchable, endlessly scrolling list of chats with their dates.
 
 **Checks & deliverables — Phase 3**
 - [ ] On the installed hub after merging and `gaifa restart`: the sidebar shows names only. By date, the headings match the real chats' days. By environment, 5 per section and Show more opens the rest. Both shows archived chats dimmed. Show all lists every chat and scrolls to the oldest. A screenshot of the sidebar by date and of Show all goes in the commit message's description of the check.
-- [ ] Delivered: `web/chat/chat-all.js`, the palette entry, the docs, and tests.
+- [x] Delivered: `web/chat/chat-all.js`, the palette entry, the docs, and tests.
 
 ## 4. Deliverables
 

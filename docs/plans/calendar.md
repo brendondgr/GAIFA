@@ -1,6 +1,6 @@
 # Plan: the calendar: events, to-dos and reminders in GAIFA, for you and the agent
 
-**Asked for:** 2026-11-09 · **Status:** Planned
+**Asked for:** 2026-11-09 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -124,7 +124,7 @@ Assumed:
 
 ## Phase 1 — The calendar mod and its data (L)
 
-- [ ] **1.1 The mod: `services/calendar/` (new, `gaifa new calendar`).**
+- [x] **1.1 The mod: `services/calendar/` (new, `gaifa new calendar`).**
   - **`service.toml`:**
     - `[run]`: `command = [".venv/bin/python", "server.py"]`, `port = 5109`, `health = "/health"`, `status = "/v1/status"`;
     - `env = { CALENDAR_DB = "{databases}/calendar.db", CALENDAR_STATE = "{root}/data/state/calendar" }`.
@@ -132,7 +132,7 @@ Assumed:
   - **The setup doc:** `setup/linux.md` with its `gaifa-setup` block (summary, steps, check `gaifa check calendar`; no models).
   - **`/v1/status`:** counts (items, calendars, unread alerts) and the next alert time.
   *Done when:* `gaifa check calendar` passes, `gaifa docs --check --strict` passes, and `services/calendar/tests/test_health.py` starts the app with a temp DB.
-- [ ] **1.2 The store: `services/calendar/store.py` (new).**
+- [x] **1.2 The store: `services/calendar/store.py` (new).**
   - **Tables:**
     - `calendars(id, name, color, is_default, hidden, position, created)`;
     - `items(id, calendar_id, kind 'event'|'todo', title, notes, location, url, start, end, all_day, tz, due, done_at, priority 0–3, estimate_min, busy 'busy'|'free'|'focus', rrule, exdates JSON, project_id, alerts JSON, prep JSON, source JSON, created, updated, deleted_at)`;
@@ -149,7 +149,7 @@ Assumed:
     - `record_undo(ops) -> id`, `undo(id)`.
   - **Rules:** every write is in one transaction and returns the inverse ops for undo. Titles are 1–200 characters and notes up to 8 000.
   *Done when:* `services/calendar/tests/test_store.py` covers CRUD, the default calendar, trash and restore, purge after 30 days, search, a project's items, and undo of a create, a patch and a trash.
-- [ ] **1.3 Repeats: `services/calendar/repeat.py` (new).**
+- [x] **1.3 Repeats: `services/calendar/repeat.py` (new).**
   - **`occurrences(item, overrides, frm, to) -> list[Occ]`:**
     - expands `rrule` in the item's `tz`;
     - drops `exdates` and cancelled overrides;
@@ -163,7 +163,7 @@ Assumed:
   - **To-dos:** completing a repeating to-do marks that occurrence done (an override with `done_at`). The next one shows.
   - **Edge cases:** the 31st in a short month follows RFC 5545 (skipped). The UI's monthly picker offers "last day" (`BYMONTHDAY=-1`).
   *Done when:* `services/calendar/tests/test_repeat.py` covers daily, weekly on several days, monthly by day and last day, yearly, `COUNT`/`UNTIL`, `EXDATE`, each edit and delete scope, a repeating to-do, an all-day series, and a DST change (`TZ` set in the test).
-- [ ] **1.4 Routes: `services/calendar/server.py`, `api_items.py` (new).**
+- [x] **1.4 Routes: `services/calendar/server.py`, `api_items.py` (new).**
   - **Calendars:** `GET/POST /v1/calendars`, `PATCH /v1/calendars/{id}`. `DELETE` takes `?items=move:<id>|trash`.
   - **Items:**
     - `POST /v1/items` takes `when` text or `start/end/due`, plus `all_day`, `rrule` or `repeat` text, `alerts`, `calendar`, `project_id`.
@@ -176,7 +176,7 @@ Assumed:
   - **Answers:** every write answers `{item, undo: "/api/s/calendar/v1/undo/<uid>"}`, so the chat's generic **Undo this turn** picks it up (chat-turn.js `undoOf`). Errors use the envelope `{detail, code, data?}`.
   - **Events:** each change goes into `/v1/status`'s `rev`, and the page refreshes when `rev` moves (a `ctx.on('services')` tick). There's no stream of its own.
   *Done when:* `services/calendar/tests/test_api_items.py` covers each route, the scopes, `undo` in answers, a bad `when` (422), and the range across a DST change.
-- [ ] **1.5 Plain-words dates: `services/calendar/when.py` (new), `GET /v1/parse`.**
+- [x] **1.5 Plain-words dates: `services/calendar/when.py` (new), `GET /v1/parse`.**
   - **`parse(text, now, tz, date_order) -> Parsed`** returns `{start?, end?, due?, all_day, rrule?, title, matched: [spans], confidence: "exact"|"assumed", assumed: [str]}`.
     - `assumed` says what it filled in, e.g. "no end: 1 hour", "Fri = Fri 14 Nov".
   - **The grammar** is §2's list. Times without am/pm between 1 and 7 are afternoon ("at 3" is 15:00), with an assumption noted.

@@ -1,0 +1,22 @@
+# Calendar (calendar plan): events and to-dos (a reminder is a to-do with a time), repeats, alerts as in-app
+# toasts, .ics import and export, plain-words dates and free time, for you and the agent.
+id = "calendar"
+name = "Calendar"
+description = "Events, to-dos and reminders, for you and the agent"
+icon = "calendar"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]
+port = 5109
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { CALENDAR_DB = "{databases}/calendar.db", CALENDAR_STATE = "{root}/data/state/calendar" }
+start_timeout_s = 30
+stop_timeout_s = 10
+restart = "on-failure"
+install = "install.sh"
+
+[ui]
+page = "ui/page.js"

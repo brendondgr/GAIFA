@@ -42,6 +42,7 @@ Pick only the mods you need; each setup doc says what the mod gives you and what
 | Mod | What it gives you | GPU | Runs on | Disk | Setup docs |
 |---|---|---|---|---|---|
 | `agent` | Chat agent: the Chat page's tool loop (files, search, images, speech) on any chat model the relay serves | no | CPU | 50 MB | [Chat agent](../../services/agent/setup/agent.md) |
+| `calendar` | Calendar: events, to-dos and reminders in GAIFA, with in-app alerts and tools for the agent | no | CPU | 100 MB | [Calendar](../../services/calendar/setup/linux.md) |
 | `comfy` | Images & Video: ComfyUI in a ROCm toolbox, running any workflow pack (images, edits, video, and two of 3D Generate's engines) | yes | ROCm · CUDA · Intel XPU · Apple MPS · CPU | 4.0 GB | [ComfyUI in the Strix Halo toolbox](../../services/comfy/setup/comfyui.md) |
 | `decide` | Decisions: fast yes/no, choice and score answers with probabilities (the Auto judge's d3-lite) | yes | ROCm · CUDA · Intel XPU · Apple MPS · CPU | 6.6 GB | [Decisions: d3-lite](../../services/decide/setup/decide.md) |
 | `embed` | Embeddings: search outputs, documents and chats by meaning (text, images, audio, video in one space) | yes | ROCm · CUDA · Intel XPU · Apple MPS · CPU | 6.6 GB | [Embeddings: EmbeddingGemma 2](../../services/embed/setup/embed.md) |

@@ -87,9 +87,11 @@ class NavCfg(_Strict):
 
 
 class ChatListCfg(_Strict):
-    """`[ui.chat.list]`: the chat list's View menu (plan 41.2): grouping, both orders, the folded sections."""
+    """`[ui.chat.list]`: the chat list's View menu (plan 41.2, chat-history 2.2): which chats, grouping, both orders,
+    the folded sections."""
 
-    group: Literal["environment", "none"] = "environment"
+    show: Literal["chats", "archived", "both"] = "chats"
+    group: Literal["environment", "date", "none"] = "environment"
     env_order: Literal["activity", "name", "created"] = "activity"
     chat_order: Literal["updated", "title", "created"] = "updated"
     collapsed: list[str] = []
@@ -209,11 +211,16 @@ class PermissionsCfg(_Strict):
     _globs = field_validator("deny", "ask", "allow")(lambda cls, v: tool_globs(v))
 
 
+JUDGE_DECIDE = {"backend": "decide", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide"}
+
+
 class JudgeCfg(_Strict):
-    """The Auto mode's judge (plan Phase 30, `utils/tools/judge.py`); the default is the eval's pick (docs/agent-eval.md)."""
-    backend: Literal["relay", "decide"] = "relay"
-    model: str = "minicpm-5-2B"             # a relay model name, or a decide model id
-    url: str = "http://127.0.0.1:4000"      # the relay, or the decide mod (http://127.0.0.1:7000/api/s/decide)
+    """The Auto mode's judge (plan Phase 30, `utils/tools/judge.py`): only ever a decision model in the `decide` mod
+    (plan web-approvals 1.1, the user's rule of 2026-11-08), never a chat model through the relay. An older
+    `config.toml` with `backend = "relay"` loads with the decide defaults instead (`gaifa doctor` names the keys)."""
+    backend: Literal["decide"] = "decide"
+    model: str = JUDGE_DECIDE["model"]      # a decide model id
+    url: str = JUDGE_DECIDE["url"]          # the decide mod, through the hub
     threshold: float = Field(0.35, gt=0, le=1)   # decide: the lowest "safe" probability of its three questions must reach it (judge.DECIDE_CUTOFF)
     timeout_s: float = Field(3.0, gt=0)     # slower → ask
     context: Literal["none", "trail", "full"] = "none"   # what it reads of the turn so far besides the user's words (judge_context.py)
@@ -221,6 +228,14 @@ class JudgeCfg(_Strict):
     ask_commands: list[str] = []            # … and these always ask
 
     _patterns = field_validator("allow_commands", "ask_commands")(lambda cls, v: command_patterns(v))
+
+    @model_validator(mode="before")
+    @classmethod
+    def _decision_model_only(cls, v: Any) -> Any:
+        """A chat-model judge (`backend = "relay"`, before web-approvals) is read as the decide defaults."""
+        if isinstance(v, dict) and v.get("backend", "decide") != "decide":
+            v = {**{k: x for k, x in v.items() if k not in JUDGE_DECIDE}, **JUDGE_DECIDE}
+        return v
 
 
 class ScreenCfg(_Strict):

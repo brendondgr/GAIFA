@@ -42,6 +42,7 @@ The docs are the source of truth. Read the section you need before acting; don't
 ## Invariants (never break these)
 - **Never run `git clean -x` or `-X`.** Ignored files include ~190 GB of model weights.
 - **`relay`, `lcpp`, `tts` and `gen3d` are submodules** of their own repositories (plan mod-repos): commit in the mod first (its tests, push), then the pin in GAIFA (`gaifa repos pin <id>`); `gaifa repos status` before a GAIFA commit; never an unpushed pin, a force push to a mod, or `git submodule update` over a mod's changes. docs/mods.md §10.
+- **The Auto judge is a decision model only** (the `decide` mod's d3-lite), never a chat model through the relay (plan web-approvals).
 - **Loopback only.** The hub refuses a non-loopback `hub.host`.
 - **Mods talk to the hub only over HTTP.** No hub imports in mods, no mod imports in the hub. Adding a mod never needs a hub code change.
 - **No import-time side effects.** Everything starts in `create_app()`'s lifespan, in the §5 order.

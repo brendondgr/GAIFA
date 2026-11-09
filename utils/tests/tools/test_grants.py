@@ -128,6 +128,37 @@ async def test_allow_in_this_chat_needs_a_chat(ph):
     assert err["code"] == "no_thread"
 
 
+async def test_every_site_in_this_chat(ph):
+    """web-approvals 2.1: "Allow every site in this chat" covers a web tool on any host, in that chat, while the URL
+    passes the judge's URL rules (2026-11-08: www.cs.fsu.edu, pc.fsu.edu and www.sc.fsu.edu each asked)."""
+    r = await ph.call(FETCH, {"url": "https://www.cs.fsu.edu/faculty/"}, thread="t1", service="agent")
+    out = await approve(ph, r, remember="sites")
+    assert out["status"] == "done"
+    g = out["grant"]
+    assert (g["tool"], g["key"], g["kind"], g["scope"], g["thread"]) == (FETCH, "*", "url:any", "thread", "t1")
+    for url in ("https://pc.fsu.edu/person/x", "https://www.sc.fsu.edu/people", "https://example.org/?q=a+b"):
+        again = await ph.call(FETCH, {"url": url}, thread="t1", service="agent")
+        assert again["status"] == "done", (url, again)
+        assert again.get("why") in (None, "allowed in this chat for every site")
+    row = await ph.hub.db.fetchone("SELECT origin FROM tool_calls WHERE id = ?", (again["call_id"],))
+    assert f'"grant": "{g["id"]}"' in row["origin"]
+    for url in ("https://a.example/x?token=abc123",                                  # credentials
+                "https://a.example/c?d=" + "QnJlbmRvbiBQaEQgRlNVIGFkdmlzb3IgT2xtbyBaYXZhbGEtUm9tZXJv" * 2,   # long encoded value
+                "http://192.168.1.10/admin", "http://localhost:8080/"):               # private addresses
+        assert (await ph.call(FETCH, {"url": url}, thread="t1"))["status"] == "needs_approval", url
+    assert (await ph.call(FETCH, {"url": "https://pc.fsu.edu/"}, thread="t2"))["status"] == "needs_approval"   # another chat
+    assert (await ph.call(FETCH, {"url": "https://pc.fsu.edu/"}))["status"] == "needs_approval"                # no chat
+    assert (await ph.call(FETCH, {"url": "https://pc.fsu.edu/"}, mode="plan", thread="t1"))["status"] != "done"  # Plan refuses
+
+
+async def test_every_site_only_for_web_tools_and_chats(ph):
+    r = await ph.call(RUN, {"folder": "x", "command": "make"}, thread="t1")
+    err = await approve(ph, r, 422, remember="sites")
+    assert err["code"] == "not_a_web_tool"
+    r = await ph.call(FETCH, {"url": "https://github.com"}, service="mcp", client="claude")
+    assert (await approve(ph, r, 422, remember="sites"))["code"] == "no_thread"
+
+
 async def test_expiry_and_revoke(ph):
     grants = ph.hub.grants
     old = await grants.add(FETCH, "github.com", "always", kind="url:host", expires_ts=time.time() - 1)

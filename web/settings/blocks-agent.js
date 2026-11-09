@@ -6,19 +6,19 @@ import { h, T } from '../chat/chat-ui.js';
 import { AgentNotes, ModelsCard, DocumentsCard, InstructionsCard, MemoryCard, SkillsCard, ModesCard, GrantsList } from '../chat/chat-settings.js';
 import { ScreenModelPick } from '../chat/chat-webprefs.js';
 import { SpeechInputPanel } from '../chat/chat-speech-input.js';
-import { JudgedList, JudgeModelPick, judgeStatusText } from '../chat/chat-judge.js';
+import { JudgedList, JudgeModelPick, judgeStatusText, JUDGE_HINT } from '../chat/chat-judge.js';
 
 const p = ctx => ({ api: ctx.api, toast: ctx.toast });
 const wrap = C => ({ ctx }) => h(C, p(ctx));
 const pad = (...kids) => h('div', { style: { padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 10 } }, ...kids);
 
-/** The judge's backend and model, on the draft; its status (whether it answers) from GET /api/judge/status. */
+/** The judge's decision model (always the decide mod's, web-approvals), on the draft; its status from GET /api/judge/status. */
 function JudgeModelBlock({ ctx }) {
   const st = ctx.judgeStatus, j = ctx.draft?.judge || {};
   return pad(
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
       h('div', { style: { flex: '1 1 220px', minWidth: 0 } }, h('div', { style: { fontWeight: 500 } }, 'Judge model'),
-        h('div', { style: { fontSize: 12, color: T.mut } }, 'In Auto, it runs commands, fetches and deletes it’s sure you asked for, and asks you about the rest.')),
+        h('div', { style: { fontSize: 12, color: T.mut } }, 'In Auto, it runs commands, fetches and deletes it’s sure you asked for, and asks you about the rest. ' + JUDGE_HINT)),
       h(JudgeModelPick, { st, value: j, onChange: v => ctx.setDraft(d => { d.judge = { ...d.judge, ...v }; }) })),
     st ? h('div', { role: 'status', style: { fontSize: 12, color: st.available ? T.mut : T.acct } }, judgeStatusText(st)) : null);
 }

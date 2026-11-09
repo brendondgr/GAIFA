@@ -176,7 +176,8 @@ class Decision(_Model):
     approve: bool
     arguments: dict[str, Any] | None = Field(None, description="Edited arguments (the parameter card); they are what runs")
     reason: str | None = None
-    remember: Literal["once", "thread", "always"] = Field("once", description="thread / always: also allow calls like this one (a grant)")
+    remember: Literal["once", "thread", "always", "sites"] = Field("once", description="thread / always: also allow calls like "
+                                                                   "this one (a grant); sites: a web tool on any site, in this chat")
     confirm: bool = Field(False, description="The second confirm an `always` grant for execute and destructive tools needs")
     grant_hours: float | None = Field(None, gt=0, description="The grant expires after this many hours (default: never)")
 

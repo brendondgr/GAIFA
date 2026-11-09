@@ -5,6 +5,7 @@ when the model doesn't answer, phrase hits are removed (fail closed)."""
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 import re
 
@@ -131,6 +132,8 @@ def fake_screen(monkeypatch, flag_word: str = "banana", status: int = 200):
     real = sc.screen
 
     async def patched(text, cfg=None, client=None, use_model=True, timeout_s=30.0, window=800, **kw):
+        if cfg is not None:     # a chat model reads (the hub's default follows the judge, a decision model: web-approvals)
+            cfg = dataclasses.replace(cfg, backend="relay", confirm=None)
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
             return await real(text, cfg, c, use_model, timeout_s, window, **kw)
     monkeypatch.setattr(sc, "screen", patched)

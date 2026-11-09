@@ -40,7 +40,7 @@ def relay(seen: list[str], delay: float = 0.0, active: list[int] | None = None) 
 async def test_code_and_tables_without_sentences_skip_the_model():
     seen: list[str] = []
     async with relay(seen) as c:
-        s = await screen.screen(PAGE, JudgeConfig(), c, window=100_000)
+        s = await screen.screen(PAGE, JudgeConfig(backend="relay"), c, window=100_000)
     sent = "\n".join(seen)
     assert s.checked == "patterns+model" and not s.findings
     assert "The list data type" in sent                          # prose: read
@@ -65,5 +65,5 @@ async def test_parallel_sets_the_calls_at_once():
     for n in (1, 3):
         seen, active = [], [0, 0]
         async with relay(seen, 0.01, active) as c:
-            await screen.screen(text, JudgeConfig(), c, window=100, parallel=n)
+            await screen.screen(text, JudgeConfig(backend="relay"), c, window=100, parallel=n)
         assert active[1] == n and len(seen) == 12

@@ -71,7 +71,7 @@ export function useUiPref(path, d, prefs = uiPrefs) {
 // ---------- 3.3: this browser's old choices, saved to config.toml once ----------
 export const IMPORTED_KEY = 'gaifa.prefs.imported';
 const OVERVIEW = { view: ['dashboard', 'services', 'table', 'timeline'], range: ['1h', '6h', '24h', '7d'] };
-const LIST = { group: ['environment', 'none'], envOrder: ['activity', 'name', 'created'], chatOrder: ['updated', 'title', 'created'] };
+const LIST = { group: ['environment', 'date', 'none'], envOrder: ['activity', 'name', 'created'], chatOrder: ['updated', 'title', 'created'] };
 
 /** What to save from this browser: each choice it made (not the default) that config.toml doesn't set yet.
  *  `ui` is GET /api/settings's `ui`. Old `aihub.*` copies count too. Returns a `ui` patch (maybe empty). */

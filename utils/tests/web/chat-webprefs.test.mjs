@@ -19,9 +19,9 @@ test('screenWay: the judge unless [agent.screen] names a backend or a model', ()
 
 test('screenPatch: what each choice saves', () => {
   assert.deepEqual(w.screenPatch('judge'), { backend: null, model: null, url: null, threshold: null });
-  assert.deepEqual(w.screenPatch('decide', { model: 'd3-lite', threshold: 0.9, confirm: false }),
-    { backend: 'decide', model: 'd3-lite', url: null, threshold: 0.9, confirm: false });
-  assert.deepEqual(w.screenPatch('decide', {}), { backend: 'decide', model: 'd3-lite', url: null, threshold: 0.95, confirm: true });
+  assert.deepEqual(w.screenPatch('decide', { model: 'd3-lite', threshold: 0.9 }),
+    { backend: 'decide', model: 'd3-lite', url: null, threshold: 0.9 });
+  assert.deepEqual(w.screenPatch('decide', {}), { backend: 'decide', model: 'd3-lite', url: null, threshold: 0.95 });   // no confirm (web-approvals)
   assert.deepEqual(w.screenPatch('relay', { model: 'gemma4-26B', threshold: 0.5 }), { backend: 'relay', model: 'gemma4-26B', url: null, threshold: null });
 });
 

@@ -27,7 +27,8 @@ theme = "system"
 density = "compact"         # or "comfortable"
 # [ui.dashboard] holds the Overview dashboard's layout (order, hidden, ranges); the UI writes it.
 # The UI also keeps your choices here, the same in every browser (settings-that-stick):
-# [ui.chat]      steps = "fold" | "split" (Steps between messages), environment (a new chat's), [ui.chat.list] (the chat list's view)
+# [ui.chat]      steps = "fold" | "split" (Steps between messages), environment (a new chat's), [ui.chat.list] (the chat list's view:
+#                show = "chats" | "archived" | "both", group = "environment" | "date" | "none", env_order, chat_order, collapsed)
 # [ui.overview]  view = "dashboard" | "services" | "table" | "timeline", timeline_range, services_range (1h, 6h, 24h, 7d)
 
 [services]
@@ -55,6 +56,6 @@ regenerate = false          # true keeps this machine's model inventory (data/st
 [agent.screen]
 window_chars = 6000
 
-# The Auto judge's model, a name your relay serves (`gaifa setup` asks; Settings → Agent):
+# The Auto judge is always a decision model in the decide mod (d3-lite), never a chat model (plan web-approvals):
 # [agent.judge]
-# model = "<a model your relay serves>"
+# model = "d3-lite"

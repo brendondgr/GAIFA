@@ -15,7 +15,8 @@ from utils.config import Config, JudgeCfg
 from utils.tools import judge as judge_mod
 from utils.tools import judge_context as jc
 from utils.tools.judge import JudgeConfig, Judgement, judge
-from utils.tests.tools.test_judge import UNSURE, FOLDER, Fake, chat, client_for, decide_answers
+from services.agent.evals.judge import relay_judge
+from utils.tests.tools.test_judge import CHAT, UNSURE, FOLDER, Fake, chat, client_for, decide_answers
 
 
 def run(coro):
@@ -131,24 +132,25 @@ def test_decide_input_holds_the_context_and_its_questions():
 
 
 def test_relay_input_holds_the_context_and_the_system_line():
+    """The judge eval's chat-model judge (evals/judge/relay_judge.py; the hub's judge is a decision model only)."""
     fake = Fake(chat('{"verdict": "allow", "reason": "asked"}'))
     cfg = JudgeConfig(backend="relay", url="http://relay", context="trail")
-    j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg, client_for(fake.handler), context=STEPS))
+    j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg, client_for(fake.handler), context=STEPS, **CHAT))
     system, user = (m["content"] for m in fake.bodies[0]["messages"])
-    assert system.endswith(judge_mod.SYSTEM_CONTEXT) and "never by the user" in system
+    assert system.endswith(relay_judge.SYSTEM_CONTEXT) and "never by the user" in system
     assert "The agent's earlier calls this turn (oldest first):\n1. read_file" in user and "IBAN" not in user and jc.FULL_TAIL not in user
     assert j.detail["context_steps"] == 1
     fake = Fake(chat('{"verdict": "allow", "reason": "asked"}'))
     run(judge(UNSURE, ["run the report script"], FOLDER, JudgeConfig(backend="relay", url="http://relay", context="full"),
-              client_for(fake.handler), context=STEPS))
+              client_for(fake.handler), context=STEPS, **CHAT))
     user = fake.bodies[0]["messages"][1]["content"]
     assert "2. result of read_file:\n<untrusted source=\"result of read_file\">" in user and "IBAN" in user
     assert user.index(jc.FULL_TAIL) > user.index("IBAN") and user.index(jc.FULL_TAIL) < user.index("Proposed call")
     assert jc.FULL_TAIL not in fake.bodies[0]["messages"][0]["content"]
     fake = Fake(chat('{"verdict": "allow", "reason": "asked"}'))
     run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="relay", url="http://relay"), client_for(fake.handler),
-              context=STEPS))
-    assert fake.bodies[0]["messages"][0]["content"] == judge_mod.SYSTEM and "read_file" not in fake.bodies[0]["messages"][1]["content"]
+              context=STEPS, **CHAT))
+    assert fake.bodies[0]["messages"][0]["content"] == relay_judge.SYSTEM and "read_file" not in fake.bodies[0]["messages"][1]["content"]
 
 
 async def test_the_hub_builds_the_context_from_the_turns_calls(wh, monkeypatch):
@@ -157,7 +159,7 @@ async def test_the_hub_builds_the_context_from_the_turns_calls(wh, monkeypatch):
     async def fake(state, cfg, client):
         seen.append(state)
         return Judgement("allow", "asked", "model", model="fake")
-    monkeypatch.setattr(judge_mod, "ask_relay", fake)
+    monkeypatch.setattr(judge_mod, "ask_decide", fake)
     wh.hub.config.agent.judge.context = "full"
     first = await wh.call("fake_ws_run", {"folder": "run", "command": "python first.py"}, mode="auto", thread="t1",
                           turn=7, said=["run the scripts"])
@@ -170,9 +172,12 @@ async def test_the_hub_builds_the_context_from_the_turns_calls(wh, monkeypatch):
                       said=["run the scripts"], narration=[{"ts": time.time() - 0.001, "text": "first.py ran; next"}])
     assert r["status"] == "done", r
     state = seen[-1]
-    assert "called fake_ws_run" in state and "first.py" in state and "<untrusted source=\"result of fake_ws_run\">" in state
+    so_far = json.loads(state)["so_far"]                                        # the decision model reads JSON
+    assert so_far[0]["agent_called"] == "fake_ws_run" and "first.py" in so_far[0]["arguments"]
+    assert any(e.get("result_of") == "fake_ws_run" and '<untrusted source="result of fake_ws_run">' in e["text"]
+               for e in so_far)
     assert "other_turn.py" not in state and "other_chat.py" not in state       # only this chat's turn
-    assert "the agent wrote:" in state and "first.py ran; next" in state
+    assert any("first.py ran; next" in e.get("agent_said", "") for e in so_far)
     stored = json.loads((await wh.hub.db.fetchone("SELECT origin FROM tool_calls WHERE id = ?", (r["call_id"],)))["origin"])
     assert "narration" not in stored and "said" not in stored and "so_far" not in json.dumps(stored)
     wh.hub.config.agent.judge.context = "none"

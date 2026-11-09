@@ -33,7 +33,7 @@ One Claude-Code-style loop, written for a local model: call the model, run its t
 ## API (through the hub: `/api/s/agent/…`)
 
 - `GET/POST /v1/threads`, `GET/PATCH/DELETE /v1/threads/{id}` (mode `ask` | `auto` | `read_only`; settings `pinned`, `disabled`, `loaded`, `dry_run`)
-- `GET /v1/threads?environment=a,b&sort=updated|created|title&offset=` (a chat without `settings.environment` is in `default`), `GET /v1/threads/groups?archived=` (per environment: count, newest `updated`, running): the chat list's sections (plan 41.1)
+- `GET /v1/threads?environment=a,b&sort=updated|created|title&offset=` (a chat without `settings.environment` is in `default`), `GET /v1/threads/groups?archived=` (per environment: count, newest `updated`, running): the chat list's sections (plan 41.1); `archived=false|true|all` on both (default `false`; `all` lists live and archived chats together), and `GET /v1/threads/count?q=&archived=&environment=` → `{count}` for the same filters with no limit (plan chat-history 1.1)
 - `POST /v1/threads/{id}/messages {text, attachments}`: starts a turn, or queues the message during one
 - `GET /v1/threads/{id}/events?after=`, `GET /v1/threads/{id}/stream?after=` (SSE: events, then live deltas, progress and the context meter)
 - `GET /v1/streams?threads=<id>:<after>,…` (SSE for up to 64 chats on one connection: each chat's events after its seq and a `ready` for it, then live events of all of them, each with `thread_id`; an unknown chat gets `gone`. The Chat page's split view uses it, plan chat-split 3.1)

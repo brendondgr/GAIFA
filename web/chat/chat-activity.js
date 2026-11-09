@@ -119,7 +119,7 @@ export function StepDetail({ row, ctx }) {
   const outs = (r?.outputs || []).map(o => (ctx.outputs || []).find(x => x.output_id === o.output_id) || o);
   const failed = r && (r.error || (r.status && r.status !== 'done'));
   const e = failed ? errorText(r) : null;
-  const decided = it.decision ? (it.decision.approve ? 'Approved by you' + ({ thread: ', and allowed in this chat', always: ', and always allowed' }[it.decision.remember] || '')   // plan 25.3
+  const decided = it.decision ? (it.decision.approve ? 'Approved by you' + ({ thread: ', and allowed in this chat', always: ', and always allowed', sites: ', and every site allowed in this chat' }[it.decision.remember] || '')   // plan 25.3
     : 'Denied by you') + (it.decision.reason && !it.decision.approve ? `: ${it.decision.reason}` : '') : null;
   const result = e ? h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2 } }, h('span', { style: { color: r.status === 'error' || r.error ? T.rd : T.mut } }, e.text), e.fix ? h('span', { style: { color: T.mut, fontSize: 12 } }, e.fix) : null)
     : outs.length ? h('span', { style: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' } }, 'Made ', outs.map(o => h(OutChip, { key: o.output_id + o.n, o })), row.seconds != null ? h('span', { style: { color: T.dim, fontSize: 12 } }, 'in ' + fmtDur(row.seconds)) : null)

@@ -19,9 +19,9 @@ async def test_a_screening_model_of_its_own(rig, serve):
         assert r.json()["settings"]["screen"]["backend"] == "decide"
         assert tomllib.loads(_file(served))["agent"]["screen"] == {"backend": "decide", "threshold": 0.9}
         s = screen_config(served.hub.config)                   # applies at once; the judge stays as it was
-        assert (s.backend, s.model, s.threshold) == ("decide", "d3-lite", 0.9) and served.hub.config.agent.judge.backend == "relay"
+        assert (s.backend, s.model, s.threshold) == ("decide", "d3-lite", 0.9) and served.hub.config.agent.judge.backend == "decide"
         r = await c.put("/api/settings", json={"screen": {"backend": "nope"}})
         assert r.status_code == 422 and r.json()["data"]["field"].startswith("screen")
         r = await c.put("/api/settings", json={"screen": {"backend": None, "threshold": None}})
         assert r.status_code == 200 and "screen" not in (tomllib.loads(_file(served)).get("agent") or {})
-        assert screen_config(served.hub.config).backend == "relay"
+        assert screen_config(served.hub.config).backend == "decide"   # the judge's: always a decision model (web-approvals)

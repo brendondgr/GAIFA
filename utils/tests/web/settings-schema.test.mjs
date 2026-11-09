@@ -107,7 +107,7 @@ test('2.1: the summaries render from a fixed draft', () => {
   const ctx = { services: ALL, draft: FULL, theme: 'dark', density: 'compact', nav: { services: 'counts' }, system: { hub: { version: '0.1.0' }, disk: { free_bytes: 500e9, total_bytes: 2000e9 } } };
   const secs = S.sections(ctx), sum = ref => { const [s, g] = ref.split('/'); return S.summaryOf(secs.find(x => x.id === s).groups.find(x => x.id === g), ctx); };
   assert.equal(sum('machine/memory'), 'Reserve 12 GB · auto make room off · 1 never unloaded');
-  assert.equal(sum('permissions/judge'), 'gemma4-26B via decide · 3 command rules');
+  assert.equal(sum('permissions/judge'), 'gemma4-26B (decision model) · 3 command rules');
   assert.equal(sum('permissions/rules'), '0 never · 1 ask · 1 allow');
   assert.equal(sum('general/interface'), 'Dark theme · compact · sidebar counts');
   assert.equal(sum('general/outputs'), 'Saved web pages kept 7 days');

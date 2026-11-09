@@ -174,8 +174,8 @@ export function sections(ctx = {}) {
         field('allow', 'permissions.allow', { label: 'Run without asking', hint: 'Never skips the card of a tool that runs code.', control: 'list', check: checkToolGlob, placeholder: 'hub_start_service' }),
       ] },
       { id: 'grants', label: 'Grants', summary: () => 'What you allowed in a chat or always', rows: [block('grants', 'GrantsList', { label: 'Grants', keywords: ['always allow', 'revoke'] })] },
-      { id: 'judge', label: 'Auto judge', summary: () => { const j = d.judge || {}; return `${j.model || '—'} via ${j.backend || '—'} · ${n((j.allow_commands || []).length + (j.ask_commands || []).length, 'command rule')}`; }, rows: [
-        block('judgeModel', 'JudgeModelBlock', { label: 'Judge model', keys: ['judge.backend', 'judge.model', 'judge.url'], keywords: ['decide', 'relay', 'auto mode'] }),
+      { id: 'judge', label: 'Auto judge', summary: () => { const j = d.judge || {}; return `${j.model || '—'} (decision model) · ${n((j.allow_commands || []).length + (j.ask_commands || []).length, 'command rule')}`; }, rows: [
+        block('judgeModel', 'JudgeModelBlock', { label: 'Judge model', keys: ['judge.backend', 'judge.model', 'judge.url'], keywords: ['decide', 'decision model', 'd3-lite', 'auto mode'] }),
         field('context', 'judge.context', { label: 'The judge reads', hint: 'What it reads of the turn besides your words and the call.', control: 'segmented', choices: JUDGE_CONTEXTS }),
         field('threshold', 'judge.threshold', { label: 'Threshold', hint: 'A decision model: every answer must clear it.', control: 'number', min: 0.01, max: 1, step: 0.01, width: 90 }),
         field('timeout', 'judge.timeout_s', { label: 'Time limit', hint: 'Slower than this, the call asks you.', control: 'number', min: 0.1, max: 60, step: 0.5, unit: 's', width: 90 }),

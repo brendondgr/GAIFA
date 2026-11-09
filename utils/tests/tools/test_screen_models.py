@@ -1,5 +1,6 @@
 """Plan 30.8: screening with its own model (`[agent.screen]` backend/model/url/threshold, else the judge's), the
-decide backend asking several passages at once with the judge's chat model confirming its flags, and screening
+decide backend asking several passages at once (a chat model confirming its flags when a caller sets one: the
+screen eval), and screening
 reports kept with an output and applied to any window of its text."""
 
 from __future__ import annotations
@@ -24,26 +25,24 @@ def cfg_with(**screen) -> Config:
 
 
 def test_the_screen_model_defaults_to_the_judges():
+    """The judge is a decision model only (web-approvals), so screening with no model of its own uses d3-lite."""
     c = Config()
     s = sc.screen_config(c)
-    assert (s.backend, s.model, s.threshold, s.confirm, s.window) == ("relay", c.agent.judge.model, 0.95, None, 800)
-    c.agent.judge.model = "gemma4-26B"
-    assert sc.screen_config(c).model == "gemma4-26B"
+    assert (s.backend, s.model, s.threshold, s.confirm, s.window) == ("decide", "d3-lite", 0.95, None, 800)
+    c.agent.judge.model = "d3-other"
+    assert sc.screen_config(c).model == "d3-other"
 
 
-def test_a_decision_model_for_screening_while_the_judge_stays_on_a_chat_model():
-    c = cfg_with(backend="decide")
-    c.agent.judge.model = "gemma4-26B"
+def test_a_chat_model_for_screening_and_no_confirm_from_the_judge():
+    c = cfg_with(backend="relay", model="minicpm-5-2B")
     s = sc.screen_config(c)
-    assert (s.backend, s.model, s.threshold) == ("decide", "d3-lite", 0.95)
+    assert (s.backend, s.model, s.threshold, s.confirm) == ("relay", "minicpm-5-2B", 0.95, None)
+    c = cfg_with(backend="decide", confirm=True)               # an old config's confirm: no chat-model judge to ask
+    s = sc.screen_config(c)
+    assert (s.backend, s.model, s.confirm) == ("decide", "d3-lite", None)
     assert s.url == "http://127.0.0.1:1"                       # conftest: tests never reach a real model
-    assert s.confirm is not None and (s.confirm.backend, s.confirm.model) == ("relay", "gemma4-26B")
-    c.agent.screen.model, c.agent.screen.threshold, c.agent.screen.confirm = "d3-lite@abc", 0.8, False
-    s = sc.screen_config(c)
-    assert (s.model, s.threshold, s.confirm) == ("d3-lite@abc", 0.8, None)
-    c = cfg_with(backend="decide")
-    c.agent.judge.backend = "decide"                           # no chat model to confirm with
-    assert sc.screen_config(c).confirm is None
+    c.agent.screen.model, c.agent.screen.threshold = "d3-lite@abc", 0.8
+    assert (sc.screen_config(c).model, sc.screen_config(c).threshold) == ("d3-lite@abc", 0.8)
     assert sc.screen_config(cfg_with(window_chars=6000)).key() != sc.screen_config(Config()).key()
 
 

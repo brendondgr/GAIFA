@@ -24,10 +24,6 @@ text = "Which model should Chat use? (one your relay serves; with no local LLM, 
 required = true
 restart = "agent"
 
-[[config]]
-key = "agent.judge.model"
-text = "Which model should judge Auto mode's actions? (a small, quick one is fine; without one, Auto mode asks about everything)"
-
 [[variants]]                    # plan 39.1: no GPU work, so one variant everywhere; tested on Linux
 accel = "cpu"
 os = ["linux", "wsl", "darwin"]
@@ -77,7 +73,7 @@ gaifa start agent
 
 ## Choosing models
 
-The agent runs no model and downloads none, so it has no suggestions. `gaifa setup` asks which model it uses once the relay and your LLM mods are installed (their models exist only then), offers to add a hosted provider when the relay has none, saves the answer through the hub (into `config.toml`, applied at once), restarts the agent, and checks it's on the relay; an agent passes it with `--set "services.agent.env.AGENT_MODEL=<name>"`. The Auto judge's model (`[agent.judge] model`) is asked the same way, and can be skipped. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
+The agent runs no model and downloads none, so it has no suggestions. `gaifa setup` asks which model it uses once the relay and your LLM mods are installed (their models exist only then), offers to add a hosted provider when the relay has none, saves the answer through the hub (into `config.toml`, applied at once), restarts the agent, and checks it's on the relay; an agent passes it with `--set "services.agent.env.AGENT_MODEL=<name>"`. The Auto judge isn't asked about: it is always a decision model in the [decide](../../decide/setup/decide.md) mod (d3-lite), so install that mod for Auto mode. It sends every turn to the relay under a model name, so `AGENT_MODEL` (and, optionally, `AGENT_FALLBACK_MODEL`) must be names your relay's `/v1/models` lists, from a model that takes tool calls. Where such names come from:
 - **[llama.cpp](../../lcpp/setup/llama-cpp.md) (`lcpp`):** any GGUF you add; a running instance registers under its catalog nickname (`nicknames` in `services/lcpp/data/models.json`), or the alias given at launch. Its doc suggests two models that take tool calls.
 - **[vLLM](../../vllm/setup/vllm.md):** a loaded profile registers under its `alias` (such as `Qwen3-0.6B-vLLM`; the profiles are parked here).
 - **[OpenCode](../../opencode/setup/opencode.md):** a free hosted id such as `opencode/glm-5.3-flash-free`, with no GPU at all. (Its `agent` model is OpenCode's own coding agent, which runs shell commands in its folder; setup doesn't offer it as Chat's model.)
@@ -110,7 +106,7 @@ AGENT_FALLBACK_MODEL = "<another-model>"   # optional; "" (the default) for none
 
 **Use names your relay has** (Choosing models, above). For example, on the machine these docs were written on, `AGENT_MODEL` is `skynet` (a remote GPU box reached through an SSH tunnel that exists only there) and the fallback was `gemma4-26B` (lcpp's nickname for the Gemma 4 26B-A4B GGUF); neither name exists on yours.
 
-**Settings → Permissions → Auto judge** holds the Auto mode's judge model: `config.toml [agent.judge]`, `model = "<your-model>"` with `backend = "relay"` (on the machine these docs were written on, for example, `gemma4-26B`). The default in code is `minicpm-5-2B`, which a relay rarely has: pick one of yours there, or the `decide` mod's models with `backend = "decide"`. The same page has the document defaults and speech input.
+**Settings → Permissions → Auto judge** holds the Auto mode's judge: `config.toml [agent.judge]`. The judge is only ever a decision model in the `decide` mod (`d3-lite` by default, answering in a fraction of a second), never a chat model through the relay: an older `backend = "relay"` is ignored, and `gaifa doctor` names it. The same page has the document defaults and speech input.
 
 ## Check it works
 
@@ -138,7 +134,7 @@ Expect `225 passed` (2026-10-21, about a minute).
 
 - **Every chat fails or falls back.** `AGENT_MODEL` names a model your relay doesn't have (such as `service.toml`'s `skynet`, which exists only on the machine these docs were written on). Check the list above, then `gaifa setup agent --set "services.agent.env.AGENT_MODEL=<name>"`, or edit `config.toml` and restart the hub, then the agent (Configuration).
 - **A fallback that's off most of the time.** An lcpp nickname is on the relay only while its instance runs. Start it from the LLM Launcher page, or choose a fallback that is always up.
-- **The judge asks about everything in Auto.** Its model doesn't answer within `timeout_s` (3 s) or isn't on the relay, so each call falls back to asking you. Pick a reachable model in Settings → Agent.
+- **The judge asks about everything in Auto.** The `decide` mod isn't installed or running, or d3-lite isn't usable (`GET /api/judge/status` says why), so each call falls back to asking you. `gaifa setup decide`, then check Settings → Permissions → Auto judge says "answering".
 - **A model without tool calls** answers but never uses a tool. The relay's facts (`tools`) say which ones take them.
 - The eval (`evals/`, results in [docs/agent-eval.md](../../../docs/agent-eval.md)) runs real models; it's not part of the install check.
 

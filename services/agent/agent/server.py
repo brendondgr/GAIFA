@@ -96,7 +96,8 @@ class ApprovalDecision(BaseModel):
     approve: bool
     arguments: dict[str, Any] | None = None
     reason: str | None = None
-    remember: Literal["once", "thread", "always"] = Field("once", description="thread / always: the hub also allows calls like this one (plan 25.2)")
+    remember: Literal["once", "thread", "always", "sites"] = Field("once", description="thread / always: the hub also allows "
+                                                                   "calls like this one (plan 25.2); sites: a web tool on any site, in this chat (web-approvals)")
     confirm: bool = Field(False, description="the second confirm an always grant for execute and destructive tools needs")
 
 
@@ -181,6 +182,18 @@ async def _upkeep(store: Store, stop: asyncio.Event, every: float = 3600) -> Non
             await asyncio.wait_for(stop.wait(), timeout=every)
         except asyncio.TimeoutError:
             pass
+
+
+ArchivedQ = Literal["false", "true", "all"]   # the thread list's ?archived= (plan chat-history 1.1)
+
+
+def archived_of(value: str) -> bool | None:
+    """`all` lists live and archived chats together (None to the store)."""
+    return None if value == "all" else value == "true"
+
+
+def envs_of(environment: str | None) -> list[str] | None:
+    return [e.strip() for e in (environment or "").split(",") if e.strip()] or None
 
 
 GROUP_ORDER = {"local": 0, "remote": 1, "cloud": 2}
@@ -393,19 +406,27 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
 
     @app.get("/v1/threads", summary="Threads, newest first; ?q= searches titles and messages; ?environment= only those "
              "environments' chats (comma-separated; `default` also matches chats without one)")
-    def list_threads(request: Request, q: str | None = None, archived: bool = False, limit: int = Query(200, ge=1, le=1000),
+    def list_threads(request: Request, q: str | None = None, archived: ArchivedQ = "false",
+                     limit: int = Query(200, ge=1, le=1000),
                      environment: str | None = Query(None, description="Environment ids, comma-separated (plan 41.1)"),
                      sort: Literal["updated", "created", "title"] = "updated", offset: int = Query(0, ge=0),
                      project: str | None = Query(None, description="Project ids, comma-separated; `none`: chats in no project "
                                                                     "(plan projects 1.2)")) -> list[dict]:
-        envs = [e for e in (environment or "").split(",") if e.strip()] or None
-        projs = [p for p in (project or "").split(",") if p.strip()] or None
-        return A(request).store.threads(q, archived, limit, environment=envs, sort=sort, offset=offset, project=projs)
+        return A(request).store.threads(q, archived_of(archived), limit, environment=envs_of(environment), sort=sort,
+                                        offset=offset, project=envs_of(project))
+
+    @app.get("/v1/threads/count", summary="How many threads /v1/threads would list with the same filters, no limit")
+    def count_threads(request: Request, q: str | None = None, archived: ArchivedQ = "false",
+                      environment: str | None = Query(None, description="Environment ids, comma-separated"),
+                      project: str | None = Query(None, description="Project ids, comma-separated (`none`: in no project)")) -> dict:
+        return {"count": A(request).store.count(q, archived_of(archived), environment=envs_of(environment),
+                                                project=envs_of(project))}
 
     @app.get("/v1/threads/groups", summary="Per environment the chats use: how many, the newest activity, and how many "
              "are running or waiting (`default` for chats without one); ?by=project: per project (`none` for chats in none)")
-    def thread_groups(request: Request, archived: bool = False, by: Literal["environment", "project"] = "environment") -> list[dict]:
-        return A(request).store.groups(archived, by=by)
+    def thread_groups(request: Request, archived: ArchivedQ = "false",
+                      by: Literal["environment", "project"] = "environment") -> list[dict]:
+        return A(request).store.groups(archived_of(archived), by=by)
 
     async def check_model(agent: Agent, model: str | None) -> None:
         """A chat's model must be one the relay serves (plan llm-servers 2.2); with the relay unreachable, anything goes."""

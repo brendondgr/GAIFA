@@ -2,7 +2,7 @@
 // /api/s/agent. `createChatClient({api})` returns the live client when the `proxy` area is live,
 // and the scripted mock agent (chat-mock.js) in `?mock`. Both have the same methods:
 //
-//   models() threads({q, archived, limit, environment, sort, offset}) threadGroups({archived}) searchChats(q, limit) create(body: {model, mode, settings, message?: messageBody(…)} → the thread, with `event` when it had a message) get(tid) patch(tid, p) remove(tid) events(tid, after)
+//   models() threads({q, archived: false | true | 'all', limit, environment, sort, offset}) threadGroups({archived}) threadCount({q, archived, environment}) → {count} searchChats(q, limit) create(body: {model, mode, settings, message?: messageBody(…)} → the thread, with `event` when it had a message) get(tid) patch(tid, p) remove(tid) events(tid, after)
 //   stream(tid, after, {onEvent, onReady, onState}) → {close()}   (reconnects with after=lastSeq; the live client shares one
 //   connection for every open chat, chat-streams.js; `sharedStream` says whether it does)
 //   send(tid, text, attachments, doc_modes, quotes, mentions, client_id, when) → the user event, or {queued: item} (held during a turn)
@@ -25,6 +25,8 @@ export class ChatError extends Error {
 }
 
 const enc = encodeURIComponent;
+/** `archived`: false (live chats), true, or 'all' (both, plan chat-history 1.1). */
+const archivedQ = a => (a === 'all' ? 'all' : a ? 'true' : undefined);
 const qs = o => { const p = Object.entries(o).filter(([, v]) => v !== undefined && v !== null && v !== ''); return p.length ? '?' + p.map(([k, v]) => `${enc(k)}=${enc(v)}`).join('&') : ''; };
 
 // FastAPI answers {detail: "…"}, or {detail: {code, detail, data}} for the agent's own errors
@@ -102,10 +104,11 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
   return {
     live: true,
     models: () => req('GET', '/v1/models'),
-    threads: ({ q, archived, limit, environment, sort, offset, project } = {}) => req('GET', '/v1/threads' + qs({ q, archived: archived ? 'true' : undefined, limit,
+    threads: ({ q, archived, limit, environment, sort, offset, project } = {}) => req('GET', '/v1/threads' + qs({ q, archived: archivedQ(archived), limit,
       environment, sort: sort && sort !== 'updated' ? sort : undefined, offset: offset || undefined, project })),
-    threadGroups: ({ archived, by } = {}) => req('GET', '/v1/threads/groups' + qs({ archived: archived ? 'true' : undefined,   // plan 41.1
-      by: by && by !== 'environment' ? by : undefined })),
+    threadGroups: ({ archived, by } = {}) => req('GET', '/v1/threads/groups' + qs({ archived: archivedQ(archived),   // plan 41.1
+      by: by && by !== 'environment' ? by : undefined })),                                 // by: 'project' (plan projects 1.3)
+    threadCount: ({ q, archived, environment, project } = {}) => req('GET', '/v1/threads/count' + qs({ q, archived: archivedQ(archived), environment, project })),   // chat-history 1.1
     ...projectCalls(req, url, ES),                                                         // plan projects 1.3
     searchChats: (q, limit = 8) => req('GET', '/v1/chats/search' + qs({ q, limit })).then(r => r.results || []),  // plan 28.5
     create: (body = {}) => req('POST', '/v1/threads', body),

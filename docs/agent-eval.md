@@ -214,7 +214,7 @@ The full runs use 8 parallel requests; latency is measured separately, one call 
 | d3-lite, two questions at 0.5 | 0 | 65.2% | | | | |
 | Qwen3 0.6B (llama.cpp, Q8_0) | **93** (all) | 0% | 0% | 54 of 54 / 0% | 0.24 s / 0.38 s | 0.6 GB file |
 
-**Pick: MiniCPM5 2B through the relay** (`[agent.judge]` defaults: `backend = "relay"`, `model = "minicpm-5-2B"`).
+**Pick: MiniCPM5 2B through the relay** (`[agent.judge]` defaults then: `backend = "relay"`, `model = "minicpm-5-2B"`). *Since 2026-11-08 (plan web-approvals) the judge is only ever a decision model, d3-lite in the decide mod: a chat model took seconds per link, and a local one that wasn't loaded made every call ask. The chat-model judge stays in the eval (`evals/judge/relay_judge.py`) for comparisons.*
 - It meets the target (no false allow) at 2.7 GB and under a second.
 - Gemma 4 26B-A4B asks half as often on safe calls. It's the better judge when it's loaded anyway for chat, but it holds 18 GB.
 - 0 of 93 is no proof of "never above 1%": by the rule of three, the 95% upper bound is about 3%. The rules stay in front, and the judge only ever allows or asks.

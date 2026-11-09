@@ -14,8 +14,9 @@ lines), then:
    flag text that tries to instruct or manipulate an AI reading it; text written to inform a human reader,
    including about prompt injection, is safe. An answer that says "not safe" without naming a passage of its
    window, or names one outside it, removes the whole window. A decision model (the decide mod) answers one yes/no
-   question per passage, several calls at once; since it flags many ordinary passages (docs/agent-eval.md), what it
-   flags is read again by the judge's chat model when that is a relay model (`confirm`), which has the final say.
+   question per passage, several calls at once. It flags many ordinary passages (docs/agent-eval.md); a `confirm`
+   chat model re-reads what it flags when a caller sets one (the screen eval; the hub doesn't, since the judge became
+   a decision model only, plan web-approvals).
    A passage longer than 6,000 characters is read in overlapping pieces, so every character is read.
 3. **Fail closed for suspects:** when the model doesn't answer, suspects are removed; other passages stay (they
    still reach the model inside `<untrusted>`), and `checked` says the model didn't run.
@@ -252,8 +253,9 @@ RELAY_DEFAULTS = {"model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "thre
 
 def screen_config(config: Any) -> ScreenConfig:
     """`[agent.screen]`'s model: the judge's (`[agent.judge]`), with `backend`, `model`, `url` and `threshold` from
-    `[agent.screen]` where set. Another backend than the judge's starts from that backend's defaults. With a decision
-    model and a judge on the relay, `confirm` (on by default) makes the judge's model re-read what it flags."""
+    `[agent.screen]` where set. Another backend than the judge's (a decision model) starts from that backend's defaults.
+    No `confirm`: it re-read with the judge's chat model, and the judge is never one now (plan web-approvals);
+    `[agent.screen] confirm` is read and ignored. The screen eval still sets one (`screen_eval.py --confirm-model`)."""
     from types import SimpleNamespace
 
     from . import judge
@@ -267,10 +269,7 @@ def screen_config(config: Any) -> ScreenConfig:
         if getattr(sc, k, None) is not None:
             base[k] = getattr(sc, k)
     own = judge.config_from(SimpleNamespace(**{**jc.model_dump(), "backend": backend, **base}))
-    confirm = None
-    if own.backend == "decide" and getattr(sc, "confirm", True) and jc.backend == "relay":
-        confirm = judge.config_from(jc)
-    return ScreenConfig(**own.__dict__, confirm=confirm, window=sc.window_chars, parallel=getattr(sc, "parallel", PARALLEL))
+    return ScreenConfig(**own.__dict__, confirm=None, window=sc.window_chars, parallel=getattr(sc, "parallel", PARALLEL))
 
 
 def covers(config: Any, kind: str) -> bool:

@@ -6,6 +6,7 @@
 
 import { webTurn } from './chat-mock-web.js';
 import { createProjectMocks } from './chat-mock-projects.js';
+import { seedHistory } from './chat-mock-history.js';
 
 const CANCEL = Symbol('cancelled');
 const MODELS = { default: 'skynet', fallback: 'gemma4-26B', models: [
@@ -49,7 +50,7 @@ function mkRun(speed = 1) {
 }
 
 /** api: mock.js's api (listOutputs, listTools). o.speed: >1 runs the script faster (tests). */
-export function createMockClient(api, { speed = 1 } = {}) {
+export function createMockClient(api, { speed = 1, history = true } = {}) {
   const threads = new Map();
   let seeded = null;
   const settings = { agent_md: '# Standing instructions\n\n- Prefer 16:9 for images unless I say otherwise.\n- Keep replies short.\n', memory: '- likes 16:9 images\n- my voice is Brendon\n',
@@ -368,30 +369,35 @@ export function createMockClient(api, { speed = 1 } = {}) {
       emit(old, 'user', { text: 'Read this in Brendon’s voice: “GAIFA runs every model on this machine.”' });
       emit(old, 'assistant', { text: 'Done: the clip is below.', step: rid('s_'), model: 'skynet' });
       old.thread.updated = now() - 86400 * 2; old.thread.archived = true;
+      if (history) seedHistory({ newThread, emit, now });   // plan chat-history 1.2: every date heading, 20 then Show all
     })();
     return seeded;
   }
 
   const net = () => new Promise(r => setTimeout(r, (60 + Math.random() * 90) / speed));
+  // the agent's list filters: archived false / true / 'all' (both, chat-history 1.1), environments, words in titles and messages
+  const inView = (t, archived) => archived === 'all' || !!t.thread.archived === !!archived;
+  const listed = ({ q, archived, environment, project }) => {
+    const qq = (q || '').toLowerCase(), envs = environment ? String(environment).split(',') : null, projs = project ? String(project).split(',') : null;
+    return [...threads.values()].filter(t => inView(t, archived)).filter(t => !envs || envs.includes(t.thread.settings?.environment || 'default'))
+      .filter(t => !projs || projs.includes(t.thread.settings?.project || 'none'))   // plan projects 1.3
+      .filter(t => !qq || t.thread.title.toLowerCase().includes(qq) || t.events.some(e => ['user', 'assistant'].includes(e.type) && String(e.payload.text).toLowerCase().includes(qq)));
+  };
   return {
     live: false,
     async models() { await net(); return structuredClone(MODELS); },
     async threads({ q, archived, limit = 200, environment, sort = 'updated', offset = 0, project } = {}) {
       await seed(); await net();
-      const qq = (q || '').toLowerCase(), envs = environment ? String(environment).split(',') : null, projs = project ? String(project).split(',') : null;
       const order = { title: (a, b) => a.thread.title.toLowerCase().localeCompare(b.thread.title.toLowerCase()), created: (a, b) => b.thread.created - a.thread.created }[sort]
         || ((a, b) => b.thread.updated - a.thread.updated);
-      return [...threads.values()].filter(t => !!t.thread.archived === !!archived)
-        .filter(t => !envs || envs.includes(t.thread.settings?.environment || 'default'))
-        .filter(t => !projs || projs.includes(t.thread.settings?.project || 'none'))
-        .filter(t => !qq || t.thread.title.toLowerCase().includes(qq) || t.events.some(e => ['user', 'assistant'].includes(e.type) && String(e.payload.text).toLowerCase().includes(qq)))
-        .sort(order).slice(offset, offset + limit).map(pub);
+      return listed({ q, archived, environment, project }).sort(order).slice(offset, offset + limit).map(pub);
     },
+    async threadCount({ q, archived, environment, project } = {}) { await seed(); await net(); return { count: listed({ q, archived, environment, project }).length }; },   // chat-history 1.1
     async threadGroups({ archived, by: key = 'environment' } = {}) {   // plan 41.1, as the agent's /v1/threads/groups (by project: plan projects 1.2)
       await seed(); await net();
       const by = new Map(), field = key === 'project' ? 'project' : 'environment', none = field === 'project' ? 'none' : 'default';
       for (const t of threads.values()) {
-        if (!!t.thread.archived !== !!archived) continue;
+        if (!inView(t, archived)) continue;
         const env = t.thread.settings?.[field] || none, g = by.get(env) || { [field]: env, count: 0, updated: 0, running: 0 };
         g.count += 1; g.updated = Math.max(g.updated, t.thread.updated); g.running += ['running', 'waiting'].includes(t.thread.state) ? 1 : 0;
         by.set(env, g);

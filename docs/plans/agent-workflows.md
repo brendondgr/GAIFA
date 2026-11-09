@@ -82,7 +82,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - Docs: brief §6 / §11.7 (the routes and events).
   *Done when:* `test_workflow_decide.py`: an approval from the parent's route runs the child's call; a remembered one covers a second child's same call.
 
-- [ ] **2.4 Children and memory: `memory/`, `learn/mine.py`, `tasks/runner.py`.**
+- [x] **2.4 Children and memory: `memory/`, `learn/mine.py`, `tasks/runner.py`.**
   - Children get no `remember` / `agent_memory_*` tools; the miner, auto-learning and the learner skip `spawn` chats. A scheduled run's children are covered by the run's grants (the run is the root).
   *Done when:* `test_workflow_memory.py` and an added case in the tasks tests.
 

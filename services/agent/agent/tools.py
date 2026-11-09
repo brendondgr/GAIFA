@@ -128,12 +128,13 @@ class ToolSet:
         self.project: str | None = settings.get("project") or None   # a project chat has the project tools (plan projects 3.4)
         self.task: str | None = settings.get("task") or None         # a scheduled run has task_note (scheduled-tasks 2.4)
         self.spawn = False                       # the `agent` tool: set with the Sub-agents prompt part (agent-workflows 1.3)
+        self.child = bool(settings.get("spawn"))  # a sub-agent: no remember, no agent_memory_* (agent-workflows 2.4)
         self.index: list[dict[str, Any]] = []
         self.full: dict[str, dict[str, Any]] = {}
         self.notes: dict[str, str] = {}              # tool → the harness's note (plan 22.2)
 
     def off(self, t: dict[str, Any]) -> bool:
-        return t["mod"] in self.disabled or group_of(t) in self.disabled
+        return t["mod"] in self.disabled or group_of(t) in self.disabled or (self.child and t["name"].startswith("agent_memory_"))
 
     def hidden(self, t: dict[str, Any]) -> bool:
         g = group_of(t)
@@ -152,7 +153,8 @@ class ToolSet:
         return next((t for t in self.index if t["name"] == name), None)
 
     def local(self) -> list[dict[str, Any]]:
-        return (LOCAL + (PROJECT_TOOLS if self.project else []) + (TASK_TOOLS if self.task else [])
+        return ([t for t in LOCAL if not (self.child and t["name"] == "remember")]
+                + (PROJECT_TOOLS if self.project else []) + (TASK_TOOLS if self.task else [])
                 + (WORKFLOW_TOOLS if self.spawn else []))
 
     def visible(self) -> set[str]:

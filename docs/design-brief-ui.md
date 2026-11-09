@@ -298,6 +298,9 @@ export default {
 
   // Render tab ctx.tab into el. May return a cleanup function.
   mount(el, ctx) { /* … */ },
+
+  // Optional (calendar 3.1), with [ui] main in service.toml: the page as a main view at #/<id>, full height.
+  main: { mount(el, ctx) { /* … */ } },
 };
 ```
 
@@ -443,6 +446,8 @@ interface ServiceSummary {
   logo_url: string | null;       // plan 33.1: the mod's logo ([ui] logo, else ui/logo.svg), or null: the UI draws a monogram
   chat_url?: string | null;      // plan 44.1: the mod's chat module ([ui] chat), which the Chat page loads; null without one
   badge?: number | null;         // calendar 2.1: the mod's unread count (its last POST /api/notify `unread`), a badge on its sidebar item
+  main?: { label: string; after: "overview" | "chat" | "outputs" } | null;   // calendar 3.1: the page module's `main` as a main view at #/<id>
+  chat_panel?: { label: string; url: string } | null;   // calendar 7.1: a side panel in Chat
   has_outputs: boolean;
   native_ui: string | null;      // URL of the service's own UI, if any
   enabled: boolean;
@@ -1386,3 +1391,15 @@ interface SessionState { unclean_shutdown: boolean;                       // the
 - Rename (inline) and Delete (with a confirm) per session.
 - **Command palette:** "Save session…" and "Switch to session…" (both open the panel; Switch opens a session's plan when typed as "Switch to <name>").
 - **On page load**, when `unclean_shutdown` is set and a last auto session exists, a toast offers **Restore last session?** (Restore opens its plan; Dismiss is remembered for this tab in `sessionStorage`).
+
+### 11.15 Calendar (plan calendar)
+
+- **Where:** the `calendar` mod's page as a main view (`[ui] main`): **Calendar** in the sidebar after Chat (its badge: unread reminders), `#/calendar` full height; `#/calendar?item=<occurrence id>` opens one (a reminder's Open). The mod's own tab (`#/s/calendar`) holds **Calendar settings**.
+- **Header**, two even rows: Today, ‹ ›, the range's title (*Friday, November 13, 2026* · *Nov 9 – 15, 2026* · *November 2026*), Day · Week · Month · Agenda, **New**, the menu (Plan my day, Import an .ics file…, Export everything as .ics, Trash, Settings); then **quick add** (plain words, a preview of what it read and assumed under it, Enter adds, Undo in the snackbar) and Search (results as an agenda; a click goes to that day).
+- **Left column** (248 px; a drawer when the page is under 880 px): a mini month (the shown range shaded, today in the accent), **Calendars** (colour, show/hide, the default, +), **Layers** (Scheduled tasks, History, when the agent mod is there), **To-dos** (open ones, overdue in red, a tick completes), **Reminders** (fired alerts, unread first, with Seen, 10 min, Done).
+- **Day and week:** hour rows of 48 px with working hours shaded and weekends a shade quieter, the all-day row (up to three rows, then "+N more"), events side by side in even columns with the calendar's colour on the left edge (focus blocks hatched, free ones dashed, ↻ for a repeat), timed to-dos as round chips, the now-line in the accent; it opens at 07:00 or an hour and a half before now. Drag on empty space to create (15-minute steps), an event to move it (across days), its bottom edge to resize; a repeating one asks **This one / This and the following ones / All of them**.
+- **Month:** weeks from the setting's first day; all-day and multi-day items as bars across days, up to three items a day then "+N more" (opens the day); a day's number opens it; a click on empty space starts an all-day item. **Agenda:** 30 days by day (Today, Tomorrow, then *Wed Nov 11*), empty days left out, **Load more**.
+- **A click** on an item: a popover (when, the repeat in words, the place, notes, the calendar, *made by the agent*, Edit, Done for a to-do, Delete). **The sheet** (Event · To-do): title, the time (date and time pickers, All day / No time, or typed words), the repeat picker (Doesn't repeat, Daily, Every weekday, Weekly on days, Monthly on day N, Monthly on the last day, Yearly, Custom with interval; ends Never, On a date, After N times; the rule in words), alerts (in the app), calendar, Shows as (Busy, Free, Focus block) or Priority, Place or *Takes (minutes)*, Project, Link, Notes. Every write shows a snackbar with **Undo**; a delete says *moved to the trash, kept 30 days*.
+- **Files:** an `.ics` dropped on the page or chosen opens the import sheet: every item ticked except those already here, what was skipped, the calendar, **Add N**. The same list draws a day plan and the agent's proposals.
+- It follows the mod's `rev` every 10 s (and its notifications), keeping the scroll and what's typed. Keys: `t`, `d` `w` `m` `a`, `j` `k`, `n`, `/`, Esc.
+

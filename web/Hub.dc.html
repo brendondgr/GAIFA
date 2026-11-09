@@ -703,6 +703,12 @@ button:disabled{cursor:not-allowed;opacity:.5}
       <div style="flex:1;min-height:0;display:flex;flex-direction:column">{{ chatEl }}</div>
     </sc-if>
     <sc-if value="{{ pg.services }}" hint-placeholder-val="{{ false }}">{{ svcsEl }}</sc-if>
+    <sc-if value="{{ pg.main }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;min-height:0;display:grid;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1fr)">
+        <sc-if value="{{ hasMainMod }}" hint-placeholder-val="{{ false }}"><dc-import name="ModPage" mod="{{ mainMod }}" hint-size="100%,100%"></dc-import></sc-if>
+        <sc-if value="{{ noMainMod }}" hint-placeholder-val="{{ false }}"><div style="padding:56px 20px;text-align:center;color:var(--mut,#8A94A6)">{{ mainMsg }}</div></sc-if>
+      </div>
+    </sc-if>
   </main>
 </div>
 <sc-if value="{{ pop.any }}" hint-placeholder-val="{{ false }}">
@@ -942,6 +948,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
 <script type="text/x-dc" data-dc-script>
 const GB = 1e9;
 const ICON = {
+  calendar: 'M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM4 10h16M8.5 3v4M15.5 3v4',   // calendar 3.1
   bulb: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z',
   grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z', chat: 'M4 5h16v11H9l-5 4z',
   relay: 'M4 7h12M12 3l4 4-4 4M20 17H8M12 13l-4 4 4 4', cpu: 'M7 7h10v10H7zM10 10h4v4h-4zM9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4',
@@ -1092,7 +1099,7 @@ class Component extends DCLogic {
       parts.push(d?.name || r.parts[1] || 'Service');
     } else if (r.page === 'settings') { parts.push(...this.settingsPlace(r).reverse(), 'Settings'); }
     else if (r.page === 'outputs' && r.parts[1]) parts.push((s.out?.detail?.id === r.parts[1] && s.out.detail.title) || (s.out?.items || []).find(o => o.id === r.parts[1])?.title || 'Output', 'Outputs');
-    else parts.push({ overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', services: 'Services' }[r.page] || cap(r.page));
+    else parts.push({ overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', services: 'Services' }[r.page] || this.mainSvc(r)?.main.label || cap(r.page));
     const n = s.approvals?.length || 0;
     return (n ? `(${n}) ` : '') + [...parts, s.hubDown ? 'GAIFA (down)' : 'GAIFA'].join(' · ');
   }
@@ -1376,6 +1383,8 @@ class Component extends DCLogic {
       return;
     }
     this.closeLogs();
+    const main = this.mainSvc(r);
+    if (main) { this.loadPage(main); return; }   // calendar 3.1: a mod's main view loads its page module
     if (r.page === 'models') {
       if (!this.state.mdl.loaded || force) this.loadModels();
       if (r.params.status) this.upd('mdl', { status: r.params.status });
@@ -1553,6 +1562,17 @@ class Component extends DCLogic {
   }
 
   // ---------- mod pages (PATCHES #6): services/<id>/ui/page.js in the ModPage host ----------
+  // calendar 3.1: a mod's main view: its page module's `main` in the ModPage host, full height (`fill`)
+  vmMain(d, r) {
+    if (!d) return { mainMod: null, mainMsg: '', hasMainMod: false, noMainMod: false };
+    const P = this.pages?.[d.id] || {}, main = P.page?.main;
+    const mod = main && typeof main.mount === 'function' ? { page: main, service: d, tab: 'main', params: r.params, route: r.parts.slice(1), fill: true, api: this.api, ui: this.modUi,
+      up: d.state === 'ready' || d.state === 'degraded', toast: (m, l) => this.toast(m, l), confirm: o => this.confirm(o), navigate: h => this.go(h), on: this.modOn } : null;
+    const msg = P.err ? `${d.name}'s page could not be loaded (${P.err}).` : P.page && !mod ? `${d.name}'s page module has no main view (export \`main: { mount(el, ctx) }\`).` : `Loading ${d.main.label}…`;
+    return { mainMod: mod, mainMsg: msg, hasMainMod: !!mod, noMainMod: !mod };
+  }
+  // calendar 3.1: the mod whose page is the main view at #/<id>, if any
+  mainSvc(r) { return r && this.state.services.find(x => x.main && x.id === r.page) || null; }
   pageUrl(d) {
     if (d.page_url) return d.page_url;
     // Mock mode: the built-in mods show their real page modules (mock.js answers their native API);
@@ -1694,6 +1714,7 @@ class Component extends DCLogic {
     const out = [], nav = h => () => { this.setState({ palette: null }); this.go(h); }, run = fn => () => { this.setState({ palette: null }); fn(); };
     [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['All chats', '#/chat/all', ICON.chat], ['Projects', '#/chat/projects', ICON.folder], ['Outputs', '#/outputs', ICON.folder], ['Services', '#/services', ICON.puzzle], ['Memory & learning', '#/s/agent/memory', ICON.bulb], ['Models', '#/models', ICON.layers], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
     if (this.state.vw >= 1024) { const n = this.state.nav || {}; out.push({ label: n.collapsed ? 'Expand the sidebar' : 'Collapse the sidebar', sub: 'Action', d: ICON.menu, run: run(() => this.setNav({ collapsed: false, services: 'list', hidden: [], folded: false, ...n, collapsed: !n.collapsed })) }); }  // plan 33
+    this.state.services.filter(sv => sv.main).forEach(sv => out.push({ label: sv.main.label, sub: 'Page', d: ICON[sv.icon] || ICON.puzzle, run: nav('#/' + sv.id) }));   // calendar 3.1
     this.state.services.forEach(sv => {
       const d = ICON[sv.icon] || ICON.puzzle;
       out.push({ label: sv.name, sub: `Service · ${sv.state}`, d, run: nav('#/s/' + sv.id) });
@@ -1866,7 +1887,8 @@ class Component extends DCLogic {
         showMock: !!this.api && (new URLSearchParams(location.search).has('mock') || !['system', 'services', 'models', 'outputs', 'memory', 'settings', 'metrics', 'tools', 'sessions'].every(a => this.api.isLive(a))) }) : null,
     };
     const running = s.jobs.filter(j => j.state === 'running' || j.state === 'queued');
-    const titles = { overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', settings: 'Settings', services: 'Services', service: this.svcMap[r.parts[1]]?.name || 'Service' };
+    const titles = { overview: 'Overview', chat: 'Chat', models: 'Models', outputs: 'Outputs', settings: 'Settings', services: 'Services', service: this.svcMap[r.parts[1]]?.name || 'Service',
+      ...Object.fromEntries(s.services.filter(x => x.main).map(x => [x.id, x.main.label])) };   // calendar 3.1: mods' main views
     const hd = {
       st: { position: 'sticky', top: 0, zIndex: 40, height: s.density === 'compact' ? 44 : 52, display: 'flex', alignItems: 'center', gap: 8, padding: '0 clamp(10px,2vw,20px)', background: 'var(--bg,#0B0E14)', borderBottom: '1px solid var(--bd,#1D2430)' },
       title: titles[r.page] || '', ...this.hdPlace(r), memText: m ? `${(m.used_bytes / GB).toFixed(1)} / ${(m.total_bytes / GB).toFixed(1)} GB` : '— GB',
@@ -2243,14 +2265,17 @@ class Component extends DCLogic {
     const dn = { td: { padding: compact ? '6px 10px' : '10px 12px', borderTop: '1px solid var(--bd,#1D2430)', verticalAlign: 'middle' }, th: { padding: compact ? '6px 10px' : '8px 12px', textAlign: 'left', fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--mut,#8A94A6)', whiteSpace: 'nowrap', background: 'var(--card,#11151D)' }, gap: compact ? 12 : 16 };
     const page = r.page, ready = s.ready;
     const pg = { overview: ready && page === 'overview', service: ready && page === 'service', models: ready && page === 'models', outputs: ready && page === 'outputs', settings: ready && page === 'settings', chat: ready && page === 'chat', services: ready && page === 'services',
-      unknown: ready && !['overview', 'service', 'models', 'outputs', 'settings', 'chat', 'services'].includes(page) };
+      main: false, unknown: false };
+    const mainSv = ready ? this.mainSvc(r) : null;   // calendar 3.1: a mod's page as a main view
+    pg.main = !!mainSv;
+    pg.unknown = ready && !mainSv && !['overview', 'service', 'models', 'outputs', 'settings', 'chat', 'services'].includes(page);
     const sv = pg.service ? this.vmService(s) : null;
     const showOutputs = pg.outputs || (pg.service && !!sv?.ok && r.parts[2] === 'outputs' && !!s.svc?.detail?.has_outputs);
     const { sb, hd } = this.vmShell(s, mob);
     const out = showOutputs || s.out.detail ? this.vmOutputs(s, dn, !pg.outputs) : null;
     const shell = {
       rootSt: { display: 'flex', minHeight: '100vh', background: 'var(--bg,#0B0E14)', color: 'var(--tx,#E6EAF2)', fontSize: compact ? 12.5 : 13, lineHeight: 1.5 },
-      mainSt: pg.chat ? { flex: 'none', width: '100%', minWidth: 0, height: `calc(100dvh - ${compact ? 44 : 52}px)`, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' } : { flex: 1, width: '100%', maxWidth: 1680, margin: '0 auto', padding: compact ? (s.vw < 600 ? '12px 12px 40px' : '14px 18px 40px') : 'clamp(14px,2.2vw,28px) clamp(12px,2.4vw,32px) 48px', display: 'flex', flexDirection: 'column', gap: compact ? 12 : 20, minWidth: 0 },
+      mainSt: pg.chat || pg.main ? { flex: 'none', width: '100%', minWidth: 0, height: `calc(100dvh - ${compact ? 44 : 52}px)`, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' } : { flex: 1, width: '100%', maxWidth: 1680, margin: '0 auto', padding: compact ? (s.vw < 600 ? '12px 12px 40px' : '14px 18px 40px') : 'clamp(14px,2.2vw,28px) clamp(12px,2.4vw,32px) 48px', display: 'flex', flexDirection: 'column', gap: compact ? 12 : 20, minWidth: 0 },
       h1St: { margin: 0, fontSize: compact ? 18 : 22, fontWeight: 600, letterSpacing: '-.01em' },
     };
     return {
@@ -2263,6 +2288,7 @@ class Component extends DCLogic {
       md: pg.models ? this.vmModels(s, dn) : null,
       se: pg.settings ? this.vmSettings(s) : null,
       chatEl: pg.chat && this.Chat ? React.createElement(this.Chat.ChatPage, { api: this.api, route: r, toast: (t, l) => this.toast(t, l), confirm: o => this.confirm(o), openOutput: (id, at) => this.loadOutputDetail(id, at), openSessions: () => this.openSessions(), go: hh => this.go(hh) }) : null,
+      ...this.vmMain(mainSv, r),
       svcsEl: pg.services && this.SvcsPage ? React.createElement(this.SvcsPage.ServicesPage, { services: s.services, nav: s.nav, setNav: this.setNav, start: id => this.start(id), stop: sv => this.stop(sv), h1St: shell.h1St }) : null,  // plan 33.4
       restoreEl: ready && this.Sess ? React.createElement(this.Sess.RestorePrompt, { api: this.api, onRestore: id => this.openSessions(id) }) : null,
       ...(ovl => ({ ...ovl, odrSt: out?.dr?.isDoc && !mob ? { ...ovl.drawerSt, width: 'min(1100px, 100vw)' } : ovl.drawerSt }))(this.vmOverlays(s, mob)),  // plan 24.7: room for a page and its text

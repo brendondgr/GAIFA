@@ -133,6 +133,9 @@ GAIFA/
 | Outputs | write into `{outputs}` (§4.7) | shows on the Outputs page automatically |
 | Models | `[models] dirs` | registry entries in those folders (or deeper, e.g. `comfyui/loras`) are listed as "used by" this mod, and their files can't be deleted while it holds them |
 | Custom page | `ui/page.js` or `ui/Page.dc.html` (UI brief §5) | own tabs inside the GAIFA shell |
+| Main view | `[ui] main = { label, after = "chat" }` with `[ui] page` (calendar 3.1): the page module's `main: { mount(el, ctx) }` at `#/<id>`, full height; the mod's id can't be a hub page | a sidebar item after Overview, Chat or Outputs, with its logo and badge, like the hub's own pages (the Calendar) |
+| Chat panel | `[ui] chat_panel = { module = "ui/panel.js", label }` (calendar 7.1): `export default { mount(el, ctx) }` | a side panel on the Chat page, opened from the Chat header |
+| Notifications | `POST /api/notify` (§6, calendar 2.1) | toasts with actions, an activity item, an unread badge on its sidebar item |
 | Chat module | `[ui] chat = "ui/chat.js"` (plan 44.1, [mods.md](mods.md)): `export default function setup(chat)` registers the mod's step words and cards; listed as `chat_url` | its own cards in Chat (a live card while its job runs, its result) |
 | Dashboard widgets | `[[ui.widgets]]` pointing at a route that returns `WidgetData` (UI brief §11.7) | its charts on the Overview dashboard |
 | Charts for free | numeric values in `stats` (§4.6) | each one is recorded as a series `svc.<id>.stat.<slug>` and drawn as sparklines and charts |
@@ -195,6 +198,8 @@ kinds = ["audio"]
 [ui]
 page = "ui/page.js"                 # optional custom page (or "ui/Page.dc.html")
 chat = "ui/chat.js"                 # optional chat module: its own cards in Chat (plan 44.1)
+main = { label = "Calendar", after = "chat" }   # optional (calendar 3.1): page.js's `main` as a main view at #/<id>
+chat_panel = { module = "ui/panel.js", label = "Calendar" }   # optional (calendar 7.1): a side panel in Chat
 native = "/ui/"                     # optional: the mod's own UI, linked from its page header
 logo = "ui/logo.svg"                # optional (plan 33.1): .svg, .png or .webp inside ui/; unset = ui/logo.svg if it exists
 

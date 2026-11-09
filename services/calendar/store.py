@@ -84,14 +84,27 @@ def _dump(k: str, v: Any) -> Any:
 
 
 class Store:
+    """One SQLite connection per thread (FastAPI runs sync routes in a pool: a shared connection gave empty
+    answers to parallel reads); `lock` keeps each write and its undo record whole."""
+
     def __init__(self, path: str) -> None:
-        self.db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
-        self.db.row_factory = sqlite3.Row
-        self.db.execute("PRAGMA journal_mode=WAL")
+        self.path = path
+        self._local = threading.local()
         self.lock = threading.RLock()
+        self.db.execute("PRAGMA journal_mode=WAL")
         self.db.executescript(SCHEMA)
         if not self.db.execute("SELECT 1 FROM calendars LIMIT 1").fetchone():
             self.add_calendar("Personal", PALETTE[0], is_default=True)
+
+    @property
+    def db(self) -> sqlite3.Connection:
+        c = getattr(self._local, "db", None)
+        if c is None:
+            c = sqlite3.connect(self.path, isolation_level=None, timeout=15)
+            c.row_factory = sqlite3.Row
+            c.execute("PRAGMA busy_timeout = 15000")
+            self._local.db = c
+        return c
 
     # ---- the revision ------------------------------------------------------------------------------------------
     @property

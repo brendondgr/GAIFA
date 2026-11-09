@@ -67,14 +67,18 @@ export function setAllHidden(nav, services, hide) {
 /** The agent page's tabs that the sidebar's Memory entry stands for (memory-auto-learning 4.2). */
 export const MEMORY_TABS = ['memory', 'review', 'learning'];
 
-/** The fixed items: Overview, Chat and Outputs on top; Memory (with the agent mod), Models and Settings at the bottom. */
+/** The fixed items: Overview, Chat and Outputs on top, each followed by the mods whose page is a main view there
+ *  (`main.after`, calendar 3.1: the Calendar after Chat, with the mod's logo and badge); Memory (with the agent mod),
+ *  Models and Settings at the bottom. */
 export function groups(route, services) {
   const r = route || { page: 'overview', parts: [] }, has = id => (services || []).some(s => s.id === id);
   const memory = r.page === 'service' && r.parts[1] === 'agent' && MEMORY_TABS.includes(r.parts[2]);
   const item = (key, label, href, icon, on) => ({ key, label, href, icon, on: !!on, hint: HINTS[key] });
+  const mains = after => (services || []).filter(s => s.main && s.main.after === after)
+    .map(s => ({ key: 'main:' + s.id, label: s.main.label, href: '#/' + s.id, icon: s.icon || 'puzzle', logo: s, on: r.page === s.id, hint: s.description || '', badge: s.badge || 0 }));
   return {
-    top: [item('overview', 'Overview', '#/overview', 'grid', r.page === 'overview'), item('chat', 'Chat', '#/chat', 'chat', r.page === 'chat'),
-      item('outputs', 'Outputs', '#/outputs', 'folder', r.page === 'outputs')],
+    top: [item('overview', 'Overview', '#/overview', 'grid', r.page === 'overview'), ...mains('overview'), item('chat', 'Chat', '#/chat', 'chat', r.page === 'chat'),
+      ...mains('chat'), item('outputs', 'Outputs', '#/outputs', 'folder', r.page === 'outputs'), ...mains('outputs')],
     bottom: [...(has('agent') ? [item('memory', 'Memory', '#/s/agent/memory', 'bulb', memory)] : []),
       item('models', 'Models', '#/models', 'layers', r.page === 'models'), item('settings', 'Settings', '#/settings', 'gear', r.page === 'settings')],
   };

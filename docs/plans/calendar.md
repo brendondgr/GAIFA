@@ -237,7 +237,7 @@ Assumed:
 
 ## Phase 3 — The Calendar in the main view (L)
 
-- [ ] **3.1 Main views declared by mods: `utils/manifest.py`, `utils/services/views.py`, `web/Hub.dc.html`, `web/nav/nav-model.js`.**
+- [x] **3.1 Main views declared by mods: `utils/manifest.py`, `utils/services/views.py`, `web/Hub.dc.html`, `web/nav/nav-model.js`.**
   - **The manifest:** `[ui] main = { label = "Calendar", after = "chat" }`, where `after` is one of `overview`, `chat`, `outputs`. The icon is the mod's `logo`. A mod id equal to a hub page (`overview`, `chat`, `outputs`, `models`, `settings`, `services`, `s`) is a manifest error.
   - **The views:** `main` goes into the service view (`main: {label, after}`), with `page_url`.
   - **The sidebar:** `groups()` puts each running or installed mod's main item after its `after` item, gated on the mod being present (like Memory with the agent). It has a badge (2.2). The tooltip is the mod's description.
@@ -249,7 +249,7 @@ Assumed:
   - the contract test is still green.
 
   Update architecture §4.2–4.3 and the brief §5.
-- [ ] **3.2 The page shell: `services/calendar/ui/page.js`, `ui/cal-shell.js` (new), `ui/cal-api.js` (new), `ui/cal-mock.js` (new).**
+- [x] **3.2 The page shell: `services/calendar/ui/page.js`, `ui/cal-shell.js` (new), `ui/cal-api.js` (new), `ui/cal-mock.js` (new).**
   - **The header:** Today, ‹ ›, the range's title ("November 2026", "Nov 9 – 15"), the view switch (Day · Week · Month · Agenda), search, and the quick-add box. Quick-add uses `GET /v1/parse` and shows what it read under the box before Enter. **New** has an Event / To-do choice.
   - **The left column (240 px):**
     - a mini month (click a day; the shown range shaded);
@@ -262,7 +262,7 @@ Assumed:
   - **Kept on the hub:** the view, the date and calendars on/off (`calendar.view`, `calendar.date`, `calendar.on`; `ctx` store). `?item=<occ>` opens that item.
   - **`cal-api.js`:** the mod's routes through `/api/s/calendar`. **`cal-mock.js`:** two calendars, a week of events (a repeating one, an all-day one, an overlap), to-dos and fired alerts, used on `?mock`.
   *Done when:* `services/calendar/tests/ui/shell.test.mjs` (run by `services/calendar/tests/test_ui_js.py` with `node --test`, skipped without node) covers the range title per view, the keys, quick-add's preview and the stored choices.
-- [ ] **3.3 Day and week: `ui/cal-grid.js` (new), `ui/cal-layout.js` (new).**
+- [x] **3.3 Day and week: `ui/cal-grid.js` (new), `ui/cal-layout.js` (new).**
   - **`layout(occs, day) -> [{occ, top, height, col, cols}]`:** overlapping events share the width in even columns, and a short event keeps a 20 px minimum height.
   - **The grid:**
     - hour rows of 48 px, the working hours shaded, scrolled to 07:00 or now;
@@ -271,7 +271,7 @@ Assumed:
     - to-dos with a time shown as a small chip at that time, with a tick.
   - **Drag:** drag on empty space to create (15-minute steps), drag an event to move, and drag its bottom edge to resize. A repeating event asks This / This and following / All on drop.
   *Done when:* `tests/ui/layout.test.mjs` covers overlaps (2, 3, a chain), the minimum height, events across midnight, the all-day row's overflow, and the 15-minute snapping of a drag.
-- [ ] **3.4 Month and agenda: `ui/cal-month.js` (new), `ui/cal-agenda.js` (new).**
+- [x] **3.4 Month and agenda: `ui/cal-month.js` (new), `ui/cal-agenda.js` (new).**
   - **Month:**
     - weeks starting on the setting's day;
     - each day lists up to 3 items (all-day and multi-day as bars across days), then "+N more" opening the day;
@@ -279,7 +279,7 @@ Assumed:
     - a click on empty space starts a new all-day item.
   - **Agenda:** 30 days from the date, grouped by day, with empty days left out and "Load more". Each row has the time, the calendar colour, the title, the location, the repeat glyph and the project chip.
   *Done when:* `tests/ui/month.test.mjs` covers the weeks of a month for each week start, multi-day bars across a week break, and "+N more"; `agenda.test.mjs` covers the grouping and Load more.
-- [ ] **3.5 The editor: `ui/cal-edit.js` (new), `ui/cal-repeat.js` (new).**
+- [x] **3.5 The editor: `ui/cal-edit.js` (new), `ui/cal-repeat.js` (new).**
   - **A popover** for a quick look: title, time, calendar, Edit, Delete, Done (to-dos). **A side sheet** for editing.
   - **The sheet's fields:**
     - Event / To-do;
@@ -291,7 +291,7 @@ Assumed:
     - to-dos: priority and estimate.
   - **Saving or deleting** a repeating item asks the scope. Deleting says "moved to the trash, kept 30 days". A toast offers Undo.
   *Done when:* `tests/ui/repeat.test.mjs` covers the picker's rule for each choice and its words back. `edit.test.mjs` covers the scope question and the fields for each kind.
-- [ ] **3.6 Import, export and the trash: `ui/cal-files.js` (new).**
+- [x] **3.6 Import, export and the trash: `ui/cal-files.js` (new).**
   - **Import:** an `.ics` dropped on the page, or **Import…**, shows the proposal sheet (Phase 4's component, built here first) with every item ticked except those "already here", the calendar to add them to, and Add N.
   - **Export:** a calendar's menu has **Export .ics**.
   - **Trash:** a list with Restore.
@@ -299,10 +299,12 @@ Assumed:
 
   Write the brief §11.15 (the Calendar page) and add `web/PATCHES.md` rows for the hub parts.
 
+  *As built (3.1–3.6):* the main-view tests are `utils/tests/services/test_ui_main.py` (with 7.1's `chat_panel` field, which landed here) and `nav.test.mjs`; the page's node tests are `services/calendar/tests/ui/` (dates, layout, month, repeat, edit with the proposal ticks, keys and the preview, the mock), run by `tests/test_ui_js.py`. The proposal list is `cal-files.js`'s, shared by import, day plans and (4.4) the chat card. The left column is a drawer when the page itself is under 880 px (a container query, not the window). Found in the browser: the store's one SQLite connection gave parallel reads empty answers (one connection per thread now, `test_parallel_reads_from_threads`); the shell's host had to be a one-row grid for the page to scroll inside.
+
 **Wire — Phase 3:** the sidebar's Calendar entry under Chat, and `#/calendar` against the live mod.
 
 **Checks & deliverables — Phase 3**
-- [ ] In the browser on the second hub (live and `?mock`):
+- [x] In the browser on the second hub (live and `?mock`):
   - each view draws, even and aligned, in light and dark;
   - a drag creates, moves and resizes;
   - a repeating event's "this one" edit shows only on that day;
@@ -310,7 +312,8 @@ Assumed:
   - the item from a toast's Open opens;
   - no console errors.
   - Screenshots go in `docs/reference/calendar-2026-11/`.
-- [ ] Delivered: the hub's `main` view, `services/calendar/ui/` (`page.js`, `cal-*.js`), and tests.
+  *As built (2026-11-09, port 7079):* week, month and agenda drew aligned in the dark theme (the hub's tokens), with the now-line and the grid opening near now; a click opened the popover and Edit the sheet; a rename with Weekly saved as `FREQ=WEEKLY;BYDAY=TU` with an Undo snackbar; quick add read "Dinner with Ana fri 7pm for 2 hours" with its preview and added it; at phone width the column folds away with no sideways scroll. Not done here: screenshots in `docs/reference/` (the browser pane's screenshots aren't files), drags (checked in the layout tests), `?mock` (the mock's services list has no calendar; `cal-mock.js` is tested in node).
+- [x] Delivered: the hub's `main` view, `services/calendar/ui/` (`page.js`, `cal-*.js`), and tests.
 
 ## Phase 4 — The agent's tools and approvals (L)
 

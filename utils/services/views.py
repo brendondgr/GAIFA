@@ -43,6 +43,8 @@ def summary(mgr: ServiceManager, svc: Service) -> dict[str, Any]:
         "logo_url": logo_url(svc),
         "chat_url": chat_url(svc),
         "badge": mgr.badges.get(svc.id) or None,
+        "main": m.ui.main.model_dump() if m and m.ui.main and has_page(svc) else None,
+        "chat_panel": chat_panel(svc),
         "has_outputs": bool(m and m.outputs),
         "native_ui": native,
         "enabled": svc.eff.enabled,
@@ -99,6 +101,15 @@ def chat_url(svc: Service) -> str | None:
     if not (m and m.ui.chat and (svc.mod.dir / m.ui.chat).is_file()):
         return None
     return f"/ui/services/{svc.id}/{m.ui.chat.removeprefix('ui/')}"
+
+
+def chat_panel(svc: Service) -> dict[str, str] | None:
+    """The mod's side panel in Chat (calendar 7.1): `{label, url}`; null without one (or a missing file)."""
+    m = svc.m
+    p = m.ui.chat_panel if m else None
+    if not (p and (svc.mod.dir / p.module).is_file()):
+        return None
+    return {"label": p.label, "url": f"/ui/services/{svc.id}/{p.module.removeprefix('ui/')}"}
 
 
 def logo_url(svc: Service) -> str | None:

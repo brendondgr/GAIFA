@@ -71,3 +71,13 @@ def test_undo_create_patch_trash(store):
     store.undo(u1)
     with pytest.raises(NotFound):
         store.get(a["id"], trashed=True)
+
+
+def test_parallel_reads_from_threads(tmp_path):
+    """Sync routes run in a thread pool: reads at once from many threads all see the rows."""
+    from concurrent.futures import ThreadPoolExecutor
+    st = Store(str(tmp_path / "p.db"))
+    st.add_calendar("Work")
+    with ThreadPoolExecutor(16) as ex:
+        counts = list(ex.map(lambda _: len(st.calendars()), range(400)))
+    assert set(counts) == {2}

@@ -356,7 +356,7 @@ async def test_every_change_is_published_with_a_full_summary(rig):
     ev = [e for e in rig.events if e["type"] == "service"][-1]["service"]
     expected = {
         "id", "name", "description", "icon", "version", "kind", "port", "url", "state", "state_since", "load", "idle_s",
-        "busy", "memory", "stats", "has_page", "page_url", "logo_url", "chat_url", "badge", "has_outputs", "native_ui", "enabled", "autostart", "last_error", "manifest_errors",
+        "busy", "memory", "stats", "has_page", "page_url", "logo_url", "chat_url", "badge", "main", "chat_panel", "has_outputs", "native_ui", "enabled", "autostart", "last_error", "manifest_errors",
         "accel", "unavailable",
     }
     assert set(ev) == expected

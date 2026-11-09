@@ -37,7 +37,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - **Routes** (a new router in `api_workflows.py`, mounted in `server.py`): `GET /v1/threads/{tid}/tree`; `DELETE /v1/threads/{tid}` and archive cascade to children.
   *Done when:* `services/agent/tests/test_workflow_store.py` covers the marker vs a fork, the tree, the list filters and the cascades.
 
-- [ ] **1.2 The runner: `services/agent/agent/workflows/runner.py`, `workflows/settings.py`.**
+- [x] **1.2 The runner: `services/agent/agent/workflows/runner.py`, `workflows/settings.py`.**
   - `Workflows(agent)`, made in the lifespan next to the task runner, hooked to `agent.on_turn_end`. `spawn(parent, prompt, label, model=None, write=False, background=False) -> child_id`: refuses past `max_depth`, `max_children` or a second live writer (`409 workflow_limit` with the reason); makes the child with `child_settings(parent, …)`; queues it, launches while under `parallel_local` / `parallel_remote` (local or remote from the relay's model facts), drains on each end.
   - `child_settings`: the parent's model, mode, project, environments, `mcp_on`, skills and `unattended`; `no_learn`; `spawn`; `max_steps = child_max_steps`. Per-thread `max_steps` replaces the loop's constant (a one-line change in `loop.py`).
   - **Budgets:** tokens counted from the workflow's `usage` events; past `workflow_tokens` its running children are stopped with a note.

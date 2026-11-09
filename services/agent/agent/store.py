@@ -165,6 +165,12 @@ class Store:
         """Every sub-agent of the workflow whose root chat is `root`, oldest first."""
         return [self._thread(r) for r in self._all(f"SELECT * FROM threads WHERE {SPAWN_ROOT} = ? ORDER BY created", (root,))]  # type: ignore[misc]
 
+    def spawned(self, states: tuple[str, ...]) -> list[dict[str, Any]]:
+        """Sub-agents in these states, in every workflow, oldest first (the runner's queue)."""
+        marks = ", ".join("?" * len(states))
+        return [self._thread(r) for r in self._all(f"SELECT * FROM threads WHERE json_extract(settings, '$.spawn') IS NOT NULL "  # type: ignore[misc]
+                                                    f"AND state IN ({marks}) ORDER BY created", states)]
+
     def root_of(self, tid: str) -> str:
         """The workflow's root chat: a sub-agent's `spawn.root`, else the chat itself."""
         t = self.thread(tid)

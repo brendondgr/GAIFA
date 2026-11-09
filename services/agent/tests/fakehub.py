@@ -124,6 +124,7 @@ class FakeHub:
         self.synonyms: list[tuple[str, str]] = []        # (query word, text word) pairs the fake treats as close in meaning
         self.judge_up = True                             # scheduled-tasks 2.2: GET /api/judge/status
         self.grant_fail: set[str] = set()                # tools POST /api/grants refuses (unknown_tool)
+        self.settings_extra: dict[str, Any] = {}         # more of GET /api/settings (agent-workflows: `workflows`)
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -611,7 +612,8 @@ class FakeHub:
 
         @app.get("/api/settings")
         def settings() -> dict:
-            return {"learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60}}
+            return {"learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
+                    **self.settings_extra}
 
         @app.get("/api/skills")
         def skills() -> list:

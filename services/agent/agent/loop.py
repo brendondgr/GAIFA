@@ -109,6 +109,8 @@ class Agent(Compaction, Queueing, Prompting):
         self.tasks: dict[str, asyncio.Task[Any]] = {}
         self.local = Local(self)
         self.on_turn_end: list[Callable[[str], Awaitable[None]]] = []
+        self.on_cancel: list[Callable[[str], Awaitable[None]]] = []   # after the user stops a chat (agent-workflows 1.2)
+        self.workflows: Any = None                # workflows/runner.Workflows, made in the app's lifespan
         self._deciding: set[str] = set()
         self._recalls: dict[str, set[asyncio.Task[Any]]] = {}   # chat-responsive 1.1: recall runs after the user event
         self._read_upto: dict[str, int] = {}     # the last seq the turn's latest model call read
@@ -345,6 +347,11 @@ class Agent(Compaction, Queueing, Prompting):
             await self._dismiss_pending(tid, "Cancelled by the user.")
             self.set_state(tid, "idle", "cancelled")
             self._queue_after(tid, "idle")      # Stop sends what was held (chat-responsive 2.1)
+        for cb in self.on_cancel:              # its sub-agents stop too, after it (agent-workflows 1.2)
+            try:
+                await cb(tid)
+            except Exception:  # noqa: BLE001
+                log.exception("cancel hook")
 
     async def resume_all(self) -> int:
         """At startup: threads a crash left `running` continue."""
@@ -385,6 +392,7 @@ class Agent(Compaction, Queueing, Prompting):
         await self._cloud_notice(tid, model)
         tools = ToolSet(self.hub, thread.get("settings") or {}, await self.all_tools(model))
         steps = 0
+        max_steps = int((thread.get("settings") or {}).get("max_steps") or self.cfg.max_steps)   # a sub-agent's own (agent-workflows 1.2)
         final, cancelled = "idle", False
         try:
             await tools.refresh()
@@ -395,8 +403,8 @@ class Agent(Compaction, Queueing, Prompting):
                     return
                 if pending == "action":
                     return
-                if steps >= self.cfg.max_steps:
-                    self.emit(tid, "assistant", {"text": f"I stopped at the step limit ({self.cfg.max_steps} steps) before "
+                if steps >= max_steps:
+                    self.emit(tid, "assistant", {"text": f"I stopped at the step limit ({max_steps} steps) before "
                                                           "finishing. Tell me to continue if you want me to go on.", "step": new_id("s_")})
                     self.emit(tid, "note", {"text": "step limit reached", "level": "warn"})
                     return

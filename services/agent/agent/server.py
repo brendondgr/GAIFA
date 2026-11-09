@@ -299,6 +299,9 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         agent.runner = Runner(agent)                                                         # scheduled-tasks 2.2–2.3
         app.state.task_schedule = TaskSchedule(agent, agent.runner)
         task_scheduler = asyncio.create_task(app.state.task_schedule.run_forever(stop))
+        from .workflows.runner import Workflows
+        agent.workflows = Workflows(agent, getattr(app.state, "workflow_limits", None))       # agent-workflows 1.2
+        workflows = asyncio.create_task(agent.workflows.run_forever(stop))
         await agent.resume_all()
         try:
             yield
@@ -315,8 +318,9 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             indexer.cancel()
             mem_learner.cancel()
             task_scheduler.cancel()
+            workflows.cancel()
             await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, summarizer, indexer, mem_learner,
-                                 task_scheduler, return_exceptions=True)
+                                 task_scheduler, workflows, return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()

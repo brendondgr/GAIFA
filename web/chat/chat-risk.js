@@ -38,6 +38,7 @@ export const ACTION_WORD = { read: 'reads', edit: 'edits a file', delete: 'delet
 /** What a grant covers, in words: "on github.com", "in ~/Projects/foo", "every search"; null: every call. */
 export function grantText(kind, key) {
   if (!kind || key == null) return null;
+  if (kind === 'url:any') return 'on every site';    // web-approvals 2.1: "Allow every site in this chat"
   if (kind === 'url:host') return `on ${key}`;
   if (kind.startsWith('arg:')) { const n = kind.slice(4); return /folder|dir|path|repo|workspace/.test(n) ? `in ${key}` : `${n} ${key}`; }
   if (kind.startsWith('const:')) return `every ${key} call`;
@@ -48,9 +49,11 @@ export function grantText(kind, key) {
  * The buttons of an approval card. `thread`: the call came from a chat ("Allow in this chat" needs
  * one). Each is {remember, label, confirm?}; `confirm` asks a second time before deciding. `folder`: the
  * preflight's `ask_folder` (plan 34): Allow for this chat · Add to “<environment>” (the caller adds it there,
- * then allows the call once: chat-env.js decideFolder).
+ * then allows the call once: chat-env.js decideFolder). `grantKey`: the tool's; a web tool (`url:host`) in a chat
+ * also offers "Allow every site in this chat" (`remember: "sites"`, plan web-approvals 2.2).
  */
-export function approvalButtons(risk, { thread = false, once = false, folder = null } = {}) {
+export const SITES_HINT = 'Open any web page in this chat without asking. Links with passwords, long encoded values or private addresses still ask.';
+export function approvalButtons(risk, { thread = false, once = false, folder = null, grantKey = null } = {}) {
   if (folder) {                  // plan 34: a folder outside the chat's environment: this chat, or the environment
     const env = folder.environment;
     return [...(thread ? [{ remember: 'thread', label: 'Allow for this chat', primary: true }] : [{ remember: 'once', label: 'Allow once', primary: true }]),
@@ -59,6 +62,7 @@ export function approvalButtons(risk, { thread = false, once = false, folder = n
   const out = [{ remember: 'once', label: 'Allow once', primary: true }];
   if (once) return out;          // host runs, commits, git remotes ask every time (plan 27.4)
   if (thread) out.push({ remember: 'thread', label: 'Allow in this chat' });
+  if (thread && grantKey === 'url:host') out.push({ remember: 'sites', label: 'Allow every site in this chat' });
   out.push({ remember: 'always', label: 'Always allow', ...(CONFIRM_RISKS.includes(risk) ? { confirm: true } : {}) });
   return out;
 }
@@ -71,7 +75,8 @@ export function confirmText(tool, risk, cover) {
 
 /** The decided card's words for how it was allowed. */
 export function rememberText(remember) {
-  return remember === 'thread' ? 'Allowed in this chat' : remember === 'always' ? 'Always allowed' : remember === 'environment' ? 'Added to the environment' : null;
+  return remember === 'thread' ? 'Allowed in this chat' : remember === 'always' ? 'Always allowed' : remember === 'environment' ? 'Added to the environment'
+    : remember === 'sites' ? 'Every site allowed in this chat' : null;
 }
 
 /** The arguments shown whole, monospaced and editable in a text box: an `execute` tool's code or

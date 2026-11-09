@@ -116,3 +116,19 @@ test('the popover says how many memories wait for review (memory-auto-learning 4
   assert.equal(memoriesText(1), '1 memory waits for your review');
   assert.equal(memoriesText(12), '12 memories wait for your review');
 });
+
+test('web-approvals 2.2: a web page card in a chat offers "Allow every site in this chat"', async () => {
+  const got = [];
+  const inChat = risk.approvalButtons('network', { thread: true, grantKey: 'url:host' });
+  assert.deepEqual(inChat.map(b => b.remember), ['once', 'thread', 'sites', 'always']);
+  assert.deepEqual(risk.approvalButtons('network', { grantKey: 'url:host' }).map(b => b.remember), ['once', 'always']);   // no chat: no sites
+  assert.deepEqual(risk.approvalButtons('execute', { thread: true, grantKey: 'arg:folder' }).map(b => b.remember), ['once', 'thread', 'always']);
+  const t = card(specOf('network'), { choices: inChat, onRun: async (args, o) => got.push(o) });
+  assert.deepEqual(buttons(t), ['Allow once', 'Allow in this chat', 'Allow every site in this chat', 'Always allow', 'Deny']);
+  const btn = all(t, n => n.type === 'button' && text(n).trim() === 'Allow every site in this chat')[0];
+  assert.equal(btn.props.title, risk.SITES_HINT);
+  await btn.props.onClick();
+  assert.deepEqual(got, [{ remember: 'sites' }]);
+  assert.equal(risk.rememberText('sites'), 'Every site allowed in this chat');
+  assert.equal(risk.grantText('url:any', '*'), 'on every site');                 // Settings → Permissions → Grants
+});

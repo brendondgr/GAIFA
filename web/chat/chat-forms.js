@@ -5,7 +5,7 @@
 
 import { h, T, MONO, Icon, Btn, Badge, cardSt, label11, shortArgs, toolLabel, inputSt } from './chat-ui.js';
 import { registerCard, ErrorBox, ProgressBar, STATUS } from './chat-cards.js';
-import { RISK_TONE, RISK_WORD, ACTION_WORD, grantKeyOf, grantText, limitsCover, codeFields, confirmText, rememberText, approvalButtons } from './chat-risk.js';
+import { RISK_TONE, RISK_WORD, ACTION_WORD, grantKeyOf, grantText, limitsCover, codeFields, confirmText, rememberText, approvalButtons, SITES_HINT } from './chat-risk.js';
 import { schemaForm } from '../mod-form.js';
 import { labelOf } from '../mod-options.js';
 import { createUi } from '../mod-ui.js';
@@ -116,7 +116,7 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
         h('span', { style: { color: ran ? T.gr : T.mut, display: 'flex', alignSelf: 'center' } }, h(Icon, { d: ran ? 'check' : 'x', size: 13, sw: 2.2 })),
         ran ? h('span', { style: { minWidth: 0, overflowWrap: 'anywhere' } }, 'Ran with ', h('span', { style: { fontFamily: MONO, fontSize: 11.5, color: T.mut } }, shortArgs(decided.arguments || args, 400) || 'the defaults'))
           : h('span', null, 'Cancelled', decided.reason ? ` · ${decided.reason}` : '')),
-      ran && rememberText(decided.remember) ? h('div', { style: { fontSize: 11.5, color: T.mut } }, rememberText(decided.remember) + (cover ? ' ' + cover : '') + ': calls like this run without asking (Settings → Agent to revoke)') : null,
+      ran && rememberText(decided.remember) ? h('div', { style: { fontSize: 11.5, color: T.mut } }, rememberText(decided.remember) + (cover && decided.remember !== 'sites' ? ' ' + cover : '') + (decided.remember === 'sites' ? ': web pages open without asking' : ': calls like this run without asking') + ' (Settings → Agent to revoke)') : null,
       after || null);
   }
 
@@ -173,6 +173,7 @@ export function ParamCard({ spec, outputs, api, mods, decided, onRun, onCancel, 
 function choiceTitle(c, cover, ask) {
   if (ask) return c.remember === 'environment' ? `Add ${ask.path} to the environment ${ask.environment?.name || ''} at Read: every chat in it can read it`
     : c.remember === 'thread' ? `Let this chat read ${ask.path} (Read); other chats still ask` : 'Read it for this call only';
+  if (c.remember === 'sites') return SITES_HINT;
   return c.remember === 'once' ? 'Run this call' : `Also run calls like this ${cover || ''} without asking${c.remember === 'thread' ? ', in this chat' : ', everywhere'}`;
 }
 
@@ -235,7 +236,7 @@ function ApprovalCard({ item, ctx }) {
     ctx.cancel ? h(Btn, { sm: true, icon: 'stop', label: 'Stop', onClick: ctx.cancel }) : null)
     : r?.error && d?.approve ? h(ErrorBox, { error: r.error }) : r && d?.approve && r.status !== 'done' ? h(Badge, { tone: (STATUS[r.status] || ['dim'])[0] }, (STATUS[r.status] || [0, r.status])[1]) : null;
   return h(ParamCard, { spec: a, outputs: ctx.outputs, api: ctx.api, mods: ctx.mods, decided, after, cancelLabel: 'Deny',
-    choices: approvalButtons(a.risk, { thread: true, once: !!a.limits?.once, folder: a.limits?.ask_folder }),
+    choices: approvalButtons(a.risk, { thread: true, once: !!a.limits?.once, folder: a.limits?.ask_folder, grantKey: a.grant_key }),
     onRun: (args, c) => ctx.decide(a, true, args, c), onCancel: reason => ctx.decide(a, false, null, { reason }) });
 }
 

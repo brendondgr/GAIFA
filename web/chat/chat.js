@@ -1,6 +1,6 @@
 // The Chat page (plan 14.1, Wire — Phase 14): thread list, thread view and composer for the agent
-// mod. A plain ES module on the page's React; Hub.dc.html mounts `ChatPage` for #/chat and
-// #/chat/<thread id>. Written by us (web/PATCHES.md). The page keeps the list and what every chat shares;
+// mod. A plain ES module on the page's React; Hub.dc.html mounts `ChatPage` for #/chat,
+// #/chat/<thread id> and #/chat/all (every chat, chat-all.js; thread ids start with t_, so they never clash). Written by us (web/PATCHES.md). The page keeps the list and what every chat shares;
 // each open chat is a `ChatPane` (chat-pane.js, chat-split plan 1.2).
 //
 // Extending the chat (the modularity contract, brief §11.13): import from this file
@@ -22,6 +22,7 @@ import { ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, Item, LIST_CSS } from './chat-list.js';
 import { DateSections } from './chat-dates.js';
+import { AllChats } from './chat-all.js';
 import { GroupedChats, readView, saveView, viewOfUi, loadEnvs, archivedParam, groupOf, showAllOf } from './chat-groups.js';
 import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
@@ -76,7 +77,7 @@ const DOWN = new Set(['service_not_running', 'service_not_found', 'service_faile
 
 export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, openSessions, go = x => { location.hash = x; } }) {
   const React = R(), { useState, useEffect, useRef, useMemo } = React;
-  const c = getChatClient(api), tid = route?.parts?.[1] || null;
+  const c = getChatClient(api), allPage = route?.parts?.[1] === 'all', tid = allPage ? null : route?.parts?.[1] || null;   // chat-history 3.1
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
   const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [total, setTotal] = useState(null);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
@@ -90,13 +91,15 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [layout, setLayout] = useState(() => withRoute(loadLayout() || single(tid), tid));
   const lref = useRef(layout); lref.current = layout;
   useEffect(() => { saveLayout(layout); }, [layout]);
-  const mounted = useRef(false);
+  const mounted = useRef(false), wasAll = useRef(allPage);
   useEffect(() => {      // a link, the list or Back: that chat in view (#/chat: the active pane becomes a new chat)
+    const back = wasAll.current; wasAll.current = allPage;
     if (!mounted.current) { mounted.current = true; return; }
+    if (allPage || (back && !tid)) return;   // Show all, and back from it: the panes stay as they were
     setLayout(L => (tid ? withRoute(L, tid) : setTid(L, activePane(L).id, null)));
-  }, [tid]);
+  }, [tid, allPage]);
   const act = activePane(layout);
-  useEffect(() => { if ((act.tid || null) !== tid) go(act.tid ? '#/chat/' + act.tid : '#/chat'); }, [act.id, act.tid]);
+  useEffect(() => { if (!allPage && (act.tid || null) !== tid) go(act.tid ? '#/chat/' + act.tid : '#/chat'); }, [act.id, act.tid]);   // not on allPage: leaving Show all is the route's
   const bus = useRef(null); if (!bus.current) bus.current = new EventTarget();
   const setListView = v => saveView(v);
   const relist = () => setListKey(n => n + 1);
@@ -194,6 +197,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     narrow && drawer ? h(React.Fragment, null,
       h('div', { onClick: () => setDrawer(false), 'aria-hidden': true, style: { position: 'absolute', inset: 0, zIndex: 40, background: T.ov } }),
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
+    allPage ? h(AllChats, { c, view: listView, onView: setListView, envs, q0: route?.params?.q || '', reloadKey: listKey, bus: bus.current, itemProps,
+      actions: { rename, archive, remove }, onError: fail, onMenu: narrow ? () => setDrawer(true) : null,
+      onBack: () => go(act.tid ? '#/chat/' + act.tid : '#/chat') }) :
     h(SplitView, { layout, setLayout, narrow, maxPanes: c.live && !c.sharedStream ? MAX_PANES : Infinity, onRefuse: m => toast(m, 'error'),
       titleOf: id => threads.find(t => t.id === id)?.title || null,
       renderPane: (p, { active, tools, grip }) => h(ChatPane, { shared: sh, tid: p.tid, paneId: p.id, cmd, grip, paneTools: tools,

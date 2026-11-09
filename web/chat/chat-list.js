@@ -19,8 +19,9 @@ export function rowLook(t) {
     archiveLabel: t.archived ? 'Unarchive' : 'Archive' };
 }
 
-/** One chat. `moveTo`: the other environments it can move to (plan 41.2). */
-export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], onMove }) {
+/** One chat. `moveTo`: the other environments it can move to (plan 41.2); `aside`: what goes after the name (the Show
+ * all page's environment and date, chat-history 3.1; nothing in the sidebar). */
+export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], onMove, aside = null }) {
   const React = R(), [menu, setMenu] = React.useState(false), [edit, setEdit] = React.useState(null), [moving, setMoving] = React.useState(false);
   const act = { r: () => { setMenu(false); setEdit(t.title || ''); }, m: onMove && moveTo.length ? () => setMoving(true) : null,
     a: () => { setMenu(false); onArchive(); }, d: () => { setMenu(false); onDelete(); } };
@@ -43,7 +44,7 @@ export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo 
       style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 4px 0 10px', color: active ? T.tx : T.mut, fontWeight: active ? 500 : 400, textDecoration: 'none', opacity: look.archived ? 0.6 : 1 } },
       dot ? h('span', { 'aria-label': look.state, style: { width: 6, height: 6, borderRadius: 99, background: dot, flex: 'none', animation: look.state === 'running' ? 'aichatpulse 1.2s ease-in-out infinite' : 'none' } }) : null,
       look.archived ? h('span', { 'aria-label': 'Archived', style: { display: 'flex', flex: 'none', color: T.dim } }, h(Icon, { d: 'archive', size: 12 })) : null,
-      h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, look.title)),
+      h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, look.title), aside),
     // a slot at the right edge, empty until hover or focus, or while the menu is open; always on touch screens (LIST_CSS)
     h('span', { className: 'aichat-slot', style: { position: 'relative', flex: 'none', width: 24, height: 24, marginRight: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' } },
       h('button', { type: 'button', className: 'aichat-more', 'aria-label': `More for ${t.title || 'chat'}`, 'aria-haspopup': 'menu', 'aria-expanded': menu ? 'true' : 'false', onClick: () => setMenu(!menu),

@@ -118,7 +118,7 @@ export function MoreBar({ n, onClick, label = 'Show more' }) {
 }
 
 // ---------- the View menu ----------
-function Choice({ label, value, options, onPick }) {
+export function Choice({ label, value, options, onPick }) {
   return h('div', { role: 'radiogroup', 'aria-label': label, style: { display: 'flex', flexDirection: 'column', gap: 4 } },
     h('span', { style: label11 }, label),
     h('div', { style: { display: 'flex', gap: 4, flexWrap: 'wrap' } },

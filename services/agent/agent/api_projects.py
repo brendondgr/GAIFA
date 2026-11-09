@@ -10,6 +10,10 @@
     POST   /v1/projects/{pid}/folders           {path, level?}: the first one makes the hidden environment
     PATCH  /v1/projects/{pid}/folders/{fid}     {level}
     DELETE /v1/projects/{pid}/folders/{fid}
+    POST   /v1/projects/{pid}/sources           {kind: "file", output_id} or {kind: "page", url, max_age_s?} (plan 3.1)
+    PATCH  /v1/projects/{pid}/sources/{sid}     {title?, max_age_s?, position?}
+    DELETE /v1/projects/{pid}/sources/{sid}     the output itself stays
+    POST   /v1/projects/{pid}/sources/{sid}/refresh   fetch a page again now
 
 A chat joins a project through `POST /v1/threads` or `PATCH /v1/threads/{id}` with `settings.project` (`new_chat` and
 `move_chat`, which server.py calls). Every change is published as `{type: "project", id, project}` (project None once
@@ -28,6 +32,7 @@ from pydantic import BaseModel, Field
 
 from .hubapi import HubCallError
 from .projects import folders as own_folders
+from .projects import sources as srcs
 from .projects.store import DESCRIPTION_MAX, INSTRUCTIONS_MAX, NAME_MAX, ProjectError
 
 log = logging.getLogger("agent.projects")
@@ -58,6 +63,20 @@ class FolderIn(BaseModel):
 
 class FolderPatch(BaseModel):
     level: Literal["read", "edit", "run", "run_net"]
+
+
+class SourceIn(BaseModel):
+    kind: Literal["file", "page"]
+    output_id: str | None = Field(None, max_length=200, description="file: an output already in GAIFA")
+    url: str | None = Field(None, max_length=2048, description="page: an http(s) URL")
+    max_age_s: int | None = Field(3600, ge=60, le=30 * 86400, description="page: fetched again when a question needs it "
+                                                                         "and its copy is older than this; null: never")
+
+
+class SourcePatch(BaseModel):
+    title: str | None = Field(None, max_length=300)
+    max_age_s: int | None = Field(None, ge=60, le=30 * 86400, description="null: never fetched again on its own")
+    position: int | None = Field(None, ge=0, le=1000)
 
 
 class ProjectPatch(BaseModel):
@@ -269,3 +288,73 @@ def add_routes(app: FastAPI) -> None:
             raise hub_error(e) from None
         publish(agent, pid, agent.projects.get(pid))
         return out
+
+    # ---- files and pages (plan projects 3.1) ------------------------------------------------------
+
+    def source_or_404(agent: Any, pid: str, sid: str) -> dict[str, Any]:
+        project_or_404(agent, pid)
+        src = agent.projects.source(sid)
+        if src is None or src["project_id"] != pid:
+            raise HTTPException(404, {"code": "unknown_source", "detail": f"no source {sid!r} in this project"})
+        return src
+
+    @app.post("/v1/projects/{pid}/sources", status_code=201, summary="Add a file (an output) or a web page (fetched in the "
+              "background: project_source events say how it went)")
+    async def add_source(pid: str, body: SourceIn, request: Request) -> Any:
+        agent = A(request)
+        project_or_404(agent, pid)
+        try:
+            if body.kind == "file":
+                if not body.output_id:
+                    raise ProjectError("bad_source", "a file source needs output_id")
+                src = await srcs.add_file(agent, pid, body.output_id)
+            else:
+                if not body.url:
+                    raise ProjectError("bad_source", "a page source needs url")
+                src = await srcs.add_page(agent, pid, body.url, body.max_age_s)
+        except ProjectError as e:
+            return refused(e)
+        except HubCallError as e:
+            raise hub_error(e) from None
+        publish(agent, pid, agent.projects.get(pid))
+        return src
+
+    @app.patch("/v1/projects/{pid}/sources/{sid}", summary="Rename a source, change a page's freshness (null: never "
+               "fetched again on its own) or move it")
+    async def patch_source(pid: str, sid: str, body: SourcePatch, request: Request) -> dict:
+        agent = A(request)
+        source_or_404(agent, pid, sid)
+        fields = body.model_dump(exclude_unset=True)
+        pos = fields.pop("position", None)
+        if fields:
+            agent.projects.update_source(sid, **fields)
+        if pos is not None:
+            order = [s["id"] for s in agent.projects.sources(pid) if s["id"] != sid]
+            order.insert(min(pos, len(order)), sid)
+            agent.projects.reorder(pid, order)
+        src = agent.projects.source(sid)
+        srcs.publish(agent, pid, src)
+        return src
+
+    @app.delete("/v1/projects/{pid}/sources/{sid}", summary="Take a file or page out of the project (the output stays)")
+    async def remove_source(pid: str, sid: str, request: Request) -> dict:
+        agent = A(request)
+        src = source_or_404(agent, pid, sid)
+        agent.projects.remove_source(sid)
+        forget = getattr(agent, "project_forget", None)
+        if forget is not None:
+            try:
+                await forget(pid, src)                                    # its chunks in the collection (3.2)
+            except Exception as e:  # noqa: BLE001: the embed mod may be off; its chunks go with the next reindex
+                log.info("forgetting %s's chunks: %s", sid, e)
+        srcs.publish(agent, pid, None, removed=sid)
+        publish(agent, pid, agent.projects.get(pid))
+        return {"removed": sid}
+
+    @app.post("/v1/projects/{pid}/sources/{sid}/refresh", summary="Fetch a page again now (its last copy stays if it fails)")
+    async def refresh_source(pid: str, sid: str, request: Request) -> Any:
+        agent = A(request)
+        src = source_or_404(agent, pid, sid)
+        if src["kind"] != "page":
+            return refused(ProjectError("not_a_page", "only pages are fetched again"))
+        return await srcs.fetch(agent, sid)

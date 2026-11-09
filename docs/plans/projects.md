@@ -119,11 +119,11 @@ Assumed:
 
 **Checks & deliverables — Phase 2**
 - [ ] On a second hub with the real workspace mod, a project with two environments and one folder of its own: a project chat lists all three folders, edits a file in an Edit folder, and is refused an edit in a Read one.
-- [ ] Delivered: the changed `folders.py`, `environments.py`, `api_env.py`, `projects/origin.py`, the agent's origin call sites, and tests.
+- [x] Delivered: the changed `folders.py`, `environments.py`, `api_env.py`, `projects/origin.py`, the agent's origin call sites, and tests.
 
 ## Phase 3 — Knowledge: files and pages (L)
 
-- [ ] **3.1 Sources and their text: `services/agent/agent/projects/sources.py` (new), `api_projects.py`.**
+- [x] **3.1 Sources and their text: `services/agent/agent/projects/sources.py` (new), `api_projects.py`.**
   - **Routes:**
     - `POST /v1/projects/{pid}/sources {kind:'file', output_id}` or `{kind:'page', url, max_age_s?}`;
     - `PATCH …/sources/{sid}` (title, `max_age_s`, position);
@@ -133,6 +133,7 @@ Assumed:
   - **Text:** a file's or page's text is read through the hub's output text routes (`/api/outputs/{id}/text`, the same reader `hub_read_document` uses), in windows of `docs.MAX_FETCH`.
   - **Events:** `project_source` events show the fetching, ok and error states live.
   *Done when:* `services/agent/tests/test_project_sources.py` covers adding a file and a page (hub and web faked), a fetch error keeping the last copy, a refresh replacing the output, and the events.
+  *As built:* adding a page answers at once with `status: fetching` and fetches in the background; `refresh` waits for its fetch and answers the source. A file must be a text or document output (`422 not_text` otherwise). The text is kept in memory per output id (64 outputs), since an output's text never changes.
 - [ ] **3.2 The project's collection: `services/agent/agent/projects/index.py` (new).**
   - **Indexing:** `chunks(text) -> [{n, text, page?, line}]` (about 3 000 characters with 300 of overlap). `index_source(pid, src)` sends the chunks to the embed mod as `PUT /api/s/embed/v1/texts/proj-<suffix>/<sid>#<n>` with the title, and deletes the source's old chunks first. Removing a source or deleting the project forgets its chunks (`DELETE /v1/texts/{ns}?ids=` / the whole ns).
   - **Search:** `search(pid, query, k)` uses the embed search, or a BM25 fallback over the same chunks kept in `agent.db` (`project_chunks(sid, n, text, page, line)`) when the embed mod is off.

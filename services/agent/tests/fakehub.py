@@ -109,6 +109,10 @@ class FakeHub:
         self.grants: list[dict[str, Any]] = []         # GET /api/grants
         self.folder_origins: list[dict[str, Any]] = []  # the X-GAIFA-Origin of each GET /api/s/workspace/v1/folders
         self.ws_envs: dict[str, Any] = {}             # plan projects 2.3: the workspace mod's environments by id
+        self.pages: dict[str, str] = {}               # plan projects 3.1: /api/web/read's pages by URL
+        self.page_fail: set[str] = set()
+        self.page_delay = 0.0
+        self.page_reads: list[str] = []
         # skill-sources 2.2: the workspace's skills by environment ({skills, instructions}) and what reads return by id
         self.ws_skills: dict[str, dict[str, Any]] = {}
         self.ws_texts: dict[str, dict[str, Any]] = {}
@@ -394,6 +398,21 @@ class FakeHub:
             env = (self.workspace or {}).get(o.get("environment") or "default") or (self.workspace or {})["default"]
             return {"folders": [*env["folders"], *granted], "environment": {"id": env["id"], "name": env["name"]}}
 
+        # plan projects 3.1: the hub's POST /api/web/read: a new text output per fetch (self.pages: url → text;
+        # self.page_fail: urls that time out; self.page_delay: seconds each read takes)
+        @app.post("/api/web/read")
+        async def web_read(request: Request) -> Any:
+            url = (await request.json())["url"]
+            self.page_reads.append(url)
+            if self.page_delay:
+                await asyncio.sleep(self.page_delay)
+            if url in self.page_fail or url not in self.pages:
+                return JSONResponse({"detail": "the page didn't answer in 20 s", "code": "timeout"}, 504)
+            title = url.rstrip("/").rsplit("/", 1)[-1].replace("-", " ").title()
+            oid = self.doc(title, text=self.pages[url], kind="text", subtype="markdown")
+            return {"output": self.outputs[oid], "url": url, "final_url": url, "title": title, "kind": "text",
+                    "chars": len(self.pages[url]), "screening": None}
+
         # plan projects 2.3: the workspace mod's environments, enough for a project's own folders (Read by default,
         # anything under a GAIFA folder capped at Read, as the mod does)
         def ws_env(eid: str) -> Any:
@@ -605,7 +624,10 @@ class FakeHub:
             return {"deleted": tid}
 
         @app.delete("/api/s/embed/v1/texts/{ns}")
-        def delete_ns(ns: str) -> Any:
+        def delete_ns(ns: str, ids: str | None = None) -> Any:
+            if ids is not None:                        # ?ids=a,b: only those (plan projects 3.2)
+                got = self.texts.get(ns, {})
+                return {"deleted": sum(got.pop(i, None) is not None for i in ids.split(",") if i)}
             return {"deleted": len(self.texts.pop(ns, {}))}
 
         @app.get("/api/s/embed/v1/texts/{ns}")

@@ -285,7 +285,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             stop.set()
             watcher.cancel()
             agent.shutting_down = True
-            for t in list(agent.tasks.values()):
+            for t in list(agent.tasks.values()) + list(getattr(agent, "project_tasks", ())):   # project fetches, indexing
                 t.cancel()
             upkeep.cancel()
             importer.cancel()

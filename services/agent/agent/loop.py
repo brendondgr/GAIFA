@@ -243,7 +243,8 @@ class Agent(Compaction, Queueing, Prompting):
             except Exception:  # noqa: BLE001
                 folders = None
             days = int(profile.settings(self.cfg.data).get("interest_days") or profile.INTEREST_DAYS)
-            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory, folders, days)[1])
+            pid = (self.project_of(tid) or {}).get("id")                # plan projects 4.2: its memory, not others'
+            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory, folders, days, project=pid)[1], project=pid)
         except Exception:  # noqa: BLE001: a message never fails over memory
             log.exception("recall for %s", tid)
             return []

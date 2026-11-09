@@ -5,7 +5,9 @@
   PROFILE_MAX characters (what doesn't fit comes in through recall);
   the active projects by name and one-line summary; and, for a chat working in workspace folders, the projects those
   folders are (by an anchor, or by the folder's name) with their current facts. It changes only when memory does,
-  so a local server's prefix cache holds between turns.
+  so a local server's prefix cache holds between turns. A project's own entity (plan projects 4.2: a `project`
+  anchor) and what is under it are kept to that project's chats: in them its facts lead the profile (CHAT_MAX_PROJECT),
+  elsewhere it is left off the "Projects:" line and out of recall.
 - **Recall** (on each user message): `memory_search` on the message, the facts not already in the profile, stored on
   the user's event so the message is the same every time it is sent again.
 """
@@ -25,6 +27,7 @@ from .store import MemoryStore
 PROFILE_MAX = 3000          # characters of the user's own facts (an import's instructions are many; memory-import 2.2)
 PROJECTS_MAX = 12
 CHAT_MAX = 900              # characters of the chat's projects' facts
+CHAT_MAX_PROJECT = 1500     # … in a project chat, its project's (plan projects 4.2)
 RECALL_MAX = 800            # characters recalled on a message
 RECALL_FACTS = 8
 INTEREST_DAYS = 90          # an interest not said this long is an earlier one (memory-auto-learning 3.2)
@@ -37,13 +40,19 @@ def _inside(a: str, b: str) -> bool:
     return a == b or a.startswith(b.rstrip("/") + "/")
 
 
-def chat_projects(m: MemoryStore, folders: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
-    """The projects a chat's folders are: an anchor (workspace id, or a folder at or above it), or the same name."""
-    if not folders:
-        return []
+def chat_projects(m: MemoryStore, folders: list[dict[str, Any]] | None, project: str | None = None) -> list[dict[str, Any]]:
+    """The projects a chat's folders are: an anchor (workspace id, or a folder at or above it), or the same name; and the
+    entity anchored to the chat's own project (`project`, plan projects 4.2), first. Another project's entity never."""
+    from ..projects.memory import private
+    hidden = private(m, project)
     out = []
     for e in m.entities("project"):
         anchors = m.anchors(e["id"])
+        if project and any(a["kind"] == "project" and a["value"] == project for a in anchors):
+            out.insert(0, e)
+            continue
+        if e["id"] in hidden or not folders:
+            continue
         names = {e["norm"], *(norm(a) for a in m.aliases(e["id"]))}
         for f in folders:
             path, fid = str(f.get("path") or ""), str(f.get("id") or "")
@@ -82,12 +91,27 @@ def dated(f: dict[str, Any]) -> str:
     return f"{f['text']} (since {_month(f)})"
 
 
-def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None, interest_days: int = INTEREST_DAYS) -> tuple[str, set[str]]:
+def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None, interest_days: int = INTEREST_DAYS,
+          project: str | None = None) -> tuple[str, set[str]]:
     """(the profile's text, the ids of the facts it shows). The user's facts carry their dates; preferences come
     first, newest first, then interests by when they were last said, then the rest, newest first; an interest not
-    said for `interest_days`, or one that was replaced or ended this past year, goes on the "Earlier interests" line."""
+    said for `interest_days`, or one that was replaced or ended this past year, goes on the "Earlier interests" line.
+    `project`: the chat's project (plan projects 4.2), whose facts come first."""
+    from ..projects.memory import private
     shown: set[str] = set()
     parts = []
+    mine = [e for e in chat_projects(m, folders, project) if project and
+            any(a["kind"] == "project" and a["value"] == project for a in m.anchors(e["id"]))]
+    for e in mine:                                         # the project chat's own project leads
+        facts, size = [], 0
+        for f in m.facts_of(e["id"]):
+            line = f"- {f['text']}"
+            if size + len(line) > CHAT_MAX_PROJECT:
+                break
+            facts.append(line)
+            size += len(line) + 1
+            shown.add(f["id"])
+        parts.append(f"This chat is in the project {e['name']} ({m.path(e)})" + (":\n" + "\n".join(facts) if facts else "."))
     stale = time.time() - interest_days * 86400
     now_, earlier = [], []
     for f in m.facts_of("user"):
@@ -111,10 +135,13 @@ def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None, interest_
         shown.update(f["id"] for f in earlier[:EARLIER_MAX])
     if lines:
         parts.append("About the user:\n" + "\n".join(lines))
-    projects = [e for e in m.entities("project") if not e["parent"]][:PROJECTS_MAX]
+    hidden = private(m, project)
+    projects = [e for e in m.entities("project") if not e["parent"] and e["id"] not in hidden][:PROJECTS_MAX]
     if projects:
         parts.append("Projects: " + "; ".join(e["name"] + (f" ({e['summary']})" if e["summary"] else "") for e in projects))
-    for e in chat_projects(m, folders):
+    for e in chat_projects(m, folders, project):
+        if e in mine:
+            continue
         facts, size = [], 0
         for f in m.facts_of(e["id"]):
             line = f"- {f['text']}"
@@ -135,14 +162,19 @@ def settings(data: Path) -> dict[str, Any]:
         return base
 
 
-async def recall(m: MemoryStore, hub: Any, text: str, shown: set[str]) -> list[dict[str, Any]]:
-    """The facts a message calls to mind, not already in the profile, best first; [] for a short or empty message."""
+async def recall(m: MemoryStore, hub: Any, text: str, shown: set[str], project: str | None = None) -> list[dict[str, Any]]:
+    """The facts a message calls to mind, not already in the profile, best first; [] for a short or empty message.
+    Facts about another project's entity are left out (plan projects 4.2; `project`: the chat's own)."""
+    from ..projects.memory import private
     if len((text or "").strip()) < 3:
         return []
     r = await search(m, hub, text, limit=RECALL_FACTS * 2, meaning_wait=MEANING_WAIT_S)
+    hidden = private(m, project)
     out, size = [], 0
     for f in r["facts"]:
         if f["id"] in shown:
+            continue
+        if hidden and {row["entity"] for row in m._rows("SELECT entity FROM mem_fact_entities WHERE fact = ?", (f["id"],))} & hidden:
             continue
         about = [p for p in f["about"] if p != "you"]
         line = f["text"] + (f" ({', '.join(about)})" if about else "")

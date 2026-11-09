@@ -14,6 +14,7 @@
     PATCH  /v1/projects/{pid}/sources/{sid}     {title?, max_age_s?, position?}
     DELETE /v1/projects/{pid}/sources/{sid}     the output itself stays
     POST   /v1/projects/{pid}/sources/{sid}/refresh   fetch a page again now
+    GET    /v1/projects/{pid}/memory            its memory entity and facts (plan 4.2; edited through /v1/memory/*)
 
 A chat joins a project through `POST /v1/threads` or `PATCH /v1/threads/{id}` with `settings.project` (`new_chat` and
 `move_chat`, which server.py calls). Every change is published as `{type: "project", id, project}` (project None once
@@ -32,6 +33,7 @@ from pydantic import BaseModel, Field
 
 from .hubapi import HubCallError
 from .projects import folders as own_folders
+from .projects import memory as project_memory
 from .projects import sources as srcs
 from .projects.store import DESCRIPTION_MAX, INSTRUCTIONS_MAX, NAME_MAX, ProjectError
 
@@ -173,6 +175,9 @@ def install(agent: Any) -> None:
     agent.project_index, agent.project_forget = idx.index_source, idx.forget_source   # sources.after_change, remove_source
     agent.project_cleanup.append(("collection", idx.forget_project))         # 3.2: its embed collection
     agent.project_cleanup.append(("environment", own_folders.drop_env))       # 2.3: its hidden environment
+    agent.project_cleanup.append(("memory", project_memory.forget_anchor))    # 4.2: its entity loses the anchor, stays
+    agent.project_created.append(project_memory.created)                      # 4.2: its memory entity
+    agent.project_changed.append(project_memory.changed)                      # 4.2: a rename renames it
 
 
 def hub_error(e: HubCallError) -> HTTPException:
@@ -363,3 +368,12 @@ def add_routes(app: FastAPI) -> None:
         if src["kind"] != "page":
             return refused(ProjectError("not_a_page", "only pages are fetched again"))
         return await srcs.fetch(agent, sid)
+
+    # ---- its memory (plan projects 4.2) -----------------------------------------------------------
+
+    @app.get("/v1/projects/{pid}/memory", summary="The project's memory entity and its facts (current, and waiting for review); "
+             "edit and forget them through /v1/memory/facts/{id}")
+    def project_memory_facts(pid: str, request: Request) -> dict:
+        agent = A(request)
+        project_or_404(agent, pid)
+        return project_memory.facts(agent, pid)

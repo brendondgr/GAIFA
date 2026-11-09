@@ -178,7 +178,7 @@ Assumed:
   - A project's `defaults.skills` are read once per prompt build: through `read_skill`'s path for the agent's own skills, and through `hub.chat_skill_read` for workspace skills. Their bodies go in a "Skills this project uses" block, up to 8 000 characters. Skills over the cap are listed first among the skills.
   *Done when:* `test_project_prompt.py` covers both kinds and the cap.
   *As built:* `knowledge.project_skills`, read with `Knowledge.read` for both kinds (a workspace skill through the chat's project environments); the block opens the Skills section and counts toward the meter's *Project*. A skill that can't be read is left out.
-- [ ] **4.2 Project memory: `services/agent/agent/memory/model.py`, `store.py`, `profile.py`, `learn.py` / `auto.py`, `api_projects.py`.**
+- [x] **4.2 Project memory: `services/agent/agent/memory/model.py`, `store.py`, `profile.py`, `learn.py` / `auto.py`, `api_projects.py`.**
   - **The entity:** creating a project creates (or adopts, by name) a `project` entity with an anchor `{kind: 'project', value: pid}` (a new anchor kind). Renaming the project renames the entity, so the old name stays as an alias.
   - **`chat_projects`:** also matches a chat whose `settings.project` is the anchor's value.
   - **Kept to its own chats:**
@@ -195,10 +195,11 @@ Assumed:
     - delete removing the anchor and keeping the entity.
 
   `test_memory_prompt.py` and the memory suites still pass. Update `docs/plans/structured-memory.md`'s anchor kinds in passing (one line) and architecture §14 (memory).
+  *As built:* `projects/memory.py` (made in `project_created`, renamed in `project_changed`, unanchored in `project_cleanup`). A name another kind of entry already has makes "<name> (project)". `chat_projects`, `build` and `recall` take the chat's `project`; `private(m, but)` is the set kept to their projects' chats (anchored entities and everything under them). The learner's prompt gets one line naming the project's path. `memory_search` (the tool) is unchanged: it can still find another project's facts when asked. The fact edits go through the existing `/v1/memory/facts/{id}` routes.
 
 **Checks & deliverables — Phase 4**
 - [ ] On a second hub: a project with instructions ("answer in French") and a pinned skill. Its new chat answers in French and quotes the skill's rule. A fact said in it ("our deadline is Dec 1") lands under the project in Memory and isn't in a plain chat's prompt.
-- [ ] Delivered: the changed memory modules, `projects/knowledge.py`, and tests.
+- [x] Delivered: the changed memory modules, `projects/knowledge.py`, and tests.
 
 ## Phase 5 — The UI (L)
 

@@ -158,6 +158,18 @@ class MemoryLearner:
                          for e in self.m.entities() if e["id"] != "user")[:4000] or "(none yet)"
         return known, ents
 
+    def _project_note(self, t: dict[str, Any]) -> str:
+        """A project chat's (plan projects 4.2): facts about its work go under the project's entry, the user's own stay
+        under "you"."""
+        from ..projects.memory import entity_of
+        pid = (t.get("settings") or {}).get("project")
+        e = entity_of(self.m, pid) if pid else None
+        if e is None:
+            return ""
+        path = self.m.path(e)
+        return (f"This chat is in the project {e['name']}: facts about its work go about \"{path}\"; facts about the user's "
+                "own tastes and habits stay about \"you\".\n")
+
     async def ask(self, model: str, prompt: str) -> dict[str, Any] | None:
         reply = await self.agent.llm.chat(model, [{"role": "user", "content": prompt}], stream=False)
         self.last_reply = reply.text or ""
@@ -183,6 +195,7 @@ class MemoryLearner:
         if model is None:
             raise RuntimeError("no model to learn with: neither the chat's nor the agent's is served")
         known, ents = self._known()
+        ents = self._project_note(t) + ents
         got = await self.ask(model, EXTRACT.format(known=known, entities=ents, chat=render(events, cap=8000, reply_cap=600)))
         if got is None or not isinstance(got.get("facts", []), list):
             tries = st["tries"] + 1

@@ -70,7 +70,7 @@ class Prompting:
         prefs = await k.preferences(set(tools.full), tid) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
         fdata = await ctx.chat_folders(self.hub, tid, thread_settings(self.store, tid), services, tools.disabled, self.projects)
         parts = {"base": tree.get("systemprompt.md", ""), "guardrails": tree.get("guardrails.md", ""),
-                 "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.profile((fdata or {}).get("folders")), prefs) if x),
+                 "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.profile((fdata or {}).get("folders"), (self.project_of(tid) or {}).get("id")), prefs) if x),
                  "skills": await k.skill_list(set(tools.disabled), await ctx.chat_skills(
                      self.hub, tid, thread_settings(self.store, tid), services, tools.disabled, self.projects)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),

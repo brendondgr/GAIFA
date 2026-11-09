@@ -383,7 +383,7 @@ Assumed:
 
 ## Phase 5 — The agenda in the prompt, and projects (M)
 
-- [ ] **5.1 The agenda text: `services/calendar/agenda.py` (new), `GET /v1/agenda/prompt`.**
+- [x] **5.1 The agenda text: `services/calendar/agenda.py` (new), `GET /v1/agenda/prompt`.**
   - **`?date=&project=`** answers `{text, rev}`. The text has:
     - **Today, <Mon 9 Nov>:** every item;
     - **To-dos:** due today and overdue;
@@ -392,16 +392,18 @@ Assumed:
   - **Rows:** each is `HH:MM–HH:MM Title (calendar) [id]`, with all-day and to-do forms, and repeats marked.
   - **Stable:** no "now" and no relative times, so the text is the same all day until something changes. Capped per §2. An empty answer when `agenda_in_prompt` is off.
   *Done when:* `services/calendar/tests/test_agenda.py` covers each section, the cap, project dates, the setting off, and the same text at 08:00 and 20:00 of one day.
-- [ ] **5.2 The prompt part: `services/agent/agent/prompting.py`, `prompts.py`, `context.py`, `hubapi.py`.**
+- [x] **5.2 The prompt part: `services/agent/agent/prompting.py`, `prompts.py`, `context.py`, `hubapi.py`.**
   - **`ctx.chat_agenda(thread)`:** like `chat_folders`, only when the calendar mod is ready and its tools aren't turned off in the chat. It calls `GET /api/s/calendar/v1/agenda/prompt?date=<local today>&project=<the chat's project>`, cached by `(date, project, rev)`, and gives None on any error.
   - **The part:** `parts["agenda"]`, a section **Your calendar** after Environment. A line says the agent can read more with `calendar_agenda` and must ask before adding. It's counted in the context meter (`sizes`). Task runs read it too.
   *Done when:* `services/agent/tests/test_prompt_agenda.py` covers the part present, its place, absent when the mod is down or turned off in the chat, the project passed, and the cache.
 
   Update architecture §14 (the prompt's parts).
-- [ ] **5.3 Projects: `services/calendar/ui/`, `web/chat/chat-project-panels.js`.**
+- [x] **5.3 Projects: `services/calendar/ui/`, `web/chat/chat-project-panels.js`.**
   - **The calendar:** items carry `project_id` (the editor, cards and proposals since Phase 3), with a project filter in the page's search.
   - **The project page:** a **Dates** panel with the project's next 14 days and New (the project preset), read from the mod and shown only when it's present.
   *Done when:* `utils/tests/web/chat-project.test.mjs` covers the panel with and without the mod.
+
+  *As built (5.1–5.3):* overdue means due before the day (not before now), so the text stays the same all day; the agent's cache is 20 s by (date, project), not by `rev`. The prompt test is `services/agent/tests/test_prompt_agenda.py` (the fake hub has a calendar), the Dates panel's `utils/tests/web/chat-project-dates.test.mjs`. Not done: a project filter in the Calendar page's search.
 
 **Checks & deliverables — Phase 5**
 - [ ] With the agent on the second hub, "am I free at 3 tomorrow?" is answered from the prompt (no tool call in the turn). In a project's chat, a project deadline is named.

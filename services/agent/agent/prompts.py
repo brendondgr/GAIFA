@@ -63,6 +63,8 @@ def build(parts: dict[str, str]) -> str:
     out += section("Project files and pages", parts.get("project_knowledge", ""))
     out += section("More tools (not loaded; load_tools or find_tools first)", parts.get("tools", ""))
     out += section("Environment", parts.get("env", ""))
+    out += section("Your calendar (today and tomorrow; calendar_agenda reads other days; add or change only what the user asks for)",
+                   parts.get("agenda", ""))                                     # calendar 5.2
     out += section("Outputs in this chat (reference them as output:<id>)", parts.get("outputs", ""))
     out += section("Earlier in this chat (summary)", parts.get("summary", ""))
     return out

@@ -135,6 +135,10 @@ class HubAPI:
         (folder grants), as the workspace mod resolves them for the chat's calls: `{folders, environment}`."""
         return await self._json("GET", "/api/s/workspace/v1/folders", headers=await self._chat_origin(tid, environment))
 
+    async def calendar_agenda(self, day: str, project: str | None) -> dict[str, Any]:
+        """Today's and tomorrow's items as text for the prompt (calendar 5.2): `{text, rev, date}` from the calendar mod."""
+        return await self._json("GET", "/api/s/calendar/v1/agenda/prompt", params={"date": day, **({"project": project} if project else {})})
+
     async def chat_skills(self, tid: str, environment: str | dict[str, Any] | None) -> dict[str, Any]:
         """Other agents' skills and instruction files in this chat's workspace folders (skill-sources 2.2):
         `{skills, instructions}` from the workspace mod."""

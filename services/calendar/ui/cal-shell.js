@@ -294,6 +294,7 @@ export function mountCalendar(root, ctx, client, store) {
     if (want && want.includes('@')) { const d = parse(want.split('@')[1]); if (!isNaN(d)) st.date = d; }
     await refresh();
     if (want) { const o = st.occs.find(x => x.id === want || x.item_id === want); if (o) open(o, page.querySelector(`[data-occ="${CSS.escape(o.id)}"]`)); }
+    if (ctx.params?.new) edit(null, { ...defaultSlot(), project_id: ctx.params.new });   // calendar 5.3: New from a project's page
     timer = setTimeout(poll, 10000);
   })();
 

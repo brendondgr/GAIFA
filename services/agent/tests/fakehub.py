@@ -118,6 +118,8 @@ class FakeHub:
         self.ws_skills: dict[str, dict[str, Any]] = {}
         self.ws_texts: dict[str, dict[str, Any]] = {}
         self.screen_down = False
+        self.calendar: str | None = None                # calendar 5.2: the agenda's text (None: the mod isn't running)
+        self.agenda_calls: list[dict[str, Any]] = []
         self.texts: dict[str, dict[str, Any]] = {}       # structured-memory 2.1: the embed mod's text collections
         self.embed_down = False
         self.search_delay = 0.0                          # chat-responsive 1.1: a slow search by meaning
@@ -560,7 +562,13 @@ class FakeHub:
         @app.get("/api/services")
         def services() -> list:
             return [{"id": "fake", "name": "Fake", "state": "ready", "load": "loaded"},
-                    *([{"id": "workspace", "name": "Workspace", "state": "ready"}] if self.workspace is not None else [])]
+                    *([{"id": "workspace", "name": "Workspace", "state": "ready"}] if self.workspace is not None else []),
+                    *([{"id": "calendar", "name": "Calendar", "state": "ready"}] if self.calendar is not None else [])]
+
+        @app.get("/api/s/calendar/v1/agenda/prompt")
+        def agenda_prompt(date: str, project: str | None = None) -> dict:
+            self.agenda_calls.append({"date": date, "project": project})
+            return {"text": (self.calendar or "") + (f"\nThis project's dates: {project}" if project else ""), "rev": 1, "date": date}
 
         @app.get("/api/memory")
         def memory() -> dict:

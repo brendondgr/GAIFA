@@ -485,6 +485,36 @@ async def folders_note(hub: Any, tid: str, settings: dict[str, Any] | None, serv
     return prompts.folders_note(data, os.path.expanduser("~"), project_of(settings, projects)) if data is not None else ""
 
 
+_AGENDA: dict[tuple[str, str | None], tuple[float, str]] = {}
+AGENDA_TTL_S = 20
+
+
+async def chat_agenda(hub: Any, services: list[dict[str, Any]] | None, disabled: set[str] | list[str],
+                      project: str | None, now: float | None = None) -> str:
+    """calendar 5.2: today's and tomorrow's calendar as text for the prompt, from the calendar mod; "" when the mod is
+    off, turned off in this chat, has the setting off, or doesn't answer. Kept 20 s (a turn builds its prompt more
+    than once); the text only changes with the calendar or the date, so the prompt stays cached."""
+    import logging
+    import time
+    from datetime import date
+
+    if "calendar" in disabled or not any(s.get("id") == "calendar" and s.get("state") in ("ready", "degraded") for s in services or []):
+        return ""
+    now = now if now is not None else time.time()
+    key = (date.today().isoformat(), project)
+    hit = _AGENDA.get(key)
+    if hit and now - hit[0] < AGENDA_TTL_S:
+        return hit[1]
+    try:
+        text = str((await hub.calendar_agenda(key[0], project)).get("text") or "")
+    except Exception as e:  # noqa: BLE001: the prompt goes on without it
+        logging.getLogger("agent.context").warning("the calendar's agenda: %s", e)
+        return hit[1] if hit else ""
+    _AGENDA.clear() if len(_AGENDA) > 64 else None
+    _AGENDA[key] = (now, text)
+    return text
+
+
 async def chat_skills(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
                       disabled: set[str] | list[str], projects: Any = None) -> dict[str, Any] | None:
     """skill-sources 2.2: other agents' skills and instruction files in this chat's workspace folders, as the workspace

@@ -38,7 +38,7 @@ export function fieldsOf(item, slot = {}) {
   return { id: it.id, kind, title: it.title || slot.title || '', date: ymd(s), time: `${pad(s.getHours())}:${pad(s.getMinutes())}`,
     endDate: ymd(endDay), endTime: `${pad(e.getHours())}:${pad(e.getMinutes())}`, all_day: allDay || (kind === 'todo' && String(it.due || slot.due || '').length === 10),
     repeat: choiceOf(it.rrule || slot.rrule), alerts: (it.alerts || slot.alerts || []).map(a => a.before_min ?? a), calendar: it.calendar_id || slot.calendar,
-    busy: it.busy || 'busy', location: it.location || '', url: it.url || '', notes: it.notes || '', project_id: it.project_id || null,
+    busy: it.busy || 'busy', location: it.location || '', url: it.url || '', notes: it.notes || '', project_id: it.project_id || slot.project_id || null,
     priority: it.priority || 0, estimate: it.estimate_min || '' };
 }
 

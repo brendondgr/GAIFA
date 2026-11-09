@@ -108,3 +108,12 @@ def mention_items(request: Request) -> list[dict]:
         if len(out) >= 40:
             break
     return out
+
+
+@router.get("/v1/agenda/prompt", summary="Today's and tomorrow's items as text for the agent's prompt (calendar plan 5.1)")
+def agenda_prompt(request: Request, date_: str | None = Query(None, alias="date", description="YYYY-MM-DD, the chat's today (default: today)"),
+                  project: str | None = Query(None, description="A project (p_…): its next 14 days too")) -> dict:
+    from agenda import prompt_text
+    c = cal(request)
+    d = day_of(date_) if date_ else T.now_local().date()
+    return {"text": prompt_text(c.items, c.settings.get(), d, project), "rev": c.store.rev, "date": d.isoformat()}

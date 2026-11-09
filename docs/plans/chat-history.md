@@ -1,6 +1,6 @@
 # Plan: a cleaner chat history: names only, grouped by date or environment, a short sidebar and a Show all page
 
-**Asked for:** 2026-11-08 · **Status:** Planned
+**Asked for:** 2026-11-08 · **Status:** In progress: every step built (2026-11-08); Phase 3's check on the installed hub waits for the merge
 
 ## 1. Introduction
 
@@ -23,62 +23,70 @@ Touches the agent's thread routes (architecture §14.1), Stage O's chat list (ba
 
 ## Phase 1 — The agent lists chats the new way (S)
 
-- [ ] **1.1 Archived, live or both: `services/agent/agent/store.py`, `server.py`.**
+- [x] **1.1 Archived, live or both: `services/agent/agent/store.py`, `server.py`.**
   - **Store:** `Store.threads(…, archived: bool | None)` and `Store.groups(archived: bool | None)`. `None` means both, with no `archived = ?` clause. The SQL and the sort stay as they are.
   - **Routes:** `GET /v1/threads` and `GET /v1/threads/groups` take `archived=true|false|all` (default `false`, so existing callers are unchanged). Each thread already carries `archived`.
   - **Count:** `GET /v1/threads/count?archived=&q=&environment=` returns `{count}`, so the Show all page can say how many there are and the sidebar knows whether Show all is needed without loading 21 rows. *Assumption:* the count route is cheap (one `COUNT(*)` with the same clauses as `threads`).
   *Done when:* `services/agent/tests/test_threads_list.py` (new) covers archived `false`, `true` and `all`, with `q`, `environment` and `offset`, plus `groups` with `all`, and `count` matches the list's length for the same filters. The existing thread tests still pass. Update architecture §14.1 (the agent's routes).
-- [ ] **1.2 The client and the mock: `web/chat/chat-api.js`, `chat-mock.js`.**
+  *As built:* one `Store._where` builds the clauses for `threads`, `count` and `groups`. `archived` is now exactly `false`, `true` or `all` (422 for anything else, where FastAPI's bool also took `1` or `yes`; no caller sent those). §14.1 gained a "chat list" bullet with the three routes, and the agent's README says the same.
+- [x] **1.2 The client and the mock: `web/chat/chat-api.js`, `chat-mock.js`.**
   - `c.threads({archived})` passes `true`, `false` or `'all'`. `c.threadGroups({archived})` does the same, and `c.threadCount({q, archived, environment})` is new. The mock does the same over its fixture chats. Give some of them older dates so every date bucket has a chat, and archive one or two.
   *Done when:* `utils/tests/web/chat.test.mjs` covers `archived: 'all'` and `threadCount` on the mock.
+  *As built:* the mock's older chats are their own file, `web/chat/chat-mock-history.js` (28 chats from 25 minutes to 380 days old, two archived; `createMockClient(api, {history: false})` leaves them out), as `chat-mock.js` was already past 500 lines. The mock had no workspace mod, so `?mock` couldn't group by environment at all: `web/mock-workspace.js` adds one with four environments (None, Default, Ariadne, Thesis) and only the routes the chat pages read.
 
 **Wire — Phase 1:** nothing visible yet. The agent and the mock answer the new filters.
 
 **Checks & deliverables — Phase 1**
-- [ ] `services/agent/tests` and `uv run pytest` are green.
-- [ ] Delivered: the changed `store.py`, `server.py`, `chat-api.js`, `chat-mock.js`, and tests.
+- [x] `services/agent/tests` and `uv run pytest` are green.
+- [x] Delivered: the changed `store.py`, `server.py`, `chat-api.js`, `chat-mock.js`, and tests.
 
 ## Phase 2 — The sidebar: names only, the View menu, date groups, 20 and Show more (M)
 
-- [ ] **2.1 Rows show only the name: `web/chat/chat-list.js`.**
+- [x] **2.1 Rows show only the name: `web/chat/chat-list.js`.**
   - `Item` drops the `where` label and the `fmtAgo` time. The ⋯ button moves into a slot that is empty until hover or focus, or always visible on touch screens (`LIST_CSS`'s hover rules change to match). An archived row (in Both) is dimmed, with an `archive` icon before the title, and the menu shows Unarchive. The `where` prop goes away from `itemProps` in `chat.js`.
   *Done when:* `utils/tests/web/chat-list.test.mjs` (new; the pure parts: what a row shows for live, archived and running chats, and `menuKey`) passes. In the browser on a second hub (`?mock#/chat`), the rows show only names.
-- [ ] **2.2 The View menu: `web/chat/chat-groups.js` (`ViewMenu`, `readView`, `uiOfView`, `viewOfUi`), `chat.js`.**
+  *As built:* `rowLook(t)` is the pure part (name, state and its dot, archived, the menu's Archive or Unarchive). chat-groups.test.mjs's old row test (the time's slot) moved to chat-list.test.mjs as the new slot test. The brief §11.13's row description changed in this step, not 3.1.
+- [x] **2.2 The View menu: `web/chat/chat-groups.js` (`ViewMenu`, `readView`, `uiOfView`, `viewOfUi`), `chat.js`.**
   - `SHOW` becomes `[['chats','Chats'],['archived','Archived'],['both','Both']]`. `GROUP_BY` becomes `[['environment','Environment'],['date','Date'],['none','None']]`. The view gains `show` (default `'chats'`). The page's `archived` state is replaced by `view.show`, mapped to the agent's `archived` (`false` / `true` / `'all'`) by one helper, `archivedParam(show)`. The bottom-bar Archived chip goes. The View menu is the one place to choose (the Sessions chip stays).
   - `[ui.chat.list]` gains `show`. A saved view with `group = "date"` or `show = "both"` is accepted by `readView`. Add these keys to `config.example.toml`'s commented `[ui.chat.list]` and to the Settings row schema if it lists `[ui.chat.list]` keys (check `web/settings/`).
   *Done when:* `utils/tests/web/chat-groups.test.mjs` covers `readView` with the new keys, the old `archived` toggle migrating to `show`, and `archivedParam`. `utils/tests/ui/test_ui_prefs*.py` (or whichever hub test checks `[ui.chat.list]` keys) is green.
-- [ ] **2.3 Date groups: `web/chat/chat-dates.js` (new).**
+  *As built:* the hub's models (`ChatListCfg` in `utils/config.py`, `ChatListSettings` in `utils/api_models.py`) gained `show` and `group = "date"`, tested in `utils/tests/settings/test_settings_ui_prefs.py`; the Settings page has no `[ui.chat.list]` rows, so nothing changed there. Group by offers Environment only while the workspace mod's environments are known (`groupChoices`, `groupOf`: a saved Environment reads as None without them; `GROUP_NEEDS` is where a later grouping says what it needs). The old toggle was never saved, so the migration is only `readView`/`viewOfUi` reading `archived: true` as Show: Archived. Archiving with Show: Both keeps the row and dims it. Until 2.3, Group by: Date drew the flat list.
+- [x] **2.3 Date groups: `web/chat/chat-dates.js` (new).**
   - **Pure helpers:** `dayStart(now)`, `bucketOf(ts, now)` → `{key, label}`: `today` "Today", `yesterday` "Yesterday", `d2` / `d3` labelled with a short date ("Nov 6", via `Intl.DateTimeFormat` in the browser's locale, month short and day numeric), `week` "Last week", `older` "Older". `groupByDate(threads, {field, now, order})` → `[{key, label, threads}]` in that order, skipping empty buckets, sorted inside each bucket by the view's order. `shortDate(ts, now)` for the Show all page: a time today, then "Yesterday", "Nov 5", and "Nov 5, 2025" for another year.
   - **Drawing:** a `DateSections` component draws each bucket as a plain heading (11.5 px, dim, no collapse arrow, no counts), then its rows. It takes the 20 chats the page already loads, so no section has its own paging.
   *Done when:* `utils/tests/web/chat-dates.test.mjs` covers every bucket's edges (just after midnight, 23:59 the day before, exactly 3 and 4 days back, 7 and 8 days back), a change of year, ordering by name inside a bucket, and `shortDate`.
-- [ ] **2.4 Twenty, then Show all; five, then Show more: `web/chat/chat.js`, `chat-list.js`, `chat-groups.js`.**
+  *As built:* `daysAgo` counts calendar days between local midnights (rounded, so a 23- or 25-hour day still counts as one; a time ahead of the clock is Today); `dateField(order)` picks the field; the helpers take a `locale` for the tests (the page leaves it to the browser). The test runs the same in any time zone (checked with UTC, New York and Kolkata). The list's `<nav>` reads "Chats by date" while grouped by date.
+- [x] **2.4 Twenty, then Show all; five, then Show more: `web/chat/chat.js`, `chat-list.js`, `chat-groups.js`.**
   - **Flat and by date:** `LIST_PAGE` becomes 20 and the page loads `limit: 20` (search too). When `c.threadCount` says there are more, the list ends with a **Show all** bar (the `MoreBar` style, the words "Show all · N") that goes to `#/chat/all`, carrying the search as `?q=` when there is one. The old `onMore` paging goes.
   - **By environment:** `FIRST` becomes 5. **Show more** in a section loads all of that environment's chats (`limit: 200`, then the next 200 at the end of the section if the count says there are more). It changes to **Show less** once open. Whether a section is expanded is page state, not saved.
   *Done when:* `chat-groups.test.mjs` covers the section's first 5 and the expanded state (the pure helpers: `sectionChats`, the more and less decision). In the browser on the mock, the list shows 20 then Show all, and a section shows 5 then all.
+  *As built:* the pure helpers are `sectionChats(row, loaded, known, open)`, `moreOrLess(row, shown, open)` (`more`, `less` or null), `mergeById` (a later page never repeats a chat) and `showAllOf(shown, total)`; `MoreBar` takes a `label` (Show more, Show less, Show all). Without a count (an agent older than 1.1), a full page of 20 shows a plain *Show all*. The flat list now reloads when the page's list key changes (a chat made, moved, archived or deleted), so it stays at 20 and its count stays right. The page's 20 are also what the sections overlay for live state; a running chat is always among the newest. Until 3.1, Show all went to `#/chat/all` with nothing there to draw it.
 
 **Wire — Phase 2:** the sidebar shows names only, the View menu has Show (Chats, Archived, Both) and Group by (Environment, Date, None), and the list is short.
 
 **Checks & deliverables — Phase 2**
-- [ ] On a second hub (`uv run python app.py --port 7077 --dev --demo-mods`, page at `?mock#/chat`), each grouping and each Show choice draws as described, and the choice survives a reload (it is in that hub's `config.toml`).
-- [ ] Delivered: `web/chat/chat-dates.js`, the changed `chat-list.js`, `chat-groups.js`, `chat.js`, and tests.
+- [x] On a second hub (`uv run python app.py --port 7077 --dev --demo-mods`, page at `?mock#/chat`), each grouping and each Show choice draws as described, and the choice survives a reload (it is in that hub's `config.toml`). *As built:* the groupings, Show choices, 20 then Show all · 27 and Ariadne's 5, Show more · 4, all 9, Show less were checked on `?mock`, whose settings live in the page; the reload was checked without `?mock` on the same hub (no workspace mod there, so Group by offered Date and None): Both and Date went to its `config.toml` (`[ui.chat.list] show = "both", group = "date"`) and were chosen again after the reload.
+- [x] Delivered: `web/chat/chat-dates.js`, the changed `chat-list.js`, `chat-groups.js`, `chat.js`, and tests.
 
 ## Phase 3 — The Show all page (M)
 
-- [ ] **3.1 `#/chat/all`: `web/chat/chat-all.js` (new), `chat.js`.**
+- [x] **3.1 `#/chat/all`: `web/chat/chat-all.js` (new), `chat.js`.**
   - **Route:** `ChatPage` reads `route.parts[1] === 'all'` (thread ids start with `t_`, so they never clash) and draws `AllChats` in the main area instead of the panes. The sidebar stays. Opening a chat from it goes to `#/chat/<id>` and the panes come back as they were.
   - **The page:** a title "All chats" with the count, a search box (focused on open, `?q=` from the URL, 220 ms debounce as in the sidebar), and the View's Show and Group by choices as chips. They share the sidebar's saved view, so changing one changes both. Then the rows: grouped by date (the same `groupByDate` headings, over everything loaded), by environment (a heading per environment), or flat. Each row shows the title, the environment's name (dim), `shortDate` at the right, and the same ⋯ menu as the sidebar (rename, Move to, archive, delete, through the page's existing handlers). Archived rows (in Both) are dimmed.
   - **Scrolling:** pages of 50 (`limit`, `offset`), loaded by an `IntersectionObserver` on a sentinel near the end, until the count is reached. A search or view change starts again from offset 0. Keyboard: ↑/↓ move through rows, Enter opens one, `/` focuses the search.
   - **Narrow screens:** the page fills the screen, as the panes do.
   *Done when:* `utils/tests/web/chat-all.test.mjs` (new; the pure parts: page arithmetic, merging pages without duplicates when a chat moves between loads, grouping what is loaded) passes. In the browser on the mock: Show all opens the page with the count, it scrolls to the last chat in pages, search narrows it, and a row opens its chat. Update the brief §11.13 (the Chat page: the sidebar and Show all).
-- [ ] **3.2 Command palette and docs: `web/Hub.dc.html` (the palette's pages), `docs/structure.md`, `web/PATCHES.md`.**
+  *As built:* a row is the sidebar's `Item` with a new `aside` (environment and date), so the menu, rename and drag are the same code. The page also has × (back to the active pane's chat) and, under 760 px, the menu button for the chat list; returning from it leaves the panes as they were (the route effects skip `#/chat/all` and the step back from it). After a chat is made, moved, archived or deleted elsewhere it reloads the rows it had (`reloadKey`), and a rename shows at once (the page's `patched` events). The environment's name shrinks first on a narrow row. Checked on a second hub (`?mock`): the count (27, then 72 after making 45 chats from the console), pages of 50 then 72 with none repeated and the oldest ("Oct 24, 2025") last, the search ("paging test 1": 10), Show all from a sidebar search carrying `?q=`, ↓ from the search to the rows, a row opening its chat in the panes, and the page at phone width.
+- [x] **3.2 Command palette and docs: `web/Hub.dc.html` (the palette's pages), `docs/structure.md`, `web/PATCHES.md`.**
   - The palette gains "All chats" (`#/chat/all`). `web/PATCHES.md` gets an entry for the changed list, the View menu, the date groups and the Show all page. `docs/structure.md` lists `chat-dates.js` and `chat-all.js`.
   *Done when:* the docs tests (`utils/tests/docs/`) and `utils/tests/web/` are green. The palette finds "All chats".
+  *As built:* `docs/structure.md` gained `chat-dates.js` and `chat-all.js` in their own steps (2.3, 3.1), as the docs tests ask of every new file; this step adds the palette entry (after Chat, tested in chat-all.test.mjs) and `web/PATCHES.md` 80 (78 on its branch; renumbered at the merge). Checked on a second hub: Search, "all chats", Enter opens `#/chat/all`.
 
 **Wire — Phase 3:** Show all opens a full, searchable, endlessly scrolling list of chats with their dates.
 
 **Checks & deliverables — Phase 3**
 - [ ] On the installed hub after merging and `gaifa restart`: the sidebar shows names only. By date, the headings match the real chats' days. By environment, 5 per section and Show more opens the rest. Both shows archived chats dimmed. Show all lists every chat and scrolls to the oldest. A screenshot of the sidebar by date and of Show all goes in the commit message's description of the check.
-- [ ] Delivered: `web/chat/chat-all.js`, the palette entry, the docs, and tests.
+- [x] Delivered: `web/chat/chat-all.js`, the palette entry, the docs, and tests.
 
 ## 4. Deliverables
 

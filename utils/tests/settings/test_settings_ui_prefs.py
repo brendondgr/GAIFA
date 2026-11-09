@@ -9,7 +9,7 @@ import httpx
 
 from utils.tests.settings.test_settings import _file, _hub
 
-CHAT = {"steps": "fold", "list": {"group": "environment", "env_order": "activity", "chat_order": "updated", "collapsed": []}, "environment": None}
+CHAT = {"steps": "fold", "list": {"show": "chats", "group": "environment", "env_order": "activity", "chat_order": "updated", "collapsed": []}, "environment": None}
 OVERVIEW = {"view": "dashboard", "timeline_range": "24h", "services_range": "24h"}
 
 
@@ -50,3 +50,15 @@ async def test_defaults_list_them(rig, serve):
     async with httpx.AsyncClient(base_url=served.url) as c:
         d = (await c.get("/api/settings/defaults")).json()["ui"]
         assert d["chat"] == CHAT and d["overview"] == OVERVIEW
+
+
+async def test_chat_list_show_and_date(rig, serve):
+    """chat-history 2.2: `[ui.chat.list]` takes show (chats, archived, both) and group = "date"; anything else is refused."""
+    served = await _hub(rig, serve)
+    async with httpx.AsyncClient(base_url=served.url) as c:
+        r = await c.put("/api/settings", json={"ui": {"chat": {"list": {"show": "both", "group": "date"}}}})
+        assert r.status_code == 200 and r.json()["settings"]["ui"]["chat"]["list"] == {**CHAT["list"], "show": "both", "group": "date"}
+        assert tomllib.loads(_file(served))["ui"]["chat"] == {"list": {"show": "both", "group": "date"}}
+        for bad, field in (({"show": "all"}, "ui.chat.list.show"), ({"group": "project"}, "ui.chat.list.group")):
+            r = await c.put("/api/settings", json={"ui": {"chat": {"list": bad}}})
+            assert r.status_code == 422 and r.json()["data"]["field"] == field, r.text

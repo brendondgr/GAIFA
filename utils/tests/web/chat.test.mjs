@@ -374,3 +374,33 @@ test('a new chat and its first message in one call, and the message body (chat-r
   assert.equal((await c.events(t.id)).find(e => e.type === 'user').payload.text, 'hello');
   await c.cancel(t.id);
 });
+
+// Plan chat-history 1.2: live chats, archived chats or both, and how many there are.
+test('the client asks for archived: all and the count; the mock answers the same way', async () => {
+  const seen = [];
+  const live = capi.createLiveClient({ base: 'http://h', fetch: async url => { seen.push(url); return new Response('{"count": 3}', { status: 200, headers: { 'content-type': 'application/json' } }); } });
+  await live.threads({ archived: 'all', limit: 20 });
+  await live.threads({ archived: false });
+  await live.threadGroups({ archived: 'all' });
+  assert.equal((await live.threadCount({ q: 'fox', archived: true, environment: 'default,none' })).count, 3);
+  assert.match(seen[0], /\/v1\/threads\?archived=all&limit=20$/);
+  assert.doesNotMatch(seen[1], /archived/);
+  assert.match(seen[2], /\/v1\/threads\/groups\?archived=all$/);
+  assert.match(seen[3], /\/v1\/threads\/count\?q=fox&archived=true&environment=default%2Cnone$/);
+
+  const m = cmock.createMockClient({}, { speed: 1000 });
+  const live1 = await m.threads(), arch = await m.threads({ archived: true }), both = await m.threads({ archived: 'all' });
+  assert.ok(live1.length > 20, 'enough chats for the sidebar\'s 20, then Show all');
+  assert.ok(arch.length >= 2 && arch.every(t => t.archived) && live1.every(t => !t.archived));
+  assert.equal(both.length, live1.length + arch.length);
+  assert.ok(both.every((t, i) => !i || both[i - 1].updated >= t.updated), 'newest first');
+  for (const [o, n] of [[{}, live1.length], [{ archived: true }, arch.length], [{ archived: 'all' }, both.length]]) assert.equal((await m.threadCount(o)).count, n);
+  const ariadne = await m.threads({ environment: 'ariadne', archived: 'all' });
+  assert.ok(ariadne.length > 5, 'an environment with more than 5 chats, for Show more');
+  assert.equal((await m.threadCount({ environment: 'ariadne', archived: 'all' })).count, ariadne.length);
+  assert.equal((await m.threadCount({ q: 'lighthouse' })).count, 1);
+  const days = new Set(both.map(t => Math.floor((Date.now() / 1000 - t.updated) / 86400)));
+  for (const d of [0, 2, 3, 5]) assert.ok(days.has(d), `a chat ${d} days old`);
+  assert.ok([...days].some(d => d >= 8) && [...days].some(d => d > 365), 'older ones, and one from another year');
+  assert.equal((await cmock.createMockClient({}, { speed: 1000, history: false }).threads({ archived: 'all' })).length, 2);
+});

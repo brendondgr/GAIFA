@@ -1673,7 +1673,7 @@ class Component extends DCLogic {
   }
   palItems() {
     const out = [], nav = h => () => { this.setState({ palette: null }); this.go(h); }, run = fn => () => { this.setState({ palette: null }); fn(); };
-    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['Outputs', '#/outputs', ICON.folder], ['Services', '#/services', ICON.puzzle], ['Memory & learning', '#/s/agent/memory', ICON.bulb], ['Models', '#/models', ICON.layers], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
+    [['Overview', '#/overview', ICON.grid], ['Chat', '#/chat', ICON.chat], ['All chats', '#/chat/all', ICON.chat], ['Outputs', '#/outputs', ICON.folder], ['Services', '#/services', ICON.puzzle], ['Memory & learning', '#/s/agent/memory', ICON.bulb], ['Models', '#/models', ICON.layers], ['Settings', '#/settings', ICON.gear]].forEach(([l, h, d]) => out.push({ label: l, sub: 'Page', d, run: nav(h) }));
     if (this.state.vw >= 1024) { const n = this.state.nav || {}; out.push({ label: n.collapsed ? 'Expand the sidebar' : 'Collapse the sidebar', sub: 'Action', d: ICON.menu, run: run(() => this.setNav({ collapsed: false, services: 'list', hidden: [], folded: false, ...n, collapsed: !n.collapsed })) }); }  // plan 33
     this.state.services.forEach(sv => {
       const d = ICON[sv.icon] || ICON.puzzle;

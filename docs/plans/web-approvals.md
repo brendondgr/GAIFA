@@ -1,6 +1,6 @@
 # Plan: fewer approvals for web pages: a decision-model judge, and every site in one chat
 
-**Asked for:** 2026-11-08 · **Status:** In progress
+**Asked for:** 2026-11-08 · **Status:** Done (2026-11-08)
 
 ## 1. Introduction
 
@@ -44,8 +44,8 @@ Phase 1 makes the judge d3-lite only: config, code, the Settings picker, the dec
   *Done when:* `utils/tests/web/settings-schema.test.mjs` (the summary), a `chat-judge` test (no backend choice; changing the model keeps `backend: "decide"`); the contract test passes. Browser check on the installed hub after `gaifa restart`: the group shows d3-lite, "answering". *As built:* the tests are in `modes.test.mjs` (the picker: one select, decide models, a pick saves `judgePick`), `settings-schema.test.mjs` (the summary) and `chat-webprefs.test.mjs` (`screenPatch` without `confirm`); Screening's "Confirm with the judge's chat model" row is gone. The browser check ran on a scratch hub from the worktree (port 7079; 7077 was another session's): Settings → Permissions → Auto judge showed one model picker (d3-lite), the hint, and "Judge: d3-lite (decision model), answering." in both status lines; no console errors. The installed hub's look is checked with Phase 1's checks after the merge. `web/PATCHES.md` 78, the brief §5 (Permissions) and the Screening paragraph.
 
 **Checks & deliverables — Phase 1**
-- [ ] On the installed hub after `gaifa restart`: `GET /api/judge/status` → `available: true`, `backend: "decide"`, `model: "d3-lite"`. A chat in Auto researching a site (search, then pages and the links from them): every `web_fetch` the judge decides is in `GET /api/judge/recent` with `model: "d3-lite"`, under 1 s once loaded; none `fail-closed`. After the decide mod unloads (idle, or `POST /v1/unload`), the next judgement still answers.
-- [ ] Delivered: `JudgeCfg` decide-only with the old config read over, `judge.py` without a chat model, `evals/judge/relay_judge.py`, the decide mod's budget after load, the Settings picker, the rule in CLAUDE.md and the `gaifa` skill.
+- [x] On the installed hub after `gaifa restart`: `GET /api/judge/status` → `available: true`, `backend: "decide"`, `model: "d3-lite"`. A chat in Auto researching a site (search, then pages and the links from them): every `web_fetch` the judge decides is in `GET /api/judge/recent` with `model: "d3-lite"`, under 1 s once loaded; none `fail-closed`. After the decide mod unloads (idle, or `POST /v1/unload`), the next judgement still answers. *Done 2026-11-08* after the merge, `gaifa restart` and restarting decide and the agent: the status said d3-lite answering. Auto `web_fetch` calls from a check thread (`t_check_web_approvals`, the user's words about FSU faculty): with decide unloaded, `www.cs.fsu.edu/department/faculty/` was judged in 7.0 s, load included, and ran (before 1.3 this failed closed at 3 s); `www.sc.fsu.edu/people` ran by its existing always grant, unjudged; `pc.fsu.edu/` was judged in 0.18 s and asked (p 0.15 on "source"): d3-lite still asks now and then, which is what "every site" (Phase 2) is for. None fail-closed. That card was denied afterwards.
+- [x] Delivered: `JudgeCfg` decide-only with the old config read over, `judge.py` without a chat model, `evals/judge/relay_judge.py`, the decide mod's budget after load, the Settings picker, the rule in CLAUDE.md and the `gaifa` skill.
 
 ## Phase 2 — Every site in one chat (S)
 
@@ -59,8 +59,8 @@ Phase 1 makes the judge d3-lite only: config, code, the Settings picker, the dec
   *Done when:* `utils/tests/web/chat-risk.test.mjs` (the buttons for a `url:host` card in a chat, and none outside one); the mock's approval decides with `sites`. Browser check on the installed hub: a chat in Manual, a `web_fetch` card, **Allow every site in this chat**, then pages on two other hosts open without a card (their step rows say "allowed in this chat for every site"), and Settings → Permissions lists the grant with Revoke. *As built:* the buttons take `grantKey` (the chat's dock passes the approval's `grant_key`, the header's popover too); the decided card says "Every site allowed in this chat: web pages open without asking", the step row "…and every site allowed in this chat", and the Grants list "on every site". The test is in `approvals.test.mjs` (the plan named `chat-risk.test.mjs`; the card tests live there). `web/PATCHES.md` 79, the brief's card paragraph. The browser check runs with Phase 2's checks on the installed hub after the merge.
 
 **Checks & deliverables — Phase 2**
-- [ ] On the installed hub: the browser check above, plus a `web_fetch` of a URL with a long base64 query in the same chat still asks.
-- [ ] Delivered: the `sites` grant and its card option.
+- [x] On the installed hub: the browser check above, plus a `web_fetch` of a URL with a long base64 query in the same chat still asks. *Done 2026-11-08* without making a chat in the user's list: a Manual `web_fetch` of `pc.fsu.edu` from a check thread (`t_check_web_approvals_2`) made a card; the header's Approvals popover showed Allow once · Allow in this chat · **Allow every site in this chat** (with its hint) · Always allow · Deny, and clicking it approved the call and wrote `web_fetch * url:any thread`. Then `www.cs.fsu.edu/` and `en.wikipedia.org/wiki/Florida_State_University` in that thread ran without a card (the grant used twice), a URL with a long base64 query asked, and the same host from another thread asked. The test cards were denied and the grant revoked afterwards.
+- [x] Delivered: the `sites` grant and its card option.
 
 ## Deliverables
 

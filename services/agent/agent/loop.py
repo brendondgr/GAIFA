@@ -64,6 +64,15 @@ class Live:
     """Per-thread subscribers (SSE)."""
 
     subs: dict[str, set[asyncio.Queue[dict[str, Any]]]] = field(default_factory=dict)
+    watchers: set[asyncio.Queue[dict[str, Any]]] = field(default_factory=set)   # /v1/streams?watch=projects (plan projects 1.2)
+
+    def broadcast(self, ev: dict[str, Any]) -> None:
+        """An event about no one chat (a project changed) to every stream that watches for them."""
+        for q in list(self.watchers):
+            try:
+                q.put_nowait(ev)
+            except asyncio.QueueFull:
+                pass
 
     def publish(self, tid: str, ev: dict[str, Any]) -> None:
         for q in list(self.subs.get(tid, ())):
@@ -100,6 +109,9 @@ class Agent(Compaction, Queueing):
         self.memory = MemoryStore(store)          # plan structured-memory 1.1
         from .projects.store import ProjectStore
         self.projects = ProjectStore(store)       # plan projects 1.1
+        self.project_created: list[Any] = []      # async (agent, project): its memory entity (4.2)
+        self.project_changed: list[Any] = []      # async (agent, old, new): a rename renames the entity (4.2)
+        self.project_cleanup: list[tuple[str, Any]] = []   # (step, async (agent, project)) when one is deleted (api_projects)
         self.live = Live()
         self.tasks: dict[str, asyncio.Task[Any]] = {}
         self.local = Local(self)

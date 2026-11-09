@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from .store import new_id
 
 MAX_THREADS = 64
+WATCHED = ("project", "project_source")   # events about no one chat, for streams opened with watch=projects
 HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
 
@@ -87,13 +88,17 @@ def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: 
     @app.get("/v1/streams", summary="Server-sent events for several threads on one connection: each thread's events after its "
                                     "seq and a `ready` for it, then live events and deltas of all of them (each has `thread_id`); "
                                     "an unknown thread gets `{type: 'gone', thread_id}`")
-    async def streams(request: Request, threads: str = "") -> StreamingResponse:
+    async def streams(request: Request, threads: str = "", watch: str = "") -> StreamingResponse:
+        """`watch=projects` (plan projects 1.2): also every `project` and `project_source` event, which belong to no chat."""
         agent = A(request)
         wanted = parse_threads(threads)
         known = [(tid, after) for tid, after in wanted if agent.store.thread(tid) is not None]
         q: asyncio.Queue[dict[str, Any]] = asyncio.Queue(4000)
         for tid, _ in known:                       # before the replay, so nothing that happens meanwhile is missed
             agent.live.subscribe(tid, q)
+        watching = "projects" in watch.split(",")
+        if watching:
+            agent.live.watchers.add(q)
         sid, carried = new_id("s_"), {tid for tid, _ in known}
         open_streams[sid] = (q, carried)
 
@@ -131,7 +136,7 @@ def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: 
                     if ev.get("type") == "_remove":
                         last.pop(tid, None)
                         continue
-                    if ev.get("type") == "gone":
+                    if ev.get("type") == "gone" or tid is None and ev.get("type") in WATCHED:
                         yield sse(ev)
                         continue
                     if tid not in last:
@@ -143,6 +148,7 @@ def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: 
                     yield sse(ev)
             finally:
                 open_streams.pop(sid, None)
+                agent.live.watchers.discard(q)
                 for tid in carried:
                     agent.live.unsubscribe(tid, q)
 

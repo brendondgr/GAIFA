@@ -60,7 +60,7 @@ Assumed:
   - **`ProjectStore`:** `create`, `get`, `list(q, sort)`, `update`, `delete`, `sources(pid)`, `add_source`, `update_source`, `remove_source`, `reorder`.
   - **Thread link:** `threads.settings.project` names the project. Add `PROJ_OF` beside `ENV_OF` in `store.py`, so `Store.threads(project=[…])` and `Store.groups(by="project")` work. The value `none` means chats without a project.
   *Done when:* `services/agent/tests/test_projects_store.py` covers create, update, list with search and sort, sources added, reordered and removed, the 200-source limit, and thread filters by project (including `none`).
-- [ ] **1.2 Routes: `services/agent/agent/api_projects.py` (new), `server.py`.**
+- [x] **1.2 Routes: `services/agent/agent/api_projects.py` (new), `server.py`.**
   - **Projects:** `GET/POST /v1/projects`, `GET/PATCH/DELETE /v1/projects/{pid}`.
   - **Chats:** `GET /v1/projects/{pid}/threads` (the same query as `/v1/threads`). `POST /v1/threads` accepts `settings.project`: a new chat in a project takes the project's defaults (model, mode, `disabled`, `pinned`, `mcp_on`) and its primary environment as `settings.environment`, under anything the request sets itself. `PATCH /v1/threads/{id}` with `settings.project` moves a chat in (environment set, nothing else) or out (`null`: project removed, environment kept).
   - **Delete:** clears `settings.project` from its chats, drops its sources and embed collection (Phase 3), asks the workspace mod to delete its hidden environment (Phase 2), and removes the project anchor from its memory entity (Phase 4). Each step is skipped when its mod is off, and logged.
@@ -76,6 +76,7 @@ Assumed:
     - the `project` event.
 
   Update architecture §14.1 (the agent's routes).
+  *As built:* `project` events belong to no chat, so they go to the `/v1/streams` connections opened with `watch=projects` (`Live.broadcast`), not to every chat's stream. A project with no environments sets none on its chats: they keep their own. The project's `chats` and `source_count` come with each row. Delete, creation and changes run hook lists on the agent (`project_cleanup`, `project_created`, `project_changed`) that later phases fill.
 - [ ] **1.3 Client and mock: `web/chat/chat-api.js`, `chat-mock.js`.** `c.projects({q, sort})`, `c.project(pid)`, `c.createProject`, `c.patchProject`, `c.deleteProject`, `c.projectThreads(pid, opts)`, `c.threadGroups({by})`, and for sources `c.addSource`, `c.patchSource`, `c.removeSource`, `c.refreshSource`. The mock keeps two fixture projects, one with files and pages.
   *Done when:* `utils/tests/web/chat.test.mjs` covers the project calls on the mock.
 

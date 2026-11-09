@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
-from . import api_imports, api_memory, api_skills, api_summaries, docs
+from . import api_imports, api_memory, api_projects, api_skills, api_summaries, docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -304,6 +304,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     api_skills.add_routes(app)                                       # skill-sources 3.1
     api_memory.add_routes(app)                                       # structured-memory 1.2
     api_imports.add_routes(app)                                      # memory-import 1.4
+    api_projects.add_routes(app)                                     # plan projects 1.2
 
     def A(request: Request) -> Agent:
         return request.app.state.agent
@@ -391,14 +392,17 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
              "environments' chats (comma-separated; `default` also matches chats without one)")
     def list_threads(request: Request, q: str | None = None, archived: bool = False, limit: int = Query(200, ge=1, le=1000),
                      environment: str | None = Query(None, description="Environment ids, comma-separated (plan 41.1)"),
-                     sort: Literal["updated", "created", "title"] = "updated", offset: int = Query(0, ge=0)) -> list[dict]:
+                     sort: Literal["updated", "created", "title"] = "updated", offset: int = Query(0, ge=0),
+                     project: str | None = Query(None, description="Project ids, comma-separated; `none`: chats in no project "
+                                                                    "(plan projects 1.2)")) -> list[dict]:
         envs = [e for e in (environment or "").split(",") if e.strip()] or None
-        return A(request).store.threads(q, archived, limit, environment=envs, sort=sort, offset=offset)
+        projs = [p for p in (project or "").split(",") if p.strip()] or None
+        return A(request).store.threads(q, archived, limit, environment=envs, sort=sort, offset=offset, project=projs)
 
     @app.get("/v1/threads/groups", summary="Per environment the chats use: how many, the newest activity, and how many "
-             "are running or waiting (`default` for chats without one)")
-    def thread_groups(request: Request, archived: bool = False) -> list[dict]:
-        return A(request).store.groups(archived)
+             "are running or waiting (`default` for chats without one); ?by=project: per project (`none` for chats in none)")
+    def thread_groups(request: Request, archived: bool = False, by: Literal["environment", "project"] = "environment") -> list[dict]:
+        return A(request).store.groups(archived, by=by)
 
     async def check_model(agent: Agent, model: str | None) -> None:
         """A chat's model must be one the relay serves (plan llm-servers 2.2); with the relay unreachable, anything goes."""
@@ -415,10 +419,12 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def new_thread(body: NewThread, request: Request) -> dict:
         """With a `message`, the thread and its first message in one call: the thread, with that message's `event`."""
         agent = A(request)
-        await check_model(agent, body.model)
+        settings, model, mode = api_projects.new_chat(agent, dict(body.settings), body.model,
+                                                      body.mode if "mode" in body.model_fields_set else None)
+        await check_model(agent, model)
         if body.message is not None:
             check_message(agent, None, body.message)
-        th = agent.store.create_thread(body.title, body.model, body.mode, body.settings)
+        th = agent.store.create_thread(body.title, model, mode or body.mode, settings)
         if body.message is not None:
             th["event"] = await send_message(agent, th["id"], body.message)
         return th
@@ -437,7 +443,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         await check_model(agent, body.model)
         settings = None
         if body.settings is not None:
-            settings = {**t["settings"], **body.settings}
+            settings = api_projects.move_chat(agent, t["settings"], body.settings)   # into a project or out (plan projects 1.2)
         return agent.store.update_thread(tid, title=body.title, model=body.model, mode=body.mode, archived=body.archived,
                                          settings=settings) or {}
 

@@ -182,15 +182,17 @@ Assumed:
   - **The grammar** is §2's list. Times without am/pm between 1 and 7 are afternoon ("at 3" is 15:00), with an assumption noted.
   - **The route:** `GET /v1/parse?text=&kind=event|todo`.
   *Done when:* `services/calendar/tests/test_when.py` covers about 60 phrases (each grammar part, ranges, repeats, all day, both date orders, "next Fri" on a Friday, past times today moving to tomorrow for to-dos only, the title left over, and three unreadable ones).
-- [ ] **1.6 Free time: `services/calendar/free.py` (new), `GET /v1/free`, `POST /v1/plan`.**
+- [x] **1.6 Free time: `services/calendar/free.py` (new), `GET /v1/free`, `POST /v1/plan`.**
   - **`free(frm, to, min_minutes, within: 'work'|'any', include_focus) -> [slot]`:** busy is events with `busy` other than `free`, plus focus unless `include_focus`. Each slot has `{start, end, minutes}`.
   - **`plan_day(date, todo_ids?) -> proposal`:** §2's placement. It answers a proposal (Phase 4 accepts it) with the to-dos that didn't fit.
   - **Settings:** `settings.py` keeps working hours, default alerts, week start, date order and `agenda_in_prompt` in `CALENDAR_STATE/settings.json`. `GET/PATCH /v1/settings`.
   *Done when:* `services/calendar/tests/test_free.py` covers overlapping events, all-day events, focus in and out, a slot shorter than the minimum, working hours by weekday, and a plan with due dates, priorities, estimates and leftovers.
-- [ ] **1.7 `.ics`: `services/calendar/ics.py` (new).**
+- [x] **1.7 `.ics`: `services/calendar/ics.py` (new).**
   - **Import:** `POST /v1/import` (a file upload or `{ics}` text, up to 5 MB) answers a proposal of kind `ics` with every event and to-do. Read: `RRULE`/`EXDATE`/`RECURRENCE-ID`, `VALARM`, `TZID` (with `VTIMEZONE` or IANA names), and all-day dates. The proposal lists what was skipped and why. Items already imported (same `UID`, kept in `source.ref`) are marked "already here".
   - **Export:** `GET /v1/export.ics?calendars=` (everything, or some calendars) and `GET /v1/items/{id}.ics`.
   *Done when:* `services/calendar/tests/test_ics.py` covers import from fixture files (a Google export, an Outlook export, a syllabus with all-day dates, a series with an override), skipped parts, the "already here" mark, and a round trip that exports and imports to the same occurrences.
+
+  *As built (1.1–1.7):* the proposal store (`proposals.py`, `api_more.py`: `/v1/proposals`, accept with one undo) landed here with import and plans, ahead of 4.3. An all-day event doesn't block free time. Who wrote an item is kept as `touched_by` (`agent` only while only the agent has changed it), for the preflight in 4.1. The worktree's setup index rows were added by hand: its submodule mods are empty, so `gaifa docs` there would drop them.
 
 **Checks & deliverables — Phase 1**
 - [ ] `services/calendar/tests` and `uv run pytest` are green. `gaifa check calendar` passes on a second hub (`--dev`, port 7078).

@@ -26,7 +26,7 @@ AGENT = {"name": "agent", "description": "Start a sub-agent for one independent 
          "parameters": {"type": "object", "properties": {
              "prompt": {"type": "string", "description": "The whole task for the sub-agent, with what to report back"},
              "label": {"type": "string", "description": "2–4 words naming its part, e.g. \"Read the tests folder\""},
-             "model": {"type": "string", "description": "Another model for it (leave out: this chat's)"},
+             "model": {"type": "string", "description": "Only to use another model the relay serves; leave it out for this chat's"},
              "write": {"type": "boolean", "default": False,
                        "description": "It may change files (one such sub-agent at a time); otherwise it only reads"}},
              "required": ["prompt", "label"]}}
@@ -98,6 +98,10 @@ class WorkflowTools:
         if wf is None:
             return self.err(tid, cid, "agent", "unavailable", "sub-agents aren't running", "do the work yourself")  # type: ignore[attr-defined]
         child = next((c for c in self.a.store.children(tid) if spawn_of(c).get("tool_call_id") == cid), None)
+        other = sorted(set(args) - {"prompt", "label", "model", "write", "background"})
+        if child is None and not str(args.get("prompt") or "").strip() and other:     # `instruction`, `task`: say which name
+            return self.err(tid, cid, "agent", "invalid_arguments", f"prompt is empty; there is no {', '.join(other)}",  # type: ignore[attr-defined]
+                            'send the whole task as `prompt` (with `label`): {"prompt": "…", "label": "…"}')
         if child is None:
             try:
                 child = await wf.spawn(tid, str(args.get("prompt") or ""), str(args.get("label") or ""),

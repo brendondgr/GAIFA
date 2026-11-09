@@ -65,7 +65,8 @@ class Workflows:
             raise KeyError(parent_id)
         prompt, label = (prompt or "").strip(), " ".join((label or "").split())[:60] or "Sub-agent"
         if not prompt:
-            raise WorkflowError("invalid_arguments", "prompt is empty", "say what the sub-agent should do and report back")
+            raise WorkflowError("invalid_arguments", "prompt is empty",
+                                'send the whole task as `prompt` (with `label`): {"prompt": "…", "label": "…"}')
         depth = depth_of(parent) + 1
         if depth > int(lim["max_depth"]):
             raise WorkflowError("workflow_limit", "a sub-agent can't start sub-agents of its own",
@@ -85,10 +86,14 @@ class Workflows:
         spawn = {"root": root, "parent": parent_id, "label": label, "by": by, "tool_call_id": tool_call_id,
                  "write": bool(write), "depth": depth, "turn": turn, "seen": True}
         settings = child_settings(parent, spawn, int(lim["child_max_steps"]))
-        th = self.store.create_thread(label, model or parent.get("model"), parent.get("mode") or "manual", settings,
-                                      parent_id=parent_id)
+        unknown = model if model and not await self.served(model) else None     # "inherit", "same", a typo: the parent's
+        th = self.store.create_thread(label, (None if unknown else model) or parent.get("model"), parent.get("mode") or "manual",
+                                      settings, parent_id=parent_id)
         tid = th["id"]
         self.store.update_thread(tid, state="queued")
+        if unknown:
+            self.agent.emit(tid, "note", {"text": f"The relay doesn't serve {unknown!r}: this sub-agent uses its parent's model.",
+                                          "level": "warn"})
         who = "the chat" if by == "agent" else ("another agent" if by == "mcp" else by)
         self.agent.emit(tid, "note", {"text": f"A sub-agent of “{parent.get('title') or 'a chat'}”, started by {who}"
                                               f"{'; it may change files' if write else '; it only reads'}. Its last reply "
@@ -99,6 +104,14 @@ class Workflows:
         return self.store.thread(tid) or th
 
     # ---- the queue ------------------------------------------------------------------------------
+
+    async def served(self, model: str) -> bool:
+        """The relay serves it (or can't be asked: then the model is taken as given)."""
+        try:
+            ids = {m.get("id") for m in await self.agent.llm.models(max_age=60)}
+        except Exception:  # noqa: BLE001
+            return True
+        return not ids or model in ids
 
     async def slot(self, model: str | None) -> str:
         """`local` for a model on this machine's relay group (or one the relay doesn't list), else `remote`."""

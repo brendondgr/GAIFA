@@ -60,8 +60,9 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 **Wire — Phase 1:** nothing in the UI; a parent's `agent` call shows as a generic step.
 
 **Checks & deliverables — Phase 1**
-- [ ] Second hub (`--port 7078`, scripted model): a chat spawns two read-only children that read files in its environment; their answers come back; a child's write is refused with the fix; Stop on the parent stops both.
-- [ ] Delivered: `agent/workflows/` (runner, settings, tool), `api_workflows.py`, the store's tree, origin fields, read-only refusal, grants by root.
+- [x] Second hub (`--port 7078`, scripted model): a chat spawns two read-only children that read files in its environment; their answers come back; a child's write is refused with the fix; Stop on the parent stops both.
+  *As built (2026-11-09, port 7078 from the worktree with only the agent (5190) and workspace (5191) mods; the remote test LLM through the installed relay's `skynet`, Qwen 3.8 27B, instead of a scripted model):* asked to compare a fixture folder's `src` and `tests` with two sub-agents, the chat called `agent` twice in one step; the two ran side by side (skynet is a remote model) and their answers came back inside `<untrusted>`; the parent checked them against the files and answered correctly. A read-only sub-agent asked to edit `src/loop.py` got `read_only` with the fix and reported it back; the file was unchanged. Stop on a parent whose two sub-agents were running stopped both (`stopped with the chat that started it`), and the parent's two `agent` calls ended `cancelled`. Two fixes from the first run: the model sent `instruction` for `prompt` (the error now names the wrong key and shows the right shape) and `model: "inherit"` (a model the relay doesn't serve now falls back to the parent's, with a note).
+- [x] Delivered: `agent/workflows/` (runner, settings, tool), `api_workflows.py`, the store's tree, origin fields, read-only refusal, grants by root.
 
 ## Phase 2 — Background children, messages and requests (M)
 

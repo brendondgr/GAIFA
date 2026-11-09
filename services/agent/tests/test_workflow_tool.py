@@ -68,6 +68,25 @@ async def test_no_tool_when_turned_off_or_the_window_is_small(env):
     assert "agent" not in _tools(env.model.received[-1])
 
 
+async def test_wrong_names_and_unknown_models(env):
+    env.model.queue({"match": "Look around", "tool_calls": [{"name": "agent", "arguments": {"instruction": "read it", "label": "R"}}]},
+                    {"match": "there is no instruction", "tool_calls": [{"name": "agent", "arguments": {
+                        "prompt": "read the folder", "label": "R", "model": "inherit"}}]},
+                    {"match": "read the folder", "text": "Read."},
+                    {"match": "Read.", "text": "Done."})
+    tid = await env.thread()
+    await env.send(tid, "Look around.")
+    for _ in range(200):
+        if env.payloads(tid, "assistant"):
+            break
+        await env.settle(tid)
+    first, second = env.payloads(tid, "tool_result")
+    assert first["error"]["code"] == "invalid_arguments" and "there is no instruction" in first["error"]["detail"]
+    assert json.loads(second["content"])["answer"] == "Read."
+    [kid] = env.agent.store.children(tid)
+    assert kid["model"] is None and any("doesn't serve 'inherit'" in n["text"] for n in env.payloads(kid["id"], "note"))
+
+
 async def test_a_refused_spawn_is_an_error_result(env):
     env.agent.workflows.limits.fixed = {"max_children": 0}
     env.model.queue({"tool_calls": [{"name": "agent", "arguments": {"prompt": "read it", "label": "Reader"}}]},

@@ -107,14 +107,14 @@ test('the View menu offers grouping only with environments', () => {
   assert.deepEqual(choices({ type: 'div', props: { children: pop2.props.children } }), ['Chats by']);
 });
 
-test('a chat\'s menu: Rename, Move to (other environments), Archive, Delete; its environment in a flat list', () => {
+test('a chat\'s menu: Rename, Move to (other environments), Archive, Delete (its row: chat-list.test.mjs)', () => {
   const t = { id: 't1', title: 'Report', settings: { environment: 'grants' } };
   // the menu's popover renders only while open (the stub's useState keeps it shut): read its children
   const menu = el => all(el, n => n.props?.label === 'Chat actions')[0].props.children.filter(Boolean).map(b => text(b.props.children.filter(c => c?.type !== 'kbd')));
-  const raw = list.Item({ t, active: false, onRename() {}, onArchive() {}, onDelete() {}, moveTo: [ENVS[0], ENVS[2]], onMove() {}, where: 'Grants' });
+  const raw = list.Item({ t, active: false, onRename() {}, onArchive() {}, onDelete() {}, moveTo: [ENVS[0], ENVS[2]], onMove() {} });
   assert.deepEqual(menu(raw), ['Rename', 'Move to…', 'Archive', 'Delete…']);
   const el = expand(raw);
-  assert.match(text(el), /Report.*Grants/);
+  assert.equal(text(el), 'Report');                                // no environment on the row (chat-history 2.1)
   assert.deepEqual(menu(list.Item({ t, active: false, onRename() {}, onArchive() {}, onDelete() {} })), ['Rename', 'Archive', 'Delete…']);
   const link = all(el, n => n.type === 'a')[0];
   assert.equal(typeof link.props.onDoubleClick, 'function');      // double-click renames
@@ -170,17 +170,6 @@ test('the top: the search across, then + New with View on its right; no Chats la
   assert.equal(all(kids[kids.length - 1], n => n.props?.['aria-label'] === 'View').length, 1);  // View on the right of New
   assert.doesNotMatch(text(el), /By meaning|Chats/);
   assert.equal(all(expand(list.ThreadList({ ...props, archived: true })), n => n.type === 'input')[0].props.placeholder, 'Search archived');
-});
-
-test('a row: its time at the right edge, and ⋯ in the same slot (shown on hover by LIST_CSS)', () => {
-  const t = { id: 't1', title: 'Report', updated: Date.now() / 1000 - 3600 };
-  const el = expand(list.Item({ t, active: false, onRename() {}, onArchive() {}, onDelete() {} }));
-  const slot = all(el, n => n.type === 'span' && all(n, x => x.props?.className === 'aichat-ago').length && all(n, x => x.props?.className === 'aichat-more').length)
-    .filter(n => n.props.style?.width === 34);
-  assert.equal(slot.length, 1);
-  assert.equal(slot[0].props.style.justifyContent, 'flex-end');
-  assert.match(list.LIST_CSS, /\.aichat-item:hover \.aichat-ago[^{]*\{display:none\}/);
-  assert.match(list.LIST_CSS, /\.aichat-item:hover \.aichat-more[^{]*\{display:grid\}/);
 });
 
 test('Show more is a full-width divider with its count', () => {

@@ -148,9 +148,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     toast(`Moved to ${(envs || []).find(e => e.id === env)?.name || env}`, 'success');
   }, fail);
   const newIn = env => newChat(env);
-  const envName = id => { const list = envs || []; return (list.find(e => e.id === id) || list.find(e => e.default))?.name || null; };
-  const itemProps = (t, flat = false) => ({ moveTo: (envs || []).filter(e => e.id !== ((t.settings || {}).environment || (envs || []).find(x => x.default)?.id)),
-    onMove: envs ? env => move(t, env) : null, where: flat && envs ? envName((t.settings || {}).environment) : null });
+  const itemProps = t => ({ moveTo: (envs || []).filter(e => e.id !== ((t.settings || {}).environment || (envs || []).find(x => x.default)?.id)),
+    onMove: envs ? env => move(t, env) : null });
   const remove = async t => {
     const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: 'The chat and its history are deleted. Its outputs stay in Outputs.', confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
     if (!ok) return;

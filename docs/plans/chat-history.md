@@ -42,9 +42,10 @@ Touches the agent's thread routes (architecture §14.1), Stage O's chat list (ba
 
 ## Phase 2 — The sidebar: names only, the View menu, date groups, 20 and Show more (M)
 
-- [ ] **2.1 Rows show only the name: `web/chat/chat-list.js`.**
+- [x] **2.1 Rows show only the name: `web/chat/chat-list.js`.**
   - `Item` drops the `where` label and the `fmtAgo` time. The ⋯ button moves into a slot that is empty until hover or focus, or always visible on touch screens (`LIST_CSS`'s hover rules change to match). An archived row (in Both) is dimmed, with an `archive` icon before the title, and the menu shows Unarchive. The `where` prop goes away from `itemProps` in `chat.js`.
   *Done when:* `utils/tests/web/chat-list.test.mjs` (new; the pure parts: what a row shows for live, archived and running chats, and `menuKey`) passes. In the browser on a second hub (`?mock#/chat`), the rows show only names.
+  *As built:* `rowLook(t)` is the pure part (name, state and its dot, archived, the menu's Archive or Unarchive). chat-groups.test.mjs's old row test (the time's slot) moved to chat-list.test.mjs as the new slot test. The brief §11.13's row description changed in this step, not 3.1.
 - [ ] **2.2 The View menu: `web/chat/chat-groups.js` (`ViewMenu`, `readView`, `uiOfView`, `viewOfUi`), `chat.js`.**
   - `SHOW` becomes `[['chats','Chats'],['archived','Archived'],['both','Both']]`. `GROUP_BY` becomes `[['environment','Environment'],['date','Date'],['none','None']]`. The view gains `show` (default `'chats'`). The page's `archived` state is replaced by `view.show`, mapped to the agent's `archived` (`false` / `true` / `'all'`) by one helper, `archivedParam(show)`. The bottom-bar Archived chip goes. The View menu is the one place to choose (the Sessions chip stays).
   - `[ui.chat.list]` gains `show`. A saved view with `group = "date"` or `show = "both"` is accepted by `readView`. Add these keys to `config.example.toml`'s commented `[ui.chat.list]` and to the Settings row schema if it lists `[ui.chat.list]` keys (check `web/settings/`).

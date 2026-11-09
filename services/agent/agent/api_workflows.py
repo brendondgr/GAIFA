@@ -53,6 +53,17 @@ def add_routes(app: FastAPI) -> None:
             raise HTTPException(404, f"no thread {tid!r}")
         return t
 
+    @app.post("/v1/threads/{tid}/seen", summary="A sub-agent was opened: how it ended is seen (its unread dot goes; 3.2)")
+    def seen(tid: str, request: Request) -> dict:
+        agent = A(request)
+        t = agent.store.thread(tid)
+        if t is None:
+            raise HTTPException(404, f"no thread {tid!r}")
+        if (t.get("settings") or {}).get("spawn") and agent.workflows is not None:
+            agent.workflows.mark(tid, seen=True)
+            agent.workflows.publish(tid)
+        return {"id": tid, "seen": True}
+
     @app.get("/v1/threads/{tid}/requests", summary="Its sub-agents' requests (approvals and questions sent to it), each with "
              "`waiting` (its card still waits), `open` (not reviewed yet) and its `review`; ?waiting=true: only those waiting")
     def list_requests(tid: str, request: Request, waiting: bool = False) -> list[dict]:

@@ -184,13 +184,24 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [tasks, setTasks] = useState([]);             // scheduled-tasks 4.2: the Scheduled row
   const loadTasks = () => c.tasks?.().then(setTasks, () => setTasks([]));
   useEffect(() => { loadTasks(); const w = c.watchTasks?.(() => loadTasks()); return () => w?.close(); }, []);
+  useEffect(() => {          // agent-workflows 3.2: sub-agents started, changed or ended; the trees follow, a parent's row counts them
+    const known = new Set();
+    const w = c.watchWorkflows?.(ev => {
+      bus.current.dispatchEvent(new CustomEvent('agent_child', { detail: ev }));
+      if (!ev.child || known.has(ev.child.id) || !ev.parent) return;
+      known.add(ev.child.id);                // the first time the page hears of one: its parent's row, with its count
+      c.get(ev.parent).then(p => listPatch(p.id, { children: p.children }), () => {});
+    });
+    return () => w?.close();
+  }, []);
   const newInProject = p => { setCmd(x => ({ n: (x?.n || 0) + 1, type: 'new', project: p || null, pane: lref.current.active })); setDrawer(false); if (sub) go('#/chat'); };   // 5.4
   const moveProject = (t, pid) => c.patch(t.id, { settings: { project: pid } }).then(n => {
     patched(n); relist();
     toast(pid ? `Moved to the project ${projects.find(p => p.id === pid)?.name || ''}` : 'Removed from the project', 'success');
   }, fail);
   const itemProps = t => ({ moveTo: (envs || []).filter(e => e.id !== ((t.settings || {}).environment || (envs || []).find(x => x.default)?.id)),
-    onMove: envs ? env => move(t, env) : null, projects, onProject: c.projects ? pid => moveProject(t, pid) : null });
+    onMove: envs ? env => move(t, env) : null, projects, onProject: c.projects ? pid => moveProject(t, pid) : null,
+    tree: c.tree ? { c, bus: bus.current, activeId: tid, onOpen: () => setDrawer(false) } : null });   // agent-workflows 3.2
   const remove = async t => {
     const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: 'The chat and its history are deleted. Its outputs stay in Outputs.', confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
     if (!ok) return;

@@ -34,6 +34,7 @@ const R = () => globalThis.React;
 export function seenRun(c, t) {
   const s = t?.settings || {};
   if (s.task && s.task_run && c.seeRun) c.seeRun(s.task, s.task_run).catch(() => {});
+  if (s.spawn && s.spawn.seen === false && c.seenChild) c.seenChild(t.id).catch(() => {});   // a sub-agent's end, seen (agent-workflows 3.2)
 }
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
 const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to GAIFA” in Hope’s voice', 'What can you do?'];

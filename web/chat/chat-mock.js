@@ -566,6 +566,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
     ...Object.fromEntries(Object.entries(tsk).filter(([k]) => k !== 'seed')),          // scheduled-tasks 4.1
     tree: tid => seed().then(() => wf.tree(tid)), requests: (tid, o) => seed().then(() => wf.requests(tid, o)),   // agent-workflows 3.1
     decideRequest: (tid, rqid, body) => wf.decideRequest(tid, rqid, body), watchWorkflows: on => wf.watchWorkflows(on),
+    seenChild: tid => wf.seenChild(tid),
     async deleteSkill(name) { await net(); settings.skills = settings.skills.filter(x => x.id !== 'user/' + name); return { deleted: name }; },
   };
 }

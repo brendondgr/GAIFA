@@ -91,6 +91,7 @@ export function createAgentMocks({ threads, newThread, emit, net, err, now, rid 
       tell(c);
       return { request: rqid, action, event: ev };
     },
+    async seenChild(tid) { await net(); const t = T(tid); if (spawnOf(t)) { t.thread.settings.spawn = { ...spawnOf(t), seen: true }; tell(t); } return { id: tid, seen: true }; },
     watchWorkflows(onEvent) { watchers.add(onEvent); return { close() { watchers.delete(onEvent); } }; },
     tell,
   };

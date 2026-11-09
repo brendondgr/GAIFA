@@ -72,6 +72,17 @@ async def test_archive_and_delete_go_with_the_parent(env):
     assert {a["id"], b["id"], root["id"]} <= set(env.hub.ended_grants)
 
 
+async def test_seen(env):
+    tid = await env.thread()
+    kid = (await env.agent.workflows.spawn(tid, "look", "Looker"))["id"]
+    await env.agent.workflows.wait(kid, timeout=10)
+    assert env.agent.store.thread(kid)["spawn"]["seen"] is False
+    r = await env.client.post(f"/v1/threads/{kid}/seen")
+    assert r.status_code == 200 and env.agent.store.thread(kid)["spawn"]["seen"] is True
+    assert (await env.client.post(f"/v1/threads/{tid}/seen")).status_code == 200      # a plain chat: nothing to do
+    assert (await env.client.post("/v1/threads/t_nope/seen")).status_code == 404
+
+
 async def test_a_child_left_running_resumes(env):
     store = env.agent.store
     root = store.create_thread("Main", None, "auto")

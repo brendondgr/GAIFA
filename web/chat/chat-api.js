@@ -18,7 +18,7 @@
 //   tasksUnread() runTask(kid) testTask(kid) checkTask(kid) taskNotes(kid) addTaskNote(kid, text) patchTaskNote(kid, nid, text)
 //   removeTaskNote(kid, nid) taskFolders(kid) addTaskFolder(kid, body) patchTaskFolder(kid, fid, p) removeTaskFolder(kid, fid)
 //   runAllows(kid, rid) addAllows(kid, body) runLog(kid, rid) watchTasks(onEvent)   (plan scheduled-tasks)
-//   tree(tid) requests(tid, {waiting}) decideRequest(tid, rid, {approve, reason, remember} | {answers}) watchWorkflows(onEvent)
+//   tree(tid) requests(tid, {waiting}) decideRequest(tid, rid, {approve, reason, remember} | {answers}) seenChild(tid) watchWorkflows(onEvent)
 //                                                                                   (plan agent-workflows 3.1: sub-agents)
 //
 // Errors are ChatError {status, detail, code, data}; status 0 means GAIFA didn't answer.
@@ -235,6 +235,7 @@ export function workflowCalls(req, url, ES = globalThis.EventSource) {
     tree: tid => req('GET', `${T(tid)}/tree`),
     requests: (tid, { waiting } = {}) => req('GET', `${T(tid)}/requests` + qs({ waiting: waiting ? 'true' : undefined })),
     decideRequest: (tid, rid, body) => req('POST', `${T(tid)}/requests/${enc(rid)}`, body),
+    seenChild: tid => req('POST', `${T(tid)}/seen`),                                       // 3.2: its unread dot goes
     watchWorkflows: onEvent => watch(url, ES, 'workflows', ev => ev.type === 'agent_child' && onEvent?.(ev)),
   };
 }

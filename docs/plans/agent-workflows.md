@@ -99,7 +99,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - `c.tree(tid)`, `c.requests(tid)`, `c.decideRequest(parent, rid, …)`; the stream's new events (`agent_request`, `agent_forwarded`, `agent_done`); `?mock` gets a workflow with a running, a waiting and a finished child.
   *Done when:* `utils/tests/web/chat-agents.test.mjs` covers the client calls and the mock.
 
-- [ ] **3.2 The sidebar tree: `web/chat/chat-tree.js`, `chat-list.js`.**
+- [x] **3.2 The sidebar tree: `web/chat/chat-tree.js`, `chat-list.js`.**
   - A row with `children > 0` gets a chevron; open, it fetches the tree and draws the children beneath it with ├ / └ lines: label, a running / queued / waiting / error dot, an unread dot (finished, not seen). Open rows kept on the hub (`hub.chat.tree.open`); the tree follows the stream. Children leave the flat list, the date, environment and project groups; Show all's search shows them with "in <parent>".
   *Done when:* the web test covers the tree's rows, and the browser shows it on the second hub (live and `?mock`).
 

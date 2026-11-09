@@ -10,6 +10,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.
 const load = f => import(pathToFileURL(path.join(root, 'web', f)).href);
 const capi = await load('chat/chat-api.js');
 const cmock = await load('chat/chat-mock.js');
+const tree = await load('chat/chat-tree.js');
 
 test('the live client: tree, requests, deciding one, the workflow watch (3.1)', async () => {
   const seen = [];
@@ -55,4 +56,27 @@ test('the mock: a workflow, its tree and requests, deciding from the parent (3.1
   const done = (await c.events(parent.id)).filter(e => e.type === 'agent_done');
   assert.equal(done.at(-1).payload.answer, 'Added the header to src/store.py.');
   w.close();
+});
+
+test('the sidebar tree: rows in order with their connectors, looks, following events, open rows (3.2)', async () => {
+  const t = { root: { id: 'r', children: 2 }, children: [
+    { id: 'a', parent: 'r', label: 'Read src', state: 'running', seen: true },
+    { id: 'b', parent: 'r', label: 'Read tests', state: 'idle', seen: false },
+    { id: 'a1', parent: 'a', label: 'Deeper', state: 'queued', seen: true }] };
+  assert.deepEqual(tree.treeRows(t).map(r => [r.node.id, r.depth, r.last]), [['a', 0, false], ['a1', 1, true], ['b', 0, true]]);
+  assert.deepEqual([tree.childLook(t.children[0]).state, tree.childLook(t.children[0]).unread], ['running', false]);
+  assert.deepEqual([tree.childLook(t.children[1]).word, tree.childLook(t.children[1]).unread], ['finished, new', true]);
+  assert.equal(tree.childLook({ state: 'waiting', seen: true }).word, 'waiting for you');
+  assert.equal(tree.childLook({ state: 'queued' }).word, 'waiting for a free slot');
+  const moved = tree.applyChild(t, { root: 'r', child: { id: 'b', parent: 'r', label: 'Read tests', state: 'idle', seen: true } });
+  assert.equal(moved.children.find(n => n.id === 'b').seen, true);
+  const added = tree.applyChild(t, { root: 'r', child: { id: 'c', parent: 'r', label: 'New', state: 'queued', seen: true } });
+  assert.equal(added.children.length, 4); assert.equal(added.root.children, 3);
+  assert.equal(tree.applyChild(t, { root: 'other', child: { id: 'x' } }), null);
+  const c = cmock.createMockClient({}, { speed: 400 });
+  const parent = (await c.threads()).find(x => x.title === 'Compare the folders');
+  const first = (await c.tree(parent.id)).children[0];
+  assert.equal(first.seen, false);
+  await c.seenChild(first.id);
+  assert.equal((await c.tree(parent.id)).children[0].seen, true);
 });

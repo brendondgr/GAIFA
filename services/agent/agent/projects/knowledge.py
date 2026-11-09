@@ -85,7 +85,8 @@ async def project_knowledge(agent: Any, pid: str, window: int, now: float | None
     return {"mode": "listed", "text": text, "tokens": ctx.est(text)}
 
 
-async def project_skills(agent: Any, tid: str, p: dict[str, Any], k: Any) -> tuple[str, list[str]]:
+async def project_skills(agent: Any, tid: str, p: dict[str, Any], k: Any,
+                         label: str = "Skills this project uses (always on in its chats: follow them)") -> tuple[str, list[str]]:
     """(the "Skills this project uses" block, the skills that didn't fit): the bodies of the project's `defaults.skills`,
     read once per prompt build (the agent's own through `Knowledge.read`, a workspace skill through the chat's folders),
     up to SKILLS_MAX characters in all, in the order the project lists them. A skill that can't be read is skipped."""
@@ -110,5 +111,5 @@ async def project_skills(agent: Any, tid: str, p: dict[str, Any], k: Any) -> tup
             continue
         blocks.append(block)
         size += len(block) + 2
-    text = ("Skills this project uses (always on in its chats: follow them):\n\n" + "\n\n".join(blocks)) if blocks else ""
+    text = (f"{label}:\n\n" + "\n\n".join(blocks)) if blocks else ""
     return text, over

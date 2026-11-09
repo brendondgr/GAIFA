@@ -73,7 +73,7 @@ class Grant(_Model):
 
 class Judged(_Model):
     """Auto mode (plan 30.3): the judge's verdict on a call, on its result or its card and in Settings → Agent."""
-    verdict: Literal["allow", "ask"]
+    verdict: Literal["allow", "ask", "refused"] = Field(description="refused: an ask in an unattended run (scheduled-tasks 2.1)")
     reason: str = ""
     source: str = Field("", description="rules | user (your command rules) | model | fail-closed")
     rule: str = ""
@@ -81,6 +81,7 @@ class Judged(_Model):
     model: str = ""
     summary: str = Field("", description="The command, URL or file, in one line")
     why: str | None = Field(None, description="The step row's words: Auto: ran (judged safe: …) or Auto: asked you (…)")
+    refused: bool | None = Field(None, description="The judge asked, and the run was unattended, so the call was refused")
 
 
 class JudgedCall(Judged):
@@ -141,6 +142,7 @@ class ToolCallResult(_Model):
     filled_by: dict[str, str] | None = None
     grant_key: str | None = None
     grant: Grant | None = None
+    grant_id: str | None = Field(None, description="A grant ran the call (scheduled-tasks 2.1: a run's pre-allow)")
     why: str | None = Field(None, description="needs_approval: why it asks (the mode, a list, the risk)")
     limits: CallLimits | None = None
     judge: Judged | None = None

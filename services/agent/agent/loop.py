@@ -102,6 +102,9 @@ class Agent(Compaction, Queueing, Prompting):
         self.project_created: list[Any] = []      # async (agent, project): its memory entity (4.2)
         self.project_changed: list[Any] = []      # async (agent, old, new): a rename renames the entity (4.2)
         self.project_cleanup: list[tuple[str, Any]] = []   # (step, async (agent, project)) when one is deleted (api_projects)
+        from .tasks.store import TaskStore
+        self.scheduled = TaskStore(store)         # plan scheduled-tasks 1.2 (`tasks` holds the running turns)
+        self.runner: Any = None                   # tasks/runner.Runner, made in the app's lifespan (2.2)
         self.live = Live()
         self.tasks: dict[str, asyncio.Task[Any]] = {}
         self.local = Local(self)
@@ -154,11 +157,12 @@ class Agent(Compaction, Queueing, Prompting):
     async def send(self, tid: str, text: str, attachments: list[str] | None = None,
                    doc_modes: dict[str, str] | None = None, quotes: list[dict[str, Any]] | None = None,
                    mentions: list[dict[str, Any]] | None = None, client_id: str | None = None, when: str = "auto",
-                   start: bool = True) -> dict[str, Any]:
+                   start: bool = True, by: str | None = None) -> dict[str, Any]:
         """`quotes`: [{text (markdown), reply, seq?}], parts of earlier replies and the user's reply to each, in order
         (Select → Reply). `text` may be empty when a reply says something. `when` (chat-responsive 2.1): `auto` holds a
         message sent during a turn, or while a card waits, in the queue (answers `{queued: item}`); `now` writes it at
-        once, for the running turn's next model call to read."""
+        once, for the running turn's next model call to read. `by`: who wrote it, when not the user typing
+        (`schedule`: a scheduled task's instructions, plan scheduled-tasks 2.2)."""
         thread = self.store.thread(tid)
         if thread is None:
             raise KeyError(tid)
@@ -185,7 +189,8 @@ class Agent(Compaction, Queueing, Prompting):
                                      **({"attachments": attachments} if attachments else {}),
                                      **({"docs": docs} if docs else {}), **({"queued": True} if queued else {}),
                                      **({"steer": True} if queued and when == "now" else {}),
-                                     **({"client_id": client_id} if client_id else {})})
+                                     **({"client_id": client_id} if client_id else {}),
+                                     **({"by": by} if by else {})})
         for d in docs:
             if d.get("fallback"):        # asked for whole, didn't fit (plan 24.9): say so in the chat
                 self.emit(tid, "note", {"text": d["fallback"], "level": "warn"})
@@ -244,7 +249,11 @@ class Agent(Compaction, Queueing, Prompting):
                 folders = None
             days = int(profile.settings(self.cfg.data).get("interest_days") or profile.INTEREST_DAYS)
             pid = (self.project_of(tid) or {}).get("id")                # plan projects 4.2: its memory, not others'
-            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory, folders, days, project=pid)[1], project=pid)
+            st = thread.get("settings") or {}
+            sw = {"user": st.get("use_profile", True) is not False,      # a scheduled task's switches (scheduled-tasks 2.4)
+                  "own_project": st.get("use_project_memory", True) is not False}
+            got = await profile.recall(self.memory, self.hub, text, profile.build(self.memory, folders, days, project=pid, **sw)[1],
+                                       project=pid, **sw)
         except Exception:  # noqa: BLE001: a message never fails over memory
             log.exception("recall for %s", tid)
             return []
@@ -519,7 +528,7 @@ class Agent(Compaction, Queueing, Prompting):
             content += "\nNote: " + hint
             self.emit(tid, "note", {"text": f"hook: added a hint to {name}'s error", "level": "info"})
         payload = {"id": call, "name": name, "status": res.get("status") or "done", "content": content}
-        for k in ("call_id", "error", "image", "data", "judge"):
+        for k in ("call_id", "error", "image", "data", "judge", "grant_id"):
             if res.get(k) is not None:
                 payload[k] = res[k]
         if outs:
@@ -618,6 +627,8 @@ class Agent(Compaction, Queueing, Prompting):
                 origin["named"] = named     # secret-looking files the user named: the workspace mod opens only these
             if (thread.get("settings") or {}).get("dry_run"):
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
+            if (thread.get("settings") or {}).get("unattended"):
+                origin["unattended"] = True  # a scheduled run with no one watching: what would ask is refused (scheduled-tasks 2.2)
             from .projects.origin import chat_envs
             origin.update(chat_envs(thread.get("settings"), self.projects))   # the chat's workspace folders (plan 34; a project's: projects 2.2)
             if mode == "auto":
@@ -650,10 +661,16 @@ class Agent(Compaction, Queueing, Prompting):
                 return "ok"
             call_id = res["call_id"]
             judged = res.get("judge")                     # the Auto judge's verdict (plan 30.5): on the step row
-            self.emit(tid, "call", {"id": cid, "call_id": call_id, **({"judge": judged} if judged else {})})
+            granted = res.get("grant_id")                 # a pre-allow ran it (scheduled-tasks 3.3)
+            self.emit(tid, "call", {"id": cid, "call_id": call_id, **({"judge": judged} if judged else {}),
+                                    **({"grant_id": granted} if granted else {})})
+        else:
+            granted = ((started or {}).get("payload") or {}).get("grant_id")
         res = await self._wait_call(tid, cid, call_id)
         if judged and not res.get("judge"):
             res = {**res, "judge": judged}
+        if granted and not res.get("grant_id"):
+            res = {**res, "grant_id": granted}
         self._hub_result(tid, cid, name, res, args)
         return "ok"
 

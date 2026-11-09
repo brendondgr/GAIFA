@@ -1,7 +1,8 @@
 // The Chat page (plan 14.1, Wire — Phase 14): thread list, thread view and composer for the agent
 // mod. A plain ES module on the page's React; Hub.dc.html mounts `ChatPage` for #/chat,
 // #/chat/<thread id>, #/chat/all (every chat, chat-all.js), #/chat/projects (the projects grid, chat-projects.js; plan
-// projects 5.1) and #/chat/projects/<id> (a project's page, chat-project.js); the last three are drawn in the main area
+// projects 5.1), #/chat/projects/<id> (a project's page, chat-project.js), #/chat/tasks (the scheduled tasks, chat-tasks.js; plan
+// scheduled-tasks 4.2) and #/chat/tasks/<id> (a task's page, chat-task.js); all but the chats are drawn in the main area
 // instead of the panes (thread ids start with t_, so they never clash). Written by us (web/PATCHES.md). The page keeps the list and what every chat shares;
 // each open chat is a `ChatPane` (chat-pane.js, chat-split plan 1.2).
 //
@@ -32,6 +33,8 @@ import { SplitView, SPLIT_CSS } from './chat-split.js';
 import { ProjectsPage, ProjectsEntry, PROJECTS_CSS } from './chat-projects.js';
 import { ProjectChats } from './chat-project-groups.js';
 import { ProjectPage } from './chat-project.js';
+import { TasksPage, TasksEntry } from './chat-tasks.js';
+import { TaskPage } from './chat-task.js';
 import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout } from './chat-layout.js';
 import { CONTROLS_CSS } from './chat-controls.js';
 import { QUOTE_CSS } from './chat-quote.js';
@@ -78,10 +81,12 @@ function withRoute(L, tid) {
   return open ? setActive(L, open.id) : setTid(L, activePane(L).id, tid);
 }
 /** What the route draws in the main area: a page of its own (`{page: 'all'}`, chat-history 3.1; `{page: 'projects'}`,
- * `{page: 'project', pid}`, plan projects 5.1–5.2), or null for the chats' panes. Thread ids start with t_, so they never clash. */
+ * `{page: 'project', pid}`, plan projects 5.1–5.2; `{page: 'tasks'}`, `{page: 'task', kid}`, scheduled-tasks 4.2), or null for the
+ * chats' panes. Thread ids start with t_, so they never clash. */
 export function subPage(route) {
   const p = route?.parts || [];
   if (p[1] === 'all') return { page: 'all' };
+  if (p[1] === 'tasks') return p[2] ? { page: 'task', kid: decodeURIComponent(p[2]) } : { page: 'tasks' };
   if (p[1] !== 'projects') return null;
   return p[2] ? { page: 'project', pid: decodeURIComponent(p[2]) } : { page: 'projects' };
 }
@@ -176,6 +181,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [projects, setProjects] = useState([]);       // plan projects 5.3: Move to… lists them
   const loadProjects = () => c.projects?.().then(setProjects, () => setProjects([]));
   useEffect(() => { loadProjects(); const w = c.watchProjects?.(() => loadProjects()); return () => w?.close(); }, []);
+  const [tasks, setTasks] = useState([]);             // scheduled-tasks 4.2: the Scheduled row
+  const loadTasks = () => c.tasks?.().then(setTasks, () => setTasks([]));
+  useEffect(() => { loadTasks(); const w = c.watchTasks?.(() => loadTasks()); return () => w?.close(); }, []);
   const newInProject = p => { setCmd(x => ({ n: (x?.n || 0) + 1, type: 'new', project: p || null, pane: lref.current.active })); setDrawer(false); if (sub) go('#/chat'); };   // 5.4
   const moveProject = (t, pid) => c.patch(t.id, { settings: { project: pid } }).then(n => {
     patched(n); relist();
@@ -189,7 +197,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     try { await c.remove(t.id); setThreads(l => l.filter(x => x.id !== t.id)); relist(); setLayout(L => dropTids(L, [t.id])); toast('Chat deleted', 'success'); } catch (e) { fail(e); }
   };
   const sh = {
-    api, c, toast, confirm, openOutput, fail, models, reloadModels: () => c.models().then(m => { setModels(m); return m; }, fail), settings, tools, mods, judge, speechOut, envs, loadEnvList, relist, bus: bus.current, rename, patched, listPatch,
+    api, c, toast, confirm, openOutput, fail, models, projects, reloadModels: () => c.models().then(m => { setModels(m); return m; }, fail), settings, tools, mods, judge, speechOut, envs, loadEnvList, relist, bus: bus.current, rename, patched, listPatch,
     reloadList: () => loadRef.current?.(),
     addThread: th => { setThreads(l => [th, ...l]); relist(); },
     envDeleted: ids => { setThreads(l => l.filter(x => !ids.includes(x.id))); relist(); setLayout(L => dropTids(L, ids)); },
@@ -209,7 +217,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     onShowAll: () => { setDrawer(false); go('#/chat/all' + (q.trim() ? '?q=' + encodeURIComponent(q.trim()) : '')); },
     onNew: () => newChat(), onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
     view: listView, onView: setListView, canGroup: !!envs, canProjects: projects.length > 0, itemProps,
-    projectsRow: c.projects ? h(ProjectsEntry, { projects, active: !!sub && sub.page !== 'all', current: sub?.page === 'project' ? sub.pid : null, go, onGo: () => setDrawer(false) }) : null,   // plan projects 5.4
+    projectsRow: c.projects ? h(ProjectsEntry, { projects, active: sub?.page === 'projects' || sub?.page === 'project', current: sub?.page === 'project' ? sub.pid : null, go, onGo: () => setDrawer(false) }) : null,   // plan projects 5.4
+    tasksRow: c.tasks ? h(TasksEntry, { tasks, active: sub?.page === 'tasks' || sub?.page === 'task', current: sub?.page === 'task' ? sub.kid : null, onGo: () => setDrawer(false) }) : null,   // scheduled-tasks 4.2
     groupLabel: grouping === 'date' ? 'Chats by date' : grouping === 'project' ? 'Chats by project' : 'Chats by environment',
     grouped: grouping === 'environment' ? h(GroupedChats, { c, api, envs, view: listView, onView: setListView, known: threads, reloadKey: listKey,
       renderItem, onNewIn: newIn, onEnvsChanged: loadEnvList, onError: fail, go })
@@ -226,6 +235,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       onBack: () => go(act.tid ? '#/chat/' + act.tid : '#/chat') }) :
     sub?.page === 'projects' ? h(ProjectsPage, { c, toast, go, onMenu: narrow ? () => setDrawer(true) : null }) :
     sub?.page === 'project' ? h(ProjectPage, { key: sub.pid, shared: sh, pid: sub.pid, go }) :
+    sub?.page === 'tasks' ? h(TasksPage, { shared: sh, go }) :
+    sub?.page === 'task' ? h(TaskPage, { key: sub.kid, shared: sh, kid: sub.kid, go }) :
     h(SplitView, { layout, setLayout, narrow, maxPanes: c.live && !c.sharedStream ? MAX_PANES : Infinity, onRefuse: m => toast(m, 'error'),
       titleOf: id => threads.find(t => t.id === id)?.title || null,
       renderPane: (p, { active, tools, grip }) => h(ChatPane, { shared: sh, tid: p.tid, paneId: p.id, cmd, grip, paneTools: tools,

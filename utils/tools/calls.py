@@ -213,6 +213,16 @@ class Calls:
                 "fix": refuse.get("fix") or "don't retry it; tell the user it's not allowed, or ask them to change the setting"}}
             await self._refused(tool.name, arguments, origin, out["error"])
             return out
+        if verdict == "ask" and (origin or {}).get("unattended"):   # scheduled-tasks 2.1: no one is there to answer a card
+            if judged is not None:
+                judged = {**judged, "refused": True}
+                await self._judged(tool.name, judged, origin)
+            out = {"status": "denied", "tool": tool.name, "error": {
+                "code": "unattended", "detail": f"{tool.name}: {why}; this is an unattended run and no one is here to approve it",
+                "fix": "don't retry it; do what you can without it, and say in your summary what was refused and why"},
+                **({"judge": judged} if judged else {})}
+            await self._refused(tool.name, arguments, origin, out["error"])
+            return out
         if verdict == "ask":
             if (limits or {}).get("ask_folder"):      # plan 34: the card asks for a folder; the popover reads it here
                 origin = {**(origin or {}), "ask_folder": limits["ask_folder"]}   # type: ignore[index]
@@ -230,6 +240,8 @@ class Calls:
         if judged is not None:
             await self._judged(tool.name, judged, origin, call_id=out.get("call_id"))
             out = {**out, "judge": judged}
+        if grant is not None:
+            out = {**out, "grant_id": grant["id"]}         # scheduled-tasks 2.1: the run's log says which pre-allow ran it
         return out
 
     async def _judged(self, tool: str, j: dict[str, Any], origin: dict[str, Any] | None,
@@ -237,10 +249,11 @@ class Calls:
         """Settings → Permissions lists recent judged calls (plan 30.5); a failure here never breaks the call."""
         try:
             await self.hub.db.execute(
-                "INSERT INTO judged (ts, tool, verdict, reason, source, rule, ms, model, summary, thread, call_id, approval_id)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO judged (ts, tool, verdict, reason, source, rule, ms, model, summary, thread, call_id, approval_id, refused)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (time.time(), tool, j.get("verdict"), j.get("reason") or "", j.get("source") or "", j.get("rule") or "",
-                 j.get("ms"), j.get("model") or "", j.get("summary") or "", (origin or {}).get("thread"), call_id, approval_id))
+                 j.get("ms"), j.get("model") or "", j.get("summary") or "", (origin or {}).get("thread"), call_id, approval_id,
+                 int(bool(j.get("refused")))))
         except Exception:  # noqa: BLE001
             log.exception("recording a judged call")
 

@@ -285,6 +285,11 @@ MIGRATIONS: list[str] = [
     ALTER TABLE outputs ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0;
     UPDATE outputs SET hidden = 1, sig = '' WHERE json_valid(meta) AND json_extract(meta, '$.hidden') = 1;
     """,
+    # 013: a judged call the judge asked about in an unattended run (scheduled-tasks 2.1) was refused, not carded:
+    # its verdict stays `ask` and `refused` says so (GET /api/judge/recent shows it as `refused`).
+    """
+    ALTER TABLE judged ADD COLUMN refused INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 _STOP = object()

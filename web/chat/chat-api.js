@@ -14,6 +14,10 @@
 //   addSource(pid, body) patchSource(pid, sid, p) removeSource(pid, sid) refreshSource(pid, sid) projectFolders(pid)
 //   addProjectFolder(pid, {path, level}) patchProjectFolder(pid, fid, p) removeProjectFolder(pid, fid) projectMemory(pid)
 //   patchProjectFact(pid, fid, p) forgetProjectFact(pid, fid) watchProjects(onEvent) → {close()}   (plan projects)
+//   tasks({q, project}) task(kid) createTask(body) patchTask(kid, p) deleteTask(kid) taskRuns(kid, opts) seeRun(kid, rid)
+//   tasksUnread() runTask(kid) testTask(kid) checkTask(kid) taskNotes(kid) addTaskNote(kid, text) patchTaskNote(kid, nid, text)
+//   removeTaskNote(kid, nid) taskFolders(kid) addTaskFolder(kid, body) patchTaskFolder(kid, fid, p) removeTaskFolder(kid, fid)
+//   runAllows(kid, rid) addAllows(kid, body) runLog(kid, rid) watchTasks(onEvent)   (plan scheduled-tasks)
 //
 // Errors are ChatError {status, detail, code, data}; status 0 means GAIFA didn't answer.
 
@@ -104,12 +108,13 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
   return {
     live: true,
     models: () => req('GET', '/v1/models'),
-    threads: ({ q, archived, limit, environment, sort, offset, project } = {}) => req('GET', '/v1/threads' + qs({ q, archived: archivedQ(archived), limit,
-      environment, sort: sort && sort !== 'updated' ? sort : undefined, offset: offset || undefined, project })),
+    threads: ({ q, archived, limit, environment, sort, offset, project, task } = {}) => req('GET', '/v1/threads' + qs({ q, archived: archivedQ(archived), limit,
+      environment, sort: sort && sort !== 'updated' ? sort : undefined, offset: offset || undefined, project, task })),
     threadGroups: ({ archived, by } = {}) => req('GET', '/v1/threads/groups' + qs({ archived: archivedQ(archived),   // plan 41.1
       by: by && by !== 'environment' ? by : undefined })),                                 // by: 'project' (plan projects 1.3)
     threadCount: ({ q, archived, environment, project } = {}) => req('GET', '/v1/threads/count' + qs({ q, archived: archivedQ(archived), environment, project })),   // chat-history 1.1
     ...projectCalls(req, url, ES),                                                         // plan projects 1.3
+    ...taskCalls(req, url, ES),                                                            // plan scheduled-tasks 4.1
     searchChats: (q, limit = 8) => req('GET', '/v1/chats/search' + qs({ q, limit })).then(r => r.results || []),  // plan 28.5
     create: (body = {}) => req('POST', '/v1/threads', body),
     get: tid => req('GET', T(tid)),
@@ -186,6 +191,49 @@ export function projectCalls(req, url, ES = globalThis.EventSource) {
       return { close() { closed = true; clearTimeout(timer); es?.close(); } };
     },
   };
+}
+
+// Scheduled tasks (plan scheduled-tasks 4.1): the agent's /v1/tasks routes. watchTasks(onEvent) keeps an EventSource on
+// /v1/streams?watch=tasks open for the `task` and `task_run` events, reconnecting on errors.
+export function taskCalls(req, url, ES = globalThis.EventSource) {
+  const K = kid => `/v1/tasks/${enc(kid)}`;
+  return {
+    tasks: ({ q, project } = {}) => req('GET', '/v1/tasks' + qs({ q, project })),
+    task: kid => req('GET', K(kid)),
+    createTask: body => req('POST', '/v1/tasks', body),
+    patchTask: (kid, patch) => req('PATCH', K(kid), patch),
+    deleteTask: kid => req('DELETE', K(kid)),
+    taskRuns: (kid, { limit, before } = {}) => req('GET', `${K(kid)}/runs` + qs({ limit, before })),
+    seeRun: (kid, rid, seen = true) => req('PATCH', `${K(kid)}/runs/${enc(rid)}`, { seen }),
+    tasksUnread: () => req('GET', '/v1/tasks/unread'),
+    runTask: kid => req('POST', `${K(kid)}/run`),
+    testTask: kid => req('POST', `${K(kid)}/test`),
+    checkTask: kid => req('POST', `${K(kid)}/check`),
+    taskNotes: kid => req('GET', `${K(kid)}/notes`),
+    addTaskNote: (kid, text) => req('POST', `${K(kid)}/notes`, { text }),
+    patchTaskNote: (kid, nid, text) => req('PATCH', `${K(kid)}/notes/${enc(nid)}`, { text }),
+    removeTaskNote: (kid, nid) => req('DELETE', `${K(kid)}/notes/${enc(nid)}`),
+    taskFolders: kid => req('GET', `${K(kid)}/folders`),
+    addTaskFolder: (kid, body) => req('POST', `${K(kid)}/folders`, body),
+    patchTaskFolder: (kid, fid, patch) => req('PATCH', `${K(kid)}/folders/${enc(fid)}`, patch),
+    removeTaskFolder: (kid, fid) => req('DELETE', `${K(kid)}/folders/${enc(fid)}`),
+    runAllows: (kid, rid) => req('GET', `${K(kid)}/runs/${enc(rid)}/allows`),
+    addAllows: (kid, body) => req('POST', `${K(kid)}/allow`, body),
+    runLog: (kid, rid) => req('GET', `${K(kid)}/runs/${enc(rid)}/log`),
+    watchTasks: onEvent => watch(url, ES, 'tasks', ev => (ev.type === 'task' || ev.type === 'task_run') && onEvent?.(ev)),
+  };
+}
+function watch(url, ES, what, on) {
+  let es = null, closed = false, tries = 0, timer = null;
+  const open = () => {
+    if (closed || !ES) return;
+    es = new ES(url(`/v1/streams?threads=&watch=${what}`));
+    es.onopen = () => { tries = 0; };
+    es.onmessage = m => { let ev; try { ev = JSON.parse(m.data); } catch { return; } on(ev); };
+    es.onerror = () => { es.close(); if (!closed) timer = setTimeout(open, Math.min(10000, 800 * 2 ** tries++)); };
+  };
+  open();
+  return { close() { closed = true; clearTimeout(timer); es?.close(); } };
 }
 
 /** The live client when GAIFA proxies to mods, else the scripted mock agent. */

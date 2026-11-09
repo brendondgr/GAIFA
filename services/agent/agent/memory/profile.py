@@ -92,15 +92,20 @@ def dated(f: dict[str, Any]) -> str:
 
 
 def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None, interest_days: int = INTEREST_DAYS,
-          project: str | None = None) -> tuple[str, set[str]]:
+          project: str | None = None, user: bool = True, own_project: bool = True) -> tuple[str, set[str]]:
     """(the profile's text, the ids of the facts it shows). The user's facts carry their dates; preferences come
     first, newest first, then interests by when they were last said, then the rest, newest first; an interest not
     said for `interest_days`, or one that was replaced or ended this past year, goes on the "Earlier interests" line.
-    `project`: the chat's project (plan projects 4.2), whose facts come first."""
+    `project`: the chat's project (plan projects 4.2), whose facts come first. A scheduled task's switches
+    (scheduled-tasks 2.4): `user=False` leaves out the user's facts and the projects line, `own_project=False` the
+    project's own memory."""
     from ..projects.memory import private
     shown: set[str] = set()
     parts = []
-    mine = [e for e in chat_projects(m, folders, project) if project and
+    keep_out: set[str] = set()
+    if not own_project:
+        project, keep_out = None, private(m, None)          # every project's memory kept out, its own included
+    mine =[e for e in chat_projects(m, folders, project) if project and
             any(a["kind"] == "project" and a["value"] == project for a in m.anchors(e["id"]))]
     for e in mine:                                         # the project chat's own project leads
         facts, size = [], 0
@@ -133,14 +138,17 @@ def build(m: MemoryStore, folders: list[dict[str, Any]] | None = None, interest_
     if earlier:
         lines.append("- Earlier interests: " + "; ".join(dated(f).removeprefix("The user ") for f in earlier[:EARLIER_MAX]))
         shown.update(f["id"] for f in earlier[:EARLIER_MAX])
+    if not user:
+        shown.difference_update(f["id"] for f in [*you, *earlier])
+        lines = []
     if lines:
         parts.append("About the user:\n" + "\n".join(lines))
     hidden = private(m, project)
-    projects = [e for e in m.entities("project") if not e["parent"] and e["id"] not in hidden][:PROJECTS_MAX]
+    projects = [e for e in m.entities("project") if not e["parent"] and e["id"] not in hidden][:PROJECTS_MAX] if user else []
     if projects:
         parts.append("Projects: " + "; ".join(e["name"] + (f" ({e['summary']})" if e["summary"] else "") for e in projects))
     for e in chat_projects(m, folders, project):
-        if e in mine:
+        if e in mine or e["id"] in keep_out:
             continue
         facts, size = [], 0
         for f in m.facts_of(e["id"]):
@@ -162,14 +170,17 @@ def settings(data: Path) -> dict[str, Any]:
         return base
 
 
-async def recall(m: MemoryStore, hub: Any, text: str, shown: set[str], project: str | None = None) -> list[dict[str, Any]]:
+async def recall(m: MemoryStore, hub: Any, text: str, shown: set[str], project: str | None = None,
+                 user: bool = True, own_project: bool = True) -> list[dict[str, Any]]:
     """The facts a message calls to mind, not already in the profile, best first; [] for a short or empty message.
-    Facts about another project's entity are left out (plan projects 4.2; `project`: the chat's own)."""
+    Facts about another project's entity are left out (plan projects 4.2; `project`: the chat's own). A scheduled
+    task's switches (scheduled-tasks 2.4): `user=False` leaves out facts about the user, `own_project=False` the
+    project's own."""
     from ..projects.memory import private
     if len((text or "").strip()) < 3:
         return []
     r = await search(m, hub, text, limit=RECALL_FACTS * 2, meaning_wait=MEANING_WAIT_S)
-    hidden = private(m, project)
+    hidden = private(m, project if own_project else None) | (set() if user else {"user"})
     out, size = [], 0
     for f in r["facts"]:
         if f["id"] in shown:

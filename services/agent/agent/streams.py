@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .store import new_id
 
 MAX_THREADS = 64
-WATCHED = ("project", "project_source")   # events about no one chat, for streams opened with watch=projects
+WATCHED = ("project", "project_source", "task", "task_run")   # events about no one chat, for streams opened with watch=projects or tasks
 HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
 
@@ -89,14 +89,15 @@ def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: 
                                     "seq and a `ready` for it, then live events and deltas of all of them (each has `thread_id`); "
                                     "an unknown thread gets `{type: 'gone', thread_id}`")
     async def streams(request: Request, threads: str = "", watch: str = "") -> StreamingResponse:
-        """`watch=projects` (plan projects 1.2): also every `project` and `project_source` event, which belong to no chat."""
+        """`watch=projects` (plan projects 1.2) or `watch=tasks` (scheduled-tasks 1.3): also every `project`, `project_source`,
+        `task` and `task_run` event, which belong to no chat."""
         agent = A(request)
         wanted = parse_threads(threads)
         known = [(tid, after) for tid, after in wanted if agent.store.thread(tid) is not None]
         q: asyncio.Queue[dict[str, Any]] = asyncio.Queue(4000)
         for tid, _ in known:                       # before the replay, so nothing that happens meanwhile is missed
             agent.live.subscribe(tid, q)
-        watching = "projects" in watch.split(",")
+        watching = bool({"projects", "tasks"} & set(watch.split(",")))
         if watching:
             agent.live.watchers.add(q)
         sid, carried = new_id("s_"), {tid for tid, _ in known}

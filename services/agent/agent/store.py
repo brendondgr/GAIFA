@@ -39,6 +39,7 @@ from typing import Any
 # A chat's environment (plan 34: `settings.environment`); none is Default. The orders `threads` takes (plan 41.1).
 ENV_OF = "COALESCE(json_extract(settings, '$.environment'), 'default')"
 PROJ_OF = "COALESCE(json_extract(settings, '$.project'), 'none')"     # a chat's project (plan projects 1.1); `none`: no project
+TASK_OF = "COALESCE(json_extract(settings, '$.task'), 'none')"        # a run chat's task (plan scheduled-tasks 1.2)
 GROUP_OF = {"environment": ENV_OF, "project": PROJ_OF}
 SORTS = {"updated": "updated DESC", "created": "created DESC", "title": "lower(title) ASC, updated DESC"}
 
@@ -145,7 +146,7 @@ class Store:
 
     @staticmethod
     def _where(q: str | None, archived: bool | None, environment: list[str] | None,
-               project: list[str] | None = None) -> tuple[str, list[Any]]:
+               project: list[str] | None = None, task: list[str] | None = None) -> tuple[str, list[Any]]:
         """The list's clauses, shared by `threads`, `count` and `groups`: `archived` None means both (plan chat-history
         1.1); `project` the chats of some projects (plan projects 1.1: `none` matches chats in none)."""
         sql, args = " WHERE 1", []
@@ -162,24 +163,27 @@ class Store:
         if project:
             sql += f" AND {PROJ_OF} IN ({', '.join('?' * len(project))})"
             args += list(project)
+        if task:
+            sql += f" AND {TASK_OF} IN ({', '.join('?' * len(task))})"
+            args += list(task)
         return sql, args
 
     def threads(self, q: str | None = None, archived: bool | None = False, limit: int = 200,
                 environment: list[str] | None = None, sort: str = "updated", offset: int = 0,
-                project: list[str] | None = None) -> list[dict[str, Any]]:
+                project: list[str] | None = None, task: list[str] | None = None) -> list[dict[str, Any]]:
         """Newest first (`sort`: updated | created; `title` A to Z), optionally only the chats of some environments
         (plan 41.1: `default` also matches chats without one) or projects (plan projects 1.1); `archived` None lists
         live and archived together."""
-        where, args = self._where(q, archived, environment, project)
+        where, args = self._where(q, archived, environment, project, task)
         sql = "SELECT * FROM threads" + where
         sql += " ORDER BY " + SORTS.get(sort, SORTS["updated"]) + " LIMIT ? OFFSET ?"
         args += [limit, max(0, offset)]
         return [self._thread(r) for r in self._all(sql, args)]  # type: ignore[misc]
 
     def count(self, q: str | None = None, archived: bool | None = False, environment: list[str] | None = None,
-              project: list[str] | None = None) -> int:
+              project: list[str] | None = None, task: list[str] | None = None) -> int:
         """How many chats `threads` would list with these filters and no limit (plan chat-history 1.1)."""
-        where, args = self._where(q, archived, environment, project)
+        where, args = self._where(q, archived, environment, project, task)
         return int(self._one("SELECT COUNT(*) FROM threads" + where, args)[0])
 
     def groups(self, archived: bool | None = False, by: str = "environment") -> list[dict[str, Any]]:

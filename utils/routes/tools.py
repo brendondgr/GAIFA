@@ -4,17 +4,18 @@
 - `POST /api/tools/{name}/call {arguments, origin, mode}?wait=` → `ToolCallResult`
 - `GET /api/tools/calls/{id}?wait=`, `GET /api/tools/calls/{id}/result?offset=&limit=`, `POST …/cancel`
 - `GET /api/approvals[?state=]`, `GET /api/approvals/{id}`, `POST /api/approvals/{id} {approve, arguments?, remember?, confirm?}`
-- `GET /api/grants[?thread=][?tool=]`, `DELETE /api/grants/{id}`, `DELETE /api/grants?thread=` (plan 25.2)
+- `GET /api/grants[?thread=][?tool=]`, `POST /api/grants` (a chat's, ahead of time: scheduled-tasks 2.1), `DELETE /api/grants/{id}`, `DELETE /api/grants?thread=` (plan 25.2)
 - `GET /api/judge/recent[?thread=]`, `GET /api/judge/status` (the Auto mode's judge, plan 30.3, 30.5)
 """
 
 from __future__ import annotations
 
+import fnmatch
 import json
 from typing import Any, Literal
 
 from fastapi import APIRouter, Query, Request
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from utils.tools.api import (Approval, CallRequest, Decision, Grant, JudgedCall, JudgeStatus, ResultPage, Tool, ToolCallResult,
                              ToolIndexItem)
@@ -162,6 +163,44 @@ async def list_grants(request: Request, thread: str | None = None, tool: str | N
     return await _hub(request).grants.list(thread, tool)
 
 
+class NewGrant(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    tool: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9_*?\[\]-]+$", description="A tool name or glob")
+    key: str | None = Field(None, max_length=300, description="What it covers (a host for url:host; * for url:any); null: every call")
+    kind: Literal["url:host", "url:any"] | None = Field(None, description="url:host: one site; url:any: every site (the judge's "
+                                                                          "URL rules still apply); null: every call of the tool")
+    thread: str = Field(min_length=1, max_length=64, description="The chat it holds in (a thread grant; never always)")
+    note: str = Field("", max_length=300)
+
+
+@router.post("/api/grants", status_code=201, summary="Allow a tool (a glob), one site or every site in one chat, ahead of time "
+             "(scheduled-tasks 2.1: a scheduled run's pre-allows); never `always`, never a folder", response_model=Grant,
+             response_model_exclude_none=True)
+async def add_grant(body: NewGrant, request: Request) -> dict[str, Any]:
+    from utils.server import HubError
+    from utils.tools.grants import SITES_KEY, SITES_KIND
+
+    hub = _hub(request)
+    if hub.grants is None:
+        raise HubError(503, "no_grants", "grants aren't available")
+    key = body.key
+    if body.kind == SITES_KIND:
+        key = SITES_KEY
+    elif body.kind == "url:host":
+        key = (key or "").strip().lower().rstrip(".")
+        if not key or "/" in key or ":" in key:
+            raise HubError(422, "invalid_arguments", "a url:host grant names one host (example.com)")
+    elif key is not None:
+        raise HubError(422, "invalid_arguments", "a grant with a key needs its kind (url:host or url:any)")
+    tools = [t for t in await hub.tools.tools() if fnmatch.fnmatchcase(t.name, body.tool)]
+    if not tools:
+        raise HubError(422, "unknown_tool", f"no tool matches {body.tool!r}", {"fix": "name a tool from /api/tools/index, or a glob such as web_*"})
+    if body.kind and not all(t.grant_key == "url:host" for t in tools):
+        raise HubError(422, "not_a_web_tool", f"{body.tool} isn't a web tool, so it can't be allowed per site")
+    risk = tools[0].risk if len(tools) == 1 else None
+    return await hub.grants.add(body.tool, key, "thread", body.thread, kind=body.kind, risk=risk, note=body.note or "allowed ahead of time")
+
+
 @router.delete("/api/grants/{grant_id}", summary="Revoke a grant: its calls ask again", response_model=GrantsDeleted)
 async def revoke_grant(grant_id: str, request: Request) -> dict[str, Any]:
     from utils.server import HubError
@@ -185,6 +224,9 @@ async def judged_recent(request: Request, thread: str | None = None, limit: int 
 
     rows = await _hub(request).db.fetchall(f"SELECT * FROM judged {where} ORDER BY ts DESC, id DESC LIMIT ?", (*args, limit))
     out = [dict(r) for r in rows]
+    for r in out:     # scheduled-tasks 2.1: asked in an unattended run, so refused
+        if r.pop("refused", 0):
+            r["verdict"], r["refused"] = "refused", True
     for r in out:     # asked by the model (the rules weren't sure): your allow rule could cover it
         prefix = f"{r['tool']}: "
         if r["verdict"] == "ask" and r["source"] in ("model", "fail-closed") and r["tool"] in ("workspace_run", "workspace_shell") \

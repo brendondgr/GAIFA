@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
-from . import api_imports, api_memory, api_projects, api_skills, api_summaries, docs
+from . import api_imports, api_memory, api_projects, api_skills, api_summaries, api_tasks, docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -251,6 +251,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         agent = Agent(cfg, store, hub, llm)
         app.state.agent = agent
         api_projects.install(agent)                                  # plan projects: what deleting one also removes
+        api_tasks.install(agent)                                     # plan scheduled-tasks 1.3: a deleted project detaches its tasks
         stop = asyncio.Event()
         watcher = asyncio.create_task(hub.follow_events(agent.hub_event, stop))
         upkeep = asyncio.create_task(_upkeep(store, stop))
@@ -293,6 +294,11 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         mem_learner = asyncio.create_task(agent.memory_learner.run_forever(stop))
         from .memory.imports import Importer
         agent.memory_importer = Importer(agent)                                              # memory-import 1.4
+        from .tasks.runner import Runner
+        from .tasks.schedule import TaskSchedule
+        agent.runner = Runner(agent)                                                         # scheduled-tasks 2.2–2.3
+        app.state.task_schedule = TaskSchedule(agent, agent.runner)
+        task_scheduler = asyncio.create_task(app.state.task_schedule.run_forever(stop))
         await agent.resume_all()
         try:
             yield
@@ -308,8 +314,9 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             summarizer.cancel()
             indexer.cancel()
             mem_learner.cancel()
+            task_scheduler.cancel()
             await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, summarizer, indexer, mem_learner,
-                                 return_exceptions=True)
+                                 task_scheduler, return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()
@@ -321,6 +328,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     api_memory.add_routes(app)                                       # structured-memory 1.2
     api_imports.add_routes(app)                                      # memory-import 1.4
     api_projects.add_routes(app)                                     # plan projects 1.2
+    api_tasks.add_routes(app)                                        # plan scheduled-tasks 1.3
 
     def A(request: Request) -> Agent:
         return request.app.state.agent
@@ -411,9 +419,11 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                      environment: str | None = Query(None, description="Environment ids, comma-separated (plan 41.1)"),
                      sort: Literal["updated", "created", "title"] = "updated", offset: int = Query(0, ge=0),
                      project: str | None = Query(None, description="Project ids, comma-separated; `none`: chats in no project "
-                                                                    "(plan projects 1.2)")) -> list[dict]:
+                                                                    "(plan projects 1.2)"),
+                     task: str | None = Query(None, description="Scheduled task ids, comma-separated: their run chats; `none`: "
+                                                                 "chats no task started (plan scheduled-tasks 1.3)")) -> list[dict]:
         return A(request).store.threads(q, archived_of(archived), limit, environment=envs_of(environment), sort=sort,
-                                        offset=offset, project=envs_of(project))
+                                        offset=offset, project=envs_of(project), task=envs_of(task))
 
     @app.get("/v1/threads/count", summary="How many threads /v1/threads would list with the same filters, no limit")
     def count_threads(request: Request, q: str | None = None, archived: ArchivedQ = "false",

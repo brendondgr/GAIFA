@@ -172,5 +172,6 @@ function status(turn, rows, gpu = null) {
 export function judgeOf(it) {
   const j = it?.result?.judge || it?.run?.judge || it?.approval?.judge || null;
   if (!j) return null;
+  if (j.refused) return { ...j, why: `Auto: refused, no one to ask (${j.reason})` };   // an unattended run (scheduled-tasks 2.1)
   return { ...j, why: j.why || (j.verdict === 'allow' ? `Auto: ran (judged safe: ${j.reason})` : `Auto: asked you (${j.reason})`) };
 }

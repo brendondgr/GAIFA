@@ -69,8 +69,10 @@ class Prompting:
         summary, _, _ = ctx.summary_state(events)
         prefs = await k.preferences(set(tools.full), tid) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
         fdata = await ctx.chat_folders(self.hub, tid, thread_settings(self.store, tid), services, tools.disabled, self.projects)
+        st = thread_settings(self.store, tid) or {}
+        sw = {"user": st.get("use_profile", True) is not False, "own_project": st.get("use_project_memory", True) is not False}
         parts = {"base": tree.get("systemprompt.md", ""), "guardrails": tree.get("guardrails.md", ""),
-                 "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.profile((fdata or {}).get("folders"), (self.project_of(tid) or {}).get("id")), prefs) if x),
+                 "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.profile((fdata or {}).get("folders"), (self.project_of(tid) or {}).get("id"), **sw), prefs) if x),
                  "skills": await k.skill_list(set(tools.disabled), await ctx.chat_skills(
                      self.hub, tid, thread_settings(self.store, tid), services, tools.disabled, self.projects)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
@@ -93,6 +95,17 @@ class Prompting:
             parts["skills"] = "\n\n".join(x for x in (block, parts["skills"]) if x)
             sizes["project"] = ctx.est(parts["project"] + parts["project_knowledge"] + block)
             sizes["skills_memory"] = ctx.est(parts["skills"] + parts["memory"]) - ctx.est(block)
+        if (kt := self.scheduled.get(str(st["task"])) if st.get("task") else None) is not None:   # scheduled-tasks 2.4
+            from .projects import knowledge
+            from .tasks import notes as task_notes
+            parts["task"] = task_notes.task_text(kt, self.scheduled.notes(kt["id"]), st)
+            block, over = await knowledge.project_skills(self, tid, {"id": kt["id"], "defaults": {"skills": kt["skills"]}}, k,
+                                                         label="Skills this scheduled task uses (always on in its runs: follow them)")
+            if over:
+                parts["skills"] = f"This task uses (read them with read_skill first): {', '.join(over)}\n" + parts["skills"]
+            parts["skills"] = "\n\n".join(x for x in (block, parts["skills"]) if x)
+            sizes["instructions"] += ctx.est(parts["task"])
+            sizes["skills_memory"] = ctx.est(parts["skills"] + parts["memory"])
         return prompts.build(parts), sizes
 
     async def all_tools(self, model: str) -> bool:

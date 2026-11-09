@@ -90,6 +90,7 @@ export function createProjectMocks({ threads, newThread, emit, net, err, now, ri
   const sortBy = { name: (a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()), created: (a, b) => b.created - a.created };
   return {
     newChatBody, movePatch, seed,
+    list() { seed(); return [...projects.values()].map(row); },     // the tasks mock's projects (scheduled-tasks 4.1)
     async projects({ q, sort = 'activity' } = {}) {
       seed(); await net();
       const qq = (q || '').toLowerCase();

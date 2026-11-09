@@ -108,7 +108,7 @@ Assumed:
 
 ## Phase 2 — Running unattended (L)
 
-- [ ] **2.1 The hub: `utils/tools/calls.py`, `utils/routes/tools.py`, `utils/tools/grants.py`.**
+- [x] **2.1 The hub: `utils/tools/calls.py`, `utils/routes/tools.py`, `utils/tools/grants.py`.**
   - **`origin.unattended`:** a call whose verdict would be `ask` is refused: `{status: "denied", error: {code: "unattended", detail: "<tool>: <why>; no one is here to approve it", fix}}`, with `judge` when the judge decided. It's recorded in `judged` with verdict `refused` (Settings → Permissions shows it) and in the refused calls. Plan mode's and the preflights' refusals are unchanged.
   - **`POST /api/grants`:** `{tool, key?, kind?, thread, note?}` writes a `thread` grant (never `always`; `422` without a thread). Tool globs are allowed. `kind: "url:any"` with key `*` is every site, which keeps the judge's URL rules.
   - **Records:** a call a grant ran answers with `grant` (its id), so the run's log can say "pre-allowed".

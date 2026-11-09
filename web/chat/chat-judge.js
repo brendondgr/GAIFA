@@ -120,7 +120,7 @@ export function JudgedList({ api, limit = 30, onAllow, allowed: allowedList, con
     rows?.length ? h('span', { style: { fontWeight: 500, marginTop: 4 } }, 'Recent calls') : null,
     rows && !rows.length ? h('span', { style: { fontSize: 12.5, color: T.mut } }, 'None yet. Pick Auto in a chat’s header to let the judge decide.') : null,
     (rows || []).map(r => h('div', { key: r.id, style: { display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', fontSize: 12.5, padding: '6px 8px', borderRadius: 6, background: T.inset } },
-      h(Badge, { tone: r.verdict === 'allow' ? 'green' : 'purple' }, r.verdict === 'allow' ? 'ran' : 'asked'),
+      h(Badge, { tone: r.verdict === 'allow' ? 'green' : r.verdict === 'refused' ? 'red' : 'purple' }, r.verdict === 'allow' ? 'ran' : r.verdict === 'refused' ? 'refused' : 'asked'),   // refused: an unattended run's (scheduled-tasks 2.1)
       h('span', { style: { fontFamily: MONO, fontSize: 12, minWidth: 0, overflowWrap: 'anywhere' } }, r.summary || r.tool),
       h('span', { style: { color: T.mut, minWidth: 0, overflowWrap: 'anywhere', flexBasis: '100%' } }, r.reason),
       h('span', { style: { fontSize: 11.5, color: T.dim } }, [SOURCE[r.source] || r.source, r.ms != null ? `${Math.round(r.ms)} ms` : null,

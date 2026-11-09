@@ -1142,8 +1142,8 @@ The `tools` area. The chat (Stage D) and outside clients (MCP) use the same call
 | `getToolCall(id, {wait?})`, `cancelToolCall(id)` | `GET /api/tools/calls/{id}`, `POST /api/tools/calls/{id}/cancel` |
 | `listApprovals({state?})`, `getApproval(id)` | `GET /api/approvals` (pending; `state=all`), `GET /api/approvals/{id}` |
 | `decideApproval(id, {approve, args?, reason?, remember?, confirm?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs; `remember: "once" \| "thread" \| "always" \| "sites"` (plan 25.2; `sites`: a `url:host` tool on any site in this chat, plan web-approvals) also writes a grant (`thread` needs a call from a chat, else 422 `no_thread`; `always` for `execute`/`destructive` needs `confirm: true`, else 422 `confirm_needed`); the result carries the `grant` |
-| `listGrants({thread?, tool?})`, `revokeGrant(id)` | `GET /api/grants`, `DELETE /api/grants/{id}` (plan 25.2); `DELETE /api/grants?thread=` ends a chat's grants |
-| `listJudged({thread?, limit?})`, `getJudgeStatus()` | `GET /api/judge/recent` → `JudgedCall[]` (newest first), `GET /api/judge/status` → `JudgeStatus` (the Auto mode's judge, plan 30.3, 30.5) |
+| `listGrants({thread?, tool?})`, `revokeGrant(id)` | `GET /api/grants`, `DELETE /api/grants/{id}` (plan 25.2); `DELETE /api/grants?thread=` ends a chat's grants; `POST /api/grants` writes one ahead of time (a scheduled run's pre-allows, scheduled-tasks 2.1) |
+| `listJudged({thread?, limit?})`, `getJudgeStatus()` | `GET /api/judge/recent` → `JudgedCall[]` (newest first), `GET /api/judge/status` → `JudgeStatus` (the Auto mode's judge, plan 30.3, 30.5); a verdict is `allow`, `ask` or `refused` (asked in an unattended run, scheduled-tasks 2.1) |
 
 Also `GET /api/tools/calls/{id}/result?offset=&limit=` pages a capped result. **Events:** `{type: "approval", approval: Approval}` when one is created or decided; `{type: "tool_call", call: ToolCallResult & {origin}}` as a call starts, makes progress and ends (`origin.grant`: the grant that let it run without a card); `{type: "grant", grant: Grant}` when one is written and `{type: "grant_deleted", id}` when one is revoked or ends.
 
@@ -1177,14 +1177,16 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            filled_by?: { [field: string]: "default" | "carried" | string };  // how, an x-options default, carried in this chat, or a preference ("pref" + its id, plan 21.7)
                            grant_key?: string;                      // needs_approval, the tool's grant key kind (plan 25.2)
                            grant?: Grant;                           // a decision with remember: thread | always | sites
+                           grant_id?: string;                       // a grant ran the call (a scheduled run's pre-allow, scheduled-tasks 2.1)
                            why?: string;                            // needs_approval: why it asks (the mode, a list, the risk; plan 27.4)
                            limits?: CallLimits;                     // needs_approval for a tool with a preflight (a workspace call, plan 27.4)
                            judge?: Judged }                         // Auto mode: the judge's verdict and why (plan 30.3)
-interface Judged { verdict: "allow" | "ask"; reason: string;
+interface Judged { verdict: "allow" | "ask" | "refused"; reason: string;   // refused: asked in an unattended run (scheduled-tasks 2.1)
                    source: string;                                  // "rules" | "model" | "fail-closed"
                    rule: string; ms?: number; model: string;
                    summary: string;                                 // the command, URL or file, in one line
-                   why?: string }                                   // the step row: "Auto: ran (judged safe: …)" | "Auto: asked you (…)"
+                   why?: string;                                    // the step row: "Auto: ran (judged safe: …)" | "Auto: asked you (…)"
+                   refused?: boolean }                              // on a result: the judge asked, no one was there (scheduled-tasks 2.1)
 interface JudgedCall extends Judged { id: number; ts: number; tool: string; thread?: string; call_id?: string; approval_id?: string;
                                       suggest?: string[] }   // allow rules that would cover a command the model asked about (plan 30.7)
 interface JudgeStatus { available: boolean; backend: string; model: string; detail: string;   // Auto is offered only when available

@@ -1,6 +1,6 @@
 # Plan: a cleaner chat history: names only, grouped by date or environment, a short sidebar and a Show all page
 
-**Asked for:** 2026-11-08 · **Status:** In progress: every step built (2026-11-08); Phase 3's check on the installed hub waits for the merge
+**Asked for:** 2026-11-08 · **Status:** Done (2026-11-08)
 
 ## 1. Introduction
 
@@ -85,7 +85,7 @@ Touches the agent's thread routes (architecture §14.1), Stage O's chat list (ba
 **Wire — Phase 3:** Show all opens a full, searchable, endlessly scrolling list of chats with their dates.
 
 **Checks & deliverables — Phase 3**
-- [ ] On the installed hub after merging and `gaifa restart`: the sidebar shows names only. By date, the headings match the real chats' days. By environment, 5 per section and Show more opens the rest. Both shows archived chats dimmed. Show all lists every chat and scrolls to the oldest. A screenshot of the sidebar by date and of Show all goes in the commit message's description of the check.
+- [x] On the installed hub after merging and `gaifa restart`: the sidebar shows names only. By date, the headings match the real chats' days. By environment, 5 per section and Show more opens the rest. Both shows archived chats dimmed. Show all lists every chat and scrolls to the oldest. A screenshot of the sidebar by date and of Show all goes in the commit message's description of the check. *Checked 2026-11-08* after `gaifa restart` and restarting the agent: rows show names only; by date the 20 newest fell under Today (3), Yesterday (8), Nov 5, Last week and Older, with Show all · 53 under Both (34 for Chats); Show all listed 53 and scrolled to the oldest (Oct 21), each row with its environment and date; by environment None showed 5 and Show more · 28, Ariadne 5 of 19 and Show more opened all 19, then Show less. The view was put back to the user's (Chats, None) afterwards.
 - [x] Delivered: `web/chat/chat-all.js`, the palette entry, the docs, and tests.
 
 ## 4. Deliverables

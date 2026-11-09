@@ -22,7 +22,7 @@ import { ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, Item, LIST_CSS } from './chat-list.js';
 import { DateSections } from './chat-dates.js';
-import { GroupedChats, readView, saveView, viewOfUi, loadEnvs, archivedParam, groupOf } from './chat-groups.js';
+import { GroupedChats, readView, saveView, viewOfUi, loadEnvs, archivedParam, groupOf, showAllOf } from './chat-groups.js';
 import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
 import { SplitView, SPLIT_CSS } from './chat-split.js';
@@ -45,7 +45,7 @@ export { registerStep } from './chat-steps.js';
 export { ParamCard } from './chat-forms.js';
 
 const R = () => globalThis.React;
-const LIST_PAGE = 200;    // chats per page in the list (Show more adds a page)
+const LIST_PAGE = 20;     // chats in the list, flat or by date, before Show all (plan chat-history 2.4)
 const PAGE_CSS = `.aichat-box:focus-within{border-color:var(--bdh,#3A4A63)!important}`;
 
 let shared = null;
@@ -78,7 +78,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const React = R(), { useState, useEffect, useRef, useMemo } = React;
   const c = getChatClient(api), tid = route?.parts?.[1] || null;
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
-  const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [limit, setLimit] = useState(LIST_PAGE);
+  const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [total, setTotal] = useState(null);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
   const [judge, setJudge] = useState(null);       // GET /api/judge/status: Auto is offered while its model answers (plan 30.5)
@@ -107,13 +107,17 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
 
   // ---- data ----
   const loadList = async () => {
-    try { setThreads(await c.threads({ q, archived, limit, sort: listView.chatOrder })); setDown(null); } catch (e) { fail(e); }
+    try {
+      const [list, n] = await Promise.all([c.threads({ q, archived, limit: LIST_PAGE, sort: listView.chatOrder }),
+        c.threadCount ? c.threadCount({ q, archived }).then(r => r.count, () => null) : null]);   // an older agent: no count
+      setThreads(list); setTotal(n); setDown(null);
+    } catch (e) { fail(e); }
     setListLoading(false);
   };
   loadRef.current = loadList;
-  useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, listView.show, limit, listView.chatOrder]);
+  useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, listView.show, listView.chatOrder, listKey]);
   const shown = useRef(listView.show);
-  useEffect(() => { if (shown.current !== listView.show) { shown.current = listView.show; setLimit(LIST_PAGE); setListLoading(true); } }, [listView.show]);
+  useEffect(() => { if (shown.current !== listView.show) { shown.current = listView.show; setListLoading(true); } }, [listView.show]);
   const loadEnvList = () => loadEnvs(api).then(setEnvs);
   useEffect(() => { loadEnvList(); }, []);
   useEffect(() => {
@@ -176,7 +180,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   // ---- render ----
   const renderItem = t => h(Item, { key: t.id, t, active: t.id === tid, onOpen: () => setDrawer(false), onRename: v => rename(t, v), onArchive: () => archive(t), onDelete: () => remove(t), ...itemProps(t) });
   const grouping = groupOf(listView, { envs: !!envs && !!c.threadGroups });   // Environment needs the workspace mod; else Date or None
-  const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: v => { setQ(v); setLimit(LIST_PAGE); }, onMore: threads.length >= limit ? () => setLimit(n => n + LIST_PAGE) : null,
+  const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: setQ,
+    showAll: grouping !== 'environment' || q.trim() ? showAllOf(threads.length, total, LIST_PAGE) : null,   // chat-history 2.4: 20, then Show all
+    onShowAll: () => { setDrawer(false); go('#/chat/all' + (q.trim() ? '?q=' + encodeURIComponent(q.trim()) : '')); },
     onNew: () => newChat(), onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
     view: listView, onView: setListView, canGroup: !!envs, itemProps,
     groupLabel: grouping === 'date' ? 'Chats by date' : 'Chats by environment',

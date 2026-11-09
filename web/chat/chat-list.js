@@ -81,7 +81,9 @@ export const LIST_CSS = `
 @media (hover:none){.aichat-item .aichat-more{display:grid}.aichat-sechead .aichat-more{opacity:1}}
 `;
 
-export function ThreadList({ threads, loading, activeId, q, onQ, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
+/** `showAll`: `{n}` when more chats exist than the list shows (n: how many in all, or null), else null; `onShowAll`
+ * opens the Show all page (plan chat-history 2.4). */
+export function ThreadList({ threads, loading, activeId, q, onQ, showAll = null, onShowAll, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
   grouped = null, groupLabel = 'Chats by environment', view = null, onView = null, canGroup = false, itemProps = () => ({}) }) {
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 4px' } },
@@ -97,13 +99,14 @@ export function ThreadList({ threads, loading, activeId, q, onQ, onMore, onNew, 
         h('span', { style: { width: 20, height: 20, borderRadius: 99, display: 'grid', placeItems: 'center', background: T.row, color: T.tx, flex: 'none' } }, h(Icon, { d: 'plus', size: 12 })),
         'New'),
       view && onView ? h(ViewMenu, { view, onChange: onView, envs: canGroup }) : null),
-    grouped && !q.trim() ? h('nav', { 'aria-label': groupLabel, style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped) :
+    grouped && !q.trim() ? h('nav', { 'aria-label': groupLabel, style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped,
+      showAll ? h(MoreBar, { n: showAll.n, label: 'Show all', onClick: onShowAll }) : null) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },
       !threads.length ? h('div', { style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } },
         loading ? 'Loading…' : emptyText(view?.show, q)) : null,
       threads.map(t => h(Item, { key: t.id, t, active: t.id === activeId, onOpen: () => onOpen?.(t),
         onRename: v => onRename(t, v), onArchive: () => onArchive(t), onDelete: () => onDelete(t), ...itemProps(t) })),
-      onMore ? h(MoreBar, { onClick: onMore }) : null),
+      showAll ? h(MoreBar, { n: showAll.n, label: 'Show all', onClick: onShowAll }) : null),
     h('div', { style: { padding: '8px 10px', borderTop: '1px solid ' + T.bd, display: 'flex', alignItems: 'center', gap: 6 } },
       onSessions ? h('button', { type: 'button', onClick: onSessions, title: 'Save or switch setups (what runs and what is loaded)', style: { ...chipSt(false, { sm: true }), marginLeft: 'auto' } }, h(Icon, { d: 'bookmark', size: 12 }), 'Sessions') : null));
 }

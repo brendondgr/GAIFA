@@ -12,8 +12,8 @@ import { uiPrefs } from '../ui-prefs.js';
 const R = () => globalThis.React;
 const enc = encodeURIComponent;
 export const LIST_VIEW = 'gaifa.chat.list';
-export const FIRST = 6;          // chats shown in a section before Show more
-export const MORE = 20;          // and each Show more adds
+export const FIRST = 5;          // chats shown in a section before Show more (chat-history 2.4)
+export const PAGE = 200;         // an open section loads its chats this many at a time
 export const VIEW_DEFAULTS = { show: 'chats', group: 'environment', envOrder: 'activity', chatOrder: 'updated', collapsed: [] };
 // Group by: a grouping needing more than the chats' own fields says so in `needs` (Environment: the workspace mod's
 // environments); a later one (projects: Project) adds a row here and its sections in the list.
@@ -86,8 +86,17 @@ export const overlay = (rows, known) => {
  * archived shows only under Archived); the user's ask, 2026-10-21. */
 export const shownRows = rows => rows.filter(r => r.count > 0);
 
-/** A section's rows: none once it's empty (its last chat moved, archived or deleted: nothing stale stays). */
-export const sectionChats = (row, loaded, known) => (row.count ? overlay(loaded || [], known) : []);
+/** A section's rows: its first 5, or all it loaded once opened with Show more; none once it's empty (its last chat
+ * moved, archived or deleted: nothing stale stays). */
+export const sectionChats = (row, loaded, known, open = false) => (row.count ? overlay((loaded || []).slice(0, open ? undefined : FIRST), known) : []);
+/** What ends a section: 'more' (Show more · N: the rest, or the next page of an open section), 'less' (Show less, once
+ * an open section has everything), or null (5 or fewer). `shown`: how many rows it draws. */
+export const moreOrLess = (row, shown, open = false) => (shown < row.count ? 'more' : open && row.count > FIRST ? 'less' : null);
+/** The flat list's end: `{n}` (Show all · n) when the agent counts more chats than the list shows; with no count (an
+ * older agent), a full page means there may be more. */
+export const showAllOf = (shown, total, page = 20) => (total == null ? (shown >= page ? { n: null } : null) : total > shown ? { n: total } : null);
+/** `more` added after `list`, a chat already there (moved up between two loads) kept once, where it was first. */
+export const mergeById = (list, more) => { const ids = new Set(list.map(t => t.id)); return [...list, ...more.filter(t => !ids.has(t.id))]; };
 const pick = t => Object.fromEntries(['title', 'state', 'running', 'updated', 'archived'].filter(k => k in t).map(k => [k, t[k]]));
 
 /** What an empty list says, per Show. */
@@ -100,11 +109,12 @@ export async function loadEnvs(api) {
 }
 
 // ---------- Show more: a full-width divider, a line each side of the words (plan 42.1) ----------
-export function MoreBar({ n, onClick }) {
+export function MoreBar({ n, onClick, label = 'Show more' }) {
   const line = h('span', { 'aria-hidden': 'true', style: { flex: 1, height: 1, background: T.bd } });
-  return h('button', { type: 'button', onClick, className: 'aichat-morebar', 'aria-label': n ? `Show ${n} more` : 'Show more',
+  const words = n ? `${label} · ${n}` : label;
+  return h('button', { type: 'button', onClick, className: 'aichat-morebar', 'aria-label': label === 'Show more' && n ? `Show ${n} more` : words,
     style: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', height: 24, margin: '2px 0 4px', padding: '0 6px', border: 0, background: 'transparent', color: T.mut, font: 'inherit', fontSize: 11.5, cursor: 'pointer' } },
-    line, h('span', { style: { flex: 'none', whiteSpace: 'nowrap' } }, n ? `Show more · ${n}` : 'Show more'), line);
+    line, h('span', { style: { flex: 'none', whiteSpace: 'nowrap' } }, words), line);
 }
 
 // ---------- the View menu ----------
@@ -132,7 +142,7 @@ export function ViewMenu({ view, onChange, envs = true }) {
 // ---------- a section ----------
 const iconBtn = { width: 22, height: 22, display: 'grid', placeItems: 'center', border: 0, borderRadius: 5, background: 'transparent', color: T.mut, cursor: 'pointer', flex: 'none' };
 
-export function Section({ row, open, onToggle, chats, loading, more, onMore, renderItem, onNew, onRename, onManage }) {
+export function Section({ row, open, onToggle, chats, loading, more, onMore, onLess, renderItem, onNew, onRename, onManage }) {
   const React = R(), [menu, setMenu] = React.useState(false), [edit, setEdit] = React.useState(null);
   const env = row.env, name = env.name || env.id;
   const save = () => { const v = (edit || '').trim(); setEdit(null); if (v && v !== name) onRename(v); };
@@ -160,21 +170,23 @@ export function Section({ row, open, onToggle, chats, loading, more, onMore, ren
       !row.count ? h('div', { style: { padding: '4px 10px 6px', color: T.dim, fontSize: 11.5 } }, 'No chats yet') : null,
       row.count && !chats.length && loading ? h('div', { role: 'status', style: { padding: '4px 10px', color: T.dim, fontSize: 11.5 } }, 'Loading…') : null,
       chats.map(t => renderItem(t)),
-      more ? h(MoreBar, { n: row.count - chats.length, onClick: onMore }) : null) : null);
+      more === 'less' ? h(MoreBar, { label: 'Show less', onClick: onLess })
+        : more ? h(MoreBar, { n: row.count - chats.length, onClick: onMore }) : null) : null);
 }
 
 /** The sections and their chats. `known`: the page's flat list, whose live state (a turn running, a new title)
  * shows on the rows; `reloadKey`: bumped by the page when chats are made, moved, archived or deleted. */
 export function GroupedChats({ c, api, envs, view, onView, known, reloadKey, renderItem, onNewIn, onEnvsChanged, onError, go }) {
-  const React = R(), [groups, setGroups] = React.useState(null), [chats, setChats] = React.useState({}), [shown, setShown] = React.useState({});
+  // `opened`: the sections whose Show more was used (page state, not saved): they hold all their chats, loaded 200 at a time
+  const React = R(), [groups, setGroups] = React.useState(null), [chats, setChats] = React.useState({}), [opened, setOpened] = React.useState({});
   const rows = orderGroups(groupRows(groups, envs), view.envOrder), archived = archivedParam(view.show);
-  const want = (row, n) => c.threads({ environment: row.ids.join(','), sort: view.chatOrder, limit: n, archived })
-    .then(list => setChats(m => ({ ...m, [row.env.id]: list })), onError);
+  const want = (row, limit, offset = 0) => c.threads({ environment: row.ids.join(','), sort: view.chatOrder, limit, offset, archived })
+    .then(list => setChats(m => ({ ...m, [row.env.id]: offset ? mergeById(m[row.env.id] || [], list) : list })), onError);
   const key = rows.map(r => `${r.env.id}:${r.count}:${r.ids.length}`).join('|');
   React.useEffect(() => { c.threadGroups?.({ archived }).then(setGroups, e => { setGroups([]); onError?.(e); }); }, [archived, reloadKey]);
   React.useEffect(() => {
     if (!groups) return;
-    rows.filter(r => r.count && !view.collapsed.includes(r.env.id)).forEach(r => want(r, shown[r.env.id] || FIRST));
+    rows.filter(r => r.count && !view.collapsed.includes(r.env.id)).forEach(r => want(r, opened[r.env.id] ? PAGE : FIRST));
   }, [key, view.chatOrder, view.collapsed.join(','), groups]);
   if (!groups) return h('div', { role: 'status', style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } }, 'Loading…');
   const rename = async (row, name) => {
@@ -185,10 +197,11 @@ export function GroupedChats({ c, api, envs, view, onView, known, reloadKey, ren
   return h('div', { style: { display: 'flex', flexDirection: 'column' } },
     !anything ? h('div', { style: { padding: '12px 10px 4px', color: T.mut, fontSize: 12, textAlign: 'center' } }, emptyText(view.show)) : null,
     shownRows(rows).map(r => {
-      const id = r.env.id, open = !view.collapsed.includes(id), list = sectionChats(r, chats[id], known);
-      return h(Section, { key: id, row: r, open, chats: list, loading: !chats[id], more: list.length < r.count,
+      const id = r.env.id, open = !view.collapsed.includes(id), all = !!opened[id], list = sectionChats(r, chats[id], known, all);
+      return h(Section, { key: id, row: r, open, chats: list, loading: !chats[id], more: moreOrLess(r, list.length, all),
         onToggle: () => onView({ ...view, collapsed: toggled(view.collapsed, id) }),
-        onMore: () => { const n = (shown[id] || FIRST) + MORE; setShown(s => ({ ...s, [id]: n })); want(r, n); },
+        onMore: () => { if (all) want(r, PAGE, (chats[id] || []).length); else { setOpened(s => ({ ...s, [id]: true })); want(r, PAGE); } },
+        onLess: () => setOpened(s => ({ ...s, [id]: false })),
         renderItem, onNew: () => onNewIn(id), onRename: name => rename(r, name), onManage: () => go('#/s/workspace/environments') });
     }));
 }

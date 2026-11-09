@@ -242,3 +242,39 @@ test('archivedParam: Chats → false, Archived → true, Both → all; the group
   assert.equal(g.emptyText('archived'), 'No archived chats.');
   assert.match(g.emptyText('both', 'fox'), /No chats match “fox”/);
 });
+
+// Plan chat-history 2.4: five per section, then Show more opens all of it (200 at a time), then Show less; the flat
+// list's 20, then Show all.
+test('a section: its first 5; opened, everything it loaded; then more, less or nothing', () => {
+  const rows = Array.from({ length: 12 }, (_, i) => ({ id: 't' + i, title: 'c' + i }));
+  const row = { env: { id: 'grants' }, count: 12 };
+  assert.equal(g.FIRST, 5);
+  assert.deepEqual(g.sectionChats(row, rows, []).map(t => t.id), ['t0', 't1', 't2', 't3', 't4']);
+  assert.equal(g.sectionChats(row, rows, [], true).length, 12);
+  assert.equal(g.moreOrLess(row, 5, false), 'more');
+  assert.equal(g.moreOrLess(row, 12, true), 'less');                       // all there: Show less
+  assert.equal(g.moreOrLess({ count: 450 }, 200, true), 'more');           // a big one: the next 200
+  assert.equal(g.moreOrLess({ count: 4 }, 4, false), null);                // 5 or fewer: nothing
+  assert.equal(g.moreOrLess({ count: 5 }, 5, true), null);
+  assert.deepEqual(g.mergeById([{ id: 'a' }, { id: 'b' }], [{ id: 'b' }, { id: 'c' }]).map(t => t.id), ['a', 'b', 'c']);
+  const el = expand(g.Section({ row: { env: { id: 'grants', name: 'Grants', folders: [] }, ids: ['grants'], count: 12, running: 0 }, open: true, chats: rows,
+    loading: false, more: 'less', onLess() {}, renderItem: t => ({ type: 'li', props: { children: [t.title] } }), onToggle() {}, onNew() {}, onRename() {}, onManage() {} }));
+  assert.match(text(el), /Show less/);
+  assert.doesNotMatch(text(el), /Show more/);
+});
+
+test('the flat list: Show all with the count when there are more; without a count, after a full page', () => {
+  assert.deepEqual(g.showAllOf(20, 57), { n: 57 });
+  assert.equal(g.showAllOf(12, 12), null);
+  assert.equal(g.showAllOf(20, 20), null);
+  assert.deepEqual(g.showAllOf(20, null), { n: null });
+  assert.equal(g.showAllOf(7, null), null);
+  assert.equal(text(expand(g.MoreBar({ n: 57, label: 'Show all', onClick() {} }))), 'Show all · 57');
+  assert.equal(expand(g.MoreBar({ n: 57, label: 'Show all', onClick() {} })).props['aria-label'], 'Show all · 57');
+  const props = { threads: [{ id: 't9', title: 'One' }], loading: false, activeId: null, q: '', onQ() {}, onNew() {}, onRename() {}, onArchive() {}, onDelete() {} };
+  assert.match(text(expand(list.ThreadList({ ...props, showAll: { n: 57 }, onShowAll() {} }))), /Show all · 57/);
+  assert.doesNotMatch(text(expand(list.ThreadList(props))), /Show all/);
+  const dated = expand(list.ThreadList({ ...props, grouped: { type: 'div', props: { children: ['DAYS'] } }, groupLabel: 'Chats by date', showAll: { n: 30 }, onShowAll() {} }));
+  assert.match(text(dated), /DAYS.*Show all · 30/);
+  assert.equal(all(dated, n => n.type === 'nav')[0].props['aria-label'], 'Chats by date');
+});

@@ -56,16 +56,17 @@ Touches the agent's thread routes (architecture §14.1), Stage O's chat list (ba
   - **Drawing:** a `DateSections` component draws each bucket as a plain heading (11.5 px, dim, no collapse arrow, no counts), then its rows. It takes the 20 chats the page already loads, so no section has its own paging.
   *Done when:* `utils/tests/web/chat-dates.test.mjs` covers every bucket's edges (just after midnight, 23:59 the day before, exactly 3 and 4 days back, 7 and 8 days back), a change of year, ordering by name inside a bucket, and `shortDate`.
   *As built:* `daysAgo` counts calendar days between local midnights (rounded, so a 23- or 25-hour day still counts as one; a time ahead of the clock is Today); `dateField(order)` picks the field; the helpers take a `locale` for the tests (the page leaves it to the browser). The test runs the same in any time zone (checked with UTC, New York and Kolkata). The list's `<nav>` reads "Chats by date" while grouped by date.
-- [ ] **2.4 Twenty, then Show all; five, then Show more: `web/chat/chat.js`, `chat-list.js`, `chat-groups.js`.**
+- [x] **2.4 Twenty, then Show all; five, then Show more: `web/chat/chat.js`, `chat-list.js`, `chat-groups.js`.**
   - **Flat and by date:** `LIST_PAGE` becomes 20 and the page loads `limit: 20` (search too). When `c.threadCount` says there are more, the list ends with a **Show all** bar (the `MoreBar` style, the words "Show all · N") that goes to `#/chat/all`, carrying the search as `?q=` when there is one. The old `onMore` paging goes.
   - **By environment:** `FIRST` becomes 5. **Show more** in a section loads all of that environment's chats (`limit: 200`, then the next 200 at the end of the section if the count says there are more). It changes to **Show less** once open. Whether a section is expanded is page state, not saved.
   *Done when:* `chat-groups.test.mjs` covers the section's first 5 and the expanded state (the pure helpers: `sectionChats`, the more and less decision). In the browser on the mock, the list shows 20 then Show all, and a section shows 5 then all.
+  *As built:* the pure helpers are `sectionChats(row, loaded, known, open)`, `moreOrLess(row, shown, open)` (`more`, `less` or null), `mergeById` (a later page never repeats a chat) and `showAllOf(shown, total)`; `MoreBar` takes a `label` (Show more, Show less, Show all). Without a count (an agent older than 1.1), a full page of 20 shows a plain *Show all*. The flat list now reloads when the page's list key changes (a chat made, moved, archived or deleted), so it stays at 20 and its count stays right. The page's 20 are also what the sections overlay for live state; a running chat is always among the newest. Until 3.1, Show all went to `#/chat/all` with nothing there to draw it.
 
 **Wire — Phase 2:** the sidebar shows names only, the View menu has Show (Chats, Archived, Both) and Group by (Environment, Date, None), and the list is short.
 
 **Checks & deliverables — Phase 2**
-- [ ] On a second hub (`uv run python app.py --port 7077 --dev --demo-mods`, page at `?mock#/chat`), each grouping and each Show choice draws as described, and the choice survives a reload (it is in that hub's `config.toml`).
-- [ ] Delivered: `web/chat/chat-dates.js`, the changed `chat-list.js`, `chat-groups.js`, `chat.js`, and tests.
+- [x] On a second hub (`uv run python app.py --port 7077 --dev --demo-mods`, page at `?mock#/chat`), each grouping and each Show choice draws as described, and the choice survives a reload (it is in that hub's `config.toml`). *As built:* the groupings, Show choices, 20 then Show all · 27 and Ariadne's 5, Show more · 4, all 9, Show less were checked on `?mock`, whose settings live in the page; the reload was checked without `?mock` on the same hub (no workspace mod there, so Group by offered Date and None): Both and Date went to its `config.toml` (`[ui.chat.list] show = "both", group = "date"`) and were chosen again after the reload.
+- [x] Delivered: `web/chat/chat-dates.js`, the changed `chat-list.js`, `chat-groups.js`, `chat.js`, and tests.
 
 ## Phase 3 — The Show all page (M)
 

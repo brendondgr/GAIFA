@@ -148,11 +148,12 @@ Assumed:
   - **The meter:** the context meter (`context.meter`) counts both parts.
   *Done when:* `services/agent/tests/test_project_prompt.py` covers inline under the budget, listed over it, untrusted wrapping, page ages, the part order, and a plain chat's prompt unchanged.
   *As built:* `loop.py` was at 963 lines, so its model side (the harness of a chat, `system_prompt`, the window, `messages`, the meter and the model call) moved to `agent/prompting.py` (the `Prompting` mixin); the project parts are added there. Inline sources have numbered lines (cited `src_…:N`). `project_share` is also a row in Settings → Agent → Documents (`chat-settings.js`), and the meter's popover shows *Project* when a chat has it (`chat-header.js`).
-- [ ] **3.4 The project tools: `services/agent/agent/projects/tools.py` (new), `local.py`, `tools.py`.**
+- [x] **3.4 The project tools: `services/agent/agent/projects/tools.py` (new), `local.py`, `tools.py`.**
   - **Tools:** `project_search {query, k?}` (passages with `src_…` and line), `project_read {source, offset?, limit?}` (a window of a source's text, cited as `src_…:line`), and `project_refresh_page {source}`. They are local tools, loaded only in project chats, and never offered at `/mcp`.
   - **Citations:** results start with how to cite them, as workspace reads do (backend-plan 34.6).
   - **Risk:** search and read are read-only. Refresh is a network read of a page the user linked, so it gets no approval card.
   *Done when:* `services/agent/tests/test_project_tools.py` covers each tool and checks that they are absent from a plain chat's tool list.
+  *As built:* `Local` mixes in `ProjectTools`; the names are in `LOCAL_NAMES`, and `ToolSet` offers the schemas only when the chat has `settings.project` (a plain chat calling one gets `not_a_project_chat`). `project_` is in `UNTRUSTED_TOOLS`.
 - [ ] **3.5 Pages fetched again when a question needs them: `services/agent/agent/projects/fresh.py` (new), `loop.py` (beside `_recall_into`).**
   - **Matching:** for a project chat's user message, `fresh.match(pid, text)` searches the project's collection, keeping only page chunks and grouping them by source. A page counts as matched when its best score is at or above `MATCH_MIN`, or its title or URL words appear in the message. At most 3 pages are matched.
   - **Fetching:** matched pages older than their `max_age_s` (and not set to never) are fetched again in parallel, re-indexed, and a `project_refresh {for: seq, pages:[{sid, title, ok, error?}]}` event is written. The first model call waits for this alongside recall (`RECALL_WAIT_S`). A page that takes longer is used as its last copy, and the prompt says so.

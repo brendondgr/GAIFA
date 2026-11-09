@@ -1,5 +1,5 @@
 """The agent's local tools: ask_user, update_todos, find_tools, load_tools, read_skill,
-view_output, read_result, chat_search, memory_search, remember."""
+view_output, read_result, chat_search, memory_search, remember; and a project chat's (projects/tools.py)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from . import context as ctx
 from . import show, skillfmt
 from .knowledge import Knowledge
+from .projects.tools import ProjectTools
 
 if TYPE_CHECKING:
     from .loop import Agent
@@ -26,7 +27,7 @@ STAND_IN = ("a dry-run stand-in: this chat is an evaluation, so nothing was gene
             "look at. Treat it as a good result of its prompt and carry on as you would with the real output")
 
 
-class Local:
+class Local(ProjectTools):
     def __init__(self, agent: Agent) -> None:
         self.a = agent
 

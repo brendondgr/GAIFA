@@ -37,7 +37,8 @@ def open_cards(agent: Any, child: str) -> list[dict[str, Any]]:
         if (ap := agent._find(child, "approval", cid)) is not None and not _decided(agent, child, cid):
             p = ap["payload"]
             out.append({"kind": "approval", "call": cid, "approval_id": p["approval_id"], "tool": p.get("tool"),
-                        "risk": p.get("risk"), "arguments": p.get("arguments")})
+                        "risk": p.get("risk"), "arguments": p.get("arguments"),
+                        **{k: p[k] for k in ("ask_fields", "schema", "description", "grant_key", "limits", "why") if p.get(k)}})   # the card (3.4)
         elif (q := agent._find(child, "question", cid)) is not None and not _decided(agent, child, cid):
             out.append({"kind": "question", "call": cid, "questions": q["payload"].get("questions")})
     return out

@@ -80,6 +80,20 @@ test('the fold: step words, the sub-agent of a row, answers, the strip, the card
   for (const k of ['live:agent', 'agent_done', 'agent_request', 'agent_review']) assert.ok(cards.hasCard(k), k);
 });
 
+test('request cards: buttons for the workflow, the review in words, when to read them again (3.4)', async () => {
+  const rq = await load('chat/chat-agent-requests.js'), appr = await load('chat/chat-approvals.js');
+  const labels = rq.requestButtons({ risk: 'write' }).map(b => b.label);
+  assert.ok(labels.includes('Allow in this workflow') && labels.includes('Allow once') && !labels.some(l => l.includes('this chat')));
+  assert.ok(rq.requestButtons({ risk: 'network', grant_key: 'url:host' }).some(b => b.remember === 'sites'));
+  assert.equal(rq.reviewWords({}), 'The chat’s agent is reviewing it…');
+  assert.equal(rq.reviewWords({ review: { action: 'forward', reason: 'your call' } }), 'The chat’s agent passed it to you: “your call”');
+  assert.equal(rq.reviewWords({ review: { action: 'forward', auto: true } }), 'The chat’s agent passed it to you.');
+  assert.equal(rq.requestStamp([{ type: 'user' }, { type: 'agent_request' }, { type: 'agent_review' }]), 2);
+  assert.ok(cards.hasCard('agent_request_card'));
+  assert.equal(appr.originText({ service: 'agent', thread: 't_c', parent: 't_p' }), 'from a sub-agent');
+  assert.equal(appr.originText({ service: 'agent', thread: 't_c' }), 'from a chat');
+});
+
 test('a background sub-agent\'s end or request heads the turn it starts (3.3)', async () => {
   const turn = await load('chat/chat-turn.js'), thread = await load('chat/chat-thread.js');
   const ev = (seq, type, payload) => ({ seq, ts: seq, type, payload });

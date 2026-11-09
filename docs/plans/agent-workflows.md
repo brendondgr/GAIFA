@@ -107,7 +107,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - `registerStep('agent', …)` (spawning, running, done sentences) and `registerCard('live:agent', …)`: the child's label, state, current step, tokens, **Open** (a split pane, `chat-split.js`) and **Stop**. Background children as a small strip above the composer while they run.
   *Done when:* browser check: a live workflow draws its children's steps and Open splits the pane.
 
-- [ ] **3.4 Request cards on the parent: `web/chat/chat-agent-requests.js`.**
+- [x] **3.4 Request cards on the parent: `web/chat/chat-agent-requests.js`.**
   - Docked on the parent's composer like approvals: "<label> wants to <tool summary>", the parent's note when it forwarded, "the parent agent is reviewing…" before that, **Approve / Deny / Allow in this workflow**. The header's Approvals popover names the child and its parent.
   *Done when:* browser check: a forwarded request decided on the parent runs in the child.
 

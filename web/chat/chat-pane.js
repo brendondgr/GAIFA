@@ -29,6 +29,7 @@ import { speak, speakable } from './chat-speak.js';
 import { MemoryNote } from './chat-memory-note.js';
 import { QueueStrip, queueRows } from './chat-queue.js';
 import { AgentStrip } from './chat-agents.js';
+import { useRequests } from './chat-agent-requests.js';
 
 const R = () => globalThis.React;
 /** A scheduled run's chat was opened: its run is seen (the Scheduled row's dot goes; scheduled-tasks 4.4). */
@@ -289,9 +290,11 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     setToolForms(f => [...f.filter(x => x.tool.name !== name), { key: 'tf' + name + Date.now(), kind: 'toolform', tool, args, label: a?.label && a.on === 'composer' ? a.label : a?.label ? `${a.label}` : null }]);
   };
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
+  const requests = useRequests(c, tid, events, shared.bus);          // agent-workflows 3.4: its sub-agents' cards, docked
   const ctx = {
     api, live: c.live, tid, thread, outputs: view.outputs, made, tools, mods, running, dock: true, confirm, toast, speechOutput: speechOut,
     workflow: c.tree ? { c, bus: shared.bus, paneId } : null,       // agent-workflows 3.3: its sub-agents' cards
+    decideRequest: (rid, body) => c.decideRequest(tid, rid, body),   // 3.4: a sub-agent's request, decided here
     act: (tool, args) => ensureThread().then(id => c.action(id, tool, args)),   // plan 46.5: a fix runs as your own step
     answer: (qid, answers) => c.answer(tid, qid, answers),
     // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying
@@ -333,7 +336,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   const empty = !mine.length && (!tid || (ready && !events.length && !running));
   const compacts = events.filter(e => e.type === 'compact').length;
   const composer = h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
-      dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })), placeholder,
+      dock: [...toolForms, ...view.pending, ...requests].reverse().map(it => h(Card, { key: it.key, item: it, ctx })), placeholder,
       voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
       queued: qRows.length,
       queue: h(React.Fragment, null,

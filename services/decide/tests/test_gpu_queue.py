@@ -149,3 +149,19 @@ def test_answer_within_counts_from_the_slot(settings, hub):
                 break
             time.sleep(0.02)
         assert gpu.held == set()
+
+
+def test_answer_within_counts_from_the_load(settings, hub):
+    """web-approvals 1.3: a model loaded after an idle unload doesn't use the caller's budget (the Auto judge's 3 s
+    ran out on d3-lite's load, so the first judgement after each unload asked)."""
+    class SlowLoad(GpuFake):
+        def load(self, *a, **k):
+            time.sleep(0.6)
+            return super().load(*a, **k)
+
+    app, gpu, dec = make(settings, hub, model=SlowLoad)
+    with TestClient(app) as c:
+        assert not dec.loaded
+        r = c.post("/v1/decide", json=ASK, headers={"X-GAIFA-Answer-Within": "0.3"})
+        assert r.status_code == 200, r.text
+        assert dec.loaded and gpu.held == set()

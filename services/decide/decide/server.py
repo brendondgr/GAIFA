@@ -28,8 +28,9 @@ WITHIN_HEADER = "X-GAIFA-Answer-Within"
 
 
 def answer_within(headers: Any) -> float | None:
-    """`X-GAIFA-Answer-Within: <seconds>`: how long the caller gives the model once the GPU slot is held (the
-    Auto judge and page screening, whose budget shouldn't run out while a job holds the GPU), or None."""
+    """`X-GAIFA-Answer-Within: <seconds>`: how long the caller gives the model once the GPU slot is held and the
+    model is loaded (the Auto judge and page screening, whose budget shouldn't run out while a job holds the GPU or
+    d3-lite loads after an idle unload: web-approvals 1.3), or None."""
     try:
         s = float(headers.get(WITHIN_HEADER) or "")
     except ValueError:
@@ -282,13 +283,15 @@ def create_app(settings: Settings, decider: Decider | None = None, hub: Hub | No
 
         async def work() -> tuple[dict, float]:
             async with (contextlib.nullcontext() if on_cpu() else gpu.slot(label, est_s=1)):   # slot first, then memory
-                started.set()
                 await make_room(mid)
+                if dec.model != mid:            # the caller's budget is for the answer, not the load (web-approvals 1.3)
+                    await asyncio.to_thread(dec.load, mid)
+                started.set()
                 return await asyncio.to_thread(dec.ask, mid, body.input, questions, images or None, videos or None)
 
         task = asyncio.create_task(work())
         try:
-            if within is not None:                  # the caller's budget starts once the slot is held
+            if within is not None:                  # the caller's budget starts once the slot is held and the model loaded
                 waiter = asyncio.ensure_future(started.wait())
                 await asyncio.wait({task, waiter}, return_when=asyncio.FIRST_COMPLETED)
                 waiter.cancel()

@@ -134,11 +134,12 @@ Assumed:
   - **Events:** `project_source` events show the fetching, ok and error states live.
   *Done when:* `services/agent/tests/test_project_sources.py` covers adding a file and a page (hub and web faked), a fetch error keeping the last copy, a refresh replacing the output, and the events.
   *As built:* adding a page answers at once with `status: fetching` and fetches in the background; `refresh` waits for its fetch and answers the source. A file must be a text or document output (`422 not_text` otherwise). The text is kept in memory per output id (64 outputs), since an output's text never changes.
-- [ ] **3.2 The project's collection: `services/agent/agent/projects/index.py` (new).**
+- [x] **3.2 The project's collection: `services/agent/agent/projects/index.py` (new).**
   - **Indexing:** `chunks(text) -> [{n, text, page?, line}]` (about 3 000 characters with 300 of overlap). `index_source(pid, src)` sends the chunks to the embed mod as `PUT /api/s/embed/v1/texts/proj-<suffix>/<sid>#<n>` with the title, and deletes the source's old chunks first. Removing a source or deleting the project forgets its chunks (`DELETE /v1/texts/{ns}?ids=` / the whole ns).
   - **Search:** `search(pid, query, k)` uses the embed search, or a BM25 fallback over the same chunks kept in `agent.db` (`project_chunks(sid, n, text, page, line)`) when the embed mod is off.
   - **Background work:** indexing runs in a task after a source is added or refreshed, and never holds up a route.
   *Done when:* `services/agent/tests/test_project_index.py` covers the chunk edges, re-indexing replacing old chunks, a search through the faked embed mod, and the BM25 fallback.
+  *As built:* `ProjectIndex` (the agent's `project_index_store`); the embed ids `<sid>#<n>` go URL-encoded. A chunk ends at the last line break in its final quarter when there is one. A search by meaning that returns none of the kept chunks (not embedded yet) also falls back to words.
 - [ ] **3.3 Knowledge in the prompt: `services/agent/agent/projects/knowledge.py` (new), `loop.py` (`system_prompt`), `prompts.py` (`build`).**
   - **Inline or listed:** `project_knowledge(pid, window) -> {mode: 'inline'|'listed', text, tokens}`.
     - *Inline:* while all sources' text fits `project_share` × the model's window, the sources go in full, each inside `<untrusted>` with its title, kind, URL and, for pages, "fetched <age> ago".

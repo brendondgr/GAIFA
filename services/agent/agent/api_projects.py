@@ -166,7 +166,12 @@ async def delete_project(agent: Any, p: dict[str, Any]) -> dict[str, Any]:
 
 
 def install(agent: Any) -> None:
-    """What deleting a project also removes, in order (each skipped and logged when its mod is off)."""
+    """The project collection (3.2), and what deleting a project also removes, in order (each skipped and logged when its
+    mod is off)."""
+    from .projects.index import ProjectIndex
+    idx = agent.project_index_store = ProjectIndex(agent)
+    agent.project_index, agent.project_forget = idx.index_source, idx.forget_source   # sources.after_change, remove_source
+    agent.project_cleanup.append(("collection", idx.forget_project))         # 3.2: its embed collection
     agent.project_cleanup.append(("environment", own_folders.drop_env))       # 2.3: its hidden environment
 
 
@@ -340,13 +345,13 @@ def add_routes(app: FastAPI) -> None:
     async def remove_source(pid: str, sid: str, request: Request) -> dict:
         agent = A(request)
         src = source_or_404(agent, pid, sid)
-        agent.projects.remove_source(sid)
         forget = getattr(agent, "project_forget", None)
         if forget is not None:
             try:
-                await forget(pid, src)                                    # its chunks in the collection (3.2)
-            except Exception as e:  # noqa: BLE001: the embed mod may be off; its chunks go with the next reindex
+                await forget(pid, src)                                    # its chunks, here and in the collection (3.2)
+            except Exception as e:  # noqa: BLE001: the embed mod may be off; the chunks here go below all the same
                 log.info("forgetting %s's chunks: %s", sid, e)
+        agent.projects.remove_source(sid)
         srcs.publish(agent, pid, None, removed=sid)
         publish(agent, pid, agent.projects.get(pid))
         return {"removed": sid}

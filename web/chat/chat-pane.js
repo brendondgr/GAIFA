@@ -30,6 +30,11 @@ import { MemoryNote } from './chat-memory-note.js';
 import { QueueStrip, queueRows } from './chat-queue.js';
 
 const R = () => globalThis.React;
+/** A scheduled run's chat was opened: its run is seen (the Scheduled row's dot goes; scheduled-tasks 4.4). */
+export function seenRun(c, t) {
+  const s = t?.settings || {};
+  if (s.task && s.task_run && c.seeRun) c.seeRun(s.task, s.task_run).catch(() => {});
+}
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
 const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to GAIFA” in Hope’s voice', 'What can you do?'];
 
@@ -84,7 +89,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     first.current = true; stick.current = true; queue.current = [];
     if (!tid) return undefined;
     let alive = true;
-    c.get(tid).then(t => { if (alive) { setThread(t); setRunning(!!t.running); } })
+    c.get(tid).then(t => { if (alive) { setThread(t); setRunning(!!t.running); seenRun(c, t); } })   // a scheduled run's chat, opened: seen (scheduled-tasks 4.4)
       .catch(e => { if (!alive) return; if (e.status === 404) { if (c.live) toast('That chat no longer exists', 'error'); onOpen(null); } else fail(e); });
     if (!own) c.context(tid).then(m => alive && setLive(l => ({ ...l, meter: m }))).catch(() => {});   // a new chat's comes when its turn ends
     const s = c.stream(tid, 0, {

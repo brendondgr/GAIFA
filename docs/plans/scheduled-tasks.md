@@ -202,34 +202,41 @@ Assumed:
 
 ## Phase 4 — The Scheduled UI (L)
 
-- [ ] **4.1 Client and mock: `web/chat/chat-api.js`, `chat-mock-tasks.js` (new).**
+- [x] **4.1 Client and mock: `web/chat/chat-api.js`, `chat-mock-tasks.js` (new).**
   - **Client calls:** `c.tasks`, `c.task`, `c.createTask`, `c.patchTask`, `c.deleteTask`, `c.taskRuns`, `c.seeRun`, `c.tasksUnread`, `c.runTask`, `c.testTask`, `c.checkTask`, `c.taskNotes` with add, patch and remove, `c.runAllows`, `c.addAllows`, `c.runLog`, and `c.watchTasks`.
   - **The mock:** two tasks (one in a project), with runs, notes and a log.
   *Done when:* `utils/tests/web/chat-tasks.test.mjs` covers the calls on the mock.
-- [ ] **4.2 The Scheduled row and routes: `chat-tasks.js` (new), `chat.js`.**
+- [x] **4.2 The Scheduled row and routes: `chat-tasks.js` (new), `chat.js`.**
   - **The row:** **Scheduled** under Projects, an accordion like Projects. It folds open to the tasks (on first, then by next run, up to 8, then All scheduled · N), each with its next time and an unread dot. Open or folded is kept on the hub as `hub.chat.tasks.open`.
   - **Routes:** `#/chat/tasks` (the grid) and `#/chat/tasks/<id>` (a task).
   *Done when:* `chat-tasks.test.mjs` covers the row's order and dots, and the routes.
-- [ ] **4.3 The grid and the editor: `chat-tasks.js`, `chat-task-edit.js` (new).**
+- [x] **4.3 The grid and the editor: `chat-tasks.js`, `chat-task-edit.js` (new).**
   - **The grid:** cards with the name, the schedule in words, the next run, the last status, a project chip and an on/off switch. Search; New task.
   - **The editor:** name; instructions; the schedule picker (Hourly / Daily / Weekdays / Weekly / Monthly with their fields); project; model; mode (Bypass warns); skills; folders (only its own, or the project's too); pre-allows (tools, sites, MCP servers); Use profile; Use project memory; keep days.
   - **Saving:** checks the task and shows its problems and warnings.
   *Done when:* `chat-tasks.test.mjs` covers the schedule picker's output for each kind, the problems shown, and the Bypass warning.
-- [ ] **4.4 The task's page: `chat-task.js` (new), `chat-task-panels.js` (new).**
+- [x] **4.4 The task's page: `chat-task.js` (new), `chat-task-panels.js` (new).**
   - **The page:** a header (name, schedule, next run, switch, Run now, Test run, Edit) and its runs (status, late, refused count, unread; opening one opens its chat).
   - **The side column:** Notes (edit and delete); the selected run's judgement log; suggested pre-allows after a test run, each with Add.
   - **Opening a run's chat** marks it seen.
   *Done when:* `chat-tasks.test.mjs` covers the runs list, seen, the log rows and adding a suggestion.
-- [ ] **4.5 The project page's Scheduled panel: `chat-project-panels.js`.** The project's tasks with their next run, and New task (the project preset).
+- [x] **4.5 The project page's Scheduled panel: `chat-project-panels.js`.** The project's tasks with their next run, and New task (the project preset).
   *Done when:* `chat-project.test.mjs` covers the panel.
 
   Update the brief §11.13 and `web/PATCHES.md`.
+  *As built (4.1–4.5):* `chat-when.js` is the agent's schedule rules in JavaScript (words, next run, checks) for the
+  editor's preview and the mock. The task page's panels (`LogPanel`, `AllowsPanel`, `NotesPanel`, `TaskFoldersPanel`,
+  `AllowedPanel`) and the project's `ScheduledPanel` are in `chat-task-panels.js`, on `chat-project-panels.js`'s
+  `Panel`. A pane that opens a run's chat marks the run seen (`chat-pane.js` `seenRun`), so the dot goes wherever it's
+  opened. The mock's Thesis backup task runs in the Thesis project, so its run chat counts among the project's chats
+  (the mock tests' counts say so). All the tests are in `chat-tasks.test.mjs` (the project panel's too).
 
 **Wire — Phase 4:** the Chat page's Scheduled row, grid, task page and the project's panel read the live agent.
 
 **Checks & deliverables — Phase 4**
-- [ ] In the browser on `?mock`: the row, the grid, the editor, a task's page and the project's panel draw, with no console errors.
-- [ ] Delivered: `chat-tasks.js`, `chat-task.js`, `chat-task-edit.js`, `chat-task-panels.js`, `chat-mock-tasks.js`, the changed `chat.js`, `chat-api.js`, `chat-project-panels.js`, and tests.
+- [x] In the browser on `?mock`: the row, the grid, the editor, a task's page and the project's panel draw, with no console errors.
+  *As built (2026-11-09, the second hub on port 7078, live and `?mock`):* live, the grid showed the five tasks from Phases 2–3 (switches, next runs, "Done · 1 refused"), the row folded open with unread dots, Live B's page drew its run, judgement log (refused, by the mode), notes, folders and pre-allows, and Open chat cleared its dot; the editor's Hourly picker with *Only between* and *Weekdays only* read "Every hour at :00, 08:00–18:00, weekdays · next today 15:00", and creating a task with the glob `nothing_*` saved it turned off with the problem and its fix. On `?mock`: Thesis's page showed its Scheduled panel (Thesis backup, next Sun 15 Nov 21:00) and Morning digest's page its log, notes and folders. No console errors but the 503s of mods that weren't running on the second hub.
+- [x] Delivered: `chat-tasks.js`, `chat-task.js`, `chat-task-edit.js`, `chat-task-panels.js`, `chat-mock-tasks.js`, the changed `chat.js`, `chat-api.js`, `chat-project-panels.js`, and tests.
 
 ## Phase 5 — On the installed hub (S)
 

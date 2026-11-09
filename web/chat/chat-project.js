@@ -9,6 +9,7 @@ import { h, T, Icon, Btn, inputSt, label11, fmtAgo, useWidth } from './chat-ui.j
 import { ChatPane } from './chat-pane.js';
 import { InstructionsPanel, FilesPanel, PagesPanel, MemoryPanel, FoldersPanel, DefaultsPanel } from './chat-project-panels.js';
 import { newChatPreset } from './chat-env.js';
+import { ScheduledPanel } from './chat-task-panels.js';
 export { newChatPreset };            // its home is chat-env.js (the panes use it too)
 
 const R = () => globalThis.React;
@@ -63,6 +64,7 @@ export function ProjectPage({ shared, pid, go = x => { location.hash = x; } }) {
     h(PagesPanel, { p, c, toast }),
     h(MemoryPanel, { p, c, toast }),
     h(FoldersPanel, { p, c, api, envs, toast }),
+    h(ScheduledPanel, { p, shared, go }),                      // scheduled-tasks 4.5
     h(DefaultsPanel, { p, models, tools, skills: settings?.skills || [], onSave: save }),
     h('button', { type: 'button', onClick: remove, style: { alignSelf: 'flex-start', border: 0, background: 'none', color: T.rd, font: 'inherit', fontSize: 12.5, cursor: 'pointer', padding: '6px 2px' } },
       'Delete project…'));

@@ -6,6 +6,7 @@
 
 import { webTurn } from './chat-mock-web.js';
 import { createProjectMocks } from './chat-mock-projects.js';
+import { createTaskMocks } from './chat-mock-tasks.js';
 import { seedHistory } from './chat-mock-history.js';
 
 const CANCEL = Symbol('cancelled');
@@ -70,6 +71,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
   const T = tid => { const t = threads.get(tid); if (!t) throw err(404, `no thread '${tid}'`, 'not_found'); return t; };
   const pub = t => ({ ...t.thread, running: !!t.run });
   const proj = createProjectMocks({ threads, newThread, emit: (...a) => emit(...a), net: () => net(), err, now, rid, pub });   // plan projects 1.3
+  const tsk = createTaskMocks({ threads, newThread, emit: (...a) => emit(...a), net: () => net(), err, now, rid, projects: () => proj.list() });   // scheduled-tasks 4.1
   function emit(t, type, payload) {
     const ev = { thread_id: t.thread.id, seq: t.events.length + 1, ts: now(), type, payload };
     t.events.push(ev); t.thread.updated = ev.ts;
@@ -345,7 +347,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
   async function seed() {
     if (seeded) return seeded;
     seeded = (async () => {
-      proj.seed();
+      proj.seed(); tsk.seed();                 // the projects, then the scheduled tasks and their run chats (scheduled-tasks 4.1)
       const t = newThread({ title: 'Fox in the snow' });
       const q = QUESTIONS.slice(0, 2), qid = rid('tc_'), cid = rid('tc_'), s = rid('s_');
       const tool = await toolSchema('comfy_generate_image'), out = await makeOutput(t, 'image', 'a red fox in fresh snow, photoreal, 16:9');
@@ -377,20 +379,22 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
   const net = () => new Promise(r => setTimeout(r, (60 + Math.random() * 90) / speed));
   // the agent's list filters: archived false / true / 'all' (both, chat-history 1.1), environments, words in titles and messages
   const inView = (t, archived) => archived === 'all' || !!t.thread.archived === !!archived;
-  const listed = ({ q, archived, environment, project }) => {
+  const listed = ({ q, archived, environment, project, task }) => {
     const qq = (q || '').toLowerCase(), envs = environment ? String(environment).split(',') : null, projs = project ? String(project).split(',') : null;
+    const tks = task ? String(task).split(',') : null;
     return [...threads.values()].filter(t => inView(t, archived)).filter(t => !envs || envs.includes(t.thread.settings?.environment || 'default'))
       .filter(t => !projs || projs.includes(t.thread.settings?.project || 'none'))   // plan projects 1.3
+      .filter(t => !tks || tks.includes(t.thread.settings?.task || 'none'))          // scheduled-tasks 4.1
       .filter(t => !qq || t.thread.title.toLowerCase().includes(qq) || t.events.some(e => ['user', 'assistant'].includes(e.type) && String(e.payload.text).toLowerCase().includes(qq)));
   };
   return {
     live: false,
     async models() { await net(); return structuredClone(MODELS); },
-    async threads({ q, archived, limit = 200, environment, sort = 'updated', offset = 0, project } = {}) {
+    async threads({ q, archived, limit = 200, environment, sort = 'updated', offset = 0, project, task } = {}) {
       await seed(); await net();
       const order = { title: (a, b) => a.thread.title.toLowerCase().localeCompare(b.thread.title.toLowerCase()), created: (a, b) => b.thread.created - a.thread.created }[sort]
         || ((a, b) => b.thread.updated - a.thread.updated);
-      return listed({ q, archived, environment, project }).sort(order).slice(offset, offset + limit).map(pub);
+      return listed({ q, archived, environment, project, task }).sort(order).slice(offset, offset + limit).map(pub);
     },
     async threadCount({ q, archived, environment, project } = {}) { await seed(); await net(); return { count: listed({ q, archived, environment, project }).length }; },   // chat-history 1.1
     async threadGroups({ archived, by: key = 'environment' } = {}) {   // plan 41.1, as the agent's /v1/threads/groups (by project: plan projects 1.2)
@@ -554,7 +558,8 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
       const row = { name, description: `Copied from ${body.id}`, source: 'user', id: 'user/' + name, enabled: true, problems: [], from: { kind: 'workspace', id: body.id } };
       settings.skills = [...settings.skills.filter(k => k.id !== row.id), row]; return structuredClone(row); },
     async setSkill(name, enabled) { await net(); const k = settings.skills.find(x => x.id === 'user/' + name); if (k) k.enabled = enabled; return structuredClone(k); },
-    ...Object.fromEntries(Object.entries(proj).filter(([k]) => !['newChatBody', 'movePatch', 'seed'].includes(k))),   // plan projects 1.3
+    ...Object.fromEntries(Object.entries(proj).filter(([k]) => !['newChatBody', 'movePatch', 'seed', 'list'].includes(k))),   // plan projects 1.3
+    ...Object.fromEntries(Object.entries(tsk).filter(([k]) => k !== 'seed')),          // scheduled-tasks 4.1
     async deleteSkill(name) { await net(); settings.skills = settings.skills.filter(x => x.id !== 'user/' + name); return { deleted: name }; },
   };
 }

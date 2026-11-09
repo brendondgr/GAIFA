@@ -396,7 +396,7 @@ test('projects on the mock: list, sort, pins, defaults on a new chat, move in an
   assert.deepEqual(t.settings, { project: thesis.id, environment: 'thesis', disabled: ['comfy'] });
   const t2 = await c.create({ mode: 'plan', settings: { project: thesis.id, disabled: [] } });
   assert.equal(t2.mode, 'plan'); assert.deepEqual(t2.settings.disabled, []);
-  assert.equal((await c.projectThreads(thesis.id)).length, 4);
+  assert.equal((await c.projectThreads(thesis.id)).filter(t => !t.settings?.task).length, 4);   // and the Thesis backup task's run chat (scheduled-tasks 4.1)
   // moving in sets the primary environment only; out keeps it
   const plain = await c.create({ model: 'gemma4-26B', settings: { environment: 'notes' } });
   let moved = await c.patch(plain.id, { settings: { project: thesis.id } });
@@ -405,7 +405,7 @@ test('projects on the mock: list, sort, pins, defaults on a new chat, move in an
   assert.equal(moved.settings.project, undefined); assert.equal(moved.settings.environment, 'thesis');
   assert.ok((await c.threads({ project: 'none' })).some(x => x.id === plain.id));
   const groups = await c.threadGroups({ by: 'project' });
-  assert.equal(groups.find(g => g.project === thesis.id).count, 4);
+  assert.equal(groups.find(g => g.project === thesis.id).count, 5);                                // with the backup task's run chat
   assert.ok(groups.some(g => g.project === 'none'));
   // sources: add a page, refresh it, change its freshness, reorder, remove
   const page = await c.addSource(thesis.id, { kind: 'page', url: 'https://example.com/a' });
@@ -423,7 +423,7 @@ test('projects on the mock: list, sort, pins, defaults on a new chat, move in an
   assert.equal(p.name, 'Trip');
   await assert.rejects(c.createProject({ name: ' ' }), e => e.code === 'bad_name');
   const done = await c.deleteProject(thesis.id);
-  assert.equal(done.chats, 4);
+  assert.equal(done.chats, 5);                                           // with the backup task's run chat (scheduled-tasks 4.1)
   assert.equal((await c.get(t.id)).settings.project, undefined);
   await assert.rejects(c.project(thesis.id), e => e.status === 404);
   assert.equal(seen.at(-1).type, 'project'); assert.equal(seen.at(-1).project, null);
@@ -472,5 +472,5 @@ test('the client asks for archived: all and the count; the mock answers the same
   const days = new Set(both.map(t => Math.floor((Date.now() / 1000 - t.updated) / 86400)));
   for (const d of [0, 2, 3, 5]) assert.ok(days.has(d), `a chat ${d} days old`);
   assert.ok([...days].some(d => d >= 8) && [...days].some(d => d > 365), 'older ones, and one from another year');
-  assert.equal((await cmock.createMockClient({}, { speed: 1000, history: false }).threads({ archived: 'all' })).filter(t => !t.settings?.project).length, 2);   // and the projects' fixture chats (plan projects 1.3)
+  assert.equal((await cmock.createMockClient({}, { speed: 1000, history: false }).threads({ archived: 'all' })).filter(t => !t.settings?.project && !t.settings?.task).length, 2);   // and the projects' fixture chats (plan projects 1.3), the tasks' runs (scheduled-tasks 4.1)
 });

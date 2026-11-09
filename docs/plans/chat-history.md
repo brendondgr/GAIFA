@@ -29,15 +29,16 @@ Touches the agent's thread routes (architecture §14.1), Stage O's chat list (ba
   - **Count:** `GET /v1/threads/count?archived=&q=&environment=` returns `{count}`, so the Show all page can say how many there are and the sidebar knows whether Show all is needed without loading 21 rows. *Assumption:* the count route is cheap (one `COUNT(*)` with the same clauses as `threads`).
   *Done when:* `services/agent/tests/test_threads_list.py` (new) covers archived `false`, `true` and `all`, with `q`, `environment` and `offset`, plus `groups` with `all`, and `count` matches the list's length for the same filters. The existing thread tests still pass. Update architecture §14.1 (the agent's routes).
   *As built:* one `Store._where` builds the clauses for `threads`, `count` and `groups`. `archived` is now exactly `false`, `true` or `all` (422 for anything else, where FastAPI's bool also took `1` or `yes`; no caller sent those). §14.1 gained a "chat list" bullet with the three routes, and the agent's README says the same.
-- [ ] **1.2 The client and the mock: `web/chat/chat-api.js`, `chat-mock.js`.**
+- [x] **1.2 The client and the mock: `web/chat/chat-api.js`, `chat-mock.js`.**
   - `c.threads({archived})` passes `true`, `false` or `'all'`. `c.threadGroups({archived})` does the same, and `c.threadCount({q, archived, environment})` is new. The mock does the same over its fixture chats. Give some of them older dates so every date bucket has a chat, and archive one or two.
   *Done when:* `utils/tests/web/chat.test.mjs` covers `archived: 'all'` and `threadCount` on the mock.
+  *As built:* the mock's older chats are their own file, `web/chat/chat-mock-history.js` (28 chats from 25 minutes to 380 days old, two archived; `createMockClient(api, {history: false})` leaves them out), as `chat-mock.js` was already past 500 lines. The mock had no workspace mod, so `?mock` couldn't group by environment at all: `web/mock-workspace.js` adds one with four environments (None, Default, Ariadne, Thesis) and only the routes the chat pages read.
 
 **Wire — Phase 1:** nothing visible yet. The agent and the mock answer the new filters.
 
 **Checks & deliverables — Phase 1**
-- [ ] `services/agent/tests` and `uv run pytest` are green.
-- [ ] Delivered: the changed `store.py`, `server.py`, `chat-api.js`, `chat-mock.js`, and tests.
+- [x] `services/agent/tests` and `uv run pytest` are green.
+- [x] Delivered: the changed `store.py`, `server.py`, `chat-api.js`, `chat-mock.js`, and tests.
 
 ## Phase 2 — The sidebar: names only, the View menu, date groups, 20 and Show more (M)
 

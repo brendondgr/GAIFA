@@ -1,7 +1,7 @@
 // GAIFA mock API — in-memory GAIFA + services with simulated time.
 // Implements the Section 6 contract; becomes web/js/mock.js in the vanilla port.
 import { createHistory, withSeries } from './mock-history.js';
-import { createModMocks } from './mock-mods.js';
+import { createModMocks, WORKSPACE_SVC } from './mock-mods.js';
 import { createToolMocks } from './mock-tools.js';
 import { createSessionMocks } from './mock-sessions.js';
 import { createLlmMocks } from './mock-llm.js';
@@ -245,8 +245,8 @@ function seedServices(base) {
     svc({ id: 'gen3d', name: '3D Generate', description: 'Text-to-3D meshes with part splitting and auto-rigging.', icon: 'cube', port: 5050, has_page: true, native_ui: 'http://127.0.0.1:5050/ui/', version: '0.3.0', load: 'unloaded', estimate: 52 * GB, peak: 52 * GB, idle_s: 5400, has_outputs: true, models: ['cube3d-v0.5', 'cubepart', 'qwen3-vl-4b-instruct', 'clip-vit-large-patch14'], stats: [{ label: 'Jobs', value: 17 }, { label: 'Queue', value: 0 }], priority: 2 }),
     svc({ id: 'comfy', name: 'Images & Video', description: 'ComfyUI workflows: text to image, image edits and video', icon: 'image', port: 5070, version: '0.1.0', load: 'unloaded', estimate: 24 * GB, peak: 60 * GB, idle_s: null, has_outputs: true, has_page: true, native_ui: 'http://127.0.0.1:8199/', models: ['z-image-turbo-fp8', 'qwen-image-2.1-fp8', 'qwen-image-2.1-q8', 'wan2.1-t2v-14b-fp8', 'wan2.1-i2v-480p-14b-fp8', 'scail-2-q8', 'qwen3vl-8b-bf16', 'umt5-xxl-enc-fp8', 'qwen-3-4b', 'wan-2.1-vae', 'qwen-image-2.1-vae', 'wan21-lightx2v-lora', 'zit-watercolor', 'clip-vision-h', 'remacri-4x'], stats: [{ label: 'Workflows', value: 4 }, { label: 'Drafts', value: 1 }, { label: 'Queue', value: 0 }, { label: 'Made today', value: 3, reset: 'daily' }], priority: 1, idle_unload_s: 600 }),
     svc({ id: 'example', name: 'Example', description: 'The mod template. Copy it with gaifa new <id>.', icon: 'puzzle', port: 5099, used: 0.05 * GB, has_page: true, stats: [{ label: 'Calls', value: 0 }], priority: 3, autostart: false }),
-    // the embed mod, so "By meaning" (Outputs, the chat list, the header Search) and its scores show in ?mock
-    svc({ id: 'embed', name: 'Embeddings', description: 'EmbeddingGemma 2 and the library: every output indexed for search by meaning', icon: 'search', port: 5104, used: 1.2 * GB, stats: [{ label: 'Indexed', value: 120 }], priority: 6 }),
+    svc({ id: 'embed', name: 'Embeddings', description: 'EmbeddingGemma 2 and the library: every output indexed for search by meaning', icon: 'search', port: 5104, used: 1.2 * GB, stats: [{ label: 'Indexed', value: 120 }], priority: 6 }),   // the embed mod: By meaning and its scores in ?mock
+    svc(WORKSPACE_SVC),   // environments for the chat list (chat-history 1.2)
   ];
 }
 

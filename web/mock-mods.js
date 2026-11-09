@@ -3,6 +3,8 @@
 // Written by us, not Claude Design.
 
 import { comfyMock } from './mock-comfy.js';
+import { workspaceMock } from './mock-workspace.js';
+export { WORKSPACE_SVC } from './mock-workspace.js';
 
 export function createModMocks(m) {
   const { ok, media, upstream, svcById, pushSvc, act, doLoad, doUnload, loadSvc, ttsOutput, makeWav, clone, now, GB, jobs, emit, models, usedBytes, renderImageBlob, voices, KOKORO, voice } = m;
@@ -43,6 +45,7 @@ export function createModMocks(m) {
   lcpp: lcppMock(m),
   relay: relayMock(m),
   comfy: comfyMock(m),
+  workspace: workspaceMock(m),   // chat-history 1.2: environments for the chat list
   transcribe: {
     'GET /health': () => ok({ status: 'ok', model: 'whisper-large-v3-turbo' }),
     'POST /v1/transcribe': ({ form }) => { const f = form?.get?.('file'); if (!f || !f.size) throw upstream(422, 'file: an audio file is required');

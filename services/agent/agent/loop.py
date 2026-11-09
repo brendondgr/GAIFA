@@ -234,7 +234,7 @@ class Agent(Compaction, Queueing):
         try:
             try:                                            # what the profile shows this chat isn't recalled again
                 folders = (await ctx.chat_folders(self.hub, tid, thread.get("settings"), await self.hub.services(),
-                                                  (thread.get("settings") or {}).get("disabled") or []) or {}).get("folders")
+                                                  (thread.get("settings") or {}).get("disabled") or [], self.projects) or {}).get("folders")
             except Exception:  # noqa: BLE001
                 folders = None
             days = int(profile.settings(self.cfg.data).get("interest_days") or profile.INTEREST_DAYS)
@@ -612,8 +612,8 @@ class Agent(Compaction, Queueing):
                 origin["named"] = named     # secret-looking files the user named: the workspace mod opens only these
             if (thread.get("settings") or {}).get("dry_run"):
                 origin["dry_run"] = True    # the eval: generating tools stand in existing outputs
-            if isinstance((thread.get("settings") or {}).get("environment"), str):
-                origin["environment"] = thread["settings"]["environment"]   # the chat's workspace folders (plan 34)
+            from .projects.origin import chat_envs
+            origin.update(chat_envs(thread.get("settings"), self.projects))   # the chat's workspace folders (plan 34; a project's: projects 2.2)
             if mode == "auto":
                 origin["said"] = self._said(tid)   # the Auto judge reads the user's own words (plan 30.3)…
                 origin["narration"] = ctx.narration(self.store.events(tid))   # …and with context "full", this turn's text
@@ -725,6 +725,11 @@ class Agent(Compaction, Queueing):
 
     # ---- the model ---------------------------------------------------------------------------
 
+    def project_of(self, tid: str) -> dict[str, Any] | None:
+        """The chat's project, or None (plan projects 2.2)."""
+        from .projects.origin import project_of
+        return project_of(thread_settings(self.store, tid), self.projects)
+
     def harness_of(self, tid: str) -> tuple[int, dict[str, str]]:
         """The harness version this chat runs (its `settings.harness` pin, else the active one) and its files."""
         from .harness import Harness, HarnessError
@@ -761,17 +766,17 @@ class Agent(Compaction, Queueing):
             services, memory = None, None
         summary, _, _ = ctx.summary_state(events)
         prefs = await k.preferences(set(tools.full), tid) if not (thread_settings(self.store, tid) or {}).get("no_learn") else ""
-        fdata = await ctx.chat_folders(self.hub, tid, thread_settings(self.store, tid), services, tools.disabled)
+        fdata = await ctx.chat_folders(self.hub, tid, thread_settings(self.store, tid), services, tools.disabled, self.projects)
         parts = {"base": tree.get("systemprompt.md", ""), "guardrails": tree.get("guardrails.md", ""),
                  "agent_md": k.agent_md(), "memory": "\n".join(x for x in (k.profile((fdata or {}).get("folders")), prefs) if x),
                  "skills": await k.skill_list(set(tools.disabled), await ctx.chat_skills(
-                     self.hub, tid, thread_settings(self.store, tid), services, tools.disabled)),
+                     self.hub, tid, thread_settings(self.store, tid), services, tools.disabled, self.projects)),
                  "tools": prompts.tool_index(tools.deferred(), set(tools.full), tools.disabled),
                  "env": prompts.environment(services, memory, model, meta.get("context_length"), meta.get("vision"))
                  + (f"\nTurned off in this chat: {', '.join(sorted(tools.disabled))} (their tools can't be used here; "
                     "the user can turn them back on in the composer)" if tools.disabled else "")
                  + prompts.mode_note(mode_of((self.store.thread(tid) or {}).get("mode")))
-                 + (prompts.folders_note(fdata, os.path.expanduser("~")) if fdata is not None else ""),
+                 + (prompts.folders_note(fdata, os.path.expanduser("~"), self.project_of(tid)) if fdata is not None else ""),
                  "outputs": prompts.outputs_table(ctx.model_outputs(events)), "summary": summary}
         sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),

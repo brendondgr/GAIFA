@@ -137,8 +137,8 @@ class Local:
             return self.err(tid, cid, "read_skill", "disabled", f"the {mod} tools are turned off in this chat",
                             "tell the user it's turned off; they can turn it back on in the composer")
         try:
-            env = (thread.get("settings") or {}).get("environment")
-            body = await k.read(name, tid, env if isinstance(env, str) and env else None)
+            from .projects.origin import chat_envs
+            body = await k.read(name, tid, chat_envs(thread.get("settings"), self.a.projects) or None)   # plan projects 2.2
         except skillfmt.SkillFileError as e:
             return self.err(tid, cid, "read_skill", e.code, e.detail, "the skill's files are listed after its body")
         if body is None:

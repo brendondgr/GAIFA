@@ -100,7 +100,7 @@ Assumed:
 
   Update architecture §4.2/§10 where the workspace mod's origin is described, and `docs/mods.md` if it documents `X-GAIFA-Origin`.
   *As built:* the tests are all in `test_origin_envs.py`. An id in `environments` that names no environment is skipped (all unknown: Default, as for one). `GET /v1/folders` answers the primary as `environment` and, with more than one, `environments`; an explicit `?environment=` (the Workspace page) drops the origin's `environments`. The origin is described in architecture §14.7 (limits); `docs/mods.md` doesn't document the workspace origin, so it is unchanged.
-- [ ] **2.2 The agent sends a project's environments: `services/agent/agent/projects/origin.py` (new), `hubapi.py`, `loop.py`, `context.py`, `local.py`, `prompts.py`.**
+- [x] **2.2 The agent sends a project's environments: `services/agent/agent/projects/origin.py` (new), `hubapi.py`, `loop.py`, `context.py`, `local.py`, `prompts.py`.**
   - **One helper:** `chat_envs(settings, projects) -> {environment, environments}` replaces the four places that read `settings.environment` today (`loop.py` ≈ 602, `local.py` ≈ 140, `context.py` ≈ 468/495, `hubapi._chat_origin`). For a project chat it returns the project's environments followed by its own hidden one. Otherwise it returns the chat's environment, as now.
   - **The prompt's Environment note** (`prompts.py` ≈ 140) names the project and each of its environments.
   *Done when:* `services/agent/tests/test_project_folders.py` covers:
@@ -109,6 +109,7 @@ Assumed:
     - the folders note listing the project's folders from each environment.
 
   `test_environments.py` still passes.
+  *As built:* the hub client's `chat_folders`, `chat_skills` and `chat_skill_read` take the helper's dict in place of an environment id, and `context.chat_folders`/`chat_skills` take the agent's `ProjectStore`. A project that lists no environments lends the chat's own (else Default) as its primary. `/v1/skills/copy` (Settings → Skills) still names one environment, as before.
 - [ ] **2.3 The project's own folders: `api_projects.py`.**
   - `POST /v1/projects/{pid}/folders {path, level}` makes the hidden environment the first time (`POST /api/s/workspace/v1/environments {name: "<project> (project)", project: pid}`) and adds the folder to it. `PATCH` changes a folder's level and `DELETE` removes it.
   - Adding or removing a whole environment is a `PATCH /v1/projects/{pid}` of `environments`.

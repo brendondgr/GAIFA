@@ -457,34 +457,36 @@ def summary_cut(events: list[dict[str, Any]]) -> int | None:
 
 
 async def chat_folders(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
-                       disabled: set[str] | list[str]) -> dict[str, Any] | None:
+                       disabled: set[str] | list[str], projects: Any = None) -> dict[str, Any] | None:
     """Plan 34: the workspace folders this chat can use (its environment's, and those the user allowed in it), as the
-    workspace mod resolves them: `{folders, environment}`; None when the mod is off, turned off here, or doesn't answer."""
+    workspace mod resolves them: `{folders, environment}`; None when the mod is off, turned off here, or doesn't answer.
+    A project chat's are its project's environments' (plan projects 2.2: `projects`, the agent's ProjectStore)."""
     import logging
 
     if "workspace" in disabled or not any(s.get("id") == "workspace" and s.get("state") in ("ready", "degraded")
                                           for s in services or []):
         return None
-    env = (settings or {}).get("environment")
+    from .projects.origin import chat_envs
     try:
-        return await hub.chat_folders(tid, env if isinstance(env, str) and env else None)
+        return await hub.chat_folders(tid, chat_envs(settings, projects) or None)
     except Exception as e:  # noqa: BLE001: the prompt goes on without it
         logging.getLogger("agent.context").warning("the folders of chat %s: %s", tid, e)
         return None
 
 
 async def folders_note(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
-                       disabled: set[str] | list[str]) -> str:
+                       disabled: set[str] | list[str], projects: Any = None) -> str:
     """For the system prompt: the chat's folders (`chat_folders`) as prompts.folders_note writes them; "" without."""
     import os
 
     from . import prompts
-    data = await chat_folders(hub, tid, settings, services, disabled)
-    return prompts.folders_note(data, os.path.expanduser("~")) if data is not None else ""
+    from .projects.origin import project_of
+    data = await chat_folders(hub, tid, settings, services, disabled, projects)
+    return prompts.folders_note(data, os.path.expanduser("~"), project_of(settings, projects)) if data is not None else ""
 
 
 async def chat_skills(hub: Any, tid: str, settings: dict[str, Any] | None, services: list[dict[str, Any]] | None,
-                      disabled: set[str] | list[str]) -> dict[str, Any] | None:
+                      disabled: set[str] | list[str], projects: Any = None) -> dict[str, Any] | None:
     """skill-sources 2.2: other agents' skills and instruction files in this chat's workspace folders, as the workspace
     mod finds them; None when the mod is off, turned off here, or doesn't answer (the prompt goes on without them)."""
     import logging
@@ -492,9 +494,9 @@ async def chat_skills(hub: Any, tid: str, settings: dict[str, Any] | None, servi
     if "workspace" in disabled or not any(s.get("id") == "workspace" and s.get("state") in ("ready", "degraded")
                                           for s in services or []):
         return None
-    env = (settings or {}).get("environment")
+    from .projects.origin import chat_envs
     try:
-        return await hub.chat_skills(tid, env if isinstance(env, str) and env else None)
+        return await hub.chat_skills(tid, chat_envs(settings, projects) or None)
     except Exception as e:  # noqa: BLE001: the prompt goes on without them
         logging.getLogger("agent.context").warning("the workspace skills of chat %s: %s", tid, e)
         return None

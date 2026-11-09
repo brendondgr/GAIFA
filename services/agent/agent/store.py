@@ -140,11 +140,14 @@ class Store:
     def thread(self, tid: str) -> dict[str, Any] | None:
         return self._thread(self._one("SELECT * FROM threads WHERE id = ?", (tid,)))
 
-    def threads(self, q: str | None = None, archived: bool = False, limit: int = 200, environment: list[str] | None = None,
-                sort: str = "updated", offset: int = 0) -> list[dict[str, Any]]:
-        """Newest first (`sort`: updated | created; `title` A to Z), optionally only the chats of some environments
-        (plan 41.1: `default` also matches chats without one)."""
-        sql, args = "SELECT * FROM threads WHERE archived = ?", [int(archived)]
+    @staticmethod
+    def _where(q: str | None, archived: bool | None, environment: list[str] | None) -> tuple[str, list[Any]]:
+        """The list's clauses, shared by `threads`, `count` and `groups`: `archived` None means both (plan chat-history
+        1.1)."""
+        sql, args = " WHERE 1", []
+        if archived is not None:
+            sql += " AND archived = ?"
+            args.append(int(archived))
         if q:
             sql += (" AND (title LIKE ? OR id IN (SELECT thread_id FROM events WHERE type IN ('user', 'assistant') "
                     "AND payload LIKE ?))")
@@ -152,15 +155,29 @@ class Store:
         if environment:
             sql += f" AND {ENV_OF} IN ({', '.join('?' * len(environment))})"
             args += list(environment)
+        return sql, args
+
+    def threads(self, q: str | None = None, archived: bool | None = False, limit: int = 200,
+                environment: list[str] | None = None, sort: str = "updated", offset: int = 0) -> list[dict[str, Any]]:
+        """Newest first (`sort`: updated | created; `title` A to Z), optionally only the chats of some environments
+        (plan 41.1: `default` also matches chats without one); `archived` None lists live and archived together."""
+        where, args = self._where(q, archived, environment)
+        sql = "SELECT * FROM threads" + where
         sql += " ORDER BY " + SORTS.get(sort, SORTS["updated"]) + " LIMIT ? OFFSET ?"
         args += [limit, max(0, offset)]
         return [self._thread(r) for r in self._all(sql, args)]  # type: ignore[misc]
 
-    def groups(self, archived: bool = False) -> list[dict[str, Any]]:
+    def count(self, q: str | None = None, archived: bool | None = False, environment: list[str] | None = None) -> int:
+        """How many chats `threads` would list with these filters and no limit (plan chat-history 1.1)."""
+        where, args = self._where(q, archived, environment)
+        return int(self._one("SELECT COUNT(*) FROM threads" + where, args)[0])
+
+    def groups(self, archived: bool | None = False) -> list[dict[str, Any]]:
         """Per environment id the chats use (`default` for none): how many, the newest `updated`, and how many are
-        running or waiting (plan 41.1)."""
+        running or waiting (plan 41.1); `archived` None counts both."""
+        where, args = self._where(None, archived, None)
         rows = self._all(f"SELECT {ENV_OF} AS env, COUNT(*), MAX(updated), SUM(state IN ('running', 'waiting')) "
-                         "FROM threads WHERE archived = ? GROUP BY env ORDER BY MAX(updated) DESC", (int(archived),))
+                         f"FROM threads{where} GROUP BY env ORDER BY MAX(updated) DESC", args)
         return [{"environment": r[0], "count": r[1], "updated": r[2], "running": int(r[3] or 0)} for r in rows]
 
     def update_thread(self, tid: str, **fields: Any) -> dict[str, Any] | None:

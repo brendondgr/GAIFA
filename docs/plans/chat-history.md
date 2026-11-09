@@ -1,6 +1,6 @@
 # Plan: a cleaner chat history: names only, grouped by date or environment, a short sidebar and a Show all page
 
-**Asked for:** 2026-11-08 · **Status:** Planned
+**Asked for:** 2026-11-08 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -23,11 +23,12 @@ Touches the agent's thread routes (architecture §14.1), Stage O's chat list (ba
 
 ## Phase 1 — The agent lists chats the new way (S)
 
-- [ ] **1.1 Archived, live or both: `services/agent/agent/store.py`, `server.py`.**
+- [x] **1.1 Archived, live or both: `services/agent/agent/store.py`, `server.py`.**
   - **Store:** `Store.threads(…, archived: bool | None)` and `Store.groups(archived: bool | None)`. `None` means both, with no `archived = ?` clause. The SQL and the sort stay as they are.
   - **Routes:** `GET /v1/threads` and `GET /v1/threads/groups` take `archived=true|false|all` (default `false`, so existing callers are unchanged). Each thread already carries `archived`.
   - **Count:** `GET /v1/threads/count?archived=&q=&environment=` returns `{count}`, so the Show all page can say how many there are and the sidebar knows whether Show all is needed without loading 21 rows. *Assumption:* the count route is cheap (one `COUNT(*)` with the same clauses as `threads`).
   *Done when:* `services/agent/tests/test_threads_list.py` (new) covers archived `false`, `true` and `all`, with `q`, `environment` and `offset`, plus `groups` with `all`, and `count` matches the list's length for the same filters. The existing thread tests still pass. Update architecture §14.1 (the agent's routes).
+  *As built:* one `Store._where` builds the clauses for `threads`, `count` and `groups`. `archived` is now exactly `false`, `true` or `all` (422 for anything else, where FastAPI's bool also took `1` or `yes`; no caller sent those). §14.1 gained a "chat list" bullet with the three routes, and the agent's README says the same.
 - [ ] **1.2 The client and the mock: `web/chat/chat-api.js`, `chat-mock.js`.**
   - `c.threads({archived})` passes `true`, `false` or `'all'`. `c.threadGroups({archived})` does the same, and `c.threadCount({q, archived, environment})` is new. The mock does the same over its fixture chats. Give some of them older dates so every date bucket has a chat, and archive one or two.
   *Done when:* `utils/tests/web/chat.test.mjs` covers `archived: 'all'` and `threadCount` on the mock.

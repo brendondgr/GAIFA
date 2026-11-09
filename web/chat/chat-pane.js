@@ -8,6 +8,8 @@
 //          envDeleted(ids), bus (EventTarget: 'patched' {detail: thread}), banner (an element or null), onMenu}
 // cmd: {n, type: 'new', env?, pane} from the page, acted on when `n` changes by the pane it names (New chat, New chat in
 // an environment). grip, paneTools: the split view's handle and buttons, drawn in the header.
+// bare, preset, placeholder (plan projects 5.2): the composer alone, for a new chat that starts as `preset` ({model, mode,
+// settings}: a project's) and opens in the panes once its first message made it (the project page's composer).
 
 import { h, T, Icon, COL, useWidth, chipSt, label11 } from './chat-ui.js';
 import { Card, TodoList } from './chat-cards.js';
@@ -31,7 +33,8 @@ const R = () => globalThis.React;
 const EMPTY_LIVE = { deltas: {}, progress: {}, meter: null };
 const SUGGEST = ['Make me an image of a fox in the snow', 'Turn my last image into a 3D model', 'Say “Welcome to GAIFA” in Hope’s voice', 'What can you do?'];
 
-export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen = () => {}, onFocus = null, grip = null, paneTools = null, style = null }) {
+export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen = () => {}, onFocus = null, grip = null, paneTools = null, style = null,
+  bare = false, preset = null, placeholder = null }) {
   const React = R(), { useState, useEffect, useRef, useMemo, useLayoutEffect } = React;
   const { api, c, toast, confirm, openOutput, fail, models, settings, tools, mods, judge, speechOut, envs } = shared;
   const [rootRef, width] = useWidth(800);
@@ -39,7 +42,8 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   const [quoteDrafts, setQuoteDrafts] = useState({});   // Select → Reply: the quote-reply cards waiting in each chat's composer
   const [drafts, setDrafts] = useState({}), [attachments, setAttachments] = useState([]), [toolForms, setToolForms] = useState([]);
   const [meterOpen, setMeterOpen] = useState(false);
-  const [fresh, setFresh] = useState(() => ({ model: null, mode: 'manual', settings: newChatSettings({}, lastEnv()) }));   // a chat not created yet; its environment: the last one picked (plan 34)
+  const [fresh, setFresh] = useState(() => (preset ? { model: preset.model || null, mode: preset.mode || 'manual', settings: newChatSettings(preset.settings || {}, lastEnv()) }
+    : { model: null, mode: 'manual', settings: newChatSettings({}, lastEnv()) }));   // a chat not created yet; its environment: the last one picked (plan 34)
   const [folders, setFolders] = useState(null);   // the workspace mod's folders, for Bypass (plan 27.4)
   // chat-responsive 1.3: messages drawn at once, before the agent stored them: {cid, key (tid | 'new'), text, atts, cards,
   // mentions, ts, state: sending | sent | failed, seq?, error?, queued?}; dropped when their user event arrives. `queued`:
@@ -315,6 +319,22 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   // ---- render ----
   const empty = !mine.length && (!tid || (ready && !events.length && !running));
   const compacts = events.filter(e => e.type === 'compact').length;
+  const composer = h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
+      dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })), placeholder,
+      voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
+      queued: qRows.length,
+      queue: h(QueueStrip, { rows: qRows, paused: held.paused, waiting: !running && (thread?.state === 'waiting' || view.pending.length > 0),
+        onEdit: qAct((t, id, text) => c.queueEdit(t, id, { text })), onMove: qAct((t, id, index) => c.queueEdit(t, id, { index })),
+        onRemove: qAct(c.queueRemove), onSendNow: qAct(c.queueSend), onResume: qAct(c.queueResume), onClear: qAct(c.queueClear) }),
+      settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, models, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
+      onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
+      controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
+        env: h(EnvMenu, { api, c, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: shared.loadEnvList, confirm,
+          onDeleted: (id, ids) => { shared.envDeleted(ids); if (tid && ids.includes(tid)) onOpen(null);
+            toast(`Deleted the environment${ids.length ? ` and ${ids.length} chat${ids.length === 1 ? '' : 's'}` : ''}`, 'success'); } }),
+        mode: h(ModeMenu, { value: thread?.mode || fresh.mode, onChange: setMode, bypass: bypassAllowed(folders, events), judge }),
+        model: h(ModelMenu, { models, value: thread?.model || fresh.model || models?.default, onChange: setModel, api, toast, onModels: shared.reloadModels }) }) });
+  if (bare) return h('section', { ref: rootRef, 'aria-label': 'New chat in the project', style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: T.bg, ...style } }, composer);
   return h('section', { ref: rootRef, 'aria-label': thread?.title ? `Chat: ${thread.title}` : 'Chat', 'data-chat-pane': tid || 'new', onMouseDownCapture: onFocus || undefined, onFocusCapture: onFocus || undefined,
     tabIndex: -1, onKeyDown: e => typeInto(e, inputRef.current),   // a click on the chat, then typing: the letters go into the box
     style: { outline: 'none', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', background: T.bg, ...style } },
@@ -332,21 +352,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
         empty && !toolForms.length ? h(EmptyState, { onPick: t => send(t), tools }) : null,
         blocks.map(b => (b.kind === 'turn' ? h(TurnView, { key: b.key, turn: b, ctx }) : h(Card, { key: b.item.key, item: b.item, ctx }))),
         running ? null : h(MemoryNote, { api, tid }))),
-    h(Composer, { draft, setDraft, attachments, setAttachments, onOpen: openOutput, onSend: send, onStop: () => c.cancel(tid).catch(fail), running, tools, index: tools,
-      dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })),
-      voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
-      queued: qRows.length,
-      queue: h(QueueStrip, { rows: qRows, paused: held.paused, waiting: !running && (thread?.state === 'waiting' || view.pending.length > 0),
-        onEdit: qAct((t, id, text) => c.queueEdit(t, id, { text })), onMove: qAct((t, id, index) => c.queueEdit(t, id, { index })),
-        onRemove: qAct(c.queueRemove), onSendNow: qAct(c.queueSend), onResume: qAct(c.queueResume), onClear: qAct(c.queueClear) }),
-      settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, models, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
-      onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
-      controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
-        env: h(EnvMenu, { api, c, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: shared.loadEnvList, confirm,
-          onDeleted: (id, ids) => { shared.envDeleted(ids); if (tid && ids.includes(tid)) onOpen(null);
-            toast(`Deleted the environment${ids.length ? ` and ${ids.length} chat${ids.length === 1 ? '' : 's'}` : ''}`, 'success'); } }),
-        mode: h(ModeMenu, { value: thread?.mode || fresh.mode, onChange: setMode, bypass: bypassAllowed(folders, events), judge }),
-        model: h(ModelMenu, { models, value: thread?.model || fresh.model || models?.default, onChange: setModel, api, toast, onModels: shared.reloadModels }) }) }),
+    composer,
     h(QuoteReplyBox, { scrollRef, resetKey: dkey, onAdd: q => setQuotes(l => addQuote(l, q)) }));
 }
 

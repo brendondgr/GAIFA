@@ -128,6 +128,7 @@ export function createProjectMocks({ threads, newThread, emit, net, err, now, ri
     },
     async addSource(pid, body) {
       seed(); await net(); P(pid);
+      if (!['file', 'page'].includes(body.kind)) throw err(422, `a source is a file or a page, not ${JSON.stringify(body.kind)}`, 'bad_kind');   // as the agent's store
       if (body.kind === 'page' && !/^https?:\/\//.test(body.url || '')) throw err(422, 'a page needs an http(s) URL', 'bad_url');
       const s = addSrc(pid, { ...body, title: body.kind === 'page' ? (body.url || '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '') : (body.title || body.output_id), chars: body.kind === 'page' ? 8000 : 4000 });
       projects.get(pid).updated = now();

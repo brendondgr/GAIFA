@@ -28,6 +28,7 @@ import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
 import { SplitView, SPLIT_CSS } from './chat-split.js';
 import { ProjectsPage, PROJECTS_CSS } from './chat-projects.js';
+import { ProjectPage } from './chat-project.js';
 import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout } from './chat-layout.js';
 import { CONTROLS_CSS } from './chat-controls.js';
 import { QUOTE_CSS } from './chat-quote.js';
@@ -193,6 +194,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       h('div', { onClick: () => setDrawer(false), 'aria-hidden': true, style: { position: 'absolute', inset: 0, zIndex: 40, background: T.ov } }),
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
     sub?.page === 'projects' ? h(ProjectsPage, { c, toast, go, onMenu: narrow ? () => setDrawer(true) : null }) :
+    sub?.page === 'project' ? h(ProjectPage, { key: sub.pid, shared: sh, pid: sub.pid, go }) :
     h(SplitView, { layout, setLayout, narrow, maxPanes: c.live && !c.sharedStream ? MAX_PANES : Infinity, onRefuse: m => toast(m, 'error'),
       titleOf: id => threads.find(t => t.id === id)?.title || null,
       renderPane: (p, { active, tools, grip }) => h(ChatPane, { shared: sh, tid: p.tid, paneId: p.id, cmd, grip, paneTools: tools,

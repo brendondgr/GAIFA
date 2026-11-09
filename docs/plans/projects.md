@@ -212,7 +212,7 @@ Assumed:
   - **Empty state:** one line and the New project button.
   *Done when:* `utils/tests/web/chat-projects.test.mjs` (new; sorting, pins first, search) passes. In the browser on the mock, the grid, search, sort, pin and New project work.
   *As built:* `chat.js`'s `subPage(route)` picks the page (the panes keep their chats while it shows). The sort is kept on the hub (`hub.chat.projects.sort`, ui-store). A card also shows how many chats the project has; a pin isn't activity, so pinning doesn't reorder by recent activity (the store and the mock leave `updated` alone). The grid follows `project` events through `c.watchProjects`. Checked on a second hub (`?mock#/chat/projects`): search, Sort by Name, pin, New project (an empty name refused, then made and opened).
-- [ ] **5.2 The project page: `web/chat/chat-project.js`, `chat-project-panels.js` (new).**
+- [x] **5.2 The project page: `web/chat/chat-project.js`, `chat-project-panels.js` (new).**
   - **Route:** `#/chat/projects/<pid>`.
   - **Left column:**
     - the name (rename in place) and the description;
@@ -228,6 +228,7 @@ Assumed:
     - a **Delete project** link at the bottom, with a confirm that says what stays.
   - **Live updates:** panels follow `project` and `project_source` events.
   *Done when:* `utils/tests/web/chat-project.test.mjs` (new; the panels' pure helpers: page ages, freshness choices, folder order) passes. In the browser on the mock, every panel adds, edits and removes.
+  *As built:* the composer is a bare `ChatPane` (`bare`, `preset`, `placeholder`; the composer alone, its controls row included), so its first message makes the chat with `c.create({settings: {project}, message})` and the page opens it at `#/chat/<id>`; the Composer takes a `placeholder`. Show all lists every chat of the project in place (up to 200) until chat-history's Show all page has a project filter (5.4). The panels fold; Defaults starts folded. Folders: drag an environment, or its ↑, to make it the primary. Files: Upload (the hub's upload) or pick a text or document from Outputs. Memory: edit and forget go through `/v1/memory/facts/{id}`; Open in Memory links the agent's Memory page. The project and its sources come from `GET /v1/projects/{id}`, read again on each `project` or `project_source` event for it. Checked on a second hub (`?mock`): rename in place, instructions saved, a file uploaded (and one taken out), a page added, its freshness set to 1 day, refreshed and removed, a fact edited and forgotten, a folder's level changed, a folder added (a typed path: the mock has no folder chooser) and removed, an environment made primary and dropped, a default tool group toggled, a new chat from the composer opening in the panes with the project's mode and model, and Delete project with its confirm.
 - [ ] **5.3 A project chat: `web/chat/chat-header.js`, `chat-env.js`, `chat-list.js`.**
   - **Header:** a project chat shows a project chip (the project's name, linking to its page) instead of the environment chip. Its menu lists the project's folders and offers "Remove from project".
   - **Chat menu:** the chat's ⋯ menu gains **Move to project…** (a list of projects) and **Remove from project**.

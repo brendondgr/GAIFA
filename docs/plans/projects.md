@@ -77,12 +77,13 @@ Assumed:
 
   Update architecture §14.1 (the agent's routes).
   *As built:* `project` events belong to no chat, so they go to the `/v1/streams` connections opened with `watch=projects` (`Live.broadcast`), not to every chat's stream. A project with no environments sets none on its chats: they keep their own. The project's `chats` and `source_count` come with each row. Delete, creation and changes run hook lists on the agent (`project_cleanup`, `project_created`, `project_changed`) that later phases fill.
-- [ ] **1.3 Client and mock: `web/chat/chat-api.js`, `chat-mock.js`.** `c.projects({q, sort})`, `c.project(pid)`, `c.createProject`, `c.patchProject`, `c.deleteProject`, `c.projectThreads(pid, opts)`, `c.threadGroups({by})`, and for sources `c.addSource`, `c.patchSource`, `c.removeSource`, `c.refreshSource`. The mock keeps two fixture projects, one with files and pages.
+- [x] **1.3 Client and mock: `web/chat/chat-api.js`, `chat-mock.js`.** `c.projects({q, sort})`, `c.project(pid)`, `c.createProject`, `c.patchProject`, `c.deleteProject`, `c.projectThreads(pid, opts)`, `c.threadGroups({by})`, and for sources `c.addSource`, `c.patchSource`, `c.removeSource`, `c.refreshSource`. The mock keeps two fixture projects, one with files and pages.
   *Done when:* `utils/tests/web/chat.test.mjs` covers the project calls on the mock.
+  *As built:* the mock's projects are in `web/chat/chat-mock-projects.js` (chat-mock.js was at 549 lines), spread into the mock client; `c.threads({project})` filters too. The client also has `c.watchProjects(onEvent)` (an EventSource on `/v1/streams?threads=&watch=projects`, see 1.2) and, ahead of 2.3 and 4.2, `c.projectFolders`, `c.addProjectFolder`, `c.patchProjectFolder`, `c.removeProjectFolder`, `c.projectMemory`, `c.patchProjectFact` and `c.forgetProjectFact` (the last two through the existing memory routes).
 
 **Checks & deliverables — Phase 1**
-- [ ] `services/agent/tests` and `uv run pytest` are green.
-- [ ] Delivered: `projects/store.py`, `api_projects.py`, the changed `store.py`, `server.py`, `chat-api.js`, `chat-mock.js`, and tests.
+- [x] `services/agent/tests` and `uv run pytest` are green.
+- [x] Delivered: `projects/store.py`, `api_projects.py`, the changed `store.py`, `server.py`, `chat-api.js`, `chat-mock.js`, and tests.
 
 ## Phase 2 — Folders across environments (M)
 

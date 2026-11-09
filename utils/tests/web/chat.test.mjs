@@ -374,3 +374,73 @@ test('a new chat and its first message in one call, and the message body (chat-r
   assert.equal((await c.events(t.id)).find(e => e.type === 'user').payload.text, 'hello');
   await c.cancel(t.id);
 });
+
+test('projects on the mock: list, sort, pins, defaults on a new chat, move in and out, sources, groups, delete (plan projects 1.3)', async () => {
+  const c = cmock.createMockClient({}, { speed: 400 });
+  const seen = [];
+  const watch = c.watchProjects(ev => seen.push(ev));
+  const list = await c.projects();
+  assert.deepEqual(list.map(p => p.name), ['Thesis', 'Garden planner']);                 // Thesis is pinned
+  const thesis = list[0];
+  assert.ok(thesis.pinned && thesis.chats === 2 && thesis.source_count === 4);
+  assert.deepEqual((await c.projects({ sort: 'name' })).map(p => p.name), ['Thesis', 'Garden planner']);
+  await c.patchProject(thesis.id, { pinned: false });
+  assert.deepEqual((await c.projects({ sort: 'name' })).map(p => p.name), ['Garden planner', 'Thesis']);
+  assert.deepEqual((await c.projects({ q: 'plant' })).map(p => p.name), ['Garden planner']);
+  const full = await c.project(thesis.id);
+  assert.deepEqual(full.sources.map(s => s.kind), ['file', 'file', 'page', 'page']);
+  assert.equal(full.sources[3].status, 'error');
+  // a new chat takes the project's defaults; the request's own settings win
+  const t = await c.create({ settings: { project: thesis.id } });
+  assert.equal(t.model, 'skynet'); assert.equal(t.mode, 'accept_edits');
+  assert.deepEqual(t.settings, { project: thesis.id, environment: 'thesis', disabled: ['comfy'] });
+  const t2 = await c.create({ mode: 'plan', settings: { project: thesis.id, disabled: [] } });
+  assert.equal(t2.mode, 'plan'); assert.deepEqual(t2.settings.disabled, []);
+  assert.equal((await c.projectThreads(thesis.id)).length, 4);
+  // moving in sets the primary environment only; out keeps it
+  const plain = await c.create({ model: 'gemma4-26B', settings: { environment: 'notes' } });
+  let moved = await c.patch(plain.id, { settings: { project: thesis.id } });
+  assert.equal(moved.settings.environment, 'thesis'); assert.equal(moved.model, 'gemma4-26B');
+  moved = await c.patch(plain.id, { settings: { project: null } });
+  assert.equal(moved.settings.project, undefined); assert.equal(moved.settings.environment, 'thesis');
+  assert.ok((await c.threads({ project: 'none' })).some(x => x.id === plain.id));
+  const groups = await c.threadGroups({ by: 'project' });
+  assert.equal(groups.find(g => g.project === thesis.id).count, 4);
+  assert.ok(groups.some(g => g.project === 'none'));
+  // sources: add a page, refresh it, change its freshness, reorder, remove
+  const page = await c.addSource(thesis.id, { kind: 'page', url: 'https://example.com/a' });
+  assert.equal(page.max_age_s, 3600);
+  await assert.rejects(c.addSource(thesis.id, { kind: 'page', url: 'https://example.com/a' }), e => e.code === 'exists');
+  const fresh = await c.refreshSource(thesis.id, page.id);
+  assert.equal(fresh.status, 'ok');
+  assert.equal((await c.patchSource(thesis.id, page.id, { max_age_s: null, position: 0 })).max_age_s, null);
+  assert.equal((await c.project(thesis.id)).sources[0].id, page.id);
+  await c.removeSource(thesis.id, page.id);
+  assert.equal((await c.project(thesis.id)).sources.length, 4);
+  assert.ok(seen.some(e => e.type === 'project_source' && e.source.status === 'fetching'));
+  // a new project, then delete: its chats become ordinary chats
+  const p = await c.createProject({ name: ' Trip ', environments: ['default'] });
+  assert.equal(p.name, 'Trip');
+  await assert.rejects(c.createProject({ name: ' ' }), e => e.code === 'bad_name');
+  const done = await c.deleteProject(thesis.id);
+  assert.equal(done.chats, 4);
+  assert.equal((await c.get(t.id)).settings.project, undefined);
+  await assert.rejects(c.project(thesis.id), e => e.status === 404);
+  assert.equal(seen.at(-1).type, 'project'); assert.equal(seen.at(-1).project, null);
+  watch.close();
+});
+
+test('projects on the live client: the routes it calls (plan projects 1.3)', async () => {
+  const calls = [];
+  const f = async (u, o = {}) => { calls.push(`${o.method || 'GET'} ${u}${o.body ? ' ' + o.body : ''}`); return { ok: true, status: 200, text: async () => '{}' }; };
+  const c = capi.createLiveClient({ fetch: f, EventSource: null });
+  await c.projects({ q: 'th', sort: 'name' }); await c.projects();
+  await c.createProject({ name: 'A' }); await c.patchProject('p_1', { pinned: true }); await c.deleteProject('p_1');
+  await c.projectThreads('p_1', { limit: 5 }); await c.threads({ project: 'none' }); await c.threadGroups({ by: 'project' });
+  await c.addSource('p_1', { kind: 'page', url: 'u' }); await c.refreshSource('p_1', 'src_1'); await c.removeSource('p_1', 'src_1');
+  assert.deepEqual(calls, ['GET /api/s/agent/v1/projects?q=th&sort=name', 'GET /api/s/agent/v1/projects', 'POST /api/s/agent/v1/projects {"name":"A"}',
+    'PATCH /api/s/agent/v1/projects/p_1 {"pinned":true}', 'DELETE /api/s/agent/v1/projects/p_1', 'GET /api/s/agent/v1/projects/p_1/threads?limit=5',
+    'GET /api/s/agent/v1/threads?project=none', 'GET /api/s/agent/v1/threads/groups?by=project',
+    'POST /api/s/agent/v1/projects/p_1/sources {"kind":"page","url":"u"}', 'POST /api/s/agent/v1/projects/p_1/sources/src_1/refresh',
+    'DELETE /api/s/agent/v1/projects/p_1/sources/src_1']);
+});

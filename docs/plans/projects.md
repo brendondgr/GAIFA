@@ -241,8 +241,9 @@ Assumed:
   - **Show all:** the page gains a project filter.
   *Done when:* `chat-groups.test.mjs` covers project sections, their order and No project. In the browser on the mock, the Projects row, its dropdown and Group by Project work. Update the brief §11.13 and `web/PATCHES.md` (one entry for the Projects UI).
   *As built (after merging chat-history):* the sections are `chat-project-groups.js` (`projectRows`, `ProjectChats`; pinned projects first, then *Projects by*, the View menu's order choice, with Environments by's values), and a project whose chats are all elsewhere in this view isn't shown; collapsed sections are saved as `p:<id>` beside the environments'. Group by: Project is offered when the agent has projects (`GROUP_NEEDS.project`); the hub's `[ui.chat.list] group` takes "project" (`utils/config.py`, `api_models.py`, `config.example.toml`). A section's `+` makes a new chat with the project's defaults (`newChatPreset`, now in `chat-env.js`); a plain New drops a project the pane had. The Show all page's Project filter is a select (All chats, each project, No project) and `?project=`; the project page's Show all opens it. Checked on the mock: the Projects row and its dropdown (Thesis, Garden planner, All projects), Group by: Project (Thesis, Garden planner, No project with Show more · 22), New chat in Thesis (its chip and Accept edits), then a plain New without it, and Show all filtered to Thesis and to No project.
-- [ ] **5.5 Docs: `docs/structure.md`, `web/PATCHES.md`, `docs/architecture.md` §14, the palette (`web/Hub.dc.html`).** The palette gains "Projects" and each project by name ("Project: <name>"). The structure doc lists every new file.
+- [x] **5.5 Docs: `docs/structure.md`, `web/PATCHES.md`, `docs/architecture.md` §14, the palette (`web/Hub.dc.html`).** The palette gains "Projects" and each project by name ("Project: <name>"). The structure doc lists every new file.
   *Done when:* the docs and web tests are green.
+  *As built:* the palette lists Projects among its pages and "Project: <name>" for each project, loaded with the palette through the chat client (so `?mock` has them too); `chat-projects.test.mjs` checks both. `web/PATCHES.md` has one entry (81) for the whole Projects UI; the structure doc lists every new file (the agent's `projects/` package and `prompting.py`, the five new chat modules); architecture §14.1 has a Projects part per phase, §14.2 the `project_refresh` event, §14.7 the workspace origin's `environments`; the brief §11.13 the Projects UI. Checked on the mock: the palette's "project" finds Projects, Project: Thesis and Project: Garden planner.
 
 **Wire — Phase 5:** the Chat page's sidebar has Projects, the projects grid, each project's page with its panels, project chats with their chip, and Group by Project.
 
@@ -255,7 +256,7 @@ Assumed:
   - deleting the test project leaves its chat as an ordinary chat.
 
   Screenshots of the projects grid and a project page go with the check.
-- [ ] Delivered: `chat-projects.js`, `chat-project.js`, `chat-project-panels.js`, the changed chat files, the docs, and tests.
+- [x] Delivered: `chat-projects.js`, `chat-project.js`, `chat-project-panels.js`, the changed chat files, the docs, and tests.
 
 ## 4. Deliverables
 

@@ -48,3 +48,11 @@ test('a card line and New project', () => {
   assert.deepEqual(pp.newProjectBody({ name: ' My   thesis ', description: ' d ', instructions: '' }).body, { name: 'My thesis', description: 'd', instructions: '' });
   assert.deepEqual(pp.SORTS.map(s => s[0]), ['activity', 'name', 'created']);
 });
+
+// Plan projects 5.5: the palette's pages list Projects, and each project is found by name.
+test('the command palette offers Projects and each project', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const hub = await readFile(path.join(root, 'web/Hub.dc.html'), 'utf8');
+  assert.match(hub, /\['Projects', '#\/chat\/projects', ICON\.folder\]/);
+  assert.match(hub, /label: `Project: \$\{p\.name\}`/);
+});

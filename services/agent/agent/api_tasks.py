@@ -1,15 +1,21 @@
 """Scheduled tasks' routes (plan scheduled-tasks 1.3, 2.3, 3.1–3.3).
 
     GET    /v1/tasks                          ?q=&project= (`none`: standalone); on first, then by the next run
-    POST   /v1/tasks                          {name, schedule, instructions?, project_id?, …}
+    POST   /v1/tasks                          {name, schedule, instructions?, project_id?, …}: the task and its `check`;
+                                              one with problems is saved turned off
     GET    /v1/tasks/unread                   {count, tasks: {id: n}}: runs not opened yet
     GET    /v1/tasks/{kid}                    the task, with its last run and `unread`
-    PATCH  /v1/tasks/{kid}                    any field; turning it on or a new schedule sets `next_due` from now
+    PATCH  /v1/tasks/{kid}                    any field; turning it on or a new schedule sets `next_due` from now; a task
+                                              that's on is checked again (problems: saved, turned off, 409 task_problems)
     DELETE /v1/tasks/{kid}                    its runs' chats stay as ordinary chats; its hidden environment goes
     GET    /v1/tasks/{kid}/runs               ?limit=&before=; newest first
     PATCH  /v1/tasks/{kid}/runs/{rid}         {seen}
-    POST   /v1/tasks/{kid}/run                Run now (no one watching)
+    POST   /v1/tasks/{kid}/run                Run now (no one watching); 409 task_problems when the check finds problems
+    POST   /v1/tasks/{kid}/check              {problems: [{field, detail, fix}], warnings: [{field, detail}]}
     POST   /v1/tasks/{kid}/test               a test run: cards as in any chat
+    GET    /v1/tasks/{kid}/runs/{rid}/allows  what you approved in it, as suggested pre-allows
+    GET    /v1/tasks/{kid}/runs/{rid}/log     its judgement log: each call, its outcome, what decided it and why
+    POST   /v1/tasks/{kid}/allow              {tools?, sites?, mcp?}: added to what the task allows
     GET    /v1/tasks/{kid}/notes              notes on how to do the task, oldest first
     POST   /v1/tasks/{kid}/notes              {text}
     PATCH  /v1/tasks/{kid}/notes/{nid}        {text}
@@ -33,6 +39,9 @@ from pydantic import BaseModel, Field
 
 from .hubapi import HubCallError
 from .projects import folders as own_folders
+from .tasks import allows
+from .tasks import log as task_log
+from .tasks.check import check
 from .tasks.store import INSTRUCTIONS_MAX, NAME_MAX, NOTE_CHARS, TaskError
 
 log = logging.getLogger("agent.tasks")
@@ -132,6 +141,17 @@ def publish_run(agent: Any, run: dict[str, Any]) -> None:
                           "payload": {"id": run["id"], "task_id": run["task_id"], "run": run}, "task_id": run["task_id"], "run": run})
 
 
+CHECKED = {"enabled", "instructions", "model", "skills", "allow", "mode", "project_id", "only_own"}
+
+
+def problems_409(found: dict[str, Any], task: dict[str, Any]) -> JSONResponse:
+    """`409 task_problems`: what's wrong, its fixes and the warnings; the task (saved, turned off) in `data`."""
+    first = found["problems"][0]
+    more = f" (and {len(found['problems']) - 1} more)" if len(found["problems"]) > 1 else ""
+    return JSONResponse({"detail": {"code": "task_problems", "detail": f"{first['field']}: {first['detail']}{more}",
+                                    "fix": first["fix"], "data": {**found, "task": task}}}, status_code=409)
+
+
 def check_project(agent: Any, pid: str | None) -> None:
     if pid and agent.projects.get(pid) is None:
         raise HTTPException(404, {"code": "unknown_project", "detail": f"no project {pid!r}"})
@@ -180,8 +200,11 @@ def add_routes(app: FastAPI) -> None:
             t = agent.scheduled.create(body.name, body.schedule, **fields)
         except TaskError as e:
             return refused(e)
+        found = await check(agent, t)
+        if t["enabled"] and found["problems"]:             # saved, but off until they're fixed (3.1)
+            t = agent.scheduled.update(t["id"], enabled=False)
         publish(agent, t["id"], t)
-        return t
+        return {**t, "check": found}
 
     @app.get("/v1/tasks/unread", summary="Runs not opened yet: how many in all and per task")
     def unread(request: Request) -> dict:
@@ -206,6 +229,12 @@ def add_routes(app: FastAPI) -> None:
             t = agent.scheduled.update(kid, **fields)
         except TaskError as e:
             return refused(e)
+        if t["enabled"] and set(fields) & CHECKED:         # 3.1: on, and something the check reads changed
+            found = await check(agent, t)
+            if found["problems"]:
+                t = agent.scheduled.update(kid, enabled=False)
+                publish(agent, kid, t)
+                return problems_409(found, t)
         publish(agent, kid, t)
         return t
 
@@ -238,10 +267,47 @@ def add_routes(app: FastAPI) -> None:
         publish_run(agent, r)  # type: ignore[arg-type]
         return r  # type: ignore[return-value]
 
+    @app.get("/v1/tasks/{kid}/runs/{rid}/allows", summary="What you approved in a (test) run, as suggested pre-allows "
+             "(a site for a web page, a server for an MCP tool, else the tool); what the task allows already is left out")
+    async def run_allows(kid: str, rid: str, request: Request) -> list[dict]:
+        agent = A(request)
+        t, r = task_or_404(agent, kid), run_or_404(agent, kid, rid)
+        return await allows.suggest(agent, t, r["thread_id"]) if r.get("thread_id") else []
+
+    @app.get("/v1/tasks/{kid}/runs/{rid}/log", summary="The run's judgement log: each tool call, what came of it (allowed, "
+             "refused, denied, asked) and what decided it (pre-allow, rules, judge, mode, you, local), with the reason")
+    def run_log(kid: str, rid: str, request: Request) -> list[dict]:
+        agent = A(request)
+        r = run_or_404(agent, kid, rid)
+        return task_log.log(agent, r["thread_id"]) if r.get("thread_id") else []
+
+    @app.post("/v1/tasks/{kid}/allow", summary="Add pre-allows (tools, sites, MCP servers) to what the task allows")
+    async def add_allows(kid: str, body: Allow, request: Request) -> Any:
+        agent = A(request)
+        t = task_or_404(agent, kid)
+        t = agent.scheduled.update(kid, allow=allows.merge(t["allow"], body.model_dump()))
+        if t["enabled"]:
+            found = await check(agent, t)
+            if found["problems"]:
+                t = agent.scheduled.update(kid, enabled=False)
+                publish(agent, kid, t)
+                return problems_409(found, t)
+        publish(agent, kid, t)
+        return t
+
     @app.post("/v1/tasks/{kid}/run", status_code=202, summary="Run now: a run with no one watching, as if it were due")
     async def run_now(kid: str, request: Request) -> dict:
         agent = A(request)
-        return await agent.runner.start(task_or_404(agent, kid), "run now")
+        t = task_or_404(agent, kid)
+        found = await check(agent, t)
+        if found["problems"]:
+            return problems_409(found, t)
+        return await agent.runner.start(t, "run now")
+
+    @app.post("/v1/tasks/{kid}/check", summary="What would break a run: problems (it can't be turned on or run) and warnings")
+    async def check_task(kid: str, request: Request) -> dict:
+        agent = A(request)
+        return await check(agent, task_or_404(agent, kid))
 
     @app.post("/v1/tasks/{kid}/test", status_code=202, summary="A test run: you watch it, its calls get cards as in any chat, "
               "and what you approve can become a pre-allow")

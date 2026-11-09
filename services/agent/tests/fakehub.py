@@ -468,7 +468,8 @@ class FakeHub:
                 return e
             if "GAIFA" in body["path"] and body.get("level", "read") != "read":
                 return JSONResponse({"detail": f"{body['path']} can't go above Read", "code": "capped"}, 422)
-            f = {"id": body["path"].rstrip("/").rsplit("/", 1)[-1].lower(), "path": body["path"], "level": body.get("level", "read")}
+            f = {"id": body["path"].rstrip("/").rsplit("/", 1)[-1].lower(), "path": body["path"], "level": body.get("level", "read"),
+                 "exists": not body["path"].startswith("/nowhere")}   # scheduled-tasks 3.1: a missing folder
             e["folders"].append(f)
             return f
 

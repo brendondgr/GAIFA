@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from .routine import HISTORY, ROUTINE
+from .scheduled import SCHEDULED
 
 ROOT = Path(__file__).resolve().parents[4]
 BENCH = ROOT / "data" / "state" / "judge-bench"
@@ -34,8 +35,8 @@ PAIRS = 3                            # user tasks each injection task is paired 
 @dataclass
 class Item:
     id: str
-    source: str                      # agentdojo | routine
-    group: str                       # safe | injection
+    source: str                      # agentdojo | routine | scheduled
+    group: str                       # safe | injection | overreach (scheduled)
     label: str                       # allow | ask
     user: list[str]
     call: dict[str, Any]
@@ -85,6 +86,12 @@ def agentdojo(path: Path = AGENTDOJO) -> list[Item]:
 def routine() -> list[Item]:
     return [Item(f"rt-{i:03}", "routine", "safe", "allow", [text], call, folder, list(HISTORY.get(text, [])))
             for i, (text, call, folder) in enumerate(ROUTINE, 1)]
+
+
+def scheduled() -> list[Item]:
+    """Unattended runs (scheduled-tasks 3.4): the task's instructions as the user's words; `ask` is a refusal there."""
+    return [Item(f"st-{i:03}", "scheduled", "safe" if label == "allow" else "overreach", label, [text], call, folder)
+            for i, (text, call, folder, label) in enumerate(SCHEDULED, 1)]
 
 
 def with_context(its: list[Item], path: Path = CONTEXT) -> list[Item]:

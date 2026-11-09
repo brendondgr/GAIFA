@@ -156,7 +156,7 @@ Assumed:
 
 ## Phase 3 — Safeguards (M)
 
-- [ ] **3.1 Check on save: `tasks/check.py` (new), `api_tasks.py`.**
+- [x] **3.1 Check on save: `tasks/check.py` (new), `api_tasks.py`.**
   - **`check(task) -> {problems: [{field, detail, fix}], warnings: [...]}`:**
     - the instructions screened (`POST /api/screen`), a flag being a problem;
     - the model served by the relay;
@@ -167,25 +167,38 @@ Assumed:
     - warnings: Bypass, and pre-allowed `execute`/`destructive` tools.
   - **Routes:** `POST /v1/tasks/{kid}/check`. Turning a task on, or Run now, with problems answers `409 task_problems` with them.
   *Done when:* `services/agent/tests/test_task_check.py` covers each problem and warning and the 409.
-- [ ] **3.2 Test run and suggested pre-allows: `api_tasks.py`, `tasks/runner.py`.**
+- [x] **3.2 Test run and suggested pre-allows: `api_tasks.py`, `tasks/runner.py`.**
   - **Test run:** `POST /v1/tasks/{kid}/test` starts a run with `test: true`: not unattended, so cards appear.
   - **Suggestions:** `GET /v1/tasks/{kid}/runs/{rid}/allows` lists the run's approved calls as suggested pre-allows (a tool; a site for a `url:host` tool; a server for an `mcp_` tool), leaving out what's already allowed.
   - **Adding:** `POST /v1/tasks/{kid}/allow` adds entries.
   *Done when:* `test_tasks_api.py` covers a test run's settings, the suggestions from approved and denied cards, and adding them.
-- [ ] **3.3 The judgement log: `tasks/log.py` (new), `api_tasks.py`.**
+- [x] **3.3 The judgement log: `tasks/log.py` (new), `api_tasks.py`.**
   - **Route:** `GET /v1/tasks/{kid}/runs/{rid}/log` lists, per tool call of the run in order: tool, a short summary, `allowed | refused | denied | asked`, `by` (`pre-allow`, `rules`, `judge`, `mode`, `you`), and the reason.
   - **Sources:** the chat's events and the hub's `GET /api/judge/recent?thread=`.
   *Done when:* `services/agent/tests/test_task_log.py` covers each `by` and refused calls.
+  *As built (3.1–3.3):* a new task with problems is saved turned off and its answer carries `check`; a change to a task
+  that's on, when it touches what the check reads, is kept but turns the task off with the 409 (`data.task`). Unknown
+  MCP servers are found from the catalog's `mcp:<server>` groups. A test run isn't checked. The suggestions and the log
+  are tested in `test_task_log.py`. The log reads only the chat's events (each result carries the judge's verdict and
+  `grant_id`), not `/api/judge/recent`; it also lists the agent's own tools (`by: local`) and a card still open
+  (`pending`).
 - [ ] **3.4 Judge eval cases for unattended runs: `services/agent/evals/judge/scheduled.py` (new), `bench.py`, `run.py`.**
   - **Cases:** about 30, each the task's instructions as the user's words with one call:
     - routine work the instructions ask for (allow);
     - writes outside what they ask, shell commands they don't name, and pages fetched from untrusted text (ask, so refused).
   - **The runner:** `--source scheduled` runs only them.
   *Done when:* `test_evals.py` checks the cases load. A live run of d3-lite over them is recorded in `docs/agent-eval.md`, with how many routine calls would have been refused.
+  *As built, so far:* 31 cases (15 routine, 16 overreach) in `scheduled.py`, `bench.scheduled()`, `run.py --source
+  scheduled`; the hub's `utils/tests/tools/test_judge_scheduled.py` checks they load and that the judge's rules alone
+  never allow an overreach (the model answering ask). Writing them found that edits inside a folder at Edit never reach
+  the judge (the mode's table; the rules' `edit-inside`), so such cases are left out and the docstring says a task's
+  folder levels keep its edits in bounds. **The live d3-lite run waits for the user:** d3-lite wasn't loaded, and this
+  machine's GPU isn't loaded without asking.
 
 **Checks & deliverables — Phase 3**
-- [ ] On the second hub: a task with a missing skill can't be turned on; a test run shows a card, and its approval becomes a pre-allow; the next run's log says `pre-allow`.
-- [ ] Delivered: `tasks/check.py`, `tasks/log.py`, `evals/judge/scheduled.py`, and tests.
+- [x] On the second hub: a task with a missing skill can't be turned on; a test run shows a card, and its approval becomes a pre-allow; the next run's log says `pre-allow`.
+  *As built (2026-11-09, port 7078, the scripted model as in Phase 2):* a task with the skill `no-such-skill` was saved turned off with that problem, and turning it on answered 409. A test run of another task showed a card for `remember` (`agent_memory_save`); approved, its suggestions were `[{kind: tool, value: agent_memory_save}]`; added with `POST …/allow`, the next Run now (unattended) saved through the grant, and its log's one row was `allowed`, `by: pre-allow`.
+- [x] Delivered: `tasks/check.py`, `tasks/allows.py`, `tasks/log.py`, `evals/judge/scheduled.py`, and tests.
 
 ## Phase 4 — The Scheduled UI (L)
 

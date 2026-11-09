@@ -9,17 +9,17 @@ DAILY = {"kind": "daily", "time": "07:00"}
 
 
 async def _task(c, **kw):
-    r = await c.post("/v1/tasks", json={"name": "Digest", "schedule": DAILY, **kw})
+    r = await c.post("/v1/tasks", json={"name": "Digest", "schedule": DAILY, "instructions": "Check the feed.", **kw})
     assert r.status_code == 201, r.text
     return r.json()
 
 
 async def test_crud(env):
     c = env.client
-    t = await _task(c, instructions="Summarise the news", allow={"tools": ["web_*"], "sites": ["example.com"]},
+    t = await _task(c, instructions="Summarise the news", allow={"tools": ["fake_*"], "sites": ["example.com"]},
                     settings={"disabled": ["comfy"]})
     assert t["id"].startswith("k_") and t["mode"] == "auto" and t["when"] == "Every day at 07:00" and t["next_due"]
-    assert t["allow"] == {"tools": ["web_*"], "sites": ["example.com"], "mcp": []} and t["settings"] == {"disabled": ["comfy"]}
+    assert t["allow"] == {"tools": ["fake_*"], "sites": ["example.com"], "mcp": []} and t["settings"] == {"disabled": ["comfy"]}
     assert [x["id"] for x in (await c.get("/v1/tasks")).json()] == [t["id"]]
     assert (await c.get(f"/v1/tasks/{t['id']}")).json()["name"] == "Digest"
     r = await c.patch(f"/v1/tasks/{t['id']}", json={"enabled": False, "instructions": "new"})

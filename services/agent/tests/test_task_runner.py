@@ -26,6 +26,7 @@ async def _run_now(env, kid):
 
 
 async def test_a_run_s_chat(env):
+    env.hub.tools["mcp_blender_scene"] = {**env.hub.tools["fake_get"], "name": "mcp_blender_scene", "mod": "mcp", "group": "mcp:blender"}
     t = await _task(env.client, allow={"tools": ["fake_wipe"], "sites": ["example.com", "*"], "mcp": ["blender"]},
                     settings={"disabled": ["comfy"]}, model="backup")
     run = await _run_now(env, t["id"])
@@ -46,11 +47,11 @@ async def test_a_run_s_chat(env):
 
 
 async def test_a_grant_the_hub_refuses_is_noted(env):
-    env.hub.grant_fail.add("nothing_*")
-    t = await _task(env.client, allow={"tools": ["nothing_*"]})
+    env.hub.grant_fail.add("fake_get")
+    t = await _task(env.client, allow={"tools": ["fake_get"]})
     run = await _run_now(env, t["id"])
     notes = [e["payload"]["text"] for e in env.events(run["thread_id"], "note")]
-    assert any("nothing_* couldn't be set" in n for n in notes) and run["state"] == "done"
+    assert any("fake_get couldn't be set" in n for n in notes) and run["state"] == "done"
 
 
 async def test_judge_down(env):

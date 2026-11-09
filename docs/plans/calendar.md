@@ -317,14 +317,14 @@ Assumed:
 
 ## Phase 4 — The agent's tools and approvals (L)
 
-- [ ] **4.1 The `change` action and the calendar's preflight: `utils/tools/approvals.py`, `services/calendar/limits.py` (new).**
+- [x] **4.1 The `change` action and the calendar's preflight: `utils/tools/approvals.py`, `services/calendar/limits.py` (new).**
   - **The hub:** `ACTIONS` gains `change` ("changes to your records"): `plan` deny, `manual` ask, `accept_edits` ask, `auto` judge, `bypass` allow. Nothing else in the order changes.
   - **The judge:** `judge_rules.classify` leaves calendar tools `unsure`, so the decide model answers its three questions against the user's own words. A call with no `origin.said` asks without the model.
   - **`POST /v1/limits`** (`[agent] limits`): `{tool, arguments, origin}` → `{action, allow_bypass: true, preview}`: `read` for reads and proposals; `edit` for a delete or change of an item the agent made in `origin.thread` and nobody changed since; `change` for the other writes; `refuse` for an unknown item.
   *Done when:* `utils/tests/tools/test_approvals_change.py` covers the action in each mode, a grant and the allow list still allowing, and unattended refused; `services/calendar/tests/test_limits.py` covers each answer.
 
   Update architecture §14.7 (the table) and docs/mods.md (the actions a preflight may answer).
-- [ ] **4.2 The tools: `services/calendar/service.toml` `[tools]`.**
+- [x] **4.2 The tools: `services/calendar/service.toml` `[tools]`.**
 
   | Tool | Op | Risk | Notes |
   |---|---|---|---|
@@ -346,6 +346,7 @@ Assumed:
     - never use `calendar_add` for those.
   - **`GET /v1/agenda`** answers compact rows (`{id, kind, title, start, end, all_day, due, done, calendar, project, recurring}`) with `cap_kb = 16`.
   *Done when:* `services/calendar/tests/test_tools.py` checks the manifest's tools load in the catalog (a fake hub), with each risk, and `/v1/agenda`'s shape.
+  *As built (4.1–4.2):* the preflight is `limits.py` with its route and `/v1/agenda` in `api_agent.py`; completing a to-do is always `change` (only an update or a delete of its own item is `edit`). A call with no user words goes to the judge's model like any (it then has nothing to ground the call in). The card says what the call does from `preview.what` (`chat-forms.js`, `chat-risk.js` has the `change` word). The tools' ops are checked against the mod's OpenAPI in `utils/tests/tools/test_calendar_tools.py`.
 - [ ] **4.3 Proposals: `services/calendar/proposals.py` (new), `api_proposals.py` (new).**
   - **`POST /v1/proposals`:** `{items: [item fields with when words or ISO], source: {kind: "document"|"agent", ref?, title?}}`, up to 200 items. Each item is parsed. Items that couldn't be read are kept with their problem.
   - **The other routes:** `GET /v1/proposals/{id}` and `POST /v1/proposals/{id}/accept` (`{ids, calendar?, project_id?}`). Accepting creates them in one undo.

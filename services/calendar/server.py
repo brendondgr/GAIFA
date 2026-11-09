@@ -77,12 +77,14 @@ def create_app(db: str | None = None, state: str | None = None, hub_url: str | N
                 "stats": [{"label": "Items", "value": items}, {"label": "Calendars", "value": len(s.calendars())},
                           {"label": "Unread reminders", "value": unread}], "jobs": []}
 
+    import api_agent
     import api_alerts
     import api_items
     import api_more
     app.include_router(api_more.router)          # first: /v1/items/{id}.ics before /v1/items/{id}
     app.include_router(api_items.router)
     app.include_router(api_alerts.router)
+    app.include_router(api_agent.router)
     return app
 
 

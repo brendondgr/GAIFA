@@ -908,13 +908,15 @@ Both the event log and the hub's approval are on disk, so a reboot between steps
   5. the **ask** list; then a **page the chat's search found**: a `web_fetch` whose URL a `web_search` earlier in the same chat (`origin.thread`) returned runs without a card in every mode but Plan, with no judge in Auto (`utils/tools/searched.py`, 2026-10-21): the same URL after trivial normalisation only (scheme and host in lower case, no default port, no fragment, an empty path as "/"; no prefix matches, another query is another URL), from the chat's last 50 finished searches read back from `tool_calls` (so it holds across restarts), and only when the judge's URL rules don't flag it (credentials, a long encoded value, a private address take the usual way). The URL came from the search engine, so the model can't hide data in it; the record says `origin.found_by`. Then the **allow** list (`execute` ignores the allow list: only a grant skips its card). Defaults: `ask = ["hub_set_preference"]` (a lasting preference reaches every later chat, so it asks in every mode, Bypass too, unless you chose "Always allow" on its card), `allow = ["hub_start_service"]`. A preference that couldn't be saved (an unknown tool or field, a value the tool doesn't take, learning off) is refused before a card;
   6. the **risk default**: `read` runs; `write` and `generate` ask, or run in `accept_edits`, `auto` and `bypass`; `network` asks (in `auto` the judge decides); `execute` and `destructive` ask in every mode.
 
-  | Mode | read | edit | delete | commit | command (sandbox) | network (sandbox + internet) | host (your machine) | remote (git push, …) |
-  |---|---|---|---|---|---|---|---|---|
-  | plan | run | refused | refused | refused | refused | refused | refused | refused |
-  | manual | run | ask | ask | ask | ask | ask | ask | ask |
-  | accept_edits | run | run | ask | ask | ask | ask | ask | ask |
-  | auto | run | run | judge | ask | judge | judge | ask | ask |
-  | bypass | run | run | run | run | run | run | ask | ask |
+  | Mode | read | edit | delete | commit | command (sandbox) | network (sandbox + internet) | host (your machine) | remote (git push, …) | change (your records) |
+  |---|---|---|---|---|---|---|---|---|---|
+  | plan | run | refused | refused | refused | refused | refused | refused | refused | refused |
+  | manual | run | ask | ask | ask | ask | ask | ask | ask | ask |
+  | accept_edits | run | run | ask | ask | ask | ask | ask | ask | ask |
+  | auto | run | run | judge | ask | judge | judge | ask | ask | judge |
+  | bypass | run | run | run | run | run | run | ask | ask | run |
+
+  `change` (calendar 4.1) is a change to the user's own records that should follow from their words: the calendar's preflight answers it for adding, changing, completing and deleting items (an item the agent made in the same chat, unchanged since, is `edit`, so it can clean up its own tests). In Auto the judge's model reads the user's own messages (`origin.said`) and the call; in a task run, the task's instructions.
 
   "judge" is Phase 30's seam: `decide` answers `"judge"` and the caller awaits `approvals.judge()` → `utils/tools/judge.py`:
   - **Rules first** (`judge_rules.py`, `judge_commands.py`): clearly safe calls run (read-only commands and known test runners, each only with the options on its list and no path outside the folder; edits inside the folder; documentation on an exact list of hosts); a command run with the internet on is never allowed by a rule (the model decides); clearly harmful ones ask (rm -rf outside build folders, pipes into a shell, dotfiles, history rewriting, killing processes, credentials, root).

@@ -33,7 +33,7 @@ export function limitsCover(limits) {
 
 // What a call with limits does, in words, for the card (plan 27.4).
 export const ACTION_WORD = { read: 'reads', edit: 'edits a file', delete: 'deletes a file', commit: 'commits', command: 'runs in the sandbox',
-  network: 'runs in the sandbox with internet', host: 'runs on your machine', remote: 'talks to a git remote' };
+  network: 'runs in the sandbox with internet', host: 'runs on your machine', remote: 'talks to a git remote', change: 'changes your records' };
 
 /** What a grant covers, in words: "on github.com", "in ~/Projects/foo", "every search"; null: every call. */
 export function grantText(kind, key) {

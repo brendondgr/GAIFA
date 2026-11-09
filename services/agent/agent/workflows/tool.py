@@ -48,7 +48,14 @@ TOOLS = [AGENT,
          {"name": "agent_stop", "description": "Stop a sub-agent this chat started.",
           "parameters": {"type": "object", "properties": {"child": CHILD_ARG}, "required": ["child"]}},
          {"name": "agent_list", "description": "The sub-agents this chat started, with their state.",
-          "parameters": {"type": "object", "properties": {}}}]
+          "parameters": {"type": "object", "properties": {}}},
+         {"name": "agent_review", "description": "Review a sub-agent's request (to run a tool that asks first, or a question): "
+          "deny it with a reason the sub-agent reads, or forward it to the user, who decides on a card. You can't approve.",
+          "parameters": {"type": "object", "properties": {
+              "request": {"type": "string", "description": "The request's id (rq_…); may be left out when only one is open"},
+              "action": {"type": "string", "enum": ["deny", "forward"]},
+              "reason": {"type": "string", "description": "Why: the sub-agent reads it when denied, the user when forwarded"}},
+              "required": ["action"]}}]
 NAMES = {t["name"] for t in TOOLS}
 
 PARENT = ("`agent` hands one independent part of a task to a sub-agent, in a chat of its own that sees none of this one: "
@@ -56,7 +63,9 @@ PARENT = ("`agent` hands one independent part of a task to a sub-agent, in a cha
           "side by side. Use them for parts that don't depend on each other (several folders, documents or pages; surveying "
           "options), never for one lookup, steps that build on each other, or what you can do in a step or two: each costs "
           "a whole chat. They only read unless write: true (one writer at a time). With background: true it returns at once; "
-          "its answer arrives later as a message (or agent_wait for it). Check what matters in their answers.")
+          "its answer arrives later as a message (or agent_wait for it). A sub-agent's request to run something that asks "
+          "first comes to you: agent_review denies it with a reason or forwards it to the user; you can never approve. "
+          "Check what matters in their answers.")
 CHILD = ("You are a sub-agent: the chat “{parent}” started you to do one task, and its prompt is this chat's first message. "
          "Do that task, then reply with what you found or did, complete and to the point: that last reply goes back to the "
          "chat that started you (the user can read this chat too). {rights} Don't ask questions: decide what you can, and say "
@@ -136,7 +145,20 @@ class WorkflowTools:
                                                "background": True, "chat": f"#/chat/{kid}",
                                                "note": "it runs on its own: its answer arrives as a message when it's done "
                                                        "(agent_wait waits for it)"}, data=data)
-        res = await wf.wait(kid, on_change=self._progress(tid, cid))
+        from . import requests
+        res = await wf.wait(kid, on_change=self._progress(tid, cid), until=lambda: requests.open_requests(self.a, tid, kid))
+        if res is None:                                       # it waits on a card: the parent reviews it (2.2)
+            wf.mark(kid, background=True, reported=False)     # …and its answer comes later, as a background one's
+            asks = [requests.summary(r) for r in requests.open_requests(self.a, tid, kid)]
+            data["agent"]["state"] = "needs_review"
+            return self.ok(tid, cid, "agent", {"child": kid, "label": spawn_of(child).get("label"), "state": "needs_review",  # type: ignore[attr-defined]
+                                               "requests": [{**a, "arguments": ctx.untrusted(f"sub-agent {a['label']} request",
+                                                                                            str(a.get("arguments") or a.get("asks")))}
+                                                            for a in asks],
+                                               "chat": f"#/chat/{kid}",
+                                               "note": "review each with agent_review: deny (with a reason it reads) or forward "
+                                                       "(the user decides on a card); you can't approve. It goes on in the "
+                                                       "background: its answer arrives as a message (or agent_wait)."}, data=data)
         wf.mark(kid, seen=True)                               # its answer is shown here
         wf.publish(kid)
         res = wf.delivered(kid)
@@ -228,6 +250,18 @@ class WorkflowTools:
         self.a.workflows.mark(c["id"], reported=True)        # stopped on purpose: no message about it
         await self.a.workflows.stop(c["id"], "stopped by the chat that started it")
         return self.ok(tid, cid, "agent_stop", {"child": c["id"], "state": (self.a.store.thread(c["id"]) or {}).get("state")})  # type: ignore[attr-defined]
+
+    async def t_agent_review(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        from . import requests
+        try:
+            out = await requests.review(self.a, tid, str(args.get("request") or ""), str(args.get("action") or ""),
+                                        str(args.get("reason") or ""))
+        except ValueError as e:
+            return self.err(tid, cid, "agent_review", "invalid_request", str(e), "agent_list and the requests you were given")  # type: ignore[attr-defined]
+        except Exception as e:  # noqa: BLE001: the hub's 409 when the user decided it meanwhile
+            return self.err(tid, cid, "agent_review", "already_decided", f"{type(e).__name__}: {e}",  # type: ignore[attr-defined]
+                            "the user decided it; go on")
+        return self.ok(tid, cid, "agent_review", out)  # type: ignore[attr-defined]
 
     async def t_agent_list(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         rows = [{"child": c["id"], "label": spawn_of(c).get("label"), "state": c["state"],

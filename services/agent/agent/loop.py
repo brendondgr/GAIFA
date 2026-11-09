@@ -147,7 +147,7 @@ class Agent(Compaction, Queueing, Prompting):
     def _unanswered(self, tid: str) -> bool:
         """A user message written after the turn's latest model call read the chat (sent while the reply streamed)."""
         mark = self._read_upto.get(tid)
-        return mark is not None and bool(self.store.events(tid, after=mark, types=("user", "agent_done")))   # agent-workflows 2.1
+        return mark is not None and bool(self.store.events(tid, after=mark, types=("user", "agent_done", "agent_request")))   # agent-workflows 2.1–2.2
 
     # ---- entry points ------------------------------------------------------------------------
 

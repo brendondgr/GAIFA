@@ -23,6 +23,8 @@ Event types (payload fields):
     state           {state: idle | running | waiting | cancelled | error, reason?}
     project_refresh {for: seq, pages: [{sid, title, ok, error?, slow?}]}   (a project chat's pages fetched again, plan projects 3.5)
     agent_done      {child, label, state, answer, refused?, error?, chat}   (a background sub-agent ended, agent-workflows 2.1)
+    agent_request   {id, child, label, kind, call, approval_id?, tool?, risk?, arguments?, questions?, in_result}   (2.2)
+    agent_review    {id, child, action: deny | forward, reason, kind, approval_id?, auto?}   (the parent's review, 2.2)
 
 Fork copies the events up to a seq into a new thread (rewind and branch).
 A sub-agent (plan agent-workflows 1.1) is a thread with `parent_id` and `settings.spawn` = {root, parent, label, by,

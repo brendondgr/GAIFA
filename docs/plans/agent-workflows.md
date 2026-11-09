@@ -71,7 +71,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - When a background child ends, the parent gets a stored `agent_done` event (read by the model as `[sub-agent <label> finished] <answer>`); an idle parent starts a turn, a running one reads it on its next call (like a steer), a parent waiting on you holds it until then.
   *Done when:* `test_workflow_background.py`: a background child's end starts the idle parent's turn; `agent_send` reaches a running child; `agent_stop` writes the cancelled result.
 
-- [ ] **2.2 Requests go to the parent: `workflows/requests.py`, `local.py`.**
+- [x] **2.2 Requests go to the parent: `workflows/requests.py`, `local.py`.** *(As built: one `agent_review` event with `action: deny | forward` instead of a separate `agent_forwarded`; `request` may be left out when only one is open.)*
   - A child's `needs_approval` or `ask_user` also writes an `agent_request` event on the parent: `{id, child, label, kind: approval|question, approval_id|question_id, tool, risk, summary}`. A foreground `agent` wait returns early with `needs_review`; a background request starts an idle parent's turn.
   - `agent_review {request, action: "deny"|"forward", reason}`: deny decides the hub approval as denied (or answers the question) with the reason, which the child reads; forward writes `agent_forwarded`, and the card is yours. There is no approve action, and the route refuses one from the model. A request not reviewed by the end of the parent's turn is forwarded. You can decide any time from the header's Approvals or the child's chat.
   - Unattended parents: the child's `ask` is refused as today (`unattended`), nothing is forwarded.

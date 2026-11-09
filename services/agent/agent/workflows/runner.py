@@ -148,17 +148,25 @@ class Workflows:
                 self.publish(tid)
 
     async def turn_ended(self, tid: str) -> None:
+        from . import requests
         t = self.store.thread(tid)
         sp = spawn_of(t)
-        if t is not None and t["state"] == "idle" and self._unread_done(tid):
-            self.agent.start(tid)                   # a sub-agent's end arrived as this chat's turn ended: read it now
+        if t is not None and self.store.children(tid):
+            if t["state"] == "idle" and self._unread_done(tid):
+                self.agent.start(tid)               # a sub-agent's end or request arrived as this turn ended: read it now
+            elif not self.agent.busy(tid):          # what its model read and didn't review goes to the user (2.2)
+                requests.forward_read(self.agent, tid, self.agent._read_upto.get(tid))
         if not sp:
             return
         self.active.pop(tid, None)
         if t["state"] in FINISHED:
             self._ended(tid)
-        else:
-            self.publish(tid)
+            return await self.drain()
+        if t["state"] == "waiting" and requests.emit(self.agent, tid) and sp.get("background"):
+            parent = self.store.thread(str(sp.get("parent"))) or {}
+            if not self.agent.busy(parent.get("id", "")) and parent.get("state") != "waiting":
+                self.agent.start(parent["id"])     # a background sub-agent's request: the parent reviews it now
+        self.publish(tid)
         await self.drain()
 
     def _ended(self, tid: str) -> None:
@@ -209,7 +217,7 @@ class Workflows:
                 self.report(c["id"])
 
     def _unread_done(self, tid: str) -> bool:
-        done = self.store.events(tid, types=("agent_done",))
+        done = [e for e in self.store.events(tid, types=("agent_done", "agent_request")) if not e["payload"].get("in_result")]
         if not done:
             return False
         mark = self.agent._read_upto.get(tid)
@@ -255,8 +263,10 @@ class Workflows:
             out["error"] = {k: errs[-1].get(k) for k in ("code", "detail") if errs[-1].get(k)}
         return out
 
-    async def wait(self, tid: str, timeout: float | None = None, on_change: Any = None) -> dict[str, Any] | None:
-        """The sub-agent's result once it's finished; None at `timeout`. `on_change(thread)` on each change seen."""
+    async def wait(self, tid: str, timeout: float | None = None, on_change: Any = None,
+                   until: Any = None) -> dict[str, Any] | None:
+        """The sub-agent's result once it's finished; None at `timeout`, or when `until()` (2.2: it has requests for
+        its parent) is true. `on_change(thread)` on each change seen."""
         deadline = None if timeout is None else time.monotonic() + timeout
         last = None
         while True:
@@ -267,6 +277,8 @@ class Workflows:
                 on_change(t)
             if self.finished(tid):
                 return self.result(tid)
+            if until is not None and until():
+                return None
             left = 2.0 if deadline is None else min(2.0, deadline - time.monotonic())
             if left <= 0:
                 return None

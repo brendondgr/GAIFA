@@ -385,6 +385,10 @@ def rebuild(events: list[dict[str, Any]], images: dict[int, dict[str, Any]] | No
         if t == "agent_done":                         # a background sub-agent finished (agent-workflows 2.1)
             flush()
             msgs.append({"role": "user", "content": agent_done_text(p)})
+        if t == "agent_request" and not p.get("in_result"):   # …or asks to run something (2.2)
+            from .workflows.requests import request_text
+            flush()
+            msgs.append({"role": "user", "content": request_text(p)})
         # tool results are placed with their step; everything else isn't sent to the model
     flush()
     return msgs, last
@@ -414,7 +418,7 @@ def meter(events: list[dict[str, Any]], window: int | None, parts: dict[str, int
                       if e["type"] == "thinking" and e["seq"] < last_usage["seq"] and e["seq"] > last_usage["seq"] - 6)
         base = int(u.get("prompt_tokens") or 0) + max(0, int(u.get("completion_tokens") or 0) - thought)
         added = sum(est({k: v for k, v in e["payload"].items() if k != "thinking"}) for e in events
-                    if e["seq"] > last_usage["seq"] and e["type"] in ("user", "tool_result", "assistant", "tool_call", "agent_done"))
+                    if e["seq"] > last_usage["seq"] and e["type"] in ("user", "tool_result", "assistant", "tool_call", "agent_done", "agent_request"))
         used = base + added
         scale = used / est_total if est_total else 1
     else:

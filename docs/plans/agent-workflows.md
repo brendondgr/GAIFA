@@ -111,7 +111,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - Docked on the parent's composer like approvals: "<label> wants to <tool summary>", the parent's note when it forwarded, "the parent agent is reviewing…" before that, **Approve / Deny / Allow in this workflow**. The header's Approvals popover names the child and its parent.
   *Done when:* browser check: a forwarded request decided on the parent runs in the child.
 
-- [ ] **3.5 The child's chat and the dialogs: `chat-header.js`, `chat-actions.js`.**
+- [x] **3.5 The child's chat and the dialogs: `chat-header.js`, `chat-actions.js`.**
   - A link back ("↖ <parent title>"), a sub-agent chip and a read-only chip; the composer works (your message is a normal `user` event). Delete and Archive on a parent say how many sub-agents go with it.
 
 - [ ] **3.6 Settings: `config.example.toml`, `web/settings/`.**

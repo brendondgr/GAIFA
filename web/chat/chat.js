@@ -187,7 +187,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const patched = t => { if (!t?.id) return; listPatch(t.id, t); bus.current.dispatchEvent(new CustomEvent('patched', { detail: t })); };   // every pane showing it
   const rename = (t, title) => c.patch(t.id, { title }).then(patched, fail);
   const archive = t => c.patch(t.id, { archived: !t.archived }).then(() => {   // with Show: Both the row stays, dimmed or not
-    setThreads(l => (archived === 'all' ? l.map(x => (x.id === t.id ? { ...x, archived: !t.archived } : x)) : l.filter(x => x.id !== t.id))); relist(); toast(t.archived ? 'Moved back to chats' : 'Archived', 'success'); }, fail);
+    setThreads(l => (archived === 'all' ? l.map(x => (x.id === t.id ? { ...x, archived: !t.archived } : x)) : l.filter(x => x.id !== t.id))); relist();
+    const kids = t.children > 0 ? ` with its ${t.children === 1 ? 'sub-agent' : `${t.children} sub-agents`}` : '';   // agent-workflows 3.5
+    toast((t.archived ? 'Moved back to chats' : 'Archived') + kids, 'success'); }, fail);
   const move = (t, env) => c.patch(t.id, { settings: { environment: env } }).then(n => {   // plan 41.2: Move to
     patched(n); relist();
     toast(`Moved to ${(envs || []).find(e => e.id === env)?.name || env}`, 'success');
@@ -218,7 +220,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     onMove: envs ? env => move(t, env) : null, projects, onProject: c.projects ? pid => moveProject(t, pid) : null,
     tree: c.tree ? { c, bus: bus.current, activeId: tid, onOpen: () => setDrawer(false) } : null });   // agent-workflows 3.2
   const remove = async t => {
-    const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: 'The chat and its history are deleted. Its outputs stay in Outputs.', confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
+    const kids = t.children > 0 ? ` and its ${t.children === 1 ? 'sub-agent' : `${t.children} sub-agents`}` : '';   // agent-workflows 3.5: they go with it
+    const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: `The chat${kids} and ${kids ? 'their histories are' : 'its history is'} deleted. Its outputs stay in Outputs.`, confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
     if (!ok) return;
     try { await c.remove(t.id); setThreads(l => l.filter(x => x.id !== t.id)); relist(); setLayout(L => dropTids(L, [t.id])); toast('Chat deleted', 'success'); } catch (e) { fail(e); }
   };

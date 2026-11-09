@@ -291,6 +291,8 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   };
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
   const requests = useRequests(c, tid, events, shared.bus);          // agent-workflows 3.4: its sub-agents' cards, docked
+  const parentId = thread?.settings?.spawn?.parent || null, [parentRow, setParentRow] = useState(null);   // 3.5: a sub-agent's way back
+  useEffect(() => { setParentRow(null); if (parentId) c.get(parentId).then(p => setParentRow({ id: p.id, title: p.title }), () => {}); }, [parentId]);
   const ctx = {
     api, live: c.live, tid, thread, outputs: view.outputs, made, tools, mods, running, dock: true, confirm, toast, speechOutput: speechOut,
     workflow: c.tree ? { c, bus: shared.bus, paneId } : null,       // agent-workflows 3.3: its sub-agents' cards
@@ -360,7 +362,8 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     style: { outline: 'none', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, position: 'relative', background: T.bg, ...style } },
     h(ThreadHeader, { thread,
       onRename: title => shared.rename(thread, title), meter: live.meter, meterOpen, setMeterOpen, onCompact: () => c.compact(tid).then(() => toast('Compacted', 'success'), fail), compacts,
-      learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,
+      learn: thread ? !(thread.settings || {}).no_learn : null, onLearn: thread && !thread.settings?.spawn ? on => setGroups({ ...(thread.settings || {}), no_learn: !on }) : null,   // a sub-agent never learns
+      parent: parentRow,                                                                    // agent-workflows 3.5
       running, state: thread?.state, onBranch: events.length ? () => forkAt(view.lastSeq, null) : null, onMenu: shared.onMenu, narrow: width < 700, grip, tools: paneTools }),
     shared.banner || null,
     conn === 'reconnecting' ? h('div', { role: 'status', style: { padding: '4px 14px', fontSize: 12, color: T.acct, background: T.tacc } }, 'Reconnecting to the chat…') : null,

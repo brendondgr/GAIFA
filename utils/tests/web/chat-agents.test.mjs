@@ -94,6 +94,13 @@ test('request cards: buttons for the workflow, the review in words, when to read
   assert.equal(appr.originText({ service: 'agent', thread: 't_c' }), 'from a chat');
 });
 
+test('a sub-agent\'s header: the way back and what it may do (3.5)', async () => {
+  const hd = await load('chat/chat-header.js');
+  assert.deepEqual(hd.spawnBits({ settings: { spawn: { parent: 't_p', write: false } } }), { parent: 't_p', rights: 'reads only', by: null });
+  assert.deepEqual(hd.spawnBits({ spawn: { parent: 't_p', write: true, by: 'mcp' } }), { parent: 't_p', rights: 'writer', by: 'from another agent' });
+  assert.equal(hd.spawnBits({ settings: {} }), null);
+});
+
 test('a background sub-agent\'s end or request heads the turn it starts (3.3)', async () => {
   const turn = await load('chat/chat-turn.js'), thread = await load('chat/chat-thread.js');
   const ev = (seq, type, payload) => ({ seq, ts: seq, type, payload });

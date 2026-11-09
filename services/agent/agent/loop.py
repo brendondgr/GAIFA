@@ -102,6 +102,9 @@ class Agent(Compaction, Queueing, Prompting):
         self.project_created: list[Any] = []      # async (agent, project): its memory entity (4.2)
         self.project_changed: list[Any] = []      # async (agent, old, new): a rename renames the entity (4.2)
         self.project_cleanup: list[tuple[str, Any]] = []   # (step, async (agent, project)) when one is deleted (api_projects)
+        from .tasks.store import TaskStore
+        self.scheduled = TaskStore(store)         # plan scheduled-tasks 1.2 (`tasks` holds the running turns)
+        self.runner: Any = None                   # tasks/runner.Runner, made in the app's lifespan (2.2)
         self.live = Live()
         self.tasks: dict[str, asyncio.Task[Any]] = {}
         self.local = Local(self)

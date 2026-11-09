@@ -70,7 +70,7 @@ Assumed:
 
 ## Phase 1 — Tasks in the agent (M)
 
-- [ ] **1.1 When: `services/agent/agent/tasks/when.py` (new).**
+- [x] **1.1 When: `services/agent/agent/tasks/when.py` (new).**
   - **Schedule shape:**
     - `{kind: "hourly", every: 1–24, minute: 0–59, from?: "HH:MM", to?: "HH:MM", weekdays?: bool}`
     - `{kind: "daily" | "weekdays", time: "HH:MM"}`
@@ -82,7 +82,7 @@ Assumed:
     - `describe(schedule) -> str`, e.g. "Weekdays at 07:00", "Every 2 hours at :15, 08:00–18:00";
     - `missed(schedule, last_due, now) -> int`.
   *Done when:* `services/agent/tests/test_task_when.py` covers each kind, the window and weekdays for hourly, the 31st in February, a DST change (`TZ` set in the test), `describe`, and `missed`.
-- [ ] **1.2 The store: `tasks/__init__.py`, `tasks/store.py` (new).**
+- [x] **1.2 The store: `tasks/__init__.py`, `tasks/store.py` (new).**
   - **Tables in `agent.db`:**
     - `tasks(id, name, instructions, project_id, schedule JSON, enabled, model, mode, skills JSON, allow JSON, settings JSON, own_env, only_own, use_profile, use_project_memory, keep_days, next_due, created, updated)`;
     - `task_runs(id, task_id, thread_id, due, started, ended, state 'queued'|'running'|'done'|'failed'|'skipped', why, late, test, refused, judge, seen)`;
@@ -91,7 +91,7 @@ Assumed:
   - **`TaskStore`:** `create`, `get`, `list(q, project)`, `update`, `delete`, `runs(task, limit, before)`, `add_run`, `update_run`, `run_of_thread`, `unread()`, `notes`, `add_note`, `update_note`, `remove_note`. Instructions are up to 16 000 characters.
   - **Thread link:** `threads.settings.task` names the task. `Store.threads(task=…)` filters by it.
   *Done when:* `services/agent/tests/test_tasks_store.py` covers CRUD, runs in order, unread, notes with their limit, and the thread filter.
-- [ ] **1.3 Routes: `services/agent/agent/api_tasks.py` (new), `server.py`.**
+- [x] **1.3 Routes: `services/agent/agent/api_tasks.py` (new), `server.py`.**
   - **Tasks:** `GET/POST /v1/tasks` (`?project=`), `GET/PATCH/DELETE /v1/tasks/{kid}`. A body's schedule is checked (`422 invalid_schedule`). `next_due` is recomputed when the schedule changes or the task is turned on.
   - **Runs:** `GET /v1/tasks/{kid}/runs`, `PATCH /v1/tasks/{kid}/runs/{rid}` (`seen`), `GET /v1/tasks/unread` (`{count, tasks: {kid: n}}`).
   - **Notes:** `GET/POST /v1/tasks/{kid}/notes`, `PATCH/DELETE …/notes/{nid}`.
@@ -100,10 +100,11 @@ Assumed:
   *Done when:* `services/agent/tests/test_tasks_api.py` covers CRUD, a bad schedule, `next_due`, runs and unread, notes, the events, and delete leaving ordinary chats.
 
   Update architecture §14.1.
+  *As built:* the store is `agent.scheduled` (`agent.tasks` already holds the running turns). The folder routes (`/v1/tasks/{id}/folders`) landed here, with `projects/folders.py` generalised to an owner kind (`task-<hex>`, "<task> (scheduled)"). Deleting a project detaches its tasks through `project_cleanup` (first in the list). `watch=tasks` and `watch=projects` both get every event that belongs to no chat.
 
 **Checks & deliverables — Phase 1**
-- [ ] `services/agent/tests` and `uv run pytest` are green.
-- [ ] Delivered: `tasks/when.py`, `tasks/store.py`, `api_tasks.py`, the changed `store.py`, `server.py`, `streams.py`, and tests.
+- [x] `services/agent/tests` and `uv run pytest` are green.
+- [x] Delivered: `tasks/when.py`, `tasks/store.py`, `api_tasks.py`, the changed `store.py`, `server.py`, `streams.py`, and tests.
 
 ## Phase 2 — Running unattended (L)
 

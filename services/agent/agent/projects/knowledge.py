@@ -5,8 +5,8 @@
   0.25, Settings → Agent → Documents) of the model's window, counted as docs.py counts (4 characters a token): each
   source whole, inside `<untrusted>`, with its title, kind, URL and, for a page, how old its copy is. *Listed* past that:
   one line per source and how to search and read them (`project_search`, `project_read`).
-- **Skills this project uses** (4.1): the bodies of the project's `defaults.skills`, up to SKILLS_MAX characters in all;
-  the rest are listed first among the skills.
+- **Skills this project uses** (4.1, `project_skills`): the bodies of the project's `defaults.skills`, up to SKILLS_MAX
+  characters in all, before the Skills list; the rest are named first in it ("this project uses").
 """
 
 from __future__ import annotations
@@ -83,3 +83,32 @@ async def project_knowledge(agent: Any, pid: str, window: int, now: float | None
             + "\nSearch them with project_search(query) and read one with project_read(source, offset?); cite a passage as "
               "src_…:line.")
     return {"mode": "listed", "text": text, "tokens": ctx.est(text)}
+
+
+async def project_skills(agent: Any, tid: str, p: dict[str, Any], k: Any) -> tuple[str, list[str]]:
+    """(the "Skills this project uses" block, the skills that didn't fit): the bodies of the project's `defaults.skills`,
+    read once per prompt build (the agent's own through `Knowledge.read`, a workspace skill through the chat's folders),
+    up to SKILLS_MAX characters in all, in the order the project lists them. A skill that can't be read is skipped."""
+    from .origin import chat_envs
+    names = [str(n) for n in ((p.get("defaults") or {}).get("skills") or []) if str(n).strip()]
+    if not names:
+        return "", []
+    t = agent.store.thread(tid) or {}
+    envs = chat_envs(t.get("settings"), agent.projects) or None
+    blocks, over, size = [], [], 0
+    for n in names:
+        try:
+            body = await k.read(n, tid, envs)
+        except Exception as e:  # noqa: BLE001: a skill that can't be read is left out
+            log.info("project %s's skill %s: %s", p["id"], n, e)
+            body = None
+        if not body:
+            continue
+        block = f"### {n}\n{body.strip()}"
+        if size + len(block) > SKILLS_MAX:
+            over.append(n)
+            continue
+        blocks.append(block)
+        size += len(block) + 2
+    text = ("Skills this project uses (always on in its chats: follow them):\n\n" + "\n\n".join(blocks)) if blocks else ""
+    return text, over

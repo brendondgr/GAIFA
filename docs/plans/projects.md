@@ -174,9 +174,10 @@ Assumed:
 
 ## Phase 4 — Instructions, defaults and project memory (M)
 
-- [ ] **4.1 Skills that are always on: `projects/knowledge.py`, `knowledge.py`.**
+- [x] **4.1 Skills that are always on: `projects/knowledge.py`, `knowledge.py`.**
   - A project's `defaults.skills` are read once per prompt build: through `read_skill`'s path for the agent's own skills, and through `hub.chat_skill_read` for workspace skills. Their bodies go in a "Skills this project uses" block, up to 8 000 characters. Skills over the cap are listed first among the skills.
   *Done when:* `test_project_prompt.py` covers both kinds and the cap.
+  *As built:* `knowledge.project_skills`, read with `Knowledge.read` for both kinds (a workspace skill through the chat's project environments); the block opens the Skills section and counts toward the meter's *Project*. A skill that can't be read is left out.
 - [ ] **4.2 Project memory: `services/agent/agent/memory/model.py`, `store.py`, `profile.py`, `learn.py` / `auto.py`, `api_projects.py`.**
   - **The entity:** creating a project creates (or adopts, by name) a `project` entity with an anchor `{kind: 'project', value: pid}` (a new anchor kind). Renaming the project renames the entity, so the old name stays as an alias.
   - **`chat_projects`:** also matches a chat whose `settings.project` is the anchor's value.

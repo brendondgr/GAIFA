@@ -87,7 +87,12 @@ class Prompting:
             from .projects import knowledge
             parts["project"] = knowledge.project_text(p)
             parts["project_knowledge"] = (await knowledge.project_knowledge(self, p["id"], await self.window(model, tid)))["text"]
-            sizes["project"] = ctx.est(parts["project"] + parts["project_knowledge"])
+            block, over = await knowledge.project_skills(self, tid, p, k)              # 4.1: its skills, always on
+            if over:
+                parts["skills"] = f"This project uses (read them with read_skill first): {', '.join(over)}\n" + parts["skills"]
+            parts["skills"] = "\n\n".join(x for x in (block, parts["skills"]) if x)
+            sizes["project"] = ctx.est(parts["project"] + parts["project_knowledge"] + block)
+            sizes["skills_memory"] = ctx.est(parts["skills"] + parts["memory"]) - ctx.est(block)
         return prompts.build(parts), sizes
 
     async def all_tools(self, model: str) -> bool:

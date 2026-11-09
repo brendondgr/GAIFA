@@ -73,3 +73,32 @@ def test_build_order_and_empty_parts():
     out = prompts.build({"base": "B", "agent_md": "A", "project": "P", "memory": "M", "skills": "S", "project_knowledge": "K", "env": "E"})
     assert [out.index(x) for x in ("A", "\nP", "\nM", "\nS", "\nK", "\nE")] == sorted(out.index(x) for x in ("A", "\nP", "\nM", "\nS", "\nK", "\nE"))
     assert "## Project" not in prompts.build({"base": "B"})
+
+
+async def test_skills_the_project_uses(env):
+    """Plan projects 4.1: the agent's own skill and a workspace skill, their bodies always in the project's chats, up to
+    the cap; the rest named first among the skills."""
+    from .test_environments import DEFAULT
+    d = env.agent.cfg.data / "skills" / "house-style"
+    d.mkdir(parents=True)
+    (d / "SKILL.md").write_text("---\nname: house-style\ndescription: How we write\n---\nAlways use the Oxford comma.\n")
+    big = env.agent.cfg.data / "skills" / "big-one"
+    big.mkdir(parents=True)
+    (big / "SKILL.md").write_text("---\nname: big-one\ndescription: Too long\n---\n" + "x" * 9000 + "\n")
+    folder = {"id": "notes", "name": "notes", "path": "/home/u/notes"}
+    env.hub.workspace = {"default": DEFAULT, "grants": {"id": "grants", "name": "Grants", "folders": [{"id": "notes", "path": "/home/u/notes", "level": "read"}]}}
+    env.hub.ws_skills = {"grants": {"skills": [{"id": "notes:cite", "name": "cite", "description": "Citations", "folder": folder,
+                                                "model_invocable": True}], "instructions": []}}
+    env.hub.ws_texts = {"notes:cite": {"id": "notes:cite", "kind": "skill", "text": "Cite as (Author, year)."}}
+    p = (await env.client.post("/v1/projects", json={"name": "Thesis", "environments": ["grants"],
+                                                      "defaults": {"skills": ["user/house-style", "notes:cite", "user/big-one", "user/nope"]}})).json()
+    tid = (await env.client.post("/v1/threads", json={"settings": {"project": p["id"]}})).json()["id"]
+    await env.send(tid, "hello")
+    sp = system_prompt(env)
+    assert "Skills this project uses (always on in its chats: follow them):" in sp
+    assert "### user/house-style\nAlways use the Oxford comma." in sp and "### notes:cite\nCite as (Author, year)." in sp
+    assert "This project uses (read them with read_skill first): user/big-one" in sp and "x" * 9000 not in sp
+    assert sp.index("Skills this project uses") < sp.index("This project uses (read them")
+    plain = await env.thread()
+    await env.send(plain, "hello")
+    assert "Oxford comma" not in system_prompt(env)

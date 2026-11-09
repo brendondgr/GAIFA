@@ -153,8 +153,9 @@ def _with_limits(name: str, risk: str, p: Any, mode: str, grant: dict[str, Any] 
 
 
 def _granted(grant: dict[str, Any]) -> str:
-    return ("allowed in this chat" if grant.get("scope") == "thread" else "always allowed") + \
-        (f" for {grant['key']}" if grant.get("key") else "")
+    key = grant.get("key")
+    what = "every site" if grant.get("kind") == "url:any" and key == "*" else key   # web-approvals 2.1
+    return ("allowed in this chat" if grant.get("scope") == "thread" else "always allowed") + (f" for {what}" if what else "")
 
 
 async def judge(hub: Any, tool: Any, arguments: dict[str, Any], origin: dict[str, Any] | None,

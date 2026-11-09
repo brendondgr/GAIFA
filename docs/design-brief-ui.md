@@ -1141,7 +1141,7 @@ The `tools` area. The chat (Stage D) and outside clients (MCP) use the same call
 | `callTool(name, args, {mode?, origin?, wait?})` | `POST /api/tools/{name}/call?wait=` (`mode`: plan · manual · accept_edits · auto · bypass; old ask, read_only accepted, plan 27.4) |
 | `getToolCall(id, {wait?})`, `cancelToolCall(id)` | `GET /api/tools/calls/{id}`, `POST /api/tools/calls/{id}/cancel` |
 | `listApprovals({state?})`, `getApproval(id)` | `GET /api/approvals` (pending; `state=all`), `GET /api/approvals/{id}` |
-| `decideApproval(id, {approve, args?, reason?, remember?, confirm?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs; `remember: "once" \| "thread" \| "always"` (plan 25.2) also writes a grant (`thread` needs a call from a chat, else 422 `no_thread`; `always` for `execute`/`destructive` needs `confirm: true`, else 422 `confirm_needed`); the result carries the `grant` |
+| `decideApproval(id, {approve, args?, reason?, remember?, confirm?, wait?})` | `POST /api/approvals/{id}`: the edited `args` are what runs; `remember: "once" \| "thread" \| "always" \| "sites"` (plan 25.2; `sites`: a `url:host` tool on any site in this chat, plan web-approvals) also writes a grant (`thread` needs a call from a chat, else 422 `no_thread`; `always` for `execute`/`destructive` needs `confirm: true`, else 422 `confirm_needed`); the result carries the `grant` |
 | `listGrants({thread?, tool?})`, `revokeGrant(id)` | `GET /api/grants`, `DELETE /api/grants/{id}` (plan 25.2); `DELETE /api/grants?thread=` ends a chat's grants |
 | `listJudged({thread?, limit?})`, `getJudgeStatus()` | `GET /api/judge/recent` → `JudgedCall[]` (newest first), `GET /api/judge/status` → `JudgeStatus` (the Auto mode's judge, plan 30.3, 30.5) |
 
@@ -1176,7 +1176,7 @@ interface ToolCallResult { status: "needs_approval" | "denied" | "running" | "do
                            filled?: string[];                       // needs_approval; filled: arguments the hub chose
                            filled_by?: { [field: string]: "default" | "carried" | string };  // how, an x-options default, carried in this chat, or a preference ("pref" + its id, plan 21.7)
                            grant_key?: string;                      // needs_approval, the tool's grant key kind (plan 25.2)
-                           grant?: Grant;                           // a decision with remember: thread | always
+                           grant?: Grant;                           // a decision with remember: thread | always | sites
                            why?: string;                            // needs_approval: why it asks (the mode, a list, the risk; plan 27.4)
                            limits?: CallLimits;                     // needs_approval for a tool with a preflight (a workspace call, plan 27.4)
                            judge?: Judged }                         // Auto mode: the judge's verdict and why (plan 30.3)

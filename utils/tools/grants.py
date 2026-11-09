@@ -19,6 +19,11 @@ no folder of the chat's environment), "Allow for this chat" writes a `kind = "fo
 `key = "folder:<path>"`, thread scope only), and the hub passes the chat's folder grants to that mod as
 `origin.folders` on every call (`Calls._folders`).
 
+**Every site in one chat** (plan web-approvals 2.1): `remember: "sites"` on a tool whose key is `url:host` (web_fetch)
+writes `{key: "*", kind: "url:any"}` for that chat only. It covers a call of that tool on any host, as long as the
+URL passes the judge's URL rules (`judge_rules.fetch_rule`: no credentials, no long encoded value, no private address),
+the same check that lets a page the chat's search found run (`searched.py`); a URL they flag takes the usual way.
+
 **Who it covers.** A `thread` grant covers calls whose origin names that thread (the chat); an MCP
 or API call has no thread, so only `always` grants apply to it. `thread` grants end with their
 thread (the agent calls `DELETE /api/grants?thread=` when a chat is deleted).
@@ -40,7 +45,8 @@ if TYPE_CHECKING:
     from utils.tools.catalog import ToolDef
 
 GRANT_KEY = re.compile(r"^(url:host|arg:[A-Za-z_][A-Za-z0-9_.-]{0,63}|const:[A-Za-z0-9_.:-]{1,64})$")
-REMEMBER = ("once", "thread", "always")
+REMEMBER = ("once", "thread", "always", "sites")
+SITES_KIND, SITES_KEY = "url:any", "*"   # web-approvals 2.1: every site, in one chat
 FOLDER_KIND = "folder"      # plan 34: a folder the user allowed in one chat (key "folder:<path>", tool "<mod>_*")
 CONFIRM_RISKS = ("execute", "destructive")   # an `always` grant for these needs a second confirm
 SHIPPED_PREFIX = "gr_default_"   # the grants GAIFA ships (utils/db.py migration 010); a person's are gr_<hex>
@@ -81,6 +87,14 @@ def problems(grant_key: str | None, params: dict[str, Any]) -> list[str]:
     return []
 
 
+def _any_site(row: dict[str, Any], arguments: Any) -> bool:
+    """An every-site grant (web-approvals 2.1) covers a URL the judge's URL rules don't flag."""
+    if row["kind"] != SITES_KIND or row["key"] != SITES_KEY or not isinstance(arguments, dict):
+        return False
+    from utils.tools.judge_rules import fetch_rule
+    return fetch_rule({"url": arguments.get("url")}).verdict != "ask"
+
+
 def _thread(origin: dict[str, Any] | None) -> str | None:
     t = (origin or {}).get("thread")
     return str(t) if t else None
@@ -103,7 +117,7 @@ class Grants:
         for r in rows:
             if dry and r["scope"] == "always" and not r["id"].startswith(SHIPPED_PREFIX):
                 continue
-            if fnmatch.fnmatchcase(tool.name, r["tool"]) and (r["key"] is None or r["key"] == key):
+            if fnmatch.fnmatchcase(tool.name, r["tool"]) and (r["key"] is None or r["key"] == key or _any_site(r, arguments)):
                 await self.db.execute("UPDATE grants SET used = used + 1, last_used_ts = ? WHERE id = ?", (time.time(), r["id"]))
                 return r
         return None
@@ -121,6 +135,15 @@ class Grants:
             raise HubError(422, "once_only", f"{tool.name}: this kind of call ({limits.get('action')}) asks every time",
                            {"fix": "allow it once"})
         thread = _thread(origin)
+        if remember == "sites":                     # web-approvals 2.1: any page, in this chat
+            if tool.grant_key != "url:host":
+                raise HubError(422, "not_a_web_tool", f"{tool.name} doesn't open web pages, so it can't be allowed for every site",
+                               {"fix": "allow it once, or in this chat"})
+            if thread is None:
+                raise HubError(422, "no_thread", "this call isn't from a chat, so it can't be allowed in this chat",
+                               {"fix": "allow it once"})
+            return {"tool": tool.name, "key": SITES_KEY, "kind": SITES_KIND, "risk": tool.risk, "scope": "thread",
+                    "thread": thread}
         if remember == "thread" and thread is None:
             raise HubError(422, "no_thread", "this call isn't from a chat, so it can't be allowed in this chat",
                            {"fix": "allow it once, or always"})

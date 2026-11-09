@@ -96,7 +96,8 @@ class ApprovalDecision(BaseModel):
     approve: bool
     arguments: dict[str, Any] | None = None
     reason: str | None = None
-    remember: Literal["once", "thread", "always"] = Field("once", description="thread / always: the hub also allows calls like this one (plan 25.2)")
+    remember: Literal["once", "thread", "always", "sites"] = Field("once", description="thread / always: the hub also allows "
+                                                                   "calls like this one (plan 25.2); sites: a web tool on any site, in this chat (web-approvals)")
     confirm: bool = Field(False, description="the second confirm an always grant for execute and destructive tools needs")
 
 

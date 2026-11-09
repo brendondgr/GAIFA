@@ -95,7 +95,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 
 ## Phase 3 — The UI (L)
 
-- [ ] **3.1 Client and mock: `web/chat/chat-api.js`, `chat-mock-agents.js`.**
+- [x] **3.1 Client and mock: `web/chat/chat-api.js`, `chat-mock-agents.js`.**
   - `c.tree(tid)`, `c.requests(tid)`, `c.decideRequest(parent, rid, …)`; the stream's new events (`agent_request`, `agent_forwarded`, `agent_done`); `?mock` gets a workflow with a running, a waiting and a finished child.
   *Done when:* `utils/tests/web/chat-agents.test.mjs` covers the client calls and the mock.
 

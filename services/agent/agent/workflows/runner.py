@@ -239,6 +239,9 @@ class Workflows:
             for to in dict.fromkeys((sp.get("parent"), sp.get("root"))):
                 if to:
                     self.agent.transient(to, "agent_child", {"child": node})
+            self.agent.live.broadcast({"type": "agent_child", "thread_id": None, "seq": None, "ts": time.time(), "id": tid,  # 3.1: the sidebar
+                                       "parent": sp.get("parent"), "root": sp.get("root"), "child": node,
+                                       "payload": {"id": tid, "parent": sp.get("parent"), "root": sp.get("root"), "child": node}})
         self.changed.set()
         self.changed = asyncio.Event()
 

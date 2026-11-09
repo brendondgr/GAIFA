@@ -169,6 +169,20 @@ async def test_a_sub_agent_s_calls_carry_its_workflow(env):
     assert [c["arguments"]["text"] for c in env.hub.calls if c["name"] == "tts_speak"] == ["b"]
 
 
+async def test_streams_watching_workflows_get_each_change(env):
+    q: asyncio.Queue = asyncio.Queue()
+    env.agent.live.watchers.add(q)
+    p = _parent(env)
+    c = await env.agent.workflows.spawn(p["id"], "look", "Looker")
+    await _done(env, c["id"])
+    evs = []
+    while not q.empty():
+        evs.append(q.get_nowait())
+    mine = [e for e in evs if e["type"] == "agent_child" and e["id"] == c["id"]]
+    assert mine and mine[0]["parent"] == p["id"] and mine[0]["root"] == p["id"] and mine[0]["thread_id"] is None
+    assert mine[-1]["child"]["state"] == "idle" and mine[-1]["child"]["seen"] is False
+
+
 async def test_queued_too_long_is_dropped(env):
     wf = env.agent.workflows
     env.model.queue({"match": "slow job", "text": "late", "delay": 1})

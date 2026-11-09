@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from .store import new_id
 
 MAX_THREADS = 64
-WATCHED = ("project", "project_source", "task", "task_run")   # events about no one chat, for streams opened with watch=projects or tasks
+WATCHED = ("project", "project_source", "task", "task_run", "agent_child")   # events about no one chat: watch=projects, tasks or workflows
 HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
 
@@ -97,7 +97,7 @@ def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: 
         q: asyncio.Queue[dict[str, Any]] = asyncio.Queue(4000)
         for tid, _ in known:                       # before the replay, so nothing that happens meanwhile is missed
             agent.live.subscribe(tid, q)
-        watching = bool({"projects", "tasks"} & set(watch.split(",")))
+        watching = bool({"projects", "tasks", "workflows"} & set(watch.split(",")))   # workflows: agent-workflows 3.1
         if watching:
             agent.live.watchers.add(q)
         sid, carried = new_id("s_"), {tid for tid, _ in known}

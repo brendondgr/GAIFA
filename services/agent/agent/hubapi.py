@@ -113,6 +113,16 @@ class HubAPI:
         return await self._json("POST", f"/api/approvals/{aid}", params={"wait": 0},
                                 json={"approve": approve, "arguments": arguments, "reason": reason, "remember": remember, "confirm": confirm})
 
+    async def add_grant(self, tid: str, tool: str, kind: str | None = None, key: str | None = None,
+                        note: str = "") -> dict[str, Any]:
+        """A grant for this chat ahead of any call (a scheduled run's pre-allows, plan scheduled-tasks 2.2)."""
+        body = {"tool": tool, "thread": tid, "note": note, **({"kind": kind} if kind else {}), **({"key": key} if key else {})}
+        return await self._json("POST", "/api/grants", json=body)
+
+    async def judge_status(self) -> dict[str, Any]:
+        """Whether the Auto judge's model answers (`GET /api/judge/status`)."""
+        return await self._json("GET", "/api/judge/status")
+
     async def end_grants(self, tid: str) -> None:
         """A deleted chat's "allow in this chat" grants end with it (plan 25.2); best effort."""
         try:

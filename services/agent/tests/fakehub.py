@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import fnmatch
 import hashlib
 import json
 import re
@@ -121,6 +122,8 @@ class FakeHub:
         self.embed_down = False
         self.search_delay = 0.0                          # chat-responsive 1.1: a slow search by meaning
         self.synonyms: list[tuple[str, str]] = []        # (query word, text word) pairs the fake treats as close in meaning
+        self.judge_up = True                             # scheduled-tasks 2.2: GET /api/judge/status
+        self.grant_fail: set[str] = set()                # tools POST /api/grants refuses (unknown_tool)
 
     def publish(self, ev: dict[str, Any]) -> None:
         for q in list(self.subs):
@@ -312,6 +315,14 @@ class FakeHub:
             if mode in ("plan", "read_only") and risk != "read":
                 return {"status": "denied", "tool": name, "error": {"code": "denied", "detail": "Plan mode: only tools that read can run"}}
             asks = name in ASK or (risk != "read" and not (mode in ("accept_edits", "auto", "bypass") and risk != "destructive"))
+            origin = body.get("origin") or {}
+            grant = next((g for g in self.grants if g.get("thread") == origin.get("thread") and fnmatch.fnmatchcase(name, g["tool"])
+                          and (g.get("key") in (None, "*") or g.get("key") in str(args.get("url") or ""))), None)
+            if asks and grant is not None:               # scheduled-tasks 2.1: a chat's grant runs it
+                return {**await self._wait(self._start(name, args, mode), wait), "grant_id": grant["id"]}
+            if asks and origin.get("unattended"):       # no one to ask: refused (scheduled-tasks 2.1)
+                return {"status": "denied", "tool": name, "error": {"code": "unattended", "detail": f"{name}: asks first; no one is here",
+                                                                   "fix": "do without it"}}
             if asks:
                 aid = f"ap_{len(self.approvals) + 1}"
                 a = {"id": aid, "tool": name, "arguments": args, "ask_fields": t["ask"], "risk": risk, "origin": body.get("origin") or {},
@@ -383,6 +394,19 @@ class FakeHub:
         @app.get("/api/grants")
         def grants(thread: str | None = None) -> list:
             return [g for g in self.grants if not thread or g.get("thread") == thread]
+
+        @app.post("/api/grants", status_code=201)       # scheduled-tasks 2.1: a chat's grant ahead of time
+        async def add_grant(request: Request) -> Any:
+            body = await request.json()
+            if body["tool"] in self.grant_fail:
+                return JSONResponse({"detail": f"no tool matches {body['tool']!r}", "code": "unknown_tool"}, status_code=422)
+            g = {"id": f"gr_{len(self.grants) + 1}", "scope": "thread", "key": "*" if body.get("kind") == "url:any" else body.get("key"), **{k: v for k, v in body.items() if k != "key"}}
+            self.grants.append(g)
+            return g
+
+        @app.get("/api/judge/status")
+        def judge_status() -> dict:
+            return {"available": self.judge_up, "backend": "decide", "model": "d3-lite", "detail": "" if self.judge_up else "the decide mod is off", "choices": []}
 
         @app.get("/api/s/workspace/v1/folders")
         def ws_folders(request: Request) -> dict:

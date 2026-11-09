@@ -13,6 +13,7 @@ from . import context as ctx
 from . import show, skillfmt
 from .knowledge import Knowledge
 from .projects.tools import ProjectTools
+from .tasks.notes import TaskTools
 
 if TYPE_CHECKING:
     from .loop import Agent
@@ -27,7 +28,7 @@ STAND_IN = ("a dry-run stand-in: this chat is an evaluation, so nothing was gene
             "look at. Treat it as a good result of its prompt and carry on as you would with the real output")
 
 
-class Local(ProjectTools):
+class Local(ProjectTools, TaskTools):
     def __init__(self, agent: Agent) -> None:
         self.a = agent
 
@@ -53,6 +54,9 @@ class Local(ProjectTools):
     async def t_ask_user(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
         if self.a._find(tid, "question", cid):
             return "waiting"   # still waiting for the answer
+        if (thread.get("settings") or {}).get("unattended"):       # a scheduled run (scheduled-tasks 2.4): no one to answer
+            return self.err(tid, cid, "ask_user", "unattended", "this is a scheduled run and no one is here to answer",
+                            "decide yourself, carry on, and say in your summary what you assumed")
         qs = args.get("questions")
         problems = []
         if not isinstance(qs, list) or not 1 <= len(qs) <= 4:

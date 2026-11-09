@@ -57,6 +57,7 @@ def build(parts: dict[str, str]) -> str:
     out += section("Guardrails", parts.get("guardrails", ""))
     out += section("Standing instructions (AGENT.md)", parts.get("agent_md", ""))
     out += section("Project", parts.get("project", ""))                          # plan projects 3.3
+    out += section("Scheduled task", parts.get("task", ""))                     # scheduled-tasks 2.4
     out += section("Memory (what you know: memory_search finds more; remember saves what the user tells you to keep)", parts.get("memory", ""))
     out += section("Skills (read one with read_skill before doing that kind of task)", parts.get("skills", ""))
     out += section("Project files and pages", parts.get("project_knowledge", ""))

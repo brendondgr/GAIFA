@@ -8,6 +8,8 @@
     DELETE /v1/tasks/{kid}                    its runs' chats stay as ordinary chats; its hidden environment goes
     GET    /v1/tasks/{kid}/runs               ?limit=&before=; newest first
     PATCH  /v1/tasks/{kid}/runs/{rid}         {seen}
+    POST   /v1/tasks/{kid}/run                Run now (no one watching)
+    POST   /v1/tasks/{kid}/test               a test run: cards as in any chat
     GET    /v1/tasks/{kid}/notes              notes on how to do the task, oldest first
     POST   /v1/tasks/{kid}/notes              {text}
     PATCH  /v1/tasks/{kid}/notes/{nid}        {text}
@@ -235,6 +237,17 @@ def add_routes(app: FastAPI) -> None:
         r = agent.scheduled.update_run(rid, seen=body.seen)
         publish_run(agent, r)  # type: ignore[arg-type]
         return r  # type: ignore[return-value]
+
+    @app.post("/v1/tasks/{kid}/run", status_code=202, summary="Run now: a run with no one watching, as if it were due")
+    async def run_now(kid: str, request: Request) -> dict:
+        agent = A(request)
+        return await agent.runner.start(task_or_404(agent, kid), "run now")
+
+    @app.post("/v1/tasks/{kid}/test", status_code=202, summary="A test run: you watch it, its calls get cards as in any chat, "
+              "and what you approve can become a pre-allow")
+    async def test_run(kid: str, request: Request) -> dict:
+        agent = A(request)
+        return await agent.runner.start(task_or_404(agent, kid), "test", test=True)
 
     # ---- notes ------------------------------------------------------------------------------------
 

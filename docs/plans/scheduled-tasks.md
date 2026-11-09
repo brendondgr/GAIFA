@@ -115,7 +115,7 @@ Assumed:
   *Done when:* `utils/tests/tools/test_unattended.py` covers an ask refused, a grant still allowing, a judged call refused with its verdict recorded, `POST /api/grants` (thread only, globs, every site under the URL rules), and `grant` in the answer.
 
   Update architecture §14.7.
-- [ ] **2.2 The runner: `tasks/runner.py` (new), `hubapi.py`.**
+- [x] **2.2 The runner: `tasks/runner.py` (new), `hubapi.py`.**
   - **`Runner.start(task, why, due, late=0, test=False) -> run`:**
     - makes the chat: title, model, mode, settings `{task, task_run, project?, unattended: not test, no_learn: true, disabled, pinned, mcp_on, task_env?, task_only?, use_profile, use_project_memory}`;
     - writes the pre-allows as the chat's grants (`hubapi.add_grant`);
@@ -134,23 +134,25 @@ Assumed:
     - a refused call counted;
     - an overlapping run skipped and the queue;
     - a project task's environments and `task_only`.
-- [ ] **2.3 The scheduler: `tasks/schedule.py` (new), `server.py`.**
+- [x] **2.3 The scheduler: `tasks/schedule.py` (new), `server.py`.**
   - **The loop:** a check every 30 s starts due tasks and advances `next_due`.
   - **Start-up:** a task due more than 2 minutes ago runs once, `late`, with the count of missed runs.
   - **Upkeep:** daily, run chats older than their task's `keep_days` are archived.
   - **Routes:** `POST /v1/tasks/{kid}/run` (Run now) and `POST /v1/tasks/{kid}/test` (a test run, Phase 3).
   *Done when:* `services/agent/tests/test_task_schedule.py` (a fake clock) covers due, not due, a missed run once on start-up with its count, a turned-off task, Run now, and archiving.
-- [ ] **2.4 The run's prompt and tools: `prompting.py`, `prompts.py`, `local.py`, `memory/learn.py`, `tasks/notes.py` (new).**
+- [x] **2.4 The run's prompt and tools: `prompting.py`, `prompts.py`, `local.py`, `memory/learn.py`, `tasks/notes.py` (new).**
   - **The prompt's Scheduled task note:** the task's name, that no one is watching, that refused calls are to be worked around and reported, that `ask_user` can't be answered, and to end with a short summary (done, refused, left open). Then the task's notes.
   - **`task_note`:** a local tool, in task runs only: `{action: add | replace | remove, id?, text}`.
   - **`ask_user` in an unattended run:** answered at once (§2).
   - **The memory switches:** `use_profile: false` leaves the user's facts out of the profile and recall. `use_project_memory: false` leaves the project's out.
   - **The memory learner** skips task chats.
   *Done when:* `services/agent/tests/test_task_prompt.py` covers the note and the notes in the prompt, `task_note` (limits), `ask_user` unattended, each memory switch, and the learner skipping a run.
+  *As built (2.2–2.4):* the agent's calls carry `origin.unattended` from the run chat's settings (`loop.py`), and `grant_id` rides on a call's `call` and `tool_result` events. `projects/knowledge.project_skills` takes a label, so a task's skills are always on the same way. The memory learner already skips `no_learn` chats, which every run is; the switches are `profile.build`/`recall`'s `user` and `own_project`. A run's `refused` also counts an `ask_user` answered with `unattended`.
 
 **Checks & deliverables — Phase 2**
-- [ ] On a second hub (port 7078, the remote test LLM): a task made through the API runs on Run now. A pre-allowed call runs, and an un-allowed write in Auto is refused and counted. The run's chat reads as a chat.
-- [ ] Delivered: the hub's `calls.py`, `grants.py` and `routes/tools.py`, `tasks/runner.py`, `tasks/schedule.py`, `tasks/notes.py`, the changed prompt, local tools and origin, and tests.
+- [x] On a second hub (port 7078, the remote test LLM): a task made through the API runs on Run now. A pre-allowed call runs, and an un-allowed write in Auto is refused and counted. The run's chat reads as a chat.
+  *As built (2026-11-09, port 7078 from the worktree, the agent on port 5190):* the remote test LLM at localhost:9090 was down and this machine's GPU wasn't to be used without asking, so the agent's model was a scripted server (the tests' `FakeModel` on its own port); the hub, the agent process, grants, the judge's status (the installed decide mod: `ok`) and HTTP were real. Task A pre-allowing `agent_memory_save`: its run's `remember` ran through the grant (`grant_id` on the result), the run `done`, `refused` 0. Task B without it: the same call was refused (`unattended`, no card, no pending approval), the run `done` with `refused` 1. A daily task set a minute ahead started on its own 19 s after its time, and its `next_due` moved to the next day. A reply in B's finished run got an answer, and the run stayed `done`. Both runs were unread. The check with a real model is Phase 5's.
+- [x] Delivered: the hub's `calls.py`, `grants.py` and `routes/tools.py`, `tasks/runner.py`, `tasks/schedule.py`, `tasks/notes.py`, the changed prompt, local tools and origin, and tests.
 
 ## Phase 3 — Safeguards (M)
 

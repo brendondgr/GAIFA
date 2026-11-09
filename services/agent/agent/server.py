@@ -294,6 +294,11 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         mem_learner = asyncio.create_task(agent.memory_learner.run_forever(stop))
         from .memory.imports import Importer
         agent.memory_importer = Importer(agent)                                              # memory-import 1.4
+        from .tasks.runner import Runner
+        from .tasks.schedule import TaskSchedule
+        agent.runner = Runner(agent)                                                         # scheduled-tasks 2.2–2.3
+        app.state.task_schedule = TaskSchedule(agent, agent.runner)
+        task_scheduler = asyncio.create_task(app.state.task_schedule.run_forever(stop))
         await agent.resume_all()
         try:
             yield
@@ -309,8 +314,9 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
             summarizer.cancel()
             indexer.cancel()
             mem_learner.cancel()
+            task_scheduler.cancel()
             await asyncio.gather(*agent.tasks.values(), watcher, upkeep, importer, scheduler, summarizer, indexer, mem_learner,
-                                 return_exceptions=True)
+                                 task_scheduler, return_exceptions=True)
             await hub.close()
             await llm.close()
             store.close()

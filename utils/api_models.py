@@ -736,9 +736,10 @@ class SpeechInputSettings(_Model):
 
 class JudgeSettings(_Model):
     """`[agent.judge]`: the Auto mode's judge (plan 30.3)."""
-    backend: Literal["relay", "decide"]
-    model: str = Field(min_length=1, max_length=200, description="A relay model name, or a decide model id")
-    url: str = Field(min_length=1, max_length=500, description="The relay, or the decide mod")
+    backend: Literal["decide"] = Field(description="Always a decision model in the decide mod, never a chat model "
+                                       "(plan web-approvals)")
+    model: str = Field(min_length=1, max_length=200, description="A decide model id (d3-lite)")
+    url: str = Field(min_length=1, max_length=500, description="The decide mod")
     threshold: float = Field(gt=0, le=1, description="decide: every answer must clear it")
     timeout_s: float = Field(gt=0, le=60, description="Slower than this → ask")
     context: Literal["none", "trail", "full"] = Field("none", description="What it reads of the turn so far besides the "

@@ -624,7 +624,7 @@ interface Settings {
                   language: string; preset: "fast" | "balanced" | "accurate" | "best"; mode: "both" | "toggle" | "hold" };
   speech_output: { voice: string; engine: "auto" | "breeze" | "kokoro"; speed: number;   // plan 49.1: reading replies aloud ("" = tts's default voice)
                    auto_read: boolean; pause_ms: number };   // auto_read: every finished reply; pause_ms: voice mode's turn end (plan 49.2)
-  judge: { backend: "relay" | "decide"; model: string;   // config.toml [agent.judge] (plan 30.3); picked in Settings → Permissions → Auto judge
+  judge: { backend: "decide"; model: string;   // config.toml [agent.judge] (plan 30.3): always a decision model (web-approvals); picked in Settings → Permissions → Auto judge
            url: string; threshold: number; timeout_s: number;
            allow_commands: string[]; ask_commands: string[];   // your command rules for Auto (`pytest *`; judge_user.py, plan 30.7)
            context: "none" | "trail" | "full" };   // what the judge reads of the turn besides your words (judge_context.py, 2026-10-21)
@@ -632,7 +632,7 @@ interface Settings {
   screen: { pages: boolean; documents: boolean; transcripts: boolean;   // [agent.screen] (plan 30.6)
             timeout_s: number; window_chars: number;
             backend: "relay" | "decide" | null; model: string | null; url: string | null;   // null: the judge's (plan 30.8)
-            threshold: number | null; confirm: boolean; parallel: number };   // parallel: model calls at once for one text
+            threshold: number | null; confirm: boolean; parallel: number };   // parallel: model calls at once for one text; confirm: ignored (web-approvals)
   web: { relevance: "auto" | "decide" | "lexical" | "off"; model: string; url: string; candidates: number; timeout_s: number };   // [agent.web]: a long page's relevant passages first (webread.py, 2026-10-21)
   outputs: { hidden_keep_days: number };   // [outputs] (plan 30.9): saved web pages go to the trash after this many days; 0 keeps them
   repos: { fetch_every_h: number; notify: "warnings" | "all" | "off"; check_on_start: boolean };   // [repos] (plan mod-repos 3.5): how often to ask GitHub (0 = never), which problems are alerts
@@ -1188,7 +1188,7 @@ interface Judged { verdict: "allow" | "ask"; reason: string;
 interface JudgedCall extends Judged { id: number; ts: number; tool: string; thread?: string; call_id?: string; approval_id?: string;
                                       suggest?: string[] }   // allow rules that would cover a command the model asked about (plan 30.7)
 interface JudgeStatus { available: boolean; backend: string; model: string; detail: string;   // Auto is offered only when available
-                       choices: string[] }   // models the backend offers that the judge could use (the picker in Settings → Permissions → Auto judge)
+                       choices: string[] }   // the decide mod's usable models (the picker in Settings → Permissions → Auto judge)
 interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote";
                        folder?: string; level?: string; allow_bypass?: boolean; path?: string;
                        key?: string;                                // what "allow in this chat" covers: the folder and the exact command

@@ -16,10 +16,11 @@ import time
 
 import httpx
 
-from utils.tools.judge import arguments, describe, own_words
+from utils.tools.judge import arguments, own_words
 from utils.tools.judge_rules import classify
 
 from .bench import BENCH, items
+from .relay_judge import describe
 from .run import split
 
 OUT = BENCH / "results" / "d3-tune.jsonl"

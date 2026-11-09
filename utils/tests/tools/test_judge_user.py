@@ -138,9 +138,9 @@ def test_the_judge_reports_your_rule_and_skips_the_model():
 
     def handler(request: httpx.Request) -> httpx.Response:
         asked.append(request)
-        return httpx.Response(200, json={"choices": [{"message": {"content": '{"verdict": "ask", "reason": "no"}'}}]})
+        return httpx.Response(200, json={"answers": {"run_ask": {"probs": {"ask": 1.0}}}})   # the decide mod: ask
 
-    cfg = JudgeConfig(backend="relay", url="http://relay", allow_commands=["pytest *"], ask_commands=["git status *"])
+    cfg = JudgeConfig(backend="decide", url="http://decide", allow_commands=["pytest *"], ask_commands=["git status *"])
     call = lambda c: {"tool": "workspace_run", "args": {"command": c}}   # noqa: E731
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
     j = asyncio.run(judge(call("pytest -p x"), ["run the tests"], RUN, cfg, client))

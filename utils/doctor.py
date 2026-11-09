@@ -21,6 +21,7 @@ import os
 import re
 import shutil
 import time
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -172,6 +173,21 @@ def _disk(hub: Any) -> list[dict[str, Any]]:
                   None if level == "ok" else "free space: old outputs (Outputs page) or unused models (Models page)")]
 
 
+def _judge(hub: Any) -> list[dict[str, Any]]:
+    """`config.toml [agent.judge]` still naming a chat model (before plan web-approvals): it's ignored, and the judge
+    is d3-lite in the decide mod (the user's rule: a decision model only)."""
+    try:
+        judge = ((tomllib.loads(hub.paths.config_file.read_text()).get("agent") or {}).get("judge") or {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+    if judge.get("backend", "decide") == "decide":
+        return []
+    stale = ", ".join(f"{k} = {judge[k]!r}" for k in ("backend", "model", "url") if k in judge)
+    return [check("config", "warn", "config.toml names a chat model for the Auto judge; it's ignored",
+                  f"[agent.judge] {stale}: the judge is a decision model (decide mod, d3-lite)",
+                  "remove backend, model and url from [agent.judge] (or pick the model in Settings → Permissions)")]
+
+
 def _offline(hub: Any, views: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for s in hub.services.list() if hub.services else []:
@@ -228,6 +244,6 @@ def _repos(hub: Any) -> list[dict[str, Any]]:
 async def run(hub: Any) -> dict[str, Any]:
     models, views = await asyncio.to_thread(_models, hub)
     checks = (models + _manifests(hub) + _paths(hub) + _stage_d(hub) + await _ports_units(hub)
-              + _disk(hub) + _offline(hub, views) + await asyncio.to_thread(_repos, hub))
+              + _disk(hub) + _judge(hub) + _offline(hub, views) + await asyncio.to_thread(_repos, hub))
     counts = {k: sum(c["level"] == k for c in checks) for k in ("ok", "note", "warn", "fail")}
     return {"ts": time.time(), "ok": counts["fail"] == 0, "counts": counts, "checks": checks}

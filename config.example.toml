@@ -55,6 +55,6 @@ regenerate = false          # true keeps this machine's model inventory (data/st
 [agent.screen]
 window_chars = 6000
 
-# The Auto judge's model, a name your relay serves (`gaifa setup` asks; Settings → Agent):
+# The Auto judge is always a decision model in the decide mod (d3-lite), never a chat model (plan web-approvals):
 # [agent.judge]
-# model = "<a model your relay serves>"
+# model = "d3-lite"

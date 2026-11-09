@@ -39,7 +39,7 @@ async def test_get_and_save_whole_form_writes_nothing(rig, serve):
             "learning": {"enabled": True, "nightly_at": "03:00", "idle_min": 60, "infer_after": 2, "fade_days": 60},
             "speech_input": {"mics": [], "language": "", "preset": "balanced", "mode": "both"},
             "speech_output": {"voice": "", "engine": "auto", "speed": 1.0, "auto_read": False, "pause_ms": 1200},
-            "judge": {"backend": "relay", "model": "minicpm-5-2B", "url": "http://127.0.0.1:4000", "threshold": 0.35, "timeout_s": 3.0, "context": "none",
+            "judge": {"backend": "decide", "model": "d3-lite", "url": "http://127.0.0.1:7000/api/s/decide", "threshold": 0.35, "timeout_s": 3.0, "context": "none",
                       "allow_commands": [], "ask_commands": []},
             "screen": {"pages": True, "documents": False, "transcripts": False, "timeout_s": 30.0, "window_chars": 800,
                        "backend": None, "model": None, "url": None, "threshold": None, "confirm": True, "parallel": 4},
@@ -178,16 +178,16 @@ async def test_the_judge_is_picked_in_settings_and_saved_under_agent(rig, serve)
     """Overnight 2026-10-21: the judge's model could only be changed by editing config.toml by hand."""
     served = await _hub(rig, serve, "")
     async with httpx.AsyncClient(base_url=served.url) as c:
-        r = await c.put("/api/settings", json={"judge": {"model": "gemma4-26B"}, "screen": {"window_chars": 6000}})
+        r = await c.put("/api/settings", json={"judge": {"model": "d3-other"}, "screen": {"window_chars": 6000}})
         assert r.status_code == 200, r.text
-        assert r.json()["settings"]["judge"]["model"] == "gemma4-26B" and r.json()["settings"]["screen"]["window_chars"] == 6000
-        assert served.hub.config.agent.judge.model == "gemma4-26B"          # applies at once
+        assert r.json()["settings"]["judge"]["model"] == "d3-other" and r.json()["settings"]["screen"]["window_chars"] == 6000
+        assert served.hub.config.agent.judge.model == "d3-other"          # applies at once
         doc = tomllib.loads(_file(served))
-        assert doc["agent"]["judge"] == {"model": "gemma4-26B"} and doc["agent"]["screen"] == {"window_chars": 6000}
+        assert doc["agent"]["judge"] == {"model": "d3-other"} and doc["agent"]["screen"] == {"window_chars": 6000}
         assert "judge" not in doc and "screen" not in doc
         r = await c.put("/api/settings", json={"judge": {"backend": "nope"}})
         assert r.status_code == 422 and r.json()["data"]["field"].startswith("judge")
-        r = await c.put("/api/settings", json={"judge": {"model": "minicpm-5-2B"}})   # back to the default: the key goes
+        r = await c.put("/api/settings", json={"judge": {"model": "d3-lite"}})   # back to the default: the key goes
         assert "judge" not in (tomllib.loads(_file(served)).get("agent") or {})
 
 

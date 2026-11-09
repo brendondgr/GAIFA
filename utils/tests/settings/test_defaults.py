@@ -47,4 +47,4 @@ async def test_without_the_example_the_built_in_defaults(rig, serve):
     async with httpx.AsyncClient(base_url=served.url) as c:
         d = (await c.get("/api/settings/defaults")).json()
         Settings.model_validate(d)
-        assert d["hub"]["port"] == 7000 and d["judge"]["model"] == "minicpm-5-2B"
+        assert d["hub"]["port"] == 7000 and d["judge"]["model"] == "d3-lite" and d["judge"]["backend"] == "decide"

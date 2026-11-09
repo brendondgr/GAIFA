@@ -31,6 +31,7 @@ from utils.tools.judge import JudgeConfig, judge
 from utils.tools import judge_context
 from utils.tools.judge_context import as_lines, render
 
+from . import relay_judge
 from .bench import BENCH, CONTEXT, agentdojo, routine, with_context
 
 RESULTS = BENCH / "results"
@@ -82,7 +83,9 @@ async def run(a: argparse.Namespace) -> None:
     cfg = JudgeConfig(backend=a.backend, model=a.model, url=a.url, threshold=a.threshold, timeout_s=a.timeout,
                       context=a.context)
     for k, v in VARIANTS[a.variant].items():
-        setattr(judge_context, k[4:], v) if k.startswith("ctx.") else setattr(judge_mod, k, v)
+        setattr(judge_context, k[4:], v) if k.startswith("ctx.") else \
+            setattr(relay_judge if k.startswith("SYSTEM") else judge_mod, k, v)
+    chat = {"ask": relay_judge.ask_relay, "state": relay_judge.state} if a.backend == "relay" else {}   # web-approvals
     todo = with_context(agentdojo(), Path(a.history) if a.history else CONTEXT) + routine()
     if a.only:
         todo = [it for it in todo if it.id in set(a.only.split(","))]
@@ -97,7 +100,7 @@ async def run(a: argparse.Namespace) -> None:
         async def one(it):
             for attempt in range(4):             # the model's server busy or restarting isn't the judge's answer
                 async with sem:
-                    j = await judge(it.call, it.user, it.folder, cfg, client, context=it.history)
+                    j = await judge(it.call, it.user, it.folder, cfg, client, context=it.history, **chat)
                 if j.source != "fail-closed" or "isn't available" not in j.reason:
                     break
                 await asyncio.sleep(5 * (attempt + 1))

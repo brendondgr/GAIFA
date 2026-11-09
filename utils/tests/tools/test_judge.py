@@ -1,6 +1,7 @@
-"""The judge's core (plan 30.3/30.4): the rules decide first; what they leave unsure goes to the decide mod or a chat
-model behind the relay (fakes here), which see only the user's typed words and the call; fail closed on timeouts,
-errors and malformed answers."""
+"""The judge's core (plan 30.3/30.4): the rules decide first; what they leave unsure goes to the decide mod (a fake
+here), which sees only the user's typed words and the call; fail closed on timeouts, errors and malformed answers.
+The judge is a decision model only (plan web-approvals): a chat model is the eval's (`evals/judge/relay_judge.py`,
+passed as `ask`/`state`), tested here too since the eval relies on it."""
 
 from __future__ import annotations
 
@@ -10,7 +11,11 @@ import json
 import httpx
 import pytest
 
-from utils.tools.judge import JudgeConfig, describe, judge, own_words, parse_verdict
+from services.agent.evals.judge import relay_judge
+from services.agent.evals.judge.relay_judge import describe, parse_verdict
+from utils.tools.judge import JudgeConfig, judge, own_words
+
+CHAT = {"ask": relay_judge.ask_relay, "state": relay_judge.state}   # the eval's chat-model judge
 
 FOLDER = {"path": "/w/proj", "level": "run"}
 UNSURE = {"tool": "workspace_run", "args": {"command": "python scripts/report.py", "where": "sandbox"}}
@@ -112,19 +117,19 @@ def test_long_arguments_are_cut():
 def test_relay_backend():
     cfg = JudgeConfig(backend="relay", model="small", url="http://relay")
     fake = Fake(chat('{"verdict": "allow", "reason": "the user asked to run it"}'))
-    j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg, client_for(fake.handler)))
+    j = run(judge(UNSURE, ["run the report script"], FOLDER, cfg, client_for(fake.handler), **CHAT))
     assert (j.verdict, j.reason, j.source) == ("allow", "the user asked to run it", "model")
     b = fake.bodies[0]
     assert b["temperature"] == 0 and b["model"] == "small" and b["messages"][0]["role"] == "system"
     assert "run the report script" in b["messages"][1]["content"]
-    j = run(judge(UNSURE, ["x"], FOLDER, cfg, client_for(Fake(chat('<think>hmm</think>{"verdict":"ask","reason":"no"}')).handler)))
+    j = run(judge(UNSURE, ["x"], FOLDER, cfg, client_for(Fake(chat('<think>hmm</think>{"verdict":"ask","reason":"no"}')).handler), **CHAT))
     assert j.verdict == "ask" and j.source == "model"
 
 
 @pytest.mark.parametrize("reply", ["sure, go ahead", '{"verdict": "deny"}', "", '{"verdict": "ALLOW"'])
 def test_malformed_answers_ask(reply):
     j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="relay", url="http://relay"),
-                  client_for(Fake(chat(reply)).handler)))
+                  client_for(Fake(chat(reply)).handler), **CHAT))
     assert (j.verdict, j.source) == ("ask", "fail-closed")
 
 
@@ -138,7 +143,7 @@ def test_the_budget_goes_with_the_call():
             return httpx.Response(200, json=decide_answers()(None))
         return httpx.Response(200, json=chat('{"verdict":"allow","reason":"asked"}'))
 
-    run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="relay", url="http://relay", timeout_s=3), client_for(handler)))
+    run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="relay", url="http://relay", timeout_s=3), client_for(handler), **CHAT))
     run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide", timeout_s=2.5), client_for(handler)))
     assert seen == ["3", "2.5"]
 
@@ -149,7 +154,7 @@ def test_timeout_and_errors_ask():
                   client_for(slow.handler)))
     assert (j.verdict, j.source) == ("ask", "fail-closed") and "didn't answer in 0.3 s" in j.reason
     late = Fake(lambda b: httpx.Response(504, json={"detail": "no answer within 3 s (after the GPU slot)", "code": "answer_timeout"}))
-    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="relay", url="http://relay"), client_for(late.handler)))
+    j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide"), client_for(late.handler)))
     assert (j.verdict, j.source) == ("ask", "fail-closed") and "longer than 3 s" in j.reason
     down = Fake(lambda b: httpx.Response(503, json={"detail": "not loaded", "code": "no_weights"}))
     j = run(judge(UNSURE, ["x"], FOLDER, JudgeConfig(backend="decide", url="http://decide"), client_for(down.handler)))
@@ -177,3 +182,13 @@ def test_config_default_matches():
     cfg, j = Config().agent.judge, JudgeConfig()
     assert (cfg.backend, cfg.model, cfg.url, cfg.threshold, cfg.timeout_s) == (j.backend, j.model, j.url, j.threshold,
                                                                                 j.timeout_s)
+
+
+def test_the_judge_never_asks_a_chat_model():
+    """web-approvals 1.2: a config naming the relay asks the user without a request (the hub's config can't name one:
+    JudgeCfg reads it as decide; this guards the code path)."""
+    fake = Fake(chat('{"verdict": "allow", "reason": "fine"}'))
+    j = run(judge(UNSURE, ["run the report script"], FOLDER, JudgeConfig(backend="relay", model="gemma4-26B",
+                                                                         url="http://relay"), client_for(fake.handler)))
+    assert (j.verdict, j.source) == ("ask", "fail-closed") and "decision model" in j.reason and fake.bodies == []
+    assert (JudgeConfig().backend, JudgeConfig().model) == ("decide", "d3-lite")

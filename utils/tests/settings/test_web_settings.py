@@ -41,10 +41,10 @@ async def test_the_reading_route_says_what_screens_and_ranks(rig, serve):
         r = await c.get("/api/web/reading")
         assert r.status_code == 200, r.text
         d = r.json()
-        assert d["screen"] == {"backend": "relay", "model": "minicpm-5-2B", "confirm": None, "same_as_judge": True}
-        assert d["judge"] == {"backend": "relay", "model": "minicpm-5-2B"}
+        assert d["screen"] == {"backend": "decide", "model": "d3-lite", "confirm": None, "same_as_judge": True}
+        assert d["judge"] == {"backend": "decide", "model": "d3-lite"}      # always a decision model (web-approvals)
         assert d["relevance"] == "lexical" and d["decide_up"] is False and d["choices"]["decide"] == []
-        await c.put("/api/settings", json={"screen": {"backend": "decide"}})
+        await c.put("/api/settings", json={"screen": {"backend": "relay", "model": "minicpm-5-2B"}})
         d = (await c.get("/api/web/reading")).json()
-        assert d["screen"]["backend"] == "decide" and d["screen"]["model"] == "d3-lite"
-        assert d["screen"]["confirm"] == "minicpm-5-2B" and d["screen"]["same_as_judge"] is False
+        assert d["screen"]["backend"] == "relay" and d["screen"]["model"] == "minicpm-5-2B"
+        assert d["screen"]["confirm"] is None and d["screen"]["same_as_judge"] is False

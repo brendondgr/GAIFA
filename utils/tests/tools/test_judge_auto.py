@@ -20,7 +20,6 @@ def fake_model(monkeypatch, decide=lambda state: ("allow", "the user asked for i
         seen.append(state)
         v, why = decide(state)
         return Judgement(v, why, "model", model="fake")
-    monkeypatch.setattr(judge_mod, "ask_relay", fake)
     monkeypatch.setattr(judge_mod, "ask_decide", fake)
     return seen
 
@@ -81,7 +80,7 @@ async def test_the_rules_decide_workspace_calls(monkeypatch):
     assert (j.verdict, j.source) == ("ask", "rules")
     j = await judge_call(Cfg, "workspace_run", {"folder": "proj", "command": "python report.py"}, {"said": ["run report.py"]},
                          limits)
-    assert j.source == "model" and "/w/proj (level: run)" in seen[0] and "run report.py" in seen[0]
+    assert j.source == "model" and json.loads(seen[0])["workspace_folder"] == "/w/proj" and "run report.py" in seen[0]
     v, why, rec = await approvals_judge(type("H", (), {"config": Cfg})(), type("T", (), {"name": "workspace_run"})(),
                                         {"folder": "proj", "command": "rm -rf ~/"}, {}, limits, "Auto: the judge decides")
     assert v == "ask" and why.startswith("Auto: asked you (rm ~/") and rec["summary"] == "workspace_run: rm -rf ~/"
@@ -90,28 +89,24 @@ async def test_the_rules_decide_workspace_calls(monkeypatch):
 async def test_status(wh, monkeypatch):
     judge_mod._status.clear()
     s = (await wh.client.get("/api/judge/status")).json()
-    assert s["available"] is False and s["backend"] == "relay" and "doesn't answer" in s["detail"]
+    assert s["available"] is False and s["backend"] == "decide" and "doesn't answer" in s["detail"]
 
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"data": [{"id": "minicpm-5-2B"}]})
+        return httpx.Response(200, json={"models": [{"id": "d3-lite", "usable": True}, {"id": "d3-x", "usable": False}]})
     judge_mod._status.clear()
     s = await judge_mod.status(wh.hub.config, httpx.AsyncClient(transport=httpx.MockTransport(handler)))
-    assert s["available"] is True and s["model"] == "minicpm-5-2B"
+    assert s["available"] is True and s["model"] == "d3-lite" and s["choices"] == ["d3-lite"]
+    monkeypatch.setattr(wh.hub.config.agent.judge, "model", "gemma4-26B")      # not a decide model: unavailable, why
+    judge_mod._status.clear()
+    s = await judge_mod.status(wh.hub.config, httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    assert s["available"] is False and s["detail"] == "the decide mod has no model gemma4-26B"
+    judge_mod._status.clear()
 
 
-async def test_no_cloud_for_the_judge(wh, monkeypatch):
-    """Plan llm-servers 2.4: the judge's and screening's choices leave out cloud models, and a judge set to one
-    isn't available, with why."""
+def test_no_cloud_for_screening():
+    """Plan llm-servers 2.4: screening's relay choices leave out cloud models (the judge is a decision model only)."""
     data = [{"id": "minicpm-5-2B", "relay": {"group": "local"}}, {"id": "claude", "relay": {"group": "cloud"}},
             {"id": "claude/claude-opus-5-5", "relay": {"group": "cloud"}}, {"id": "skynet", "relay": {"group": "remote"}},
             {"id": "auto"}, {"id": "agent", "relay": {"group": "agent"}}]
     choices, cloud = judge_mod.relay_choices(data)
     assert choices == ["minicpm-5-2B", "skynet"] and cloud == {"claude", "claude/claude-opus-5-5"}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"data": data})
-    monkeypatch.setattr(wh.hub.config.agent.judge, "model", "claude")
-    judge_mod._status.clear()
-    s = await judge_mod.status(wh.hub.config, httpx.AsyncClient(transport=httpx.MockTransport(handler)))
-    assert s["available"] is False and s["detail"] == judge_mod.CLOUD_ONLY_CHATS and s["choices"] == ["minicpm-5-2B", "skynet"]
-    judge_mod._status.clear()

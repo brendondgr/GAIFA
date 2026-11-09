@@ -22,7 +22,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 - **Child context.** *Assumption:* fresh, like Claude Code's sub-agents: the parent's project, instructions, environments and skills, the profile and recall, and the parent's prompt, but not the parent's history.
 - **Child model.** *Assumption:* the parent's; the `model` argument may name any model the parent's chat could use.
 - **Writes.** *Assumption:* a child is read-only (the hub refuses anything above `read` for it) unless spawned with `write: true`; at most one live writer per workflow.
-- **Caps.** *Assumption:* `[agent.workflows]` `enabled = true`, `parallel_local = 1`, `parallel_remote = 3`, `max_children = 8` per workflow, `max_depth = 1`, `child_max_steps = 25`, `workflow_tokens = 400000`; a queued child waits at most 30 min.
+- **Caps.** *Assumption:* `[agent.workflows]` `enabled = true`, `parallel_local = 1`, `parallel_remote = 3`, `max_children = 8` per workflow, `max_depth = 1`, `child_max_steps = 25`, `workflow_tokens = 400000`; a queued child waits at most 30 min. *Added in 1.3:* `min_window = 16384`: the `agent` tool only in chats whose model's window is at least that (a small window has no room for a workflow's answers, and the tool's schema alone crowded the test chats' 8k windows).
 - **Memory and learning.** *Assumption:* children read memory but don't write it (`no_learn`, the memory tools left out); the miner and learner skip them.
 - **Mode.** *Assumption:* children take the parent's mode. A chat started over `/mcp` may not be Bypass.
 - **Deleting and archiving a parent.** *Assumption:* deleting a parent deletes its children (the confirm says how many) and archiving archives them; forking a parent copies no children. Deleting a child alone is allowed.
@@ -45,7 +45,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - **Stop:** `Agent.cancel` of a parent cancels its children (a hook the runner registers; no loop logic moves).
   *Done when:* `test_workflow_runner.py` (scripted model, `fakehub.py`): two children queue and run one at a time under `parallel_local = 1`, the limits refuse with their codes, the budget stops a child, cancelling the parent cancels both.
 
-- [ ] **1.3 The `agent` tool, in the foreground: `agent/workflows/tool.py`, `tools.py`, `prompts.py`.**
+- [x] **1.3 The `agent` tool, in the foreground: `agent/workflows/tool.py`, `tools.py`, `prompts.py`.**
   - A local tool `agent {prompt, label, model?, write?}` offered when `[agent.workflows] enabled` and the chat isn't at `max_depth` (gated in `ToolSet` like `task_note`). It spawns and waits like `_wait_call`: transient `progress` events carry the child's state and current step for the fold; the result is `{child, label, state, answer, refused}`.
   - A **Sub-agents** prompt part (only when the tool is offered): when to spawn (independent parts, broad reading, a second opinion) and when not to (sequential edits, a single lookup), that a child sees none of this chat, and that a child is read-only unless `write`.
   *Done when:* `test_workflow_tool.py`: a scripted parent spawns two children, gets both answers as results and replies; a child at depth 1 isn't offered the tool; the prompt part appears only with the tool.

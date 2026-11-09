@@ -22,6 +22,7 @@ DEFAULTS: dict[str, Any] = {
     "child_max_steps": 25,
     "workflow_tokens": 400_000,  # per parent turn, every sub-agent's prompt and reply tokens together
     "queue_wait_s": 1800,       # a queued sub-agent that waited longer is dropped
+    "min_window": 16384,        # the `agent` tool only in chats whose model's window is at least this
 }
 INHERIT = ("project", "environment", "task_env", "task_only", "disabled", "pinned", "mcp_on", "unattended", "use_profile",
            "use_project_memory", "dry_run", "window")

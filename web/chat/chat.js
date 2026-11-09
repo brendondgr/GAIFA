@@ -209,7 +209,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     onShowAll: () => { setDrawer(false); go('#/chat/all' + (q.trim() ? '?q=' + encodeURIComponent(q.trim()) : '')); },
     onNew: () => newChat(), onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
     view: listView, onView: setListView, canGroup: !!envs, canProjects: projects.length > 0, itemProps,
-    projectsRow: c.projects ? h(ProjectsEntry, { projects, active: !!sub && sub.page !== 'all', go, onGo: () => setDrawer(false) }) : null,   // plan projects 5.4
+    projectsRow: c.projects ? h(ProjectsEntry, { projects, active: !!sub && sub.page !== 'all', current: sub?.page === 'project' ? sub.pid : null, go, onGo: () => setDrawer(false) }) : null,   // plan projects 5.4
     groupLabel: grouping === 'date' ? 'Chats by date' : grouping === 'project' ? 'Chats by project' : 'Chats by environment',
     grouped: grouping === 'environment' ? h(GroupedChats, { c, api, envs, view: listView, onView: setListView, known: threads, reloadKey: listKey,
       renderItem, onNewIn: newIn, onEnvsChanged: loadEnvList, onError: fail, go })

@@ -42,24 +42,34 @@ export const dropdownProjects = (list, n = 8) => sortProjects(list, 'activity').
 
 /** The sidebar's Projects row under New (plan projects 5.4): its icon and label open the projects page; the chevron opens
  * a dropdown with the pinned and most recent projects, then All projects. Whether it's open is page state. */
-export function ProjectsEntry({ projects, active = false, go = x => { location.hash = x; }, onGo = () => {} }) {
-  const React = R(), [open, setOpen] = React.useState(false);
-  const nav = to => { setOpen(false); onGo(); go(to); };
-  const shown = dropdownProjects(projects || []);
-  return h('div', { style: { position: 'relative', display: 'flex', alignItems: 'center', gap: 2, padding: '0 10px 6px 8px' } },
-    h('a', { href: '#/chat/projects', onClick: () => { setOpen(false); onGo(); }, className: 'aichat-newbar', 'aria-current': active ? 'page' : undefined,
-      style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, height: 30, padding: '0 6px', borderRadius: 7, color: T.tx, fontSize: 13, textDecoration: 'none', background: active ? T.hov : 'transparent' } },
-      h('span', { style: { width: 20, height: 20, display: 'grid', placeItems: 'center', color: T.mut, flex: 'none' } }, h(Icon, { d: 'folder', size: 14 })), 'Projects'),
-    h('button', { type: 'button', onClick: () => setOpen(!open), 'aria-label': 'Projects list', 'aria-haspopup': 'menu', 'aria-expanded': open ? 'true' : 'false', className: 'aichat-quiet',
-      style: { width: 30, height: 30, display: 'grid', placeItems: 'center', border: '1px solid transparent', borderRadius: 7, background: 'transparent', color: T.mut, cursor: 'pointer', flex: 'none' } },
-      h(Icon, { d: open ? 'chevD' : 'chevR', size: 13 })),
-    h(Popover, { open, onClose: () => setOpen(false), place: 'down-left', width: 240, label: 'Projects', style: { padding: 4, gap: 0 } },
-      shown.length ? shown.map(p => h('button', { key: p.id, type: 'button', role: 'menuitem', onClick: () => nav('#/chat/projects/' + enc(p.id)), title: p.description || p.name,
-        style: { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' } },
-        h(Icon, { d: p.pinned ? 'pin' : 'folder', size: 13 }), h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, p.name)))
-        : h('span', { style: { fontSize: 12, color: T.mut, padding: '6px 9px' } }, 'No projects yet.'),
-      h('button', { type: 'button', role: 'menuitem', onClick: () => nav('#/chat/projects'), style: { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0,
-        borderTop: '1px solid ' + T.bd, borderRadius: 0, background: 'transparent', color: T.mut, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' } }, 'All projects')));
+// The sidebar's Projects row (plan projects 5.4; an accordion since 2026-11-09, the user's ask): the row opens the
+// projects page, its chevron folds the projects open right under it (pinned first, then the most recent, up to 8, then
+// All projects), each one a click away. Whether it's open is kept on the hub (`hub.chat.projects.open`).
+export const OPEN_KEY = 'hub.chat.projects.open';
+
+export function ProjectsEntry({ projects, active = false, current = null, go = x => { location.hash = x; }, onGo = () => {} }) {
+  const React = R(), [open, setOpenS] = React.useState(() => !!store.get(OPEN_KEY, false));
+  const setOpen = v => { setOpenS(v); store.set(OPEN_KEY, v); };
+  const all = projects || [], shown = dropdownProjects(all);
+  const row = { display: 'flex', alignItems: 'center', gap: 8, height: 28, borderRadius: 6, fontSize: 12.5, textDecoration: 'none' };
+  return h('div', { style: { display: 'flex', flexDirection: 'column', padding: '0 10px 4px 8px' } },
+    h('div', { className: 'aichat-newbar', style: { display: 'flex', alignItems: 'center', height: 28, borderRadius: 7, background: active && !current ? T.hov : 'transparent' } },
+      h('a', { href: '#/chat/projects', onClick: () => onGo(), 'aria-current': active && !current ? 'page' : undefined,
+        style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, height: 28, padding: '0 6px', color: T.tx, fontSize: 13, textDecoration: 'none' } },
+        h('span', { style: { width: 20, height: 20, display: 'grid', placeItems: 'center', color: T.mut, flex: 'none' } }, h(Icon, { d: 'folder', size: 14 })), 'Projects'),
+      h('button', { type: 'button', onClick: () => setOpen(!open), 'aria-label': open ? 'Hide projects' : 'Show projects', 'aria-expanded': open ? 'true' : 'false',
+        title: open ? 'Hide projects' : 'Show projects',
+        style: { width: 26, height: 26, marginRight: 1, display: 'grid', placeItems: 'center', border: 0, borderRadius: 6, background: 'transparent', color: T.mut, cursor: 'pointer', flex: 'none' } },
+        h(Icon, { d: open ? 'chevD' : 'chevR', size: 12 }))),
+    open ? h('div', { role: 'list', 'aria-label': 'Projects', style: { display: 'flex', flexDirection: 'column', gap: 1, padding: '1px 0 2px 16px' } },
+      shown.length ? shown.map(p => h('a', { key: p.id, role: 'listitem', href: '#/chat/projects/' + enc(p.id), onClick: () => onGo(), title: p.description || p.name,
+        className: 'aichat-item', 'aria-current': current === p.id ? 'page' : undefined,
+        style: { ...row, padding: '0 8px 0 10px', color: current === p.id ? T.tx : T.mut, fontWeight: current === p.id ? 500 : 400, background: current === p.id ? T.hov : 'transparent' } },
+        h(Icon, { d: p.pinned ? 'pin' : 'folder', size: 12 }),
+        h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, p.name)))
+        : h('a', { href: '#/chat/projects', onClick: () => onGo(), style: { ...row, padding: '0 10px', color: T.dim } }, 'No projects yet: make one'),
+      all.length > shown.length ? h('a', { href: '#/chat/projects', onClick: () => onGo(), className: 'aichat-item',
+        style: { ...row, padding: '0 10px', color: T.dim, fontSize: 12 } }, `All projects · ${all.length}`) : null) : null);
 }
 
 export function ProjectsPage({ c, toast = () => {}, go = x => { location.hash = x; }, onMenu = null }) {

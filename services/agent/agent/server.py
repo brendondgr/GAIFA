@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
-from . import api_imports, api_memory, api_projects, api_skills, api_summaries, api_tasks, docs
+from . import api_imports, api_memory, api_projects, api_skills, api_summaries, api_tasks, api_workflows, docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -329,6 +329,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     api_imports.add_routes(app)                                      # memory-import 1.4
     api_projects.add_routes(app)                                     # plan projects 1.2
     api_tasks.add_routes(app)                                        # plan scheduled-tasks 1.3
+    api_workflows.add_routes(app)                                    # plan agent-workflows 1.1
 
     def A(request: Request) -> Agent:
         return request.app.state.agent
@@ -421,16 +422,19 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
                      project: str | None = Query(None, description="Project ids, comma-separated; `none`: chats in no project "
                                                                     "(plan projects 1.2)"),
                      task: str | None = Query(None, description="Scheduled task ids, comma-separated: their run chats; `none`: "
-                                                                 "chats no task started (plan scheduled-tasks 1.3)")) -> list[dict]:
+                                                                 "chats no task started (plan scheduled-tasks 1.3)"),
+                     children: bool = Query(False, description="Sub-agents too (a search always finds them; plan agent-workflows 1.1)")
+                     ) -> list[dict]:
         return A(request).store.threads(q, archived_of(archived), limit, environment=envs_of(environment), sort=sort,
-                                        offset=offset, project=envs_of(project), task=envs_of(task))
+                                        offset=offset, project=envs_of(project), task=envs_of(task), children=children)
 
     @app.get("/v1/threads/count", summary="How many threads /v1/threads would list with the same filters, no limit")
     def count_threads(request: Request, q: str | None = None, archived: ArchivedQ = "false",
                       environment: str | None = Query(None, description="Environment ids, comma-separated"),
-                      project: str | None = Query(None, description="Project ids, comma-separated (`none`: in no project)")) -> dict:
+                      project: str | None = Query(None, description="Project ids, comma-separated (`none`: in no project)"),
+                      children: bool = False) -> dict:
         return {"count": A(request).store.count(q, archived_of(archived), environment=envs_of(environment),
-                                                project=envs_of(project))}
+                                                project=envs_of(project), children=children)}
 
     @app.get("/v1/threads/groups", summary="Per environment the chats use: how many, the newest activity, and how many "
              "are running or waiting (`default` for chats without one); ?by=project: per project (`none` for chats in none)")
@@ -485,12 +489,13 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     async def delete_thread(tid: str, request: Request) -> dict:
         agent = A(request)
         thread_or_404(agent, tid)
+        children = await api_workflows.delete_children(agent, tid)    # its sub-agents go with it (agent-workflows 1.1)
         await agent.cancel(tid)
         agent.store.delete_thread(tid)
         await agent.hub.end_grants(tid)      # "allow in this chat" ends with the chat (plan 25.2)
         if getattr(agent, "summaries", None):
             await agent.summaries.forget(tid)   # its summary and vector go too (plan 28.5)
-        return {"deleted": tid}
+        return {"deleted": tid, **({"children": children} if children else {})}
 
     @app.get("/v1/threads/{tid}/events", summary="The thread's events after a seq (replay after a reload)")
     def events(tid: str, request: Request, after: int = 0) -> list[dict]:

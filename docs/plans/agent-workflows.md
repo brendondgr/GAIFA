@@ -31,7 +31,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 
 ## Phase 1 — The engine (M)
 
-- [ ] **1.1 Children in the store: `services/agent/agent/store.py`, `agent/api_workflows.py`.**
+- [x] **1.1 Children in the store: `services/agent/agent/store.py`, `agent/api_workflows.py`.**
   - **Marker:** a child is a thread with `parent_id` set and `settings.spawn = {root, parent, label, by: "agent"|"mcp", tool_call_id, write, depth}`; a fork has `parent_id` without `spawn`. `SPAWN_OF` (a `json_extract` like `TASK_OF`).
   - **Store:** `children(tid)`, `tree(root)` (root plus children with state, label, model, `seen`, last event time), `root_of(tid)`; `list_threads`, `count` and `groups` leave children out unless `children=1` or `q` is given (a search hit carries `parent`); a thread row carries `children` (count) and `spawn`.
   - **Routes** (a new router in `api_workflows.py`, mounted in `server.py`): `GET /v1/threads/{tid}/tree`; `DELETE /v1/threads/{tid}` and archive cascade to children.

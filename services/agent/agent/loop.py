@@ -349,7 +349,7 @@ class Agent(Compaction, Queueing, Prompting):
     async def resume_all(self) -> int:
         """At startup: threads a crash left `running` continue."""
         n = 0
-        for t in self.store.threads(limit=1000):
+        for t in self.store.threads(limit=1000, children=True):     # sub-agents too (agent-workflows 1.1)
             if t["state"] == "running":
                 self.start(t["id"])
                 n += 1

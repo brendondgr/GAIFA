@@ -285,7 +285,7 @@ export function createMockApi() {
       overview: { view: 'dashboard', timeline_range: '24h', services_range: '24h' } },
     learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
     speech_input: { mics: [], language: '', preset: 'balanced', mode: 'both' },
-    judge: { backend: 'relay', model: 'minicpm-5-2B', url: 'http://127.0.0.1:4000', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: [], ask_commands: [] },
+    judge: { backend: 'decide', model: 'd3-lite', url: 'http://127.0.0.1:7000/api/s/decide', threshold: 0.35, timeout_s: 3, context: 'none', allow_commands: [], ask_commands: [] },
     screen: { pages: true, documents: false, transcripts: false, timeout_s: 30, window_chars: 800, backend: null, model: null, url: null, threshold: null, confirm: true },
     permissions: { deny: [], ask: ['hub_set_preference'], allow: ['hub_start_service'] },
     speech_output: { voice: '', engine: 'auto', speed: 1, auto_read: false, pause_ms: 1200 },

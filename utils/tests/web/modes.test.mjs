@@ -165,3 +165,17 @@ test('Settings → Agent picks what the judge reads, saved on change', async () 
   assert.equal(unset.props.value, 'none');                         // not in config.toml: the default
   assert.equal(JudgeContext({ api: {}, cfg: { judge: {} } }), null);   // no saving: nothing
 });
+
+test('web-approvals 1.4: the judge picker offers decision models only, and a pick saves the decide backend', async () => {
+  const { JudgeModelPick, judgeStatusText, judgePick } = await load('chat/chat-judge.js');
+  const picked = [];
+  const el = expand(JudgeModelPick({ st: { choices: ['d3-lite', 'd3-pro'] }, value: { backend: 'decide', model: 'd3-lite' }, onChange: v => picked.push(v) }));
+  const sels = all(el, n => n.type === 'select');
+  assert.equal(sels.length, 1);                                      // no backend choice: only the model
+  assert.deepEqual(all(sels[0], n => n.type === 'option').map(o => o.props.value), ['d3-lite', 'd3-pro']);
+  sels[0].props.onChange({ target: { value: 'd3-pro' } });
+  assert.deepEqual(picked, [{ backend: 'decide', model: 'd3-pro', url: 'http://127.0.0.1:7000/api/s/decide' }]);
+  assert.deepEqual(judgePick('d3-lite').backend, 'decide');
+  assert.match(judgeStatusText({ available: true, model: 'd3-lite' }), /d3-lite \(decision model\), answering/);
+  assert.doesNotMatch(text(el), /relay|chat model/);
+});

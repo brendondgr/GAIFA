@@ -9,31 +9,37 @@ import { CommandRules, withRule, errText, allowConfirm } from './chat-rules.js';
 const R = () => globalThis.React;
 const SOURCE = { rules: 'the fixed rules', user: 'your rule', model: 'the model', 'fail-closed': 'failed: asked' };
 
-const URLS = { relay: 'http://127.0.0.1:4000', decide: 'http://127.0.0.1:7000/api/s/decide' };
+// The judge is only ever a decision model in the decide mod (plan web-approvals): no backend to pick, only its model.
+export const DECIDE_URL = 'http://127.0.0.1:7000/api/s/decide';
+export const JUDGE_HINT = 'The judge is a decision model: it answers in a fraction of a second, with probabilities, and never writes text.';
+/** What a pick saves: always the decide backend. */
+export const judgePick = model => ({ backend: 'decide', model, url: DECIDE_URL });
+const modelChoices = (st, model) => [...new Set([...(st?.choices || []), ...(model ? [model] : [])])];
 
-/** Pick the judge's model from what its backend offers (GET /api/judge/status `choices`); saved to config.toml [agent.judge]. */
+/** Pick the judge's decision model from the decide mod's (GET /api/judge/status `choices`); saved to config.toml [agent.judge]. */
 function JudgePicker({ api, st, onSaved }) {
-  const React = R(), [backend, setBackend] = React.useState(st.backend), [model, setModel] = React.useState(st.model);
+  const React = R(), [model, setModel] = React.useState(st.model);
   const [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
-  React.useEffect(() => { setBackend(st.backend); setModel(st.model); }, [st.backend, st.model]);
+  React.useEffect(() => { setModel(st.model); }, [st.model]);
   if (!api?.saveSettings) return null;
-  const choices = [...new Set([...(backend === st.backend ? st.choices || [] : []), ...(backend === st.backend ? [st.model] : [])])];
   const save = async () => {
     setBusy(true); setMsg(null);
-    try { await api.saveSettings({ judge: { backend, model, url: URLS[backend] } }); setMsg('Saved.'); onSaved?.(); }
+    try { await api.saveSettings({ judge: judgePick(model) }); setMsg('Saved.'); onSaved?.(); }
     catch (e) { setMsg(`Couldn’t save: ${e.detail || e.message}`); } finally { setBusy(false); }
   };
   const sel = { height: 26, fontSize: 12.5, background: T.inset, color: 'inherit', border: '1px solid ' + T.bd, borderRadius: 5 };
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12.5 } },
-    h('span', { style: { color: T.mut } }, 'Judge model'),
-    h('select', { 'aria-label': 'Judge backend', value: backend, style: sel, onChange: e => { setBackend(e.target.value); setModel(''); } },
-      h('option', { value: 'relay' }, 'a chat model (relay)'), h('option', { value: 'decide' }, 'a decision model (decide mod)')),
-    choices.length ? h('select', { 'aria-label': 'Judge model', value: model, style: sel, onChange: e => setModel(e.target.value) },
-      model ? null : h('option', { value: '' }, 'pick one'), choices.map(c => h('option', { key: c, value: c }, c)))
-      : h('input', { 'aria-label': 'Judge model', value: model, placeholder: backend === 'decide' ? 'd3-lite' : 'a model name', style: { ...sel, padding: '0 6px', width: 180 },
-          onChange: e => setModel(e.target.value) }),
-    h(Btn, { sm: true, label: busy ? 'Saving…' : 'Save', disabled: busy || !model || (backend === st.backend && model === st.model), onClick: save }),
+    h('span', { style: { color: T.mut }, title: JUDGE_HINT }, 'Judge (decision model)'),
+    h(JudgeModelSelect, { choices: modelChoices(st, st.model), model, sel, onPick: setModel }),
+    h(Btn, { sm: true, label: busy ? 'Saving…' : 'Save', disabled: busy || !model || model === st.model, onClick: save }),
     msg ? h('span', { role: 'status', style: { color: T.mut } }, msg) : null);
+}
+
+function JudgeModelSelect({ choices, model, sel, onPick }) {
+  return choices.length ? h('select', { 'aria-label': 'Judge model', value: model, style: sel, onChange: e => onPick(e.target.value) },
+    model ? null : h('option', { value: '' }, 'pick one'), choices.map(c => h('option', { key: c, value: c }, c)))
+    : h('input', { 'aria-label': 'Judge model', value: model, placeholder: 'd3-lite', style: { ...sel, padding: '0 6px', width: 180 },
+        onChange: e => onPick(e.target.value) });
 }
 
 // [agent.judge] context (judge_context.py): what the judge reads of the turn besides your words.
@@ -62,19 +68,13 @@ export function JudgeContext({ api, cfg, onSaved }) {
 
 /** The judge's backend and model as a controlled picker (Settings → Permissions → Auto judge, on the page's draft). */
 export function JudgeModelPick({ st, value, onChange }) {
-  const backend = value?.backend || 'relay', model = value?.model || '';
-  const choices = [...new Set([...(st && backend === st.backend ? st.choices || [] : []), ...(model ? [model] : [])])];
+  const model = value?.model || '';
   const sel = { height: 30, fontSize: 12.5, background: T.sb, color: 'inherit', border: '1px solid ' + T.bds, borderRadius: 6 };
   return h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12.5 } },
-    h('select', { 'aria-label': 'Judge backend', value: backend, style: sel, onChange: e => onChange({ backend: e.target.value, model: '', url: URLS[e.target.value] }) },
-      h('option', { value: 'relay' }, 'a chat model (relay)'), h('option', { value: 'decide' }, 'a decision model (decide mod)')),
-    choices.length ? h('select', { 'aria-label': 'Judge model', value: model, style: sel, onChange: e => onChange({ backend, model: e.target.value, url: URLS[backend] }) },
-      model ? null : h('option', { value: '' }, 'pick one'), choices.map(c => h('option', { key: c, value: c }, c)))
-      : h('input', { 'aria-label': 'Judge model', value: model, placeholder: backend === 'decide' ? 'd3-lite' : 'a model name', style: { ...sel, padding: '0 6px', width: 180 },
-          onChange: e => onChange({ backend, model: e.target.value, url: URLS[backend] }) }));
+    h(JudgeModelSelect, { choices: modelChoices(st, model), model, sel, onPick: m => onChange(judgePick(m)) }));
 }
-export const judgeStatusText = st => (st.available ? `Judge: ${st.model} (${st.backend}), answering.`
-  : `Judge: ${st.model} (${st.backend}) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`);
+export const judgeStatusText = st => (st.available ? `Judge: ${st.model} (decision model), answering.`
+  : `Judge: ${st.model} (decision model) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`);
 
 /** "Always allow"'s save: the list with the rule, and as `base` the list it was added to, so a rule added elsewhere
  *  since that list loaded stays (settings-that-stick 2.2). Returns `saveSettings`' arguments. */
@@ -111,7 +111,7 @@ export function JudgedList({ api, limit = 30, onAllow, allowed: allowedList, con
       h('span', { style: { fontSize: 12, color: T.mut } }, 'In Auto, the judge runs commands, fetches and deletes it’s sure you asked for, and asks you about the rest.'),
       h('span', { style: { flex: 1 } }), h(Btn, { sm: true, kind: 'ghost', icon: 'refresh', label: 'Refresh', onClick: load })),
     st ? h('div', { role: 'status', style: { fontSize: 12, color: st.available ? T.mut : T.acct } },
-      st.available ? `Judge: ${st.model} (${st.backend}), answering.` : `Judge: ${st.model} (${st.backend}) doesn’t answer: ${st.detail || 'unavailable'}. Auto isn’t offered until it does.`) : null,
+      judgeStatusText(st)) : null,
     st && controls ? h(JudgePicker, { api, st, onSaved: () => setTimeout(load, 300) }) : null,
     controls ? h(JudgeContext, { api, cfg, onSaved: setCfg }) : null,
     controls ? h(CommandRules, { api, cfg, onSaved: setCfg }) : null,

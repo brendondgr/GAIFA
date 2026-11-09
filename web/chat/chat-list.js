@@ -8,6 +8,7 @@
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, inputSt, label11 } from './chat-ui.js';
 import { ViewMenu, MoreBar, emptyText } from './chat-groups.js';
+import { moveGroups } from './chat-env.js';
 
 const R = () => globalThis.React;
 
@@ -21,9 +22,10 @@ export function rowLook(t) {
 
 /** One chat. `moveTo`: the other environments it can move to (plan 41.2); `aside`: what goes after the name (the Show
  * all page's environment and date, chat-history 3.1; nothing in the sidebar). */
-export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], onMove, aside = null }) {
+export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], onMove, aside = null, projects = [], onProject }) {
   const React = R(), [menu, setMenu] = React.useState(false), [edit, setEdit] = React.useState(null), [moving, setMoving] = React.useState(false);
-  const act = { r: () => { setMenu(false); setEdit(t.title || ''); }, m: onMove && moveTo.length ? () => setMoving(true) : null,
+  const groups = moveGroups(t, onProject ? projects : [], onMove ? moveTo : []);        // plan projects 5.3: projects, then environments
+  const act = { r: () => { setMenu(false); setEdit(t.title || ''); }, m: groups.some(g => g.rows.length) ? () => setMoving(true) : null,
     a: () => { setMenu(false); onArchive(); }, d: () => { setMenu(false); onDelete(); } };
   React.useEffect(() => {        // while the menu is open: R renames, M moves, A archives, D deletes (the user's ask)
     if (!menu || moving) return undefined;
@@ -49,10 +51,12 @@ export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo 
     h('span', { className: 'aichat-slot', style: { position: 'relative', flex: 'none', width: 24, height: 24, marginRight: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' } },
       h('button', { type: 'button', className: 'aichat-more', 'aria-label': `More for ${t.title || 'chat'}`, 'aria-haspopup': 'menu', 'aria-expanded': menu ? 'true' : 'false', onClick: () => setMenu(!menu),
         style: { width: 24, height: 24, placeItems: 'center', border: 0, borderRadius: 5, background: 'transparent', color: T.mut, cursor: 'pointer' } }, h(Icon, { d: 'more', size: 14 })),
-      h(Popover, { open: menu, onClose: () => { setMenu(false); setMoving(false); }, width: 190, label: 'Chat actions', style: { padding: 4, gap: 0 } },
+      h(Popover, { open: menu, onClose: () => { setMenu(false); setMoving(false); }, width: moving ? 250 : 190, label: 'Chat actions', style: { padding: 4, gap: 0 } },
         moving
-          ? [h('span', { key: 'h', style: { ...label11, padding: '4px 9px' } }, 'Move to'),
-            ...moveTo.map(e => menuItem(e.id, 'home', e.name, () => { setMenu(false); setMoving(false); onMove(e.id); }))]
+          ? groups.flatMap(g => [h('span', { key: 'h' + g.key, style: { ...label11, padding: '6px 9px 2px' } }, g.label),
+            h('span', { key: 'n' + g.key, style: { fontSize: 11, color: T.dim, padding: '0 9px 4px', lineHeight: 1.35 } }, g.hint),
+            ...g.rows.map(r => menuItem(`${r.kind}:${r.id}`, r.kind === 'project' ? 'folder' : 'home', r.label, () => {
+              setMenu(false); setMoving(false); if (r.kind === 'project') onProject(r.id); else onMove(r.id); }))])
           : [menuItem('rename', 'edit', 'Rename', act.r, T.tx, 'R'),
             act.m ? menuItem('move', 'folder', 'Move to…', act.m, T.tx, 'M') : null,
             menuItem('archive', 'archive', look.archiveLabel, act.a, T.tx, 'A'),
@@ -85,7 +89,7 @@ export const LIST_CSS = `
 /** `showAll`: `{n}` when more chats exist than the list shows (n: how many in all, or null), else null; `onShowAll`
  * opens the Show all page (plan chat-history 2.4). */
 export function ThreadList({ threads, loading, activeId, q, onQ, showAll = null, onShowAll, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
-  grouped = null, groupLabel = 'Chats by environment', view = null, onView = null, canGroup = false, itemProps = () => ({}) }) {
+  grouped = null, groupLabel = 'Chats by environment', view = null, onView = null, canGroup = false, canProjects = false, projectsRow = null, itemProps = () => ({}) }) {   // projectsRow: plan projects 5.4
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 4px' } },
       h('label', { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, ...inputSt, height: 30, padding: '0 9px', borderRadius: 7 } },
@@ -99,7 +103,8 @@ export function ThreadList({ threads, loading, activeId, q, onQ, showAll = null,
         style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, height: 30, padding: '0 6px', borderRadius: 7, border: 0, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, cursor: 'pointer', textAlign: 'left' } },
         h('span', { style: { width: 20, height: 20, borderRadius: 99, display: 'grid', placeItems: 'center', background: T.row, color: T.tx, flex: 'none' } }, h(Icon, { d: 'plus', size: 12 })),
         'New'),
-      view && onView ? h(ViewMenu, { view, onChange: onView, envs: canGroup }) : null),
+      view && onView ? h(ViewMenu, { view, onChange: onView, envs: canGroup, projects: canProjects }) : null),
+    projectsRow,
     grouped && !q.trim() ? h('nav', { 'aria-label': groupLabel, style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped,
       showAll ? h(MoreBar, { n: showAll.n, label: 'Show all', onClick: onShowAll }) : null) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },

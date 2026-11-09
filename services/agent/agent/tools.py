@@ -80,7 +80,9 @@ LOCAL: list[dict[str, Any]] = [
                                                     "kind": {"type": "string", "enum": ["preference", "fact", "interest", "event"]}},
                     "required": ["text"]}},
 ]
-LOCAL_NAMES = {t["name"] for t in LOCAL}
+from .projects.tools import NAMES as PROJECT_NAMES, TOOLS as PROJECT_TOOLS  # noqa: E402 - plan projects 3.4
+
+LOCAL_NAMES = {t["name"] for t in LOCAL} | PROJECT_NAMES          # a project chat's tools run locally too
 READ_ONLY_LOCAL = LOCAL_NAMES - {"remember"}
 
 
@@ -121,6 +123,7 @@ class ToolSet:
         self.pinned: set[str] = set(settings.get("pinned") or [])
         self.disabled: set[str] = set(settings.get("disabled") or [])
         self.on: set[str] = set(settings.get("mcp_on") or [])
+        self.project: str | None = settings.get("project") or None   # a project chat has the project tools (plan projects 3.4)
         self.index: list[dict[str, Any]] = []
         self.full: dict[str, dict[str, Any]] = {}
         self.notes: dict[str, str] = {}              # tool → the harness's note (plan 22.2)
@@ -144,11 +147,14 @@ class ToolSet:
     def by_name(self, name: str) -> dict[str, Any] | None:
         return next((t for t in self.index if t["name"] == name), None)
 
+    def local(self) -> list[dict[str, Any]]:
+        return LOCAL + (PROJECT_TOOLS if self.project else [])
+
     def visible(self) -> set[str]:
-        return set(self.full) | LOCAL_NAMES
+        return set(self.full) | {t["name"] for t in self.local()}
 
     def functions(self) -> list[dict[str, Any]]:
-        return [function(t, self.notes.get(t["name"])) for t in LOCAL] + [function(t, self.notes.get(t["name"])) for t in self.full.values()]
+        return [function(t, self.notes.get(t["name"])) for t in self.local()] + [function(t, self.notes.get(t["name"])) for t in self.full.values()]
 
     def deferred(self) -> list[dict[str, Any]]:
         return [t for t in self.index if t["name"] not in self.full and not self.off(t) and not self.hidden(t)]

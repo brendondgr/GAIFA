@@ -1,5 +1,5 @@
-"""The system prompt (plan 14.7 order): base rules, AGENT.md, the memory index, skills, the
-deferred tool index, the environment, and the thread's outputs table."""
+"""The system prompt (plan 14.7 order): base rules, AGENT.md, a project chat's project (plan projects 3.3), the memory
+index, skills, a project's files and pages, the deferred tool index, the environment, and the thread's outputs table."""
 
 from __future__ import annotations
 
@@ -56,8 +56,10 @@ def build(parts: dict[str, str]) -> str:
     out = (parts.get("base") or base_text()).rstrip("\n")
     out += section("Guardrails", parts.get("guardrails", ""))
     out += section("Standing instructions (AGENT.md)", parts.get("agent_md", ""))
+    out += section("Project", parts.get("project", ""))                          # plan projects 3.3
     out += section("Memory (what you know: memory_search finds more; remember saves what the user tells you to keep)", parts.get("memory", ""))
     out += section("Skills (read one with read_skill before doing that kind of task)", parts.get("skills", ""))
+    out += section("Project files and pages", parts.get("project_knowledge", ""))
     out += section("More tools (not loaded; load_tools or find_tools first)", parts.get("tools", ""))
     out += section("Environment", parts.get("env", ""))
     out += section("Outputs in this chat (reference them as output:<id>)", parts.get("outputs", ""))
@@ -132,9 +134,10 @@ def _home(path: str, home: str) -> str:
     return "~" + path[len(home):] if home and (path == home or path.startswith(home.rstrip("/") + "/")) else path
 
 
-def folders_note(data: dict[str, Any] | None, home: str = "") -> str:
+def folders_note(data: dict[str, Any] | None, home: str = "", project: dict[str, Any] | None = None) -> str:
     """Plan 34: the folders this chat can use (its environment's, then those the user allowed in this chat),
-    from the workspace mod's `GET /v1/folders` for the chat; "" when the workspace mod didn't answer."""
+    from the workspace mod's `GET /v1/folders` for the chat; "" when the workspace mod didn't answer. A project chat's
+    note names the project and each of its environments (plan projects 2.2)."""
     if not isinstance(data, dict):
         return ""
     env = (data.get("environment") or {}).get("name") or "Default"
@@ -142,8 +145,17 @@ def folders_note(data: dict[str, Any] | None, home: str = "") -> str:
     row = lambda f: f"{_home(str(f['path']), home)} ({LEVEL_WORDS.get(f.get('level'), f.get('level'))}, id {f.get('id')})"  # noqa: E731
     mine = [row(f) for f in fs if not f.get("granted")]
     allowed = [row(f) for f in fs if f.get("granted")]
-    out = (f"\nFolders this chat can use (environment {env}): {'; '.join(mine)}" if mine
-           else f"\nThis chat's environment ({env}) has no workspace folders.")
+    where = f"environment {env}"
+    if project:
+        own = project.get("own_env")
+        names = [e.get("name") or e.get("id") for e in data.get("environments") or [data.get("environment") or {}]
+                 if isinstance(e, dict) and e.get("id") != own]
+        parts = ([f"environment{'s' if len(names) > 1 else ''} {', '.join(str(n) for n in names)}"] if names else []) + \
+            (["the project's own folders"] if own else [])
+        where = f"project {project.get('name')}: {' and '.join(parts) or 'no environment'}"
+    out = (f"\nFolders this chat can use ({where}): {'; '.join(mine)}" if mine
+           else f"\nThis chat's {'project' if project else 'environment'} ({env if not project else project.get('name')}) "
+                "has no workspace folders.")
     if allowed:
         out += f"\nAllowed in this chat by the user: {'; '.join(allowed)}"
     return out + ("\nTo look at another folder the user names, pass its full path as `folder` to workspace_tree or "

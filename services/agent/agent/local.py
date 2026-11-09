@@ -1,5 +1,5 @@
 """The agent's local tools: ask_user, update_todos, find_tools, load_tools, read_skill,
-view_output, read_result, chat_search, memory_search, remember."""
+view_output, read_result, chat_search, memory_search, remember; and a project chat's (projects/tools.py)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from . import context as ctx
 from . import show, skillfmt
 from .knowledge import Knowledge
+from .projects.tools import ProjectTools
 
 if TYPE_CHECKING:
     from .loop import Agent
@@ -26,7 +27,7 @@ STAND_IN = ("a dry-run stand-in: this chat is an evaluation, so nothing was gene
             "look at. Treat it as a good result of its prompt and carry on as you would with the real output")
 
 
-class Local:
+class Local(ProjectTools):
     def __init__(self, agent: Agent) -> None:
         self.a = agent
 
@@ -137,8 +138,8 @@ class Local:
             return self.err(tid, cid, "read_skill", "disabled", f"the {mod} tools are turned off in this chat",
                             "tell the user it's turned off; they can turn it back on in the composer")
         try:
-            env = (thread.get("settings") or {}).get("environment")
-            body = await k.read(name, tid, env if isinstance(env, str) and env else None)
+            from .projects.origin import chat_envs
+            body = await k.read(name, tid, chat_envs(thread.get("settings"), self.a.projects) or None)   # plan projects 2.2
         except skillfmt.SkillFileError as e:
             return self.err(tid, cid, "read_skill", e.code, e.detail, "the skill's files are listed after its body")
         if body is None:

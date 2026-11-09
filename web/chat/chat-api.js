@@ -10,6 +10,10 @@
 //   answer(tid, question_id, answers) approval(tid, {approval_id, approve, arguments, reason})
 //   action(tid, tool, args) fork(tid, seq) cancel(tid) compact(tid) context(tid) settings() saveSettings(body)
 //   feedback(tid, {value, output_id | seq, note}) decidePref(pid, approve)   (plan 21.7)
+//   projects({q, sort}) project(pid) createProject(body) patchProject(pid, p) deleteProject(pid) projectThreads(pid, opts)
+//   addSource(pid, body) patchSource(pid, sid, p) removeSource(pid, sid) refreshSource(pid, sid) projectFolders(pid)
+//   addProjectFolder(pid, {path, level}) patchProjectFolder(pid, fid, p) removeProjectFolder(pid, fid) projectMemory(pid)
+//   patchProjectFact(pid, fid, p) forgetProjectFact(pid, fid) watchProjects(onEvent) → {close()}   (plan projects)
 //
 // Errors are ChatError {status, detail, code, data}; status 0 means GAIFA didn't answer.
 
@@ -100,10 +104,12 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
   return {
     live: true,
     models: () => req('GET', '/v1/models'),
-    threads: ({ q, archived, limit, environment, sort, offset } = {}) => req('GET', '/v1/threads' + qs({ q, archived: archivedQ(archived), limit,
-      environment, sort: sort && sort !== 'updated' ? sort : undefined, offset: offset || undefined })),
-    threadGroups: ({ archived } = {}) => req('GET', '/v1/threads/groups' + qs({ archived: archivedQ(archived) })),   // plan 41.1
-    threadCount: ({ q, archived, environment } = {}) => req('GET', '/v1/threads/count' + qs({ q, archived: archivedQ(archived), environment })),   // chat-history 1.1
+    threads: ({ q, archived, limit, environment, sort, offset, project } = {}) => req('GET', '/v1/threads' + qs({ q, archived: archivedQ(archived), limit,
+      environment, sort: sort && sort !== 'updated' ? sort : undefined, offset: offset || undefined, project })),
+    threadGroups: ({ archived, by } = {}) => req('GET', '/v1/threads/groups' + qs({ archived: archivedQ(archived),   // plan 41.1
+      by: by && by !== 'environment' ? by : undefined })),                                 // by: 'project' (plan projects 1.3)
+    threadCount: ({ q, archived, environment, project } = {}) => req('GET', '/v1/threads/count' + qs({ q, archived: archivedQ(archived), environment, project })),   // chat-history 1.1
+    ...projectCalls(req, url, ES),                                                         // plan projects 1.3
     searchChats: (q, limit = 8) => req('GET', '/v1/chats/search' + qs({ q, limit })).then(r => r.results || []),  // plan 28.5
     create: (body = {}) => req('POST', '/v1/threads', body),
     get: tid => req('GET', T(tid)),
@@ -137,6 +143,48 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     deleteSkill: name => req('DELETE', `/v1/skills/${enc(name)}`),
     feedback: (tid, body) => req('POST', `${T(tid)}/feedback`, body),
     decidePref: (pid, approve) => req('POST', `/v1/prefs/${enc(pid)}/${approve ? 'approve' : 'reject'}`),
+  };
+}
+
+// Projects (plan projects 1.3): the agent's /v1/projects routes. watchProjects(onEvent) keeps an EventSource on
+// /v1/streams?watch=projects open (no chats on it) for the `project` and `project_source` events, reconnecting on errors.
+export function projectCalls(req, url, ES = globalThis.EventSource) {
+  const P = pid => `/v1/projects/${enc(pid)}`;
+  return {
+    projects: ({ q, sort } = {}) => req('GET', '/v1/projects' + qs({ q, sort: sort && sort !== 'activity' ? sort : undefined })),
+    project: pid => req('GET', P(pid)),
+    createProject: body => req('POST', '/v1/projects', body),
+    patchProject: (pid, patch) => req('PATCH', P(pid), patch),
+    deleteProject: pid => req('DELETE', P(pid)),
+    projectThreads: (pid, { q, archived, limit, sort, offset } = {}) => req('GET', `${P(pid)}/threads` + qs({ q, archived: archived ? 'true' : undefined, limit,
+      sort: sort && sort !== 'updated' ? sort : undefined, offset: offset || undefined })),
+    addSource: (pid, body) => req('POST', `${P(pid)}/sources`, body),
+    patchSource: (pid, sid, patch) => req('PATCH', `${P(pid)}/sources/${enc(sid)}`, patch),
+    removeSource: (pid, sid) => req('DELETE', `${P(pid)}/sources/${enc(sid)}`),
+    refreshSource: (pid, sid) => req('POST', `${P(pid)}/sources/${enc(sid)}/refresh`),
+    projectFolders: pid => req('GET', `${P(pid)}/folders`),
+    addProjectFolder: (pid, body) => req('POST', `${P(pid)}/folders`, body),
+    patchProjectFolder: (pid, fid, patch) => req('PATCH', `${P(pid)}/folders/${enc(fid)}`, patch),
+    removeProjectFolder: (pid, fid) => req('DELETE', `${P(pid)}/folders/${enc(fid)}`),
+    projectMemory: pid => req('GET', `${P(pid)}/memory`),
+    patchProjectFact: (pid, fid, patch) => req('PATCH', `/v1/memory/facts/${enc(fid)}`, patch),
+    forgetProjectFact: (pid, fid) => req('DELETE', `/v1/memory/facts/${enc(fid)}`),
+    watchProjects(onEvent) {
+      let es = null, closed = false, tries = 0, timer = null;
+      const open = () => {
+        if (closed || !ES) return;
+        es = new ES(url('/v1/streams?threads=&watch=projects'));
+        es.onopen = () => { tries = 0; };
+        es.onmessage = m => {
+          let ev;
+          try { ev = JSON.parse(m.data); } catch { return; }
+          if (ev.type === 'project' || ev.type === 'project_source') onEvent?.(ev);
+        };
+        es.onerror = () => { es.close(); if (!closed) timer = setTimeout(open, Math.min(10000, 800 * 2 ** tries++)); };
+      };
+      open();
+      return { close() { closed = true; clearTimeout(timer); es?.close(); } };
+    },
   };
 }
 

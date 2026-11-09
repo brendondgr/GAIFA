@@ -4,7 +4,8 @@
 - **Settings** (Settings → Agent, kept in `data/agent/documents.json` over the env defaults):
   `inline_tokens`, how big a document may be to go in whole on its own (default `AGENT_INLINE_TOKENS`,
   6000; `"window"` means up to the model's window), and `reply_reserve`, the tokens kept free for the
-  reply and tools (default 4096).
+  reply and tools (default 4096). `project_share` (plan projects 3.3): the share of the model's window a project's
+  files and pages may fill whole before the prompt lists them instead (default 0.25).
 - **Room** = the model's window − the reserve − what the chat already uses (the meter). Documents
   attached together share it, in order.
 - **Per attachment** (`auto` unless the chip says otherwise, remembered for the chat in its
@@ -38,7 +39,7 @@ class SettingsError(ValueError):
 
 
 def defaults(cfg: Any) -> dict[str, Any]:
-    return {"inline_tokens": cfg.inline_tokens, "reply_reserve": cfg.reply_reserve}
+    return {"inline_tokens": cfg.inline_tokens, "reply_reserve": cfg.reply_reserve, "project_share": 0.25}
 
 
 def load(data: Path | None, cfg: Any) -> dict[str, Any]:
@@ -63,6 +64,11 @@ def save(data: Path, cfg: Any, patch: dict[str, Any]) -> dict[str, Any]:
         if not (isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 1_000_000):
             raise SettingsError("reply_reserve: a number of tokens, 0 or more")
         cur["reply_reserve"] = v
+    if "project_share" in patch:
+        v = patch["project_share"]
+        if not (isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 0.9):
+            raise SettingsError("project_share: a share of the window from 0 to 0.9")
+        cur["project_share"] = float(v)
     Path(data).mkdir(parents=True, exist_ok=True)
     tmp = Path(data) / (FILE + ".part")
     tmp.write_text(json.dumps(cur, indent=1))

@@ -34,7 +34,7 @@ KIND = Literal["project", "person", "place", "tool", "topic", "organization", "p
 
 
 class Anchor(BaseModel):
-    kind: Literal["workspace", "folder", "git"]
+    kind: Literal["workspace", "folder", "git", "project"]
     value: str = Field(min_length=1, max_length=1000)
 
 

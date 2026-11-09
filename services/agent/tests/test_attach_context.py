@@ -149,7 +149,7 @@ def last_user(env) -> str:
 async def test_the_setting_whole_documents_up_to(env):
     env.model.models["wide"] = WIDE
     s = (await env.client.get("/v1/settings")).json()["documents"]
-    assert s == {"inline_tokens": 6000, "reply_reserve": 4096}
+    assert s == {"inline_tokens": 6000, "reply_reserve": 4096, "project_share": 0.25}
     mid = env.hub.doc("mid.txt", text="word " * 800, kind="text", subtype="plain")              # 1,000 tokens
     r = await env.client.put("/v1/settings", json={"documents": {"inline_tokens": 500}})
     assert r.status_code == 200 and r.json()["documents"]["inline_tokens"] == 500
@@ -163,7 +163,8 @@ async def test_the_setting_whole_documents_up_to(env):
     assert d["inline"] is True and len(d["text"]) == 100000                                         # up to the window, fetched whole
     assert (await env.client.put("/v1/settings", json={"documents": {"inline_tokens": -3}})).status_code == 422
     assert (await env.client.put("/v1/settings", json={"documents": {"reply_reserve": -1}})).status_code == 422
-    assert (await env.client.get("/v1/settings")).json()["documents"] == {"inline_tokens": "window", "reply_reserve": 4096}
+    assert (await env.client.get("/v1/settings")).json()["documents"] == {"inline_tokens": "window", "reply_reserve": 4096,
+                                                                           "project_share": 0.25}
 
 
 async def test_whole_or_card_per_attachment_and_the_model_gets_all_of_it(env):

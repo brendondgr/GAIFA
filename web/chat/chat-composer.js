@@ -129,7 +129,7 @@ function DocMode({ a, mode, onPick }) {
 const menuSt = { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' };
 
 // controls: the row under the box (chat-controls.js: environment, mode, model; plan 42.3)
-export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, models = null, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [], voice = null, queue = null, queued = 0 }) {   // queue: the strip; queued: how many it holds
+export function Composer({ draft, setDraft, attachments, setAttachments, onSend, onStop, running, tools, index, settings, onSettings, skills, models = null, outputs, api, onQuick, inputRef, disabled, dock, onOpen, quotes = [], setQuotes, controls = null, folders = [], voice = null, queue = null, queued = 0, placeholder = null }) {   // queue: the strip; queued: how many it holds
   const React = R(), [pop, setPop] = React.useState(null), [sel, setSel] = React.useState(0);
   const own = React.useRef(null), ref = inputRef || own, picker = React.useRef(null), plain = React.useRef(false);
   const [uploading, setUploading] = React.useState(0), [upErr, setUpErr] = React.useState(null), [over, setOver] = React.useState(false);
@@ -253,7 +253,7 @@ export function Composer({ draft, setDraft, attachments, setAttachments, onSend,
           h('textarea', { ref, value: draft, rows: 1, disabled, onChange: e => { setDraft(e.target.value); setCaret(e.target.selectionStart); }, onKeyDown: onKey, 'aria-label': 'Message',
             onSelect: e => setCaret(e.target.selectionStart),
             onPaste,
-            placeholder: running ? 'Queue a message (sent when this reply ends; Ctrl+Enter sends it now)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
+            placeholder: placeholder && !running && !quotes.length ? placeholder : running ? 'Queue a message (sent when this reply ends; Ctrl+Enter sends it now)…' : quotes.length ? 'Add a message, or just send your replies…' : 'Message the agent, or / for commands',
             style: { flex: 1, minWidth: 0, alignSelf: 'center', minHeight: 22, maxHeight: boxMax(), resize: 'none', border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, lineHeight: 1.5, padding: '2px 0' } }),
           h(MicButton, { api, draft, setDraft, disabled }),   // only while the stt mod is up (plan 29.3)
           voice,                                               // voice mode (plan 49.2)

@@ -16,9 +16,9 @@ export const FIRST = 5;          // chats shown in a section before Show more (c
 export const PAGE = 200;         // an open section loads its chats this many at a time
 export const VIEW_DEFAULTS = { show: 'chats', group: 'environment', envOrder: 'activity', chatOrder: 'updated', collapsed: [] };
 // Group by: a grouping needing more than the chats' own fields says so in `needs` (Environment: the workspace mod's
-// environments); a later one (projects: Project) adds a row here and its sections in the list.
-export const GROUP_BY = [['environment', 'Environment'], ['date', 'Date'], ['none', 'None']];
-export const GROUP_NEEDS = { environment: 'envs' };
+// environments; Project: the agent's projects, plan projects 5.4, whose sections are chat-project-groups.js's).
+export const GROUP_BY = [['environment', 'Environment'], ['project', 'Project'], ['date', 'Date'], ['none', 'None']];
+export const GROUP_NEEDS = { environment: 'envs', project: 'projects' };
 export const SHOW = [['chats', 'Chats'], ['archived', 'Archived'], ['both', 'Both']];
 export const ENV_ORDERS = [['activity', 'Recent activity'], ['name', 'Name'], ['created', 'Created']];
 export const CHAT_ORDERS = [['updated', 'Recent activity'], ['title', 'Name'], ['created', 'Created']];
@@ -29,7 +29,8 @@ export const viewOfUi = u => (u && typeof u === 'object' ? { show: u.show ?? (u.
 export const uiOfView = v => ({ show: v.show || 'chats', group: v.group, env_order: v.envOrder, chat_order: v.chatOrder, collapsed: [...(v.collapsed || [])] });
 /** Show → the agent's `archived` filter: live chats (false), archived ones (true), or both ('all'). */
 export const archivedParam = show => (show === 'both' ? 'all' : show === 'archived');
-/** The groupings the menu offers: Environment only with the workspace mod's environments (`have.envs`). */
+/** The groupings the menu offers: Environment only with the workspace mod's environments (`have.envs`), Project only
+ * with the agent's projects (`have.projects`). */
 export const groupChoices = (have = {}) => GROUP_BY.filter(([k]) => !GROUP_NEEDS[k] || have[GROUP_NEEDS[k]]);
 /** The grouping in effect: the saved one, or None when what it needs is missing (no environments). */
 export const groupOf = (view, have = {}) => (groupChoices(have).some(([k]) => k === view.group) ? view.group : 'none');
@@ -125,8 +126,9 @@ export function Choice({ label, value, options, onPick }) {
       options.map(([k, l]) => h('button', { key: k, type: 'button', role: 'radio', 'aria-checked': k === value ? 'true' : 'false', onClick: () => onPick(k), style: chipSt(k === value, { sm: true }) }, l))));
 }
 
-/** `envs`: whether the workspace mod's environments are known (Group by: Environment needs them). */
-export function ViewMenu({ view, onChange, envs = true }) {
+/** `envs`: whether the workspace mod's environments are known (Group by: Environment needs them); `projects`: whether
+ * the agent has projects (Group by: Project, plan projects 5.4). */
+export function ViewMenu({ view, onChange, envs = true, projects = false }) {
   const React = R(), [open, setOpen] = React.useState(false);
   const set = patch => onChange({ ...view, ...patch });
   return h('span', { style: { position: 'relative', flex: 'none' } },
@@ -134,8 +136,9 @@ export function ViewMenu({ view, onChange, envs = true }) {
       className: 'aichat-quiet', style: { width: 30, height: 30, borderRadius: 7, background: 'transparent', color: T.mut } }),
     h(Popover, { open, onClose: () => setOpen(false), place: 'down-left', width: 280, label: 'View', style: { gap: 10 } },   // opens over the chat, not behind the app's rail
       h(Choice, { label: 'Show', value: view.show, options: SHOW, onPick: show => set({ show }) }),   // the one place to choose (chat-history 2.2)
-      h(Choice, { label: 'Group by', value: groupOf(view, { envs }), options: groupChoices({ envs }), onPick: group => set({ group }) }),
-      groupOf(view, { envs }) === 'environment' ? h(Choice, { label: 'Environments by', value: view.envOrder, options: ENV_ORDERS, onPick: envOrder => set({ envOrder }) }) : null,
+      h(Choice, { label: 'Group by', value: groupOf(view, { envs, projects }), options: groupChoices({ envs, projects }), onPick: group => set({ group }) }),
+      ['environment', 'project'].includes(groupOf(view, { envs, projects })) ? h(Choice, { label: groupOf(view, { envs, projects }) === 'project' ? 'Projects by' : 'Environments by',
+        value: view.envOrder, options: ENV_ORDERS, onPick: envOrder => set({ envOrder }) }) : null,
       h(Choice, { label: 'Chats by', value: view.chatOrder, options: CHAT_ORDERS, onPick: chatOrder => set({ chatOrder }) })));
 }
 

@@ -101,3 +101,30 @@ test('"Add to the environment" adds the folder there, then allows the call once'
 test('the chip shows nothing without the workspace mod', () => {
   assert.equal(env.EnvChip({ api: {}, thread: null, value: null }), null);
 });
+
+// Plan projects 5.3: a project chat's chip and the sidebar's Move to… (Projects, then Environments; the user's ask).
+test('a project chat\'s chip: its name, and the folders its menu lists', () => {
+  assert.equal(env.projectChipText({ name: 'Thesis' }, 'p_1'), 'Thesis');
+  assert.equal(env.projectChipText(null, 'p_1'), 'Project');
+  const envs = [{ id: 'grants', name: 'Grants', folders: [{ path: '/home/u/grants', level: 'edit' }] }];
+  const groups = env.projectFolderGroups({ environments: ['grants', 'gone'] }, envs, [{ path: '/home/u/refs', level: 'read' }]);
+  assert.deepEqual(groups.map(g => g.name), ['Grants (primary)', 'gone', 'Its own folders']);
+  assert.deepEqual(groups[0].folders, [{ path: '/home/u/grants', level: 'edit' }]);
+  assert.deepEqual(env.projectFolderGroups({ environments: [] }, envs, []), []);
+});
+
+test('Move to…: projects first, No project for a project chat, environments replaced by a note there', () => {
+  const projects = [{ id: 'p_1', name: 'Thesis' }, { id: 'p_2', name: 'Garden' }];
+  const envs = [{ id: 'grants', name: 'Grants' }];
+  const plain = env.moveGroups({ settings: {} }, projects, envs);
+  assert.deepEqual(plain.map(g => g.key), ['projects', 'environments']);
+  assert.deepEqual(plain[0].rows.map(r => r.label), ['Thesis', 'Garden']);
+  assert.match(plain[0].hint, /folders and instructions apply/);
+  assert.deepEqual(plain[1].rows.map(r => [r.kind, r.id]), [['environment', 'grants']]);
+  const inOne = env.moveGroups({ settings: { project: 'p_1' } }, projects, envs);
+  assert.deepEqual(inOne[0].rows.map(r => [r.id, r.label]), [['p_2', 'Garden'], [null, 'No project']]);
+  assert.deepEqual(inOne[1].rows, []);
+  assert.match(inOne[1].hint, /Thesis/);
+  assert.deepEqual(env.moveGroups({ settings: {} }, [], []), []);
+  assert.deepEqual(env.moveGroups({ settings: {} }, [], envs).map(g => g.key), ['environments']);
+});

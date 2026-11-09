@@ -219,6 +219,13 @@ function DocSettings({ value, onSave }) {
           h('input', { type: 'checkbox', checked: win, onChange: e => setV(x => ({ ...x, inline_tokens: e.target.checked ? 'window' : 6000 })) }), 'up to the model’s window'))),
     row('Reply reserve', 'Tokens kept free for the reply and tools: a document goes whole only if it fits the window after this and what the chat already holds.',
       h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } }, num('reply_reserve', false, 'Reply reserve (tokens)'), h('span', { style: { fontSize: 12, color: T.mut } }, 'tokens'))),
+    // plan projects 3.3: a project's files and pages go into its chats whole up to this share of the window
+    v.project_share != null ? row('Project files and pages whole up to', 'In a project’s chats, its files and pages go into the prompt whole while all of them fit this share of the model’s window; past that, the agent searches and reads them.',
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+        h('input', { type: 'number', min: 0, max: 90, step: 5, value: Math.round(v.project_share * 100), 'aria-label': 'Project files and pages whole up to (% of the window)',
+          onChange: e => setV(x => ({ ...x, project_share: Math.max(0, Math.min(90, Math.round(Number(e.target.value) || 0))) / 100 })),
+          style: { width: 72, height: 28, padding: '0 8px', borderRadius: 6, border: '1px solid ' + T.bds, background: T.sb, color: T.tx, fontFamily: MONO, fontSize: 12 } }),
+        h('span', { style: { fontSize: 12, color: T.mut } }, '% of the window'))) : null,
     dirty ? h('div', { style: { display: 'flex', gap: 8 } },
       h(Btn, { kind: 'pri', sm: true, label: busy ? 'Saving…' : 'Save', disabled: busy, onClick: async () => { setBusy(true); try { await onSave(v); } catch { /* toasted */ } finally { setBusy(false); } } }),
       h(Btn, { kind: 'ghost', sm: true, label: 'Revert', onClick: () => setV(value) })) : null);

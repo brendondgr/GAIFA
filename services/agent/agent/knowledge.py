@@ -50,13 +50,15 @@ class Knowledge:
     def agent_md(self) -> str:
         return self._head(self.data / "AGENT.md")
 
-    def profile(self, folders: list[dict[str, Any]] | None = None) -> str:
+    def profile(self, folders: list[dict[str, Any]] | None = None, project: str | None = None) -> str:
         """The prompt's Memory section (structured-memory 3.3): the user's facts, the projects, and the chat's projects
-        by its folders. (MEMORY.md was imported once, 1.3; its editor is gone, 5.2.)"""
+        by its folders; a project chat's own project first (plan projects 4.2). (MEMORY.md was imported once, 1.3; its
+        editor is gone, 5.2.)"""
         if self.memory is None:
             return self.memory_index()
         from .memory import profile
-        return profile.build(self.memory, folders, int(profile.settings(self.data).get("interest_days") or profile.INTEREST_DAYS))[0]
+        return profile.build(self.memory, folders, int(profile.settings(self.data).get("interest_days") or profile.INTEREST_DAYS),
+                             project=project)[0]
 
     def memory_index(self) -> str:
         """What the prompt's Memory section lists: the current facts, newest first (structured-memory 1.3; Phase 3

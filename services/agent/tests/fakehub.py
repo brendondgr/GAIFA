@@ -108,6 +108,11 @@ class FakeHub:
         self.workspace: dict[str, Any] | None = None   # plan 34: the workspace mod's folders by environment (None: not running)
         self.grants: list[dict[str, Any]] = []         # GET /api/grants
         self.folder_origins: list[dict[str, Any]] = []  # the X-GAIFA-Origin of each GET /api/s/workspace/v1/folders
+        self.ws_envs: dict[str, Any] = {}             # plan projects 2.3: the workspace mod's environments by id
+        self.pages: dict[str, str] = {}               # plan projects 3.1: /api/web/read's pages by URL
+        self.page_fail: set[str] = set()
+        self.page_delay = 0.0
+        self.page_reads: list[str] = []
         # skill-sources 2.2: the workspace's skills by environment ({skills, instructions}) and what reads return by id
         self.ws_skills: dict[str, dict[str, Any]] = {}
         self.ws_texts: dict[str, dict[str, Any]] = {}
@@ -383,10 +388,82 @@ class FakeHub:
         def ws_folders(request: Request) -> dict:
             o = json.loads(request.headers.get("x-gaifa-origin") or "{}")
             self.folder_origins.append(o)
-            env = (self.workspace or {}).get(o.get("environment") or "default") or (self.workspace or {})["default"]
             granted = [{"id": f["path"].rsplit("/", 1)[-1].lower(), "path": f["path"], "level": "read", "granted": True}
                        for f in o.get("folders") or []]
+            many = [self.workspace[e] for e in o.get("environments") or [] if e in (self.workspace or {})]
+            if many:                                   # plan projects 2.1: the union, as the workspace mod answers it
+                folders = list({f["id"]: f for e in many for f in e["folders"]}.values())
+                return {"folders": [*folders, *granted], "environment": {"id": many[0]["id"], "name": many[0]["name"]},
+                        "environments": [{"id": e["id"], "name": e["name"]} for e in many]}
+            env = (self.workspace or {}).get(o.get("environment") or "default") or (self.workspace or {})["default"]
             return {"folders": [*env["folders"], *granted], "environment": {"id": env["id"], "name": env["name"]}}
+
+        # plan projects 3.1: the hub's POST /api/web/read: a new text output per fetch (self.pages: url → text;
+        # self.page_fail: urls that time out; self.page_delay: seconds each read takes)
+        @app.post("/api/web/read")
+        async def web_read(request: Request) -> Any:
+            url = (await request.json())["url"]
+            self.page_reads.append(url)
+            if self.page_delay:
+                await asyncio.sleep(self.page_delay)
+            if url in self.page_fail or url not in self.pages:
+                return JSONResponse({"detail": "the page didn't answer in 20 s", "code": "timeout"}, 504)
+            title = url.rstrip("/").rsplit("/", 1)[-1].replace("-", " ").title()
+            oid = self.doc(title, text=self.pages[url], kind="text", subtype="markdown")
+            return {"output": self.outputs[oid], "url": url, "final_url": url, "title": title, "kind": "text",
+                    "chars": len(self.pages[url]), "screening": None}
+
+        # plan projects 2.3: the workspace mod's environments, enough for a project's own folders (Read by default,
+        # anything under a GAIFA folder capped at Read, as the mod does)
+        def ws_env(eid: str) -> Any:
+            e = self.ws_envs.get(eid)
+            return e if e else JSONResponse({"detail": f"there is no environment {eid!r}", "code": "unknown_environment"}, 404)
+
+        @app.post("/api/s/workspace/v1/environments")
+        async def ws_env_create(request: Request) -> Any:
+            body = await request.json()
+            if any(e["name"].lower() == body["name"].lower() for e in self.ws_envs.values()):
+                return JSONResponse({"detail": "exists", "code": "exists"}, 409)
+            e = {"id": body.get("id") or body["name"].lower(), "name": body["name"], "folders": [],
+                 **({"project": body["project"]} if body.get("project") else {})}
+            self.ws_envs[e["id"]] = e
+            return e
+
+        @app.get("/api/s/workspace/v1/environments/{eid}")
+        def ws_env_get(eid: str) -> Any:
+            return ws_env(eid)
+
+        @app.delete("/api/s/workspace/v1/environments/{eid}")
+        def ws_env_delete(eid: str) -> Any:
+            return {"deleted": eid} if self.ws_envs.pop(eid, None) else ws_env(eid)
+
+        @app.post("/api/s/workspace/v1/environments/{eid}/folders")
+        async def ws_env_add(eid: str, request: Request) -> Any:
+            e, body = ws_env(eid), await request.json()
+            if not isinstance(e, dict):
+                return e
+            if "GAIFA" in body["path"] and body.get("level", "read") != "read":
+                return JSONResponse({"detail": f"{body['path']} can't go above Read", "code": "capped"}, 422)
+            f = {"id": body["path"].rstrip("/").rsplit("/", 1)[-1].lower(), "path": body["path"], "level": body.get("level", "read")}
+            e["folders"].append(f)
+            return f
+
+        @app.patch("/api/s/workspace/v1/environments/{eid}/folders/{fid}")
+        async def ws_env_change(eid: str, fid: str, request: Request) -> Any:
+            e = ws_env(eid)
+            f = next((x for x in e["folders"] if x["id"] == fid), None) if isinstance(e, dict) else None
+            if f is None:
+                return JSONResponse({"detail": f"there is no folder {fid!r}", "code": "unknown_folder"}, 404)
+            f["level"] = (await request.json())["level"]
+            return f
+
+        @app.delete("/api/s/workspace/v1/environments/{eid}/folders/{fid}")
+        def ws_env_remove(eid: str, fid: str) -> Any:
+            e = ws_env(eid)
+            if not isinstance(e, dict) or not any(x["id"] == fid for x in e["folders"]):
+                return JSONResponse({"detail": f"there is no folder {fid!r}", "code": "unknown_folder"}, 404)
+            e["folders"] = [x for x in e["folders"] if x["id"] != fid]
+            return {"removed": fid}
 
         @app.get("/api/s/workspace/v1/skills")
         def ws_skills(request: Request) -> dict:
@@ -547,7 +624,10 @@ class FakeHub:
             return {"deleted": tid}
 
         @app.delete("/api/s/embed/v1/texts/{ns}")
-        def delete_ns(ns: str) -> Any:
+        def delete_ns(ns: str, ids: str | None = None) -> Any:
+            if ids is not None:                        # ?ids=a,b: only those (plan projects 3.2)
+                got = self.texts.get(ns, {})
+                return {"deleted": sum(got.pop(i, None) is not None for i in ids.split(",") if i)}
             return {"deleted": len(self.texts.pop(ns, {}))}
 
         @app.get("/api/s/embed/v1/texts/{ns}")

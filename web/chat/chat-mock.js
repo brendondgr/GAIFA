@@ -5,6 +5,7 @@
 // model call, like POST /action. Outputs are mock.js's (api.listOutputs), so they open in Outputs.
 
 import { webTurn } from './chat-mock-web.js';
+import { createProjectMocks } from './chat-mock-projects.js';
 import { seedHistory } from './chat-mock-history.js';
 
 const CANCEL = Symbol('cancelled');
@@ -57,7 +58,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
       { name: 'comfy', description: 'Choosing a ComfyUI workflow and its settings per task', source: 'comfy', id: 'comfy/comfy' },
       { name: 'tts', description: 'Voices and delivery direction', source: 'tts', id: 'tts/tts' },
       { name: 'gen3d', description: 'Presets, parts and rigs for 3D models', source: 'gen3d', id: 'gen3d/gen3d' }],
-    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['plan', 'manual', 'accept_edits', 'auto', 'bypass'], documents: { inline_tokens: 6000, reply_reserve: 4096 },
+    model: 'skynet', fallback: 'gemma4-26B', max_steps: 25, modes: ['plan', 'manual', 'accept_edits', 'auto', 'bypass'], documents: { inline_tokens: 6000, reply_reserve: 4096, project_share: 0.25 },
     memory_settings: { recall: true, fade_days: 180, auto_approve: true, auto_threshold: 0.8, auto_after_seen: 2, always_review: ['health', 'money', 'legal', 'relationships', 'religion', 'politics', 'sexuality'] }, memory_stats: { facts: 2, entities: 1, proposed: 0 } };
 
   function newThread(o = {}) {
@@ -68,6 +69,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
   }
   const T = tid => { const t = threads.get(tid); if (!t) throw err(404, `no thread '${tid}'`, 'not_found'); return t; };
   const pub = t => ({ ...t.thread, running: !!t.run });
+  const proj = createProjectMocks({ threads, newThread, emit: (...a) => emit(...a), net: () => net(), err, now, rid, pub });   // plan projects 1.3
   function emit(t, type, payload) {
     const ev = { thread_id: t.thread.id, seq: t.events.length + 1, ts: now(), type, payload };
     t.events.push(ev); t.thread.updated = ev.ts;
@@ -343,6 +345,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
   async function seed() {
     if (seeded) return seeded;
     seeded = (async () => {
+      proj.seed();
       const t = newThread({ title: 'Fox in the snow' });
       const q = QUESTIONS.slice(0, 2), qid = rid('tc_'), cid = rid('tc_'), s = rid('s_');
       const tool = await toolSchema('comfy_generate_image'), out = await makeOutput(t, 'image', 'a red fox in fresh snow, photoreal, 16:9');
@@ -374,27 +377,28 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
   const net = () => new Promise(r => setTimeout(r, (60 + Math.random() * 90) / speed));
   // the agent's list filters: archived false / true / 'all' (both, chat-history 1.1), environments, words in titles and messages
   const inView = (t, archived) => archived === 'all' || !!t.thread.archived === !!archived;
-  const listed = ({ q, archived, environment }) => {
-    const qq = (q || '').toLowerCase(), envs = environment ? String(environment).split(',') : null;
+  const listed = ({ q, archived, environment, project }) => {
+    const qq = (q || '').toLowerCase(), envs = environment ? String(environment).split(',') : null, projs = project ? String(project).split(',') : null;
     return [...threads.values()].filter(t => inView(t, archived)).filter(t => !envs || envs.includes(t.thread.settings?.environment || 'default'))
+      .filter(t => !projs || projs.includes(t.thread.settings?.project || 'none'))   // plan projects 1.3
       .filter(t => !qq || t.thread.title.toLowerCase().includes(qq) || t.events.some(e => ['user', 'assistant'].includes(e.type) && String(e.payload.text).toLowerCase().includes(qq)));
   };
   return {
     live: false,
     async models() { await net(); return structuredClone(MODELS); },
-    async threads({ q, archived, limit = 200, environment, sort = 'updated', offset = 0 } = {}) {
+    async threads({ q, archived, limit = 200, environment, sort = 'updated', offset = 0, project } = {}) {
       await seed(); await net();
       const order = { title: (a, b) => a.thread.title.toLowerCase().localeCompare(b.thread.title.toLowerCase()), created: (a, b) => b.thread.created - a.thread.created }[sort]
         || ((a, b) => b.thread.updated - a.thread.updated);
-      return listed({ q, archived, environment }).sort(order).slice(offset, offset + limit).map(pub);
+      return listed({ q, archived, environment, project }).sort(order).slice(offset, offset + limit).map(pub);
     },
-    async threadCount({ q, archived, environment } = {}) { await seed(); await net(); return { count: listed({ q, archived, environment }).length }; },   // chat-history 1.1
-    async threadGroups({ archived } = {}) {   // plan 41.1, as the agent's /v1/threads/groups
+    async threadCount({ q, archived, environment, project } = {}) { await seed(); await net(); return { count: listed({ q, archived, environment, project }).length }; },   // chat-history 1.1
+    async threadGroups({ archived, by: key = 'environment' } = {}) {   // plan 41.1, as the agent's /v1/threads/groups (by project: plan projects 1.2)
       await seed(); await net();
-      const by = new Map();
+      const by = new Map(), field = key === 'project' ? 'project' : 'environment', none = field === 'project' ? 'none' : 'default';
       for (const t of threads.values()) {
         if (!inView(t, archived)) continue;
-        const env = t.thread.settings?.environment || 'default', g = by.get(env) || { environment: env, count: 0, updated: 0, running: 0 };
+        const env = t.thread.settings?.[field] || none, g = by.get(env) || { [field]: env, count: 0, updated: 0, running: 0 };
         g.count += 1; g.updated = Math.max(g.updated, t.thread.updated); g.running += ['running', 'waiting'].includes(t.thread.state) ? 1 : 0;
         by.set(env, g);
       }
@@ -414,14 +418,14 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
       }).sort((a, b) => b.score - a.score).slice(0, limit);
     },
     async create(body = {}) {        // with a message, the thread and its first message at once (chat-responsive 1.2)
-      await net(); const t = newThread(body), m = body.message;
+      await net(); body = proj.newChatBody(body); const t = newThread(body), m = body.message;
       if (!m) return pub(t);
       const event = await this.send(t.thread.id, m.text, m.attachments || [], m.doc_modes || {}, m.quotes || [], m.mentions || [], m.client_id);
       return { ...pub(t), event };
     },
     async get(tid) { await seed(); await net(); return pub(T(tid)); },
     async patch(tid, p) { await net(); const t = T(tid); for (const k of ['title', 'model', 'mode', 'archived']) if (p[k] != null) t.thread[k] = p[k];
-      if (p.settings) t.thread.settings = { ...t.thread.settings, ...p.settings }; t.thread.updated = now(); return pub(t); },
+      if (p.settings) t.thread.settings = proj.movePatch(t.thread.settings, p.settings); t.thread.updated = now(); return pub(t); },
     async remove(tid) { await net(); const t = T(tid); t.run?.cancel(); threads.delete(tid); return { deleted: tid }; },
     async events(tid, after = 0) { await net(); return T(tid).events.filter(e => e.seq > after); },
     stream(tid, after = 0, { onEvent, onReady, onState } = {}) {
@@ -550,6 +554,7 @@ export function createMockClient(api, { speed = 1, history = true } = {}) {
       const row = { name, description: `Copied from ${body.id}`, source: 'user', id: 'user/' + name, enabled: true, problems: [], from: { kind: 'workspace', id: body.id } };
       settings.skills = [...settings.skills.filter(k => k.id !== row.id), row]; return structuredClone(row); },
     async setSkill(name, enabled) { await net(); const k = settings.skills.find(x => x.id === 'user/' + name); if (k) k.enabled = enabled; return structuredClone(k); },
+    ...Object.fromEntries(Object.entries(proj).filter(([k]) => !['newChatBody', 'movePatch', 'seed'].includes(k))),   // plan projects 1.3
     async deleteSkill(name) { await net(); settings.skills = settings.skills.filter(x => x.id !== 'user/' + name); return { deleted: name }; },
   };
 }

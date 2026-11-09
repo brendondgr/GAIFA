@@ -44,14 +44,17 @@ class Env:
     folders: list[Folder] = field(default_factory=list)
     created: float = 0.0
     updated: float = 0.0
+    project: str | None = None      # a project's own folders (plan projects 2.1): hidden from the lists
 
     def public(self, caps: Caps) -> dict[str, Any]:
         return {"id": self.id, "name": self.name, "default": self.id == DEFAULT, "none": self.id == NONE, "created": self.created,
-                "updated": self.updated, "folders": [f.public(caps) for f in self.folders]}
+                "updated": self.updated, "folders": [f.public(caps) for f in self.folders],
+                **({"project": self.project} if self.project else {})}
 
     def raw(self) -> dict[str, Any]:
         return {"id": self.id, "name": self.name, "created": self.created, "updated": self.updated,
-                "folders": [{k: getattr(f, k) for k in FOLDER_KEYS} for f in self.folders]}
+                "folders": [{k: getattr(f, k) for k in FOLDER_KEYS} for f in self.folders],
+                **({"project": self.project} if self.project else {})}
 
 
 def _folder(d: dict[str, Any]) -> Folder | None:
@@ -84,7 +87,8 @@ class Environments:
             if not isinstance(e, dict) or not ENV_ID.match(str(e.get("id") or "")):
                 continue
             fs = [f for f in (_folder(x) for x in e.get("folders") or [] if isinstance(x, dict)) if f is not None]
-            envs.append(Env(e["id"], str(e.get("name") or e["id"])[:64], fs, float(e.get("created") or 0), float(e.get("updated") or 0)))
+            envs.append(Env(e["id"], str(e.get("name") or e["id"])[:64], fs, float(e.get("created") or 0), float(e.get("updated") or 0),
+                            str(e["project"]) if e.get("project") else None))
         if not any(e.id == DEFAULT for e in envs):
             envs.insert(0, Env(DEFAULT, "Default", [], time.time(), time.time()))
         return envs
@@ -118,6 +122,10 @@ class Environments:
         """None first, then the stored ones."""
         return [_none(), *self._load()]
 
+    def listed(self) -> list[Env]:
+        """What the Workspace page and the chat's environment chip list: every one but the projects' own (plan projects 2.1)."""
+        return [e for e in self.all() if not e.project]
+
     def get(self, eid: str | None) -> Env:
         """An environment by id; unknown → 404."""
         for e in self.all():
@@ -132,7 +140,7 @@ class Environments:
         envs = self._load()
         return next((e for e in envs if eid and e.id == eid), None) or next(e for e in envs if e.id == DEFAULT)
 
-    def create(self, name: str, eid: str | None = None) -> Env:
+    def create(self, name: str, eid: str | None = None, project: str | None = None) -> Env:
         name = _name(name)
         with self._lock:
             envs = self._load()
@@ -142,7 +150,7 @@ class Environments:
             if not ENV_ID.match(eid) or eid == NONE or any(e.id == eid for e in envs):
                 raise Refused("bad_id", f"{eid!r} is taken or isn't a valid id", "use lowercase letters, digits, . _ -", 422)
             now = time.time()
-            env = Env(eid, name, [], now, now)
+            env = Env(eid, name, [], now, now, project or None)
             envs.append(env)
             self._save(envs)
             return env

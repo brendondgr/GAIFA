@@ -42,7 +42,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS mem_fts USING fts5(ref UNINDEXED, text, token
 """
 TABLES = {"mem_entities": "id", "mem_aliases": "entity", "mem_anchors": "entity", "mem_facts": "id",
           "mem_fact_entities": "fact"}
-ANCHOR_KINDS = ("workspace", "folder", "git")
+ANCHOR_KINDS = ("workspace", "folder", "git", "project")   # project: the agent's project it belongs to (plan projects 4.2)
 
 
 def new_id(prefix: str) -> str:

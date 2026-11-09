@@ -1,6 +1,8 @@
 // The Chat page (plan 14.1, Wire — Phase 14): thread list, thread view and composer for the agent
 // mod. A plain ES module on the page's React; Hub.dc.html mounts `ChatPage` for #/chat,
-// #/chat/<thread id> and #/chat/all (every chat, chat-all.js; thread ids start with t_, so they never clash). Written by us (web/PATCHES.md). The page keeps the list and what every chat shares;
+// #/chat/<thread id>, #/chat/all (every chat, chat-all.js), #/chat/projects (the projects grid, chat-projects.js; plan
+// projects 5.1) and #/chat/projects/<id> (a project's page, chat-project.js); the last three are drawn in the main area
+// instead of the panes (thread ids start with t_, so they never clash). Written by us (web/PATCHES.md). The page keeps the list and what every chat shares;
 // each open chat is a `ChatPane` (chat-pane.js, chat-split plan 1.2).
 //
 // Extending the chat (the modularity contract, brief §11.13): import from this file
@@ -27,6 +29,9 @@ import { GroupedChats, readView, saveView, viewOfUi, loadEnvs, archivedParam, gr
 import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
 import { SplitView, SPLIT_CSS } from './chat-split.js';
+import { ProjectsPage, ProjectsEntry, PROJECTS_CSS } from './chat-projects.js';
+import { ProjectChats } from './chat-project-groups.js';
+import { ProjectPage } from './chat-project.js';
 import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout } from './chat-layout.js';
 import { CONTROLS_CSS } from './chat-controls.js';
 import { QUOTE_CSS } from './chat-quote.js';
@@ -59,7 +64,7 @@ function injectCss() {
   if (typeof document === 'undefined' || document.getElementById('aichat-css')) return;
   installCopy();
   const s = document.createElement('style');
-  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + CONTROLS_CSS + QUOTE_CSS + QREPLY_CSS + SPLIT_CSS + PAGE_CSS;
+  s.id = 'aichat-css'; s.textContent = MD_CSS + CARD_CSS + ACTIVITY_CSS + LIST_CSS + CONTROLS_CSS + QUOTE_CSS + QREPLY_CSS + SPLIT_CSS + PROJECTS_CSS + PAGE_CSS;
   document.head.appendChild(s);
 }
 /** What a mod's chat module gets (plan 44.1). */
@@ -72,12 +77,20 @@ function withRoute(L, tid) {
   const open = panes(L.root).find(p => p.tid === tid);
   return open ? setActive(L, open.id) : setTid(L, activePane(L).id, tid);
 }
+/** What the route draws in the main area: a page of its own (`{page: 'all'}`, chat-history 3.1; `{page: 'projects'}`,
+ * `{page: 'project', pid}`, plan projects 5.1–5.2), or null for the chats' panes. Thread ids start with t_, so they never clash. */
+export function subPage(route) {
+  const p = route?.parts || [];
+  if (p[1] === 'all') return { page: 'all' };
+  if (p[1] !== 'projects') return null;
+  return p[2] ? { page: 'project', pid: decodeURIComponent(p[2]) } : { page: 'projects' };
+}
 const MAX_PANES = 4;   // while each pane opens its own stream: a browser keeps about six connections to the hub (plan chat-split 2.3)
 const DOWN = new Set(['service_not_running', 'service_not_found', 'service_failed', 'upstream_error', 'hub_error']);
 
 export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, openSessions, go = x => { location.hash = x; } }) {
   const React = R(), { useState, useEffect, useRef, useMemo } = React;
-  const c = getChatClient(api), allPage = route?.parts?.[1] === 'all', tid = allPage ? null : route?.parts?.[1] || null;   // chat-history 3.1
+  const c = getChatClient(api), sub = subPage(route), allPage = sub?.page === 'all', tid = sub ? null : route?.parts?.[1] || null;   // chat-history 3.1, projects 5.1
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
   const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [total, setTotal] = useState(null);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
@@ -91,15 +104,15 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const [layout, setLayout] = useState(() => withRoute(loadLayout() || single(tid), tid));
   const lref = useRef(layout); lref.current = layout;
   useEffect(() => { saveLayout(layout); }, [layout]);
-  const mounted = useRef(false), wasAll = useRef(allPage);
+  const mounted = useRef(false), wasSub = useRef(!!sub);
   useEffect(() => {      // a link, the list or Back: that chat in view (#/chat: the active pane becomes a new chat)
-    const back = wasAll.current; wasAll.current = allPage;
+    const back = wasSub.current; wasSub.current = !!sub;
     if (!mounted.current) { mounted.current = true; return; }
-    if (allPage || (back && !tid)) return;   // Show all, and back from it: the panes stay as they were
+    if (sub || (back && !tid)) return;   // a page in the main area (Show all, projects), and back from it: the panes stay as they were
     setLayout(L => (tid ? withRoute(L, tid) : setTid(L, activePane(L).id, null)));
-  }, [tid, allPage]);
+  }, [tid, sub?.page]);
   const act = activePane(layout);
-  useEffect(() => { if (!allPage && (act.tid || null) !== tid) go(act.tid ? '#/chat/' + act.tid : '#/chat'); }, [act.id, act.tid]);   // not on allPage: leaving Show all is the route's
+  useEffect(() => { if (!sub && (act.tid || null) !== tid) go(act.tid ? '#/chat/' + act.tid : '#/chat'); }, [act.id, act.tid]);   // not on a page: leaving it is the route's
   const bus = useRef(null); if (!bus.current) bus.current = new EventTarget();
   const setListView = v => saveView(v);
   const relist = () => setListKey(n => n + 1);
@@ -159,9 +172,17 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     patched(n); relist();
     toast(`Moved to ${(envs || []).find(e => e.id === env)?.name || env}`, 'success');
   }, fail);
-  const newIn = env => newChat(env);
+  const newIn = env => { newChat(env); if (sub) go('#/chat'); };
+  const [projects, setProjects] = useState([]);       // plan projects 5.3: Move to… lists them
+  const loadProjects = () => c.projects?.().then(setProjects, () => setProjects([]));
+  useEffect(() => { loadProjects(); const w = c.watchProjects?.(() => loadProjects()); return () => w?.close(); }, []);
+  const newInProject = p => { setCmd(x => ({ n: (x?.n || 0) + 1, type: 'new', project: p || null, pane: lref.current.active })); setDrawer(false); if (sub) go('#/chat'); };   // 5.4
+  const moveProject = (t, pid) => c.patch(t.id, { settings: { project: pid } }).then(n => {
+    patched(n); relist();
+    toast(pid ? `Moved to the project ${projects.find(p => p.id === pid)?.name || ''}` : 'Removed from the project', 'success');
+  }, fail);
   const itemProps = t => ({ moveTo: (envs || []).filter(e => e.id !== ((t.settings || {}).environment || (envs || []).find(x => x.default)?.id)),
-    onMove: envs ? env => move(t, env) : null });
+    onMove: envs ? env => move(t, env) : null, projects, onProject: c.projects ? pid => moveProject(t, pid) : null });
   const remove = async t => {
     const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: 'The chat and its history are deleted. Its outputs stay in Outputs.', confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
     if (!ok) return;
@@ -182,24 +203,29 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
 
   // ---- render ----
   const renderItem = t => h(Item, { key: t.id, t, active: t.id === tid, onOpen: () => setDrawer(false), onRename: v => rename(t, v), onArchive: () => archive(t), onDelete: () => remove(t), ...itemProps(t) });
-  const grouping = groupOf(listView, { envs: !!envs && !!c.threadGroups });   // Environment needs the workspace mod; else Date or None
+  const grouping = groupOf(listView, { envs: !!envs && !!c.threadGroups, projects: !!c.threadGroups && projects.length > 0 });   // Environment needs the workspace mod, Project some projects; else Date or None
   const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: setQ,
-    showAll: grouping !== 'environment' || q.trim() ? showAllOf(threads.length, total, LIST_PAGE) : null,   // chat-history 2.4: 20, then Show all
+    showAll: !['environment', 'project'].includes(grouping) || q.trim() ? showAllOf(threads.length, total, LIST_PAGE) : null,   // chat-history 2.4: 20, then Show all
     onShowAll: () => { setDrawer(false); go('#/chat/all' + (q.trim() ? '?q=' + encodeURIComponent(q.trim()) : '')); },
     onNew: () => newChat(), onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
-    view: listView, onView: setListView, canGroup: !!envs, itemProps,
-    groupLabel: grouping === 'date' ? 'Chats by date' : 'Chats by environment',
+    view: listView, onView: setListView, canGroup: !!envs, canProjects: projects.length > 0, itemProps,
+    projectsRow: c.projects ? h(ProjectsEntry, { projects, active: !!sub && sub.page !== 'all', go, onGo: () => setDrawer(false) }) : null,   // plan projects 5.4
+    groupLabel: grouping === 'date' ? 'Chats by date' : grouping === 'project' ? 'Chats by project' : 'Chats by environment',
     grouped: grouping === 'environment' ? h(GroupedChats, { c, api, envs, view: listView, onView: setListView, known: threads, reloadKey: listKey,
       renderItem, onNewIn: newIn, onEnvsChanged: loadEnvList, onError: fail, go })
+      : grouping === 'project' ? h(ProjectChats, { c, projects, view: listView, onView: setListView, known: threads, reloadKey: listKey,   // plan projects 5.4
+        renderItem, onNewIn: newInProject, onError: fail, go })
       : grouping === 'date' && threads.length ? h(DateSections, { threads, view: listView, renderItem }) : null });   // chat-history 2.3
   return h('div', { ref: rootRef, style: { display: 'flex', height: '100%', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.bg } },
     narrow ? null : h('div', { style: { width: 248, flex: 'none', borderRight: '1px solid ' + T.bd, minHeight: 0 } }, list),
     narrow && drawer ? h(React.Fragment, null,
       h('div', { onClick: () => setDrawer(false), 'aria-hidden': true, style: { position: 'absolute', inset: 0, zIndex: 40, background: T.ov } }),
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
-    allPage ? h(AllChats, { c, view: listView, onView: setListView, envs, q0: route?.params?.q || '', reloadKey: listKey, bus: bus.current, itemProps,
+    allPage ? h(AllChats, { c, view: listView, onView: setListView, envs, projects, project0: route?.params?.project || '', q0: route?.params?.q || '', reloadKey: listKey, bus: bus.current, itemProps,
       actions: { rename, archive, remove }, onError: fail, onMenu: narrow ? () => setDrawer(true) : null,
       onBack: () => go(act.tid ? '#/chat/' + act.tid : '#/chat') }) :
+    sub?.page === 'projects' ? h(ProjectsPage, { c, toast, go, onMenu: narrow ? () => setDrawer(true) : null }) :
+    sub?.page === 'project' ? h(ProjectPage, { key: sub.pid, shared: sh, pid: sub.pid, go }) :
     h(SplitView, { layout, setLayout, narrow, maxPanes: c.live && !c.sharedStream ? MAX_PANES : Infinity, onRefuse: m => toast(m, 'error'),
       titleOf: id => threads.find(t => t.id === id)?.title || null,
       renderPane: (p, { active, tools, grip }) => h(ChatPane, { shared: sh, tid: p.tid, paneId: p.id, cmd, grip, paneTools: tools,

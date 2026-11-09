@@ -112,3 +112,46 @@ export function EnvChip({ api, thread, value, onChange, stamp = 0, narrow = fals
       h('div', { style: { fontSize: 11.5, color: T.mut } }, 'The agent can ask to read another folder you name; you choose this chat only, or the environment.'),
       h('a', { href: '#/s/workspace/environments', onClick: () => setOpen(false), style: { fontSize: 12.5 } }, 'Manage environments…')));
 }
+
+// ---------- a project chat (plan projects 5.3) ----------
+/** The project chip's label: the project's name (its own label until the project has loaded). */
+export const projectChipText = (p, pid) => p?.name || (pid ? 'Project' : '');
+
+/** What the project chip's menu lists: the project's environments (names and folders, primary first) and its own
+ * folders, each `{name, folders: [{path, level}]}`; an environment the list doesn't know is shown by its id. */
+export function projectFolderGroups(p, envs, own = []) {
+  const out = (p?.environments || []).map((id, i) => {
+    const e = (envs || []).find(x => x.id === id);
+    return { id, name: (e?.name || id) + (i === 0 ? ' (primary)' : ''), folders: (e?.folders || []).map(f => ({ path: f.path, level: f.level })) };
+  });
+  if ((own || []).length) out.push({ id: 'own', name: 'Its own folders', folders: own.map(f => ({ path: f.path, level: f.level })) });
+  return out;
+}
+
+/** Move to… (the sidebar's ⋯ menu; the user's ask, 2026-11-08): two groups, Projects (each project but the chat's own,
+ * and No project when it is in one) and Environments (as before; a project chat's are its project's, so the group is
+ * replaced by a note), each with a line on what a move does. */
+export function moveGroups(t, projects = [], envs = []) {
+  const cur = t?.settings?.project || null;
+  const inProject = !!cur;
+  const projectRows = [...(projects || []).filter(p => p.id !== cur).map(p => ({ kind: 'project', id: p.id, label: p.name })),
+    ...(inProject ? [{ kind: 'project', id: null, label: 'No project' }] : [])];
+  const groups = [];
+  if (projectRows.length) {
+    groups.push({ key: 'projects', label: 'Projects', rows: projectRows,
+      hint: inProject ? 'Moves the chat to that project, or out of projects (it keeps its folders’ environment).'
+        : 'Moves the chat into the project: its folders and instructions apply; the model and mode stay.' });
+  }
+  if (inProject) {
+    const p = (projects || []).find(x => x.id === cur);
+    groups.push({ key: 'environments', label: 'Environments', rows: [], hint: `In ${p?.name || 'a project'}, the chat uses the project’s environments: change them on the project’s page.` });
+  } else if ((envs || []).length) {
+    groups.push({ key: 'environments', label: 'Environments', rows: envs.map(e => ({ kind: 'environment', id: e.id, label: e.name })),
+      hint: 'Moves the chat to another set of workspace folders.' });
+  }
+  return groups;
+}
+
+/** The settings a new chat in a project starts with (plan projects 5.2, 5.4; the agent fills the rest of its defaults). */
+export const newChatPreset = p => ({ model: p?.defaults?.model || null, mode: p?.defaults?.mode || 'manual',
+  settings: { project: p.id, ...((p.environments || [])[0] ? { environment: p.environments[0] } : {}) } });

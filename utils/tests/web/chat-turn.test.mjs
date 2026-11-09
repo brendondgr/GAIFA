@@ -217,3 +217,21 @@ test('a step is described by the arguments that ran: the approved ones, else the
   assert.equal(act.statusText({ kind: 'waiting', question: true }).text, 'Waiting for your answer below');
   assert.equal(act.fmtDur(178), '2m 58s');
 });
+
+test('a project_refresh event is a step of its turn: "Refreshed 2 pages" (plan projects 3.5)', async () => {
+  const steps = await load('chat/chat-steps.js');
+  const evs = [{ seq: 1, ts: 10, type: 'user', payload: { text: 'how much ice did the Alps lose?' } },
+    { seq: 2, ts: 11, type: 'project_refresh', payload: { for: 1, pages: [{ sid: 'src_a', title: 'Alps melt', ok: true }, { sid: 'src_b', title: 'WGMS', ok: true }] } },
+    { seq: 3, ts: 12, type: 'assistant', payload: { text: 'Five percent.', step: 's1' } }];
+  const view = th.buildView(evs);
+  const it = view.items.find(i => i.call?.name === 'project_refresh');
+  assert.equal(it.kind, 'tool'); assert.equal(it.result.status, 'done');
+  const [t] = ct.groupTurns(view, { now: 20 }).filter(b => b.kind === 'turn');
+  assert.ok(rowTypes(t).flat().includes('tool:project_refresh:done'));
+  const w = steps.stepText('project_refresh', { args: it.call.arguments, done: true });
+  assert.equal(w.label, 'Refreshed 2 pages'); assert.equal(w.detail, 'Alps melt, WGMS'); assert.equal(w.icon, 'globe');
+  const half = steps.stepText('project_refresh', { args: { pages: [{ title: 'a', ok: true }, { title: 'b', ok: false, slow: true }] }, done: true });
+  assert.equal(half.label, 'Refreshed 1 of 2 pages');
+  const failed = th.buildView([evs[0], { ...evs[1], payload: { for: 1, pages: [{ sid: 'src_a', title: 'A', ok: false, error: 'timed out' }] } }]);
+  assert.equal(failed.items.find(i => i.call?.name === 'project_refresh').result.status, 'error');
+});

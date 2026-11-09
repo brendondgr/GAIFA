@@ -688,7 +688,7 @@ class NavSettings(_Model):
 class ChatListSettings(_Model):
     """`[ui.chat.list]`: the chat list's View menu."""
     show: Literal["chats", "archived", "both"] = Field("chats", description="Live chats, archived ones, or both")
-    group: Literal["environment", "date", "none"] = "environment"
+    group: Literal["environment", "project", "date", "none"] = "environment"   # project: plan projects 5.4
     env_order: Literal["activity", "name", "created"] = "activity"
     chat_order: Literal["updated", "title", "created"] = "updated"
     collapsed: list[str] = Field([], description="Environment ids whose section is folded")

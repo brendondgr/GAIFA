@@ -1,6 +1,6 @@
 # Plan: projects: chats with standing instructions, files, live web pages, folders and their own memory
 
-**Asked for:** 2026-11-08 · **Status:** Planned
+**Asked for:** 2026-11-08 · **Status:** In progress
 
 ## 1. Introduction
 
@@ -35,8 +35,8 @@ Answered by the user on 2026-11-08:
 - **Deleting a project:** its chats become ordinary chats, still in history. Its memory entity stays in Memory, where it can be deleted, with its project anchor removed. Its uploaded files stay in Outputs. Only the project record, its instructions, its page links, its embed collection and its hidden environment go. The confirm dialog says all of this.
 
 Assumed:
-- **Scheduled tasks** (the screenshot's last panel) are out of scope. A later plan adds them.
-- **A chat belongs to at most one project.** A chat can be moved into a project or out of one from its ⋯ menu (**Move to project…**, **Remove from project**). Moving it in applies the project's environment, but not its model or mode: those stay as the chat had them. A new chat started in a project takes all of the project's defaults.
+- **Scheduled tasks** (the screenshot's last panel) are out of scope. A later plan adds them (confirmed by the user, 2026-11-08).
+- **A chat belongs to at most one project** (confirmed by the user, 2026-11-08). A chat can be moved into a project or out of one from its ⋯ menu's **Move to…**, which lists Projects (and No project) above Environments (the user's ask, 2026-11-08; see 5.3). Moving it in applies the project's environment, but not its model or mode: those stay as the chat had them. A new chat started in a project takes all of the project's defaults.
 - **Instructions:** plain text (markdown), up to 16 000 characters, in the prompt of every project chat right after AGENT.md. Instruction files in the project's folders (CLAUDE.md, AGENTS.md…) keep working as they do now (skill-sources 2.2).
 - **Always-on skills:** each skill's SKILL.md body is put into the prompt of the project's chats, up to 8 000 characters in total (the rest are listed first among the skills, marked "this project uses"). Skills keep their ids (`<folder>:<skill>` or the agent's own).
 - **Tool groups and MCP servers:** stored as the thread settings they already are (`disabled`, `pinned`, `mcp_on`) and copied onto each new project chat. The composer's controls still change them per chat.
@@ -52,7 +52,7 @@ Assumed:
 
 ## Phase 1 — Projects in the agent (M)
 
-- [ ] **1.1 The store: `services/agent/agent/projects/__init__.py`, `projects/store.py` (new).**
+- [x] **1.1 The store: `services/agent/agent/projects/__init__.py`, `projects/store.py` (new).**
   - **Tables in `agent.db`:**
     - `projects(id, name, description, instructions, environments JSON, own_env, defaults JSON, memory_entity, pinned, created, updated)`;
     - `project_sources(id, project_id, kind 'file'|'page', output_id, url, title, max_age_s, fetched, chars, status 'ok'|'fetching'|'error', error, added, position)`.
@@ -60,7 +60,7 @@ Assumed:
   - **`ProjectStore`:** `create`, `get`, `list(q, sort)`, `update`, `delete`, `sources(pid)`, `add_source`, `update_source`, `remove_source`, `reorder`.
   - **Thread link:** `threads.settings.project` names the project. Add `PROJ_OF` beside `ENV_OF` in `store.py`, so `Store.threads(project=[…])` and `Store.groups(by="project")` work. The value `none` means chats without a project.
   *Done when:* `services/agent/tests/test_projects_store.py` covers create, update, list with search and sort, sources added, reordered and removed, the 200-source limit, and thread filters by project (including `none`).
-- [ ] **1.2 Routes: `services/agent/agent/api_projects.py` (new), `server.py`.**
+- [x] **1.2 Routes: `services/agent/agent/api_projects.py` (new), `server.py`.**
   - **Projects:** `GET/POST /v1/projects`, `GET/PATCH/DELETE /v1/projects/{pid}`.
   - **Chats:** `GET /v1/projects/{pid}/threads` (the same query as `/v1/threads`). `POST /v1/threads` accepts `settings.project`: a new chat in a project takes the project's defaults (model, mode, `disabled`, `pinned`, `mcp_on`) and its primary environment as `settings.environment`, under anything the request sets itself. `PATCH /v1/threads/{id}` with `settings.project` moves a chat in (environment set, nothing else) or out (`null`: project removed, environment kept).
   - **Delete:** clears `settings.project` from its chats, drops its sources and embed collection (Phase 3), asks the workspace mod to delete its hidden environment (Phase 2), and removes the project anchor from its memory entity (Phase 4). Each step is skipped when its mod is off, and logged.
@@ -76,16 +76,18 @@ Assumed:
     - the `project` event.
 
   Update architecture §14.1 (the agent's routes).
-- [ ] **1.3 Client and mock: `web/chat/chat-api.js`, `chat-mock.js`.** `c.projects({q, sort})`, `c.project(pid)`, `c.createProject`, `c.patchProject`, `c.deleteProject`, `c.projectThreads(pid, opts)`, `c.threadGroups({by})`, and for sources `c.addSource`, `c.patchSource`, `c.removeSource`, `c.refreshSource`. The mock keeps two fixture projects, one with files and pages.
+  *As built:* `project` events belong to no chat, so they go to the `/v1/streams` connections opened with `watch=projects` (`Live.broadcast`), not to every chat's stream. A project with no environments sets none on its chats: they keep their own. The project's `chats` and `source_count` come with each row. Delete, creation and changes run hook lists on the agent (`project_cleanup`, `project_created`, `project_changed`) that later phases fill.
+- [x] **1.3 Client and mock: `web/chat/chat-api.js`, `chat-mock.js`.** `c.projects({q, sort})`, `c.project(pid)`, `c.createProject`, `c.patchProject`, `c.deleteProject`, `c.projectThreads(pid, opts)`, `c.threadGroups({by})`, and for sources `c.addSource`, `c.patchSource`, `c.removeSource`, `c.refreshSource`. The mock keeps two fixture projects, one with files and pages.
   *Done when:* `utils/tests/web/chat.test.mjs` covers the project calls on the mock.
+  *As built:* the mock's projects are in `web/chat/chat-mock-projects.js` (chat-mock.js was at 549 lines), spread into the mock client; `c.threads({project})` filters too. The client also has `c.watchProjects(onEvent)` (an EventSource on `/v1/streams?threads=&watch=projects`, see 1.2) and, ahead of 2.3 and 4.2, `c.projectFolders`, `c.addProjectFolder`, `c.patchProjectFolder`, `c.removeProjectFolder`, `c.projectMemory`, `c.patchProjectFact` and `c.forgetProjectFact` (the last two through the existing memory routes).
 
 **Checks & deliverables — Phase 1**
-- [ ] `services/agent/tests` and `uv run pytest` are green.
-- [ ] Delivered: `projects/store.py`, `api_projects.py`, the changed `store.py`, `server.py`, `chat-api.js`, `chat-mock.js`, and tests.
+- [x] `services/agent/tests` and `uv run pytest` are green.
+- [x] Delivered: `projects/store.py`, `api_projects.py`, the changed `store.py`, `server.py`, `chat-api.js`, `chat-mock.js`, and tests.
 
 ## Phase 2 — Folders across environments (M)
 
-- [ ] **2.1 Several environments in an origin: `services/workspace/folders.py`, `environments.py`, `api_env.py`.**
+- [x] **2.1 Several environments in an origin: `services/workspace/folders.py`, `environments.py`, `api_env.py`.**
   - **Origin:** `X-GAIFA-Origin` may carry `environments: [ids]` (primary first). `Folders.view(origin)` resolves the union of their folders. A folder that is in more than one gets the highest level any of them gives it. `environment` alone works as before. With both, `environments` wins. The folder grants (`origin.folders`) still add folders at Read. Every route that uses `view` (read, search, edit, run, preflight, undo, skills) gets this for free. Check each one in the tests.
   - **Project environments:** an environment may carry `project: "<pid>"`. `GET /v1/environments` leaves them out unless `?all=1`, and the Workspace page and the chat's environment chip never list them. `POST /v1/environments` takes `project`. `DELETE` works on them as on any environment, except the Default one.
   *Done when:* `services/workspace/tests/test_environments.py` (extended) and `test_origin_envs.py` (new) cover:
@@ -97,7 +99,8 @@ Assumed:
     - project environments hidden from the list.
 
   Update architecture §4.2/§10 where the workspace mod's origin is described, and `docs/mods.md` if it documents `X-GAIFA-Origin`.
-- [ ] **2.2 The agent sends a project's environments: `services/agent/agent/projects/origin.py` (new), `hubapi.py`, `loop.py`, `context.py`, `local.py`, `prompts.py`.**
+  *As built:* the tests are all in `test_origin_envs.py`. An id in `environments` that names no environment is skipped (all unknown: Default, as for one). `GET /v1/folders` answers the primary as `environment` and, with more than one, `environments`; an explicit `?environment=` (the Workspace page) drops the origin's `environments`. The origin is described in architecture §14.7 (limits); `docs/mods.md` doesn't document the workspace origin, so it is unchanged.
+- [x] **2.2 The agent sends a project's environments: `services/agent/agent/projects/origin.py` (new), `hubapi.py`, `loop.py`, `context.py`, `local.py`, `prompts.py`.**
   - **One helper:** `chat_envs(settings, projects) -> {environment, environments}` replaces the four places that read `settings.environment` today (`loop.py` ≈ 602, `local.py` ≈ 140, `context.py` ≈ 468/495, `hubapi._chat_origin`). For a project chat it returns the project's environments followed by its own hidden one. Otherwise it returns the chat's environment, as now.
   - **The prompt's Environment note** (`prompts.py` ≈ 140) names the project and each of its environments.
   *Done when:* `services/agent/tests/test_project_folders.py` covers:
@@ -106,19 +109,22 @@ Assumed:
     - the folders note listing the project's folders from each environment.
 
   `test_environments.py` still passes.
-- [ ] **2.3 The project's own folders: `api_projects.py`.**
+  *As built:* the hub client's `chat_folders`, `chat_skills` and `chat_skill_read` take the helper's dict in place of an environment id, and `context.chat_folders`/`chat_skills` take the agent's `ProjectStore`. A project that lists no environments lends the chat's own (else Default) as its primary. `/v1/skills/copy` (Settings → Skills) still names one environment, as before.
+- [x] **2.3 The project's own folders: `api_projects.py`.**
   - `POST /v1/projects/{pid}/folders {path, level}` makes the hidden environment the first time (`POST /api/s/workspace/v1/environments {name: "<project> (project)", project: pid}`) and adds the folder to it. `PATCH` changes a folder's level and `DELETE` removes it.
   - Adding or removing a whole environment is a `PATCH /v1/projects/{pid}` of `environments`.
   - The workspace mod's rules apply unchanged: a folder starts at Read, the GAIFA folder and `data/models/` are capped at Read, and secrets are refused.
   *Done when:* `test_projects_api.py` covers the first folder making the hidden environment, a level change and a removal, with the workspace mod faked.
+  *As built:* the calls are in `projects/folders.py`; `GET /v1/projects/{pid}/folders` lists them. The hidden environment's id is `proj-<the project id's hex>`; when "<project> (project)" is taken (two projects with one name) it is "<project> (project <hex>)". Deleting the project deletes it (`project_cleanup`).
 
 **Checks & deliverables — Phase 2**
-- [ ] On a second hub with the real workspace mod, a project with two environments and one folder of its own: a project chat lists all three folders, edits a file in an Edit folder, and is refused an edit in a Read one.
-- [ ] Delivered: the changed `folders.py`, `environments.py`, `api_env.py`, `projects/origin.py`, the agent's origin call sites, and tests.
+- [x] On a second hub with the real workspace mod, a project with two environments and one folder of its own: a project chat lists all three folders, edits a file in an Edit folder, and is refused an edit in a Read one.
+  *As built (2026-11-08, port 7078, the worktree's agent and workspace mods):* environments Alpha (a folder at Edit) and Beta (one at Read) and a folder of the project's own at Edit; the project chat's `workspace_folders` (run as a button, `/action`, so no model was needed) listed all three with the environments Alpha, Beta and "Live check (project)"; `workspace_edit` in Alpha edited the file; in Beta it was refused (`level`: Beta is at Read). The hidden environment wasn't in `GET /v1/environments`. The model reading the folders note is covered by `test_project_folders.py`.
+- [x] Delivered: the changed `folders.py`, `environments.py`, `api_env.py`, `projects/origin.py`, the agent's origin call sites, and tests.
 
 ## Phase 3 — Knowledge: files and pages (L)
 
-- [ ] **3.1 Sources and their text: `services/agent/agent/projects/sources.py` (new), `api_projects.py`.**
+- [x] **3.1 Sources and their text: `services/agent/agent/projects/sources.py` (new), `api_projects.py`.**
   - **Routes:**
     - `POST /v1/projects/{pid}/sources {kind:'file', output_id}` or `{kind:'page', url, max_age_s?}`;
     - `PATCH …/sources/{sid}` (title, `max_age_s`, position);
@@ -128,24 +134,28 @@ Assumed:
   - **Text:** a file's or page's text is read through the hub's output text routes (`/api/outputs/{id}/text`, the same reader `hub_read_document` uses), in windows of `docs.MAX_FETCH`.
   - **Events:** `project_source` events show the fetching, ok and error states live.
   *Done when:* `services/agent/tests/test_project_sources.py` covers adding a file and a page (hub and web faked), a fetch error keeping the last copy, a refresh replacing the output, and the events.
-- [ ] **3.2 The project's collection: `services/agent/agent/projects/index.py` (new).**
+  *As built:* adding a page answers at once with `status: fetching` and fetches in the background; `refresh` waits for its fetch and answers the source. A file must be a text or document output (`422 not_text` otherwise). The text is kept in memory per output id (64 outputs), since an output's text never changes.
+- [x] **3.2 The project's collection: `services/agent/agent/projects/index.py` (new).**
   - **Indexing:** `chunks(text) -> [{n, text, page?, line}]` (about 3 000 characters with 300 of overlap). `index_source(pid, src)` sends the chunks to the embed mod as `PUT /api/s/embed/v1/texts/proj-<suffix>/<sid>#<n>` with the title, and deletes the source's old chunks first. Removing a source or deleting the project forgets its chunks (`DELETE /v1/texts/{ns}?ids=` / the whole ns).
   - **Search:** `search(pid, query, k)` uses the embed search, or a BM25 fallback over the same chunks kept in `agent.db` (`project_chunks(sid, n, text, page, line)`) when the embed mod is off.
   - **Background work:** indexing runs in a task after a source is added or refreshed, and never holds up a route.
   *Done when:* `services/agent/tests/test_project_index.py` covers the chunk edges, re-indexing replacing old chunks, a search through the faked embed mod, and the BM25 fallback.
-- [ ] **3.3 Knowledge in the prompt: `services/agent/agent/projects/knowledge.py` (new), `loop.py` (`system_prompt`), `prompts.py` (`build`).**
+  *As built:* `ProjectIndex` (the agent's `project_index_store`); the embed ids `<sid>#<n>` go URL-encoded. A chunk ends at the last line break in its final quarter when there is one. A search by meaning that returns none of the kept chunks (not embedded yet) also falls back to words.
+- [x] **3.3 Knowledge in the prompt: `services/agent/agent/projects/knowledge.py` (new), `loop.py` (`system_prompt`), `prompts.py` (`build`).**
   - **Inline or listed:** `project_knowledge(pid, window) -> {mode: 'inline'|'listed', text, tokens}`.
     - *Inline:* while all sources' text fits `project_share` × the model's window, the sources go in full, each inside `<untrusted>` with its title, kind, URL and, for pages, "fetched <age> ago".
     - *Listed:* past that, each source is one line (`src_…`, title, kind, size, age), followed by a line on `project_search` and `project_read`.
   - **Order in `prompts.build`:** new parts `project` (the name, description and instructions, after AGENT.md) and `project_knowledge` (after Skills).
   - **The meter:** the context meter (`context.meter`) counts both parts.
   *Done when:* `services/agent/tests/test_project_prompt.py` covers inline under the budget, listed over it, untrusted wrapping, page ages, the part order, and a plain chat's prompt unchanged.
-- [ ] **3.4 The project tools: `services/agent/agent/projects/tools.py` (new), `local.py`, `tools.py`.**
+  *As built:* `loop.py` was at 963 lines, so its model side (the harness of a chat, `system_prompt`, the window, `messages`, the meter and the model call) moved to `agent/prompting.py` (the `Prompting` mixin); the project parts are added there. Inline sources have numbered lines (cited `src_…:N`). `project_share` is also a row in Settings → Agent → Documents (`chat-settings.js`), and the meter's popover shows *Project* when a chat has it (`chat-header.js`).
+- [x] **3.4 The project tools: `services/agent/agent/projects/tools.py` (new), `local.py`, `tools.py`.**
   - **Tools:** `project_search {query, k?}` (passages with `src_…` and line), `project_read {source, offset?, limit?}` (a window of a source's text, cited as `src_…:line`), and `project_refresh_page {source}`. They are local tools, loaded only in project chats, and never offered at `/mcp`.
   - **Citations:** results start with how to cite them, as workspace reads do (backend-plan 34.6).
   - **Risk:** search and read are read-only. Refresh is a network read of a page the user linked, so it gets no approval card.
   *Done when:* `services/agent/tests/test_project_tools.py` covers each tool and checks that they are absent from a plain chat's tool list.
-- [ ] **3.5 Pages fetched again when a question needs them: `services/agent/agent/projects/fresh.py` (new), `loop.py` (beside `_recall_into`).**
+  *As built:* `Local` mixes in `ProjectTools`; the names are in `LOCAL_NAMES`, and `ToolSet` offers the schemas only when the chat has `settings.project` (a plain chat calling one gets `not_a_project_chat`). `project_` is in `UNTRUSTED_TOOLS`.
+- [x] **3.5 Pages fetched again when a question needs them: `services/agent/agent/projects/fresh.py` (new), `loop.py` (beside `_recall_into`).**
   - **Matching:** for a project chat's user message, `fresh.match(pid, text)` searches the project's collection, keeping only page chunks and grouping them by source. A page counts as matched when its best score is at or above `MATCH_MIN`, or its title or URL words appear in the message. At most 3 pages are matched.
   - **Fetching:** matched pages older than their `max_age_s` (and not set to never) are fetched again in parallel, re-indexed, and a `project_refresh {for: seq, pages:[{sid, title, ok, error?}]}` event is written. The first model call waits for this alongside recall (`RECALL_WAIT_S`). A page that takes longer is used as its last copy, and the prompt says so.
   - **Activity:** the event draws as a step ("Refreshed 2 pages") in the activity fold (`chat-steps.js` `registerStep`).
@@ -157,17 +167,19 @@ Assumed:
     - the event.
 
   Update architecture §14.2 (the `project_refresh` event).
+  *As built:* `MATCH_MIN` is 0.6 (by meaning) and `WORDS_MIN` 1.0 (BM25, without the embed mod); title and URL words count when they are 4+ letters and not common words. The fetches wait `FRESH_WAIT_S` (8 s, under the loop's 10 s recall wait) so the event is written before the model call; a slow page's fetch finishes in the background and the prompt calls its copy "being fetched again; this is the last copy". Eval dry runs never refresh. The step words are in `chat-steps.js` (with the three project tools'), and `chat-thread.js` turns the event into a step row.
 
 **Checks & deliverables — Phase 3**
-- [ ] On a second hub with the web and embed mods: a project with a short PDF and a news page. A question about the page's subject refreshes it (the step shows) and answers from it. An unrelated question refreshes nothing. With 30 large documents the knowledge switches to listed, and `project_search` finds a passage.
-- [ ] Delivered: `projects/sources.py`, `index.py`, `knowledge.py`, `tools.py`, `fresh.py`, the changed `loop.py`, `prompts.py`, `local.py`, and tests.
+- [ ] *(Open: the second hub had neither the web mod's venv nor the embed mod, which needs this GPU; left for the installed hub after the merge. The fetch, re-index, matching and listed/inline switch are covered by `test_project_sources.py`, `test_project_index.py`, `test_project_fresh.py` and `test_project_prompt.py` with the hub, web and embed faked.)* On a second hub with the web and embed mods: a project with a short PDF and a news page. A question about the page's subject refreshes it (the step shows) and answers from it. An unrelated question refreshes nothing. With 30 large documents the knowledge switches to listed, and `project_search` finds a passage.
+- [x] Delivered: `projects/sources.py`, `index.py`, `knowledge.py`, `tools.py`, `fresh.py`, the changed `loop.py`, `prompts.py`, `local.py`, and tests.
 
 ## Phase 4 — Instructions, defaults and project memory (M)
 
-- [ ] **4.1 Skills that are always on: `projects/knowledge.py`, `knowledge.py`.**
+- [x] **4.1 Skills that are always on: `projects/knowledge.py`, `knowledge.py`.**
   - A project's `defaults.skills` are read once per prompt build: through `read_skill`'s path for the agent's own skills, and through `hub.chat_skill_read` for workspace skills. Their bodies go in a "Skills this project uses" block, up to 8 000 characters. Skills over the cap are listed first among the skills.
   *Done when:* `test_project_prompt.py` covers both kinds and the cap.
-- [ ] **4.2 Project memory: `services/agent/agent/memory/model.py`, `store.py`, `profile.py`, `learn.py` / `auto.py`, `api_projects.py`.**
+  *As built:* `knowledge.project_skills`, read with `Knowledge.read` for both kinds (a workspace skill through the chat's project environments); the block opens the Skills section and counts toward the meter's *Project*. A skill that can't be read is left out.
+- [x] **4.2 Project memory: `services/agent/agent/memory/model.py`, `store.py`, `profile.py`, `learn.py` / `auto.py`, `api_projects.py`.**
   - **The entity:** creating a project creates (or adopts, by name) a `project` entity with an anchor `{kind: 'project', value: pid}` (a new anchor kind). Renaming the project renames the entity, so the old name stays as an alias.
   - **`chat_projects`:** also matches a chat whose `settings.project` is the anchor's value.
   - **Kept to its own chats:**
@@ -184,21 +196,24 @@ Assumed:
     - delete removing the anchor and keeping the entity.
 
   `test_memory_prompt.py` and the memory suites still pass. Update `docs/plans/structured-memory.md`'s anchor kinds in passing (one line) and architecture §14 (memory).
+  *As built:* `projects/memory.py` (made in `project_created`, renamed in `project_changed`, unanchored in `project_cleanup`). A name another kind of entry already has makes "<name> (project)". `chat_projects`, `build` and `recall` take the chat's `project`; `private(m, but)` is the set kept to their projects' chats (anchored entities and everything under them). The learner's prompt gets one line naming the project's path. `memory_search` (the tool) is unchanged: it can still find another project's facts when asked. The fact edits go through the existing `/v1/memory/facts/{id}` routes.
 
 **Checks & deliverables — Phase 4**
-- [ ] On a second hub: a project with instructions ("answer in French") and a pinned skill. Its new chat answers in French and quotes the skill's rule. A fact said in it ("our deadline is Dec 1") lands under the project in Memory and isn't in a plain chat's prompt.
-- [ ] Delivered: the changed memory modules, `projects/knowledge.py`, and tests.
+- [x] On a second hub: a project with instructions ("answer in French") and a pinned skill. Its new chat answers in French and quotes the skill's rule. A fact said in it ("our deadline is Dec 1") lands under the project in Memory and isn't in a plain chat's prompt.
+  *As built (2026-11-08, port 7078, the agent on the remote test LLM through localhost:9090, `default-model`, never this GPU):* a project "Glacier thesis" with "Answer in French, always." and the skill `user/house-rule` (end every answer with "-- Règle maison respectée.") always on. Its new chat answered in French and ended with the rule's line; the model filed "our deadline is Dec 1" with `remember` under `projects/Glacier thesis` (a card in Manual mode, approved), and `GET /v1/projects/{id}/memory` listed it. A plain chat asked for any deadline said it knew none. The learner's path (a quiet chat's facts filed under the project) is covered by `test_project_memory.py`, not run live.
+- [x] Delivered: the changed memory modules, `projects/knowledge.py`, and tests.
 
 ## Phase 5 — The UI (L)
 
-- [ ] **5.1 The projects page: `web/chat/chat-projects.js` (new), `chat.js`.**
+- [x] **5.1 The projects page: `web/chat/chat-projects.js` (new), `chat.js`.**
   - **Route:** `#/chat/projects` draws `ProjectsPage` in the main area (as chat-history's Show all does).
   - **Header:** a title "Projects", a search, a sort menu (Recent activity, Name, Created) and **New project**.
   - **Cards:** a two-column grid (one column when narrow). Each card shows an icon, the name and the date of its last activity, and a pin toggle on hover. Pinned cards come first. A card opens `#/chat/projects/<pid>`.
   - **New project:** a dialog asks for the name (required), a description and instructions (optional). It creates the project and opens it.
   - **Empty state:** one line and the New project button.
   *Done when:* `utils/tests/web/chat-projects.test.mjs` (new; sorting, pins first, search) passes. In the browser on the mock, the grid, search, sort, pin and New project work.
-- [ ] **5.2 The project page: `web/chat/chat-project.js`, `chat-project-panels.js` (new).**
+  *As built:* `chat.js`'s `subPage(route)` picks the page (the panes keep their chats while it shows). The sort is kept on the hub (`hub.chat.projects.sort`, ui-store). A card also shows how many chats the project has; a pin isn't activity, so pinning doesn't reorder by recent activity (the store and the mock leave `updated` alone). The grid follows `project` events through `c.watchProjects`. Checked on a second hub (`?mock#/chat/projects`): search, Sort by Name, pin, New project (an empty name refused, then made and opened).
+- [x] **5.2 The project page: `web/chat/chat-project.js`, `chat-project-panels.js` (new).**
   - **Route:** `#/chat/projects/<pid>`.
   - **Left column:**
     - the name (rename in place) and the description;
@@ -214,18 +229,22 @@ Assumed:
     - a **Delete project** link at the bottom, with a confirm that says what stays.
   - **Live updates:** panels follow `project` and `project_source` events.
   *Done when:* `utils/tests/web/chat-project.test.mjs` (new; the panels' pure helpers: page ages, freshness choices, folder order) passes. In the browser on the mock, every panel adds, edits and removes.
-- [ ] **5.3 A project chat: `web/chat/chat-header.js`, `chat-env.js`, `chat-list.js`.**
+  *As built:* the composer is a bare `ChatPane` (`bare`, `preset`, `placeholder`; the composer alone, its controls row included), so its first message makes the chat with `c.create({settings: {project}, message})` and the page opens it at `#/chat/<id>`; the Composer takes a `placeholder`. Show all lists every chat of the project in place (up to 200) until chat-history's Show all page has a project filter (5.4). The panels fold; Defaults starts folded. Folders: drag an environment, or its ↑, to make it the primary. Files: Upload (the hub's upload) or pick a text or document from Outputs. Memory: edit and forget go through `/v1/memory/facts/{id}`; Open in Memory links the agent's Memory page. The project and its sources come from `GET /v1/projects/{id}`, read again on each `project` or `project_source` event for it. Checked on a second hub (`?mock`): rename in place, instructions saved, a file uploaded (and one taken out), a page added, its freshness set to 1 day, refreshed and removed, a fact edited and forgotten, a folder's level changed, a folder added (a typed path: the mock has no folder chooser) and removed, an environment made primary and dropped, a default tool group toggled, a new chat from the composer opening in the panes with the project's mode and model, and Delete project with its confirm.
+- [x] **5.3 A project chat: `web/chat/chat-header.js`, `chat-env.js`, `chat-list.js`.**
   - **Header:** a project chat shows a project chip (the project's name, linking to its page) instead of the environment chip. Its menu lists the project's folders and offers "Remove from project".
   - **Chat menu:** the chat's ⋯ menu gains **Move to project…** (a list of projects) and **Remove from project**.
   - **Composer:** a new chat started from a project's page keeps the project when it opens in a pane.
   *Done when:* `utils/tests/web/chat-env.test.mjs` / `environments.test.mjs` cover the project chip's choice of label and menu. In the browser on the mock, Move to project and Remove work.
-- [ ] **5.4 The sidebar: Projects under New, and Group by Project: `web/chat/chat-list.js`, `chat-groups.js`, `chat-all.js`.** *Needs chat-history Phase 2 (and 3 for the Show all filter) merged first.*
+  *As built:* at the user's ask (2026-11-08) there is no separate Move to project…: the chat's ⋯ **Move to…** (key M) lists two groups, **Projects** (each project but the chat's own, and **No project** when it is in one) and **Environments** (as before), each with a line on what a move does ("Moves the chat into the project: its folders and instructions apply; the model and mode stay."); for a project chat the environment list is replaced by a note that it uses the project's environments (`moveGroups` in `chat-env.js`). The environment control moved to the row under the message box in plan 42.3, so the project chip (`ProjectMenu`, `chat-controls.js`) takes its place there: the project's name; its menu opens the project, lists its environments' folders (the primary marked) and its own, and offers Remove from project for a chat already made. The page loads the projects for Move to… and follows `project` events. Checked on the mock: a chat moved into Thesis from Move to…, its chip and menu, Remove from project (the environment chip comes back), and No project offered for a project chat.
+- [x] **5.4 The sidebar: Projects under New, and Group by Project: `web/chat/chat-list.js`, `chat-groups.js`, `chat-all.js`.** *Needs chat-history Phase 2 (and 3 for the Show all filter) merged first.*
   - **Projects entry:** a **Projects** row under **New** (icon, label, chevron). The row opens `#/chat/projects`. The chevron opens a dropdown with pinned projects, then the most recent, up to 8, then **All projects**. Whether the dropdown is open is page state.
   - **Group by Project:** `GROUP_BY` gains `['project', 'Project']`. It draws a section per project (5 chats, then Show more, as environments do; `c.threadGroups({by: 'project'})`, `c.threads({project})`), then **No project**. Each section header has New chat in the project and a ⋯ menu with Open project.
   - **Show all:** the page gains a project filter.
   *Done when:* `chat-groups.test.mjs` covers project sections, their order and No project. In the browser on the mock, the Projects row, its dropdown and Group by Project work. Update the brief §11.13 and `web/PATCHES.md` (one entry for the Projects UI).
-- [ ] **5.5 Docs: `docs/structure.md`, `web/PATCHES.md`, `docs/architecture.md` §14, the palette (`web/Hub.dc.html`).** The palette gains "Projects" and each project by name ("Project: <name>"). The structure doc lists every new file.
+  *As built (after merging chat-history):* the sections are `chat-project-groups.js` (`projectRows`, `ProjectChats`; pinned projects first, then *Projects by*, the View menu's order choice, with Environments by's values), and a project whose chats are all elsewhere in this view isn't shown; collapsed sections are saved as `p:<id>` beside the environments'. Group by: Project is offered when the agent has projects (`GROUP_NEEDS.project`); the hub's `[ui.chat.list] group` takes "project" (`utils/config.py`, `api_models.py`, `config.example.toml`). A section's `+` makes a new chat with the project's defaults (`newChatPreset`, now in `chat-env.js`); a plain New drops a project the pane had. The Show all page's Project filter is a select (All chats, each project, No project) and `?project=`; the project page's Show all opens it. Checked on the mock: the Projects row and its dropdown (Thesis, Garden planner, All projects), Group by: Project (Thesis, Garden planner, No project with Show more · 22), New chat in Thesis (its chip and Accept edits), then a plain New without it, and Show all filtered to Thesis and to No project.
+- [x] **5.5 Docs: `docs/structure.md`, `web/PATCHES.md`, `docs/architecture.md` §14, the palette (`web/Hub.dc.html`).** The palette gains "Projects" and each project by name ("Project: <name>"). The structure doc lists every new file.
   *Done when:* the docs and web tests are green.
+  *As built:* the palette lists Projects among its pages and "Project: <name>" for each project, loaded with the palette through the chat client (so `?mock` has them too); `chat-projects.test.mjs` checks both. `web/PATCHES.md` has one entry (81) for the whole Projects UI; the structure doc lists every new file (the agent's `projects/` package and `prompting.py`, the five new chat modules); architecture §14.1 has a Projects part per phase, §14.2 the `project_refresh` event, §14.7 the workspace origin's `environments`; the brief §11.13 the Projects UI. Checked on the mock: the palette's "project" finds Projects, Project: Thesis and Project: Garden planner.
 
 **Wire — Phase 5:** the Chat page's sidebar has Projects, the projects grid, each project's page with its panels, project chats with their chip, and Group by Project.
 
@@ -238,7 +257,7 @@ Assumed:
   - deleting the test project leaves its chat as an ordinary chat.
 
   Screenshots of the projects grid and a project page go with the check.
-- [ ] Delivered: `chat-projects.js`, `chat-project.js`, `chat-project-panels.js`, the changed chat files, the docs, and tests.
+- [x] Delivered: `chat-projects.js`, `chat-project.js`, `chat-project-panels.js`, the changed chat files, the docs, and tests.
 
 ## 4. Deliverables
 

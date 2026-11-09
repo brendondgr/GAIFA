@@ -276,10 +276,16 @@ def add_routes(app: FastAPI) -> None:
 
     @app.get("/v1/tasks/{kid}/runs/{rid}/log", summary="The run's judgement log: each tool call, what came of it (allowed, "
              "refused, denied, asked) and what decided it (pre-allow, rules, judge, mode, you, local), with the reason")
-    def run_log(kid: str, rid: str, request: Request) -> list[dict]:
+    async def run_log(kid: str, rid: str, request: Request) -> list[dict]:
         agent = A(request)
         r = run_or_404(agent, kid, rid)
-        return task_log.log(agent, r["thread_id"]) if r.get("thread_id") else []
+        if not r.get("thread_id"):
+            return []
+        try:                                           # the chat's own grants, to tell its pre-allows from your `always` ones
+            own = {g["id"] for g in await agent.hub._json("GET", "/api/grants", params={"thread": r["thread_id"]})}
+        except Exception:  # noqa: BLE001
+            own = None
+        return task_log.log(agent, r["thread_id"], own)
 
     @app.post("/v1/tasks/{kid}/allow", summary="Add pre-allows (tools, sites, MCP servers) to what the task allows")
     async def add_allows(kid: str, body: Allow, request: Request) -> Any:

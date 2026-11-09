@@ -53,6 +53,9 @@ async def test_the_log_of_an_unattended_run(env):
     log = (await c.get(f"/v1/tasks/{t['id']}/runs/{run['id']}/log")).json()
     rows = {x["tool"]: x for x in log}
     assert (rows["fake_wipe"]["outcome"], rows["fake_wipe"]["by"]) == ("allowed", "pre-allow")
+    from agent.tasks.log import log as task_log
+    mine = task_log(env.agent, run["thread_id"], own=set())                 # a grant not the chat's own: one of yours
+    assert next(x for x in mine if x["tool"] == "fake_wipe")["by"] == "always"
     assert (rows["fake_get"]["outcome"], rows["fake_get"]["by"]) == ("allowed", "mode")
     assert (rows["hub_set_preference"]["outcome"], rows["hub_set_preference"]["by"]) == ("refused", "mode")
     assert "no one is here" in rows["hub_set_preference"]["reason"]

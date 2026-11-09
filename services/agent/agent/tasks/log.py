@@ -3,7 +3,8 @@
 `log(agent, thread_id) -> [{seq, tool, summary, outcome, by, reason}]`:
 - `outcome`: `allowed` (it ran), `refused` (it would have asked; no one was there), `denied` (a rule, the mode or a
   folder's level said no), `asked` (a card, in a test run or after the run) or `pending`;
-- `by`: `pre-allow` (one of the task's grants ran it), `rules` (the judge's rules or your command rules), `judge`
+- `by`: `pre-allow` (one of the run chat's own grants ran it: the task's pre-allows, or one approved in a test run),
+  `always` (one of your grants for every chat, Settings → Permissions), `rules` (the judge's rules or your command rules), `judge`
   (the decision model), `mode` (the mode and the tool's risk, your permission lists, a preflight), `you` (a card you
   decided), `local` (the agent's own tools: notes, questions, finding tools).
 
@@ -32,7 +33,9 @@ def _summary(name: str, args: Any, judge: dict[str, Any] | None) -> str:
     return f"{name}: {text[:160]}"
 
 
-def log(agent: Any, thread_id: str) -> list[dict[str, Any]]:
+def log(agent: Any, thread_id: str, own: set[str] | None = None) -> list[dict[str, Any]]:
+    """`own`: the ids of the chat's own grants (`GET /api/grants?thread=`); a grant not among them is one of yours
+    for every chat. None: every grant counts as the chat's own."""
     evs = agent.store.events(thread_id, types=("tool_call", "tool_result", "approval", "decision", "call"))
     by_id: dict[str, dict[str, dict[str, Any]]] = {}
     for e in evs:
@@ -51,8 +54,11 @@ def log(agent: Any, thread_id: str) -> list[dict[str, Any]]:
         if name in LOCAL_NAMES and name != "remember":
             outcome = "refused" if err.get("code") == "unattended" else "allowed"
             row.update(outcome=outcome, by="local", reason=err.get("detail") or "the agent's own tool")
-        elif res.get("grant_id") or call.get("grant_id"):
-            row.update(outcome="allowed", by="pre-allow", reason="the task allows it ahead of time")
+        elif gid := res.get("grant_id") or call.get("grant_id"):
+            if own is None or gid in own:
+                row.update(outcome="allowed", by="pre-allow", reason="the task allows it ahead of time")
+            else:
+                row.update(outcome="allowed", by="always", reason="you allow it in every chat (Settings → Permissions)")
         elif dec is not None:
             row.update(outcome="asked", by="you", reason="you approved it" if dec.get("approve") else (dec.get("reason") or "you said no"))
         elif ap is not None:

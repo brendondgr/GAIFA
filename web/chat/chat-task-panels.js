@@ -10,7 +10,7 @@ import { TaskEditor } from './chat-task-edit.js';
 const R = () => globalThis.React;
 const LEVELS = [['read', 'Read'], ['edit', 'Edit'], ['run', 'Run'], ['run_net', 'Run + internet']];
 export const OUTCOME_TONE = { allowed: 'green', refused: 'red', denied: 'red', asked: 'purple', pending: 'dim' };
-export const BY_WORD = { 'pre-allow': 'pre-allowed', rules: 'rules', judge: 'the judge', mode: 'the mode', you: 'you', local: 'the agent' };
+export const BY_WORD = { 'pre-allow': 'pre-allowed', always: 'your permissions', rules: 'rules', judge: 'the judge', mode: 'the mode', you: 'you', local: 'the agent' };
 const muted = text => h('div', { style: { fontSize: 12, color: T.mut } }, text);
 const rowSt = { display: 'flex', alignItems: 'center', gap: 8, minHeight: 28, fontSize: 12.5, minWidth: 0 };
 const ell = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 };

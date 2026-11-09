@@ -1,6 +1,6 @@
 # Plan: scheduled tasks: chats that run on their own, on a schedule, gated by the judge
 
-**Asked for:** 2026-11-09 · **Status:** In progress
+**Asked for:** 2026-11-09 · **Status:** Done (2026-11-09)
 
 ## 1. Introduction
 
@@ -182,7 +182,7 @@ Assumed:
   are tested in `test_task_log.py`. The log reads only the chat's events (each result carries the judge's verdict and
   `grant_id`), not `/api/judge/recent`; it also lists the agent's own tools (`by: local`) and a card still open
   (`pending`).
-- [ ] **3.4 Judge eval cases for unattended runs: `services/agent/evals/judge/scheduled.py` (new), `bench.py`, `run.py`.**
+- [x] **3.4 Judge eval cases for unattended runs: `services/agent/evals/judge/scheduled.py` (new), `bench.py`, `run.py`.**
   - **Cases:** about 30, each the task's instructions as the user's words with one call:
     - routine work the instructions ask for (allow);
     - writes outside what they ask, shell commands they don't name, and pages fetched from untrusted text (ask, so refused).
@@ -192,8 +192,8 @@ Assumed:
   scheduled`; the hub's `utils/tests/tools/test_judge_scheduled.py` checks they load and that the judge's rules alone
   never allow an overreach (the model answering ask). Writing them found that edits inside a folder at Edit never reach
   the judge (the mode's table; the rules' `edit-inside`), so such cases are left out and the docstring says a task's
-  folder levels keep its edits in bounds. **The live d3-lite run waits for the user:** d3-lite wasn't loaded, and this
-  machine's GPU isn't loaded without asking.
+  folder levels keep its edits in bounds. The live run (the user said yes, 2026-11-09) is in `docs/agent-eval.md`: at
+  the deployed cutoff (0.35) no overreach was allowed (0 of 16) and 3 of 15 routine calls would have been refused.
 
 **Checks & deliverables — Phase 3**
 - [x] On the second hub: a task with a missing skill can't be turned on; a test run shows a card, and its approval becomes a pre-allow; the next run's log says `pre-allow`.
@@ -240,13 +240,31 @@ Assumed:
 
 ## Phase 5 — On the installed hub (S)
 
-- [ ] **5.1 The live check.** After `gaifa restart` and restarting the agent mod:
+- [x] **5.1 The live check.** After `gaifa restart` and restarting the agent mod:
   - a standalone task with a folder of its own runs on a schedule a few minutes ahead;
   - a project task runs in the project's context;
   - a test run's approval becomes a pre-allow;
   - a refused call shows in the log;
   - the unread dot clears when the run is opened.
   The test tasks are deleted and their chats archived. CLAUDE.md's status, the plans index and the structure doc are updated.
+  *As built (2026-11-09, the installed hub after the merge, `gaifa restart` and the agent restarted; skynet through the
+  remote test LLM; the judge d3-lite):*
+  - A standalone task with a scratch folder of its own at Edit, set a few minutes ahead, started on its own 18 s after
+    its time: it read the folder, wrote `summary.md` there, and its `remember` was refused (the run had read files, so a
+    lasting save asks first, over the user's `always` grant for it, and with no one there that's a refusal); the run was
+    `done` with `refused` 1, its log named each call's decider, and its closing summary said what was refused.
+  - A task in a test project (instructions: end every answer with a fixed line) ran on Run now: its answer named the
+    project and ended with the line, and it kept a note with `task_note`.
+  - A test run of a task that makes a memory entity showed a card for `agent_memory_entity`; approved, its suggestion
+    was that tool; added, the next unattended Run now made the call through the pre-allow (`allowed`, `pre-allow`).
+  - Opening a run's chat from the history cleared its task's unread count.
+  - Found and fixed: this machine's `always` grants (memory saves, web pages, Python, writes) also answer with
+    `grant_id`, and the log called them pre-allows; it now reads the run chat's own grants and says `always` ("your
+    permissions") for the others (`test_task_log.py`).
+  - Known, left: a run kept to its own folders has no `settings.environment`, so the chip under its composer shows the
+    default environment's name, though its calls carry the task's environment.
+  - The test tasks were deleted, their chats archived, the test project deleted, its memory entity and the test entity
+    archived, and the scratch folder removed.
 
 ## 4. Deliverables
 

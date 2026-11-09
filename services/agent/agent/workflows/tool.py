@@ -191,6 +191,9 @@ class WorkflowTools:
         def pending() -> list[dict[str, Any]]:
             return [c for c in self.a.store.children(tid) if spawn_of(c).get("background") and not spawn_of(c).get("reported")
                     and (want is None or c["id"] == want["id"])]
+        if want is not None and not pending() and spawn_of(want).get("reported") and wf.finished(want["id"]):
+            return self.ok(tid, cid, "agent_wait", {**wf.delivered(want["id"]),  # type: ignore[attr-defined]
+                                                    "note": "it had reported already, as a message in this chat"})
         if not pending():
             return self.err(tid, cid, "agent_wait", "nothing_to_wait_for",  # type: ignore[attr-defined]
                             "no background sub-agent of this chat is still to report" if want is None

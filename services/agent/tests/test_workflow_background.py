@@ -67,6 +67,13 @@ async def test_wait_with_nothing_to_wait_for(env):
     tid = await env.thread()
     await env.send(tid, "Wait.")
     assert env.payloads(tid, "tool_result")[0]["error"]["code"] == "nothing_to_wait_for"
+    kid = (await env.agent.workflows.spawn(tid, "a quick one", "Quick", background=True))["id"]
+    await _until(lambda: env.payloads(tid, "agent_done"))
+    await env.settle(tid)
+    env.model.queue({"match": "Wait for it", "tool_calls": [{"name": "agent_wait", "arguments": {"child": kid}}]}, {"text": "Got it."})
+    await env.send(tid, "Wait for it.")
+    got = json.loads(env.payloads(tid, "tool_result")[-1]["content"])      # reported as a message already: given again
+    assert got["child"] == kid and "reported already" in got["note"]
 
 
 async def test_agent_send_gives_a_finished_one_more_to_do(env):

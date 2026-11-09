@@ -89,8 +89,9 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 **Wire — Phase 2:** none yet; the events exist for Phase 3.
 
 **Checks & deliverables — Phase 2**
-- [ ] Second hub: a parent starts two background children, keeps talking, and answers when both finish; a child's web fetch is forwarded and approved from the parent's route; a denied one reaches the child with the reason.
-- [ ] Delivered: background children, `agent_wait/send/stop/list/review`, requests, the decide route.
+- [x] Second hub: a parent starts two background children, keeps talking, and answers when both finish; a child's web fetch is forwarded and approved from the parent's route; a denied one reaches the child with the reason.
+  *As built (2026-11-09, the second hub on 7078 with the remote test LLM as in Phase 1; a `workspace_edit` in Manual stood in for the web fetch, since the second hub runs no web mod):* two background sub-agents read the fixture's `src` and `tests` while the parent answered a side question; one came back through `agent_wait`, the other as an `agent_done` message, and the parent named the untested function. A writer sub-agent's `workspace_edit` became `needs_review`; the parent forwarded it with a reason, and approving it through `POST …/requests/{rid}` ran the edit (the file changed), after which the sub-agent's end came back as `agent_done` and the parent confirmed it. In another chat the parent denied the same kind of request with "the file is frozen this week"; the sub-agent's result read "the chat that started you said no: …", it didn't retry, and the file was unchanged. Fix: `agent_wait` naming a sub-agent that had just reported as a message answered `nothing_to_wait_for`; it now gives that answer again.
+- [x] Delivered: background children, `agent_wait/send/stop/list/review`, requests, the decide route.
 
 ## Phase 3 — The UI (L)
 

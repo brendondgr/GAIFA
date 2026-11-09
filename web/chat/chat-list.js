@@ -89,7 +89,7 @@ export const LIST_CSS = `
 /** `showAll`: `{n}` when more chats exist than the list shows (n: how many in all, or null), else null; `onShowAll`
  * opens the Show all page (plan chat-history 2.4). */
 export function ThreadList({ threads, loading, activeId, q, onQ, showAll = null, onShowAll, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
-  grouped = null, groupLabel = 'Chats by environment', view = null, onView = null, canGroup = false, itemProps = () => ({}) }) {
+  grouped = null, groupLabel = 'Chats by environment', view = null, onView = null, canGroup = false, canProjects = false, projectsRow = null, itemProps = () => ({}) }) {   // projectsRow: plan projects 5.4
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 4px' } },
       h('label', { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, ...inputSt, height: 30, padding: '0 9px', borderRadius: 7 } },
@@ -103,7 +103,8 @@ export function ThreadList({ threads, loading, activeId, q, onQ, showAll = null,
         style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, height: 30, padding: '0 6px', borderRadius: 7, border: 0, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, cursor: 'pointer', textAlign: 'left' } },
         h('span', { style: { width: 20, height: 20, borderRadius: 99, display: 'grid', placeItems: 'center', background: T.row, color: T.tx, flex: 'none' } }, h(Icon, { d: 'plus', size: 12 })),
         'New'),
-      view && onView ? h(ViewMenu, { view, onChange: onView, envs: canGroup }) : null),
+      view && onView ? h(ViewMenu, { view, onChange: onView, envs: canGroup, projects: canProjects }) : null),
+    projectsRow,
     grouped && !q.trim() ? h('nav', { 'aria-label': groupLabel, style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped,
       showAll ? h(MoreBar, { n: showAll.n, label: 'Show all', onClick: onShowAll }) : null) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },

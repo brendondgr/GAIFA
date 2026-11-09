@@ -19,7 +19,7 @@ import { messageBody } from './chat-api.js';
 import { groupTurns } from './chat-turn.js';
 import { TurnView } from './chat-activity.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
-import { decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
+import { decideFolder, lastEnv, rememberEnv, newChatSettings, newChatPreset } from './chat-env.js';
 import { ControlsRow, ModeMenu, ModelMenu, EnvMenu, ProjectMenu } from './chat-controls.js';
 import { Composer, chatSkills, typeInto } from './chat-composer.js';
 import { VoiceButton, lastAnswer } from './chat-voice.js';
@@ -106,6 +106,10 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     if (cmd.pane && cmd.pane !== paneId) return;
     if (cmd.type === 'new') {
       if (cmd.env) { rememberEnv(cmd.env); setFresh(f => ({ ...f, settings: { ...f.settings, environment: cmd.env } })); }
+      if (cmd.project) {                  // New chat in a project (plan projects 5.4): its defaults and primary environment
+        const pre = newChatPreset(cmd.project);
+        setFresh(f => ({ model: pre.model || f.model, mode: pre.mode, settings: { ...f.settings, ...pre.settings } }));
+      } else setFresh(f => (f.settings?.project ? { ...f, settings: (({ project, ...rest }) => rest)(f.settings) } : f));   // a plain New: no project
       onOpen(null);
       setTimeout(() => inputRef.current?.focus(), 50);
     }

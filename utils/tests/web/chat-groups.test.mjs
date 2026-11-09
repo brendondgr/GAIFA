@@ -278,3 +278,40 @@ test('the flat list: Show all with the count when there are more; without a coun
   assert.match(text(dated), /DAYS.*Show all · 30/);
   assert.equal(all(dated, n => n.type === 'nav')[0].props['aria-label'], 'Chats by date');
 });
+
+// Plan projects 5.4: Group by: Project, its sections in order and No project last; the sidebar's Projects dropdown.
+test('Group by: Project is offered with projects, and saved', () => {
+  assert.deepEqual(g.groupChoices({ envs: true, projects: true }).map(([k]) => k), ['environment', 'project', 'date', 'none']);
+  assert.deepEqual(g.groupChoices({ projects: true }).map(([k]) => k), ['project', 'date', 'none']);
+  assert.equal(g.readView({ group: 'project' }).group, 'project');
+  assert.equal(g.groupOf({ group: 'project' }, { envs: true }), 'none', 'no projects: the flat list');
+  assert.equal(g.groupOf({ group: 'project' }, { projects: true }), 'project');
+  assert.equal(g.uiOfView(g.readView({ group: 'project' })).group, 'project');
+});
+
+test('project sections: those with chats here, pinned first, in the chosen order, then No project', async () => {
+  const pg = await load('chat/chat-project-groups.js');
+  const projects = [{ id: 'p_a', name: 'beta', created: 1 }, { id: 'p_b', name: 'Alpha', created: 3 }, { id: 'p_c', name: 'gamma', created: 2, pinned: true },
+    { id: 'p_d', name: 'empty', created: 4 }];
+  const groups = [{ project: 'p_a', count: 3, updated: 50, running: 1 }, { project: 'p_b', count: 1, updated: 90, running: 0 },
+    { project: 'p_c', count: 2, updated: 10, running: 0 }, { project: 'none', count: 7, updated: 99, running: 0 }, { project: 'p_gone', count: 2, updated: 5 }];
+  const rows = pg.projectRows(groups, projects);
+  assert.deepEqual(rows.map(r => r.key), ['p_c', 'p_b', 'p_a', 'none']);
+  assert.deepEqual([rows[2].count, rows[2].running, rows[2].ids], [3, 1, ['p_a']]);
+  assert.equal(rows.at(-1).project, null);
+  assert.deepEqual(pg.projectRows(groups, projects, 'name').map(r => r.key), ['p_c', 'p_b', 'p_a', 'none']);
+  assert.deepEqual(pg.projectRows(groups, projects.map(p => ({ ...p, pinned: false })), 'name').map(r => r.key), ['p_b', 'p_a', 'p_c', 'none']);
+  assert.deepEqual(pg.projectRows(groups, projects.map(p => ({ ...p, pinned: false })), 'created').map(r => r.key), ['p_b', 'p_c', 'p_a', 'none']);
+  assert.deepEqual(pg.projectRows([{ project: 'p_a', count: 1 }], projects).map(r => r.key), ['p_a'], 'no No project section when every chat is in one');
+  assert.deepEqual(pg.projectRows(null, projects), []);
+  const pp = await load('chat/chat-projects.js');
+  const many = Array.from({ length: 12 }, (_, i) => ({ id: 'p' + i, name: 'n' + i, activity: i, pinned: i === 2 }));
+  assert.deepEqual(pp.dropdownProjects(many).map(p => p.id), ['p2', 'p11', 'p10', 'p9', 'p8', 'p7', 'p6', 'p5']);
+});
+
+test('Show all grouped by project, and its project filter', async () => {
+  const all = await load('chat/chat-all.js');
+  const items = [{ id: 't1', settings: { project: 'p_a' } }, { id: 't2', settings: {} }, { id: 't3', settings: { project: 'p_a' } }, { id: 't4', settings: { project: 'p_gone' } }];
+  const got = all.groupLoaded(items, { group: 'project', projects: [{ id: 'p_a', name: 'Thesis' }] });
+  assert.deepEqual(got.map(x => [x.label, x.threads.map(t => t.id)]), [['Thesis', ['t1', 't3']], ['No project', ['t2', 't4']]]);
+});

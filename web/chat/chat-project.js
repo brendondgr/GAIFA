@@ -8,6 +8,8 @@
 import { h, T, Icon, Btn, inputSt, label11, fmtAgo, useWidth } from './chat-ui.js';
 import { ChatPane } from './chat-pane.js';
 import { InstructionsPanel, FilesPanel, PagesPanel, MemoryPanel, FoldersPanel, DefaultsPanel } from './chat-project-panels.js';
+import { newChatPreset } from './chat-env.js';
+export { newChatPreset };            // its home is chat-env.js (the panes use it too)
 
 const R = () => globalThis.React;
 export const RECENTS = 20;
@@ -16,10 +18,6 @@ export const RECENTS = 20;
 export const DELETE_BODY = 'Its chats stay, as ordinary chats in your history. Its memory stays in Memory (you can delete it there). '
   + 'Its uploaded files stay in Outputs. The project, its instructions, its page links, its search index and its own folders’ '
   + 'environment are deleted (the folders’ files are left alone).';
-
-/** The settings a new chat in the project starts with (the agent fills the rest of its defaults). */
-export const newChatPreset = p => ({ model: p?.defaults?.model || null, mode: p?.defaults?.mode || 'manual',
-  settings: { project: p.id, ...((p.environments || [])[0] ? { environment: p.environments[0] } : {}) } });
 
 export function ProjectPage({ shared, pid, go = x => { location.hash = x; } }) {
   const React = R(), { useState, useEffect } = React;
@@ -57,7 +55,7 @@ export function ProjectPage({ shared, pid, go = x => { location.hash = x; } }) {
         style: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, color: T.tx, textDecoration: 'none', borderBottom: '1px solid ' + T.bd } },
         h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 } }, t.title || 'New chat'),
         h('span', { style: { fontSize: 11.5, color: T.dim, flex: 'none' } }, fmtAgo(t.updated)))),
-      !all && (chats || []).length > RECENTS ? h('button', { type: 'button', onClick: () => { setAll(true); loadChats(200); },
+      !all && (chats || []).length > RECENTS ? h('button', { type: 'button', onClick: () => go('#/chat/all?project=' + encodeURIComponent(pid)),   // the Show all page, filtered to the project (5.4)
         style: { alignSelf: 'flex-start', marginTop: 6, border: 0, background: 'none', color: T.mut, font: 'inherit', fontSize: 12.5, cursor: 'pointer' } }, 'Show all') : null));
   const right = h('aside', { 'aria-label': 'Project', style: { width: narrow ? '100%' : 330, flex: 'none', display: 'flex', flexDirection: 'column', gap: 10 } },
     h(InstructionsPanel, { p, onSave: save }),

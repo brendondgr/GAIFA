@@ -53,12 +53,15 @@ async def test_defaults_list_them(rig, serve):
 
 
 async def test_chat_list_show_and_date(rig, serve):
-    """chat-history 2.2: `[ui.chat.list]` takes show (chats, archived, both) and group = "date"; anything else is refused."""
+    """chat-history 2.2: `[ui.chat.list]` takes show (chats, archived, both) and group = "date" (and "project", plan projects
+    5.4); anything else is refused."""
     served = await _hub(rig, serve)
     async with httpx.AsyncClient(base_url=served.url) as c:
         r = await c.put("/api/settings", json={"ui": {"chat": {"list": {"show": "both", "group": "date"}}}})
         assert r.status_code == 200 and r.json()["settings"]["ui"]["chat"]["list"] == {**CHAT["list"], "show": "both", "group": "date"}
         assert tomllib.loads(_file(served))["ui"]["chat"] == {"list": {"show": "both", "group": "date"}}
-        for bad, field in (({"show": "all"}, "ui.chat.list.show"), ({"group": "project"}, "ui.chat.list.group")):
+        r = await c.put("/api/settings", json={"ui": {"chat": {"list": {"group": "project"}}}})
+        assert r.status_code == 200 and r.json()["settings"]["ui"]["chat"]["list"]["group"] == "project"
+        for bad, field in (({"show": "all"}, "ui.chat.list.show"), ({"group": "folder"}, "ui.chat.list.group")):
             r = await c.put("/api/settings", json={"ui": {"chat": {"list": bad}}})
             assert r.status_code == 422 and r.json()["data"]["field"] == field, r.text

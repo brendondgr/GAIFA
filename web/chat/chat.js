@@ -29,7 +29,8 @@ import { GroupedChats, readView, saveView, viewOfUi, loadEnvs, archivedParam, gr
 import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
 import { SplitView, SPLIT_CSS } from './chat-split.js';
-import { ProjectsPage, PROJECTS_CSS } from './chat-projects.js';
+import { ProjectsPage, ProjectsEntry, PROJECTS_CSS } from './chat-projects.js';
+import { ProjectChats } from './chat-project-groups.js';
 import { ProjectPage } from './chat-project.js';
 import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout } from './chat-layout.js';
 import { CONTROLS_CSS } from './chat-controls.js';
@@ -171,10 +172,11 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     patched(n); relist();
     toast(`Moved to ${(envs || []).find(e => e.id === env)?.name || env}`, 'success');
   }, fail);
-  const newIn = env => newChat(env);
+  const newIn = env => { newChat(env); if (sub) go('#/chat'); };
   const [projects, setProjects] = useState([]);       // plan projects 5.3: Move to… lists them
   const loadProjects = () => c.projects?.().then(setProjects, () => setProjects([]));
   useEffect(() => { loadProjects(); const w = c.watchProjects?.(() => loadProjects()); return () => w?.close(); }, []);
+  const newInProject = p => { setCmd(x => ({ n: (x?.n || 0) + 1, type: 'new', project: p || null, pane: lref.current.active })); setDrawer(false); if (sub) go('#/chat'); };   // 5.4
   const moveProject = (t, pid) => c.patch(t.id, { settings: { project: pid } }).then(n => {
     patched(n); relist();
     toast(pid ? `Moved to the project ${projects.find(p => p.id === pid)?.name || ''}` : 'Removed from the project', 'success');
@@ -201,22 +203,25 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
 
   // ---- render ----
   const renderItem = t => h(Item, { key: t.id, t, active: t.id === tid, onOpen: () => setDrawer(false), onRename: v => rename(t, v), onArchive: () => archive(t), onDelete: () => remove(t), ...itemProps(t) });
-  const grouping = groupOf(listView, { envs: !!envs && !!c.threadGroups });   // Environment needs the workspace mod; else Date or None
+  const grouping = groupOf(listView, { envs: !!envs && !!c.threadGroups, projects: !!c.threadGroups && projects.length > 0 });   // Environment needs the workspace mod, Project some projects; else Date or None
   const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: setQ,
-    showAll: grouping !== 'environment' || q.trim() ? showAllOf(threads.length, total, LIST_PAGE) : null,   // chat-history 2.4: 20, then Show all
+    showAll: !['environment', 'project'].includes(grouping) || q.trim() ? showAllOf(threads.length, total, LIST_PAGE) : null,   // chat-history 2.4: 20, then Show all
     onShowAll: () => { setDrawer(false); go('#/chat/all' + (q.trim() ? '?q=' + encodeURIComponent(q.trim()) : '')); },
     onNew: () => newChat(), onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
-    view: listView, onView: setListView, canGroup: !!envs, itemProps,
-    groupLabel: grouping === 'date' ? 'Chats by date' : 'Chats by environment',
+    view: listView, onView: setListView, canGroup: !!envs, canProjects: projects.length > 0, itemProps,
+    projectsRow: c.projects ? h(ProjectsEntry, { projects, active: !!sub && sub.page !== 'all', go, onGo: () => setDrawer(false) }) : null,   // plan projects 5.4
+    groupLabel: grouping === 'date' ? 'Chats by date' : grouping === 'project' ? 'Chats by project' : 'Chats by environment',
     grouped: grouping === 'environment' ? h(GroupedChats, { c, api, envs, view: listView, onView: setListView, known: threads, reloadKey: listKey,
       renderItem, onNewIn: newIn, onEnvsChanged: loadEnvList, onError: fail, go })
+      : grouping === 'project' ? h(ProjectChats, { c, projects, view: listView, onView: setListView, known: threads, reloadKey: listKey,   // plan projects 5.4
+        renderItem, onNewIn: newInProject, onError: fail, go })
       : grouping === 'date' && threads.length ? h(DateSections, { threads, view: listView, renderItem }) : null });   // chat-history 2.3
   return h('div', { ref: rootRef, style: { display: 'flex', height: '100%', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.bg } },
     narrow ? null : h('div', { style: { width: 248, flex: 'none', borderRight: '1px solid ' + T.bd, minHeight: 0 } }, list),
     narrow && drawer ? h(React.Fragment, null,
       h('div', { onClick: () => setDrawer(false), 'aria-hidden': true, style: { position: 'absolute', inset: 0, zIndex: 40, background: T.ov } }),
       h('div', { style: { position: 'absolute', top: 0, bottom: 0, left: 0, zIndex: 41, width: 'min(300px, 86%)', borderRight: '1px solid ' + T.bds, boxShadow: '0 0 40px rgba(0,0,0,.4)' } }, list)) : null,
-    allPage ? h(AllChats, { c, view: listView, onView: setListView, envs, q0: route?.params?.q || '', reloadKey: listKey, bus: bus.current, itemProps,
+    allPage ? h(AllChats, { c, view: listView, onView: setListView, envs, projects, project0: route?.params?.project || '', q0: route?.params?.q || '', reloadKey: listKey, bus: bus.current, itemProps,
       actions: { rename, archive, remove }, onError: fail, onMenu: narrow ? () => setDrawer(true) : null,
       onBack: () => go(act.tid ? '#/chat/' + act.tid : '#/chat') }) :
     sub?.page === 'projects' ? h(ProjectsPage, { c, toast, go, onMenu: narrow ? () => setDrawer(true) : null }) :

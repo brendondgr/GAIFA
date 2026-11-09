@@ -91,7 +91,7 @@ class ChatListCfg(_Strict):
     the folded sections."""
 
     show: Literal["chats", "archived", "both"] = "chats"
-    group: Literal["environment", "date", "none"] = "environment"
+    group: Literal["environment", "project", "date", "none"] = "environment"   # project: plan projects 5.4
     env_order: Literal["activity", "name", "created"] = "activity"
     chat_order: Literal["updated", "title", "created"] = "updated"
     collapsed: list[str] = []

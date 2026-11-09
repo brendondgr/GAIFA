@@ -37,6 +37,31 @@ export function newProjectBody(f) {
   return { body: { name, description: String(f.description || '').trim(), instructions: String(f.instructions || '').trim() } };
 }
 
+/** The sidebar dropdown's projects (plan projects 5.4): pinned first, then the most recently active, up to `n`. */
+export const dropdownProjects = (list, n = 8) => sortProjects(list, 'activity').slice(0, n);
+
+/** The sidebar's Projects row under New (plan projects 5.4): its icon and label open the projects page; the chevron opens
+ * a dropdown with the pinned and most recent projects, then All projects. Whether it's open is page state. */
+export function ProjectsEntry({ projects, active = false, go = x => { location.hash = x; }, onGo = () => {} }) {
+  const React = R(), [open, setOpen] = React.useState(false);
+  const nav = to => { setOpen(false); onGo(); go(to); };
+  const shown = dropdownProjects(projects || []);
+  return h('div', { style: { position: 'relative', display: 'flex', alignItems: 'center', gap: 2, padding: '0 10px 6px 8px' } },
+    h('a', { href: '#/chat/projects', onClick: () => { setOpen(false); onGo(); }, className: 'aichat-newbar', 'aria-current': active ? 'page' : undefined,
+      style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, height: 30, padding: '0 6px', borderRadius: 7, color: T.tx, fontSize: 13, textDecoration: 'none', background: active ? T.hov : 'transparent' } },
+      h('span', { style: { width: 20, height: 20, display: 'grid', placeItems: 'center', color: T.mut, flex: 'none' } }, h(Icon, { d: 'folder', size: 14 })), 'Projects'),
+    h('button', { type: 'button', onClick: () => setOpen(!open), 'aria-label': 'Projects list', 'aria-haspopup': 'menu', 'aria-expanded': open ? 'true' : 'false', className: 'aichat-quiet',
+      style: { width: 30, height: 30, display: 'grid', placeItems: 'center', border: '1px solid transparent', borderRadius: 7, background: 'transparent', color: T.mut, cursor: 'pointer', flex: 'none' } },
+      h(Icon, { d: open ? 'chevD' : 'chevR', size: 13 })),
+    h(Popover, { open, onClose: () => setOpen(false), place: 'down-left', width: 240, label: 'Projects', style: { padding: 4, gap: 0 } },
+      shown.length ? shown.map(p => h('button', { key: p.id, type: 'button', role: 'menuitem', onClick: () => nav('#/chat/projects/' + enc(p.id)), title: p.description || p.name,
+        style: { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0, borderRadius: 5, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' } },
+        h(Icon, { d: p.pinned ? 'pin' : 'folder', size: 13 }), h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, p.name)))
+        : h('span', { style: { fontSize: 12, color: T.mut, padding: '6px 9px' } }, 'No projects yet.'),
+      h('button', { type: 'button', role: 'menuitem', onClick: () => nav('#/chat/projects'), style: { display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 9px', border: 0,
+        borderTop: '1px solid ' + T.bd, borderRadius: 0, background: 'transparent', color: T.mut, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' } }, 'All projects')));
+}
+
 export function ProjectsPage({ c, toast = () => {}, go = x => { location.hash = x; }, onMenu = null }) {
   const React = R(), { useState, useEffect } = React;
   const [list, setList] = useState(null), [q, setQ] = useState(''), [sort, setSortS] = useState(() => store.get(SORT_KEY, 'activity'));

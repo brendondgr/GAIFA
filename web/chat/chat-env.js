@@ -151,3 +151,7 @@ export function moveGroups(t, projects = [], envs = []) {
   }
   return groups;
 }
+
+/** The settings a new chat in a project starts with (plan projects 5.2, 5.4; the agent fills the rest of its defaults). */
+export const newChatPreset = p => ({ model: p?.defaults?.model || null, mode: p?.defaults?.mode || 'manual',
+  settings: { project: p.id, ...((p.environments || [])[0] ? { environment: p.environments[0] } : {}) } });

@@ -3,6 +3,8 @@
 // Group by as chips (the same saved view, so changing one changes both), then every chat: grouped by date (the same
 // headings, over what's loaded), by environment, or flat. A row is the sidebar's (`Item`: rename, Move to, archive,
 // delete, drag into a pane) with its environment and its date added. Pages of 50 load as the end scrolls into view.
+// A Project filter (plan projects 5.4; `?project=` from the URL: a project page's Show all) narrows it to one project's
+// chats, or to those in none, and Group by: Project heads them by project.
 // Keys: ↑/↓ move through the rows, Enter opens one, / focuses the search. Pure helpers first (tested in
 // utils/tests/web/chat-all.test.mjs). Written by us (web/PATCHES.md).
 
@@ -32,10 +34,20 @@ export function envOf(t, envs) {
   return env ? { id: env.id, name: env.name || env.id } : { id, name: id === 'default' ? 'Default' : id };
 }
 
-/** What's loaded, under its headings: by date (the sidebar's), by environment (in the order its first chat comes), or
- * one group with no heading. */
-export function groupLoaded(items, { group = 'none', order = 'updated', envs, now } = {}) {
+/** What's loaded, under its headings: by date (the sidebar's), by environment or by project (in the order its first
+ * chat comes; No project for chats in none), or one group with no heading. */
+export function groupLoaded(items, { group = 'none', order = 'updated', envs, projects, now } = {}) {
   if (group === 'date') return groupByDate(items, { order, now });
+  if (group === 'project') {                        // plan projects 5.4
+    const by = new Map();
+    for (const t of items) {
+      const pid = (t.settings || {}).project || 'none', p = (projects || []).find(x => x.id === pid);
+      const key = p ? pid : 'none';
+      if (!by.has(key)) by.set(key, { key, label: p ? p.name : 'No project', threads: [] });
+      by.get(key).threads.push(t);
+    }
+    return [...by.values()];
+  }
   if (group !== 'environment') return [{ key: 'all', label: null, threads: items }];
   const by = new Map();
   for (const t of items) {
@@ -55,14 +67,16 @@ const metaSt = { fontSize: 11, color: T.dim, flex: 'none', whiteSpace: 'nowrap',
 /** `c`: the chat client; `view`/`onView`: the sidebar's saved view; `itemProps(t)` and `actions` ({rename, archive,
  * remove}): the page's handlers; `reloadKey`: bumped when chats are made, moved, archived or deleted; `bus`: the
  * page's `patched` events (a rename shows at once). */
-export function AllChats({ c, view, onView, envs, q0 = '', reloadKey, bus, actions, itemProps = () => ({}), onError, onMenu, onBack }) {
+export function AllChats({ c, view, onView, envs, projects = [], project0 = '', q0 = '', reloadKey, bus, actions, itemProps = () => ({}), onError, onMenu, onBack }) {
   const React = R(), { useState, useEffect, useRef } = React;
+  const [project, setProject] = useState(project0);                         // plan projects 5.4: '' all, an id, or 'none'
+  useEffect(() => { setProject(project0); }, [project0]);
   const [text, setText] = useState(q0), [q, setQ] = useState(q0.trim());
   const [items, setItems] = useState([]), [total, setTotal] = useState(null), [done, setDone] = useState(false), [loading, setLoading] = useState(true);
   const gen = useRef(0), busy = useRef(false), st = useRef({}); st.current = { items, total, done };
   const search = useRef(null), sentinel = useRef(null), listRef = useRef(null);
-  const archived = archivedParam(view.show), grouping = groupOf(view, { envs: !!envs });
-  const params = { q: q || undefined, archived, sort: view.chatOrder };
+  const archived = archivedParam(view.show), grouping = groupOf(view, { envs: !!envs, projects: projects.length > 0 });
+  const params = { q: q || undefined, archived, sort: view.chatOrder, project: project || undefined };
 
   const load = async (fresh = false) => {
     const s = st.current, next = fresh ? { offset: 0, limit: Math.max(ALL_PAGE, fresh === 'keep' ? s.items.length : 0) } : nextPage(s.items.length, s.total, s.done);
@@ -71,7 +85,7 @@ export function AllChats({ c, view, onView, envs, q0 = '', reloadKey, bus, actio
     busy.current = true; setLoading(true);
     try {
       const [page, count] = await Promise.all([c.threads({ ...params, ...next }),
-        fresh && c.threadCount ? c.threadCount({ q: params.q, archived }).then(r => r.count, () => null) : null]);
+        fresh && c.threadCount ? c.threadCount({ q: params.q, archived, project: params.project }).then(r => r.count, () => null) : null]);
       if (my !== gen.current) return;                       // a newer search or view started meanwhile
       const out = addPage(fresh ? [] : st.current.items, page, next.limit);
       setItems(out.items); setDone(out.done);
@@ -80,7 +94,7 @@ export function AllChats({ c, view, onView, envs, q0 = '', reloadKey, bus, actio
     finally { if (my === gen.current) { busy.current = false; setLoading(false); } }
   };
   useEffect(() => { const t = setTimeout(() => setQ(text.trim()), text.trim() === q ? 0 : 220); return () => clearTimeout(t); }, [text]);
-  useEffect(() => { setItems([]); setTotal(null); setDone(false); load(true); }, [q, view.show, view.chatOrder]);
+  useEffect(() => { setItems([]); setTotal(null); setDone(false); load(true); }, [q, view.show, view.chatOrder, project]);
   const first = useRef(true);
   useEffect(() => { if (first.current) { first.current = false; return; } load('keep'); }, [reloadKey]);   // changed elsewhere: the same rows again
   useEffect(() => { search.current?.focus(); }, []);
@@ -96,7 +110,7 @@ export function AllChats({ c, view, onView, envs, q0 = '', reloadKey, bus, actio
     const io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) load(); }, { root: listRef.current, rootMargin: '300px' });
     io.observe(el);
     return () => io.disconnect();
-  }, [items.length, done, total, q, view.show, view.chatOrder]);
+  }, [items.length, done, total, q, view.show, view.chatOrder, project]);
 
   const onKey = e => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || '');
@@ -113,7 +127,7 @@ export function AllChats({ c, view, onView, envs, q0 = '', reloadKey, bus, actio
         aside: [envs ? h('span', { key: 'e', title: 'Environment', style: { ...metaSt, flex: '0 1 auto', minWidth: 0, maxWidth: 'min(120px, 35%)' } }, env.name) : null,
           h('span', { key: 'd', style: { ...metaSt, minWidth: 44, textAlign: 'right' } }, shortDate(t[view.chatOrder === 'created' ? 'created' : 'updated']))] }));
   };
-  const groups = groupLoaded(items, { group: grouping, order: view.chatOrder, envs });
+  const groups = groupLoaded(items, { group: grouping, order: view.chatOrder, envs, projects });
   return h('section', { 'aria-label': 'All chats', onKeyDown: onKey, style: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0, background: T.bg } },
     h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 18px 10px', borderBottom: '1px solid ' + T.bd } },
       h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
@@ -129,7 +143,11 @@ export function AllChats({ c, view, onView, envs, q0 = '', reloadKey, bus, actio
           style: { flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5 } })),
       h('div', { style: { display: 'flex', gap: 18, flexWrap: 'wrap' } },
         h(Choice, { label: 'Show', value: view.show, options: SHOW, onPick: show => onView({ ...view, show }) }),
-        h(Choice, { label: 'Group by', value: grouping, options: groupChoices({ envs: !!envs }), onPick: group => onView({ ...view, group }) }))),
+        h(Choice, { label: 'Group by', value: grouping, options: groupChoices({ envs: !!envs, projects: projects.length > 0 }), onPick: group => onView({ ...view, group }) }),
+        projects.length ? h('label', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },   // plan projects 5.4: one project's chats
+          h('span', { style: { fontSize: 11, fontWeight: 600, letterSpacing: '.07em', textTransform: 'uppercase', color: T.mut } }, 'Project'),
+          h('select', { value: project, onChange: e => setProject(e.target.value), 'aria-label': 'Project', style: { ...inputSt, height: 26, fontSize: 12, cursor: 'pointer' } },
+            h('option', { value: '' }, 'All chats'), projects.map(p => h('option', { key: p.id, value: p.id }, p.name)), h('option', { value: 'none' }, 'No project'))) : null)),
     h('div', { ref: listRef, style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '6px 12px 18px' } },
       h('div', { style: { maxWidth: 760, display: 'flex', flexDirection: 'column', gap: 1 } },
         !items.length ? h('div', { role: 'status', style: { padding: '24px 10px', color: T.mut, fontSize: 12.5 } }, loading ? 'Loading…' : emptyText(view.show, q)) : null,

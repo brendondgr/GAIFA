@@ -63,6 +63,8 @@ export function groupTurns(view, { running = false, now = Date.now() / 1000, too
     if (STANDALONE.has(it.kind)) { (turn ? held : out).push({ kind: 'item', item: it }); continue; }
     const p = it.ev?.payload || {};
     if (it.kind === 'user') { open(it); continue; }
+    // a background sub-agent's end, or its request, starts a turn of the parent's: it heads that turn (agent-workflows 3.3)
+    if (it.kind === 'agent_done' || (it.kind === 'agent_request' && p.in_result === false)) { open(it); continue; }
     if ((it.kind === 'tool' || it.kind === 'approval') && it.call?.by === 'user') open(it, true);
     if (!turn) { out.push({ kind: 'item', item: it }); continue; }
     turn.end = Math.max(turn.end, tsOf(it), it.resultTs || 0, it.decisionTs || 0, it.answerTs || 0);

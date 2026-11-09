@@ -103,7 +103,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - A row with `children > 0` gets a chevron; open, it fetches the tree and draws the children beneath it with ├ / └ lines: label, a running / queued / waiting / error dot, an unread dot (finished, not seen). Open rows kept on the hub (`hub.chat.tree.open`); the tree follows the stream. Children leave the flat list, the date, environment and project groups; Show all's search shows them with "in <parent>".
   *Done when:* the web test covers the tree's rows, and the browser shows it on the second hub (live and `?mock`).
 
-- [ ] **3.3 The parent's fold: `web/chat/chat-agents.js`.**
+- [x] **3.3 The parent's fold: `web/chat/chat-agents.js`.**
   - `registerStep('agent', …)` (spawning, running, done sentences) and `registerCard('live:agent', …)`: the child's label, state, current step, tokens, **Open** (a split pane, `chat-split.js`) and **Stop**. Background children as a small strip above the composer while they run.
   *Done when:* browser check: a live workflow draws its children's steps and Open splits the pane.
 

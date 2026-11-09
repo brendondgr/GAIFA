@@ -11,6 +11,9 @@ const load = f => import(pathToFileURL(path.join(root, 'web', f)).href);
 const capi = await load('chat/chat-api.js');
 const cmock = await load('chat/chat-mock.js');
 const tree = await load('chat/chat-tree.js');
+const agents = await load('chat/chat-agents.js');
+const steps = await load('chat/chat-steps.js');
+const cards = await load('chat/chat-cards.js');
 
 test('the live client: tree, requests, deciding one, the workflow watch (3.1)', async () => {
   const seen = [];
@@ -56,6 +59,35 @@ test('the mock: a workflow, its tree and requests, deciding from the parent (3.1
   const done = (await c.events(parent.id)).filter(e => e.type === 'agent_done');
   assert.equal(done.at(-1).payload.answer, 'Added the header to src/store.py.');
   w.close();
+});
+
+test('the fold: step words, the sub-agent of a row, answers, the strip, the cards registered (3.3)', () => {
+  const w = steps.stepFor('agent');
+  assert.equal(w.done({ background: true }), 'Started a sub-agent'); assert.equal(w.done({}), 'Ran a sub-agent');
+  assert.equal(w.detail({ label: 'Read src' }), 'Read src');
+  assert.equal(steps.stepFor('agent_review').done({ action: 'deny' }), 'Said no to a sub-agent');
+  assert.ok(steps.stepFor('agent_list').lookup);
+  assert.deepEqual(agents.childOfRow({ item: { result: { data: { agent: { child: 't_a', label: 'A', background: true } } } } }),
+    { id: 't_a', label: 'A', background: true, answer: undefined, state: undefined });
+  assert.equal(agents.childOfRow({ item: { result: { data: { agent: { child: 't_a' } }, content: JSON.stringify({ answer: 'done' }) } } }).answer, 'done');
+  assert.equal(agents.childOfRow({ progress: { live: { agent: { child: 't_b', label: 'B' } } }, item: {} }).id, 't_b');
+  assert.equal(agents.childOfRow({ item: { result: { content: JSON.stringify({ child: 't_c', label: 'C', answer: 'x', state: 'idle' }) } } }).answer, 'x');
+  assert.equal(agents.childOfRow({ item: { result: { content: 'nope' } } }), null);
+  assert.equal(agents.answerText('<untrusted source="sub-agent A">\nThe answer.\n</untrusted>'), 'The answer.');
+  assert.equal(agents.answerText('x'.repeat(400), 10).length, 10);
+  const t = { children: [{ id: 'a', parent: 'p', state: 'running' }, { id: 'b', parent: 'p', state: 'idle' }, { id: 'c', parent: 'p', state: 'waiting' }, { id: 'd', parent: 'q', state: 'running' }] };
+  assert.deepEqual(agents.atWork(t, 'p').map(n => n.id), ['a', 'c']);
+  for (const k of ['live:agent', 'agent_done', 'agent_request', 'agent_review']) assert.ok(cards.hasCard(k), k);
+});
+
+test('a background sub-agent\'s end or request heads the turn it starts (3.3)', async () => {
+  const turn = await load('chat/chat-turn.js'), thread = await load('chat/chat-thread.js');
+  const ev = (seq, type, payload) => ({ seq, ts: seq, type, payload });
+  const view = thread.buildView([ev(1, 'user', { text: 'go' }), ev(2, 'assistant', { text: 'started', step: 's1' }),
+    ev(3, 'agent_done', { child: 't_a', label: 'A', state: 'idle', answer: 'x' }), ev(4, 'assistant', { text: 'A found x', step: 's2' }),
+    ev(5, 'agent_request', { id: 'rq_1', child: 't_b', kind: 'approval', tool: 'fake_wipe', in_result: false }), ev(6, 'assistant', { text: 'over to you', step: 's3' })]);
+  const turns = turn.groupTurns(view).filter(b => b.kind === 'turn');
+  assert.deepEqual(turns.map(t => t.user.kind), ['user', 'agent_done', 'agent_request']);
 });
 
 test('the sidebar tree: rows in order with their connectors, looks, following events, open rows (3.2)', async () => {

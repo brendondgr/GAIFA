@@ -28,6 +28,7 @@ import { QuoteReplyBox, addQuote, draftQuotes, quotesPayload, messageText } from
 import { speak, speakable } from './chat-speak.js';
 import { MemoryNote } from './chat-memory-note.js';
 import { QueueStrip, queueRows } from './chat-queue.js';
+import { AgentStrip } from './chat-agents.js';
 
 const R = () => globalThis.React;
 /** A scheduled run's chat was opened: its run is seen (the Scheduled row's dot goes; scheduled-tasks 4.4). */
@@ -290,6 +291,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   const attach = o => { setAttachments(l => (l.some(x => x.id === o.output_id) ? l : [...l, { id: o.output_id, kind: o.kind, title: o.title, preview: o.preview, n: o.n }])); inputRef.current?.focus(); };
   const ctx = {
     api, live: c.live, tid, thread, outputs: view.outputs, made, tools, mods, running, dock: true, confirm, toast, speechOutput: speechOut,
+    workflow: c.tree ? { c, bus: shared.bus, paneId } : null,       // agent-workflows 3.3: its sub-agents' cards
     act: (tool, args) => ensureThread().then(id => c.action(id, tool, args)),   // plan 46.5: a fix runs as your own step
     answer: (qid, answers) => c.answer(tid, qid, answers),
     // o: {remember, confirm} when allowing (plan 25.3), {reason} when denying
@@ -334,9 +336,11 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
       dock: [...toolForms, ...view.pending].reverse().map(it => h(Card, { key: it.key, item: it, ctx })), placeholder,
       voice: h(VoiceButton, { api, onSend: t => send(t), running, waiting: view.pending.length > 0, answer: lastAnswer(events), speechOutput: speechOut, onMode: m => { voiceOn.current = m !== 'off'; } }),
       queued: qRows.length,
-      queue: h(QueueStrip, { rows: qRows, paused: held.paused, waiting: !running && (thread?.state === 'waiting' || view.pending.length > 0),
+      queue: h(React.Fragment, null,
+        tid && thread?.children ? h(AgentStrip, { w: ctx.workflow, tid, count: thread.children }) : null,   // agent-workflows 3.3
+        h(QueueStrip, { rows: qRows, paused: held.paused, waiting: !running && (thread?.state === 'waiting' || view.pending.length > 0),
         onEdit: qAct((t, id, text) => c.queueEdit(t, id, { text })), onMove: qAct((t, id, index) => c.queueEdit(t, id, { index })),
-        onRemove: qAct(c.queueRemove), onSendNow: qAct(c.queueSend), onResume: qAct(c.queueResume), onClear: qAct(c.queueClear) }),
+        onRemove: qAct(c.queueRemove), onSendNow: qAct(c.queueSend), onResume: qAct(c.queueResume), onClear: qAct(c.queueClear) })),
       settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, models, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
       onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
       controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box

@@ -35,7 +35,8 @@ import { ProjectChats } from './chat-project-groups.js';
 import { ProjectPage } from './chat-project.js';
 import { TasksPage, TasksEntry } from './chat-tasks.js';
 import { TaskPage } from './chat-task.js';
-import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout } from './chat-layout.js';
+import { single, panes, activePane, setTid, setActive, dropTids, loadLayout, saveLayout, splitPane } from './chat-layout.js';
+import './chat-agents.js';
 import { CONTROLS_CSS } from './chat-controls.js';
 import { QUOTE_CSS } from './chat-quote.js';
 import { QREPLY_CSS } from './chat-quote-reply.js';
@@ -97,6 +98,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const React = R(), { useState, useEffect, useRef, useMemo } = React;
   const c = getChatClient(api), sub = subPage(route), allPage = sub?.page === 'all', tid = sub ? null : route?.parts?.[1] || null;   // chat-history 3.1, projects 5.1
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
+  const narrowRef = useRef(narrow); narrowRef.current = narrow;
   const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [total, setTotal] = useState(null);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
@@ -165,6 +167,19 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     document.addEventListener('gaifa:open-output', on);
     return () => document.removeEventListener('gaifa:open-output', on);
   }, [openOutput]);
+  useEffect(() => {       // agent-workflows 3.3: a sub-agent's Open puts it in a pane beside the chat that asked (narrow: in its place)
+    const on = e => {
+      const { tid: id, pane } = e.detail || {};
+      if (!id) return;
+      if (narrowRef.current) { go('#/chat/' + id); return; }
+      setLayout(L => { const open = panes(L.root).find(p => p.tid === id);
+        if (open) return setActive(L, open.id);
+        const full = c.live && !c.sharedStream && panes(L.root).length >= MAX_PANES;   // each pane its own stream: as the split's limit
+        return full ? setTid(L, activePane(L).id, id) : splitPane(L, pane || L.active, 'right', id); });
+    };
+    document.addEventListener('gaifa:open-chat-beside', on);
+    return () => document.removeEventListener('gaifa:open-chat-beside', on);
+  }, []);
   const mods = useMemo(() => [...new Set((tools || []).map(t => t.mod))], [tools]);
 
   // ---- the list's actions ----
@@ -190,7 +205,7 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
       bus.current.dispatchEvent(new CustomEvent('agent_child', { detail: ev }));
       if (!ev.child || known.has(ev.child.id) || !ev.parent) return;
       known.add(ev.child.id);                // the first time the page hears of one: its parent's row, with its count
-      c.get(ev.parent).then(p => listPatch(p.id, { children: p.children }), () => {});
+      c.get(ev.parent).then(p => patched(p), () => {});
     });
     return () => w?.close();
   }, []);

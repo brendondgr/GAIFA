@@ -394,6 +394,10 @@ class FakeHub:
             out = await self._wait(st, wait)
             if body.get("remember") in ("thread", "always"):
                 out = {**out, "grant": {"id": "gr_" + aid, "scope": body["remember"]}}
+                if body["remember"] == "thread":                # agent-workflows 1.4: a workflow's grant is its root's
+                    o = a.get("origin") or {}
+                    self.grants.append({"id": "gr_" + aid, "tool": a["tool"], "thread": o.get("root") or o.get("thread"),
+                                        "scope": "thread", "key": None})
             return out
 
         @app.get("/api/grants")

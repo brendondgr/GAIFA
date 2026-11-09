@@ -44,13 +44,14 @@ def open_cards(agent: Any, child: str) -> list[dict[str, Any]]:
 
 
 def requests_of(agent: Any, parent: str) -> list[dict[str, Any]]:
-    """Every `agent_request` in the parent, with `open` (not reviewed and its card still waiting) and `seq`."""
+    """Every `agent_request` in the parent, with `waiting` (its card still waits), `open` (waiting and not reviewed:
+    the parent's model still has to deny or forward it) and `seq`."""
     reviewed = {e["payload"]["id"] for e in agent.store.events(parent, types=("agent_review",))}
     out = []
     for e in agent.store.events(parent, types=("agent_request",)):
         p = e["payload"]
         live = agent.store.thread(p["child"]) is not None and not _decided(agent, p["child"], p["call"])
-        out.append({**p, "seq": e["seq"], "open": p["id"] not in reviewed and live})
+        out.append({**p, "seq": e["seq"], "waiting": live, "open": p["id"] not in reviewed and live})
     return out
 
 

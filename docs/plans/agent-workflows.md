@@ -77,7 +77,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - Unattended parents: the child's `ask` is refused as today (`unattended`), nothing is forwarded.
   *Done when:* `test_workflow_requests.py`: deny reaches the child with its reason; forward leaves the approval open for the user; an unreviewed request is forwarded at turn end; the model can't approve; an unattended child is refused.
 
-- [ ] **2.3 Deciding from the parent: `api_workflows.py`.**
+- [x] **2.3 Deciding from the parent: `api_workflows.py`.** *(As built: `?waiting=true` lists the cards still waiting, forwarded ones included; the brief's part is Phase 3's.)*
   - `POST /v1/threads/{parent}/requests/{rid}` `{approve, arguments?, reason?, remember?}` decides the child's approval through `agent.approval(child, …)`; `remember: "chat"` writes the grant on the root (1.4 covers the children). `GET /v1/threads/{tid}/requests` lists the open ones.
   - Docs: brief §6 / §11.7 (the routes and events).
   *Done when:* `test_workflow_decide.py`: an approval from the parent's route runs the child's call; a remembered one covers a second child's same call.

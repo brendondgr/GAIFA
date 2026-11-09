@@ -3,7 +3,7 @@
 // title), archive, delete (with a confirm), Move to another environment. A row shows only the chat's name and its
 // state dot; ⋯ shows on hover or focus (always on a touch screen), and an archived chat (Show: Both) is dimmed
 // with an archive mark (plan chat-history 2.1). Which chats show is the View menu's (2.2). Sessions at the bottom. A drawer on narrow screens (chat.js
-// decides). Grouped by environment (plan 41.2), the list's body is chat-groups.js's sections. Chats by meaning
+// decides). Grouped by environment (plan 41.2), the list's body is chat-groups.js's sections; by date, chat-dates.js's. Chats by meaning
 // are in the header's Search (palette-meaning.js).
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, inputSt, label11 } from './chat-ui.js';
@@ -82,7 +82,7 @@ export const LIST_CSS = `
 `;
 
 export function ThreadList({ threads, loading, activeId, q, onQ, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
-  grouped = null, view = null, onView = null, canGroup = false, itemProps = () => ({}) }) {
+  grouped = null, groupLabel = 'Chats by environment', view = null, onView = null, canGroup = false, itemProps = () => ({}) }) {
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 4px' } },
       h('label', { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, ...inputSt, height: 30, padding: '0 9px', borderRadius: 7 } },
@@ -97,7 +97,7 @@ export function ThreadList({ threads, loading, activeId, q, onQ, onMore, onNew, 
         h('span', { style: { width: 20, height: 20, borderRadius: 99, display: 'grid', placeItems: 'center', background: T.row, color: T.tx, flex: 'none' } }, h(Icon, { d: 'plus', size: 12 })),
         'New'),
       view && onView ? h(ViewMenu, { view, onChange: onView, envs: canGroup }) : null),
-    grouped && !q.trim() ? h('nav', { 'aria-label': 'Chats by environment', style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped) :
+    grouped && !q.trim() ? h('nav', { 'aria-label': groupLabel, style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },
       !threads.length ? h('div', { style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } },
         loading ? 'Loading…' : emptyText(view?.show, q)) : null,

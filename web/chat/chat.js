@@ -21,6 +21,7 @@ import './chat-save.js';
 import { ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, Item, LIST_CSS } from './chat-list.js';
+import { DateSections } from './chat-dates.js';
 import { GroupedChats, readView, saveView, viewOfUi, loadEnvs, archivedParam, groupOf } from './chat-groups.js';
 import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
@@ -173,12 +174,15 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   };
 
   // ---- render ----
+  const renderItem = t => h(Item, { key: t.id, t, active: t.id === tid, onOpen: () => setDrawer(false), onRename: v => rename(t, v), onArchive: () => archive(t), onDelete: () => remove(t), ...itemProps(t) });
+  const grouping = groupOf(listView, { envs: !!envs && !!c.threadGroups });   // Environment needs the workspace mod; else Date or None
   const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: v => { setQ(v); setLimit(LIST_PAGE); }, onMore: threads.length >= limit ? () => setLimit(n => n + LIST_PAGE) : null,
     onNew: () => newChat(), onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
     view: listView, onView: setListView, canGroup: !!envs, itemProps,
-    grouped: envs && groupOf(listView, { envs: true }) === 'environment' && c.threadGroups ? h(GroupedChats, { c, api, envs, view: listView, onView: setListView, known: threads, reloadKey: listKey,
-      renderItem: t => h(Item, { key: t.id, t, active: t.id === tid, onOpen: () => setDrawer(false), onRename: v => rename(t, v), onArchive: () => archive(t), onDelete: () => remove(t), ...itemProps(t) }),
-      onNewIn: newIn, onEnvsChanged: loadEnvList, onError: fail, go }) : null });
+    groupLabel: grouping === 'date' ? 'Chats by date' : 'Chats by environment',
+    grouped: grouping === 'environment' ? h(GroupedChats, { c, api, envs, view: listView, onView: setListView, known: threads, reloadKey: listKey,
+      renderItem, onNewIn: newIn, onEnvsChanged: loadEnvList, onError: fail, go })
+      : grouping === 'date' && threads.length ? h(DateSections, { threads, view: listView, renderItem }) : null });   // chat-history 2.3
   return h('div', { ref: rootRef, style: { display: 'flex', height: '100%', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.bg } },
     narrow ? null : h('div', { style: { width: 248, flex: 'none', borderRight: '1px solid ' + T.bd, minHeight: 0 } }, list),
     narrow && drawer ? h(React.Fragment, null,

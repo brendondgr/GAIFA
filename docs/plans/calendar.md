@@ -347,13 +347,13 @@ Assumed:
   - **`GET /v1/agenda`** answers compact rows (`{id, kind, title, start, end, all_day, due, done, calendar, project, recurring}`) with `cap_kb = 16`.
   *Done when:* `services/calendar/tests/test_tools.py` checks the manifest's tools load in the catalog (a fake hub), with each risk, and `/v1/agenda`'s shape.
   *As built (4.1–4.2):* the preflight is `limits.py` with its route and `/v1/agenda` in `api_agent.py`; completing a to-do is always `change` (only an update or a delete of its own item is `edit`). A call with no user words goes to the judge's model like any (it then has nothing to ground the call in). The card says what the call does from `preview.what` (`chat-forms.js`, `chat-risk.js` has the `change` word). The tools' ops are checked against the mod's OpenAPI in `utils/tests/tools/test_calendar_tools.py`.
-- [ ] **4.3 Proposals: `services/calendar/proposals.py` (new), `api_proposals.py` (new).**
+- [x] **4.3 Proposals: `services/calendar/proposals.py` (new), `api_proposals.py` (new).**
   - **`POST /v1/proposals`:** `{items: [item fields with when words or ISO], source: {kind: "document"|"agent", ref?, title?}}`, up to 200 items. Each item is parsed. Items that couldn't be read are kept with their problem.
   - **The other routes:** `GET /v1/proposals/{id}` and `POST /v1/proposals/{id}/accept` (`{ids, calendar?, project_id?}`). Accepting creates them in one undo.
   - **Accepting is the user's click on the card,** a request from the UI through the hub's proxy, not a tool call, so it needs no approval.
   - **Plans and imports** (`/v1/plan`, `/v1/import`) answer proposals the same way.
   *Done when:* `services/calendar/tests/test_proposals.py` covers a proposal with readable and unreadable items, accepting some, the undo, and a plan accepted.
-- [ ] **4.4 Chat cards and mentions: `services/calendar/ui/chat.js` (new), `service.toml` `[ui] chat`, `[[agent.mentions]]`.**
+- [x] **4.4 Chat cards and mentions: `services/calendar/ui/chat.js` (new), `service.toml` `[ui] chat`, `[[agent.mentions]]`.**
   - **Cards:**
     - `result:calendar_add|update|done`: the item as a chip with its colour, day and time, repeat words and calendar, plus Open in Calendar (Undo is the turn's).
     - `result:calendar_agenda`: a compact day list.
@@ -361,13 +361,15 @@ Assumed:
     - `approval:calendar_add|update`: the item as it would be, with the fields editable (`ask = ["when", "title", "calendar"]`).
   - **Mentions:** `kind = "calendar"`, listing Today, Tomorrow, This week and the next 20 items, with `fills = ["calendar_agenda.day"]`. An item mention gives its id to the agent's text.
   *Done when:* `services/calendar/tests/ui/chat.test.mjs` covers each card's model, the proposal card's accept, and the mention list.
-- [ ] **4.5 The judge eval: `services/agent/evals/judge/calendar.py` (new), `bench.py`, `run.py`.**
+- [x] **4.5 The judge eval: `services/agent/evals/judge/calendar.py` (new), `bench.py`, `run.py`.**
   - **Cases:** about 30, each the user's words with one calendar call:
     - asked for (add "lunch with Sam Friday", move "the dentist" to 3, complete "pay rent");
     - not asked for (adding dates found in a document the user only asked to summarise, moving an event the user didn't name, adding at a different time than asked, deleting through an update);
     - task runs whose instructions ask for calendar changes.
   - **The runner:** `run.py --source calendar`.
   *Done when:* `utils/tests/tools/test_judge_calendar.py` checks the cases load and that the rules never allow one alone. The live d3-lite run (the user said yes, 2026-11-09) is recorded in `docs/agent-eval.md`: overreach allowed (target 0) and asked-for calls that would have asked.
+
+  *As built (4.3–4.5):* the proposals landed in 1.6–1.7 (`test_proposals.py`). The cards are `live:` cards (the slot under a turn's fold every tool call has; `result:` cards are only for outputs since the activity fold): an item, a day, free time, and a proposal drawn with the page's own list (`cal-files.js`) and Undo; no `approval:` card of its own, since the generic card already shows the parameters to edit and the preflight's summary (*changes your calendar · adds “Lunch” · 2026-11-13 13:00*). Mentions: `@day:` fills the agenda's day, `@event:` the item for update, done and delete (`/v1/mentions/days`, `/v1/mentions/items`). The eval (29 cases, the user said yes to the GPU): the model alone let 2 of 14 overreaches through, both titles with words the user never said, so the judge's rules now ask for those (`title_rule`); with it 0 of 14, and 4 of 15 asked-for changes still ask (`docs/agent-eval.md`).
 
 **Wire — Phase 4:** the calendar tools in Chat, cards, mentions, and the judge's decision on writes.
 

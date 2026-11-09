@@ -32,7 +32,7 @@ from utils.tools import judge_context
 from utils.tools.judge_context import as_lines, render
 
 from . import relay_judge
-from .bench import BENCH, CONTEXT, agentdojo, routine, scheduled, with_context
+from .bench import BENCH, CONTEXT, agentdojo, calendar, routine, scheduled, with_context
 
 RESULTS = BENCH / "results"
 SUMMARY = Path(__file__).with_name("results.json")
@@ -88,6 +88,8 @@ async def run(a: argparse.Namespace) -> None:
     chat = {"ask": relay_judge.ask_relay, "state": relay_judge.state} if a.backend == "relay" else {}   # web-approvals
     if a.source == "scheduled":                  # scheduled-tasks 3.4: unattended runs alone
         todo = scheduled()
+    elif a.source == "calendar":                 # calendar 4.5: calendar writes alone
+        todo = calendar()
     else:
         todo = with_context(agentdojo(), Path(a.history) if a.history else CONTEXT) + routine()
     if a.only:
@@ -213,8 +215,8 @@ def main() -> None:
     ap.add_argument("--variant", choices=sorted(VARIANTS), default="default")
     ap.add_argument("--only", default="", help="comma-separated item ids")
     ap.add_argument("--history", default="", help="another history file (default: agentdojo-context.jsonl)")
-    ap.add_argument("--source", choices=("bench", "scheduled"), default="bench",
-                    help="bench: AgentDojo and the routine set; scheduled: unattended runs (scheduled-tasks 3.4)")
+    ap.add_argument("--source", choices=("bench", "scheduled", "calendar"), default="bench",
+                    help="bench: AgentDojo and the routine set; scheduled: unattended runs (scheduled-tasks 3.4); calendar: calendar writes (calendar 4.5)")
     ap.add_argument("--summary", action="store_true")
     a = ap.parse_args()
     if a.summary:

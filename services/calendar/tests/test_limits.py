@@ -44,3 +44,11 @@ def test_agenda_rows(client):
     assert [(x["title"], x["start"], x.get("repeats")) for x in r["items"]] == [("Standup", "2030-01-07T09:15", True), ("Standup", "2030-01-08T09:15", True)]
     assert r["undated_todos"] == [{"id": r["undated_todos"][0]["id"], "title": "Rent"}]
     assert client.get("/v1/agenda", params={"day": "someday"}).json()["code"] == "bad_day"
+
+
+def test_mentions(client):
+    days = client.get("/v1/mentions/days").json()
+    assert [d["value"] for d in days[:2]] == ["today", "tomorrow"] and len(days) == 8
+    a = client.post("/v1/items", json={"title": "Dentist", "when": "tomorrow 3pm"}).json()["item"]
+    items = client.get("/v1/mentions/items").json()
+    assert items[0]["value"] == a["id"] and items[0]["label"].startswith("Dentist · ")

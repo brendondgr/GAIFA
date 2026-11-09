@@ -81,3 +81,30 @@ def agenda(request: Request, day: str | None = Query(None, description="today (d
         out["undated_todos"] = [{"id": o["item_id"], "title": o["title"]} for o in open_ if o.get("ts") is None][:30]
         out["overdue_todos"] = [row(o) for o in open_ if o.get("overdue")][:30]
     return out
+
+
+# ---- @-mentions (calendar plan 4.4) -----------------------------------------------------------------------------
+@router.get("/v1/mentions/days", summary="Days to @-mention (@day:today …): they fill calendar_agenda's day")
+def mention_days() -> list[dict]:
+    today = T.now_local().date()
+    out = [{"value": "today", "label": "Today"}, {"value": "tomorrow", "label": "Tomorrow"}]
+    for i in range(2, 8):
+        d = today + timedelta(days=i)
+        out.append({"value": d.isoformat(), "label": f"{d.strftime('%a %b')} {d.day}"})
+    return out
+
+
+@router.get("/v1/mentions/items", summary="Items to @-mention (@event:…): the next 30 days' events and open to-dos")
+def mention_items(request: Request) -> list[dict]:
+    c = cal(request)
+    now = T.now_local()
+    seen, out = set(), []
+    for o in c.items.range(now - timedelta(hours=12), now + timedelta(days=30)):
+        if o["item_id"] in seen or (o["kind"] == "todo" and o.get("done")):
+            continue
+        seen.add(o["item_id"])
+        when = o["start"].replace("T", " ") if o.get("start") else ""
+        out.append({"value": o["item_id"], "label": f"{o['title']} · {when}".strip(" ·")})
+        if len(out) >= 40:
+            break
+    return out

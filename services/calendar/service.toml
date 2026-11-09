@@ -20,10 +20,26 @@ install = "install.sh"
 
 [ui]
 page = "ui/page.js"
+chat = "ui/chat.js"            # calendar 4.4: its cards in Chat (an item, a day, a proposal to tick and add)
 main = { label = "Calendar", after = "chat" }      # calendar 3.1: #/calendar, after Chat in the sidebar
 
 [agent]
 limits = "POST /v1/limits"     # calendar 4.1: each call's action (read, change, or edit for an item it made in this chat)
+
+# @-mentions (calendar 4.4): @day:tomorrow fills the agenda's day; @event:<item> fills the item to change
+[[agent.mentions]]
+kind = "day"
+list = "GET /v1/mentions/days"
+value = "value"
+label = "label"
+fills = ["agenda.day"]
+
+[[agent.mentions]]
+kind = "event"
+list = "GET /v1/mentions/items"
+value = "value"
+label = "label"
+fills = ["update.iid", "done.iid", "delete.iid"]
 
 # The agent's tools (calendar 4.2). Names become calendar_<tool>. Writes go through the preflight above: in Auto
 # they run only when the judge finds the user asked for them; Manual and Accept edits ask.

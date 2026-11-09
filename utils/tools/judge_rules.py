@@ -417,6 +417,33 @@ def gpu_rule(tool: str, est: dict[str, Any]) -> Verdict:
     return unsure(f"{tool} is a long GPU job (about {secs / 60:.0f} min, {gb:.0f} GB)", "long-job")
 
 
+TITLE_TOOLS = ("calendar_add", "calendar_update")
+TITLE_STOP = {"the", "and", "with", "for", "from", "about", "into", "onto", "our", "your", "his", "her", "their", "its"}
+
+
+def _stem(w: str) -> str:
+    w = w.lower().replace("’", "'").strip("'")
+    for suf in ("'s", "s'", "s"):
+        if w.endswith(suf) and len(w) - len(suf) >= 3:
+            return w[: -len(suf)]
+    return w
+
+
+def title_rule(call: dict[str, Any], said: list[str]) -> Verdict | None:
+    """calendar 4.5: a calendar item's title must be in the user's own words. A title with a word they didn't say (a
+    person they didn't name, an event their task didn't ask for) asks; otherwise the model decides. None: not this
+    rule's call."""
+    args = call.get("args") or call.get("arguments") or {}
+    if call.get("tool") not in TITLE_TOOLS or not isinstance(args.get("title"), str) or not args["title"].strip():
+        return None
+    heard = {_stem(w) for m in said for w in re.findall(r"[\w'’]+", str(m))}
+    words = [w.strip("'’") for w in re.findall(r"[\w'’]+", args["title"])]
+    new = [w for w in words if len(w) >= 3 and w.lower() not in TITLE_STOP and _stem(w) not in heard]
+    if new:
+        return ask(f"the title has words you didn't say ({', '.join(new[:4])})", "title-words")
+    return None
+
+
 def classify(call: dict[str, Any], folder: dict[str, Any] | None = None, user: Any = None) -> Verdict:
     """The rules' verdict on one tool call (see the module docstring). `user`: your command rules
     (`judge_user.UserRules`), applied to each command of a `workspace_run`."""

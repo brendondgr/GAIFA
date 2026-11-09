@@ -197,6 +197,10 @@ class Agent(Compaction, Queueing, Prompting):
             task = asyncio.create_task(self._recall_into(tid, thread, text, ev["seq"]))
             self._recalls.setdefault(tid, set()).add(task)
             task.add_done_callback(lambda t: self._recalls.get(tid, set()).discard(t))
+        if (thread.get("settings") or {}).get("project") and not (thread.get("settings") or {}).get("dry_run"):
+            task = asyncio.create_task(self._fresh_into(tid, text, ev["seq"]))   # plan projects 3.5: waited for like recall
+            self._recalls.setdefault(tid, set()).add(task)
+            task.add_done_callback(lambda t: self._recalls.get(tid, set()).discard(t))
         if not queued and start:
             self.start(tid)
         return ev
@@ -210,6 +214,17 @@ class Agent(Compaction, Queueing, Prompting):
         got = await self._recall(tid, thread, text)
         if got:
             self.emit(tid, "recall", {"for": seq, "memory": got})
+
+    async def _fresh_into(self, tid: str, text: str, seq: int) -> None:
+        """The project's pages this message needs, fetched again when stale (a `project_refresh` event; plan projects 3.5)."""
+        from .projects import fresh
+        p = self.project_of(tid)
+        if p is None:
+            return
+        try:
+            await fresh.refresh_for(self, tid, p["id"], text, seq)
+        except Exception:  # noqa: BLE001: a message never fails over a page
+            log.exception("refreshing project pages for %s", tid)
 
     async def _await_recall(self, tid: str) -> None:
         pending = list(self._recalls.get(tid, ()))

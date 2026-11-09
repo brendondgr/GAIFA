@@ -49,6 +49,8 @@ def _where(src: dict[str, Any], now: float) -> str:
             bits.append(f"fetched {sources.age_words(now - src['fetched'])} ago")
         if src.get("status") == "error":
             bits.append(f"the last fetch failed: {src.get('error') or 'unknown error'}; this is the last copy")
+        elif src.get("status") == "fetching":                     # plan projects 3.5: a fetch that took too long
+            bits.append("being fetched again; this is the last copy")
     return ", ".join(bits)
 
 

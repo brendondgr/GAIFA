@@ -76,6 +76,15 @@ export function buildView(events, live = {}) {
         todos = Array.isArray(p.items) ? p.items : [];
         if (!todoItem) { todoItem = { key: 'todos', kind: 'todos', ev, items: todos }; items.push(todoItem); } else todoItem.items = todos;
         break;
+      case 'project_refresh': {    // plan projects 3.5: pages fetched again for a message, drawn as a step of its turn
+        const pages = Array.isArray(p.pages) ? p.pages : [];
+        items.push({ key: 'e' + ev.seq, kind: 'tool', ev, call: { id: 'pr' + ev.seq, name: 'project_refresh', arguments: { pages } },
+          result: { id: 'pr' + ev.seq, name: 'project_refresh', status: pages.some(x => x.ok) || !pages.length ? 'done' : 'error',
+            content: pages.map(x => `${x.title}: ${x.ok ? 'fetched again' : x.slow ? 'still fetching (its last copy was used)' : x.error || 'failed'}`).join('\n'),
+            ...(pages.some(x => x.ok) || !pages.length ? {} : { error: { code: 'fetch_failed', detail: pages.map(x => x.error || 'still fetching').join('; ') } }) },
+          resultTs: ev.ts });
+        break;
+      }
       case 'usage': usage = p; break;
       case 'state': state = p.state; break;
       default:

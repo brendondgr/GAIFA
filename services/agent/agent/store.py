@@ -21,6 +21,7 @@ Event types (payload fields):
     note            {text, level}                        (fallback model used, step limit, …)
     error           {code, detail, fix?}
     state           {state: idle | running | waiting | cancelled | error, reason?}
+    project_refresh {for: seq, pages: [{sid, title, ok, error?, slow?}]}   (a project chat's pages fetched again, plan projects 3.5)
 
 Fork copies the events up to a seq into a new thread (rewind and branch).
 """

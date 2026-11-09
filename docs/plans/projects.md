@@ -154,7 +154,7 @@ Assumed:
   - **Risk:** search and read are read-only. Refresh is a network read of a page the user linked, so it gets no approval card.
   *Done when:* `services/agent/tests/test_project_tools.py` covers each tool and checks that they are absent from a plain chat's tool list.
   *As built:* `Local` mixes in `ProjectTools`; the names are in `LOCAL_NAMES`, and `ToolSet` offers the schemas only when the chat has `settings.project` (a plain chat calling one gets `not_a_project_chat`). `project_` is in `UNTRUSTED_TOOLS`.
-- [ ] **3.5 Pages fetched again when a question needs them: `services/agent/agent/projects/fresh.py` (new), `loop.py` (beside `_recall_into`).**
+- [x] **3.5 Pages fetched again when a question needs them: `services/agent/agent/projects/fresh.py` (new), `loop.py` (beside `_recall_into`).**
   - **Matching:** for a project chat's user message, `fresh.match(pid, text)` searches the project's collection, keeping only page chunks and grouping them by source. A page counts as matched when its best score is at or above `MATCH_MIN`, or its title or URL words appear in the message. At most 3 pages are matched.
   - **Fetching:** matched pages older than their `max_age_s` (and not set to never) are fetched again in parallel, re-indexed, and a `project_refresh {for: seq, pages:[{sid, title, ok, error?}]}` event is written. The first model call waits for this alongside recall (`RECALL_WAIT_S`). A page that takes longer is used as its last copy, and the prompt says so.
   - **Activity:** the event draws as a step ("Refreshed 2 pages") in the activity fold (`chat-steps.js` `registerStep`).
@@ -166,10 +166,11 @@ Assumed:
     - the event.
 
   Update architecture §14.2 (the `project_refresh` event).
+  *As built:* `MATCH_MIN` is 0.6 (by meaning) and `WORDS_MIN` 1.0 (BM25, without the embed mod); title and URL words count when they are 4+ letters and not common words. The fetches wait `FRESH_WAIT_S` (8 s, under the loop's 10 s recall wait) so the event is written before the model call; a slow page's fetch finishes in the background and the prompt calls its copy "being fetched again; this is the last copy". Eval dry runs never refresh. The step words are in `chat-steps.js` (with the three project tools'), and `chat-thread.js` turns the event into a step row.
 
 **Checks & deliverables — Phase 3**
 - [ ] On a second hub with the web and embed mods: a project with a short PDF and a news page. A question about the page's subject refreshes it (the step shows) and answers from it. An unrelated question refreshes nothing. With 30 large documents the knowledge switches to listed, and `project_search` finds a passage.
-- [ ] Delivered: `projects/sources.py`, `index.py`, `knowledge.py`, `tools.py`, `fresh.py`, the changed `loop.py`, `prompts.py`, `local.py`, and tests.
+- [x] Delivered: `projects/sources.py`, `index.py`, `knowledge.py`, `tools.py`, `fresh.py`, the changed `loop.py`, `prompts.py`, `local.py`, and tests.
 
 ## Phase 4 — Instructions, defaults and project memory (M)
 

@@ -105,6 +105,14 @@ const W = {
   lcpp_stop_llm: { running: 'Stopping an LLM', done: 'Stopped an LLM', icon: 'stop', detail: a => a.name || '' },
   vllm_load_llm: { running: 'Loading an LLM in vLLM', done: 'Loaded an LLM in vLLM', icon: 'play', detail: a => a.profile || a.id || '' },
   vllm_unload_llm: { running: 'Unloading the vLLM model', done: 'Unloaded the vLLM model', icon: 'stop' },
+  // plan projects 3.4–3.5: a project's files and pages
+  project_refresh: { running: 'Refreshing pages', icon: 'globe', lookup: true,
+    done: a => { const n = (a.pages || []).filter(x => x.ok).length, all = (a.pages || []).length;
+      return n === all ? `Refreshed ${all} page${all === 1 ? '' : 's'}` : `Refreshed ${n} of ${all} pages`; },
+    detail: a => (a.pages || []).map(x => x.title).filter(Boolean).join(', ') },
+  project_search: { running: 'Searching the project', done: 'Searched the project', icon: 'search', lookup: true, detail: a => quoted(a.query) },
+  project_read: { running: 'Reading a project file', done: 'Read a project file', icon: 'bookmark', lookup: true, detail: a => a.source || '' },
+  project_refresh_page: { running: 'Refreshing a page', done: 'Refreshed a page', icon: 'globe', lookup: true, detail: a => a.source || '' },
 };
 for (const [k, v] of Object.entries(W)) registerStep(k, v);
 

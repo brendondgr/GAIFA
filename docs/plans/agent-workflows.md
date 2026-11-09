@@ -66,7 +66,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 
 ## Phase 2 — Background children, messages and requests (M)
 
-- [ ] **2.1 Background and messages: `workflows/tool.py`, `workflows/notes.py`.**
+- [x] **2.1 Background and messages: `workflows/tool.py`, `workflows/notes.py`.** *(As built: reporting is in `runner.py` (`report`, `flush`); no `notes.py` was needed.)*
   - `agent {…, background: true}` returns at once with the child's id. Further local tools: `agent_wait {child?, timeout}` (the first or named child to finish), `agent_send {child, text}` (a `user` event `by: "parent"`), `agent_stop {child}`, `agent_list`.
   - When a background child ends, the parent gets a stored `agent_done` event (read by the model as `[sub-agent <label> finished] <answer>`); an idle parent starts a turn, a running one reads it on its next call (like a steer), a parent waiting on you holds it until then.
   *Done when:* `test_workflow_background.py`: a background child's end starts the idle parent's turn; `agent_send` reaches a running child; `agent_stop` writes the cancelled result.

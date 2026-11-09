@@ -46,6 +46,7 @@ class Workflows:
         self.store = agent.store
         self.limits = Limits(agent.hub, limits)
         self.active: dict[str, str] = {}          # started sub-agents whose turn runs → their slot (local | remote)
+        self.waiters: dict[str, int] = {}         # parent → its agent_wait calls under way: they report what ends (2.1)
         self.changed = asyncio.Event()            # a sub-agent started, ended or was stopped
         self._draining = asyncio.Lock()
         agent.on_turn_end.append(self.turn_ended)
@@ -54,7 +55,8 @@ class Workflows:
     # ---- spawning -------------------------------------------------------------------------------
 
     async def spawn(self, parent_id: str, prompt: str, label: str, model: str | None = None, write: bool = False,
-                    by: str = "agent", tool_call_id: str | None = None, turn: int | None = None) -> dict[str, Any]:
+                    by: str = "agent", tool_call_id: str | None = None, turn: int | None = None,
+                    background: bool = False) -> dict[str, Any]:
         """A new sub-agent of `parent_id`, queued (WorkflowError when a limit refuses it)."""
         lim = await self.limits.get()
         if not lim["enabled"]:
@@ -84,7 +86,8 @@ class Workflows:
             raise WorkflowError("workflow_budget", "this turn's sub-agents used their token budget",
                                 "finish with what you have")
         spawn = {"root": root, "parent": parent_id, "label": label, "by": by, "tool_call_id": tool_call_id,
-                 "write": bool(write), "depth": depth, "turn": turn, "seen": True}
+                 "write": bool(write), "depth": depth, "turn": turn, "seen": True,
+                 **({"background": True, "reported": False} if background else {})}
         settings = child_settings(parent, spawn, int(lim["child_max_steps"]))
         unknown = model if model and not await self.served(model) else None     # "inherit", "same", a typo: the parent's
         th = self.store.create_thread(label, (None if unknown else model) or parent.get("model"), parent.get("mode") or "manual",
@@ -147,6 +150,8 @@ class Workflows:
     async def turn_ended(self, tid: str) -> None:
         t = self.store.thread(tid)
         sp = spawn_of(t)
+        if t is not None and t["state"] == "idle" and self._unread_done(tid):
+            self.agent.start(tid)                   # a sub-agent's end arrived as this chat's turn ended: read it now
         if not sp:
             return
         self.active.pop(tid, None)
@@ -159,9 +164,59 @@ class Workflows:
     def _ended(self, tid: str) -> None:
         t = self.store.thread(tid) or {}
         st = dict(t.get("settings") or {})
-        st["spawn"] = {**(st.get("spawn") or {}), "seen": False, "ended": self.clock()}
+        sp = st["spawn"] = {**(st.get("spawn") or {}), "seen": False, "ended": self.clock()}
         self.store.update_thread(tid, settings=st)
         self.publish(tid)
+        if sp.get("background") and not sp.get("reported") and not self.waiters.get(str(sp.get("parent"))):
+            self.report(tid)
+
+    def mark(self, tid: str, **fields: Any) -> None:
+        t = self.store.thread(tid)
+        if t is not None:
+            st = dict(t["settings"])
+            st["spawn"] = {**st.get("spawn", {}), **fields}
+            self.store.update_thread(tid, settings=st)
+
+    def delivered(self, tid: str) -> dict[str, Any]:
+        """The result as the parent reads it: the answer inside <untrusted> when the sub-agent read outside text."""
+        from .. import context as ctx
+        res = self.result(tid)
+        if res.get("answer") and ctx.read_untrusted(self.store.events(tid)):
+            res["answer"] = ctx.untrusted(f"sub-agent {res.get('label')}", res["answer"])
+        res["chat"] = f"#/chat/{tid}"
+        return res
+
+    def report(self, tid: str) -> None:
+        """A background sub-agent ended: an `agent_done` event in its parent (read as a message from GAIFA, not the
+        user); an idle parent starts a turn, a running one reads it at its next model call, a waiting one after."""
+        sp = spawn_of(self.store.thread(tid))
+        parent = str(sp.get("parent"))
+        if self.store.thread(parent) is None:
+            return
+        self.mark(tid, reported=True)
+        self.agent.emit(parent, "agent_done", self.delivered(tid))
+        p = self.store.thread(parent) or {}
+        if not self.agent.busy(parent) and p.get("state") != "waiting":
+            self.agent.start(parent)
+
+    def flush(self, parent: str) -> None:
+        """Report the background sub-agents that ended while an agent_wait was under way and didn't return them."""
+        if self.waiters.get(parent):
+            return
+        for c in self.store.children(parent):
+            sp = spawn_of(c)
+            if sp.get("background") and not sp.get("reported") and self.finished(c["id"]):
+                self.report(c["id"])
+
+    def _unread_done(self, tid: str) -> bool:
+        done = self.store.events(tid, types=("agent_done",))
+        if not done:
+            return False
+        mark = self.agent._read_upto.get(tid)
+        if mark is None:
+            usage = self.store.events(tid, types=("usage",))
+            mark = usage[-1]["seq"] if usage else 0
+        return done[-1]["seq"] > mark
 
     def finished(self, tid: str) -> bool:
         t = self.store.thread(tid)
@@ -242,6 +297,8 @@ class Workflows:
         """Queued ones first, so a running one's freed slot doesn't start them."""
         kids = sorted(self.store.children(tid), key=lambda c: c["state"] != "queued")
         for c in kids:
+            if not self.finished(c["id"]):
+                self.mark(c["id"], reported=True)    # stopped with its parent: nothing to report, no turn to start
             await self.stop(c["id"], "stopped with the chat that started it")
 
     def tokens(self, parent_id: str, turn: int) -> int:

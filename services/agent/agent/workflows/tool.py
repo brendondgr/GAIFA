@@ -1,4 +1,7 @@
-"""The `agent` tool and the Sub-agents prompt part (plan agent-workflows 1.3).
+"""The `agent` tools and the Sub-agents prompt part (plan agent-workflows 1.3, 2.1).
+
+`agent_wait`, `agent_send`, `agent_stop` and `agent_list` (2.1) come with it: `background: true` returns at once, and the
+sub-agent's end arrives as an `agent_done` event (runner.report) unless an agent_wait returns it first.
 
 A chat that may spawn (workflows on, not at `max_depth`) gets the local tool `agent {prompt, label, model?, write?}`:
 it spawns a sub-agent and waits for it; transient `progress` events carry the sub-agent's state and current step for
@@ -10,6 +13,7 @@ by side (they count as reads, so the loop gathers them), each in its slot.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 from .. import context as ctx
@@ -28,16 +32,31 @@ AGENT = {"name": "agent", "description": "Start a sub-agent for one independent 
              "label": {"type": "string", "description": "2–4 words naming its part, e.g. \"Read the tests folder\""},
              "model": {"type": "string", "description": "Only to use another model the relay serves; leave it out for this chat's"},
              "write": {"type": "boolean", "default": False,
-                       "description": "It may change files (one such sub-agent at a time); otherwise it only reads"}},
+                       "description": "It may change files (one such sub-agent at a time); otherwise it only reads"},
+             "background": {"type": "boolean", "default": False,
+                            "description": "Return at once and go on; its answer arrives as a message when it's done"}},
              "required": ["prompt", "label"]}}
-TOOLS = [AGENT]
+CHILD_ARG = {"type": "string", "description": "The sub-agent's id (child, from agent or agent_list)"}
+TOOLS = [AGENT,
+         {"name": "agent_wait", "description": "Wait for a background sub-agent to finish (the first one, or `child`) and get "
+          "its answer.", "parameters": {"type": "object", "properties": {
+              "child": CHILD_ARG, "timeout": {"type": "integer", "minimum": 5, "maximum": 1800, "default": 600}}}},
+         {"name": "agent_send", "description": "Send a sub-agent this chat started a follow-up message (more to do, or a "
+          "correction); its next answer comes back as from a background one.",
+          "parameters": {"type": "object", "properties": {"child": CHILD_ARG, "text": {"type": "string"}},
+                         "required": ["child", "text"]}},
+         {"name": "agent_stop", "description": "Stop a sub-agent this chat started.",
+          "parameters": {"type": "object", "properties": {"child": CHILD_ARG}, "required": ["child"]}},
+         {"name": "agent_list", "description": "The sub-agents this chat started, with their state.",
+          "parameters": {"type": "object", "properties": {}}}]
 NAMES = {t["name"] for t in TOOLS}
 
 PARENT = ("`agent` hands one independent part of a task to a sub-agent, in a chat of its own that sees none of this one: "
           "`prompt` says the goal, where to look and what to report; its last reply is the result. Several in one step run "
           "side by side. Use them for parts that don't depend on each other (several folders, documents or pages; surveying "
           "options), never for one lookup, steps that build on each other, or what you can do in a step or two: each costs "
-          "a whole chat. They only read unless write: true (one writer at a time). Check what matters in their answers.")
+          "a whole chat. They only read unless write: true (one writer at a time). With background: true it returns at once; "
+          "its answer arrives later as a message (or agent_wait for it). Check what matters in their answers.")
 CHILD = ("You are a sub-agent: the chat “{parent}” started you to do one task, and its prompt is this chat's first message. "
          "Do that task, then reply with what you found or did, complete and to the point: that last reply goes back to the "
          "chat that started you (the user can read this chat too). {rights} Don't ask questions: decide what you can, and say "
@@ -102,29 +121,116 @@ class WorkflowTools:
         if child is None and not str(args.get("prompt") or "").strip() and other:     # `instruction`, `task`: say which name
             return self.err(tid, cid, "agent", "invalid_arguments", f"prompt is empty; there is no {', '.join(other)}",  # type: ignore[attr-defined]
                             'send the whole task as `prompt` (with `label`): {"prompt": "…", "label": "…"}')
+        background = bool(args.get("background"))
         if child is None:
             try:
                 child = await wf.spawn(tid, str(args.get("prompt") or ""), str(args.get("label") or ""),
-                                       model=args.get("model") or None, write=bool(args.get("write")), tool_call_id=cid)
+                                       model=args.get("model") or None, write=bool(args.get("write")), tool_call_id=cid,
+                                       background=background)
             except WorkflowError as e:
                 return self.err(tid, cid, "agent", e.code, e.detail, e.fix)  # type: ignore[attr-defined]
         kid = child["id"]
+        data = {"agent": {"child": kid, "label": spawn_of(child).get("label"), "background": background}}
+        if background or spawn_of(child).get("background"):
+            return self.ok(tid, cid, "agent", {"child": kid, "label": spawn_of(child).get("label"), "state": child["state"],  # type: ignore[attr-defined]
+                                               "background": True, "chat": f"#/chat/{kid}",
+                                               "note": "it runs on its own: its answer arrives as a message when it's done "
+                                                       "(agent_wait waits for it)"}, data=data)
+        res = await wf.wait(kid, on_change=self._progress(tid, cid))
+        wf.mark(kid, seen=True)                               # its answer is shown here
+        wf.publish(kid)
+        res = wf.delivered(kid)
+        data["agent"]["state"] = res.get("state")
+        return self.ok(tid, cid, "agent", res, data=data)  # type: ignore[attr-defined]
 
+    def _progress(self, tid: str, cid: str) -> Any:
         def changed(t: dict[str, Any] | None) -> None:
             words, live = _doing(self.a, t)
             self.a.transient(tid, "progress", {"id": cid, "note": f"{live.get('label', 'sub-agent')}: {words}",
                                                "live": {"agent": live}})
+        return changed
 
-        res = await wf.wait(kid, on_change=changed)
-        t = self.a.store.thread(kid)
-        if t is not None:                                     # its answer is shown here: seen
-            st = dict(t["settings"])
-            st["spawn"] = {**st.get("spawn", {}), "seen": True}
-            self.a.store.update_thread(kid, settings=st)
-            wf.publish(kid)
-        res = dict(res or wf.result(kid))
-        if res.get("answer") and ctx.read_untrusted(self.a.store.events(kid)):
-            res["answer"] = ctx.untrusted(f"sub-agent {res.get('label')}", res["answer"])
-        res["chat"] = f"#/chat/{kid}"
-        return self.ok(tid, cid, "agent", res, data={"agent": {"child": kid, "label": res.get("label"),  # type: ignore[attr-defined]
-                                                                "state": res.get("state")}})
+    def _own(self, tid: str, cid: str, name: str, args: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+        """The sub-agent `child` names, if this chat started it; else an error result."""
+        kid = str(args.get("child") or "").strip()
+        c = next((c for c in self.a.store.children(tid) if c["id"] == kid), None)
+        if c is None:
+            return None, self.err(tid, cid, name, "unknown_child", f"{kid or 'child'} isn't a sub-agent this chat started",  # type: ignore[attr-defined]
+                                  "agent_list shows them")
+        return c, None
+
+    async def t_agent_wait(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        wf = self.a.workflows
+        want = None
+        if args.get("child"):
+            want, bad = self._own(tid, cid, "agent_wait", args)
+            if bad:
+                return bad
+        def pending() -> list[dict[str, Any]]:
+            return [c for c in self.a.store.children(tid) if spawn_of(c).get("background") and not spawn_of(c).get("reported")
+                    and (want is None or c["id"] == want["id"])]
+        if not pending():
+            return self.err(tid, cid, "agent_wait", "nothing_to_wait_for",  # type: ignore[attr-defined]
+                            "no background sub-agent of this chat is still to report" if want is None
+                            else f"{want['id']} has reported already, or wasn't started in the background",
+                            "its answer is in this chat already; agent_list shows them all")
+        timeout = min(max(int(args.get("timeout") or 600), 5), 1800)
+        wf.waiters[tid] = wf.waiters.get(tid, 0) + 1
+        try:
+            deadline = asyncio.get_running_loop().time() + timeout
+            while True:
+                done = next((c for c in pending() if wf.finished(c["id"])), None)
+                if done is not None:
+                    wf.mark(done["id"], reported=True, seen=True)
+                    wf.publish(done["id"])
+                    res = wf.delivered(done["id"])
+                    left = [spawn_of(c).get("label") for c in pending()]
+                    return self.ok(tid, cid, "agent_wait", {**res, **({"still_running": left} if left else {})},  # type: ignore[attr-defined]
+                                   data={"agent": {"child": done["id"], "label": res.get("label"), "state": res.get("state")}})
+                left_s = deadline - asyncio.get_running_loop().time()
+                if left_s <= 0:
+                    return self.ok(tid, cid, "agent_wait", {"timed_out": True, "still_running": [  # type: ignore[attr-defined]
+                        {"child": c["id"], "label": spawn_of(c).get("label"), "state": c["state"]} for c in pending()]})
+                changed = wf.changed
+                try:
+                    await asyncio.wait_for(changed.wait(), timeout=min(2.0, left_s))
+                except asyncio.TimeoutError:
+                    pass
+        finally:
+            wf.waiters[tid] -= 1
+            if not wf.waiters[tid]:
+                del wf.waiters[tid]
+                wf.flush(tid)
+
+    async def t_agent_send(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        c, bad = self._own(tid, cid, "agent_send", args)
+        if bad:
+            return bad
+        text = str(args.get("text") or "").strip()
+        if not text:
+            return self.err(tid, cid, "agent_send", "invalid_arguments", "text is empty")  # type: ignore[attr-defined]
+        wf = self.a.workflows
+        wf.mark(c["id"], background=True, reported=False)    # its next answer comes back as a background one's
+        if wf.finished(c["id"]):
+            await self.a.send(c["id"], text, by="parent", start=False)
+            self.a.store.update_thread(c["id"], state="queued")
+            await wf.drain()
+        else:
+            await self.a.send(c["id"], text, by="parent")
+        wf.publish(c["id"])
+        return self.ok(tid, cid, "agent_send", {"child": c["id"], "sent": True,  # type: ignore[attr-defined]
+                                                "note": "its answer arrives as a message when it's done (agent_wait waits for it)"})
+
+    async def t_agent_stop(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        c, bad = self._own(tid, cid, "agent_stop", args)
+        if bad:
+            return bad
+        self.a.workflows.mark(c["id"], reported=True)        # stopped on purpose: no message about it
+        await self.a.workflows.stop(c["id"], "stopped by the chat that started it")
+        return self.ok(tid, cid, "agent_stop", {"child": c["id"], "state": (self.a.store.thread(c["id"]) or {}).get("state")})  # type: ignore[attr-defined]
+
+    async def t_agent_list(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        rows = [{"child": c["id"], "label": spawn_of(c).get("label"), "state": c["state"],
+                 "background": bool(spawn_of(c).get("background")), "reported": bool(spawn_of(c).get("reported")),
+                 "write": bool(spawn_of(c).get("write"))} for c in self.a.store.children(tid)]
+        return self.ok(tid, cid, "agent_list", {"sub_agents": rows} if rows else {"sub_agents": [], "note": "none yet"})  # type: ignore[attr-defined]

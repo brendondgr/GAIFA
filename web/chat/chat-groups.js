@@ -1,6 +1,7 @@
 // The chat list by environment (plan 41.2, after Claude Code's sidebar): one section per environment (Phase 34's
 // workspaces) with its name, how many chats, New chat in it and a ⋯ menu (Rename, Manage folders), then its
-// first chats in the chosen order and Show more. The View menu picks the grouping and both orders; they and the
+// first chats in the chosen order and Show more. The View menu picks which chats (Chats, Archived, Both), the
+// grouping (Environment, Date, None) and both orders (plan chat-history 2.2); they and the
 // collapsed sections are saved in config.toml (`[ui.chat.list]`, settings-that-stick 3.3; `gaifa.chat.list` before). Chats load per section from the agent
 // (`GET /v1/threads?environment=`, `GET /v1/threads/groups`), so a big environment never loads whole.
 // Pure helpers first (tested in utils/tests/web/chat-groups.test.mjs). Written by us (web/PATCHES.md).
@@ -13,22 +14,33 @@ const enc = encodeURIComponent;
 export const LIST_VIEW = 'gaifa.chat.list';
 export const FIRST = 6;          // chats shown in a section before Show more
 export const MORE = 20;          // and each Show more adds
-export const VIEW_DEFAULTS = { group: 'environment', envOrder: 'activity', chatOrder: 'updated', collapsed: [] };
-export const GROUP_BY = [['environment', 'Environment'], ['none', 'None']];
-export const SHOW = [['chats', 'Chats'], ['archived', 'Archived']];
+export const VIEW_DEFAULTS = { show: 'chats', group: 'environment', envOrder: 'activity', chatOrder: 'updated', collapsed: [] };
+// Group by: a grouping needing more than the chats' own fields says so in `needs` (Environment: the workspace mod's
+// environments); a later one (projects: Project) adds a row here and its sections in the list.
+export const GROUP_BY = [['environment', 'Environment'], ['date', 'Date'], ['none', 'None']];
+export const GROUP_NEEDS = { environment: 'envs' };
+export const SHOW = [['chats', 'Chats'], ['archived', 'Archived'], ['both', 'Both']];
 export const ENV_ORDERS = [['activity', 'Recent activity'], ['name', 'Name'], ['created', 'Created']];
 export const CHAT_ORDERS = [['updated', 'Recent activity'], ['title', 'Name'], ['created', 'Created']];
 
-/** `[ui.chat.list]` (snake case) ↔ the page's view. */
-export const viewOfUi = u => (u && typeof u === 'object' ? { group: u.group, envOrder: u.env_order, chatOrder: u.chat_order, collapsed: u.collapsed } : {});
-export const uiOfView = v => ({ group: v.group, env_order: v.envOrder, chat_order: v.chatOrder, collapsed: [...(v.collapsed || [])] });
+/** `[ui.chat.list]` (snake case) ↔ the page's view. An old saved `archived` toggle reads as Show: Archived. */
+export const viewOfUi = u => (u && typeof u === 'object' ? { show: u.show ?? (u.archived === true ? 'archived' : undefined), group: u.group,
+  envOrder: u.env_order, chatOrder: u.chat_order, collapsed: u.collapsed } : {});
+export const uiOfView = v => ({ show: v.show || 'chats', group: v.group, env_order: v.envOrder, chat_order: v.chatOrder, collapsed: [...(v.collapsed || [])] });
+/** Show → the agent's `archived` filter: live chats (false), archived ones (true), or both ('all'). */
+export const archivedParam = show => (show === 'both' ? 'all' : show === 'archived');
+/** The groupings the menu offers: Environment only with the workspace mod's environments (`have.envs`). */
+export const groupChoices = (have = {}) => GROUP_BY.filter(([k]) => !GROUP_NEEDS[k] || have[GROUP_NEEDS[k]]);
+/** The grouping in effect: the saved one, or None when what it needs is missing (no environments). */
+export const groupOf = (view, have = {}) => (groupChoices(have).some(([k]) => k === view.group) ? view.group : 'none');
 const saved0 = () => { const u = uiPrefs.get('chat.list', null); return u ? viewOfUi(u) : getPref(LIST_VIEW, {}); };
 
 /** The saved view, with defaults for anything missing or unknown. */
 export function readView(saved = saved0()) {
   const v = { ...VIEW_DEFAULTS, ...Object.fromEntries(Object.entries(saved && typeof saved === 'object' ? saved : {}).filter(([, x]) => x !== undefined)) };
+  if (saved?.show === undefined && saved?.archived === true) v.show = 'archived';      // the old toggle (chat-history 2.2)
   const ok = (list, x, d) => (list.some(([k]) => k === x) ? x : d);
-  return { group: ok(GROUP_BY, v.group, 'environment'), envOrder: ok(ENV_ORDERS, v.envOrder, 'activity'),
+  return { show: ok(SHOW, v.show, 'chats'), group: ok(GROUP_BY, v.group, 'environment'), envOrder: ok(ENV_ORDERS, v.envOrder, 'activity'),
     chatOrder: ok(CHAT_ORDERS, v.chatOrder, 'updated'), collapsed: Array.isArray(v.collapsed) ? v.collapsed.map(String) : [] };
 }
 export const saveView = v => uiPrefs.set('chat.list', uiOfView(v));
@@ -78,6 +90,9 @@ export const shownRows = rows => rows.filter(r => r.count > 0);
 export const sectionChats = (row, loaded, known) => (row.count ? overlay(loaded || [], known) : []);
 const pick = t => Object.fromEntries(['title', 'state', 'running', 'updated', 'archived'].filter(k => k in t).map(k => [k, t[k]]));
 
+/** What an empty list says, per Show. */
+export const emptyText = (show, q = '') => (q ? `No chats match “${q}”.` : show === 'archived' ? 'No archived chats.' : 'No chats yet. Start one ↑');
+
 /** Environments from the workspace mod, or null without it (the list is then flat). */
 export async function loadEnvs(api) {
   if (!api?.callService) return null;
@@ -100,16 +115,17 @@ function Choice({ label, value, options, onPick }) {
       options.map(([k, l]) => h('button', { key: k, type: 'button', role: 'radio', 'aria-checked': k === value ? 'true' : 'false', onClick: () => onPick(k), style: chipSt(k === value, { sm: true }) }, l))));
 }
 
-export function ViewMenu({ view, onChange, grouped = true, archived = false, onArchived = null }) {
+/** `envs`: whether the workspace mod's environments are known (Group by: Environment needs them). */
+export function ViewMenu({ view, onChange, envs = true }) {
   const React = R(), [open, setOpen] = React.useState(false);
   const set = patch => onChange({ ...view, ...patch });
   return h('span', { style: { position: 'relative', flex: 'none' } },
     h(Btn, { sm: true, icon: 'sliders', title: 'View: group and order the chats', 'aria-label': 'View', 'aria-expanded': open ? 'true' : 'false', onClick: () => setOpen(!open),
       className: 'aichat-quiet', style: { width: 30, height: 30, borderRadius: 7, background: 'transparent', color: T.mut } }),
     h(Popover, { open, onClose: () => setOpen(false), place: 'down-left', width: 280, label: 'View', style: { gap: 10 } },   // opens over the chat, not behind the app's rail
-      onArchived ? h(Choice, { label: 'Show', value: archived ? 'archived' : 'chats', options: SHOW, onPick: v => onArchived(v === 'archived') }) : null,   // the user's ask: archived chats from here too
-      grouped ? h(Choice, { label: 'Group by', value: view.group, options: GROUP_BY, onPick: group => set({ group }) }) : null,
-      grouped && view.group === 'environment' ? h(Choice, { label: 'Environments by', value: view.envOrder, options: ENV_ORDERS, onPick: envOrder => set({ envOrder }) }) : null,
+      h(Choice, { label: 'Show', value: view.show, options: SHOW, onPick: show => set({ show }) }),   // the one place to choose (chat-history 2.2)
+      h(Choice, { label: 'Group by', value: groupOf(view, { envs }), options: groupChoices({ envs }), onPick: group => set({ group }) }),
+      groupOf(view, { envs }) === 'environment' ? h(Choice, { label: 'Environments by', value: view.envOrder, options: ENV_ORDERS, onPick: envOrder => set({ envOrder }) }) : null,
       h(Choice, { label: 'Chats by', value: view.chatOrder, options: CHAT_ORDERS, onPick: chatOrder => set({ chatOrder }) })));
 }
 
@@ -149,9 +165,9 @@ export function Section({ row, open, onToggle, chats, loading, more, onMore, ren
 
 /** The sections and their chats. `known`: the page's flat list, whose live state (a turn running, a new title)
  * shows on the rows; `reloadKey`: bumped by the page when chats are made, moved, archived or deleted. */
-export function GroupedChats({ c, api, envs, archived, view, onView, known, reloadKey, renderItem, onNewIn, onEnvsChanged, onError, go }) {
+export function GroupedChats({ c, api, envs, view, onView, known, reloadKey, renderItem, onNewIn, onEnvsChanged, onError, go }) {
   const React = R(), [groups, setGroups] = React.useState(null), [chats, setChats] = React.useState({}), [shown, setShown] = React.useState({});
-  const rows = orderGroups(groupRows(groups, envs), view.envOrder);
+  const rows = orderGroups(groupRows(groups, envs), view.envOrder), archived = archivedParam(view.show);
   const want = (row, n) => c.threads({ environment: row.ids.join(','), sort: view.chatOrder, limit: n, archived })
     .then(list => setChats(m => ({ ...m, [row.env.id]: list })), onError);
   const key = rows.map(r => `${r.env.id}:${r.count}:${r.ids.length}`).join('|');
@@ -167,7 +183,7 @@ export function GroupedChats({ c, api, envs, archived, view, onView, known, relo
   };
   const anything = rows.some(r => r.count);
   return h('div', { style: { display: 'flex', flexDirection: 'column' } },
-    !anything ? h('div', { style: { padding: '12px 10px 4px', color: T.mut, fontSize: 12, textAlign: 'center' } }, archived ? 'No archived chats.' : 'No chats yet. Start one →') : null,
+    !anything ? h('div', { style: { padding: '12px 10px 4px', color: T.mut, fontSize: 12, textAlign: 'center' } }, emptyText(view.show)) : null,
     shownRows(rows).map(r => {
       const id = r.env.id, open = !view.collapsed.includes(id), list = sectionChats(r, chats[id], known);
       return h(Section, { key: id, row: r, open, chats: list, loading: !chats[id], more: list.length < r.count,

@@ -281,7 +281,7 @@ export function createMockApi() {
     memory: { reserve_gb: 12, auto_make_room: false, never_unload: ['lcpp'], priority: ['tts', 'comfy', 'gen3d', 'example', 'relay', 'lcpp'] },
     services: { order: services.map(s => s.id), enabled: Object.fromEntries(services.map(s => [s.id, true])), autostart: Object.fromEntries(services.map(s => [s.id, s.autostart])) },
     ui: { theme: 'system', density: 'compact', dashboard: { order: [], hidden: [], ranges: {} }, nav: { collapsed: false, services: 'list', hidden: [], folded: false },
-      chat: { steps: 'fold', list: { group: 'environment', env_order: 'activity', chat_order: 'updated', collapsed: [] }, environment: null },   // settings-that-stick 3.1
+      chat: { steps: 'fold', list: { show: 'chats', group: 'environment', env_order: 'activity', chat_order: 'updated', collapsed: [] }, environment: null },   // settings-that-stick 3.1
       overview: { view: 'dashboard', timeline_range: '24h', services_range: '24h' } },
     learning: { enabled: true, nightly_at: '03:00', idle_min: 60, infer_after: 2, fade_days: 60 },
     speech_input: { mics: [], language: '', preset: 'balanced', mode: 'both' },

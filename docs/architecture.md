@@ -582,7 +582,7 @@ steps = "split"             # Steps between messages: "fold" (default, one fold 
 environment = "work"        # the environment a new chat starts in (the last one picked)
 
 [ui.chat.list]              # the chat list's View menu
-group = "none"              # "environment" (default) or "none"; env_order, chat_order, collapsed
+group = "date"              # "environment" (default), "date" or "none"; show ("chats", "archived", "both"), env_order, chat_order, collapsed
 
 [ui.overview]               # the Overview (settings-that-stick 3.1)
 view = "timeline"           # "dashboard" (default), "services", "table" or "timeline"

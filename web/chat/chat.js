@@ -21,7 +21,7 @@ import './chat-save.js';
 import { ACTIVITY_CSS } from './chat-activity.js';
 import { createChatClient } from './chat-api.js';
 import { ThreadList, Item, LIST_CSS } from './chat-list.js';
-import { GroupedChats, readView, saveView, viewOfUi, loadEnvs } from './chat-groups.js';
+import { GroupedChats, readView, saveView, viewOfUi, loadEnvs, archivedParam, groupOf } from './chat-groups.js';
 import { useUiPref } from '../ui-prefs.js';
 import { ChatPane } from './chat-pane.js';
 import { SplitView, SPLIT_CSS } from './chat-split.js';
@@ -77,12 +77,13 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const React = R(), { useState, useEffect, useRef, useMemo } = React;
   const c = getChatClient(api), tid = route?.parts?.[1] || null;
   const [rootRef, width] = useWidth(1000), narrow = width < 760;
-  const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [archived, setArchived] = useState(false), [limit, setLimit] = useState(LIST_PAGE);
+  const [threads, setThreads] = useState([]), [listLoading, setListLoading] = useState(true), [q, setQ] = useState(''), [limit, setLimit] = useState(LIST_PAGE);
   const [models, setModels] = useState(null), [settings, setSettings] = useState(null), [tools, setTools] = useState(null);
   const [drawer, setDrawer] = useState(false), [down, setDown] = useState(null);
   const [judge, setJudge] = useState(null);       // GET /api/judge/status: Auto is offered while its model answers (plan 30.5)
   const [envs, setEnvs] = useState(null), [listKey, setListKey] = useState(0);   // plan 41.2
   const [listUi] = useUiPref('chat.list', null), listView = readView(listUi ? viewOfUi(listUi) : undefined);   // settings-that-stick 3.3: config.toml [ui.chat.list]
+  const archived = archivedParam(listView.show);   // Show: Chats, Archived or Both (chat-history 2.2)
   const [cmd, setCmd] = useState(null);           // the page's New chat, for the active pane
   // chat-split plan 2.2: the open chats' layout, saved in this browser; the URL follows the active pane
   const [layout, setLayout] = useState(() => withRoute(loadLayout() || single(tid), tid));
@@ -109,7 +110,9 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     setListLoading(false);
   };
   loadRef.current = loadList;
-  useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, archived, limit, listView.chatOrder]);
+  useEffect(() => { const t = setTimeout(loadList, q ? 220 : 0); return () => clearTimeout(t); }, [q, listView.show, limit, listView.chatOrder]);
+  const shown = useRef(listView.show);
+  useEffect(() => { if (shown.current !== listView.show) { shown.current = listView.show; setLimit(LIST_PAGE); setListLoading(true); } }, [listView.show]);
   const loadEnvList = () => loadEnvs(api).then(setEnvs);
   useEffect(() => { loadEnvList(); }, []);
   useEffect(() => {
@@ -142,7 +145,8 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   const listPatch = (id, p) => setThreads(l => l.map(x => (x.id === id ? { ...x, ...p } : x)));
   const patched = t => { if (!t?.id) return; listPatch(t.id, t); bus.current.dispatchEvent(new CustomEvent('patched', { detail: t })); };   // every pane showing it
   const rename = (t, title) => c.patch(t.id, { title }).then(patched, fail);
-  const archive = t => c.patch(t.id, { archived: !t.archived }).then(() => { setThreads(l => l.filter(x => x.id !== t.id)); relist(); toast(t.archived ? 'Moved back to chats' : 'Archived', 'success'); }, fail);
+  const archive = t => c.patch(t.id, { archived: !t.archived }).then(() => {   // with Show: Both the row stays, dimmed or not
+    setThreads(l => (archived === 'all' ? l.map(x => (x.id === t.id ? { ...x, archived: !t.archived } : x)) : l.filter(x => x.id !== t.id))); relist(); toast(t.archived ? 'Moved back to chats' : 'Archived', 'success'); }, fail);
   const move = (t, env) => c.patch(t.id, { settings: { environment: env } }).then(n => {   // plan 41.2: Move to
     patched(n); relist();
     toast(`Moved to ${(envs || []).find(e => e.id === env)?.name || env}`, 'success');
@@ -169,10 +173,10 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
   };
 
   // ---- render ----
-  const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: v => { setQ(v); setLimit(LIST_PAGE); }, archived, onArchived: v => { setArchived(v); setLimit(LIST_PAGE); setListLoading(true); }, onMore: threads.length >= limit ? () => setLimit(n => n + LIST_PAGE) : null,
+  const list = h(ThreadList, { threads, loading: listLoading, activeId: tid, q, onQ: v => { setQ(v); setLimit(LIST_PAGE); }, onMore: threads.length >= limit ? () => setLimit(n => n + LIST_PAGE) : null,
     onNew: () => newChat(), onOpen: () => setDrawer(false), onRename: rename, onArchive: archive, onDelete: remove, onClose: narrow ? () => setDrawer(false) : null, onSessions: openSessions ? () => { setDrawer(false); openSessions(); } : null,
     view: listView, onView: setListView, canGroup: !!envs, itemProps,
-    grouped: envs && listView.group === 'environment' && c.threadGroups ? h(GroupedChats, { c, api, envs, archived, view: listView, onView: setListView, known: threads, reloadKey: listKey,
+    grouped: envs && groupOf(listView, { envs: true }) === 'environment' && c.threadGroups ? h(GroupedChats, { c, api, envs, view: listView, onView: setListView, known: threads, reloadKey: listKey,
       renderItem: t => h(Item, { key: t.id, t, active: t.id === tid, onOpen: () => setDrawer(false), onRename: v => rename(t, v), onArchive: () => archive(t), onDelete: () => remove(t), ...itemProps(t) }),
       onNewIn: newIn, onEnvsChanged: loadEnvList, onError: fail, go }) : null });
   return h('div', { ref: rootRef, style: { display: 'flex', height: '100%', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.bg } },

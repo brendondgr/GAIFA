@@ -87,9 +87,11 @@ class NavCfg(_Strict):
 
 
 class ChatListCfg(_Strict):
-    """`[ui.chat.list]`: the chat list's View menu (plan 41.2): grouping, both orders, the folded sections."""
+    """`[ui.chat.list]`: the chat list's View menu (plan 41.2, chat-history 2.2): which chats, grouping, both orders,
+    the folded sections."""
 
-    group: Literal["environment", "none"] = "environment"
+    show: Literal["chats", "archived", "both"] = "chats"
+    group: Literal["environment", "date", "none"] = "environment"
     env_order: Literal["activity", "name", "created"] = "activity"
     chat_order: Literal["updated", "title", "created"] = "updated"
     collapsed: list[str] = []

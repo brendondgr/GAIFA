@@ -2,12 +2,12 @@
 // then "+ New" with the View button on its right, then the chats: rename (the ⋯ menu, or double-click a
 // title), archive, delete (with a confirm), Move to another environment. A row shows only the chat's name and its
 // state dot; ⋯ shows on hover or focus (always on a touch screen), and an archived chat (Show: Both) is dimmed
-// with an archive mark (plan chat-history 2.1). Sessions at the bottom. A drawer on narrow screens (chat.js
+// with an archive mark (plan chat-history 2.1). Which chats show is the View menu's (2.2). Sessions at the bottom. A drawer on narrow screens (chat.js
 // decides). Grouped by environment (plan 41.2), the list's body is chat-groups.js's sections. Chats by meaning
 // are in the header's Search (palette-meaning.js).
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, inputSt, label11 } from './chat-ui.js';
-import { ViewMenu, MoreBar } from './chat-groups.js';
+import { ViewMenu, MoreBar, emptyText } from './chat-groups.js';
 
 const R = () => globalThis.React;
 
@@ -81,13 +81,13 @@ export const LIST_CSS = `
 @media (hover:none){.aichat-item .aichat-more{display:grid}.aichat-sechead .aichat-more{opacity:1}}
 `;
 
-export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArchived, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
+export function ThreadList({ threads, loading, activeId, q, onQ, onMore, onNew, onOpen, onRename, onArchive, onDelete, onClose, onSessions,
   grouped = null, view = null, onView = null, canGroup = false, itemProps = () => ({}) }) {
   return h('aside', { 'aria-label': 'Chats', style: { width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: T.sb, minHeight: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 4px' } },
       h('label', { style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7, ...inputSt, height: 30, padding: '0 9px', borderRadius: 7 } },
         h('span', { style: { color: T.mut, display: 'flex' } }, h(Icon, { d: 'search', size: 13 })),
-        h('input', { value: q, onChange: e => onQ(e.target.value), placeholder: archived ? 'Search archived' : 'Search', 'aria-label': 'Search chats',
+        h('input', { value: q, onChange: e => onQ(e.target.value), placeholder: view?.show === 'archived' ? 'Search archived' : 'Search', 'aria-label': 'Search chats',
           style: { flex: 1, minWidth: 0, border: 0, outline: 'none', background: 'transparent', color: T.tx, font: 'inherit', fontSize: 12.5 } }),
         q ? h('button', { type: 'button', 'aria-label': 'Clear search', onClick: () => onQ(''), style: { border: 0, background: 'none', color: T.mut, cursor: 'pointer', padding: 0, display: 'flex' } }, h(Icon, { d: 'x', size: 12 })) : null),
       onClose ? h(Btn, { kind: 'ghost', sm: true, icon: 'x', title: 'Close', onClick: onClose }) : null),
@@ -96,15 +96,14 @@ export function ThreadList({ threads, loading, activeId, q, onQ, archived, onArc
         style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, height: 30, padding: '0 6px', borderRadius: 7, border: 0, background: 'transparent', color: T.tx, font: 'inherit', fontSize: 13, cursor: 'pointer', textAlign: 'left' } },
         h('span', { style: { width: 20, height: 20, borderRadius: 99, display: 'grid', placeItems: 'center', background: T.row, color: T.tx, flex: 'none' } }, h(Icon, { d: 'plus', size: 12 })),
         'New'),
-      view && onView ? h(ViewMenu, { view, onChange: onView, grouped: canGroup, archived, onArchived }) : null),
+      view && onView ? h(ViewMenu, { view, onChange: onView, envs: canGroup }) : null),
     grouped && !q.trim() ? h('nav', { 'aria-label': 'Chats by environment', style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px' } }, grouped) :
     h('nav', { style: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 6px 8px', display: 'flex', flexDirection: 'column', gap: 1 } },
       !threads.length ? h('div', { style: { padding: '18px 10px', color: T.mut, fontSize: 12, textAlign: 'center' } },
-        loading ? 'Loading…' : q ? `No chats match “${q}”.` : archived ? 'No archived chats.' : 'No chats yet. Start one ↑') : null,
+        loading ? 'Loading…' : emptyText(view?.show, q)) : null,
       threads.map(t => h(Item, { key: t.id, t, active: t.id === activeId, onOpen: () => onOpen?.(t),
         onRename: v => onRename(t, v), onArchive: () => onArchive(t), onDelete: () => onDelete(t), ...itemProps(t) })),
       onMore ? h(MoreBar, { onClick: onMore }) : null),
     h('div', { style: { padding: '8px 10px', borderTop: '1px solid ' + T.bd, display: 'flex', alignItems: 'center', gap: 6 } },
-      h('button', { type: 'button', 'aria-pressed': archived ? 'true' : 'false', onClick: () => onArchived(!archived), style: chipSt(archived, { sm: true }) }, h(Icon, { d: 'archive', size: 12 }), archived ? 'Showing archived' : 'Archived'),
       onSessions ? h('button', { type: 'button', onClick: onSessions, title: 'Save or switch setups (what runs and what is loaded)', style: { ...chipSt(false, { sm: true }), marginLeft: 'auto' } }, h(Icon, { d: 'bookmark', size: 12 }), 'Sessions') : null));
 }

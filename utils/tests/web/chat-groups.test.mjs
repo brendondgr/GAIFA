@@ -42,7 +42,7 @@ const GROUPS = [{ environment: 'grants', count: 9, updated: 40, running: 1 }, { 
 test('the saved view, with defaults for anything unknown', () => {
   assert.deepEqual(g.readView({}), g.VIEW_DEFAULTS);
   assert.deepEqual(g.readView({ group: 'none', envOrder: 'name', chatOrder: 'title', collapsed: ['art'] }),
-    { group: 'none', envOrder: 'name', chatOrder: 'title', collapsed: ['art'] });
+    { show: 'chats', group: 'none', envOrder: 'name', chatOrder: 'title', collapsed: ['art'] });
   assert.deepEqual(g.readView({ group: 'tag', chatOrder: 'size', collapsed: 'x' }), g.VIEW_DEFAULTS);
   assert.deepEqual(g.readView(null), g.VIEW_DEFAULTS);
   assert.deepEqual(g.toggled(['a'], 'b'), ['a', 'b']);
@@ -98,13 +98,17 @@ test('the View menu offers grouping only with environments', () => {
   const v = g.readView({});
   const choices = el => all(expand(el), n => n.props?.role === 'radiogroup').map(n => n.props['aria-label']);
   // the popover renders its children only when open; the stub's useState keeps it closed, so read the props
-  const menu = g.ViewMenu({ view: v, onChange() {}, grouped: true });
+  const menu = g.ViewMenu({ view: v, onChange() {}, envs: true });
   const pop = all(menu, n => n.props && 'label' in n.props && n.props.label === 'View')[0];
   assert.deepEqual(all(pop.props.children, n => n.props?.role === 'radiogroup').length, 0);   // Choice elements aren't expanded yet
-  assert.deepEqual(choices({ type: 'div', props: { children: pop.props.children } }), ['Group by', 'Environments by', 'Chats by']);
-  const flat = g.ViewMenu({ view: v, onChange() {}, grouped: false });
+  assert.deepEqual(choices({ type: 'div', props: { children: pop.props.children } }), ['Show', 'Group by', 'Environments by', 'Chats by']);
+  // without environments: Group by offers Date and None, and the saved Environment reads as None
+  const flat = g.ViewMenu({ view: v, onChange() {}, envs: false });
   const pop2 = all(flat, n => n.props && n.props.label === 'View')[0];
-  assert.deepEqual(choices({ type: 'div', props: { children: pop2.props.children } }), ['Chats by']);
+  assert.deepEqual(choices({ type: 'div', props: { children: pop2.props.children } }), ['Show', 'Group by', 'Chats by']);
+  const by = pop2.props.children.filter(Boolean).find(c => c.props.label === 'Group by');
+  assert.deepEqual(by.props.options.map(([k]) => k), ['date', 'none']);
+  assert.equal(by.props.value, 'none');
 });
 
 test('a chat\'s menu: Rename, Move to (other environments), Archive, Delete (its row: chat-list.test.mjs)', () => {
@@ -121,7 +125,7 @@ test('a chat\'s menu: Rename, Move to (other environments), Archive, Delete (its
 });
 
 test('the list shows the sections, or a flat list while searching', () => {
-  const props = { threads: [{ id: 't9', title: 'Flat one' }], loading: false, activeId: null, q: '', onQ() {}, archived: false, onArchived() {},
+  const props = { threads: [{ id: 't9', title: 'Flat one' }], loading: false, activeId: null, q: '', onQ() {},
     onNew() {}, onRename() {}, onArchive() {}, onDelete() {}, grouped: { type: 'div', props: { children: ['SECTIONS'] } } };
   assert.match(text(expand(list.ThreadList(props))), /SECTIONS/);
   const searching = text(expand(list.ThreadList({ ...props, q: 'flat' })));
@@ -156,7 +160,7 @@ test('the client asks the agent per environment, and the mock answers the same w
 
 // Plan 42.1: the compact sidebar after Claude Code's.
 test('the top: the search across, then + New with View on its right; no Chats label, no By meaning', () => {
-  const props = { threads: [], loading: false, activeId: null, q: '', onQ() {}, archived: false, onArchived() {}, onNew() {}, onRename() {}, onArchive() {}, onDelete() {},
+  const props = { threads: [], loading: false, activeId: null, q: '', onQ() {}, onNew() {}, onRename() {}, onArchive() {}, onDelete() {},
     view: g.readView({}), onView() {}, canGroup: true };
   const el = expand(list.ThreadList(props));
   const rows = el.props.children.filter(Boolean);
@@ -169,7 +173,8 @@ test('the top: the search across, then + New with View on its right; no Chats la
   const kids = second.props.children.filter(Boolean);
   assert.equal(all(kids[kids.length - 1], n => n.props?.['aria-label'] === 'View').length, 1);  // View on the right of New
   assert.doesNotMatch(text(el), /By meaning|Chats/);
-  assert.equal(all(expand(list.ThreadList({ ...props, archived: true })), n => n.type === 'input')[0].props.placeholder, 'Search archived');
+  assert.equal(all(expand(list.ThreadList({ ...props, view: g.readView({ show: 'archived' }) })), n => n.type === 'input')[0].props.placeholder, 'Search archived');
+  assert.doesNotMatch(text(el), /Archived/);                       // no Archived chip at the bottom: the View menu chooses (chat-history 2.2)
 });
 
 test('Show more is a full-width divider with its count', () => {
@@ -199,13 +204,41 @@ test('the chat menu\'s letters: R renames, M moves, A archives, D deletes; not w
   assert.deepEqual(items.map(b => b.props['aria-keyshortcuts']), ['R', 'M', 'A', 'D']);
 });
 
-test('View shows archived chats too (Show: Chats · Archived)', () => {
+test('View: Show (Chats · Archived · Both) and Group by (Environment · Date · None) change the saved view', () => {
   const got = [];
-  const menu = g.ViewMenu({ view: g.readView({}), onChange() {}, grouped: true, archived: false, onArchived: v => got.push(v) });
+  const menu = g.ViewMenu({ view: g.readView({}), onChange: v => got.push(v), envs: true });
   const pop = all(menu, n => n.props?.label === 'View')[0];
-  const show = pop.props.children.filter(Boolean)[0];
+  const [show, group] = pop.props.children.filter(Boolean);
   assert.equal(show.props.label, 'Show');
+  assert.deepEqual(show.props.options, [['chats', 'Chats'], ['archived', 'Archived'], ['both', 'Both']]);
   assert.equal(show.props.value, 'chats');
-  show.props.onPick('archived');
-  assert.deepEqual(got, [true]);
+  assert.deepEqual(group.props.options.map(([, l]) => l), ['Environment', 'Date', 'None']);
+  show.props.onPick('both');
+  group.props.onPick('date');
+  assert.deepEqual(got.map(v => [v.show, v.group]), [['both', 'environment'], ['chats', 'date']]);
+});
+
+// Plan chat-history 2.2: the view's new keys, the old toggle, and Show → the agent's filter.
+test('readView: show and group = date; an old archived toggle reads as Show: Archived', () => {
+  assert.equal(g.VIEW_DEFAULTS.show, 'chats');
+  assert.deepEqual(g.readView({ show: 'both', group: 'date' }), { ...g.VIEW_DEFAULTS, show: 'both', group: 'date' });
+  assert.equal(g.readView({ show: 'all' }).show, 'chats');                           // unknown: the default
+  assert.equal(g.readView({ archived: true }).show, 'archived');
+  assert.equal(g.readView({ archived: true, show: 'both' }).show, 'both');           // a saved show wins
+  assert.equal(g.readView({ archived: false }).show, 'chats');
+  assert.equal(g.viewOfUi({ archived: true, group: 'none' }).show, 'archived');
+  assert.deepEqual(g.uiOfView(g.readView({ show: 'both', group: 'date', chatOrder: 'title' })),
+    { show: 'both', group: 'date', env_order: 'activity', chat_order: 'title', collapsed: [] });
+  const round = g.readView(g.viewOfUi(g.uiOfView(g.readView({ show: 'archived', group: 'date', collapsed: ['x'] }))));
+  assert.deepEqual(round, { show: 'archived', group: 'date', envOrder: 'activity', chatOrder: 'updated', collapsed: ['x'] });
+});
+
+test('archivedParam: Chats → false, Archived → true, Both → all; the grouping in effect', () => {
+  assert.deepEqual(['chats', 'archived', 'both', undefined].map(g.archivedParam), [false, true, 'all', false]);
+  assert.equal(g.groupOf({ group: 'environment' }, { envs: true }), 'environment');
+  assert.equal(g.groupOf({ group: 'environment' }, { envs: false }), 'none');
+  assert.equal(g.groupOf({ group: 'date' }, {}), 'date');
+  assert.deepEqual(g.groupChoices({}).map(([k]) => k), ['date', 'none']);
+  assert.equal(g.emptyText('archived'), 'No archived chats.');
+  assert.match(g.emptyText('both', 'fox'), /No chats match “fox”/);
 });

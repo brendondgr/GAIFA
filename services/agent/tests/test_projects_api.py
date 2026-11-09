@@ -134,3 +134,34 @@ async def test_project_event_on_a_watching_stream(env):
     finally:
         server.should_exit = True
         await task
+
+
+async def test_own_folders(env):
+    """Plan projects 2.3: the first folder makes the hidden environment; a level change; a removal; the workspace mod's
+    rules come back as they are; delete removes the environment."""
+    c = env.client
+    p = await _project(c, name="Thesis")
+    assert (await c.get(f"/v1/projects/{p['id']}/folders")).json() == []
+    r = await c.post(f"/v1/projects/{p['id']}/folders", json={"path": "/home/u/refs"})
+    assert r.status_code == 201 and r.json()["level"] == "read"
+    own = env.agent.projects.get(p["id"])["own_env"]
+    assert own == "proj-" + p["id"][2:]
+    assert env.hub.ws_envs[own]["name"] == "Thesis (project)" and env.hub.ws_envs[own]["project"] == p["id"]
+    await c.post(f"/v1/projects/{p['id']}/folders", json={"path": "/home/u/drafts", "level": "edit"})
+    assert len(env.hub.ws_envs) == 1                                                          # made once
+    r = await c.post(f"/v1/projects/{p['id']}/folders", json={"path": "/home/u/Agents/GAIFA", "level": "edit"})
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "capped"
+    assert (await c.patch(f"/v1/projects/{p['id']}/folders/refs", json={"level": "run"})).json()["level"] == "run"
+    assert (await c.delete(f"/v1/projects/{p['id']}/folders/drafts")).json() == {"removed": "drafts"}
+    assert [(f["id"], f["level"]) for f in (await c.get(f"/v1/projects/{p['id']}/folders")).json()] == [("refs", "run")]
+    assert (await c.delete(f"/v1/projects/{p['id']}/folders/nope")).status_code == 404
+    assert (await c.post(f"/v1/projects/{p['id']}/folders", json={"path": "/x", "level": "admin"})).status_code == 422
+    # another project with the same name gets another environment name
+    q = await _project(c, name="Thesis")
+    await c.post(f"/v1/projects/{q['id']}/folders", json={"path": "/home/u/other"})
+    assert env.hub.ws_envs["proj-" + q["id"][2:]]["name"] == f"Thesis (project {q['id'][2:]})"
+    done = (await c.delete(f"/v1/projects/{p['id']}")).json()
+    assert done["environment"] == own and own not in env.hub.ws_envs
+    bare = await _project(c, name="Bare")
+    assert (await c.delete(f"/v1/projects/{bare['id']}")).json()["environment"] == "none"
+    assert (await c.patch(f"/v1/projects/{bare['id']}/folders/x", json={"level": "edit"})).status_code == 404

@@ -235,6 +235,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
         hub, llm = HubAPI(hub_url), LLM(llm_url)
         agent = Agent(cfg, store, hub, llm)
         app.state.agent = agent
+        api_projects.install(agent)                                  # plan projects: what deleting one also removes
         stop = asyncio.Event()
         watcher = asyncio.create_task(hub.follow_events(agent.hub_event, stop))
         upkeep = asyncio.create_task(_upkeep(store, stop))

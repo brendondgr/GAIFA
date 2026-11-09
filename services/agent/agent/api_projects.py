@@ -6,6 +6,10 @@
     PATCH  /v1/projects/{pid}                   {name?, description?, instructions?, environments?, defaults?, pinned?}
     DELETE /v1/projects/{pid}                   its chats become ordinary chats; what goes and what stays: `delete_project`
     GET    /v1/projects/{pid}/threads           the project's chats (the same query as /v1/threads)
+    GET    /v1/projects/{pid}/folders           its own folders (the hidden environment's, plan 2.3)
+    POST   /v1/projects/{pid}/folders           {path, level?}: the first one makes the hidden environment
+    PATCH  /v1/projects/{pid}/folders/{fid}     {level}
+    DELETE /v1/projects/{pid}/folders/{fid}
 
 A chat joins a project through `POST /v1/threads` or `PATCH /v1/threads/{id}` with `settings.project` (`new_chat` and
 `move_chat`, which server.py calls). Every change is published as `{type: "project", id, project}` (project None once
@@ -22,6 +26,8 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from .hubapi import HubCallError
+from .projects import folders as own_folders
 from .projects.store import DESCRIPTION_MAX, INSTRUCTIONS_MAX, NAME_MAX, ProjectError
 
 log = logging.getLogger("agent.projects")
@@ -43,6 +49,15 @@ class ProjectIn(BaseModel):
     instructions: str = Field("", max_length=INSTRUCTIONS_MAX)
     environments: list[str] = Field(default_factory=list, max_length=16, description="workspace environments, primary first")
     defaults: Defaults = Field(default_factory=Defaults)
+
+
+class FolderIn(BaseModel):
+    path: str = Field(min_length=1, max_length=4096, description="The folder's full path on this machine")
+    level: Literal["read", "edit", "run", "run_net"] = Field("read", description="read · edit · run · run_net")
+
+
+class FolderPatch(BaseModel):
+    level: Literal["read", "edit", "run", "run_net"]
 
 
 class ProjectPatch(BaseModel):
@@ -131,6 +146,15 @@ async def delete_project(agent: Any, p: dict[str, Any]) -> dict[str, Any]:
     return done
 
 
+def install(agent: Any) -> None:
+    """What deleting a project also removes, in order (each skipped and logged when its mod is off)."""
+    agent.project_cleanup.append(("environment", own_folders.drop_env))       # 2.3: its hidden environment
+
+
+def hub_error(e: HubCallError) -> HTTPException:
+    return HTTPException(e.status, {"code": e.code, "detail": e.detail, "data": e.data})
+
+
 def add_routes(app: FastAPI) -> None:
     @app.get("/v1/projects", summary="Projects, pinned first, then by recent activity (or name, or created); ?q= searches "
              "names and descriptions")
@@ -198,3 +222,50 @@ def add_routes(app: FastAPI) -> None:
         agent = A(request)
         project_or_404(agent, pid)
         return agent.store.threads(q, archived, limit, sort=sort, offset=offset, project=[pid])
+
+    # ---- its own folders (plan projects 2.3) ------------------------------------------------------
+
+    @app.get("/v1/projects/{pid}/folders", summary="The project's own folders, with their levels")
+    async def project_folders(pid: str, request: Request) -> list[dict]:
+        agent = A(request)
+        try:
+            return await own_folders.folders(agent, project_or_404(agent, pid))
+        except HubCallError as e:
+            raise hub_error(e) from None
+
+    @app.post("/v1/projects/{pid}/folders", status_code=201, summary="Add a folder of its own (Read unless you say "
+              "otherwise); the first makes the project's hidden environment")
+    async def add_folder(pid: str, body: FolderIn, request: Request) -> dict:
+        agent = A(request)
+        try:
+            f = await own_folders.add(agent, project_or_404(agent, pid), body.path, body.level)
+        except HubCallError as e:
+            raise hub_error(e) from None
+        publish(agent, pid, agent.projects.get(pid))
+        return f
+
+    @app.patch("/v1/projects/{pid}/folders/{fid}", summary="Change one of its folders' level")
+    async def change_folder(pid: str, fid: str, body: FolderPatch, request: Request) -> dict:
+        agent = A(request)
+        p = project_or_404(agent, pid)
+        if not p.get("own_env"):
+            raise HTTPException(404, {"code": "unknown_folder", "detail": f"the project has no folder {fid!r}"})
+        try:
+            f = await own_folders.change(agent, p, fid, body.level)
+        except HubCallError as e:
+            raise hub_error(e) from None
+        publish(agent, pid, agent.projects.get(pid))
+        return f
+
+    @app.delete("/v1/projects/{pid}/folders/{fid}", summary="Remove one of its folders (its files are left alone)")
+    async def remove_folder(pid: str, fid: str, request: Request) -> dict:
+        agent = A(request)
+        p = project_or_404(agent, pid)
+        if not p.get("own_env"):
+            raise HTTPException(404, {"code": "unknown_folder", "detail": f"the project has no folder {fid!r}"})
+        try:
+            out = await own_folders.remove(agent, p, fid)
+        except HubCallError as e:
+            raise hub_error(e) from None
+        publish(agent, pid, agent.projects.get(pid))
+        return out

@@ -110,11 +110,12 @@ Assumed:
 
   `test_environments.py` still passes.
   *As built:* the hub client's `chat_folders`, `chat_skills` and `chat_skill_read` take the helper's dict in place of an environment id, and `context.chat_folders`/`chat_skills` take the agent's `ProjectStore`. A project that lists no environments lends the chat's own (else Default) as its primary. `/v1/skills/copy` (Settings → Skills) still names one environment, as before.
-- [ ] **2.3 The project's own folders: `api_projects.py`.**
+- [x] **2.3 The project's own folders: `api_projects.py`.**
   - `POST /v1/projects/{pid}/folders {path, level}` makes the hidden environment the first time (`POST /api/s/workspace/v1/environments {name: "<project> (project)", project: pid}`) and adds the folder to it. `PATCH` changes a folder's level and `DELETE` removes it.
   - Adding or removing a whole environment is a `PATCH /v1/projects/{pid}` of `environments`.
   - The workspace mod's rules apply unchanged: a folder starts at Read, the GAIFA folder and `data/models/` are capped at Read, and secrets are refused.
   *Done when:* `test_projects_api.py` covers the first folder making the hidden environment, a level change and a removal, with the workspace mod faked.
+  *As built:* the calls are in `projects/folders.py`; `GET /v1/projects/{pid}/folders` lists them. The hidden environment's id is `proj-<the project id's hex>`; when "<project> (project)" is taken (two projects with one name) it is "<project> (project <hex>)". Deleting the project deletes it (`project_cleanup`).
 
 **Checks & deliverables — Phase 2**
 - [ ] On a second hub with the real workspace mod, a project with two environments and one folder of its own: a project chat lists all three folders, edits a file in an Edit folder, and is refused an edit in a Read one.

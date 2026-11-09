@@ -638,7 +638,9 @@ class Agent(Compaction, Queueing, Prompting):
             if (thread.get("settings") or {}).get("unattended"):
                 origin["unattended"] = True  # a scheduled run with no one watching: what would ask is refused (scheduled-tasks 2.2)
             from .projects.origin import chat_envs
+            from .workflows.settings import spawn_origin
             origin.update(chat_envs(thread.get("settings"), self.projects))   # the chat's workspace folders (plan 34; a project's: projects 2.2)
+            origin.update(spawn_origin(thread.get("settings")))     # a sub-agent's root, parent, read_only (agent-workflows 1.4)
             if mode == "auto":
                 origin["said"] = self._said(tid)   # the Auto judge reads the user's own words (plan 30.3)…
                 origin["narration"] = ctx.narration(self.store.events(tid))   # …and with context "full", this turn's text

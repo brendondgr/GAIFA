@@ -50,7 +50,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - A **Sub-agents** prompt part (only when the tool is offered): when to spawn (independent parts, broad reading, a second opinion) and when not to (sequential edits, a single lookup), that a child sees none of this chat, and that a child is read-only unless `write`.
   *Done when:* `test_workflow_tool.py`: a scripted parent spawns two children, gets both answers as results and replies; a child at depth 1 isn't offered the tool; the prompt part appears only with the tool.
 
-- [ ] **1.4 The hub side: `utils/tools/calls.py`, `utils/tools/grants.py`, the agent's `origin`.**
+- [x] **1.4 The hub side: `utils/tools/calls.py`, `utils/tools/grants.py`, the agent's `origin`.**
   - The agent's calls carry `origin.root`, `origin.parent` and `origin.read_only` (from `settings.spawn`).
   - `calls.py`: a call above `read` with `origin.read_only` is refused (`read_only`, with a fix: "ask the parent to spawn a writer").
   - `grants.py`: a grant on thread R also matches calls whose `origin.root` is R, so "allow in this chat" on the parent covers the workflow.

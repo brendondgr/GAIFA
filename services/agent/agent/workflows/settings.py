@@ -57,6 +57,15 @@ def child_settings(parent: dict[str, Any], spawn: dict[str, Any], max_steps: int
     return {**out, "no_learn": True, "max_steps": int(max_steps), "spawn": spawn}
 
 
+def spawn_origin(settings: dict[str, Any] | None) -> dict[str, Any]:
+    """What a sub-agent's hub calls carry (1.4): its workflow's `root` and `parent` (grants on the root cover it) and
+    `read_only` unless it is the workflow's writer (the hub refuses its calls above `read`)."""
+    sp = (settings or {}).get("spawn") or {}
+    if not sp:
+        return {}
+    return {"root": sp.get("root"), "parent": sp.get("parent"), **({} if sp.get("write") else {"read_only": True})}
+
+
 def depth_of(thread: dict[str, Any]) -> int:
     """0 for a chat, 1 for a sub-agent, 2 for a sub-agent's…"""
     return int(((thread.get("settings") or {}).get("spawn") or {}).get("depth") or 0)

@@ -136,7 +136,7 @@ async def test_the_budget_stops_a_turn_s_sub_agents(env):
                      "usage": {"prompt_tokens": 900, "completion_tokens": 200}})
     p = _parent(env, mode="bypass")
     env.agent.store.update_thread(p["id"], mode="bypass")
-    c = await wf.spawn(p["id"], "render a clip", "Renderer")
+    c = await wf.spawn(p["id"], "render a clip", "Renderer", write=True)       # generating isn't a read
     for _ in range(100):
         if env.events(c["id"], "call"):
             break
@@ -148,6 +148,25 @@ async def test_the_budget_stops_a_turn_s_sub_agents(env):
     with pytest.raises(WorkflowError) as e:
         await wf.spawn(p["id"], "one more", "More")
     assert e.value.code == "workflow_budget"
+
+
+async def test_a_sub_agent_s_calls_carry_its_workflow(env):
+    wf = env.agent.workflows
+    env.model.queue({"match": "say a", "tool_calls": [{"name": "tts_speak", "arguments": {"text": "a", "name": "x"}}]},
+                    {"match": "only reads", "text": "Couldn't."},
+                    {"match": "say b", "tool_calls": [{"name": "tts_speak", "arguments": {"text": "b", "name": "x"}}]})
+    p = _parent(env)
+    env.agent.store.update_thread(p["id"], mode="bypass")
+    p = env.agent.store.thread(p["id"])
+    r = await _done(env, (await wf.spawn(p["id"], "say a", "Reader"))["id"])
+    o = next(a["origin"] for a in env.hub.attempts if a["arguments"].get("text") == "a")
+    assert (o["root"], o["parent"], o["read_only"]) == (p["id"], p["id"], True)
+    assert r["refused"] == ["tts_speak"] and not [c for c in env.hub.calls if c["name"] == "tts_speak"]
+    w = await wf.spawn(p["id"], "say b", "Writer", write=True)
+    await _done(env, w["id"])
+    o = next(a["origin"] for a in env.hub.attempts if a["arguments"].get("text") == "b")
+    assert o["root"] == p["id"] and "read_only" not in o
+    assert [c["arguments"]["text"] for c in env.hub.calls if c["name"] == "tts_speak"] == ["b"]
 
 
 async def test_queued_too_long_is_dropped(env):

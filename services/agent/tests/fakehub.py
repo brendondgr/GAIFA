@@ -313,11 +313,15 @@ class FakeHub:
                 return {"status": "error", "tool": name, "error": {"code": "invalid_arguments", "detail": f"{missing[0]} is required",
                                                                    "fix": f"add {missing[0]}"}}
             risk = t["risk"]
+            if (body.get("origin") or {}).get("read_only") and risk not in ("read", "network"):   # agent-workflows 1.4
+                return {"status": "denied", "tool": name, "error": {"code": "read_only", "detail": f"{name}: this sub-agent only reads",
+                                                                   "fix": "say what should change"}}
             if mode in ("plan", "read_only") and risk != "read":
                 return {"status": "denied", "tool": name, "error": {"code": "denied", "detail": "Plan mode: only tools that read can run"}}
             asks = name in ASK or (risk != "read" and not (mode in ("accept_edits", "auto", "bypass") and risk != "destructive"))
             origin = body.get("origin") or {}
-            grant = next((g for g in self.grants if g.get("thread") == origin.get("thread") and fnmatch.fnmatchcase(name, g["tool"])
+            grant = next((g for g in self.grants if g.get("thread") in (origin.get("thread"), origin.get("root") or origin.get("thread"))
+                          and fnmatch.fnmatchcase(name, g["tool"])
                           and (g.get("key") in (None, "*") or g.get("key") in str(args.get("url") or ""))), None)
             if asks and grant is not None:               # scheduled-tasks 2.1: a chat's grant runs it
                 return {**await self._wait(self._start(name, args, mode), wait), "grant_id": grant["id"]}

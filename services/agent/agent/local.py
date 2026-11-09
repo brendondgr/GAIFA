@@ -308,11 +308,13 @@ class Local(ProjectTools):
         """structured-memory 2.3: names, keywords and meaning, fused."""
         from .memory.model import MemoryError
         from .memory.search import search
+        from .projects.memory import keep_private
         try:
             r = await search(self.a.memory, self.a.hub, str(args.get("query") or ""), args.get("entity") or None,
                              args.get("kind") or None, bool(args.get("history")), int(args.get("limit") or 10))
         except MemoryError as e:
             return self.err(tid, cid, "memory_search", e.code, e.detail, e.fix)
+        r = keep_private(self.a.memory, r, (thread.get("settings") or {}).get("project"))   # plan projects 4.2
         self.a.memory.touch([f["id"] for f in r["facts"]])
         if not r["facts"] and not r["entities"]:
             r["note"] = "nothing in memory matches: ask the user if it matters"

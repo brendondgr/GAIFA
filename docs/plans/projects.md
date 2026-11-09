@@ -1,6 +1,6 @@
 # Plan: projects: chats with standing instructions, files, live web pages, folders and their own memory
 
-**Asked for:** 2026-11-08 · **Status:** In progress
+**Asked for:** 2026-11-08 · **Status:** Done (2026-11-08)
 
 ## 1. Introduction
 
@@ -170,7 +170,7 @@ Assumed:
   *As built:* `MATCH_MIN` is 0.6 (by meaning) and `WORDS_MIN` 1.0 (BM25, without the embed mod); title and URL words count when they are 4+ letters and not common words. The fetches wait `FRESH_WAIT_S` (8 s, under the loop's 10 s recall wait) so the event is written before the model call; a slow page's fetch finishes in the background and the prompt calls its copy "being fetched again; this is the last copy". Eval dry runs never refresh. The step words are in `chat-steps.js` (with the three project tools'), and `chat-thread.js` turns the event into a step row.
 
 **Checks & deliverables — Phase 3**
-- [ ] *(Open: the second hub had neither the web mod's venv nor the embed mod, which needs this GPU; left for the installed hub after the merge. The fetch, re-index, matching and listed/inline switch are covered by `test_project_sources.py`, `test_project_index.py`, `test_project_fresh.py` and `test_project_prompt.py` with the hub, web and embed faked.)* On a second hub with the web and embed mods: a project with a short PDF and a news page. A question about the page's subject refreshes it (the step shows) and answers from it. An unrelated question refreshes nothing. With 30 large documents the knowledge switches to listed, and `project_search` finds a passage.
+- [x] *(Was open: the second hub had neither the web mod's venv nor the embed mod, which needs this GPU; left for the installed hub after the merge. The fetch, re-index, matching and listed/inline switch are covered by `test_project_sources.py`, `test_project_index.py`, `test_project_fresh.py` and `test_project_prompt.py` with the hub, web and embed faked.)* On a second hub with the web and embed mods: a project with a short PDF and a news page. A question about the page's subject refreshes it (the step shows) and answers from it. An unrelated question refreshes nothing. With 30 large documents the knowledge switches to listed, and `project_search` finds a passage. *Checked 2026-11-08 on the installed hub* (skynet, the real web and embed mods): a project with a one-page PDF and the Tallahassee Wikipedia page (157 653 characters, 40 s to screen whole). Its sources fit 25 % of skynet's 262 144-token window, so they went in whole: the first answer gave the 2020 population and the PDF's code with `src_…:line` citations. A question about the city's universities a minute later refreshed the page (`project_refresh`, `slow`: the screening outlasts the 8 s wait, so the answer used the last copy while the new one landed in the background); a haiku request refreshed nothing. With two more long pages (Florida, History of Florida: 662 000 characters in all) a new chat's prompt was 11 155 tokens, the sources listed, and `project_search` found the year of statehood and the first governor. *Fixed on the way:* two pages added together queue for screening, and the second ran out of the agent's 60 s; `FETCH_TIMEOUT_S` is now 300 s (the call passes its own timeout past the client's 120 s); a chat still waits only for its own refresh.
 - [x] Delivered: `projects/sources.py`, `index.py`, `knowledge.py`, `tools.py`, `fresh.py`, the changed `loop.py`, `prompts.py`, `local.py`, and tests.
 
 ## Phase 4 — Instructions, defaults and project memory (M)
@@ -196,7 +196,7 @@ Assumed:
     - delete removing the anchor and keeping the entity.
 
   `test_memory_prompt.py` and the memory suites still pass. Update `docs/plans/structured-memory.md`'s anchor kinds in passing (one line) and architecture §14 (memory).
-  *As built:* `projects/memory.py` (made in `project_created`, renamed in `project_changed`, unanchored in `project_cleanup`). A name another kind of entry already has makes "<name> (project)". `chat_projects`, `build` and `recall` take the chat's `project`; `private(m, but)` is the set kept to their projects' chats (anchored entities and everything under them). The learner's prompt gets one line naming the project's path. `memory_search` (the tool) is unchanged: it can still find another project's facts when asked. The fact edits go through the existing `/v1/memory/facts/{id}` routes.
+  *As built:* `projects/memory.py` (made in `project_created`, renamed in `project_changed`, unanchored in `project_cleanup`). A name another kind of entry already has makes "<name> (project)". `chat_projects`, `build` and `recall` take the chat's `project`; `private(m, but)` is the set kept to their projects' chats (anchored entities and everything under them). The learner's prompt gets one line naming the project's path. `memory_search` (the tool) was first left unchanged; the live check on 2026-11-08 found a plain chat reading a project's fact through it, so in a chat it now leaves out another project's entities and their facts (`keep_private`, `test_project_memory.py`); the Memory page's search still sees everything. The fact edits go through the existing `/v1/memory/facts/{id}` routes.
 
 **Checks & deliverables — Phase 4**
 - [x] On a second hub: a project with instructions ("answer in French") and a pinned skill. Its new chat answers in French and quotes the skill's rule. A fact said in it ("our deadline is Dec 1") lands under the project in Memory and isn't in a plain chat's prompt.
@@ -249,7 +249,7 @@ Assumed:
 **Wire — Phase 5:** the Chat page's sidebar has Projects, the projects grid, each project's page with its panels, project chats with their chip, and Group by Project.
 
 **Checks & deliverables — Phase 5**
-- [ ] On the installed hub after merging and `gaifa restart`, with the user's agreement to make a test project:
+- [x] On the installed hub after merging and `gaifa restart`, with the user's agreement to make a test project:
   - a project with instructions, one uploaded PDF, one web page, an environment and a folder of its own;
   - a new chat from its page follows the instructions, cites the PDF, and refreshes the page when asked about it;
   - the chat shows under the project with Group by Project, and under its primary environment with Group by Environment;
@@ -257,6 +257,7 @@ Assumed:
   - deleting the test project leaves its chat as an ordinary chat.
 
   Screenshots of the projects grid and a project page go with the check.
+  *Checked 2026-11-08* after `gaifa restart` and restarting the agent and workspace mods (the user asked for the build and checks while away): the project above with Ariadne as its environment and `~/Agents/GAIFA/docs/plans` of its own at Read (capped). Every answer ended with the instructions' line; the PDF was cited; the page refreshed when asked about. Group by Project showed the project's section (2) and No project; Group by Environment put its chats under Ariadne; Move to… listed the project with its note, and moving a plain chat in set its project; the chat showed the project chip under the composer. "Remember this for the project: … December 12" landed in the project's Memory panel. A plain chat then found it through `memory_search`: fixed (the tool keeps other projects' memory out, `keep_private`), and after a restart the same chat found nothing. The projects grid and the project page drew as planned (screenshots taken in the session). Deleting the project left its three chats ordinary (environment kept), removed its hidden environment and collection, and kept its memory entry. Cleaned up afterwards: the chats archived, the PDF in Outputs' trash, the test fact retired and its entry archived.
 - [x] Delivered: `chat-projects.js`, `chat-project.js`, `chat-project-panels.js`, the changed chat files, the docs, and tests.
 
 ## 4. Deliverables

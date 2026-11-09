@@ -3,7 +3,8 @@ project (`{kind: "project", value: <pid>}`), made (or adopted, by name) when the
 
 - Renaming the project renames the entity, so the old name stays an alias.
 - Its facts, and its children's, are kept to the project's own chats: other chats' profiles leave it off the
-  "Projects:" line and recall leaves out its facts (memory/profile.py, `private`); in its chats they lead the profile.
+  "Projects:" line, recall and `memory_search` leave out its facts (memory/profile.py, `private`; `keep_private`); in
+  its chats they lead the profile.
 - The learner is told when a chat is in a project, so facts about the work are filed under it (memory/learn.py).
 - Deleting the project removes the anchor; the entity and its facts stay in Memory, where they can be deleted.
 """
@@ -43,6 +44,18 @@ def private(m: Any, but: str | None = None) -> set[str]:
                 grew = True
     return out
 
+
+
+def keep_private(m: Any, r: dict[str, Any], project: str | None) -> dict[str, Any]:
+    """`memory_search`'s result in a chat: another project's entities and the facts about them left out (the Memory
+    page's own search still sees everything). `project`: the chat's own, whose memory it may search."""
+    hidden = private(m, project)
+    if not hidden:
+        return r
+    def about(fid: str) -> set[str]:
+        return {row["entity"] for row in m._rows("SELECT entity FROM mem_fact_entities WHERE fact = ?", (fid,))}
+    return {**r, "facts": [f for f in r.get("facts", []) if not about(f["id"]) & hidden],
+            "entities": [e for e in r.get("entities", []) if e.get("id") not in hidden]}
 
 async def created(agent: Any, p: dict[str, Any]) -> None:
     """Make the project's entity, or adopt the project entry of that name memory already has."""

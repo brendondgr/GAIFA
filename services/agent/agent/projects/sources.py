@@ -25,7 +25,8 @@ from ..hubapi import HubCallError
 
 log = logging.getLogger("agent.projects")
 TEXT_CACHE = 64                   # outputs whose text is kept in memory
-FETCH_TIMEOUT_S = 60.0
+FETCH_TIMEOUT_S = 300.0           # the hub screens pages one at a time, a long page in about a minute: several added
+                                  # together queue behind each other (a chat waits only RECALL_WAIT_S for its own)
 
 
 def publish(agent: Any, pid: str, src: dict[str, Any] | None, removed: str | None = None) -> None:
@@ -108,7 +109,7 @@ async def fetch(agent: Any, sid: str) -> dict[str, Any] | None:
     src = agent.projects.update_source(sid, status="fetching")
     publish(agent, pid, src)
     try:
-        got = await asyncio.wait_for(agent.hub._json("POST", "/api/web/read", json={"url": src["url"]}), FETCH_TIMEOUT_S)
+        got = await asyncio.wait_for(agent.hub._json("POST", "/api/web/read", json={"url": src["url"]}, timeout=FETCH_TIMEOUT_S), FETCH_TIMEOUT_S)
     except (HubCallError, asyncio.TimeoutError, OSError, ValueError) as e:
         why = e.detail if isinstance(e, HubCallError) else "the page didn't answer in time" if isinstance(e, asyncio.TimeoutError) else str(e)
         log.info("fetching %s for project %s: %s", src["url"], pid, why)

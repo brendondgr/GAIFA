@@ -102,3 +102,25 @@ async def test_delete_removes_the_anchor_and_keeps_the_entity(env):
     text, _ = profile.build(m, None)
     assert "Glacier thesis" in text                                          # an ordinary project entry again
     assert json.dumps(done)
+
+
+async def test_memory_search_in_a_chat_keeps_other_projects_out(env, monkeypatch):
+    """Found live on 2026-11-08: a plain chat found a project's fact through memory_search; the tool now leaves out
+    another project's entity and its facts, while the project's own chats (and the Memory page's search) see them."""
+    m = env.agent.memory
+    p = await _project(env)
+    e = entity_of(m, p["id"])
+    m.add_fact("The thesis draft is due on December 1.", about=[e["id"]], kind="fact", source="stated", by="user")
+
+    got: list[str] = []
+    monkeypatch.setattr(env.agent, "_result", lambda tid, cid, name, res: got.append(res["content"]))
+
+    async def find(settings):
+        await env.agent.local.t_memory_search("t_x", "c1", {"query": "thesis draft due"}, None, {"settings": settings})
+        return json.loads(got[-1])
+
+    plain, mine = await find({}), await find({"project": p["id"]})
+    assert "December 1" not in json.dumps(plain) and all(x["id"] != e["id"] for x in plain.get("entities", []))
+    assert "December 1" in json.dumps(mine)
+    page = (await env.client.get("/v1/memory/search", params={"q": "thesis draft due"})).json()
+    assert "December 1" in json.dumps(page)

@@ -20,7 +20,7 @@ import { groupTurns } from './chat-turn.js';
 import { TurnView } from './chat-activity.js';
 import { ThreadHeader, bypassAllowed } from './chat-header.js';
 import { decideFolder, lastEnv, rememberEnv, newChatSettings } from './chat-env.js';
-import { ControlsRow, ModeMenu, ModelMenu, EnvMenu } from './chat-controls.js';
+import { ControlsRow, ModeMenu, ModelMenu, EnvMenu, ProjectMenu } from './chat-controls.js';
 import { Composer, chatSkills, typeInto } from './chat-composer.js';
 import { VoiceButton, lastAnswer } from './chat-voice.js';
 import { scrollToReply } from './chat-quote.js';
@@ -258,6 +258,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
   const setModel = m => { if (thread) c.patch(thread.id, { model: m }).then(t => { shared.patched(t); c.context(thread.id).then(mm => setLive(l => ({ ...l, meter: mm }))).catch(() => {}); }, fail); else setFresh(f => ({ ...f, model: m })); };
   const setMode = m => { if (thread) c.patch(thread.id, { mode: m }).then(shared.patched, fail); else setFresh(f => ({ ...f, mode: m })); };
   const setGroups = s => { if (thread) c.patch(thread.id, { settings: s }).then(shared.patched, fail); else setFresh(f => ({ ...f, settings: { ...f.settings, ...s } })); };
+  const removeFromProject = () => c.patch(tid, { settings: { project: null } }).then(t => { shared.patched(t); shared.relist?.(); toast('Removed from the project', 'success'); }, fail);
   const setEnv = id => { rememberEnv(id); setGroups({ ...(thread ? thread.settings || {} : {}), environment: id }); if (thread) setTimeout(shared.relist, 300); };
   const forkAt = async (seq, text, qs = []) => {   // qs: the message's quote-replies, as cards to edit (their seqs are the same in the branch)
     try {
@@ -329,7 +330,9 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
       settings: thread?.settings || fresh.settings, onSettings: setGroups, skills, models, outputs: view.outputs, api, inputRef, quotes, setQuotes, folders,
       onQuick: a => runAction(a, null, { openTool, attach, sendPrompt: t => send(t) }),
       controls: h(ControlsRow, {   // plan 42.3: the chat's environment, mode and model, under the box
-        env: h(EnvMenu, { api, c, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: shared.loadEnvList, confirm,
+        env: (thread?.settings || fresh.settings)?.project   // plan projects 5.3: a project chat shows its project
+          ? h(ProjectMenu, { c, settings: thread?.settings || fresh.settings, envs, onRemove: tid ? () => removeFromProject() : null })
+          : h(EnvMenu, { api, c, thread, envs, value: envId, onChange: setEnv, stamp: events.reduce((n, e) => n + (e.type === 'decision'), 0), onEnvsChanged: shared.loadEnvList, confirm,
           onDeleted: (id, ids) => { shared.envDeleted(ids); if (tid && ids.includes(tid)) onOpen(null);
             toast(`Deleted the environment${ids.length ? ` and ${ids.length} chat${ids.length === 1 ? '' : 's'}` : ''}`, 'success'); } }),
         mode: h(ModeMenu, { value: thread?.mode || fresh.mode, onChange: setMode, bypass: bypassAllowed(folders, events), judge }),

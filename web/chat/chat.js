@@ -172,8 +172,15 @@ export function ChatPage({ api, route, toast = () => {}, confirm, openOutput, op
     toast(`Moved to ${(envs || []).find(e => e.id === env)?.name || env}`, 'success');
   }, fail);
   const newIn = env => newChat(env);
+  const [projects, setProjects] = useState([]);       // plan projects 5.3: Move to… lists them
+  const loadProjects = () => c.projects?.().then(setProjects, () => setProjects([]));
+  useEffect(() => { loadProjects(); const w = c.watchProjects?.(() => loadProjects()); return () => w?.close(); }, []);
+  const moveProject = (t, pid) => c.patch(t.id, { settings: { project: pid } }).then(n => {
+    patched(n); relist();
+    toast(pid ? `Moved to the project ${projects.find(p => p.id === pid)?.name || ''}` : 'Removed from the project', 'success');
+  }, fail);
   const itemProps = t => ({ moveTo: (envs || []).filter(e => e.id !== ((t.settings || {}).environment || (envs || []).find(x => x.default)?.id)),
-    onMove: envs ? env => move(t, env) : null });
+    onMove: envs ? env => move(t, env) : null, projects, onProject: c.projects ? pid => moveProject(t, pid) : null });
   const remove = async t => {
     const ok = confirm ? await confirm({ title: `Delete “${t.title || 'this chat'}”?`, body: 'The chat and its history are deleted. Its outputs stay in Outputs.', confirmLabel: 'Delete chat', danger: true }) : window.confirm('Delete this chat?');
     if (!ok) return;

@@ -6,7 +6,7 @@
 import { h, T, MONO, Icon, Popover, label11 } from './chat-ui.js';
 import { EnvDialog } from './chat-envedit.js';
 import { modeChoices, modeTitle, modeOf, MODES } from './chat-header.js';
-import { envOf, allowedFolders, shortPath, LEVEL_WORD } from './chat-env.js';
+import { envOf, allowedFolders, shortPath, LEVEL_WORD, projectChipText, projectFolderGroups } from './chat-env.js';
 
 const R = () => globalThis.React;
 
@@ -87,6 +87,36 @@ export function EnvMenu({ api, c, thread, envs, value, onChange, stamp = 0, onEn
     dialog ? h(EnvDialog, { key: dialog.env?.id || 'new', api, c, env: dialog.env, confirm, onClose: () => setDialog(null),
       onSaved: async (id, created) => { await onEnvsChanged?.(); if (created && id) onChange(id); },
       onDeleted: (id, ids) => { onEnvsChanged?.(); onDeleted?.(id, ids); if (id === env?.id) onChange('none'); } }) : null);
+}
+
+/** A project chat's chip (plan projects 5.3), in the environment's place: the project's name; its menu opens the project's
+ * page, lists the folders the chat can use (the project's environments, then its own folders) and, for a chat already
+ * made, offers Remove from project. */
+export function ProjectMenu({ c, settings, envs, onRemove }) {
+  const React = R(), [open, setOpen] = React.useState(false), [p, setP] = React.useState(null), [own, setOwn] = React.useState([]);
+  const pid = settings?.project || null;
+  React.useEffect(() => {
+    if (!pid || !c?.project) return;
+    c.project(pid).then(setP, () => setP(null));
+    c.projectFolders?.(pid).then(setOwn, () => setOwn([]));
+  }, [pid, open]);
+  if (!pid) return null;
+  const groups = projectFolderGroups(p, envs, own);
+  return h('span', { style: { position: 'relative', flex: 'none' } },
+    h(Control, { icon: 'folder', label: projectChipText(p, pid), title: 'Project: its instructions, files, pages and folders apply to this chat',
+      ariaLabel: `Project: ${projectChipText(p, pid)}`, open, onClick: () => setOpen(!open) }),
+    h(Popover, { open, onClose: () => setOpen(false), place: 'up-left', width: ENV_MENU_W, label: 'Project', style: { gap: 4, padding: 6 } },
+      h('span', { style: { ...label11, padding: '2px 4px' } }, 'Project'),
+      h('a', { href: '#/chat/projects/' + encodeURIComponent(pid), onClick: () => setOpen(false), style: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', fontSize: 12.5, fontWeight: 500 } },
+        h(Icon, { d: 'folder', size: 12 }), p?.name || pid, h('span', { style: { marginLeft: 'auto', fontSize: 11.5, fontWeight: 400 } }, 'Open project')),
+      groups.length ? groups.map(g => h('div', { key: g.id, style: { display: 'flex', flexDirection: 'column', gap: 1, padding: '2px 6px' } },
+        h('span', { style: { fontSize: 11.5, color: T.mut } }, g.name),
+        g.folders.length ? g.folders.slice(0, 6).map(f => h('span', { key: f.path, title: f.path, style: { fontFamily: MONO, fontSize: 11, color: T.mut, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } },
+          `${shortPath(f.path)} · ${LEVEL_WORD[f.level] || f.level}`)) : h('span', { style: { fontSize: 11, color: T.dim } }, 'No folders'),
+        g.folders.length > 6 ? h('span', { style: { fontSize: 11, color: T.dim } }, `and ${g.folders.length - 6} more`) : null))
+        : h('span', { style: { fontSize: 11.5, color: T.dim, padding: '0 6px' } }, 'The project has no folders.'),
+      onRemove ? h('button', { type: 'button', onClick: () => { setOpen(false); onRemove(); }, style: { display: 'flex', alignItems: 'center', gap: 6, height: 28, padding: '0 8px', marginTop: 2,
+        border: 0, borderTop: '1px solid ' + T.bd, background: 'none', color: T.tx, font: 'inherit', fontSize: 12.5, cursor: 'pointer', textAlign: 'left' } }, h(Icon, { d: 'x', size: 12 }), 'Remove from project') : null));
 }
 
 /** The row: environment and mode on the left, the model on the right. */

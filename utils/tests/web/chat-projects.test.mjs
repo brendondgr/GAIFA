@@ -36,6 +36,7 @@ test('the routes: #/chat/projects and #/chat/projects/<id> are pages; a chat id 
   assert.deepEqual(chat.subPage({ parts: ['chat', 'projects'] }), { page: 'projects' });
   assert.deepEqual(chat.subPage({ parts: ['chat', 'projects', 'p_0a1b'] }), { page: 'project', pid: 'p_0a1b' });
   assert.equal(chat.subPage({ parts: ['chat', 't_abc'] }), null);
+  assert.deepEqual(chat.subPage({ parts: ['chat', 'all'] }), { page: 'all' });          // chat-history's Show all
   assert.equal(chat.subPage({ parts: ['chat'] }), null);
   assert.equal(chat.subPage(null), null);
 });

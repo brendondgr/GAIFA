@@ -8,6 +8,7 @@
 
 import { h, T, MONO, Icon, Btn, Popover, chipSt, inputSt, label11 } from './chat-ui.js';
 import { ViewMenu, MoreBar, emptyText } from './chat-groups.js';
+import { moveGroups } from './chat-env.js';
 
 const R = () => globalThis.React;
 
@@ -21,9 +22,10 @@ export function rowLook(t) {
 
 /** One chat. `moveTo`: the other environments it can move to (plan 41.2); `aside`: what goes after the name (the Show
  * all page's environment and date, chat-history 3.1; nothing in the sidebar). */
-export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], onMove, aside = null }) {
+export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], onMove, aside = null, projects = [], onProject }) {
   const React = R(), [menu, setMenu] = React.useState(false), [edit, setEdit] = React.useState(null), [moving, setMoving] = React.useState(false);
-  const act = { r: () => { setMenu(false); setEdit(t.title || ''); }, m: onMove && moveTo.length ? () => setMoving(true) : null,
+  const groups = moveGroups(t, onProject ? projects : [], onMove ? moveTo : []);        // plan projects 5.3: projects, then environments
+  const act = { r: () => { setMenu(false); setEdit(t.title || ''); }, m: groups.some(g => g.rows.length) ? () => setMoving(true) : null,
     a: () => { setMenu(false); onArchive(); }, d: () => { setMenu(false); onDelete(); } };
   React.useEffect(() => {        // while the menu is open: R renames, M moves, A archives, D deletes (the user's ask)
     if (!menu || moving) return undefined;
@@ -49,10 +51,12 @@ export function Item({ t, active, onOpen, onRename, onArchive, onDelete, moveTo 
     h('span', { className: 'aichat-slot', style: { position: 'relative', flex: 'none', width: 24, height: 24, marginRight: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' } },
       h('button', { type: 'button', className: 'aichat-more', 'aria-label': `More for ${t.title || 'chat'}`, 'aria-haspopup': 'menu', 'aria-expanded': menu ? 'true' : 'false', onClick: () => setMenu(!menu),
         style: { width: 24, height: 24, placeItems: 'center', border: 0, borderRadius: 5, background: 'transparent', color: T.mut, cursor: 'pointer' } }, h(Icon, { d: 'more', size: 14 })),
-      h(Popover, { open: menu, onClose: () => { setMenu(false); setMoving(false); }, width: 190, label: 'Chat actions', style: { padding: 4, gap: 0 } },
+      h(Popover, { open: menu, onClose: () => { setMenu(false); setMoving(false); }, width: moving ? 250 : 190, label: 'Chat actions', style: { padding: 4, gap: 0 } },
         moving
-          ? [h('span', { key: 'h', style: { ...label11, padding: '4px 9px' } }, 'Move to'),
-            ...moveTo.map(e => menuItem(e.id, 'home', e.name, () => { setMenu(false); setMoving(false); onMove(e.id); }))]
+          ? groups.flatMap(g => [h('span', { key: 'h' + g.key, style: { ...label11, padding: '6px 9px 2px' } }, g.label),
+            h('span', { key: 'n' + g.key, style: { fontSize: 11, color: T.dim, padding: '0 9px 4px', lineHeight: 1.35 } }, g.hint),
+            ...g.rows.map(r => menuItem(`${r.kind}:${r.id}`, r.kind === 'project' ? 'folder' : 'home', r.label, () => {
+              setMenu(false); setMoving(false); if (r.kind === 'project') onProject(r.id); else onMove(r.id); }))])
           : [menuItem('rename', 'edit', 'Rename', act.r, T.tx, 'R'),
             act.m ? menuItem('move', 'folder', 'Move to…', act.m, T.tx, 'M') : null,
             menuItem('archive', 'archive', look.archiveLabel, act.a, T.tx, 'A'),

@@ -27,7 +27,7 @@ export function proposalList(p, a) {
   const root = el('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px', minWidth: 0 } });
   const draw = () => {
     const n = ticks.size;
-    root.replaceChildren(
+    root.replaceChildren(...[            // (replaceChildren would write a null as the text "null")
       el('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', maxHeight: '360px', overflowY: 'auto' } },
         ...(p.items || []).map(r => {
           const v = r.view || r.fields || {}, can = !r.problem;
@@ -41,7 +41,7 @@ export function proposalList(p, a) {
         a.calendars?.length ? (() => { const s = el('select.cal-input', { onchange: e => { calendar = e.target.value; } }, ...a.calendars.map(c => el('option', { value: c.id }, c.name))); s.value = calendar; return s; })() : null,
         el('button.cal-btn.pri', { disabled: !n, onclick: async e => { e.target.disabled = true; try { await a.accept({ ids: [...ticks], calendar }); } finally { e.target.disabled = false; } } }, addLabel(n)),
         el('button.cal-btn.ghost', { onclick: () => { if (ticks.size) ticks.clear(); else initialTicks(p).forEach(x => ticks.add(x)); draw(); } }, ticks.size ? 'Untick all' : 'Tick all'),
-        a.close ? el('button.cal-btn.ghost', { onclick: a.close }, 'Cancel') : null));
+        a.close ? el('button.cal-btn.ghost', { onclick: a.close }, 'Cancel') : null)].filter(Boolean));
   };
   draw();
   return root;

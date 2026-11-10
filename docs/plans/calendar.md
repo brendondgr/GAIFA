@@ -1,6 +1,6 @@
 # Plan: the calendar: events, to-dos and reminders in GAIFA, for you and the agent
 
-**Asked for:** 2026-11-09 · **Status:** In progress
+**Asked for:** 2026-11-09 · **Status:** Done (2026-11-09)
 
 ## 1. Introduction
 
@@ -493,7 +493,7 @@ Assumed:
 
 ## Phase 9 — On the installed hub (S)
 
-- [ ] **9.1 The live check.** `gaifa setup calendar`, then `gaifa restart` and the agent restarted:
+- [x] **9.1 The live check.** `gaifa setup calendar`, then `gaifa restart` and the agent restarted:
   - the sidebar shows Calendar under Chat;
   - an event and a repeating to-do made on the page fire their alerts as toasts, and the badge counts the unseen one;
   - a chat (Auto, d3-lite) adds an event you asked for and asks for one you didn't;
@@ -503,6 +503,17 @@ Assumed:
   - `gaifa backup` includes `calendar.db` and its settings.
 
   The test items, calendars and tasks are deleted. CLAUDE.md's status, the plans index, `docs/structure.md` and `docs/agent-eval.md` are updated.
+
+  *As built (2026-11-09, the installed hub after the merge: `gaifa install calendar`, `gaifa restart`, the agent restarted; skynet through the relay, the judge d3-lite):*
+  - `gaifa check calendar` passed; the sidebar showed **Calendar** between Chat and Outputs.
+  - An event two minutes ahead with a 1-minute alert fired at its time: a toast with Open and Snooze 10 min, and the badge 1 on the Calendar entry.
+  - In an Auto chat, "Add lunch with Sam on Friday at 1pm" added it (the judge's model allowed it: *something you asked for*) with its card; the same chat's origin with an added person in the title, or a date the user only asked to summarise, stopped at a card (the `title-words` rule), and both were denied.
+  - Four syllabus dates in a message became a proposal card (`calendar_propose`); **Add 4** added them in one undo and **Undo** took them away.
+  - "Am I free tomorrow at 1:30pm?" was answered from the prompt's *Your calendar*, with no tool call.
+  - A prep task two minutes before an event ran on time, once, for that occurrence (`done`, the judge `ok`), and showed on the Scheduled tasks layer.
+  - `gaifa backup` included `databases/calendar.db` (`calendar/settings.json` is only there once a setting changes).
+  - Found and fixed: a proposal card showed the word "null" (`replaceChildren` writes a null as text); the logo drew in `currentColor`, black on the dark sidebar, so it's a red tile with a white glyph like the other mods'.
+  - The test items went to the trash, the test task was deleted and its chats archived.
 
 ## 4. Deliverables
 

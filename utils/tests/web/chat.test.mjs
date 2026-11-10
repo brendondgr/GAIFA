@@ -474,3 +474,20 @@ test('the client asks for archived: all and the count; the mock answers the same
   assert.ok([...days].some(d => d >= 8) && [...days].some(d => d > 365), 'older ones, and one from another year');
   assert.equal((await cmock.createMockClient({}, { speed: 1000, history: false }).threads({ archived: 'all' })).filter(t => !t.settings?.project && !t.settings?.task && !t.children && !t.settings?.external).length, 2);   // and the projects' fixture chats (plan projects 1.3), the tasks' runs (scheduled-tasks 4.1), a workflow and a chat another agent started (agent-workflows 3.1, 4.3)
 });
+
+test('the plan is pinned only while its turn goes on', () => {
+  const plan = st => ev(2, 'todos', { items: [{ text: 'a', state: 'done' }, { text: 'b', state: st }] });
+  const v = th.buildView([ev(1, 'user', { text: 'go' }), plan('in_progress')]);
+  assert.equal(th.todosPinned(v, { running: true }), true);
+  assert.equal(th.todosPinned(v, { state: 'waiting' }), true);                        // a card or a question in the turn
+  assert.equal(th.todosPinned(v, { running: false, state: 'idle' }), false);          // the turn ended (an error, a stop) with steps left
+  assert.equal(th.todosPinned(th.buildView([ev(1, 'user', { text: 'go' }), plan('done')]), { running: true }), false);
+  // you wrote again and the agent didn't update the plan: it stays inline, stopped, and isn't pinned on the new turn
+  const moved = th.buildView([ev(1, 'user', { text: 'go' }), plan('pending'), ev(3, 'user', { text: 'write a report instead' })]);
+  assert.equal(moved.todosStopped, true); assert.equal(th.todosPinned(moved, { running: true }), false);
+  assert.equal(moved.items.find(i => i.kind === 'todos').stopped, true);
+  // a message queued into the running turn doesn't; a new list from the agent pins again
+  assert.equal(th.todosPinned(th.buildView([ev(1, 'user', { text: 'go' }), plan('pending'), ev(3, 'user', { text: 'also x', queued: true })]), { running: true }), true);
+  assert.equal(th.todosPinned(th.buildView([ev(1, 'user', { text: 'go' }), plan('pending'), ev(3, 'user', { text: 'carry on' }),
+    ev(4, 'todos', { items: [{ text: 'b', state: 'in_progress' }] })]), { running: true }), true);
+});

@@ -192,19 +192,20 @@ export function ErrorBox({ error }) {
 }
 
 // ---------- todos (inline where they first appeared; chat.js pins the latest list on top) ----------
-export function TodoList({ items, compact }) {
+export function TodoList({ items, compact, stopped }) {
   const icon = s => s === 'done' ? h('span', { style: { color: T.gr, display: 'flex' } }, h(Icon, { d: 'check', size: 13, sw: 2.2 }))
     : s === 'failed' ? h('span', { style: { color: T.rd, display: 'flex' } }, h(Icon, { d: 'x', size: 13, sw: 2.2 }))
-      : h('span', { style: { width: 11, height: 11, margin: 1, borderRadius: 99, border: '1.5px solid ' + (s === 'in_progress' ? T.acc : T.bdh), background: s === 'in_progress' ? T.tacc : 'none', animation: s === 'in_progress' ? 'aichatpulse 1.4s ease-in-out infinite' : 'none', flex: 'none' } });
+      : h('span', { style: { width: 11, height: 11, margin: 1, borderRadius: 99, border: '1.5px solid ' + (s === 'in_progress' && !stopped ? T.acc : T.bdh), background: s === 'in_progress' && !stopped ? T.tacc : 'none', animation: s === 'in_progress' && !stopped ? 'aichatpulse 1.4s ease-in-out infinite' : 'none', flex: 'none' } });
   return h('ul', { style: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: compact ? 'row' : 'column', flexWrap: 'wrap', gap: compact ? '4px 14px' : 4 } },
     (items || []).map((t, i) => h('li', { key: i, style: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: t.state === 'done' ? T.mut : T.tx, textDecoration: t.state === 'done' && !compact ? 'line-through' : 'none' } }, icon(t.state), t.text)));
 }
-function TodosCard({ item }) {
-  const done = (item.items || []).filter(t => t.state === 'done').length;
+function TodosCard({ item, ctx }) {
+  const done = (item.items || []).filter(t => t.state === 'done').length, open = todosOpen(item.items);
+  const stopped = open && (item.stopped || ctx?.running === false);     // its turn ended with steps left
   return h('div', { style: cardSt({ pad: '8px 10px', gap: 6 }) },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } }, h('span', { style: label11 }, 'Plan'), h('span', { style: { fontSize: 11.5, color: T.mut, fontFamily: MONO } }, `${done}/${(item.items || []).length}`),
-      todosOpen(item.items) ? null : h(Badge, { tone: 'green' }, 'done')),
-    h(TodoList, { items: item.items }));
+      open ? (stopped ? h(Badge, null, 'stopped') : null) : h(Badge, { tone: 'green' }, 'done')),
+    h(TodoList, { items: item.items, stopped }));
 }
 
 // ---------- memory, note, error, compact ----------

@@ -14,7 +14,7 @@
 import { h, T, Icon, COL, useWidth, chipSt, label11 } from './chat-ui.js';
 import { Card, TodoList } from './chat-cards.js';
 import { runAction } from './chat-actions.js';
-import { buildView, applyTransient, settleLive, mergeEvents, todosOpen, threadOf, pendingOf } from './chat-thread.js';
+import { buildView, applyTransient, settleLive, mergeEvents, todosPinned, threadOf, pendingOf } from './chat-thread.js';
 import { messageBody } from './chat-api.js';
 import { groupTurns } from './chat-turn.js';
 import { TurnView } from './chat-activity.js';
@@ -368,7 +368,7 @@ export function ChatPane({ shared, tid = null, paneId = null, cmd = null, onOpen
     shared.banner || null,
     conn === 'reconnecting' ? h('div', { role: 'status', style: { padding: '4px 14px', fontSize: 12, color: T.acct, background: T.tacc } }, 'Reconnecting to the chat…') : null,
     h('div', { ref: scrollRef, onScroll, style: { flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', position: 'relative' } },
-      view.todos && todosOpen(view.todos) ? h('div', { style: { position: 'sticky', top: 0, zIndex: 5, background: T.bg, borderBottom: '1px solid ' + T.bd, padding: '7px 16px' } },
+      todosPinned(view, { running: running || starting, state: thread?.state }) ? h('div', { style: { position: 'sticky', top: 0, zIndex: 5, background: T.bg, borderBottom: '1px solid ' + T.bd, padding: '7px 16px' } },
         h('div', { style: { maxWidth: COL, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 } },
           h('span', { style: label11 }, 'Plan'), h('div', { style: { minWidth: 0, flex: 1 } }, h(TodoList, { items: view.todos, compact: true })))) : null,
       h('div', { ref: contentRef, style: { maxWidth: COL, margin: '0 auto', padding: '18px 16px 28px', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 } },

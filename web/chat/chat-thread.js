@@ -7,7 +7,8 @@
 //   approval                           a tool_call that needs a parameter card (approval + decision)
 //   question                           an ask_user question with its answer
 //   result                             the outputs of a tool_result (#n), after the tool card
-//   todos                              the checklist, where it first appeared (it is also pinned)
+//   todos                              the checklist, where it first appeared (pinned on top while its turn goes on;
+//                                      `stopped` once you wrote again without the agent updating it)
 //   <any other event type>             memory, note, error, compact … and types added later:
 //                                      unknown kinds fall back to a generic card, never an error.
 
@@ -25,6 +26,7 @@ export function buildView(events, live = {}) {
     if (ev.seq > lastSeq) lastSeq = ev.seq;
     switch (ev.type) {
       case 'user': {
+        if (todoItem && !p.queued) todoItem.stopped = true;     // the conversation moved on; a queued message joins the turn
         // keyed by the page's id when it sent one, so the message it drew before (live.pending) keeps its place
         const it = { key: p.client_id ? 'u' + p.client_id : 'e' + ev.seq, kind: 'user', ev, queued: !!p.queued };
         items.push(it);
@@ -75,6 +77,7 @@ export function buildView(events, live = {}) {
       case 'todos':
         todos = Array.isArray(p.items) ? p.items : [];
         if (!todoItem) { todoItem = { key: 'todos', kind: 'todos', ev, items: todos }; items.push(todoItem); } else todoItem.items = todos;
+        todoItem.stopped = false;
         break;
       case 'project_refresh': {    // plan projects 3.5: pages fetched again for a message, drawn as a step of its turn
         const pages = Array.isArray(p.pages) ? p.pages : [];
@@ -108,7 +111,7 @@ export function buildView(events, live = {}) {
     if (pr && !it.result) it.progress = pr;
   }
   const pending = items.filter(i => (i.kind === 'question' && !i.answer && !i.result) || (i.kind === 'approval' && !i.decision && !i.result));
-  return { items, todos, state, usage, outputs, pending, lastSeq, gpu: live.gpu || null };
+  return { items, todos, todosStopped: !!todoItem?.stopped, state, usage, outputs, pending, lastSeq, gpu: live.gpu || null };
 }
 
 /** The pending messages ({cid, seq?, …}) whose user event isn't in `events` yet: matched by `client_id`, or by the seq
@@ -171,3 +174,8 @@ export const threadOf = p => (p?.thread && typeof p.thread === 'object' ? p.thre
 
 /** Is any item of a todo list still open? (the list stays pinned while it is). */
 export const todosOpen = items => Array.isArray(items) && items.some(i => i.state !== 'done');
+
+/** The plan pinned on top: open steps, and the turn that wrote it still going (running, or waiting on a card or a
+ *  question). A turn that ended (an error, a stop, an answer with steps left) or a message you wrote since: inline only. */
+export const todosPinned = (view, { running = false, state = null } = {}) =>
+  todosOpen(view?.todos) && !view.todosStopped && (running || state === 'waiting' || (view.pending || []).length > 0);

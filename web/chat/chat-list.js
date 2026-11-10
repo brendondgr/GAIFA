@@ -9,7 +9,7 @@
 import { h, T, MONO, Icon, Btn, Popover, chipSt, inputSt, label11 } from './chat-ui.js';
 import { ViewMenu, MoreBar, emptyText } from './chat-groups.js';
 import { moveGroups } from './chat-env.js';
-import { SubAgents, TreeToggle, openIds, setOpen } from './chat-tree.js';
+import { SubAgents, TreeToggle, openIds, setOpen, externalOf } from './chat-tree.js';
 
 const R = () => globalThis.React;
 
@@ -60,7 +60,10 @@ function Row({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], on
       style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: toggle ? '0 4px 0 2px' : '0 4px 0 10px', color: active ? T.tx : T.mut, fontWeight: active ? 500 : 400, textDecoration: 'none', opacity: look.archived ? 0.6 : 1 } },
       dot ? h('span', { 'aria-label': look.state, style: { width: 6, height: 6, borderRadius: 99, background: dot, flex: 'none', animation: look.state === 'running' ? 'aichatpulse 1.2s ease-in-out infinite' : 'none' } }) : null,
       look.archived ? h('span', { 'aria-label': 'Archived', style: { display: 'flex', flex: 'none', color: T.dim } }, h(Icon, { d: 'archive', size: 12 })) : null,
-      h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, look.title), aside),
+      h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, look.title),
+      externalOf(t) ? h('span', { title: `Started by ${externalOf(t)} over /mcp`, style: { fontSize: 10, color: T.dim, border: '1px solid ' + T.bd, borderRadius: 4,
+        padding: '0 4px', lineHeight: '15px', whiteSpace: 'nowrap', flex: 'none', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis' } }, externalOf(t)) : null,   // agent-workflows 4.3
+      aside),
     // a slot at the right edge, empty until hover or focus, or while the menu is open; always on touch screens (LIST_CSS)
     h('span', { className: 'aichat-slot', style: { position: 'relative', flex: 'none', width: 24, height: 24, marginRight: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' } },
       h('button', { type: 'button', className: 'aichat-more', 'aria-label': `More for ${t.title || 'chat'}`, 'aria-haspopup': 'menu', 'aria-expanded': menu ? 'true' : 'false', onClick: () => setMenu(!menu),

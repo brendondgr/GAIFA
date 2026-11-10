@@ -63,6 +63,10 @@ export function createAgentMocks({ threads, newThread, emit, net, err, now, rid 
     emit(p, 'agent_review', { id: rq, child: wr.thread.id, action: 'forward', reason: 'It changes your file: your call.', kind: 'approval', approval_id: apid });
     emit(p, 'assistant', { text: 'The tests reader is done; the src reader is still going. The header edit needs your approval: it’s on the card below.', step: rid('s_'), model: 'skynet' });
     p.thread.updated = now() - 60;
+    const x = newThread({ title: 'Summarise the build log', mode: 'manual', settings: { external: { by: 'mcp', client: 'claude-code/2.1', started: now() - 900 } } });   // 4.3
+    emit(x, 'user', { text: 'Summarise the last build log in the workspace and list the failing steps.', by: 'mcp' });
+    emit(x, 'assistant', { text: 'The build failed at **test_store**: 1 of 12 tests. Everything else passed.', step: rid('s_'), model: 'skynet' });
+    x.thread.state = 'idle'; x.thread.updated = now() - 900;
   }
   return {
     seed,

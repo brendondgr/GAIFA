@@ -3,6 +3,7 @@
 // message box (chat-controls.js, plan 42.3); ModelSelect and ModeSelect stay for other pages.
 
 import { h, T, MONO, Icon, Btn, Popover, inputSt, fmtTokens, label11 } from './chat-ui.js';
+import { externalOf } from './chat-tree.js';
 
 const R = () => globalThis.React;
 // The five chat modes (plan 27.4, after Claude Code's). The stricter of the mode and a workspace folder's level wins.
@@ -119,6 +120,7 @@ export function ThreadHeader({ thread, onRename, meter, meterOpen, setMeterOpen,
     sp ? chip('sub-agent', 'A chat another chat started to do one part of its task; its last reply went back there') : null,
     sp && !narrow ? chip(sp.rights, sp.rights === 'writer' ? 'It may change files' : 'Tools that change, generate or delete things are refused here') : null,
     sp?.by && !narrow ? chip(sp.by, 'Started over /mcp by another agent') : null,
+    externalOf(thread) ? chip(`from ${externalOf(thread)}`, `Started by ${externalOf(thread)} over /mcp: it reads this chat's answers; its cards are yours`) : null,   // agent-workflows 4.3
     st ? h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: st[1], whiteSpace: 'nowrap', flex: 'none' } },
       h('span', { style: { width: 6, height: 6, borderRadius: 99, background: st[1], animation: running ? 'aichatpulse 1.2s ease-in-out infinite' : 'none' } }), narrow ? null : st[0]) : null,
     h('span', { style: { flex: 1 } }),

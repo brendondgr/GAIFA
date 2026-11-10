@@ -40,6 +40,15 @@ export function applyChild(tree, ev) {
   return { ...tree, children, root: { ...tree.root, children: children.filter(n => n.parent === tree.root.id).length } };
 }
 
+/** An MCP client's name for people (agent-workflows 4.3): `claude-code/2.1` → Claude Code, `codex-cli/1.2` → Codex. */
+export function clientName(c) {
+  const id = String(c || '').split(/[/ ]/)[0].toLowerCase();
+  const known = { 'claude-code': 'Claude Code', claude: 'Claude', 'codex-cli': 'Codex', codex: 'Codex', cursor: 'Cursor', 'gemini-cli': 'Gemini CLI' };
+  return known[id] || (id ? id.replace(/[-_]+/g, ' ').replace(/^./, s => s.toUpperCase()) : 'another agent');
+}
+/** A chat another agent started over /mcp: its client's name, else null. */
+export const externalOf = t => { const x = t?.settings?.external; return x ? clientName(x.client) : null; };
+
 export const openIds = () => { const v = store.get(OPEN_KEY, []); return Array.isArray(v) ? v : []; };
 export function setOpen(id, on) {
   const ids = openIds().filter(x => x !== id);

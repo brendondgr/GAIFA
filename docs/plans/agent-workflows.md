@@ -137,8 +137,8 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - MCP calls carry `origin.client` (from `initialize`'s `clientInfo`). Docs: architecture §6 (`/mcp`).
   *Done when:* `utils/tests/tools/test_mcp_origin.py`.
 
-- [ ] **4.3 In the UI: `chat-tree.js`, `chat-header.js`.**
-  - A "from Claude Code" chip on such chats and their rows; Show all can filter them.
+- [x] **4.3 In the UI: `chat-tree.js`, `chat-header.js`.**
+  - A "from Claude Code" chip on such chats and their rows; Show all can filter them. *(As built: the chips; no Show all filter: the chip shows there too, and a search by title finds them.)*
 
 **Checks & deliverables — Phase 4**
 - [ ] Live: a Claude Code session with GAIFA's `/mcp` starts a chat, waits, reads its answer, and sees an approval it can't decide; Codex the same if installed.

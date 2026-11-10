@@ -101,6 +101,17 @@ test('a sub-agent\'s header: the way back and what it may do (3.5)', async () =>
   assert.equal(hd.spawnBits({ settings: {} }), null);
 });
 
+test('chats another agent started: the client by name (4.3)', async () => {
+  assert.equal(tree.clientName('claude-code/2.1.0'), 'Claude Code');
+  assert.equal(tree.clientName('codex-cli/1.2'), 'Codex');
+  assert.equal(tree.clientName('my_tool/3'), 'My tool');
+  assert.equal(tree.clientName(''), 'another agent');
+  assert.equal(tree.externalOf({ settings: { external: { by: 'mcp', client: 'cursor/1' } } }), 'Cursor');
+  assert.equal(tree.externalOf({ settings: {} }), null);
+  const c = cmock.createMockClient({}, { speed: 400 });
+  assert.ok((await c.threads()).some(t => tree.externalOf(t) === 'Claude Code'));
+});
+
 test('a background sub-agent\'s end or request heads the turn it starts (3.3)', async () => {
   const turn = await load('chat/chat-turn.js'), thread = await load('chat/chat-thread.js');
   const ev = (seq, type, payload) => ({ seq, ts: seq, type, payload });

@@ -1,6 +1,6 @@
 # Plan: Agent workflows (sub-agents in chats)
 
-**Asked for:** 2026-11-09 · **Status:** Planned
+**Asked for:** 2026-11-09 · **Status:** Done (2026-11-09). After the merge, `gaifa restart` and the agent restarted: the installed hub served `[agent.workflows]` and the six `agent_chat_*` tools, and a chat in Manual ran two sub-agents side by side (Europe's and Asia's capitals) and answered from both; the test chat was deleted with its sub-agents.
 
 ## 1. Introduction
 

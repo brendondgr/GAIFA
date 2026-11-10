@@ -81,8 +81,9 @@ class Prompting:
                     "the user can turn them back on in the composer)" if tools.disabled else "")
                  + prompts.mode_note(mode_of((self.store.thread(tid) or {}).get("mode")))
                  + (prompts.folders_note(fdata, os.path.expanduser("~"), self.project_of(tid)) if fdata is not None else ""),
-                 "outputs": prompts.outputs_table(ctx.model_outputs(events)), "summary": summary}
-        sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"]),
+                 "outputs": prompts.outputs_table(ctx.model_outputs(events)), "summary": summary,
+                 "agenda": await ctx.chat_agenda(self.hub, services, tools.disabled, (self.project_of(tid) or {}).get("id"))}
+        sizes = {"instructions": ctx.est(parts["base"] + parts["guardrails"] + parts["agent_md"] + parts["env"] + parts["agenda"]),
                  "skills_memory": ctx.est(parts["skills"] + parts["memory"]),
                  "tool_index": ctx.est(parts["tools"]), "outputs": ctx.est(parts["outputs"] + parts["summary"])}
         if (p := self.project_of(tid)) is not None:         # plan projects 3.3: the project, its files and pages

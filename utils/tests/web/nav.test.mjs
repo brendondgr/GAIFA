@@ -104,3 +104,19 @@ test('tooltips: every fixed item has its words, and a service its state (33.5)',
   assert.equal(n.stateWords(SVCS[4]), 'Stopping · Inactive');
   assert.equal(n.stateWords(SVCS[6]), 'Manifest error · Failed');
 });
+
+test('calendar 2.2: a badge reads the count up to 9, then 9+', () => {
+  assert.deepEqual([0, -1, null, 1, 9, 10, 250].map(n.badgeText), ['', '', '', '1', '9', '9+', '9+']);
+});
+
+test('calendar 3.1: a mod with a main view is an item after its `after`, with its logo, badge and on state', () => {
+  const cal = sv('calendar', 'ready', { main: { label: 'Calendar', after: 'chat' }, badge: 2, description: 'Events' });
+  const g = n.groups({ page: 'calendar', parts: ['calendar'] }, [...SVCS, cal]);
+  assert.deepEqual(g.top.map(x => x.label), ['Overview', 'Chat', 'Calendar', 'Outputs']);
+  const it = g.top[2];
+  assert.equal(it.href, '#/calendar');
+  assert.equal(it.badge, 2);
+  assert.equal(it.on, true);
+  assert.equal(it.logo.id, 'calendar');
+  assert.deepEqual(n.groups({ page: 'calendar', parts: [] }, SVCS).top.map(x => x.label), ['Overview', 'Chat', 'Outputs']);
+});

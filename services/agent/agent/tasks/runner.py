@@ -55,14 +55,14 @@ class Runner:
         return [r for r in self.k.active() if r["state"] == "running" and not r["test"]]
 
     async def start(self, task: dict[str, Any], why: str, due: float | None = None, late: int = 0,
-                    test: bool = False) -> dict[str, Any]:
+                    test: bool = False, occurrence: str | None = None) -> dict[str, Any]:
         """Record a run of `task` and launch it when a slot is free (a test run at once)."""
         due = self.clock() if due is None else due
         if not test and any(not r["test"] for r in self.k.active(task["id"])):
-            run = self.k.add_run(task["id"], due, state="skipped", why="still running", late=late)
+            run = self.k.add_run(task["id"], due, state="skipped", why="still running", late=late, occurrence=occurrence)
             self.publish(run)
             return run
-        run = self.k.add_run(task["id"], due, state="queued", why=why, late=late, test=test)
+        run = self.k.add_run(task["id"], due, state="queued", why=why, late=late, test=test, occurrence=occurrence)
         self.publish(run)
         if test or len(self.running()) < self.parallel:
             return await self.launch(run)

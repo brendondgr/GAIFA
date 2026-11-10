@@ -1,0 +1,57 @@
+# Calendar (calendar plan): events and to-dos (a reminder is a to-do with a time), repeats, alerts as in-app
+# toasts, .ics import and export, plain-words dates and free time, for you and the agent.
+id = "calendar"
+name = "Calendar"
+description = "Events, to-dos and reminders, for you and the agent"
+icon = "calendar"
+version = "0.1.0"
+
+[run]
+command = [".venv/bin/python", "server.py"]
+port = 5109
+health = "/health"
+status = "/v1/status"
+openapi = "/openapi.json"
+env = { CALENDAR_DB = "{databases}/calendar.db", CALENDAR_STATE = "{root}/data/state/calendar" }
+start_timeout_s = 30
+stop_timeout_s = 10
+restart = "on-failure"
+install = "install.sh"
+
+[ui]
+page = "ui/page.js"
+chat = "ui/chat.js"            # calendar 4.4: its cards in Chat (an item, a day, a proposal to tick and add)
+chat_panel = { module = "ui/panel.js", label = "Calendar" }   # calendar 7.2: the day or the week beside your chats
+main = { label = "Calendar", after = "chat" }      # calendar 3.1: #/calendar, after Chat in the sidebar
+
+[agent]
+limits = "POST /v1/limits"     # calendar 4.1: each call's action (read, change, or edit for an item it made in this chat)
+
+# @-mentions (calendar 4.4): @day:tomorrow fills the agenda's day; @event:<item> fills the item to change
+[[agent.mentions]]
+kind = "day"
+list = "GET /v1/mentions/days"
+value = "value"
+label = "label"
+fills = ["agenda.day"]
+
+[[agent.mentions]]
+kind = "event"
+list = "GET /v1/mentions/items"
+value = "value"
+label = "label"
+fills = ["update.iid", "done.iid", "delete.iid"]
+
+# The agent's tools (calendar 4.2). Names become calendar_<tool>. Writes go through the preflight above: in Auto
+# they run only when the judge finds the user asked for them; Manual and Accept edits ask.
+[tools]
+agenda = { op = "GET /v1/agenda", core = true, cap_kb = 16, description = "What's on the user's calendar: events and to-dos for a day (`day`: today, tomorrow or YYYY-MM-DD) and the days after it (`days`, up to 31), or between `from` and `to`, plus undated and overdue to-dos. Rows are short: id, title, start/end or due, all_day, repeats. Today's and tomorrow's items are usually in your prompt already (Your calendar); call this for other days or to be sure. Times are the user's local time." }
+search = { op = "GET /v1/search", description = "Find calendar items whose title, notes or place has these words, to get an item's id before changing it." }
+when = { op = "GET /v1/parse", core = true, description = "Read a date and time written in plain words ('Fri 1pm for 90 min', 'tomorrow at 10', 'every Tuesday at 9', 'Nov 14 all day') with the calendar's own parser, no guessing: answers the exact start/end (or due) and repeat, and what it assumed. Use it when you're unsure what date a phrase means, and say the exact date you chose." }
+free = { op = "GET /v1/free", description = "The user's free time between `from` and `to` (up to 31 days): slots of at least `min` minutes inside their working hours (`within=any` for any time), computed from the calendar, not guessed. Focus blocks count as busy unless include_focus=true." }
+add = { op = "POST /v1/items", core = true, risk = "write", description = "Add one event, or a to-do (kind=todo; a reminder is a to-do with a time), to the user's calendar. Only when the user asked for this item; give `when` in words or ISO (read by the calendar's parser; the answer says what it assumed) and `repeat` in words ('every weekday'). Use the user's wording for the title. For more than three items, or dates you read in a document, a page or an .ics file, use calendar_propose instead. The answer has the item and an undo." }
+update = { op = "PATCH /v1/items/{iid}", risk = "write", description = "Change one calendar item (`iid` from calendar_agenda or calendar_search): its title, `when` (words or ISO), repeat, place, notes, calendar or alerts. For a repeating item give `occurrence` (from the agenda) and `scope`: this (one), following (this and later) or all. Only what the user asked to change." }
+done = { op = "POST /v1/items/{iid}/done", risk = "write", description = "Mark a to-do done (undone=true reopens it). For a repeating to-do give `occurrence`, else its next open one." }
+delete = { op = "DELETE /v1/items/{iid}", risk = "write", description = "Delete a calendar item (to the trash, kept 30 days). For a repeating item give `occurrence` and `scope` (this, following or all). Only items the user asked to delete, or a test item you made yourself in this chat." }
+propose = { op = "POST /v1/proposals", risk = "read", description = "Propose items for the user to tick and add: dates you found in a document, a page, an email or an .ics file (exams, deadlines, an itinerary), or more than three items at once. Adds nothing by itself: the user sees a card with every item, ticks the ones they want and adds them. Give each item a title and `when` (words or ISO), and `source` {kind: document, title}." }
+plan_day = { op = "POST /v1/plan", risk = "read", description = "Plan a day: place the user's open to-dos in that day's free working time (due soonest and higher priority first, each taking its estimate, 30 min by default). Answers a proposal card the user ticks and adds; adds nothing by itself." }

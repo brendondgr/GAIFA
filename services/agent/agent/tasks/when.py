@@ -5,7 +5,10 @@ A schedule is one of:
   from 00:MM, only inside the window when there is one, only Monday to Friday with `weekdays`;
 - `{kind: "daily" | "weekdays", time: "HH:MM"}`;
 - `{kind: "weekly", day: 0–6 (Monday = 0), time}`;
-- `{kind: "monthly", day: 1–31, time}`: a shorter month runs on its last day.
+- `{kind: "monthly", day: 1–31, time}`: a shorter month runs on its last day;
+- `{kind: "once", at: "YYYY-MM-DDTHH:MM"}` (calendar 6.1): one run; after it, the task turns off;
+- `{kind: "event", item: "c_…", before_min: 0–1440, title?}` (calendar 6.2): N minutes before each occurrence of a
+  calendar item; its times come from the calendar mod (`event_due.py`), so `next_after` doesn't answer for it.
 
 Local times go through `time.mktime`, so a time that a daylight-saving change skips moves to the next valid minute,
 and a repeated hour runs once (the first).
@@ -19,7 +22,8 @@ import time
 from datetime import date, timedelta
 from typing import Any
 
-KINDS = ("hourly", "daily", "weekdays", "weekly", "monthly")
+KINDS = ("hourly", "daily", "weekdays", "weekly", "monthly", "once", "event")
+AT = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)$")
 DAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 HHMM = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 MISSED_MAX = 1000
@@ -42,6 +46,19 @@ def check(s: Any) -> list[str]:
     if kind not in KINDS:
         return [f"kind must be one of {', '.join(KINDS)}"]
     out = []
+    if kind == "once":
+        m = AT.match(str(s.get("at") or ""))
+        try:
+            date(int(m[1]), int(m[2]), int(m[3])) if m else None
+        except ValueError:
+            m = None
+        return [] if m else ["at must be a date and time, YYYY-MM-DDTHH:MM"]
+    if kind == "event":
+        if not str(s.get("item") or "").startswith("c_"):
+            out.append("item must be a calendar item's id (c_…)")
+        if _int(s.get("before_min", 0), 0, 1440) is None:
+            out.append("before_min must be 0 to 1440 minutes")
+        return out
     if kind == "hourly":
         if _int(s.get("every", 1), 1, 24) is None:
             out.append("every must be a whole number of hours, 1 to 24")
@@ -81,6 +98,12 @@ def _times(s: dict[str, Any]) -> list[tuple[int, int]]:
 def _on(s: dict[str, Any], d: date) -> list[tuple[int, int]]:
     """The schedule's times on day `d`."""
     kind = s["kind"]
+    if kind == "once":
+        m = AT.match(s["at"])
+        assert m is not None
+        return [(int(m[4]), int(m[5]))] if d == date(int(m[1]), int(m[2]), int(m[3])) else []
+    if kind == "event":
+        return []
     if kind == "hourly":
         return [] if s.get("weekdays") and d.weekday() >= 5 else _times(s)
     hm = _hm(s["time"])
@@ -111,11 +134,25 @@ def next_after(s: dict[str, Any], t: float) -> float:
     raise ValueError("the schedule never comes due")
 
 
+def next_due(s: dict[str, Any], t: float) -> float | None:
+    """`next_after`, or None when the schedule won't come due again by itself (a once that ran; an event's times,
+    which the calendar answers)."""
+    if s.get("kind") == "event":
+        return None
+    try:
+        return next_after(s, t)
+    except ValueError:
+        return None
+
+
 def missed(s: dict[str, Any], last_due: float, now: float) -> int:
     """How many times the schedule came due after `last_due` and up to `now` (capped at MISSED_MAX)."""
     n, t = 0, last_due
     while n < MISSED_MAX:
-        t = next_after(s, t)
+        nxt = next_due(s, t)
+        if nxt is None:
+            break
+        t = nxt
         if t > now:
             break
         n += 1
@@ -131,6 +168,17 @@ def describe(s: dict[str, Any]) -> str:
         if s.get("from") and s.get("to"):
             out += f", {s['from']}–{s['to']}"
         return out + (", weekdays" if s.get("weekdays") else "")
+    if kind == "once":
+        m = AT.match(str(s.get("at") or ""))
+        if not m:
+            return "Once"
+        d = date(int(m[1]), int(m[2]), int(m[3]))
+        return f"Once, {DAYS[d.weekday()][:3]} {d.day} {d.strftime('%b')} {m[4]}:{m[5]}"
+    if kind == "event":
+        b = int(s.get("before_min") or 0)
+        lead = "When" if not b else f"{b} min before" if b < 60 or b % 60 else f"{b // 60} h before"
+        what = f"“{s['title']}”" if s.get("title") else "a calendar item"
+        return f"{lead} {what}" + (" starts" if not b else "") + ", each time"
     at = s.get("time") or "?"
     if kind == "daily":
         return f"Every day at {at}"

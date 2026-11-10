@@ -198,7 +198,7 @@ function LimitsBlock({ lim, why }) {
   return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 } },
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12, color: host ? T.rd : T.mut } },
       host ? h(Icon, { d: 'alert', size: 13 }) : null,
-      h('span', null, (ACTION_WORD[lim.action] || lim.action) + (lim.folder ? ` · ${lim.folder}` : '') + (p.summary ? ` · ${p.summary}` : '')),
+      h('span', null, (p.what || ACTION_WORD[lim.action] || lim.action) + (lim.folder ? ` · ${lim.folder}` : '') + (p.summary ? ` · ${p.summary}` : '')),   // calendar 4.1: a mod may say what it does
       host ? h('strong', null, 'outside the sandbox: your files, your network') : null,
       p.network && !host ? h(Badge, { tone: 'cyan' }, 'internet') : null,
       lim.once ? h('span', { style: { color: T.dim } }, '· asks every time') : null,

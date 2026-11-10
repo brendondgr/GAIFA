@@ -3,7 +3,7 @@
 // footer. Collapsed, it is a 56 px rail of icons where each service's logo carries its state colour.
 // Hovering the services shows a gear: a menu to pick how they show and which are listed. Hub.dc.html
 // mounts it in its <aside> (`{{ sb.navEl }}`); the choices are Settings.ui.nav (nav-model.js).
-import { BUCKETS, MODES, counts, countsText, groups, serviceOn, setAllHidden, setHidden, visible, normNav, bucket, stateWords } from './nav-model.js';
+import { BUCKETS, MODES, counts, countsText, groups, serviceOn, setAllHidden, setHidden, visible, normNav, bucket, stateWords, badgeText } from './nav-model.js';
 import { ServiceLogo, StateDot } from './logo.js';
 export { ServiceLogo };  // the Overview tiles and the service page header (Hub.dc.html)
 
@@ -17,6 +17,8 @@ const MONO = "'JetBrains Mono',ui-monospace,monospace";
 const CSS = `
 .hubnav-a{position:relative;display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:6px;font-size:13px;color:var(--mut,#8A94A6);text-decoration:none;flex:none}
 .hubnav-a:hover{background:var(--hov,#161C28);color:var(--tx,#E6EAF2);text-decoration:none}
+.hubnav-badge{min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--ac,#FFB224);color:#1A1200;font-size:10px;font-weight:700;line-height:16px;text-align:center;flex:none;font-family:inherit}
+.hubnav-rail .hubnav-badge{position:absolute;top:2px;right:6px;min-width:14px;height:14px;line-height:14px;font-size:9px;padding:0 3px}
 .hubnav-a[aria-current=page]{background:var(--hov,#161C28);color:var(--tx,#E6EAF2);font-weight:600}
 .hubnav-rail .hubnav-a{justify-content:center;width:40px;height:36px;padding:0;margin:0 auto;gap:0}
 .hubnav-ib{width:24px;height:24px;display:grid;place-items:center;border:0;border-radius:5px;background:transparent;color:var(--mut,#8A94A6);cursor:pointer;flex:none;padding:0}
@@ -115,18 +117,21 @@ export function Sidebar(p) {
   };
   const gear = () => h('button', { className: 'hubnav-ib hubnav-gear', onClick: openMenu, 'aria-label': 'Choose the services in the sidebar', ...tipOn('Choose the services', 'How they show, and which the list has'), 'aria-haspopup': 'dialog', 'aria-expanded': !!menu }, h(Icon, { d: I.gear, size: 14 }));
   const cur = on => on ? 'page' : undefined;
+  // calendar 2.2: a mod's unread count (its last /api/notify `unread`) as a small badge
+  const badge = n => badgeText(n) ? h('span', { className: 'hubnav-badge', 'aria-label': `${n} unread` }, badgeText(n)) : null;
+  const look = n => n.logo ? h(ServiceLogo, { sv: n.logo, size: rail ? 20 : 16 }) : h(Icon, { d: ic(n.icon) });
   const fixed = n => rail
-    ? h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), 'aria-label': n.label, ...tipOn(n.label, n.hint) }, h(Icon, { d: ic(n.icon) }))
-    : h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), ...tipOn(n.label, n.hint) }, h(Icon, { d: ic(n.icon) }), h('span', null, n.label));
+    ? h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), 'aria-label': n.label + (n.badge ? `, ${n.badge} unread` : ''), ...tipOn(n.label, n.hint) }, look(n), badge(n.badge))
+    : h('a', { key: n.key, href: n.href, className: 'hubnav-a', 'aria-current': cur(n.on), ...tipOn(n.label, n.hint) }, look(n), h('span', { style: { flex: 1 } }, n.label), badge(n.badge));
   const svcTitle = sv => `${sv.name} · ${sv.manifest_errors?.length ? 'manifest error' : sv.state}`;
   const svcTip = sv => tipOn(sv.name, `${stateWords(sv)}${sv.description ? ' — ' + sv.description : ''}`, BUCKETS[bucket(sv)].color);
   const svcItem = sv => rail
-    ? h('a', { key: sv.id, href: '#/s/' + sv.id, className: 'hubnav-a', 'aria-current': cur(serviceOn(route, sv.id)), 'aria-label': svcTitle(sv), ...svcTip(sv) }, h(ServiceLogo, { sv, size: 20, dot: true }))
+    ? h('a', { key: sv.id, href: '#/s/' + sv.id, className: 'hubnav-a', 'aria-current': cur(serviceOn(route, sv.id)), 'aria-label': svcTitle(sv), ...svcTip(sv) }, h(ServiceLogo, { sv, size: 20, dot: true }), badge(sv.badge))
     : h('a', { key: sv.id, href: '#/s/' + sv.id, className: 'hubnav-a', 'aria-current': cur(serviceOn(route, sv.id)), ...svcTip(sv) },
       h(ServiceLogo, { sv, size: 16 }),
       h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, sv.name,
         h('span', { style: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' } }, `, ${BUCKETS[bucket(sv)].label.toLowerCase()}`)),
-      h(StateDot, { sv }));
+      badge(sv.badge), h(StateDot, { sv }));
   const seeAll = () => rail
     ? h('a', { key: 'all', href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), 'aria-label': 'See all services', ...tipOn('See all services', countsText(c)) }, h(Icon, { d: ICONS.apps }))
     : h('a', { key: 'all', href: '#/services', className: 'hubnav-a', 'aria-current': cur(onSvcs), ...tipOn('See all services', countsText(c)) }, h(Icon, { d: ICONS.apps }), h('span', { style: { flex: 1 } }, 'See all'),

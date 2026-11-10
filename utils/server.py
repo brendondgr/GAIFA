@@ -144,7 +144,7 @@ def default_backend(options: Options, config: Config | None = None, paths: Paths
 
 def create_app(paths: Paths, config: Config, backend: Any = None, options: Options | None = None) -> FastAPI:
     from utils import proxy
-    from utils.routes import events, gpu, llm, mcp, memory, mentions, metrics, models, outputs, overview, prefs, repos, services, sessions, settings, skills, system, tools, ui_store, web, webpages, widgets
+    from utils.routes import events, gpu, llm, mcp, memory, mentions, metrics, models, notify, outputs, overview, prefs, repos, services, sessions, settings, skills, system, tools, ui_store, web, webpages, widgets
 
     options = options or Options()
     hub = Hub(paths=paths, config=config, backend=backend or default_backend(options, config, paths), options=options, version=hub_version())
@@ -321,8 +321,9 @@ def create_app(paths: Paths, config: Config, backend: Any = None, options: Optio
     app.include_router(repos.router)  # /api/repos (mod-repos 3.3)
     app.include_router(llm.router)  # /api/llm (llm-servers 3.4)
     app.include_router(ui_store.router)  # /api/ui/store (settings-that-stick 4.1)
+    app.include_router(notify.router)  # /api/notify (calendar 2.1)
     for area in ("services", "logs", "operations", "proxy", "events", "models", "outputs", "memory", "metrics", "widgets",
-                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos", "llm", "ui_store"):
+                 "overview", "settings", "tools", "sessions", "prefs", "webpages", "gpu", "mentions", "repos", "llm", "ui_store", "notify"):
         hub.mark_live(area)
 
     app.include_router(web.router)

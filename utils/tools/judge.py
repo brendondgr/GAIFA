@@ -40,7 +40,7 @@ from typing import Any
 
 import httpx
 
-from .judge_rules import classify
+from .judge_rules import classify, title_rule
 from .judge_user import UserRules
 
 UNTRUSTED_RE = re.compile(r"<untrusted\b[^>]*>.*?(</untrusted>|$)", re.DOTALL | re.IGNORECASE)
@@ -248,6 +248,8 @@ async def judge(call: dict[str, Any], user_messages: list[Any], folder: dict[str
     cfg = cfg or JudgeConfig()
     t0 = time.perf_counter()
     r = classify(call, folder, UserRules(cfg.allow_commands, cfg.ask_commands))
+    if rules and r.verdict == "unsure" and (t := title_rule(call, own_words(user_messages))) is not None:
+        r = t                                       # calendar 4.5: a title in the user's words
     if rules and r.verdict in ("allow", "ask"):
         return Judgement(r.verdict, r.reason, "user" if r.rule in ("user-allow", "user-ask") else "rules", rule=r.rule,
                          ms=round((time.perf_counter() - t0) * 1000, 2))

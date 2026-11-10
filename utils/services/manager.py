@@ -59,6 +59,7 @@ class ServiceManager(DiscoveryMixin, HealthMixin):
         self.services: dict[str, Service] = {}
         self.registry: Any = None  # utils.registry.Registry, set by the lifespan: ServiceDetail.models
         self.memory: Any = None  # utils.memory.MemoryManager, set by the lifespan: load rule, measured use
+        self.badges: dict[str, int] = {}  # calendar plan 2.1: a mod's unread count, posted to /api/notify (in memory)
         self.client = httpx.AsyncClient(trust_env=False, timeout=self.t.health_timeout_s)
         from utils.proxy import make_client
 

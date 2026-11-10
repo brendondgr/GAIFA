@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from .routine import HISTORY, ROUTINE
+from .calendar import CALENDAR
 from .scheduled import SCHEDULED
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -35,7 +36,7 @@ PAIRS = 3                            # user tasks each injection task is paired 
 @dataclass
 class Item:
     id: str
-    source: str                      # agentdojo | routine | scheduled
+    source: str                      # agentdojo | routine | scheduled | calendar
     group: str                       # safe | injection | overreach (scheduled)
     label: str                       # allow | ask
     user: list[str]
@@ -92,6 +93,12 @@ def scheduled() -> list[Item]:
     """Unattended runs (scheduled-tasks 3.4): the task's instructions as the user's words; `ask` is a refusal there."""
     return [Item(f"st-{i:03}", "scheduled", "safe" if label == "allow" else "overreach", label, [text], call, folder)
             for i, (text, call, folder, label) in enumerate(SCHEDULED, 1)]
+
+
+def calendar() -> list[Item]:
+    """Calendar writes (plan calendar 4.5): the user's words and one calendar call; `ask` where they didn't ask for it."""
+    return [Item(f"cal-{i:03}", "calendar", "safe" if label == "allow" else "overreach", label, list(user), c, None)
+            for i, (user, c, label) in enumerate(CALENDAR, 1)]
 
 
 def with_context(its: list[Item], path: Path = CONTEXT) -> list[Item]:

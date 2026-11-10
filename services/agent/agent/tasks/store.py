@@ -57,7 +57,8 @@ CREATE TABLE IF NOT EXISTS task_runs (
     test      INTEGER NOT NULL DEFAULT 0,
     refused   INTEGER NOT NULL DEFAULT 0,
     judge     TEXT,
-    seen      INTEGER NOT NULL DEFAULT 1
+    seen      INTEGER NOT NULL DEFAULT 1,
+    occurrence TEXT
 );
 CREATE INDEX IF NOT EXISTS task_runs_task ON task_runs (task_id, due DESC);
 CREATE INDEX IF NOT EXISTS task_runs_thread ON task_runs (thread_id);
@@ -117,6 +118,8 @@ class TaskStore:
         self.c, self.lock, self.clock = store._c, store._lock, clock
         with self.lock:
             self.c.executescript(SCHEMA)
+            if "occurrence" not in {r[1] for r in self.c.execute("PRAGMA table_info(task_runs)")}:   # calendar 6.2
+                self.c.execute("ALTER TABLE task_runs ADD COLUMN occurrence TEXT")
 
     def _rows(self, sql: str, args: Any = ()) -> list[dict[str, Any]]:
         with self.lock:
@@ -184,7 +187,7 @@ class TaskStore:
         cols = self._fields({"name": name, "schedule": schedule, **fields})
         tid, now = new_id("k_"), self.clock()
         if "next_due" not in cols:
-            cols["next_due"] = when.next_after(schedule, now) if cols.get("enabled", 1) else None
+            cols["next_due"] = when.next_due(schedule, now) if cols.get("enabled", 1) else None
         cols.update(id=tid, created=now, updated=now)
         with self.lock:
             self.c.execute(f"INSERT INTO tasks ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})", list(cols.values()))
@@ -229,7 +232,7 @@ class TaskStore:
             if not enabled:
                 cols["next_due"] = None
             elif "schedule" in cols or not old["enabled"] or old["next_due"] is None:
-                cols["next_due"] = when.next_after(sched, self.clock())
+                cols["next_due"] = when.next_due(sched, self.clock())
         if set(cols) != {"next_due"}:
             cols["updated"] = self.clock()
         with self.lock:
@@ -300,6 +303,14 @@ class TaskStore:
                 self.c.execute(f"UPDATE task_runs SET {', '.join(f'{k} = ?' for k in cols)} WHERE id = ?", [*cols.values(), rid])
         return self.run(rid)
 
+    def occurrences_run(self, tid: str) -> set[str]:
+        """The calendar occurrences a task before an event has had a run for (calendar 6.2)."""
+        return {r["occurrence"] for r in self._rows("SELECT occurrence FROM task_runs WHERE task_id = ? AND occurrence IS NOT NULL AND test = 0", (tid,))}
+
+    def event_tasks(self) -> list[dict[str, Any]]:
+        """The tasks on, before a calendar event (calendar 6.2)."""
+        return [t for t in self.list() if t["enabled"] and t["schedule"].get("kind") == "event"]
+
     def active(self, tid: str | None = None) -> list[dict[str, Any]]:
         """Runs queued or running (of one task, or all), oldest first."""
         sql, args = "SELECT * FROM task_runs WHERE state IN ('queued', 'running')", []
@@ -357,7 +368,7 @@ class TaskStore:
 
 _LAST = "(SELECT r.id FROM task_runs r WHERE r.task_id = k.id AND r.state != 'queued' ORDER BY r.due DESC, r.rowid DESC LIMIT 1)"
 _UNREAD = "(SELECT COUNT(*) FROM task_runs r WHERE r.task_id = k.id AND r.seen = 0)"
-RUN_COLS = {"thread_id", "started", "ended", "why", "late", "test", "refused", "judge", "seen"}
+RUN_COLS = {"thread_id", "started", "ended", "why", "late", "test", "refused", "judge", "seen", "occurrence"}
 
 
 def _run_cols(fields: dict[str, Any]) -> dict[str, Any]:

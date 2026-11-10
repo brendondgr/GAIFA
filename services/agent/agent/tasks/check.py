@@ -7,6 +7,8 @@
 - **skills:** each found, the agent's own or one in the run's workspace folders (`<folder>:<skill>`);
 - **pre-allows:** each tool glob matches a tool in the catalog, each MCP server has tools there;
 - **folders:** each of its own folders exists;
+- **an event** (calendar 6.2): a task before a calendar item needs the item to be there (`event_gone`); the calendar
+  being down is a warning;
 - **warnings:** Bypass (only the folders' levels limit it), pre-allowed `execute` or `destructive` tools, a folder capped
   below its level, and what couldn't be checked (a mod that's off).
 
@@ -58,6 +60,7 @@ async def check(agent: Any, task: dict[str, Any]) -> dict[str, list[dict[str, st
         _allows(task, index, problems, warnings)
     await _skills(agent, task, problems, warnings)
     await _folders(agent, task, problems, warnings)
+    await _event(agent, task, problems, warnings)
     if task.get("mode") == "bypass":
         warnings.append(_w("mode", "Bypass: the judge isn't asked; only the folders' levels limit what a run does"))
     return {"problems": problems, "warnings": warnings}
@@ -146,3 +149,18 @@ async def _folders(agent: Any, task: dict[str, Any], problems: list, warnings: l
             problems.append(_p("folders", f"{f.get('path')} doesn't exist", "make it, or take it out of the task"))
         elif f.get("capped"):
             warnings.append(_w("folders", f"{f.get('path')}: {f['capped']}"))
+
+
+async def _event(agent: Any, task: dict[str, Any], problems: list[dict[str, str]], warnings: list[dict[str, str]]) -> None:
+    s = task.get("schedule") or {}
+    if s.get("kind") != "event":
+        return
+    try:
+        await agent.hub._json("GET", f"/api/s/calendar/v1/items/{s.get('item')}")
+    except Exception as e:  # noqa: BLE001
+        if getattr(e, "status", None) == 404:
+            problems.append(_p("schedule", f"the calendar item {s.get('item')} is gone (event_gone)",
+                               "pick another event, or delete this task"))
+        else:
+            warnings.append(_w("schedule", f"the calendar didn't answer, so its event wasn't checked ({getattr(e, 'detail', None) or type(e).__name__})"))
+

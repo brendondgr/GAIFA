@@ -2,7 +2,11 @@
 // words and next-run preview and for the mock. In local time; a monthly day past the month's end is its last day.
 // Written by us (web/PATCHES.md).
 
-export const KINDS = [['hourly', 'Hourly'], ['daily', 'Every day'], ['weekdays', 'Weekdays'], ['weekly', 'Weekly'], ['monthly', 'Monthly']];
+export const KINDS = [['hourly', 'Hourly'], ['daily', 'Every day'], ['weekdays', 'Weekdays'], ['weekly', 'Weekly'], ['monthly', 'Monthly'], ['once', 'Once']];
+// calendar 6.2: N minutes before a calendar item's occurrences; set from the Calendar (its sheet's Prep task), not
+// picked here, so it isn't a chip; its times come from the calendar mod.
+export const ALL_KINDS = [...KINDS.map(k => k[0]), 'event'];
+const AT = /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d)$/;
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const hm = v => { const m = HHMM.exec(String(v || '')); return m ? [+m[1], +m[2]] : null; };
@@ -12,8 +16,18 @@ const wd = d => (d.getDay() + 6) % 7;                // Monday 0, as Python's we
 /** What's wrong with a schedule ([] when it's fine), in the agent's words. */
 export function check(s) {
   if (!s || typeof s !== 'object') return ['the schedule must be an object'];
-  if (!KINDS.some(k => k[0] === s.kind)) return [`kind must be one of ${KINDS.map(k => k[0]).join(', ')}`];
+  if (!ALL_KINDS.includes(s.kind)) return [`kind must be one of ${ALL_KINDS.join(', ')}`];
   const out = [];
+  if (s.kind === 'once') {
+    const m = AT.exec(String(s.at || ''));
+    const ok = m && new Date(+m[1], +m[2] - 1, +m[3]).getDate() === +m[3];
+    return ok ? [] : ['at must be a date and time, YYYY-MM-DDTHH:MM'];
+  }
+  if (s.kind === 'event') {
+    if (!String(s.item || '').startsWith('c_')) out.push('item must be a calendar item’s id (c_…)');
+    if (!int(s.before_min ?? 0, 0, 1440)) out.push('before_min must be 0 to 1440 minutes');
+    return out;
+  }
   if (s.kind === 'hourly') {
     if (!int(s.every ?? 1, 1, 24)) out.push('every must be a whole number of hours, 1 to 24');
     if (!int(s.minute ?? 0, 0, 59)) out.push('minute must be 0 to 59');
@@ -50,7 +64,11 @@ function on(s, d) {
 
 /** The first time (unix seconds) the schedule is due strictly after `t`; null for a schedule with problems. */
 export function nextAfter(s, t = Date.now() / 1000) {
-  if (check(s).length) return null;
+  if (check(s).length || s.kind === 'event') return null;
+  if (s.kind === 'once') {                              // calendar 6.1: its one time, while it's ahead
+    const m = AT.exec(s.at), ts = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTime() / 1000;
+    return ts > t ? ts : null;
+  }
   const d0 = new Date(t * 1000);
   const d = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() - 1);
   for (let i = 0; i < 400; i++, d.setDate(d.getDate() + 1)) {
@@ -72,6 +90,16 @@ export function describe(s) {
     let out = (every === 1 ? 'Every hour' : `Every ${every} hours`) + ` at :${minute}`;
     if (s.from && s.to) out += `, ${s.from}–${s.to}`;
     return out + (s.weekdays ? ', weekdays' : '');
+  }
+  if (s.kind === 'once') {
+    const m = AT.exec(String(s.at || ''));
+    if (!m) return 'Once';
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return `Once, ${DAYS[wd(d)].slice(0, 3)} ${d.getDate()} ${d.toLocaleString('en-US', { month: 'short' })} ${m[4]}:${m[5]}`;
+  }
+  if (s.kind === 'event') {
+    const b = s.before_min || 0, lead = !b ? 'When' : b < 60 || b % 60 ? `${b} min before` : `${b / 60} h before`;
+    return `${lead} ${s.title ? `“${s.title}”` : 'a calendar item'}${b ? '' : ' starts'}, each time`;
   }
   const at = s.time || '?';
   if (s.kind === 'daily') return `Every day at ${at}`;

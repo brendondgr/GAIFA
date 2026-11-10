@@ -210,6 +210,14 @@ def add_routes(app: FastAPI) -> None:
     def unread(request: Request) -> dict:
         return A(request).scheduled.unread()
 
+    @app.get("/v1/tasks/calendar", summary="The tasks' due times and runs between from and to (unix seconds), for the "
+             "Calendar's layer (calendar 6.4)")
+    def tasks_calendar(request: Request, from_: float = Query(..., alias="from"), to: float = Query(...)) -> dict:
+        from .tasks.layer import calendar_layer
+        if to <= from_ or to - from_ > 62 * 86400:
+            raise HTTPException(422, "the range is from < to, up to 62 days")
+        return {"tasks": calendar_layer(A(request).scheduled, from_, to)}
+
     @app.get("/v1/tasks/{kid}", summary="One task, with its last run")
     def get_task(kid: str, request: Request) -> dict:
         return task_or_404(A(request), kid)

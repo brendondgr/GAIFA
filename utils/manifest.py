@@ -207,8 +207,33 @@ class WidgetSpec(_Strict):
         return v
 
 
+HUB_PAGES = frozenset({"overview", "chat", "outputs", "models", "settings", "services", "s", "service"})
+
+
+class MainSpec(_Strict):
+    """calendar 3.1: the mod's page as a main view: `#/<id>`, a sidebar item after `after`, full height."""
+    label: str = Field(min_length=1, max_length=30)
+    after: Literal["overview", "chat", "outputs"] = "chat"
+
+
+class ChatPanelSpec(_Strict):
+    """calendar 7.1: a side panel in Chat, `export default { mount(el, ctx) }` in a .js file inside ui/."""
+    module: str
+    label: str = Field(min_length=1, max_length=30)
+
+    @field_validator("module")
+    @classmethod
+    def _module(cls, v: str) -> str:
+        p = Path(v)
+        if p.is_absolute() or ".." in p.parts or p.parts[:1] != ("ui",) or p.suffix != ".js":
+            raise ValueError(f"{v!r} must be a .js file inside the mod's ui/ folder")
+        return v
+
+
 class UiSpec(_Strict):
     page: str | None = None
+    main: MainSpec | None = None              # calendar 3.1: `page`'s `main` export as a main view
+    chat_panel: ChatPanelSpec | None = None   # calendar 7.1: a side panel in Chat
     native: str | None = None
     logo: str | None = None   # plan 33.1: unset = ui/logo.svg when that file exists
     chat: str | None = None   # plan 44.1: a chat module (`export default function setup(chat)`) inside ui/
@@ -397,6 +422,11 @@ class Manifest(_Strict):
     def _defaults(self) -> Manifest:
         if not self.name:
             self.name = self.id
+        if self.ui.main is not None:          # calendar 3.1
+            if self.id in HUB_PAGES:
+                raise ValueError(f"[ui] main: #/{self.id} is one of the hub's own pages; a main view needs another id")
+            if not (self.ui.page or "").endswith(".js"):
+                raise ValueError("[ui] main needs [ui] page, a .js page module that exports `main`")
         return self
 
 

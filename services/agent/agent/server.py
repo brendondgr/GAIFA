@@ -21,7 +21,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .hubapi import HubAPI, HubCallError
-from . import api_imports, api_memory, api_projects, api_skills, api_summaries, api_tasks, api_workflows, api_external, docs
+from . import api_history, api_imports, api_memory, api_projects, api_skills, api_summaries, api_tasks, api_workflows, api_external, docs
 from .knowledge import Knowledge
 from .llm import LLM
 from .loop import Agent, Busy, Config
@@ -331,6 +331,7 @@ def create_app(cfg: Config | None = None, db: Path | None = None, hub_url: str |
     api_skills.add_routes(app)                                       # skill-sources 3.1
     api_memory.add_routes(app)                                       # structured-memory 1.2
     api_imports.add_routes(app)                                      # memory-import 1.4
+    api_history.add_routes(app)                                      # calendar 8.1
     api_projects.add_routes(app)                                     # plan projects 1.2
     api_tasks.add_routes(app)                                        # plan scheduled-tasks 1.3
     api_workflows.add_routes(app)                                    # plan agent-workflows 1.1

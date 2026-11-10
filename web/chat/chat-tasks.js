@@ -73,10 +73,17 @@ export function TasksEntry({ tasks, active = false, current = null, onGo = () =>
         style: { ...row, padding: '0 10px', color: T.dim, fontSize: 12 } }, `All scheduled · ${all.length}`) : null) : null);
 }
 
+/** calendar 6.4: `#/chat/tasks?new=once&at=2026-11-14T15:00` (the Calendar's Schedule a task here) opens a new task. */
+export function presetOf(hash) {
+  const q = new URLSearchParams(String(hash || '').split('?')[1] || '');
+  if (q.get('new') !== 'once') return null;
+  return { kind: 'once', at: q.get('at') || '', ...(q.get('project') ? { project_id: q.get('project') } : {}) };
+}
+
 export function TasksPage({ shared, go = x => { location.hash = x; } }) {
   const React = R(), { useState, useEffect } = React;
   const { c, toast } = shared;
-  const [list, setList] = useState(null), [q, setQ] = useState(''), [editing, setEditing] = useState(false);
+  const [list, setList] = useState(null), [q, setQ] = useState(''), [editing, setEditing] = useState(() => presetOf(globalThis.location?.hash) || false);
   const [ref, width] = useWidth(900), narrow = width < 640;
   const load = () => c.tasks().then(setList, e => { setList([]); toast(e?.detail || 'The scheduled tasks didn’t load', 'error'); });
   useEffect(() => { load(); const w = c.watchTasks?.(() => load()); return () => w?.close(); }, []);
@@ -102,7 +109,7 @@ export function TasksPage({ shared, go = x => { location.hash = x; } }) {
       !shown.length ? h('div', { style: { color: T.mut, padding: 20 } }, `No tasks match “${q}”.`) :
       h('div', { role: 'list', style: { display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 10 } },
         shown.map(t => h(TaskCard, { key: t.id, t, project: (shared.projects || []).find(p => p.id === t.project_id), onToggle: () => toggle(t) })))),
-    editing ? h(TaskEditor, { shared, onClose: () => setEditing(false), onSaved: t => { setEditing(false); go('#/chat/tasks/' + enc(t.id)); } }) : null);
+    editing ? h(TaskEditor, { shared, preset: editing === true ? {} : editing, onClose: () => setEditing(false), onSaved: t => { setEditing(false); go('#/chat/tasks/' + enc(t.id)); } }) : null);
 }
 
 export function Switch({ on, label, onChange }) {

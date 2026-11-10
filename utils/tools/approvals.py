@@ -56,24 +56,27 @@ OLD_MODES = {"ask": "manual", "read_only": "plan"}
 MODE_WORD = {"plan": "Plan", "manual": "Manual", "accept_edits": "Accept edits", "auto": "Auto", "bypass": "Bypass"}
 EDITS_RUN = ("accept_edits", "auto", "bypass")    # modes where `write` and `generate` tools run without a card
 AUTO_RUNS = ("write", "generate")
-ACTIONS = ("read", "edit", "delete", "commit", "command", "network", "host", "remote")
+ACTIONS = ("read", "edit", "delete", "commit", "command", "network", "host", "remote", "change")
 ASK_AFTER_UNTRUSTED = ("hub_set_preference", "agent_memory_save", "agent_memory_entity")   # never saved unseen by a chat that read a page, file or transcript
 
 # The mode × action table (plan Phase 27). "judge": Auto's judge decides (Phase 30); until then it asks.
+# `change` (calendar 4.1): a change to your own records (a calendar item) that runs only when you asked for it: it
+# asks in Manual and Accept edits (which accepts file edits), and the judge reads your words in Auto.
 CELLS: dict[str, dict[str, str]] = {
     "plan":         {"read": "allow", "edit": "deny", "delete": "deny", "commit": "deny", "command": "deny",
-                     "network": "deny", "host": "deny", "remote": "deny"},
+                     "network": "deny", "host": "deny", "remote": "deny", "change": "deny"},
     "manual":       {"read": "allow", "edit": "ask", "delete": "ask", "commit": "ask", "command": "ask",
-                     "network": "ask", "host": "ask", "remote": "ask"},
+                     "network": "ask", "host": "ask", "remote": "ask", "change": "ask"},
     "accept_edits": {"read": "allow", "edit": "allow", "delete": "ask", "commit": "ask", "command": "ask",
-                     "network": "ask", "host": "ask", "remote": "ask"},
+                     "network": "ask", "host": "ask", "remote": "ask", "change": "ask"},
     "auto":         {"read": "allow", "edit": "allow", "delete": "judge", "commit": "ask", "command": "judge",
-                     "network": "judge", "host": "ask", "remote": "ask"},
+                     "network": "judge", "host": "ask", "remote": "ask", "change": "judge"},
     "bypass":       {"read": "allow", "edit": "allow", "delete": "allow", "commit": "allow", "command": "allow",
-                     "network": "allow", "host": "ask", "remote": "ask"},
+                     "network": "allow", "host": "ask", "remote": "ask", "change": "allow"},
 }
 ACTION_WORD = {"read": "reads", "edit": "edits", "delete": "deletes", "commit": "commits", "command": "commands",
-               "network": "commands with internet", "host": "commands on your machine", "remote": "git remotes"}
+               "network": "commands with internet", "host": "commands on your machine", "remote": "git remotes",
+               "change": "changes to your records"}
 
 
 def canonical(mode: str | None) -> str:

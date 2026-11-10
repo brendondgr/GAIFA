@@ -7,11 +7,11 @@
 </head>
 <body>
 <x-dc>
-<div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+<div style="{{ rootSt }}">
   <sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}">
     <div role="alert" style="padding:14px 16px;border-radius:10px;border:1px solid var(--rd,#F85149);background:var(--trd,rgba(248,81,73,.13));font-size:12.5px;word-break:break-word"><strong>This page crashed.</strong> {{ error }} — the API, Logs and Settings tabs still work.</div>
   </sc-if>
-  <div ref="{{ mountRef }}" data-mod-page="{{ modId }}" style="min-width:0"></div>
+  <div ref="{{ mountRef }}" data-mod-page="{{ modId }}" style="{{ mountSt }}"></div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script>
@@ -32,7 +32,7 @@ class Component extends DCLogic {
   componentDidUpdate() { this.sync(); }
   componentWillUnmount() { this.teardown(); this.el = null; }
 
-  keyOf(m) { return [m.service.id, m.tab, m.up ? 'up' : 'down', JSON.stringify(m.params || {})].join('|'); }
+  keyOf(m) { return [m.service.id, m.tab, m.up ? 'up' : 'down', JSON.stringify(m.params || {}), (m.route || []).join('/')].join('|'); }
 
   sync() {
     const m = this.props.mod;
@@ -43,7 +43,7 @@ class Component extends DCLogic {
     this.key = k;
     const offs = this.offs;
     const ctx = this.ctx = {
-      service: m.service, tab: m.tab, params: m.params || {}, api: m.api, ui: m.ui,
+      service: m.service, tab: m.tab, params: m.params || {}, route: m.route || [], api: m.api, ui: m.ui,
       call: (method, path, opts) => m.api.callService(m.service.id, method, path, opts),
       toast: (msg, level) => m.toast(msg, level), confirm: o => m.confirm(o), navigate: route => m.navigate(route),
       on: (type, fn) => { const off = m.on(type, fn); offs.push(off); return off; },
@@ -69,7 +69,10 @@ class Component extends DCLogic {
   }
 
   renderVals() {
-    return { mountRef: this.mountRef, hasError: !!this.state.error, error: this.state.error || '', modId: this.props.mod?.service?.id || '' };
+    const fill = !!this.props.mod?.fill;   // calendar 3.1: a main view takes the whole height
+    return { mountRef: this.mountRef, hasError: !!this.state.error, error: this.state.error || '', modId: this.props.mod?.service?.id || '',
+      rootSt: fill ? { display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, minHeight: 0, height: '100%' } : { display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 },
+      mountSt: fill ? { minWidth: 0, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : { minWidth: 0 } };
   }
 }
 </script>

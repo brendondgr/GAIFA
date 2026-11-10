@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+httpx
+icalendar
+python-dateutil
+tzlocal
+python-multipart

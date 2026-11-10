@@ -42,6 +42,7 @@ export const EVENT_AREA = {
   activity: 'events', job: 'events', alert: 'events', alert_cleared: 'events',
   approval: 'tools', tool_call: 'tools', grant: 'tools', grant_deleted: 'tools',
   session: 'sessions', session_step: 'sessions', repos: 'repos', settings: 'settings', ui_store: 'ui_store',
+  notification: 'notify', badge: 'notify',   // calendar 2.2: mods' notifications and badges (POST /api/notify)
 };
 
 const enc = encodeURIComponent;

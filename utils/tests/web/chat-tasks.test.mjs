@@ -143,3 +143,25 @@ test('tasks on the mock: list, create with a check, 409 on problems, runs, unrea
   assert.ok(seen.includes('task')); w.close();
   await assert.rejects(c.task(good.id), e => e.status === 404);
 });
+
+test('calendar 6.1: once in the rules, the picker and its preview; an event schedule as it is', async () => {
+  const W = await import(pathToFileURL(path.join(root, 'web/chat/chat-when.js')).href);
+  const E = await import(pathToFileURL(path.join(root, 'web/chat/chat-task-edit.js')).href);
+  const T = await import(pathToFileURL(path.join(root, 'web/chat/chat-tasks.js')).href);
+  const s = { kind: 'once', at: '2026-11-14T07:00' }, t = new Date(2026, 10, 14, 7).getTime() / 1000;
+  assert.deepEqual(W.check(s), []);
+  assert.ok(W.check({ kind: 'once', at: '2026-02-30T07:00' }).length);
+  assert.equal(W.nextAfter(s, t - 60), t);
+  assert.equal(W.nextAfter(s, t), null);
+  assert.equal(W.describe(s), 'Once, Sat 14 Nov 07:00');
+  assert.equal(W.describe({ kind: 'event', item: 'c_1', before_min: 30, title: 'Review' }), '30 min before “Review”, each time');
+  const f = E.formOf(null, { kind: 'once', at: '2026-11-14T07:00' });
+  assert.deepEqual(E.scheduleOf(f), s);
+  assert.equal(E.preview(f, t - 3600).words, 'Once, Sat 14 Nov 07:00');
+  assert.ok(E.preview(f, t + 60).error);
+  const ev = { kind: 'event', item: 'c_1', before_min: 15, title: 'Review' };
+  assert.deepEqual(E.scheduleOf(E.formOf({ schedule: ev, name: 'Prep', instructions: 'x' })), ev);
+  assert.deepEqual(T.presetOf('#/chat/tasks?new=once&at=2026-11-14T15:00'), { kind: 'once', at: '2026-11-14T15:00' });
+  assert.equal(T.presetOf('#/chat/tasks'), null);
+  assert.match(E.defaultAt(new Date(2026, 10, 9, 18, 31)), /^2026-11-09T19:00$/);
+});

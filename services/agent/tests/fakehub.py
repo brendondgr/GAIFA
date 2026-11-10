@@ -119,6 +119,8 @@ class FakeHub:
         self.ws_texts: dict[str, dict[str, Any]] = {}
         self.screen_down = False
         self.calendar: str | None = None                # calendar 5.2: the agenda's text (None: the mod isn't running)
+        self.cal_items: dict[str, list[dict[str, Any]]] = {}   # calendar 6.2: an item's occurrences ({occurrence, ts, end_ts, title})
+        self.cal_down = False
         self.agenda_calls: list[dict[str, Any]] = []
         self.texts: dict[str, dict[str, Any]] = {}       # structured-memory 2.1: the embed mod's text collections
         self.embed_down = False
@@ -564,6 +566,25 @@ class FakeHub:
             return [{"id": "fake", "name": "Fake", "state": "ready", "load": "loaded"},
                     *([{"id": "workspace", "name": "Workspace", "state": "ready"}] if self.workspace is not None else []),
                     *([{"id": "calendar", "name": "Calendar", "state": "ready"}] if self.calendar is not None else [])]
+
+        @app.get("/api/s/calendar/v1/items/{iid}")
+        def cal_item(iid: str) -> dict:
+            if self.cal_down:
+                raise HTTPException(503, "calendar down")
+            if iid not in self.cal_items:
+                raise HTTPException(404, "no such item")
+            return {"id": iid, "title": (self.cal_items[iid] or [{}])[0].get("title", "")}
+
+        @app.get("/api/s/calendar/v1/items/{iid}/next")
+        def cal_next(iid: str, after: str) -> dict:
+            from datetime import datetime
+            if self.cal_down:
+                raise HTTPException(503, "calendar down")
+            if iid not in self.cal_items:
+                raise HTTPException(404, "no such item")
+            t = datetime.fromisoformat(after).timestamp()
+            nxt = next((o for o in sorted(self.cal_items[iid], key=lambda o: o["ts"]) if o["ts"] >= t), None)
+            return {"item_id": iid, "next": nxt, "rev": 1}
 
         @app.get("/api/s/calendar/v1/agenda/prompt")
         def agenda_prompt(date: str, project: str | None = None) -> dict:

@@ -135,6 +135,10 @@ class HubAPI:
         (folder grants), as the workspace mod resolves them for the chat's calls: `{folders, environment}`."""
         return await self._json("GET", "/api/s/workspace/v1/folders", headers=await self._chat_origin(tid, environment))
 
+    async def calendar_next(self, item: str, after: str) -> dict[str, Any]:
+        """A calendar item's next occurrence starting at or after `after` (calendar 6.2): `{next, rev}`; 404 when gone."""
+        return await self._json("GET", f"/api/s/calendar/v1/items/{item}/next", params={"after": after})
+
     async def calendar_agenda(self, day: str, project: str | None) -> dict[str, Any]:
         """Today's and tomorrow's items as text for the prompt (calendar 5.2): `{text, rev, date}` from the calendar mod."""
         return await self._json("GET", "/api/s/calendar/v1/agenda/prompt", params={"date": day, **({"project": project} if project else {})})

@@ -20,7 +20,8 @@ export const splitList = s => [...new Set(String(s || '').split(/[\s,]+/).map(x 
 export function formOf(t = null, preset = {}) {
   const s = t?.schedule || { kind: 'daily', time: '07:00' };
   return {
-    name: t?.name || '', instructions: t?.instructions || '', kind: s.kind, time: s.time || '07:00', day: s.day ?? (s.kind === 'monthly' ? 1 : 0),
+    name: t?.name || '', instructions: t?.instructions || '', kind: t ? s.kind : preset.kind || s.kind, time: s.time || '07:00', day: s.day ?? (s.kind === 'monthly' ? 1 : 0),
+    at: s.at || preset.at || '', event: s.kind === 'event' ? s : null,   // calendar 6.1–6.2: once's time; an event schedule kept as it is
     every: s.every || 1, minute: s.minute || 0, windowOn: !!(s.from && s.to), from: s.from || '08:00', to: s.to || '18:00', weekdays: !!s.weekdays,
     project_id: t?.project_id || preset.project_id || '', only_own: !!t?.only_own, model: t?.model || '', mode: t?.mode || 'auto',
     skills: [...(t?.skills || [])], tools: (t?.allow?.tools || []).join(', '), sites: (t?.allow?.sites || []).filter(x => x !== '*').join(', '),
@@ -28,11 +29,19 @@ export function formOf(t = null, preset = {}) {
     use_project_memory: t ? !!t.use_project_memory : true, keep_days: t?.keep_days || 30,
   };
 }
+/** Once's default time: the next whole hour. */
+export function defaultAt(now = new Date()) {
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1, 0);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00`;
+}
 /** The schedule the fields describe. */
 export function scheduleOf(f) {
   if (f.kind === 'hourly') {
     return { kind: 'hourly', every: +f.every || 1, minute: +f.minute || 0, ...(f.windowOn ? { from: f.from, to: f.to } : {}), ...(f.weekdays ? { weekdays: true } : {}) };
   }
+  if (f.kind === 'once') return { kind: 'once', at: f.at };
+  if (f.kind === 'event' && f.event) return f.event;
   if (f.kind === 'weekly') return { kind: 'weekly', day: +f.day || 0, time: f.time };
   if (f.kind === 'monthly') return { kind: 'monthly', day: Math.min(31, Math.max(1, +f.day || 1)), time: f.time };
   return { kind: f.kind, time: f.time };
@@ -55,7 +64,9 @@ export function taskBody(f) {
 export function preview(f, now = Date.now() / 1000) {
   const s = scheduleOf(f), bad = check(s);
   if (bad.length) return { error: bad[0] };
-  return { words: describe(s), next: whenWords(nextAfter(s, now), now) };
+  if (s.kind === 'event') return { words: describe(s), next: 'from the calendar' };
+  const nxt = nextAfter(s, now);
+  return nxt ? { words: describe(s), next: whenWords(nxt, now) } : { error: 'that time has passed' };
 }
 
 export function TaskEditor({ shared, task = null, preset = {}, onClose, onSaved }) {
@@ -104,7 +115,10 @@ export function TaskEditor({ shared, task = null, preset = {}, onClose, onSaved 
     check1('weekdays', 'Weekdays only'))
     : f.kind === 'weekly' ? row('On', h('select', { value: f.day, onChange: ev('day'), 'aria-label': 'Day of the week', style: sel }, DAYS.map((d, i) => h('option', { key: d, value: i }, d))), 'at', time('time', 'Time'))
       : f.kind === 'monthly' ? row('On day', num('day', 1, 31, 64, 'Day of the month'), 'at', time('time', 'Time'), +f.day > 28 ? h('span', { style: { color: T.dim, fontSize: 11.5 } }, 'a shorter month: its last day') : null)
-        : row('At', time('time', 'Time'));
+        : f.kind === 'once' ? row('On', h('input', { type: 'datetime-local', value: f.at, onChange: ev('at'), 'aria-label': 'Date and time', style: { ...inputSt, height: 30, width: 210 } }),
+          h('span', { style: { color: T.dim, fontSize: 11.5 } }, 'it runs once, then turns off'))
+          : f.kind === 'event' ? row(h('span', { style: { color: T.mut } }, 'Set from the Calendar: open the event there to change it.'))
+            : row('At', time('time', 'Time'));
   return h('div', { role: 'dialog', 'aria-modal': 'true', 'aria-label': saved ? `Edit ${saved.name}` : 'New scheduled task', onKeyDown: e => { if (e.key === 'Escape') onClose(); },
     style: { position: 'fixed', inset: 0, zIndex: 80, display: 'grid', placeItems: 'center', background: T.ov, padding: 16, overflowY: 'auto' } },
     h('form', { onSubmit: submit, style: { width: 'min(620px, 100%)', maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: T.card, border: '1px solid ' + T.bds, borderRadius: 12,
@@ -115,7 +129,8 @@ export function TaskEditor({ shared, task = null, preset = {}, onClose, onSaved 
         placeholder: 'What each run should do, in detail. A run reads these as your words, with no one there to ask.', style: area })),
       h('div', { style: { display: 'flex', flexDirection: 'column', gap: 6 } }, h('span', { style: label11 }, 'Schedule'),
         h('div', { role: 'radiogroup', 'aria-label': 'How often', style: { display: 'flex', flexWrap: 'wrap', gap: 4 } },
-          KINDS.map(([k, l]) => chip(f.kind === k, l, () => setF(x => ({ ...x, kind: k, day: k === 'monthly' ? Math.max(1, +x.day || 1) : k === 'weekly' ? Math.min(6, +x.day || 0) : x.day }))))),
+          f.kind === 'event' ? chip(true, 'Before an event', () => {}) : KINDS.map(([k, l]) => chip(f.kind === k, l, () => setF(x => ({ ...x, kind: k, day: k === 'monthly' ? Math.max(1, +x.day || 1) : k === 'weekly' ? Math.min(6, +x.day || 0) : x.day,
+            at: k === 'once' && !x.at ? defaultAt() : x.at }))))),
         scheduleFields,
         h('span', { role: 'status', style: { fontSize: 12, color: pv.error ? T.rd : T.mut } }, pv.error ? `The schedule: ${pv.error}` : `${pv.words} · next ${pv.next}`)),
       h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } },

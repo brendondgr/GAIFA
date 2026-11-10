@@ -411,18 +411,19 @@ Assumed:
 
 ## Phase 6 — Scheduled tasks and the calendar (L)
 
-- [ ] **6.1 Once: `services/agent/agent/tasks/when.py`, `store.py`, `schedule.py`, `web/chat/chat-when.js`, `chat-task-edit.js`.**
+- [x] **6.1 Once: `services/agent/agent/tasks/when.py`, `store.py`, `schedule.py`, `web/chat/chat-when.js`, `chat-task-edit.js`.**
   - **The kind:** `{kind: "once", at: "YYYY-MM-DDTHH:MM"}` (local). `next_after` answers None after it, and `describe` reads "Once, Fri 14 Nov 07:00".
   - **The loop:** `tick` and the store accept None. A once task that ran is turned off (`why: "ran once"`). A missed once runs late per the usual rule.
   - **The editor:** a **Once** choice with a date and time.
   *Done when:* `test_task_when.py`, `test_task_schedule.py` and `chat-tasks.test.mjs` cover once: next, run and turned off, missed, and the picker.
-- [ ] **6.2 Before an event: `tasks/when.py`, `tasks/event_due.py` (new), `store.py` (migration), `check.py`.**
+- [x] **6.2 Before an event: `tasks/when.py`, `tasks/event_due.py` (new), `store.py` (migration), `check.py`.**
   - **The kind:** `{kind: "event", item: "c_…", before_min: 0–1440}`.
   - **`EventDue.next(task, now)`** asks the calendar mod for the item's next occurrence (`GET /api/s/calendar/v1/items/{id}/next?after=`), so `tick` awaits it for these tasks. Answers are cached for 5 minutes and dropped when the calendar's `rev` moves.
   - **Runs:** `task_runs` gains `occurrence`. A run per occurrence happens once, and the missed rule is §2's.
   - **Checks:** the item must exist and not be in the trash (`event_gone` turns the task off). The calendar mod being down is a warning, and the run waits.
   - **The calendar side:** `GET /v1/items/{id}/next` is a new route there.
   *Done when:* `services/agent/tests/test_task_event.py` (a fake calendar) covers next from a repeating event, a moved occurrence, one run per occurrence, missed before and after the event's end, the item gone, and the mod down.
+  *As built (6.1–6.2):* `when.next_due` answers None for a once that ran and for event schedules; the scheduler (`TaskSchedule.refresh_events`) asks the calendar each check for event tasks (`EventDue`, 60 s cache) and keeps the next occurrence in memory; an item that answers 404 turns the task off. Tests: `services/agent/tests/test_task_event.py` (the fake hub has a calendar's items), `chat-tasks.test.mjs`.
 - [ ] **6.3 Prep from the event: `services/calendar/ui/cal-edit.js`, `ui/cal-prep.js` (new), the agent's `api_tasks.py`.**
   - **The sheet:** the event editor gets **Prep task**: instructions ("Gather my notes on… and write a brief"), minutes before, model and mode (defaults from Settings → Agent), and pre-allows.
   - **Saving:** creates the task through `POST /api/s/agent/v1/tasks` with the event kind and a name "Prep: <title>", and stores `prep` on the item. The item shows a small prep mark and opens its task page.

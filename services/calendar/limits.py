@@ -6,13 +6,19 @@ calendar calls would do, for the hub's mode × action table.
   when the judge finds you asked for them, and ask in Manual and Accept edits;
 - changing or deleting an item the agent made in this same chat, which nobody changed since (a test it made), is
   `edit`: it runs in Accept edits, Auto and Bypass;
-- an item that isn't there is refused (`not_found`).
+- an item that isn't there is refused (`not_found`);
+- a fourth different `add` from one chat within two minutes is refused (`use_propose`): many items at once are a
+  proposal the user ticks, not a card each (plan 4.2's rule, which a small model may skip). The same add checked
+  again (the hub's re-check when you approve its card) isn't counted twice.
 `allow_bypass` is always true: Bypass may change the calendar. There's no grant key: "Allow in this chat" covers
 every call of that tool in the chat.
 """
 
 from __future__ import annotations
 
+import json
+import threading
+import time
 from typing import Any
 
 import repeat as R
@@ -22,6 +28,30 @@ from store import NotFound
 
 READS = {"agenda", "search", "when", "free", "propose", "plan_day"}
 OWN = {"update", "delete"}
+BURST_N, BURST_S = 3, 120.0
+
+
+class Burst:
+    """The adds each chat sent lately: {thread: {arguments as JSON: when}}. On `app.state.cal.burst`."""
+
+    def __init__(self) -> None:
+        self.seen: dict[str, dict[str, float]] = {}
+        self.lock = threading.Lock()
+
+    def over(self, thread: str, args: dict[str, Any], now: float | None = None) -> bool:
+        """Counts this add; true when it is past the limit (it isn't counted then, so a proposal of the rest is clean)."""
+        now = time.time() if now is None else now
+        key = json.dumps(args, sort_keys=True, default=str)
+        with self.lock:
+            for t in [t for t, d in self.seen.items() if all(now - w > BURST_S for w in d.values())]:
+                del self.seen[t]
+            mine = {k: w for k, w in self.seen.get(thread, {}).items() if now - w <= BURST_S}
+            if key not in mine and len(mine) >= BURST_N:
+                self.seen[thread] = mine
+                return True
+            mine[key] = mine.get(key, now)
+            self.seen[thread] = mine
+            return False
 
 
 def _summary(store: Any, settings: dict[str, Any], tool: str, args: dict[str, Any], item: dict[str, Any] | None) -> str:
@@ -48,9 +78,15 @@ def _summary(store: Any, settings: dict[str, Any], tool: str, args: dict[str, An
     return tool
 
 
-def preflight(store: Any, settings: dict[str, Any], tool: str, args: dict[str, Any], origin: dict[str, Any]) -> dict[str, Any]:
+def preflight(store: Any, settings: dict[str, Any], tool: str, args: dict[str, Any], origin: dict[str, Any],
+              burst: Burst | None = None) -> dict[str, Any]:
     if tool in READS:
         return {"action": "read", "allow_bypass": True}
+    if tool == "add" and burst is not None and origin.get("thread") and burst.over(str(origin["thread"]), args):
+        return {"action": "change", "refuse": {
+            "code": "use_propose", "detail": f"more than {BURST_N} calendar items at once go to the user as one proposal, not a card each",
+            "fix": "don't retry calendar_add; put this item and the others you haven't added yet in one calendar_propose call "
+                   "(the earlier adds already went to the user)"}}
     item = None
     iid = args.get("id") or args.get("iid")
     if tool in ("update", "done", "delete"):

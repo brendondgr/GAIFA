@@ -7,6 +7,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from utils.tools.approvals import ACTIONS
+
 Risk = Literal["read", "write", "generate", "network", "execute", "destructive"]
 
 
@@ -105,7 +107,7 @@ class JudgeStatus(_Model):
 
 class CallLimits(_Model):
     """needs_approval for a tool with a preflight (plan 27.4): what the call would do."""
-    action: Literal["read", "edit", "delete", "commit", "command", "network", "host", "remote"]
+    action: Literal[ACTIONS] = Field(description="The decision table's word (approvals.ACTIONS); a mod's other word is shown as command")  # type: ignore[valid-type]
     folder: str | None = None
     level: str | None = None
     allow_bypass: bool | None = None

@@ -52,3 +52,23 @@ def test_mentions(client):
     a = client.post("/v1/items", json={"title": "Dentist", "when": "tomorrow 3pm"}).json()["item"]
     items = client.get("/v1/mentions/items").json()
     assert items[0]["value"] == a["id"] and items[0]["label"].startswith("Dentist · ")
+
+
+def test_many_adds_from_one_chat_are_a_proposal(client):
+    """A fourth different add from one chat within two minutes is refused with use_propose; the same add checked again
+    (the hub's re-check on approval) isn't counted; another chat has its own count."""
+    adds = [{"title": f"Deadline {i}", "when": f"2026-12-0{i + 1}"} for i in range(5)]
+    got = [pre(client, "add", a, thread="t_burst") for a in adds]
+    assert [g.get("refuse", {}).get("code") for g in got] == [None, None, None, "use_propose", "use_propose"]
+    assert "calendar_propose" in got[3]["refuse"]["fix"]
+    assert "refuse" not in pre(client, "add", adds[0], thread="t_burst")        # an approved card's re-check
+    assert "refuse" not in pre(client, "add", adds[4], thread="t_other")
+    assert pre(client, "propose", {"items": adds}, thread="t_burst")["action"] == "read"
+
+
+def test_the_window_passes():
+    from limits import BURST_S, Burst
+    b = Burst()
+    assert not any(b.over("t", {"n": i}, now=0) for i in range(3))
+    assert b.over("t", {"n": 3}, now=1)
+    assert not b.over("t", {"n": 3}, now=BURST_S + 1)                        # the first three are older than the window

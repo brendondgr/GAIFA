@@ -9,13 +9,16 @@ uses sudo. The tool routes echo what they were sent (and the folders the hub pas
 Plan 34: a folder given as a full path is a folder outside the chat's environment. A read of one answers
 `ask_folder` (the hub asks the user) unless the origin's `folders` holds it (then it reads, at Read);
 `/etc` is never asked for.
+
+An edit whose path starts `record:` answers the calendar's `change` (calendar 4.1), and `odd:` a word the hub's table
+doesn't know (both reach the card through the call route).
 """
 
 from __future__ import annotations
 
 LEVELS = ("read", "edit", "run", "run_net")
 NEEDS = {"read": "read", "edit": "edit", "delete": "edit", "commit": "edit", "command": "run", "network": "run_net",
-         "host": "run", "remote": "run_net"}
+         "host": "run", "remote": "run_net", "change": "edit"}
 TOOLS = {"read": "read", "edit": "edit", "delete": "delete", "commit": "commit", "run": None}
 
 
@@ -61,9 +64,12 @@ def limits(b: dict) -> dict:
     else:
         out["action"] = TOOLS.get(tool or "", "read") or "read"
         out["once"] = out["action"] == "commit"
+        path = str(args.get("path") or "")
+        if out["action"] == "edit" and path.startswith(("record:", "odd:")):
+            out["action"] = "change" if path.startswith("record:") else "frobnicate"
         if out["action"] in ("edit", "delete"):
             out["preview"] = {"summary": f"{tool} {args.get('path')}", "diff": f"--- a/{args.get('path')}\n+++ b/{args.get('path')}\n"}
-    need = NEEDS[out["action"]]
+    need = NEEDS.get(out["action"], "edit")
     if LEVELS.index(level) < LEVELS.index(need):
         out["refuse"] = {"code": "level", "detail": f"needs the folder at {need}; {folder} is at {level}",
                          "fix": f"ask the user to raise {folder} on the Workspace page"}

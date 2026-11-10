@@ -19,7 +19,7 @@ router = APIRouter()
 @router.post("/v1/limits", summary="The preflight of one agent call: its action for the hub's mode table")
 def limits(request: Request, body: dict = Body(...)) -> dict:
     c = cal(request)
-    return preflight(c.store, c.settings.get(), str(body.get("tool") or ""), body.get("arguments") or {}, body.get("origin") or {})
+    return preflight(c.store, c.settings.get(), str(body.get("tool") or ""), body.get("arguments") or {}, body.get("origin") or {}, c.burst)
 
 
 def row(o: dict[str, Any]) -> dict[str, Any]:

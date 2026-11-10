@@ -35,7 +35,7 @@ from utils import live as live_mod
 from utils.gpu import gpu_note
 from utils.services import ServiceError
 from utils.tools import fixes, pins, results
-from utils.tools.approvals import Approvals, canonical, decide, judge
+from utils.tools.approvals import ACTIONS, Approvals, canonical, decide, judge
 from utils.tools.catalog import Catalog, ToolDef
 from utils.tools.doc_tools import untrusted
 from utils.tools.modcall import FIX_NO_ANSWER, ToolError, dry_run, mod_error
@@ -398,6 +398,8 @@ class Calls:
         if limits:      # what the card shows: the action, the folder, the diff or the command; `once`: no grant buttons
             out["limits"] = {k: limits[k] for k in ("action", "folder", "level", "allow_bypass", "key", "once", "preview", "path", "ask_folder")
                              if limits.get(k) is not None}
+            if out["limits"].get("action") not in ACTIONS:     # as decide() reads it: a word the table lacks is a command
+                out["limits"]["action"] = "command"
         if filled:
             out["filled"] = filled
             out["filled_by"] = {k: v for k, v in (how or {}).items() if k in filled}   # "default" | "pref:<id>" | "carried" (21.7)

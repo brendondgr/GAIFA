@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from items import Invalid, Items
+from limits import Burst
 from proposals import Proposals
 from settings import Settings
 from store import NotFound, Store
@@ -33,6 +34,7 @@ class Calendar:
         self.proposals = Proposals(self)
         self.hub_url = hub_url
         self.alerts: Any = None          # alerts.Alerts, started in the lifespan (plan 2.3)
+        self.burst = Burst()             # the preflight's count of each chat's recent adds
 
 
 def create_app(db: str | None = None, state: str | None = None, hub_url: str | None = None,

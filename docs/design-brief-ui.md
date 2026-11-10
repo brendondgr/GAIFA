@@ -1201,7 +1201,7 @@ interface JudgedCall extends Judged { id: number; ts: number; tool: string; thre
                                       suggest?: string[] }   // allow rules that would cover a command the model asked about (plan 30.7)
 interface JudgeStatus { available: boolean; backend: string; model: string; detail: string;   // Auto is offered only when available
                        choices: string[] }   // the decide mod's usable models (the picker in Settings → Permissions → Auto judge)
-interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote";
+interface CallLimits { action: "read" | "edit" | "delete" | "commit" | "command" | "network" | "host" | "remote" | "change";
                        folder?: string; level?: string; allow_bypass?: boolean; path?: string;
                        key?: string;                                // what "allow in this chat" covers: the folder and the exact command
                        once?: boolean;                              // asks every time: only "Allow once" (host runs, commits, git remotes)

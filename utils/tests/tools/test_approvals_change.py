@@ -42,3 +42,15 @@ def test_its_own_items_as_edits():
 def test_a_refusal_ends_it():
     lim = {"action": "change", "refuse": {"code": "not_found", "detail": "there's no calendar item 'c_x'"}}
     assert decide("calendar_update", "write", cfg(), "bypass", limits=lim)[0] == "deny"
+
+
+async def test_a_change_card_through_the_route(wh):
+    """The route's response model takes every word of the table: a `change` that asks reaches the caller as a card, not
+    a 500 after the approval was made (the calendar's writes in Manual did), and a word the table lacks reads as command."""
+    for mode, want in (("manual", "needs_approval"), ("accept_edits", "needs_approval"), ("plan", "denied"), ("bypass", "done")):
+        r = await wh.call("fake_ws_edit", {"folder": "edit-bypass", "path": "record:rent"}, mode=mode, thread="t1")
+        assert r["status"] == want, (mode, r)
+        if want == "needs_approval":
+            assert r["limits"]["action"] == "change" and r["approval_id"]
+    r = await wh.call("fake_ws_edit", {"folder": "edit", "path": "odd:x"}, mode="manual", thread="t1")
+    assert r["status"] == "needs_approval" and r["limits"]["action"] == "command"

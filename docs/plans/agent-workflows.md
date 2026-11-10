@@ -141,8 +141,9 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - A "from Claude Code" chip on such chats and their rows; Show all can filter them. *(As built: the chips; no Show all filter: the chip shows there too, and a search by title finds them.)*
 
 **Checks & deliverables — Phase 4**
-- [ ] Live: a Claude Code session with GAIFA's `/mcp` starts a chat, waits, reads its answer, and sees an approval it can't decide; Codex the same if installed.
-- [ ] Delivered: `api_external.py`, the six tools, the client's name, the chip; `docs/` on using GAIFA's chats from another agent.
+- [x] Live: a Claude Code session with GAIFA's `/mcp` starts a chat, waits, reads its answer, and sees an approval it can't decide; Codex the same if installed.
+  *As built (2026-11-09, the second hub's `/mcp`):* an MCP client over HTTP (a script with the protocol's own messages) listed the six `agent_chat_*` tools (no `agent_memory_*`); `agent_chat_start` asked, was approved in GAIFA, started the chat, and `agent_chat_wait` read its answer ("2 + 2 equals 4."); a second chat whose `workspace_edit` waited on a card read back `state: waiting`, `waiting_for_you: [{kind: approval, tool: workspace_edit, risk: write}]` and the note that the user decides it; the only approval tool at `/mcp` is `gaifa_wait_approval`, which waits. Real clients, headless and with temporary config only (nothing saved to their settings): `claude -p` with `--mcp-config` reached GAIFA as `client: claude-code`, but headless Claude Code cancels MCP forms and GAIFA counts that as a denial (plan 13.4's behavior), so its start was denied; `codex exec` refused the call itself (its approval policy). `docs/agents-over-mcp.md` says how to connect them and allow GAIFA's tools; an interactive run of each is the user's.
+- [x] Delivered: `api_external.py`, the six tools, the client's name, the chip; `docs/` on using GAIFA's chats from another agent.
 
 ## Phase 5 — Eval and the decision (S)
 

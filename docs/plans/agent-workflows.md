@@ -133,7 +133,7 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
   - A started chat is a root with `spawn.by = "mcp"` and the client's name; it may spawn sub-agents as any chat. *(As built: `settings.external = {by: "mcp", client, started}`, not `spawn`: it is a root chat in the user's list, not a sub-agent; only such chats and their sub-agents are reachable over these tools.)* `mode: "bypass"` is refused. Its approvals are yours (the chat, the header); the outside agent only sees that they wait.
   *Done when:* `test_external_chats.py`: start → wait → read returns the answer; Bypass is refused; an approval shows as `waiting_for_you`.
 
-- [ ] **4.2 The client's name: `utils/tools/mcp.py`.**
+- [x] **4.2 The client's name: `utils/tools/mcp.py`.** *(As built: the hub already passed it, `origin.client` since plan 13.4; this step added the test and the docs.)*
   - MCP calls carry `origin.client` (from `initialize`'s `clientInfo`). Docs: architecture §6 (`/mcp`).
   *Done when:* `utils/tests/tools/test_mcp_origin.py`.
 

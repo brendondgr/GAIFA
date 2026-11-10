@@ -30,8 +30,30 @@ test('the live client: tree, requests, deciding one, the workflow watch (3.1)', 
   const opened = [];
   class ES { constructor(u) { opened.push(u); this.close = () => {}; } }
   const w = capi.createLiveClient({ base: '', fetch: async () => new Response('{}'), EventSource: ES }).watchWorkflows(() => {});
-  assert.match(opened[0], /\/v1\/streams\?threads=&watch=workflows$/);
+  assert.match(opened[0], /\/v1\/streams\?threads=&watch=projects,tasks,workflows$/);
   w.close();
+});
+
+test('projects, tasks and sub-agents share one watch connection, open while anyone listens', () => {
+  const all = [];
+  class ES { constructor(u) { this.url = u; this.closed = false; all.push(this); } close() { this.closed = true; } }
+  const c = capi.createLiveClient({ base: '', fetch: async () => new Response('{}'), EventSource: ES });
+  const got = { p: [], t: [], t2: [], w: [] };
+  const wp = c.watchProjects(ev => got.p.push(ev.type));
+  const wt = c.watchTasks(ev => got.t.push(ev.type));
+  const wt2 = c.watchTasks(ev => got.t2.push(ev.type));
+  const ww = c.watchWorkflows(ev => got.w.push(ev.type));
+  assert.equal(all.length, 1, 'one EventSource for every listener');
+  for (const type of ['project', 'project_source', 'task', 'task_run', 'agent_child', 'delta'])
+    all[0].onmessage({ data: JSON.stringify({ type }) });
+  assert.deepEqual(got, { p: ['project', 'project_source'], t: ['task', 'task_run'], t2: ['task', 'task_run'], w: ['agent_child'] });
+  wp.close(); wt.close(); wt.close(); ww.close();
+  assert.equal(all[0].closed, false, 'still open while a listener is left');
+  wt2.close();
+  assert.equal(all[0].closed, true, 'closed after the last');
+  const again = c.watchProjects(() => {});
+  assert.equal(all.length, 2, 'a new listener opens it again');
+  again.close();
 });
 
 test('the mock: a workflow, its tree and requests, deciding from the parent (3.1)', async () => {

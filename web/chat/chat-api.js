@@ -107,6 +107,8 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
       catch { return true; } finally { ac?.abort(); }
     } });
 
+  const watch = sharedWatch(url, ES);   // projects, tasks and sub-agents: one connection for all of them
+
   return {
     live: true,
     models: () => req('GET', '/v1/models'),
@@ -115,9 +117,9 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
     threadGroups: ({ archived, by } = {}) => req('GET', '/v1/threads/groups' + qs({ archived: archivedQ(archived),   // plan 41.1
       by: by && by !== 'environment' ? by : undefined })),                                 // by: 'project' (plan projects 1.3)
     threadCount: ({ q, archived, environment, project } = {}) => req('GET', '/v1/threads/count' + qs({ q, archived: archivedQ(archived), environment, project })),   // chat-history 1.1
-    ...projectCalls(req, url, ES),                                                         // plan projects 1.3
-    ...taskCalls(req, url, ES),                                                            // plan scheduled-tasks 4.1
-    ...workflowCalls(req, url, ES),                                                        // plan agent-workflows 3.1
+    ...projectCalls(req, watch),                                                           // plan projects 1.3
+    ...taskCalls(req, watch),                                                              // plan scheduled-tasks 4.1
+    ...workflowCalls(req, watch),                                                          // plan agent-workflows 3.1
     searchChats: (q, limit = 8) => req('GET', '/v1/chats/search' + qs({ q, limit })).then(r => r.results || []),  // plan 28.5
     create: (body = {}) => req('POST', '/v1/threads', body),
     get: tid => req('GET', T(tid)),
@@ -154,9 +156,9 @@ export function createLiveClient({ base = '', fetch: f = globalThis.fetch?.bind(
   };
 }
 
-// Projects (plan projects 1.3): the agent's /v1/projects routes. watchProjects(onEvent) keeps an EventSource on
-// /v1/streams?watch=projects open (no chats on it) for the `project` and `project_source` events, reconnecting on errors.
-export function projectCalls(req, url, ES = globalThis.EventSource) {
+// Projects (plan projects 1.3): the agent's /v1/projects routes. watchProjects(onEvent) hears the `project` and
+// `project_source` events on the client's one watch connection (sharedWatch below).
+export function projectCalls(req, watch) {
   const P = pid => `/v1/projects/${enc(pid)}`;
   return {
     projects: ({ q, sort } = {}) => req('GET', '/v1/projects' + qs({ q, sort: sort && sort !== 'activity' ? sort : undefined })),
@@ -177,28 +179,13 @@ export function projectCalls(req, url, ES = globalThis.EventSource) {
     projectMemory: pid => req('GET', `${P(pid)}/memory`),
     patchProjectFact: (pid, fid, patch) => req('PATCH', `/v1/memory/facts/${enc(fid)}`, patch),
     forgetProjectFact: (pid, fid) => req('DELETE', `/v1/memory/facts/${enc(fid)}`),
-    watchProjects(onEvent) {
-      let es = null, closed = false, tries = 0, timer = null;
-      const open = () => {
-        if (closed || !ES) return;
-        es = new ES(url('/v1/streams?threads=&watch=projects'));
-        es.onopen = () => { tries = 0; };
-        es.onmessage = m => {
-          let ev;
-          try { ev = JSON.parse(m.data); } catch { return; }
-          if (ev.type === 'project' || ev.type === 'project_source') onEvent?.(ev);
-        };
-        es.onerror = () => { es.close(); if (!closed) timer = setTimeout(open, Math.min(10000, 800 * 2 ** tries++)); };
-      };
-      open();
-      return { close() { closed = true; clearTimeout(timer); es?.close(); } };
-    },
+    watchProjects: onEvent => watch(ev => (ev.type === 'project' || ev.type === 'project_source') && onEvent?.(ev)),
   };
 }
 
-// Scheduled tasks (plan scheduled-tasks 4.1): the agent's /v1/tasks routes. watchTasks(onEvent) keeps an EventSource on
-// /v1/streams?watch=tasks open for the `task` and `task_run` events, reconnecting on errors.
-export function taskCalls(req, url, ES = globalThis.EventSource) {
+// Scheduled tasks (plan scheduled-tasks 4.1): the agent's /v1/tasks routes. watchTasks(onEvent) hears the `task` and
+// `task_run` events on the client's one watch connection.
+export function taskCalls(req, watch) {
   const K = kid => `/v1/tasks/${enc(kid)}`;
   return {
     tasks: ({ q, project } = {}) => req('GET', '/v1/tasks' + qs({ q, project })),
@@ -223,33 +210,45 @@ export function taskCalls(req, url, ES = globalThis.EventSource) {
     runAllows: (kid, rid) => req('GET', `${K(kid)}/runs/${enc(rid)}/allows`),
     addAllows: (kid, body) => req('POST', `${K(kid)}/allow`, body),
     runLog: (kid, rid) => req('GET', `${K(kid)}/runs/${enc(rid)}/log`),
-    watchTasks: onEvent => watch(url, ES, 'tasks', ev => (ev.type === 'task' || ev.type === 'task_run') && onEvent?.(ev)),
+    watchTasks: onEvent => watch(ev => (ev.type === 'task' || ev.type === 'task_run') && onEvent?.(ev)),
   };
 }
 // Sub-agents (plan agent-workflows 3.1): a chat's workflow tree, its sub-agents' requests and deciding one from it.
-// watchWorkflows(onEvent) keeps /v1/streams?watch=workflows open for the `agent_child` events (a sub-agent started,
-// changed state or ended: {id, parent, root, child: <tree row>}).
-export function workflowCalls(req, url, ES = globalThis.EventSource) {
+// watchWorkflows(onEvent) hears the `agent_child` events (a sub-agent started, changed state or ended:
+// {id, parent, root, child: <tree row>}) on the client's one watch connection.
+export function workflowCalls(req, watch) {
   const T = tid => `/v1/threads/${enc(tid)}`;
   return {
     tree: tid => req('GET', `${T(tid)}/tree`),
     requests: (tid, { waiting } = {}) => req('GET', `${T(tid)}/requests` + qs({ waiting: waiting ? 'true' : undefined })),
     decideRequest: (tid, rid, body) => req('POST', `${T(tid)}/requests/${enc(rid)}`, body),
     seenChild: tid => req('POST', `${T(tid)}/seen`),                                       // 3.2: its unread dot goes
-    watchWorkflows: onEvent => watch(url, ES, 'workflows', ev => ev.type === 'agent_child' && onEvent?.(ev)),
+    watchWorkflows: onEvent => watch(ev => ev.type === 'agent_child' && onEvent?.(ev)),
   };
 }
-function watch(url, ES, what, on) {
-  let es = null, closed = false, tries = 0, timer = null;
+// The events about no one chat (projects, tasks, sub-agents) on ONE /v1/streams connection for every listener: a
+// browser keeps about six connections to the hub over HTTP/1.1, and one each for projects, tasks and workflows next to
+// /api/events and the chats' stream left none for ordinary requests (the chat list stayed at Loading…). It opens with
+// the first listener, closes after the last and reconnects on errors; each listener picks its own events.
+export function sharedWatch(url, ES = globalThis.EventSource) {
+  const listeners = new Set();
+  let es = null, tries = 0, timer = null;
   const open = () => {
-    if (closed || !ES) return;
-    es = new ES(url(`/v1/streams?threads=&watch=${what}`));
+    timer = null;
+    if (!listeners.size || !ES) return;
+    es = new ES(url('/v1/streams?threads=&watch=projects,tasks,workflows'));
     es.onopen = () => { tries = 0; };
-    es.onmessage = m => { let ev; try { ev = JSON.parse(m.data); } catch { return; } on(ev); };
-    es.onerror = () => { es.close(); if (!closed) timer = setTimeout(open, Math.min(10000, 800 * 2 ** tries++)); };
+    es.onmessage = m => { let ev; try { ev = JSON.parse(m.data); } catch { return; } for (const on of [...listeners]) on(ev); };
+    es.onerror = () => { es.close(); es = null; if (listeners.size) timer = setTimeout(open, Math.min(10000, 800 * 2 ** tries++)); };
   };
-  open();
-  return { close() { closed = true; clearTimeout(timer); es?.close(); } };
+  return on => {
+    listeners.add(on);
+    if (!es && !timer) open();
+    return { close() {
+      if (!listeners.delete(on) || listeners.size) return;
+      clearTimeout(timer); timer = null; es?.close(); es = null; tries = 0;
+    } };
+  };
 }
 
 /** The live client when GAIFA proxies to mods, else the scripted mock agent. */

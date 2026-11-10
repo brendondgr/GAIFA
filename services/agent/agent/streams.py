@@ -89,7 +89,8 @@ def add_stream_routes(app: FastAPI, A: Callable[[Request], Any], thread_or_404: 
                                     "seq and a `ready` for it, then live events and deltas of all of them (each has `thread_id`); "
                                     "an unknown thread gets `{type: 'gone', thread_id}`")
     async def streams(request: Request, threads: str = "", watch: str = "") -> StreamingResponse:
-        """`watch=projects` (plan projects 1.2) or `watch=tasks` (scheduled-tasks 1.3): also every `project`, `project_source`,
+        """`watch=projects` (plan projects 1.2), `watch=tasks` (scheduled-tasks 1.3), `watch=workflows` or a comma list of
+        them (the Chat page sends all three on one connection): also every `project`, `project_source`, `agent_child`,
         `task` and `task_run` event, which belong to no chat."""
         agent = A(request)
         wanted = parse_threads(threads)

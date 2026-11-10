@@ -134,7 +134,8 @@ class ToolSet:
         self.notes: dict[str, str] = {}              # tool → the harness's note (plan 22.2)
 
     def off(self, t: dict[str, Any]) -> bool:
-        return t["mod"] in self.disabled or group_of(t) in self.disabled or (self.child and t["name"].startswith("agent_memory_"))
+        return (t["mod"] in self.disabled or group_of(t) in self.disabled or (self.child and t["name"].startswith("agent_memory_"))
+                or t["name"].startswith("agent_chat_"))    # other agents' chat tools (/mcp): a chat here has its agent tool
 
     def hidden(self, t: dict[str, Any]) -> bool:
         g = group_of(t)

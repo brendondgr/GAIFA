@@ -128,9 +128,9 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 
 ## Phase 4 — Claude Code and Codex over `/mcp` (M)
 
-- [ ] **4.1 Chat tools for outside agents: `agent/api_external.py`, `services/agent/service.toml`.**
+- [x] **4.1 Chat tools for outside agents: `agent/api_external.py`, `services/agent/service.toml`.**
   - Routes and `[tools]` entries with `mcp = true` (the catalog names them `agent_chat_*`): `chat_start {prompt, title?, model?, mode?, environment?, project?}` (risk `execute`), `chat_send {chat, text}` (`execute`), `chat_read {chat, after?}` (`read`: state, the last answer, open approvals as `waiting_for_you`), `chat_wait {chat, timeout ≤ 60}` (`read`), `chat_stop {chat}` (`write`), `chat_list` (`read`: chats this client started).
-  - A started chat is a root with `spawn.by = "mcp"` and the client's name; it may spawn sub-agents as any chat. `mode: "bypass"` is refused. Its approvals are yours (the chat, the header); the outside agent only sees that they wait.
+  - A started chat is a root with `spawn.by = "mcp"` and the client's name; it may spawn sub-agents as any chat. *(As built: `settings.external = {by: "mcp", client, started}`, not `spawn`: it is a root chat in the user's list, not a sub-agent; only such chats and their sub-agents are reachable over these tools.)* `mode: "bypass"` is refused. Its approvals are yours (the chat, the header); the outside agent only sees that they wait.
   *Done when:* `test_external_chats.py`: start → wait → read returns the answer; Bypass is refused; an approval shows as `waiting_for_you`.
 
 - [ ] **4.2 The client's name: `utils/tools/mcp.py`.**

@@ -53,19 +53,21 @@ function Row({ t, active, onOpen, onRename, onArchive, onDelete, moveTo = [], on
       onKeyDown: e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { e.stopPropagation(); setEdit(null); } }, style: { ...inputSt, width: '100%', height: 28 } }));
   }
   return h('div', { className: 'aichat-item' + (menu ? ' open' : '') + (look.archived ? ' archived' : ''), style: { position: 'relative', display: 'flex', alignItems: 'center', borderRadius: 6, background: active ? T.hov : 'transparent' } },
+    toggle ? h('span', { style: { display: 'flex', flex: 'none', paddingLeft: 6 } }, toggle) : null,   // agent-workflows 3.2: its sub-agents, at the left
     h('a', { href: '#/chat/' + encodeURIComponent(t.id), onClick: onOpen, draggable: true,   // chat-split plan 2.3: drag it beside an open chat
       onDragStart: e => { e.dataTransfer.setData('application/x-gaifa-chat', t.id); e.dataTransfer.effectAllowed = 'copyMove'; }, onDoubleClick: e => { e.preventDefault(); setEdit(t.title || ''); }, 'aria-current': active ? 'page' : undefined,
       title: look.archived ? 'Archived' : undefined,
-      style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: '0 4px 0 10px', color: active ? T.tx : T.mut, fontWeight: active ? 500 : 400, textDecoration: 'none', opacity: look.archived ? 0.6 : 1 } },
-      dot ? h('span', { 'aria-label': look.state, style: { width: 6, height: 6, borderRadius: 99, background: dot, flex: 'none', animation: look.state === 'running' ? 'aichatpulse 1.2s ease-in-out infinite' : 'none' } }) : null,
+      style: { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, height: 30, padding: toggle ? '0 4px 0 2px' : '0 4px 0 10px', color: active ? T.tx : T.mut, fontWeight: active ? 500 : 400, textDecoration: 'none', opacity: look.archived ? 0.6 : 1 } },
       look.archived ? h('span', { 'aria-label': 'Archived', style: { display: 'flex', flex: 'none', color: T.dim } }, h(Icon, { d: 'archive', size: 12 })) : null,
       h('span', { style: { flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, look.title),
       externalOf(t) ? h('span', { title: `Started by ${externalOf(t)} over /mcp`, style: { fontSize: 10, color: T.dim, border: '1px solid ' + T.bd, borderRadius: 4,
         padding: '0 4px', lineHeight: '15px', whiteSpace: 'nowrap', flex: 'none', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis' } }, externalOf(t)) : null,   // agent-workflows 4.3
       aside),
-    toggle ? h('span', { style: { display: 'flex', flex: 'none' } }, toggle) : null,   // agent-workflows 3.2: its sub-agents, at the right (the user's ask)
-    // a slot at the right edge, empty until hover or focus, or while the menu is open; always on touch screens (LIST_CSS)
-    h('span', { className: 'aichat-slot', style: { position: 'relative', flex: 'none', width: 24, height: 24, marginRight: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' } },
+    // a slot at the right edge: the state dot (running, waiting, failed), and ⋯ in its place on hover or focus, or while the
+    // menu is open; on touch screens both (LIST_CSS; the user's ask, 2026-11-10)
+    h('span', { className: 'aichat-slot', style: { position: 'relative', flex: 'none', minWidth: 24, height: 24, marginRight: 4, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4 } },
+      dot ? h('span', { className: 'aichat-dot', 'aria-label': look.state, style: { width: 24, height: 24, placeItems: 'center', flex: 'none' } },
+        h('span', { style: { width: 6, height: 6, borderRadius: 99, background: dot, animation: look.state === 'running' ? 'aichatpulse 1.2s ease-in-out infinite' : 'none' } })) : null,
       h('button', { type: 'button', className: 'aichat-more', 'aria-label': `More for ${t.title || 'chat'}`, 'aria-haspopup': 'menu', 'aria-expanded': menu ? 'true' : 'false', onClick: () => setMenu(!menu),
         style: { width: 24, height: 24, placeItems: 'center', border: 0, borderRadius: 5, background: 'transparent', color: T.mut, cursor: 'pointer' } }, h(Icon, { d: 'more', size: 14 })),
       h(Popover, { open: menu, onClose: () => { setMenu(false); setMoving(false); }, width: moving ? 250 : 190, label: 'Chat actions', style: { padding: 4, gap: 0 } },
@@ -95,12 +97,14 @@ const menuItem = (key, ic, label, fn, color = T.tx, letter = null) => h('button'
 export const LIST_CSS = `
 .aichat-item .aichat-more{display:none}
 .aichat-item:hover .aichat-more,.aichat-item:focus-within .aichat-more,.aichat-item.open .aichat-more{display:grid}
+.aichat-item .aichat-dot{display:grid}
+.aichat-item:hover .aichat-dot,.aichat-item:focus-within .aichat-dot,.aichat-item.open .aichat-dot{display:none}
 .aichat-item:hover,.aichat-item.open{background:var(--hov,#161C28)}
 .aichat-sechead .aichat-more{opacity:0}.aichat-sechead:hover .aichat-more,.aichat-sechead:focus-within .aichat-more,.aichat-sechead .aichat-more[aria-expanded="true"]{opacity:1}
 .aichat-morebar:hover{color:var(--tx,#E6EAF2)!important}
 .aichat-newbar:hover{background:var(--hov,#161C28)!important}
 .aichat-quiet{border-color:transparent!important}.aichat-quiet:hover,.aichat-quiet:focus-visible,.aichat-quiet[aria-expanded="true"]{border-color:var(--bds,#2A3547)!important;color:var(--tx,#E6EAF2)!important}
-@media (hover:none){.aichat-item .aichat-more{display:grid}.aichat-sechead .aichat-more{opacity:1}}
+@media (hover:none){.aichat-item .aichat-more{display:grid}.aichat-item .aichat-dot{display:grid!important}.aichat-sechead .aichat-more{opacity:1}}
 `;
 
 /** `showAll`: `{n}` when more chats exist than the list shows (n: how many in all, or null), else null; `onShowAll`

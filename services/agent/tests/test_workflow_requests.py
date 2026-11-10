@@ -96,6 +96,20 @@ async def test_a_background_request_starts_the_parent(env):
     assert msg["role"] == "user" and msg["content"].startswith("(From GAIFA, not the user")
 
 
+async def test_agent_wait_returns_for_a_request(env):
+    env.model.queue({"match": "Tidy up", "tool_calls": [{**WIPER, "arguments": {**WIPER["arguments"], "background": True}}]},
+                    {"match": "its answer arrives", "tool_calls": [{"name": "agent_wait", "arguments": {}}]},
+                    {**WIPE, "delay": 0.3},
+                    {"match": "needs_review", "tool_calls": [{"name": "agent_review", "arguments": {"action": "forward"}}]},
+                    {"match": "agent_review", "text": "Over to you."})
+    tid = await env.thread()
+    await env.send(tid, "Tidy up.")
+    await _until(lambda: env.payloads(tid, "agent_review"), timeout=15)
+    waited = json.loads(next(r for r in env.payloads(tid, "tool_result") if r["name"] == "agent_wait")["content"])
+    assert waited["needs_review"][0]["tool"] == "fake_wipe" and "agent_review" in waited["note"]
+    assert env.payloads(tid, "agent_review")[0]["action"] == "forward"
+
+
 async def test_an_unattended_sub_agent_is_refused(env):
     env.model.queue({"match": "Clean up", "tool_calls": [WIPER]}, WIPE, {"match": "unattended", "text": "Couldn't."},
                     {"match": "Couldn't", "text": "Refused."})

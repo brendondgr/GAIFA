@@ -122,8 +122,9 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 **Wire — Phase 3:** the sidebar tree, the fold's live card, request cards, the child's header, Settings → Agent → Sub-agents.
 
 **Checks & deliverables — Phase 3**
-- [ ] Browser, installed hub after `gaifa restart`: a chat spawns three readers over a folder, the tree fills and updates, Open splits a child beside the parent, a forwarded request is approved on the parent, deleting the parent removes the tree.
-- [ ] Delivered: `chat-tree.js`, `chat-agents.js`, `chat-agent-requests.js`, `chat-mock-agents.js`, the settings rows.
+- [x] Browser, installed hub after `gaifa restart`: a chat spawns three readers over a folder, the tree fills and updates, Open splits a child beside the parent, a forwarded request is approved on the parent, deleting the parent removes the tree.
+  *As built (2026-11-09, on the second hub at 7078 with the remote test LLM; the installed hub's check comes with the merge):* a chat asked in Manual for three background readers over the fixture folder and a writer: the three ran side by side, their live cards and the "3 sub-agents at work" strip followed them, the parent drew the coverage table from their answers, and the writer's `workspace_edit` was forwarded; its dock card showed the diff, and Allow once ran it (the file changed) and the parent summed it all up. The sidebar's tree held the four, one with an unread dot. Open beside split the pane (checked on `?mock`, with the request card, the header's link back and the delete dialog naming the sub-agents). Deleting the parent deleted its four sub-agents (each 404). Fixes from the run: `agent_wait` now returns `needs_review` when a sub-agent it waits for sends a request (the parent sat in a 10-minute wait while the writer waited on it); the sidebar's grouped sections take a chat's `children` from the page's list, so a new workflow's chevron shows without a reload.
+- [x] Delivered: `chat-tree.js`, `chat-agents.js`, `chat-agent-requests.js`, `chat-mock-agents.js`, the settings rows.
 
 ## Phase 4 — Claude Code and Codex over `/mcp` (M)
 

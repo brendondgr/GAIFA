@@ -182,6 +182,7 @@ class WorkflowTools:
         return c, None
 
     async def t_agent_wait(self, tid: str, cid: str, args: dict[str, Any], tools: ToolSet, thread: dict[str, Any]) -> str:
+        from . import requests
         wf = self.a.workflows
         want = None
         if args.get("child"):
@@ -212,6 +213,11 @@ class WorkflowTools:
                     left = [spawn_of(c).get("label") for c in pending()]
                     return self.ok(tid, cid, "agent_wait", {**res, **({"still_running": left} if left else {})},  # type: ignore[attr-defined]
                                    data={"agent": {"child": done["id"], "label": res.get("label"), "state": res.get("state")}})
+                asks = [r for r in requests.open_requests(self.a, tid) if r["child"] in {c["id"] for c in pending()}]
+                if asks:                                         # one waits on a card: the parent reviews it now (2.2)
+                    return self.ok(tid, cid, "agent_wait", {"needs_review": [requests.summary(r) for r in asks],  # type: ignore[attr-defined]
+                        "still_running": [spawn_of(c).get("label") for c in pending()],
+                        "note": "review each with agent_review (deny with a reason, or forward to the user), then agent_wait again"})
                 left_s = deadline - asyncio.get_running_loop().time()
                 if left_s <= 0:
                     return self.ok(tid, cid, "agent_wait", {"timed_out": True, "still_running": [  # type: ignore[attr-defined]

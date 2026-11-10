@@ -47,6 +47,8 @@ async def test_a_parent_gets_two_answers(env):
     assert {k["settings"]["spawn"]["tool_call_id"] for k in kids} == {r["id"] for r in results}
     first = env.model.received[0]
     assert "agent" in _tools(first) and "## Sub-agents" in _system(first) and "1 at a time on this machine" in _system(first)
+    assert "agent_wait" not in _tools(first)                                         # 5.2: not before it has sub-agents…
+    assert {"agent_wait", "agent_review"} <= set(_tools(env.model.received[-1]))     # …then the follow-up tools
     child_body = next(b for b in env.model.received if "report the main modules" in json.dumps(b["messages"][1:]))
     assert "agent" not in _tools(child_body)                                         # depth 1: no sub-agents of its own
     assert "You are a sub-agent" in _system(child_body) and "You can only read" in _system(child_body)

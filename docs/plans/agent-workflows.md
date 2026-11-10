@@ -147,10 +147,11 @@ Builds on: architecture §14 (the agent, approvals, grants) and §14.1 (schedule
 
 ## Phase 5 — Eval and the decision (S)
 
-- [ ] **5.1 `services/agent/evals/subagents.py`.**
+- [x] **5.1 `services/agent/evals/subagents.py`.**
   - Cases where splitting should help (survey three folders, compare three pages, a second opinion) and where it shouldn't be used (a sequential edit, one lookup): pass, tokens, time, and spawns where none belonged; with and without the tool. Run on the remote test LLM; at most 2 cases at once (the eval also loads stt/embed/decide on this GPU).
   *Done when:* results in `docs/agent-eval.md`.
-- [ ] **5.2 The decision.** Update `docs/agent-architecture.md` §1's "Agents" row with what the eval found; if spawning hurt on the local model, `enabled` defaults to false for local models.
+- [x] **5.2 The decision.** Update `docs/agent-architecture.md` §1's "Agents" row with what the eval found; if spawning hurt on the local model, `enabled` defaults to false for local models.
+  *As built (2026-11-09):* the eval found no harm in answers and no spawn where none belonged, and showed the tool's cost on every call (~950 tokens), so only `agent` is offered until a chat has sub-agents (the five follow-up tools after); `enabled` stays on by default. The local model wasn't measured (this machine's GPU wasn't to be used): `parallel_local = 1` and `min_window` keep a small local setup from paying for it, and Settings → Agent → Model turns it off.
 
 ## 4. Deliverables
 

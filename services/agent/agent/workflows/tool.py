@@ -90,6 +90,7 @@ async def prompt_part(agent: Any, tid: str, tools: ToolSet) -> str:
     thread = agent.store.thread(tid) or {}
     ok, lim = await offered(agent, thread)
     tools.spawn = ok
+    tools.spawn_more = ok and bool(agent.store.children(tid))     # the follow-up tools once it has sub-agents (5.2: ~480 tokens a call)
     out = []
     sp = spawn_of(thread)
     if sp:

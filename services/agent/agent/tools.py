@@ -128,6 +128,7 @@ class ToolSet:
         self.project: str | None = settings.get("project") or None   # a project chat has the project tools (plan projects 3.4)
         self.task: str | None = settings.get("task") or None         # a scheduled run has task_note (scheduled-tasks 2.4)
         self.spawn = False                       # the `agent` tool: set with the Sub-agents prompt part (agent-workflows 1.3)
+        self.spawn_more = False                  # agent_wait, …_send, …_stop, …_list, …_review: once the chat has sub-agents (5.2)
         self.child = bool(settings.get("spawn"))  # a sub-agent: no remember, no agent_memory_* (agent-workflows 2.4)
         self.index: list[dict[str, Any]] = []
         self.full: dict[str, dict[str, Any]] = {}
@@ -156,7 +157,7 @@ class ToolSet:
     def local(self) -> list[dict[str, Any]]:
         return ([t for t in LOCAL if not (self.child and t["name"] == "remember")]
                 + (PROJECT_TOOLS if self.project else []) + (TASK_TOOLS if self.task else [])
-                + (WORKFLOW_TOOLS if self.spawn else []))
+                + (WORKFLOW_TOOLS[:1] if self.spawn else []) + (WORKFLOW_TOOLS[1:] if self.spawn and self.spawn_more else []))
 
     def visible(self) -> set[str]:
         return set(self.full) | {t["name"] for t in self.local()}
